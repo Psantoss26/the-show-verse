@@ -245,6 +245,11 @@ export default function WatchNextAssistant({
   triggerVariant = "icon",
   open: openProp,
   onOpenChange,
+  // Monta SOLO el panel, sin botón. Lo usa el navbar de escritorio: el
+  // asistente ya no tiene icono propio en la barra —se abre desde el
+  // desplegable de Perfil— pero el componente tiene que seguir montado fuera de
+  // ese desplegable, porque es quien mantiene vivo el panel.
+  hideTrigger = false,
 }) {
   const [mounted, setMounted] = useState(false);
   // ESTADO OPCIONALMENTE CONTROLADO.
@@ -1008,54 +1013,56 @@ export default function WatchNextAssistant({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => {
-          setOpen(true);
-          window.setTimeout(() => inputRef.current?.focus(), 120);
-        }}
-        className={[
-          drawerTrigger
-            ? "group flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-neutral-300 transition-all duration-200 hover:bg-white/5 hover:text-white active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
-            : [
-                "group relative grid shrink-0 place-items-center rounded-full transition-all duration-300 ease-out",
-                open
-                  ? isMobile
-                    ? "text-cyan-200 bg-cyan-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(34,211,238,0.2)]"
-                    : "text-cyan-200"
-                  : [
-                      isMobile
-                        ? "text-white"
-                        : heroNavMode
-                          ? "text-neutral-100"
-                          : "text-neutral-400",
-                      isMobile
-                        ? "hover:text-cyan-200 hover:bg-white/10"
-                        : "hover:text-cyan-300 hover:bg-cyan-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(34,211,238,0.15)]",
-                      heroNavMode
-                        ? "drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]"
-                        : "",
-                    ].join(" "),
-                "hover:-translate-y-0.5 hover:scale-[1.05] active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
-                isMobile ? "h-10 w-10 p-2" : "p-2",
-              ].join(" "),
-        ].join(" ")}
-        aria-label="Abrir recomendador de qué ver"
-      >
-        {open && !isMobile && !drawerTrigger && (
-          <span
-            className="absolute inset-0 rounded-full border border-cyan-500/10 bg-cyan-500/20 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(34,211,238,0.08)]"
+      {hideTrigger ? null : (
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(true);
+            window.setTimeout(() => inputRef.current?.focus(), 120);
+          }}
+          className={[
+            drawerTrigger
+              ? "group flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-neutral-300 transition-all duration-200 hover:bg-white/5 hover:text-white active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+              : [
+                  "group relative grid shrink-0 place-items-center rounded-full transition-all duration-300 ease-out",
+                  open
+                    ? isMobile
+                      ? "text-cyan-200 bg-cyan-500/20 backdrop-blur-md shadow-[0_4px_12px_rgba(34,211,238,0.2)]"
+                      : "text-cyan-200"
+                    : [
+                        isMobile
+                          ? "text-white"
+                          : heroNavMode
+                            ? "text-neutral-100"
+                            : "text-neutral-400",
+                        isMobile
+                          ? "hover:text-cyan-200 hover:bg-white/10"
+                          : "hover:text-cyan-300 hover:bg-cyan-500/15 hover:backdrop-blur-md hover:shadow-[0_4px_12px_rgba(34,211,238,0.15)]",
+                        heroNavMode
+                          ? "drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]"
+                          : "",
+                      ].join(" "),
+                  "hover:-translate-y-0.5 hover:scale-[1.05] active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
+                  isMobile ? "h-10 w-10 p-2" : "p-2",
+                ].join(" "),
+          ].join(" ")}
+          aria-label="Abrir recomendador de qué ver"
+        >
+          {open && !isMobile && !drawerTrigger && (
+            <span
+              className="absolute inset-0 rounded-full border border-cyan-500/10 bg-cyan-500/20 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.15),0_4px_10px_rgba(34,211,238,0.08)]"
+              aria-hidden="true"
+            />
+          )}
+          <Sparkles
+            className={`relative z-10 h-5 w-5 shrink-0 transition-transform duration-200 group-hover:scale-110 ${
+              drawerTrigger ? "text-cyan-400" : ""
+            }`}
             aria-hidden="true"
           />
-        )}
-        <Sparkles
-          className={`relative z-10 h-5 w-5 shrink-0 transition-transform duration-200 group-hover:scale-110 ${
-            drawerTrigger ? "text-cyan-400" : ""
-          }`}
-          aria-hidden="true"
-        />
-        {drawerTrigger ? <span>Qué ver con IA</span> : null}
-      </button>
+          {drawerTrigger ? <span>Qué ver con IA</span> : null}
+        </button>
+      )}
 
       {mounted ? createPortal(modal, document.body) : null}
     </>

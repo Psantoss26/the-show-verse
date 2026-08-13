@@ -37,12 +37,13 @@ export async function GET(request) {
     // como Universal/App Link y funciona aunque la app no esté instalada)
     const fallbackUrl = watchPlexUrl || webUrl || "https://app.plex.tv";
 
-    // Android intent URI con S.browser_fallback_url:
-    // Chrome abre la app si está instalada; si no, redirige al fallback
-    // automáticamente sin necesidad de timers ni visibilitychange.
-    const androidFallbackEncoded = encodeURIComponent(fallbackUrl);
+    // Android intent URI, SIN `S.browser_fallback_url`: ese parámetro es
+    // justamente lo que hacía que Chrome se fuera solo a la web de Plex cuando
+    // el lanzamiento no prosperaba. Sin él, y con `package=`, Chrome abre la
+    // ficha de Play Store de la app -- que sigue siendo una app, no el
+    // navegador. En táctil no queremos NINGUNA salida automática a web.
     const intentUrl = slug
-        ? `intent://${contentType}/${slug}#Intent;scheme=plex;package=com.plexapp.android;S.browser_fallback_url=${androidFallbackEncoded};end`
+        ? `intent://${contentType}/${slug}#Intent;scheme=plex;package=com.plexapp.android;end`
         : "";
 
     // Título seguro para HTML
@@ -164,10 +165,20 @@ export async function GET(request) {
     (function () {
       var ua = navigator.userAgent || '';
       var isAndroid = /Android/i.test(ua);
-      var isIOS = /iPad|iPhone|iPod/i.test(ua) ||
-                  (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
-      var isMobile = isAndroid || isIOS ||
-                     /webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+
+      // MÓVIL Y TABLET = todo lo que no sea "un ordenador de verdad". Se usa el
+      // MISMO criterio que la variante \`desktop:\` de la web (ver globals.css):
+      // el ancho no distingue un iPad de un monitor, el puntero sí. Con el
+      // sniffing de user-agent anterior, una tablet que se anunciara como
+      // escritorio se iba derecha a la web.
+      var esEscritorio = window.matchMedia(
+        '(min-width: 64rem) and (hover: hover) and (pointer: fine)'
+      ).matches;
+
+      // Dentro de la app de Android, el WebView resuelve los esquemas externos
+      // con \`ACTION_VIEW\`, que entiende \`plex://\` pero NO \`intent://\` (esa
+      // forma necesita \`Intent.parseUri\`). Así que allí se usa \`plex://\`.
+      var enAppAndroid = !!window.TSVAndroidBridge;
 
       var intentUrl    = "${safeIntentUrl}";
       var plexScheme   = "${safePlexSchemeUrl}";

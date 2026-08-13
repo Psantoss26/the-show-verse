@@ -38,10 +38,29 @@ test("el asistente NO se monta dentro del desplegable de Perfil", async () => {
   // usarlo, porque el menú se cierra al pulsar fuera y el panel ESTÁ fuera.
   // Debe vivir fuera y recibir el estado desde el Navbar.
   assert.doesNotMatch(dropdown, /<WatchNextAssistant/);
-  assert.match(
-    navbar,
-    /<WatchNextAssistant\s+heroNavMode=\{heroNavMode\}\s+open=\{assistantOpen\}\s+onOpenChange=\{setAssistantOpen\}/,
-  );
+
+  const montaje = navbar.match(
+    /<WatchNextAssistant\b(?![^>]*isMobile)[\s\S]*?\/>/,
+  )?.[0];
+  assert.ok(montaje, "no se localiza el montaje de escritorio del asistente");
+  assert.match(montaje, /open=\{assistantOpen\}/);
+  assert.match(montaje, /onOpenChange=\{setAssistantOpen\}/);
+});
+
+test("el asistente ya no ocupa un icono propio en la barra", async () => {
+  const navbar = await readFile(navbarPath, "utf8");
+  const assistant = await readFile(assistantPath, "utf8");
+
+  // Se abre desde el desplegable, así que el montaje de escritorio no pinta
+  // botón. Sigue montado sólo para sostener su panel.
+  const montaje = navbar.match(
+    /<WatchNextAssistant\b(?![^>]*isMobile)[\s\S]*?\/>/,
+  )?.[0];
+  assert.match(montaje, /hideTrigger/);
+  assert.match(assistant, /\{hideTrigger \? null : \(/);
+
+  // El menú móvil sí conserva su fila propia.
+  assert.match(navbar, /<WatchNextAssistant isMobile triggerVariant="drawer" \/>/);
 });
 
 test("el asistente acepta estado controlado sin romper el uso suelto", async () => {

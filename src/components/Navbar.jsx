@@ -65,23 +65,58 @@ import {
 // Secciones del desplegable del PERFIL, en dos columnas. Antes eran una fila de
 // nueve iconos sueltos en la barra: sin rotulo, habia que adivinarlos o pasar el
 // raton por encima de uno en uno.
+// `tone` es el color YA establecido de cada sección: el mismo que usan sus
+// iconos en el menú móvil y en la barra inferior. No se inventa uno nuevo aquí
+// para que una sección se reconozca por su color en todas partes. Que
+// Recomendaciones, En Progreso e Historial compartan el verde es intencionado:
+// es así en las otras dos superficies.
 const PROFILE_MENU_GROUPS = [
   {
     titulo: "Descubrir",
     items: [
-      { href: "/recommendations", label: "Recomendaciones", Icon: ThumbsUp },
-      { href: "/social", label: "Social", Icon: Users },
-      { href: "/lists", label: "Listas", Icon: ListVideo },
-      { href: "/calendar", label: "Calendario", Icon: CalendarDaysIcon },
+      {
+        href: "/recommendations",
+        label: "Recomendaciones",
+        Icon: ThumbsUp,
+        tone: "text-emerald-400",
+      },
+      { href: "/social", label: "Social", Icon: Users, tone: "text-pink-400" },
+      {
+        href: "/lists",
+        label: "Listas",
+        Icon: ListVideo,
+        tone: "text-purple-400",
+      },
+      {
+        href: "/calendar",
+        label: "Calendario",
+        Icon: CalendarDaysIcon,
+        tone: "text-amber-400",
+      },
     ],
   },
   {
     titulo: "Lo tuyo",
     items: [
-      { href: "/in-progress", label: "En Progreso", Icon: Play },
-      { href: "/history", label: "Historial", Icon: History },
-      { href: "/favorites", label: "Favoritas", Icon: Heart },
-      { href: "/watchlist", label: "Pendientes", Icon: Bookmark },
+      {
+        href: "/in-progress",
+        label: "En Progreso",
+        Icon: Play,
+        tone: "text-emerald-400",
+      },
+      {
+        href: "/history",
+        label: "Historial",
+        Icon: History,
+        tone: "text-emerald-400",
+      },
+      { href: "/favorites", label: "Favoritas", Icon: Heart, tone: "text-red-400" },
+      {
+        href: "/watchlist",
+        label: "Pendientes",
+        Icon: Bookmark,
+        tone: "text-sky-400",
+      },
     ],
   },
 ];
@@ -2203,7 +2238,14 @@ export default function Navbar() {
               )}
             </div>
 
+            {/* SIN ICONO PROPIO EN LA BARRA: el asistente se abre desde el
+                desplegable de Perfil. El componente sigue montado AQUÍ, y no
+                dentro del desplegable, porque es quien mantiene vivo su panel:
+                el menú se cierra al pulsar fuera —y el panel está fuera—, así
+                que allí dentro se desmontaría al primer clic. Con `hideTrigger`
+                no pinta nada, solo sostiene el panel. */}
             <WatchNextAssistant
+              hideTrigger
               heroNavMode={heroNavMode}
               open={assistantOpen}
               onOpenChange={setAssistantOpen}
@@ -2292,7 +2334,7 @@ export default function Navbar() {
                                 <p className="px-3 pb-1 pt-2 text-[10px] font-black uppercase tracking-widest text-zinc-500">
                                   {grupo.titulo}
                                 </p>
-                                {grupo.items.map(({ href, label, Icon }) => (
+                                {grupo.items.map(({ href, label, Icon, tone }) => (
                                   <Link
                                     key={href}
                                     href={href}
@@ -2307,7 +2349,11 @@ export default function Navbar() {
                                         : "text-zinc-300 hover:bg-white/5 hover:text-white"
                                     }`}
                                   >
-                                    <Icon className="h-4 w-4 shrink-0 text-zinc-400" />
+                                    {/* El color va SIEMPRE, esté activa o no
+                                        la sección, igual que el de «Qué ver con
+                                        IA». La fila activa ya se distingue por
+                                        su fondo y su texto en negrita. */}
+                                    <Icon className={`h-4 w-4 shrink-0 ${tone}`} />
                                     <span className="truncate">{label}</span>
                                   </Link>
                                 ))}
