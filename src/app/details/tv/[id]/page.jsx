@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import DetailsPageLoader from "@/components/DetailsPageLoader";
+import MobilePosterPreload from "@/components/details/MobilePosterPreload";
 import { getDetails } from "@/lib/api/tmdb";
 export const revalidate = 600;
 
@@ -52,13 +53,18 @@ export default async function TvDetailsPage({ params }) {
     : [];
 
   return (
-    <DetailsPageLoader
-      type="tv"
-      id={id}
-      data={data}
-      initialCastData={initialCastData}
-      initialReviews={initialReviews}
-      initialRecommendations={initialRecommendations}
-    />
+    <>
+      {/* Va antes que la ficha: el navegador empieza a bajar la portada móvil
+          mientras todavía está leyendo el HTML, sin esperar a hidratar. */}
+      <MobilePosterPreload data={data} />
+      <DetailsPageLoader
+        type="tv"
+        id={id}
+        data={data}
+        initialCastData={initialCastData}
+        initialReviews={initialReviews}
+        initialRecommendations={initialRecommendations}
+      />
+    </>
   );
 }
