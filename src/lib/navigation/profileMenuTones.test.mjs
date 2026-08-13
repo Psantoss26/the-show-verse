@@ -14,7 +14,9 @@ const TONOS = {
   "/lists": "purple",
   "/calendar": "amber",
   "/in-progress": "emerald",
+  "/completed": "emerald",
   "/history": "emerald",
+  "/continue-watching": "emerald",
   "/favorites": "red",
   "/watchlist": "sky",
 };
