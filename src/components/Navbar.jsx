@@ -2277,7 +2277,17 @@ export default function Navbar() {
                       // del logo y que el botón de buscar: con `h-9` la píldora
                       // se quedaba corta respecto a esos dos y sobraba franja
                       // por arriba y por abajo en la barra compactada.
-                      className={`relative flex h-8 md:h-10 shrink-0 items-center justify-center rounded-full transition-[width,padding,color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
+                      //
+                      // En MÓVIL crece solo al compactar (32px -> 36px). Se toca
+                      // el ALTO y no la escala del grupo a propósito: el ancho
+                      // aquí lo manda el logo centrado -- con «Películas», el
+                      // rótulo más largo, no queda holgura -- y el alto no
+                      // arrastra ancho, porque los destinos inactivos van a `w-8`
+                      // fijo y el activo se mide por su `px`. Así la píldora gana
+                      // presencia sin acercarse al logo.
+                      className={`relative flex ${
+                        mobileTopIsCompact ? "h-9" : "h-8"
+                      } md:h-10 shrink-0 items-center justify-center rounded-full transition-[width,padding,color,height] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
                         active
                           ? `px-1.5 md:px-3.5 max-[359px]:w-8 max-[359px]:px-0 ${tone}`
                           : "w-8 md:w-auto md:px-3.5 text-white/70 hover:text-white"
