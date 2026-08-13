@@ -1904,10 +1904,15 @@ export default function Navbar() {
     { href: "/series", label: t("nav_series", "Series"), Icon: TvIcon, tone: "text-fuchsia-200" },
   ];
 
+  // El encogido al compactar está calibrado para un móvil de 390px, donde la
+  // barra se queda en 48px y los controles necesitan ceder sitio. En tablet la
+  // barra compactada mide 56px y aplicar ese mismo 0,82 dejaba el selector en
+  // ~34px flotando en una franja de 56: mucho aire arriba y abajo. Ahí se
+  // encoge solo lo justo para que se note la compactación.
   const mobileTopControlScaleClass = isImmersiveRoute
-    ? "scale-[0.8]"
+    ? "scale-[0.8] md:scale-[0.95]"
     : isScrolled
-      ? "scale-[0.82]"
+      ? "scale-[0.82] md:scale-[0.95]"
       : "scale-100";
 
   // Menú inferior fijo: las secciones siempre son accesibles; cada página muestra
@@ -2268,7 +2273,11 @@ export default function Navbar() {
                       {...navPrefetchHandlers(href)}
                       aria-label={label}
                       aria-current={active ? "page" : undefined}
-                      className={`relative flex h-8 md:h-9 shrink-0 items-center justify-center rounded-full transition-[width,padding,color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
+                      // En tablet el destino mide 40px, lo mismo que la caja
+                      // del logo y que el botón de buscar: con `h-9` la píldora
+                      // se quedaba corta respecto a esos dos y sobraba franja
+                      // por arriba y por abajo en la barra compactada.
+                      className={`relative flex h-8 md:h-10 shrink-0 items-center justify-center rounded-full transition-[width,padding,color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
                         active
                           ? `px-1.5 md:px-3.5 max-[359px]:w-8 max-[359px]:px-0 ${tone}`
                           : "w-8 md:w-auto md:px-3.5 text-white/70 hover:text-white"
@@ -2394,7 +2403,11 @@ export default function Navbar() {
         // (donde ya no hay móviles en vertical) crece de alto y de ancho y se
         // separa algo más del borde: en una pantalla de 10" la de 21,5rem se
         // veía como una pastilla diminuta perdida abajo.
-        className={`desktop:hidden fixed left-1/2 z-30 flex h-14 w-[min(calc(100%_-_3rem),21.5rem)] origin-bottom -translate-x-1/2 items-center rounded-full px-3.5 md:h-16 md:w-[min(calc(100%_-_8rem),30rem)] md:px-4 ${LIQUID_GLASS_BAR} bottom-[calc(0.75rem+env(safe-area-inset-bottom))] md:bottom-[calc(1.25rem+env(safe-area-inset-bottom))] transform-gpu transition-transform duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+        // El alto y el ancho de tablet se recortaron después (64px→60px y
+        // 30rem→28rem, ~6% en los dos ejes para no deformar la píldora): con la
+        // medida anterior pesaba de más sobre el contenido. La lente de la
+        // sección activa es un % del alto, así que sigue el cambio sola.
+        className={`desktop:hidden fixed left-1/2 z-30 flex h-14 w-[min(calc(100%_-_3rem),21.5rem)] origin-bottom -translate-x-1/2 items-center rounded-full px-3.5 md:h-[3.75rem] md:w-[min(calc(100%_-_8rem),28rem)] md:px-4 ${LIQUID_GLASS_BAR} bottom-[calc(0.75rem+env(safe-area-inset-bottom))] md:bottom-[calc(1.25rem+env(safe-area-inset-bottom))] transform-gpu transition-transform duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
           bottomNavCompact ? "scale-[0.86]" : "scale-100"
         }`}
       >
