@@ -929,22 +929,21 @@ function SearchBar({
             if (!query.trim()) openSearchHistory();
           }}
           className={`
-            relative flex items-center w-full transition-all duration-300 ease-out
-            rounded-full group
+            relative flex w-full items-center overflow-hidden rounded-full transition-all duration-300 ease-out group
             ${
               isMobile
-                ? // SIN FONDO PROPIO. Medido en el navegador: de toda la cadena de
-                // contenedores, la unica pieza con fondo era esta pildora
-                // (`LIQUID_GLASS_PANEL`), y al recortarse contra el cristal del
-                // navbar se veia como un bloque mas oscuro con sus cuatro bordes
-                // marcados. La barra se apoya ahora en el cristal del navbar: solo
-                // aporta la lupa, el campo y el boton de filtros. Y al no haber
-                // fondo tampoco hay estados que lo cambien, asi que se ve IGUAL en
-                // reposo, al pasar el raton y al escribir.
-                "bg-transparent"
+                ? ""
                 : "bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_30px_-10px_rgba(0,0,0,0.5)] hover:bg-black/30 focus-within:bg-black/40 focus-within:ring-4 focus-within:ring-white/10"
             }
-            ${isMobile ? "h-12 pl-4 pr-3" : "h-11 pl-4 pr-3"}
+            ${
+              isMobile
+                // En el overlay, la barra necesita su propia superficie para
+                // leerse como un control independiente. Comparte exactamente el
+                // cristal de los paneles de recientes y resultados; el relleno
+                // derecho del formulario reserva el hueco del botón de cierre.
+                ? `${LIQUID_GLASS_PANEL} h-12 pl-4 pr-3`
+                : "h-11 pl-4 pr-3"
+            }
           `}
         >
           {/* Lupa siempre blanca y visible */}
@@ -2772,11 +2771,12 @@ export default function Navbar() {
                 </Link>
 
                 <button
+                  type="button"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`p-2 rounded-full text-neutral-200 transition-colors hover:bg-white/10 hover:text-white flex-shrink-0 ${LIQUID_GLASS_PANEL}`}
+                  className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full bg-white/[0.06] text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-[6px] transition-[color,background-color,transform] duration-200 hover:-translate-y-0.5 hover:bg-white/[0.1] hover:text-white active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
                   aria-label="Cerrar menú"
                 >
-                  <XIcon className="w-5 h-5" />
+                  <XIcon className="h-4 w-4" />
                 </button>
               </div>
 
@@ -2791,7 +2791,7 @@ export default function Navbar() {
                       : "text-neutral-300 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <HomeIcon className={`w-5 h-5 ${isActive("/") ? "text-white" : "text-neutral-400"}`} />
+                  <HomeIcon className="h-5 w-5 text-white" />
                   <span>{t("nav_home", "Inicio")}</span>
                 </Link>
 
@@ -2806,7 +2806,7 @@ export default function Navbar() {
                       : "text-neutral-300 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <FilmIcon className={`w-5 h-5 ${isActive("/movies") ? "text-sky-400" : "text-neutral-400"}`} />
+                  <FilmIcon className="h-5 w-5 text-sky-400" />
                   <span>{t("nav_movies", "Películas")}</span>
                 </Link>
 
@@ -2821,7 +2821,7 @@ export default function Navbar() {
                       : "text-neutral-300 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <TvIcon className={`w-5 h-5 ${isActive("/series") ? "text-fuchsia-400" : "text-neutral-400"}`} />
+                  <TvIcon className="h-5 w-5 text-fuchsia-400" />
                   <span>{t("nav_series", "Series")}</span>
                 </Link>
 
@@ -2834,24 +2834,9 @@ export default function Navbar() {
                       : "text-neutral-300 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <Compass className={`w-5 h-5 ${isActive("/discover") ? "text-indigo-400" : "text-neutral-400"}`} />
+                  <Compass className="h-5 w-5 text-indigo-400" />
                   <span>{t("nav_discover", "Descubrir")}</span>
                 </Link>
-
-                <Link
-                  href="/recommendations"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                    isActive("/recommendations")
-                      ? "bg-emerald-500/20 text-emerald-300 font-bold"
-                      : "text-neutral-300 hover:text-white hover:bg-white/5"
-                  }`}
-                >
-                  <ThumbsUp className={`w-5 h-5 ${isActive("/recommendations") ? "text-emerald-400" : "text-neutral-400"}`} />
-                  <span>{t("nav_recommendations", "Recomendaciones")}</span>
-                </Link>
-
-                <WatchNextAssistant isMobile triggerVariant="drawer" />
 
                 <Link
                   href="/biblioteca"
@@ -2862,7 +2847,7 @@ export default function Navbar() {
                       : "text-neutral-300 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <FolderKanban className={`w-5 h-5 ${isActive("/biblioteca") ? "text-amber-400" : "text-neutral-400"}`} />
+                  <FolderKanban className="h-5 w-5 text-amber-400" />
                   <span>{t("nav_library", "Biblioteca")}</span>
                 </Link>
 
@@ -2877,7 +2862,7 @@ export default function Navbar() {
                       : "text-neutral-300 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <Play className={`w-5 h-5 ${isActive("/in-progress") ? "text-emerald-400" : "text-neutral-400"}`} fill="currentColor" />
+                  <Play className="h-5 w-5 text-emerald-400" fill="currentColor" />
                   <span>{t("nav_in_progress", "En Progreso")}</span>
                 </Link>
 
@@ -2890,7 +2875,7 @@ export default function Navbar() {
                       : "text-neutral-300 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <Eye className={`w-5 h-5 ${isActive("/history") ? "text-emerald-400" : "text-neutral-400"}`} />
+                  <Eye className="h-5 w-5 text-emerald-400" />
                   <span>{t("nav_history", "Historial")}</span>
                 </Link>
 
@@ -2905,7 +2890,7 @@ export default function Navbar() {
                       : "text-neutral-300 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <Heart className={`w-5 h-5 ${isActive("/favorites") ? "text-red-400" : "text-neutral-400"}`} />
+                  <Heart className="h-5 w-5 text-red-400" />
                   <span>{t("nav_favorites", "Favoritas")}</span>
                 </Link>
 
@@ -2918,7 +2903,7 @@ export default function Navbar() {
                       : "text-neutral-300 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <Bookmark className={`w-5 h-5 ${isActive("/watchlist") ? "text-sky-400" : "text-neutral-400"}`} />
+                  <Bookmark className="h-5 w-5 text-sky-400" />
                   <span>{t("nav_watchlist", "Pendientes")}</span>
                 </Link>
 
@@ -2933,7 +2918,7 @@ export default function Navbar() {
                       : "text-neutral-300 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <Users className={`w-5 h-5 ${isActive("/social") ? "text-pink-400" : "text-neutral-400"}`} />
+                  <Users className="h-5 w-5 text-pink-400" />
                   <span>{t("nav_social", "Social")}</span>
                 </Link>
 
@@ -2946,7 +2931,7 @@ export default function Navbar() {
                       : "text-neutral-300 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <ListVideo className={`w-5 h-5 ${isActive("/lists") ? "text-purple-400" : "text-neutral-400"}`} />
+                  <ListVideo className="h-5 w-5 text-purple-400" />
                   <span>{t("nav_lists", "Listas")}</span>
                 </Link>
 
@@ -2959,9 +2944,28 @@ export default function Navbar() {
                       : "text-neutral-300 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <CalendarDaysIcon className={`w-5 h-5 ${isActive("/calendar") ? "text-amber-400" : "text-neutral-400"}`} />
+                  <CalendarDaysIcon className="h-5 w-5 text-amber-400" />
                   <span>{t("nav_calendar", "Calendario")}</span>
                 </Link>
+
+                <div className="my-2.5 h-px bg-white/5" />
+
+                <section>
+                  <Link
+                    href="/recommendations"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                      isActive("/recommendations")
+                        ? "bg-emerald-500/20 text-emerald-300 font-bold"
+                        : "text-neutral-300 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    <ThumbsUp className="h-5 w-5 text-emerald-400" />
+                    <span>{t("nav_recommendations", "Recomendaciones")}</span>
+                  </Link>
+
+                  <WatchNextAssistant isMobile triggerVariant="drawer" />
+                </section>
               </div>
             </motion.aside>
           </motion.div>
@@ -2975,7 +2979,10 @@ export default function Navbar() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-[50px] flex flex-col p-4 pt-4"
+            // El velo solo atenúa la página. Aplicar `backdrop-filter` aquí
+            // aislaría a sus hijos y la barra no podría refractar el mismo fondo
+            // que los paneles de recientes y resultados, que viven en portal.
+            className="fixed inset-0 z-50 flex flex-col bg-black/60 p-4 pt-4"
             onClick={() => setShowMobileSearch(false)}
           >
             <motion.div
@@ -2995,7 +3002,7 @@ export default function Navbar() {
                 <button
                   type="button"
                   onClick={() => setShowMobileSearch(false)}
-                  className={`absolute right-0 top-0 flex h-12 w-12 items-center justify-center rounded-full border border-white/[0.1] text-white transition-all active:scale-95 hover:bg-black/[0.34] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 ${LIQUID_GLASS_PANEL}`}
+                  className={`absolute right-0 top-0 flex h-12 w-12 items-center justify-center overflow-hidden rounded-full text-white/90 transition-[color,background-color,transform] duration-200 hover:bg-white/[0.12] hover:text-white active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 ${LIQUID_GLASS_PANEL}`}
                   aria-label="Cerrar búsqueda"
                 >
                   <XIcon className="w-6 h-6" />
