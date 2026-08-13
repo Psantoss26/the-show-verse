@@ -2099,7 +2099,13 @@ export default function Navbar() {
                 El ancho es lo único que se anima, así que la barra no salta. */}
             <div
               ref={desktopSearchRef}
-              className={`flex items-center overflow-hidden transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+              // `rounded-full` EN EL RECORTE. Este contenedor lleva
+              // `overflow-hidden` para animar el ancho, y su radio era 0: la
+              // pildora de dentro (redonda, con su fondo) se recortaba contra una
+              // ventana de esquinas RECTAS, y por eso asomaba un rectangulo de
+              // otro tono en las esquinas. Igualando el radio, el recorte sigue la
+              // forma de la barra y no se ve nada mas que ella.
+              className={`flex items-center overflow-hidden rounded-full transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
                 desktopSearchOpen ? "w-[34rem]" : "w-10"
               }`}
             >
@@ -2176,12 +2182,16 @@ export default function Navbar() {
                       // (rounded-2xl) y misma capa. Antes iba con rounded-3xl y un
                       // z-index mucho mas bajo, asi que se leian como dos piezas
                       // distintas.
-                      className={`absolute right-0 top-full z-[99999] mt-3 w-[34rem] overflow-hidden rounded-2xl p-3 text-white ${LIQUID_GLASS_PANEL}`}
+                      // `top-full` cuelga del BOTON, y el boton acaba 8px antes que la barra,
+                      // asi que con mt-3 el panel quedaba a solo 4px del borde del
+                      // navbar y se leian pegados. Con mt-5 quedan 12px de aire.
+                      className={`absolute right-0 top-full z-[99999] mt-5 w-64 overflow-hidden rounded-2xl p-2 text-white ${LIQUID_GLASS_PANEL}`}
                     >
-                      {/* DOS COLUMNAS: descubrir a la izquierda, lo que es tuyo
-                          a la derecha. Con nueve entradas una lista sola queda
-                          larguísima y obliga a recorrerla entera. */}
-                      <div className="grid grid-cols-2 gap-x-2">
+                      {/* UNA COLUMNA. Los dos grupos se apilan, con su rotulo
+                          haciendo de separador: el panel queda estrecho y pegado
+                          al boton de Perfil, en vez de extenderse a lo ancho de
+                          media barra. */}
+                      <div className="flex flex-col">
                         {PROFILE_MENU_GROUPS.map((grupo) => (
                           <div key={grupo.titulo} className="min-w-0">
                             <p className="px-3 pb-1 pt-2 text-[10px] font-black uppercase tracking-widest text-zinc-500">
