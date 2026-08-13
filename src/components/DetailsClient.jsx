@@ -39,6 +39,7 @@ import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
 import {
   fetchArtworkOverride,
   readArtworkPreference,
+  readPersistedArtworkOverride,
   resolveCachedArtworkOverride,
   saveArtworkOverride,
   saveArtworkOverrides,
@@ -2970,9 +2971,6 @@ export default function DetailsClient({
     setPosterImgError(false);
     setArtworkInitialized(false);
     posterSettledRef.current = false;
-    // Nuevo título: hay que volver a confirmar si tiene overrides remotos
-    // antes de poder pintar cualquier imagen por defecto (ver declaración).
-    setRemoteArtworkChecked(false);
 
     const initialPoster = readArtworkPreference(posterStorageKey);
     const initialMobilePoster = readArtworkPreference(mobilePosterStorageKey);
@@ -2982,13 +2980,52 @@ export default function DetailsClient({
     );
     const initialBackdrop = readArtworkPreference(backgroundStorageKey);
 
+    // Instantánea persistida de overrides: la MISMA que cachea AuthContext,
+    // pero leída de localStorage aquí y de forma síncrona. Es lo que permite
+    // abrir la puerta (`remoteArtworkChecked`) en el primer efecto de layout,
+    // antes de cualquier pintado, en vez de esperar dos re-renders a que
+    // AuthContext se hidrate (su efecto es de un ancestro: corre DESPUÉS de
+    // este) o, si no hay caché de auth, a que responda la red. En móvil esa
+    // espera era justo el retraso con el que arrancaba la descarga del póster.
+    //
+    // `null` = no hay instantánea (primerísima visita del dispositivo): se
+    // mantiene el comportamiento anterior de esperar a la comprobación remota.
+    // `{}` = hay instantánea y este título no tiene selección propia, lo que
+    // confirma el caso negativo con la misma certeza que el servidor.
+    const persistedOverride = readPersistedArtworkOverride({
+      type: endpointType,
+      id,
+    });
+
+    // La selección se aplica en el MISMO efecto que abre la puerta: si se
+    // abriera antes de aplicarla, se pintaría la imagen por defecto y el
+    // override llegaría después -- el parpadeo que este estado evita.
+    const initialFor = (kind, storageKey, localValue) => {
+      if (!persistedOverride) return localValue;
+      const filePath = persistedOverride[kind] || null;
+      // La instantánea manda sobre la copia por título: si el usuario reseteó
+      // la portada en otro dispositivo, esta clave local queda obsoleta.
+      writeArtworkPreference(storageKey, filePath);
+      return filePath;
+    };
+
     setBaseBackdropPath(initialBackdrop);
     setBasePosterPath(initialPoster);
-    setSelectedPosterPath(initialPoster);
-    setSelectedMobilePosterPath(initialMobilePoster);
-    setSelectedPreviewBackdropPath(initialPreviewBackdrop);
-    setSelectedBackgroundPath(initialBackdrop);
-    setSelectedLogoPath(initialLogo);
+    setSelectedPosterPath(initialFor("poster", posterStorageKey, initialPoster));
+    setSelectedMobilePosterPath(
+      initialFor("mobilePoster", mobilePosterStorageKey, initialMobilePoster),
+    );
+    setSelectedPreviewBackdropPath(
+      initialFor("backdrop", previewBackdropStorageKey, initialPreviewBackdrop),
+    );
+    setSelectedBackgroundPath(
+      initialFor("background", backgroundStorageKey, initialBackdrop),
+    );
+    setSelectedLogoPath(initialFor("logo", logoStorageKey, initialLogo));
+    // Nuevo título: solo se vuelve a cerrar la puerta cuando NO hay
+    // instantánea que confirme sus overrides. La revalidación remota de más
+    // abajo sigue corriendo y sigue siendo la fuente de verdad.
+    setRemoteArtworkChecked(Boolean(persistedOverride));
     // No activar posterResolved hasta que initArtwork termine
 
     setImagesState({

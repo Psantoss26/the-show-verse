@@ -10,7 +10,10 @@ import {
   useMemo,
   useState,
 } from "react";
-import { applyArtworkOverrideChanges } from "@/lib/artworkApi";
+import {
+  ARTWORK_PREFERENCES_CACHE_KEY,
+  applyArtworkOverrideChanges,
+} from "@/lib/artworkApi";
 import { finalizeLogout } from "@/lib/auth/logoutFinalization";
 
 const AuthContext = createContext(null);
@@ -119,7 +122,10 @@ function writeAuthUserCache(user) {
   }
 }
 
-const AUTH_PREFERENCES_CACHE_KEY = "showverse:auth:preferences:v1";
+// Definida en `@/lib/artworkApi` porque DetailsClient lee esta misma
+// instantánea de forma síncrona para pintar la portada sin esperar a que este
+// contexto se hidrate. Una sola constante evita que las dos rutas se separen.
+const AUTH_PREFERENCES_CACHE_KEY = ARTWORK_PREFERENCES_CACHE_KEY;
 
 function hasAuthPreferencesCache() {
   if (typeof window === "undefined") return false;
