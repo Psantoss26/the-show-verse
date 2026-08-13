@@ -5,6 +5,13 @@
 // en móvil), el icono de Plex enlaza a ESTA URL. El navegador la carga como
 // una navegación completa, lo que es mucho más fiable para deep links.
 //
+// POLÍTICA EN MÓVIL Y TABLET: la app o nada. Ninguna rama navega por su cuenta
+// a una página web; si el lanzamiento no prospera se ofrecen botones y decide
+// el usuario. En ESCRITORIO se mantiene la redirección a Plex Web, que allí es
+// el destino correcto. La frontera entre ambos es la misma que usa la web para
+// decidir qué interfaz pinta (ver la variante `desktop:` en globals.css), no el
+// user-agent: una tablet no es un escritorio aunque tenga la resolución de uno.
+//
 // Query params:
 //   - slug:    string  — slug del contenido (ej. "fight-club", "the-wire")
 //   - type:    string  — "movie" | "show"
@@ -196,66 +203,40 @@ export async function GET(request) {
         btnGroup.style.display  = 'flex';
       }
 
-      if (!isMobile) {
-        // Escritorio: redirigir directamente a app.plex.tv o watch.plex.tv
+      if (esEscritorio) {
+        // Escritorio: ahí sí, Plex Web es el destino natural.
         statusEl.textContent = 'Redirigiendo a Plex Web…';
         window.location.replace(webUrl || watchUrl || fallbackUrl);
         return;
       }
 
-      if (isAndroid && intentUrl) {
-        // Android Chrome: intent:// URI con S.browser_fallback_url.
-        // Chrome abre la app si está instalada; si no, redirige al fallback
-        // automáticamente. No necesitamos timers.
-        statusEl.textContent = 'Abriendo la app de Plex…';
-        window.location.href = intentUrl;
-        // Mostrar botones tras 3s por si Chrome no soporta el intent
-        setTimeout(function () { showFallback(); }, 3000);
+      // ---- MÓVIL Y TABLET: SOLO LA APP ----
+      // A partir de aquí NINGUNA rama navega sola a una página web. Antes sí:
+      // iOS tenía un temporizador de 2s que se iba a watch.plex.tv si la app
+      // tardaba en pasar a primer plano, Android llevaba un
+      // \`S.browser_fallback_url\` a esa misma web, y el caso por defecto hacía
+      // un \`location.replace\`. Cualquiera de los tres acababa en el navegador.
+      // Ahora, si el lanzamiento no prospera, se ofrecen BOTONES y decide el
+      // usuario.
+      var destino = (isAndroid && !enAppAndroid && intentUrl)
+        ? intentUrl
+        : plexScheme;
+
+      if (!destino) {
+        // Sin slug no hay enlace nativo que probar.
+        showFallback('No hay enlace directo a la app para este contenido.');
         return;
       }
 
-      if (isIOS && plexScheme) {
-        // iOS: plex:// custom scheme.
-        // Safari lo maneja con un prompt nativo; si la app no está instalada,
-        // muestra "No se puede abrir la página" — en ese caso el fallback
-        // del timeout redirige a watch.plex.tv.
-        statusEl.textContent = 'Abriendo la app de Plex…';
+      statusEl.textContent = 'Abriendo la app de Plex…';
+      window.location.href = destino;
 
-        // Usamos un iframe oculto para el intento; así Safari no muestra
-        // la pantalla de error si la app no está instalada.
-        var iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
-        iframe.src = plexScheme;
-        document.body.appendChild(iframe);
-
-        // Fallback: si en 2s la página sigue activa, ir a watch.plex.tv
-        var fallbackTimer = setTimeout(function () {
-          if (!document.hidden) {
-            window.location.href = watchUrl || fallbackUrl;
-          }
-        }, 2000);
-
-        // Si la app se abrió, el navegador queda en background → hidden
-        document.addEventListener('visibilitychange', function onHide() {
-          if (document.hidden) {
-            clearTimeout(fallbackTimer);
-            document.removeEventListener('visibilitychange', onHide);
-          }
-        });
-
-        // Mostrar botones manuales tras 3s
-        setTimeout(function () { showFallback(); }, 3000);
-        return;
-      }
-
-      // Sin slug o sin match de plataforma: ir a watch.plex.tv o web
-      if (watchUrl) {
-        window.location.replace(watchUrl);
-      } else if (fallbackUrl) {
-        window.location.replace(fallbackUrl);
-      } else {
-        showFallback('No se pudo determinar la URL de Plex.');
-      }
+      // El navegador puede bloquear un salto a un esquema propio que no venga
+      // de un gesto del usuario. Por eso el botón de abajo NO es solo un plan
+      // B: es un reintento con gesto, que es la vía más fiable de las dos.
+      setTimeout(function () {
+        showFallback('Si la app no se abrió, ábrela desde aquí:');
+      }, 2500);
     })();
   </script>
 </body>
