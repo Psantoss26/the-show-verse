@@ -2258,10 +2258,10 @@ export default function Navbar() {
                       {...navPrefetchHandlers(href)}
                       aria-label={label}
                       aria-current={active ? "page" : undefined}
-                      className={`relative flex h-8 shrink-0 items-center justify-center rounded-full transition-[width,padding,color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
+                      className={`relative flex h-8 md:h-9 shrink-0 items-center justify-center rounded-full transition-[width,padding,color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
                         active
-                          ? `px-1.5 md:px-3 max-[359px]:w-8 max-[359px]:px-0 ${tone}`
-                          : "w-8 md:w-auto md:px-3 text-white/70 hover:text-white"
+                          ? `px-1.5 md:px-3.5 max-[359px]:w-8 max-[359px]:px-0 ${tone}`
+                          : "w-8 md:w-auto md:px-3.5 text-white/70 hover:text-white"
                       }`}
                     >
                       {active && (
@@ -2283,7 +2283,7 @@ export default function Navbar() {
                           a partir de `md` sobra ancho de sobra, asi que se leen los
                           tres nombres como en escritorio. */}
                       <span
-                        className={`relative z-10 whitespace-nowrap text-[12.5px] font-extrabold tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)] md:inline ${
+                        className={`relative z-10 whitespace-nowrap text-[12.5px] md:text-[13.5px] font-extrabold tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)] md:inline ${
                           active ? "hidden min-[360px]:inline" : "hidden"
                         }`}
                       >
