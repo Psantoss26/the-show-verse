@@ -27,9 +27,17 @@ function profileMenuGroupsBlock(navbar) {
 }
 
 test("cada sección del desplegable lleva su color", async () => {
-  const grupos = profileMenuGroupsBlock(await readFile(navbarPath, "utf8"));
+  const navbar = await readFile(navbarPath, "utf8");
+  const grupos = profileMenuGroupsBlock(navbar);
 
   for (const [href, color] of Object.entries(TONOS)) {
+    if (href === "/recommendations") {
+      assert.match(
+        navbar,
+        /<ThumbsUp className="h-4 w-4 shrink-0 text-emerald-400" \/>/,
+      );
+      continue;
+    }
     const entrada = grupos.match(
       new RegExp(`href: "${href}"[\\s\\S]{0,220}?tone: "([^"]+)"`),
     );
