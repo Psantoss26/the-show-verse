@@ -45,6 +45,7 @@ import {
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 import { pickBestBackdropByLangResVotes } from "@/lib/dashboard/media";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
+import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 
 
 // ================== CONSTANTS ==================
@@ -762,6 +763,46 @@ function openPlexLink(item) {
   }
 }
 
+function LibraryHoverIndicator({ isMovie, resolution, compact = false }) {
+  const resolutionLabel = formatResolutionLabel(resolution);
+  const hasLongResolutionLabel = resolutionLabel?.length > 2;
+  const itemClassName = compact ? "h-7 w-8" : "h-9 w-10";
+  const iconClassName = compact ? "h-4 w-4" : "h-5 w-5";
+  const resolutionClassName = hasLongResolutionLabel
+    ? compact
+      ? "h-7 px-2 text-base"
+      : "h-9 px-2.5 text-xl"
+    : compact
+      ? "h-7 w-8 text-base"
+      : "h-9 w-10 text-xl";
+
+  return (
+    <div
+      className={`pointer-events-none absolute ${compact ? "bottom-1.5 px-1" : "bottom-2 px-1.5"} ${hasLongResolutionLabel ? "gap-0.5" : ""} left-1/2 z-20 hidden -translate-x-1/2 translate-y-3 scale-95 items-center overflow-hidden rounded-full ${LIQUID_GLASS_PANEL} text-white opacity-0 shadow-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform transform-gpu motion-reduce:transition-none lg:flex lg:group-hover:translate-y-0 lg:group-hover:scale-100 lg:group-hover:opacity-100`}
+      aria-hidden="true"
+    >
+      <span
+        className={`flex ${itemClassName} shrink-0 items-center justify-center ${isMovie ? "text-sky-400" : "text-violet-400"}`}
+      >
+        {isMovie ? (
+          <Film className={iconClassName} />
+        ) : (
+          <MonitorPlay className={iconClassName} />
+        )}
+      </span>
+      {resolutionLabel ? (
+        <span
+          className={`flex ${resolutionClassName} shrink-0 items-center justify-center font-black leading-none tracking-tight ${getResolutionTextColor(
+            resolution,
+          )}`}
+        >
+          {resolutionLabel}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 function LibraryMediaCard({
   item,
   index = 0,
@@ -791,8 +832,6 @@ function LibraryMediaCard({
     item?.links?.androidIntent ||
     item?.links?.androidIntentPlay,
   );
-  const resolutions = Array.isArray(item?.resolutions) ? item.resolutions : [];
-
   const effectiveImageMode = viewMode === "list" ? "backdrop" : imageMode;
   const aspectRatio =
     effectiveImageMode === "backdrop" ? "aspect-[16/9]" : "aspect-[2/3]";
@@ -822,6 +861,8 @@ function LibraryMediaCard({
     animated &&
     totalItems <= 120 &&
     (viewMode === "compact" || viewMode === "grid");
+  const shellClassName =
+    "relative z-0 overflow-visible focus-within:z-[40] hover:z-[50]";
 
   useEffect(() => {
     setImageIndex(0);
@@ -868,6 +909,7 @@ function LibraryMediaCard({
   if (viewMode === "list") {
     return (
       <motion.div
+        className={shellClassName}
         initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -10, scale: 0.95 }}
@@ -879,11 +921,11 @@ function LibraryMediaCard({
         layout
       >
         <article
-          className={`block bg-zinc-900/40 border border-zinc-800/80 rounded-xl transition-[background-color,border-color] duration-300 group overflow-hidden ${canOpen ? "cursor-pointer hover:border-amber-500/35 hover:bg-zinc-900/65" : ""}`}
+          className={`relative block bg-zinc-900/30 rounded-xl transition-colors group overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(239,68,68,0.95)] ${canOpen ? "cursor-pointer hover:bg-zinc-900/60" : ""}`}
           onClick={openItem}
         >
           <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
-            <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md border border-zinc-800/80 bg-zinc-900 shrink-0">
+            <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md bg-zinc-900 shrink-0">
               {renderMedia()}
             </div>
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
@@ -921,6 +963,7 @@ function LibraryMediaCard({
   if (viewMode === "compact") {
     return (
       <motion.div
+        className={shellClassName}
         initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -10, scale: 0.95 }}
@@ -933,12 +976,12 @@ function LibraryMediaCard({
       >
         <div className="block">
           <motion.article
-            className={`relative ${aspectRatio} group rounded-lg overflow-hidden bg-zinc-900 shadow-md after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(245,158,11,0.95)] ${canOpen ? "cursor-pointer" : ""}`}
+            className={`relative ${aspectRatio} group rounded-lg overflow-hidden bg-zinc-900 shadow-md ${canOpen ? "cursor-pointer" : ""}`}
             whileHover={
               canOpen && enableHoverLift
                 ? {
                     scale: 1.15,
-                    zIndex: 50,
+                    zIndex: 100,
                     boxShadow:
                       "0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5)",
                   }
@@ -955,46 +998,11 @@ function LibraryMediaCard({
             onClick={openItem}
           >
             {renderMedia()}
-            <div
-              className={`hidden lg:block absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
-                isMovie
-                  ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
-                  : "bg-purple-500/15 border-purple-500/30 text-purple-300"
-              }`}
-            >
-              {isMovie ? (
-                <Film className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-              ) : (
-                <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-              )}
-            </div>
-            {primaryRes && (
-              <div
-                className={`hidden lg:flex items-center justify-center absolute top-0 right-0 z-20 p-2 sm:p-2.5 rounded-bl-2xl border-l border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-right lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${getResolutionStyle(
-                  primaryRes,
-                )}`}
-              >
-                <span className="flex w-4 h-4 sm:w-[18px] sm:h-[18px] items-center justify-center text-xs sm:text-sm font-black tracking-tight drop-shadow-sm leading-none [text-box:trim-both_cap_alphabetic]">
-                  {formatResolutionLabel(primaryRes)}
-                </span>
-              </div>
-            )}
-            {/* Overlay con gradientes */}
-            <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
-              {/* Bottom gradient con título y año */}
-              <div className="p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                <div className="flex items-end justify-between gap-3">
-                  <div className="min-w-0 text-left flex-1">
-                    <h3 className="text-white font-bold leading-tight line-clamp-2 drop-shadow-md text-xs">
-                      {title}
-                    </h3>
-                    <p className="text-amber-500 text-[10px] font-bold mt-0.5 drop-shadow-md">
-                      {year}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <LibraryHoverIndicator
+              isMovie={isMovie}
+              resolution={primaryRes}
+              compact
+            />
           </motion.article>
         </div>
       </motion.div>
@@ -1003,64 +1011,24 @@ function LibraryMediaCard({
 
   return (
     <motion.div
+      className={shellClassName}
       initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -10, scale: 0.95 }}
       transition={{
         duration: 0.25,
         delay: shouldAnimate ? animDelay : 0,
-        ease: [0.25, 0.1, 0.25, 1],
       }}
       layout
     >
       <div className="block">
         <article
-          className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800/80 shadow-md lg:hover:shadow-amber-900/20 transition-[border-color,box-shadow] duration-300 ${canOpen ? "cursor-pointer hover:border-amber-500/30" : ""}`}
+          className={`relative ${aspectRatio} group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-red-900/20 transition-shadow duration-300 ${canOpen ? "cursor-pointer" : ""}`}
           onClick={openItem}
         >
+          <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(239,68,68,0.95)]" />
           {renderMedia()}
-
-          <div
-            className={`hidden lg:block absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
-              isMovie
-                ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
-                : "bg-purple-500/15 border-purple-500/30 text-purple-300"
-            }`}
-          >
-            {isMovie ? (
-              <Film className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-            ) : (
-              <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-            )}
-          </div>
-          {primaryRes && (
-            <div
-              className={`hidden lg:flex items-center justify-center absolute top-0 right-0 z-20 p-2 sm:p-2.5 rounded-bl-2xl border-l border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-right lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${getResolutionStyle(
-                primaryRes,
-              )}`}
-            >
-              <span className="flex w-4 h-4 sm:w-[18px] sm:h-[18px] items-center justify-center text-xs sm:text-sm font-black tracking-tight drop-shadow-sm leading-none [text-box:trim-both_cap_alphabetic]">
-                {formatResolutionLabel(primaryRes)}
-              </span>
-            </div>
-          )}
-
-          {/* Desktop overlay con gradientes */}
-          <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
-            {/* Bottom gradient con título y año */}
-            <div className="p-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-              <div className="flex items-end justify-between gap-3">
-                <div className="min-w-0 text-left flex-1">
-                  <h3 className="text-white font-bold leading-tight line-clamp-2 drop-shadow-md text-sm">
-                    {title}
-                  </h3>
-                  <p className="text-amber-500 text-xs font-bold mt-0.5 drop-shadow-md">
-                    {year}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+          <LibraryHoverIndicator isMovie={isMovie} resolution={primaryRes} />
         </article>
       </div>
     </motion.div>

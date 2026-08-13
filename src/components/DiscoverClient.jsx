@@ -2,10 +2,11 @@
 
 
 import OptimizedImage from "@/components/OptimizedImage";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import {
   SlidersHorizontal,
   Loader2,
@@ -46,6 +47,8 @@ const STORAGE_KEYS = {
   KEYWORDS: "discover_keywords",
 };
 const SECTION_STORAGE_PREFIX = "discover_section_open";
+const discoverImdbScores = new Map();
+const discoverImdbRequests = new Map();
 
 function getDefaultDiscoverFilters() {
   return {
@@ -220,6 +223,52 @@ function isAbortError(e) {
       .toLowerCase()
       .includes("aborted")
   );
+}
+
+function discoverScoreKey(item) {
+  const type = item?.media_type === "tv" ? "tv" : "movie";
+  return item?.id == null ? "" : `${type}:${item.id}`;
+}
+
+async function fetchDiscoverImdbScore(item) {
+  const key = discoverScoreKey(item);
+  if (!key) return null;
+  if (discoverImdbScores.has(key)) return discoverImdbScores.get(key);
+  if (discoverImdbRequests.has(key)) return discoverImdbRequests.get(key);
+
+  const request = fetch("/api/imdb/ratings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      items: [
+        {
+          key,
+          id: item.id,
+          mediaType: item.media_type,
+          imdbId: item.imdb_id || null,
+        },
+      ],
+    }),
+    cache: "no-store",
+    priority: "low",
+  })
+    .then(async (response) => {
+      if (!response.ok) return null;
+      const payload = await response.json().catch(() => null);
+      const rating = Number(payload?.items?.[key]?.rating);
+      return Number.isFinite(rating) && rating > 0 ? rating : null;
+    })
+    .catch(() => null)
+    .then((rating) => {
+      discoverImdbScores.set(key, rating);
+      return rating;
+    })
+    .finally(() => {
+      discoverImdbRequests.delete(key);
+    });
+
+  discoverImdbRequests.set(key, request);
+  return request;
 }
 
 /* =========================
@@ -521,118 +570,76 @@ function SortMenu({ value, onChange }) {
   );
 }
 
-function RatingBadge({ percent }) {
-  const p = Math.max(0, Math.min(100, Math.round(percent || 0)));
-  let stroke = "rgba(249, 115, 22, 1)"; // Orange
-  let shadowColor = "rgba(249, 115, 22, 0.4)";
-
-  if (p >= 70) {
-    stroke = "rgba(16, 185, 129, 1)"; // Green
-    shadowColor = "rgba(16, 185, 129, 0.4)";
-  } else if (p < 40) {
-    stroke = "rgba(239, 68, 68, 1)"; // Red
-    shadowColor = "rgba(239, 68, 68, 0.4)";
-  }
-
-  const r = 14;
-  const c = 2 * Math.PI * r;
-  const dash = (p / 100) * c;
+function DiscoverHoverIndicator({ type, tmdbScore, imdbScore }) {
+  const normalizedTmdbScore = Number(tmdbScore);
+  const normalizedImdbScore = Number(imdbScore);
+  const hasTmdbScore =
+    Number.isFinite(normalizedTmdbScore) && normalizedTmdbScore > 0;
+  const hasImdbScore =
+    Number.isFinite(normalizedImdbScore) && normalizedImdbScore > 0;
 
   return (
-    <div className="relative isolate w-9 h-9 flex items-center justify-center rounded-full bg-black/40 bg-gradient-to-br from-white/20 via-white/5 to-transparent backdrop-blur-md border border-white/10 shadow-lg">
-      <svg
-        viewBox="0 0 36 36"
-        className="relative z-10 w-full h-full -rotate-90 p-0.5"
-        style={{ filter: `drop-shadow(0 0 3px ${shadowColor})` }}
+    <div
+      className={`pointer-events-none absolute bottom-2 left-1/2 z-20 hidden -translate-x-1/2 translate-y-3 scale-95 items-center overflow-hidden rounded-full ${LIQUID_GLASS_PANEL} px-1.5 text-white opacity-0 shadow-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform motion-reduce:transition-none lg:flex lg:group-hover:translate-y-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 lg:group-focus-visible:translate-y-0 lg:group-focus-visible:scale-100 lg:group-focus-visible:opacity-100`}
+      aria-hidden="true"
+    >
+      <span
+        className={`flex h-9 w-10 shrink-0 items-center justify-center ${type === "movie" ? "text-sky-400" : "text-violet-400"}`}
       >
-        <circle
-          cx="18"
-          cy="18"
-          r={r}
-          fill="none"
-          stroke="rgba(255,255,255,0.1)"
-          strokeWidth="2.5"
-        />
-        <circle
-          cx="18"
-          cy="18"
-          r={r}
-          fill="none"
-          stroke={stroke}
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeDasharray={`${dash} ${c}`}
-        />
-      </svg>
-      <div className="absolute inset-0 z-20 flex items-center justify-center text-[10px] font-bold text-white drop-shadow-md">
-        {p}
-        <span className="text-[7px] align-top mt-[1.5px] opacity-70">%</span>
-      </div>
+        {type === "movie" ? (
+          <FilmIcon className="h-5 w-5" />
+        ) : (
+          <TvIcon className="h-5 w-5" />
+        )}
+      </span>
+      {hasTmdbScore ? (
+        <span className="flex h-9 w-10 shrink-0 items-center justify-center font-black leading-none tabular-nums text-sky-400">
+          {normalizedTmdbScore.toFixed(1)}
+        </span>
+      ) : null}
+      {hasImdbScore ? (
+        <span className="flex h-9 w-10 shrink-0 items-center justify-center font-black leading-none tabular-nums text-amber-300">
+          {normalizedImdbScore.toFixed(1)}
+        </span>
+      ) : null}
     </div>
   );
 }
 
 function DiscoverCard({ item }) {
   const router = useRouter();
+  const [imdbScore, setImdbScore] = useState(null);
   const isMovie = item.media_type === "movie";
   const title = isMovie ? item.title : item.name;
-  const rawDate = isMovie ? item.release_date : item.first_air_date;
-  const year = rawDate ? rawDate.split("-")[0] : "";
-  const percent = (item.vote_average || 0) * 10;
   const href = `/details/${item.media_type}/${item.id}`;
-  const handlePrefetch = () => {
+  const handleCardIntent = useCallback(() => {
     router.prefetch(href);
-  };
-
-  const typeColorClass = isMovie
-    ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
-    : "bg-purple-500/15 border-purple-500/30 text-purple-300";
+    void fetchDiscoverImdbScore(item).then(setImdbScore);
+  }, [href, item, router]);
 
   return (
     <Link
       href={href}
       prefetch={false}
-      className="group relative flex flex-col w-full h-full"
-      onMouseEnter={handlePrefetch}
-      onFocus={handlePrefetch}
-      onTouchStart={handlePrefetch}
+      className="group relative flex h-full w-full flex-col rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
+      onMouseEnter={handleCardIntent}
+      onFocus={handleCardIntent}
+      onTouchStart={handleCardIntent}
     >
-      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-transparent border border-transparent shadow-[0_8px_24px_-12px_rgba(0,0,0,0.5)] transition-all duration-300 group-hover:shadow-[0_24px_70px_rgba(0,0,0,0.45)] group-hover:bg-white/5 group-hover:-translate-y-1 z-0 group-hover:z-10">
-        <div className="pointer-events-none absolute inset-0 rounded-[inherit] border border-white/5 z-20 group-hover:border-white/20 transition-colors" />
+      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl bg-zinc-900 shadow-md transition-shadow duration-300 lg:group-hover:shadow-blue-900/20">
         <OptimizedImage
           src={posterSrc(item)}
           alt={title}
-          className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
+          className="h-full w-full object-cover transition-transform duration-500 ease-out lg:group-hover:scale-110"
           loading="lazy"
           decoding="async"
         />
 
-        <div
-          className={`absolute top-0 left-0 z-20 flex items-center justify-center p-2 sm:p-2.5 rounded-br-xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100 ${typeColorClass}`}
-        >
-          {isMovie ? (
-            <FilmIcon className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-          ) : (
-            <TvIcon className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-          )}
-        </div>
-
-        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
-          {percent > 0 && (
-            <div className="absolute top-2 right-2 translate-y-[-10px] group-hover:translate-y-0 transition-transform duration-300 delay-75">
-              <RatingBadge percent={percent} />
-            </div>
-          )}
-
-          <div className="translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-            <h3 className="text-white font-bold text-sm leading-tight line-clamp-2 mb-1">
-              {title}
-            </h3>
-            <p className="text-orange-500 font-medium text-xs">
-              {year || "N/A"}
-            </p>
-          </div>
-        </div>
+        <DiscoverHoverIndicator
+          type={item.media_type}
+          tmdbScore={item.vote_average}
+          imdbScore={imdbScore}
+        />
       </div>
     </Link>
   );
@@ -1550,11 +1557,9 @@ export default function DiscoverClient() {
               </div>
             )}
 
-            {/* 4. Grid de resultados (persiste con opacidad al recargar) */}
+            {/* 4. Grid de resultados: se mantiene estable al refrescar filtros. */}
             {items.length > 0 && (
-              <div
-                className={`transition-opacity duration-300 ${loading ? "opacity-50 pointer-events-none" : "opacity-100"}`}
-              >
+              <div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-x-4 gap-y-8">
                   {items.map((item) => (
                     <DiscoverCard
@@ -1579,15 +1584,6 @@ export default function DiscoverClient() {
               </div>
             )}
 
-            {/* 5. Loader superpuesto discreto (cuando recarga filtros sobre datos existentes) */}
-            {loading && items.length > 0 && (
-              <div className="absolute top-10 left-1/2 -translate-x-1/2 z-50">
-                <div className="bg-black/80 backdrop-blur-md text-white px-4 py-2 rounded-full flex items-center gap-3 shadow-2xl border border-white/10">
-                  <Loader2 className="w-4 h-4 animate-spin text-yellow-500" />
-                  <span className="text-xs font-medium">Actualizando...</span>
-                </div>
-              </div>
-            )}
           </main>
         </div>
       </div>
