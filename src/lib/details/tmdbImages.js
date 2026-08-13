@@ -127,6 +127,34 @@ export function pickBestNeutralPosterByResVotes(list, opts = {}) {
     return sorted[0] || pool1[0] || null
 }
 
+// Portada del héroe MÓVIL calculada SOLO con lo que ya trae el SSR.
+//
+// Reproduce la política de `mobileNeutralPosterPath` (DetailsClient): se
+// prefiere arte sin idioma de la galería, y la portada principal queda como
+// último recurso. La galería excluye la portada principal porque en el cliente
+// entra marcada con `from: "main"` y ese filtro la descarta: no lleva metadatos
+// de idioma, así que no puede considerarse neutra.
+//
+// Vive aquí para que el servidor pueda precargar EXACTAMENTE la URL que el
+// cliente va a pedir. Si las dos se separan, la precarga deja de valer y se
+// descarga una imagen de más -- justo lo contrario de lo que busca.
+export function pickMobileHeroPosterPath({
+    posterPath,
+    profilePath,
+    posters
+} = {}) {
+    const gallery = (Array.isArray(posters) ? posters : []).filter(
+        (img) => img?.file_path && img.file_path !== posterPath
+    )
+
+    return (
+        pickBestNeutralPosterByResVotes(gallery)?.file_path ||
+        posterPath ||
+        profilePath ||
+        null
+    )
+}
+
 export const isLanguageNeutralImage = (img) => {
     if (!img?.file_path) return false
     if (!Object.prototype.hasOwnProperty.call(img, 'iso_639_1')) return false

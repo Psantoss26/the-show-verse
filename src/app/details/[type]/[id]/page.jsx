@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import DetailsPageLoader from "@/components/DetailsPageLoader";
+import MobilePosterPreload from "@/components/details/MobilePosterPreload";
 import { getDetails } from "@/lib/api/tmdb";
 import { fetchCommunitySummary } from "@/lib/community/server";
 export const revalidate = 600;
@@ -62,16 +63,21 @@ export default async function DetailsPage({ params }) {
   );
 
   return (
-    <DetailsPageLoader
-      type={type}
-      id={id}
-      data={data}
-      initialCastData={initialCastData}
-      initialReviews={initialReviews}
-      initialRecommendations={initialRecommendations}
-      initialSentiment={community?.sentiment || null}
-      initialComments={community?.comments || null}
-      initialLists={community?.lists?.items || null}
-    />
+    <>
+      {/* Va antes que la ficha: el navegador empieza a bajar la portada móvil
+          mientras todavía está leyendo el HTML, sin esperar a hidratar. */}
+      <MobilePosterPreload data={data} />
+      <DetailsPageLoader
+        type={type}
+        id={id}
+        data={data}
+        initialCastData={initialCastData}
+        initialReviews={initialReviews}
+        initialRecommendations={initialRecommendations}
+        initialSentiment={community?.sentiment || null}
+        initialComments={community?.comments || null}
+        initialLists={community?.lists?.items || null}
+      />
+    </>
   );
 }

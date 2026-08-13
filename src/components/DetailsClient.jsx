@@ -1701,7 +1701,17 @@ export default function DetailsClient({
 
   // Detecta las capacidades del dispositivo: hover (desktop) y viewport movil.
   // Usa matchMedia para reaccionar a cambios en tiempo real (ej. rotar tablet).
-  useEffect(() => {
+  //
+  // ES `useLayoutEffect` A PROPÓSITO, y es lo que decide QUÉ PORTADA pide el
+  // navegador primero. Con un `useEffect` normal esto corría DESPUÉS del primer
+  // pintado, así que en un móvil el primer render seguía creyéndose escritorio:
+  // `mobilePosterPath` valía `null` y la portada se pedía como
+  // `w342/<poster principal>`. Al resolverse el viewport, la ruta pasaba al
+  // póster sin idioma en `w500`+`w780` -- otra imagen distinta. Resultado: en
+  // móvil se descargaba una portada de más, y encima antes que la buena,
+  // compitiendo con ella por el ancho de banda. Resolviéndolo antes de pintar,
+  // la primera y única URL que se pide ya es la definitiva.
+  useLayoutEffect(() => {
     if (typeof window === "undefined") return;
 
     // hover + puntero fino => escritorio con raton
@@ -3063,13 +3073,29 @@ export default function DetailsClient({
     setRemoteArtworkChecked(skipOverrides || Boolean(persistedOverride));
     // No activar posterResolved hasta que initArtwork termine
 
+    // La galería se siembra YA con las imágenes del SSR, no solo con la portada
+    // principal. Es lo que decide qué portada pide el navegador primero en
+    // móvil: `mobileNeutralPosterPath` elige el mejor arte SIN IDIOMA de esta
+    // lista, y con la lista vacía caía en la portada principal (localizada).
+    // Como `initArtwork` es un efecto normal —corre DESPUÉS de pintar—, la
+    // galería llegaba tarde: se pedía la principal, y al llegar la lista se
+    // sustituía por el arte neutro. Dos portadas descargadas por visita, y la
+    // buena empezando la última. `data.images` ya está en props desde el primer
+    // render, así que no hay nada que esperar: `initArtwork` sigue haciendo su
+    // fusión después (idempotente) y añadiendo lo que venga de la API.
+    const ssrPosters = data?.images?.posters || [];
+    const ssrBackdrops = data?.images?.backdrops || [];
     setImagesState({
-      posters: data.poster_path
-        ? [{ file_path: data.poster_path, from: "main" }]
-        : [],
-      backdrops: data.backdrop_path
-        ? [{ file_path: data.backdrop_path, from: "main" }]
-        : [],
+      posters: mergeUniqueImages(
+        data.poster_path ? [{ file_path: data.poster_path, from: "main" }] : [],
+        ssrPosters,
+      ),
+      backdrops: mergeUniqueImages(
+        data.backdrop_path
+          ? [{ file_path: data.backdrop_path, from: "main" }]
+          : [],
+        ssrBackdrops,
+      ),
     });
     setImagesLoading(false);
     setImagesError("");
@@ -3088,6 +3114,8 @@ export default function DetailsClient({
     data?.poster_path,
     data?.backdrop_path,
     data?.profile_path,
+    data?.images?.posters,
+    data?.images?.backdrops,
     posterStorageKey,
     mobilePosterStorageKey,
     logoStorageKey,
