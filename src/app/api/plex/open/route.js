@@ -213,9 +213,9 @@ export async function GET(request) {
       // ---- MÓVIL Y TABLET: SOLO LA APP ----
       // A partir de aquí NINGUNA rama navega sola a una página web. Antes sí:
       // iOS tenía un temporizador de 2s que se iba a watch.plex.tv si la app
-      // tardaba en pasar a primer plano, Android llevaba un
-      // \`S.browser_fallback_url\` a esa misma web, y el caso por defecto hacía
-      // un \`location.replace\`. Cualquiera de los tres acababa en el navegador.
+      // tardaba en pasar a primer plano, el intent de Android llevaba un
+      // parámetro de repliegue a esa misma web, y el caso por defecto hacía un
+      // \`location.replace\`. Cualquiera de los tres acababa en el navegador.
       // Ahora, si el lanzamiento no prospera, se ofrecen BOTONES y decide el
       // usuario.
       var destino = (isAndroid && !enAppAndroid && intentUrl)
