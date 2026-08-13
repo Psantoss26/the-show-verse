@@ -1,6 +1,28 @@
 // /src/lib/artworkApi.js
 
+import { isExternalNetworkAccess } from './network/accessScope.js'
+
 const sessionArtworkPreferences = new Map()
+
+// ¿Hay que renunciar a los overrides de artwork en esta visita?
+//
+// En VISTA MÓVIL y con acceso externo, sí. La comprobación de overrides es una
+// ida y vuelta al NAS por el túnel, y es lo único que separa a la ficha de
+// empezar a descargar la portada en una primera visita. Renunciar a ella sale
+// barato: las selecciones personalizadas son rutas de TMDb, así que la portada
+// se descarga del MISMO CDN en ambos casos -- lo único que cambia es cuál se
+// elige, y sin overrides se usa el criterio automático.
+//
+// En la red del servidor la consulta es local y no compensa apagar nada; en
+// escritorio y tablet tampoco se toca (decisión de producto, no técnica).
+export function shouldSkipRemoteArtwork({
+    mobileViewport,
+    hostname,
+    localHosts
+} = {}) {
+    if (!mobileViewport) return false
+    return isExternalNetworkAccess({ hostname, localHosts })
+}
 let artworkPreferencesRequest = null
 let artworkSaveQueue = Promise.resolve()
 
