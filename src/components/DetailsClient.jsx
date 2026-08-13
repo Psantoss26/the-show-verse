@@ -43,6 +43,7 @@ import {
   resolveCachedArtworkOverride,
   saveArtworkOverride,
   saveArtworkOverrides,
+  shouldSkipRemoteArtwork,
   writeArtworkPreference,
 } from "@/lib/artworkApi";
 import Link from "next/link";
@@ -1409,6 +1410,18 @@ export default function DetailsClient({
   // que no hace falta esperar (usuario no autenticado) o en cuanto responde
   // la comprobación remota (autenticado).
   const [remoteArtworkChecked, setRemoteArtworkChecked] = useState(false);
+  // VISTA MÓVIL + RED EXTERNA: la ficha renuncia a los overrides de artwork.
+  // La comprobación es una ida y vuelta al NAS por el túnel y es lo único que
+  // separa a la ficha de empezar a descargar la portada en una primera visita;
+  // como las selecciones son rutas de TMDb, renunciar a ellas no cambia de
+  // dónde se descarga la portada, solo cuál se elige (ver
+  // `shouldSkipRemoteArtwork`). Se decide en el efecto de layout de abajo, no
+  // aquí: en el primer render no se puede leer `window`.
+  const [artworkOverridesSkipped, setArtworkOverridesSkipped] = useState(false);
+  // ...salvo que se llegue a "Portadas y fondos": esa galería sí necesita saber
+  // qué tienes elegido, así que al acercarse a pantalla se hace la consulta que
+  // nos habíamos ahorrado. Para entonces la portada lleva rato pintada.
+  const [artworkGalleryReached, setArtworkGalleryReached] = useState(false);
 
   // -- Estados de carga progresiva del poster --
   // Se usan para mostrar primero una version de baja calidad y luego la alta
@@ -2980,6 +2993,18 @@ export default function DetailsClient({
     );
     const initialBackdrop = readArtworkPreference(backgroundStorageKey);
 
+    // ¿Toca renunciar a los overrides en esta visita? `isMobileViewport` es
+    // estado y todavía vale `false` aquí (se resuelve en un efecto posterior),
+    // así que el viewport se consulta directamente a `matchMedia` -- mismo
+    // breakpoint que ese estado.
+    const skipOverrides = shouldSkipRemoteArtwork({
+      mobileViewport:
+        typeof window !== "undefined" &&
+        window.matchMedia("(max-width: 640px)").matches,
+    });
+    setArtworkOverridesSkipped(skipOverrides);
+    setArtworkGalleryReached(false);
+
     // Instantánea persistida de overrides: la MISMA que cachea AuthContext,
     // pero leída de localStorage aquí y de forma síncrona. Es lo que permite
     // abrir la puerta (`remoteArtworkChecked`) en el primer efecto de layout,
@@ -2992,15 +3017,21 @@ export default function DetailsClient({
     // mantiene el comportamiento anterior de esperar a la comprobación remota.
     // `{}` = hay instantánea y este título no tiene selección propia, lo que
     // confirma el caso negativo con la misma certeza que el servidor.
-    const persistedOverride = readPersistedArtworkOverride({
-      type: endpointType,
-      id,
-    });
+    const persistedOverride = skipOverrides
+      ? null
+      : readPersistedArtworkOverride({
+          type: endpointType,
+          id,
+        });
 
     // La selección se aplica en el MISMO efecto que abre la puerta: si se
     // abriera antes de aplicarla, se pintaría la imagen por defecto y el
     // override llegaría después -- el parpadeo que este estado evita.
     const initialFor = (kind, storageKey, localValue) => {
+      // Renunciando a los overrides no se hereda tampoco la copia por título:
+      // el criterio automático tiene que partir de cero, o seguiría saliendo la
+      // portada elegida a mano en visitas anteriores desde este dispositivo.
+      if (skipOverrides) return null;
       if (!persistedOverride) return localValue;
       const filePath = persistedOverride[kind] || null;
       // La instantánea manda sobre la copia por título: si el usuario reseteó
@@ -3009,8 +3040,10 @@ export default function DetailsClient({
       return filePath;
     };
 
-    setBaseBackdropPath(initialBackdrop);
-    setBasePosterPath(initialPoster);
+    // Las rutas "base" son el último recurso del criterio automático, así que
+    // al renunciar también tienen que quedar vacías.
+    setBaseBackdropPath(skipOverrides ? null : initialBackdrop);
+    setBasePosterPath(skipOverrides ? null : initialPoster);
     setSelectedPosterPath(initialFor("poster", posterStorageKey, initialPoster));
     setSelectedMobilePosterPath(
       initialFor("mobilePoster", mobilePosterStorageKey, initialMobilePoster),
@@ -3025,7 +3058,9 @@ export default function DetailsClient({
     // Nuevo título: solo se vuelve a cerrar la puerta cuando NO hay
     // instantánea que confirme sus overrides. La revalidación remota de más
     // abajo sigue corriendo y sigue siendo la fuente de verdad.
-    setRemoteArtworkChecked(Boolean(persistedOverride));
+    // Renunciando a los overrides la puerta se abre de inmediato: no hay nada
+    // que esperar, el criterio automático ya es la respuesta definitiva.
+    setRemoteArtworkChecked(skipOverrides || Boolean(persistedOverride));
     // No activar posterResolved hasta que initArtwork termine
 
     setImagesState({
@@ -3069,6 +3104,11 @@ export default function DetailsClient({
   // cambió una selección, la respuesta más reciente sigue siendo la fuente de
   // verdad y actualiza esta vista.
   const cachedArtworkOverride = useMemo(() => {
+    // Renunciando a los overrides (móvil + red externa) tampoco se aplica la
+    // instantánea local: la ficha se pinta con el criterio automático hasta que
+    // se llegue a la galería.
+    if (artworkOverridesSkipped && !artworkGalleryReached) return null;
+
     return resolveCachedArtworkOverride({
       preferences,
       cached: preferencesCached,
@@ -3077,6 +3117,8 @@ export default function DetailsClient({
       id,
     });
   }, [
+    artworkOverridesSkipped,
+    artworkGalleryReached,
     authenticated,
     preferencesCached,
     preferences,
@@ -3127,6 +3169,11 @@ export default function DetailsClient({
   // (éxito o fallo -- `finally` evita que las imágenes por defecto se queden
   // ocultas para siempre si la petición falla).
   useEffect(() => {
+    // Móvil + red externa: ESTA es la petición que se ahorra. No se lanza hasta
+    // que la galería de portadas se acerca a pantalla; si no se llega a ella,
+    // la visita entera no consulta el NAS.
+    if (artworkOverridesSkipped && !artworkGalleryReached) return;
+
     let cancelled = false;
     const revisionAtStart = artworkPreferenceRevisionRef.current;
 
@@ -3180,6 +3227,8 @@ export default function DetailsClient({
       cancelled = true;
     };
   }, [
+    artworkOverridesSkipped,
+    artworkGalleryReached,
     id,
     endpointType,
     posterStorageKey,
@@ -7656,6 +7705,33 @@ export default function DetailsClient({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  // Recupera los overrides a los que se había renunciado (móvil + red externa)
+  // en cuanto "Portadas y fondos" se acerca a pantalla: allí hay que poder ver
+  // qué imagen tienes elegida. Es la ÚNICA vía por la que esa visita llega a
+  // consultar el NAS, y para entonces la portada lleva rato pintada, que era
+  // todo el objetivo. El margen adelanta la consulta para que la galería no
+  // aparezca sin la selección marcada.
+  useEffect(() => {
+    if (!artworkOverridesSkipped || artworkGalleryReached) return;
+    const el = artworkControlsWrapRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) setArtworkGalleryReached(true);
+      },
+      { rootMargin: "600px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [
+    artworkOverridesSkipped,
+    artworkGalleryReached,
+    // La sección de portadas se monta con las secciones diferidas: hasta
+    // entonces la ref está vacía y no hay nada que observar.
+    canRenderLowerPrioritySections,
+  ]);
 
   useEffect(() => {
     if (!sentinelRef.current) return;

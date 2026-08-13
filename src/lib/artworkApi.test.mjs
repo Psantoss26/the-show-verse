@@ -8,6 +8,7 @@ import {
   readPersistedArtworkOverride,
   readPersistedArtworkOverrides,
   resolveCachedArtworkOverride,
+  shouldSkipRemoteArtwork,
   writeArtworkPreference
 } from './artworkApi.js'
 
@@ -146,6 +147,29 @@ test('without a usable snapshot the caller must keep waiting for the network', (
 
   // Un blob que no es un objeto de preferencias no puede confirmar nada.
   assert.equal(readPersistedArtworkOverrides(snapshotStorage('"texto"')), null)
+})
+
+test('overrides are only skipped on mobile view over an external network', () => {
+  const external = 'theshowverse.com'
+  const local = '192.168.1.130'
+
+  assert.equal(
+    shouldSkipRemoteArtwork({ mobileViewport: true, hostname: external, localHosts: [] }),
+    true
+  )
+  // En la red del servidor la consulta es local: no compensa apagar nada.
+  assert.equal(
+    shouldSkipRemoteArtwork({ mobileViewport: true, hostname: local, localHosts: [] }),
+    false
+  )
+  // Escritorio y tablet conservan la funcionalidad aunque estén fuera.
+  assert.equal(
+    shouldSkipRemoteArtwork({ mobileViewport: false, hostname: external, localHosts: [] }),
+    false
+  )
+  // Sin datos (render de servidor) no se apaga nada.
+  assert.equal(shouldSkipRemoteArtwork({ mobileViewport: true, localHosts: [] }), false)
+  assert.equal(shouldSkipRemoteArtwork(), false)
 })
 
 test('artwork cache changes preserve other titles and remove empty entries', () => {
