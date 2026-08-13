@@ -81,6 +81,49 @@ function browserSessionStorage() {
     }
 }
 
+// Clave donde AuthContext persiste la instantánea COMPLETA de preferencias.
+// Vive aquí (y no en AuthContext) porque el propietario de los overrides de
+// artwork es este módulo y AuthContext ya importa de él; al revés habría ciclo.
+export const ARTWORK_PREFERENCES_CACHE_KEY = 'showverse:auth:preferences:v1'
+
+// Instantánea persistida de overrides. A diferencia de `sessionArtworkPreferences`
+// (memoria, muere al recargar) y del propio contexto de auth (que no está
+// hidratado en el primer render), esto se puede leer de forma SÍNCRONA en el
+// primer efecto de layout, antes de cualquier pintado.
+//
+// `null` significa «no hay instantánea utilizable»: quien llame debe seguir
+// esperando a la red. `{}` es una respuesta afirmativa —hay instantánea y no
+// contiene overrides—, con la misma certeza que daría el servidor.
+export function readPersistedArtworkOverrides(storage) {
+    const store = storage || browserStorage()
+    if (!store) return null
+
+    try {
+        const raw = store.getItem(ARTWORK_PREFERENCES_CACHE_KEY)
+        if (!raw) return null
+        const parsed = JSON.parse(raw)
+        if (!parsed || typeof parsed !== 'object') return null
+        const overrides = parsed?.uiSettings?.artworkOverrides
+        return overrides && typeof overrides === 'object' ? overrides : {}
+    } catch {
+        return null
+    }
+}
+
+// Overrides persistidos de UN título. Mismo contrato que `fetchArtworkOverride`
+// (`null` = todavía no se sabe, `{}` = sin selección propia) para que el
+// consumidor trate igual la instantánea local y la respuesta remota.
+export function readPersistedArtworkOverride({ type, id, storage }) {
+    if (id == null || id === '') return null
+
+    const overrides = readPersistedArtworkOverrides(storage)
+    if (overrides == null) return null
+
+    const normalizedType = type === 'show' ? 'tv' : type || 'movie'
+    const entry = overrides[`${normalizedType}:${Number(id)}`]
+    return entry && typeof entry === 'object' ? entry : {}
+}
+
 // Mantiene la selección durante la sesión incluso cuando un navegador móvil
 // rechaza localStorage (modo privado, WebView o cuota). localStorage sigue
 // siendo la persistencia preferida entre recargas.
