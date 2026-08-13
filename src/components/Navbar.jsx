@@ -62,63 +62,28 @@ import {
 
 // Búsqueda tolerante a erratas: por debajo de esta longitud de consulta el fuzzy
 // es ruido (todo "se parece"), así que se mantiene el comportamiento por substring.
-// Secciones del desplegable del PERFIL, en dos columnas. Antes eran una fila de
-// nueve iconos sueltos en la barra: sin rotulo, habia que adivinarlos o pasar el
-// raton por encima de uno en uno.
+// Destinos del desplegable del PERFIL. Siguen el mismo orden que el subconjunto
+// equivalente del menú móvil/tablet; las recomendaciones y la IA quedan al final
+// como un bloque separado.
 // `tone` es el color YA establecido de cada sección: el mismo que usan sus
 // iconos en el menú móvil y en la barra inferior. No se inventa uno nuevo aquí
 // para que una sección se reconozca por su color en todas partes. Que
 // Recomendaciones, En Progreso e Historial compartan el verde es intencionado:
 // es así en las otras dos superficies.
 const PROFILE_MENU_GROUPS = [
-  {
-    titulo: "Descubrir",
-    items: [
-      {
-        href: "/recommendations",
-        label: "Recomendaciones",
-        Icon: ThumbsUp,
-        tone: "text-emerald-400",
-      },
-      { href: "/social", label: "Social", Icon: Users, tone: "text-pink-400" },
-      {
-        href: "/lists",
-        label: "Listas",
-        Icon: ListVideo,
-        tone: "text-purple-400",
-      },
-      {
-        href: "/calendar",
-        label: "Calendario",
-        Icon: CalendarDaysIcon,
-        tone: "text-amber-400",
-      },
-    ],
-  },
-  {
-    titulo: "Lo tuyo",
-    items: [
-      {
-        href: "/in-progress",
-        label: "En Progreso",
-        Icon: Play,
-        tone: "text-emerald-400",
-      },
-      {
-        href: "/history",
-        label: "Historial",
-        Icon: History,
-        tone: "text-emerald-400",
-      },
-      { href: "/favorites", label: "Favoritas", Icon: Heart, tone: "text-red-400" },
-      {
-        href: "/watchlist",
-        label: "Pendientes",
-        Icon: Bookmark,
-        tone: "text-sky-400",
-      },
-    ],
-  },
+  [
+    { href: "/in-progress", label: "En Progreso", Icon: Play, tone: "text-emerald-400" },
+    { href: "/history", label: "Historial", Icon: History, tone: "text-emerald-400" },
+  ],
+  [
+    { href: "/favorites", label: "Favoritas", Icon: Heart, tone: "text-red-400" },
+    { href: "/watchlist", label: "Pendientes", Icon: Bookmark, tone: "text-sky-400" },
+  ],
+  [
+    { href: "/social", label: "Social", Icon: Users, tone: "text-pink-400" },
+    { href: "/lists", label: "Listas", Icon: ListVideo, tone: "text-purple-400" },
+    { href: "/calendar", label: "Calendario", Icon: CalendarDaysIcon, tone: "text-amber-400" },
+  ],
 ];
 
 const FUZZY_MIN_QUERY_LEN = 4;
@@ -2323,17 +2288,12 @@ export default function Navbar() {
                           // no hay un contenedor del que colgar.
                           className={`fixed z-[99999] overflow-hidden rounded-2xl p-2 text-white ${LIQUID_GLASS_PANEL}`}
                         >
-                          {/* UNA COLUMNA. Los dos grupos se apilan, con su rotulo
-                              haciendo de separador: el panel queda estrecho y pegado
-                              al boton de Perfil, en vez de extenderse a lo ancho de
-                              media barra. */}
+                          {/* Una columna, en el mismo orden que el menú lateral de
+                              móvil/tablet. */}
                           <div className="flex flex-col">
-                            {PROFILE_MENU_GROUPS.map((grupo) => (
-                              <div key={grupo.titulo} className="min-w-0">
-                                <p className="px-3 pb-1 pt-2 text-[10px] font-black uppercase tracking-widest text-zinc-500">
-                                  {grupo.titulo}
-                                </p>
-                                {grupo.items.map(({ href, label, Icon, tone }) => (
+                            {PROFILE_MENU_GROUPS.map((items) => (
+                              <div key={items[0].href}>
+                                {items.map(({ href, label, Icon, tone }) => (
                                   <Link
                                     key={href}
                                     href={href}
@@ -2348,44 +2308,46 @@ export default function Navbar() {
                                         : "text-zinc-300 hover:bg-white/5 hover:text-white"
                                     }`}
                                   >
-                                    {/* El color va SIEMPRE, esté activa o no
-                                        la sección, igual que el de «Qué ver con
-                                        IA». La fila activa ya se distingue por
-                                        su fondo y su texto en negrita. */}
                                     <Icon className={`h-4 w-4 shrink-0 ${tone}`} />
                                     <span className="truncate">{label}</span>
                                   </Link>
                                 ))}
+                                <div className="my-2.5 h-px bg-white/5" />
                               </div>
                             ))}
 
-                            {/* ASISTENTE. Es una sección más del panel, pero NO un
-                                enlace: no lleva a ninguna ruta, abre el recomendador
-                                sobre la página. Por eso va aparte de
-                                `PROFILE_MENU_GROUPS`, que son destinos.
-                                El componente NO se monta aquí dentro (está junto a
-                                su icono de la barra): esta fila solo pide que se
-                                abra y cierra el menú. Montarlo aquí lo desmontaría
-                                justo al empezar a usarlo -- el panel se pinta por
-                                portal, fuera de este desplegable, y el desplegable
-                                se cierra al pulsar fuera. */}
-                            <div className="min-w-0">
-                              <p className="px-3 pb-1 pt-2 text-[10px] font-black uppercase tracking-widest text-zinc-500">
-                                Asistente
-                              </p>
-                              <button
-                                type="button"
-                                role="menuitem"
-                                onClick={() => {
-                                  setProfileMenuOpen(false);
-                                  setAssistantOpen(true);
-                                }}
-                                className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-zinc-300 transition-colors hover:bg-white/5 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-                              >
-                                <Sparkles className="h-4 w-4 shrink-0 text-cyan-400" />
-                                <span className="truncate">Qué ver con IA</span>
-                              </button>
-                            </div>
+                            <Link
+                              href="/recommendations"
+                              prefetch
+                              {...navPrefetchHandlers("/recommendations")}
+                              role="menuitem"
+                              onClick={() => setProfileMenuOpen(false)}
+                              aria-current={isActive("/recommendations") ? "page" : undefined}
+                              className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors ${
+                                isActive("/recommendations")
+                                  ? "bg-white/10 font-bold text-white"
+                                  : "text-zinc-300 hover:bg-white/5 hover:text-white"
+                              }`}
+                            >
+                              <ThumbsUp className="h-4 w-4 shrink-0 text-emerald-400" />
+                              <span className="truncate">Recomendaciones</span>
+                            </Link>
+
+                            {/* No es un enlace: abre el recomendador y luego cierra
+                                el menú. El asistente se mantiene montado fuera de
+                                este portal para que su panel no se desmonte. */}
+                            <button
+                              type="button"
+                              role="menuitem"
+                              onClick={() => {
+                                setProfileMenuOpen(false);
+                                setAssistantOpen(true);
+                              }}
+                              className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-zinc-300 transition-colors hover:bg-white/5 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                            >
+                              <Sparkles className="h-4 w-4 shrink-0 text-cyan-400" />
+                              <span className="truncate">Qué ver con IA</span>
+                            </button>
                           </div>
                         </motion.div>
                       ) : null}

@@ -20,7 +20,7 @@ function profileDropdownBlock(navbar) {
 test("el desplegable de Perfil ofrece el asistente", async () => {
   const dropdown = profileDropdownBlock(await readFile(navbarPath, "utf8"));
 
-  assert.match(dropdown, /Asistente/);
+  assert.match(dropdown, /<div className="my-2\.5 h-px bg-white\/5" \/>/);
   assert.match(dropdown, /setAssistantOpen\(true\)/);
   assert.match(dropdown, /Qué ver con IA/);
   // Cierra el menú al abrirlo: dejarlo abierto detrás del panel lo dejaría
