@@ -5,6 +5,7 @@ import OptimizedImage from "@/components/OptimizedImage";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import useModalGuard from "@/hooks/useModalGuard";
+import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
@@ -473,7 +474,14 @@ export default function WatchNextAssistant({
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-[9999] overflow-hidden bg-black/80 lg:bg-black/90 p-0 sm:p-3"
+          // MISMO VELO que los modales de la ficha (AddToListModal, VideoModal,
+          // StarRating…): `bg-black/60` + desenfoque. Antes era `/80` (`/90` en
+          // escritorio) y SIN desenfoque, así que la página de detrás quedaba
+          // casi apagada y el conjunto se leía como una pantalla nueva, no como
+          // una capa de cristal sobre la ficha. El velo forma parte de la receta
+          // tanto como el panel: es lo que oscurece y difumina el fondo para que
+          // el cristal del panel tenga algo coherente que atravesar.
+          className="fixed inset-0 z-[9999] overflow-hidden bg-black/60 backdrop-blur-lg p-0 sm:p-3"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -501,9 +509,18 @@ export default function WatchNextAssistant({
               ease: [0.22, 1, 0.36, 1],
             }}
             onMouseDown={(e) => e.stopPropagation()}
-            className="relative isolate mx-auto flex h-[100dvh] w-full max-w-5xl flex-col overflow-hidden bg-black/45 bg-gradient-to-br from-white/10 to-white/5 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl transform-gpu sm:rounded-[2rem] sm:h-[calc(100dvh-24px)] sm:w-[calc(100vw-24px)]"
+            // ACABADO COMPARTIDO. Este panel llevaba su propia versión del
+            // cristal —`bg-black/45`, `backdrop-blur-3xl`, sin `saturate`, otro
+            // degradado y otra sombra—, que es exactamente la deriva que
+            // `LIQUID_GLASS_PANEL` existe para evitar (ver su cabecera). Con la
+            // constante, el modal es la MISMA pieza que los de la ficha y
+            // cambiarla en un sitio los cambia a todos.
+            //
+            // La constante aporta solo el ACABADO; la FORMA (alto, ancho, radio
+            // y el flex de la columna) sigue siendo propia, como en el resto de
+            // consumidores.
+            className={`relative isolate mx-auto flex h-[100dvh] w-full max-w-5xl flex-col overflow-hidden ${LIQUID_GLASS_PANEL} transform-gpu sm:rounded-[2rem] sm:h-[calc(100dvh-24px)] sm:w-[calc(100vw-24px)]`}
           >
-            <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-black/10 opacity-70 -z-10" />
             {/* Header */}
             <header className="flex items-center justify-between gap-4 border-b border-transparent bg-black/10 px-4 py-3 sm:px-6 backdrop-blur-sm flex-shrink-0">
               <div className="flex min-w-0 items-center gap-3">
