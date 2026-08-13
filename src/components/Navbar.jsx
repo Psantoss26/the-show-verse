@@ -1878,10 +1878,21 @@ export default function Navbar() {
   // es justo lo que pasa al usar el asistente.
   const [assistantOpen, setAssistantOpen] = useState(false);
   const profileMenuRef = useRef(null);
+  // El panel se saca de la barra con un portal (ver más abajo), así que deja de
+  // estar dentro de `profileMenuRef`: sin este segundo ref, pulsar en el propio
+  // menú contaría como "pulsar fuera" y lo cerraría.
+  const profileMenuPanelRef = useRef(null);
+  const [profileMenuPosition, setProfileMenuPosition] = useState(null);
+  const [profilePortalReady, setProfilePortalReady] = useState(false);
+  useEffect(() => {
+    setProfilePortalReady(true);
+  }, []);
   useEffect(() => {
     if (!profileMenuOpen) return undefined;
     const fuera = (e) => {
-      if (!profileMenuRef.current?.contains(e.target)) setProfileMenuOpen(false);
+      if (profileMenuRef.current?.contains(e.target)) return;
+      if (profileMenuPanelRef.current?.contains(e.target)) return;
+      setProfileMenuOpen(false);
     };
     const escape = (e) => {
       if (e.key === "Escape") setProfileMenuOpen(false);
@@ -1891,6 +1902,59 @@ export default function Navbar() {
     return () => {
       document.removeEventListener("pointerdown", fuera);
       document.removeEventListener("keydown", escape);
+    };
+  }, [profileMenuOpen]);
+
+  // Posición del panel, ahora que va por portal y no cuelga del botón. Mismo
+  // procedimiento que los desplegables de la barra de búsqueda: se mide el botón
+  // y se recalcula en scroll y resize (con `capture`, para enterarse también de
+  // los scrolls de contenedores internos).
+  useLayoutEffect(() => {
+    if (!profileMenuOpen || !profileMenuRef.current) {
+      setProfileMenuPosition(null);
+      return undefined;
+    }
+
+    let frameId = 0;
+    const updatePosition = () => {
+      // Se mide el CONTENEDOR, no el botón: el botón lleva `-mr-1.5` y sobresale
+      // 6px por la derecha. El panel se alineaba con el borde del contenedor
+      // (`right-0`), así que medir el botón lo correría esos 6px.
+      frameId = 0;
+      const rect = profileMenuRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      const viewportPadding = 16;
+      // 256px = el `w-64` que tenía el panel cuando iba anclado al botón.
+      const width = Math.min(256, window.innerWidth - viewportPadding * 2);
+      const left = Math.min(
+        window.innerWidth - width - viewportPadding,
+        Math.max(viewportPadding, rect.right - width),
+      );
+      // 20px = el `mt-5` anterior, que es lo que dejaba 12px de aire respecto al
+      // borde de la barra.
+      const next = { top: rect.bottom + 20, left, width };
+
+      setProfileMenuPosition((current) =>
+        current &&
+        current.top === next.top &&
+        current.left === next.left &&
+        current.width === next.width
+          ? current
+          : next,
+      );
+    };
+    const schedulePositionUpdate = () => {
+      if (!frameId) frameId = window.requestAnimationFrame(updatePosition);
+    };
+
+    updatePosition();
+    window.addEventListener("resize", schedulePositionUpdate);
+    window.addEventListener("scroll", schedulePositionUpdate, true);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener("resize", schedulePositionUpdate);
+      window.removeEventListener("scroll", schedulePositionUpdate, true);
     };
   }, [profileMenuOpen]);
 
@@ -2185,87 +2249,104 @@ export default function Navbar() {
                   />
                 </button>
 
-                <AnimatePresence>
-                  {profileMenuOpen ? (
-                    <motion.div
-                      role="menu"
-                      initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                      transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-                      // MISMO CRISTAL Y MISMA FORMA que el desplegable de la barra de
-                      // busqueda: identico `LIQUID_GLASS_PANEL`, mismo radio
-                      // (rounded-2xl) y misma capa. Antes iba con rounded-3xl y un
-                      // z-index mucho mas bajo, asi que se leian como dos piezas
-                      // distintas.
-                      // `top-full` cuelga del BOTON, y el boton acaba 8px antes que la barra,
-                      // asi que con mt-3 el panel quedaba a solo 4px del borde del
-                      // navbar y se leian pegados. Con mt-5 quedan 12px de aire.
-                      className={`absolute right-0 top-full z-[99999] mt-5 w-64 overflow-hidden rounded-2xl p-2 text-white ${LIQUID_GLASS_PANEL}`}
-                    >
-                      {/* UNA COLUMNA. Los dos grupos se apilan, con su rotulo
-                          haciendo de separador: el panel queda estrecho y pegado
-                          al boton de Perfil, en vez de extenderse a lo ancho de
-                          media barra. */}
-                      <div className="flex flex-col">
-                        {PROFILE_MENU_GROUPS.map((grupo) => (
-                          <div key={grupo.titulo} className="min-w-0">
-                            <p className="px-3 pb-1 pt-2 text-[10px] font-black uppercase tracking-widest text-zinc-500">
-                              {grupo.titulo}
-                            </p>
-                            {grupo.items.map(({ href, label, Icon }) => (
-                              <Link
-                                key={href}
-                                href={href}
-                                prefetch
-                                {...navPrefetchHandlers(href)}
-                                role="menuitem"
-                                onClick={() => setProfileMenuOpen(false)}
-                                aria-current={isActive(href) ? "page" : undefined}
-                                className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors ${
-                                  isActive(href)
-                                    ? "bg-white/10 font-bold text-white"
-                                    : "text-zinc-300 hover:bg-white/5 hover:text-white"
-                                }`}
-                              >
-                                <Icon className="h-4 w-4 shrink-0 text-zinc-400" />
-                                <span className="truncate">{label}</span>
-                              </Link>
+                {/* EL PANEL SALE DE LA BARRA, no cuelga del botón.
+                    `backdrop-filter` solo difumina lo que hay detrás DENTRO de
+                    su raíz de composición, y un ancestro que también lo use
+                    abre una raíz nueva. La barra gana su cristal al hacer
+                    scroll (`LIQUID_GLASS_BAR_FLAT` / `desktop:backdrop-blur`),
+                    así que a partir de ahí el panel se quedaba sin nada que
+                    difuminar y se veía transparente -- justo el síntoma. Con el
+                    portal cuelga de <body>, fuera de esa raíz, y conserva el
+                    cristal en todo momento. Es lo mismo que hacen los
+                    desplegables de la barra de búsqueda. */}
+                {profilePortalReady &&
+                  createPortal(
+                    <AnimatePresence>
+                      {profileMenuOpen && profileMenuPosition ? (
+                        <motion.div
+                          ref={profileMenuPanelRef}
+                          role="menu"
+                          style={profileMenuPosition}
+                          initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                          transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                          // MISMO CRISTAL Y MISMA FORMA que el desplegable de la barra de
+                          // busqueda: identico `LIQUID_GLASS_PANEL`, mismo radio
+                          // (rounded-2xl) y misma capa. Antes iba con rounded-3xl y un
+                          // z-index mucho mas bajo, asi que se leian como dos piezas
+                          // distintas.
+                          // Ancho, posicion y separacion respecto a la barra los
+                          // fija ahora `profileMenuPosition` (antes: `w-64`,
+                          // `right-0 top-full` y `mt-5`), porque con el portal ya
+                          // no hay un contenedor del que colgar.
+                          className={`fixed z-[99999] overflow-hidden rounded-2xl p-2 text-white ${LIQUID_GLASS_PANEL}`}
+                        >
+                          {/* UNA COLUMNA. Los dos grupos se apilan, con su rotulo
+                              haciendo de separador: el panel queda estrecho y pegado
+                              al boton de Perfil, en vez de extenderse a lo ancho de
+                              media barra. */}
+                          <div className="flex flex-col">
+                            {PROFILE_MENU_GROUPS.map((grupo) => (
+                              <div key={grupo.titulo} className="min-w-0">
+                                <p className="px-3 pb-1 pt-2 text-[10px] font-black uppercase tracking-widest text-zinc-500">
+                                  {grupo.titulo}
+                                </p>
+                                {grupo.items.map(({ href, label, Icon }) => (
+                                  <Link
+                                    key={href}
+                                    href={href}
+                                    prefetch
+                                    {...navPrefetchHandlers(href)}
+                                    role="menuitem"
+                                    onClick={() => setProfileMenuOpen(false)}
+                                    aria-current={isActive(href) ? "page" : undefined}
+                                    className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors ${
+                                      isActive(href)
+                                        ? "bg-white/10 font-bold text-white"
+                                        : "text-zinc-300 hover:bg-white/5 hover:text-white"
+                                    }`}
+                                  >
+                                    <Icon className="h-4 w-4 shrink-0 text-zinc-400" />
+                                    <span className="truncate">{label}</span>
+                                  </Link>
+                                ))}
+                              </div>
                             ))}
-                          </div>
-                        ))}
 
-                        {/* ASISTENTE. Es una sección más del panel, pero NO un
-                            enlace: no lleva a ninguna ruta, abre el recomendador
-                            sobre la página. Por eso va aparte de
-                            `PROFILE_MENU_GROUPS`, que son destinos.
-                            El componente NO se monta aquí dentro (está junto a
-                            su icono de la barra): esta fila solo pide que se
-                            abra y cierra el menú. Montarlo aquí lo desmontaría
-                            justo al empezar a usarlo -- el panel se pinta por
-                            portal, fuera de este desplegable, y el desplegable
-                            se cierra al pulsar fuera. */}
-                        <div className="min-w-0">
-                          <p className="px-3 pb-1 pt-2 text-[10px] font-black uppercase tracking-widest text-zinc-500">
-                            Asistente
-                          </p>
-                          <button
-                            type="button"
-                            role="menuitem"
-                            onClick={() => {
-                              setProfileMenuOpen(false);
-                              setAssistantOpen(true);
-                            }}
-                            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-zinc-300 transition-colors hover:bg-white/5 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-                          >
-                            <Sparkles className="h-4 w-4 shrink-0 text-cyan-400" />
-                            <span className="truncate">Qué ver con IA</span>
-                          </button>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ) : null}
-                </AnimatePresence>
+                            {/* ASISTENTE. Es una sección más del panel, pero NO un
+                                enlace: no lleva a ninguna ruta, abre el recomendador
+                                sobre la página. Por eso va aparte de
+                                `PROFILE_MENU_GROUPS`, que son destinos.
+                                El componente NO se monta aquí dentro (está junto a
+                                su icono de la barra): esta fila solo pide que se
+                                abra y cierra el menú. Montarlo aquí lo desmontaría
+                                justo al empezar a usarlo -- el panel se pinta por
+                                portal, fuera de este desplegable, y el desplegable
+                                se cierra al pulsar fuera. */}
+                            <div className="min-w-0">
+                              <p className="px-3 pb-1 pt-2 text-[10px] font-black uppercase tracking-widest text-zinc-500">
+                                Asistente
+                              </p>
+                              <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
+                                  setProfileMenuOpen(false);
+                                  setAssistantOpen(true);
+                                }}
+                                className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-zinc-300 transition-colors hover:bg-white/5 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                              >
+                                <Sparkles className="h-4 w-4 shrink-0 text-cyan-400" />
+                                <span className="truncate">Qué ver con IA</span>
+                              </button>
+                            </div>
+                          </div>
+                        </motion.div>
+                      ) : null}
+                    </AnimatePresence>,
+                    document.body,
+                  )}
               </div>
             )}
           </div>
