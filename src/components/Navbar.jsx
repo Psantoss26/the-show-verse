@@ -2260,8 +2260,8 @@ export default function Navbar() {
                       aria-current={active ? "page" : undefined}
                       className={`relative flex h-8 shrink-0 items-center justify-center rounded-full transition-[width,padding,color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
                         active
-                          ? `px-1.5 max-[359px]:w-8 max-[359px]:px-0 ${tone}`
-                          : "w-8 text-white/70 hover:text-white"
+                          ? `px-1.5 md:px-3 max-[359px]:w-8 max-[359px]:px-0 ${tone}`
+                          : "w-8 md:w-auto md:px-3 text-white/70 hover:text-white"
                       }`}
                     >
                       {active && (
@@ -2278,18 +2278,24 @@ export default function Navbar() {
                       {/* En pantallas de menos de 360px el rótulo no cabe sin
                           empujar al logo: ahí la sección activa se queda con su
                           icono, resaltado por la cápsula. */}
-                      {active && (
-                        <span className="relative z-10 hidden whitespace-nowrap text-[12.5px] font-extrabold tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)] min-[360px]:inline">
-                          {label}
-                        </span>
-                      )}
+                      {/* EN TABLET, TEXTO EN LOS TRES. En movil solo el activo lleva
+                          rotulo y los otros dos van con icono, porque no cabe mas;
+                          a partir de `md` sobra ancho de sobra, asi que se leen los
+                          tres nombres como en escritorio. */}
+                      <span
+                        className={`relative z-10 whitespace-nowrap text-[12.5px] font-extrabold tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)] md:inline ${
+                          active ? "hidden min-[360px]:inline" : "hidden"
+                        }`}
+                      >
+                        {label}
+                      </span>
                       {/* Mismo tamaño que el resto de iconos de la barra
                           (buscar, perfil): así el selector pesa lo mismo que
                           ellos en los dos estados, porque todos escalan juntos.
                           La caja del botón sigue siendo de 32px, de modo que el
                           selector no gana ancho. */}
                       <Icon
-                        className={`relative z-10 h-6 w-6 drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)] ${
+                        className={`relative z-10 h-6 w-6 drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)] md:hidden ${
                           active ? "min-[360px]:hidden" : ""
                         }`}
                         strokeWidth={2.2}
