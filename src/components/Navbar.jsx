@@ -949,7 +949,7 @@ function SearchBar({
         >
           {/* Lupa siempre blanca y visible */}
           <SearchIcon
-            className="w-5 h-5 text-white flex-shrink-0 opacity-100"
+            className="h-6 w-6 shrink-0 text-white opacity-100"
             strokeWidth={2.5}
           />
 
@@ -2233,7 +2233,7 @@ export default function Navbar() {
                   className="grid h-10 w-10 place-items-center rounded-full text-zinc-300 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
                   aria-label={t("search_input_label", "Buscar en The Show Verse")}
                 >
-                  <SearchIcon className="h-5 w-5" />
+                  <SearchIcon className="h-6 w-6" />
                 </button>
               )}
             </div>
@@ -2254,17 +2254,17 @@ export default function Navbar() {
             {profileAuthLoading ? (
               <div
                 aria-hidden="true"
-                className="ml-2 h-9 w-9 rounded-full bg-neutral-800/80 animate-pulse"
+                className="ml-1 h-9 w-9 rounded-full bg-neutral-800/80 animate-pulse"
               />
             ) : !account ? (
               <a
                 href={loginHref}
-                className="ml-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-medium transition-colors"
+                className="ml-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-medium transition-colors"
               >
                 {t("nav_login", "Iniciar sesión")}
               </a>
             ) : (
-              <div ref={profileMenuRef} className="relative ml-2">
+              <div ref={profileMenuRef} className="relative ml-1">
                 <button
                   type="button"
                   onClick={() => setProfileMenuOpen((v) => !v)}
