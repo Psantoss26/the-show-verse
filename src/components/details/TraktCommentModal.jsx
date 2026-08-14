@@ -152,7 +152,7 @@ export default function TraktCommentModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-full bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition shadow-sm cursor-pointer"
+            className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-full bg-white/5 text-white/70 hover:bg-white/10 hover:text-white transition shadow-sm cursor-pointer"
             aria-label="Cerrar"
           >
             <X className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -177,7 +177,7 @@ export default function TraktCommentModal({
                   if (error) setError("");
                 }}
                 placeholder="Escribe tu reseña o comentario aquí..."
-                className="w-full min-h-[160px] sm:min-h-[240px] rounded-2xl bg-black/30 border border-white/10 p-3.5 sm:p-4 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-orange-500/50 resize-none transition"
+                className="w-full min-h-[160px] sm:min-h-[240px] rounded-2xl bg-black/30 p-3.5 sm:p-4 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border focus:border-orange-500/50 resize-none transition"
                 disabled={submitting}
               />
 
@@ -193,10 +193,10 @@ export default function TraktCommentModal({
                   type="button"
                   onClick={() => setIsSpoiler(!isSpoiler)}
                   disabled={submitting}
-                  className={`flex items-center gap-2 px-3 py-1.5 sm:px-3.5 sm:py-1.5 rounded-full border text-[11px] sm:text-xs font-bold transition-all duration-300 select-none cursor-pointer ${
+                  className={`flex items-center gap-2 px-3 py-1.5 sm:px-3.5 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-bold transition-all duration-300 select-none cursor-pointer ${
                     isSpoiler
-                      ? "bg-rose-500/10 border-rose-500/30 text-rose-400 shadow-[0_0_15px_rgba(239,68,68,0.1)]"
-                      : "bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10 hover:border-white/20"
+                      ? "bg-rose-500/10 border border-rose-500/30 text-rose-400 shadow-[0_0_15px_rgba(239,68,68,0.1)]"
+                      : "bg-white/5 text-zinc-400 hover:bg-white/10 "
                   }`}
                 >
                   <div
@@ -222,7 +222,7 @@ export default function TraktCommentModal({
                       type="button"
                       onClick={handleCancelEdit}
                       disabled={submitting}
-                      className="rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 px-3.5 py-2 sm:px-4 sm:py-2.5 text-[11px] sm:text-xs font-bold text-zinc-300 transition cursor-pointer"
+                      className="rounded-xl bg-white/5 hover:bg-white/10 px-3.5 py-2 sm:px-4 sm:py-2.5 text-[11px] sm:text-xs font-bold text-zinc-300 transition cursor-pointer"
                     >
                       Cancelar
                     </button>
@@ -250,7 +250,7 @@ export default function TraktCommentModal({
                   {myComments.map((comment) => (
                     <div
                       key={comment.id}
-                      className="relative group overflow-hidden rounded-2xl bg-white/5 border border-white/10 p-4 transition-all duration-300 hover:border-white/20 hover:bg-white/10"
+                      className="relative group overflow-hidden rounded-2xl bg-white/5 p-4 transition-all duration-300 hover:bg-white/10"
                     >
                       <div className="flex items-center justify-between gap-4 mb-2">
                         <div className="flex items-center gap-2">
@@ -299,7 +299,7 @@ export default function TraktCommentModal({
                               <button
                                 type="button"
                                 onClick={() => handleStartEdit(comment)}
-                                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-[11px] font-bold text-zinc-300 hover:bg-orange-500/10 hover:border-orange-500/30 hover:text-orange-300 transition-all cursor-pointer"
+                                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white/5 text-[11px] font-bold text-zinc-300 hover:bg-orange-500/10 hover:text-orange-300 transition-all cursor-pointer"
                                 title="Editar reseña"
                               >
                                 <Pencil className="w-3 h-3" />
@@ -308,7 +308,7 @@ export default function TraktCommentModal({
                               <button
                                 type="button"
                                 onClick={() => setConfirmDeleteId(comment.id)}
-                                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-[11px] font-bold text-zinc-300 hover:bg-rose-500/10 hover:border-rose-500/30 hover:text-rose-300 transition-all cursor-pointer"
+                                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white/5 text-[11px] font-bold text-zinc-300 hover:bg-rose-500/10 hover:text-rose-300 transition-all cursor-pointer"
                                 title="Eliminar reseña"
                               >
                                 <Trash2 className="w-3 h-3" />
@@ -322,7 +322,7 @@ export default function TraktCommentModal({
                       {/* Comment text */}
                       <div className="text-zinc-300 text-sm leading-relaxed whitespace-pre-wrap">
                         {comment.spoiler && !revealedSpoilers.has(comment.id) ? (
-                          <div className="relative overflow-hidden rounded-xl bg-black/40 border border-white/5 p-4 text-center mt-2">
+                          <div className="relative overflow-hidden rounded-xl bg-black/40 p-4 text-center mt-2">
                             <p className="text-xs text-rose-400 font-bold mb-2 flex items-center justify-center gap-1.5">
                               <AlertTriangle className="w-4 h-4" />
                               Esta reseña contiene spoilers

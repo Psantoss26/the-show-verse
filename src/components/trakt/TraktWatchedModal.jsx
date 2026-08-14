@@ -168,7 +168,7 @@ function CalendarPickerModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white"
             aria-label="Cerrar"
           >
             <X className="w-5 h-5" />
@@ -184,7 +184,7 @@ function CalendarPickerModal({
                 (d) => new Date(d.getFullYear(), d.getMonth() - 1, 1),
               )
             }
-            className="rounded-full border border-white/10 bg-white/5 p-2 text-white/70 transition hover:bg-white/10 hover:text-white"
+            className="rounded-full bg-white/5 p-2 text-white/70 transition hover:bg-white/10 hover:text-white"
             aria-label="Mes anterior"
           >
             <ChevronLeft className="w-5 h-5" />
@@ -199,7 +199,7 @@ function CalendarPickerModal({
                 (d) => new Date(d.getFullYear(), d.getMonth() + 1, 1),
               )
             }
-            className="rounded-full border border-white/10 bg-white/5 p-2 text-white/70 transition hover:bg-white/10 hover:text-white"
+            className="rounded-full bg-white/5 p-2 text-white/70 transition hover:bg-white/10 hover:text-white"
             aria-label="Mes siguiente"
           >
             <ChevronRight className="w-5 h-5" />
@@ -234,7 +234,7 @@ function CalendarPickerModal({
                                         relative aspect-square rounded-lg flex items-center justify-center text-sm font-medium transition-all duration-200
                                         ${!inMonth ? "text-white/20 opacity-50" : "text-white/70 hover:bg-white/10 hover:text-white"}
                                         ${isSel ? "!bg-emerald-500 !text-black font-extrabold shadow-[0_0_15px_rgba(16,185,129,0.4)] scale-105 z-10" : ""}
-                                        ${isToday && !isSel ? "bg-white/5 border border-white/10 text-white" : ""}
+                                        ${isToday && !isSel ? "bg-white/5 text-white" : ""}
                                     `}
                 >
                   {d.getDate()}
@@ -250,7 +250,7 @@ function CalendarPickerModal({
             <button
               type="button"
               onClick={() => onSelect?.(todayYmd())}
-              className="flex-1 rounded-full border border-white/20 bg-white/10 py-2.5 text-xs font-bold uppercase tracking-wide text-white/90 backdrop-blur-xl transition hover:bg-white/20 active:scale-95"
+              className="flex-1 rounded-full bg-white/10 py-2.5 text-xs font-bold uppercase tracking-wide text-white/90 backdrop-blur-xl transition hover:bg-white/20 active:scale-95"
             >
               Seleccionar Hoy
             </button>
@@ -393,7 +393,7 @@ export default function TraktWatchedModal({
           <button
             type="button"
             onClick={onClose}
-            className="-mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white"
+            className="-mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white"
             aria-label="Cerrar (Esc)"
           >
             <X className="w-5 h-5" />
@@ -404,7 +404,7 @@ export default function TraktWatchedModal({
           {/* SECCIÓN 1: AÑADIR NUEVO (Hero Section) */}
           <div className="relative group">
             <div className="absolute -inset-2 rounded-3xl bg-gradient-to-b from-emerald-400/15 to-transparent opacity-0 blur-lg transition duration-500 group-hover:opacity-100" />
-            <div className="relative flex flex-col gap-3 rounded-3xl border border-white/10 bg-white/5 p-4 shadow-lg backdrop-blur-xl">
+            <div className="relative flex flex-col gap-3 rounded-3xl bg-white/5 p-4 shadow-lg backdrop-blur-xl">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-white/60">
                   Registrar nueva vista
@@ -419,7 +419,7 @@ export default function TraktWatchedModal({
                   type="button"
                   onClick={openCalendarForNew}
                   disabled={isBusy}
-                  className="flex flex-1 items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left backdrop-blur-md shadow-sm transition hover:bg-white/10 hover:border-white/20 disabled:opacity-50"
+                  className="flex flex-1 items-center gap-3 rounded-2xl bg-white/5 px-4 py-3 text-left backdrop-blur-md shadow-sm transition hover:bg-white/10 disabled:opacity-50"
                 >
                   <CalendarDays className="w-5 h-5 text-emerald-200/80" />
                   <div>
@@ -471,11 +471,11 @@ export default function TraktWatchedModal({
                     <div
                       key={it.id}
                       className={`
-                                                relative rounded-3xl border p-4 backdrop-blur-xl transition-all duration-300 shadow-md
+                                                relative rounded-3xl p-4 backdrop-blur-xl transition-all duration-300 shadow-md
                                                 ${
                                                   isEditing
-                                                    ? "border-yellow-500/30 bg-yellow-500/10 shadow-[0_0_20px_-5px_rgba(234,179,8,0.3)]"
-                                                    : "border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10"
+                                                    ? "border border-yellow-500/30 bg-yellow-500/10 shadow-[0_0_20px_-5px_rgba(234,179,8,0.3)]"
+                                                    : "bg-white/5 hover:bg-white/10"
                                                 }
                                             `}
                     >
@@ -483,8 +483,8 @@ export default function TraktWatchedModal({
                         <div className="flex items-center gap-4">
                           <div
                             className={`
-                                                        w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border backdrop-blur-md
-                                                        ${isEditing ? "bg-yellow-400/15 border-yellow-300/25 text-yellow-200" : "bg-white/5 border-white/10 text-white/45"}
+                                                        w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 backdrop-blur-md
+                                                        ${isEditing ? "bg-yellow-400/15 border border-yellow-300/25 text-yellow-200" : "bg-white/5 text-white/45"}
                                                     `}
                           >
                             {isEditing ? (
@@ -535,7 +535,7 @@ export default function TraktWatchedModal({
                               type="button"
                               onClick={openCalendarForEdit}
                               disabled={isBusy}
-                              className="flex flex-1 items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white/85 shadow-sm transition hover:bg-white/10 hover:border-white/20"
+                              className="flex flex-1 items-center justify-between rounded-2xl bg-white/5 px-3 py-2.5 text-sm text-white/85 shadow-sm transition hover:bg-white/10 "
                             >
                               <span className="font-mono">
                                 {formatYmdHuman(editDate)}
@@ -554,7 +554,7 @@ export default function TraktWatchedModal({
                               type="button"
                               onClick={stopEdit}
                               disabled={isBusy}
-                              className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm font-bold text-white/60 transition hover:bg-white/10 hover:text-white"
+                              className="rounded-full bg-white/5 px-3 py-2 text-sm font-bold text-white/60 transition hover:bg-white/10 hover:text-white"
                               aria-label="Cancelar"
                             >
                               <X className="w-4 h-4" />
