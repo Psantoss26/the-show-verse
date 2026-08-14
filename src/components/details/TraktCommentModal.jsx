@@ -295,24 +295,35 @@ export default function TraktCommentModal({
                               </button>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300">
+                            // MISMOS BOTONES QUE EL HISTORIAL DE VISIONADO: solo
+                            // icono, redondos y en gris tenue, con el color
+                            // apareciendo al pasar por encima. Antes eran
+                            // píldoras con rótulo ("Editar" / "Eliminar"), que
+                            // pesaban mucho más en una fila que ya lleva fecha
+                            // y etiqueta de spoiler.
+                            //
+                            // El rótulo desaparece, así que el nombre accesible
+                            // pasa a `aria-label`: `title` solo produce el
+                            // globo del ratón y no siempre lo anuncian los
+                            // lectores de pantalla.
+                            <div className="flex items-center gap-1">
                               <button
                                 type="button"
                                 onClick={() => handleStartEdit(comment)}
-                                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white/5 text-[11px] font-bold text-zinc-300 hover:bg-orange-500/10 hover:text-orange-300 transition-all cursor-pointer"
+                                className="rounded-full p-2 text-white/45 transition hover:bg-white/10 hover:text-white"
+                                aria-label="Editar"
                                 title="Editar reseña"
                               >
-                                <Pencil className="w-3 h-3" />
-                                <span>Editar</span>
+                                <Pencil className="w-4 h-4" />
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setConfirmDeleteId(comment.id)}
-                                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white/5 text-[11px] font-bold text-zinc-300 hover:bg-rose-500/10 hover:text-rose-300 transition-all cursor-pointer"
+                                className="rounded-full p-2 text-white/45 transition hover:bg-red-500/15 hover:text-red-300"
+                                aria-label="Eliminar"
                                 title="Eliminar reseña"
                               >
-                                <Trash2 className="w-3 h-3" />
-                                <span>Eliminar</span>
+                                <Trash2 className="w-4 h-4" />
                               </button>
                             </div>
                           )}
