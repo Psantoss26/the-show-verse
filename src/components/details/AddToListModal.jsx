@@ -191,7 +191,7 @@ export default function AddToListModal(props) {
                     onChange={(e) => setNewName?.(e.target.value)}
                     placeholder="Nombre de la lista"
                     maxLength={60}
-                    className="w-full rounded-xl bg-black/40 px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none focus:border focus:border-yellow-500/50 focus:bg-black/60 transition"
+                    className="w-full rounded-xl bg-black/40 px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none focus:ring-2 focus:ring-yellow-500/50 focus:bg-black/60 transition"
                     autoFocus
                   />
 

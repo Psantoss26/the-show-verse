@@ -839,7 +839,7 @@ export default function TraktEpisodesWatchedModal({
                     type="datetime-local"
                     value={movieEditValue}
                     onChange={(e) => setMovieEditValue(e.target.value)}
-                    className="w-full rounded-xl bg-black/30 px-4 py-3 text-sm text-white backdrop-blur-md transition focus:border focus:border-emerald-300/50 focus:outline-none"
+                    className="w-full rounded-xl bg-black/30 px-4 py-3 text-sm text-white backdrop-blur-md transition focus:ring-2 focus:ring-emerald-300/50 focus:outline-none"
                   />
                   {movieWatchedAt && (
                     <p className="mt-2 text-xs text-emerald-400">
@@ -985,7 +985,7 @@ export default function TraktEpisodesWatchedModal({
                     ? "Buscar episodio..."
                     : "Buscar temporada..."
                 }
-                className="h-10 w-full rounded-xl bg-black/30 py-2.5 pl-10 pr-4 text-sm text-white/85 backdrop-blur-md transition placeholder:text-white/30 focus:border focus:border-emerald-300/50 focus:outline-none"
+                className="h-10 w-full rounded-xl bg-black/30 py-2.5 pl-10 pr-4 text-sm text-white/85 backdrop-blur-md transition placeholder:text-white/30 focus:ring-2 focus:ring-emerald-300/50 focus:outline-none"
               />
             </div>
             <button
@@ -1198,7 +1198,7 @@ export default function TraktEpisodesWatchedModal({
                     ? "Buscar episodio..."
                     : "Buscar temporada..."
                 }
-                className="h-11 w-full rounded-xl bg-black/30 py-2.5 pl-10 pr-4 text-sm text-white/85 backdrop-blur-md transition placeholder:text-white/30 focus:border focus:border-emerald-300/50 focus:outline-none"
+                className="h-11 w-full rounded-xl bg-black/30 py-2.5 pl-10 pr-4 text-sm text-white/85 backdrop-blur-md transition placeholder:text-white/30 focus:ring-2 focus:ring-emerald-300/50 focus:outline-none"
               />
             </div>
 
@@ -1448,7 +1448,7 @@ export default function TraktEpisodesWatchedModal({
                     type="datetime-local"
                     value={rewatchMarkOtherValue}
                     onChange={(e) => setRewatchMarkOtherValue(e.target.value)}
-                    className="w-full rounded-xl bg-black/30 px-3.5 py-2.5 text-sm text-white backdrop-blur-md transition focus:border focus:border-purple-300/50 focus:outline-none sm:w-[230px]"
+                    className="w-full rounded-xl bg-black/30 px-3.5 py-2.5 text-sm text-white backdrop-blur-md transition focus:ring-2 focus:ring-purple-300/50 focus:outline-none sm:w-[230px]"
                   />
                 )}
               </div>
@@ -1943,7 +1943,7 @@ export default function TraktEpisodesWatchedModal({
                         value={addPlayOtherValue}
                         onChange={(e) => setAddPlayOtherValue(e.target.value)}
                         disabled={addPlayBusy}
-                        className="w-full rounded-xl bg-black/30 px-4 py-3 text-sm text-white backdrop-blur-md transition focus:border focus:border-emerald-300/50 focus:outline-none"
+                        className="w-full rounded-xl bg-black/30 px-4 py-3 text-sm text-white backdrop-blur-md transition focus:ring-2 focus:ring-emerald-300/50 focus:outline-none"
                       />
                     </div>
                   )}
@@ -2047,7 +2047,7 @@ export default function TraktEpisodesWatchedModal({
                         setHistoryLimit(60);
                       }}
                       placeholder="Buscar por fecha/hora..."
-                      className="w-full rounded-xl bg-black/30 py-2 pl-9 pr-4 text-sm text-white/85 backdrop-blur-md transition focus:border focus:border-emerald-300/50 focus:outline-none"
+                      className="w-full rounded-xl bg-black/30 py-2 pl-9 pr-4 text-sm text-white/85 backdrop-blur-md transition focus:ring-2 focus:ring-emerald-300/50 focus:outline-none"
                     />
                   </div>
 

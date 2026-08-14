@@ -55,16 +55,11 @@ export default function TraktCommentModal({
 
   if (!open) return null;
 
-  const wordCount = commentText.trim().split(/\s+/).filter(Boolean).length;
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     const cleanComment = commentText.trim();
+    // Única condición: que haya algo escrito. Ya no hay mínimo de palabras.
     if (!cleanComment) return;
-    if (wordCount < 5) {
-      setError("El comentario debe tener al menos 5 palabras.");
-      return;
-    }
 
     setSubmitting(true);
     setError("");
@@ -164,10 +159,15 @@ export default function TraktCommentModal({
           <div className="px-5 py-5 sm:px-6 sm:py-6 space-y-5 sm:space-y-6">
             {/* Form */}
             <form onSubmit={handleSubmit} className="flex flex-col space-y-4">
-              <div className="flex items-center justify-between text-xs font-bold text-zinc-400">
-                <span>{editingCommentId ? "Modificando tu comentario" : "Tu opinión en Trakt"}</span>
-                <span className="text-zinc-500">Mínimo 5 palabras</span>
-              </div>
+              {/* Sin el aviso del mínimo, esta fila solo tiene algo que decir
+                  mientras se edita. Va CONDICIONAL y no como fila vacía: el
+                  `space-y-4` del formulario le reservaría su hueco igualmente y
+                  el campo aparecería hundido sin motivo. */}
+              {editingCommentId && (
+                <div className="text-xs font-bold text-zinc-400">
+                  Modificando tu comentario
+                </div>
+              )}
 
               <textarea
                 ref={textareaRef}
@@ -177,7 +177,7 @@ export default function TraktCommentModal({
                   if (error) setError("");
                 }}
                 placeholder="Escribe tu reseña o comentario aquí..."
-                className="w-full min-h-[160px] sm:min-h-[240px] rounded-2xl bg-black/30 p-3.5 sm:p-4 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border focus:border-orange-500/50 resize-none transition"
+                className="w-full min-h-[160px] sm:min-h-[240px] rounded-2xl bg-black/30 p-3.5 sm:p-4 text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50 resize-none transition"
                 disabled={submitting}
               />
 
@@ -196,7 +196,7 @@ export default function TraktCommentModal({
                   className={`flex items-center gap-2 px-3 py-1.5 sm:px-3.5 sm:py-1.5 rounded-full text-[11px] sm:text-xs font-bold transition-all duration-300 select-none cursor-pointer ${
                     isSpoiler
                       ? "bg-rose-500/10 border border-rose-500/30 text-rose-400 shadow-[0_0_15px_rgba(239,68,68,0.1)]"
-                      : "bg-white/5 text-zinc-400 hover:bg-white/10 "
+                      : "bg-white/5 text-zinc-400 hover:bg-white/10"
                   }`}
                 >
                   <div
@@ -207,16 +207,8 @@ export default function TraktCommentModal({
                   <span>Contiene spoilers</span>
                 </button>
 
-                {/* Word count & Submit / Cancel buttons */}
+                {/* Submit / Cancel buttons */}
                 <div className="flex items-center justify-end flex-1 sm:flex-none gap-2 sm:gap-3">
-                  {commentText.trim() && (
-                    <span className={`text-[10px] sm:text-[11px] font-bold ${
-                      wordCount < 5 ? "text-rose-400" : "text-emerald-400"
-                    }`}>
-                      {wordCount} / 5 palabras
-                    </span>
-                  )}
-
                   {editingCommentId && (
                     <button
                       type="button"
@@ -230,7 +222,9 @@ export default function TraktCommentModal({
 
                   <button
                     type="submit"
-                    disabled={submitting || wordCount < 5}
+                    // Se sigue impidiendo publicar en vacío, que es lo que
+                    // rechaza `handleSubmit`; el mínimo de palabras ya no.
+                    disabled={submitting || !commentText.trim()}
                     className="rounded-xl bg-orange-500 hover:bg-orange-600 disabled:bg-zinc-800 disabled:text-zinc-500 px-4 py-2 sm:px-6 sm:py-2.5 text-[11px] sm:text-xs font-bold text-white transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer disabled:cursor-not-allowed shadow-[0_0_20px_-5px_rgba(249,115,22,0.3)]"
                   >
                     {submitting && <Loader2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 animate-spin text-white" />}

@@ -80,16 +80,31 @@ test("ningún color de borde se queda sin ancho", async () => {
   }
 });
 
-test("el foco sigue teniendo indicador visible", async () => {
-  // Quitar el contorno en reposo NO puede llevarse por delante el foco: ahí el
-  // borde aparece solo al enfocar, que es justo el comportamiento deseado.
-  const conCampos = ["details/TraktCommentModal", "details/AddToListModal"];
+test("el foco tiene indicador y no mueve el layout", async () => {
+  // Quitar el contorno en reposo no puede llevarse por delante el foco. Pero el
+  // indicador tiene que ser un ANILLO, no un borde:
+  //
+  // `focus:border` lleva el ancho de 0 a 1px al enfocar y, con
+  // `box-sizing: border-box`, eso encoge el área de contenido 2px. El campo da
+  // un salto -- y como estos modales enfocan solos al abrirse, el salto se ve
+  // como un parpadeo nada más aparecer. El anillo es `box-shadow`: no ocupa
+  // caja, así que no puede mover nada.
+  const conCampos = [
+    "details/TraktCommentModal",
+    "details/AddToListModal",
+    "trakt/TraktEpisodesWatchedModal",
+  ];
   for (const nombre of conCampos) {
     const source = await leer(nombre);
     assert.match(
       source,
-      /focus:border focus:border-/,
+      /focus:ring-\d/,
       `${nombre} perdió el indicador de foco de sus campos`,
+    );
+    assert.doesNotMatch(
+      source,
+      /focus(-visible)?:border(?![-\w])/,
+      `${nombre} usa un borde de foco: desplaza el contenido al enfocar`,
     );
   }
 });
