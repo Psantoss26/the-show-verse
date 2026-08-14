@@ -176,7 +176,7 @@ export default function EpisodeRatingsModal({
           <button
             type="button"
             onClick={closeFromEvent}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white"
             aria-label="Cerrar valoraciones de episodios"
             title="Cerrar (Esc)"
           >
@@ -209,7 +209,7 @@ export default function EpisodeRatingsModal({
                 <button
                   type="button"
                   onClick={() => setRequestKey((current) => current + 1)}
-                  className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/10 px-4 text-sm font-bold text-white transition hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
+                  className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-white/10 px-4 text-sm font-bold text-white transition hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
                 >
                   <RotateCw className="h-4 w-4" aria-hidden="true" />
                   Reintentar

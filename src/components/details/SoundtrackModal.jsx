@@ -243,7 +243,7 @@ export default function SoundtrackModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="flex h-11 w-11 items-center justify-center rounded-full bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition shadow-sm"
+                className="flex h-11 w-11 items-center justify-center rounded-full bg-white/5 text-white/70 hover:bg-white/10 hover:text-white transition shadow-sm"
                 aria-label="Cerrar (Esc)"
               >
                 <X className="h-5 w-5" />
@@ -251,7 +251,7 @@ export default function SoundtrackModal({
             </div>
 
             {/* --- PORTADA --- */}
-            <div className="relative w-72 h-72 sm:w-80 sm:h-80 rounded-[2.5rem] overflow-hidden shadow-[0_30px_60px_-15px_rgba(0,0,0,0.9)] border border-white/10 mb-8 transition-transform duration-500 hover:scale-[1.02]">
+            <div className="relative w-72 h-72 sm:w-80 sm:h-80 rounded-[2.5rem] overflow-hidden shadow-[0_30px_60px_-15px_rgba(0,0,0,0.9)] mb-8 transition-transform duration-500 hover:scale-[1.02]">
               {selectedTrack.artworkUrl ? (
                 <OptimizedImage
                   src={selectedTrack.artworkUrl}
@@ -296,7 +296,7 @@ export default function SoundtrackModal({
                     {formatTime(progress)}
                   </span>
                   <div className="relative flex-1 flex items-center group h-5">
-                    <div className="absolute inset-x-0 h-1.5 bg-black/40 backdrop-blur-md rounded-full overflow-hidden border border-white/10 pointer-events-none">
+                    <div className="absolute inset-x-0 h-1.5 bg-black/40 backdrop-blur-md rounded-full overflow-hidden pointer-events-none">
                       <div
                         className="h-full bg-gradient-to-r from-white/60 to-white rounded-full transition-all duration-75 shadow-[0_0_10px_rgba(255,255,255,0.5)]"
                         style={{
@@ -320,7 +320,7 @@ export default function SoundtrackModal({
                 </div>
               </>
             ) : (
-              <div className="mb-8 flex w-full flex-col items-center gap-3 rounded-3xl border border-white/10 bg-white/5 px-5 py-4 text-center">
+              <div className="mb-8 flex w-full flex-col items-center gap-3 rounded-3xl bg-white/5 px-5 py-4 text-center">
                 <p className="text-sm font-medium text-white/60">
                   Esta pista no tiene preview disponible.
                 </p>
@@ -329,10 +329,10 @@ export default function SoundtrackModal({
                     href={selectedExternalUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-bold transition ${
+                    className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition ${
                       selectedTrack?.source === "Spotify"
                         ? "border-[#1DB954]/30 bg-[#1DB954]/15 text-[#1ED760] hover:bg-[#1DB954]/25"
-                        : "border-white/20 bg-white/10 text-zinc-200 hover:bg-white/20"
+                        : "bg-white/10 text-zinc-200 hover:bg-white/20"
                     }`}
                   >
                     <SourceLinkIcon
@@ -360,7 +360,7 @@ export default function SoundtrackModal({
                 <button
                   type="button"
                   onClick={togglePlay}
-                  className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 text-white flex items-center justify-center hover:bg-white/20 hover:scale-105 active:scale-95 transition shadow-[0_10px_40px_-10px_rgba(255,255,255,0.2)]"
+                  className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white/10 backdrop-blur-xl text-white flex items-center justify-center hover:bg-white/20 hover:scale-105 active:scale-95 transition shadow-[0_10px_40px_-10px_rgba(255,255,255,0.2)]"
                   aria-label="Reproducir o pausar preview"
                 >
                   {isPlaying ? (
@@ -396,7 +396,7 @@ export default function SoundtrackModal({
                   )}
                 </button>
                 <div className="relative flex items-center w-28 h-5 group">
-                  <div className="absolute inset-x-0 h-1.5 bg-black/40 backdrop-blur-md rounded-full overflow-hidden border border-white/10 pointer-events-none">
+                  <div className="absolute inset-x-0 h-1.5 bg-black/40 backdrop-blur-md rounded-full overflow-hidden pointer-events-none">
                     <div
                       className="h-full bg-white/70 group-hover:bg-white rounded-full transition-all duration-75"
                       style={{ width: `${(isMuted ? 0 : volume) * 100}%` }}

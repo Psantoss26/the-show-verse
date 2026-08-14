@@ -176,7 +176,7 @@ export default function VideoModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition shadow-sm"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/5 text-white/70 hover:bg-white/10 hover:text-white transition shadow-sm"
             title="Cerrar (Esc)"
           >
             <X className="w-5 h-5" />

@@ -115,7 +115,7 @@ export default function AddToListModal(props) {
           <button
             type="button"
             onClick={onClose}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition shadow-sm"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/5 text-white/70 hover:bg-white/10 hover:text-white transition shadow-sm"
             aria-label="Cerrar"
           >
             <X className="w-5 h-5" />
@@ -163,7 +163,7 @@ export default function AddToListModal(props) {
                 type="button"
                 onClick={() => setCreateOpen(true)}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-white/10 bg-white/[0.02]
-                           text-zinc-400 text-sm font-bold hover:bg-white/[0.05] hover:border-white/20 hover:text-white transition-all group"
+                           text-zinc-400 text-sm font-bold hover:bg-white/[0.05] hover:text-white transition-all group"
               >
                 <div className="p-1 rounded-md bg-white/5 group-hover:bg-yellow-500 group-hover:text-black transition-colors">
                   <Plus className="w-4 h-4" />
@@ -171,7 +171,7 @@ export default function AddToListModal(props) {
                 Crear nueva lista
               </button>
             ) : (
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 space-y-4 animate-in slide-in-from-top-2 fade-in">
+              <div className="rounded-2xl bg-white/[0.03] p-4 space-y-4 animate-in slide-in-from-top-2 fade-in">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
                     Nueva Lista
@@ -191,7 +191,7 @@ export default function AddToListModal(props) {
                     onChange={(e) => setNewName?.(e.target.value)}
                     placeholder="Nombre de la lista"
                     maxLength={60}
-                    className="w-full rounded-xl bg-black/40 border border-white/10 px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none focus:border-yellow-500/50 focus:bg-black/60 transition"
+                    className="w-full rounded-xl bg-black/40 px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none focus:border focus:border-yellow-500/50 focus:bg-black/60 transition"
                     autoFocus
                   />
 
@@ -200,7 +200,7 @@ export default function AddToListModal(props) {
                     onChange={(e) => setNewDesc?.(e.target.value)}
                     placeholder="Descripción (opcional)"
                     maxLength={120}
-                    className="w-full rounded-xl bg-black/40 border border-white/10 px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none focus:border-white/20 focus:bg-black/60 transition"
+                    className="w-full rounded-xl bg-black/40 px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none focus:focus:bg-black/60 transition"
                   />
 
                   <button
@@ -234,7 +234,7 @@ export default function AddToListModal(props) {
                 value={query ?? ""}
                 onChange={(e) => setQuery?.(e.target.value)}
                 placeholder="Buscar en tus listas..."
-                className="w-full rounded-xl bg-black/40 border border-white/10 pl-10 pr-4 py-3 text-sm text-white placeholder-zinc-600 outline-none focus:border-white/20 focus:bg-black/60 transition"
+                className="w-full rounded-xl bg-black/40 pl-10 pr-4 py-3 text-sm text-white placeholder-zinc-600 outline-none focus:focus:bg-black/60 transition"
               />
             </div>
 
@@ -279,11 +279,11 @@ export default function AddToListModal(props) {
                   <div
                     key={id}
                     className={[
-                      "w-full relative overflow-hidden rounded-2xl border transition-all duration-300",
+                      "w-full relative overflow-hidden rounded-2xl transition-all duration-300",
                       "flex items-center justify-between gap-4 text-left",
                       present
-                        ? "bg-emerald-500/[0.03] border-emerald-500/20 hover:bg-emerald-500/[0.05]"
-                        : "bg-white/[0.02] border-white/5 hover:bg-white/[0.06] hover:border-white/10",
+                        ? "bg-emerald-500/[0.03] border border-emerald-500/20 hover:bg-emerald-500/[0.05]"
+                        : "bg-white/[0.02] hover:bg-white/[0.06] ",
                     ].join(" ")}
                   >
                     <Link
@@ -310,7 +310,7 @@ export default function AddToListModal(props) {
                         {l?.description || "Sin descripción"}
                       </div>
 
-                      <div className="mt-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-white/5 text-zinc-400 border border-white/5">
+                      <div className="mt-2 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-white/5 text-zinc-400 ">
                         {typeof l?.item_count === "number"
                           ? `${l.item_count} ITEMS`
                           : "—"}
@@ -334,12 +334,12 @@ export default function AddToListModal(props) {
                     >
                       <div
                         className={[
-                          "w-10 h-10 rounded-full flex items-center justify-center border transition-all duration-300",
+                          "w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300",
                           busy
-                            ? "bg-white/5 border-white/10"
+                            ? "bg-white/5 "
                             : present
-                              ? "bg-emerald-500 text-black border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)] group-hover/action:bg-red-500 group-hover/action:border-red-500 group-hover/action:text-white group-hover/action:shadow-[0_0_15px_rgba(239,68,68,0.25)]"
-                              : "bg-transparent border-white/10 text-zinc-500 group-hover/action:border-yellow-500 group-hover/action:text-yellow-500 group-hover/action:bg-yellow-500/10",
+                              ? "bg-emerald-500 text-black shadow-[0_0_15px_rgba(16,185,129,0.3)] group-hover/action:bg-red-500 group-hover/action:text-white group-hover/action:shadow-[0_0_15px_rgba(239,68,68,0.25)]"
+                              : "bg-transparent text-zinc-500 group-hover/action:text-yellow-500 group-hover/action:bg-yellow-500/10",
                         ].join(" ")}
                       >
                         {busy ? (
