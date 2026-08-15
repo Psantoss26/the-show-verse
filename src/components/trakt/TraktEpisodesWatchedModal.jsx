@@ -1112,7 +1112,7 @@ export default function TraktEpisodesWatchedModal({
                       onClick={() => setOnlyUnwatched(!onlyUnwatched)}
                       className={`flex-1 h-11 inline-flex items-center justify-center gap-2 px-4 rounded-xl text-sm font-semibold transition whitespace-nowrap ${
                         onlyUnwatched
-                          ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-400"
+                          ? "bg-emerald-500/10 text-emerald-400"
                           : "bg-black/30 text-white/50 hover:bg-white/10 hover:text-white"
                       }`}
                     >
@@ -1310,7 +1310,7 @@ export default function TraktEpisodesWatchedModal({
               onClick={() => setOnlyUnwatched(!onlyUnwatched)}
               className={`h-10 xl:h-11 inline-flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-4 rounded-xl text-[11px] xl:text-sm font-semibold transition whitespace-nowrap shrink-0 ${
                 onlyUnwatched
-                  ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-400"
+                  ? "bg-emerald-500/10 text-emerald-400"
                   : "bg-black/30 text-white/50 hover:bg-white/10 hover:text-white"
               }`}
               aria-label={onlyUnwatched ? "Mostrar no vistos" : "Mostrar todos"}
@@ -1864,7 +1864,7 @@ export default function TraktEpisodesWatchedModal({
                         }}
                         className={`px-3 py-3 rounded-2xl text-sm font-black transition text-left ${
                           addPlayMode === "play"
-                            ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-300"
+                            ? "bg-emerald-500/10 text-emerald-300"
                             : "bg-black/30 text-white/70 hover:bg-white/10"
                         }`}
                       >
@@ -1883,7 +1883,7 @@ export default function TraktEpisodesWatchedModal({
                         }}
                         className={`px-3 py-3 rounded-2xl text-sm font-black transition text-left ${
                           addPlayMode === "rewatch"
-                            ? "bg-purple-500/10 border border-purple-500/30 text-purple-200"
+                            ? "bg-purple-500/10 text-purple-200"
                             : "bg-black/30 text-white/70 hover:bg-white/10"
                         } ${!hasCreateRewatchHandler ? "opacity-50 cursor-not-allowed" : ""}`}
                       >
@@ -1927,7 +1927,7 @@ export default function TraktEpisodesWatchedModal({
                         className={`px-3 py-2 rounded-xl text-xs font-black transition
                           ${
                             addPlayPreset === opt.id
-                              ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-300"
+                              ? "bg-emerald-500/10 text-emerald-300"
                               : "bg-black/30 text-white/70 hover:bg-white/10"
                           }
                           ${opt.disabled ? "opacity-40 cursor-not-allowed" : ""}`}
@@ -2087,7 +2087,7 @@ export default function TraktEpisodesWatchedModal({
                                 changeView(item.id);
                                 setHistoryOpen(false);
                               }}
-                              className="px-3 py-2 rounded-xl text-xs font-black bg-purple-500/10 border border-purple-500/20 text-purple-200 hover:bg-purple-500/15 transition"
+                              className="px-3 py-2 rounded-xl text-xs font-black bg-purple-500/10 text-purple-200 hover:bg-purple-500/15 transition"
                               aria-label="Abrir esta vista rewatch"
                             >
                               Abrir rewatch
@@ -2100,7 +2100,7 @@ export default function TraktEpisodesWatchedModal({
                                   handleDeleteRewatch(item.id, item.startedAt)
                                 }
                                 disabled={deleteRunBusyId === item.id}
-                                className="px-2.5 py-2 rounded-xl text-xs font-black bg-red-500/10 border border-red-500/20 text-red-300 hover:bg-red-500/15 transition disabled:opacity-60"
+                                className="px-2.5 py-2 rounded-xl text-xs font-black bg-red-500/10 text-red-300 hover:bg-red-500/15 transition disabled:opacity-60"
                                 aria-label="Borrar rewatch"
                               >
                                 {deleteRunBusyId === item.id ? (
