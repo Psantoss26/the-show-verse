@@ -42,7 +42,7 @@ import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 
 // Badge de estadística de Trakt (Watchers, Plays, Lists, Favorited).
 // Movido VERBATIM desde DetailsClient para compartirlo con el modal.
-function TraktStatBadge({ icon: Icon, value, label, tooltip }) {
+function TraktStatBadge({ icon: Icon, value, label, tooltip, pending = false }) {
   return (
     <motion.div
       // Ver la nota de DetailAtoms: nada de entrada propia, o el panel se ve
@@ -55,7 +55,16 @@ function TraktStatBadge({ icon: Icon, value, label, tooltip }) {
       <div className="grid min-w-0 grid-cols-[1rem_auto] grid-rows-[auto_auto] items-center gap-x-1 sm:grid-cols-[1.25rem_auto] sm:gap-x-2">
         <Icon className="col-start-1 row-start-1 h-4 w-4 shrink-0 self-center text-zinc-400 transition-colors duration-200 group-hover/statbadge:text-zinc-200 sm:h-5 sm:w-5" />
         <span className="col-start-2 row-start-1 block self-center text-[11px] font-bold leading-none tracking-tight text-white/90 [font-variant-numeric:tabular-nums] [text-box:trim-both_cap_alphabetic] sm:text-sm">
-          {value || "-"}
+          {/* CARGANDO ≠ SIN DATO. Mientras la consulta está en vuelo el hueco
+              se reserva con un valor INVISIBLE: ocupa lo mismo, pero no afirma
+              nada. El guion queda para cuando ya se sabe que no hay dato. */}
+          {pending ? (
+            <span className="invisible" aria-hidden="true">
+              0
+            </span>
+          ) : (
+            value || "-"
+          )}
         </span>
         <span className="col-start-2 row-start-2 mt-1 hidden text-[8px] font-bold uppercase leading-none tracking-widest text-zinc-500 transition-colors duration-200 group-hover/statbadge:text-zinc-400 [text-box:trim-both_cap_alphabetic] sm:block sm:text-[9px]">
           {label}
@@ -186,12 +195,28 @@ export function DetailsRatingsBadges({
 // B. FOOTER DE ESTADÍSTICAS (Watchers, Plays, Lists, Favorited)
 //    Markup VERBATIM del bloque original; los datos vienen por props.
 // ---------------------------------------------------------------------------
-export function DetailsStatsRow({ stats = null, showFavoritedStat = true }) {
+export function DetailsStatsRow({
+  stats = null,
+  showFavoritedStat = true,
+  // `pending`: las stats de Trakt todavía vienen de camino. La fila se monta
+  // igualmente para RESERVAR SU ALTO. Puede hacerse con exactitud porque el
+  // markup es fijo -- siempre las mismas insignias, cambian solo los números--,
+  // así que reservado y definitivo miden lo mismo. Sin esto, el pie aparecía al
+  // llegar la respuesta, el panel crecía y empujaba hacia abajo todo lo que va
+  // debajo.
+  pending = false,
+}) {
   // Mostrar cuando hay stats numéricas (incluyendo de cache stale)
   const hasStats = Object.values(stats || {}).some(
     (v) => typeof v === "number",
   );
-  if (!hasStats) return null;
+  if (!hasStats && !pending) return null;
+
+  // Con `pending` no se pasa valor: la insignia reserva el hueco con un
+  // marcador invisible. Un "0" sería un dato ("no lo sigue nadie") y un guion
+  // sería "no hay dato"; durante la carga no se sabe ninguna de las dos cosas.
+  const statValue = (value) =>
+    hasStats ? formatShortNumber(value ?? 0)?.toUpperCase() || "0" : null;
 
   return (
     <div className="relative z-10 border-t border-white/5 bg-black/[0.04] rounded-b-2xl">
@@ -211,9 +236,8 @@ export function DetailsStatsRow({ stats = null, showFavoritedStat = true }) {
           {/* Watchers - Usuarios que siguen este contenido */}
           <TraktStatBadge
             icon={Eye}
-            value={formatShortNumber(
-              stats?.watchers ?? 0,
-            )?.toUpperCase() || "0"}
+            value={statValue(stats?.watchers)}
+            pending={!hasStats && pending}
             label="SEGUIDORES"
             tooltip="Seguidores"
           />
@@ -221,9 +245,8 @@ export function DetailsStatsRow({ stats = null, showFavoritedStat = true }) {
           {/* Plays - Número de reproducciones totales */}
           <TraktStatBadge
             icon={Play}
-            value={formatShortNumber(
-              stats?.plays ?? 0,
-            )?.toUpperCase() || "0"}
+            value={statValue(stats?.plays)}
+            pending={!hasStats && pending}
             label="REPRODUCCIONES"
             tooltip="Reproducciones"
           />
@@ -231,9 +254,8 @@ export function DetailsStatsRow({ stats = null, showFavoritedStat = true }) {
           {/* Lists - Cantidad de listas que incluyen este contenido */}
           <TraktStatBadge
             icon={List}
-            value={formatShortNumber(
-              stats?.lists ?? 0,
-            )?.toUpperCase() || "0"}
+            value={statValue(stats?.lists)}
+            pending={!hasStats && pending}
             label="LISTAS"
             tooltip="En listas"
           />
@@ -241,9 +263,8 @@ export function DetailsStatsRow({ stats = null, showFavoritedStat = true }) {
           {showFavoritedStat && (
             <TraktStatBadge
               icon={Heart}
-              value={formatShortNumber(
-                stats?.favorited ?? 0,
-              )?.toUpperCase() || "0"}
+              value={statValue(stats?.favorited)}
+            pending={!hasStats && pending}
               label="FAVORITOS"
               tooltip="Favoritos"
             />
@@ -431,6 +452,11 @@ export default function DetailsScoreboardPanel({
   mc = null,
   stats = null,
   showFavoritedStat = true,
+  // Las stats de Trakt aún no han llegado. El panel se pinta ya con su ALTO
+  // DEFINITIVO (pie de estadísticas incluido) en vez de crecer al recibirlas y
+  // empujar hacia abajo lo que tenga debajo. Es opcional: quien no la pase
+  // conserva el comportamiento anterior.
+  statsPending = false,
   externalLinks = null,
   streamingProviders = null,
   onMoreLinks,
@@ -463,7 +489,10 @@ export default function DetailsScoreboardPanel({
     !!share ||
     !!toolbarActions;
 
-  if (!hasToolbar && !hasStats && !children) return null;
+  // `statsPending` cuenta como contenido: si no, el panel entero no se montaría
+  // hasta que llegasen las stats y aparecería de golpe, que es justo el salto
+  // que se quiere evitar.
+  if (!hasToolbar && !hasStats && !statsPending && !children) return null;
 
   return (
     <div
@@ -505,7 +534,11 @@ export default function DetailsScoreboardPanel({
         </div>
       )}
 
-      <DetailsStatsRow stats={stats} showFavoritedStat={showFavoritedStat} />
+      <DetailsStatsRow
+        stats={stats}
+        showFavoritedStat={showFavoritedStat}
+        pending={statsPending}
+      />
 
       {children}
     </div>
