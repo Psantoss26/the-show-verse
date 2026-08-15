@@ -115,3 +115,29 @@ test("los separadores y el estado vacío se conservan", async () => {
   assert.match(historial, /border-t border-white\/\d+/);
   assert.match(historial, /border-dashed/);
 });
+
+test("las tarjetas del modal rápido no dibujan un anillo al pasar por encima", async () => {
+  // Un aro de 2.5px que aparece en hover es un contorno marcado como cualquier
+  // otro, solo que intermitente. Se dibujaba con un `::after` + `box-shadow`
+  // interior, así que no lo detecta una búsqueda de `border`.
+  const modal = await leer("dashboard/DetailModal");
+
+  assert.doesNotMatch(
+    modal,
+    /hover:after:shadow-\[inset/,
+    "una tarjeta volvió a marcar su borde en hover",
+  );
+});
+
+test("las tarjetas del modal rápido conservan respuesta al hover", async () => {
+  // Quitar el aro no puede dejarlas sin señal de que son pulsables.
+  const modal = await leer("dashboard/DetailModal");
+
+  for (const señal of [
+    /group-hover:scale-105/, // Títulos similares: la imagen crece
+    /group-hover:grayscale-0/, // Reparto: la foto recupera color
+    /hover:bg-white\/\[0\.05\]/, // Temporadas: la tarjeta se aclara
+  ]) {
+    assert.match(modal, señal, `falta la respuesta al hover ${señal}`);
+  }
+});

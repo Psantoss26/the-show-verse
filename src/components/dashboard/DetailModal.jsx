@@ -497,7 +497,7 @@ function SimilarBackdrop({ rec, onOpen }) {
 
   return (
     <div
-      className="group relative aspect-video w-full cursor-pointer overflow-hidden rounded-xl bg-neutral-800 shadow-md transition duration-300 hover:shadow-lg hover:shadow-black/40 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]"
+      className="group relative aspect-video w-full cursor-pointer overflow-hidden rounded-xl bg-neutral-800 shadow-md transition duration-300 hover:shadow-lg hover:shadow-black/40"
       role="button"
       tabIndex={onOpen ? 0 : -1}
       title={recTitle}
@@ -3264,7 +3264,7 @@ export default function DetailModal({
                       <SwiperSlide key={person?.id ?? person?.credit_id ?? person?.name}>
                         <Link
                           href={`/details/person/${person.id}`}
-                          className="block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md lg:hover:shadow-yellow-900/20 transition-all duration-300 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]"
+                          className="block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md lg:hover:shadow-yellow-900/20 transition-all duration-300"
                         >
                           <div className="aspect-[2/3] overflow-hidden relative">
                             {photo ? (
@@ -3348,8 +3348,20 @@ export default function DetailModal({
                   Sentimientos de la comunidad
                 </h3>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {/* MISMAS TARJETAS QUE EN LA FICHA (`DetailsClient`, sección
+                      "Análisis de sentimientos"): solo TINTE de color, sin
+                      contorno y sin cristal propio.
+                      - El borde se va porque dibujaba un canto por columna y el
+                        bloque dejaba de leerse como una superficie continua.
+                      - El `backdrop-blur` propio también: el cristal lo pone la
+                        superficie de debajo (allí el panel de sección, aquí el
+                        del modal con su capa hermana de desenfoque). Repetirlo
+                        por tarjeta es lo que en la ficha se retiró por añadir un
+                        canto luminoso a cada una.
+                      - El tinte sube a `/15` con una parada intermedia, que es
+                        lo que compensa el cristal que ya no aporta la tarjeta. */}
                   {sentiment.pros?.length > 0 && (
-                    <div className="relative isolate overflow-hidden rounded-2xl border border-emerald-500/5 bg-gradient-to-br from-emerald-500/10 via-transparent to-transparent p-5 backdrop-blur-md">
+                    <div className="relative isolate overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-emerald-500/15 via-emerald-500/[0.04] to-transparent">
                       <div className="mb-4 flex items-center gap-3">
                         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-white shadow-lg shadow-emerald-500/20">
                           <ThumbsUp className="h-4 w-4" />
@@ -3372,7 +3384,7 @@ export default function DetailModal({
                     </div>
                   )}
                   {sentiment.cons?.length > 0 && (
-                    <div className="relative isolate overflow-hidden rounded-2xl border border-rose-500/5 bg-gradient-to-br from-rose-500/10 via-transparent to-transparent p-5 backdrop-blur-md">
+                    <div className="relative isolate overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-rose-500/15 via-rose-500/[0.04] to-transparent">
                       <div className="mb-4 flex items-center gap-3">
                         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500 text-white shadow-lg shadow-rose-500/20">
                           <ThumbsDown className="h-4 w-4" />
@@ -3518,7 +3530,7 @@ export default function DetailModal({
                           onTouchStart={() =>
                             prefetchEpisodeDetails(episodeNumber)
                           }
-                          className="group relative flex h-full w-full flex-col overflow-hidden rounded-xl bg-white/[0.03] text-left transition hover:bg-white/[0.05] focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400/40 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]"
+                          className="group relative flex h-full w-full flex-col overflow-hidden rounded-xl bg-white/[0.03] text-left transition hover:bg-white/[0.05] focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400/40"
                           title={episodeTitle}
                         >
                           <div className="relative aspect-video overflow-hidden bg-white/[0.04]">
