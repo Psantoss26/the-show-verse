@@ -22,6 +22,10 @@ const MODALES = [
   "details/SoundtrackModal",
   "details/TraktCommentModal",
   "StarRating",
+  // No es un modal, pero ES el contenido de EpisodeRatingsModal: comprobar solo
+  // el envoltorio daba el modal por limpio mientras sus casillas —la rejilla,
+  // el desplegable de temporada, el aviso y el tooltip— seguían con contorno.
+  "EpisodeRatingsGrid",
 ];
 
 const COLORES =

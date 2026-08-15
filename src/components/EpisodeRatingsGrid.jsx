@@ -125,7 +125,7 @@ function TooltipPortal({ activeData, anchorRect, enabled }) {
         opacity: anchorRect && coords.top > 0 ? 1 : 0,
       }}
     >
-      <div className="bg-black/95 backdrop-blur-md text-white px-3.5 py-2.5 rounded-lg shadow-2xl border border-white/10 max-w-[280px] sm:max-w-[320px]">
+      <div className="bg-black/95 backdrop-blur-md text-white px-3.5 py-2.5 rounded-lg shadow-2xl max-w-[280px] sm:max-w-[320px]">
         <div className="font-bold text-sm mb-1 leading-snug text-balance drop-shadow-sm">
           {activeData.titleText}
         </div>
@@ -1410,7 +1410,7 @@ export default function EpisodeRatingsGrid({
               renderGrid()
             )
           ) : (
-            <div className="mt-2 rounded-xl border border-white/10 bg-black/30 p-4 text-sm text-zinc-300">
+            <div className="mt-2 rounded-xl bg-black/30 p-4 text-sm text-zinc-300">
               Cargando vista Grid…
             </div>
           )
@@ -1547,8 +1547,12 @@ function LegendPopover({ open, setOpen }) {
           transition-all duration-250 focus:outline-none
           ${
             open
-              ? "bg-gradient-to-br from-white/10 to-white/5 text-white border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_0_12px_rgba(255,255,255,0.08)] backdrop-blur-md scale-105"
-              : "bg-transparent text-zinc-400 border border-transparent hover:bg-gradient-to-br hover:from-white/8 hover:to-white/2 hover:text-white hover:border-white/5 hover:scale-105"
+              // El estado activo se lee por el degradado, el reflejo interior y
+              // el `scale-105`; no hace falta un aro. Con él fuera, la rama
+              // inactiva ya no necesita su borde transparente de reserva (ni el
+              // que se encendía al pasar por encima).
+              ? "bg-gradient-to-br from-white/10 to-white/5 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_0_12px_rgba(255,255,255,0.08)] backdrop-blur-md scale-105"
+              : "bg-transparent text-zinc-400 hover:bg-gradient-to-br hover:from-white/8 hover:to-white/2 hover:text-white hover:scale-105"
           }
         `}
       >
@@ -1556,7 +1560,7 @@ function LegendPopover({ open, setOpen }) {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-30 mt-2 w-[min(78vw,260px)] rounded-xl border border-white/10 bg-[#111214]/95 p-3 shadow-2xl backdrop-blur-xl sm:w-[300px]">
+        <div className="absolute right-0 top-full z-30 mt-2 w-[min(78vw,260px)] rounded-xl bg-[#111214]/95 p-3 shadow-2xl backdrop-blur-xl sm:w-[300px]">
           <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-zinc-400">
             Leyenda
           </div>
