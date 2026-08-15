@@ -156,3 +156,32 @@ test("`scoreboardResolved` se marca en TODAS las salidas de su consulta", async 
     "alguna salida dejó de marcar la señal: el marcador se quedaría con el hueco",
   );
 });
+
+test("ninguna tarjeta de la fila puede quedarse sola y estirarse", async () => {
+  const tabs = await readFile(
+    new URL("../../components/details/DetailsInfoTabs.jsx", import.meta.url),
+    "utf8",
+  );
+
+  // Las tarjetas comparten la fila con `lg:flex-auto`: su ancho depende de
+  // CUÁNTAS haya. Si una se pinta mientras las demás aún no existen, se lleva
+  // todo el ancho y luego encoge. Por eso todas las de la ruta de series pasan
+  // por la misma puerta de carga y aparecen juntas.
+  const lineas = tabs.split("\n");
+  const sinPuerta = [];
+  for (let i = 215; i < Math.min(lineas.length, 315); i += 1) {
+    if (!lineas[i].includes("VisualMetaCard")) continue;
+    const bloque = lineas.slice(Math.max(0, i - 6), i + 11).join("\n");
+    const propia = lineas.slice(i, i + 11).join("\n");
+    const tienePuerta =
+      bloque.includes("metadataLoading ?") || bloque.includes("!metadataLoading");
+    const creceSola = propia.includes("flex-auto");
+    const soloPelicula = /budget|revenue/i.test(bloque);
+    if (creceSola && !tienePuerta && !soloPelicula) sinPuerta.push(i + 1);
+  }
+  assert.deepEqual(
+    sinPuerta,
+    [],
+    `estas tarjetas se estirarían solas durante la carga: ${sinPuerta.join(", ")}`,
+  );
+});
