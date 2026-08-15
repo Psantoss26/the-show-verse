@@ -1409,7 +1409,13 @@ export default function EpisodeDetailsClient({
               delay: 0.04,
               ease: [0.22, 1, 0.36, 1],
             }}
-            className="flex-1 flex flex-col min-w-0 w-full"
+            // Mismo motivo que en la página de temporada: el fundido de esta
+            // columna (`opacity < 1`) abre una raíz de composición que anula el
+            // `backdrop-filter` del ScoreboardPanel, y al terminar la retira,
+            // por lo que el cristal se "encendía" de golpe tras cargar. Con el
+            // transform de clase la raíz es permanente, como en la ficha
+            // completa, y el panel se ve igual desde el primer fotograma.
+            className="flex-1 flex flex-col min-w-0 w-full transform-gpu"
           >
             <div className="mb-5 px-1 flex flex-col items-center lg:items-start text-center lg:text-left w-full">
               <div className="text-xs font-bold uppercase tracking-widest text-zinc-400">
