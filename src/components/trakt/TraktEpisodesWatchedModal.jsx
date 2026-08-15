@@ -1164,11 +1164,14 @@ export default function TraktEpisodesWatchedModal({
                     type="button"
                     disabled={!canToggleShow}
                     onClick={onClickToggleShow}
+                    // Marcar / Quitar serie: el estado lo dicen el tinte, el
+                    // color del texto y el propio icono (ojo / ojo tachado). El
+                    // aro solo repetía esa información dibujando un contorno.
                     className={`w-full h-11 inline-flex items-center justify-center gap-2 px-4 rounded-xl text-sm font-semibold transition whitespace-nowrap
                       ${
                         showCompleted
-                          ? "bg-red-500/10 border border-red-500/30 text-red-300 hover:bg-red-500/20 "
-                          : "bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 "
+                          ? "bg-red-500/10 text-red-300 hover:bg-red-500/20"
+                          : "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
                       }
                       ${!canToggleShow ? "opacity-50 cursor-not-allowed" : ""}`}
                   >
@@ -1375,11 +1378,13 @@ export default function TraktEpisodesWatchedModal({
               type="button"
               disabled={!canToggleShow}
               onClick={onClickToggleShow}
+              // Mismo botón que el de la fila móvil, sin aro por el mismo
+              // motivo: el tinte y el icono ya dicen en qué estado está.
               className={`h-10 w-10 xl:h-11 xl:w-11 inline-flex items-center justify-center rounded-xl transition shrink-0
                 ${
                   showCompleted
-                    ? "bg-red-500/10 border border-red-500/30 text-red-300 hover:bg-red-500/20 "
-                    : "bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 "
+                    ? "bg-red-500/10 text-red-300 hover:bg-red-500/20"
+                    : "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
                 }
                 ${!canToggleShow ? "opacity-50 cursor-not-allowed" : ""}`}
               aria-label={
@@ -1494,12 +1499,16 @@ export default function TraktEpisodesWatchedModal({
                           if (Array.isArray(seasonCache?.[sn]?.episodes))
                             setDisplaySeason(sn);
                         }}
+                        // La temporada seleccionada se lee por su TINTE y por el
+                        // color del rótulo, no por un aro. Con el aro fuera, la
+                        // rama inactiva tampoco necesita su borde transparente:
+                        // solo existía para reservarle el hueco de 1px.
                         className={`w-full text-left px-4 py-3 rounded-xl transition-all flex justify-between items-center group ${
                           active
                             ? isRewatchView
-                              ? "bg-purple-500/10 border border-purple-500/20"
-                              : "bg-emerald-500/10 border border-emerald-500/20"
-                            : "border border-transparent hover:bg-white/10"
+                              ? "bg-purple-500/10"
+                              : "bg-emerald-500/10"
+                            : "hover:bg-white/10"
                         }`}
                       >
                         <div>
