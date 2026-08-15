@@ -227,6 +227,11 @@ const EMPTY_DATA = {
   scoreboard: null,
   scoreboardResolved: false,
   providers: [],
+  // ¿Se sabe YA si este título tiene plataformas? Mientras no, el modal
+  // reserva el hueco de esa fila: si aparece después, empuja hacia abajo todo
+  // lo que va debajo (premios, características, marcador y pestañas). Misma
+  // convención que `scoreboardResolved` / `imdbRatingResolved`.
+  providersResolved: false,
   seasons: [],
   showReleaseDate: null,
 };
@@ -1040,6 +1045,9 @@ export function useDetailModalData(item) {
     // el título/año semilla del item (equivalen a los de TMDb). Best-effort:
     // nunca lanza; si falla, providers se queda en [] y no se pinta la fila.
     (async () => {
+      // Se marca como resuelta pase lo que pase —sin título, error de red, sin
+      // resultados—, no solo en el camino feliz: si no, el hueco reservado no
+      // se liberaría nunca en los títulos sin plataformas.
       try {
         const streamTitle = (item.title || item.name || "").trim();
         if (!streamTitle) return;
@@ -1063,6 +1071,10 @@ export function useDetailModalData(item) {
         }
       } catch {
         // sin plataformas: no se muestra la fila
+      } finally {
+        if (!cancelled) {
+          setData((prev) => ({ ...prev, providersResolved: true }));
+        }
       }
     })();
 

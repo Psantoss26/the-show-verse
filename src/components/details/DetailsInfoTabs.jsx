@@ -140,7 +140,7 @@ export default function DetailsInfoTabs({
                   <VisualMetaCard
                     icon={mediaType === "movie" ? FilmIcon : MonitorPlay}
                     label="Título original"
-                    value={originalTitle || "—"}
+                    value={metadataLoading ? null : originalTitle || "—"}
                     isLoading={metadataLoading}
                     className="w-full"
                   />
@@ -174,7 +174,7 @@ export default function DetailsInfoTabs({
                     <VisualMetaCard
                       icon={Layers}
                       label="Duración"
-                      value={formatValue || "—"}
+                      value={metadataLoading ? null : formatValue || "—"}
                       isLoading={metadataLoading}
                       className="w-full"
                     />
@@ -183,14 +183,14 @@ export default function DetailsInfoTabs({
                       <VisualMetaCard
                         icon={Layers}
                         label="Formato"
-                        value={formatValue || "—"}
+                        value={metadataLoading ? null : formatValue || "—"}
                         isLoading={metadataLoading}
                         className="min-w-0"
                       />
                       <VisualMetaCard
                         icon={Layers}
                         label="Duración"
-                        value={durationValue || "—"}
+                        value={metadataLoading ? null : durationValue || "—"}
                         isLoading={metadataLoading}
                         className="min-w-0"
                       />
@@ -398,7 +398,7 @@ export default function DetailsInfoTabs({
                           <VisualMetaCard
                             icon={MonitorPlay}
                             label="Canal"
-                            value={network || "—"}
+                            value={metadataLoading ? null : network || "—"}
                             className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                           />
                         ))}
@@ -407,7 +407,7 @@ export default function DetailsInfoTabs({
                   <VisualMetaCard
                     icon={Building2}
                     label="Producción"
-                    value={productionText || "—"}
+                    value={metadataLoading ? null : productionText || "—"}
                     expanded={true}
                     className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                   />

@@ -2945,7 +2945,7 @@ export default function DetailModal({
                 />
               </div>
 
-              {hasProviders && (
+              {hasProviders ? (
                 <div className="flex shrink-0 flex-wrap items-center justify-center gap-3 self-center sm:justify-end">
                   {streamingProviders.map((prov) => (
                     <a
@@ -2968,7 +2968,14 @@ export default function DetailModal({
                     </a>
                   ))}
                 </div>
-              )}
+              ) : !data.providersResolved ? (
+                /* HUECO RESERVADO mientras no se sabe si hay plataformas.
+                   La consulta a /api/streaming (y la de Plex) terminan DESPUÉS del
+                   resto, así que esta fila aparecía tarde y empujaba hacia abajo
+                   premios, características, marcador y pestañas. `h-11` es el alto
+                   de un logo, que es lo que mide la fila con una sola línea. */
+                <div aria-hidden="true" className="h-11 shrink-0 self-center" />
+              ) : null}
             </DetailModalActionsReveal>
             )}
 
@@ -3014,7 +3021,7 @@ export default function DetailModal({
                   />
                 </div>
 
-                {hasProviders && (
+                {hasProviders ? (
                   <div className="flex shrink-0 flex-wrap items-center justify-center gap-3 self-center sm:justify-end">
                     {streamingProviders.map((prov) => (
                       <a
@@ -3037,7 +3044,14 @@ export default function DetailModal({
                       </a>
                     ))}
                   </div>
-                )}
+                ) : !data.providersResolved ? (
+                  /* HUECO RESERVADO mientras no se sabe si hay plataformas.
+                     La consulta a /api/streaming (y la de Plex) terminan DESPUÉS del
+                     resto, así que esta fila aparecía tarde y empujaba hacia abajo
+                     premios, características, marcador y pestañas. `h-11` es el alto
+                     de un logo, que es lo que mide la fila con una sola línea. */
+                  <div aria-hidden="true" className="h-11 shrink-0 self-center" />
+                ) : null}
               </DetailModalActionsReveal>
             )}
 
@@ -3045,7 +3059,7 @@ export default function DetailModal({
               {/* Premios / nominaciones: misma línea verde que las previews del
                   dashboard (InlinePreviewCard). Se alimenta de la cadena cruda de
                   OMDb (data.awards) formateada con formatDashboardAwards. */}
-              {data.awards && (
+              {data.awards ? (
                 <motion.div
                   initial={{ opacity: 0, y: 12 }}
                   whileInView={{ opacity: 1, y: 0 }}
@@ -3058,7 +3072,25 @@ export default function DetailModal({
                     {formatDashboardAwards(data.awards)}
                   </span>
                 </motion.div>
-              )}
+              ) : !data.imdbRatingResolved ? (
+                /* HUECO RESERVADO mientras OMDb no ha contestado.
+                   Los premios llegan en un efecto INDEPENDIENTE que termina
+                   después del resto, así que esta fila aparecía la última y
+                   empujaba hacia abajo características, marcador y pestañas.
+                   `imdbRatingResolved` se marca en las DOS salidas de ese
+                   efecto (con y sin imdbId) y en el mismo `setData` que
+                   `awards`, así que es exactamente su señal de "ya se sabe".
+                   El hueco se clona de la fila real —mismas clases, mismo
+                   icono, una línea— en vez de fijar una altura a mano: así no
+                   puede descuadrarse si cambia la tipografía. */
+                <div
+                  aria-hidden="true"
+                  className="invisible flex items-center justify-center gap-2 text-center text-xs font-bold sm:justify-start sm:text-left sm:text-sm"
+                >
+                  <Award className="h-4 w-4 shrink-0" />
+                  <span className="line-clamp-1">&nbsp;</span>
+                </div>
+              ) : null}
 
               {error && (
                 <p className="line-clamp-1 text-xs font-medium text-red-400">
@@ -3115,6 +3147,13 @@ export default function DetailModal({
               <div>
                 <DetailsScoreboardPanel
                   loading={loading}
+                  // El pie de estadísticas de Trakt llega en su propia consulta
+                  // y, al montarse, hacía crecer el panel y empujaba hacia
+                  // abajo las pestañas. Con esto el panel nace ya con su alto
+                  // final. `scoreboardResolved` se marca en TODAS las salidas
+                  // de esa consulta —incluida "este título no está en
+                  // Trakt"—, así que el hueco siempre acaba liberándose.
+                  statsPending={!data.scoreboardResolved}
                   tmdb={{
                     value:
                       data.tmdbRating != null
