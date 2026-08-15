@@ -187,6 +187,7 @@ import {
   pickBestNeutralPosterByResVotes,
   isLanguageNeutralImage,
   resolveNeutralBackdropPath,
+  pickHeroBackdropPath,
   pickBestBackdropByLangResVotes,
   pickBestBackdropTVNeutralFirst,
   pickBestBackdropForPreview,
@@ -3558,7 +3559,22 @@ export default function DetailsClient({
     // En MÓVIL no se hace: allí el héroe es el póster de portada y cambiarlo a
     // media carga sí se nota como un salto.
     if (!artworkInitialized) {
-      return isMobileViewport ? null : data?.backdrop_path || null;
+      if (isMobileViewport) return null;
+      // El provisional es LA MISMA imagen a la que llegará la selección
+      // definitiva, no `data.backdrop_path`. Esa ruta es la portada principal
+      // de TMDb —normalmente localizada y casi nunca la mejor neutra—, así que
+      // toda carga empezaba con una imagen y acababa en otra. En una navegación
+      // rápida no se notaba; al RECARGAR, la hidratación tarda más y el fondo
+      // "equivocado" se ve el tiempo suficiente. Todo lo que hace falta para
+      // acertar ya viene en el SSR (`data.images.backdrops`), así que no hay
+      // nada que esperar.
+      return pickHeroBackdropPath({
+        backdropPath: data?.backdrop_path,
+        backdrops: data?.images?.backdrops,
+        // Si ya se conoce una selección del usuario, manda ella (la
+        // instantánea de overrides la resuelve en el primer efecto de layout).
+        preferredPaths: [selectedBackgroundPath, baseBackdropPath],
+      });
     }
 
     // Desktop: el backdrop seleccionado y, si en ese instante aún no hay uno,

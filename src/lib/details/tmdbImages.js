@@ -209,6 +209,27 @@ export function resolveNeutralBackdropPath(list, preferredPaths = []) {
     return pickBestNeutralBackdropByResVotes(neutralImages)?.file_path || null
 }
 
+// Fondo del héroe calculado SOLO con lo que ya trae el SSR.
+//
+// Es la MISMA elección a la que llega `displayBackdropPath` en DetailsClient
+// (`resolveNeutralBackdropPath` sobre la galería), pero disponible desde el
+// primer render. Existe para que el fondo PROVISIONAL y el DEFINITIVO sean la
+// misma imagen: antes el provisional era `data.backdrop_path` —la portada
+// principal de TMDb, que suele estar localizada y rara vez es la mejor neutra—,
+// así que toda carga pintaba una imagen y terminaba en otra. En una navegación
+// rápida el cambio pasaba desapercibido; al RECARGAR, la hidratación tarda más
+// y se ve el fondo "equivocado" el tiempo suficiente para notarlo.
+//
+// `preferredPaths` respeta una selección del usuario si ya se conoce.
+export function pickHeroBackdropPath({
+    backdropPath,
+    backdrops,
+    preferredPaths = []
+} = {}) {
+    const resuelto = resolveNeutralBackdropPath(backdrops || [], preferredPaths)
+    return resuelto || backdropPath || null
+}
+
 export function pickBestBackdropByLangResVotes(list, opts = {}) {
     const {
         preferLangs = ['en', 'en-US'],

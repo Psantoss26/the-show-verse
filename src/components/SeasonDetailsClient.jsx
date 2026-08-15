@@ -1149,7 +1149,23 @@ export default function SeasonDetailsClient({
               delay: 0.04,
               ease: [0.22, 1, 0.36, 1],
             }}
-            className="flex-1 flex flex-col min-w-0 w-full"
+            // `transform-gpu` NO es aquí un truco de rendimiento: fija el
+            // cristal del marcador.
+            //
+            // Esta columna entra con un fundido, y `opacity < 1` abre una RAÍZ
+            // DE COMPOSICIÓN: mientras dura, el `backdrop-filter` del
+            // ScoreboardPanel no puede muestrear más allá de ella y el panel se
+            // ve solo con su tinte. Al terminar, framer-motion retira la
+            // opacidad en línea, la raíz desaparece y el panel empieza de golpe
+            // a difuminar el fondo de la página: ese "extra" que aparecía
+            // DESPUÉS de cargar.
+            //
+            // En la ficha completa el contenedor equivalente es un `div` normal
+            // con `transform-gpu` de clase, así que es raíz SIEMPRE y el panel
+            // se ve igual desde el primer fotograma. Con el transform aquí, la
+            // raíz sobrevive al fundido y las tres páginas quedan estables e
+            // iguales. Framer no lo pisa: en esta columna solo anima `opacity`.
+            className="flex-1 flex flex-col min-w-0 w-full transform-gpu"
           >
             <div className="mb-5 px-1 flex flex-col items-center lg:items-start text-center lg:text-left w-full">
               <div className="flex items-center justify-center lg:justify-start gap-2 text-xs font-bold uppercase tracking-widest text-zinc-400">
