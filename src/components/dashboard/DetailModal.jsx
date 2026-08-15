@@ -1951,22 +1951,42 @@ export default function DetailModal({
     if (!item?.id) return;
     try {
       router.prefetch(dashboardDetailHref(item, mediaType));
+      // La temporada se precarga igual: es el otro destino del mismo grupo de
+      // botones y comparte su transición, así que debe llegar igual de listo.
+      const showId = data.episodeMeta?.showId;
+      const seasonNumber = data.episodeMeta?.seasonNumber;
+      if (showId != null && seasonNumber != null) {
+        router.prefetch(`/details/tv/${showId}/season/${seasonNumber}`);
+      }
     } catch {
       // prefetch best-effort
     }
-  }, [item?.id, mediaType, router]);
+  }, [
+    item?.id,
+    mediaType,
+    router,
+    data.episodeMeta?.showId,
+    data.episodeMeta?.seasonNumber,
+  ]);
 
-  const goToFullDetails = async () => {
-    if (navigatingToFullDetails) return;
-    const href = dashboardDetailHref(item, mediaType);
+  // Navegación del modal a una ruta de `/details` con la transición de morfeo.
+  // Está extraída de `goToFullDetails` porque ahora hay DOS destinos: la ficha
+  // del episodio y la de su temporada. `transitionKey` solo lo usa
+  // DetailsClient para reconocer que viene de aquí; la ruta de temporada no
+  // participa en ese apretón de manos, así que no lo escribe (dejar una clave
+  // que nadie consume la deja colgada en sessionStorage).
+  const goToDetailsRoute = async (href, transitionKey) => {
+    if (navigatingToFullDetails || !href) return;
 
-    try {
-      window.sessionStorage?.setItem(
-        DETAILS_ROUTE_TRANSITION_KEY,
-        `${mediaType}:${item?.id ?? ""}`,
-      );
-    } catch {
-      // sessionStorage best-effort
+    if (transitionKey) {
+      try {
+        window.sessionStorage?.setItem(
+          DETAILS_ROUTE_TRANSITION_KEY,
+          transitionKey,
+        );
+      } catch {
+        // sessionStorage best-effort
+      }
     }
 
     if (prefersReducedMotion) {
@@ -1992,6 +2012,25 @@ export default function DetailModal({
         .finally(routeTransition.reveal);
     }
   };
+
+  const goToFullDetails = () =>
+    goToDetailsRoute(
+      dashboardDetailHref(item, mediaType),
+      `${mediaType}:${item?.id ?? ""}`,
+    );
+
+  // Ficha de la TEMPORADA a la que pertenece el episodio. Solo existe en la
+  // variante de episodio y cuando se conocen serie y temporada: en un episodio
+  // suelto (sin `showId`) no hay a dónde ir, y es mejor no pintar el botón que
+  // pintarlo roto.
+  const seasonHref =
+    isEpisode &&
+    episodeMeta?.showId != null &&
+    episodeMeta?.seasonNumber != null
+      ? `/details/tv/${episodeMeta.showId}/season/${episodeMeta.seasonNumber}`
+      : null;
+
+  const goToSeasonDetails = () => goToDetailsRoute(seasonHref);
 
   /* --------------------------------- derivados --------------------------------- */
   // Las pestañas (estado activo + cuerpos) las gestiona <DetailsInfoTabs>.
@@ -2574,22 +2613,56 @@ export default function DetailModal({
             <X className="h-5 w-5 transition-transform duration-300 group-hover:rotate-90" />
           </button>
 
-          {/* Botón superior derecho: abre la ficha completa */}
-          <button
-            type="button"
-            onClick={goToFullDetails}
-            disabled={navigatingToFullDetails}
-            className={`absolute right-4 top-4 z-30 group flex h-10 w-10 select-none items-center justify-center gap-0 overflow-hidden rounded-full px-0 transition-all duration-300 ease-out hover:w-[166px] hover:gap-1.5 hover:px-3 ${DETAIL_MODAL_GLASS_CONTROL}`}
-            aria-label="Ver ficha completa"
-            aria-busy={navigatingToFullDetails ? "true" : undefined}
-          >
-            <div className="flex h-5 w-5 shrink-0 items-center justify-center transition-transform duration-300 group-hover:rotate-45">
-              <ArrowUpRight className="h-5 w-5 shrink-0" />
-            </div>
-            <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-bold leading-normal tracking-wide opacity-0 transition-[max-width,opacity] duration-200 group-hover:max-w-[120px] group-hover:opacity-100 translate-y-[1px]">
-              Ver ficha completa
-            </span>
-          </button>
+          {/* Controles superiores derechos.
+              Van en un contenedor ANCLADO A LA DERECHA en vez de posicionar
+              cada botón por su cuenta: las píldoras se ensanchan al pasar por
+              encima (hasta 166px), así que con dos posiciones absolutas fijas se
+              solaparían. Anclado solo por `right`, el contenedor mide lo que
+              miden sus hijos y crece hacia la izquierda, de modo que al
+              expandirse una, la otra se aparta sola. */}
+          <div className="absolute right-4 top-4 z-30 flex items-center gap-2">
+            {/* Ficha de la temporada: solo en la variante de episodio. */}
+            {seasonHref && (
+              <button
+                type="button"
+                onClick={goToSeasonDetails}
+                disabled={navigatingToFullDetails}
+                className={`group flex h-10 w-10 select-none items-center justify-center gap-0 overflow-hidden rounded-full px-0 transition-all duration-300 ease-out hover:w-[150px] hover:gap-1.5 hover:px-3 ${DETAIL_MODAL_GLASS_CONTROL}`}
+                // La temporada 0 son los especiales: "Ver temporada 0" no dice
+                // nada a quien lo escuche en un lector de pantalla.
+                aria-label={
+                  episodeMeta.seasonNumber === 0
+                    ? "Ver especiales"
+                    : `Ver temporada ${episodeMeta.seasonNumber}`
+                }
+                aria-busy={navigatingToFullDetails ? "true" : undefined}
+              >
+                <div className="flex h-5 w-5 shrink-0 items-center justify-center transition-transform duration-300 group-hover:scale-110">
+                  <Layers className="h-5 w-5 shrink-0" />
+                </div>
+                <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-bold leading-normal tracking-wide opacity-0 transition-[max-width,opacity] duration-200 group-hover:max-w-[104px] group-hover:opacity-100 translate-y-[1px]">
+                  Ver temporada
+                </span>
+              </button>
+            )}
+
+            {/* Abre la ficha completa */}
+            <button
+              type="button"
+              onClick={goToFullDetails}
+              disabled={navigatingToFullDetails}
+              className={`group flex h-10 w-10 select-none items-center justify-center gap-0 overflow-hidden rounded-full px-0 transition-all duration-300 ease-out hover:w-[166px] hover:gap-1.5 hover:px-3 ${DETAIL_MODAL_GLASS_CONTROL}`}
+              aria-label="Ver ficha completa"
+              aria-busy={navigatingToFullDetails ? "true" : undefined}
+            >
+              <div className="flex h-5 w-5 shrink-0 items-center justify-center transition-transform duration-300 group-hover:rotate-45">
+                <ArrowUpRight className="h-5 w-5 shrink-0" />
+              </div>
+              <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-bold leading-normal tracking-wide opacity-0 transition-[max-width,opacity] duration-200 group-hover:max-w-[120px] group-hover:opacity-100 translate-y-[1px]">
+                Ver ficha completa
+              </span>
+            </button>
+          </div>
 
           {/* Contenedor con scroll interno (barra oculta) */}
           <div

@@ -19,7 +19,14 @@ test("los controles superiores de DetailModal reutilizan el liquid glass del nav
     source,
     /const DETAIL_MODAL_GLASS_CONTROL = `\$\{LIQUID_GLASS_PANEL\}/,
   );
-  assert.equal(uses.length, 2);
+  // Se comprueba que la constante SE USA, no cuántos controles hay. Un número
+  // exacto no protegía de nada: añadir un control sin la constante lo deja
+  // igual, y solo saltaba al añadir uno correctamente (que es lo que pasó al
+  // sumar "Ver temporada" junto a "Ver ficha completa").
+  assert.ok(
+    uses.length >= 2,
+    `los controles superiores deberían usar la constante (usos: ${uses.length})`,
+  );
   assert.doesNotMatch(source, /bg-black\/\[0\.48\]/);
   assert.match(source, /DETAIL_MODAL_GLASS_CONTROL = `[^`]*border-0/);
   assert.doesNotMatch(source, /DETAIL_MODAL_GLASS_CONTROL = `[^`]*border-white/);
