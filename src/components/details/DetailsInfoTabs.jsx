@@ -214,10 +214,16 @@ export default function DetailsInfoTabs({
               ) : (
                 <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
                   {/* Título Original */}
+                  {/* Misma puerta que el resto de la fila. Sin ella conservaba
+                      el valor del título ANTERIOR durante el cambio, así que se
+                      quedaba sola en el contenedor flex y se llevaba todo el
+                      ancho -- el mismo efecto que tenía Duración. Todas las
+                      tarjetas de esta fila aparecen juntas, y por eso cada una
+                      nace ya con su ancho definitivo. */}
                   <VisualMetaCard
                     icon={mediaType === "movie" ? FilmIcon : MonitorPlay}
                     label="Título Original"
-                    value={originalTitle}
+                    value={metadataLoading ? null : originalTitle}
                     isLoading={metadataLoading}
                     expanded={true}
                     className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
@@ -232,12 +238,19 @@ export default function DetailsInfoTabs({
                     className="w-full sm:hidden"
                   />
 
-                  {/* Duración (solo series) */}
+                  {/* Duración (solo series).
+                      Era la ÚNICA tarjeta de esta fila sin puerta de carga: sus
+                      vecinas devuelven `null` mientras `metadataLoading`, así
+                      que esta se quedaba sola en un contenedor flex y su
+                      `lg:flex-auto` le daba TODO el ancho, hasta que llegaban
+                      las demás y la encogían a su tamaño real. Con la puerta
+                      aparece a la vez que el resto, ya en su sitio. */}
                   {mediaType !== "movie" ? (
                     <VisualMetaCard
                       icon={Layers}
                       label="Duración"
-                      value={formatValue}
+                      value={metadataLoading ? null : formatValue}
+                      isLoading={metadataLoading}
                       className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                     />
                   ) : null}
@@ -251,8 +264,12 @@ export default function DetailsInfoTabs({
                     className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
                   />
 
-                  {/* Finalización / Última emisión (solo series) */}
-                  {mediaType !== "movie" && lastAirDateValue && (
+                  {/* Finalización / Última emisión (solo series).
+                      `!metadataLoading` por el mismo motivo que sus vecinas:
+                      durante el cambio de título `lastAirDateValue` aún guarda
+                      el valor del anterior, así que sin la puerta esta tarjeta
+                      se quedaría sola en la fila y se estiraría. */}
+                  {mediaType !== "movie" && !metadataLoading && lastAirDateValue && (
                     <VisualMetaCard
                       icon={CalendarIcon}
                       label={
