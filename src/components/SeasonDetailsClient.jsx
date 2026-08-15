@@ -28,6 +28,8 @@ import { AnimatedSection } from "@/components/details/AnimatedSection";
 import AnimatedPosterFrame from "@/components/details/AnimatedPosterFrame";
 import StreamingHoverOverlay from "@/components/details/StreamingHoverOverlay";
 import DetailsScoreboardPanel from "@/components/details/DetailsScoreboardPanel";
+import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
+import { LIQUID_GLASS_CARD } from "@/lib/ui/liquidGlass";
 import {
   buildTraktHref,
   buildImdbHref,
@@ -1399,10 +1401,25 @@ export default function SeasonDetailsClient({
                         onMouseEnter={() => prefetchEpisodeDetails(epNum)}
                         onFocus={() => prefetchEpisodeDetails(epNum)}
                         onTouchStart={() => prefetchEpisodeDetails(epNum)}
-                        className="group relative block rounded-2xl bg-zinc-900/20 backdrop-blur-2xl shadow-[0_4px_24px_rgba(0,0,0,0.3)] hover:bg-zinc-800/30 hover:shadow-[0_8px_32px_rgba(234,179,8,0.15)] transition-all duration-500 overflow-hidden"
+                        // MISMO CRISTAL QUE LOS PANELES DE LA FICHA. Antes era
+                        // una copia a mano del acabado —`bg-zinc-900/20` con
+                        // `backdrop-blur-2xl` (64px), sin saturar ni realzar, y
+                        // dos capas propias de degradado y reflejo—, que es la
+                        // deriva que las constantes existen para impedir. Con
+                        // 64px de desenfoque y ese velo no pasaba color del
+                        // fondo: se leía como una placa gris, no como vidrio.
+                        //
+                        // Se usa `LIQUID_GLASS_CARD` y NO el `LIQUID_GLASS_BAR`
+                        // del ScoreboardPanel a propósito: es la variante SIN
+                        // SOMBRA, pensada justo para tarjetas en grupo. Los
+                        // episodios van apilados y, con la sombra de la barra,
+                        // las de cada tarjeta se solapan y forman una banda
+                        // oscura detrás de toda la lista (ver liquidGlass.js).
+                        className={`group relative isolate block rounded-2xl ${LIQUID_GLASS_CARD} transition-all duration-500 overflow-hidden hover:bg-white/[0.06]`}
                       >
-                        <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent opacity-40 group-hover:from-yellow-400/10 transition-colors duration-500" />
-                        <div className="absolute inset-0 shadow-[inset_0_1px_2px_rgba(255,255,255,0.15),inset_0_-1px_2px_rgba(0,0,0,0.3)] rounded-2xl pointer-events-none" />
+                        {/* Refracción del canto, especular y luz superior: las
+                            mismas que pinta el ScoreboardPanel. */}
+                        <LiquidGlassOpticalLayers />
 
                         <div className="relative z-10 flex flex-col sm:flex-row gap-4 p-4">
                           {/* Still */}
