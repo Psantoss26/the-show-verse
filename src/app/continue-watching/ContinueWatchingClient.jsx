@@ -870,7 +870,10 @@ export default function ContinueWatchingClient() {
 
   const load = useCallback(async () => {
     try {
-      const rows = await getLocalInProgress();
+      // `throwOnError`: sin él, un fallo de red devolvía `[]` y el `catch` de
+      // abajo NUNCA saltaba. La página se vaciaba y —lo peor— guardaba ese
+      // vacío en la caché, así que al volver tampoco había nada que pintar.
+      const rows = await getLocalInProgress({ throwOnError: true });
       const mapped = mapRows(rows);
       setItems(mapped);
       writeCache(mapped);
