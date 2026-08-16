@@ -141,6 +141,16 @@ const SEARCH_FILTER_OPTIONS = [
   },
 ];
 
+// ZONA DE ACTUACION MAS AMPLIA. Antes el area util era la del avatar mas una
+// flecha diminuta: para abrir el menu habia que apuntar. Con relleno propio el
+// boton pasa a ~52x44px, se ilumina al pasar por encima —asi se lee como
+// pulsable— y el margen negativo evita que ese relleno desplace al avatar.
+//
+// Lo comparte el marcador que ocupa su sitio mientras arranca la sesion: si el
+// recuadro cambia, cambian los dos y la recarga no mueve nada de sitio.
+const PROFILE_TRIGGER_SHELL =
+  "-mr-1.5 flex items-center gap-2 rounded-full py-1 pl-1 pr-2";
+
 function isActorOrDirector(item) {
   return ["Acting", "Directing"].includes(item?.known_for_department);
 }
@@ -2207,7 +2217,18 @@ export default function Navbar() {
             />
 
             {profileAuthLoading ? (
-              <UserAvatarBoot className="ml-1" />
+              // MISMO RECUADRO QUE EL BOTÓN REAL, flecha incluida. Si el
+              // marcador solo pintase el disco, al hidratar aparecería de
+              // repente la flecha y el conjunto se desplazaría; con la pieza
+              // completa el relevo no se nota. La flecha se oculta cuando no
+              // hay sesión cacheada (regla `.avatar-boot-chevron`), porque
+              // entonces lo que va a salir ahí es "Iniciar sesión".
+              <div className="relative ml-1">
+                <div aria-hidden="true" className={PROFILE_TRIGGER_SHELL}>
+                  <UserAvatarBoot />
+                  <ChevronDown className="avatar-boot-chevron h-[18px] w-[18px] shrink-0 text-zinc-300" />
+                </div>
+              </div>
             ) : !account ? (
               <a
                 href={loginHref}
@@ -2223,12 +2244,7 @@ export default function Navbar() {
                   aria-haspopup="menu"
                   aria-expanded={profileMenuOpen}
                   aria-label={t("nav_profile", "Perfil")}
-                  // ZONA DE ACTUACION MAS AMPLIA. Antes el area util era la del
-                  // avatar mas una flecha diminuta: para abrir el menu habia que
-                  // apuntar. Con relleno propio el boton pasa a ~52x44px, se
-                  // ilumina al pasar por encima —asi se lee como pulsable— y el
-                  // margen negativo evita que ese relleno desplace al avatar.
-                  className="-mr-1.5 flex items-center gap-2 rounded-full py-1 pl-1 pr-2 transition-colors hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                  className={`${PROFILE_TRIGGER_SHELL} transition-colors hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70`}
                 >
                   <UserAvatar
                     account={account}

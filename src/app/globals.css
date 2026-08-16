@@ -327,6 +327,13 @@ html:not([data-avatar-boot]) .avatar-boot {
   animation: avatar-boot-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+/* La flecha del menú de perfil solo acompaña al hueco cuando sabemos que hay
+ * sesión: sin ella, ahí acabará saliendo "Iniciar sesión" y una flecha de
+ * desplegable prometería algo que no existe. */
+html:not([data-avatar-boot]) .avatar-boot-chevron {
+  display: none;
+}
+
 @keyframes avatar-boot-pulse {
 
   50% {
