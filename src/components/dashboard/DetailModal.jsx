@@ -52,6 +52,7 @@ import {
 
 import { useAuth } from "@/context/AuthContext";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import { clampDrawerWidth } from "@/lib/ui/detailModalSizing";
 import { getBackendItemStatus } from "@/lib/api/itemStatus";
 import { markAsFavorite, markInWatchlist } from "@/lib/api/tmdb";
 import {
@@ -422,16 +423,6 @@ let drawerWidthVarOwner = 0;
 // no hacía absolutamente nada en prácticamente ningún portátil ni monitor.
 // La fila de Reparto ya baja a 5 tarjetas por sí sola —para eso están sus
 // breakpoints—, así que no hay nada que proteger con un mínimo tan alto.
-const DRAWER_MIN_PX = 560;
-
-function clampDrawerWidth(width, viewportWidth) {
-  const vw = viewportWidth || 1280;
-  const max = Math.round(vw * 0.5);
-  // Se sigue acotando por si el máximo cayera por debajo del mínimo (ventanas
-  // muy estrechas): ahí el drawer queda fijo al máximo en lugar de romperse.
-  const min = Math.min(DRAWER_MIN_PX, max);
-  return Math.max(min, Math.min(Math.round(width || 0), max));
-}
 
 function initialDrawerWidth() {
   if (typeof window === "undefined") return 1080;
@@ -3240,8 +3231,15 @@ export default function DetailModal({
 
             {/* EPISODIO: pestañas Detalles/Sinopsis (mismos componentes que
                 EpisodeDetails). Detalles = Serie/Emisión/Duración/Episodio. */}
+            {/* El hueco hasta la primera sección (Reparto) lo pone el
+                `space-y-6` de la columna —`margin-block-end` de 24px—. Aquí se
+                recorta a 16px: el menú de secciones y su contenido se leen como
+                UN bloque, y 24px lo separaban más de la cuenta de la sección que
+                encabeza. Basta con la clase propia porque `space-y-*` se compila
+                dentro de `:where(...)`, que no tiene especificidad. */}
             {isEpisode ? (
               <motion.div
+                className="mb-4"
                 initial={{ opacity: 0, y: 15 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-10px" }}
@@ -3315,7 +3313,7 @@ export default function DetailModal({
                 </div>
               </motion.div>
             ) : (
-              <div>
+              <div className="mb-4">
                 <DetailsInfoTabs
                   variant="normal"
                   layoutId="detailModalTab"

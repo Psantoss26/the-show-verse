@@ -55,6 +55,24 @@ function hasPendingHistoryNavigation() {
   }
 }
 
+// Una navegación NORMAL (pulsar un enlace, el desplegable del navbar,
+// `router.push`) cancela la ventana de historial.
+//
+// Sin esto, la ventana de 10 s se aplicaba a cualquier montaje posterior a un
+// `popstate`: si retrocedías y acto seguido entrabas a Favoritos o Pendientes
+// desde el navbar, esa página se pintaba ESTÁTICA —sin su animación de
+// entrada— pese a no ser una vuelta atrás. La ventana existe para tolerar que
+// el remontaje de la lista llegue tarde tras el `popstate`, no para teñir las
+// navegaciones que vengan después.
+//
+// Lo llama el parche de `pushState` de <ScrollRestoration>, que ya es el único
+// sitio que intercepta las navegaciones de empuje (y allí mismo se limpia el
+// marcador de sesión). Mantenerlo en UN solo punto evita dos parches
+// compitiendo por `history.pushState`.
+export function notifyPushNavigation() {
+  lastHistoryNavAt = -Infinity;
+}
+
 // ¿El momento actual está dentro de la ventana posterior a una navegación de
 // historial? (lectura puntual, no reactiva).
 export function isHistoryNavigation() {
