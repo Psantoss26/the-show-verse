@@ -2,16 +2,22 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import OptimizedImage from "@/components/OptimizedImage";
+import Avatar from "@/components/ui/Avatar";
 
-function getInitials(account) {
-  const source = account?.displayName || account?.name || account?.username || "TSV";
-  return String(source)
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
+// Mismo marco que el avatar real —anillo, tamaño y tipografía— para que el
+// relevo al hidratar no mueva ni un píxel. Lo de dentro lo pone `.avatar-boot`
+// (globals.css) leyendo lo que AvatarBootScript dejó en :root: la foto del
+// usuario o, si no tiene, su inicial. Vive aquí, pegado a UserAvatar, porque
+// ambos deben cambiar a la vez si cambia el marco.
+export function UserAvatarBoot({ className = "" }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`block flex-shrink-0 rounded-full bg-neutral-700 p-[2px] ${className}`}
+    >
+      <span className="avatar-boot flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-neutral-900 text-sm font-black text-white" />
+    </span>
+  );
 }
 
 export default function UserAvatar({ account, className = "" }) {
@@ -44,18 +50,14 @@ export default function UserAvatar({ account, className = "" }) {
       title={label}
       className={`flex-shrink-0 rounded-full p-[2px] bg-neutral-700 hover:bg-white/30 transition-colors duration-200 ${className}`}
     >
-      <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-neutral-900 text-xs font-black text-white">
-        {avatarUrl ? (
-          <OptimizedImage
-            src={avatarUrl}
-            alt={label}
-            priority
-            fetchPriority="high"
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <span>{getInitials(account)}</span>
-        )}
+      <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-neutral-900 text-sm font-black text-white">
+        <Avatar
+          src={avatarUrl}
+          name={account?.displayName || account?.name || account?.username}
+          alt={label}
+          priority
+          fetchPriority="high"
+        />
       </div>
     </Link>
   );

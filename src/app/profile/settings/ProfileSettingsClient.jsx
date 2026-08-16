@@ -31,6 +31,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import Avatar, { getInitial } from "@/components/ui/Avatar";
 import ProfileFavoritesEditor from "@/components/social/ProfileFavoritesEditor";
 import AndroidSyncPanel from "@/components/settings/AndroidSyncPanel";
 import { pairDevice, useSyncStatus } from "@/lib/android/appBridge";
@@ -209,13 +210,22 @@ function ToggleRow({ icon: Icon, title, description, checked, disabled, onChange
   );
 }
 
-function SettingActionRow({ icon: Icon, avatarSrc, title, description, buttonLabel = "Cambiar", disabled, onClick }) {
+function SettingActionRow({ icon: Icon, avatarSrc, avatarName, title, description, buttonLabel = "Cambiar", disabled, onClick }) {
   return (
     <div className={`${GLASS_PANEL} rounded-2xl p-4 sm:p-5 flex items-center justify-between gap-4 group`}>
       <div className="flex min-w-0 items-center gap-4">
-        <div className="h-10 w-10 shrink-0 rounded-xl bg-white/5 p-2.5 text-emerald-400 ring-1 ring-white/10 group-hover:scale-105 group-hover:bg-white/10 transition-all duration-300 flex items-center justify-center overflow-hidden">
-          {avatarSrc ? (
-            <img src={avatarSrc} alt="" className="h-full w-full rounded-lg object-cover" />
+        {/* La fila de la foto de perfil (la que recibe `avatarName`) enseña el
+            avatar real, y sin imagen la inicial: el icono genérico no dejaba
+            ver lo que se está a punto de cambiar. Las demás filas siguen con
+            su icono. */}
+        <div className={`h-10 w-10 shrink-0 rounded-xl bg-white/5 text-emerald-400 ring-1 ring-white/10 group-hover:scale-105 group-hover:bg-white/10 transition-all duration-300 flex items-center justify-center overflow-hidden ${avatarName ? "" : "p-2.5"}`}>
+          {avatarName ? (
+            <Avatar
+              src={avatarSrc}
+              name={avatarName}
+              className="h-full w-full rounded-xl object-cover"
+              fallbackClassName="text-lg font-black text-emerald-300"
+            />
           ) : Icon ? (
             <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
           ) : null}
@@ -696,7 +706,7 @@ async function createOptimizedAvatar(file) {
   }
 }
 
-function AvatarModal({ isOpen, onClose, currentAvatarUrl, onSave, loading }) {
+function AvatarModal({ isOpen, onClose, currentAvatarUrl, userName, onSave, loading }) {
   const [mode, setMode] = useState("file");
   const [urlInput, setUrlInput] = useState(currentAvatarUrl || "");
   const [selectedFile, setSelectedFile] = useState(null);
@@ -814,7 +824,11 @@ function AvatarModal({ isOpen, onClose, currentAvatarUrl, onSave, loading }) {
                 onError={() => setError("No se pudo cargar la imagen desde la URL especificada.")}
               />
             ) : (
-              <User className="h-10 w-10 text-zinc-500" />
+              // Sin foto la vista previa enseña la inicial, que es exactamente
+              // lo que verá el resto de la aplicación si se guarda así.
+              <span aria-hidden="true" className="text-4xl font-black text-white">
+                {getInitial(userName)}
+              </span>
             )}
           </div>
           {previewUrl && (
@@ -1819,12 +1833,14 @@ function ProfileSettingsClient() {
         <div className="mb-8 rounded-3xl bg-gradient-to-r from-emerald-950/20 to-indigo-950/20 border border-white/[0.06] p-4 sm:p-6 flex flex-row items-center justify-between gap-4 backdrop-blur-xl relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/[0.04] to-indigo-500/[0.04] pointer-events-none" />
           <div className="flex items-center gap-3.5 sm:gap-4 min-w-0 flex-1">
-            <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0 shadow-lg text-emerald-400">
-              {user?.avatarUrl ? (
-                <img src={user.avatarUrl} alt="" className="h-full w-full rounded-2xl object-cover" />
-              ) : (
-                <User className="h-6 w-6" />
-              )}
+            <div className="h-12 w-12 sm:h-14 sm:w-14 overflow-hidden rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0 shadow-lg text-emerald-400">
+              <Avatar
+                src={user?.avatarUrl}
+                name={user?.displayName || user?.username}
+                alt=""
+                className="h-full w-full rounded-2xl object-cover"
+                fallbackClassName="text-xl sm:text-2xl font-black text-emerald-300"
+              />
             </div>
             <div className="min-w-0 flex-1">
               <h2 className="text-base sm:text-lg font-black text-white leading-tight truncate">
@@ -1903,6 +1919,7 @@ function ProfileSettingsClient() {
                     <SettingActionRow
                       icon={ImageIcon}
                       avatarSrc={user?.avatarUrl}
+                      avatarName={user?.displayName || user?.username || "Usuario"}
                       title={t("settings_avatar", "Foto de perfil")}
                       description={user?.avatarUrl ? "Imagen de perfil personalizada activa" : "Personaliza tu imagen con un archivo local o URL"}
                       buttonLabel="Cambiar"
@@ -2632,6 +2649,7 @@ function ProfileSettingsClient() {
             isOpen={showAvatarModal}
             onClose={() => setShowAvatarModal(false)}
             currentAvatarUrl={user?.avatarUrl || ""}
+            userName={user?.displayName || user?.username}
             onSave={saveAvatar}
             loading={profileSaving}
           />
