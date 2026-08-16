@@ -375,11 +375,22 @@ export const AuthProvider = ({ children }) => {
         let nextUser = await fetchMe();
 
         // Si teníamos sesión cacheada pero /api/auth/me dice que no, puede ser
-        // una carrera de refresco concurrente: al cargar el dashboard varias
-        // peticiones intentan rotar el mismo refresh token a la vez. Reintentamos
-        // unas veces (manteniendo el usuario optimista) antes de cerrar sesión.
+        // una carrera de refresco concurrente: al cargar el dashboard —o al
+        // entrar y salir de varias fichas seguidas— muchas peticiones intentan
+        // rotar el mismo refresh token a la vez. Reintentamos (manteniendo el
+        // usuario optimista) antes de cerrar sesión.
+        //
+        // LA VENTANA DE REINTENTOS CUBRE LA DE GRACIA DEL BACKEND.
+        // El servidor no borra el refresh token al rotarlo: lo deja válido
+        // `REFRESH_ROTATION_GRACE_MS` = 60 s para que los refrescos concurrentes
+        // sigan funcionando (ver backend/src/lib/refreshRotation.js). El cliente,
+        // en cambio, se rendía a los ~4,2 s y BORRABA la sesión, que es lo que
+        // dejaba las páginas de usuario vacías, el perfil con "No se pudo
+        // cargar" y "En progreso" pidiendo iniciar sesión pese a que la sesión
+        // seguía siendo válida. Los reintentos se estiran para cubrir esa
+        // ventana: si es una carrera, se resuelve dentro de ella.
         if (!nextUser && cachedUser) {
-          const delays = [500, 1200, 2500];
+          const delays = [500, 1200, 2500, 5000, 10000, 20000, 25000];
           for (let i = 0; i < delays.length && !nextUser; i += 1) {
             await new Promise((resolve) => window.setTimeout(resolve, delays[i]));
             if (cancelled) return;
