@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
+import { notifyPushNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 
 const STORAGE_PREFIX = "showverse:scroll-position:";
 const HISTORY_NAVIGATION_MARKER_KEY = "showverse:pending-history-navigation";
@@ -174,6 +175,12 @@ export default function ScrollRestoration() {
     window.history.pushState = function pushState(...args) {
       saveScrollPosition(currentRouteKeyRef.current);
       clearHistoryNavigationMarker();
+      // Además del marcador, se cancela la VENTANA temporal de
+      // `useIsHistoryNavigation`. Sin esto, durante los 10 s siguientes a un
+      // `popstate` cualquier página a la que se entrara por un enlace (p. ej.
+      // Favoritos desde el desplegable del navbar) se pintaba estática, sin su
+      // animación de entrada, como si se estuviera volviendo a ella.
+      notifyPushNavigation();
       clearRestorationComplete();
       navigationModeRef.current = "push";
       return originalPushState.apply(this, args);
