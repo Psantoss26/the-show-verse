@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import OptimizedImage from "@/components/OptimizedImage";
+import Avatar from "@/components/ui/Avatar";
 import {
   BookmarkPlus,
   Check,
@@ -707,12 +708,8 @@ function ProfileSectionToolbar({ section, controls, onChange }) {
 function ActivityAvatar({ actor }) {
   const name = actor?.displayName || actor?.username || "Usuario";
   return (
-    <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-900 text-[10px] font-black text-zinc-300">
-      {actor?.avatarUrl ? (
-        <OptimizedImage src={actor.avatarUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
-      ) : (
-        name.slice(0, 2).toUpperCase()
-      )}
+    <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-900 text-xs font-black text-zinc-300">
+      <Avatar src={actor?.avatarUrl} name={name} alt="" loading="lazy" />
     </span>
   );
 }

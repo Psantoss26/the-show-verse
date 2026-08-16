@@ -14,6 +14,7 @@ import {
   ARTWORK_PREFERENCES_CACHE_KEY,
   applyArtworkOverrideChanges,
 } from "@/lib/artworkApi";
+import { AUTH_USER_CACHE_KEY } from "@/lib/auth/authUserCache";
 import { finalizeLogout } from "@/lib/auth/logoutFinalization";
 import { setLocalStorageItem } from "@/lib/storage/localStorageBudget";
 
@@ -71,7 +72,6 @@ function cleanLegacyStorage() {
 // Caché del usuario (stale-while-revalidate), igual que las páginas de usuario
 // (History/Stats): permite pintar el icono de perfil del navbar al instante sin
 // esperar a /api/auth/me, y revalidar en segundo plano.
-const AUTH_USER_CACHE_KEY = "showverse:auth:user:v1";
 const AUTH_USER_CACHE_HARD_MAX_AGE = 1000 * 60 * 60 * 24 * 365; // 1 año
 
 function readAuthUserCache() {

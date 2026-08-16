@@ -9,6 +9,7 @@
 "use client";
 
 import OptimizedImage from "@/components/OptimizedImage";
+import Avatar from "@/components/ui/Avatar";
 // -- Hooks de React --
 import {
   useRef,
@@ -11907,13 +11908,15 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           {reviews.slice(0, 2).map((r) => {
+                            // Sin avatar en TMDB no se pide uno a un servicio
+                            // externo: la inicial se pinta aquí mismo.
                             const avatar = r.author_details?.avatar_path
                               ? r.author_details.avatar_path.startsWith(
                                   "/https",
                                 )
                                 ? r.author_details.avatar_path.slice(1)
                                 : `https://image.tmdb.org/t/p/w185${r.author_details.avatar_path}`
-                              : `https://ui-avatars.com/api/?name=${r.author}&background=random`;
+                              : null;
 
                             return (
                               <div
@@ -11921,11 +11924,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 className={`relative isolate flex flex-col gap-4 overflow-hidden rounded-2xl p-6 transform-gpu transition-all ${LIQUID_GLASS_CARD} hover:brightness-110`}
                               >
                                 <div className="relative z-10 flex items-center gap-4">
-                                  <OptimizedImage
-                                    src={avatar}
-                                    alt={r.author}
-                                    className="w-12 h-12 rounded-full object-cover shadow-lg"
-                                  />
+                                  <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10 text-lg font-black text-white shadow-lg">
+                                    <Avatar src={avatar} name={r.author} />
+                                  </span>
                                   <div>
                                     <h4 className="font-bold text-white">
                                       {r.author}
@@ -12015,7 +12016,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               const avatar =
                                 user?.images?.avatar?.full ||
                                 user?.images?.avatar?.medium ||
-                                `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || user?.username || "User")}`;
+                                null;
                               const text = stripHtml(
                                 c?.comment?.comment ?? c?.comment ?? "",
                               );
@@ -12047,11 +12048,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   className="group relative isolate flex gap-4 overflow-hidden rounded-2xl bg-white/[0.06] p-5 transform-gpu transition-colors duration-300 hover:bg-white/[0.1]"
                                 >
                                   {/* Avatar */}
-                                  <div className="relative z-10 shrink-0">
-                                    <OptimizedImage
+                                  <div className="relative z-10 flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10 text-lg font-black text-white shadow-lg ring-2 ring-white/10 transition group-hover:ring-white/20">
+                                    <Avatar
                                       src={avatar}
+                                      name={authorName}
                                       alt={user?.username}
-                                      className="h-12 w-12 rounded-full object-cover shadow-lg ring-2 ring-white/10 transition group-hover:ring-white/20"
                                     />
                                   </div>
 
@@ -12146,9 +12147,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 ? `/lists/community/${encodeURIComponent(String(listId))}`
                                 : null;
 
-                              const avatar =
-                                user?.images?.avatar?.full ||
-                                `https://ui-avatars.com/api/?name=${encodeURIComponent(username || "user")}&background=random`;
+                              const avatar = user?.images?.avatar?.full || null;
 
                               const disabled = !internalUrl;
 
@@ -12210,11 +12209,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     {/* Footer */}
                                     <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-4">
                                       <div className="flex items-center gap-2 min-w-0">
-                                        <OptimizedImage
-                                          src={avatar}
-                                          alt={username || "user"}
-                                          className="h-6 w-6 rounded-full ring-1 ring-white/20"
-                                        />
+                                        <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10 text-[10px] font-black text-white ring-1 ring-white/20">
+                                          <Avatar
+                                            src={avatar}
+                                            name={username || "user"}
+                                          />
+                                        </span>
                                         <span className="text-xs font-medium text-zinc-300 group-hover:text-white truncate max-w-[120px]">
                                           {username || "—"}
                                         </span>

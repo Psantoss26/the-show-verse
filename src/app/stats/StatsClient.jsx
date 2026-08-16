@@ -2,6 +2,7 @@
 
 
 import OptimizedImage from "@/components/OptimizedImage";
+import Avatar from "@/components/ui/Avatar";
 import DetailsSectionMenu from "@/components/DetailsSectionMenu";
 import {
   Children,
@@ -997,24 +998,16 @@ function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
     <div className="flex min-w-0 items-center gap-4 sm:gap-5 w-full">
       {/* Clean Avatar Box */}
       <div className="h-28 w-28 sm:h-32 sm:w-32 md:h-36 md:w-36 flex-shrink-0 overflow-hidden rounded-[2rem] sm:rounded-[2.5rem] ring-2 ring-indigo-500/30 shadow-2xl shadow-indigo-500/10">
-        {avatarUrl ? (
-          <OptimizedImage
-            src={avatarUrl}
-            alt={displayName}
-            width={144}
-            height={144}
-            loading="eager"
-            fetchPriority="high"
-            decoding="sync"
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-700">
-            <span className="text-4xl sm:text-5xl md:text-6xl font-black text-white">
-              {displayName[0]?.toUpperCase() || "?"}
-            </span>
-          </div>
-        )}
+        <Avatar
+          src={avatarUrl}
+          name={displayName}
+          width={144}
+          height={144}
+          loading="eager"
+          fetchPriority="high"
+          decoding="sync"
+          fallbackClassName="flex h-full w-full items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-700 text-4xl sm:text-5xl md:text-6xl font-black text-white"
+        />
       </div>
 
       {/* User text details & Inline actions */}

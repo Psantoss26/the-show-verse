@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import OptimizedImage from "@/components/OptimizedImage";
+import Avatar from "@/components/ui/Avatar";
 import LiquidButton from "@/components/LiquidButton";
 import { useAuth } from "@/context/AuthContext";
 import FollowButton from "@/components/social/FollowButton";
@@ -128,28 +129,14 @@ function ProfilePendingSurface() {
 // Utilidades de presentación
 // ─────────────────────────────────────────────
 
-function getInitials(source) {
-  return String(source || "TSV")
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase())
-    .join("");
-}
-
 function ProfileAvatar({ user, size = "h-22 w-22 sm:h-26 sm:w-26" }) {
   return (
-    <div className={`flex ${size} items-center justify-center overflow-hidden rounded-full bg-neutral-800 text-xl font-black text-white ring-2 ring-white/10`}>
-      {user?.avatarUrl ? (
-        <OptimizedImage
-          src={user.avatarUrl}
-          alt={user?.displayName || user?.username || ""}
-          className="h-full w-full object-cover"
-          priority
-        />
-      ) : (
-        <span>{getInitials(user?.displayName || user?.username)}</span>
-      )}
+    <div className={`flex ${size} items-center justify-center overflow-hidden rounded-full bg-neutral-800 text-3xl font-black text-white ring-2 ring-white/10`}>
+      <Avatar
+        src={user?.avatarUrl}
+        name={user?.displayName || user?.username}
+        priority
+      />
     </div>
   );
 }
@@ -1143,18 +1130,13 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
                     <Link
                       key={f.username}
                       href={`/u/${f.username}`}
-                      className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-neutral-800 text-[10px] font-black text-white transition-transform hover:scale-110 shadow-sm"
+                      className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-neutral-800 text-sm font-black text-white transition-transform hover:scale-110 shadow-sm"
                     >
-                      {f.avatarUrl ? (
-                        <OptimizedImage
-                          src={f.avatarUrl}
-                          alt={f.displayName}
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <span>{getInitials(f.displayName)}</span>
-                      )}
+                      <Avatar
+                        src={f.avatarUrl}
+                        name={f.displayName || f.username}
+                        loading="lazy"
+                      />
                     </Link>
                   ))}
                 </div>

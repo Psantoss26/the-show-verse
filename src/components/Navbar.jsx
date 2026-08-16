@@ -18,7 +18,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import "@/app/globals.css";
 import { useAuth } from "@/context/AuthContext";
-import UserAvatar from "@/components/auth/UserAvatar";
+import UserAvatar, { UserAvatarBoot } from "@/components/auth/UserAvatar";
+import Avatar from "@/components/ui/Avatar";
 import { useTranslation } from "@/lib/i18n";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import {
@@ -152,15 +153,6 @@ function normalizeUserSearchResult(user) {
     media_type: "user",
     title: user.displayName || user.username,
   };
-}
-
-function getSearchInitials(source) {
-  return String(source || "TSV")
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
 }
 
 function scoreSearchResult(item, normalizedQuery) {
@@ -1224,18 +1216,13 @@ function SearchBar({
                         <div className="flex items-center gap-4 px-3 py-3 rounded-xl hover:bg-white/10 active:bg-white/15 transition-all cursor-pointer group">
                           <div className="relative flex-shrink-0">
                             {isUser ? (
-                              <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-neutral-900 text-xs font-black text-white shadow-lg transition-colors group-hover:border-cyan-300/30">
-                                {item.avatarUrl ? (
-                                  <OptimizedImage
-                                    src={item.avatarUrl}
-                                    alt={resultLabel}
-                                    width={48}
-                                    height={48}
-                                    className="h-full w-full object-cover"
-                                  />
-                                ) : (
-                                  <span>{getSearchInitials(resultLabel)}</span>
-                                )}
+                              <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-neutral-900 text-base font-black text-white shadow-lg transition-colors group-hover:border-cyan-300/30">
+                                <Avatar
+                                  src={item.avatarUrl}
+                                  name={resultLabel}
+                                  width={48}
+                                  height={48}
+                                />
                               </div>
                             ) : (
                               <OptimizedImage
@@ -2220,10 +2207,7 @@ export default function Navbar() {
             />
 
             {profileAuthLoading ? (
-              <div
-                aria-hidden="true"
-                className="ml-1 h-9 w-9 rounded-full bg-neutral-800/80 animate-pulse"
-              />
+              <UserAvatarBoot className="ml-1" />
             ) : !account ? (
               <a
                 href={loginHref}
@@ -2516,7 +2500,7 @@ export default function Navbar() {
             </button>
 
             {profileAuthLoading ? (
-              <div className="w-9 h-9 rounded-full bg-neutral-800/80 animate-pulse" />
+              <UserAvatarBoot />
             ) : !account ? (
               <a
                 href={loginHref}

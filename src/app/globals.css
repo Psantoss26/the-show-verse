@@ -302,6 +302,38 @@ body {
   }
 }
 
+/* HUECO DEL AVATAR MIENTRAS ARRANCA LA SESIÓN.
+ *
+ * Lo rellena AvatarBootScript, que corre antes del primer pintado y deja en
+ * :root la foto (`--avatar-image`) y la inicial (`--avatar-initial`) del usuario
+ * de este dispositivo. Así la recarga enseña ya lo definitivo en vez del hueco
+ * vacío, y cuando React hidrata el cambio a UserAvatar no se nota.
+ *
+ * Van por variable CSS y no por atributo del propio elemento porque el script
+ * corre cuando el avatar aún no existe en el DOM; las variables se heredan desde
+ * la raíz hasta él. Sin sesión cacheada no hay variables, el contenido queda
+ * vacío y se mantiene el latido de siempre. */
+.avatar-boot {
+  background-image: var(--avatar-image, none);
+  background-position: center;
+  background-size: cover;
+}
+
+.avatar-boot::after {
+  content: var(--avatar-initial, "");
+}
+
+html:not([data-avatar-boot]) .avatar-boot {
+  animation: avatar-boot-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes avatar-boot-pulse {
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
 @keyframes pulse-subtle {
 
   0%,
