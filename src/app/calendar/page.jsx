@@ -24,15 +24,12 @@ import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import {
   ImageOff,
-  Loader2,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
   Calendar as CalendarIcon,
   CheckCircle2,
-  Bookmark,
-  Heart,
   Film,
   MonitorPlay,
   SlidersHorizontal,
@@ -57,6 +54,7 @@ import {
 import { formatPageTitle } from "@/lib/pageTitle";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import useModalGuard from "@/hooks/useModalGuard";
+import { useAuth } from "@/context/AuthContext";
 
 const TYPE_FILTERS = [
   { id: "all", label: "Todo" },
@@ -92,6 +90,11 @@ const CARD_VIEWS = [
 
 const pad2 = (n) => String(n).padStart(2, "0");
 
+// Lo ya traído, por ventana consultada. Vive fuera del componente para que
+// entrar y salir de la página no vuelva a pedirlo todo.
+const moviesCache = new Map();
+const episodesCache = new Map();
+
 // Texto comparable para el buscador: sin mayúsculas y sin tildes, para que
 // "bicicleta" encuentre "La bicicleta de Bartali" y "asi" encuentre "Así".
 const foldText = (value) =>
@@ -107,13 +110,21 @@ const foldText = (value) =>
 // rompería la hidratación. Se restaura en un efecto, y hasta que eso ocurre no
 // se escribe nada —si no, el primer render pisaría con el valor por defecto lo
 // que había guardado.
+// Devuelve además `chosen`: si esta página ya tiene un valor propio, sea porque
+// estaba guardado o porque el usuario acaba de elegirlo. Lo usa la vista de
+// tarjetas para saber si puede sembrarse desde la preferencia global de la
+// cuenta o si debe respetar lo que se decidió aquí, igual que hace Historial.
 function useStoredSetting(storageKey, options, initial) {
   const [value, setValue] = useState(initial);
   const restored = useRef(false);
+  const chosen = useRef(false);
 
   useEffect(() => {
     const saved = window.localStorage.getItem(storageKey);
-    if (options.some(({ id }) => id === saved)) setValue(saved);
+    if (options.some(({ id }) => id === saved)) {
+      setValue(saved);
+      chosen.current = true;
+    }
     restored.current = true;
   }, [storageKey, options]);
 
@@ -122,7 +133,19 @@ function useStoredSetting(storageKey, options, initial) {
     window.localStorage.setItem(storageKey, value);
   }, [storageKey, value]);
 
-  return [value, setValue];
+  // Elegir marca el ajuste como propio de esta página.
+  const choose = useCallback((next) => {
+    chosen.current = true;
+    setValue(next);
+  }, []);
+
+  // Sembrar es una sugerencia: se aplica solo si aquí no se ha decidido nada.
+  const seed = useCallback((next) => {
+    if (chosen.current) return;
+    setValue(next);
+  }, []);
+
+  return [value, choose, seed];
 }
 
 // --- COMPONENTES UI AUXILIARES ---
@@ -205,8 +228,6 @@ function normalizeMovieItem(item) {
     href: `/details/${mediaType}/${item?.id}`,
     posterPath: item?.poster_path || item?.backdrop_path || null,
     backdropPath: item?.backdrop_path || item?.poster_path || null,
-    favorite: false,
-    watchlist: false,
   };
 }
 
@@ -216,7 +237,6 @@ function normalizeEpisodeItem(item) {
   const season = Number(episode?.season || 0);
   const number = Number(episode?.number || 0);
   const aired = item?.first_aired ? new Date(item.first_aired) : null;
-  const source = Array.isArray(item?.source) ? item.source : [];
   const epLabel = `T${season || "?"} · E${number || "?"}`;
 
   return {
@@ -231,8 +251,6 @@ function normalizeEpisodeItem(item) {
         : `/details/tv/${show?.tmdbId}`,
     posterPath: show?.poster_path || show?.backdrop_path || null,
     backdropPath: show?.backdrop_path || show?.poster_path || null,
-    favorite: source.includes("favorite"),
-    watchlist: source.includes("watchlist"),
   };
 }
 
@@ -288,32 +306,6 @@ function CalendarHoverIndicator({ kind, dateParts, compact = false }) {
   );
 }
 
-// Marca de favorito/pendiente. Es propia de Calendario —el Historial usa esa
-// esquina para borrar—, así que ocupa el mismo sitio con el mismo acabado.
-function CalendarSourceBadge({ item, compact = false }) {
-  if (!item.favorite && !item.watchlist) return null;
-
-  return (
-    <div
-      className={`pointer-events-none absolute top-0 left-0 z-20 flex items-center gap-1.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm ${
-        compact ? "p-1.5" : "p-2 sm:p-2.5"
-      } ${
-        item.favorite
-          ? "bg-rose-500/15 border-rose-500/30 text-rose-300"
-          : "bg-sky-500/15 border-sky-500/30 text-sky-300"
-      }`}
-    >
-      {item.watchlist && (
-        <Bookmark className={compact ? "w-3.5 h-3.5" : "w-4 h-4"} />
-      )}
-      {item.favorite && (
-        <Heart
-          className={`fill-current ${compact ? "w-3.5 h-3.5" : "w-4 h-4"}`}
-        />
-      )}
-    </div>
-  );
-}
 
 // Retraso de entrada en cascada, tarjeta a tarjeta, como en Historial.
 function entranceDelay(index, total) {
@@ -354,7 +346,6 @@ const CalendarListCard = memo(function CalendarListCard({
                 alt={item.title}
                 className="absolute inset-0 w-full h-full object-cover"
               />
-              <CalendarSourceBadge item={item} />
             </div>
           </div>
 
@@ -418,7 +409,6 @@ const CalendarCompactCard = memo(function CalendarCompactCard({
               alt={item.title}
               className="w-full h-full object-cover"
             />
-            <CalendarSourceBadge item={item} compact />
             <CalendarHoverIndicator
               kind={item.kind}
               dateParts={dateParts}
@@ -458,7 +448,6 @@ const CalendarGridCard = memo(function CalendarGridCard({
               alt={item.title}
               className="w-full h-full object-cover"
             />
-            <CalendarSourceBadge item={item} />
             <CalendarHoverIndicator kind={item.kind} dateParts={dateParts} />
 
             {/* Banda inferior con el texto: en escritorio la sustituye el
@@ -479,6 +468,38 @@ const CalendarGridCard = memo(function CalendarGridCard({
     </motion.div>
   );
 });
+
+// Las tres rejillas, con las medidas del Historial. En un solo sitio porque las
+// usan tanto los grupos de fecha como la tira suelta de episodios, y tienen que
+// verse exactamente igual en ambos.
+function CalendarCardGrid({ items, cardView, baseIndex = 0, total = 0 }) {
+  const Card =
+    cardView === "grid"
+      ? CalendarGridCard
+      : cardView === "compact"
+        ? CalendarCompactCard
+        : CalendarListCard;
+
+  const className =
+    cardView === "grid"
+      ? "grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3"
+      : cardView === "compact"
+        ? "compact-cards-grid grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-2"
+        : "grid grid-cols-1 xl:grid-cols-2 gap-4";
+
+  return (
+    <div className={className}>
+      {items.map((item, index) => (
+        <Card
+          key={item.key}
+          item={item}
+          index={baseIndex + index}
+          total={total}
+        />
+      ))}
+    </div>
+  );
+}
 
 // Rejilla de 6 semanas que empieza en lunes, con los días de relleno del mes
 // anterior y el siguiente. La comparten el calendario del selector de fecha y el
@@ -642,15 +663,12 @@ function DropdownItem({ active, onClick, children }) {
   );
 }
 
-// Calendario lateral, mismo patrón que el del Historial: la rejilla del mes con
-// un punto en los días que traen algo. La diferencia está en lo que hace un
-// clic. En Historial FILTRA la lista; aquí NAVEGA, porque el modelo de esta
-// página es una fecha seleccionada y un rango, no una lista que acotar: pulsar
-// un día salta a ese día en vista "Día".
+// Calendario lateral, igual que el del Historial: la rejilla del mes con un
+// punto en los días que traen algo, y pulsar un día ACOTA el listado a ese día.
+// Volver a pulsarlo, o usar "Ver todo el mes", deshace el filtro.
 //
-// El mes que enseña es independiente del seleccionado —se puede curiosear
-// noviembre sin salir de agosto— y solo se sincroniza cuando cambia la
-// selección.
+// El mes que enseña es independiente del acotado —se puede curiosear noviembre
+// sin perder el día elegido— y solo se sincroniza al cambiar de periodo.
 function CalendarSidePanel({
   monthDate,
   onPrev,
@@ -659,6 +677,7 @@ function CalendarSidePanel({
   selectedYmd,
   onSelectDay,
   onShowMonth,
+  onClearDay,
   loading = false,
   className = "",
 }) {
@@ -681,7 +700,11 @@ function CalendarSidePanel({
             {monthLabel}
           </h3>
           <p className="text-sm text-yellow-500/70 mt-1 font-medium">
-            {loading ? "Buscando estrenos…" : "Pulsa un día para verlo"}
+            {loading
+              ? "Buscando estrenos…"
+              : selectedYmd
+                ? "Mostrando solo ese día"
+                : "Pulsa un día para verlo solo a él"}
           </p>
         </div>
         <div className="flex gap-2 bg-black/20 rounded-xl p-1.5 shadow-inner shrink-0">
@@ -751,10 +774,18 @@ function CalendarSidePanel({
 
       <button
         type="button"
-        onClick={onShowMonth}
+        onClick={selectedYmd ? onClearDay : onShowMonth}
         className="mt-8 w-full py-3 text-sm font-bold text-yellow-400 hover:text-yellow-300 flex items-center justify-center gap-2 border-t border-white/10 uppercase tracking-wide transition-colors"
       >
-        <CalendarIcon className="w-4 h-4" /> Ver todo el mes
+        {selectedYmd ? (
+          <>
+            <RotateCcw className="w-4 h-4" /> Ver todo el mes
+          </>
+        ) : (
+          <>
+            <CalendarIcon className="w-4 h-4" /> Ir a este mes
+          </>
+        )}
       </button>
     </div>
   );
@@ -773,6 +804,7 @@ function MobileCalendarOverlay({
   selectedYmd,
   onSelectDay,
   onShowMonth,
+  onClearDay,
   loading,
 }) {
   useModalGuard({ open, onClose });
@@ -810,6 +842,10 @@ function MobileCalendarOverlay({
             onSelectDay(date);
             onClose();
           }}
+          onClearDay={() => {
+            onClearDay();
+            onClose();
+          }}
           onShowMonth={() => {
             onShowMonth();
             onClose();
@@ -826,6 +862,7 @@ function MobileCalendarOverlay({
 // --- PÁGINA PRINCIPAL ---
 
 export default function CalendarPage() {
+  const { preferences } = useAuth();
   const [selectedDate, setSelectedDate] = useState(new Date());
 
   const [selectedMovies, setSelectedMovies] = useState([]);
@@ -853,12 +890,24 @@ export default function CalendarPage() {
     SORT_MODES,
     "date-asc",
   );
-  const [cardView, setCardView] = useStoredSetting(
+  const [cardView, setCardView, seedCardView] = useStoredSetting(
     "showverse:calendar:cardView",
     CARD_VIEWS,
     "grid",
   );
+
+  // La preferencia global de la cuenta ("Vista por defecto") solo SIEMBRA la
+  // vista mientras Calendario no tenga la suya. En cuanto se elige una aquí,
+  // manda ésta y la global ya no vuelve a pisarla. Mismo trato que en Historial.
+  useEffect(() => {
+    const preferred = preferences?.defaultView;
+    if (CARD_VIEWS.some(({ id }) => id === preferred)) seedCardView(preferred);
+  }, [preferences?.defaultView, seedCardView]);
   const [query, setQuery] = useState("");
+  // Día al que se ha acotado el listado desde el calendario lateral (yyyy-MM-dd)
+  // o null si se ve el periodo entero. No se guarda entre visitas: es una lupa
+  // momentánea, no un ajuste.
+  const [selectedDay, setSelectedDay] = useState(null);
 
   // Menú fijo: en móvil los controles secundarios viven en un panel desplegable,
   // igual que en Historial, para que la fila principal quepa en una pantalla
@@ -957,47 +1006,90 @@ export default function CalendarPage() {
     return { start, end };
   }, [selectedDate, groupBy]);
 
+  // LAS DOS FUENTES, CADA UNA A LO SUYO Y SIN BLOQUEAR A LA OTRA.
+  //
+  // Los episodios (BBDD propia) llegan en un instante; los estrenos tardan
+  // bastante más —varias páginas de TMDB y, encima, resolver las fechas
+  // españolas descuadradas—. Antes una pantalla de carga tapaba las dos hasta
+  // que la lenta terminaba. Ahora cada una se pinta en cuanto está.
+  //
+  // Y se recuerda lo ya traído por ventana: volver a un periodo visitado —o
+  // soltar un día acotado— es inmediato en vez de repetir toda la tanda.
+  const windowKey = `${dayKey(dateRange.start)}_${dayKey(dateRange.end)}`;
+
   useEffect(() => {
+    let cancelled = false;
+    const cached = moviesCache.get(windowKey);
+    if (cached) {
+      setSelectedMovies(cached);
+      setMoviesLoading(false);
+      setError(null);
+      return undefined;
+    }
+
     const fetchMovies = async () => {
+      setMoviesLoading(true);
+      setError(null);
       try {
-        setMoviesLoading(true);
-        setError(null);
         const movies = await getMoviesByWindow(dateRange.start, dateRange.end);
-        setSelectedMovies(Array.isArray(movies) ? movies : []);
+        if (cancelled) return;
+        const list = Array.isArray(movies) ? movies : [];
+        moviesCache.set(windowKey, list);
+        setSelectedMovies(list);
       } catch (err) {
         console.error("Error al cargar estrenos:", err);
+        if (cancelled) return;
         setSelectedMovies([]);
         setError("No se han podido cargar los estrenos.");
       } finally {
-        setMoviesLoading(false);
+        if (!cancelled) setMoviesLoading(false);
       }
     };
 
     fetchMovies();
-  }, [dateRange.start, dateRange.end]);
+    return () => {
+      cancelled = true;
+    };
+  }, [windowKey, dateRange.start, dateRange.end]);
 
   useEffect(() => {
+    let cancelled = false;
+    const cached = episodesCache.get(windowKey);
+    if (cached) {
+      setTrackedEpisodes(cached);
+      setEpisodesLoading(false);
+      setEpisodeError(null);
+      return undefined;
+    }
+
     const fetchTrackedEpisodes = async () => {
+      setEpisodesLoading(true);
+      setEpisodeError(null);
       try {
-        setEpisodesLoading(true);
-        setEpisodeError(null);
         const data = await getTrackedEpisodesByWindow(
           dateRange.start,
           dateRange.end,
         );
-        setTrackedEpisodes(Array.isArray(data?.items) ? data.items : []);
+        if (cancelled) return;
+        const list = Array.isArray(data?.items) ? data.items : [];
+        episodesCache.set(windowKey, list);
+        setTrackedEpisodes(list);
         if (data?.error) setEpisodeError(data.error);
       } catch (err) {
         console.error("Error al cargar episodios:", err);
+        if (cancelled) return;
         setTrackedEpisodes([]);
         setEpisodeError("No se han podido cargar los episodios de tus series.");
       } finally {
-        setEpisodesLoading(false);
+        if (!cancelled) setEpisodesLoading(false);
       }
     };
 
     fetchTrackedEpisodes();
-  }, [dateRange.start, dateRange.end]);
+    return () => {
+      cancelled = true;
+    };
+  }, [windowKey, dateRange.start, dateRange.end]);
 
   // "Hoy" aquí es la ventana que arranca en el mes en curso, no un día suelto:
   // es a donde vuelve el botón de reinicio.
@@ -1009,6 +1101,16 @@ export default function CalendarPage() {
         ? format(dateRange.start, "MMMM 'de' yyyy", { locale: es })
         : `${format(dateRange.start, "MMM yyyy", { locale: es })} – ${format(dateRange.end, "MMM yyyy", { locale: es })}`,
     [dateRange, groupBy],
+  );
+
+  const selectedDayLabel = useMemo(
+    () =>
+      selectedDay
+        ? format(new Date(`${selectedDay}T00:00:00`), "EEEE, d 'de' MMMM", {
+            locale: es,
+          })
+        : null,
+    [selectedDay],
   );
 
   const sortedTrackedEpisodes = useMemo(
@@ -1033,7 +1135,13 @@ export default function CalendarPage() {
   );
 
   const visibleItems = useMemo(() => {
-    const byType = allItems.filter((item) => {
+    // El día acotado va PRIMERO: manda sobre todo lo demás, y así el resto de
+    // filtros trabajan ya sobre ese día.
+    const byDay = selectedDay
+      ? allItems.filter((item) => item.date && dayKey(item.date) === selectedDay)
+      : allItems;
+
+    const byType = byDay.filter((item) => {
       if (typeFilter === "movies") return item.kind === "movie";
       if (typeFilter === "episodes") return item.kind === "episode";
       return true;
@@ -1064,20 +1172,42 @@ export default function CalendarPage() {
           return time(a) - time(b);
       }
     });
-  }, [allItems, typeFilter, sortBy, query]);
+  }, [allItems, selectedDay, typeFilter, sortBy, query]);
+
+  // CON "TIPO: TODO" LOS EPISODIOS VAN APARTE, ENCIMA.
+  //
+  // Son pocos frente a los estrenos y se perderían repartidos por las fechas, así
+  // que salen en su propia tira antes de la agrupación —al margen de ella— y
+  // abajo quedan solo las películas. Filtrando por un tipo concreto no hay nada
+  // que separar: todo va agrupado como siempre.
+  const splitEpisodes = typeFilter === "all";
+  const loneEpisodes = useMemo(
+    () => (splitEpisodes ? visibleItems.filter((i) => i.kind === "episode") : []),
+    [visibleItems, splitEpisodes],
+  );
+  const groupedItems = useMemo(
+    () =>
+      splitEpisodes
+        ? visibleItems.filter((i) => i.kind === "movie")
+        : visibleItems,
+    [visibleItems, splitEpisodes],
+  );
 
   // Agrupación por día, mes o año. Las cabeceras siguen el sentido cronológico
   // del orden elegido; con orden por título mandan igualmente las fechas, que es
   // lo que da estructura a la página.
   const groups = useMemo(() => {
     const map = new Map();
-    for (const item of visibleItems) {
+    for (const item of groupedItems) {
       // Sin fecha no hay grupo posible: ni los estrenos ni los episodios llegan
       // así, pero un dato incompleto no debe tumbar el listado.
       if (!item.date) continue;
       const d = item.date;
-      const key =
-        groupBy === "year"
+      // Acotado a un día, la cabecera es la de ese día aunque se esté agrupando
+      // por mes o año: agrupar por "agosto" un único día se leería mal.
+      const key = selectedDay
+        ? dayKey(d)
+        : groupBy === "year"
           ? `${d.getFullYear()}-01-01`
           : groupBy === "month"
             ? `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-01`
@@ -1096,19 +1226,20 @@ export default function CalendarPage() {
       date: new Date(key),
       items: map.get(key) || [],
     }));
-  }, [visibleItems, groupBy, sortBy]);
+  }, [groupedItems, groupBy, sortBy, selectedDay]);
 
   // Índice GLOBAL de cada tarjeta para que la cascada de entrada sea continua en
-  // toda la página, no reiniciada en cada grupo.
+  // toda la página, no reiniciada en cada grupo. La tira de episodios va primera,
+  // así que los grupos arrancan detrás de ella.
   const cardOrder = useMemo(() => {
     const offsets = [];
-    let acc = 0;
+    let acc = loneEpisodes.length;
     for (const group of groups) {
       offsets.push(acc);
       acc += group.items.length;
     }
     return { offsets, total: acc };
-  }, [groups]);
+  }, [groups, loneEpisodes]);
 
   const typeLabel =
     TYPE_FILTERS.find(({ id }) => id === typeFilter)?.label ?? "Todo";
@@ -1116,21 +1247,34 @@ export default function CalendarPage() {
     GROUP_MODES.find(({ id }) => id === groupBy)?.label ?? "Día";
   const sortLabel =
     SORT_MODES.find(({ id }) => id === sortBy)?.label ?? "Más próximo";
-  const loading =
-    (moviesLoading && !hasEpisodes) || (episodesLoading && !hasMovies);
+  // Las dos fuentes han contestado: solo entonces tiene sentido decir que no
+  // hay nada. Antes, un "periodo tranquilo" podía aparecer mientras los estrenos
+  // seguían de camino.
+  const settled = !moviesLoading && !episodesLoading;
 
-  // El calendario lateral es AHORA la única forma de moverse por el tiempo: ya
-  // no hay flechas ni selector de fecha en el menú. Pulsar un día lleva la
-  // ventana a su mes.
+  // Pulsar un día ACOTA el listado a ese día. Se mueve además la ventana a su
+  // mes, porque el día elegido puede estar en un mes que no se había consultado
+  // todavía: sin eso el filtro dejaría la página vacía. Repetir el mismo día lo
+  // desactiva, como en Historial.
   const goToDay = useCallback((date) => {
+    const key = dayKey(date);
+    setSelectedDay((prev) => (prev === key ? null : key));
     setSelectedDate(date);
   }, []);
 
+  const clearSelectedDay = useCallback(() => setSelectedDay(null), []);
+
+  // Botón de reinicio: vuelve al periodo en curso y suelta el día acotado.
+  const resetToToday = useCallback(() => {
+    setSelectedDay(null);
+    setSelectedDate(new Date());
+  }, []);
+
   const showPanelMonth = useCallback(() => {
+    setSelectedDay(null);
     setSelectedDate(startOfMonth(panelMonth));
   }, [panelMonth]);
 
-  const selectedYmd = dayKey(selectedDate);
 
   return (
     <div className="min-h-screen bg-black text-gray-100 font-sans selection:bg-yellow-500/30 pb-20">
@@ -1333,7 +1477,7 @@ export default function CalendarPage() {
 
                         <button
                           type="button"
-                          onClick={() => setSelectedDate(new Date())}
+                          onClick={resetToToday}
                           disabled={isTodaySelected}
                           className="w-full h-11 flex items-center justify-center gap-2 rounded-2xl text-xs font-bold uppercase tracking-wide transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-yellow-400 hover:text-yellow-300 hover:bg-black/30 disabled:opacity-40 disabled:hover:bg-transparent"
                         >
@@ -1450,7 +1594,7 @@ export default function CalendarPage() {
                     de anchura al navegar por los días. */}
                 <button
                   type="button"
-                  onClick={() => setSelectedDate(new Date())}
+                  onClick={resetToToday}
                   disabled={isTodaySelected}
                   title="Volver a hoy"
                   aria-label="Volver a hoy"
@@ -1461,15 +1605,10 @@ export default function CalendarPage() {
               </div>
             </motion.div>
 
-            {/* Content Area */}
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-32">
-                <Loader2 className="w-10 h-10 animate-spin text-yellow-500 mb-4" />
-                <span className="text-zinc-500 text-sm font-medium animate-pulse">
-                  Consultando fecha...
-                </span>
-              </div>
-            ) : error && !hasAnyItems ? (
+            {/* CONTENIDO. Sin pantalla de carga: cada fuente entra en cuanto
+                llega, y los avisos de "no hay nada" esperan a que las dos hayan
+                terminado para no acusar de vacío a algo que aún viene en camino. */}
+            {error && settled && !hasAnyItems ? (
               <div className="rounded-[2rem] flex flex-col items-center justify-center py-32 text-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg mx-2">
                 <ImageOff className="w-16 h-16 text-red-500/50 mb-4" />
                 <h3 className="text-xl font-bold text-red-200">{error}</h3>
@@ -1477,7 +1616,7 @@ export default function CalendarPage() {
                   Inténtalo de nuevo más tarde.
                 </p>
               </div>
-            ) : !hasAnyItems ? (
+            ) : settled && !hasAnyItems ? (
               <div className="flex flex-col items-center justify-center py-40 text-center rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg mx-2 border border-white/10">
                 <div className="w-24 h-24 rounded-full flex items-center justify-center mb-6 bg-white/5 shadow-sm border border-white/10">
                   <CalendarIcon className="w-10 h-10 text-zinc-600" />
@@ -1497,17 +1636,25 @@ export default function CalendarPage() {
               </div>
             ) : (
               <>
-                {/* Header con info del período */}
-                <div className="mb-6 sm:mb-8 px-2 sm:px-0">
+                {/* Header con info del período. Espera a tener algo que contar:
+                    un "0 películas · 0 episodios" de medio segundo al entrar es
+                    peor que no decir nada todavía. */}
+                <div
+                  className={`mb-6 sm:mb-8 px-2 sm:px-0 ${hasAnyItems ? "" : "hidden"}`}
+                >
                   <div className="flex items-center gap-3">
                     <div className="h-px flex-1 bg-gradient-to-r from-transparent via-yellow-500/40 to-yellow-500/15" />
                     <div className="relative overflow-hidden inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-1.5 text-center">
+                      {/* Con un día acotado el resumen cuenta lo que se está
+                          viendo: anunciar el periodo entero mientras se enseñan
+                          tres fichas sería contradecirse. */}
                       <span className="text-yellow-100 font-bold text-xs sm:text-sm tracking-widest uppercase block drop-shadow-sm">
-                        {selectedMovies.length} películas ·{" "}
-                        {sortedTrackedEpisodes.length} episodios
+                        {selectedDay
+                          ? `${visibleItems.length} ${visibleItems.length === 1 ? "título" : "títulos"}`
+                          : `${selectedMovies.length} películas · ${sortedTrackedEpisodes.length} episodios`}
                       </span>
                       <span className="text-yellow-300/80 text-[10px] sm:text-xs capitalize block ml-2">
-                        ({rangeLabel})
+                        ({selectedDay ? selectedDayLabel : rangeLabel})
                       </span>
                     </div>
                     <div className="h-px flex-1 bg-gradient-to-l from-transparent via-yellow-500/40 to-yellow-500/15" />
@@ -1522,15 +1669,54 @@ export default function CalendarPage() {
                   </div>
                 )}
 
-                {visibleItems.length === 0 ? (
+                {/* Tira de episodios: va suelta, entre el resumen del periodo y
+                    la primera cabecera de agrupación, y con las mismas tarjetas
+                    que el resto. Solo aparece con "Tipo: Todo"; filtrando por
+                    episodios no hay nada de lo que separarlos. */}
+                {loneEpisodes.length > 0 && (
+                  <div className="mb-8 px-2 sm:px-0">
+                    <div className="flex items-center gap-3 py-1.5 sm:py-4 mb-2">
+                      <div className="h-px flex-1 bg-gradient-to-r from-transparent via-violet-500/40 to-violet-500/15" />
+                      <div className="relative overflow-hidden inline-flex max-w-[80%] items-center gap-2 rounded-xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-1.5 text-xs sm:text-sm">
+                        <MonitorPlay className="relative z-10 h-3.5 w-3.5 shrink-0 text-violet-300" />
+                        <span className="relative z-10 truncate font-black uppercase tracking-wide text-violet-100 drop-shadow-sm">
+                          Tus episodios
+                        </span>
+                        <span className="relative z-10 shrink-0 text-[10px] font-bold text-violet-300/80">
+                          {loneEpisodes.length}
+                        </span>
+                      </div>
+                      <div className="h-px flex-1 bg-gradient-to-l from-transparent via-violet-500/40 to-violet-500/15" />
+                    </div>
+
+                    <CalendarCardGrid
+                      items={loneEpisodes}
+                      cardView={cardView}
+                      baseIndex={0}
+                      total={cardOrder.total}
+                    />
+                  </div>
+                )}
+
+                {settled && visibleItems.length === 0 ? (
                   <div className="py-24 text-center border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20">
                     <LayoutList className="w-16 h-16 text-zinc-800 mx-auto mb-4" />
                     <p className="text-zinc-500 font-medium">
                       {query
                         ? "No se encontraron resultados."
-                        : "No hay nada de ese tipo en este periodo."}
+                        : selectedDay
+                          ? "Ese día no tiene nada."
+                          : "No hay nada de ese tipo en este periodo."}
                     </p>
-                    {query ? (
+                    {selectedDay && !query ? (
+                      <button
+                        type="button"
+                        onClick={clearSelectedDay}
+                        className="mt-4 text-yellow-500 text-sm font-bold hover:underline"
+                      >
+                        Ver todo el mes
+                      </button>
+                    ) : query ? (
                       <button
                         type="button"
                         onClick={() => setQuery("")}
@@ -1561,7 +1747,7 @@ export default function CalendarPage() {
                             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-yellow-500/40 to-yellow-500/15" />
                             <div className="relative overflow-hidden inline-flex max-w-[80%] items-center gap-2 rounded-xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-1.5 text-xs sm:text-sm">
                               <span className="relative z-10 truncate font-black uppercase tracking-wide text-yellow-100 drop-shadow-sm">
-                                {formatGroupHeader(group.date, groupBy)}
+                                {formatGroupHeader(group.date, selectedDay ? "day" : groupBy)}
                               </span>
                               <span className="relative z-10 shrink-0 text-[10px] font-bold text-yellow-300/80">
                                 {group.items.length}{" "}
@@ -1571,40 +1757,12 @@ export default function CalendarPage() {
                             <div className="h-px flex-1 bg-gradient-to-l from-transparent via-yellow-500/40 to-yellow-500/15" />
                           </div>
 
-                          {cardView === "grid" ? (
-                            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
-                              {group.items.map((item, idx) => (
-                                <CalendarGridCard
-                                  key={item.key}
-                                  item={item}
-                                  index={baseIndex + idx}
-                                  total={cardOrder.total}
-                                />
-                              ))}
-                            </div>
-                          ) : cardView === "compact" ? (
-                            <div className="compact-cards-grid grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-2">
-                              {group.items.map((item, idx) => (
-                                <CalendarCompactCard
-                                  key={item.key}
-                                  item={item}
-                                  index={baseIndex + idx}
-                                  total={cardOrder.total}
-                                />
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                              {group.items.map((item, idx) => (
-                                <CalendarListCard
-                                  key={item.key}
-                                  item={item}
-                                  index={baseIndex + idx}
-                                  total={cardOrder.total}
-                                />
-                              ))}
-                            </div>
-                          )}
+                          <CalendarCardGrid
+                            items={group.items}
+                            cardView={cardView}
+                            baseIndex={baseIndex}
+                            total={cardOrder.total}
+                          />
                         </div>
                       );
                     })}
@@ -1627,9 +1785,10 @@ export default function CalendarPage() {
               onPrev={() => setPanelMonth((d) => subMonths(d, 1))}
               onNext={() => setPanelMonth((d) => addMonths(d, 1))}
               countsByDay={monthCounts}
-              selectedYmd={selectedYmd}
+              selectedYmd={selectedDay}
               onSelectDay={goToDay}
               onShowMonth={showPanelMonth}
+              onClearDay={clearSelectedDay}
               loading={monthCountsLoading}
             />
           </motion.div>
@@ -1645,9 +1804,10 @@ export default function CalendarPage() {
             onPrev={() => setPanelMonth((d) => subMonths(d, 1))}
             onNext={() => setPanelMonth((d) => addMonths(d, 1))}
             countsByDay={monthCounts}
-            selectedYmd={selectedYmd}
+            selectedYmd={selectedDay}
             onSelectDay={goToDay}
             onShowMonth={showPanelMonth}
+            onClearDay={clearSelectedDay}
             loading={monthCountsLoading}
           />
         )}
