@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
 import LiquidButton from "@/components/LiquidButton";
 import { useAndroidApp } from "@/lib/android/appBridge";
+import { sweepLocalStorageOnStartup } from "@/lib/storage/localStorageBudget";
 
 // Kill-switch de escape: si el SW diera problemas, poner en localStorage
 //   showverse:sw:disabled = "1"   (o abrir la app con ?nosw en la URL)
@@ -47,6 +48,14 @@ export default function PwaManager() {
   // Dentro de la app de Android ya ESTÁS en la app: ofrecer "instalar la PWA"
   // ahí sería instalar una segunda copia de lo mismo.
   const inAndroidApp = useAndroidApp();
+
+  // Un dispositivo que ya venía con localStorage lleno (el techo son ~5 MB y las
+  // cachés por título de las fichas crecen sin freno) arranca haciendo sitio.
+  // Sin esto, las páginas de usuario no podrían reescribir su caché y seguirían
+  // pintándose vacías al volver de una ficha. Ver lib/storage/localStorageBudget.
+  useEffect(() => {
+    sweepLocalStorageOnStartup();
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

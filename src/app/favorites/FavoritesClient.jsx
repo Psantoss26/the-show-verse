@@ -55,6 +55,7 @@ import {
 } from "@/lib/ui/entranceFill";
 import { LIST_CHANGED_EVENT } from "@/lib/userLists/optimisticListCache";
 import { readCachedUserId } from "@/lib/auth/currentUser";
+import { setLocalStorageItem } from "@/lib/storage/localStorageBudget";
 import {
   mergePendingTmdbListItems,
   prunePendingListChanges,
@@ -306,7 +307,7 @@ function readFavoritesCache() {
 function writeFavoritesCache(items, ratedItems = []) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(
+    setLocalStorageItem(
       FAVORITES_CACHE_KEY,
       JSON.stringify({
         t: Date.now(),

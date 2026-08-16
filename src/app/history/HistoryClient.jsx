@@ -39,6 +39,7 @@ import {
 } from "@/lib/api/traktClient";
 import LiquidButton from "@/components/LiquidButton";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import { setLocalStorageItem } from "@/lib/storage/localStorageBudget";
 import { pickResponsiveColumns, estimateVisibleCards } from "@/lib/ui/entranceFill";
 import { isServerUnavailable } from "@/lib/offline/serverError";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
@@ -172,7 +173,7 @@ function writeHistoryCache(items, { hasMore = false, nextPage } = {}) {
   historySessionCache = snapshot;
 
   try {
-    window.localStorage.setItem(HISTORY_CACHE_KEY, JSON.stringify(snapshot));
+    setLocalStorageItem(HISTORY_CACHE_KEY, JSON.stringify(snapshot));
   } catch {}
 }
 

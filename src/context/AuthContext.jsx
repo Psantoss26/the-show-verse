@@ -15,6 +15,7 @@ import {
   applyArtworkOverrideChanges,
 } from "@/lib/artworkApi";
 import { finalizeLogout } from "@/lib/auth/logoutFinalization";
+import { setLocalStorageItem } from "@/lib/storage/localStorageBudget";
 
 const AuthContext = createContext(null);
 const LEGACY_STORAGE_KEYS = ["tmdb_session", "tmdb_session_id", "tmdb_account"];
@@ -103,10 +104,14 @@ function writeAuthUserCache(user) {
       return;
     }
     const payload = JSON.stringify({ t: Date.now(), user });
-    try {
-      window.localStorage.setItem(AUTH_USER_CACHE_KEY, payload);
+    // `setLocalStorageItem` hace sitio desalojando cachés por título antes de
+    // darse por vencido. Que la sesión acabe en sessionStorage (la rama de
+    // abajo) es lo que deja la app en el estado "zombi" descrito en
+    // lib/backend/sessionAvailability.js, así que es el ÚLTIMO recurso, no el
+    // primero.
+    if (setLocalStorageItem(AUTH_USER_CACHE_KEY, payload)) {
       window.sessionStorage.removeItem(AUTH_USER_CACHE_KEY);
-    } catch {
+    } else {
       // Si setItem en localStorage falla por límite de cuota (frecuente en navegador móvil
       // cuando avatarUrl contiene una imagen base64 de ~300KB), eliminamos la clave antigua
       // de localStorage para NO conservar la foto o datos obsoletos guardados previamente.
@@ -167,7 +172,7 @@ function writeAuthPreferencesCache(prefs) {
       window.localStorage.removeItem(AUTH_PREFERENCES_CACHE_KEY);
       return;
     }
-    window.localStorage.setItem(AUTH_PREFERENCES_CACHE_KEY, JSON.stringify(prefs));
+    setLocalStorageItem(AUTH_PREFERENCES_CACHE_KEY, JSON.stringify(prefs));
   } catch {
     // ignore
   }
