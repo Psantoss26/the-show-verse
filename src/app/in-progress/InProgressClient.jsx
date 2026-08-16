@@ -381,7 +381,12 @@ function readSessionCache(key, ttlMs = CACHE_HARD_MAX_AGE) {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     const ts = Number(parsed?.ts || 0);
-    const maxAge = Math.max(ttlMs, CACHE_HARD_MAX_AGE);
+    // `min`, no `max`. Con `Math.max` el TTL que pasaba cada llamada NO servía
+    // de nada: `max(10 min, 7 días)` son 7 días, así que toda caché vivía una
+    // semana y un dato malo —una lista de completadas vacía, por ejemplo— se
+    // quedaba pegado. `CACHE_HARD_MAX_AGE` es un TECHO (su nombre lo dice), no
+    // un suelo: manda el TTL de quien lee, acotado por él.
+    const maxAge = Math.min(ttlMs, CACHE_HARD_MAX_AGE);
     if (!ts || Date.now() - ts > maxAge) {
       window.localStorage.removeItem(key);
       return null;
@@ -1541,7 +1546,10 @@ export default function InProgressClient({
   useEffect(() => {
     if (!auth.connected) return;
     const cached = readSessionCache(COMPLETED_CACHE_KEY, COMPLETED_CACHE_TTL);
-    if (cached?.items || cached?.stats) {
+    // `cached.items` es un ARRAY: `[]` es truthy, así que la condición anterior
+    // daba por buena una caché vacía y marcaba la sección como cargada. Se exige
+    // contenido real: una lista vacía no es una respuesta, es la ausencia de una.
+    if (cached?.items?.length || cached?.stats) {
       setCompletedItems(Array.isArray(cached?.items) ? cached.items : []);
       setCompletedStats(cached?.stats || null);
       setCompletedLoaded(true);
@@ -1556,11 +1564,35 @@ export default function InProgressClient({
   }, [auth.connected, dataLoaded, completedLoaded, loadCompleted]);
 
   // Lazy load completed data when tab is switched (fallback si la precarga no terminó)
+  //
+  // REVALIDACIÓN DE LA LISTA VACÍA.
+  //
+  // La precarga en segundo plano que corre mientras estás en "En progreso"
+  // puede terminar vacía: una respuesta prematura mientras el token de Trakt
+  // aún no está listo, o un error. Ese vacío se guarda en caché, y al abrir
+  // Completadas la sección se daba por cargada con cero elementos y nada la
+  // volvía a pedir.
+  //
+  // Por eso, al ABRIR la sección, una lista vacía se vuelve a pedir en segundo
+  // plano: la página se cura sola en vez de depender de una recarga. No hay
+  // bucle: si la respuesta vuelve vacía, ni `completedLoaded` ni
+  // `completedItems.length` cambian, y el efecto no se repite.
   useEffect(() => {
-    if (auth.connected && activeTab === "completed" && !completedLoaded) {
+    if (!auth.connected || activeTab !== "completed") return;
+    if (!completedLoaded) {
       loadCompleted({ background: false });
+      return;
     }
-  }, [auth.connected, activeTab, completedLoaded, loadCompleted]);
+    if (completedItems.length === 0) {
+      void loadCompleted({ background: true });
+    }
+  }, [
+    auth.connected,
+    activeTab,
+    completedLoaded,
+    completedItems.length,
+    loadCompleted,
+  ]);
 
   // Active data based on tab
   const currentItems = activeTab === "completed" ? completedItems : items;
