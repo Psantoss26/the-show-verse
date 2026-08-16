@@ -13,7 +13,6 @@ import {
 import { createPortal } from "react-dom";
 import {
   format,
-  isToday,
   addMonths,
   subMonths,
   startOfMonth,
@@ -38,6 +37,8 @@ import {
   MonitorPlay,
   SlidersHorizontal,
   RotateCcw,
+  Search,
+  X,
   Filter,
   Layers,
   ArrowUpDown,
@@ -90,6 +91,39 @@ const CARD_VIEWS = [
 ];
 
 const pad2 = (n) => String(n).padStart(2, "0");
+
+// Texto comparable para el buscador: sin mayúsculas y sin tildes, para que
+// "bicicleta" encuentre "La bicicleta de Bartali" y "asi" encuentre "Así".
+const foldText = (value) =>
+  String(value ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+// Ajuste del menú que sobrevive a la visita.
+//
+// El valor NO se lee en el useState inicial a propósito: el servidor pinta el
+// HTML sin acceso a localStorage, y arrancar con otro valor en el cliente
+// rompería la hidratación. Se restaura en un efecto, y hasta que eso ocurre no
+// se escribe nada —si no, el primer render pisaría con el valor por defecto lo
+// que había guardado.
+function useStoredSetting(storageKey, options, initial) {
+  const [value, setValue] = useState(initial);
+  const restored = useRef(false);
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem(storageKey);
+    if (options.some(({ id }) => id === saved)) setValue(saved);
+    restored.current = true;
+  }, [storageKey, options]);
+
+  useEffect(() => {
+    if (!restored.current) return;
+    window.localStorage.setItem(storageKey, value);
+  }, [storageKey, value]);
+
+  return [value, setValue];
+}
 
 // --- COMPONENTES UI AUXILIARES ---
 
@@ -477,104 +511,6 @@ function formatGroupHeader(date, mode) {
   return format(date, "EEEE, d 'de' MMMM", { locale: es });
 }
 
-function CustomCalendar({
-  selected,
-  onSelect,
-  currentMonth,
-  onMonthChange,
-}) {
-  const year = currentMonth.getFullYear();
-  const month = currentMonth.getMonth();
-
-  const weeks = useMemo(() => buildMonthGrid(year, month), [year, month]);
-  const dow = ["L", "M", "X", "J", "V", "S", "D"];
-
-  const goPrev = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    onMonthChange(subMonths(currentMonth, 1));
-  };
-  const goNext = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    onMonthChange(addMonths(currentMonth, 1));
-  };
-
-  return (
-    <div className="w-[280px] sm:w-[320px] p-2 flex flex-col gap-4">
-      <div className="flex items-center justify-between px-2">
-        <button
-          type="button"
-          onClick={goPrev}
-          className="p-1.5 hover:bg-white/10 rounded-lg transition text-yellow-500"
-        >
-          <ChevronLeft className="w-5 h-5" />
-        </button>
-        <div className="text-sm font-bold text-yellow-400 capitalize">
-          {format(currentMonth, "MMMM yyyy", { locale: es })}
-        </div>
-        <button
-          type="button"
-          onClick={goNext}
-          className="p-1.5 hover:bg-white/10 rounded-lg transition text-yellow-500"
-        >
-          <ChevronRight className="w-5 h-5" />
-        </button>
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <div className="grid grid-cols-7 mb-2">
-          {dow.map((d) => (
-            <div
-              key={d}
-              className="text-center text-xs font-bold text-zinc-500"
-            >
-              {d}
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-7 gap-y-1">
-          {weeks.flat().map((d, i) => {
-            const key = format(d, "yyyy-MM-dd");
-            const selKey = format(selected, "yyyy-MM-dd");
-            const isSel = key === selKey;
-
-            const inMonth = d.getMonth() === month;
-            const isTodayDate = isToday(d);
-
-            return (
-              <div
-                key={i}
-                className="flex justify-center items-center h-8 sm:h-9 relative"
-              >
-                <button
-                  type="button"
-                  onClick={() => {
-                    onSelect(d);
-                    onMonthChange(d);
-                  }}
-                  className={`relative w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-sm transition-all z-10 ${
-                    isSel
-                      ? "bg-gradient-to-br from-yellow-400 to-yellow-500 text-black font-bold shadow-md shadow-yellow-500/20 scale-105"
-                      : isTodayDate
-                        ? "bg-white/5 text-yellow-400 font-bold border border-yellow-500/30 hover:bg-white/10"
-                        : inMonth
-                          ? "text-zinc-300 hover:bg-white/10 hover:text-white"
-                          : "text-zinc-600 hover:bg-white/5 hover:text-zinc-400"
-                  }`}
-                >
-                  {d.getDate()}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // Desplegable del menú, calcado del de Historial.
 //
 // El menú se RENDERIZA POR PORTAL en <body> con position:fixed calculado desde
@@ -703,75 +639,6 @@ function DropdownItem({ active, onClick, children }) {
       <span className="font-medium">{children}</span>
       {active && <CheckCircle2 className="w-4 h-4 text-yellow-500" />}
     </button>
-  );
-}
-
-function DateSelector({
-  selected,
-  onSelect,
-  currentMonth,
-  onMonthChange,
-  label,
-  className = "",
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const onDown = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener("pointerdown", onDown);
-    return () => document.removeEventListener("pointerdown", onDown);
-  }, []);
-
-  const handleSelect = (date) => {
-    if (date) {
-      onSelect(date);
-      setOpen(false);
-    }
-  };
-
-  // El texto lo pone quien lo usa: es la ventana consultada (un mes, un año o
-  // dos), no el día suelto que se eligió en el calendario.
-  return (
-    <div
-      ref={ref}
-      className={`relative ${open ? "z-[99999]" : "z-50"} ${className}`}
-    >
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="w-full h-11 flex items-center justify-center gap-2 sm:gap-3 px-3 sm:px-5 rounded-2xl transition-all group bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg hover:bg-black/30"
-      >
-        <CalendarIcon className="w-4 h-4 shrink-0 text-yellow-500" />
-        <span className="text-xs sm:text-sm font-bold capitalize truncate text-white">
-          {label}
-        </span>
-        <ChevronDown
-          className={`w-3.5 h-3.5 text-zinc-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-        />
-      </button>
-
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.95, x: "-50%" }}
-            animate={{ opacity: 1, y: 0, scale: 1, x: "-50%" }}
-            exit={{ opacity: 0, y: 10, scale: 0.95, x: "-50%" }}
-            transition={{ duration: 0.15 }}
-            className="absolute left-1/2 mt-2 sm:mt-4 p-4 bg-zinc-950/95 bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-2xl rounded-3xl shadow-2xl z-[99999] w-auto"
-          >
-            <CustomCalendar
-              selected={selected}
-              onSelect={handleSelect}
-              currentMonth={currentMonth}
-              onMonthChange={onMonthChange}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
   );
 }
 
@@ -960,7 +827,6 @@ function MobileCalendarOverlay({
 
 export default function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const [selectedMovies, setSelectedMovies] = useState([]);
   const [trackedEpisodes, setTrackedEpisodes] = useState([]);
@@ -969,13 +835,30 @@ export default function CalendarPage() {
   const [episodeError, setEpisodeError] = useState(null);
   const [error, setError] = useState(null);
 
-  // Controles del menú, los mismos que en Historial. `cardView` es el modo de
-  // vista de las TARJETAS (lista/compacta/rejilla); no confundir con `viewMode`,
-  // que es el rango de fechas que se consulta.
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [groupBy, setGroupBy] = useState("day");
-  const [sortBy, setSortBy] = useState("date-asc");
-  const [cardView, setCardView] = useState("grid");
+  // Controles del menú, los mismos que en Historial, y todos recordados: al
+  // volver a la página está como se dejó. La agrupación arranca en "Mes", que es
+  // la lectura natural de un calendario de estrenos.
+  const [typeFilter, setTypeFilter] = useStoredSetting(
+    "showverse:calendar:typeFilter",
+    TYPE_FILTERS,
+    "all",
+  );
+  const [groupBy, setGroupBy] = useStoredSetting(
+    "showverse:calendar:groupBy",
+    GROUP_MODES,
+    "month",
+  );
+  const [sortBy, setSortBy] = useStoredSetting(
+    "showverse:calendar:sortBy",
+    SORT_MODES,
+    "date-asc",
+  );
+  const [cardView, setCardView] = useStoredSetting(
+    "showverse:calendar:cardView",
+    CARD_VIEWS,
+    "grid",
+  );
+  const [query, setQuery] = useState("");
 
   // Menú fijo: en móvil los controles secundarios viven en un panel desplegable,
   // igual que en Historial, para que la fila principal quepa en una pantalla
@@ -999,28 +882,8 @@ export default function CalendarPage() {
     document.title = formatPageTitle("Calendario");
   }, []);
 
-  // La agrupación se recuerda: es la que decide también cuánto se consulta.
+  // El panel lateral sigue a la ventana: al saltar de mes, se abre por ese mes.
   useEffect(() => {
-    const saved = window.localStorage.getItem("showverse:calendar:groupBy");
-    if (GROUP_MODES.some(({ id }) => id === saved)) setGroupBy(saved);
-  }, []);
-
-  useEffect(() => {
-    window.localStorage.setItem("showverse:calendar:groupBy", groupBy);
-  }, [groupBy]);
-
-  // El modo de tarjeta también se recuerda, igual que en Historial.
-  useEffect(() => {
-    const saved = window.localStorage.getItem("showverse:calendar:cardView");
-    if (CARD_VIEWS.some(({ id }) => id === saved)) setCardView(saved);
-  }, []);
-
-  useEffect(() => {
-    window.localStorage.setItem("showverse:calendar:cardView", cardView);
-  }, [cardView]);
-
-  useEffect(() => {
-    setCurrentMonth(selectedDate);
     setPanelMonth(startOfMonth(selectedDate));
   }, [selectedDate]);
 
@@ -1176,8 +1039,19 @@ export default function CalendarPage() {
       return true;
     });
 
+    // La búsqueda mira también el subtítulo: en un episodio ahí va el nombre del
+    // capítulo, que es por lo que se busca tantas veces como por el de la serie.
+    const needle = foldText(query.trim());
+    const found = needle
+      ? byType.filter(
+          (item) =>
+            foldText(item.title).includes(needle) ||
+            foldText(item.subtitle).includes(needle),
+        )
+      : byType;
+
     const time = (item) => item.date?.getTime() ?? 0;
-    return [...byType].sort((a, b) => {
+    return [...found].sort((a, b) => {
       switch (sortBy) {
         case "date-desc":
           return time(b) - time(a);
@@ -1190,7 +1064,7 @@ export default function CalendarPage() {
           return time(a) - time(b);
       }
     });
-  }, [allItems, typeFilter, sortBy]);
+  }, [allItems, typeFilter, sortBy, query]);
 
   // Agrupación por día, mes o año. Las cabeceras siguen el sentido cronológico
   // del orden elegido; con orden por título mandan igualmente las fechas, que es
@@ -1245,25 +1119,15 @@ export default function CalendarPage() {
   const loading =
     (moviesLoading && !hasEpisodes) || (episodesLoading && !hasMovies);
 
-  // Las flechas mueven una ventana entera, no un mes suelto: así al agrupar por
-  // mes se pasa de un año al siguiente sin repetir lo ya visto.
-  const step = RANGE_MONTHS[groupBy];
-  const goPrev = () =>
-    setSelectedDate((prev) => startOfMonth(subMonths(prev, step)));
-  const goNext = () =>
-    setSelectedDate((prev) => startOfMonth(addMonths(prev, step)));
-
-  // El calendario lateral NAVEGA (no filtra): pulsar un día lleva a ese día.
+  // El calendario lateral es AHORA la única forma de moverse por el tiempo: ya
+  // no hay flechas ni selector de fecha en el menú. Pulsar un día lleva la
+  // ventana a su mes.
   const goToDay = useCallback((date) => {
     setSelectedDate(date);
-    setViewMode("day");
   }, []);
 
-  // "Ver todo el mes" del panel: pasa a vista mes del mes que se está mirando
-  // en el panel, que puede no ser el del rango actual.
   const showPanelMonth = useCallback(() => {
     setSelectedDate(startOfMonth(panelMonth));
-    setViewMode("month");
   }, [panelMonth]);
 
   const selectedYmd = dayKey(selectedDate);
@@ -1320,33 +1184,25 @@ export default function CalendarPage() {
                   (filtersSticky) pasa a overlay para no desplazar nada. */}
               <div className="relative z-10 lg:hidden">
                 <div className="relative flex gap-2">
-                  <div className="flex shrink-0 gap-1 rounded-2xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-                    <button
-                      type="button"
-                      onClick={goPrev}
-                      aria-label="Periodo anterior"
-                      className="flex h-9 w-9 items-center justify-center rounded-xl text-zinc-300 transition-colors hover:bg-white/10 hover:text-white"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={goNext}
-                      aria-label="Periodo siguiente"
-                      className="flex h-9 w-9 items-center justify-center rounded-xl text-zinc-300 transition-colors hover:bg-white/10 hover:text-white"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
+                  <div className="relative min-w-0 flex-1">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-yellow-500 z-10 pointer-events-none" />
+                    <input
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder="Buscar..."
+                      className="w-full h-11 rounded-2xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-yellow-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
+                    />
+                    {query && (
+                      <button
+                        type="button"
+                        onClick={() => setQuery("")}
+                        aria-label="Limpiar búsqueda"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-zinc-800 rounded-md transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5 text-zinc-500" />
+                      </button>
+                    )}
                   </div>
-
-                  <DateSelector
-                    selected={selectedDate}
-                    onSelect={setSelectedDate}
-                    currentMonth={currentMonth}
-                    onMonthChange={setCurrentMonth}
-                    label={rangeLabel}
-                    className="min-w-0 flex-1"
-                  />
 
                   <button
                     type="button"
@@ -1359,7 +1215,7 @@ export default function CalendarPage() {
                   <button
                     type="button"
                     onClick={() => setMobileFiltersOpen((v) => !v)}
-                    aria-label="Vista y fecha"
+                    aria-label="Filtros y vista"
                     aria-expanded={mobileFiltersOpen}
                     className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
                       mobileFiltersOpen
@@ -1491,37 +1347,25 @@ export default function CalendarPage() {
 
               {/* Escritorio: una sola fila con todo */}
               <div className="hidden lg:flex gap-3 relative z-10">
-                <div className="flex shrink-0 gap-1 rounded-2xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-                  <button
-                    type="button"
-                    onClick={goPrev}
-                    aria-label="Periodo anterior"
-                    className="flex h-9 w-9 items-center justify-center rounded-xl text-zinc-300 transition-colors hover:bg-white/10 hover:text-white"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={goNext}
-                    aria-label="Periodo siguiente"
-                    className="flex h-9 w-9 items-center justify-center rounded-xl text-zinc-300 transition-colors hover:bg-white/10 hover:text-white"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
+                <div className="relative flex-1 min-w-[140px]">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-yellow-500 z-10 pointer-events-none" />
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Buscar por título..."
+                    className="w-full h-11 rounded-2xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-yellow-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
+                  />
+                  {query && (
+                    <button
+                      type="button"
+                      onClick={() => setQuery("")}
+                      aria-label="Limpiar búsqueda"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-zinc-800 rounded-md transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5 text-zinc-500" />
+                    </button>
+                  )}
                 </div>
-
-                {/* Reclama un mínimo: al ser el único elástico de la fila, sin
-                    él se queda con las sobras y el texto de la fecha desaparece.
-                    Cede parte de ese mínimo en pantallas medianas para que todo
-                    siga en UNA fila, como en Historial. */}
-                <DateSelector
-                  selected={selectedDate}
-                  onSelect={setSelectedDate}
-                  currentMonth={currentMonth}
-                  onMonthChange={setCurrentMonth}
-                  label={rangeLabel}
-                  className="min-w-[120px] 2xl:min-w-[200px] flex-1"
-                />
 
                 <InlineDropdown label="Tipo" valueLabel={typeLabel} icon={Filter}>
                   {({ close }) =>
@@ -1682,15 +1526,27 @@ export default function CalendarPage() {
                   <div className="py-24 text-center border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20">
                     <LayoutList className="w-16 h-16 text-zinc-800 mx-auto mb-4" />
                     <p className="text-zinc-500 font-medium">
-                      No hay nada de ese tipo en este rango.
+                      {query
+                        ? "No se encontraron resultados."
+                        : "No hay nada de ese tipo en este periodo."}
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => setTypeFilter("all")}
-                      className="mt-4 text-yellow-500 text-sm font-bold hover:underline"
-                    >
-                      Ver todo
-                    </button>
+                    {query ? (
+                      <button
+                        type="button"
+                        onClick={() => setQuery("")}
+                        className="mt-4 text-yellow-500 text-sm font-bold hover:underline"
+                      >
+                        Limpiar búsqueda
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setTypeFilter("all")}
+                        className="mt-4 text-yellow-500 text-sm font-bold hover:underline"
+                      >
+                        Ver todo
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-8 px-2 sm:px-0">
