@@ -28,6 +28,7 @@ import {
   recordPendingListChange,
 } from "./pendingListAdditions.js";
 import { historyEntryMatchesTarget } from "./historyCacheSnapshot.js";
+import { setLocalStorageItem } from "@/lib/storage/localStorageBudget";
 
 function recordProfilePending(
   listType,
@@ -184,9 +185,9 @@ function readCache(cacheKey) {
 function writeCache(cacheKey, envelope) {
   try {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem(cacheKey, JSON.stringify(envelope));
+    setLocalStorageItem(cacheKey, JSON.stringify(envelope));
   } catch {
-    // modo privado / cuota: ignorar
+    // modo privado: ignorar
   }
 }
 

@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import { setLocalStorageItem } from "@/lib/storage/localStorageBudget";
 import {
   Tv,
   Play,
@@ -819,7 +820,7 @@ function readCache() {
 function writeCache(items) {
   if (typeof window === "undefined") return;
   try {
-    if (Array.isArray(items) && items.length) window.localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), items }));
+    if (Array.isArray(items) && items.length) setLocalStorageItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), items }));
     else window.localStorage.removeItem(CACHE_KEY);
   } catch {
     /* modo privado / cuota */

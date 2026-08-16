@@ -10,6 +10,8 @@
 //   ...tras un fetch OK:  cache.write(items, { extra });
 //   ...si el fetch falla y hay seed, se conserva `items` (no vaciar).
 
+import { setLocalStorageItem } from "@/lib/storage/localStorageBudget";
+
 const DEFAULT_TTL_MS = 10 * 60 * 1000; // "fresco" (revalidar en segundo plano)
 const DEFAULT_HARD_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // descartar si es más viejo
 
@@ -42,7 +44,11 @@ export function makePageCache(
   function write(items, meta = null) {
     if (typeof window === "undefined") return;
     try {
-      window.localStorage.setItem(
+      // Vía `setLocalStorageItem`: si el almacenamiento está lleno hace sitio
+      // desalojando cachés por título antes de rendirse. Perder ESTA escritura
+      // deja a la página sin pintado instantáneo la próxima vez, que es
+      // justamente el fallo que estamos evitando.
+      setLocalStorageItem(
         key,
         JSON.stringify({
           t: Date.now(),
@@ -51,7 +57,7 @@ export function makePageCache(
         }),
       );
     } catch {
-      // Cuota superada / modo privado: ignorar (best-effort).
+      // Modo privado: ignorar (best-effort).
     }
   }
 

@@ -39,6 +39,7 @@ import LiquidButton from "@/components/LiquidButton";
 import WatchingSectionNav from "@/components/WatchingSectionNav";
 import { useAuth } from "@/context/AuthContext";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import { setLocalStorageItem } from "@/lib/storage/localStorageBudget";
 import {
   isServerUnavailable,
   isUnavailableStatus,
@@ -387,10 +388,25 @@ function readSessionCache(key, ttlMs = CACHE_HARD_MAX_AGE) {
     // quedaba pegado. `CACHE_HARD_MAX_AGE` es un TECHO (su nombre lo dice), no
     // un suelo: manda el TTL de quien lee, acotado por él.
     const maxAge = Math.min(ttlMs, CACHE_HARD_MAX_AGE);
-    if (!ts || Date.now() - ts > maxAge) {
+    if (!ts) {
       window.localStorage.removeItem(key);
       return null;
     }
+
+    const age = Date.now() - ts;
+    // SOLO el techo duro BORRA. Antes bastaba con superar el TTL corto (5/10
+    // min) para eliminar la entrada, dando por hecho que el siguiente fetch
+    // podría reescribirla. Cuando localStorage se llena esa reescritura falla en
+    // silencio, así que la caché desaparecía para siempre y la página se quedaba
+    // sin nada que pintar al volver de una ficha. Pasado el TTL el dato se
+    // considera obsoleto —se devuelve `null` a quien pide frescura— pero se
+    // CONSERVA como red de seguridad, igual que hacen Favoritos y Pendientes.
+    if (age > CACHE_HARD_MAX_AGE) {
+      window.localStorage.removeItem(key);
+      return null;
+    }
+    if (age > maxAge) return null;
+
     return parsed?.data ?? null;
   } catch {
     return null;
@@ -400,10 +416,9 @@ function readSessionCache(key, ttlMs = CACHE_HARD_MAX_AGE) {
 function writeSessionCache(key, data) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(
-      key,
-      JSON.stringify({ ts: Date.now(), data }),
-    );
+    // Con el almacenamiento lleno, `setLocalStorageItem` desaloja cachés por
+    // título (regenerables) para que ESTA sí entre.
+    setLocalStorageItem(key, JSON.stringify({ ts: Date.now(), data }));
   } catch {}
 }
 
@@ -1285,9 +1300,13 @@ export default function InProgressClient({
   useLayoutEffect(() => {
     if (!isBackNav) return;
 
+    // Al VOLVER se pinta lo último que se sepa, aunque haya pasado su TTL: el
+    // objetivo aquí es que la página aparezca igual que se dejó, no que el dato
+    // sea fresco (de eso se encarga el refresco en segundo plano que va detrás).
+    // Con el TTL corto, volver pasados 5 minutos dejaba la página en blanco.
     const cachedInProgress = readSessionCache(
       IN_PROGRESS_CACHE_KEY,
-      IN_PROGRESS_CACHE_TTL,
+      CACHE_HARD_MAX_AGE,
     );
     if (cachedInProgress?.items || cachedInProgress?.stats) {
       setItems(Array.isArray(cachedInProgress.items) ? cachedInProgress.items : []);
@@ -1298,7 +1317,7 @@ export default function InProgressClient({
 
     const cachedCompleted = readSessionCache(
       COMPLETED_CACHE_KEY,
-      COMPLETED_CACHE_TTL,
+      CACHE_HARD_MAX_AGE,
     );
     if (cachedCompleted?.items || cachedCompleted?.stats) {
       setCompletedItems(Array.isArray(cachedCompleted.items) ? cachedCompleted.items : []);
