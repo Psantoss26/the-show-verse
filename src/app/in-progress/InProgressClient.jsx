@@ -1390,11 +1390,23 @@ export default function InProgressClient({
         items: nextItems,
         stats: nextStats,
       });
+      setCompletedLoaded(true);
     } catch (e) {
       console.error("Error loading completed:", e);
+      // FALLO ≠ "no tienes completadas". Antes se marcaba `completedLoaded` en
+      // el `finally`, así que un error de red dejaba la lista vacía Y bloqueaba
+      // cualquier reintento: la sección se quedaba en blanco hasta recargar la
+      // página. Ahora se recupera lo último que hubiera en caché (aunque haya
+      // caducado) y, si no hay nada, NO se marca como cargada, para que el
+      // efecto pueda volver a intentarlo.
+      const cached = readSessionCache(COMPLETED_CACHE_KEY, Infinity);
+      if (cached?.items?.length || cached?.stats) {
+        setCompletedItems(Array.isArray(cached.items) ? cached.items : []);
+        setCompletedStats(cached.stats || null);
+        setCompletedLoaded(true);
+      }
     } finally {
       if (!background) setCompletedLoading(false);
-      setCompletedLoaded(true);
     }
   }, []);
 

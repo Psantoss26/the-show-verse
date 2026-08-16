@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   addManualProgress,
+  getLocalInProgress,
   normalizeProgressSearchResults,
 } from "./progressClient.js";
 
@@ -89,4 +90,75 @@ test("sends a manual TV title using the progress API contract", async () => {
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+// Un fallo de red y "no tienes nada" NO son lo mismo. Confundirlos es lo que
+// vaciaba "Continuar viendo": la lista se quedaba en blanco y, como el vacío se
+// guardaba en su caché (que se BORRA al escribir una lista vacía), al volver
+// atrás tampoco quedaba nada que pintar.
+function conFetch(impl, fn) {
+  const original = globalThis.fetch;
+  globalThis.fetch = impl;
+  return fn().finally(() => {
+    globalThis.fetch = original;
+  });
+}
+
+const ok = (results) =>
+  async () => ({ ok: true, json: async () => ({ results }) });
+
+test("por defecto se sigue degradando a lista vacía", async () => {
+  // Los consumidores "de adorno" (el % de una ficha, una fila del dashboard)
+  // prefieren no romperse: para ellos el comportamiento no cambia.
+  await conFetch(
+    async () => ({ ok: false, status: 500, json: async () => ({}) }),
+    async () => assert.deepEqual(await getLocalInProgress(), []),
+  );
+  await conFetch(
+    async () => {
+      throw new Error("red caída");
+    },
+    async () => assert.deepEqual(await getLocalInProgress(), []),
+  );
+});
+
+test("con throwOnError, un fallo del servidor se propaga", async () => {
+  await conFetch(
+    async () => ({ ok: false, status: 502, json: async () => ({}) }),
+    async () => {
+      await assert.rejects(
+        () => getLocalInProgress({ throwOnError: true }),
+        /502/,
+      );
+    },
+  );
+});
+
+test("con throwOnError, un fallo de red también se propaga", async () => {
+  await conFetch(
+    async () => {
+      throw new Error("Failed to fetch");
+    },
+    async () => {
+      await assert.rejects(
+        () => getLocalInProgress({ throwOnError: true }),
+        /Failed to fetch/,
+      );
+    },
+  );
+});
+
+test("una lista vacía REAL sigue siendo una lista vacía", async () => {
+  // Es la distinción que da sentido a todo: si el servidor responde bien y no
+  // hay títulos, eso sí es un dato y debe pintarse como "no tienes nada".
+  await conFetch(ok([]), async () => {
+    assert.deepEqual(await getLocalInProgress({ throwOnError: true }), []);
+  });
+});
+
+test("las filas se devuelven tal cual cuando la respuesta es buena", async () => {
+  const filas = [{ tmdbId: 1, mediaType: "movie" }];
+  await conFetch(ok(filas), async () => {
+    assert.deepEqual(await getLocalInProgress({ throwOnError: true }), filas);
+  });
 });

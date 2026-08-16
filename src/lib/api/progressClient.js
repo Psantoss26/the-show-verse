@@ -7,16 +7,34 @@
  * expone el backend: filas de watch_progress. Nunca lanza (devuelve [] si falla).
  * @returns {Promise<Array<{id:string,tmdbId:number,mediaType:string,season:number|null,episode:number|null,positionSeconds:number,runtimeSeconds:number,percent:number,platform:string|null,title:string|null,posterPath:string|null,updatedAt:string}>>}
  */
-export async function getLocalInProgress() {
+/**
+ * Progreso local ("Continuar viendo").
+ *
+ * `throwOnError` distingue DOS COSAS QUE NO SON LA MISMA: "el servidor dice que
+ * no tienes nada" y "no he podido preguntar". Por defecto sigue devolviendo `[]`
+ * ante cualquier fallo, que es lo que esperan los consumidores que solo quieren
+ * un dato de adorno (el % de una ficha, una fila del dashboard).
+ *
+ * Quien PINTA la lista entera debe pedir `throwOnError: true`: para esa página
+ * un `[]` inventado por un fallo de red significa vaciar la pantalla y, peor,
+ * guardar ese vacío en su caché — con lo que el error sobrevive a la navegación.
+ */
+export async function getLocalInProgress({ throwOnError = false } = {}) {
   try {
     const res = await fetch("/api/progress", {
       cache: "no-store",
       credentials: "include",
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      if (throwOnError) {
+        throw new Error(`Progreso local HTTP ${res.status}`);
+      }
+      return [];
+    }
     const json = await res.json().catch(() => null);
     return Array.isArray(json?.results) ? json.results : [];
-  } catch {
+  } catch (error) {
+    if (throwOnError) throw error;
     return [];
   }
 }
