@@ -19,7 +19,17 @@ import {
 } from '../db/schema.js';
 import { getTitlePoster } from './tmdbPoster.js';
 import { getMediaMetadataMap, metadataFor } from '../utils/mediaMetadata.js';
-import { computeShowProgress } from './showProgress.js';
+import {
+  countCompletedShows,
+  getCompletedShowsCount,
+  mediaCacheKeys,
+} from './completedShows.js';
+import { getLevelState, getLevelSummaries } from '../level/store.js';
+
+// Re-exportadas: el recuento de series completadas se movió a su propio módulo
+// para que level/stats.js pueda usarlo sin crear un ciclo de imports, pero el
+// perfil sigue siendo su punto de entrada histórico.
+export { countCompletedShows, getCompletedShowsCount };
 
 const RECENT_WATCHED_SCAN = 40; // filas a escanear para deduplicar por título
 const RECENT_WATCHED_LIMIT = 5;
@@ -31,7 +41,6 @@ const LIST_PREVIEW_LIMIT = 5;
 const PROFILE_ANALYTICS_HISTORY_LIMIT = 1500;
 const DEFAULT_MOVIE_RUNTIME_MINS = 100;
 const DEFAULT_EPISODE_RUNTIME_MINS = 45;
-const PROFILE_COMPLETED_SHOWS_HISTORY_LIMIT = 5000;
 const PROFILE_ENGLISH_POSTER_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 const PROFILE_ENGLISH_POSTER_FETCH_CONCURRENCY = 8;
 const PROFILE_ENGLISH_POSTER_POLICY_VERSION = 'v2';
@@ -317,71 +326,6 @@ export function normalizeProfileFavorites(items, max = PROFILE_FAVORITES_MAX, me
 // Completadas: todos los episodios emitidos conocidos deben tener al menos un
 // visionado. Los rewatches se contabilizan como plays adicionales, no como
 // nuevas series completadas.
-export function countCompletedShows(rows, metadataByKey) {
-  const playsByShow = new Map();
-  for (const row of Array.isArray(rows) ? rows : []) {
-    const tmdbId = Number(row?.tmdbId);
-    const season = Number(row?.season);
-    const episode = Number(row?.episode);
-    if (!Number.isInteger(tmdbId) || tmdbId <= 0 || !Number.isInteger(season) || season <= 0 || !Number.isInteger(episode) || episode <= 0) continue;
-
-    const playCounts = playsByShow.get(tmdbId) || new Map();
-    const episodeKey = `${season}-${episode}`;
-    playCounts.set(episodeKey, (playCounts.get(episodeKey) || 0) + 1);
-    playsByShow.set(tmdbId, playCounts);
-  }
-
-  let completed = 0;
-  for (const [tmdbId, playCounts] of playsByShow) {
-    const metadata = metadataByKey?.get(`tmdb:tv:${tmdbId}`)
-      || metadataByKey?.get(`tv:${tmdbId}`)
-      || {};
-    const seasonEpisodeCounts = {};
-    for (const season of Array.isArray(metadata.seasons) ? metadata.seasons : []) {
-      const seasonNumber = Number(season?.season_number);
-      const episodeCount = Number(season?.episode_count || 0);
-      if (seasonNumber > 0 && episodeCount > 0) seasonEpisodeCounts[seasonNumber] = episodeCount;
-    }
-    if (computeShowProgress(playCounts, seasonEpisodeCounts).baseComplete) completed += 1;
-  }
-  return completed;
-}
-
-function mediaCacheKeys(mediaType, tmdbId) {
-  const media = mediaType === 'movie' ? 'movie' : 'tv';
-  return [`tmdb:${media}:${tmdbId}`, `${media}:${tmdbId}`];
-}
-
-async function getCompletedShowsCount(db, targetId) {
-  const rows = await db
-    .select({
-      tmdbId: watchHistory.tmdbId,
-      season: watchHistory.season,
-      episode: watchHistory.episode,
-    })
-    .from(watchHistory)
-    .where(
-      and(
-        eq(watchHistory.userId, targetId),
-        eq(watchHistory.mediaType, 'tv'),
-        isNotNull(watchHistory.season),
-        isNotNull(watchHistory.episode),
-      ),
-    )
-    .orderBy(desc(watchHistory.watchedAt))
-    .limit(PROFILE_COMPLETED_SHOWS_HISTORY_LIMIT);
-  if (!rows.length) return 0;
-
-  const cacheKeys = [...new Set(rows.flatMap((row) => mediaCacheKeys('tv', row.tmdbId)))];
-  const cachedRows = cacheKeys.length
-    ? await db
-      .select({ cacheKey: tmdbCache.cacheKey, data: tmdbCache.data })
-      .from(tmdbCache)
-      .where(inArray(tmdbCache.cacheKey, cacheKeys))
-    : [];
-  const metadataByKey = new Map(cachedRows.map((row) => [row.cacheKey, row.data || {}]));
-  return countCompletedShows(rows, metadataByKey);
-}
 
 function publicMonthLabel(date) {
   return new Intl.DateTimeFormat('es-ES', { month: 'short' })
@@ -685,6 +629,22 @@ export async function buildUserProfile(db, targetUser, viewerId = null) {
   ]);
 
   const recentWatched = dedupeRecentWatched(recentRows, RECENT_WATCHED_LIMIT);
+  // El nivel se calcula (o se lee de su caché) aquí para que la cabecera del
+  // perfil llegue completa. Si algo falla, el perfil se sirve sin insignia: el
+  // XP nunca debe tumbar la página.
+  const levelSummary = await getLevelState(db, targetId)
+    .then((state) => ({
+      xp: state.xp,
+      level: state.level,
+      tier: state.tier,
+      percent: state.progress.percent,
+      xpToNextLevel: state.progress.xpToNextLevel,
+      isMax: state.progress.isMax,
+      achievementsUnlocked: state.achievements.unlockedCount,
+      achievementsTotal: state.achievements.total,
+      streak: state.streaks.current,
+    }))
+    .catch(() => null);
   const analytics = await buildPublicProfileAnalytics(
     db,
     targetId,
@@ -781,6 +741,10 @@ export async function buildUserProfile(db, targetUser, viewerId = null) {
     },
     isSelf: Boolean(viewerId && viewerId === targetId),
     isFollowing: Boolean(followingState),
+    // Nivel resumido para la cabecera: la insignia y la barra de XP se pintan en
+    // el primer render, sin una segunda petición. El detalle (desglose y logros)
+    // lo sirve /users/:username/level.
+    level: levelSummary,
     counts: {
       films: filmsRows[0]?.n || 0,
       thisYear: thisYearRows[0]?.n || 0,
@@ -1542,7 +1506,7 @@ export async function searchUsers(db, { query, viewerId, limit = 20 }) {
   if (!rows.length) return [];
 
   const ids = rows.map((r) => r.id);
-  const [followerCounts, viewerFollowing] = await Promise.all([
+  const [followerCounts, viewerFollowing, levels] = await Promise.all([
     db
       .select({ followingId: follows.followingId, n: count() })
       .from(follows)
@@ -1554,6 +1518,8 @@ export async function searchUsers(db, { query, viewerId, limit = 20 }) {
           .from(follows)
           .where(and(eq(follows.followerId, viewerId), inArray(follows.followingId, ids)))
       : Promise.resolve([]),
+    // Solo lo ya cacheado: un listado no puede recalcular decenas de perfiles.
+    getLevelSummaries(db, ids).catch(() => new Map()),
   ]);
 
   const countByuser = new Map(followerCounts.map((r) => [r.followingId, r.n]));
@@ -1567,5 +1533,6 @@ export async function searchUsers(db, { query, viewerId, limit = 20 }) {
     bio: r.bio || null,
     followerCount: countByuser.get(r.id) || 0,
     isFollowing: followingSet.has(r.id),
+    level: levels.get(r.id) || null,
   }));
 }

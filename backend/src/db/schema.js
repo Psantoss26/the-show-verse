@@ -449,6 +449,75 @@ export const profileFavorites = pgTable('profile_favorites', {
 }));
 
 // ─────────────────────────────────────────────
+// NIVEL Y EXPERIENCIA
+// ─────────────────────────────────────────────
+// El XP se DERIVA del estado actual del resto de las tablas (ver
+// backend/src/level/rules.js): el mismo historial siempre da el mismo XP, un
+// reimport no duplica nada y todo el historial previo cuenta retroactivamente.
+// Esta tabla es solo la caché del cálculo, con el mismo patrón de expiración que
+// dashboard_pools y user_recommendations. Borrar una fila es seguro: se
+// reconstruye en la siguiente lectura.
+export const userLevelState = pgTable('user_level_state', {
+  userId: uuid('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  xp: integer('xp').default(0).notNull(),
+  level: smallint('level').default(1).notNull(),
+  tier: text('tier').default('espectador').notNull(),
+  // Recuentos por fuente y XP que aporta cada una (rules.computeXpBreakdown).
+  breakdown: jsonb('breakdown').default({}).notNull(),
+  // Agregados en bruto, para no repetir las consultas al pintar la pestaña.
+  stats: jsonb('stats').default({}).notNull(),
+  streaks: jsonb('streaks').default({}).notNull(),
+  computedAt: timestamp('computed_at', { withTimezone: true }).defaultNow().notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+}, (t) => ({
+  expiresIdx: index('idx_user_level_state_expires').on(t.expiresAt),
+  // La clasificación por XP y el ranking de la comunidad leen por este orden.
+  xpIdx: index('idx_user_level_state_xp').on(t.xp),
+}));
+
+// Los logros SÍ se persisten: el XP puede bajar (si el usuario borra favoritos),
+// pero un logro conseguido no se pierde y su fecha de desbloqueo debe ser la
+// real, no la del último recálculo.
+export const userAchievements = pgTable('user_achievements', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  achievementId: text('achievement_id').notNull(),   // id del catálogo en level/achievements.js
+  unlockedAt: timestamp('unlocked_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  uniqueAchievement: uniqueIndex('idx_user_achievements_unique').on(t.userId, t.achievementId),
+  userIdx: index('idx_user_achievements_user').on(t.userId, t.unlockedAt),
+}));
+
+// ─────────────────────────────────────────────
+// ME GUSTA (reseñas y listas de la comunidad)
+// ─────────────────────────────────────────────
+// title_comments.likes y community_lists.likes existían ya como contador, pero
+// solo se rellenaban al importar de Trakt. Estas tablas registran quién dio cada
+// me gusta —necesario para que sea idempotente, para poder quitarlo y para el XP
+// social— y mantienen el contador denormalizado que ya consumen los listados.
+export const commentLikes = pgTable('comment_likes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  commentId: uuid('comment_id').notNull().references(() => titleComments.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  uniqueLike: uniqueIndex('idx_comment_likes_unique').on(t.userId, t.commentId),
+  commentIdx: index('idx_comment_likes_comment').on(t.commentId),
+  userIdx: index('idx_comment_likes_user').on(t.userId, t.createdAt),
+}));
+
+export const listLikes = pgTable('list_likes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  listId: uuid('list_id').notNull().references(() => communityLists.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  uniqueLike: uniqueIndex('idx_list_likes_unique').on(t.userId, t.listId),
+  listIdx: index('idx_list_likes_list').on(t.listId),
+  userIdx: index('idx_list_likes_user').on(t.userId, t.createdAt),
+}));
+
+// ─────────────────────────────────────────────
 // RECOMMENDATION DISMISSALS (títulos descartados en la sección de
 // Recomendaciones, con su flujo de deslizar). Se guardan en la base de datos y
 // no en el navegador para que un descarte valga en todos los dispositivos: es

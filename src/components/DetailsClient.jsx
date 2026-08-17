@@ -111,6 +111,7 @@ import LiquidButton from "@/components/LiquidButton";
 
 // -- Autenticacion y APIs de cuenta (TMDb) --
 import { useAuth } from "@/context/AuthContext";
+import CommentLikeButton from "@/components/community/CommentLikeButton";
 import {
   titleStateKey,
   useViewerTitleStates,
@@ -12096,9 +12097,16 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                                     {/* Actions Footer */}
                                     <div className="mt-3 flex items-center gap-4 border-t border-white/5 pt-3">
-                                      <div className="flex items-center gap-1.5 rounded-full bg-white/5 px-2 py-1 text-xs font-medium text-emerald-400">
-                                        <ThumbsUp className="h-3 w-3" /> {likes}
-                                      </div>
+                                      <CommentLikeButton
+                                        commentId={c?.id}
+                                        // endpointType, no traktType: el backend
+                                        // espera 'tv'|'movie' y traktType es 'show'.
+                                        mediaType={endpointType}
+                                        tmdbId={id}
+                                        likes={likes}
+                                        liked={Boolean(c?.liked)}
+                                        canLike={authenticated}
+                                      />
                                     </div>
                                   </div>
                                 </div>

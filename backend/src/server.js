@@ -15,6 +15,7 @@ import { getAllowedOrigins, validateRuntimeEnv } from './config/env.js';
 import { db, closeDb } from './db/client.js';
 import { openApiDocument } from './docs/openapi.js';
 import authPlugin from './plugins/auth.js';
+import levelInvalidationPlugin from './plugins/levelInvalidation.js';
 import authRoutes from './routes/auth.js';
 import favoritesRoutes from './routes/favorites.js';
 import watchlistRoutes from './routes/watchlist.js';
@@ -32,6 +33,7 @@ import publicUsersRoutes from './routes/publicUsers.js';
 import dashboardRoutes from './routes/dashboard.js';
 import calendarRoutes from './routes/calendar.js';
 import communityRoutes from './routes/community.js';
+import levelRoutes from './routes/level.js';
 import { refreshAllPools } from './dashboard/pools.js';
 
 import { closeRedis, getRedis } from './lib/redis.js';
@@ -105,6 +107,10 @@ await fastify.register(fastifySwaggerUi, {
 // Plugin de autenticación
 // ────────────────────────────────────────────
 await fastify.register(authPlugin);
+
+// Caduca la caché de nivel cuando una mutación cambia algo que da XP. Va después
+// de authPlugin porque necesita req.user.
+await fastify.register(levelInvalidationPlugin);
 
 // Rate limiting global (ejecutado en preHandler para tener req.user disponible)
 await fastify.register(fastifyRateLimit, {
@@ -203,6 +209,9 @@ const apiV1 = async (app) => {
   app.register(importRoutes, { prefix: '/import' });
   app.register(statsRoutes, { prefix: '/stats' });
   app.register(publicUsersRoutes, { prefix: '/users/public' });
+  // Antes de usersRoutes: /users/level/catalog es estático y no debe caer en el
+  // comodín /users/:username de las secciones de perfil.
+  app.register(levelRoutes, { prefix: '/users' });
   app.register(usersRoutes, { prefix: '/users' });
   app.register(dashboardRoutes, { prefix: '/dashboard' });
   app.register(calendarRoutes, { prefix: '/calendar' });

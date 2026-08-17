@@ -47,6 +47,22 @@ test('commentRowToApi produces the UI contract shape', () => {
   assert.equal(api.created_at, '2020-05-01T00:00:00.000Z');
 });
 
+test('commentRowToApi marks a comment the viewer has already liked', () => {
+  const row = { id: 'uuid-1', body: 'Nice', likes: 3, createdAt: new Date('2020-05-01T00:00:00Z') };
+  assert.equal(commentRowToApi({ ...row, likedByViewer: true }).liked, true);
+});
+
+test('commentRowToApi reports not-liked when the viewer is anonymous', () => {
+  const row = { id: 'uuid-1', body: 'Nice', likes: 3, createdAt: new Date('2020-05-01T00:00:00Z') };
+  assert.equal(commentRowToApi(row).liked, false);
+});
+
+test('listRowToApi marks a list the viewer has already liked', () => {
+  const row = { id: 'L1', name: 'Cult Classics', itemCount: 3, likes: 43 };
+  assert.equal(listRowToApi({ ...row, likedByViewer: true }).liked, true);
+  assert.equal(listRowToApi(row).liked, false);
+});
+
 test('normalizeTraktList maps a Trakt "list containing" row', () => {
   const raw = {
     name: 'Cult Classics', description: 'Weird & wonderful', item_count: 693, likes: 43,

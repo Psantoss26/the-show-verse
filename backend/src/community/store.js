@@ -1,7 +1,15 @@
 // backend/src/community/store.js
 import { db } from '../db/client.js';
-import { titleComments, titleSentiment, communityLists, communityListItems, userLists } from '../db/schema.js';
-import { and, eq, desc, asc, sql, gt } from 'drizzle-orm';
+import {
+  titleComments,
+  titleSentiment,
+  communityLists,
+  communityListItems,
+  userLists,
+  commentLikes,
+  listLikes,
+} from '../db/schema.js';
+import { and, eq, desc, asc, sql, gt, inArray } from 'drizzle-orm';
 import { resolveCommentTab } from './tabs.js';
 import { commentRowToApi, listRowToApi } from './normalize.js';
 import { sentimentRowToApi } from './sentiment.js';
@@ -47,7 +55,7 @@ async function hydrateListItemPosters(items) {
   return items;
 }
 
-export async function getCommentsPage({ tmdbId, mediaType, tab, page = 1, limit = 5 }) {
+export async function getCommentsPage({ tmdbId, mediaType, tab, page = 1, limit = 5, viewerId = null }) {
   const { order, sinceDays } = resolveCommentTab(tab);
   const conds = [eq(titleComments.tmdbId, Number(tmdbId)), eq(titleComments.mediaType, mediaType)];
   if (sinceDays) {
@@ -67,9 +75,11 @@ export async function getCommentsPage({ tmdbId, mediaType, tab, page = 1, limit 
     db.select({ count: sql`count(*)::int` }).from(titleComments).where(where),
   ]);
 
+  const liked = await likedCommentIds(viewerId, rows.map((row) => row.id));
+
   const itemCount = Number(count) || 0;
   return {
-    items: rows.map(commentRowToApi),
+    items: rows.map((row) => commentRowToApi({ ...row, likedByViewer: liked.has(row.id) })),
     pagination: {
       itemCount,
       pageCount: Math.ceil(itemCount / safeLimit) || 0,
@@ -122,6 +132,158 @@ export async function deleteNativeComment({ id, userId }) {
   return rows.length > 0;
 }
 
+// ─────────────────────────────────────────────
+// ME GUSTA (reseñas y listas)
+// ─────────────────────────────────────────────
+// El contador denormalizado (`likes`) se AJUSTA, no se recalcula: para los
+// comentarios y listas importados de Trakt ese contador trae el recuento de
+// Trakt, y recalcularlo desde comment_likes lo pondría a cero. El índice único
+// garantiza la idempotencia: solo se toca el contador cuando la fila realmente
+// se insertó o se borró, así que dar dos veces me gusta no infla nada.
+
+/** Marca me gusta en una reseña. Devuelve el estado resultante o null si no existe. */
+export async function likeComment({ commentId, userId }) {
+  const inserted = await db
+    .insert(commentLikes)
+    .values({ commentId, userId })
+    .onConflictDoNothing({ target: [commentLikes.userId, commentLikes.commentId] })
+    .returning({ id: commentLikes.id });
+
+  if (inserted.length) {
+    const [row] = await db
+      .update(titleComments)
+      .set({ likes: sql`${titleComments.likes} + 1` })
+      .where(eq(titleComments.id, commentId))
+      .returning({ likes: titleComments.likes });
+    if (!row) return null;
+    return { liked: true, likes: Number(row.likes) || 0 };
+  }
+
+  // Ya estaba: se devuelve el estado actual sin tocar el contador.
+  const [row] = await db
+    .select({ likes: titleComments.likes })
+    .from(titleComments)
+    .where(eq(titleComments.id, commentId))
+    .limit(1);
+  return row ? { liked: true, likes: Number(row.likes) || 0 } : null;
+}
+
+/** Quita el me gusta de una reseña. */
+export async function unlikeComment({ commentId, userId }) {
+  const removed = await db
+    .delete(commentLikes)
+    .where(and(eq(commentLikes.commentId, commentId), eq(commentLikes.userId, userId)))
+    .returning({ id: commentLikes.id });
+
+  if (removed.length) {
+    const [row] = await db
+      .update(titleComments)
+      .set({ likes: sql`GREATEST(0, ${titleComments.likes} - 1)` })
+      .where(eq(titleComments.id, commentId))
+      .returning({ likes: titleComments.likes });
+    if (!row) return null;
+    return { liked: false, likes: Number(row.likes) || 0 };
+  }
+
+  const [row] = await db
+    .select({ likes: titleComments.likes })
+    .from(titleComments)
+    .where(eq(titleComments.id, commentId))
+    .limit(1);
+  return row ? { liked: false, likes: Number(row.likes) || 0 } : null;
+}
+
+/** Marca me gusta en una lista de la comunidad. */
+export async function likeCommunityList({ listId, userId }) {
+  const inserted = await db
+    .insert(listLikes)
+    .values({ listId, userId })
+    .onConflictDoNothing({ target: [listLikes.userId, listLikes.listId] })
+    .returning({ id: listLikes.id });
+
+  if (inserted.length) {
+    const [row] = await db
+      .update(communityLists)
+      .set({ likes: sql`${communityLists.likes} + 1` })
+      .where(eq(communityLists.id, listId))
+      .returning({ likes: communityLists.likes });
+    if (!row) return null;
+    return { liked: true, likes: Number(row.likes) || 0 };
+  }
+
+  const [row] = await db
+    .select({ likes: communityLists.likes })
+    .from(communityLists)
+    .where(eq(communityLists.id, listId))
+    .limit(1);
+  return row ? { liked: true, likes: Number(row.likes) || 0 } : null;
+}
+
+/** Quita el me gusta de una lista de la comunidad. */
+export async function unlikeCommunityList({ listId, userId }) {
+  const removed = await db
+    .delete(listLikes)
+    .where(and(eq(listLikes.listId, listId), eq(listLikes.userId, userId)))
+    .returning({ id: listLikes.id });
+
+  if (removed.length) {
+    const [row] = await db
+      .update(communityLists)
+      .set({ likes: sql`GREATEST(0, ${communityLists.likes} - 1)` })
+      .where(eq(communityLists.id, listId))
+      .returning({ likes: communityLists.likes });
+    if (!row) return null;
+    return { liked: false, likes: Number(row.likes) || 0 };
+  }
+
+  const [row] = await db
+    .select({ likes: communityLists.likes })
+    .from(communityLists)
+    .where(eq(communityLists.id, listId))
+    .limit(1);
+  return row ? { liked: false, likes: Number(row.likes) || 0 } : null;
+}
+
+/** Dueño de una reseña, para invalidar su nivel cuando recibe un me gusta. */
+export async function getCommentOwnerId(commentId) {
+  const [row] = await db
+    .select({ userId: titleComments.userId })
+    .from(titleComments)
+    .where(eq(titleComments.id, commentId))
+    .limit(1);
+  return row?.userId || null;
+}
+
+/** Dueño de una lista de la comunidad, si es una lista de un usuario nuestro. */
+export async function getCommunityListOwnerId(listId) {
+  const [row] = await db
+    .select({ userId: userLists.userId })
+    .from(communityLists)
+    .innerJoin(userLists, eq(userLists.id, communityLists.userListId))
+    .where(eq(communityLists.id, listId))
+    .limit(1);
+  return row?.userId || null;
+}
+
+/** Ids (de un conjunto dado) a los que este visitante ya dio me gusta. */
+async function likedCommentIds(viewerId, commentIds) {
+  if (!viewerId || !commentIds.length) return new Set();
+  const rows = await db
+    .select({ commentId: commentLikes.commentId })
+    .from(commentLikes)
+    .where(and(eq(commentLikes.userId, viewerId), inArray(commentLikes.commentId, commentIds)));
+  return new Set(rows.map((row) => row.commentId));
+}
+
+async function likedListIds(viewerId, listIds) {
+  if (!viewerId || !listIds.length) return new Set();
+  const rows = await db
+    .select({ listId: listLikes.listId })
+    .from(listLikes)
+    .where(and(eq(listLikes.userId, viewerId), inArray(listLikes.listId, listIds)));
+  return new Set(rows.map((row) => row.listId));
+}
+
 export async function getSentiment({ tmdbId, mediaType }) {
   const [row] = await db.select().from(titleSentiment)
     .where(and(eq(titleSentiment.tmdbId, Number(tmdbId)), eq(titleSentiment.mediaType, mediaType))).limit(1);
@@ -163,7 +325,7 @@ export async function insertListMemberships(listId, items) {
     .onConflictDoNothing({ target: [communityListItems.listId, communityListItems.tmdbId, communityListItems.mediaType] });
 }
 
-export async function getListsForTitle({ tmdbId, mediaType, limit = 6 }) {
+export async function getListsForTitle({ tmdbId, mediaType, limit = 6, viewerId = null }) {
   const rows = await db
     .select({
       id: communityLists.id, externalId: communityLists.externalId, slug: communityLists.slug,
@@ -177,7 +339,8 @@ export async function getListsForTitle({ tmdbId, mediaType, limit = 6 }) {
     .where(and(eq(communityListItems.tmdbId, Number(tmdbId)), eq(communityListItems.mediaType, mediaType)))
     .orderBy(desc(communityLists.likes))
     .limit(Math.min(Number(limit) || 6, 20));
-  return rows.map(listRowToApi);
+  const liked = await likedListIds(viewerId, rows.map((row) => row.id));
+  return rows.map((row) => listRowToApi({ ...row, likedByViewer: liked.has(row.id) }));
 }
 
 const SORTS = {
@@ -186,17 +349,20 @@ const SORTS = {
   name_asc: [asc(communityLists.name)], name_desc: [desc(communityLists.name)],
 };
 
-export async function discoverLists({ sort = 'items_desc', page = 1, limit = 30 }) {
+export async function discoverLists({ sort = 'items_desc', page = 1, limit = 30, viewerId = null }) {
   const orderBy = Object.hasOwn(SORTS, sort) ? SORTS[sort] : SORTS.items_desc;
   const safeLimit = Math.min(Math.max(Number(limit) || 30, 1), 60);
   const offset = (Math.max(Number(page) || 1, 1) - 1) * safeLimit;
   const rows = await db.select().from(communityLists).orderBy(...orderBy).limit(safeLimit).offset(offset);
-  return rows.map(listRowToApi);
+  const liked = await likedListIds(viewerId, rows.map((row) => row.id));
+  return rows.map((row) => listRowToApi({ ...row, likedByViewer: liked.has(row.id) }));
 }
 
-export async function getCommunityListWithItems({ id, page = 1, limit = 50 }) {
+export async function getCommunityListWithItems({ id, page = 1, limit = 50, viewerId = null }) {
   const [list] = await db.select().from(communityLists).where(eq(communityLists.id, id)).limit(1);
   if (!list) return null;
+  const liked = await likedListIds(viewerId, [id]);
+  list.likedByViewer = liked.has(id);
   const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 150);
   const offset = (Math.max(Number(page) || 1, 1) - 1) * safeLimit;
   const items = await db.select().from(communityListItems)
