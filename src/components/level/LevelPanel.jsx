@@ -84,8 +84,10 @@ export default function LevelPanel({ username, initialSummary = null }) {
     <div className="mt-8 space-y-8">
       {/* ── Cabecera: la insignia manda ── */}
       <section className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-white/[0.09] to-white/[0.03] p-5 sm:p-7">
-        <div className="flex flex-wrap items-center gap-5">
-          <LevelBadge level={shown.level} tier={shown.tier} size="lg" />
+        {/* items-stretch: la insignia `fill` toma el alto de esta fila, que lo
+            marca la columna de información de su derecha. */}
+        <div className="flex flex-wrap items-stretch gap-5">
+          <LevelBadge level={shown.level} tier={shown.tier} size="fill" />
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">
               Nivel {shown.level} de {progress?.maxLevel || 40}
