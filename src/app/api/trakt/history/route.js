@@ -8,7 +8,15 @@ import {
   setTraktCookies,
   traktFetch,
 } from "@/lib/trakt/server";
-import { backendFetchJson, setBackendAuthCookies } from "@/lib/backend/server";
+import {
+  backendFetchJson,
+  hasBackendCredentials,
+  setBackendAuthCookies,
+} from "@/lib/backend/server";
+import {
+  degradedUserDataResponse,
+  shouldReportBackendDegraded,
+} from "@/lib/backend/userDataAvailability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -203,6 +211,11 @@ export async function GET(request) {
     : 200;
   const targetCount = hasNumericLimit ? Math.floor(numericLimit) : null;
 
+  const hadBackendCredentials = hasBackendCredentials(request);
+  // Si el backend propio no responde, NO podemos concluir que el usuario esté
+  // desconectado: ver lib/backend/userDataAvailability.js.
+  let backendFailed = false;
+
   try {
     const rows = [];
     let currentPage = page;
@@ -222,6 +235,7 @@ export async function GET(request) {
       const backend = await backendFetchJson(request, `/v1/history?${qs.toString()}`);
       if (!backend.ok) {
         backendFailure = backend;
+        backendFailed = true;
         break;
       }
 
@@ -275,6 +289,7 @@ export async function GET(request) {
       console.warn("Backend history failed; falling back to Trakt", backendFailure.error);
     }
   } catch (e) {
+    backendFailed = true;
     console.warn("Backend history failed; falling back to Trakt", e);
   }
 
@@ -284,6 +299,15 @@ export async function GET(request) {
     readTraktCookies(cookieStore);
 
   if (!accessToken && !refreshToken) {
+    if (
+      shouldReportBackendDegraded({
+        hadBackendCredentials,
+        backendFailed,
+        hasTraktTokens: false,
+      })
+    ) {
+      return degradedUserDataResponse({ items: [], stats: null });
+    }
     return NextResponse.json({ connected: false, items: [], stats: null });
   }
 
