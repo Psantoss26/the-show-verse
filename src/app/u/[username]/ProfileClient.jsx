@@ -347,30 +347,40 @@ function SidebarActivityTitle({ item }) {
   );
 }
 
-function SidebarActivityText({ item }) {
+// Conjugación de la actividad. En tu propio perfil el timeline te habla a ti
+// ("has escrito"); en el de otro miembro sigue siendo tercera persona ("ha
+// escrito"), que es lo correcto para quien lo lee.
+function activityVerbs(isSelf) {
+  return isSelf
+    ? { escrito: "has escrito una reseña de ", anadido: "has añadido ", puntuado: "has puntuado ", creado: "has creado la lista ", visto: "has visto " }
+    : { escrito: "ha escrito una reseña de ", anadido: "ha añadido ", puntuado: "ha puntuado ", creado: "ha creado la lista ", visto: "ha visto " };
+}
+
+function SidebarActivityText({ item, isSelf = false }) {
+  const verb = activityVerbs(isSelf);
   const episodeLabel = item.type === "watched" && item.season && item.episode
     ? `S${String(item.season).padStart(2, "0")}E${String(item.episode).padStart(2, "0")} de `
     : "";
 
   if (item.type === "review") {
-    return <><span className="text-zinc-300">ha escrito una reseña de </span><SidebarActivityTitle item={item} /></>;
+    return <><span className="text-zinc-300">{verb.escrito}</span><SidebarActivityTitle item={item} /></>;
   }
   if (item.type === "watchlist") {
-    return <><span className="text-zinc-300">ha añadido </span><SidebarActivityTitle item={item} /><span className="text-zinc-300"> a Pendientes</span></>;
+    return <><span className="text-zinc-300">{verb.anadido}</span><SidebarActivityTitle item={item} /><span className="text-zinc-300"> a Pendientes</span></>;
   }
   if (item.type === "favorite") {
-    return <><span className="text-zinc-300">ha añadido </span><SidebarActivityTitle item={item} /><span className="text-zinc-300"> a Favoritos</span></>;
+    return <><span className="text-zinc-300">{verb.anadido}</span><SidebarActivityTitle item={item} /><span className="text-zinc-300"> a Favoritos</span></>;
   }
   if (item.type === "rating") {
-    return <><span className="text-zinc-300">ha puntuado </span><SidebarActivityTitle item={item} /><span className="text-zinc-300 font-medium">{typeof item.rating === "number" ? ` · ${item.rating}/10` : ""}</span></>;
+    return <><span className="text-zinc-300">{verb.puntuado}</span><SidebarActivityTitle item={item} /><span className="text-zinc-300 font-medium">{typeof item.rating === "number" ? ` · ${item.rating}/10` : ""}</span></>;
   }
   if (item.type === "list") {
-    return <><span className="text-zinc-300">ha creado la lista </span><Link href={`/lists/${String(item.id || "").replace("list:", "")}`} className="font-extrabold text-white transition-colors hover:text-emerald-400">{item.name || "sin título"}</Link></>;
+    return <><span className="text-zinc-300">{verb.creado}</span><Link href={`/lists/${String(item.id || "").replace("list:", "")}`} className="font-extrabold text-white transition-colors hover:text-emerald-400">{item.name || "sin título"}</Link></>;
   }
   if (item.type === "list_item") {
-    return <><span className="text-zinc-300">ha añadido </span><SidebarActivityTitle item={item} /><span className="text-zinc-300">{item.listName ? ` a ${item.listName}` : " a una lista"}</span></>;
+    return <><span className="text-zinc-300">{verb.anadido}</span><SidebarActivityTitle item={item} /><span className="text-zinc-300">{item.listName ? ` a ${item.listName}` : " a una lista"}</span></>;
   }
-  return <><span className="text-zinc-300">ha visto </span><span className="text-zinc-300">{episodeLabel}</span><SidebarActivityTitle item={item} /></>;
+  return <><span className="text-zinc-300">{verb.visto}</span><span className="text-zinc-300">{episodeLabel}</span><SidebarActivityTitle item={item} /></>;
 }
 
 // Revelado "punto a punto" del timeline de actividad lateral: la línea se dibuja
@@ -388,7 +398,7 @@ const activityTimelineDot = {
   visible: { scale: 1, opacity: 1, transition: { type: "spring", stiffness: 480, damping: 20 } },
 };
 
-function ActivitySidebarPreview({ username, onOpen }) {
+function ActivitySidebarPreview({ username, onOpen, isSelf = false }) {
   const [items, setItems] = useState([]);
   const [status, setStatus] = useState("loading");
   // Al volver atrás o con "reducir movimiento" NO se anima: se pinta estático.
@@ -453,7 +463,7 @@ function ActivitySidebarPreview({ username, onOpen }) {
               {/* Una sola línea (truncada): altura fija por item → el esqueleto la
                   reserva exactamente y nada de debajo salta al cargar. */}
               <p className="truncate text-[13px] leading-5 text-zinc-300">
-                <SidebarActivityText item={item} />
+                <SidebarActivityText item={item} isSelf={isSelf} />
               </p>
               <time dateTime={item.createdAt} className="mt-0.5 block text-[11px] font-semibold leading-4 text-zinc-400">
                 {relativeSidebarActivityTime(item.createdAt)}
@@ -1111,7 +1121,11 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
               </dl>
             </section>
 
-            <ActivitySidebarPreview username={user.username} onOpen={() => navigateToTab("activity")} />
+            <ActivitySidebarPreview
+              username={user.username}
+              onOpen={() => navigateToTab("activity")}
+              isSelf={isSelf}
+            />
 
             <section>
               <SectionHeader
@@ -1271,19 +1285,19 @@ function ProfileLevelSidebar({ level, username, routeBase, onNavigate }) {
         href={profileTabHref(username, "level", routeBase)}
         scroll={false}
         onClick={goToLevel}
-        className="block rounded-2xl bg-zinc-900/40 p-3.5 shadow-sm transition-colors hover:bg-zinc-900/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70"
+        className="block rounded-2xl bg-zinc-900/40 p-4 shadow-sm transition-colors hover:bg-zinc-900/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70"
         title={`Nivel ${level.level} · ${level.tier?.name || ""}`}
       >
         <LevelBadge level={level.level} tier={level.tier} size="md" showTierName />
         <LevelProgress
-          className="mt-3"
+          className="mt-4"
           level={level.level}
           tier={level.tier}
           progress={level}
           xp={level.xp}
         />
         {totalAchievements > 0 && (
-          <p className="mt-2.5 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+          <p className="mt-3 border-t border-white/[0.06] pt-3 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
             {level.achievementsUnlocked} de {totalAchievements} logros
             {streak > 0 && ` · racha de ${streak} d`}
           </p>

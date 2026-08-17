@@ -12,10 +12,12 @@ export default function LevelProgress({ level, tier, progress, xp, className = "
   return (
     <div className={className}>
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
-          {formatXp(totalXp)} XP
+        {/* La XP acumulada es el dato principal de la barra: va en blanco y sin
+            versalitas, que a este tamaño son lo que más cuesta leer. */}
+        <span className="text-sm font-black tabular-nums tracking-tight text-white">
+          {formatXp(totalXp)} <span className="text-[11px] font-bold text-zinc-400">XP</span>
         </span>
-        <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
           {isMax
             ? "Nivel máximo"
             : `${formatXp(progress?.xpToNextLevel)} XP para el nivel ${Number(level) + 1}`}
@@ -23,7 +25,7 @@ export default function LevelProgress({ level, tier, progress, xp, className = "
       </div>
 
       <div
-        className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.07]"
+        className="mt-2 h-2 overflow-hidden rounded-full bg-white/[0.07]"
         role="progressbar"
         aria-valuenow={percent}
         aria-valuemin={0}

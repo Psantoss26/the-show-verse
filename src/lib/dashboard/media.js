@@ -5,6 +5,7 @@ import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
 // comparten la misma instancia de caché.
 
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
+import { getMediaTypeForItem } from "./mediaType.mjs";
 
 /* ---------- helpers de formato ---------- */
 export const yearOf = (m) =>
@@ -61,12 +62,10 @@ export const buildImg = (path, size = "original") =>
 
 export const PREVIEW_BACKDROP_SIZE = "w780";
 
-export const getMediaTypeForItem = (item) =>
-  item?.media_type === "tv" ||
-  (item?.name && !item?.title) ||
-  item?.first_air_date
-    ? "tv"
-    : "movie";
+// Vive en su propio módulo, sin dependencias, para poder probarlo con node --test
+// (este fichero importa por alias `@/`, que el runner no resuelve). Se reexporta
+// para no tocar a los ~15 consumidores que ya lo importan desde aquí.
+export { getMediaTypeForItem };
 
 export const getBackdropCacheKey = (item, mediaType = getMediaTypeForItem(item)) =>
   `${mediaType}:${item?.id}`;
