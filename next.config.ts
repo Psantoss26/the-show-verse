@@ -1,6 +1,31 @@
 import type { NextConfig } from "next";
 
+// SELLO DE BUILD PARA EL SERVICE WORKER.
+//
+// El SW nombraba sus cachés con una constante escrita a mano (`VERSION = "v2"`).
+// Como nadie la sube en cada despliegue, `activate` nunca borraba nada y las
+// cachés acumulaban documentos y chunks de TODOS los builds anteriores. Al
+// primer fallo de red o 5xx del origen (rutina con el NAS detrás del túnel), el
+// SW servía un documento viejo y, con él, los chunks de aquel build —que seguían
+// ahí en cache-first—: la app arrancaba ENTERA en una versión antigua. Eso es lo
+// que hacía reaparecer el navbar de antes, con las secciones como iconos fijos y
+// sin desplegable.
+//
+// Con un sello que cambia en cada build, el SW estrena nombre de caché por
+// despliegue y `activate` se lleva los anteriores. `env` se inlinea en tiempo de
+// build, así que cliente y SW ven el mismo valor.
+//
+// Se respeta un valor externo si el despliegue ya aporta uno estable (Vercel
+// expone el SHA del commit); si no, la fecha del build sirve igual.
+const SW_BUILD =
+  process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ||
+  process.env.SOURCE_COMMIT?.slice(0, 12) ||
+  String(Date.now());
+
 const nextConfig: NextConfig = {
+  env: {
+    NEXT_PUBLIC_SW_BUILD: SW_BUILD,
+  },
   // Salida "standalone" para autoalojar en Docker (imagen mínima con server.js).
   // Vercel la ignora sin problema, así que es seguro para ambos despliegues.
   output: "standalone",
