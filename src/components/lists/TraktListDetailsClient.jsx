@@ -6,6 +6,8 @@ import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { Loader2, ExternalLink, ChevronDown, UserRound, ListVideo } from 'lucide-react'
 import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayout'
 import FilterableListItems from '@/components/lists/ListDetailsTools'
+import ListLikeButton from '@/components/community/ListLikeButton'
+import { useAuth } from '@/context/AuthContext'
 import { formatPageTitle } from '@/lib/pageTitle'
 import {
     getCommunityListDetailsCacheKey,
@@ -90,6 +92,7 @@ function computeHasMore(list, loadedCount) {
 const tmdbImg = (path, size = 'w500') => path ? `https://image.tmdb.org/t/p/${size}${path}` : null
 
 export default function TraktListDetailsClient({ username, listId }) {
+    const { authenticated = false } = useAuth()
     const loadMoreRef = useRef(null)
     const stateRef = useRef(null)
     const loadingMoreRef = useRef(false)
@@ -285,6 +288,16 @@ export default function TraktListDetailsClient({ username, listId }) {
                 { label: 'Fuente', value: 'Comunidad' },
             ]}
             backHref="/lists"
+            rightActions={
+                list?.id ? (
+                    <ListLikeButton
+                        listId={list.id}
+                        likes={Number(list?.likes || 0)}
+                        liked={Boolean(list?.liked)}
+                        canLike={authenticated}
+                    />
+                ) : null
+            }
         >
             {items.length > 0 || !state.loading ? (
                 <FilterableListItems

@@ -33,6 +33,7 @@ import {
   applyResolvedEnglishPosterPaths,
   resolveEnglishPosterPaths,
 } from '../lib/userProfile.js';
+import { getLevelSummaries } from '../level/store.js';
 
 const ARTWORK_KINDS = ['poster', 'mobilePoster', 'backdrop', 'background', 'logo'];
 const artworkChangeSchema = z.object({
@@ -433,13 +434,19 @@ export default async function usersRoutes(fastify) {
     // Estado de seguimiento del visor respecto a cada usuario listado.
     const viewerId = req.user.id;
     const followingSet = new Set();
+    let levels = new Map();
     if (page.length) {
       const ids = page.map((r) => r.id);
-      const viewerFollows = await db
-        .select({ followingId: follows.followingId })
-        .from(follows)
-        .where(and(eq(follows.followerId, viewerId), inArray(follows.followingId, ids)));
+      const [viewerFollows, levelSummaries] = await Promise.all([
+        db
+          .select({ followingId: follows.followingId })
+          .from(follows)
+          .where(and(eq(follows.followerId, viewerId), inArray(follows.followingId, ids))),
+        // Solo lo ya cacheado: el listado no recalcula perfiles ajenos.
+        getLevelSummaries(db, ids).catch(() => new Map()),
+      ]);
       for (const r of viewerFollows) followingSet.add(r.followingId);
+      levels = levelSummaries;
     }
 
     return reply.send({
@@ -449,6 +456,7 @@ export default async function usersRoutes(fastify) {
         avatarUrl: r.avatarUrl || null,
         isFollowing: followingSet.has(r.id),
         isSelf: r.id === viewerId,
+        level: levels.get(r.id) || null,
       })),
       hasMore,
       offset: offset + page.length,

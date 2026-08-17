@@ -15,6 +15,9 @@ import PosterTile from "@/components/social/PosterTile";
 import { titleStateKey, useViewerTitleStates } from "@/components/social/useViewerTitleStates";
 import { LIQUID_GLASS_PANEL, LIQUID_GLASS_TOOLTIP } from "@/lib/ui/liquidGlass";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
+import LevelBadge from "@/components/level/LevelBadge";
+import LevelProgress from "@/components/level/LevelProgress";
+import LevelPanel from "@/components/level/LevelPanel";
 import ProfileSection from "./ProfileSection";
 import { PROFILE_TAB_IDS, profileTabHref } from "./profileRoutes";
 import {
@@ -997,7 +1000,11 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
           />
         </div>
 
-        {tab === "statistics" ? (
+        {tab === "level" ? (
+          <div className="sv-profile-entry sv-profile-entry--content">
+            <LevelPanel username={user.username} initialSummary={profile.level} />
+          </div>
+        ) : tab === "statistics" ? (
           <div className="sv-profile-entry sv-profile-entry--content mt-8">
             {resolvedAnalytics ? (
               <ProfileAnalytics analytics={resolvedAnalytics} />
@@ -1082,6 +1089,14 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
 
           {/* ── COLUMNA LATERAL ── */}
           <aside className="sv-profile-entry sv-profile-entry--aside space-y-8 xl:sticky xl:top-24 xl:self-start">
+            {/* Nivel y experiencia: encabeza el lateral, antes del resumen del mes */}
+            <ProfileLevelSidebar
+              level={profile.level}
+              username={user.username}
+              routeBase={routeBase}
+              onNavigate={navigateToTab}
+            />
+
             {/* Resumen del mes actual */}
             <section>
               <SectionHeader
@@ -1156,6 +1171,7 @@ function ProfileTabs({ tab, username, sections, onNavigate, routeBase }) {
   const navRef = useRef(null);
   const items = [
     { id: "profile", label: "Perfil" },
+    { id: "level", label: "Nivel" },
     { id: "statistics", label: "Estadísticas" },
     { id: "activity", label: "Actividad", count: sections?.activity },
     { id: "watched", label: "Diario", count: sections?.watched },
@@ -1227,6 +1243,53 @@ function ProfileTabs({ tab, username, sections, onNavigate, routeBase }) {
         );
       })}
     </nav>
+  );
+}
+
+// Bloque de nivel de la columna lateral. Vive aquí, junto a StatCell, porque es
+// composición propia del perfil: la insignia y la barra son los componentes
+// compartidos de components/level. Sigue el acabado discreto del resto del
+// lateral (zinc-900/40), no el degradado de la cabecera.
+function ProfileLevelSidebar({ level, username, routeBase, onNavigate }) {
+  if (!level) return null;
+
+  const goToLevel = (event) => {
+    // Se conservan los modificadores para abrir en otra pestaña o copiar la URL.
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey
+      || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    onNavigate?.("level");
+  };
+
+  const totalAchievements = Number(level.achievementsTotal) || 0;
+  const streak = Number(level.streak) || 0;
+
+  return (
+    <section>
+      <SectionHeader label="Nivel" onClick={() => onNavigate?.("level")} />
+      <Link
+        href={profileTabHref(username, "level", routeBase)}
+        scroll={false}
+        onClick={goToLevel}
+        className="block rounded-2xl bg-zinc-900/40 p-3.5 shadow-sm transition-colors hover:bg-zinc-900/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70"
+        title={`Nivel ${level.level} · ${level.tier?.name || ""}`}
+      >
+        <LevelBadge level={level.level} tier={level.tier} size="md" showTierName />
+        <LevelProgress
+          className="mt-3"
+          level={level.level}
+          tier={level.tier}
+          progress={level}
+          xp={level.xp}
+        />
+        {totalAchievements > 0 && (
+          <p className="mt-2.5 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+            {level.achievementsUnlocked} de {totalAchievements} logros
+            {streak > 0 && ` · racha de ${streak} d`}
+          </p>
+        )}
+      </Link>
+    </section>
   );
 }
 

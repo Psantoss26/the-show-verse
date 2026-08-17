@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Avatar from "@/components/ui/Avatar";
+import LevelChip from "@/components/level/LevelChip";
 import FollowButton from "./FollowButton";
 
 // Fila de un miembro: avatar + nombre/usuario (+ bio opcional) + botón de
@@ -19,7 +20,12 @@ export default function MemberRow({ member }) {
       </Link>
 
       <Link href={`/u/${member.username}`} className="min-w-0 flex-1">
-        <p className="truncate text-sm font-bold text-white">{label}</p>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <p className="truncate text-sm font-bold text-white">{label}</p>
+          {member.level ? (
+            <LevelChip level={member.level.level} tier={member.level.tier} />
+          ) : null}
+        </span>
         <p className="truncate text-xs text-zinc-500">@{member.username}</p>
         {member.bio ? (
           <p className="mt-0.5 truncate text-xs text-zinc-600">{member.bio}</p>

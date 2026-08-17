@@ -39,6 +39,9 @@ export function commentRowToApi(row) {
     id: row.id,
     comment: row.body,
     likes: Number(row.likes) || 0,
+    // Si el visitante ya dio me gusta, para pintar el corazón relleno sin una
+    // segunda petición. Falso también cuando no hay sesión.
+    liked: !!row.likedByViewer,
     spoiler: !!row.spoiler,
     created_at: (row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt)).toISOString(),
     user: {
@@ -96,5 +99,6 @@ export function listRowToApi(row) {
       images: { avatar: { full: row.ownerAvatarUrl || null } },
     },
     previewPosters: Array.isArray(row.previewPosters) ? row.previewPosters : [],
+    liked: !!row.likedByViewer,
   };
 }
