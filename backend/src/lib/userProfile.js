@@ -870,6 +870,35 @@ async function resolveTitleMetadata(db, targetId, keys) {
   return map;
 }
 
+/**
+ * Normaliza los títulos que se MUESTRAN al idioma del producto (es-ES).
+ *
+ * Las tablas del usuario guardan el título con el que llegó cada fila, y los
+ * imports de Trakt/Netflix lo escribieron en inglés. Como `resolveTitleMetadata`
+ * se queda con el de la primera tabla que lo tenga, una misma serie podía
+ * aparecer como "House of the Dragon" (de Pendientes) aunque el historial y el
+ * caché de TMDb tuvieran "La casa del dragón".
+ *
+ * Aquí no se toca lo almacenado: se sustituye solo lo que se envía, usando TMDb
+ * en es-ES como fuente autorizada. Es el mismo planteamiento que ya se usa con el
+ * artwork (`resolveEnglishPosterPaths`): decidir en la lectura, no en la escritura.
+ *
+ * Puro: recibe el mapa de metadatos ya resuelto. Muta y devuelve los items.
+ */
+export function applySpanishTitles(items, metadataByKey) {
+  if (!Array.isArray(items) || !(metadataByKey instanceof Map)) return items;
+
+  for (const item of items) {
+    if (!item?.tmdbId || !item?.mediaType) continue;
+    const meta = metadataFor(metadataByKey, item.mediaType, item.tmdbId);
+    if (!meta) continue;
+    const localized = item.mediaType === 'movie' ? meta.title : meta.name;
+    // Un metadato sin título localizado no debe vaciar el que ya había.
+    if (localized) item.title = localized;
+  }
+  return items;
+}
+
 // Rellena `posterPath` y `title` cuando falten en los items de un perfil.
 // Los visionados (watch_history) suelen guardarse sin poster_path, así que:
 //   1) se busca el póster en otras tablas del usuario (favoritos, watchlist,
@@ -1337,6 +1366,11 @@ export async function getUserActivity(db, targetId, opts = {}) {
     item.rating = reviewRatingByKey.get(titleKey(item.mediaType, item.tmdbId)) ?? null;
   }
   await fillMissingPosters(db, targetId, titleEvents);
+  // Después de rellenar: los títulos guardados en las tablas del usuario pueden
+  // venir en inglés de los imports, así que el que se muestra se normaliza a
+  // es-ES con TMDb. Best-effort: si falla, se envían los títulos almacenados.
+  const titleMetadata = await getMediaMetadataMap(titleEvents).catch(() => new Map());
+  applySpanishTitles(page.items, titleMetadata);
   const englishPosters = await resolveEnglishPosterPaths(db, titleEvents);
   page.items = applyResolvedEnglishPosterPaths(
     page.items,

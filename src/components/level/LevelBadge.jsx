@@ -10,9 +10,9 @@
 import { tierVisual } from "@/lib/level/tiers.mjs";
 
 const SIZES = {
-  sm: { box: "h-8 w-7", numeral: "text-[13px]", label: null },
-  md: { box: "h-12 w-10", numeral: "text-[20px]", label: "text-[8px]" },
-  lg: { box: "h-20 w-16", numeral: "text-[34px]", label: "text-[10px]" },
+  sm: { box: "h-8 w-7", numeral: "text-[13px]", label: null, name: "text-sm" },
+  md: { box: "h-14 w-11", numeral: "text-[25px]", label: "text-[10px]", name: "text-base" },
+  lg: { box: "h-20 w-16", numeral: "text-[34px]", label: "text-[11px]", name: "text-lg" },
 };
 
 // Cuatro perforaciones por lado, como en la película real.
@@ -31,7 +31,7 @@ export default function LevelBadge({
   const gradientId = `sv-level-frame-${visual.name.toLowerCase().replace(/[^a-z]/g, "")}-${size}`;
 
   return (
-    <span className={`inline-flex items-center gap-2 ${className}`}>
+    <span className={`inline-flex items-center gap-3 ${className}`}>
       <span className={`relative inline-block shrink-0 ${dims.box}`}>
         <svg
           viewBox="0 0 56 72"
@@ -91,10 +91,10 @@ export default function LevelBadge({
 
       {showTierName && dims.label && (
         <span className="min-w-0">
-          <span className={`block font-bold uppercase tracking-[0.18em] text-zinc-500 ${dims.label}`}>
+          <span className={`block font-bold uppercase tracking-[0.14em] text-zinc-400 ${dims.label}`}>
             Nivel {shownLevel}
           </span>
-          <span className={`block truncate text-sm font-black tracking-tight ${visual.accent}`}>
+          <span className={`block truncate font-black tracking-tight ${dims.name} ${visual.accent}`}>
             {visual.name}
           </span>
         </span>

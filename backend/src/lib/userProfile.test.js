@@ -13,6 +13,7 @@ import {
   pageParams,
   packPage,
   applyEnglishPostersToProfileOverview,
+  applySpanishTitles,
   applyResolvedEnglishPosterPaths,
   profileEnglishPosterCacheKey,
   pickBestEnglishPosterPath,
@@ -284,4 +285,76 @@ test('packPage detects hasMore via the limit+1 sentinel and trims it', () => {
   assert.deepEqual(noMore.items, [1, 2]);
   assert.equal(noMore.hasMore, false);
   assert.equal(noMore.offset, 12);
+});
+
+// ─────────────────────────────────────────────
+// Títulos en español (localización de la actividad)
+// ─────────────────────────────────────────────
+// Los imports de Trakt/Netflix guardaron títulos en INGLÉS en algunas tablas del
+// usuario, y resolveTitleMetadata se queda con el de la primera tabla que lo
+// tenga: por eso una serie podía salir como "House of the Dragon" en la actividad
+// aunque el caché de TMDb tuviera "La casa del dragón". El título que se MUESTRA
+// se normaliza con el de TMDb en es-ES, que es la fuente autorizada.
+const META_ES = new Map([
+  ['tv:94997', { name: 'La casa del dragón', original_name: 'House of the Dragon' }],
+  ['tv:1399', { name: 'Juego de tronos', original_name: 'Game of Thrones' }],
+  ['movie:121', { title: 'El señor de los anillos: Las dos torres', original_title: 'The Lord of the Rings: The Two Towers' }],
+]);
+
+test('el título en inglés guardado se sustituye por el español de TMDb', () => {
+  const items = [{ tmdbId: 94997, mediaType: 'tv', title: 'House of the Dragon' }];
+  applySpanishTitles(items, META_ES);
+  assert.equal(items[0].title, 'La casa del dragón');
+});
+
+test('una película usa `title` y una serie `name` del metadato', () => {
+  const items = [
+    { tmdbId: 121, mediaType: 'movie', title: 'The Lord of the Rings: The Two Towers' },
+    { tmdbId: 1399, mediaType: 'tv', title: 'Game of Thrones' },
+  ];
+  applySpanishTitles(items, META_ES);
+  assert.equal(items[0].title, 'El señor de los anillos: Las dos torres');
+  assert.equal(items[1].title, 'Juego de tronos');
+});
+
+test('un título que ya estaba en español no cambia', () => {
+  const items = [{ tmdbId: 94997, mediaType: 'tv', title: 'La casa del dragón' }];
+  applySpanishTitles(items, META_ES);
+  assert.equal(items[0].title, 'La casa del dragón');
+});
+
+test('sin metadato se conserva el título guardado en vez de vaciarlo', () => {
+  const items = [{ tmdbId: 555, mediaType: 'movie', title: 'Algo Importado' }];
+  applySpanishTitles(items, META_ES);
+  assert.equal(items[0].title, 'Algo Importado');
+});
+
+test('un metadato sin título localizado no borra el que había', () => {
+  const items = [{ tmdbId: 7, mediaType: 'tv', title: 'Serie Importada' }];
+  applySpanishTitles(items, new Map([['tv:7', { name: '', original_name: 'Imported Show' }]]));
+  assert.equal(items[0].title, 'Serie Importada');
+});
+
+test('un item sin título lo recibe del metadato', () => {
+  const items = [{ tmdbId: 1399, mediaType: 'tv' }];
+  applySpanishTitles(items, META_ES);
+  assert.equal(items[0].title, 'Juego de tronos');
+});
+
+test('los eventos sin título de catálogo (listas) se dejan intactos', () => {
+  const items = [{ type: 'list', name: 'Mi maratón', title: undefined }];
+  applySpanishTitles(items, META_ES);
+  assert.equal(items[0].name, 'Mi maratón');
+  assert.equal(items[0].title, undefined);
+});
+
+test('applySpanishTitles tolera entradas vacías o inválidas', () => {
+  assert.doesNotThrow(() => applySpanishTitles(undefined, META_ES));
+  assert.doesNotThrow(() => applySpanishTitles([], undefined));
+  assert.doesNotThrow(() => applySpanishTitles([null, {}], META_ES));
+});
+
+test('applySpanishTitles devuelve los mismos items para poder encadenar', () => {
+  const items = [{ tmdbId: 1399, mediaType: 'tv', title: 'Game of Thrones' }];
+  assert.equal(applySpanishTitles(items, META_ES), items);
 });
