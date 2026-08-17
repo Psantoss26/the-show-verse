@@ -23,7 +23,27 @@
  * o servir /sw.js?kill — pero la vía soportada es el flag de PwaManager.
  */
 
-const VERSION = "v2";
+// UNA CACHÉ POR BUILD. NO VOLVER A UNA CONSTANTE A MANO.
+//
+// Antes esto era `VERSION = "v2"`, escrito a mano. Nadie lo sube en cada
+// despliegue, así que `activate` no borraba nada nunca y las cachés se quedaban
+// con documentos y chunks de TODOS los builds pasados (104 MB medidos en un
+// navegador real). El daño no es el espacio: es que las dos cachés se
+// DESINCRONIZAN del servidor.
+//
+// El documento se sirve network-first, pero cae a caché ante fallo de red O 5xx
+// del origen —rutina con el NAS detrás del túnel de Cloudflare—. Ese documento
+// viejo pide los chunks de SU build, que siguen ahí y se sirven cache-first
+// (`/_next/static` se trata como inmutable). Resultado: la app arranca entera en
+// una versión antigua sin avisar. Así reaparecía el navbar de antes, con las
+// secciones como iconos fijos delante de la foto de perfil y sin desplegable.
+//
+// El sello viene en la URL con la que PwaManager registra el SW
+// (`/sw.js?v=<build>`), que además hace que el navegador vea un script NUEVO en
+// cada despliegue y dispare install/activate. Si faltara el parámetro, se cae a
+// una constante para no quedarse sin nombre de caché.
+const VERSION =
+  new URL(self.location.href).searchParams.get("v") || "unversioned";
 const SHELL_CACHE = `showverse-shell-${VERSION}`; // documentos HTML + RSC
 const ASSET_CACHE = `showverse-assets-${VERSION}`; // solo /_next/static con hash
 const OFFLINE_URL = "/offline.html";

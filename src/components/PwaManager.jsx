@@ -12,6 +12,15 @@ import { sweepLocalStorageOnStartup } from "@/lib/storage/localStorageBudget";
 // puramente online.
 const SW_DISABLED_KEY = "showverse:sw:disabled";
 
+// EL SELLO DE BUILD VA EN LA URL DEL SCRIPT, y no es cosmético:
+//   1. El navegador solo busca un SW nuevo si el script CAMBIA. Con la URL fija
+//      `/sw.js`, un despliegue que no tocara ese fichero no disparaba
+//      install/activate, así que las cachés del build anterior seguían vivas.
+//   2. El propio SW lee este `v` para nombrar sus cachés, de forma que `activate`
+//      se lleve las del build anterior en vez de acumularlas.
+// Ver el porqué completo en public/sw.js. Lo inyecta next.config.ts.
+const SW_URL = `/sw.js?v=${process.env.NEXT_PUBLIC_SW_BUILD || "dev"}`;
+
 async function clearShowVerseCaches() {
   if (typeof window === "undefined" || !("caches" in window)) return;
   const keys = await window.caches.keys();
@@ -92,7 +101,7 @@ export default function PwaManager() {
       );
 
       navigator.serviceWorker
-        .register("/sw.js", { scope: "/" })
+        .register(SW_URL, { scope: "/" })
         .then((registration) => {
           // Flujo de actualización: cuando hay un worker nuevo instalado y ya
           // había uno controlando, le pedimos que active y (vía controllerchange)
