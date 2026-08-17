@@ -10,6 +10,10 @@ import {
   traktFetch,
 } from "@/lib/trakt/server";
 import { backendFetchJson, setBackendAuthCookies, hasBackendCredentials } from "@/lib/backend/server";
+import {
+  degradedUserDataResponse,
+  shouldReportBackendDegraded,
+} from "@/lib/backend/userDataAvailability";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -115,9 +119,15 @@ async function mapLimit(arr, limit, fn) {
 }
 
 export async function GET(request) {
-  if (hasBackendCredentials(request)) {
+  const hadBackendCredentials = hasBackendCredentials(request);
+  // Si el backend propio no responde, NO podemos concluir que el usuario esté
+  // desconectado: ver lib/backend/userDataAvailability.js.
+  let backendFailed = false;
+
+  if (hadBackendCredentials) {
     try {
       const backend = await backendFetchJson(request, "/v1/stats/shows/completed");
+      backendFailed = !backend.ok;
       if (backend.ok) {
         const backendItems = Array.isArray(backend.json?.results) ? backend.json.results : [];
         const completedShows = (
@@ -161,6 +171,7 @@ export async function GET(request) {
         return res;
       }
     } catch (e) {
+      backendFailed = true;
       console.error("Failed to load completed from backend", e);
     }
   }
@@ -170,6 +181,15 @@ export async function GET(request) {
     readTraktCookies(cookieStore);
 
   if (!accessToken && !refreshToken) {
+    if (
+      shouldReportBackendDegraded({
+        hadBackendCredentials,
+        backendFailed,
+        hasTraktTokens: false,
+      })
+    ) {
+      return degradedUserDataResponse({ items: [], stats: null });
+    }
     return NextResponse.json({ connected: false, items: [] });
   }
 

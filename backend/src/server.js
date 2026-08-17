@@ -129,9 +129,18 @@ await fastify.register(fastifyRateLimit, {
     }
   })(),
   keyGenerator: (req) => req.user?.id || req.ip, // Por usuario si está autenticado
-  errorResponseBuilder: () => ({
+  // `statusCode` ES OBLIGATORIO AQUÍ.
+  //
+  // El plugin LANZA lo que devuelva esta función y Fastify saca el código de
+  // `err.statusCode` (ver defaultErrorResponse en @fastify/rate-limit). Sin él,
+  // el throttling salía por la puerta del 500: los logs decían «error del
+  // servidor» cuando en realidad era rate limit, y ningún manejador de 429 del
+  // frontend (hay varios, con reintentos y backoff) llegaba a enterarse.
+  // `context.statusCode` es 429 (o 403 si algún día se activa `ban`).
+  errorResponseBuilder: (_req, context) => ({
+    statusCode: context.statusCode,
     error: 'Too Many Requests',
-    message: 'Rate limit exceeded. Please wait before retrying.',
+    message: `Rate limit exceeded. Please wait ${context.after} before retrying.`,
   }),
 });
 
