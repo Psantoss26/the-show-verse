@@ -178,3 +178,28 @@ test('evaluateAchievements tolera un contexto incompleto', () => {
   assert.deepEqual(evaluateAchievements({}).unlocked, []);
   assert.deepEqual(evaluateAchievements().unlocked, []);
 });
+
+// ─────────────────────────────────────────────
+// Los recuentos se escriben con cifras, no con letras
+// ─────────────────────────────────────────────
+// "Quinientos episodios vistos" obliga a leer y traducir mentalmente; "500
+// episodios vistos" se compara de un vistazo con el 643 que llevas. Los
+// ORDINALES ("tu primera película") se quedan en letra: no son un recuento, y
+// "tu 1.ª película" se lee peor.
+test('la descripción de cada logro con umbral > 1 contiene su cifra', () => {
+  for (const a of ACHIEVEMENTS) {
+    if (a.threshold <= 1) continue;
+    assert.ok(
+      new RegExp(`\\b${a.threshold}\\b`).test(a.description),
+      `${a.id}: la descripción debería decir ${a.threshold} con cifras — "${a.description}"`,
+    );
+  }
+});
+
+test('ninguna descripción deletrea un número en letras', () => {
+  const enLetras = /\b(dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|veinte|veinticinco|treinta|cincuenta|cien|ciento|doscientos|doscientas|trescientos|trescientas|quinientos|quinientas|mil)\b/i;
+  for (const a of ACHIEVEMENTS) {
+    const match = enLetras.exec(a.description);
+    assert.equal(match, null, `${a.id}: "${match?.[0]}" debería ir en cifras — "${a.description}"`);
+  }
+});

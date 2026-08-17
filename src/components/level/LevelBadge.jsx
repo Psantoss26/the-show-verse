@@ -9,10 +9,30 @@
 
 import { tierVisual } from "@/lib/level/tiers.mjs";
 
+// `fill` no lleva alto propio: se estira al de su fila (por eso el contenedor
+// necesita `items-stretch`) y la proporción del fotograma deriva el ancho. Así la
+// insignia acompaña exactamente al bloque de información que tenga al lado, sin
+// que haya que recalcular un alto fijo cada vez que ese bloque cambia. El
+// `min-h` cubre el caso de que la fila envuelva y la insignia quede sola.
 const SIZES = {
   sm: { box: "h-8 w-7", numeral: "text-[13px]", label: null, name: "text-sm" },
   md: { box: "h-14 w-11", numeral: "text-[25px]", label: "text-[10px]", name: "text-base" },
   lg: { box: "h-20 w-16", numeral: "text-[34px]", label: "text-[11px]", name: "text-lg" },
+  // De `sm:` en adelante el ALTO lo toma de la fila (`h-full`, definido por el
+  // estirado) y el ancho es fijo. No se usa `aspect-ratio`: con el ancho en
+  // `auto` el navegador lo pide al contenido —el SVG, que es `w-full`— y el
+  // cálculo se vuelve circular, lo que disparaba la caja a 386 px. Con el ancho
+  // fijo, el SVG se ajusta dentro conservando su proporción (`preserveAspectRatio`
+  // por defecto), así que un cambio de alto del texto nunca lo deforma.
+  // Por debajo de `sm:` la fila envuelve y la insignia queda sola en su línea:
+  // ahí `h-full` no tendría alto de referencia, así que se conserva el fijo.
+  fill: {
+    box: "h-20 w-16 sm:h-full sm:w-[5.15rem]",
+    numeral: "text-[34px] sm:text-[clamp(2rem,3vw,2.75rem)]",
+    label: "text-[11px]",
+    name: "text-lg",
+    stretch: true,
+  },
 };
 
 // Cuatro perforaciones por lado, como en la película real.
@@ -31,7 +51,9 @@ export default function LevelBadge({
   const gradientId = `sv-level-frame-${visual.name.toLowerCase().replace(/[^a-z]/g, "")}-${size}`;
 
   return (
-    <span className={`inline-flex items-center gap-3 ${className}`}>
+    <span
+      className={`inline-flex gap-3 ${dims.stretch ? "items-center sm:items-stretch sm:self-stretch" : "items-center"} ${className}`}
+    >
       <span className={`relative inline-block shrink-0 ${dims.box}`}>
         <svg
           viewBox="0 0 56 72"
