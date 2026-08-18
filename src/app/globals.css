@@ -410,6 +410,72 @@ html:not([data-avatar-boot]) .avatar-boot-chevron {
   }
 }
 
+/* Sección NIVEL del perfil.
+   Misma curva y duración que `sv-profile-entry` para que se lea como una
+   continuación de la entrada del perfil y no como otra animación distinta. Lo
+   que cambia es CÓMO se escalona: aquí las listas (filas de experiencia,
+   logros) tienen longitud variable, así que el retardo viaja en la custom
+   property `--sv-level-delay` en vez de en una clase por elemento.
+
+   Cada bloque escalona respecto a SU PROPIO montaje, no al de la sección: la
+   cabecera se pinta al instante con el resumen que ya trae el perfil, mientras
+   que el desglose y los logros llegan después por API. Encadenar todo a un
+   único reloj dejaría esos bloques esperando un retardo que ya no viene a
+   cuento. */
+@keyframes sv-level-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 0.6rem, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.sv-level-rise {
+  animation: sv-level-rise 460ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: var(--sv-level-delay, 0ms);
+}
+
+/* Las barras se llenan desde cero: es la animación que convierte un dato en la
+   sensación de progreso, así que va con un recorrido más largo que la entrada.
+
+   El ancho final viaja en `--sv-level-bar-width` y se declara TAMBIÉN como
+   `width` estático. Así el estado real de la barra no depende de que la
+   animación llegue a ejecutarse (con movimiento reducido, o si el navegador la
+   descarta), que es justo el fallo que documenta la entrada de DetailsClient
+   más abajo: una pieza que se queda pegada a su estado inicial.
+
+   `backwards` en lugar de `both` a propósito: mantiene el `from` durante el
+   retardo, pero al terminar devuelve el control al `width` base. Eso deja que
+   la barra de LevelProgress siga usando su `transition-[width]` cuando el
+   porcentaje cambia al llegar el detalle de la API, y que el `hover` de las
+   tarjetas de logro recupere su transform. */
+@keyframes sv-level-bar-fill {
+  from {
+    width: 0%;
+  }
+
+  to {
+    width: var(--sv-level-bar-width, 0%);
+  }
+}
+
+.sv-level-bar {
+  width: var(--sv-level-bar-width, 0%);
+  animation: sv-level-bar-fill 900ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: var(--sv-level-delay, 0ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-level-rise,
+  .sv-level-bar {
+    animation: none;
+  }
+}
+
 /* Entrada del contenido de la FICHA (DetailsClient): el marcador y las pestañas
    de información aparecen como el título y los botones, con un desplazamiento
    corto hacia arriba.
