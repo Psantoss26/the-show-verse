@@ -23,11 +23,20 @@ export default function XpBreakdown({ breakdown, tier, total }) {
 
   const max = Math.max(...rows.map((row) => row.xp));
 
+  // Escalonado de las filas. El paso se topa a 12 filas para que un desglose
+  // largo no acabe con la última barra llenándose varios segundos tarde: a
+  // partir de ahí entran a la vez y la cascada sigue leyéndose igual.
+  const rowDelay = (index) => 60 + Math.min(index, 12) * 55;
+
   return (
     <div>
       <ul className="space-y-2.5">
-        {rows.map((row) => (
-          <li key={row.key}>
+        {rows.map((row, index) => (
+          <li
+            key={row.key}
+            className="sv-level-rise"
+            style={{ "--sv-level-delay": `${rowDelay(index)}ms` }}
+          >
             <div className="flex items-baseline justify-between gap-3">
               <span className="truncate text-sm font-bold text-zinc-200">{row.label}</span>
               <span className="shrink-0 text-xs font-bold tabular-nums text-zinc-500">
@@ -38,17 +47,29 @@ export default function XpBreakdown({ breakdown, tier, total }) {
                 <span className={`font-black ${visual.accent}`}>{formatXp(row.xp)}</span>
               </span>
             </div>
+            {/* La barra arranca su llenado cuando su fila ya está colocada, no
+                a la vez: primero se lee la cifra y después crece la barra. */}
             <div className="mt-1 h-[3px] overflow-hidden rounded-full bg-white/[0.05]">
               <div
-                className={`h-full rounded-full bg-gradient-to-r ${visual.bar} opacity-80`}
-                style={{ width: `${Math.max(2, Math.round((row.xp / max) * 100))}%` }}
+                className={`sv-level-bar h-full rounded-full bg-gradient-to-r ${visual.bar} opacity-80`}
+                style={{
+                  // Ancho en línea además de en la custom property: sin la hoja
+                  // cargada, un div de bloque sin `width` ocuparía el 100% y
+                  // todas las filas parecerían iguales. Ver `.sv-level-bar`.
+                  width: `${Math.max(2, Math.round((row.xp / max) * 100))}%`,
+                  "--sv-level-bar-width": `${Math.max(2, Math.round((row.xp / max) * 100))}%`,
+                  "--sv-level-delay": `${rowDelay(index) + 110}ms`,
+                }}
               />
             </div>
           </li>
         ))}
       </ul>
 
-      <div className="mt-4 flex items-baseline justify-between border-t border-white/10 pt-3">
+      <div
+        className="sv-level-rise mt-4 flex items-baseline justify-between border-t border-white/10 pt-3"
+        style={{ "--sv-level-delay": `${rowDelay(rows.length) + 60}ms` }}
+      >
         <span className="text-xs font-bold uppercase tracking-widest text-zinc-400">
           Experiencia total
         </span>

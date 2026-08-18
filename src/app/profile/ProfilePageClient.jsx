@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import { useSelectedLayoutSegment, useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import DetailModalProvider from "@/components/dashboard/DetailModalProvider";
 import ProfileClient from "@/app/u/[username]/ProfileClient";
@@ -29,12 +28,15 @@ export default function ProfilePageClient({ children }) {
   // pasar de /profile a /profile/[section].
   if (!isProfileRoute) return children;
 
+  // SIN ESTADO DE CARGA: el perfil aparece directamente en cuanto está listo.
+  // AuthContext restaura la sesión cacheada en un `useLayoutEffect`, o sea ANTES
+  // del paint, así que en un dispositivo ya usado esta rama ni se llega a ver: el
+  // primer frame trae ya el contenido. Cuando no hay sesión cacheada (o se está
+  // redirigiendo a /login) se deja el lienzo neutro, igual que hace
+  // `ProfilePendingSurface` en ProfileClient mientras llega el perfil: un spinner
+  // aquí solo añadiría un parpadeo antes de pintar lo mismo.
   if (!hydrated || !user?.username) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-black">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-400" />
-      </div>
-    );
+    return <div className="min-h-screen bg-black" aria-busy="true" />;
   }
 
   return (

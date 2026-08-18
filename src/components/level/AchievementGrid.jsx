@@ -38,7 +38,7 @@ function unlockedDate(value) {
   return date.toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
 }
 
-function AchievementCard({ achievement }) {
+function AchievementCard({ achievement, delay = 0 }) {
   const Icon = ICONS[achievement.icon] || Award;
   const rarity = rarityVisual(achievement.rarity);
   const unlocked = Boolean(achievement.unlocked);
@@ -47,11 +47,12 @@ function AchievementCard({ achievement }) {
 
   return (
     <li
-      className={`relative flex flex-col overflow-hidden rounded-2xl p-3.5 ring-1 transition duration-300 ${
+      className={`sv-level-rise relative flex flex-col overflow-hidden rounded-2xl p-3.5 ring-1 transition duration-300 ${
         unlocked
           ? `bg-gradient-to-br from-white/[0.09] to-white/[0.03] ${rarity.ring} hover:-translate-y-0.5`
           : "bg-white/[0.02] ring-white/[0.06]"
       }`}
+      style={{ "--sv-level-delay": `${delay}ms` }}
     >
       <div className="flex items-start gap-2.5">
         <span
@@ -90,7 +91,16 @@ function AchievementCard({ achievement }) {
               {formatXp(achievement.progress?.current)} / {formatXp(achievement.progress?.threshold)}
             </p>
             <div className="mt-1 h-[2px] overflow-hidden rounded-full bg-white/[0.06]">
-              <div className="h-full rounded-full bg-zinc-500" style={{ width: `${percent}%` }} />
+              <div
+                className="sv-level-bar h-full rounded-full bg-zinc-500"
+                style={{
+                  // Ancho en línea además de en la custom property, para que el
+                  // avance del logro sea correcto aunque la hoja no aplique.
+                  width: `${percent}%`,
+                  "--sv-level-bar-width": `${percent}%`,
+                  "--sv-level-delay": `${delay + 140}ms`,
+                }}
+              />
             </div>
           </>
         )}
@@ -112,12 +122,23 @@ export default function AchievementGrid({ achievements }) {
 
   return (
     <div className="space-y-7">
-      {families.map((family) => {
+      {families.map((family, familyIndex) => {
         const group = byFamily.get(family);
         const unlocked = group.filter((item) => item.unlocked).length;
+        // Cada familia arranca un poco después que la anterior, y dentro de ella
+        // las tarjetas caen en cascada. Ambos escalonados van topados: la
+        // rejilla puede pasar de las veinte tarjetas y sin tope la última
+        // entraría cuando el usuario ya ha dejado de mirar.
+        // El grupo NO se envuelve en `sv-level-rise`: lo hacen su encabezado y
+        // sus tarjetas por separado, para no encadenar dos desvanecidos sobre
+        // la misma pieza.
+        const baseDelay = Math.min(familyIndex, 5) * 80;
         return (
           <section key={family}>
-            <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-2">
+            <div
+              className="sv-level-rise mb-3 flex items-center justify-between border-b border-white/10 pb-2"
+              style={{ "--sv-level-delay": `${baseDelay}ms` }}
+            >
               <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400">
                 {ACHIEVEMENT_FAMILY_LABELS[family]}
               </h3>
@@ -126,8 +147,12 @@ export default function AchievementGrid({ achievements }) {
               </span>
             </div>
             <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
-              {group.map((item) => (
-                <AchievementCard key={item.id} achievement={item} />
+              {group.map((item, index) => (
+                <AchievementCard
+                  key={item.id}
+                  achievement={item}
+                  delay={baseDelay + 70 + Math.min(index, 11) * 30}
+                />
               ))}
             </ul>
           </section>

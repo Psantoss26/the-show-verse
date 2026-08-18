@@ -29,6 +29,45 @@ const nextConfig: NextConfig = {
   // Salida "standalone" para autoalojar en Docker (imagen mínima con server.js).
   // Vercel la ignora sin problema, así que es seguro para ambos despliegues.
   output: "standalone",
+
+  // NINGÚN DOCUMENTO (HTML/RSC) SE CACHEA EN CLOUDFLARE ENTRE DESPLIEGUES.
+  //
+  // Next marca las páginas PRERRENDERIZADAS con `Cache-Control: s-maxage=31536000`
+  // (un año) y las ISR con `stale-while-revalidate=31535700`. Eso está pensado
+  // para un CDN que se PURGA en cada despliegue (Vercel). Aquí el origen es el
+  // NAS detrás del túnel de Cloudflare, que NO purga nada: el edge se quedaba
+  // con el HTML de un build viejo durante días (`cf-cache-status: HIT`,
+  // `age: 527830` = 6 días medidos en /profile) y lo seguía sirviendo después de
+  // desplegar.
+  //
+  // Ese documento viejo pide los chunks de SU build (`/_next/static/chunks/…`),
+  // que ya no existen en la imagen nueva y devuelven 404. La página nunca
+  // hidrata. En /profile/settings el HTML prerenderizado es justo el spinner
+  // (el cliente decide qué pintar tras leer la sesión), así que el síntoma era
+  // "Configuración se queda cargando para siempre"; y los 404 de los chunks
+  // aparecían como "página no encontrada".
+  //
+  // La cabecera propia GANA: Next solo pone la suya si la respuesta no trae ya
+  // una (`server/send-payload.js`: `if (cacheControl && !res.getHeader(...))`).
+  // Con `max-age=0, must-revalidate` el edge puede seguir guardando el objeto,
+  // pero revalida SIEMPRE contra el NAS (ETag → 304), así que nunca sirve el
+  // documento de un despliegue anterior.
+  //
+  // Se excluyen:
+  //   - `/_next/…`: los chunks llevan hash en el nombre, son inmutables y DEBEN
+  //     seguir cacheándose (es lo que hace que la web vuele).
+  //   - `/api/…`: respuestas por usuario; ya salen como `DYNAMIC` en Cloudflare
+  //     y cada ruta fija su propia política. No tocarlas.
+  async headers() {
+    return [
+      {
+        source: "/((?!_next/|api/).*)",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=0, must-revalidate" },
+        ],
+      },
+    ];
+  },
   experimental: {
     viewTransition: true,
   },

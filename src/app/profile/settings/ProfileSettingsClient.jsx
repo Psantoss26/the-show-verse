@@ -1726,7 +1726,14 @@ function ProfileSettingsClient() {
   };
 
   // Hook up dynamic saving feedback
+  //
+  // La PRIMERA carga de preferencias no es un guardado. Antes daba igual porque
+  // quedaba tapada por el spinner de pantalla completa; ahora el contenido se ve
+  // desde el principio y, sin este corte, al entrar en Configuración aparecería
+  // "Guardando → Guardado" sin que el usuario haya tocado nada.
+  // `preferencesReady` solo es falso durante esa carga inicial.
   useEffect(() => {
+    if (!preferencesReady) return;
     if (loadingPreferences) {
       setSaving(true);
       setSaved(false);
@@ -1736,15 +1743,25 @@ function ProfileSettingsClient() {
       const timer = setTimeout(() => setSaved(false), 1800);
       return () => clearTimeout(timer);
     }
-  }, [loadingPreferences]);
+  }, [loadingPreferences, preferencesReady]);
 
-  if (!hydrated || (authenticated && !preferencesReady)) {
+  // SIN ESTADO DE CARGA. Dos cambios respecto a la versión con spinner:
+  //
+  //  - Ya NO se espera a `preferencesReady`. `preferences` arranca desde la
+  //    instantánea de localStorage (AuthContext las inicializa con
+  //    `readAuthPreferencesCache`), así que los ajustes se pintan con el último
+  //    valor conocido y se revalidan en segundo plano: el mismo
+  //    stale-while-revalidate que ya usa el resto de la app. De paso desaparece
+  //    el bloqueo real que tenía esta pantalla: si la sesión entraba en el bucle
+  //    de reintentos de AuthContext, la espera podía llegar al minuto.
+  //  - Mientras no hay hidratación se deja solo el fondo, sin indicador. Ese
+  //    primer render TIENE que coincidir con el HTML del servidor, pero
+  //    `hydrated` se activa en un `useLayoutEffect` (antes del paint), así que
+  //    con sesión cacheada esta rama no llega a verse.
+  if (!hydrated) {
     return (
-      <main className="min-h-screen bg-black text-zinc-100 flex items-center justify-center relative">
+      <main className="relative min-h-screen bg-black text-zinc-100" aria-busy="true">
         <SettingsBackground />
-        <div className="relative z-10 flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-emerald-400" />
-        </div>
       </main>
     );
   }

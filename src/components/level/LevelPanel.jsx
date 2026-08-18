@@ -14,9 +14,12 @@ import XpBreakdown from "./XpBreakdown";
 import AchievementGrid from "./AchievementGrid";
 import { formatXp, tierVisual } from "@/lib/level/tiers.mjs";
 
-function StatCell({ value, label }) {
+function StatCell({ value, label, delay = 0 }) {
   return (
-    <div className="rounded-2xl bg-gradient-to-br from-white/[0.08] to-white/[0.03] px-4 py-3 text-center">
+    <div
+      className="sv-level-rise rounded-2xl bg-gradient-to-br from-white/[0.08] to-white/[0.03] px-4 py-3 text-center"
+      style={{ "--sv-level-delay": `${delay}ms` }}
+    >
       <span className="block text-xl font-black tracking-tight text-white sm:text-2xl">{value}</span>
       <span className="mt-0.5 block text-[9px] font-bold uppercase tracking-widest text-zinc-400 sm:text-[10px]">
         {label}
@@ -58,8 +61,11 @@ export default function LevelPanel({ username, initialSummary = null }) {
   const shown = level || initialSummary;
   const visual = tierVisual(shown?.tier);
 
+  // Sin estado de carga: se reserva el hueco para que la entrada del panel no
+  // desplace lo que hay debajo, pero sin latido ni indicador. El contenido
+  // aparece animado en cuanto está.
   if (!shown && status === "loading") {
-    return <div className="mt-8 h-64 animate-pulse rounded-[2rem] bg-white/[0.03]" />;
+    return <div className="mt-8 h-64" aria-busy="true" />;
   }
 
   if (!shown) {
@@ -83,20 +89,34 @@ export default function LevelPanel({ username, initialSummary = null }) {
   return (
     <div className="mt-8 space-y-8">
       {/* ── Cabecera: la insignia manda ── */}
-      <section className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-white/[0.09] to-white/[0.03] p-5 sm:p-7">
+      {/* El recuadro entra como una pieza y, dentro, la insignia, el rótulo, la
+          barra y las cifras se escalonan detrás. Los retardos son relativos a
+          este bloque, que se pinta en el primer frame con el resumen que ya
+          traía el perfil. */}
+      <section className="sv-level-rise overflow-hidden rounded-[2rem] bg-gradient-to-br from-white/[0.09] to-white/[0.03] p-5 sm:p-7">
         {/* items-stretch: la insignia `fill` toma el alto de esta fila, que lo
             marca la columna de información de su derecha. */}
         <div className="flex flex-wrap items-stretch gap-5">
-          <LevelBadge level={shown.level} tier={shown.tier} size="fill" />
+          <div className="sv-level-rise flex" style={{ "--sv-level-delay": "90ms" }}>
+            <LevelBadge level={shown.level} tier={shown.tier} size="fill" />
+          </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">
+            <p
+              className="sv-level-rise text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500"
+              style={{ "--sv-level-delay": "130ms" }}
+            >
               Nivel {shown.level} de {progress?.maxLevel || 40}
             </p>
-            <h2 className={`mt-0.5 text-[clamp(1.6rem,5vw,2.5rem)] font-black leading-none tracking-[-0.04em] ${visual.accent}`}>
+            <h2
+              className={`sv-level-rise mt-0.5 text-[clamp(1.6rem,5vw,2.5rem)] font-black leading-none tracking-[-0.04em] ${visual.accent}`}
+              style={{ "--sv-level-delay": "160ms" }}
+            >
               {visual.name}
             </h2>
             <LevelProgress
-              className="mt-3 max-w-md"
+              className="sv-level-rise mt-3 max-w-md"
+              style={{ "--sv-level-delay": "200ms" }}
+              barDelay={320}
               level={shown.level}
               tier={shown.tier}
               progress={progress}
@@ -106,17 +126,21 @@ export default function LevelPanel({ username, initialSummary = null }) {
         </div>
 
         <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-          <StatCell value={formatXp(shown.xp)} label="Experiencia" />
+          <StatCell value={formatXp(shown.xp)} label="Experiencia" delay={260} />
           <StatCell
             value={`${level?.achievements?.unlockedCount ?? shown.achievementsUnlocked ?? 0}/${level?.achievements?.total ?? shown.achievementsTotal ?? 0}`}
             label="Logros"
+            delay={305}
           />
-          <StatCell value={streaks?.longest ?? "—"} label="Mejor racha" />
-          <StatCell value={streaks?.activeDays ?? "—"} label="Días activos" />
+          <StatCell value={streaks?.longest ?? "—"} label="Mejor racha" delay={350} />
+          <StatCell value={streaks?.activeDays ?? "—"} label="Días activos" delay={395} />
         </div>
 
         {streaks?.current > 0 && (
-          <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-orange-400/10 px-3 py-1 text-xs font-bold text-orange-300">
+          <p
+            className="sv-level-rise mt-3 inline-flex items-center gap-1.5 rounded-full bg-orange-400/10 px-3 py-1 text-xs font-bold text-orange-300"
+            style={{ "--sv-level-delay": "450ms" }}
+          >
             <Flame className="h-3.5 w-3.5" aria-hidden="true" />
             {streaks.current} {streaks.current === 1 ? "día seguido" : "días seguidos"} con actividad
           </p>
@@ -125,13 +149,16 @@ export default function LevelPanel({ username, initialSummary = null }) {
 
       {/* ── De dónde sale el XP ── */}
       <section>
-        <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-2">
+        <div
+          className="sv-level-rise mb-3 flex items-center justify-between border-b border-white/10 pb-2"
+          style={{ "--sv-level-delay": "180ms" }}
+        >
           <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-400">
             De dónde sale la experiencia
           </h2>
         </div>
         {status === "loading" && !level ? (
-          <div className="h-48 animate-pulse rounded-2xl bg-white/[0.03]" />
+          <div className="h-48" aria-busy="true" />
         ) : (
           <XpBreakdown breakdown={level?.breakdown} tier={shown.tier} total={shown.xp} />
         )}
@@ -140,7 +167,7 @@ export default function LevelPanel({ username, initialSummary = null }) {
       {/* ── Logros ── */}
       {level?.achievements?.items?.length ? (
         <section>
-          <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-2">
+          <div className="sv-level-rise mb-4 flex items-center justify-between border-b border-white/10 pb-2">
             <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-400">Logros</h2>
             <span className="text-[10px] font-bold uppercase tracking-widest tabular-nums text-zinc-500">
               {level.achievements.unlockedCount} de {level.achievements.total}
