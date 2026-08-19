@@ -4,7 +4,10 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Loader2, Eye } from "lucide-react";
 import { useCenteredGlyphOffset } from "@/hooks/useCenteredGlyphOffset";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
-import { LIQUID_GLASS_CARD } from "@/lib/ui/liquidGlass";
+import {
+  LIQUID_GLASS_ELEVATION,
+  LIQUID_GLASS_SURFACE_CARD,
+} from "@/lib/ui/liquidGlass";
 
 /**
  * LiquidButton: Botón con efecto de gotas/cristal líquido
@@ -527,9 +530,24 @@ export default function LiquidButton({
   const proximityScale = proximityGlow > 0 ? 1 + proximityGlow * 0.04 : 1;
   const explosionScale = isExploding ? (isLabeled ? 1.05 : 1.08) : 1;
   const finalScale = Math.max(hoverScale, proximityScale) * explosionScale;
+  // ACABADO DE CRISTAL: la MISMA receta que el resto de la ficha, tomada de
+  // liquidGlass.js en vez de repetir aquí las clases. Así el marcador, las
+  // tarjetas de info y estos botones no pueden divergir.
+  //
+  // El cristal entra sin elevación (`_SURFACE_CARD`) y la elevación se añade
+  // aparte, porque el botón la enciende y la apaga por estado: `disabled` va sin
+  // sombra, y en hover/activo el `style` de abajo la sustituye por el resplandor
+  // de color. Se comprobó que la sombra de la familia NO emborrona esta fila:
+  // con nueve círculos de 52px separados 12px, los huecos pasan de 67.0 a 63.0
+  // de luminancia media, lejos del 106→73 que sí medía la columna de tarjetas.
+  // El halo blanco de esa sombra es justo lo que les faltaba para leerse del
+  // mismo material que el navbar y el menú de secciones.
   const surfaceClass = liquidGlass
-    ? LIQUID_GLASS_CARD
+    ? LIQUID_GLASS_SURFACE_CARD
     : "backdrop-blur-[50px] black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40";
+  const elevationClass = liquidGlass
+    ? LIQUID_GLASS_ELEVATION
+    : "shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]";
 
   return (
     <button
@@ -551,8 +569,8 @@ export default function LiquidButton({
           disabled
             ? "text-white/30 cursor-not-allowed"
             : active
-              ? "shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]"
-              : "shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200 hover:bg-white/10 hover:text-white"
+              ? elevationClass
+              : `${elevationClass} text-zinc-200 hover:bg-white/10 hover:text-white`
         }
         ${
           isExploding
