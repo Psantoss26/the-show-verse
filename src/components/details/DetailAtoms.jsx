@@ -3,7 +3,7 @@
 import OptimizedImage from "@/components/OptimizedImage";
 import { motion } from "framer-motion";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
-import { LIQUID_GLASS_CARD } from "@/lib/ui/liquidGlass";
+import { LIQUID_GLASS_BAR, LIQUID_GLASS_CARD } from "@/lib/ui/liquidGlass";
 
 export function VisualMetaCard({
   icon: Icon,
@@ -210,6 +210,56 @@ export function StatChip({ icon: Icon, label, value }) {
   );
 }
 
+// MENÚ DE PESTAÑAS de la ficha (Detalles · Producción · Sinopsis · Plataformas
+// · Premios). Compartido por la ficha completa, la ficha rápida del dashboard,
+// temporadas y episodios: cambiarlo aquí lo cambia en las cuatro.
+//
+// EL PROBLEMA: era texto suelto sobre la imagen —la activa en blanco y las demás
+// en `text-zinc-500`—. Sobre un backdrop OSCURO se leía, pero sobre un cartel
+// claro ese gris medio quedaba a un paso del fondo y las pestañas no
+// seleccionadas desaparecían: solo se veía la activa, así que el menú no parecía
+// un menú y no había forma de saber que había más secciones.
+//
+// DOS ACABADOS, UNO POR VIEWPORT, y el corte es `sm` (640px) porque es el mismo
+// que usa DetailsClient para decidir entre su diseño móvil y el de escritorio:
+//
+//   MÓVIL: cristal, y es EXACTAMENTE el de DetailsSectionMenu —el menú de
+//   secciones que va justo debajo en la misma pantalla—: mismo token
+//   (`LIQUID_GLASS_BAR`), mismo `rounded-2xl`, las mismas capas ópticas y el
+//   mismo `transform-gpu`. Los dos menús se ven a la vez, así que cualquier
+//   desviación (un tinte más oscuro, otro radio) se lee como un error, no como
+//   una variante. Por eso reutiliza el token y NO uno propio.
+//
+//   ESCRITORIO: la tira de siempre —sin fondo, con la línea inferior— porque el
+//   menú vive dentro de una columna ya delimitada por el scoreboard de arriba y
+//   las tarjetas de abajo, y un cristal más ahí solo añade peso.
+//
+// CÓMO SE APAGA EL CRISTAL EN `sm`, y por qué así: cuatro utilidades que anulan
+// una PROPIEDAD entera cada una (`bg-transparent`, `bg-none`,
+// `[backdrop-filter:none]`, `shadow-none`). No enumeran las clases del token, así
+// que si mañana LIQUID_GLASS_BAR cambia de tinte o de desenfoque, el escritorio
+// sigue apagándolo entero sin tocar nada aquí.
+//
+// EL CRISTAL VA EN EL PROPIO CONTENEDOR, no en una capa hija, y esto NO es
+// indiferente: `isolate` convierte al contenedor en backdrop root, así que el
+// `backdrop-filter` de un hijo no tendría fondo que muestrear y el desenfoque no
+// se aplicaría. Medido en Chromium con `backdrop-filter: invert(1)`: en la capa
+// hija no invierte nada; en el contenedor sí. (Dentro del bloque móvil de
+// DetailsClient tampoco surte efecto, porque ese bloque ya es backdrop root por
+// su `transform-gpu` + `will-change` — ahí el cristal lo sostienen el tinte, el
+// degradado y la sombra, y a DetailsSectionMenu le pasa exactamente lo mismo.)
+//
+// LO QUE SOSTIENE LA LEGIBILIDAD EN AMBOS, ya sin depender del fondo:
+//   1) COLOR: activa en blanco puro, inactivas en `text-white/70`. Blanco al 70%
+//      es MÁS claro que el `zinc-500` anterior y a la vez se distingue del 100%
+//      de la activa, así que sube el contraste sin borrar la jerarquía.
+//   2) HALO OSCURO en todas: el `drop-shadow` anterior (alfa 0.4) apenas
+//      despegaba las letras. Dos sombras —una cerrada para el filo y otra
+//      abierta para el halo— dibujan un borde oscuro alrededor del texto, y eso
+//      es lo que hace legible el blanco sobre un cartel claro. En móvil es
+//      además lo que compensa que este cristal tiña menos que un panel opaco.
+//   3) SUBRAYADO ÁMBAR, intacto: sigue siendo el indicador principal y conserva
+//      su animación compartida (`layoutId`).
 export function DetailsTabsMenu({
   tabs,
   activeTab,
@@ -217,16 +267,27 @@ export function DetailsTabsMenu({
   layoutId = "activeTabIndicator",
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-6 md:gap-8 border-b border-white/10 w-full mb-4 px-2 pb-0 relative">
+    <div
+      className={`relative isolate mb-4 flex w-full flex-wrap items-center gap-x-6 gap-y-0 overflow-hidden rounded-2xl px-4 py-1 max-sm:transform-gpu md:gap-x-8 ${LIQUID_GLASS_BAR} sm:rounded-none sm:border-b sm:border-white/10 sm:bg-transparent sm:bg-none sm:px-2 sm:py-0 sm:shadow-none sm:[backdrop-filter:none]`}
+    >
+      {/* Capas ópticas del cristal, las mismas de DetailsSectionMenu. Solo móvil:
+          en escritorio no hay cristal que rematar. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 rounded-[inherit] sm:hidden"
+      >
+        <LiquidGlassOpticalLayers />
+      </div>
+
       {tabs.map((tab) => (
         <button
           key={tab.id}
           type="button"
           onClick={() => onChangeTab(tab.id)}
-          className={`relative pb-2 text-xs md:text-sm font-bold uppercase tracking-wider transition-colors duration-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)] ${
+          className={`relative z-10 rounded-md px-0.5 pb-2 pt-2 text-xs font-bold uppercase tracking-wider transition-colors duration-300 [text-shadow:0_1px_2px_rgba(0,0,0,0.9),0_0_10px_rgba(0,0,0,0.6)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 sm:pt-0 md:text-sm ${
             activeTab === tab.id
               ? "text-white font-extrabold"
-              : "text-zinc-500 hover:text-zinc-300"
+              : "text-white/70 hover:text-white"
           }`}
         >
           <span className="relative z-10">{tab.label}</span>
@@ -234,7 +295,7 @@ export function DetailsTabsMenu({
           {activeTab === tab.id && (
             <motion.div
               layoutId={layoutId}
-              className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-yellow-500 to-amber-500 rounded-full shadow-[0_1.5px_6px_rgba(245,158,11,0.5)] z-20"
+              className="absolute bottom-0.5 left-0 right-0 h-0.5 bg-gradient-to-r from-yellow-500 to-amber-500 rounded-full shadow-[0_1.5px_6px_rgba(245,158,11,0.5)] z-20 sm:bottom-0"
               transition={{ type: "spring", stiffness: 380, damping: 30 }}
             />
           )}
