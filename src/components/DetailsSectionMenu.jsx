@@ -3,7 +3,7 @@
 import React, { useMemo, useRef, useLayoutEffect, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
-import { LIQUID_GLASS_BAR } from "@/lib/ui/liquidGlass";
+import { LIQUID_GLASS_SURFACE } from "@/lib/ui/liquidGlass";
 
 export default function DetailsSectionMenu({
   items = [],
@@ -115,15 +115,14 @@ export default function DetailsSectionMenu({
     >
       <nav className={["mx-auto w-full", maxWidthClass].join(" ")}>
         <div
-          // Mismo cristal que el Scoreboard y los paneles de la ficha: base
-          // LIQUID_GLASS_BAR + las capas ópticas en su versión contenida (canto
-          // al brillo del propio cristal, reflejos a la mitad). Con la variante
-          // PLANA la barra se veía transparente y sin cuerpo sobre el backdrop.
-          className={[
-            "relative isolate overflow-hidden rounded-2xl",
-            LIQUID_GLASS_BAR,
-            "transform-gpu",
-          ].join(" ")}
+          // Mismo cristal que el Scoreboard, las pestañas y las tarjetas de la
+          // ficha: `LIQUID_GLASS_SURFACE` (base LIQUID_GLASS_BAR + envoltura) más
+          // las capas ópticas en su versión contenida (canto al brillo del propio
+          // cristal, reflejos a la mitad). Con la variante PLANA la barra se veía
+          // transparente y sin cuerpo sobre el backdrop. Esta es la pieza de
+          // REFERENCIA: el resto de superficies de la ficha copian de aquí, y por
+          // eso comparten constante en vez de repetir las clases.
+          className={["rounded-2xl", LIQUID_GLASS_SURFACE].join(" ")}
           style={{ contain: "layout style" }}
         >
           <LiquidGlassOpticalLayers />

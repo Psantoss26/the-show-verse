@@ -37,7 +37,7 @@ import {
   ActionShareButton,
 } from "@/components/details/DetailHeaderBits";
 import { formatShortNumber } from "@/lib/details/formatters";
-import { LIQUID_GLASS_BAR } from "@/lib/ui/liquidGlass";
+import { LIQUID_GLASS_SURFACE } from "@/lib/ui/liquidGlass";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 
 // Badge de estadística de Trakt (Watchers, Plays, Lists, Favorited).
@@ -496,7 +496,7 @@ export default function DetailsScoreboardPanel({
 
   return (
     <div
-      className={`relative isolate w-full overflow-hidden rounded-2xl ${LIQUID_GLASS_BAR} ${className}`}
+      className={`w-full rounded-2xl ${LIQUID_GLASS_SURFACE} ${className}`}
     >
       {/* Refracción, reflejo especular y luz difusa compartidos con InfoTabs. */}
       <LiquidGlassOpticalLayers />

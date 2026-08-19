@@ -118,12 +118,13 @@ export default function ExternalLinksModal({ open, onClose, links }) {
                                             }}
                                         >
                                             {/* Misma tarjeta de cristal que las de
-                                                información de la ficha (VisualMetaCard
-                                                con `liquidGlass`): LIQUID_GLASS_CARD
-                                                —sin sombra, para que en grupo no formen
-                                                una banda oscura detrás— y las capas
-                                                ópticas, que son las que dan el canto y
-                                                el relieve. */}
+                                                información de la ficha (VisualMetaCard),
+                                                pero con LIQUID_GLASS_CARD en vez de la
+                                                variante con sombra: aquí van en REJILLA
+                                                dentro de un modal, y en grupo cerrado las
+                                                sombras se solapan y forman una banda
+                                                oscura detrás. Las capas ópticas sí son
+                                                las mismas: dan el canto y el relieve. */}
                                             <a
                                                 href={it.href}
                                                 target="_blank"

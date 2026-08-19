@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 
 import {
-  VisualMetaCard as BaseVisualMetaCard,
+  VisualMetaCard,
   DetailsTabsMenu,
 } from "@/components/details/DetailAtoms";
 import AwardsPanel from "@/components/details/AwardsPanel";
@@ -39,16 +39,12 @@ import OptimizedImage from "@/components/OptimizedImage";
 import { ExternalLinkButton } from "@/components/details/DetailHeaderBits";
 import { getStatusLabel } from "@/components/details/DetailsMetaGenresRow";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
-import { LIQUID_GLASS_BAR } from "@/lib/ui/liquidGlass";
-
-function VisualMetaCard(props) {
-  return <BaseVisualMetaCard {...props} liquidGlass />;
-}
+import { LIQUID_GLASS_SURFACE } from "@/lib/ui/liquidGlass";
 
 function InfoGlassPanel({ children, className = "" }) {
   return (
     <div
-      className={`relative isolate overflow-hidden rounded-xl ${LIQUID_GLASS_BAR} ${className}`}
+      className={`rounded-2xl ${LIQUID_GLASS_SURFACE} ${className}`}
     >
       <LiquidGlassOpticalLayers />
       <div className="relative z-10">{children}</div>

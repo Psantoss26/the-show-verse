@@ -77,6 +77,36 @@ export const LIQUID_GLASS_CARD =
 
 export const LIQUID_GLASS_BAR =
   "bg-black/15 bg-gradient-to-b from-white/[0.14] via-white/[0.03] to-black/15 backdrop-blur-[7px] backdrop-saturate-[190%] backdrop-brightness-[1.06] shadow-[0_16px_40px_-8px_rgba(0,0,0,0.75),0_0_32px_rgba(255,255,255,0.06)]";
+// ENVOLTURA del acabado de barra: las clases que SIEMPRE acompañan a
+// LIQUID_GLASS_BAR, extraídas de DetailsSectionMenu, que es la pieza de
+// referencia de la ficha.
+//
+// Cada una está por un motivo concreto, y ninguna es decorativa:
+//   - `relative isolate`: posiciona las capas ópticas y aísla el interior. OJO,
+//     `isolate` convierte al elemento en BACKDROP ROOT, así que el
+//     `backdrop-filter` tiene que ir en ESTE elemento, nunca en un hijo: medido
+//     en Chromium, un hijo con `backdrop-filter: invert(1)` bajo un padre con
+//     `isolate` no invierte nada.
+//   - `overflow-hidden`: recorta las capas ópticas al radio de la pieza.
+//   - `transform-gpu`: viene de DetailsSectionMenu, donde está para promover la
+//     capa. OJO: en este Tailwind v4 esa utilidad NO genera ninguna regla
+//     —medido en el CSS servido: 0 reglas con ese selector, y el `transform`
+//     computado de las piezas que la llevan es `none`—, así que hoy no hace
+//     nada. Se mantiene para que la lista de clases sea LITERALMENTE la misma
+//     que la de la pieza de referencia; si algún día se sustituye por algo que
+//     sí promueva, cambia aquí para todas a la vez.
+//
+// El RADIO no entra aquí: es forma, y la pone cada superficie (todas las de la
+// ficha usan `rounded-2xl`). Las capas ópticas tampoco, porque son un elemento:
+// hay que pintar <LiquidGlassOpticalLayers /> como primer hijo.
+export const LIQUID_GLASS_SURFACE = `relative isolate overflow-hidden transform-gpu ${LIQUID_GLASS_BAR}`;
 
-
-
+// La MISMA envoltura, sobre el cristal sin sombra: para tarjetas que van en
+// GRUPO (las de metadatos de la ficha, temporada, episodio y el modal del
+// dashboard). Tinte, desenfoque, saturación y capas ópticas idénticos a
+// LIQUID_GLASS_SURFACE; lo único que cambia es la elevación, y no por gusto:
+// apiladas en columna con 12px de separación, las sombras de cada tarjeta
+// rellenan los huecos y el grupo deja de leerse como piezas sueltas sobre el
+// cartel para parecer un panel oscuro con separadores (verificado en la columna
+// móvil de la ficha). Es el mismo motivo por el que existe LIQUID_GLASS_CARD.
+export const LIQUID_GLASS_SURFACE_CARD = `relative isolate overflow-hidden transform-gpu ${LIQUID_GLASS_CARD}`;
