@@ -75,8 +75,18 @@ export const LIQUID_GLASS_BAR_FLAT =
 export const LIQUID_GLASS_CARD =
   "bg-black/15 bg-gradient-to-b from-white/[0.14] via-white/[0.03] to-black/15 backdrop-blur-[7px] backdrop-saturate-[190%] backdrop-brightness-[1.06]";
 
-export const LIQUID_GLASS_BAR =
-  "bg-black/15 bg-gradient-to-b from-white/[0.14] via-white/[0.03] to-black/15 backdrop-blur-[7px] backdrop-saturate-[190%] backdrop-brightness-[1.06] shadow-[0_16px_40px_-8px_rgba(0,0,0,0.75),0_0_32px_rgba(255,255,255,0.06)]";
+// La ELEVACIÓN de la familia, suelta: sombra amplia hacia abajo más un halo
+// blanco tenue alrededor. Ese halo es la mitad de la firma —es lo que separa la
+// pieza del fondo sin dibujarle un borde—, así que quien quiera parecerse a la
+// barra lo necesita. Va aparte porque hay superficies que toman el cristal SIN
+// la elevación (las tarjetas en grupo) y otras que la quieren sobre una forma
+// propia (los botones de acción, redondos).
+export const LIQUID_GLASS_ELEVATION =
+  "shadow-[0_16px_40px_-8px_rgba(0,0,0,0.75),0_0_32px_rgba(255,255,255,0.06)]";
+
+// BAR = CARD + ELEVATION. Antes eran dos cadenas literales con el mismo cristal
+// escrito dos veces; componerla evita que una se quede atrás al tocar la otra.
+export const LIQUID_GLASS_BAR = `${LIQUID_GLASS_CARD} ${LIQUID_GLASS_ELEVATION}`;
 // ENVOLTURA del acabado de barra: las clases que SIEMPRE acompañan a
 // LIQUID_GLASS_BAR, extraídas de DetailsSectionMenu, que es la pieza de
 // referencia de la ficha.
