@@ -1027,6 +1027,9 @@ function SearchBar({
             {showFilterMenu && filterMenuPosition && (
               <motion.div
                 ref={filterMenuRef}
+                // Marca para que Navbar sepa que esto es "dentro" de la barra
+                // aunque el portal lo saque del árbol (ver su handler de cierre).
+                data-search-portal=""
                 id={filterMenuId}
                 role="menu"
                 aria-label={t("search_filter_menu", "Filtros de búsqueda")}
@@ -1110,6 +1113,10 @@ function SearchBar({
                 <motion.div
                   ref={dropdownRef}
                   id={dropdownId}
+                  // Ver `data-search-portal` en el menú de filtros: sin esta
+                  // marca, pulsar un resultado replegaba la barra antes de que
+                  // el click llegase al enlace.
+                  data-search-portal=""
                   initial={{ opacity: 0, y: -10, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -10, scale: 0.98 }}
@@ -1858,11 +1865,28 @@ export default function Navbar() {
   // La barra de busqueda de escritorio se repliega al pulsar FUERA de ella:
   // en el navbar, en la pagina, donde sea. Al desplegarse en linea no hay un
   // velo que capture el clic, asi que se escucha en el documento.
+  //
+  // "FUERA" NO INCLUYE SUS DESPLEGABLES: la lista de resultados y el menú de
+  // filtros se pintan con `createPortal` al final del body, así que no cuelgan
+  // de `desktopSearchRef` y un clic en ellos contaba como clic fuera. Como esto
+  // escucha `pointerdown` —que va ANTES que el click—, al pulsar un resultado la
+  // barra se replegaba, el portal se desmontaba y el click nunca llegaba a su
+  // enlace: la búsqueda se cerraba sin navegar a nada. Es el mismo motivo por el
+  // que el desplegable de Perfil tiene su segundo ref (`profileMenuPanelRef`)
+  // unas líneas más abajo; aquí no sirve un ref porque los desplegables son de
+  // SearchBar, otro componente.
   const desktopSearchRef = useRef(null);
   useEffect(() => {
     if (!desktopSearchOpen) return undefined;
     const fuera = (e) => {
-      if (!desktopSearchRef.current?.contains(e.target)) setDesktopSearchOpen(false);
+      if (desktopSearchRef.current?.contains(e.target)) return;
+      // Los desplegables de la barra (resultados y filtros) se pintan con
+      // `createPortal` al final del body, así que NO cuelgan de la barra: sus
+      // raíces se marcan con `data-search-portal` desde SearchBar y aquí se
+      // consultan por el DOM. Con los refs no vale, porque viven en OTRO
+      // componente (SearchBar) y desde Navbar ni existen.
+      if (e.target instanceof Element && e.target.closest("[data-search-portal]")) return;
+      setDesktopSearchOpen(false);
     };
     document.addEventListener("pointerdown", fuera);
     return () => document.removeEventListener("pointerdown", fuera);
