@@ -48,6 +48,7 @@ import {
 } from "@/components/details/AnimatedSection";
 import { ExternalLinkButton } from "@/components/details/DetailHeaderBits";
 import DetailsSectionMenu from "./DetailsSectionMenu";
+import { careerRange, formatCareerRange } from "@/lib/actor/careerRange";
 
 /* --- CONFIG & UTILS --- */
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
@@ -141,6 +142,10 @@ const normalizeKnownForItem = (item) => {
     subtitle: "",
   };
 };
+
+function normalizeWatchedCredits(items) {
+  return (Array.isArray(items) ? items : []).filter((item) => item?.poster_path);
+}
 
 function cleanAwardTitle(name) {
   return String(name || "")
@@ -1406,6 +1411,7 @@ export default function ActorDetails({
   actorDetails,
   actorMovies,
   initialKnownFor = [],
+  initialWatchedCredits = [],
 }) {
   const personId = actorDetails?.id;
   const contentTopRef = useRef(null);
@@ -1447,7 +1453,9 @@ export default function ActorDetails({
       .map(normalizeKnownForItem)
       .filter((item) => item?.poster_path),
   );
-  const [watchedCredits, setWatchedCredits] = useState([]);
+  const [watchedCredits, setWatchedCredits] = useState(() =>
+    normalizeWatchedCredits(initialWatchedCredits),
+  );
 
   // Filter States (Créditos)
   const [q, setQ] = useState("");
@@ -1896,13 +1904,16 @@ export default function ActorDetails({
     [creditsAll],
   );
 
-  const careerYears = useMemo(() => {
-    const years = creditsAll.map((x) => x.year).filter((y) => y > 0);
-    if (!years.length) return "—";
-    const min = Math.min(...years);
-    const max = Math.max(...years);
-    return min === max ? String(min) : `${min} - ${max}`;
-  }, [creditsAll]);
+  // Los créditos de TV se fechan con el estreno de la SERIE, no con el episodio
+  // en el que sale la persona, así que una aparición suelta en una gala o un
+  // programa diario arrastraba el inicio de la trayectoria décadas atrás (ver
+  // careerRange.js, con los casos medidos). La regla y su porqué viven en el
+  // helper, que además está cubierto por tests.
+  const careerYears = useMemo(
+    () =>
+      formatCareerRange(careerRange(creditsAll, actorDetails?.birthday)),
+    [creditsAll, actorDetails?.birthday],
+  );
 
   const mostPopularCredit = useMemo(() => {
     const knownForFirst = tmdbKnownFor.find((item) => item?.poster_path);
