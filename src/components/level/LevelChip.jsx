@@ -11,20 +11,17 @@ export default function LevelChip({ level, tier, className = "" }) {
 
   return (
     <span
-      className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-bold leading-none ${visual.chip} ${className}`}
+      className={`inline-flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-1 text-[10px] font-bold leading-none tabular-nums ${visual.chip} ${className}`}
+      aria-label={`Nivel ${shownLevel}, rango ${visual.name}`}
       title={`Nivel ${shownLevel} · ${visual.name}`}
     >
-      {/* Glifo de fotograma: la misma idea que la insignia grande, reducida a 8px */}
-      <svg viewBox="0 0 10 12" className="h-3 w-2.5" aria-hidden="true">
-        <rect x="0.6" y="0.6" width="8.8" height="10.8" rx="1.6" fill="none" stroke="currentColor" strokeWidth="1.2" />
-        <rect x="1.9" y="3" width="1.3" height="1.6" rx="0.4" fill="currentColor" />
-        <rect x="1.9" y="6.4" width="1.3" height="1.6" rx="0.4" fill="currentColor" />
-        <rect x="6.8" y="3" width="1.3" height="1.6" rx="0.4" fill="currentColor" />
-        <rect x="6.8" y="6.4" width="1.3" height="1.6" rx="0.4" fill="currentColor" />
+      {/* Fotograma compacto: identifica el sistema de nivel sin competir con el usuario. */}
+      <svg viewBox="0 0 12 12" className="h-3 w-3" aria-hidden="true">
+        <rect x="1" y="1" width="10" height="10" rx="1.75" fill="none" stroke="currentColor" strokeWidth="1.25" />
+        <path d="M3 3.25h1.25M7.75 3.25H9M3 8.75h1.25M7.75 8.75H9" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
       </svg>
-      <span>
-        <span className="sr-only">Nivel </span>
-        {shownLevel}
+      <span className="sv-level-chip-label">
+        Nivel <span className="text-white">{shownLevel}</span>
       </span>
     </span>
   );

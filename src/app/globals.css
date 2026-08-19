@@ -469,6 +469,15 @@ html:not([data-avatar-boot]) .avatar-boot-chevron {
   animation-delay: var(--sv-level-delay, 0ms);
 }
 
+/* El texto del chip de nivel queda centrado con el icono en los navegadores
+   que ya exponen las métricas tipográficas precisas. El line-height anterior
+   conserva la misma composición como fallback. */
+@supports (text-box: trim-both cap alphabetic) {
+  .sv-level-chip-label {
+    text-box: trim-both cap alphabetic;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sv-level-rise,
   .sv-level-bar {

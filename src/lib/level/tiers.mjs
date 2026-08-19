@@ -12,6 +12,8 @@
 export const LEVEL_TIER_VISUALS = Object.freeze({
   espectador: {
     name: "Espectador",
+    minLevel: 1,
+    maxLevel: 5,
     hex: "#a1a1aa",
     hexDeep: "#3f3f46",
     chip: "border-zinc-400/25 bg-zinc-400/10 text-zinc-200",
@@ -20,6 +22,8 @@ export const LEVEL_TIER_VISUALS = Object.freeze({
   },
   aficionado: {
     name: "Aficionado",
+    minLevel: 6,
+    maxLevel: 10,
     hex: "#38bdf8",
     hexDeep: "#0c4a6e",
     chip: "border-sky-400/25 bg-sky-400/10 text-sky-200",
@@ -28,6 +32,8 @@ export const LEVEL_TIER_VISUALS = Object.freeze({
   },
   cinefilo: {
     name: "Cinéfilo",
+    minLevel: 11,
+    maxLevel: 15,
     hex: "#34d399",
     hexDeep: "#064e3b",
     chip: "border-emerald-400/25 bg-emerald-400/10 text-emerald-200",
@@ -36,6 +42,8 @@ export const LEVEL_TIER_VISUALS = Object.freeze({
   },
   critico: {
     name: "Crítico",
+    minLevel: 16,
+    maxLevel: 20,
     hex: "#2dd4bf",
     hexDeep: "#134e4a",
     chip: "border-teal-400/25 bg-teal-400/10 text-teal-200",
@@ -44,6 +52,8 @@ export const LEVEL_TIER_VISUALS = Object.freeze({
   },
   coleccionista: {
     name: "Coleccionista",
+    minLevel: 21,
+    maxLevel: 25,
     hex: "#a78bfa",
     hexDeep: "#4c1d95",
     chip: "border-violet-400/25 bg-violet-400/10 text-violet-200",
@@ -51,7 +61,9 @@ export const LEVEL_TIER_VISUALS = Object.freeze({
     accent: "text-violet-300",
   },
   archivista: {
-    name: "Archivista",
+    name: "Experto",
+    minLevel: 26,
+    maxLevel: 30,
     hex: "#e879f9",
     hexDeep: "#701a75",
     chip: "border-fuchsia-400/25 bg-fuchsia-400/10 text-fuchsia-200",
@@ -60,6 +72,8 @@ export const LEVEL_TIER_VISUALS = Object.freeze({
   },
   maestro: {
     name: "Maestro",
+    minLevel: 31,
+    maxLevel: 35,
     hex: "#fbbf24",
     hexDeep: "#78350f",
     chip: "border-amber-400/25 bg-amber-400/10 text-amber-200",
@@ -68,6 +82,8 @@ export const LEVEL_TIER_VISUALS = Object.freeze({
   },
   leyenda: {
     name: "Leyenda",
+    minLevel: 36,
+    maxLevel: 40,
     hex: "#fcd34d",
     hexDeep: "#713f12",
     chip: "border-yellow-300/35 bg-yellow-300/10 text-yellow-100",

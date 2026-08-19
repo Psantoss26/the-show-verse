@@ -1529,6 +1529,39 @@ export default function DetailsClient({
   // -- Refs y estado para scroll horizontal de la galeria de imagenes --
   const imagesScrollRef = useRef(null);
   const contentTopRef = useRef(null);
+  // En una navegación desde la ficha rápida, la transición vive fuera de este
+  // componente (`DetailModal`). En una recarga esa capa no existe y las
+  // animaciones CSS podían agotarse mientras llegaban el HTML y los bundles,
+  // antes de que la ficha fuese visible/interactiva. Esta fase conserva la
+  // superficie de carga y activa la entrada cuando el cliente ya está listo.
+  const detailsEntryKey = `${endpointType}:${id}`;
+  const [detailsEntry, setDetailsEntry] = useState(() => ({
+    key: detailsEntryKey,
+    ready: false,
+  }));
+  const detailsEntryReady =
+    detailsEntry.key === detailsEntryKey && detailsEntry.ready;
+
+  useEffect(() => {
+    let firstFrame = 0;
+    let secondFrame = 0;
+
+    setDetailsEntry({ key: detailsEntryKey, ready: false });
+    firstFrame = window.requestAnimationFrame(() => {
+      // Dos frames garantizan que la capa de carga se haya pintado antes de
+      // revelar el contenido. Así la animación empieza después de hidratar,
+      // tanto al abrir la ficha como al usar Recargar.
+      secondFrame = window.requestAnimationFrame(() => {
+        setDetailsEntry({ key: detailsEntryKey, ready: true });
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
+    };
+  }, [detailsEntryKey]);
+
   // En móvil el alto real de los botones cambia con el ancho disponible y con
   // las acciones que tenga cada título. Se mide para que el hero termine justo
   // antes del navbar inferior, sin dejar metadatos entre ambos.
@@ -8909,8 +8942,21 @@ export default function DetailsClient({
   return (
     <div
       data-details-root
+      data-details-entry={detailsEntryReady ? "ready" : "loading"}
+      aria-busy={!detailsEntryReady}
       className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30"
     >
+      {/* Equivale a la superficie de `loading.jsx`, pero también cubre una
+          recarga directa, donde el servidor puede entregar DetailsClient antes
+          de que el navegador haya hidratado sus animaciones. */}
+      <div
+        aria-hidden="true"
+        className={`fixed inset-0 z-20 bg-[#101010] transition-opacity duration-200 motion-reduce:transition-none ${
+          detailsEntryReady
+            ? "pointer-events-none opacity-0"
+            : "pointer-events-auto opacity-100"
+        }`}
+      />
       {/* --- BACKGROUND & OVERLAY --- */}
       <div className="fixed inset-0 z-0 overflow-hidden bg-[#0a0a0a] pointer-events-none">
         {useBackdrop && heroBackgroundPath ? (
@@ -9016,7 +9062,7 @@ export default function DetailsClient({
                 superponen. Solo móvil (`sm:hidden`). */}
             <div
               className={`sv-mobile-poster-entry sm:hidden absolute top-0 inset-x-0 bg-cover bg-center poster-mobile-fade ${
-                currentLowLoaded
+                detailsEntryReady && currentLowLoaded
                   ? "sv-mobile-poster-reveal [opacity:calc(1_-_var(--sv-hero-scroll,0))]"
                   : "opacity-0"
               }`}
@@ -9791,7 +9837,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 // oculta el revelado por scroll con su propia opacidad, y
                 // `visibility` cortaría esa transición.
                 mobileActionsWaitForScroll ||
-                (currentLowLoaded && inProgressChecked)
+                (detailsEntryReady && currentLowLoaded && inProgressChecked)
                   ? ""
                   : "max-sm:invisible"
               }`}
@@ -9810,7 +9856,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           `${MOBILE_REVEAL_BASE} ${
                             mobileSecondaryVisible ? "" : MOBILE_REVEAL_HIDDEN
                           }`
-                        : currentLowLoaded && inProgressChecked
+                        : detailsEntryReady && currentLowLoaded && inProgressChecked
                           ? "sv-mobile-actions-reveal"
                           : ""
                     }
@@ -9884,7 +9930,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             {/* MÓVIL: los metadatos viven en pestañas tras el marcador, sin una
                 segunda fila de plataformas/estado/premios fuera de la jerarquía
                 informativa. */}
-            <div className="sv-details-entry sv-details-entry--tabs order-3 mb-2 w-full sm:hidden">
+            <div className={`${detailsEntryReady ? "sv-details-entry" : ""} sv-details-entry--tabs order-3 mb-2 w-full sm:hidden`}>
               {/* El revelado por posición va en una capa PROPIA, por dentro del
                   contenedor estable. Comparte señal con el marcador para que
                   ambos aparezcan y desaparezcan como una sola pieza, sin que
@@ -9953,7 +9999,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   externos y compartir) + estadísticas. Componente presentacional
                   compartido con DetailModal para que se vean IDÉNTICOS. */}
             <div
-              className={`sv-details-entry sv-details-entry--scoreboard order-2 sm:order-none ${isBackdropPoster ? "" : "mb-6"}`}
+              className={`${detailsEntryReady ? "sv-details-entry" : ""} sv-details-entry--scoreboard order-2 sm:order-none ${isBackdropPoster ? "" : "mb-6"}`}
             >
               <span
                 ref={mobileSecondaryTriggerRef}
@@ -10062,7 +10108,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             {/* Sistema de tabs para mostrar información adicional: Detalles, Producción y Sinopsis */}
             {/* Solo visible cuando NO estamos en modo backdrop (en ese modo se muestra más abajo) */}
             {!isBackdropPoster && (
-              <div className="sv-details-entry sv-details-entry--tabs hidden sm:order-none sm:block">
+              <div className={`${detailsEntryReady ? "sv-details-entry" : ""} sv-details-entry--tabs hidden sm:order-none sm:block`}>
                 <div>
                   {/* Sección de pestañas compartida con DetailModal (misma tarjetas).
                       variant="normal": Presupuesto/Recaudación/Canal con fallback "—"
@@ -10104,7 +10150,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
         {/* Tabs y contenido debajo de la tarjeta (solo cuando es backdrop) */}
         {isBackdropPoster && (
-          <div className="sv-details-entry sv-details-entry--tabs mt-8 hidden w-full sm:block lg:mt-6">
+          <div className={`${detailsEntryReady ? "sv-details-entry" : ""} sv-details-entry--tabs mt-8 hidden w-full sm:block lg:mt-6`}>
             {/* Sección de pestañas compartida con DetailModal (mismas tarjetas).
                 variant="backdrop": Presupuesto/Recaudación/Canal solo si hay valor
                 y tagline con comillas rectas. */}
