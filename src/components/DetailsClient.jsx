@@ -4275,6 +4275,9 @@ export default function DetailsClient({
     };
   }, [initialComments]);
   const [tComments, setTComments] = useState(() => initialCommentsState);
+  // Pestaña que corresponde a lo que hay ahora mismo en `tComments`, para
+  // distinguir un cambio de pestaña de una paginación (ver el cargador).
+  const commentsTabRef = useRef(tCommentsTab);
   const [commentProfileUsernames, setCommentProfileUsernames] = useState(
     () => new Map(),
   );
@@ -4506,6 +4509,32 @@ export default function DetailsClient({
     let seedTimers = [];
     let scheduledPoll = false;
 
+    // CAMBIO DE PESTAÑA: se reinicia AQUÍ, y marcando `loading`.
+    //
+    // Antes esto vivía en un efecto aparte que solo vaciaba `items`. Como los
+    // efectos corren en orden de declaración, ese vaciado pasaba DESPUÉS de que
+    // este cargador hubiera pintado la caché, así que dejaba la lista vacía con
+    // `loading: false` -- y esa es justo la combinación que enseña "Sé el primero
+    // en comentar." Con la pestaña recién pulsada, el mensaje se quedaba visible
+    // durante toda la petición. Además tiraba a la basura el pintado instantáneo
+    // de la caché, que era el motivo de guardarla.
+    //
+    // La página NO entra en la condición: este efecto también corre al paginar
+    // ("cargar más"), y ahí hay que conservar lo ya cargado.
+    const tabChanged = commentsTabRef.current !== tCommentsTab;
+    commentsTabRef.current = tCommentsTab;
+    if (tabChanged) {
+      setTComments((p) => ({
+        ...p,
+        items: [],
+        page: 1,
+        hasMore: false,
+        total: 0,
+        loading: true,
+        error: "",
+      }));
+    }
+
     const commentsCacheKey = `showverse:trakt:comments:${traktType}:${id}:${tCommentsTab}`;
 
     const load = async () => {
@@ -4519,7 +4548,11 @@ export default function DetailsClient({
         try {
           const raw = window.localStorage.getItem(commentsCacheKey);
           const cached = raw ? JSON.parse(raw) : null;
-          if (cached && Array.isArray(cached.items)) {
+          // Solo se pinta una caché CON contenido. Una caché vacía dejaba
+          // `loading: false` con la lista a cero, es decir el mensaje de "no hay
+          // comentarios" en pantalla mientras aún se estaba consultando. Si de
+          // verdad no hay ninguno, lo dirá la respuesta.
+          if (cached && Array.isArray(cached.items) && cached.items.length > 0) {
             hadCache = true;
             setTComments((p) => ({
               ...p,
@@ -4705,17 +4738,6 @@ export default function DetailsClient({
       seedTimers.forEach((t) => window.clearTimeout(t));
     };
   }, [id, traktType, traktDeferredReady]);
-
-  // Resetear paginacion de comentarios al cambiar de pestana
-  useEffect(() => {
-    setTComments((p) => ({
-      ...p,
-      items: [],
-      page: 1,
-      hasMore: false,
-      total: 0,
-    }));
-  }, [tCommentsTab]);
 
   // Carga las temporadas de la serie desde Trakt (con datos extendidos)
   useEffect(() => {
