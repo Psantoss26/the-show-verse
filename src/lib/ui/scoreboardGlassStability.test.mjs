@@ -14,8 +14,12 @@ test("el panel es UNA sola superficie compartida", async () => {
   const panel = await readFile(PANEL, "utf8");
 
   // Si alguien copiara el acabado a una página, dejarían de ser el mismo panel.
-  assert.match(panel, /import \{ LIQUID_GLASS_BAR \} from "@\/lib\/ui\/liquidGlass"/);
-  assert.match(panel, /relative isolate w-full overflow-hidden rounded-2xl \$\{LIQUID_GLASS_BAR\}/);
+  //
+  // El acabado se consume ya como receta compartida: `LIQUID_GLASS_SURFACE` es
+  // exactamente `relative isolate overflow-hidden transform-gpu` +
+  // LIQUID_GLASS_BAR, las mismas clases que antes se escribían aquí a mano.
+  assert.match(panel, /import \{ LIQUID_GLASS_SURFACE \} from "@\/lib\/ui\/liquidGlass"/);
+  assert.match(panel, /w-full rounded-2xl \$\{LIQUID_GLASS_SURFACE\}/);
 });
 
 test("ninguna página altera el cristal del panel al invocarlo", async () => {

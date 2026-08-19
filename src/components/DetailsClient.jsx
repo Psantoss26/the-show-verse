@@ -188,7 +188,6 @@ import {
   pickBestEnglishPoster,
   pickBestNeutralPosterByResVotes,
   isLanguageNeutralImage,
-  resolveNeutralBackdropPath,
   pickHeroBackdropPath,
   pickBestBackdropByLangResVotes,
   pickBestBackdropTVNeutralFirst,
@@ -196,7 +195,6 @@ import {
 } from "@/lib/details/tmdbImages";
 import {
   getTitleLogos,
-  pickBestBackdropNoLang,
 } from "@/lib/dashboard/media";
 
 // -- Funciones de formato: numeros, fechas, HTML, conteos --
@@ -2614,19 +2612,14 @@ export default function DetailsClient({
       ...(data?.images?.backdrops ? data.images.backdrops : []),
     ];
 
-    // 2. Usar exactamente el selector de DetailModal. La imagen inicial del
-    // detalle no tiene metadatos de idioma, así que no participa como arte
-    // neutro; solo queda como último fallback, igual que en la preview.
-    if (allBackdrops.length > 0) {
-      const galleryBackdrops = allBackdrops.filter(
-        (backdrop) => backdrop?.file_path && backdrop.from !== "main",
-      );
-      const bestBackdrop = pickBestBackdropNoLang(galleryBackdrops);
-      if (bestBackdrop?.file_path) return bestBackdrop.file_path;
-    }
-
-    // 3. Fallback final: si ya terminamos y no hay nada mejor, usamos el generico
-    return data?.backdrop_path || null;
+    // 2. El MISMO helper que el fondo de la ficha y el héroe de DetailModal, en
+    // vez de repetir aquí el filtro y el selector: esta copia tenía el fallo del
+    // `from: "main"` —descartaba la portada principal aunque viniera fundida con
+    // su entrada real de la galería— y una copia que se arregla sola no existe.
+    return pickHeroBackdropPath({
+      backdropPath: data?.backdrop_path,
+      backdrops: allBackdrops,
+    });
   }, [
     imagesState?.backdrops,
     data?.images?.backdrops,
@@ -3499,22 +3492,32 @@ export default function DetailsClient({
     [posterLayoutMode, displayPosterPath, isBackdropPath],
   );
 
-  // Backdrop de fondo: solo se admiten imagenes confirmadas por TMDb como
-  // neutras. La ruta principal no incluye metadatos de idioma y no es segura.
+  // Backdrop de FONDO de la ficha.
+  //
+  // MISMO CRITERIO QUE DetailModal, y con la misma función: `pickHeroBackdropPath`
+  // (ver tmdbImages.js) resuelve selección del usuario -> mejor textless de la
+  // galería -> portada principal. Antes esta ruta usaba `resolveNeutralBackdropPath`
+  // —que ordena por ÁREA— y el modal ordenaba por ANCHO, así que para el mismo
+  // título la ficha y su vista previa podían enseñar imágenes distintas.
+  //
+  // `baseBackdropPath` ya NO entra como preferida: era el cálculo de la política
+  // anterior (`pickBestBackdropTVNeutralFirst` en la inicialización), y colarlo
+  // aquí como "preferido" mantenía viva justo la elección que se está sustituyendo.
   const displayBackdropPath = useMemo(() => {
     // Sin override remoto conocido todavía, no se elige un backdrop "por
     // defecto" de la galería: se vería sustituido al llegar la selección del
     // usuario. `selectedBackgroundPath` ya es seguro de usar en cuanto se
     // conoce (caché local o respuesta remota), pase lo que pase con el resto.
     if (!remoteArtworkChecked && !selectedBackgroundPath) return null;
-    return resolveNeutralBackdropPath(imagesState?.backdrops || [], [
-      selectedBackgroundPath,
-      baseBackdropPath,
-    ]);
+    return pickHeroBackdropPath({
+      backdropPath: data?.backdrop_path,
+      backdrops: imagesState?.backdrops,
+      preferredPaths: [selectedBackgroundPath],
+    });
   }, [
     imagesState?.backdrops,
     selectedBackgroundPath,
-    baseBackdropPath,
+    data?.backdrop_path,
     remoteArtworkChecked,
   ]);
 
@@ -3563,19 +3566,24 @@ export default function DetailsClient({
     if (!artworkInitialized) {
       if (isMobileViewport) return null;
       // El provisional es LA MISMA imagen a la que llegará la selección
-      // definitiva, no `data.backdrop_path`. Esa ruta es la portada principal
-      // de TMDb —normalmente localizada y casi nunca la mejor neutra—, así que
-      // toda carga empezaba con una imagen y acababa en otra. En una navegación
-      // rápida no se notaba; al RECARGAR, la hidratación tarda más y el fondo
-      // "equivocado" se ve el tiempo suficiente. Todo lo que hace falta para
-      // acertar ya viene en el SSR (`data.images.backdrops`), así que no hay
-      // nada que esperar.
+      // definitiva: misma función y mismo criterio, solo que sobre la galería
+      // que ya trae el SSR (`data.images.backdrops`), disponible en el primer
+      // render. Así no hay dos imágenes seguidas.
+      //
+      // SIN GALERÍA NO SE PINTA NADA (`allowMainFallback: false`). Antes se caía
+      // a `data.backdrop_path`, que es la portada principal de TMDb —localizada
+      // casi siempre y rara vez la mejor textless—: se veía esa y, al resolver
+      // la galería, se sustituía por otra. Es el parpadeo que se quiere quitar,
+      // y el criterio del modal para ese mismo caso es esperar. El precio es que
+      // en títulos sin imágenes en el SSR el cristal tarda un instante en tener
+      // algo que refractar; el beneficio es no enseñar nunca la imagen que no es.
       return pickHeroBackdropPath({
         backdropPath: data?.backdrop_path,
         backdrops: data?.images?.backdrops,
+        allowMainFallback: false,
         // Si ya se conoce una selección del usuario, manda ella (la
         // instantánea de overrides la resuelve en el primer efecto de layout).
-        preferredPaths: [selectedBackgroundPath, baseBackdropPath],
+        preferredPaths: [selectedBackgroundPath],
       });
     }
 

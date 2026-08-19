@@ -64,11 +64,15 @@ test("DetailsScoreboardPanel reutiliza el liquid glass completo del navbar", asy
     readFile(opticalLayersPath, "utf8"),
   ]);
 
+  // El acabado ya no se escribe pieza por pieza: `LIQUID_GLASS_SURFACE` es la
+  // receta compartida (envoltura + LIQUID_GLASS_BAR) extraída de
+  // DetailsSectionMenu, que es la pieza de referencia. Lo que se comprueba es
+  // que el scoreboard la CONSUMA, no que repita sus clases.
   assert.match(
     scoreboard,
-    /import \{ LIQUID_GLASS_BAR \} from "@\/lib\/ui\/liquidGlass"/,
+    /import \{ LIQUID_GLASS_SURFACE \} from "@\/lib\/ui\/liquidGlass"/,
   );
-  assert.match(scoreboard, /rounded-2xl \$\{LIQUID_GLASS_BAR\}/);
+  assert.match(scoreboard, /rounded-2xl \$\{LIQUID_GLASS_SURFACE\}/);
   assert.match(scoreboard, /<LiquidGlassOpticalLayers \/>/);
   assert.doesNotMatch(scoreboard, /rounded-2xl bg-black\/\[0\.08\]/);
 
@@ -92,17 +96,26 @@ test("cada tarjeta de DetailsInfoTabs comparte el acabado del Scoreboard", async
     readFile(awardsPanelPath, "utf8"),
   ]);
 
-  assert.match(detailAtoms, /liquidGlass\s*\? LIQUID_GLASS_CARD/);
-  assert.match(detailAtoms, /liquidGlass \? \([\s\S]*?<LiquidGlassOpticalLayers/);
+  // VisualMetaCard tiene UN SOLO acabado: se acabó la prop `liquidGlass`, que
+  // repartía cristal bueno a DetailsInfoTabs y uno pobre a temporada, episodio
+  // y el modal del dashboard. Ahora todas las tarjetas son la misma pieza.
+  assert.match(detailAtoms, /rounded-2xl p-3\.5 pl-4 \$\{LIQUID_GLASS_SURFACE_CARD\}/);
+  assert.doesNotMatch(detailAtoms, /liquidGlass\s*\? LIQUID_GLASS_CARD/);
+  // (el fichero sigue nombrando el módulo `@/lib/ui/liquidGlass`; lo que no
+  // puede quedar es el ENVOLTORIO que pasaba la prop)
+  assert.doesNotMatch(infoTabs, /<BaseVisualMetaCard/);
+  assert.doesNotMatch(infoTabs, /liquidGlass\s*\/>/);
+  // Las capas ópticas ya no dependen de ninguna prop: van siempre.
+  assert.match(detailAtoms, /<LiquidGlassOpticalLayers \/>/);
+
+  // Las tarjetas van SIN sombra y los paneles CON ella, y no es un descuido:
+  // apiladas en la columna móvil, las sombras rellenaban los huecos y el grupo
+  // se leía como un bloque oscuro (medido: 106 -> 73 de luminancia en el hueco).
   assert.match(
     infoTabs,
-    /<BaseVisualMetaCard \{\.\.\.props\} liquidGlass \/>/,
+    /rounded-2xl \$\{LIQUID_GLASS_SURFACE\}[\s\S]*?<LiquidGlassOpticalLayers/,
   );
-  assert.match(
-    infoTabs,
-    /rounded-xl \$\{LIQUID_GLASS_BAR\}[\s\S]*?<LiquidGlassOpticalLayers/,
-  );
-  assert.match(awardsPanel, /rounded-xl[\s\S]*?\$\{LIQUID_GLASS_BAR\}/);
+  assert.match(awardsPanel, /rounded-2xl[\s\S]*?\$\{LIQUID_GLASS_SURFACE\}/);
   assert.match(awardsPanel, /<LiquidGlassOpticalLayers \/>/);
 });
 
@@ -187,9 +200,9 @@ test("DetailsSectionMenu comparte el liquid glass estable de las barras", async 
   // plana y sin capas se veía transparente y sin cuerpo sobre el backdrop.
   assert.match(
     sectionMenu,
-    /import \{ LIQUID_GLASS_BAR \} from "@\/lib\/ui\/liquidGlass"/,
+    /import \{ LIQUID_GLASS_SURFACE \} from "@\/lib\/ui\/liquidGlass"/,
   );
-  assert.match(sectionMenu, /rounded-2xl",\s*LIQUID_GLASS_BAR/);
+  assert.match(sectionMenu, /"rounded-2xl", LIQUID_GLASS_SURFACE/);
   assert.match(sectionMenu, /<LiquidGlassOpticalLayers \/>/);
   assert.doesNotMatch(
     sectionMenu,

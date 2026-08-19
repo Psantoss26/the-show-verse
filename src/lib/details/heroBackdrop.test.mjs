@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  pickBestBackdropNoLang,
   pickHeroBackdropPath,
   resolveNeutralBackdropPath,
 } from "./tmdbImages.js";
@@ -66,4 +67,104 @@ test("sin galería cae en la portada principal, no en nada", async () => {
   // Y sin nada de nada, `null` (el consumidor no pinta fondo).
   assert.equal(pickHeroBackdropPath({}), null);
   assert.equal(pickHeroBackdropPath(), null);
+});
+
+// ---------------------------------------------------------------------------
+// PARIDAD CON DetailModal
+//
+// El modal resuelve su héroe con `backdropOverride || pickBestBackdropNoLang(...)
+// || item.backdrop_path` (useDetailModalData). La ficha tiene que llegar a la
+// MISMA imagen: si no, abrir la vista previa y entrar en la ficha del mismo
+// título enseña dos fondos distintos, que es el fallo que originó este cambio.
+const comoDetailModal = (backdrops, backdropPath) =>
+  pickBestBackdropNoLang(
+    backdrops.filter((b) => b.from !== "main"),
+  )?.file_path || backdropPath || null;
+
+// Caso que ANTES divergía: el más ANCHO y el de más ÁREA no son el mismo.
+// El modal ordenaba por ancho (4096) y la ficha por área (3840x2160 = 8.29 Mpx
+// frente a 7.03), así que cada uno elegía uno.
+const ANCHO_VS_AREA = [
+  { file_path: "/panoramica-4096.jpg", iso_639_1: null, width: 4096, height: 1716, vote_count: 4, vote_average: 5 },
+  { file_path: "/uhd-3840.jpg", iso_639_1: null, width: 3840, height: 2160, vote_count: 40, vote_average: 8 },
+];
+
+test("la ficha elige EXACTAMENTE el mismo fondo que DetailModal", async () => {
+  const ficha = pickHeroBackdropPath({
+    backdropPath: BACKDROP_PATH,
+    backdrops: ANCHO_VS_AREA,
+  });
+
+  assert.equal(ficha, comoDetailModal(ANCHO_VS_AREA, BACKDROP_PATH));
+  assert.equal(ficha, "/panoramica-4096.jpg");
+
+  // Y se deja constancia de que el criterio ANTERIOR de la ficha elegía otra:
+  // por eso el mismo título se veía distinto según por dónde se entrara.
+  assert.equal(
+    resolveNeutralBackdropPath(ANCHO_VS_AREA, []),
+    "/uhd-3840.jpg",
+  );
+});
+
+test("mismo criterio también con la galería real", async () => {
+  assert.equal(
+    pickHeroBackdropPath({ backdropPath: BACKDROP_PATH, backdrops: BACKDROPS }),
+    comoDetailModal(BACKDROPS, BACKDROP_PATH),
+  );
+});
+
+// ---------------------------------------------------------------------------
+// EL PARPADEO AL RECARGAR
+
+test("sin galería, el fondo PROVISIONAL no pinta la portada principal", async () => {
+  // Con `allowMainFallback: false` no hay imagen provisional: se espera. Pintar
+  // `backdrop_path` (localizada casi siempre) y sustituirla al llegar la galería
+  // es justo el "se ve un instante la otra imagen" del que venimos.
+  assert.equal(
+    pickHeroBackdropPath({
+      backdropPath: BACKDROP_PATH,
+      backdrops: [],
+      allowMainFallback: false,
+    }),
+    null,
+  );
+
+  // Pero con galería el provisional YA es el definitivo, sin esperar a nada.
+  assert.equal(
+    pickHeroBackdropPath({
+      backdropPath: BACKDROP_PATH,
+      backdrops: BACKDROPS,
+      allowMainFallback: false,
+    }),
+    pickHeroBackdropPath({ backdropPath: BACKDROP_PATH, backdrops: BACKDROPS }),
+  );
+});
+
+test("la entrada PELADA de la portada principal no puede ganar", async () => {
+  // DetailsClient mete `{ file_path, from: "main" }` en `imagesState.backdrops`.
+  // No trae `iso_639_1`, así que sin filtro se colaría como textless.
+  const conMain = [
+    { file_path: BACKDROP_PATH, from: "main" },
+    ...ANCHO_VS_AREA,
+  ];
+  assert.equal(
+    pickHeroBackdropPath({ backdropPath: BACKDROP_PATH, backdrops: conMain }),
+    "/panoramica-4096.jpg",
+  );
+});
+
+test("pero la portada principal FUNDIDA con su entrada real sí compite", async () => {
+  // Caso real (Barbie): la portada principal también está en la galería, así
+  // que `mergeUniqueImages` funde las dos y la entrada buena arrastra la marca
+  // `from: "main"`. Es arte legítimo —trae idioma y medidas— y de hecho era la
+  // elección correcta: descartarla por la marca hacía que el servidor pintara
+  // una imagen y el cliente la cambiara por otra.
+  const fundida = [
+    { file_path: "/principal.jpg", from: "main", iso_639_1: null, width: 3840, height: 2160, vote_count: 27, vote_average: 6.13 },
+    { file_path: "/otra.jpg", iso_639_1: null, width: 3840, height: 2160, vote_count: 61, vote_average: 6.106 },
+  ];
+  assert.equal(
+    pickHeroBackdropPath({ backdropPath: "/principal.jpg", backdrops: fundida }),
+    "/principal.jpg",
+  );
 });
