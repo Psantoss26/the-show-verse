@@ -121,6 +121,8 @@ import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 import {
   LIQUID_GLASS_BAR,
   LIQUID_GLASS_CARD,
+  LIQUID_GLASS_ELEVATION,
+  LIQUID_GLASS_HOST,
   LIQUID_GLASS_PANEL,
 } from "@/lib/ui/liquidGlass";
 import { getLocalInProgress } from "@/lib/api/progressClient";
@@ -11983,8 +11985,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         icon={MessageSquareIcon}
                       />
 
+                      {/* Cristal ANFITRIÓN (ver liquidGlass.js): este panel lleva
+                          una tarjeta por comentario encima, y dos capas translúcidas
+                          apiladas suman sus aclarados. Sobre un backdrop claro el
+                          bloque se iba a gris y el texto dejaba de leerse. Mismo
+                          vidrio, un punto menos encendido. */}
                       <div
-                        className={`relative isolate overflow-hidden rounded-2xl transform-gpu ${LIQUID_GLASS_BAR}`}
+                        className={`relative isolate overflow-hidden rounded-2xl transform-gpu ${LIQUID_GLASS_HOST} ${LIQUID_GLASS_ELEVATION}`}
                       >
                         <LiquidGlassOpticalLayers />
                         {/* Filtros estilo Tabs Modernos */}
@@ -12062,7 +12069,14 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   // plana, justo lo contrario del efecto. Aquí
                                   // basta un velo translúcido: el cristal que se
                                   // ve es el del panel, continuo bajo todas.
-                                  className="group relative isolate flex gap-4 overflow-hidden rounded-2xl bg-white/[0.06] p-5 transform-gpu transition-colors duration-300 hover:bg-white/[0.1]"
+                                  //
+                                  // El velo TIÑE EN NEGRO, no en blanco: encima de
+                                  // un panel ya translúcido, blanco sobre blanco se
+                                  // sumaba y sobre un backdrop claro se comía el
+                                  // texto. En negro la tarjeta se separa por
+                                  // contraste, que además es lo que sostiene la
+                                  // lectura.
+                                  className="group relative isolate flex gap-4 overflow-hidden rounded-2xl bg-black/10 p-5 transform-gpu transition-colors duration-300 hover:bg-black/5"
                                 >
                                   {/* Avatar */}
                                   <div className="relative z-10 flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10 text-lg font-black text-white shadow-lg ring-2 ring-white/10 transition group-hover:ring-white/20">
