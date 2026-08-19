@@ -62,9 +62,18 @@ test("all detail action variants use the shared liquid glass surface", async () 
   assert.match(actions, /<TraktWatchedControl[\s\S]*?liquidGlass/);
   assert.match(actions, /<StarRating[\s\S]*?liquidGlass/);
   assert.match(liquidButton, /liquidGlass = false/);
+  // El cristal sale de la receta COMPARTIDA (`LIQUID_GLASS_SURFACE_CARD` =
+  // envoltura + cristal sin sombra), no de clases repetidas aquí, y la
+  // elevación es la misma de la familia (`LIQUID_GLASS_ELEVATION`): halo blanco
+  // incluido, que es lo que hace que el botón se lea del mismo material que el
+  // navbar y el menú de secciones.
   assert.match(
     liquidButton,
-    /const surfaceClass = liquidGlass\s*\? LIQUID_GLASS_CARD/,
+    /const surfaceClass = liquidGlass\s*\? LIQUID_GLASS_SURFACE_CARD/,
+  );
+  assert.match(
+    liquidButton,
+    /const elevationClass = liquidGlass\s*\? LIQUID_GLASS_ELEVATION/,
   );
   assert.match(
     liquidButton,

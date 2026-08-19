@@ -209,25 +209,100 @@ export function resolveNeutralBackdropPath(list, preferredPaths = []) {
     return pickBestNeutralBackdropByResVotes(neutralImages)?.file_path || null
 }
 
-// Fondo del héroe calculado SOLO con lo que ya trae el SSR.
+// Mejor backdrop SIN idioma (textless), que es el arte apto para llevar el
+// logotipo superpuesto: un fondo con el título impreso lo duplicaría.
 //
-// Es la MISMA elección a la que llega `displayBackdropPath` en DetailsClient
-// (`resolveNeutralBackdropPath` sobre la galería), pero disponible desde el
-// primer render. Existe para que el fondo PROVISIONAL y el DEFINITIVO sean la
-// misma imagen: antes el provisional era `data.backdrop_path` —la portada
-// principal de TMDb, que suele estar localizada y rara vez es la mejor neutra—,
-// así que toda carga pintaba una imagen y terminaba en otra. En una navegación
-// rápida el cambio pasaba desapercibido; al RECARGAR, la hidratación tarda más
-// y se ve el fondo "equivocado" el tiempo suficiente para notarlo.
+// ESTE ES EL CRITERIO DE LA FICHA, y vive aquí —en un módulo sin dependencias—
+// porque lo comparten el fondo de DetailsClient y el héroe de DetailModal. Antes
+// cada uno tenía el suyo: el modal ordenaba por ANCHO y la ficha por ÁREA dentro
+// de una ventana del 98%, así que en cuanto un título tenía, por ejemplo, un
+// 4096x1716 y un 3840x2160, cada superficie elegía una imagen distinta para el
+// mismo título. `@/lib/dashboard/media` lo reexporta para no duplicarlo.
 //
-// `preferredPaths` respeta una selección del usuario si ya se conoce.
+// Orden: primero se descarta lo que lleva idioma; si no queda nada textless se
+// admite el resto (`allowLanguageFallback`), porque es preferible un fondo con
+// texto a ninguno. Dentro del grupo mandan ancho, alto y nota.
+export function pickBestBackdropNoLang(
+    list,
+    {
+        minWidth = 1280,
+        offset = 0,
+        limit = 0,
+        excludePaths = [],
+        allowLanguageFallback = true
+    } = {}
+) {
+    if (!Array.isArray(list) || list.length === 0) return null
+
+    const norm = (v) => (v ? String(v).toLowerCase().split('-')[0] : null)
+    const noLang = list.filter((b) => !norm(b?.iso_639_1))
+    if (!noLang.length && !allowLanguageFallback) return null
+    const pool = noLang.length ? noLang : list
+    const excluded = new Set(excludePaths.filter(Boolean))
+
+    const sized = pool.filter((b) => (b?.width || 0) >= minWidth)
+    const candidates = sized.length ? sized : pool
+    const limitedCandidates =
+        Number.isFinite(limit) && limit > 0 ? candidates.slice(0, limit) : candidates
+    const sorted = limitedCandidates
+        .map((backdrop, position) => ({ backdrop, position }))
+        .filter(({ backdrop }) => !excluded.has(backdrop?.file_path))
+        .sort((a, b) =>
+            (b.backdrop?.width || 0) - (a.backdrop?.width || 0) ||
+            (b.backdrop?.height || 0) - (a.backdrop?.height || 0) ||
+            (b.backdrop?.vote_average || 0) - (a.backdrop?.vote_average || 0) ||
+            a.position - b.position
+        )
+        .map(({ backdrop }) => backdrop)
+
+    const index = Math.max(0, Math.min(sorted.length - 1, Number(offset) || 0))
+    return sorted[index] || null
+}
+
+// Fondo de la ficha (DetailsClient) y del héroe del modal, con UN SOLO criterio.
+//
+// La cadena es la misma que resuelve `useDetailModalData` para su hero:
+//   selección del usuario -> mejor textless de la galería -> portada principal.
+//
+// SE EXIGE METADATO DE IDIOMA para entrar en la galería, y el matiz importa:
+// DetailsClient inyecta la portada principal como `{ file_path, from: "main" }`,
+// sin `iso_639_1` ni medidas. Esa entrada PELADA no puede competir —sin idioma
+// declarado, `pickBestBackdropNoLang` la tomaría por textless y podría elegirla
+// por delante del arte de verdad—, así que se descarta y queda como último
+// recurso, igual que en el modal.
+//
+// Filtrar por `from !== "main"` NO vale, y costó un rato verlo: cuando la
+// portada principal TAMBIÉN está en la galería (lo normal), `mergeUniqueImages`
+// funde las dos entradas y la buena se queda con la marca `from: "main"` encima.
+// Con ese filtro se descartaba justo la imagen que había que elegir: en Barbie,
+// el servidor pintaba la correcta y el cliente la sustituía por la siguiente.
+// El metadato de idioma distingue las dos cosas sin ambigüedad.
+//
+// `allowMainFallback: false` es para el fondo PROVISIONAL (mientras la galería
+// aún no se conoce): sin galería no se pinta la portada principal, porque casi
+// nunca es la elección definitiva y pintarla primero es justo el parpadeo
+// "una imagen y luego otra" que este módulo existe para evitar. Es preferible
+// esperar, que es lo que hace el modal con su esqueleto.
 export function pickHeroBackdropPath({
     backdropPath,
     backdrops,
-    preferredPaths = []
+    preferredPaths = [],
+    allowMainFallback = true
 } = {}) {
-    const resuelto = resolveNeutralBackdropPath(backdrops || [], preferredPaths)
-    return resuelto || backdropPath || null
+    for (const value of preferredPaths || []) {
+        const path = typeof value === 'string' ? value : value?.file_path
+        if (path) return path
+    }
+
+    const gallery = (Array.isArray(backdrops) ? backdrops : []).filter(
+        (img) =>
+            img?.file_path &&
+            Object.prototype.hasOwnProperty.call(img, 'iso_639_1')
+    )
+    const best = pickBestBackdropNoLang(gallery)?.file_path
+    if (best) return best
+
+    return allowMainFallback ? backdropPath || null : null
 }
 
 export function pickBestBackdropByLangResVotes(list, opts = {}) {
