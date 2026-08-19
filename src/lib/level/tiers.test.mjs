@@ -41,6 +41,20 @@ test("cada rango trae color de trazo, chip y barra", () => {
   }
 });
 
+test("los rangos de la leyenda cubren los niveles 1 a 40 sin huecos", () => {
+  const ranges = Object.values(LEVEL_TIER_VISUALS);
+  assert.equal(ranges[0].minLevel, 1);
+  assert.equal(ranges.at(-1).maxLevel, 40);
+
+  for (let index = 1; index < ranges.length; index += 1) {
+    assert.equal(
+      ranges[index].minLevel,
+      ranges[index - 1].maxLevel + 1,
+      `el rango ${ranges[index].name} debe continuar el anterior`,
+    );
+  }
+});
+
 test("tierVisual acepta el objeto de rango que envía la API", () => {
   const visual = tierVisual({ id: "cinefilo", name: "Cinéfilo" });
   assert.equal(visual.name, "Cinéfilo");

@@ -20,13 +20,13 @@ export default function MemberRow({ member }) {
       </Link>
 
       <Link href={`/u/${member.username}`} className="min-w-0 flex-1">
-        <span className="flex min-w-0 items-center gap-1.5">
-          <p className="truncate text-sm font-bold text-white">{label}</p>
+        <p className="truncate text-sm font-bold text-white">{label}</p>
+        <div className="flex min-w-0 items-center gap-1.5 text-xs text-zinc-500">
+          <span className="truncate">@{member.username}</span>
           {member.level ? (
             <LevelChip level={member.level.level} tier={member.level.tier} />
           ) : null}
-        </span>
-        <p className="truncate text-xs text-zinc-500">@{member.username}</p>
+        </div>
         {member.bio ? (
           <p className="mt-0.5 truncate text-xs text-zinc-600">{member.bio}</p>
         ) : typeof member.followerCount === "number" ? (

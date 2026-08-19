@@ -22,7 +22,7 @@ export const TIERS = Object.freeze([
   { id: 'cinefilo', name: 'Cinéfilo', minLevel: 11, maxLevel: 15, color: 'emerald' },
   { id: 'critico', name: 'Crítico', minLevel: 16, maxLevel: 20, color: 'teal' },
   { id: 'coleccionista', name: 'Coleccionista', minLevel: 21, maxLevel: 25, color: 'violet' },
-  { id: 'archivista', name: 'Archivista', minLevel: 26, maxLevel: 30, color: 'fuchsia' },
+  { id: 'archivista', name: 'Experto', minLevel: 26, maxLevel: 30, color: 'fuchsia' },
   { id: 'maestro', name: 'Maestro', minLevel: 31, maxLevel: 35, color: 'amber' },
   { id: 'leyenda', name: 'Leyenda', minLevel: 36, maxLevel: MAX_LEVEL, color: 'gold' },
 ].map((tier) => Object.freeze(tier)));
