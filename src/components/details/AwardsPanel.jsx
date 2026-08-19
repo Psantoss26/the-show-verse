@@ -8,14 +8,14 @@
 import { Trophy } from "lucide-react";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
-import { LIQUID_GLASS_BAR } from "@/lib/ui/liquidGlass";
+import { LIQUID_GLASS_SURFACE } from "@/lib/ui/liquidGlass";
 
 export default function AwardsPanel({ awards }) {
   const formattedAwards = formatDashboardAwards(awards);
 
   return (
     <div
-      className={`relative isolate overflow-hidden rounded-xl p-5 sm:p-6 ${LIQUID_GLASS_BAR}`}
+      className={`rounded-2xl p-5 sm:p-6 ${LIQUID_GLASS_SURFACE}`}
     >
       <LiquidGlassOpticalLayers />
       <div className="absolute top-0 right-0 -mt-6 -mr-6 w-32 h-32 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none z-10" />

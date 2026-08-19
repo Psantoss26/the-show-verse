@@ -498,8 +498,21 @@ html:not([data-avatar-boot]) .avatar-boot-chevron {
   }
 }
 
+/* `backwards` Y NO `both`, y esto NO es un detalle: con `both`, al terminar la
+   animación se queda fijado el `transform: translate3d(0, 0, 0)` del último
+   fotograma. Un transform, aunque sea la identidad, convierte al elemento en
+   BACKDROP ROOT, y a partir de ahí NINGÚN `backdrop-filter` de su interior
+   vuelve a tener fondo que muestrear: el marcador, el menú de pestañas y las
+   tarjetas de información quedaban con el tinte del cristal pero SIN desenfoque
+   ni saturación, es decir, como paneles planos en vez de vidrio. Medido en
+   Chromium con `backdrop-filter: invert(1)`: dentro de `.sv-details-entry` no
+   invertía nada; en el elemento de fuera, sí.
+   `backwards` mantiene lo único que se necesitaba del relleno —el estado inicial
+   durante el `animation-delay`, para que la pieza no asome antes de entrar— y al
+   acabar devuelve el elemento a su estilo base, que ya es exactamente el último
+   fotograma (opacidad 1, sin desplazamiento) pero SIN transform. */
 .sv-details-entry {
-  animation: sv-details-entry 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: sv-details-entry 520ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 /* Escalonado: el marcador entra justo después del bloque de acciones y las

@@ -9858,10 +9858,14 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   ambos aparezcan y desaparezcan como una sola pieza, sin que
                   una opacidad de carga atenúe el cristal de las tarjetas. */}
               <div
+                // SIN `will-change` en el estado visible: `will-change: opacity`
+                // convierte esta capa en BACKDROP ROOT, y con ella el cristal de
+                // lo que envuelve (marcador, pestañas y tarjetas) se quedaba sin
+                // fondo que desenfocar -- plano en vez de vidrio. El hint solo
+                // haría falta MIENTRAS se transiciona, y el compositor ya promueve
+                // la capa por su cuenta durante una transición de opacity/translate.
                 className={`${MOBILE_REVEAL_BASE} ${
-                  mobileSecondaryVisible
-                    ? "max-sm:will-change-[opacity,transform]"
-                    : MOBILE_REVEAL_HIDDEN
+                  mobileSecondaryVisible ? "" : MOBILE_REVEAL_HIDDEN
                 }`}
                 inert={isMobileViewport && !mobileSecondaryVisible}
                 aria-hidden={
@@ -9925,10 +9929,14 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 className="block h-px sm:hidden"
               />
               <div
+                // SIN `will-change` en el estado visible: `will-change: opacity`
+                // convierte esta capa en BACKDROP ROOT, y con ella el cristal de
+                // lo que envuelve (marcador, pestañas y tarjetas) se quedaba sin
+                // fondo que desenfocar -- plano en vez de vidrio. El hint solo
+                // haría falta MIENTRAS se transiciona, y el compositor ya promueve
+                // la capa por su cuenta durante una transición de opacity/translate.
                 className={`${MOBILE_REVEAL_BASE} ${
-                  mobileSecondaryVisible
-                    ? "max-sm:will-change-[opacity,transform]"
-                    : MOBILE_REVEAL_HIDDEN
+                  mobileSecondaryVisible ? "" : MOBILE_REVEAL_HIDDEN
                 }`}
                 inert={isMobileViewport && !mobileSecondaryVisible}
                 aria-hidden={

@@ -3,15 +3,35 @@
 import OptimizedImage from "@/components/OptimizedImage";
 import { motion } from "framer-motion";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
-import { LIQUID_GLASS_BAR, LIQUID_GLASS_CARD } from "@/lib/ui/liquidGlass";
+import {
+  LIQUID_GLASS_BAR,
+  LIQUID_GLASS_SURFACE_CARD,
+} from "@/lib/ui/liquidGlass";
 
+// TARJETA DE METADATO (Título original, Estreno, Duración, Género…). Es la
+// pieza más repetida de la ficha: las filas de Detalles y Producción, las de
+// temporada y episodio y las de la ficha rápida del dashboard son todas esta.
+//
+// UN SOLO ACABADO, el de DetailsSectionMenu: mismo cristal, `rounded-2xl` y las
+// mismas capas ópticas. Antes había dos —el cristal completo si le
+// pasabas `liquidGlass` y, si no, un vidrio pobre de `bg-black/[0.04]` con 6px
+// de desenfoque—, y quién recibía cuál dependía de quién montara la tarjeta:
+// DetailsInfoTabs pedía el bueno y temporada, episodio y el modal del dashboard
+// se quedaban con el pobre. Eran las MISMAS tarjetas con dos aspectos, así que
+// la bifurcación desaparece en vez de duplicarse.
+//
+// LA ÚNICA DIFERENCIA CON LA PIEZA DE REFERENCIA ES LA SOMBRA, y está medida:
+// con la de DetailsSectionMenu (`LIQUID_GLASS_SURFACE`), estas tarjetas apiladas
+// en la columna móvil rellenaban de sombra los 12px de hueco entre ellas y el
+// grupo dejaba de leerse como piezas sueltas sobre el cartel para parecer un
+// panel oscuro con separadores. `LIQUID_GLASS_SURFACE_CARD` es el mismo cristal
+// —mismo tinte, desenfoque, saturación y capas ópticas— sin esa elevación.
 export function VisualMetaCard({
   icon: Icon,
   iconContent = null,
   label,
   value,
   isLoading = false,
-  liquidGlass = false,
   className = "",
 }) {
   // Sin valor NO se pinta la tarjeta, ni siquiera cargando. Antes `isLoading`
@@ -22,21 +42,9 @@ export function VisualMetaCard({
 
   return (
     <div
-      className={`relative isolate flex h-full transform-gpu items-center gap-3.5 overflow-hidden rounded-xl p-3.5 pl-4 ${
-        liquidGlass
-          ? LIQUID_GLASS_CARD
-          : "bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 shadow-none backdrop-blur-[6px]"
-      } ${className}`}
+      className={`flex h-full items-center gap-3.5 rounded-2xl p-3.5 pl-4 ${LIQUID_GLASS_SURFACE_CARD} ${className}`}
     >
-      {liquidGlass ? (
-        <LiquidGlassOpticalLayers />
-      ) : (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]"
-          style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
-        />
-      )}
+      <LiquidGlassOpticalLayers />
 
       <motion.div
       // SIN entrada propia: el contenido aparece A LA VEZ que su cristal.
