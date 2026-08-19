@@ -75,6 +75,26 @@ export const LIQUID_GLASS_BAR_FLAT =
 export const LIQUID_GLASS_CARD =
   "bg-black/15 bg-gradient-to-b from-white/[0.14] via-white/[0.03] to-black/15 backdrop-blur-[7px] backdrop-saturate-[190%] backdrop-brightness-[1.06]";
 
+// Variante para superficies que llevan OTRAS piezas translúcidas ENCIMA (hoy, la
+// sección de Comentarios: un panel de cristal con una tarjeta por comentario).
+//
+// El cristal normal está calculado para verse contra la imagen de la página. Al
+// apilar encima otra pieza translúcida los dos aclarados se suman, y sobre un
+// backdrop claro y de poco contraste el bloque entero se va a gris claro: medido
+// en La comunidad del anillo, el panel solo aclaraba el fondo +15.2 de
+// luminancia y la zona con tarjeta +28.1 (x1.60). Ahí el texto blanco deja de
+// leerse.
+//
+// Es el MISMO vidrio, un punto menos encendido:
+//   - SIN `backdrop-brightness`: es lo que se multiplica al apilar.
+//   - Tinte 15% -> 22% y luz superior 0.14 -> 0.10: la superficie sostiene el
+//     texto en vez de competir con él.
+//   - Saturación 190% -> 175%, lo justo para que el color de detrás siga
+//     atravesando sin encenderse.
+// El desenfoque no se toca: es el que hace que siga siendo vidrio.
+export const LIQUID_GLASS_HOST =
+  "bg-black/22 bg-gradient-to-b from-white/[0.10] via-white/[0.02] to-black/[0.18] backdrop-blur-[7px] backdrop-saturate-[175%]";
+
 // La ELEVACIÓN de la familia, suelta: sombra amplia hacia abajo más un halo
 // blanco tenue alrededor. Ese halo es la mitad de la firma —es lo que separa la
 // pieza del fondo sin dibujarle un borde—, así que quien quiera parecerse a la
