@@ -13,7 +13,7 @@ import {
   useTransition,
   memo,
 } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { FreeMode } from "swiper/modules";
 import "swiper/swiper-bundle.css";
@@ -1237,6 +1237,33 @@ function ListNavWrapper({ list, className = "", children }) {
   return <div className={className}>{children}</div>;
 }
 
+// Entrada escalonada de las tarjetas de lista. El retardo se corta a los 0,36s
+// para que, en una rejilla de treinta y tantas colecciones, la última no entre
+// segundo y medio después de la primera: lo que se busca es que el bloque
+// "aterrice", no un desfile.
+const LIST_ENTRANCE_STEP = 0.035;
+const LIST_ENTRANCE_MAX_DELAY = 0.36;
+
+function ListEntrance({ index = 0, className = "", children }) {
+  const shouldReduceMotion = useReducedMotion();
+  if (shouldReduceMotion) return <div className={className}>{children}</div>;
+
+  return (
+    <motion.div
+      className={className}
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{
+        duration: 0.34,
+        delay: Math.min(index * LIST_ENTRANCE_STEP, LIST_ENTRANCE_MAX_DELAY),
+        ease: [0.22, 1, 0.36, 1],
+      }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
 const GridListCard = memo(function GridListCard({
   list,
   itemsState,
@@ -1928,6 +1955,31 @@ export default function ListsPage() {
     }
   }, [authStatus, sourceInitialized, hasCompletedInitialLoad]);
 
+  // CONTENIDO QUE SE PINTA, que no siempre es el de la fuente seleccionada.
+  //
+  // Al cambiar de fuente, `filtered` se vacía en el acto —las listas nuevas aún
+  // no han llegado— y la rejilla desaparecía entera hasta que la petición
+  // terminaba. Medido en Chromium: el documento pasaba de 6195px a 964px durante
+  // ~330ms y volvía de golpe con el contenido nuevo ya montado. Eso era el corte:
+  // primero un hueco en blanco, luego una aparición instantánea.
+  //
+  // La solución no es tapar el hueco con un esqueleto —seguirían siendo dos
+  // saltos— sino no dejar de pintar: mientras la fuente nueva no está lista se
+  // conserva lo último que SÍ lo estuvo, y el relevo ocurre en un solo paso,
+  // ya con datos, animado por el <AnimatePresence> de más abajo. El usuario
+  // tiene respuesta inmediata igualmente: la pestaña activa y el título cambian
+  // al pulsar, y el botón de sincronizar gira mientras carga.
+  const [readyContent, setReadyContent] = useState({ source, lists: [] });
+  useEffect(() => {
+    if (!sourceInitialized) return;
+    setReadyContent({ source, lists: filtered });
+  }, [source, sourceInitialized, filtered]);
+
+  // Con la fuente ya lista se pinta SIEMPRE lo vivo, para que buscar y ordenar
+  // sigan siendo instantáneos dentro de la misma fuente.
+  const contentSource = sourceInitialized ? source : readyContent.source;
+  const contentLists = sourceInitialized ? filtered : readyContent.lists;
+
   const errorUnified =
     source === "personal" ? error : source === "trakt" ? trakt?.error : "";
 
@@ -2431,69 +2483,106 @@ export default function ListsPage() {
           </div>
         ) : null}
 
-        {/* CONTENT */}
-        {!sourceInitialized &&
-        filtered.length === 0 ? null : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-32 text-center border border-dashed border-neutral-800 rounded-3xl bg-neutral-900/20">
-            <ListVideo className="w-16 h-16 text-neutral-700 mb-4" />
-            <h3 className="text-xl font-bold text-neutral-300">
-              {source === "collections"
-                ? "No hay colecciones"
-                : "No hay listas"}
-            </h3>
-            <p className="text-zinc-500 mt-2">
-              {source === "personal"
-                ? "Crea una nueva lista arriba para empezar."
-                : "Prueba cambiando el modo o el buscador."}
-            </p>
-          </div>
-        ) : (
-          <>
-            {viewMode === "grid" && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {filtered.map((l) => (
-                  <GridListCard
-                    key={`${l.source}-${l.id}`}
-                    list={l}
-                    itemsState={itemsMap[getListCacheKey(l)]}
-                    ensureListItems={ensureListItems}
-                    canUse={canEdit}
-                    onDelete={handleDelete}
-                  />
-                ))}
-              </div>
-            )}
+        {/* CONTENT
+            Relevo entre fuentes. `mode="wait"` encadena salida y entrada en vez
+            de superponerlas: con alturas tan distintas entre una rejilla de
+            colecciones y una de listas propias, solaparlas obligaría a
+            posicionarlas en absoluto y el pie de página daría un salto. La salida
+            es corta (0,16s) a propósito, porque el relevo solo se dispara cuando
+            los datos nuevos YA están, y la espera no debe notarse.
+            La clave es `contentSource`, no `source`: así el bloque no sale de
+            escena en cuanto se pulsa la pestaña, sino cuando hay algo con lo que
+            sustituirlo. */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={contentSource}
+            // Marca la fuente que se está pintando de verdad, que durante la
+            // carga NO es la seleccionada. Sirve de asidero para comprobar el
+            // relevo, igual que `data-lists-view-selector` en la barra.
+            data-lists-content={contentSource}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{
+              opacity: 0,
+              y: -8,
+              // La transición de salida va DENTRO de `exit`: es la forma que
+              // Framer resuelve para el desmontaje (una clave `exit` dentro de
+              // `transition` no la aplicaría).
+              transition: { duration: 0.16, ease: "easeIn" },
+            }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+          >
+            {contentLists.length === 0 ? (
+              // Sin resultados solo se anuncia cuando la fuente está resuelta:
+              // durante la carga inicial, un "no hay listas" que dura un instante
+              // es peor que no decir nada todavía.
+              sourceInitialized ? (
+                <div className="flex flex-col items-center justify-center py-32 text-center border border-dashed border-neutral-800 rounded-3xl bg-neutral-900/20">
+                  <ListVideo className="w-16 h-16 text-neutral-700 mb-4" />
+                  <h3 className="text-xl font-bold text-neutral-300">
+                    {source === "collections"
+                      ? "No hay colecciones"
+                      : "No hay listas"}
+                  </h3>
+                  <p className="text-zinc-500 mt-2">
+                    {source === "personal"
+                      ? "Crea una nueva lista arriba para empezar."
+                      : "Prueba cambiando el modo o el buscador."}
+                  </p>
+                </div>
+              ) : null
+            ) : (
+              <>
+                {viewMode === "grid" && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {contentLists.map((l, index) => (
+                      <ListEntrance key={`${l.source}-${l.id}`} index={index}>
+                        <GridListCard
+                          list={l}
+                          itemsState={itemsMap[getListCacheKey(l)]}
+                          ensureListItems={ensureListItems}
+                          canUse={canEdit}
+                          onDelete={handleDelete}
+                        />
+                      </ListEntrance>
+                    ))}
+                  </div>
+                )}
 
-            {viewMode === "rows" && (
-              <div className="space-y-12">
-                {filtered.map((l) => (
-                    <RowListSection
-                      key={`${l.source}-${l.id}`}
-                      list={l}
-                      itemsState={itemsMap[getListCacheKey(l)]}
-                      ensureListItems={ensureListItems}
-                      isMobile={isMobile}
-                    />
-                ))}
-              </div>
-            )}
+                {viewMode === "rows" && (
+                  <div className="space-y-12">
+                    {contentLists.map((l, index) => (
+                      <ListEntrance key={`${l.source}-${l.id}`} index={index}>
+                        <RowListSection
+                          list={l}
+                          itemsState={itemsMap[getListCacheKey(l)]}
+                          ensureListItems={ensureListItems}
+                          isMobile={isMobile}
+                        />
+                      </ListEntrance>
+                    ))}
+                  </div>
+                )}
 
-            {viewMode === "list" && (
-              <div className="flex flex-col gap-3">
-                {filtered.map((l) => (
-                  <ListModeRow
-                    key={`${l.source}-${l.id}`}
-                    list={l}
-                    itemsState={itemsMap[getListCacheKey(l)]}
-                    ensureListItems={ensureListItems}
-                    canUse={canEdit}
-                    onDelete={handleDelete}
-                  />
-                ))}
-              </div>
+                {viewMode === "list" && (
+                  <div className="flex flex-col gap-3">
+                    {contentLists.map((l, index) => (
+                      <ListEntrance key={`${l.source}-${l.id}`} index={index}>
+                        <ListModeRow
+                          list={l}
+                          itemsState={itemsMap[getListCacheKey(l)]}
+                          ensureListItems={ensureListItems}
+                          canUse={canEdit}
+                          onDelete={handleDelete}
+                        />
+                      </ListEntrance>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
-          </>
-        )}
+          </motion.div>
+        </AnimatePresence>
 
         {/* Carga adicional de listas propias si el backend la expone. */}
         {source === "personal" && hasMore && !loadingUnified && (
