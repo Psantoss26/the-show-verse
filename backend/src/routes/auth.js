@@ -133,6 +133,13 @@ const netflixProgressSchema = z.object({
   // 'high' a ciegas y una resolución dudosa quedaba en el historial indistinguible
   // de una segura.
   confidence: z.enum(['high', 'medium', 'low']).optional(),
+  // La posición viene DEDUCIDA por reloj, no publicada por el reproductor (varias
+  // apps de Android no exponen `position` en su MediaSession). El handler ya la
+  // trataba distinto —ni completa ni pisa hacia atrás una posición real— pero el
+  // campo NO estaba declarado aquí: Zod elimina las claves desconocidas, así que
+  // `parsed.data.estimated` llegaba siempre `undefined` y las dos protecciones
+  // quedaban muertas. Declararlo es lo que las reactiva.
+  estimated: z.boolean().optional(),
 });
 
 const netflixSyncBatchSchema = z.object({
