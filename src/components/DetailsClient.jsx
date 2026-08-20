@@ -357,10 +357,44 @@ const TTL = 1000 * 60 * 5; // Tiempo de vida del cache: 5 minutos
 // (`transition-transform` de Tailwind sí las cubre todas; aquí hay que
 // enumerarlas porque el valor es arbitrario.) `visibility` entra en la lista por
 // lo dicho arriba: es la que sustituye al fundido.
+//
+// EL MOVIMIENTO, y por qué es así. Sin fundido —lo impide el cristal— toda la
+// fluidez tiene que salir del propio recorrido, y el que había no daba para
+// tanto: 12px de desplazamiento en 450ms se lee como un corte, porque
+// `visibility` es discreta (al mostrar salta a `visible` en el primer fotograma
+// y al ocultar aguanta hasta el último). O sea: aparecía de golpe y DESPUÉS se
+// movía un pelo. Tres cambios:
+//   - RECORRIDO de 12px a 24px y un `scale` de 0.97 a 1 desde `origin-top`: el
+//     bloque se despliega desde su borde superior en vez de dar un empujoncito.
+//     Con recorrido suficiente el ojo sigue el movimiento y el salto discreto de
+//     `visibility` deja de ser lo que se ve.
+//   - DURACIÓN de 450ms a 320ms al entrar: es la mitad de "mostrarse antes".
+//   - ASIMETRÍA: entrar y salir no se parecen. Las curvas y duraciones de SALIDA
+//     viven en la clase de estado oculto, no aquí, y eso no es un descuido: una
+//     transición usa el `transition-*` del estado DESTINO, así que lo que
+//     escribas en `MOBILE_REVEAL_HIDDEN` es exactamente lo que gobierna el
+//     ocultado. Sale en 200ms con curva de aceleración —lo que se va, se va
+//     rápido— y entra en 320ms con una curva que asienta.
 const MOBILE_REVEAL_BASE =
-  "origin-top transform-gpu transition-[visibility,transform,translate,scale,rotate] duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none";
+  "origin-top transform-gpu transition-[visibility,transform,translate,scale,rotate] duration-[320ms] ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none";
 const MOBILE_REVEAL_HIDDEN =
-  "max-sm:invisible max-sm:translate-y-3 max-sm:pointer-events-none";
+  "max-sm:invisible max-sm:translate-y-6 max-sm:scale-[0.97] max-sm:pointer-events-none max-sm:duration-[200ms] max-sm:ease-[cubic-bezier(0.4,0,1,1)] max-sm:delay-0";
+
+// Escalonado de ENTRADA para la capa de pestañas: entra justo detrás del
+// marcador para que la columna se lea de arriba abajo en vez de moverse como una
+// losa. Solo a la entrada; al ocultar, `MOBILE_REVEAL_HIDDEN` pone `delay-0` y
+// las dos se van a la vez.
+const MOBILE_REVEAL_STAGGERED = "max-sm:delay-[70ms]";
+
+// Umbrales de scroll del revelado. El de OCULTAR tiene que quedar POR DEBAJO del
+// de MOSTRAR: al revés, la franja entre ambos cumple las dos condiciones a la vez
+// y el ocultado —que va en cada evento de scroll— gana siempre, así que el bloque
+// no llegaba a aparecer nunca. La banda entre los dos valores es la histéresis:
+// sin ella, el punto justo de cruce haría parpadear el bloque al arrastrar.
+// El "ocultarse antes" de verdad no lo dan estos números sino el centinela (ver
+// el observador): estos son la red de seguridad para el tope de la página.
+const MOBILE_REVEAL_SHOW_AT_PX = 16;
+const MOBILE_REVEAL_HIDE_AT_PX = 8;
 
 function normalizePlayableVideos(rawVideos) {
   const source = Array.isArray(rawVideos?.results)
@@ -1844,13 +1878,25 @@ export default function DetailsClient({
     if (!trigger) return undefined;
 
     const hideAtTop = () => {
-      if (window.scrollY <= 4) setMobileSecondaryVisible(false);
+      if (window.scrollY <= MOBILE_REVEAL_HIDE_AT_PX) setMobileSecondaryVisible(false);
     };
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting && window.scrollY > 4) {
-          setMobileSecondaryVisible(true);
+        if (entry.isIntersecting) {
+          if (window.scrollY > MOBILE_REVEAL_SHOW_AT_PX) {
+            setMobileSecondaryVisible(true);
+          }
+          return;
+        }
+        // Dejó de cruzarse Y SIGUE POR DEBAJO del área: el usuario ha subido
+        // más allá del centinela. Se oculta aquí, anclado a la posición real del
+        // bloque, en vez de esperar al tope exacto de la página.
+        // La comprobación de `top > 0` NO es opcional: el centinela también deja
+        // de cruzarse al salir por ARRIBA (bajando mucho), y sin ella el bloque
+        // se escondería justo cuando más falta hace.
+        if (entry.boundingClientRect.top > 0) {
+          setMobileSecondaryVisible(false);
         }
       },
       {
@@ -9958,7 +10004,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 // fondo que desenfocar -- plano en vez de vidrio. El hint solo
                 // haría falta MIENTRAS se transiciona, y el compositor ya promueve
                 // la capa por su cuenta durante una transición de opacity/translate.
-                className={`${MOBILE_REVEAL_BASE} ${
+                className={`${MOBILE_REVEAL_BASE} ${MOBILE_REVEAL_STAGGERED} ${
                   mobileSecondaryVisible ? "" : MOBILE_REVEAL_HIDDEN
                 }`}
                 inert={isMobileViewport && !mobileSecondaryVisible}
