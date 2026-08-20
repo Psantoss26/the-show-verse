@@ -22,18 +22,17 @@ import {
   Layers3,
   List,
   ListPlus,
-  ListVideo,
   Loader2,
   MessageSquare,
-  Rows,
   Search,
   SlidersHorizontal,
-  StretchHorizontal,
   ArrowUpDown,
   X,
 } from "lucide-react";
-import ListPosterCard from "@/components/lists/ListPosterCard";
+import ListCoverBackdropCollage from "@/components/lists/ListCoverBackdropCollage";
 import { getListDetails } from "@/lib/api/backendLists";
+import { enrichListPreviewArtwork } from "@/lib/lists/previewArtwork";
+import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
 import MemberRow from "@/components/social/MemberRow";
 import PosterTile from "@/components/social/PosterTile";
 import Stars from "@/components/social/Stars";
@@ -94,7 +93,7 @@ const SECTIONS = {
   activity: { layout: "activity", empty: "Aún no hay actividad pública." },
 };
 
-const PROFILE_MENU_SECTIONS = new Set(["activity", "watched", "favorites", "watchlist", "ratings", "lists"]);
+const PROFILE_MENU_SECTIONS = new Set(["activity", "watched", "favorites", "watchlist", "ratings"]);
 const profileSectionPreferences = new Map();
 const profileViewPreferences = new Map();
 const PROFILE_VIEW_STORAGE_PREFIX = "showverse:profile:view-mode:v2:";
@@ -121,12 +120,6 @@ function getItemDate(item) {
 function getItemRating(item) {
   const rating = Number(item?.rating ?? item?.userRating ?? item?.user_rating ?? 0);
   return Number.isFinite(rating) ? rating : 0;
-}
-
-// Nº de títulos de una lista, para ordenar por tamaño en la sección Listas.
-function getItemCount(item) {
-  const total = Number(item?.itemCount ?? item?.item_count ?? 0);
-  return Number.isFinite(total) ? total : 0;
 }
 
 // Las secciones pueden contener registros históricos del mismo título e
@@ -344,33 +337,6 @@ function sectionMenuOptions(section) {
   const activity = section === "activity";
   const ratings = section === "ratings";
 
-  // LISTAS. El menú es el de la página /lists traducido a los componentes del
-  // perfil: buscador, orden y modo de vista, y nada más. "Tipo" (película/serie)
-  // y "Agrupar" (mes/año) son de títulos sueltos; una lista no tiene tipo, y
-  // agrupar media docena de listas por mes no ordena nada. Los dos desplegables
-  // se omiten devolviendo sus opciones vacías (ver ProfileSectionToolbar).
-  // Las tres vistas y sus iconos son EXACTAMENTE los de /lists: cuadrícula,
-  // filas (cada lista con la fila de sus títulos) y lista compacta.
-  if (section === "lists") {
-    return {
-      filters: [],
-      groups: [],
-      sorts: [
-        ["recent", "Más recientes"],
-        ["oldest", "Más antiguas"],
-        ["title-asc", "Nombre A–Z"],
-        ["title-desc", "Nombre Z–A"],
-        ["items-desc", "Más títulos"],
-        ["items-asc", "Menos títulos"],
-      ],
-      views: [
-        ["grid", "Cuadrícula", LayoutGrid],
-        ["rows", "Filas", Rows],
-        ["list", "Lista", StretchHorizontal],
-      ],
-    };
-  }
-
   return {
     filters: activity
       ? [
@@ -419,10 +385,7 @@ function readStoredProfileView(profileKey) {
   if (!profileKey || typeof window === "undefined") return null;
   try {
     const value = window.localStorage.getItem(`${PROFILE_VIEW_STORAGE_PREFIX}${profileKey}`);
-    // `rows` solo existe en Listas, pero la clave de almacenamiento es por
-    // sección, así que no puede colarse en otra: `supportsProfileView` descarta
-    // el modo guardado que la sección no ofrezca y cae en su vista por defecto.
-    return value === "grid" || value === "compact" || value === "list" || value === "rows" || value === "poster-list" ? value : null;
+    return value === "grid" || value === "compact" || value === "list" || value === "poster-list" ? value : null;
   } catch {
     return null;
   }
@@ -677,43 +640,6 @@ function ProfileSectionToolbar({ section, controls, onChange }) {
     onChange({ view });
   };
 
-  // Los desplegables que la sección OFRECE de verdad. Una sección los desactiva
-  // devolviendo sus opciones vacías desde `sectionMenuOptions` (hoy, Listas, que
-  // no tiene ni tipo ni agrupación que ofrecer), y la barra se recompone sola en
-  // vez de pintar un desplegable con un único valor inerte.
-  const dropdowns = [
-    options.filters.length
-      ? {
-          key: "filter",
-          label: section === "activity" ? "Acción" : "Tipo",
-          valueLabel: filterLabel,
-          icon: Filter,
-          options: options.filters,
-          value: controls.filter,
-          onChange: (filter) => onChange({ filter }),
-        }
-      : null,
-    {
-      key: "sort",
-      label: "Ordenar",
-      valueLabel: sortLabel,
-      icon: ArrowUpDown,
-      options: options.sorts,
-      value: controls.sort,
-      onChange: (sort) => onChange({ sort }),
-    },
-    options.groups.length
-      ? {
-          key: "group",
-          label: "Agrupar",
-          valueLabel: groupLabel,
-          icon: Layers3,
-          options: options.groups,
-          value: controls.group,
-          onChange: (group) => onChange({ group }),
-        }
-      : null,
-  ].filter(Boolean);
 
   return (
     <section aria-label="Opciones de la sección" className="relative z-20 mb-5 space-y-2 sm:mb-6">
@@ -752,17 +678,7 @@ function ProfileSectionToolbar({ section, controls, onChange }) {
         </button>
       </div>
 
-      {/* Las columnas van en `style` y no en una clase `lg:grid-cols-[...]`
-          porque el número de desplegables depende de la sección y Tailwind no
-          puede generar un valor arbitrario construido en tiempo de ejecución.
-          Por debajo de `lg` el contenedor está oculto, así que el estilo en
-          línea no llega a afectar al layout móvil. */}
-      <div
-        className="hidden gap-2 lg:grid"
-        style={{
-          gridTemplateColumns: `minmax(13rem, 1.35fr) repeat(${dropdowns.length}, minmax(10rem, 1fr)) minmax(10rem, 0.8fr)`,
-        }}
-      >
+      <div className="hidden grid-cols-1 gap-2 lg:grid lg:grid-cols-[minmax(13rem,1.35fr)_repeat(3,minmax(10rem,1fr))_minmax(10rem,0.8fr)]">
         <label className="relative min-w-0">
           <span className="sr-only">Buscar en esta sección</span>
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-400" aria-hidden="true" />
@@ -778,16 +694,16 @@ function ProfileSectionToolbar({ section, controls, onChange }) {
             </button>
           ) : null}
         </label>
-        {dropdowns.map(({ key, ...dropdown }) => (
-          <ProfileMenuDropdown key={key} {...dropdown} />
-        ))}
+        <ProfileMenuDropdown label={section === "activity" ? "Acción" : "Tipo"} valueLabel={filterLabel} icon={Filter} options={options.filters} value={controls.filter} onChange={(filter) => onChange({ filter })} />
+        <ProfileMenuDropdown label="Ordenar" valueLabel={sortLabel} icon={ArrowUpDown} options={options.sorts} value={controls.sort} onChange={(sort) => onChange({ sort })} />
+        <ProfileMenuDropdown label="Agrupar" valueLabel={groupLabel} icon={Layers3} options={options.groups} value={controls.group} onChange={(group) => onChange({ group })} />
         <ProfileViewMode value={controls.view} options={options.views} onChange={handleViewChange} />
       </div>
 
       <div id={`profile-menu-${section}`} className={`${mobileControlsOpen ? "grid" : "hidden"} grid-cols-2 gap-2 lg:hidden`}>
-        {dropdowns.map(({ key, ...dropdown }) => (
-          <ProfileMenuDropdown key={key} {...dropdown} />
-        ))}
+        <ProfileMenuDropdown label={section === "activity" ? "Acción" : "Tipo"} valueLabel={filterLabel} icon={Filter} options={options.filters} value={controls.filter} onChange={(filter) => onChange({ filter })} />
+        <ProfileMenuDropdown label="Ordenar" valueLabel={sortLabel} icon={ArrowUpDown} options={options.sorts} value={controls.sort} onChange={(sort) => onChange({ sort })} />
+        <ProfileMenuDropdown label="Agrupar" valueLabel={groupLabel} icon={Layers3} options={options.groups} value={controls.group} onChange={(group) => onChange({ group })} />
         <ProfileViewMode value={controls.view} options={options.views} onChange={handleViewChange} />
       </div>
     </section>
@@ -1018,59 +934,18 @@ function ReviewCard({ item }) {
   );
 }
 
-function ProfileListCard({ item }) {
-  const posters = Array.isArray(item.previewPosters) ? item.previewPosters.slice(0, 5) : [];
-  return (
-    <Link
-      href={`/lists/${item.id}`}
-      className="group block rounded-xl bg-zinc-900/40 p-4 shadow-sm transition-all hover:bg-zinc-900/60"
-    >
-      <div className="mb-3 flex items-center gap-1.5">
-        {posters.length ? (
-          posters.map((p, i) => (
-            <div
-              key={i}
-              className="h-16 w-11 flex-shrink-0 overflow-hidden rounded-xl bg-zinc-900 shadow-sm"
-              style={{ marginLeft: i === 0 ? 0 : -14, zIndex: 10 - i }}
-            >
-              <OptimizedImage
-                src={`https://image.tmdb.org/t/p/w185${p}`}
-                alt=""
-                className="h-full w-full object-cover"
-                loading="lazy"
-              />
-            </div>
-          ))
-        ) : (
-          <div className="flex h-16 w-11 items-center justify-center rounded-xl bg-zinc-900 text-zinc-700">
-            <ListVideo className="h-5 w-5" />
-          </div>
-        )}
-      </div>
-      <p className="truncate text-sm font-bold text-white group-hover:text-emerald-400">
-        {item.name}
-      </p>
-      <p className="text-xs text-zinc-500">
-        {item.itemCount} {item.itemCount === 1 ? "título" : "títulos"}
-      </p>
-      {item.description && (
-        <p className="mt-1 line-clamp-2 text-xs text-zinc-600">{item.description}</p>
-      )}
-    </Link>
-  );
-}
-
-// ===================== SECCIÓN LISTAS: LAS TRES VISTAS =====================
-// Mismos tres modos que la página /lists —cuadrícula, filas y lista— pintados
-// con el lenguaje visual del perfil (esmeralda, tarjetas del perfil) en vez de
-// portar la barra morada de /lists.
+// ===================== SECCIÓN LISTAS: TARJETA DE PORTADA =====================
+// La MISMA tarjeta que la vista de cuadrícula de /lists: colage de hasta cuatro
+// backdrops, píldora con el nº de títulos y, debajo, nombre y descripción. El
+// colage se comparte de verdad (`ListCoverBackdropCollage`), no se reimplementa.
 //
-// La API del perfil entrega cada lista con nombre, descripción, nº de títulos y
-// hasta CINCO pósters de portada. Eso le basta a la cuadrícula y a la vista de
-// lista; la de FILAS necesita los títulos de verdad, así que se piden por lista
-// —y solo cuando la fila se acerca a la pantalla— con el mismo endpoint que usa
-// /lists (`GET /lists/:id`, que sirve también las listas públicas de otro
-// usuario). Se cachean por lista para que alternar de vista o volver a la
+// La API del perfil entrega cada lista con nombre, descripción y nº de títulos,
+// pero SIN los títulos que la componen y sin backdrops. Hacen falta las dos
+// cosas: los items se piden por lista con el mismo endpoint que usa /lists
+// (`GET /lists/:id`, que sirve también las listas públicas de otro usuario) y su
+// artwork se resuelve con `enrichListPreviewArtwork`, porque el backend guarda
+// el póster de cada item pero no su backdrop. Ambas cosas ocurren solo cuando la
+// tarjeta se acerca a la pantalla, y quedan cacheadas para que volver a la
 // sección no repita ninguna petición.
 const profileListItemsCache = new Map();
 
@@ -1099,7 +974,7 @@ function useInViewOnce(rootMargin = "320px 0px") {
 }
 
 // `null` mientras se piden; array (posiblemente vacío) una vez resueltos.
-function useProfileListItems(listId) {
+function useProfileListPreview(listId) {
   const [ref, inView] = useInViewOnce();
   const key = String(listId || "");
   const [items, setItems] = useState(() => profileListItemsCache.get(key) || null);
@@ -1116,15 +991,22 @@ function useProfileListItems(listId) {
     let alive = true;
     setItems(null);
     getListDetails({ listId: key })
-      .then((detail) => {
-        const next = Array.isArray(detail?.items) ? detail.items : [];
+      .then((detail) =>
+        // Cuatro backdrops es lo que pinta el colage; pedir más artwork sería
+        // gastar peticiones en imágenes que no se ven.
+        enrichListPreviewArtwork(
+          Array.isArray(detail?.items) ? detail.items : [],
+          { resolveImages: fetchTmdbImages, limit: 4 },
+        ),
+      )
+      .then((next) => {
         profileListItemsCache.set(key, next);
         if (alive) setItems(next);
       })
       .catch(() => {
         // Una lista que el visitante no puede abrir (privada, borrada) no debe
-        // dejar la fila girando para siempre: se resuelve vacía y la sección
-        // sigue funcionando.
+        // dejar la portada girando para siempre: se resuelve vacía y el colage
+        // enseña su marcador.
         profileListItemsCache.set(key, []);
         if (alive) setItems([]);
       });
@@ -1137,176 +1019,45 @@ function useProfileListItems(listId) {
   return [ref, items];
 }
 
-function profileListItemHref(entry) {
-  const type = entry?.media_type === "tv" ? "tv" : "movie";
-  return `/details/${type}/${entry?.id}`;
-}
-
-function profileListCountLabel(total) {
-  return `${total} ${total === 1 ? "título" : "títulos"}`;
-}
-
-// Pila de pósters solapados: la portada de una lista en las vistas compactas.
-function ProfileListPosterStack({ posters, size = "h-16 w-11" }) {
-  if (!posters.length) {
-    return (
-      <div className={`${size} flex items-center justify-center rounded-xl bg-zinc-900 text-zinc-700`}>
-        <ListVideo className="h-5 w-5" />
-      </div>
-    );
-  }
+function ProfileListCard({ item }) {
+  const [ref, previewItems] = useProfileListPreview(item.id);
+  const loading = previewItems === null;
+  const total = Number(item?.itemCount ?? item?.item_count ?? 0);
 
   return (
-    <>
-      {posters.map((poster, index) => (
-        <div
-          key={index}
-          className={`${size} flex-shrink-0 overflow-hidden rounded-xl bg-zinc-900 shadow-sm`}
-          style={{ marginLeft: index === 0 ? 0 : -14, zIndex: 10 - index }}
-        >
-          <OptimizedImage
-            src={`https://image.tmdb.org/t/p/w185${poster}`}
-            alt=""
-            className="h-full w-full object-cover"
-            loading="lazy"
-          />
-        </div>
-      ))}
-    </>
-  );
-}
+    <div ref={ref} className="h-full">
+      <Link href={`/lists/${item.id}`} className="group block h-full">
+        <div className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-white/5 bg-zinc-900/40 transition-all md:hover:border-white/10 md:hover:bg-zinc-900/60">
+          <div className="relative aspect-video w-full overflow-hidden bg-zinc-950 transition-opacity md:group-hover:opacity-90">
+            {loading ? (
+              <div className="h-full w-full animate-pulse bg-zinc-900/40" />
+            ) : (
+              <ListCoverBackdropCollage items={previewItems} alt={item.name} />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent opacity-60" />
 
-// VISTA FILAS: cada lista con su cabecera y la fila de sus títulos, como en
-// /lists. Sin ProfileEntrance a propósito: la fila ya aparece cuando entra en
-// pantalla, y un fundido de opacidad por encima dejaría sin desenfoque el
-// cristal de las tarjetas de póster mientras dura.
-function ProfileListRowSection({ item }) {
-  const [ref, listItems] = useProfileListItems(item.id);
-  const total = getItemCount(item);
-  const loading = listItems === null;
-  const entries = Array.isArray(listItems) ? listItems : [];
+            <div className="absolute bottom-3 right-3 flex items-center gap-2 rounded-full border border-white/10 bg-black/60 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-md">
+              <span className="h-1.5 w-1.5 rounded-full bg-purple-500" />
+              {total} items
+            </div>
+          </div>
 
-  return (
-    <section ref={ref} className="space-y-3">
-      <div className="flex items-end justify-between gap-3 border-b border-white/5 pb-2">
-        <Link href={`/lists/${item.id}`} className="group/title min-w-0 focus-visible:outline-none">
-          <h3 className="truncate text-xl font-black text-white transition-colors group-hover/title:text-emerald-400 sm:text-2xl">
-            {item.name}
-          </h3>
-          {item.description ? (
-            <p className="mt-0.5 line-clamp-1 text-xs text-zinc-500">{item.description}</p>
-          ) : null}
-        </Link>
-        <span className="shrink-0 text-xs font-bold uppercase tracking-wider text-zinc-500">
-          {profileListCountLabel(total)}
-        </span>
-      </div>
-
-      {loading ? (
-        <div className="no-scrollbar -mx-4 overflow-x-hidden px-4 sm:mx-0 sm:px-0">
-          <div className="flex gap-3 sm:gap-4">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <div
-                key={index}
-                className="aspect-[2/3] w-[30vw] max-w-[10rem] shrink-0 animate-pulse rounded-2xl bg-white/5 sm:w-32 md:w-36"
-              />
-            ))}
+          <div className="flex flex-1 flex-col p-4">
+            <h3 className="line-clamp-1 text-lg font-bold leading-tight text-white transition-colors md:group-hover:text-purple-400">
+              {item.name}
+            </h3>
+            <p className="mt-1 line-clamp-2 flex-1 text-sm leading-relaxed text-zinc-400">
+              {item.description || (
+                <span className="italic opacity-50">Sin descripción</span>
+              )}
+            </p>
           </div>
         </div>
-      ) : entries.length ? (
-        <div className="no-scrollbar -mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-          <div className="flex gap-3 sm:gap-4">
-            {entries.map((entry, index) => (
-              <div
-                key={`${entry?.media_type}-${entry?.id}-${index}`}
-                className="w-[30vw] max-w-[10rem] shrink-0 sm:w-32 md:w-36"
-              >
-                <ListPosterCard
-                  href={profileListItemHref(entry)}
-                  title={entry?.title || entry?.name || "Sin título"}
-                  mediaType={entry?.media_type === "tv" ? "tv" : "movie"}
-                  posterPath={entry?.poster_path}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <p className="py-6 text-sm text-zinc-500">Esta lista está vacía.</p>
-      )}
-    </section>
-  );
-}
-
-// VISTA LISTA: una fila compacta por lista, para verlas todas de un vistazo.
-function ProfileListCompactRow({ item }) {
-  const posters = Array.isArray(item.previewPosters) ? item.previewPosters.slice(0, 4) : [];
-  const total = getItemCount(item);
-
-  return (
-    <Link
-      href={`/lists/${item.id}`}
-      className="group flex min-w-0 items-center gap-4 rounded-xl bg-gradient-to-br from-white/[0.08] to-white/[0.025] p-2.5 shadow-lg transition hover:from-white/[0.13] hover:to-white/[0.06]"
-    >
-      <span className="flex shrink-0 items-center">
-        <ProfileListPosterStack posters={posters} size="h-14 w-10" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-bold text-white transition-colors group-hover:text-emerald-400">
-          {item.name}
-        </span>
-        {/* En móvil el nº de títulos baja aquí en vez de ocupar su propia
-            columna: compitiendo por el ancho dejaba el nombre de la lista en dos
-            palabras y unos puntos suspensivos. */}
-        <span className="mt-0.5 block truncate text-xs text-zinc-500 sm:hidden">
-          {profileListCountLabel(total)}
-          {item.description ? ` · ${item.description}` : ""}
-        </span>
-        {item.description ? (
-          <span className="mt-0.5 hidden truncate text-xs text-zinc-500 sm:block">{item.description}</span>
-        ) : null}
-      </span>
-      <span className="hidden shrink-0 text-xs font-bold uppercase tracking-wider text-zinc-500 sm:block">
-        {profileListCountLabel(total)}
-      </span>
-      <ChevronRight className="h-4 w-4 shrink-0 text-zinc-600 transition-colors group-hover:text-emerald-400" aria-hidden="true" />
-    </Link>
-  );
-}
-
-function ProfileListsItems({ items, view, animateWithin }) {
-  if (view === "rows") {
-    return (
-      <div className="space-y-10">
-        {items.map((item) => (
-          <ProfileListRowSection key={item.id} item={item} />
-        ))}
-      </div>
-    );
-  }
-
-  if (view === "list") {
-    return (
-      <div className="flex flex-col gap-2">
-        {items.map((item, index) => (
-          <ProfileEntrance key={item.id} index={index} total={items.length} animateWithin={animateWithin}>
-            <ProfileListCompactRow item={item} />
-          </ProfileEntrance>
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {items.map((item, index) => (
-        <ProfileEntrance key={item.id} index={index} total={items.length} animateWithin={animateWithin}>
-          <ProfileListCard item={item} />
-        </ProfileEntrance>
-      ))}
+      </Link>
     </div>
   );
 }
+
 
 function ProfileMediaListItem({ item, showStars, viewerState, compact = false }) {
   const previewClick = usePreviewOpen();
@@ -1866,8 +1617,6 @@ function ProfileContentSection({ username, section, actor }) {
       if (controls.sort === "title-desc") return getItemTitle(b).localeCompare(getItemTitle(a), "es");
       if (controls.sort === "rating-desc") return getItemRating(b) - getItemRating(a);
       if (controls.sort === "rating-asc") return getItemRating(a) - getItemRating(b);
-      if (controls.sort === "items-desc") return getItemCount(b) - getItemCount(a);
-      if (controls.sort === "items-asc") return getItemCount(a) - getItemCount(b);
       const aDate = getItemDate(a)?.getTime() || 0;
       const bDate = getItemDate(b)?.getTime() || 0;
       return controls.sort === "oldest" ? aDate - bDate : bDate - aDate;
@@ -1890,9 +1639,7 @@ function ProfileContentSection({ username, section, actor }) {
     ? activityPosterSourceItems
     : visibleItems;
 
-  // Listas no ofrece "Agrupar", así que tampoco puede arrastrar una agrupación
-  // guardada de una visita anterior: siempre va en un único bloque.
-  const effectiveGroup = section === "lists" ? "none" : controls.group;
+  const effectiveGroup = controls.group;
   const groups = useMemo(
     () => (menuEnabled ? groupProfileItems(displayItems, effectiveGroup, section) : [{ key: "all", label: null, items: displayItems }]),
     [displayItems, effectiveGroup, menuEnabled, section],
@@ -2217,12 +1964,19 @@ function ProfileContentSection({ username, section, actor }) {
                   ))}
                 </div>
               ) : null}
+              {/* Listas: mismas columnas y mismo hueco que la cuadrícula de
+                  /lists. El contenedor del perfil tiene el mismo ancho útil
+                  (`max-w-[1600px]` con idéntico padding), así que copiando los
+                  breakpoints la tarjeta sale EXACTAMENTE del mismo tamaño en las
+                  dos páginas, con cuatro por fila a partir de `xl`. */}
               {config.layout === "lists" ? (
-                <ProfileListsItems
-                  items={group.items}
-                  view={menuEnabled ? controls.view : "grid"}
-                  animateWithin={entranceCount}
-                />
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {group.items.map((item, index) => (
+                    <ProfileEntrance key={item.id} index={index} total={group.items.length} animateWithin={entranceCount}>
+                      <ProfileListCard item={item} />
+                    </ProfileEntrance>
+                  ))}
+                </div>
               ) : null}
               {config.layout === "activity" ? (
                 <ActivityFeed
