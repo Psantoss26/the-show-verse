@@ -166,6 +166,10 @@ import {
 
 // Menu lateral/sticky de navegacion por secciones
 import DetailsSectionMenu from "./DetailsSectionMenu";
+import {
+  DETAILS_STICKY_TOP_DESKTOP,
+  DETAILS_STICKY_TOP_MOBILE,
+} from "@/hooks/useDetailsStickyTop";
 
 // Cache de datos OMDb en localStorage para evitar peticiones repetidas
 import {
@@ -7837,9 +7841,13 @@ export default function DetailsClient({
     awardsLoading,
   ]);
 
-  // Menú global (scroll + sticky + spy). En móvil Details mantiene el navbar
-  // superior compacto (48px); desde `sm` se conserva la referencia de 72px.
-  const STICKY_TOP = isMobileViewport ? 48 : 72;
+  // Menú global (scroll + sticky + spy). Los dos valores salen de
+  // `useDetailsStickyTop`, que es donde viven para que esta ficha y la de actor
+  // no puedan volver a separarse (aquí se usa `isMobileViewport`, que ya existe
+  // para otras diez cosas, en vez de montar una segunda media query).
+  const STICKY_TOP = isMobileViewport
+    ? DETAILS_STICKY_TOP_MOBILE
+    : DETAILS_STICKY_TOP_DESKTOP;
 
   const sentinelRef = useRef(null);
   const menuStickyRef = useRef(null);
@@ -10086,6 +10094,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 }
               >
                 <DetailsScoreboardPanel
+                shareIconOnly={isBackdropPoster}
                 loading={tScoreboard.loading}
                 tmdb={{
                   value:

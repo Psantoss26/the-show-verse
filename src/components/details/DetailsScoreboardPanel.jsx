@@ -334,6 +334,7 @@ function DetailsToolbarActions({
   streamingProviders = null,
   onMoreLinks,
   share = null,
+  shareIconOnly = false,
   toolbarActions = null,
 }) {
   const hasExternalLinks =
@@ -418,6 +419,7 @@ function DetailsToolbarActions({
             title={share.title}
             text={share.text}
             url={share.url}
+            iconOnly={shareIconOnly}
           />
         </div>
       )}
@@ -461,6 +463,9 @@ export default function DetailsScoreboardPanel({
   streamingProviders = null,
   onMoreLinks,
   share = null,
+  // Modo de portada backdrop: el marcador comparte fila con las puntuaciones y
+  // las estadísticas, así que "Compartir" va sin texto para no comerse el ancho.
+  shareIconOnly = false,
   toolbarActions = null,
   className = "",
   children = null,
@@ -529,6 +534,7 @@ export default function DetailsScoreboardPanel({
             streamingProviders={streamingProviders}
             onMoreLinks={onMoreLinks}
             share={share}
+            shareIconOnly={shareIconOnly}
             toolbarActions={toolbarActions}
           />
         </div>
