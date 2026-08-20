@@ -35,12 +35,11 @@ class MediaListenerService : NotificationListenerService() {
     // y control de cadencia de los pings.
     private val syncedByPackage = HashMap<String, SyncedInfo>()
     private val lastProgressAtByPackage = HashMap<String, Long>()
-    // Última posición/duración conocida por paquete (segundos): sirve para volcar
-    // el punto EXACTO al salir cuando la sesión ya no puede leerse.
-    private val lastPosByPackage = HashMap<String, Pair<Long, Long>>()
-    // ¿La posición de este paquete es estimada (la app no la publica)? El servidor
-    // la acepta para "Continuar viendo" pero nunca da nada por visto con ella.
-    private val estimatedByPackage = HashMap<String, Boolean>()
+    // Último punto conocido por paquete (posición, duración y si la posición está
+    // deducida). Sirve para volcar el punto EXACTO al salir, cuando la sesión ya
+    // no puede leerse, y al encadenar con otro contenido. Ver PuntoDeReproduccion:
+    // van juntos a propósito.
+    private val puntos = PuntoDeReproduccion()
 
     private val sessionsListener =
         MediaSessionManager.OnActiveSessionsChangedListener { list ->
@@ -139,8 +138,7 @@ class MediaListenerService : NotificationListenerService() {
             // título, se vuelve a resolver y a retomar el seguimiento de progreso.
             syncedByPackage.remove(pkg)
             lastProgressAtByPackage.remove(pkg)
-            lastPosByPackage.remove(pkg)
-            estimatedByPackage.remove(pkg)
+            puntos.olvidar(pkg)
             lastKeyByPackage.remove(pkg)
         }
 
@@ -181,7 +179,9 @@ class MediaListenerService : NotificationListenerService() {
                     "Continuar viendo, pero no se marcará como visto",
             )
         }
-        estimatedByPackage[pkg] = posicionEstimada
+        // OJO: el punto de este paquete NO se escribe aquí. Hasta que se vuelque el
+        // contenido anterior (más abajo), la caché sigue siendo SUYA y no puede
+        // pisarse con lo que acaba de empezar a sonar.
         val notif = notifExtrasFor(pkg)
         val raw = RawMetadata(
             packageName = pkg,
@@ -239,12 +239,40 @@ class MediaListenerService : NotificationListenerService() {
             return
         }
 
-        // Cachea la última posición/duración conocida (para el volcado al salir). La
-        // duración puede ser 0 (desconocida): el backend la completa desde TMDb.
+        val key = signal.dedupKey
+        val claveAnterior = lastKeyByPackage[pkg]
+        val contenidoNuevo = claveAnterior != null && claveAnterior != key
+
+        // CAMBIO DE CONTENIDO (el típico "siguiente episodio" que arranca solo).
+        //
+        // El volcado del anterior tiene que ir AQUÍ, antes de tocar ninguna caché,
+        // porque todas ellas están indexadas por PAQUETE y no por contenido: en
+        // cuanto se escriben con lo que acaba de empezar, el episodio que se acaba
+        // de terminar ya no tiene dónde consultarse. Antes se volcaba después, y
+        // salía mal por partida doble:
+        //   - Con la POSICIÓN NUEVA (unos segundos) atribuida a la entidad ANTERIOR,
+        //     así que el episodio terminado se guardaba por el minuto 0.
+        //   - Con la marca de estimación NUEVA. Si el episodio siguiente no publica
+        //     posición, el que sí la publicaba y acababa de terminar se volcaba
+        //     como estimado, y el servidor no marca como visto una posición
+        //     estimada: el episodio se quedaba sin registrar. Justo el caso de ver
+        //     una serie del tirón, que es el más habitual.
+        //
+        // Tampoco se le pasa el `controller`: su posición viva ya es la del
+        // contenido NUEVO. Del anterior solo vale lo que quedó cacheado.
+        if (contenidoNuevo) {
+            volcarProgresoCacheado(pkg)
+            syncedByPackage.remove(pkg)
+            lastProgressAtByPackage.remove(pkg)
+            puntos.olvidar(pkg)
+        }
+
+        // A partir de aquí las cachés ya son del contenido ACTUAL. La duración puede
+        // ser 0 (desconocida): el backend la completa desde TMDb.
         val dSec = signal.durationSec
         val pSec = signal.positionSec
-        if (pSec != null && pSec >= 0) {
-            lastPosByPackage[pkg] = pSec to (dSec ?: 0L)
+        if (pSec != null) {
+            puntos.registrar(pkg, pSec, dSec ?: 0L, posicionEstimada)
         }
 
         // Progreso: si ya resolvimos este contenido, enviamos posición/duración
@@ -252,23 +280,8 @@ class MediaListenerService : NotificationListenerService() {
         // siga latiendo mientras se reproduce el mismo título.
         maybeSendProgress(pkg, signal)
 
-        val key = signal.dedupKey
-        if (lastKeyByPackage[pkg] == key) return
-
-        // CAMBIO DE CONTENIDO (el típico "siguiente episodio" que arranca solo).
-        // Antes se olvidaba el anterior sin más, así que su último punto conocido
-        // era el del ping de hacía hasta 30 s y se quedaba ahí para siempre en
-        // "Continuar viendo": nunca llegaba al 90% ni salía de la lista. Se vuelca
-        // ANTES de cambiar de título.
-        if (lastKeyByPackage[pkg] != null) {
-            volcarProgreso(pkg, controller)
-        }
-
+        if (claveAnterior == key) return
         lastKeyByPackage[pkg] = key
-        // Contenido nuevo: reiniciamos el estado de progreso de este paquete.
-        syncedByPackage.remove(pkg)
-        lastProgressAtByPackage.remove(pkg)
-        lastPosByPackage.remove(pkg)
 
         val token = prefs.token ?: return
         val origin = prefs.origin ?: return
@@ -301,12 +314,16 @@ class MediaListenerService : NotificationListenerService() {
     // que suele estar estancada: hay que extrapolar con el tiempo transcurrido ×
     // velocidad.
     //
-    // Y si la app no publica posición, se devuelve NULL. Antes se estimaba con el
-    // reloj de pared desde que empezamos a mirar, y eso no es una posición: al
-    // retomar un episodio por el minuto 40 se enviaba "15 s" y "Continuar viendo"
-    // lo mandaba al principio; y como el porcentaje se calcula contra la duración
-    // de TMDb, un rato largo de reproducción cruzaba el 90% y marcaba como visto
-    // algo que no se había terminado. Mejor no enviar progreso que enviarlo mal.
+    // Si la app no publica posición se devuelve NULL, y quien llama decide: hoy
+    // `evaluate` la deduce con el reloj de pared desde que empezó a mirar, pero
+    // marcándola como ESTIMADA. Esa distinción es la que hace que la deducción sea
+    // aceptable, porque el servidor la trata aparte: sirve para que el título
+    // aparezca en "Continuar viendo" y nunca para dar nada por visto, y además no
+    // puede hacer retroceder una posición real ya guardada. Sin esa marca —que es
+    // justo lo que pasaba cuando el esquema del backend no la declaraba— la
+    // deducción es dañina: al retomar un episodio por el minuto 40 se envía "15 s"
+    // y, como el porcentaje se calcula contra la duración de TMDb, un rato largo de
+    // reproducción cruza el 90% y marca como visto algo sin terminar.
     private fun livePositionMs(controller: MediaController): Long? {
         val ps = controller.playbackState ?: return null
         val base = ps.position
@@ -352,7 +369,7 @@ class MediaListenerService : NotificationListenerService() {
         val origin = prefs.origin ?: return
         SyncClient.sendProgress(
             origin, token, synced, positionSec, durationSec, Platforms.idFor(pkg),
-            estimated = estimatedByPackage[pkg] == true,
+            estimated = puntos.de(pkg)?.estimado == true,
         ) { ok, completed ->
             handler.post {
                 when {
@@ -392,24 +409,39 @@ class MediaListenerService : NotificationListenerService() {
      * envía una posición MENOR que la última conocida de este mismo contenido.
      */
     private fun volcarProgreso(pkg: String, controller: MediaController?) {
-        val synced = syncedByPackage[pkg] ?: return
-        val cached = lastPosByPackage[pkg]
+        val cached = puntos.de(pkg)
         val liveSec = controller?.let { livePositionMs(it) }?.let { it / 1000 }
         val dur = controller?.metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION)
             ?.let { if (it > 0) it / 1000 else null }
-            ?: cached?.second
+            ?: cached?.durSec
             ?: 0L
 
         // El mayor entre lo que dice la sesión y lo último que vimos: una foto
         // obsoleta no puede hacer retroceder el progreso.
-        val pos = maxOf(liveSec ?: 0L, cached?.first ?: 0L)
-        if (pos <= 0L) return
+        val pos = maxOf(liveSec ?: 0L, cached?.posSec ?: 0L)
+        enviarVolcado(pkg, pos, dur, cached?.estimado == true)
+    }
+
+    /**
+     * Volcado del contenido que ACABA de terminar, cuando ya suena otro en el mismo
+     * paquete. Solo mira las cachés: la sesión viva ya está reproduciendo lo
+     * siguiente, así que su posición y su duración no son las de este contenido.
+     */
+    private fun volcarProgresoCacheado(pkg: String) {
+        val cached = puntos.de(pkg) ?: return
+        enviarVolcado(pkg, cached.posSec, cached.durSec, cached.estimado)
+    }
+
+    /** Tronco común de los dos volcados. */
+    private fun enviarVolcado(pkg: String, posSec: Long, durSec: Long, estimado: Boolean) {
+        val synced = syncedByPackage[pkg] ?: return
+        if (posSec <= 0L) return
 
         val token = prefs.token ?: return
         val origin = prefs.origin ?: return
         SyncClient.sendProgress(
-            origin, token, synced, pos, dur, Platforms.idFor(pkg),
-            estimated = estimatedByPackage[pkg] == true,
+            origin, token, synced, posSec, durSec, Platforms.idFor(pkg),
+            estimated = estimado,
         ) { ok, completed ->
             handler.post {
                 if (ok && completed) {
