@@ -28,9 +28,29 @@
   }
 }
 
+/* La app es SIEMPRE oscura: no existe tema claro. Estos dos tokens venían del
+   boilerplate de create-next-app con su par claro/oscuro (#ffffff / #0a0a0a) y
+   el único sitio que los consume es la regla `body` de más abajo.
+
+   Y ahí estaba el problema. `body` lleva la utilidad `bg-black`, pero en
+   Tailwind v4 las utilidades viven dentro de `@layer utilities` y esta hoja
+   escribe `body { background: var(--background) }` FUERA de toda capa: el CSS
+   sin capa gana siempre al que está en una capa, da igual la especificidad. Así
+   que el fondo real del body nunca fue negro, era #0a0a0a —o blanco en un móvil
+   en modo claro—.
+
+   Dentro de la página no se nota, porque todo lo que va encima ya es negro,
+   pero sí se ve en la PWA instalada: Chrome pinta con el color de fondo de la
+   página la franja del sistema donde Android dibuja la barra de gestos, y salía
+   ese gris casi negro. Con el token en negro puro la franja se funde con la app.
+
+   `color-scheme: dark` lo remata: le dice al navegador que pinte de oscuro sus
+   propias superficies (el lienzo antes del primer pintado, el overscroll y los
+   controles nativos) en lugar de asumir un tema claro. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #000000;
+  --foreground: #ededed;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -38,13 +58,6 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 /* Reserva SIEMPRE el hueco de la barra de scroll vertical. Sin esto, al abrir
@@ -84,10 +97,14 @@ html,
 body {
   max-width: 100vw;
   overflow-x: clip;
+  /* El fondo va también en <html>: el navegador pinta su lienzo —lo que se ve
+     por detrás de la página, incluida el área de las barras del sistema en la
+     PWA— con el fondo de <html> y solo recurre al de <body> si <html> no tiene.
+     Ponerlo en los dos evita cualquier destello claro en el primer pintado. */
+  background: var(--background);
 }
 
 body {
-  background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
