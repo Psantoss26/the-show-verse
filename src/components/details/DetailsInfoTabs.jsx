@@ -13,7 +13,7 @@
 //   - "backdrop": Presupuesto/Recaudación/Canal se muestran SOLO si hay valor
 //                 y el tagline usa comillas rectas " ".
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import {
   CalendarIcon,
@@ -40,6 +40,7 @@ import { ExternalLinkButton } from "@/components/details/DetailHeaderBits";
 import { getStatusLabel } from "@/components/details/DetailsMetaGenresRow";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 import { LIQUID_GLASS_SURFACE } from "@/lib/ui/liquidGlass";
+import useHorizontalSwipe from "@/hooks/useHorizontalSwipe";
 
 function InfoGlassPanel({ children, className = "" }) {
   return (
@@ -85,6 +86,40 @@ export default function DetailsInfoTabs({
   const hasAwardItems = awardItems.length > 0;
   const hasAwardsTab = showAwardsTab && (awards || hasAwardItems);
   const hasPlatformsTab = mobileLayout;
+
+  // UNA sola lista de pestañas: la pinta el menú y la recorre el gesto de
+  // deslizar. Si cada uno tuviera la suya se desincronizarían en cuanto una
+  // pestaña condicional (Plataformas, Premios) entra o sale.
+  const tabs = useMemo(
+    () => [
+      { id: "details", label: "Detalles" },
+      { id: "production", label: "Producción" },
+      { id: "synopsis", label: "Sinopsis" },
+      ...(hasPlatformsTab ? [{ id: "platforms", label: "Plataformas" }] : []),
+      ...(hasAwardsTab ? [{ id: "awards", label: "Premios" }] : []),
+    ],
+    [hasPlatformsTab, hasAwardsTab],
+  );
+
+  // En móvil se cambia de sección deslizando sobre la zona de pestañas -- el
+  // menú Y las tarjetas de debajo--, sin tener que apuntar a la etiqueta. Sin
+  // ciclo: en la primera y en la última el gesto no hace nada, que es justo lo
+  // que está prometiendo la posición del subrayado.
+  const goToAdjacentTab = (step) => {
+    setActiveTab((current) => {
+      const index = tabs.findIndex((tab) => tab.id === current);
+      if (index < 0) return current;
+      const next = index + step;
+      return next >= 0 && next < tabs.length ? tabs[next].id : current;
+    });
+  };
+
+  const swipeHandlers = useHorizontalSwipe({
+    enabled: mobileLayout,
+    onSwipeLeft: () => goToAdjacentTab(1),
+    onSwipeRight: () => goToAdjacentTab(-1),
+  });
+
   const genresValue = Array.isArray(genres)
     ? genres
         .filter(Boolean)
@@ -94,16 +129,14 @@ export default function DetailsInfoTabs({
     : "";
 
   return (
-    <>
+    // `contents`: el contenedor existe en el DOM -- los eventos táctiles
+    // burbujean por él-- pero no genera caja, así que el menú y las tarjetas
+    // siguen colocándose en el layout de la ficha exactamente igual que cuando
+    // eran hermanos sueltos dentro de un fragmento.
+    <div className="contents" {...swipeHandlers}>
       {/* ========== MENÚ DE NAVEGACIÓN DE TABS ========== */}
       <DetailsTabsMenu
-        tabs={[
-          { id: "details", label: "Detalles" },
-          { id: "production", label: "Producción" },
-          { id: "synopsis", label: "Sinopsis" },
-          ...(hasPlatformsTab ? [{ id: "platforms", label: "Plataformas" }] : []),
-          ...(hasAwardsTab ? [{ id: "awards", label: "Premios" }] : []),
-        ]}
+        tabs={tabs}
         activeTab={activeTab}
         onChangeTab={setActiveTab}
         layoutId={layoutId}
@@ -521,6 +554,6 @@ export default function DetailsInfoTabs({
           )}
         </AnimatePresence>
       </div>
-    </>
+    </div>
   );
 }
