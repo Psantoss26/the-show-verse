@@ -18,6 +18,10 @@ import {
   normalizeBackendStatus,
   setBackendAuthCookies,
 } from "@/lib/backend/server";
+import {
+  classifyBackendItemStatus,
+  ITEM_STATUS_OUTCOME,
+} from "@/lib/backend/itemStatusOutcome";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -86,9 +90,10 @@ export async function GET(request) {
   }
 
   // ¿El backend —que es de donde sale el estado de esta app— pudo contestar?
-  // Un 404 SÍ es autoritativo: el título no está en las listas del usuario. El
-  // resto de fallos (sin access token disponible durante el refresco, 401
-  // pasajero, 5xx, red) NO dicen nada del estado real.
+  // La clasificación vive en `classifyBackendItemStatus`, con el porqué de cada
+  // caso. En corto: un 404 es autoritativo (no está en sus listas) y un 401 sin
+  // llegar a pedir también lo es (no hay sesión utilizable); lo demás —5xx, red,
+  // timeout— es lo único que de verdad deja el estado sin resolver.
   let backendNoConcluyente = false;
 
   if (tmdbId) {
@@ -102,7 +107,8 @@ export async function GET(request) {
         setBackendAuthCookies(res, backend, { secure: request.nextUrl.protocol === "https:" });
         return noCacheHeaders(res);
       }
-      if (backend.status !== 404) backendNoConcluyente = true;
+      backendNoConcluyente =
+        classifyBackendItemStatus(backend) === ITEM_STATUS_OUTCOME.NO_CONCLUYENTE;
       if (!backend.skipped && backend.status !== 401 && backend.status !== 404) {
         console.warn("Backend item status failed; falling back to Trakt", backend.error);
       }
