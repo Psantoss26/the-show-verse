@@ -324,11 +324,26 @@ const TTL = 1000 * 60 * 5; // Tiempo de vida del cache: 5 minutos
 // Revelado por posición del bloque secundario en móvil (marcador + pestañas).
 //
 // Mismo lenguaje de movimiento que la barra inferior de navegación: una ÚNICA
-// curva y duración para todo lo que se mueve, de modo que opacidad y
-// desplazamiento empiezan y terminan a la vez, y la transición es SIMÉTRICA (se
-// oculta exactamente igual que aparece). Solo se animan `opacity` y `transform`,
-// las dos propiedades que el compositor puede resolver sin recalcular layout:
-// por eso resulta fluida en todo momento aunque el usuario siga desplazándose.
+// curva y duración, y la transición es SIMÉTRICA (se oculta exactamente igual
+// que aparece). Lo que se mueve es el desplazamiento, que el compositor resuelve
+// sin recalcular layout: por eso resulta fluida en todo momento aunque el
+// usuario siga desplazándose.
+//
+// SIN FUNDIDO, y esto NO es una simplificación: se oculta con `invisible` y no
+// con `opacity-0` porque un `opacity` MENOR QUE 1 convierte esta capa en
+// BACKDROP ROOT. Durante los 450ms de la transición, el cristal de todo lo que
+// envuelve —el marcador, el menú de pestañas y las tarjetas de información— se
+// quedaba sin fondo que desenfocar: la pieza entraba PLANA y el vidrio solo
+// "encendía" de golpe en el fotograma en que la opacidad llegaba a 1 exacto.
+// Medido en Chromium con la sonda `backdrop-filter: invert(1)`: con
+// `opacity: 0.99` en el ancestro la sonda queda INERTE; con un desplazamiento en
+// curso, intacta. Es el mismo motivo por el que la entrada `.sv-details-entry`
+// de globals.css tampoco lleva `opacity`, y lo que hace que `DetailsSectionMenu`
+// —que entra solo con un `y: 10 -> 0`— se viera bien desde siempre.
+// `visibility` es discreta pero se interpola justo como hace falta: al mostrar
+// pasa a `visible` en el primer fotograma (la pieza aparece ya con su cristal y
+// solo le queda deslizarse) y al ocultar aguanta visible hasta el final del
+// recorrido, así que la simetría se mantiene.
 //
 // Se hace con transición CSS y no con Framer Motion a propósito: el estado
 // oculto tiene que estar garantizado ya en el primer pintado (antes de que
@@ -338,13 +353,14 @@ const TTL = 1000 * 60 * 5; // Tiempo de vida del cache: 5 minutos
 // estado oculto es el que se transiciona, así que no hay dos sistemas peleando.
 // `translate` va en la lista de propiedades a propósito: Tailwind v4 no compone
 // `translate-y-*` dentro de `transform`, sino en la propiedad INDEPENDIENTE
-// `translate`. Si solo se transiciona `transform`, la opacidad atenúa suave pero
-// el desplazamiento salta de golpe. (`transition-transform` de Tailwind sí las
-// cubre todas; aquí hay que enumerarlas porque el valor es arbitrario.)
+// `translate`. Si no se enumera, el desplazamiento salta de golpe.
+// (`transition-transform` de Tailwind sí las cubre todas; aquí hay que
+// enumerarlas porque el valor es arbitrario.) `visibility` entra en la lista por
+// lo dicho arriba: es la que sustituye al fundido.
 const MOBILE_REVEAL_BASE =
-  "origin-top transform-gpu transition-[opacity,transform,translate,scale,rotate] duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none";
+  "origin-top transform-gpu transition-[visibility,transform,translate,scale,rotate] duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none";
 const MOBILE_REVEAL_HIDDEN =
-  "max-sm:opacity-0 max-sm:translate-y-3 max-sm:pointer-events-none";
+  "max-sm:invisible max-sm:translate-y-3 max-sm:pointer-events-none";
 
 function normalizePlayableVideos(rawVideos) {
   const source = Array.isArray(rawVideos?.results)
