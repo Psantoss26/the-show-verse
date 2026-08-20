@@ -48,6 +48,7 @@ import {
 } from "@/components/details/AnimatedSection";
 import { ExternalLinkButton } from "@/components/details/DetailHeaderBits";
 import DetailsSectionMenu from "./DetailsSectionMenu";
+import useDetailsStickyTop from "@/hooks/useDetailsStickyTop";
 import { careerRange, formatCareerRange } from "@/lib/actor/careerRange";
 
 /* --- CONFIG & UTILS --- */
@@ -2183,7 +2184,9 @@ export default function ActorDetails({
     taggedCount,
   ]);
 
-  const STICKY_TOP = 72;
+  // El navbar superior se hace compacto en móvil: el menú tiene que pegarse a
+  // ÉL, no a la altura de escritorio. Compartido con DetailsClient.
+  const STICKY_TOP = useDetailsStickyTop();
   const sentinelRef = useRef(null);
   const menuStickyRef = useRef(null);
   const sectionElsRef = useRef({});
@@ -2223,7 +2226,7 @@ export default function ActorDetails({
     );
     io.observe(sentinelRef.current);
     return () => io.disconnect();
-  }, []);
+  }, [STICKY_TOP]);
 
   const scrollToSection = useCallback(
     (sid) => {
@@ -2235,7 +2238,7 @@ export default function ActorDetails({
       const y = window.scrollY + el.getBoundingClientRect().top - offset;
       window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
     },
-    [menuH],
+    [menuH, STICKY_TOP],
   );
 
   useEffect(() => {
@@ -2276,7 +2279,7 @@ export default function ActorDetails({
       window.removeEventListener("resize", onScroll);
       if (raf) window.cancelAnimationFrame(raf);
     };
-  }, [sectionItems, menuH]);
+  }, [sectionItems, menuH, STICKY_TOP]);
 
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-emerald-500/30 selection:text-emerald-200">
