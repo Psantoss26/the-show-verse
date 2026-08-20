@@ -11,6 +11,12 @@ const listsPage = readFileSync(
   new URL("../../app/lists/page.jsx", import.meta.url),
   "utf8",
 );
+// El colage de portada ya no vive dentro de /lists: es un componente compartido
+// con la sección Listas del perfil, que pinta la misma tarjeta.
+const coverCollage = readFileSync(
+  new URL("../../components/lists/ListCoverBackdropCollage.jsx", import.meta.url),
+  "utf8",
+);
 
 test("las vistas de listas resuelven backdrop y poster en inglés", async () => {
   clearListPreviewArtworkCache();
@@ -120,13 +126,18 @@ test("solo se resuelve el artwork de los cinco primeros títulos", async () => {
 });
 
 test("grid usa backdrops sin recorte y lista muestra cinco posters completos", () => {
-  const collage = listsPage.slice(
-    listsPage.indexOf("function ListCoverBackdropCollage"),
-    listsPage.indexOf("function ListPreviewPosterStrip"),
+  const collage = coverCollage.slice(
+    coverCollage.indexOf("function ListCoverBackdropCollage"),
   );
   const posterStrip = listsPage.slice(
     listsPage.indexOf("function ListPreviewPosterStrip"),
     listsPage.indexOf("function Dropdown"),
+  );
+  // La tarjeta de la cuadrícula tiene que seguir usando el colage compartido,
+  // en /lists y en el perfil.
+  const profileSection = readFileSync(
+    new URL("../../app/u/[username]/ProfileSection.jsx", import.meta.url),
+    "utf8",
   );
   const listMode = listsPage.slice(
     listsPage.indexOf("const ListModeRow"),
@@ -142,4 +153,6 @@ test("grid usa backdrops sin recorte y lista muestra cinco posters completos", (
   assert.match(posterStrip, /_listPreviewPoster/);
   assert.match(posterStrip, /object-contain/);
   assert.match(listMode, /<ListPreviewPosterStrip/);
+  assert.match(listsPage, /<ListCoverBackdropCollage/);
+  assert.match(profileSection, /<ListCoverBackdropCollage/);
 });
