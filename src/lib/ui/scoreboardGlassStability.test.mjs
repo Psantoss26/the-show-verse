@@ -39,39 +39,25 @@ test("ninguna página altera el cristal del panel al invocarlo", async () => {
   }
 });
 
-test("la columna del marcador es raíz de composición PERMANENTE", async () => {
-  // ESTE es el arreglo. La columna entra con un fundido y `opacity < 1` abre una
-  // raíz de composición: mientras dura, el `backdrop-filter` del panel no ve el
-  // fondo de la página. Al acabar, framer-motion retira la opacidad, la raíz
-  // desaparece y el cristal se "enciende" de golpe -- el salto que se veía en
-  // temporada y episodio y no en la ficha.
-  //
-  // Con `transform-gpu` de CLASE la raíz sobrevive al fundido, igual que en la
-  // ficha completa, y el panel se ve idéntico desde el primer fotograma.
+test("la entrada no atenúa los ancestros del marcador", async () => {
+  // `opacity < 1` en un ancestro convierte la columna en backdrop root y el
+  // ScoreboardPanel no puede desenfocar el fondo hasta terminar el fundido.
+  // El desplazamiento vertical es seguro y conserva el cristal en el primer
+  // fotograma visible, como en DetailsClient.
   for (const url of [SEASON, EPISODE]) {
     const source = await readFile(url, "utf8");
-    assert.match(
-      source,
-      /className="flex-1 flex flex-col min-w-0 w-full transform-gpu"/,
-      "la columna del marcador perdió su raíz de composición permanente",
-    );
-  }
-});
+    const heroStart = source.indexOf("{/* Hero */}");
+    const posterStart = source.indexOf("{/* Left", heroStart);
+    const hero = source.slice(heroStart, posterStart);
+    const columnStart = source.indexOf("{/* Right info", heroStart);
+    const scoreboardStart = source.indexOf("<DetailsScoreboardPanel", columnStart);
+    const column = source.slice(columnStart, scoreboardStart);
 
-test("framer no anima transform en esa columna, o pisaría la clase", async () => {
-  // Si esa columna pasara a animar `y`/`scale`, framer escribiría `transform`
-  // en línea y lo dejaría en `none` al terminar: volvería el salto.
-  for (const url of [SEASON, EPISODE]) {
-    const source = await readFile(url, "utf8");
-    const i = source.indexOf(
-      'className="flex-1 flex flex-col min-w-0 w-full transform-gpu"',
-    );
-    const bloque = source.slice(Math.max(0, i - 700), i);
-    const animadas = [...bloque.matchAll(/[{,]\s*(y|x|scale|rotate):/g)];
-    assert.equal(
-      animadas.length,
-      0,
-      "la columna anima un transform: framer lo dejaría en `none` y el cristal volvería a saltar",
-    );
+    assert.match(hero, /initial=\{\{ y: 16 \}\}/);
+    assert.match(hero, /animate=\{\{ y: 0 \}\}/);
+    assert.doesNotMatch(hero, /opacity:/);
+    assert.match(column, /<div/);
+    assert.doesNotMatch(column, /opacity:/);
+    assert.doesNotMatch(column, /transform-gpu/);
   }
 });

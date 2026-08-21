@@ -13,7 +13,7 @@ import {
 } from "@/lib/ui/liquidGlass";
 
 const ROW_CLASS = `flex w-full flex-nowrap items-center justify-center gap-1 sm:justify-start sm:gap-3
-  [&>*]:flex-1 [&>*]:min-w-[34px] sm:[&>*]:max-w-[52px]
+  [&>*]:flex-1 [&>*]:min-w-[34px] [&>*]:max-w-[60px] sm:[&>*]:max-w-[52px]
   ${MOBILE_ACTION_BUTTON_CLASS}`;
 
 function ActionButton({ label, onClick, children }) {

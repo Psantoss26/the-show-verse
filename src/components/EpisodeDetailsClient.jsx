@@ -1274,8 +1274,8 @@ export default function EpisodeDetailsClient({
       <div className="relative z-10 px-4 py-8 lg:py-12 max-w-7xl mx-auto">
         {/* Hero */}
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ y: 16 }}
+          animate={{ y: 0 }}
           transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
           className="flex flex-col lg:flex-row gap-8 lg:gap-12 mb-10 items-start transform-gpu"
         >
@@ -1365,22 +1365,13 @@ export default function EpisodeDetailsClient({
             )}
           </motion.div>
 
-          {/* Right info + SCOREBOARD + TABS */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{
-              duration: 0.46,
-              delay: 0.04,
-              ease: [0.22, 1, 0.36, 1],
-            }}
-            // Mismo motivo que en la página de temporada: el fundido de esta
-            // columna (`opacity < 1`) abre una raíz de composición que anula el
-            // `backdrop-filter` del ScoreboardPanel, y al terminar la retira,
-            // por lo que el cristal se "encendía" de golpe tras cargar. Con el
-            // transform de clase la raíz es permanente, como en la ficha
-            // completa, y el panel se ve igual desde el primer fotograma.
-            className="flex-1 flex flex-col min-w-0 w-full transform-gpu"
+          {/* Right info + scoreboard */}
+          <div
+            // Un fundido aquí haría que el ancestro del marcador tuviese
+            // `opacity < 1`, anulando su backdrop-filter hasta que terminase.
+            // La entrada vertical del hero ya aporta movimiento sin retrasar el
+            // cristal, igual que DetailsClient.
+            className="flex-1 flex flex-col min-w-0 w-full"
           >
             <div className="mb-5 px-1 flex flex-col items-center lg:items-start text-center lg:text-left w-full">
               <div className="text-xs font-bold uppercase tracking-widest text-zinc-400">
@@ -1481,76 +1472,84 @@ export default function EpisodeDetailsClient({
               }}
               stats={tScoreboard?.stats}
               showFavoritedStat={false}
+              share={{
+                title: epName,
+                text: `Echa un vistazo a ${epName} de ${showName} en The Show Verse`,
+              }}
             />
 
-            {/* Tabs (DETALLES / SINOPSIS) */}
-            <div>
-              <DetailsTabsMenu
-                tabs={[
-                  { id: "details", label: "Detalles" },
-                  { id: "synopsis", label: "Sinopsis" },
-                ]}
-                activeTab={activeTab}
-                onChangeTab={setActiveTab}
-                layoutId="episodeTabInline"
-              />
-
-              <div className="relative min-h-[100px]">
-                <AnimatePresence mode="wait" initial={false}>
-                  {activeTab === "synopsis" && (
-                    <div key="synopsis">
-                      <div className="relative p-5 sm:p-6 rounded-xl overflow-hidden">
-                        {/* Capa de fondo estilo ScoreboardBar (cristal más claro, difuminado de 15px) */}
-                        <div
-                          className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[15px] pointer-events-none overflow-hidden"
-                          style={{
-                            WebkitMaskImage:
-                              "-webkit-radial-gradient(white, black)",
-                          }}
-                        />
-                        <p className="relative z-10 text-zinc-200 text-base md:text-lg leading-relaxed text-justify whitespace-pre-line">
-                          {episode?.overview?.trim() ||
-                            "No hay descripción disponible."}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {activeTab === "details" && (
-                    <div key="details">
-                      <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
-                        <VisualMetaCard
-                          icon={MonitorPlay}
-                          label="Serie"
-                          value={showName}
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                        />
-                        <VisualMetaCard
-                          icon={CalendarIcon}
-                          label="Emisión"
-                          value={airDate || "—"}
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                        />
-                        <VisualMetaCard
-                          icon={ClockIcon}
-                          label="Duración"
-                          value={runtime ? `${runtime} min` : "—"}
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                        />
-                        <VisualMetaCard
-                          icon={StarIcon}
-                          label="Episodio"
-                          value={`T${seasonNumber} · E${episodeNumber}`}
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </div>
-          </motion.div>
+          </div>
         </motion.div>
+
+        {/* El still del episodio es horizontal, igual que una portada en modo
+            backdrop. Por eso sus pestañas se colocan tras el hero: así no
+            quedan limitadas a la columna de texto y usan todo el ancho de la
+            ficha, como en DetailsClient. */}
+        <section className="mb-10 w-full">
+          <DetailsTabsMenu
+            tabs={[
+              { id: "details", label: "Detalles" },
+              { id: "synopsis", label: "Sinopsis" },
+            ]}
+            activeTab={activeTab}
+            onChangeTab={setActiveTab}
+            layoutId="episodeTabBackdrop"
+          />
+
+          <div className="relative min-h-[100px]">
+            <AnimatePresence mode="wait" initial={false}>
+              {activeTab === "synopsis" && (
+                <div key="synopsis">
+                  <div className="relative overflow-hidden rounded-xl p-5 sm:p-6">
+                    {/* Capa de fondo estilo ScoreboardBar (cristal más claro, difuminado de 15px) */}
+                    <div
+                      className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[15px]"
+                      style={{
+                        WebkitMaskImage:
+                          "-webkit-radial-gradient(white, black)",
+                      }}
+                    />
+                    <p className="relative z-10 whitespace-pre-line text-justify text-base leading-relaxed text-zinc-200 md:text-lg">
+                      {episode?.overview?.trim() ||
+                        "No hay descripción disponible."}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === "details" && (
+                <div key="details">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
+                    <VisualMetaCard
+                      icon={MonitorPlay}
+                      label="Serie"
+                      value={showName}
+                      className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                    />
+                    <VisualMetaCard
+                      icon={CalendarIcon}
+                      label="Emisión"
+                      value={airDate || "—"}
+                      className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                    />
+                    <VisualMetaCard
+                      icon={ClockIcon}
+                      label="Duración"
+                      value={runtime ? `${runtime} min` : "—"}
+                      className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                    />
+                    <VisualMetaCard
+                      icon={StarIcon}
+                      label="Episodio"
+                      value={`T${seasonNumber} · E${episodeNumber}`}
+                      className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                    />
+                  </div>
+                </div>
+              )}
+            </AnimatePresence>
+          </div>
+        </section>
 
         {/* === ESTILOS PARA SSR SWIPER FIX (EVITAR SALTOS) === */}
         {!isMounted && (

@@ -24,6 +24,18 @@ export function getCommunityListDetailsCacheKey(listId) {
   return listId ? `showverse:list-details:community:${listId}:v1` : null;
 }
 
+// La caché de una ficha de lista solo puede sembrar el primer render cuando
+// volvemos con atrás/adelante. En una entrada normal se revalida desde la red
+// para no mostrar una lista desactualizada de otra sesión o dispositivo.
+// Mantener esta decisión en un helper permite que listas personales, de
+// comunidad y colecciones respeten exactamente el mismo contrato.
+export function resolveBackNavigationDetailsSnapshot(
+  cached,
+  isBackNavigation,
+) {
+  return isBackNavigation && cached ? cached : null;
+}
+
 export function shouldRenderCachedListDuringAuthHydration({
   canUse,
   hydrated,

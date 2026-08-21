@@ -70,7 +70,6 @@ export const listPosterGridClass =
 export default function ListPosterCard({
   href,
   title = "Sin título",
-  year,
   mediaType = "movie",
   posterPath,
   voteAverage,
@@ -85,13 +84,6 @@ export default function ListPosterCard({
       className={`relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/35 shadow-lg backdrop-blur-[28px] ${className}`}
     >
       <TmdbPoster posterPath={posterPath} alt={title} />
-
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 p-2 pt-10 bg-gradient-to-t from-black/90 via-black/45 to-transparent lg:hidden">
-        {year ? <div className="mb-1 text-[10px] font-bold text-yellow-300">{year}</div> : null}
-        <h3 className="line-clamp-2 text-[11px] font-bold leading-tight text-white drop-shadow-md sm:text-xs">
-          {title}
-        </h3>
-      </div>
 
       {!disableHover ? (
         <>

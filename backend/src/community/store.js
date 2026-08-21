@@ -15,6 +15,7 @@ import { commentRowToApi, listRowToApi } from './normalize.js';
 import { sentimentRowToApi } from './sentiment.js';
 import { getMediaMetadataMap, metadataFor } from '../utils/mediaMetadata.js';
 import { buildRatingSummary, hydrateListRatings, isMissingVoteAverageColumn } from '../utils/listRatings.js';
+import { mergeListItemRatings } from '../utils/listRatingMerge.js';
 
 const communityListItemFields = {
   id: communityListItems.id,
@@ -414,10 +415,11 @@ export async function getCommunityListWithItems({ id, page = 1, limit = 50, view
   });
   const hydrated = await hydrateListItemPosters(items);
   const ratedItems = await hydrateListRatings(allRatingRows);
+  const visibleItems = mergeListItemRatings(hydrated, ratedItems);
   const api = listRowToApi(list);
   return {
     list: { ...api.list, user: api.user },
-    items: hydrated,
+    items: visibleItems,
     ratingSummary: buildRatingSummary(ratedItems),
   };
 }

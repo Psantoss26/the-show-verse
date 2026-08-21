@@ -8,9 +8,13 @@ import FilterableListItems from '@/components/lists/ListDetailsTools'
 import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayout'
 import ListDetailsActionRow from '@/components/lists/ListDetailsActionRow'
 import { formatPageTitle } from '@/lib/pageTitle'
-import { resolveCollectionDetailsInitialState } from '@/lib/lists/detailsInitialState'
+import {
+    resolveBackNavigationDetailsSnapshot,
+    resolveCollectionDetailsInitialState,
+} from '@/lib/lists/detailsInitialState'
 import { ratingSummaryBadge, summarizeListRatings } from '@/lib/lists/ratingSummary'
 import useListImdbRatings from '@/hooks/useListImdbRatings'
+import { useIsHistoryNavigation } from '@/lib/hooks/useIsHistoryNavigation'
 
 const COLLECTION_DETAILS_CACHE_TTL_MS = 30 * 60 * 1000
 
@@ -72,11 +76,17 @@ function MovieCard({ movie, idx, imdbRating, disableHover = false }) {
 
 export default function CollectionDetailsClient({ collectionId }) {
     const router = useRouter()
-    // sessionStorage solo existe en el navegador. Restaurar la caché aquí
-    // desalineaba el primer render del cliente con el HTML del servidor.
-    // El efecto siguiente la aplica inmediatamente después de hidratar.
+    const isBackNav = useIsHistoryNavigation()
+    // El primer frame de una vuelta atrás necesita las películas cacheadas para
+    // que el restaurador de scroll tenga su altura real. En una entrada nueva
+    // se conserva el árbol inicial del servidor y la caché se aplica en efecto.
     const [state, setState] = useState(() =>
-        resolveCollectionDetailsInitialState(null),
+        resolveCollectionDetailsInitialState(
+            resolveBackNavigationDetailsSnapshot(
+                isBackNav ? readCollectionDetailsCache(collectionId) : null,
+                isBackNav,
+            ),
+        ),
     )
 
     useEffect(() => {

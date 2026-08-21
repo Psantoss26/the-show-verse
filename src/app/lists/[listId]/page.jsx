@@ -13,7 +13,11 @@ import FilterableListItems from '@/components/lists/ListDetailsTools'
 import LiquidGlassOpticalLayers from '@/components/ui/LiquidGlassOpticalLayers'
 import { LIQUID_GLASS_CARD, LIQUID_GLASS_PANEL } from '@/lib/ui/liquidGlass'
 import { formatPageTitle } from '@/lib/pageTitle'
-import { shouldRenderCachedListDuringAuthHydration } from '@/lib/lists/detailsInitialState'
+import {
+    resolveBackNavigationDetailsSnapshot,
+    shouldRenderCachedListDuringAuthHydration,
+} from '@/lib/lists/detailsInitialState'
+import { useIsHistoryNavigation } from '@/lib/hooks/useIsHistoryNavigation'
 import { ratingSummaryBadge, summarizeListRatings } from '@/lib/lists/ratingSummary'
 import useListImdbRatings from '@/hooks/useListImdbRatings'
 
@@ -261,12 +265,19 @@ export default function ListDetailsPage() {
 
     const { session, account, hydrated } = useAuth()
     const canUse = useMemo(() => !!session && !!account?.id, [session, account])
+    const isBackNav = useIsHistoryNavigation()
 
-    // La caché vive en sessionStorage, indisponible en SSR. El primer render
-    // debe ser igual en servidor y cliente; `load` restaura la caché tras la
-    // hidratación y luego la revalida en segundo plano.
-    const [data, setData] = useState(null)
-    const [loading, setLoading] = useState(true)
+    // Solo una vuelta atrás puede usar la instantánea en el primer render. Así
+    // el contenido ya existe cuando ScrollRestoration restituye la posición;
+    // en una entrada normal seguimos evitando una caché potencialmente vieja.
+    const [backNavigationSnapshot] = useState(() =>
+        resolveBackNavigationDetailsSnapshot(
+            isBackNav ? readTmdbListDetailsCache(listId) : null,
+            isBackNav,
+        ),
+    )
+    const [data, setData] = useState(backNavigationSnapshot)
+    const [loading, setLoading] = useState(() => !backNavigationSnapshot)
     const [err, setErr] = useState('')
     const [busyId, setBusyId] = useState(null)
     const [clearing, setClearing] = useState(false)

@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
   getCommunityListDetailsCacheKey,
+  resolveBackNavigationDetailsSnapshot,
   resolveCollectionDetailsInitialState,
   resolveCommunityListDetailsInitialState,
   shouldRenderCachedListDuringAuthHydration,
@@ -49,6 +51,27 @@ test("uses the community list id as the cache identity", () => {
     "showverse:list-details:community:c0ffee:v1",
   );
   assert.equal(getCommunityListDetailsCacheKey(null), null);
+});
+
+test("solo si se vuelve atrás la instantánea puede poblar el primer render", () => {
+  const cache = { items: [{ id: 42 }] };
+
+  assert.equal(resolveBackNavigationDetailsSnapshot(cache, true), cache);
+  assert.equal(resolveBackNavigationDetailsSnapshot(cache, false), null);
+  assert.equal(resolveBackNavigationDetailsSnapshot(null, true), null);
+});
+
+test("las tres fichas de lista siembran la caché antes de sus efectos al volver atrás", async () => {
+  const sources = await Promise.all([
+    readFile(new URL("../../components/lists/TraktListDetailsClient.jsx", import.meta.url), "utf8"),
+    readFile(new URL("../../components/lists/CollectionDetailsClient.jsx", import.meta.url), "utf8"),
+    readFile(new URL("../../app/lists/[listId]/page.jsx", import.meta.url), "utf8"),
+  ]);
+
+  for (const source of sources) {
+    assert.match(source, /useIsHistoryNavigation\(\)/);
+    assert.match(source, /resolveBackNavigationDetailsSnapshot\(/);
+  }
 });
 
 test("keeps a cached personal list visible only while auth is hydrating", () => {

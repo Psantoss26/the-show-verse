@@ -15,8 +15,10 @@ import { ratingSummaryBadge } from '@/lib/lists/ratingSummary'
 import useListImdbRatings from '@/hooks/useListImdbRatings'
 import {
     getCommunityListDetailsCacheKey,
+    resolveBackNavigationDetailsSnapshot,
     resolveCommunityListDetailsInitialState,
 } from '@/lib/lists/detailsInitialState'
+import { useIsHistoryNavigation } from '@/lib/hooks/useIsHistoryNavigation'
 
 const PAGE_SIZE = 48
 const TRAKT_LIST_DETAILS_CACHE_TTL_MS = 20 * 60 * 1000
@@ -98,16 +100,22 @@ const tmdbImg = (path, size = 'w500') => path ? `https://image.tmdb.org/t/p/${si
 export default function TraktListDetailsClient({ username, listId }) {
     const router = useRouter()
     const { authenticated = false } = useAuth()
+    const isBackNav = useIsHistoryNavigation()
     const loadMoreRef = useRef(null)
     const stateRef = useRef(null)
     const loadingMoreRef = useRef(false)
 
-    // El servidor no tiene sessionStorage. Sembrar este estado con la caché
-    // durante render hacía que SSR devolviese null y el primer render del
-    // navegador ya montase la ficha completa. La caché sigue restaurándose en
-    // el efecto de carga, pero ambos lados empiezan con el mismo árbol.
+    // Al volver con atrás/adelante el montaje es solo de cliente: sembramos la
+    // instantánea ANTES de los efectos para que ScrollRestoration encuentre la
+    // lista completa al fijar su posición. Una entrada normal sigue arrancando
+    // vacía, igual que el HTML del servidor, y se revalida desde la API.
     const [state, setState] = useState(() =>
-        resolveCommunityListDetailsInitialState(null),
+        resolveCommunityListDetailsInitialState(
+            resolveBackNavigationDetailsSnapshot(
+                isBackNav ? readDetailsCache(listId) : null,
+                isBackNav,
+            ),
+        ),
     )
 
     useEffect(() => {
