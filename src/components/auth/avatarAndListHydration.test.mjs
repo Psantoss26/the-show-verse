@@ -18,6 +18,7 @@ test("el bootstrap del avatar usa el cargador de scripts de Next", async () => {
 
   assert.match(avatarSource, /export const AVATAR_BOOT_SCRIPT/);
   assert.doesNotMatch(avatarSource, /<script/);
+  assert.doesNotMatch(avatarSource, /export default function AvatarBootScript/);
   assert.match(layoutSource, /import Script from "next\/script"/);
   assert.match(layoutSource, /id="avatar-boot"/);
   assert.match(layoutSource, /strategy="beforeInteractive"/);
@@ -41,4 +42,9 @@ test("las fichas de listas no leen sessionStorage durante el primer render", asy
   );
   assert.match(personal, /const \[data, setData\] = useState\(null\)/);
   assert.match(personal, /const \[loading, setLoading\] = useState\(true\)/);
+
+  for (const source of [community, collection, personal]) {
+    assert.match(source, /useClientLayoutEffect/);
+    assert.match(source, /if \(!isBackNav\) return/);
+  }
 });

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useLayoutEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Clock3, ExternalLink, Film } from 'lucide-react'
 import ListPosterCard from '@/components/lists/ListPosterCard'
@@ -9,7 +9,6 @@ import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayou
 import ListDetailsActionRow from '@/components/lists/ListDetailsActionRow'
 import { formatPageTitle } from '@/lib/pageTitle'
 import {
-    resolveBackNavigationDetailsSnapshot,
     resolveCollectionDetailsInitialState,
 } from '@/lib/lists/detailsInitialState'
 import { ratingSummaryBadge, summarizeListRatings } from '@/lib/lists/ratingSummary'
@@ -17,6 +16,7 @@ import useListImdbRatings from '@/hooks/useListImdbRatings'
 import { useIsHistoryNavigation } from '@/lib/hooks/useIsHistoryNavigation'
 
 const COLLECTION_DETAILS_CACHE_TTL_MS = 30 * 60 * 1000
+const useClientLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
 
 function getCollectionDetailsCacheKey(collectionId) {
     return collectionId ? `showverse:list-details:collection:${collectionId}:v1` : null
@@ -77,17 +77,16 @@ function MovieCard({ movie, idx, imdbRating, disableHover = false }) {
 export default function CollectionDetailsClient({ collectionId }) {
     const router = useRouter()
     const isBackNav = useIsHistoryNavigation()
-    // El primer frame de una vuelta atrás necesita las películas cacheadas para
-    // que el restaurador de scroll tenga su altura real. En una entrada nueva
-    // se conserva el árbol inicial del servidor y la caché se aplica en efecto.
-    const [state, setState] = useState(() =>
-        resolveCollectionDetailsInitialState(
-            resolveBackNavigationDetailsSnapshot(
-                isBackNav ? readCollectionDetailsCache(collectionId) : null,
-                isBackNav,
-            ),
-        ),
-    )
+    // Conserva el mismo primer árbol que el servidor. Al regresar, la caché se
+    // incorpora antes del primer repintado para que el scroll siga teniendo la
+    // altura completa de la colección.
+    const [state, setState] = useState(() => resolveCollectionDetailsInitialState(null))
+
+    useClientLayoutEffect(() => {
+        if (!isBackNav) return
+        const cached = readCollectionDetailsCache(collectionId)
+        if (cached) setState(resolveCollectionDetailsInitialState(cached))
+    }, [isBackNav, collectionId])
 
     useEffect(() => {
         document.title = formatPageTitle(state.collection?.name || 'Colección')

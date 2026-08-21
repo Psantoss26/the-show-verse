@@ -4,7 +4,6 @@ import test from "node:test";
 
 import {
   getCommunityListDetailsCacheKey,
-  resolveBackNavigationDetailsSnapshot,
   resolveCollectionDetailsInitialState,
   resolveCommunityListDetailsInitialState,
   shouldRenderCachedListDuringAuthHydration,
@@ -53,15 +52,7 @@ test("uses the community list id as the cache identity", () => {
   assert.equal(getCommunityListDetailsCacheKey(null), null);
 });
 
-test("solo si se vuelve atrás la instantánea puede poblar el primer render", () => {
-  const cache = { items: [{ id: 42 }] };
-
-  assert.equal(resolveBackNavigationDetailsSnapshot(cache, true), cache);
-  assert.equal(resolveBackNavigationDetailsSnapshot(cache, false), null);
-  assert.equal(resolveBackNavigationDetailsSnapshot(null, true), null);
-});
-
-test("las tres fichas de lista siembran la caché antes de sus efectos al volver atrás", async () => {
+test("las tres fichas de lista restauran la caché tras hidratar y antes de pintar", async () => {
   const sources = await Promise.all([
     readFile(new URL("../../components/lists/TraktListDetailsClient.jsx", import.meta.url), "utf8"),
     readFile(new URL("../../components/lists/CollectionDetailsClient.jsx", import.meta.url), "utf8"),
@@ -70,7 +61,8 @@ test("las tres fichas de lista siembran la caché antes de sus efectos al volver
 
   for (const source of sources) {
     assert.match(source, /useIsHistoryNavigation\(\)/);
-    assert.match(source, /resolveBackNavigationDetailsSnapshot\(/);
+    assert.match(source, /useClientLayoutEffect/);
+    assert.match(source, /if \(!isBackNav\) return/);
   }
 });
 
