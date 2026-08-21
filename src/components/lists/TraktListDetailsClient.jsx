@@ -3,12 +3,16 @@
 
 import OptimizedImage from "@/components/OptimizedImage";
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
-import { Loader2, ExternalLink, ChevronDown, UserRound, ListVideo } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Heart, Loader2, ExternalLink, ChevronDown, UserRound, ListVideo } from 'lucide-react'
 import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayout'
+import ListDetailsActionRow from '@/components/lists/ListDetailsActionRow'
 import FilterableListItems from '@/components/lists/ListDetailsTools'
 import ListLikeButton from '@/components/community/ListLikeButton'
 import { useAuth } from '@/context/AuthContext'
 import { formatPageTitle } from '@/lib/pageTitle'
+import { ratingSummaryBadge } from '@/lib/lists/ratingSummary'
+import useListImdbRatings from '@/hooks/useListImdbRatings'
 import {
     getCommunityListDetailsCacheKey,
     resolveCommunityListDetailsInitialState,
@@ -92,13 +96,18 @@ function computeHasMore(list, loadedCount) {
 const tmdbImg = (path, size = 'w500') => path ? `https://image.tmdb.org/t/p/${size}${path}` : null
 
 export default function TraktListDetailsClient({ username, listId }) {
+    const router = useRouter()
     const { authenticated = false } = useAuth()
     const loadMoreRef = useRef(null)
     const stateRef = useRef(null)
     const loadingMoreRef = useRef(false)
 
+    // El servidor no tiene sessionStorage. Sembrar este estado con la caché
+    // durante render hacía que SSR devolviese null y el primer render del
+    // navegador ya montase la ficha completa. La caché sigue restaurándose en
+    // el efecto de carga, pero ambos lados empiezan con el mismo árbol.
     const [state, setState] = useState(() =>
-        resolveCommunityListDetailsInitialState(readDetailsCache(listId)),
+        resolveCommunityListDetailsInitialState(null),
     )
 
     useEffect(() => {
@@ -147,6 +156,7 @@ export default function TraktListDetailsClient({ username, listId }) {
                         loadingMore: false,
                         error: null,
                         list: json?.list || null,
+                        ratingSummary: json?.ratingSummary || null,
                         items,
                         page: 1,
                         // El endpoint {list, items} no trae paginación: la
@@ -163,7 +173,8 @@ export default function TraktListDetailsClient({ username, listId }) {
                         ...p,
                         loading: false,
                         error: e?.message || 'Error',
-                        list: p.list,
+                    list: p.list,
+                    ratingSummary: p.ratingSummary,
                         items: p.items,
                         page: p.page || 1,
                         hasMore: p.hasMore,
@@ -199,7 +210,8 @@ export default function TraktListDetailsClient({ username, listId }) {
                     ...p,
                     loadingMore: false,
                     error: null,
-                    list: json?.list || p.list,
+                        list: json?.list || p.list,
+                        ratingSummary: json?.ratingSummary || p.ratingSummary,
                     items,
                     page: nextPage,
                     hasMore: computeHasMore(json?.list || p.list, items.length),
@@ -238,9 +250,14 @@ export default function TraktListDetailsClient({ username, listId }) {
     const list = state.list
     const items = Array.isArray(state.items) ? state.items : []
     const creatorUsername = list?.user?.username || username || 'Usuario'
+    const listItemCount = Number(list?.item_count || items.length)
+    const { ratingsByKey: imdbRatings, summary: imdbSummary } = useListImdbRatings(items, { totalCount: listItemCount })
 
     const firstPoster = items.find((item) => item?.posterPath)?.posterPath
     const firstBackdrop = firstPoster
+    const posterImages = items
+        .map((item) => tmdbImg(item?.posterPath, 'w342'))
+        .filter(Boolean)
 
     // Item shape nuevo (community_list_items): { tmdbId, mediaType, title, posterPath, addedAt }.
     const getTraktMeta = useCallback((it, index) => {
@@ -253,10 +270,11 @@ export default function TraktListDetailsClient({ username, listId }) {
             year: '',
             posterPath: it?.posterPath || null,
             href: tmdbId && mediaType ? `/details/${mediaType}/${tmdbId}` : null,
-            voteAverage: null,
+            voteAverage: it?.voteAverage ?? null,
+            imdbRating: imdbRatings[`${mediaType === 'tv' ? 'tv' : 'movie'}:${tmdbId}`]?.rating,
             addedAt: it?.addedAt || '',
         }
-    }, [])
+    }, [imdbRatings])
 
     if (state.loading && !list && items.length === 0) {
         return null
@@ -279,24 +297,32 @@ export default function TraktListDetailsClient({ username, listId }) {
             description={list?.description || ''}
             sourceLabel="Lista de la comunidad"
             posterImage={tmdbImg(firstPoster)}
+            posterImages={posterImages}
             backdropImage={tmdbImg(firstBackdrop, 'original')}
-            badges={[]}
-            stats={[
-                { label: 'Elementos', value: Number(list?.item_count || items.length) },
-                { label: 'Usuario', value: `@${creatorUsername}`, icon: UserRound, tone: 'emerald' },
-                { label: 'Likes', value: Number(list?.likes || 0) },
-                { label: 'Fuente', value: 'Comunidad' },
+            scoreboardStats={[
+                { icon: ListVideo, label: 'ELEMENTOS', value: listItemCount, tooltip: 'Títulos de la lista' },
+                { icon: UserRound, label: 'USUARIO', value: `@${creatorUsername}`, tooltip: 'Creador de la lista' },
+                { icon: Heart, label: 'LIKES', value: Number(list?.likes || 0), tooltip: 'Me gusta de la comunidad' },
+                { icon: ExternalLink, label: 'FUENTE', value: 'Comunidad', tooltip: 'Lista de la comunidad' },
             ]}
-            backHref="/lists"
-            rightActions={
-                list?.id ? (
+            scoreboardRatings={{
+                tmdb: ratingSummaryBadge(state.ratingSummary),
+                imdb: ratingSummaryBadge(imdbSummary),
+            }}
+            showTopBar={false}
+            heroActions={
+                <ListDetailsActionRow
+                    onBack={() => router.back()}
+                    favoriteAction={list?.id ? (
                     <ListLikeButton
                         listId={list.id}
                         likes={Number(list?.likes || 0)}
                         liked={Boolean(list?.liked)}
                         canLike={authenticated}
+                        liquidGlass
                     />
-                ) : null
+                    ) : null}
+                />
             }
         >
             {items.length > 0 || !state.loading ? (

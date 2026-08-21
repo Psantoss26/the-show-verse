@@ -2142,6 +2142,7 @@ export default function DetailsClient({
         mediaType: endpointType,
         title: title || undefined,
         posterPath: data?.poster_path || undefined,
+        voteAverage: data?.vote_average,
       });
 
       // Actualizacion optimista: marca como presente antes de confirmar. Solo se
@@ -2222,6 +2223,7 @@ export default function DetailsClient({
         mediaType: endpointType,
         title: title || undefined,
         posterPath: data?.poster_path || undefined,
+        voteAverage: data?.vote_average,
       });
 
       // Refresca todas las listas del usuario para reflejar la nueva lista

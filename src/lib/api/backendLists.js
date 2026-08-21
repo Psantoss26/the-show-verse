@@ -31,6 +31,7 @@ function itemToTmdbShape(it) {
     backdrop_path: null,
     title: it.title || null,
     name: it.title || null,
+    vote_average: Number.isFinite(Number(it.voteAverage)) ? Number(it.voteAverage) : null,
     _listItemId: it.id || null,
   };
 }
@@ -85,10 +86,11 @@ export async function getListDetails({ listId, signal } = {}) {
     page: 1,
     total_pages: 1,
     items,
+    ratingSummary: json?.ratingSummary || null,
   };
 }
 
-export async function addMovieToList({ listId, movieId, mediaType = 'movie', title, posterPath } = {}) {
+export async function addMovieToList({ listId, movieId, mediaType = 'movie', title, posterPath, voteAverage } = {}) {
   await api(`/${encodeURIComponent(listId)}/items`, {
     method: 'POST',
     body: JSON.stringify({
@@ -96,6 +98,7 @@ export async function addMovieToList({ listId, movieId, mediaType = 'movie', tit
       mediaType: mediaType === 'tv' ? 'tv' : 'movie',
       ...(title ? { title } : {}),
       ...(posterPath ? { posterPath } : {}),
+      ...(Number.isFinite(Number(voteAverage)) ? { voteAverage: Number(voteAverage) } : {}),
     }),
   });
   return { ok: true };

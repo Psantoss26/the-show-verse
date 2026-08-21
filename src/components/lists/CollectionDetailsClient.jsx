@@ -1,14 +1,16 @@
 'use client'
 
-import { useEffect, useState, useMemo, useRef } from 'react'
-import { Film, ExternalLink } from 'lucide-react'
-import { getExternalIds } from '@/lib/api/tmdb'
-import { fetchOmdbByImdb } from '@/lib/api/omdb'
+import { useEffect, useState, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
+import { Clock3, ExternalLink, Film } from 'lucide-react'
 import ListPosterCard from '@/components/lists/ListPosterCard'
 import FilterableListItems from '@/components/lists/ListDetailsTools'
 import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayout'
+import ListDetailsActionRow from '@/components/lists/ListDetailsActionRow'
 import { formatPageTitle } from '@/lib/pageTitle'
 import { resolveCollectionDetailsInitialState } from '@/lib/lists/detailsInitialState'
+import { ratingSummaryBadge, summarizeListRatings } from '@/lib/lists/ratingSummary'
+import useListImdbRatings from '@/hooks/useListImdbRatings'
 
 const COLLECTION_DETAILS_CACHE_TTL_MS = 30 * 60 * 1000
 
@@ -69,61 +71,17 @@ function MovieCard({ movie, idx, imdbRating, disableHover = false }) {
 }
 
 export default function CollectionDetailsClient({ collectionId }) {
+    const router = useRouter()
+    // sessionStorage solo existe en el navegador. Restaurar la caché aquí
+    // desalineaba el primer render del cliente con el HTML del servidor.
+    // El efecto siguiente la aplica inmediatamente después de hidratar.
     const [state, setState] = useState(() =>
-        resolveCollectionDetailsInitialState(readCollectionDetailsCache(collectionId)),
+        resolveCollectionDetailsInitialState(null),
     )
-
-    const [imdbRatings, setImdbRatings] = useState({})
-    const imdbIdCacheRef = useRef({})
 
     useEffect(() => {
         document.title = formatPageTitle(state.collection?.name || 'Colección')
     }, [state.collection?.name])
-
-    // Fetch IMDb ratings for movies
-    useEffect(() => {
-        if (!state.parts.length) return
-
-        const fetchImdbRatings = async () => {
-            const ratings = {}
-            
-            // Process movies in batches to avoid overwhelming the API
-            for (const movie of state.parts) {
-                try {
-                    const key = `movie:${movie.id}`
-                    
-                    // Get IMDb ID from TMDb external IDs
-                    let imdbId = imdbIdCacheRef.current[key]
-                    if (!imdbId) {
-                        const ext = await getExternalIds('movie', movie.id)
-                        imdbId = ext?.imdb_id || null
-                        if (imdbId) {
-                            imdbIdCacheRef.current[key] = imdbId
-                        }
-                    }
-
-                    if (!imdbId) continue
-
-                    // Fetch OMDB data
-                    const omdb = await fetchOmdbByImdb(imdbId)
-                    const rating = omdb?.imdbRating && omdb.imdbRating !== 'N/A'
-                        ? Number(omdb.imdbRating)
-                        : null
-
-                    if (rating) {
-                        ratings[key] = rating
-                    }
-                } catch (e) {
-                    // Silently fail for individual movies
-                    console.error(`Error fetching IMDb for movie ${movie.id}:`, e)
-                }
-            }
-
-            setImdbRatings(ratings)
-        }
-
-        fetchImdbRatings()
-    }, [state.parts])
 
     useEffect(() => {
         let cancelled = false
@@ -176,13 +134,17 @@ export default function CollectionDetailsClient({ collectionId }) {
         if (!parts.length) return 0
         return parts.reduce((sum, movie) => sum + (movie.runtime || 0), 0)
     }, [parts])
+    const averageRating = useMemo(() => summarizeListRatings(parts), [parts])
+    const { ratingsByKey: imdbRatings, summary: imdbSummary } = useListImdbRatings(parts, {
+        totalCount: parts.length,
+    })
 
     const filterableParts = useMemo(
         () =>
             parts.map((movie) => ({
                 ...movie,
                 media_type: 'movie',
-                imdbRating: imdbRatings[`movie:${movie.id}`],
+                imdbRating: imdbRatings[`movie:${movie.id}`]?.rating,
             })),
         [parts, imdbRatings]
     )
@@ -204,6 +166,10 @@ export default function CollectionDetailsClient({ collectionId }) {
 
     const collectionPoster = collection?.poster_path || parts.find((movie) => movie?.poster_path)?.poster_path || null
     const collectionBackdrop = collection?.backdrop_path || parts.find((movie) => movie?.backdrop_path)?.backdrop_path || collectionPoster
+    const posterImages = parts
+        .map((movie) => movie?.poster_path || movie?.backdrop_path || null)
+        .filter(Boolean)
+        .map((path) => `https://image.tmdb.org/t/p/w342${path}`)
 
     return (
         <UnifiedListDetailsLayout
@@ -211,23 +177,19 @@ export default function CollectionDetailsClient({ collectionId }) {
             description={collection?.description || ''}
             sourceLabel="Colección TMDb"
             posterImage={collectionPoster ? `https://image.tmdb.org/t/p/w500${collectionPoster}` : null}
+            posterImages={posterImages}
             backdropImage={collectionBackdrop ? `https://image.tmdb.org/t/p/original${collectionBackdrop}` : null}
-            badges={[`${parts.length} películas`, totalRuntime > 0 ? `${Math.round(totalRuntime / 60)}h total` : 'TMDb']}
-            stats={[]}
-            backHref="/lists"
-            rightActions={
-                tmdbUrl ? (
-                    <a
-                        href={tmdbUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-blue-400 hover:border-blue-500/50 transition"
-                        title="Ver en TMDb"
-                    >
-                        <ExternalLink className="w-5 h-5" />
-                    </a>
-                ) : null
-            }
+            scoreboardStats={[
+                { icon: Film, label: 'PELÍCULAS', value: parts.length, tooltip: 'Películas de la colección' },
+                ...(totalRuntime > 0 ? [{ icon: Clock3, label: 'DURACIÓN', value: `${Math.round(totalRuntime / 60)} h`, tooltip: 'Duración total aproximada' }] : []),
+                { icon: ExternalLink, label: 'FUENTE', value: 'TMDb', tooltip: 'Datos de TMDb' },
+            ]}
+            scoreboardRatings={{
+                tmdb: ratingSummaryBadge(averageRating),
+                imdb: ratingSummaryBadge(imdbSummary),
+            }}
+            showTopBar={false}
+            heroActions={<ListDetailsActionRow onBack={() => router.back()} externalHref={tmdbUrl} externalLabel="Ver colección en TMDb" />}
         >
             {parts.length > 0 ? (
                 <FilterableListItems

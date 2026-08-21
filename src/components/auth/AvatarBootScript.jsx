@@ -8,16 +8,15 @@ import { AUTH_USER_CACHE_KEY } from "@/lib/auth/authUserCache";
 // la caché. En una recarga eso son unas décimas en las que el avatar se ve
 // vacío, justo el estado que el respaldo de la inicial debía evitar.
 //
-// Este script va como primer hijo del <body>: un <script> en línea bloquea el
-// parseo, de modo que se ejecuta ANTES de que el navegador construya —y pinte—
-// el navbar que viene debajo. Deja en :root la foto y la inicial del usuario de
-// este dispositivo, y `.avatar-boot` (globals.css) las consume. Sin caché no
-// toca nada y el hueco sigue latiendo como hasta ahora.
+// El layout raíz lo registra con `next/script` y `beforeInteractive`, de modo
+// que Next lo incluye en el HTML inicial antes de hidratar el navbar. Deja en
+// :root la foto y la inicial del usuario de este dispositivo, y `.avatar-boot`
+// (globals.css) las consume. Sin caché no toca nada y el hueco sigue latiendo.
 //
 // Se escribe en variables CSS en vez de tocar el DOM porque el elemento del
 // avatar todavía no existe cuando esto corre, y porque así React puede hidratar
 // después sin encontrarse nodos que él no creó.
-const BOOT_SCRIPT = `(function(){try{
+export const AVATAR_BOOT_SCRIPT = `(function(){try{
 var k=${JSON.stringify(AUTH_USER_CACHE_KEY)};
 var raw=window.localStorage.getItem(k)||window.sessionStorage.getItem(k);
 if(!raw)return;
@@ -35,7 +34,3 @@ root.style.setProperty("--avatar-initial",hasImage?'""':JSON.stringify(letter.to
 root.style.setProperty("--avatar-image",hasImage?"url("+JSON.stringify(src)+")":"none");
 root.setAttribute("data-avatar-boot","");
 }catch(e){}})();`;
-
-export default function AvatarBootScript() {
-  return <script dangerouslySetInnerHTML={{ __html: BOOT_SCRIPT }} />;
-}

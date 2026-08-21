@@ -230,6 +230,9 @@ export const userListItems = pgTable('user_list_items', {
   mediaType: text('media_type').notNull(),
   title: text('title'),
   posterPath: text('poster_path'),
+  // La puntuación pública recibida al añadir el título. Guardarla evita tener
+  // que consultar TMDb otra vez para calcular la media de una lista grande.
+  voteAverage: real('vote_average'),
   position: integer('position').default(0),
   addedAt: timestamp('added_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => ({
@@ -402,6 +405,7 @@ export const communityListItems = pgTable('community_list_items', {
   mediaType: text('media_type').notNull(),
   title: text('title'),
   posterPath: text('poster_path'),
+  voteAverage: real('vote_average'),
   position: integer('position').default(0),
   addedAt: timestamp('added_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => ({

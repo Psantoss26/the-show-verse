@@ -53,6 +53,36 @@ function InfoGlassPanel({ children, className = "" }) {
   );
 }
 
+function CustomInfoCards({ cards = [], mobileLayout = false }) {
+  const availableCards = cards.filter((card) => card?.label && card?.value);
+  if (!availableCards.length) return null;
+
+  return (
+    <div
+      className={
+        mobileLayout
+          ? "flex flex-col gap-3"
+          : "flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]"
+      }
+    >
+      {availableCards.map((card, index) => (
+        <VisualMetaCard
+          key={card.key || `${card.label}-${index}`}
+          icon={card.icon}
+          iconContent={card.iconContent}
+          label={card.label}
+          value={card.value}
+          className={
+            mobileLayout
+              ? "w-full"
+              : "w-full lg:w-auto lg:flex-auto lg:shrink-0"
+          }
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function DetailsInfoTabs({
   variant = "normal",
   layoutId = "detailsTabInline",
@@ -80,25 +110,39 @@ export default function DetailsInfoTabs({
   platforms = [],
   platformLinks = [],
   awardsValue,
+  // Listas y colecciones comparten la navegación y las tarjetas, pero no los
+  // campos propios de una película. Estas dos colecciones permiten expresar
+  // únicamente los metadatos que realmente existen sin falsear etiquetas.
+  detailCards = null,
+  productionCards = null,
+  showDetailsTab = true,
+  showProductionTab = true,
+  // Las listas pueden incluir descripciones muy extensas. Se limita solo en
+  // ese contexto para conservar una ficha compacta sin truncar el contenido.
+  scrollableSynopsis = false,
 }) {
-  const [activeTab, setActiveTab] = useState("details");
+  const [activeTab, setActiveTab] = useState(() =>
+    showDetailsTab ? "details" : showProductionTab ? "production" : "synopsis",
+  );
   const isBackdrop = variant === "backdrop";
   const hasAwardItems = awardItems.length > 0;
   const hasAwardsTab = showAwardsTab && (awards || hasAwardItems);
   const hasPlatformsTab = mobileLayout;
+  const hasCustomDetailCards = Array.isArray(detailCards);
+  const hasCustomProductionCards = Array.isArray(productionCards);
 
   // UNA sola lista de pestañas: la pinta el menú y la recorre el gesto de
   // deslizar. Si cada uno tuviera la suya se desincronizarían en cuanto una
   // pestaña condicional (Plataformas, Premios) entra o sale.
   const tabs = useMemo(
     () => [
-      { id: "details", label: "Detalles" },
-      { id: "production", label: "Producción" },
+      ...(showDetailsTab ? [{ id: "details", label: "Detalles" }] : []),
+      ...(showProductionTab ? [{ id: "production", label: "Producción" }] : []),
       { id: "synopsis", label: "Sinopsis" },
       ...(hasPlatformsTab ? [{ id: "platforms", label: "Plataformas" }] : []),
       ...(hasAwardsTab ? [{ id: "awards", label: "Premios" }] : []),
     ],
-    [hasPlatformsTab, hasAwardsTab],
+    [showDetailsTab, showProductionTab, hasPlatformsTab, hasAwardsTab],
   );
 
   // En móvil se cambia de sección deslizando sobre la zona de pestañas -- el
@@ -154,9 +198,15 @@ export default function DetailsInfoTabs({
                     {isBackdrop ? `"${tagline}"` : `“${tagline}”`}
                   </div>
                 )}
-                <p className="whitespace-pre-line text-justify text-base leading-relaxed text-zinc-200 md:text-lg">
-                  {overview || "No hay descripción disponible."}
-                </p>
+                <div
+                  className={scrollableSynopsis ? "sv-scroll max-h-[11rem] overflow-y-auto pr-3 [overscroll-behavior:contain] [scrollbar-gutter:stable] sm:max-h-[13rem]" : ""}
+                  tabIndex={scrollableSynopsis ? 0 : undefined}
+                  aria-label={scrollableSynopsis ? "Sinopsis completa" : undefined}
+                >
+                  <p className="whitespace-pre-line text-justify text-base leading-relaxed text-zinc-200 md:text-lg">
+                    {overview || "No hay descripción disponible."}
+                  </p>
+                </div>
               </InfoGlassPanel>
             </div>
           )}
@@ -164,7 +214,9 @@ export default function DetailsInfoTabs({
           {/* ===== TAB: DETALLES ===== */}
           {activeTab === "details" && (
             <div key="details">
-              {mobileLayout ? (
+              {hasCustomDetailCards ? (
+                <CustomInfoCards cards={detailCards} mobileLayout={mobileLayout} />
+              ) : mobileLayout ? (
                 <div className="flex flex-col gap-3">
                   <VisualMetaCard
                     icon={mediaType === "movie" ? FilmIcon : MonitorPlay}
@@ -360,7 +412,9 @@ export default function DetailsInfoTabs({
           {/* ===== TAB: PRODUCCIÓN Y EQUIPO ===== */}
           {activeTab === "production" && (
             <div key="production">
-              {mobileLayout ? (
+              {hasCustomProductionCards ? (
+                <CustomInfoCards cards={productionCards} mobileLayout={mobileLayout} />
+              ) : mobileLayout ? (
                 <div className="flex flex-col gap-3">
                   <VisualMetaCard
                     icon={Users}

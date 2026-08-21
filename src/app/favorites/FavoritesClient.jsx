@@ -1,6 +1,7 @@
 // src/app/favorites/FavoritesClient.jsx
 "use client";
 import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
+import { pickBestFavoriteEnglishPoster } from "@/lib/details/tmdbImages";
 
 import OptimizedImage from "@/components/OptimizedImage";
 import {
@@ -725,31 +726,6 @@ function preloadImage(src) {
   });
 }
 
-function pickBestPosterEN(posters) {
-  if (!Array.isArray(posters) || posters.length === 0) return null;
-
-  const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
-  const englishPosters = posters.filter((p) => norm(p?.iso_639_1) === "en");
-  if (!englishPosters.length) return null;
-
-  const maxVotes = englishPosters.reduce(
-    (max, p) => ((p.vote_count || 0) > max ? p.vote_count || 0 : max),
-    0,
-  );
-  const withMaxVotes = englishPosters.filter(
-    (p) => (p.vote_count || 0) === maxVotes,
-  );
-  if (!withMaxVotes.length) return null;
-
-  return (
-    [...withMaxVotes].sort((a, b) => {
-      const va = (b.vote_average || 0) - (a.vote_average || 0);
-      if (va !== 0) return va;
-      return (b.width || 0) - (a.width || 0);
-    })[0] || null
-  );
-}
-
 function pickBestBackdropByLangResVotes(list, opts = {}) {
   const { preferLangs = ["en", "en-US"], minWidth = 1200 } = opts;
   if (!Array.isArray(list) || list.length === 0) return null;
@@ -838,7 +814,7 @@ async function fetchBestPosterEN(type, id) {
     // 429 en ~13% de las tarjetas, que acababan en el backdrop crudo.
     const j = await fetchTmdbImages(type, id);
     if (!j) return null;
-    return pickBestPosterEN(j?.posters)?.file_path || null;
+    return pickBestFavoriteEnglishPoster(j?.posters)?.file_path || null;
   } catch {
     return null;
   }

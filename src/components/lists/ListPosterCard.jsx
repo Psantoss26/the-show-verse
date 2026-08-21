@@ -4,9 +4,10 @@
 import OptimizedImage from "@/components/OptimizedImage";
 import Link from "next/link";
 import { useState } from "react";
-import { ImageOff } from "lucide-react";
+import { Film, ImageOff, MonitorPlay } from "lucide-react";
+import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 
-function TmdbPoster({ posterPath, alt, enableHover = true }) {
+function TmdbPoster({ posterPath, alt }) {
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
@@ -24,19 +25,42 @@ function TmdbPoster({ posterPath, alt, enableHover = true }) {
       <OptimizedImage
         src={`https://image.tmdb.org/t/p/w500${posterPath}`}
         alt={alt}
-        className={`h-full w-full object-cover transition-all duration-500 ease-out transform-gpu ${
-          enableHover
-            ? "md:group-hover/card:scale-[1.08] md:group-hover/card:-translate-y-1 md:group-hover/card:grayscale-0 md:group-focus/card:scale-[1.08] md:group-focus/card:-translate-y-1 md:group-focus/card:grayscale-0 grayscale-[18%]"
-            : ""
-        } ${
-          loaded ? "opacity-100" : "opacity-0"
-        }`}
+        className={`h-full w-full object-cover transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
         loading="lazy"
         draggable={false}
         onLoad={() => setLoaded(true)}
         onError={() => setFailed(true)}
       />
     </>
+  );
+}
+
+function ListDetailsHoverIndicator({ mediaType, voteAverage, imdbRating }) {
+  const tmdbScore = Number(voteAverage);
+  const imdbScore = Number(imdbRating);
+  const hasTmdbScore = Number.isFinite(tmdbScore) && tmdbScore > 0;
+  const hasImdbScore = Number.isFinite(imdbScore) && imdbScore > 0;
+  const isTv = mediaType === "tv";
+
+  return (
+    <div
+      className={`pointer-events-none absolute bottom-2 left-1/2 z-20 hidden -translate-x-1/2 translate-y-3 scale-95 items-center overflow-hidden rounded-full px-1.5 opacity-0 ${LIQUID_GLASS_PANEL} text-white shadow-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none lg:flex lg:group-hover/card:translate-y-0 lg:group-hover/card:scale-100 lg:group-hover/card:opacity-100 lg:group-focus-visible/card:translate-y-0 lg:group-focus-visible/card:scale-100 lg:group-focus-visible/card:opacity-100 will-change-transform transform-gpu`}
+      aria-hidden="true"
+    >
+      <span className={`flex h-9 w-10 shrink-0 items-center justify-center ${isTv ? "text-violet-400" : "text-sky-400"}`}>
+        {isTv ? <MonitorPlay className="h-5 w-5" /> : <Film className="h-5 w-5" />}
+      </span>
+      {hasTmdbScore ? (
+        <span className="flex h-9 w-10 shrink-0 items-center justify-center text-xl font-black leading-none tabular-nums text-sky-400">
+          {tmdbScore.toFixed(1)}
+        </span>
+      ) : null}
+      {hasImdbScore ? (
+        <span className="flex h-9 w-10 shrink-0 items-center justify-center text-xl font-black leading-none tabular-nums text-amber-300">
+          {imdbScore.toFixed(1)}
+        </span>
+      ) : null}
+    </div>
   );
 }
 
@@ -56,26 +80,13 @@ export default function ListPosterCard({
   className = "",
   disableHover = false,
 }) {
-  const rating =
-    typeof voteAverage === "number" && voteAverage > 0
-      ? voteAverage.toFixed(1)
-      : null;
-  const imdb =
-    typeof imdbRating === "number" && imdbRating > 0
-      ? imdbRating.toFixed(1)
-      : null;
-
   const content = (
     <div
-      className={`relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/35 shadow-lg backdrop-blur-[28px] transition-all duration-500 transform-gpu ${
-        disableHover
-          ? ""
-          : "md:group-hover/card:-translate-y-1.5 md:group-hover/card:shadow-[0_20px_45px_rgba(0,0,0,0.34)] md:group-focus/card:-translate-y-1.5 md:group-focus/card:shadow-[0_20px_45px_rgba(0,0,0,0.34)]"
-      } ${className}`}
+      className={`relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/35 shadow-lg backdrop-blur-[28px] ${className}`}
     >
-      <TmdbPoster posterPath={posterPath} alt={title} enableHover={!disableHover} />
+      <TmdbPoster posterPath={posterPath} alt={title} />
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 p-2 pt-10 bg-gradient-to-t from-black/90 via-black/45 to-transparent md:hidden">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 p-2 pt-10 bg-gradient-to-t from-black/90 via-black/45 to-transparent lg:hidden">
         {year ? <div className="mb-1 text-[10px] font-bold text-yellow-300">{year}</div> : null}
         <h3 className="line-clamp-2 text-[11px] font-bold leading-tight text-white drop-shadow-md sm:text-xs">
           {title}
@@ -84,40 +95,12 @@ export default function ListPosterCard({
 
       {!disableHover ? (
         <>
-          <div className="pointer-events-none absolute inset-x-0 top-0 z-10 hidden items-start justify-between gap-3 p-3 opacity-0 transition-all duration-500 ease-out transform-gpu md:flex md:-translate-y-2 md:group-hover/card:translate-y-0 md:group-hover/card:opacity-100 md:group-focus/card:translate-y-0 md:group-focus/card:opacity-100">
-            <div />
-            <div className="flex flex-col items-end gap-1">
-              {rating ? (
-                <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                  <span className="font-mono text-[10px] font-black tracking-tight text-emerald-400 sm:text-xs">
-                    {rating}
-                  </span>
-                  <OptimizedImage src="/logo-TMDb.png" alt="" className="h-2 w-auto sm:h-2.5" draggable={false} />
-                </div>
-              ) : null}
-              {imdb ? (
-                <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                  <span className="font-mono text-[10px] font-black tracking-tight text-yellow-400 sm:text-xs">
-                    {imdb}
-                  </span>
-                  <OptimizedImage src="/logo-IMDb.svg" alt="" className="h-2.5 w-auto sm:h-3" draggable={false} />
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="pointer-events-none absolute inset-0 z-0 hidden bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 transition-opacity duration-500 md:block md:group-hover/card:opacity-100 md:group-focus/card:opacity-100" />
-
-          <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-10 hidden p-3 pb-4 opacity-0 transition-all duration-500 ease-out transform-gpu md:block md:translate-y-2 md:group-hover/card:translate-y-0 md:group-hover/card:opacity-100 md:group-focus/card:translate-y-0 md:group-focus/card:opacity-100">
-            <h3 className="line-clamp-2 text-xs font-extrabold leading-tight text-white drop-shadow-sm sm:text-sm">
-              {title}
-            </h3>
-            {year ? (
-              <p className="mt-0.5 text-[10px] font-semibold leading-tight text-zinc-300 transition-colors duration-300 line-clamp-1 drop-shadow-sm group-hover/card:text-purple-400 sm:text-xs">
-                {year}
-              </p>
-            ) : null}
-          </div>
+          <div className="pointer-events-none absolute inset-0 z-30 rounded-[inherit] transition-shadow duration-300 lg:group-hover/card:shadow-[inset_0_0_0_2px_rgba(168,85,247,0.92)] lg:group-focus-visible/card:shadow-[inset_0_0_0_2px_rgba(168,85,247,0.92)]" />
+          <ListDetailsHoverIndicator
+            mediaType={mediaType}
+            voteAverage={voteAverage}
+            imdbRating={imdbRating}
+          />
         </>
       ) : null}
 
@@ -138,7 +121,7 @@ export default function ListPosterCard({
   return (
     <Link
       href={href}
-      className="group/card relative block w-full select-none focus:outline-none"
+      className="group/card relative block w-full select-none focus:outline-none focus-visible:rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-300"
       draggable={false}
       onClick={onClick}
       onMouseEnter={handlePrefetch}

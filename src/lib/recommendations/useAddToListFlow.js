@@ -82,6 +82,7 @@ export default function useAddToListFlow() {
           mediaType: item.mediaType === "tv" ? "tv" : "movie",
           title: item.title,
           posterPath: item.posterPath,
+          voteAverage: item.voteAverage ?? item.vote_average ?? item.tmdbRating,
         });
         setAddedListIds((prev) => ({ ...prev, [lid]: true }));
       } catch (err) {
@@ -111,6 +112,7 @@ export default function useAddToListFlow() {
           mediaType: item.mediaType === "tv" ? "tv" : "movie",
           title: item.title,
           posterPath: item.posterPath,
+          voteAverage: item.voteAverage ?? item.vote_average ?? item.tmdbRating,
         });
         setAddedListIds((prev) => ({ ...prev, [lid]: true }));
       }

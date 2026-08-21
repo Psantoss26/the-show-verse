@@ -103,7 +103,7 @@ export async function runSeed({ tmdbId, mediaType }) {
             const m = it.movie || it.show; const isTv = !!it.show;
             const itemTmdbId = m?.ids?.tmdb; if (!itemTmdbId) return null;
             return { tmdbId: itemTmdbId, mediaType: isTv ? 'tv' : 'movie', title: m?.title || null,
-              posterPath: null }; // hydrated below for the first 5 (preview posters); rest stay null
+              posterPath: null, voteAverage: null }; // hydrated below for the first 5 (preview posters); rest stay null
           }).filter(Boolean).slice(0, 150);
         }
         // Hidrata el poster de los primeros 5 miembros vía TMDb (coste acotado);
@@ -112,6 +112,7 @@ export async function runSeed({ tmdbId, mediaType }) {
           try {
             const d = await tmdbDetails(m.mediaType === 'tv' ? 'tv' : 'movie', m.tmdbId);
             m.posterPath = d?.poster_path || null;
+            m.voteAverage = Number.isFinite(Number(d?.vote_average)) ? Number(d.vote_average) : null;
           } catch {
             // best-effort: deja posterPath en null si TMDb falla
           }

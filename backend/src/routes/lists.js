@@ -6,6 +6,35 @@ import { db } from '../db/client.js';
 import { userLists, userListItems } from '../db/schema.js';
 import { eq, and, asc, desc, sql } from 'drizzle-orm';
 import { getMediaMetadataMap, metadataFor } from '../utils/mediaMetadata.js';
+import { buildRatingSummary, hydrateListRatings, isMissingVoteAverageColumn } from '../utils/listRatings.js';
+
+const userListItemFields = {
+  id: userListItems.id,
+  listId: userListItems.listId,
+  tmdbId: userListItems.tmdbId,
+  mediaType: userListItems.mediaType,
+  title: userListItems.title,
+  posterPath: userListItems.posterPath,
+  position: userListItems.position,
+  addedAt: userListItems.addedAt,
+};
+
+async function readUserListItems(listId) {
+  const read = (includeStoredRating) => db
+    .select(includeStoredRating
+      ? { ...userListItemFields, voteAverage: userListItems.voteAverage }
+      : userListItemFields)
+    .from(userListItems)
+    .where(eq(userListItems.listId, listId))
+    .orderBy(asc(userListItems.position), desc(userListItems.addedAt));
+
+  try {
+    return await read(true);
+  } catch (error) {
+    if (!isMissingVoteAverageColumn(error)) throw error;
+    return read(false);
+  }
+}
 
 const listSchema = z.object({
   name: z.string().min(1).max(100),
@@ -23,6 +52,7 @@ const listItemSchema = z.object({
   mediaType: z.enum(['movie', 'tv']),
   title: z.string().optional(),
   posterPath: z.string().optional(),
+  voteAverage: z.number().min(0).max(10).optional(),
   position: z.number().int().min(0).optional(),
 });
 
@@ -78,15 +108,14 @@ export default async function listsRoutes(fastify) {
       return reply.status(404).send({ error: 'List not found' });
     }
 
-    const items = await db
-      .select()
-      .from(userListItems)
-      .where(eq(userListItems.listId, list.id))
-      .orderBy(asc(userListItems.position), desc(userListItems.addedAt));
+    const items = await readUserListItems(list.id);
+
+    const ratedItems = await hydrateListRatings(items);
 
     return reply.send({
       list,
-      items,
+      items: ratedItems,
+      ratingSummary: buildRatingSummary(ratedItems),
       canEdit: list.userId === req.user.id,
     });
   });
@@ -131,7 +160,7 @@ export default async function listsRoutes(fastify) {
       return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
     }
 
-    let { tmdbId, mediaType, title, posterPath, position = 0 } = parsed.data;
+    let { tmdbId, mediaType, title, posterPath, voteAverage, position = 0 } = parsed.data;
 
     // Enriquecer título/poster desde TMDb (cacheado) si el cliente no los aportó,
     // para que la tarjeta muestre portada aunque solo se pase el tmdbId.
@@ -148,10 +177,10 @@ export default async function listsRoutes(fastify) {
 
     const [item] = await db
       .insert(userListItems)
-      .values({ listId: list.id, tmdbId, mediaType, title, posterPath, position })
+      .values({ listId: list.id, tmdbId, mediaType, title, posterPath, voteAverage, position })
       .onConflictDoUpdate({
         target: [userListItems.listId, userListItems.tmdbId, userListItems.mediaType],
-        set: { position, addedAt: new Date() },
+        set: { position, voteAverage, addedAt: new Date() },
       })
       .returning();
 

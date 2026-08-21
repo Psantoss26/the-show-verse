@@ -1,18 +1,21 @@
 // /src/app/lists/[listId]/page.jsx
 'use client'
 
-import OptimizedImage from "@/components/OptimizedImage";
-import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { AnimatePresence, motion } from 'framer-motion'
 
 import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayout'
+import ListDetailsActionRow from '@/components/lists/ListDetailsActionRow'
 import ListPosterCard, { listPosterGridClass } from '@/components/lists/ListPosterCard'
 import FilterableListItems from '@/components/lists/ListDetailsTools'
+import LiquidGlassOpticalLayers from '@/components/ui/LiquidGlassOpticalLayers'
+import { LIQUID_GLASS_CARD, LIQUID_GLASS_PANEL } from '@/lib/ui/liquidGlass'
 import { formatPageTitle } from '@/lib/pageTitle'
 import { shouldRenderCachedListDuringAuthHydration } from '@/lib/lists/detailsInitialState'
+import { ratingSummaryBadge, summarizeListRatings } from '@/lib/lists/ratingSummary'
+import useListImdbRatings from '@/hooks/useListImdbRatings'
 
 import {
     getListDetails,
@@ -30,7 +33,6 @@ import {
     Trash2,
     Eraser,
     ListVideo,
-    Pencil,
     Check,
     Search,
     Plus,
@@ -39,32 +41,14 @@ import {
     Clapperboard,
     CalendarClock,
     ChevronDown,
-    Save
+    Save,
+    Globe2,
+    LockKeyhole,
+    MonitorPlay,
+    X
 } from 'lucide-react'
 
 // --- COMPONENTES UI ---
-
-function TmdbPoster({ path, alt, className = '' }) {
-    const [failed, setFailed] = useState(false)
-
-    if (!path || failed) {
-        return (
-            <div className={`bg-zinc-900 flex items-center justify-center text-zinc-700 ${className}`}>
-                <ListVideo className="w-8 h-8 opacity-50" />
-            </div>
-        )
-    }
-
-    return (
-        <OptimizedImage
-            src={`https://image.tmdb.org/t/p/w500${path}`}
-            alt={alt}
-            className={className}
-            loading="lazy"
-            onError={() => setFailed(true)}
-        />
-    )
-}
 
 function Segmented({ options, value, onChange }) {
     return (
@@ -197,6 +181,75 @@ function CatalogDropdown({ value, onChange }) {
     )
 }
 
+function ListActionDialog({ open, onClose, title, children }) {
+    const dialogRef = useRef(null)
+
+    useEffect(() => {
+        const dialog = dialogRef.current
+        if (!dialog) return
+
+        if (open && !dialog.open) dialog.showModal()
+        if (!open && dialog.open) dialog.close()
+    }, [open])
+
+    return (
+        <dialog
+            ref={dialogRef}
+            aria-label={title}
+            closedby="any"
+            onClose={onClose}
+            onClick={(event) => {
+                if (event.target === event.currentTarget) onClose()
+            }}
+            className="m-auto w-[calc(100%-2rem)] max-w-3xl overflow-visible border-0 bg-transparent p-0 text-zinc-100 shadow-none backdrop:bg-black/60 backdrop:backdrop-blur-lg"
+        >
+            <div className={`relative isolate max-h-[85vh] overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}>
+                <LiquidGlassOpticalLayers />
+
+                <div className="relative z-10 flex items-start justify-between gap-4 border-b border-white/[0.08] bg-white/[0.025] px-5 py-5 sm:px-7 sm:py-6">
+                    <div className="min-w-0">
+                        <h2 className="text-xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400 sm:text-2xl">
+                            {title}
+                        </h2>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/[0.06] text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-[6px] transition hover:-translate-y-0.5 hover:bg-white/[0.1] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400"
+                        aria-label="Cerrar"
+                    >
+                        <X className="h-4 w-4" />
+                    </button>
+                </div>
+
+                <div className="relative z-10 px-5 pb-5 sm:px-7 sm:pb-7">
+                    {children}
+                </div>
+            </div>
+        </dialog>
+    )
+}
+
+function DialogButton({ children, tone = 'neutral', ...props }) {
+    const toneClass = {
+        neutral: 'text-zinc-100 hover:brightness-110',
+        primary: 'text-violet-100 hover:text-white',
+        warning: 'text-amber-100 hover:text-amber-50',
+        danger: 'text-red-100 hover:text-white',
+    }[tone] || 'text-zinc-100'
+
+    return (
+        <button
+            type="button"
+            className={`relative isolate inline-flex min-h-11 items-center justify-center gap-2 overflow-hidden rounded-xl px-4 text-sm font-bold transition hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-purple-400/70 disabled:cursor-not-allowed disabled:opacity-50 ${LIQUID_GLASS_CARD} ${toneClass}`}
+            {...props}
+        >
+            <LiquidGlassOpticalLayers />
+            <span className="relative z-10 inline-flex items-center gap-2">{children}</span>
+        </button>
+    )
+}
+
 // --- PÁGINA PRINCIPAL ---
 
 export default function ListDetailsPage() {
@@ -209,22 +262,25 @@ export default function ListDetailsPage() {
     const { session, account, hydrated } = useAuth()
     const canUse = useMemo(() => !!session && !!account?.id, [session, account])
 
-    const [data, setData] = useState(() => readTmdbListDetailsCache(listId))
-    const [loading, setLoading] = useState(() => !readTmdbListDetailsCache(listId))
+    // La caché vive en sessionStorage, indisponible en SSR. El primer render
+    // debe ser igual en servidor y cliente; `load` restaura la caché tras la
+    // hidratación y luego la revalida en segundo plano.
+    const [data, setData] = useState(null)
+    const [loading, setLoading] = useState(true)
     const [err, setErr] = useState('')
     const [busyId, setBusyId] = useState(null)
     const [clearing, setClearing] = useState(false)
     const [deleting, setDeleting] = useState(false)
 
+    const [actionDialog, setActionDialog] = useState(null)
+
     // Edit
-    const [editing, setEditing] = useState(false)
     const [editName, setEditName] = useState('')
     const [editDesc, setEditDesc] = useState('')
     const [savingEdit, setSavingEdit] = useState(false)
 
-    // Tabs
-    const [tab, setTab] = useState('items')
     const items = Array.isArray(data?.items) ? data.items : []
+    const { ratingsByKey: imdbRatings, summary: imdbSummary } = useListImdbRatings(items, { totalCount: items.length })
     // La edición solo se habilita cuando el backend confirma que esta lista
     // pertenece a la sesión actual. Así una caché antigua no expone controles
     // de gestión al abrir una lista desde otro perfil.
@@ -239,8 +295,15 @@ export default function ListDetailsPage() {
         [items]
     )
     const filterableItems = useMemo(
-        () => items.map((item) => ({ ...item, media_type: item?.media_type || 'movie' })),
-        [items]
+        () => items.map((item) => {
+            const mediaType = item?.media_type === 'tv' ? 'tv' : 'movie'
+            return {
+                ...item,
+                media_type: mediaType,
+                imdbRating: imdbRatings[`${mediaType}:${item?.id}`]?.rating,
+            }
+        }),
+        [items, imdbRatings]
     )
 
     // Add: search + catalog
@@ -291,7 +354,7 @@ export default function ListDetailsPage() {
 
     // Search debounce
     useEffect(() => {
-        if (tab !== 'add' || addMode !== 'search') return
+        if (actionDialog !== 'add' || addMode !== 'search') return
 
         if (debounceRef.current) clearTimeout(debounceRef.current)
         const query = q.trim()
@@ -323,11 +386,11 @@ export default function ListDetailsPage() {
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current)
         }
-    }, [q, tab, addMode])
+    }, [q, actionDialog, addMode])
 
     // Catalog load
     useEffect(() => {
-        if (tab !== 'add' || addMode !== 'catalog') return
+        if (actionDialog !== 'add' || addMode !== 'catalog') return
         let ignore = false
 
         const run = async () => {
@@ -351,7 +414,7 @@ export default function ListDetailsPage() {
         return () => {
             ignore = true
         }
-    }, [cat, tab, addMode])
+    }, [cat, actionDialog, addMode])
 
     const handleRemove = async (movie) => {
         const movieId = typeof movie === 'object' ? movie?.id : movie
@@ -394,6 +457,7 @@ export default function ListDetailsPage() {
                 mediaType: movie.media_type === 'tv' ? 'tv' : 'movie',
                 title: movie.title || movie.name || null,
                 posterPath: movie.poster_path || null,
+                voteAverage: movie.vote_average,
             })
             setData((prev) => {
                 if (!prev) return prev
@@ -412,13 +476,12 @@ export default function ListDetailsPage() {
 
     const handleClear = async () => {
         if (!canManage || !listId) return
-        const ok = window.confirm('¿Vaciar la lista por completo?')
-        if (!ok) return
         setClearing(true)
         setErr('')
         try {
             await clearList({ listId })
             await load()
+            setActionDialog(null)
         } catch (e) {
             setErr(e?.message || 'Error vaciando lista')
         } finally {
@@ -428,8 +491,6 @@ export default function ListDetailsPage() {
 
     const handleDeleteList = async () => {
         if (!canManage || !listId) return
-        const ok = window.confirm('¿Borrar la lista definitivamente?')
-        if (!ok) return
         setDeleting(true)
         setErr('')
         try {
@@ -458,7 +519,7 @@ export default function ListDetailsPage() {
                 items
             })
 
-            setEditing(false)
+            setActionDialog(null)
 
             // Si tu update recrea lista y cambia el id
             if (res?.recreated && res?.listId && String(res.listId) !== String(listId)) {
@@ -482,149 +543,50 @@ export default function ListDetailsPage() {
     })) return null
     if (loading && !data) return null
 
-    const gridItems = tab === 'items' ? items : addMode === 'search' ? searchRes : catRes
-    const coverItem = items.find((item) => item?.poster_path || item?.backdrop_path) || gridItems.find((item) => item?.poster_path || item?.backdrop_path)
+    const addCandidates = addMode === 'search' ? searchRes : catRes
+    const coverItem = items.find((item) => item?.poster_path || item?.backdrop_path)
     const coverPath = coverItem?.poster_path || coverItem?.backdrop_path || null
     const backdropPath = coverItem?.backdrop_path || coverItem?.poster_path || null
+    const posterImages = items
+        .map((item) => item?.poster_path || item?.backdrop_path || null)
+        .filter(Boolean)
+        .map((path) => `https://image.tmdb.org/t/p/w342${path}`)
+    const movieCount = items.filter((item) => item?.media_type !== 'tv').length
+    const tvCount = items.filter((item) => item?.media_type === 'tv').length
+    const visibility = data?.public ? 'Pública' : 'Privada'
+    const averageRating = summarizeListRatings(items)
 
     return (
         <UnifiedListDetailsLayout
-            title={!editing ? (data?.name || 'Lista') : editName}
-            description={!editing ? (data?.description || '') : editDesc}
+            title={data?.name || 'Lista'}
+            description={data?.description || ''}
             sourceLabel="Lista de usuario"
             posterImage={coverPath ? `https://image.tmdb.org/t/p/w500${coverPath}` : null}
+            posterImages={posterImages}
             backdropImage={backdropPath ? `https://image.tmdb.org/t/p/original${backdropPath}` : null}
-            badges={data ? [`${items.length} items`, 'The Show Verse'] : ['The Show Verse']}
-            backHref="/lists"
-            rightActions={
-                <>
-                    {canManage && <button
-                        onClick={() => setEditing(true)}
-                        disabled={editing}
-                        className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-600 transition disabled:opacity-50"
-                        title="Editar detalles"
-                    >
-                        <Pencil className="w-5 h-5" />
-                    </button>}
-
-                    {canManage && <button
-                        onClick={handleClear}
-                        disabled={clearing || items.length === 0}
-                        className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-yellow-400 hover:border-yellow-500/50 transition disabled:opacity-50"
-                        title="Vaciar lista"
-                    >
-                        {clearing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Eraser className="w-5 h-5" />}
-                    </button>}
-
-                    {canManage && <button
-                        onClick={handleDeleteList}
-                        disabled={deleting}
-                        className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-red-400 hover:border-red-500/50 transition disabled:opacity-50"
-                        title="Borrar lista"
-                    >
-                        {deleting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />}
-                    </button>}
-                </>
-            }
-            tabs={[
-                { id: 'items', label: 'Títulos', icon: ListVideo },
-                ...(canManage ? [{ id: 'add', label: 'Añadir', icon: Plus }] : [])
+            scoreboardStats={[
+                { icon: ListVideo, label: 'ELEMENTOS', value: items.length, tooltip: 'Títulos de la lista' },
+                ...(movieCount ? [{ icon: Clapperboard, label: 'PELÍCULAS', value: movieCount, tooltip: 'Películas en la lista' }] : []),
+                ...(tvCount ? [{ icon: MonitorPlay, label: 'SERIES', value: tvCount, tooltip: 'Series en la lista' }] : []),
+                { icon: data?.public ? Globe2 : LockKeyhole, label: 'VISIBILIDAD', value: visibility, tooltip: `Lista ${visibility.toLowerCase()}` },
             ]}
-            activeTab={tab}
-            onTabChange={(next) => {
-                setTab(next)
-                // Si cambias a items, cierra edición rápida si quieres:
-                // if (next === 'items') setEditing(false)
+            scoreboardRatings={{
+                tmdb: ratingSummaryBadge(averageRating),
+                imdb: ratingSummaryBadge(imdbSummary),
             }}
-            topControls={
-                tab === 'add' ? (
-                    <div className="space-y-3">
-                        <Segmented
-                            value={addMode}
-                            onChange={setAddMode}
-                            options={[
-                                { id: 'search', label: 'Buscar', icon: Search },
-                                { id: 'catalog', label: 'Catálogo', icon: Flame }
-                            ]}
-                        />
-
-                        {addMode === 'search' ? (
-                            <div className="relative w-full">
-                                <Search
-                                    aria-hidden="true"
-                                    className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 shrink-0 -translate-y-1/2 text-purple-400"
-                                />
-                                <input
-                                    value={q}
-                                    onChange={(e) => setQ(e.target.value)}
-                                    placeholder="Buscar película..."
-                                    className="h-10 w-full rounded-xl bg-gradient-to-br from-white/10 to-white/5 pl-9 pr-4 text-sm text-white shadow-lg backdrop-blur-lg transition placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                                    autoFocus
-                                />
-                                {searchLoading && (
-                                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                                        <Loader2 className="w-4 h-4 animate-spin text-purple-500" />
-                                    </div>
-                                )}
-                            </div>
-                        ) : (
-                            <div className="w-full relative">
-                                {catLoading && (
-                                    <div className="absolute right-10 top-1/2 -translate-y-1/2 z-[70]">
-                                        <Loader2 className="w-4 h-4 animate-spin text-purple-500" />
-                                    </div>
-                                )}
-                                <CatalogDropdown value={cat} onChange={setCat} />
-                            </div>
-                        )}
-                    </div>
-                ) : (
-                    // En tab items mostramos el editor inline (igual que antes, pero ya dentro del layout unificado)
-                    editing ? (
-                        <div className="space-y-3">
-                            <div className="space-y-2">
-                                <input
-                                    value={editName}
-                                    onChange={(e) => setEditName(e.target.value)}
-                                    className="h-12 w-full rounded-xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/30 px-4 text-lg font-bold text-white shadow-lg backdrop-blur-[28px] outline-none transition focus:bg-white/10"
-                                    placeholder="Nombre"
-                                    maxLength={60}
-                                    autoFocus
-                                />
-                                <textarea
-                                    value={editDesc}
-                                    onChange={(e) => setEditDesc(e.target.value)}
-                                    className="h-24 w-full resize-none rounded-xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/30 px-4 py-3 text-sm text-zinc-300 shadow-lg backdrop-blur-[28px] outline-none transition focus:bg-white/10"
-                                    placeholder="Descripción"
-                                    maxLength={200}
-                                />
-                            </div>
-
-                            <div className="flex gap-3">
-                                {canManage && <button
-                                    onClick={handleSaveEdit}
-                                    disabled={savingEdit || !editName.trim()}
-                                    className="flex items-center gap-2 rounded-full bg-purple-500/25 px-6 py-2.5 font-bold text-purple-100 shadow-lg backdrop-blur-[28px] transition hover:bg-purple-500/35 disabled:opacity-50"
-                                >
-                                    {savingEdit ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                                    Guardar
-                                </button>}
-
-                                <button
-                                    onClick={() => {
-                                        setEditing(false)
-                                        setEditName(data?.name || '')
-                                        setEditDesc(data?.description || '')
-                                    }}
-                                    className="rounded-full bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/30 px-6 py-2.5 font-bold text-white shadow-lg backdrop-blur-[28px] transition hover:bg-white/10"
-                                >
-                                    Cancelar
-                                </button>
-                            </div>
-                        </div>
-                    ) : null
-                )
-            }
+            showTopBar={false}
+            heroActions={(
+                <ListDetailsActionRow
+                    onBack={() => router.back()}
+                    onAdd={canManage ? () => setActionDialog('add') : null}
+                    onEdit={canManage ? () => setActionDialog('edit') : null}
+                    onClear={canManage ? () => setActionDialog('clear') : null}
+                    onDelete={canManage ? () => setActionDialog('delete') : null}
+                    clearDisabled={items.length === 0}
+                    clearing={clearing}
+                    deleting={deleting}
+                />
+            )}
         >
             {/* Error */}
             {err ? (
@@ -634,16 +596,16 @@ export default function ListDetailsPage() {
                 </div>
             ) : null}
 
-            {/* Empty / Filtros / Grid */}
-            {tab === 'items' && items.length === 0 && !loading ? (
+            {/* Títulos de la lista */}
+            {items.length === 0 && !loading ? (
                 <div className="flex flex-col items-center justify-center rounded-3xl bg-black/[0.08] bg-gradient-to-br from-white/10 via-transparent to-black/15 py-20 text-center shadow-none backdrop-blur-[28px]">
                     <ListVideo className="w-12 h-12 text-zinc-700 mb-4" />
                     <h3 className="text-lg font-bold text-zinc-300">Lista vacía</h3>
                     <p className="text-zinc-500 mt-1 text-sm">
-                        {canManage ? <>Usa la pestaña <b>Añadir</b> para agregar títulos.</> : "Esta lista todavía no tiene títulos."}
+                        {canManage ? <>Usa la acción <b>Añadir títulos</b> para agregar contenido.</> : "Esta lista todavía no tiene títulos."}
                     </p>
                 </div>
-            ) : tab === 'items' && items.length > 0 ? (
+            ) : items.length > 0 ? (
                 <FilterableListItems
                     items={filterableItems}
                     editable={canManage}
@@ -663,6 +625,7 @@ export default function ListDetailsPage() {
                                     mediaType={mediaType}
                                     posterPath={posterPath}
                                     voteAverage={it?.vote_average}
+                                    imdbRating={meta.imdbRating}
                                     disableHover={viewMode === 'compact'}
                                 />
                                 {canManage && <button
@@ -690,64 +653,99 @@ export default function ListDetailsPage() {
                     emptyTitle="Sin resultados"
                     emptyText="No hay títulos que coincidan con los filtros."
                 />
-            ) : tab === 'add' ? (
-                <div className={listPosterGridClass}>
-                    {gridItems.map((it) => {
-                        const id = it?.id
-                        const inList = idsInList.has(listKeyOf(it))
-                        const posterPath = it?.poster_path || it?.backdrop_path || null
-                        const href = `/details/${it?.media_type || 'movie'}/${id}`
-                        const mediaType = it?.media_type || 'movie'
-                        const title = it?.title || it?.name || 'Poster'
-                        const year = (it?.release_date || it?.first_air_date || '').slice(0, 4)
-
-                        return (
-                            <div key={`${tab}-${addMode}-${id}`} className="relative">
-                                <ListPosterCard
-                                    href={href}
-                                    title={title}
-                                    year={year}
-                                    mediaType={mediaType}
-                                    posterPath={posterPath}
-                                    voteAverage={it?.vote_average}
-                                />
-                                {tab === 'add' && inList && (
-                                    <div className="absolute top-2 left-2 z-20 px-2 py-0.5 rounded-md bg-emerald-500/90 text-white text-[10px] font-bold shadow-lg backdrop-blur-sm flex items-center gap-1">
-                                        <Check className="w-3 h-3" /> Añadido
-                                    </div>
-                                )}
-
-                                {canManage && <button
-                                    type="button"
-                                    disabled={busyId === id || (tab === 'add' && inList)}
-                                    onClick={(e) => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
-                                        if (tab === 'items') handleRemove(it)
-                                        else handleAdd(it)
-                                    }}
-                                    className={`absolute right-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full shadow-lg backdrop-blur-[28px] transition-all
-                    ${tab === 'items'
-                                            ? 'bg-black/30 bg-gradient-to-br from-white/10 via-transparent to-black/40 text-zinc-300 hover:bg-red-500/70 hover:text-white opacity-0 group-hover:opacity-100'
-                                            : inList
-                                                ? 'bg-emerald-500/20 text-emerald-300 cursor-default opacity-0'
-                                                : 'bg-black/30 bg-gradient-to-br from-white/10 via-transparent to-black/40 text-white hover:bg-purple-600/70 hover:scale-110 opacity-100'
-                                        }
-                    ${busyId === id ? 'opacity-100 cursor-wait' : ''}`}
-                                >
-                                    {busyId === id ? (
-                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                    ) : tab === 'items' ? (
-                                        <Trash2 className="w-4 h-4" />
-                                    ) : (
-                                        <Plus className="w-5 h-5" />
-                                    )}
-                                </button>}
-                            </div>
-                        )
-                    })}
-                </div>
             ) : null}
+
+            <ListActionDialog open={actionDialog === 'add'} onClose={() => setActionDialog(null)} title="Añadir títulos">
+                <div className="mt-5 space-y-4">
+                    <Segmented
+                        value={addMode}
+                        onChange={setAddMode}
+                        options={[
+                            { id: 'search', label: 'Buscar', icon: Search },
+                            { id: 'catalog', label: 'Catálogo', icon: Flame }
+                        ]}
+                    />
+
+                    {addMode === 'search' ? (
+                        <div className="relative">
+                            <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-purple-400" />
+                            <input
+                                value={q}
+                                onChange={(event) => setQ(event.target.value)}
+                                placeholder="Buscar película o serie..."
+                                className="h-11 w-full rounded-xl bg-white/10 pl-9 pr-10 text-sm text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                                autoFocus
+                            />
+                            {searchLoading ? <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-purple-400" /> : null}
+                        </div>
+                    ) : (
+                        <div className="relative">
+                            {catLoading ? <Loader2 className="pointer-events-none absolute right-10 top-1/2 z-[70] h-4 w-4 -translate-y-1/2 animate-spin text-purple-400" /> : null}
+                            <CatalogDropdown value={cat} onChange={setCat} />
+                        </div>
+                    )}
+
+                    <div className="sv-scroll max-h-[52vh] overflow-y-auto pr-1">
+                        {addCandidates.length ? (
+                            <div className={listPosterGridClass}>
+                                {addCandidates.map((item) => {
+                                    const id = item?.id
+                                    const inList = idsInList.has(listKeyOf(item))
+                                    const mediaType = item?.media_type || 'movie'
+                                    const title = item?.title || item?.name || 'Poster'
+                                    const year = (item?.release_date || item?.first_air_date || '').slice(0, 4)
+                                    return (
+                                        <div key={`${addMode}-${mediaType}-${id}`} className="relative">
+                                            <ListPosterCard href={`/details/${mediaType}/${id}`} title={title} year={year} mediaType={mediaType} posterPath={item?.poster_path || item?.backdrop_path || null} voteAverage={item?.vote_average} />
+                                            {inList ? <div className="absolute left-2 top-2 z-20 inline-flex items-center gap-1 rounded-md bg-emerald-500/90 px-2 py-0.5 text-[10px] font-bold text-white"><Check className="h-3 w-3" />Añadido</div> : null}
+                                            <button
+                                                type="button"
+                                                aria-label={`Añadir ${title}`}
+                                                disabled={busyId === id || inList}
+                                                onClick={() => handleAdd(item)}
+                                                className="absolute right-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white shadow-lg backdrop-blur transition hover:bg-purple-600 disabled:cursor-not-allowed disabled:opacity-50"
+                                            >
+                                                {busyId === id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-5 w-5" />}
+                                            </button>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        ) : !searchLoading && !catLoading ? <p className="py-12 text-center text-sm text-zinc-500">{addMode === 'search' ? 'Busca un título para añadirlo a la lista.' : 'No hay títulos disponibles.'}</p> : null}
+                    </div>
+                </div>
+            </ListActionDialog>
+
+            <ListActionDialog open={actionDialog === 'edit'} onClose={() => setActionDialog(null)} title="Editar lista">
+                <form className="mt-5 space-y-4" onSubmit={(event) => { event.preventDefault(); handleSaveEdit() }}>
+                    <label className="block space-y-2 text-sm font-bold text-zinc-300">Nombre
+                        <input value={editName} onChange={(event) => setEditName(event.target.value)} maxLength={60} autoFocus className="h-11 w-full rounded-xl bg-white/10 px-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50" />
+                    </label>
+                    <label className="block space-y-2 text-sm font-bold text-zinc-300">Descripción
+                        <textarea value={editDesc} onChange={(event) => setEditDesc(event.target.value)} maxLength={200} className="h-28 w-full resize-none rounded-xl bg-white/10 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50" />
+                    </label>
+                    <div className="flex justify-end gap-3">
+                        <DialogButton onClick={() => setActionDialog(null)}>Cancelar</DialogButton>
+                        <DialogButton type="submit" tone="primary" disabled={savingEdit || !editName.trim()}>{savingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Guardar cambios</DialogButton>
+                    </div>
+                </form>
+            </ListActionDialog>
+
+            <ListActionDialog open={actionDialog === 'clear'} onClose={() => setActionDialog(null)} title="¿Vaciar la lista?">
+                <p className="mt-3 text-sm leading-6 text-zinc-300">Se eliminarán los {items.length} títulos de esta lista. La lista y sus detalles se conservarán.</p>
+                <div className="mt-6 flex justify-end gap-3">
+                    <DialogButton onClick={() => setActionDialog(null)}>Cancelar</DialogButton>
+                    <DialogButton onClick={handleClear} tone="warning" disabled={clearing}>{clearing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eraser className="h-4 w-4" />}Vaciar lista</DialogButton>
+                </div>
+            </ListActionDialog>
+
+            <ListActionDialog open={actionDialog === 'delete'} onClose={() => setActionDialog(null)} title="¿Borrar la lista?">
+                <p className="mt-3 text-sm leading-6 text-zinc-300">Esta acción elimina la lista y todos sus títulos de forma permanente. No se puede deshacer.</p>
+                <div className="mt-6 flex justify-end gap-3">
+                    <DialogButton onClick={() => setActionDialog(null)}>Cancelar</DialogButton>
+                    <DialogButton onClick={handleDeleteList} tone="danger" disabled={deleting}>{deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}Borrar definitivamente</DialogButton>
+                </div>
+            </ListActionDialog>
         </UnifiedListDetailsLayout>
     )
 }
