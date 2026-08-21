@@ -117,6 +117,9 @@ export default function DetailsInfoTabs({
   productionCards = null,
   showDetailsTab = true,
   showProductionTab = true,
+  // Las fichas que solo tienen sinopsis no necesitan una navegación de una
+  // única opción: muestran el panel directamente.
+  showTabsMenu = true,
   // Las listas pueden incluir descripciones muy extensas. Se limita solo en
   // ese contexto para conservar una ficha compacta sin truncar el contenido.
   scrollableSynopsis = false,
@@ -179,12 +182,14 @@ export default function DetailsInfoTabs({
     // eran hermanos sueltos dentro de un fragmento.
     <div className="contents" {...swipeHandlers}>
       {/* ========== MENÚ DE NAVEGACIÓN DE TABS ========== */}
-      <DetailsTabsMenu
-        tabs={tabs}
-        activeTab={activeTab}
-        onChangeTab={setActiveTab}
-        layoutId={layoutId}
-      />
+      {showTabsMenu ? (
+        <DetailsTabsMenu
+          tabs={tabs}
+          activeTab={activeTab}
+          onChangeTab={setActiveTab}
+          layoutId={layoutId}
+        />
+      ) : null}
 
       {/* ========== ÁREA DE CONTENIDO DE TABS ========== */}
       <div className="relative min-h-[100px]">
