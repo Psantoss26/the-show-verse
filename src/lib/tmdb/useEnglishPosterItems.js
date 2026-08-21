@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { pickBestEnglishPoster } from "@/lib/details/tmdbImages";
+import { pickBestFavoriteEnglishPoster } from "@/lib/details/tmdbImages";
 import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
 
 // Compartida por las superficies de Perfil: una misma ficha conserva el
@@ -20,7 +20,7 @@ function posterKey(item) {
 
 /**
  * Sustituye solo en pantalla el póster de cada título por la elección inglesa
- * de DetailsClient. Si la consulta no devuelve artwork válido, mantiene el
+ * de Favoritos. Si la consulta no devuelve artwork válido, mantiene el
  * posterPath recibido de la BBDD como fallback.
  */
 export function useEnglishPosterItems(items, enabled = true) {
@@ -61,7 +61,7 @@ export function useEnglishPosterItems(items, enabled = true) {
         const mediaType = key.startsWith("tv:") ? "tv" : "movie";
         const tmdbId = item?.tmdbId ?? item?.tmdb_id ?? item?.id;
         const images = await fetchTmdbImages(mediaType, tmdbId);
-        const posterPath = pickBestEnglishPoster(images?.posters || [])?.file_path || null;
+        const posterPath = pickBestFavoriteEnglishPoster(images?.posters || [])?.file_path || null;
         if (posterPath) englishPosterCache.set(key, posterPath);
         return [key, posterPath];
       }),

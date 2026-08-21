@@ -96,6 +96,32 @@ export function pickBestEnglishPoster(list) {
     return pickBestImage(nonSpanishPosters)
 }
 
+// Criterio de Favoritos para las parrillas: solo arte en inglés; dentro de
+// ese grupo se prioriza el consenso de TMDb y se conserva el póster original
+// del llamante si no hay una alternativa inglesa.
+export function pickBestFavoriteEnglishPoster(list) {
+    if (!Array.isArray(list) || list.length === 0) return null
+
+    const languageOf = (value) => value ? String(value).toLowerCase().split('-')[0] : null
+    const englishPosters = list.filter(
+        (poster) => poster?.file_path && languageOf(poster?.iso_639_1) === 'en',
+    )
+    if (!englishPosters.length) return null
+
+    const maxVotes = englishPosters.reduce(
+        (max, poster) => Math.max(max, Number(poster?.vote_count) || 0),
+        0,
+    )
+    const candidates = englishPosters.filter(
+        (poster) => (Number(poster?.vote_count) || 0) === maxVotes,
+    )
+
+    return [...candidates].sort((a, b) =>
+        (Number(b?.vote_average) || 0) - (Number(a?.vote_average) || 0)
+        || (Number(b?.width) || 0) - (Number(a?.width) || 0),
+    )[0] || null
+}
+
 export function pickBestNeutralPosterByResVotes(list, opts = {}) {
     const { resolutionWindow = 0.98, minWidth = 600 } = opts
     if (!Array.isArray(list) || list.length === 0) return null

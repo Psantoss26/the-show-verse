@@ -13,6 +13,7 @@ export function resolveCommunityListDetailsInitialState(cached) {
     loadingMore: false,
     error: null,
     list: cached?.list || null,
+    ratingSummary: cached?.ratingSummary || null,
     items: Array.isArray(cached?.items) ? cached.items : [],
     page: cached?.page || 1,
     hasMore: Boolean(cached?.hasMore),

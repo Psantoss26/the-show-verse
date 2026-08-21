@@ -21,6 +21,7 @@ import ListPosterCard, {
 } from "@/components/lists/ListPosterCard";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
+import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
 import {
   normalizeSearchText,
   titleMatchesQuery,
@@ -320,6 +321,23 @@ export default function FilterableListItems({
     return nextGroups;
   }, [groups, visibleCount]);
   const hasMoreEntries = visibleCount < entries.length;
+  // Solo se resuelven los títulos ya montados en pantalla. Así una lista de
+  // cientos de elementos no dispara la resolución de artwork completa al abrir.
+  const visibleItems = useMemo(
+    () => visibleGroups.flatMap((group) => group.entries.map((entry) => entry.item)),
+    [visibleGroups],
+  );
+  const englishPosterItems = useEnglishPosterItems(visibleItems);
+  const visibleGroupsWithEnglishPosters = useMemo(() => {
+    let itemIndex = 0;
+    return visibleGroups.map((group) => ({
+      ...group,
+      entries: group.entries.map((entry) => {
+        const item = englishPosterItems[itemIndex++] || entry.item;
+        return { ...entry, item, meta: getMeta(item, entry.index) };
+      }),
+    }));
+  }, [visibleGroups, englishPosterItems, getMeta]);
 
   useEffect(() => {
     if (skipInitialResetRef.current) {
@@ -511,7 +529,7 @@ export default function FilterableListItems({
           <p className="mt-1 text-sm text-zinc-500">{emptyText}</p>
         </div>
       ) : (
-        visibleGroups.map((group) => (
+        visibleGroupsWithEnglishPosters.map((group) => (
           <section key={group.key} className="space-y-4">
             {groupBy !== "none" ? (
               <div className="flex items-center justify-between rounded-2xl bg-black/[0.08] bg-gradient-to-br from-white/10 via-transparent to-black/15 px-4 py-3 shadow-none backdrop-blur-[28px]">

@@ -5,7 +5,7 @@
   "type": "module",
   "main": "src/server.js",
   "scripts": {
-    "dev": "node --watch src/server.js",
+    "dev": "node src/db/migrate.js && node --watch src/server.js",
     "start": "node src/db/migrate.js && node src/server.js",
     "deploy:check": "NODE_ENV=production node src/scripts/check-deploy.js",
     "db:generate": "drizzle-kit generate",

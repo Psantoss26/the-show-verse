@@ -197,6 +197,11 @@ export function DetailsRatingsBadges({
 // ---------------------------------------------------------------------------
 export function DetailsStatsRow({
   stats = null,
+  // Variante para entidades que no proceden de Trakt (listas, colecciones,
+  // perfiles…). Conserva exactamente la pieza visual del marcador, pero evita
+  // inventar "seguidores" o "reproducciones" cuando esos datos no existen.
+  // Cada entrada: { icon, value, label, tooltip? }.
+  statItems = null,
   showFavoritedStat = true,
   // `pending`: las stats de Trakt todavía vienen de camino. La fila se monta
   // igualmente para RESERVAR SU ALTO. Puede hacerse con exactitud porque el
@@ -206,11 +211,49 @@ export function DetailsStatsRow({
   // debajo.
   pending = false,
 }) {
+  const customStatItems = Array.isArray(statItems)
+    ? statItems.filter((item) => item?.label && item?.value != null)
+    : [];
+  const hasCustomStats = customStatItems.length > 0;
   // Mostrar cuando hay stats numéricas (incluyendo de cache stale)
   const hasStats = Object.values(stats || {}).some(
     (v) => typeof v === "number",
   );
-  if (!hasStats && !pending) return null;
+  if (!hasCustomStats && !hasStats && !pending) return null;
+
+  if (hasCustomStats) {
+    return (
+      <div className="relative z-10 border-t border-white/5 bg-black/[0.04] rounded-b-2xl">
+        <div
+          className="
+          overflow-x-auto scrollbar-hide overscroll-x-contain [touch-action:pan-y]
+          py-2.5
+          pl-[calc(1.25rem+env(safe-area-inset-left))]
+          pr-[calc(0.75rem+env(safe-area-inset-right))]
+          sm:pl-[calc(1.5rem+env(safe-area-inset-left))]
+          sm:pr-[calc(1.25rem+env(safe-area-inset-right))]
+          md:overflow-x-visible
+        "
+        >
+          <div className="flex w-max min-w-0 flex-nowrap items-center justify-start gap-x-4 gap-y-1.5 sm:w-full sm:flex-wrap">
+            {customStatItems.map((item, index) => (
+              <TraktStatBadge
+                key={item.key || `${item.label}-${index}`}
+                icon={item.icon || List}
+                value={
+                  typeof item.value === "number"
+                    ? formatShortNumber(item.value)?.toUpperCase() || "0"
+                    : String(item.value)
+                }
+                label={item.label}
+                tooltip={item.tooltip}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Con `pending` no se pasa valor: la insignia reserva el hueco con un
   // marcador invisible. Un "0" sería un dato ("no lo sigue nadie") y un guion
@@ -453,6 +496,7 @@ export default function DetailsScoreboardPanel({
   rt = null,
   mc = null,
   stats = null,
+  statItems = null,
   showFavoritedStat = true,
   // Las stats de Trakt aún no han llegado. El panel se pinta ya con su ALTO
   // DEFINITIVO (pie de estadísticas incluido) en vez de crecer al recibirlas y
@@ -483,6 +527,9 @@ export default function DetailsScoreboardPanel({
   const hasStats = Object.values(stats || {}).some(
     (v) => typeof v === "number",
   );
+  const hasCustomStats = Array.isArray(statItems) && statItems.some(
+    (item) => item?.label && item?.value != null,
+  );
   const hasExternalLinks =
     Array.isArray(externalLinks) && externalLinks.length > 0;
   const hasStreamingProviders =
@@ -497,7 +544,7 @@ export default function DetailsScoreboardPanel({
   // `statsPending` cuenta como contenido: si no, el panel entero no se montaría
   // hasta que llegasen las stats y aparecería de golpe, que es justo el salto
   // que se quiere evitar.
-  if (!hasToolbar && !hasStats && !statsPending && !children) return null;
+  if (!hasToolbar && !hasStats && !hasCustomStats && !statsPending && !children) return null;
 
   return (
     <div
@@ -542,6 +589,7 @@ export default function DetailsScoreboardPanel({
 
       <DetailsStatsRow
         stats={stats}
+        statItems={statItems}
         showFavoritedStat={showFavoritedStat}
         pending={statsPending}
       />

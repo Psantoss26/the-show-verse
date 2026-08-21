@@ -7,7 +7,8 @@
 // servidor. Sin sesión enseña el recuento pero no invita a pulsar.
 
 import { useState } from "react";
-import { Heart } from "lucide-react";
+import { Heart, Loader2 } from "lucide-react";
+import LiquidButton from "@/components/LiquidButton";
 
 export default function ListLikeButton({
   listId,
@@ -15,6 +16,7 @@ export default function ListLikeButton({
   liked = false,
   canLike = false,
   className = "",
+  liquidGlass = false,
 }) {
   const [state, setState] = useState({ liked: Boolean(liked), likes: Number(likes) || 0 });
   const [pending, setPending] = useState(false);
@@ -43,6 +45,29 @@ export default function ListLikeButton({
 
   const active = state.liked;
   const shared = "inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-bold transition-colors";
+
+  if (liquidGlass) {
+    const label = !canLike
+      ? "Inicia sesión para marcar como favorito"
+      : active ? "Quitar de favoritos" : "Marcar como favorito";
+    return (
+      <LiquidButton
+        type="button"
+        liquidGlass
+        groupId="list-details-actions"
+        title={label}
+        aria-label={label}
+        aria-pressed={active}
+        active={active}
+        activeColor="red"
+        disabled={!canLike || pending}
+        onClick={toggle}
+        className={`!h-auto !w-full aspect-square ${className}`}
+      >
+        {pending ? <Loader2 className="animate-spin" /> : <Heart className={active ? "fill-current" : ""} />}
+      </LiquidButton>
+    );
+  }
 
   if (!canLike) {
     return (

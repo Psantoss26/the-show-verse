@@ -10,7 +10,8 @@ import AndroidSessionClaim from "@/components/android/AndroidSessionClaim";
 import OfflineBanner from "@/components/OfflineBanner";
 import OfflineQueueBadge from "@/components/OfflineQueueBadge";
 import ScrollRestoration from "@/components/ScrollRestoration";
-import AvatarBootScript from "@/components/auth/AvatarBootScript";
+import { AVATAR_BOOT_SCRIPT } from "@/components/auth/AvatarBootScript";
+import Script from "next/script";
 import { anton, ptSans } from "./fonts";
 
 export const metadata = {
@@ -55,8 +56,13 @@ export default function RootLayout({ children }) {
       <body
         className={`${ptSans.className} ${ptSans.variable} ${anton.variable} bg-black text-white antialiased`}
       >
-        {/* Primero de todo: debe correr antes de que se parsee el navbar. */}
-        <AvatarBootScript />
+        {/* Debe declararse directamente en el root layout: Next lo inyecta
+            antes de hidratar, sin que React intente renderizar un <script>. */}
+        <Script
+          id="avatar-boot"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: AVATAR_BOOT_SCRIPT }}
+        />
         {/* Adelanta la conexión a TMDb (arte) y a YouTube (trailers de las
             vistas previas) para que el iframe del trailer cargue lo antes
             posible y se reproduzca de forma casi instantánea al hacer hover. */}

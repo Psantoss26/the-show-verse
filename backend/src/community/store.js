@@ -14,6 +14,44 @@ import { resolveCommentTab } from './tabs.js';
 import { commentRowToApi, listRowToApi } from './normalize.js';
 import { sentimentRowToApi } from './sentiment.js';
 import { getMediaMetadataMap, metadataFor } from '../utils/mediaMetadata.js';
+import { buildRatingSummary, hydrateListRatings, isMissingVoteAverageColumn } from '../utils/listRatings.js';
+
+const communityListItemFields = {
+  id: communityListItems.id,
+  listId: communityListItems.listId,
+  tmdbId: communityListItems.tmdbId,
+  mediaType: communityListItems.mediaType,
+  title: communityListItems.title,
+  posterPath: communityListItems.posterPath,
+  position: communityListItems.position,
+  addedAt: communityListItems.addedAt,
+};
+
+async function readCommunityListItemsWithRatings({ listId, limit, offset }) {
+  const readItems = (includeStoredRating) => db
+    .select(includeStoredRating
+      ? { ...communityListItemFields, voteAverage: communityListItems.voteAverage }
+      : communityListItemFields)
+    .from(communityListItems)
+    .where(eq(communityListItems.listId, listId))
+    .orderBy(asc(communityListItems.position))
+    .limit(limit)
+    .offset(offset);
+
+  const readRatingRows = (includeStoredRating) => db
+    .select(includeStoredRating
+      ? { tmdbId: communityListItems.tmdbId, mediaType: communityListItems.mediaType, voteAverage: communityListItems.voteAverage }
+      : { tmdbId: communityListItems.tmdbId, mediaType: communityListItems.mediaType })
+    .from(communityListItems)
+    .where(eq(communityListItems.listId, listId));
+
+  try {
+    return await Promise.all([readItems(true), readRatingRows(true)]);
+  } catch (error) {
+    if (!isMissingVoteAverageColumn(error)) throw error;
+    return Promise.all([readItems(false), readRatingRows(false)]);
+  }
+}
 
 // Rellena posterPath (y título si falta) de items de lista comunitaria cuya columna
 // posterPath es null (el sembrado solo hidrata 5 por lista). Usa el caché Postgres
@@ -320,7 +358,9 @@ export async function insertListMemberships(listId, items) {
   await db.insert(communityListItems)
     .values(items.map((it, i) => ({
       listId, tmdbId: Number(it.tmdbId), mediaType: it.mediaType,
-      title: it.title || null, posterPath: it.posterPath || null, position: it.position ?? i,
+      title: it.title || null, posterPath: it.posterPath || null,
+      voteAverage: Number.isFinite(Number(it.voteAverage)) ? Number(it.voteAverage) : null,
+      position: it.position ?? i,
     })))
     .onConflictDoNothing({ target: [communityListItems.listId, communityListItems.tmdbId, communityListItems.mediaType] });
 }
@@ -365,10 +405,19 @@ export async function getCommunityListWithItems({ id, page = 1, limit = 50, view
   list.likedByViewer = liked.has(id);
   const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 150);
   const offset = (Math.max(Number(page) || 1, 1) - 1) * safeLimit;
-  const items = await db.select().from(communityListItems)
-    .where(eq(communityListItems.listId, id))
-    .orderBy(asc(communityListItems.position)).limit(safeLimit).offset(offset);
+  // Una lectura local de todos los ids/puntuaciones, nunca peticiones TMDb.
+  // Sirve para que la media sea de la lista completa aunque su grid pagine.
+  const [items, allRatingRows] = await readCommunityListItemsWithRatings({
+    listId: id,
+    limit: safeLimit,
+    offset,
+  });
   const hydrated = await hydrateListItemPosters(items);
+  const ratedItems = await hydrateListRatings(allRatingRows);
   const api = listRowToApi(list);
-  return { list: { ...api.list, user: api.user }, items: hydrated };
+  return {
+    list: { ...api.list, user: api.user },
+    items: hydrated,
+    ratingSummary: buildRatingSummary(ratedItems),
+  };
 }

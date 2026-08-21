@@ -27,6 +27,7 @@ function cacheKeyToCanonical(cacheKey) {
 export async function getMediaMetadataMap(rows = [], options = {}) {
   const getMediaType = options.getMediaType || ((row) => row.mediaType);
   const getTmdbId = options.getTmdbId || ((row) => row.tmdbId);
+  const fetchMissing = options.fetchMissing !== false;
   const keys = [
     ...new Set(rows.flatMap((row) => cacheKeys(getMediaType(row), getTmdbId(row)))),
   ];
@@ -53,7 +54,7 @@ export async function getMediaMetadataMap(rows = [], options = {}) {
     }
   }
 
-  if (missing.length > 0 && process.env.TMDB_API_KEY) {
+  if (fetchMissing && missing.length > 0 && process.env.TMDB_API_KEY) {
     await Promise.all(
       missing.map(async ({ type, id }) => {
         try {
