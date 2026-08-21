@@ -1,7 +1,7 @@
 // /src/app/lists/[listId]/page.jsx
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -13,10 +13,7 @@ import FilterableListItems from '@/components/lists/ListDetailsTools'
 import LiquidGlassOpticalLayers from '@/components/ui/LiquidGlassOpticalLayers'
 import { LIQUID_GLASS_CARD, LIQUID_GLASS_PANEL } from '@/lib/ui/liquidGlass'
 import { formatPageTitle } from '@/lib/pageTitle'
-import {
-    resolveBackNavigationDetailsSnapshot,
-    shouldRenderCachedListDuringAuthHydration,
-} from '@/lib/lists/detailsInitialState'
+import { shouldRenderCachedListDuringAuthHydration } from '@/lib/lists/detailsInitialState'
 import { useIsHistoryNavigation } from '@/lib/hooks/useIsHistoryNavigation'
 import { ratingSummaryBadge, summarizeListRatings } from '@/lib/lists/ratingSummary'
 import useListImdbRatings from '@/hooks/useListImdbRatings'
@@ -51,6 +48,8 @@ import {
     MonitorPlay,
     X
 } from 'lucide-react'
+
+const useClientLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
 
 // --- COMPONENTES UI ---
 
@@ -267,17 +266,11 @@ export default function ListDetailsPage() {
     const canUse = useMemo(() => !!session && !!account?.id, [session, account])
     const isBackNav = useIsHistoryNavigation()
 
-    // Solo una vuelta atrás puede usar la instantánea en el primer render. Así
-    // el contenido ya existe cuando ScrollRestoration restituye la posición;
-    // en una entrada normal seguimos evitando una caché potencialmente vieja.
-    const [backNavigationSnapshot] = useState(() =>
-        resolveBackNavigationDetailsSnapshot(
-            isBackNav ? readTmdbListDetailsCache(listId) : null,
-            isBackNav,
-        ),
-    )
-    const [data, setData] = useState(backNavigationSnapshot)
-    const [loading, setLoading] = useState(() => !backNavigationSnapshot)
+    // El estado inicial no puede depender de sessionStorage: el servidor no lo
+    // conoce. La caché de una vuelta atrás se aplica antes de pintar, para que
+    // la restauración de scroll conserve su contenido y altura reales.
+    const [data, setData] = useState(null)
+    const [loading, setLoading] = useState(true)
     const [err, setErr] = useState('')
     const [busyId, setBusyId] = useState(null)
     const [clearing, setClearing] = useState(false)
@@ -289,6 +282,16 @@ export default function ListDetailsPage() {
     const [editName, setEditName] = useState('')
     const [editDesc, setEditDesc] = useState('')
     const [savingEdit, setSavingEdit] = useState(false)
+
+    useClientLayoutEffect(() => {
+        if (!isBackNav) return
+        const cached = readTmdbListDetailsCache(listId)
+        if (!cached) return
+        setData(cached)
+        setLoading(false)
+        setEditName(cached?.name || '')
+        setEditDesc(cached?.description || '')
+    }, [isBackNav, listId])
 
     const items = Array.isArray(data?.items) ? data.items : []
     const { ratingsByKey: imdbRatings, summary: imdbSummary } = useListImdbRatings(items, { totalCount: items.length })

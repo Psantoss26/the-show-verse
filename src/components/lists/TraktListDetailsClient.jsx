@@ -2,7 +2,7 @@
 
 
 import OptimizedImage from "@/components/OptimizedImage";
-import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Heart, Loader2, ExternalLink, ChevronDown, UserRound, ListVideo } from 'lucide-react'
 import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayout'
@@ -15,13 +15,13 @@ import { ratingSummaryBadge } from '@/lib/lists/ratingSummary'
 import useListImdbRatings from '@/hooks/useListImdbRatings'
 import {
     getCommunityListDetailsCacheKey,
-    resolveBackNavigationDetailsSnapshot,
     resolveCommunityListDetailsInitialState,
 } from '@/lib/lists/detailsInitialState'
 import { useIsHistoryNavigation } from '@/lib/hooks/useIsHistoryNavigation'
 
 const PAGE_SIZE = 48
 const TRAKT_LIST_DETAILS_CACHE_TTL_MS = 20 * 60 * 1000
+const useClientLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
 
 function getDetailsCacheKey(listId) {
     return getCommunityListDetailsCacheKey(listId)
@@ -105,18 +105,16 @@ export default function TraktListDetailsClient({ username, listId }) {
     const stateRef = useRef(null)
     const loadingMoreRef = useRef(false)
 
-    // Al volver con atrás/adelante el montaje es solo de cliente: sembramos la
-    // instantánea ANTES de los efectos para que ScrollRestoration encuentre la
-    // lista completa al fijar su posición. Una entrada normal sigue arrancando
-    // vacía, igual que el HTML del servidor, y se revalida desde la API.
-    const [state, setState] = useState(() =>
-        resolveCommunityListDetailsInitialState(
-            resolveBackNavigationDetailsSnapshot(
-                isBackNav ? readDetailsCache(listId) : null,
-                isBackNav,
-            ),
-        ),
-    )
+    // El primer render debe ser idéntico al HTML del servidor. La instantánea
+    // se recupera en layout effect: antes del primer repintado y antes de que
+    // ScrollRestoration recupere la posición, sin romper la hidratación.
+    const [state, setState] = useState(() => resolveCommunityListDetailsInitialState(null))
+
+    useClientLayoutEffect(() => {
+        if (!isBackNav) return
+        const cached = readDetailsCache(listId)
+        if (cached) setState(resolveCommunityListDetailsInitialState(cached))
+    }, [isBackNav, listId])
 
     useEffect(() => {
         stateRef.current = state
