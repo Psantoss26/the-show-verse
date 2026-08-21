@@ -1,4 +1,5 @@
 import { buildImg } from "@/lib/dashboard/media";
+import { isAndroidApp } from "@/lib/android/appBridge";
 
 function normalizeProviderName(name = "") {
   return String(name)
@@ -99,37 +100,58 @@ function getProviderLogoSrc(provider) {
   return logoPath;
 }
 
-function getPlatformLink(provider, { endpointType, justwatchUrl, title }) {
-  const isPlexProvider = provider?.isPlex === true;
+// ¿Estamos en "un ordenador de verdad"? Se usa el MISMO criterio que la
+// variante `desktop:` de la web (ver globals.css): el ancho no distingue un
+// iPad de un monitor, el puntero sí. En SSR se asume escritorio porque el
+// destino web vale en cualquier parte; da igual, porque la tarjeta de Plex solo
+// existe tras la consulta a /api/plex, que ocurre ya en el cliente.
+function esEscritorio() {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return true;
+  }
+  return window.matchMedia(
+    "(min-width: 64rem) and (hover: hover) and (pointer: fine)",
+  ).matches;
+}
 
-  if (isPlexProvider && provider.url && typeof provider.url === "object") {
-    let rawSlug = "";
+// Enlace del icono de Plex (servidor personal). Va DIRECTO al título: antes
+// pasaba por una página intermedia (/api/plex/open) que anunciaba "Abriendo en
+// Plex…" y lanzaba el deep link por JS; ahora el href ya es el destino final.
+//
+// Además es más fiable: un click en un <a> es un gesto del usuario, y los
+// navegadores dejan pasar los esquemas propios (`plex://`) mucho mejor así que
+// desde un `location.href` automático.
+//
+// POLÍTICA EN MÓVIL Y TABLET: la app primero. Solo se cae a la web si este
+// contenido no tiene deep link nativo (sin slug no hay `plex://`).
+function getPlexLink(plexUrl) {
+  if (!plexUrl) return "#";
+  if (typeof plexUrl === "string") return plexUrl;
 
-    if (provider.url.slug) {
-      const slugMatch = provider.url.slug.match(
-        /plex:\/\/(?:movie|show)\/(.+)$/i,
-      );
-      rawSlug = slugMatch ? slugMatch[1] : provider.url.slug;
-    } else if (provider.url.universal) {
-      const universalMatch = provider.url.universal.match(
-        /watch\.plex\.tv\/(?:movie|show)\/(.+)$/i,
-      );
-      rawSlug = universalMatch ? universalMatch[1] : "";
-    }
+  const web = plexUrl.web || "";
+  const universal = plexUrl.universal || "";   // https://watch.plex.tv/{type}/{slug}
+  const slug = plexUrl.slug || "";             // plex://{type}/{slug}
+  const androidIntent = plexUrl.androidSlugIntent || ""; // intent:// para Chrome
 
-    const webUrl = provider.url.web || "";
+  // Escritorio: Plex Web sobre el servidor personal es el destino natural.
+  if (esEscritorio()) return web || universal || "#";
 
-    if (rawSlug) {
-      const params = new URLSearchParams({
-        slug: rawSlug,
-        type: endpointType === "movie" ? "movie" : "show",
-        webUrl,
-        title: title || "",
-      });
-      return `/api/plex/open?${params.toString()}`;
-    }
+  // Dentro de la app de Android, el WebView resuelve los esquemas externos con
+  // `ACTION_VIEW`, que entiende `plex://` pero NO `intent://` (esa forma
+  // necesita `Intent.parseUri`). Así que allí se usa `plex://`.
+  const enChromeAndroid =
+    typeof navigator !== "undefined" &&
+    /Android/i.test(navigator.userAgent || "") &&
+    !isAndroidApp();
 
-    return webUrl || provider.url.universal || "#";
+  if (enChromeAndroid && androidIntent) return androidIntent;
+
+  return slug || universal || web || "#";
+}
+
+function getPlatformLink(provider, { justwatchUrl }) {
+  if (provider?.isPlex === true) {
+    return getPlexLink(provider.url);
   }
 
   return provider?.url || justwatchUrl || "#";

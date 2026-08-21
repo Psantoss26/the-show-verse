@@ -1329,15 +1329,24 @@ function AnalyticsCard({ title, subtitle, icon: Icon, iconClassName = "text-emer
     <section
       className={`min-w-0 rounded-xl bg-zinc-900/30 p-4 shadow-sm sm:p-5 ${className}`}
     >
-      <div className="mb-3 flex items-center gap-3">
+      <div className="mb-3 flex items-center gap-2.5">
+        {/* El icono va SUELTO: sin pastilla de fondo ni borde. Antes vivía dentro
+            de un cuadro de 32px con `bg-white/[0.045]`, que competía con la
+            tarjeta (que ya tiene su propio fondo) y encajonaba el icono. Al
+            quitarlo se sube el tamaño de 16 a 20px para que no quede escuálido,
+            y el hueco pasa de `gap-3` a `gap-2.5` porque la caja ya no aporta
+            aire lateral. */}
         {Icon && (
-          <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/[0.045] ${iconClassName}`}>
-            <Icon className="h-4 w-4" aria-hidden="true" />
-          </span>
+          <Icon className={`h-5 w-5 shrink-0 ${iconClassName}`} aria-hidden="true" />
         )}
-        <div>
-        <h2 className="text-sm font-black text-white">{title}</h2>
-        {subtitle && <p className="mt-0.5 text-xs text-zinc-500">{subtitle}</p>}
+        <div className="min-w-0">
+          {/* Misma tipografía que las cabeceras de sección del Perfil
+              (`SectionHeader`) y del panel de Nivel: versalita en mayúsculas,
+              `text-xs`, `font-bold`, `tracking-widest` y `text-zinc-400`. Antes
+              era `text-sm font-black text-white`, que no se parecía a ninguna
+              otra cabecera de la página. */}
+          <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-400">{title}</h2>
+          {subtitle && <p className="mt-0.5 text-xs text-zinc-500">{subtitle}</p>}
         </div>
       </div>
       {children}
@@ -1429,20 +1438,20 @@ function HabitMetrics({ insights = {} }) {
 
 function HabitMetric({ icon: Icon, label, value, tone = "emerald" }) {
   const toneClass = {
-    amber: "text-amber-300",
-    emerald: "text-emerald-300",
-    orange: "text-orange-300",
-    rose: "text-rose-300",
-    sky: "text-sky-300",
-    violet: "text-violet-300",
-  }[tone] || "text-emerald-300";
+    amber: "text-amber-400",
+    emerald: "text-emerald-400",
+    orange: "text-orange-400",
+    rose: "text-rose-400",
+    sky: "text-sky-400",
+    violet: "text-violet-400",
+  }[tone] || "text-emerald-400";
 
   return (
     <div
       className="relative flex min-w-0 flex-col items-center justify-center overflow-hidden rounded-xl bg-zinc-900/30 px-2 py-2.5 text-center shadow-sm"
       aria-label={`${label}: ${value}`}
     >
-      <span className={`relative z-10 mb-1 inline-flex h-6 w-6 items-center justify-center ${toneClass}`}>
+      <span className={`relative z-10 mb-1 inline-flex h-6 w-6 items-center justify-center drop-shadow-[0_0_5px_currentColor] ${toneClass}`}>
         <Icon className="h-5 w-5" aria-hidden="true" />
       </span>
       <span className="relative z-10 block max-w-full truncate text-base font-black tracking-tight text-white drop-shadow-md sm:text-lg">
