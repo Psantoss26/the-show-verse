@@ -104,6 +104,59 @@ export const GENRES = {
   10768: "Guerra y política",
 };
 
+// TMDb NO traduce algunos géneros combinados de TV ("Action & Adventure",
+// "Sci-Fi & Fantasy", "War & Politics"): aunque se pidan los detalles con
+// `language=es-ES`, esos tres vuelven en inglés. Donde tenemos el `id` del
+// género se resuelve con `GENRES`, pero hay sitios —las estadísticas del
+// perfil— donde lo único que llega es el NOMBRE ya agregado, así que hace falta
+// esta tabla nombre→nombre. Los valores salen de `GENRES` para que la redacción
+// en español no se duplique.
+const GENRE_NAME_ES = {
+  Action: GENRES[28],
+  Adventure: GENRES[12],
+  Animation: GENRES[16],
+  Comedy: GENRES[35],
+  Crime: GENRES[80],
+  Documentary: GENRES[99],
+  Drama: GENRES[18],
+  Family: GENRES[10751],
+  Fantasy: GENRES[14],
+  History: GENRES[36],
+  Horror: GENRES[27],
+  Music: GENRES[10402],
+  Mystery: GENRES[9648],
+  Romance: GENRES[10749],
+  "Science Fiction": GENRES[878],
+  "TV Movie": GENRES[10770],
+  Thriller: GENRES[53],
+  War: GENRES[10752],
+  Western: GENRES[37],
+  // Los tres que TMDb deja sin traducir, más las variantes con las que también
+  // se los ve escritos.
+  "Action & Adventure": GENRES[10759],
+  "Sci-Fi & Fantasy": GENRES[10765],
+  "Science Fiction & Fantasy": GENRES[10765],
+  "War & Politics": GENRES[10768],
+  Kids: GENRES[10762],
+  News: GENRES[10763],
+  Reality: GENRES[10764],
+  Soap: GENRES[10766],
+  Talk: GENRES[10767],
+};
+
+const GENRE_NAME_ES_LOOKUP = new Map(
+  Object.entries(GENRE_NAME_ES).map(([english, spanish]) => [
+    english.toLowerCase(),
+    spanish,
+  ]),
+);
+
+/** Nombre de género en español. Si ya venía traducido, se devuelve tal cual. */
+export function translateGenreName(name) {
+  if (!name) return "";
+  return GENRE_NAME_ES_LOOKUP.get(String(name).trim().toLowerCase()) || name;
+}
+
 /* --------- precargar una imagen --------- */
 export const imagePreloadCache = new Map();
 
