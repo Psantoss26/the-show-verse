@@ -5,7 +5,7 @@
 // downloaded when the overview/patterns charts actually render. Each export is a
 // self-contained chart that mirrors the markup previously inlined in StatsClient.
 
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   AreaChart,
   Area,
@@ -27,6 +27,7 @@ import {
   Legend,
 } from "recharts";
 import { COLORS, CHART_THEME } from "./chartConstants";
+import { translateGenreName } from "@/lib/dashboard/media";
 
 function CustomTooltip({ active, payload, label, formatter }) {
   if (active && payload && payload.length) {
@@ -141,22 +142,24 @@ function formatMinutes(mins) {
   return `${h}h ${m}m`;
 }
 
+// Los nombres largos no caben en el eje del radar, así que se abrevian. OJO:
+// aquí solo se acorta, NO se traduce — al gráfico le llegan los géneros ya en
+// español (ver `translateGenreName`). Antes esta tabla mezclaba las dos cosas y
+// tenía entradas inglés→inglés ("Action & Adventure" → "Action/Adv."), que era
+// justo lo que dejaba dos etiquetas del radar sin traducir.
+const GENRE_TICK_ABBR = {
+  "ciencia ficción": "C. Ficción",
+  "ciencia ficción y fantasía": "C. Ficc/Fant",
+  "acción y aventura": "Acción/Aven.",
+  "guerra y política": "Guerra/Pol.",
+  "película de tv": "Peli TV",
+  "tv movie": "Peli TV",
+  documental: "Docu",
+};
+
 function formatGenreTick(value) {
   if (!value) return "";
-  const mappings = {
-    "Ciencia ficción": "C. Ficción",
-    "Science Fiction": "Sci-Fi",
-    "Ciencia ficción y Fantasía": "C. Ficc/Fant",
-    "Science Fiction & Fantasy": "Sci-Fi/Fant",
-    "Sci-Fi & Fantasy": "Sci-Fi/Fant",
-    "Acción y aventura": "Acción/Aven.",
-    "Action & Adventure": "Action/Adv.",
-    "Película de TV": "Peli TV",
-    "TV Movie": "TV Movie",
-    "Documental": "Docu",
-    "Documentary": "Docu",
-  };
-  return mappings[value] || value;
+  return GENRE_TICK_ABBR[String(value).trim().toLowerCase()] || value;
 }
 
 export function MonthlyActivityChart({ data }) {
@@ -308,10 +311,21 @@ export function DayOfWeekChart({ data }) {
 }
 
 export function GenreRadarChart({ data, isMobile = false }) {
+  // La traducción se aplica al DATO, no al tick: `tickFormatter` solo afecta al
+  // eje, y el tooltip usa el `name` crudo. Haciéndolo aquí, ambos coinciden.
+  const localizedData = useMemo(
+    () =>
+      (Array.isArray(data) ? data : []).map((entry) => ({
+        ...entry,
+        name: translateGenreName(entry?.name),
+      })),
+    [data],
+  );
+
   return (
     <ChartFrame>
       <FrameResponsiveContainer>
-        <RadarChart cx="50%" cy="50%" outerRadius="80%" data={data}>
+        <RadarChart cx="50%" cy="50%" outerRadius="80%" data={localizedData}>
           <PolarGrid stroke={CHART_THEME.grid} />
           <PolarAngleAxis
             dataKey="name"

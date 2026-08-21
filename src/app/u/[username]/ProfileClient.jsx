@@ -20,6 +20,7 @@ import LevelProgress from "@/components/level/LevelProgress";
 import LevelPanel from "@/components/level/LevelPanel";
 import ProfileSection from "./ProfileSection";
 import { PROFILE_TAB_IDS, profileTabHref } from "./profileRoutes";
+import { translateGenreName } from "@/lib/dashboard/media";
 import {
   Activity,
   Award,
@@ -1324,7 +1325,7 @@ function formatProfileTime(minutes) {
   return `${Math.floor(value / 60)} h`;
 }
 
-function AnalyticsCard({ title, subtitle, icon: Icon, iconClassName = "text-emerald-400", children, className = "" }) {
+function AnalyticsCard({ title, icon: Icon, iconClassName = "text-emerald-400", children, className = "" }) {
   return (
     <section
       className={`min-w-0 rounded-xl bg-zinc-900/30 p-4 shadow-sm sm:p-5 ${className}`}
@@ -1339,15 +1340,21 @@ function AnalyticsCard({ title, subtitle, icon: Icon, iconClassName = "text-emer
         {Icon && (
           <Icon className={`h-5 w-5 shrink-0 ${iconClassName}`} aria-hidden="true" />
         )}
-        <div className="min-w-0">
-          {/* Misma tipografía que las cabeceras de sección del Perfil
-              (`SectionHeader`) y del panel de Nivel: versalita en mayúsculas,
-              `text-xs`, `font-bold`, `tracking-widest` y `text-zinc-400`. Antes
-              era `text-sm font-black text-white`, que no se parecía a ninguna
-              otra cabecera de la página. */}
-          <h2 className="text-xs font-bold uppercase tracking-widest text-zinc-400">{title}</h2>
-          {subtitle && <p className="mt-0.5 text-xs text-zinc-500">{subtitle}</p>}
-        </div>
+        {/* Misma tipografía que las cabeceras de sección del Perfil
+            (`SectionHeader`) y del panel de Nivel: versalita en mayúsculas,
+            `text-xs`, `font-bold`, `tracking-widest` y `text-zinc-400`. Antes
+            era `text-sm font-black text-white`, que no se parecía a ninguna
+            otra cabecera de la página.
+
+            El `top-px` es una corrección ÓPTICA, no un capricho: `items-center`
+            centra la CAJA DE LÍNEA (16px), pero un texto en mayúsculas no ocupa
+            los 4px de descendente que esa caja reserva, así que su mancha queda
+            alta. Medido con PT Sans 700 a 12px: la banda de mayúsculas caía 1px
+            por encima del centro de tinta del icono en las seis tarjetas.
+            Bajarla 1px las alinea (comprobado: desviación 0,00px). */}
+        <h2 className="relative top-px min-w-0 text-xs font-bold uppercase tracking-widest text-zinc-400">
+          {title}
+        </h2>
       </div>
       {children}
     </section>
@@ -1361,7 +1368,6 @@ function ProfileAnalytics({ analytics }) {
       <div className="grid min-w-0 gap-4 xl:grid-cols-12">
         <AnalyticsCard
           title="Actividad mensual"
-          subtitle="Últimos doce meses"
           icon={Activity}
           iconClassName="text-indigo-400"
           className="xl:col-span-6"
@@ -1374,7 +1380,6 @@ function ProfileAnalytics({ analytics }) {
         </AnalyticsCard>
         <AnalyticsCard
           title="Tiempo de visionado"
-          subtitle="Películas frente a series"
           icon={PieChart}
           iconClassName="text-violet-400"
           className="xl:col-span-3"
@@ -1396,16 +1401,16 @@ function ProfileAnalytics({ analytics }) {
         </aside>
       </div>
       <div className="grid min-w-0 gap-4 md:grid-cols-2">
-        <AnalyticsCard title="Hora del día" subtitle="Cuándo hay más actividad" icon={Clock3} iconClassName="text-pink-400">
+        <AnalyticsCard title="Hora del día" icon={Clock3} iconClassName="text-pink-400">
           {hasActivity ? <HourOfDayChart data={analytics.hourOfDay || []} /> : <EmptyChart />}
         </AnalyticsCard>
-        <AnalyticsCard title="Día de la semana" subtitle="Ritmo semanal" icon={CalendarDays} iconClassName="text-cyan-400">
+        <AnalyticsCard title="Día de la semana" icon={CalendarDays} iconClassName="text-cyan-400">
           {hasActivity ? <DayOfWeekChart data={analytics.dayOfWeek || []} /> : <EmptyChart />}
         </AnalyticsCard>
-        <AnalyticsCard title="Gustos por género" subtitle="Las categorías más frecuentes" icon={Target} iconClassName="text-lime-400">
+        <AnalyticsCard title="Gustos por género" icon={Target} iconClassName="text-lime-400">
           {analytics.genres?.length ? <GenreRadarChart data={analytics.genres} /> : <EmptyChart />}
         </AnalyticsCard>
-        <AnalyticsCard title="Puntuaciones" subtitle="Distribución de notas">
+        <AnalyticsCard title="Puntuaciones" icon={Star} iconClassName="text-amber-400">
           {analytics.ratings?.length ? <RatingsBarChart data={analytics.ratings} /> : <EmptyChart />}
         </AnalyticsCard>
       </div>
@@ -1426,7 +1431,10 @@ function HabitMetrics({ insights = {} }) {
     { icon: Flame, label: "Racha actual", value: `${insights.currentStreak || 0} días`, tone: "orange" },
     { icon: Award, label: "Mejor racha", value: `${insights.bestStreak || 0} días`, tone: "rose" },
     { icon: Star, label: "Nota media", value: insights.averageRating != null ? insights.averageRating.toFixed(1) : "—", tone: "amber" },
-    { icon: Activity, label: "Género top", value: insights.topGenre?.name || "—", tone: "emerald" },
+    // Mismo arreglo que el radar de "Gustos por género": este nombre sale
+    // agregado del backend tal cual lo da TMDb, que deja sin traducir los
+    // géneros combinados de TV.
+    { icon: Activity, label: "Género top", value: translateGenreName(insights.topGenre?.name) || "—", tone: "emerald" },
     { icon: CalendarDays, label: "Día favorito", value: insights.topDay?.name || "—", tone: "sky" },
     { icon: Clock3, label: "Hora punta", value: insights.peakHour?.name || "—", tone: "violet" },
   ];
