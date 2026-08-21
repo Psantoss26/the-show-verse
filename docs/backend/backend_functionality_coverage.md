@@ -193,7 +193,7 @@ Estas funcionalidades siguen en Next.js y no tienen reemplazo en `backend/`:
 
 | Area | Rutas actuales |
 | --- | --- |
-| Plex | `/api/plex`, `/api/plex/library`, `/api/plex/open` |
+| Plex | `/api/plex`, `/api/plex/library` |
 | Spotify | `/api/spotify/login`, `/api/spotify/callback` |
 | Soundtrack | `/api/soundtrack` |
 | IA Watch Next | `/api/ai/watch-next`, `/api/ai/health` |

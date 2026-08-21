@@ -342,6 +342,20 @@ export function GenreRadarChart({ data, isMobile = false }) {
   );
 }
 
+// Misma escala semántica que las celdas de valoración de episodios: cada
+// intervalo de nota conserva su color también en el resumen del perfil.
+function ratingBarColor(value) {
+  const rating = Number(value);
+  if (!Number.isFinite(rating)) return COLORS.slate;
+  if (rating >= 9.7) return "#26a8ea";
+  if (rating >= 9) return "#0b6f3d";
+  if (rating >= 8) return "#24b260";
+  if (rating >= 7) return "#f2d43b";
+  if (rating >= 6) return "#f39b16";
+  if (rating >= 5) return "#f04444";
+  return "#8b22d6";
+}
+
 export function RatingsBarChart({ data }) {
   return (
     <ChartFrame>
@@ -369,17 +383,10 @@ export function RatingsBarChart({ data }) {
           />
           <Bar dataKey="value" name="Votos" radius={[4, 4, 0, 0]}>
             {(data || []).map((entry, index) => {
-              const rating = Number(entry.name);
               return (
                 <Cell
                   key={`cell-${index}`}
-                  fill={
-                    rating >= 7.5
-                      ? COLORS.teal
-                      : rating >= 5
-                        ? COLORS.yellow
-                        : COLORS.rose
-                  }
+                  fill={ratingBarColor(entry.name)}
                 />
               );
             })}
