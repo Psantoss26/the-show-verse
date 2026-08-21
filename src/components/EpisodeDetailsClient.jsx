@@ -18,7 +18,6 @@ import "swiper/swiper-bundle.css";
 import DetailsArrowCarousel from "@/components/details/DetailsArrowCarousel";
 
 import {
-  ArrowLeft,
   Calendar as CalendarIcon,
   Clock as ClockIcon,
   Star as StarIcon,
@@ -51,9 +50,8 @@ import {
   fetchSeriesGraphRatingsCached,
   getSeriesGraphEpisodeRating,
 } from "@/lib/details/seriesGraphRatings";
-import StarRating from "@/components/StarRating";
-import TraktWatchedControl from "@/components/trakt/TraktWatchedControl";
 import TraktWatchedModal from "@/components/trakt/TraktWatchedModal";
+import SubrouteDetailsActionRow from "@/components/details/SubrouteDetailsActionRow";
 import {
   invalidateTraktGetCache,
   traktGetItemStatus,
@@ -674,7 +672,6 @@ export default function EpisodeDetailsClient({
   // =========================
   // Rating SOLO Trakt + StarRating
   // =========================
-  const [isRatingOpen, setIsRatingOpen] = useState(false);
   const [userRating, setUserRating] = useState(null);
   const [ratingLoading, setRatingLoading] = useState(false);
   const [traktConnected, setTraktConnected] = useState(true);
@@ -786,7 +783,6 @@ export default function EpisodeDetailsClient({
         console.error(e);
       } finally {
         setRatingLoading(false);
-        setIsRatingOpen(false);
       }
     },
     [showId, seasonNumber, episodeNumber],
@@ -1276,37 +1272,6 @@ export default function EpisodeDetailsClient({
 
       {/* Content */}
       <div className="relative z-10 px-4 py-8 lg:py-12 max-w-7xl mx-auto">
-        {/* Back buttons */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1] }}
-          className="flex flex-wrap items-center gap-2 mb-6"
-        >
-          <button
-            type="button"
-            onClick={() => router.back()}
-            title="Volver"
-            className="inline-flex items-center justify-center rounded-full bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-lg backdrop-blur-md p-2 text-zinc-200 hover:bg-white/10 transition"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-
-          <Link
-            href={`/details/tv/${showId}/season/${seasonNumber}`}
-            className="inline-flex items-center gap-2 rounded-full bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-lg backdrop-blur-md px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-200 hover:bg-white/10 transition"
-          >
-            Temporada {seasonNumber}
-          </Link>
-
-          <Link
-            href={`/details/tv/${showId}`}
-            className="inline-flex items-center gap-2 rounded-full bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-lg backdrop-blur-md px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-200 hover:bg-white/10 transition"
-          >
-            <MonitorPlay className="w-4 h-4" /> {showName}
-          </Link>
-        </motion.div>
-
         {/* Hero */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -1451,6 +1416,39 @@ export default function EpisodeDetailsClient({
               </div>
             </div>
 
+            <div className="mb-6 px-1">
+              <SubrouteDetailsActionRow
+                onBack={() => router.back()}
+                seriesHref={`/details/tv/${showId}`}
+                seasonHref={`/details/tv/${showId}/season/${seasonNumber}`}
+                trakt={{
+                  connected: trakt.connected,
+                  watched: trakt.watched,
+                  plays: episodePlays.plays,
+                  badge: null,
+                  busy: watchedBusy,
+                  loading: trakt.loading && !watchedBySeasonLoaded,
+                  onOpen: async () => {
+                    setWatchedBusy(true);
+                    try {
+                      await loadEpisodePlays();
+                    } finally {
+                      setWatchedBusy(false);
+                    }
+                    setEpisodePlaysOpen(true);
+                  },
+                }}
+                rate={{
+                  rating: userRating,
+                  loading: ratingLoading,
+                  connected: traktConnected,
+                  onConnect: () =>
+                    (window.location.href = `/login?next=/details/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`),
+                  onRate: handleRate,
+                }}
+              />
+            </div>
+
             {/* SCOREBOARD */}
             <DetailsScoreboardPanel
               className="mb-6"
@@ -1483,37 +1481,6 @@ export default function EpisodeDetailsClient({
               }}
               stats={tScoreboard?.stats}
               showFavoritedStat={false}
-              toolbarActions={
-                <>
-                  {/* Botón de visionado — abre modal con historial de plays */}
-                  <TraktWatchedControl
-                    connected={trakt.connected}
-                    watched={trakt.watched}
-                    plays={episodePlays.plays}
-                    badge={null}
-                    busy={watchedBusy}
-                    loading={trakt.loading && !watchedBySeasonLoaded}
-                    onOpen={async () => {
-                      setWatchedBusy(true);
-                      try {
-                        await loadEpisodePlays();
-                      } finally {
-                        setWatchedBusy(false);
-                      }
-                      setEpisodePlaysOpen(true);
-                    }}
-                  />
-
-                  {/* Botón de rating */}
-                  <StarRating
-                    open={isRatingOpen}
-                    rating={userRating}
-                    loading={ratingLoading}
-                    onClose={() => setIsRatingOpen(false)}
-                    onRate={handleRate}
-                  />
-                </>
-              }
             />
 
             {/* Tabs (DETALLES / SINOPSIS) */}

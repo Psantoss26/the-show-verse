@@ -8,7 +8,6 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 
 import {
-  ArrowLeft,
   Layers,
   Calendar as CalendarIcon,
   Film as FilmIcon,
@@ -43,9 +42,8 @@ import {
   fetchSeriesGraphRatingsCached,
   getSeriesGraphSeasonAggregate,
 } from "@/lib/details/seriesGraphRatings";
-import StarRating from "@/components/StarRating";
-import TraktWatchedControl from "@/components/trakt/TraktWatchedControl";
 import TraktEpisodesWatchedModal from "@/components/trakt/TraktEpisodesWatchedModal";
+import SubrouteDetailsActionRow from "@/components/details/SubrouteDetailsActionRow";
 import {
   invalidateTraktGetCache,
   traktGetShowWatched,
@@ -1078,30 +1076,6 @@ export default function SeasonDetailsClient({
 
       {/* Content */}
       <div className="relative z-10 px-4 py-8 lg:py-12 max-w-7xl mx-auto">
-        {/* Back buttons */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.36, ease: [0.22, 1, 0.36, 1] }}
-          className="flex items-center gap-2 mb-6"
-        >
-          <button
-            type="button"
-            onClick={() => router.back()}
-            title="Volver"
-            className="inline-flex items-center justify-center rounded-full bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-lg backdrop-blur-md p-2 text-zinc-200 hover:bg-white/10 transition"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-
-          <Link
-            href={`/details/tv/${showId}`}
-            className="inline-flex items-center gap-2 rounded-full bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-lg backdrop-blur-md px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-200 hover:bg-white/10 transition"
-          >
-            <MonitorPlay className="w-4 h-4" /> {showName}
-          </Link>
-        </motion.div>
-
         {/* Hero */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -1199,6 +1173,38 @@ export default function SeasonDetailsClient({
               </div>
             </div>
 
+            <div className="mb-6 px-1">
+              <SubrouteDetailsActionRow
+                onBack={() => router.back()}
+                seriesHref={`/details/tv/${showId}`}
+                trakt={
+                  Number(seasonNumber) > 0
+                    ? {
+                        connected: trakt.connected,
+                        watched: seasonButtonWatched,
+                        plays: null,
+                        badge: seasonProgressBadge,
+                        busy: watchedBusy,
+                        loading: trakt.loading && !watchedBySeasonLoaded,
+                        onOpen: () => setTraktEpisodesOpen(true),
+                      }
+                    : null
+                }
+                rate={{
+                  rating: userRating,
+                  loading: ratingLoading,
+                  connected: traktConnected,
+                  onConnect: () =>
+                    (window.location.href = `/login?next=/details/tv/${showId}/season/${seasonNumber}`),
+                  onRate: handleRate,
+                  onClear: () => handleRate(null),
+                  min: 1,
+                  max: 10,
+                  step: 1,
+                }}
+              />
+            </div>
+
             {/* SCOREBOARD */}
             <DetailsScoreboardPanel
               className="mb-6"
@@ -1233,35 +1239,6 @@ export default function SeasonDetailsClient({
               }}
               stats={tScoreboard?.stats}
               showFavoritedStat={false}
-              toolbarActions={
-                <>
-                  {Number(seasonNumber) > 0 && (
-                    <TraktWatchedControl
-                      connected={trakt.connected}
-                      watched={seasonButtonWatched}
-                      plays={null}
-                      badge={seasonProgressBadge}
-                      busy={watchedBusy}
-                      loading={trakt.loading && !watchedBySeasonLoaded}
-                      onOpen={() => setTraktEpisodesOpen(true)}
-                    />
-                  )}
-
-                  <StarRating
-                    rating={userRating}
-                    loading={ratingLoading}
-                    connected={traktConnected}
-                    onConnect={() =>
-                      (window.location.href = `/login?next=/details/tv/${showId}/season/${seasonNumber}`)
-                    }
-                    onRating={handleRate}
-                    onClearRating={() => handleRate(null)}
-                    min={1}
-                    step={1}
-                    max={10}
-                  />
-                </>
-              }
             />
 
             {/* Tabs */}
