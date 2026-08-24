@@ -775,7 +775,9 @@ export default function TraktEpisodesWatchedModal({
 
   if (!open) return null;
 
-  const PanelClass = `fixed inset-0 sm:static w-full h-[100dvh] sm:h-[85vh] sm:max-w-5xl overflow-hidden flex flex-col z-[10060] sm:z-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] sm:py-0 ${LIQUID_GLASS_PANEL} sm:rounded-[2rem] sm:shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_30px_80px_-15px_rgba(0,0,0,0.95)]`;
+  // Igual que los demás modales de acciones: en móvil conserva márgenes y una
+  // altura máxima, en lugar de convertirse en una pantalla completa.
+  const PanelClass = `relative z-[10060] flex w-full max-w-5xl max-h-[85dvh] flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_30px_80px_-15px_rgba(0,0,0,0.95)] sm:h-[85vh]`;
 
   const ButtonBase =
     "inline-flex items-center justify-center gap-2 rounded-xl text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed";
@@ -783,7 +785,7 @@ export default function TraktEpisodesWatchedModal({
   // --- MOVIE RENDER ---
   if (isMovie) {
     return (
-      <div className="fixed inset-0 z-[99999] flex items-center justify-center sm:p-4">
+      <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
         <div
           className="absolute inset-0 bg-black/60 backdrop-blur-lg"
           onClick={onClose}
@@ -903,7 +905,7 @@ export default function TraktEpisodesWatchedModal({
 
   // --- TV RENDER ---
   return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center sm:p-4">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-lg"
         onClick={onClose}
