@@ -143,7 +143,7 @@ export default function EpisodeRatingsModal({
 
       {/* MODAL CONTAINER: Liquid Glass */}
       <div
-        className={`relative flex h-fit max-h-[calc(100dvh-2rem)] w-fit min-w-[min(20rem,calc(100%_-_2rem))] max-w-[min(78rem,calc(100%_-_2rem))] flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
+        className={`relative flex h-fit max-h-[min(50rem,84dvh)] w-fit min-w-[min(20rem,calc(100%_-_2rem))] max-w-[min(78rem,calc(100%_-_2rem))] flex-col overflow-hidden rounded-[2rem] sm:max-h-[calc(100dvh-2rem)] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
