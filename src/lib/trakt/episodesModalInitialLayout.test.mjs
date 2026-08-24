@@ -17,3 +17,11 @@ test("el modal de episodios reserva su altura móvil antes de recibir episodios"
     "la vista de series debe conservar altura estable durante la carga inicial",
   );
 });
+
+test("al cambiar de temporada no se tapa el contenido con un estado de carga", () => {
+  assert.doesNotMatch(
+    modalSource,
+    /\bisSwitching\b/,
+    "el cambio de temporada no debe renderizar una capa de carga sobre la lista",
+  );
+});

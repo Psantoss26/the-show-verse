@@ -594,7 +594,6 @@ export default function TraktEpisodesWatchedModal({
     !Array.isArray(displayCache?.episodes) &&
     !displayCache?.error
   );
-  const isSwitching = selectedSn !== displaySn && loadingSeason;
 
   const filteredEpisodes = useMemo(() => {
     const q2 = (query || "").trim().toLowerCase();
@@ -1658,14 +1657,6 @@ export default function TraktEpisodesWatchedModal({
                 }}
                 className="relative flex-1 overflow-y-auto scroll-smooth p-3 pb-20 touch-pan-y no-scrollbar sm:p-4 sm:pb-4 md:touch-auto"
               >
-                {isSwitching && (
-                  <div className="absolute inset-0 bg-black/50 z-10 flex items-center justify-center backdrop-blur-[1px]">
-                    <Loader2
-                      className={`w-8 h-8 animate-spin ${isRewatchView ? "text-purple-400" : "text-emerald-500"}`}
-                    />
-                  </div>
-                )}
-
                 <div className="space-y-3">
                   {filteredEpisodes.length === 0 && !loadingSeason ? (
                     <div className="text-center py-12 text-zinc-500 text-sm">
