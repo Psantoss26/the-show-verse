@@ -156,6 +156,8 @@ export default function TraktEpisodesWatchedModal({
   const [seasonCache, setSeasonCache] = useState({});
   const [movieEditValue, setMovieEditValue] = useState("");
   const [showError, setShowError] = useState("");
+  const episodeListRef = useRef(null);
+  const seasonSwipeStartRef = useRef(null);
 
   // local view fallback si el padre no controla activeView/onChangeView
   const [localView, setLocalView] = useState("global");
@@ -495,6 +497,19 @@ export default function TraktEpisodesWatchedModal({
     [tmdbId, seasonCache],
   );
 
+  const selectSeason = useCallback(
+    (seasonNumber) => {
+      if (seasonNumber == null) return;
+
+      episodeListRef.current?.scrollTo({ top: 0 });
+      setActiveSeason(seasonNumber);
+      if (Array.isArray(seasonCache?.[seasonNumber]?.episodes)) {
+        setDisplaySeason(seasonNumber);
+      }
+    },
+    [seasonCache],
+  );
+
   // Auto-load season
   useEffect(() => {
     if (!open || isMovie || viewMode !== "list" || activeSeason == null) return;
@@ -519,6 +534,49 @@ export default function TraktEpisodesWatchedModal({
   // estado vacío antes de que arranque la petición.
   const selectedSn = selectedSeasonObj?.season_number ?? initialSeasonNumber;
   const displaySn = displaySeason ?? activeSeason ?? initialSeasonNumber;
+
+  const handleEpisodeListTouchStart = useCallback((event) => {
+    if (window.matchMedia("(min-width: 768px)").matches) return;
+
+    const target = event.target;
+    if (
+      event.touches.length !== 1 ||
+      target.closest?.("button, a, input, select, textarea")
+    ) {
+      seasonSwipeStartRef.current = null;
+      return;
+    }
+
+    const touch = event.touches[0];
+    seasonSwipeStartRef.current = { x: touch.clientX, y: touch.clientY };
+  }, []);
+
+  const handleEpisodeListTouchEnd = useCallback(
+    (event) => {
+      const start = seasonSwipeStartRef.current;
+      seasonSwipeStartRef.current = null;
+      if (!start || window.matchMedia("(min-width: 768px)").matches) return;
+
+      const touch = event.changedTouches[0];
+      if (!touch) return;
+
+      const deltaX = touch.clientX - start.x;
+      const deltaY = touch.clientY - start.y;
+      if (Math.abs(deltaX) < 56 || Math.abs(deltaX) <= Math.abs(deltaY)) {
+        return;
+      }
+
+      const currentIndex = usableSeasons.findIndex(
+        (season) => season?.season_number === selectedSn,
+      );
+      const nextSeason = usableSeasons[
+        currentIndex + (deltaX < 0 ? 1 : -1)
+      ];
+      if (nextSeason) selectSeason(nextSeason.season_number);
+    },
+    [selectSeason, selectedSn, usableSeasons],
+  );
+
   const displayCache = displaySn != null ? seasonCache?.[displaySn] : null;
   const episodes = Array.isArray(displayCache?.episodes)
     ? displayCache.episodes
@@ -1520,11 +1578,7 @@ export default function TraktEpisodesWatchedModal({
                       <button
                         key={sn}
                         type="button"
-                        onClick={() => {
-                          setActiveSeason(sn);
-                          if (Array.isArray(seasonCache?.[sn]?.episodes))
-                            setDisplaySeason(sn);
-                        }}
+                        onClick={() => selectSeason(sn)}
                         // La temporada seleccionada se lee por su TINTE y por el
                         // color del rótulo, no por un aro. Con el aro fuera, la
                         // rama inactiva tampoco necesita su borde transparente:
@@ -1578,11 +1632,7 @@ export default function TraktEpisodesWatchedModal({
                       <button
                         key={sn}
                         type="button"
-                        onClick={() => {
-                          setActiveSeason(sn);
-                          if (Array.isArray(seasonCache?.[sn]?.episodes))
-                            setDisplaySeason(sn);
-                        }}
+                        onClick={() => selectSeason(sn)}
                         className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
                           active
                             ? isRewatchView
@@ -1599,7 +1649,15 @@ export default function TraktEpisodesWatchedModal({
               </div>
 
               {/* Episodes List */}
-              <div className="flex-1 overflow-y-auto no-scrollbar p-3 sm:p-4 pb-20 sm:pb-4 relative scroll-smooth">
+              <div
+                ref={episodeListRef}
+                onTouchStart={handleEpisodeListTouchStart}
+                onTouchEnd={handleEpisodeListTouchEnd}
+                onTouchCancel={() => {
+                  seasonSwipeStartRef.current = null;
+                }}
+                className="relative flex-1 overflow-y-auto scroll-smooth p-3 pb-20 touch-pan-y no-scrollbar sm:p-4 sm:pb-4 md:touch-auto"
+              >
                 {isSwitching && (
                   <div className="absolute inset-0 bg-black/50 z-10 flex items-center justify-center backdrop-blur-[1px]">
                     <Loader2
