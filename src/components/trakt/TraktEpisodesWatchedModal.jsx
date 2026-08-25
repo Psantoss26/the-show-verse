@@ -336,6 +336,7 @@ export default function TraktEpisodesWatchedModal({
       ...rewatchItems.map((item) => ({
         id: item.id,
         label: item.label,
+        mobileLabel: formatDate(item.startedAt),
         kind: "rewatch",
       })),
     ],
@@ -1145,7 +1146,7 @@ export default function TraktEpisodesWatchedModal({
                                       <History className="w-4 h-4 text-purple-400 shrink-0" />
                                     )}
                                     <span className="flex-1 truncate">
-                                      {item.label}
+                                      {item.mobileLabel || item.label}
                                     </span>
                                     {active && (
                                       <Check className="w-4 h-4 shrink-0" />

@@ -69,6 +69,8 @@ test("el selector de escritorio antepone Rewatch a la fecha", () => {
 test("el desplegable conserva el formato y color morado de los rewatch", () => {
   assert.match(modalSource, /label: `Rewatch · \$\{formatDate\(startedAt\)\}`/);
   assert.match(modalSource, /label: `Rewatch · \$\{formatDate\(iso\)\}`/);
+  assert.match(modalSource, /mobileLabel: formatDate\(item\.startedAt\)/);
+  assert.match(modalSource, /\{item\.mobileLabel \|\| item\.label\}/);
   assert.match(modalSource, /bg-purple-500\/12 text-purple-200/);
   assert.match(modalSource, /History className="w-4 h-4 text-purple-400 shrink-0"/);
 });
