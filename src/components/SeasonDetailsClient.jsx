@@ -20,9 +20,13 @@ import {
 import { offlineMutationFetch } from "@/lib/offline/syncQueue";
 
 import DetailsInfoTabs from "@/components/details/DetailsInfoTabs";
-import { AnimatedSection } from "@/components/details/AnimatedSection";
+import {
+  AnimatedSection,
+  StaggerContainer,
+} from "@/components/details/AnimatedSection";
 import AnimatedPosterFrame from "@/components/details/AnimatedPosterFrame";
 import StreamingHoverOverlay from "@/components/details/StreamingHoverOverlay";
+import StreamingProviderLogo from "@/components/details/StreamingProviderLogo";
 import DetailsScoreboardPanel from "@/components/details/DetailsScoreboardPanel";
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
@@ -321,9 +325,10 @@ export default function SeasonDetailsClient({
         ? show.production_companies
         : []
       )
+        .slice(0, 3)
         .map((company) => company?.name)
         .filter(Boolean)
-        .join(" · "),
+        .join(", ") || null,
     [show?.production_companies],
   );
   const showCreators = useMemo(
@@ -1181,6 +1186,44 @@ export default function SeasonDetailsClient({
                 />
               }
             />
+
+            {/* En la vista normal las plataformas acompañan al póster, como en
+                la ficha principal. En móvil se accede a ellas desde el modal
+                para conservar el hero compacto. */}
+            {seasonPlatformItems.length > 0 ? (
+              <StaggerContainer
+                className="hidden w-full flex-wrap items-center justify-center gap-3 px-1 py-1 sm:flex"
+                staggerDelay={0.05}
+              >
+                {seasonPlatformItems.map((provider, index) => (
+                  <motion.a
+                    key={provider.key ?? `${provider.title}-${index}`}
+                    href={provider.href}
+                    initial={{ opacity: 0, y: 10, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{
+                      duration: 0.28,
+                      delay: 0.03 + index * 0.04,
+                      ease: [0.22, 1, 0.36, 1],
+                    }}
+                    target={provider.target}
+                    rel={provider.rel}
+                    aria-label={provider.title}
+                    className="group/provider relative flex-shrink-0 cursor-pointer transition-transform hover:z-10 hover:scale-110 hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400"
+                  >
+                    <StreamingProviderLogo
+                      provider={provider}
+                      onError={(event) => {
+                        event.currentTarget.style.visibility = "hidden";
+                      }}
+                    />
+                    <span className="pointer-events-none absolute left-1/2 top-full z-[100] mt-2 -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/provider:scale-100 group-hover/provider:opacity-100 group-hover/provider:delay-[2000ms]">
+                      {provider.subtitle || provider.title}
+                    </span>
+                  </motion.a>
+                ))}
+              </StaggerContainer>
+            ) : null}
           </motion.div>
 
           {/* Right info + SCOREBOARD + TABS */}
@@ -1300,8 +1343,7 @@ export default function SeasonDetailsClient({
                 creators={showCreators}
                 network={showNetwork}
                 productionText={seasonProduction}
-                platforms={seasonPlatformItems}
-                showPlatformsTab
+                showPlatformsTab={false}
                 showAwardsTab={false}
                 detailCards={seasonDetailCards}
               />
