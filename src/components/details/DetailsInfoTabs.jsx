@@ -28,6 +28,7 @@ import {
   Tags,
   BadgeCheck,
   ChevronDown,
+  ExternalLink,
 } from "lucide-react";
 
 import {
@@ -108,9 +109,15 @@ export default function DetailsInfoTabs({
   genres = [],
   metadataLoading = false,
   mobileLayout = false,
+  // El cambio de pestaña mediante gesto se configura por separado del layout:
+  // SeasonDetails comparte este componente entre móvil y escritorio, mientras
+  // que EpisodeDetails renderiza una instancia exclusiva para móvil.
+  enableMobileTabSwipe = false,
   platforms = [],
   platformLinks = [],
   showPlatformsTab = mobileLayout,
+  externalLinks = [],
+  showExternalLinksTab = false,
   awardsValue,
   // Listas y colecciones comparten la navegación y las tarjetas, pero no los
   // campos propios de una película. Estas dos colecciones permiten expresar
@@ -136,6 +143,7 @@ export default function DetailsInfoTabs({
   const hasAwardItems = awardItems.length > 0;
   const hasAwardsTab = showAwardsTab && (awards || hasAwardItems);
   const hasPlatformsTab = showPlatformsTab;
+  const hasExternalLinksTab = showExternalLinksTab;
   const synopsisText = typeof overview === "string" ? overview.trim() : "";
   const synopsisIsExpandable = expandableSynopsis && synopsisText.length > 420;
   const hasCustomDetailCards = Array.isArray(detailCards);
@@ -150,15 +158,21 @@ export default function DetailsInfoTabs({
       ...(showProductionTab ? [{ id: "production", label: "Producción" }] : []),
       { id: "synopsis", label: "Sinopsis" },
       ...(hasPlatformsTab ? [{ id: "platforms", label: "Plataformas" }] : []),
+      ...(hasExternalLinksTab ? [{ id: "links", label: "Enlaces" }] : []),
       ...(hasAwardsTab ? [{ id: "awards", label: "Premios" }] : []),
     ],
-    [showDetailsTab, showProductionTab, hasPlatformsTab, hasAwardsTab],
+    [
+      showDetailsTab,
+      showProductionTab,
+      hasPlatformsTab,
+      hasExternalLinksTab,
+      hasAwardsTab,
+    ],
   );
 
-  // En móvil se cambia de sección deslizando sobre la zona de pestañas -- el
-  // menú Y las tarjetas de debajo--, sin tener que apuntar a la etiqueta. Sin
-  // ciclo: en la primera y en la última el gesto no hace nada, que es justo lo
-  // que está prometiendo la posición del subrayado.
+  // En móvil se cambia de sección deslizando sobre el menú, sin tener que
+  // apuntar a la etiqueta. Sin ciclo: en la primera y en la última el gesto no
+  // hace nada, que es justo lo que está prometiendo la posición del subrayado.
   const goToAdjacentTab = (step) => {
     setActiveTab((current) => {
       const index = tabs.findIndex((tab) => tab.id === current);
@@ -169,7 +183,7 @@ export default function DetailsInfoTabs({
   };
 
   const swipeHandlers = useHorizontalSwipe({
-    enabled: mobileLayout,
+    enabled: enableMobileTabSwipe,
     onSwipeLeft: () => goToAdjacentTab(1),
     onSwipeRight: () => goToAdjacentTab(-1),
   });
@@ -183,11 +197,7 @@ export default function DetailsInfoTabs({
     : "";
 
   return (
-    // `contents`: el contenedor existe en el DOM -- los eventos táctiles
-    // burbujean por él-- pero no genera caja, así que el menú y las tarjetas
-    // siguen colocándose en el layout de la ficha exactamente igual que cuando
-    // eran hermanos sueltos dentro de un fragmento.
-    <div className="contents" {...swipeHandlers}>
+    <div className="contents">
       {/* ========== MENÚ DE NAVEGACIÓN DE TABS ========== */}
       {showTabsMenu ? (
         <DetailsTabsMenu
@@ -195,6 +205,7 @@ export default function DetailsInfoTabs({
           activeTab={activeTab}
           onChangeTab={setActiveTab}
           layoutId={layoutId}
+          swipeHandlers={swipeHandlers}
         />
       ) : null}
 
@@ -601,6 +612,50 @@ export default function DetailsInfoTabs({
                       />
                     ))}
                   </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ===== TAB: ENLACES EXTERNOS ===== */}
+          {activeTab === "links" && hasExternalLinksTab && (
+            <div key="links">
+              <div className="flex flex-col gap-3">
+                {externalLinks.length > 0 ? (
+                  externalLinks.map((link, index) => (
+                    <a
+                      key={link.id ?? link.key ?? `${link.label}-${index}`}
+                      href={link.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`Abrir ${link.label || "enlace externo"}`}
+                      className="group/link block rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400"
+                    >
+                      <VisualMetaCard
+                        iconContent={
+                          link.icon ? (
+                            <OptimizedImage
+                              src={link.icon}
+                              alt=""
+                              className="h-10 w-10 rounded-xl bg-white/5 object-contain shadow-lg"
+                            />
+                          ) : (
+                            <ExternalLink className="h-6 w-6 text-zinc-300" />
+                          )
+                        }
+                        label="Enlace externo"
+                        value={link.label || "Enlace"}
+                        className="w-full transition-colors group-hover/link:from-white/15 group-hover/link:to-black/5"
+                      />
+                    </a>
+                  ))
+                ) : (
+                  <VisualMetaCard
+                    icon={ExternalLink}
+                    label="Enlaces externos"
+                    value="No hay enlaces disponibles."
+                    className="w-full"
+                  />
                 )}
               </div>
             </div>

@@ -29,7 +29,7 @@
 import { Fragment } from "react";
 import { motion } from "framer-motion";
 import NextImage from "next/image";
-import { Eye, Play, List, Heart, MoreHorizontal } from "lucide-react";
+import { Eye, Play, List, Heart, MoreHorizontal, MonitorPlay } from "lucide-react";
 
 import {
   CompactBadge,
@@ -325,6 +325,8 @@ export function DetailsStatsRow({
 //       wrapperClassName?, key? }. Si está vacío/ausente no se pinta la región de
 //       enlaces (equivale al modo backdrop de DetailsClient).
 //    - `onMoreLinks`: callback del botón "..." que abre el modal de enlaces.
+//    - `onMorePlatforms`: sustituye en móvil el acceso a enlaces por el de
+//       plataformas, sin modificar la composición de escritorio.
 //    - `externalLinksMenuOnly`: mantiene esos enlaces en el botón también en
 //       escritorio, en vez de desplegarlos como iconos individuales.
 //    - `showExternalLinksLabel`: muestra la etiqueta del botón desde `sm`.
@@ -377,6 +379,7 @@ function DetailsToolbarActions({
   externalLinks = null,
   streamingProviders = null,
   onMoreLinks,
+  onMorePlatforms,
   externalLinksMenuOnly = false,
   showExternalLinksLabel = false,
   share = null,
@@ -387,7 +390,9 @@ function DetailsToolbarActions({
     Array.isArray(externalLinks) && externalLinks.length > 0;
   const hasStreamingProviders =
     Array.isArray(streamingProviders) && streamingProviders.length > 0;
-  const hasInlineActions = hasExternalLinks || hasStreamingProviders;
+  const hasMobilePlatformAction = typeof onMorePlatforms === "function";
+  const hasInlineActions =
+    hasExternalLinks || hasStreamingProviders || hasMobilePlatformAction;
 
   return (
     <>
@@ -446,7 +451,7 @@ function DetailsToolbarActions({
               <button
                 type="button"
                 onClick={onMoreLinks}
-                className={`${externalLinksMenuOnly ? "" : "sm:hidden"} relative isolate flex h-10 w-10 shrink-0 transform-gpu items-center justify-center overflow-hidden rounded-full bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 text-zinc-200 shadow-none backdrop-blur-[6px] transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/[0.08] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/30 ${showExternalLinksLabel ? "sm:inline-flex sm:h-auto sm:w-auto sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2" : ""}`}
+                className={`${hasMobilePlatformAction ? "hidden sm:flex" : externalLinksMenuOnly ? "" : "sm:hidden"} relative isolate h-10 w-10 shrink-0 transform-gpu items-center justify-center overflow-hidden rounded-full bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 text-zinc-200 shadow-none backdrop-blur-[6px] transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/[0.08] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/30 ${showExternalLinksLabel ? "sm:h-auto sm:w-auto sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2" : ""}`}
                 title="Enlaces"
                 aria-label="Abrir enlaces externos"
               >
@@ -460,6 +465,22 @@ function DetailsToolbarActions({
                     Enlaces
                   </span>
                 )}
+              </button>
+            )}
+
+            {hasMobilePlatformAction && (
+              <button
+                type="button"
+                onClick={onMorePlatforms}
+                className="relative isolate flex h-10 w-10 shrink-0 transform-gpu items-center justify-center overflow-hidden rounded-full bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 text-zinc-200 shadow-none backdrop-blur-[6px] transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/[0.08] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/30 sm:hidden"
+                title="Plataformas"
+                aria-label="Abrir plataformas disponibles"
+              >
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]"
+                />
+                <MonitorPlay className="relative z-10 h-5 w-5" />
               </button>
             )}
           </div>
@@ -521,6 +542,7 @@ export default function DetailsScoreboardPanel({
   externalLinks = null,
   streamingProviders = null,
   onMoreLinks,
+  onMorePlatforms,
   externalLinksMenuOnly = false,
   showExternalLinksLabel = false,
   share = null,
@@ -555,6 +577,7 @@ export default function DetailsScoreboardPanel({
     hasRatings ||
     hasExternalLinks ||
     hasStreamingProviders ||
+    typeof onMorePlatforms === "function" ||
     !!share ||
     !!toolbarActions;
 
@@ -597,6 +620,7 @@ export default function DetailsScoreboardPanel({
             externalLinks={externalLinks}
             streamingProviders={streamingProviders}
             onMoreLinks={onMoreLinks}
+            onMorePlatforms={onMorePlatforms}
             externalLinksMenuOnly={externalLinksMenuOnly}
             showExternalLinksLabel={showExternalLinksLabel}
             share={share}

@@ -1263,6 +1263,7 @@ export default function SeasonDetailsClient({
 
             <DetailsInfoTabs
               layoutId="seasonTabInline"
+              enableMobileTabSwipe
               mediaType="tv"
               overview={season?.overview}
               creators={showCreators}

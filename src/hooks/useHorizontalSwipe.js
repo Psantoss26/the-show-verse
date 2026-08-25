@@ -21,8 +21,9 @@ const MAX_DURATION_MS = 700;
  *
  * NO llama a `preventDefault`: el gesto se decide al LEVANTAR el dedo mirando
  * lo recorrido, de modo que mientras tanto el navegador conserva el scroll
- * vertical y el pinch-zoom intactos. Por eso tampoco hace falta declarar
- * `touch-action` en el contenedor.
+ * vertical y el pinch-zoom intactos. El contenedor puede complementar esto con
+ * `touch-action: pan-y` cuando quiera priorizar explícitamente el scroll
+ * vertical de la página.
  *
  * Con `enabled: false` devuelve un objeto vacío: el contenedor se queda sin
  * listeners (escritorio) en vez de registrarlos para no usarlos.
