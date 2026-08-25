@@ -20,10 +20,14 @@ function posterKey(item) {
 
 /**
  * Sustituye solo en pantalla el póster de cada título por la elección inglesa
- * de Favoritos. Si la consulta no devuelve artwork válido, mantiene el
- * posterPath recibido de la BBDD como fallback.
+ * de Favoritos. Las superficies que no deben revelar el artwork persistido
+ * mientras carga pueden ocultarlo mediante `hideOriginalPosters`.
  */
-export function useEnglishPosterItems(items, enabled = true) {
+export function useEnglishPosterItems(
+  items,
+  enabled = true,
+  { hideOriginalPosters = false } = {},
+) {
   const [resolvedPosters, setResolvedPosters] = useState(() => new Map());
   const itemKeys = useMemo(
     () => (items || []).map(posterKey).filter(Boolean).join("|"),
@@ -37,9 +41,8 @@ export function useEnglishPosterItems(items, enabled = true) {
       const next = new Map(current);
       let changed = false;
       for (const key of itemKeys.split("|")) {
-        const posterPath = englishPosterCache.get(key);
-        if (posterPath && next.get(key) !== posterPath) {
-          next.set(key, posterPath);
+        if (englishPosterCache.has(key) && !next.has(key)) {
+          next.set(key, englishPosterCache.get(key));
           changed = true;
         }
       }
@@ -58,12 +61,19 @@ export function useEnglishPosterItems(items, enabled = true) {
     let cancelled = false;
     void Promise.all(
       missingItems.map(async ({ key, item }) => {
-        const mediaType = key.startsWith("tv:") ? "tv" : "movie";
-        const tmdbId = item?.tmdbId ?? item?.tmdb_id ?? item?.id;
-        const images = await fetchTmdbImages(mediaType, tmdbId);
-        const posterPath = pickBestFavoriteEnglishPoster(images?.posters || [])?.file_path || null;
-        if (posterPath) englishPosterCache.set(key, posterPath);
-        return [key, posterPath];
+        try {
+          const mediaType = key.startsWith("tv:") ? "tv" : "movie";
+          const tmdbId = item?.tmdbId ?? item?.tmdb_id ?? item?.id;
+          const images = await fetchTmdbImages(mediaType, tmdbId);
+          const posterPath = pickBestFavoriteEnglishPoster(images?.posters || [])?.file_path || null;
+          englishPosterCache.set(key, posterPath);
+          return [key, posterPath];
+        } catch {
+          // Una petición fallida tampoco debe exponer un póster localizado
+          // mientras se está mostrando una parrilla que exige arte inglés.
+          englishPosterCache.set(key, null);
+          return [key, null];
+        }
       }),
     ).then((entries) => {
       if (cancelled) return;
@@ -71,7 +81,7 @@ export function useEnglishPosterItems(items, enabled = true) {
         const next = new Map(current);
         let changed = false;
         for (const [key, posterPath] of entries) {
-          if (posterPath && next.get(key) !== posterPath) {
+          if (!next.has(key) || next.get(key) !== posterPath) {
             next.set(key, posterPath);
             changed = true;
           }
@@ -88,10 +98,23 @@ export function useEnglishPosterItems(items, enabled = true) {
   return useMemo(
     () => (items || []).map((item) => {
       const key = posterKey(item);
-      const posterPath = resolvedPosters.get(key);
+      const posterPath = resolvedPosters.has(key)
+        ? resolvedPosters.get(key)
+        : englishPosterCache.get(key);
       if (posterPath) return { ...item, posterPath, poster_path: posterPath };
+      if (hideOriginalPosters && key) {
+        const resolved = resolvedPosters.has(key) || englishPosterCache.has(key);
+        return {
+          ...item,
+          posterPath: null,
+          poster_path: null,
+          backdropPath: null,
+          backdrop_path: null,
+          _englishPosterPending: !resolved,
+        };
+      }
       return item;
     }),
-    [items, resolvedPosters],
+    [items, resolvedPosters, hideOriginalPosters],
   );
 }
