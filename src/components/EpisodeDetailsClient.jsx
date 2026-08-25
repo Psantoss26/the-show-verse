@@ -363,9 +363,10 @@ export default function EpisodeDetailsClient({
         ? show.production_companies
         : []
       )
+        .slice(0, 3)
         .map((company) => company?.name)
         .filter(Boolean)
-        .join(" · "),
+        .join(", ") || null,
     [show?.production_companies],
   );
   const showCreators = useMemo(
