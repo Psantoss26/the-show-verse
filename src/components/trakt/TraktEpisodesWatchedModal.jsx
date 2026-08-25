@@ -833,9 +833,10 @@ export default function TraktEpisodesWatchedModal({
 
   if (!open) return null;
 
-  // Igual que los demás modales de acciones: en móvil conserva márgenes y una
-  // altura máxima, en lugar de convertirse en una pantalla completa.
-  const PanelClass = `relative z-[10060] flex w-full max-w-5xl ${isMovie ? "" : "h-[85dvh]"} max-h-[85dvh] flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_30px_80px_-15px_rgba(0,0,0,0.95)] sm:h-[85vh]`;
+  // La ficha de episodios mantiene una altura estable antes de cargar. Ambos
+  // modales de episodios se limitan a 90dvh para respirar un 5% por arriba y
+  // abajo, en cualquier tamaño de pantalla.
+  const PanelClass = `relative z-[10060] flex w-full max-w-5xl ${isMovie ? "max-h-[85dvh] sm:max-h-[85vh]" : "h-[90dvh] max-h-[90dvh]"} flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_30px_80px_-15px_rgba(0,0,0,0.95)]`;
 
   const ButtonBase =
     "inline-flex items-center justify-center gap-2 rounded-xl text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed";
@@ -982,7 +983,7 @@ export default function TraktEpisodesWatchedModal({
         aria-label="Episodios vistos"
       >
         {/* Header */}
-        <div className="z-30 flex shrink-0 items-center justify-between bg-white/[0.035] px-5 py-4 backdrop-blur-xl">
+        <div className="z-30 flex shrink-0 items-center justify-between bg-white/[0.035] px-6 py-5 backdrop-blur-xl sm:px-8 sm:pt-8 sm:pb-6">
           <div className="min-w-0 pr-4">
             <h2 className="truncate text-lg font-black leading-tight text-white drop-shadow-md sm:text-xl">
               Episodios vistos

@@ -9,12 +9,32 @@ const modalSource = await readFile(
   ),
   "utf8",
 );
+const ratingsSource = await readFile(
+  new URL(
+    "../../components/details/EpisodeRatingsModal.jsx",
+    import.meta.url,
+  ),
+  "utf8",
+);
 
-test("el modal de episodios reserva su altura móvil antes de recibir episodios", () => {
+test("los modales de episodios conservan un margen proporcional", () => {
   assert.match(
     modalSource,
-    /\$\{isMovie \? "" : "h-\[85dvh\]"\} max-h-\[85dvh\]/,
-    "la vista de series debe conservar altura estable durante la carga inicial",
+    /\$\{isMovie \? "max-h-\[85dvh\] sm:max-h-\[85vh\]" : "h-\[90dvh\] max-h-\[90dvh\]"\}/,
+    "la vista de series debe conservar altura estable sin tocar los bordes del viewport",
+  );
+  assert.match(
+    ratingsSource,
+    /h-fit max-h-\[90dvh\]/,
+    "el modal de valoraciones debe compartir el mismo límite proporcional",
+  );
+});
+
+test("la cabecera de episodios comparte el espaciado de los demás modales", () => {
+  assert.match(
+    modalSource,
+    /items-center justify-between bg-white\/\[0\.035\] px-6 py-5 backdrop-blur-xl sm:px-8 sm:pt-8 sm:pb-6/,
+    "el título debe respirar respecto a los bordes lateral y superior del modal",
   );
 });
 
