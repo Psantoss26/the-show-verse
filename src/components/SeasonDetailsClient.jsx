@@ -1131,7 +1131,10 @@ export default function SeasonDetailsClient({
       <div className="relative z-10 px-4 py-8 lg:py-12 max-w-7xl mx-auto">
         {/* Hero */}
         <motion.div
-          initial={{ y: 16 }}
+          // El hero contiene el marcador y el menú de secciones liquid glass.
+          // No debe montar primero desplazado y aplicar el cristal al terminar:
+          // DetailsClient los muestra completos desde el primer frame.
+          initial={false}
           animate={{ y: 0 }}
           transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
           className="flex flex-col lg:flex-row gap-8 lg:gap-12 mb-10 items-start transform-gpu"
@@ -1274,7 +1277,11 @@ export default function SeasonDetailsClient({
         </motion.div>
 
         {/* Episodes */}
-        <AnimatedSection className="mb-12 group/section" delay={0.04}>
+        <AnimatedSection
+          className="mb-12 group/section"
+          delay={0.04}
+          renderImmediately
+        >
           {/* Header con toggle (mismo estilo SectionTitle) */}
           <div className="flex items-center justify-between gap-4 mb-8 w-full">
             <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0 pr-4 sm:pr-6">

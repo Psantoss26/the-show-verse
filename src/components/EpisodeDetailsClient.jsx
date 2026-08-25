@@ -1327,7 +1327,10 @@ export default function EpisodeDetailsClient({
       <div className="relative z-10 px-4 py-8 lg:py-12 max-w-7xl mx-auto">
         {/* Hero */}
         <motion.div
-          initial={{ y: 16 }}
+          // El marcador y el menú de secciones comparten el cristal de
+          // DetailsClient: se pintan ya completos, sin un frame inicial
+          // desplazado que retrase el backdrop-filter.
+          initial={false}
           animate={{ y: 0 }}
           transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
           className="flex flex-col items-start gap-8 lg:flex-row lg:gap-12 transform-gpu"
