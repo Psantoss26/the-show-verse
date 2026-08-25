@@ -477,7 +477,7 @@ export default function TraktWatchedModal({
                                                 relative rounded-3xl p-4 backdrop-blur-xl transition-all duration-300 shadow-md
                                                 ${
                                                   isEditing
-                                                    ? "border border-yellow-500/30 bg-yellow-500/10 shadow-[0_0_20px_-5px_rgba(234,179,8,0.3)]"
+                                                    ? "bg-yellow-500/10 shadow-[0_0_20px_-5px_rgba(234,179,8,0.3)]"
                                                     : "bg-white/5 hover:bg-white/10"
                                                 }
                                             `}

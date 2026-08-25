@@ -145,3 +145,56 @@ test("las tarjetas del modal rápido conservan respuesta al hover", async () => 
     assert.match(modal, señal, `falta la respuesta al hover ${señal}`);
   }
 });
+
+test("los títulos similares no superponen un icono al pasar por encima", async () => {
+  const modal = await leer("dashboard/DetailModal");
+  const similar = modal.slice(
+    modal.indexOf("function SimilarBackdrop"),
+    modal.indexOf("/* ======================== SELECTOR DE TEMPORADA"),
+  );
+
+  assert.doesNotMatch(
+    similar,
+    /<PlayCircle\b/,
+    "las tarjetas de títulos similares no deben cubrir su imagen con un icono de hover",
+  );
+});
+
+test("el selector de temporadas no dibuja contornos en el modal", async () => {
+  const modal = await leer("dashboard/DetailModal");
+  const selector = modal.slice(
+    modal.indexOf("function SeasonDropdown"),
+    modal.indexOf("const MODAL_ARROW_PROPS"),
+  );
+
+  assert.doesNotMatch(selector, /(?:hover:)?border-(?:white|yellow)-/);
+  assert.match(selector, /border-0/);
+  assert.match(selector, /focus-visible:ring-2/);
+});
+
+test("la edición de una fecha no contornea el registro del historial", async () => {
+  const historial = await leer("trakt/TraktWatchedModal");
+  const editor = historial.slice(
+    historial.indexOf("{/* SECCIÓN 2: HISTORIAL"),
+    historial.indexOf("{/* Calendario Modal"),
+  );
+
+  assert.doesNotMatch(
+    editor,
+    /\? "border border-yellow-500\/30 bg-yellow-500\/10/,
+    "el registro editado no debe dibujar un borde amarillo",
+  );
+  assert.match(editor, /\? "bg-yellow-500\/10 shadow-/);
+});
+
+test("las secciones de añadir a una lista no dibujan marcos", async () => {
+  const modal = await leer("details/AddToListModal");
+
+  assert.doesNotMatch(modal, /rounded-2xl border border-emerald-500\/20/);
+  assert.doesNotMatch(modal, /rounded-xl border border-dashed border-white\/10/);
+  assert.doesNotMatch(
+    modal,
+    /present\s*\?\s*"bg-emerald-500\/\[0\.03\] border border-emerald-500\/20/,
+  );
+  assert.match(modal, /focus-visible:outline-yellow-400\/70/);
+});

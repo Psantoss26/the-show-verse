@@ -63,7 +63,11 @@ import DetailModalProvider from "@/components/dashboard/DetailModalProvider";
 import PreviewTrailerAudioButton, {
   usePreviewTrailerAudio,
 } from "@/components/dashboard/PreviewTrailerAudioControl";
-import { fetchBestBackdropNoLang, fetchBestLogo } from "@/lib/dashboard/media";
+import {
+  fetchBestBackdropNoLang,
+  fetchBestLogo,
+  getArtworkPreference,
+} from "@/lib/dashboard/media";
 import DashboardSpotlightPreview from "@/components/dashboard/DashboardSpotlightPreview";
 import DashboardRankNumber from "@/components/dashboard/DashboardRankNumber";
 
@@ -265,21 +269,6 @@ const movieExtrasCache = new Map(); // movie.id -> { runtime, awards, imdbRating
 const movieBackdropCache = new Map(); // movie.id -> backdrop file_path | null | undefined
 const movieSpotlightBackdropCache = new Map();
 const movieImagesCache = new Map(); // movie.id -> { posters, backdrops }
-
-/* ======== Preferencias de artwork guardadas en localStorage ======== */
-function getArtworkPreference(movieId) {
-  if (typeof window === "undefined") {
-    return { poster: null, backdrop: null };
-  }
-  const posterKey = `showverse:movie:${movieId}:poster`;
-  const backdropKey = `showverse:movie:${movieId}:backdrop`;
-  const poster = window.localStorage.getItem(posterKey);
-  const backdrop = window.localStorage.getItem(backdropKey);
-  return {
-    poster: poster || null,
-    backdrop: backdrop || null,
-  };
-}
 
 /* ====================================================================
  * LOGICA IMAGENES (Backdrops / Posters)
@@ -651,13 +640,6 @@ function Top10MobileBackdropCard({
         setReady(!!path);
       };
 
-      const { backdrop: userBackdrop } = getArtworkPreference(movie.id);
-      if (userBackdrop) {
-        movieBackdropCache.set(movie.id, userBackdrop);
-        revealBackdrop(userBackdrop);
-        return;
-      }
-
       const cached = movieBackdropCache.get(movie.id);
       if (cached !== undefined) {
         revealBackdrop(cached);
@@ -843,28 +825,20 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
           }
         }
       } else {
-        const { backdrop: userBackdrop } = getArtworkPreference(movie.id);
-        const userPreferredBackdrop = userBackdrop || null;
-
-        if (userPreferredBackdrop) {
-          movieBackdropCache.set(movie.id, userPreferredBackdrop);
-          revealBackdrop(userPreferredBackdrop);
+        const cachedBackdrop = movieBackdropCache.get(movie.id);
+        if (cachedBackdrop !== undefined) {
+          revealBackdrop(cachedBackdrop);
         } else {
-          const cachedBackdrop = movieBackdropCache.get(movie.id);
-          if (cachedBackdrop !== undefined) {
-            revealBackdrop(cachedBackdrop);
-          } else {
-            try {
-              const preferred = await fetchBestBackdrop(movie.id);
-              const chosen = preferred || getPreviewBackdropFallback(movie);
-              movieBackdropCache.set(movie.id, chosen);
+          try {
+            const preferred = await fetchBestBackdrop(movie.id);
+            const chosen = preferred || getPreviewBackdropFallback(movie);
+            movieBackdropCache.set(movie.id, chosen);
 
-              revealBackdrop(chosen);
-            } catch {
-              const fallback = getPreviewBackdropFallback(movie);
-              movieBackdropCache.set(movie.id, fallback);
-              revealBackdrop(fallback);
-            }
+            revealBackdrop(chosen);
+          } catch {
+            const fallback = getPreviewBackdropFallback(movie);
+            movieBackdropCache.set(movie.id, fallback);
+            revealBackdrop(fallback);
           }
         }
       }
