@@ -13,8 +13,9 @@ test("las plataformas de la ficha y del modal usan una celda visual única", asy
     readFile(modalUrl, "utf8"),
   ]);
 
-  assert.match(logo, /h-11 w-11 shrink-0 overflow-hidden rounded-xl/);
-  assert.match(logo, /h-full w-full object-cover/);
+  assert.match(logo, /h-11 w-11 shrink-0 overflow-visible rounded-xl/);
+  assert.match(logo, /h-full w-full rounded-xl object-cover/);
+  assert.match(logo, /absolute -right-1 -top-1 h-3 w-3/);
   assert.match(details, /StreamingProviderLogo\s+provider=\{provider\}/);
   assert.match(modal, /StreamingProviderLogo provider=\{prov\}/);
 });
