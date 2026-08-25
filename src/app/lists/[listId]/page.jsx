@@ -201,31 +201,32 @@ function ListActionDialog({ open, onClose, title, children }) {
             aria-label={title}
             closedby="any"
             onClose={onClose}
+            onCancel={onClose}
             onClick={(event) => {
                 if (event.target === event.currentTarget) onClose()
             }}
             className="m-auto w-[calc(100%-2rem)] max-w-3xl overflow-visible border-0 bg-transparent p-0 text-zinc-100 shadow-none backdrop:bg-black/60 backdrop:backdrop-blur-lg"
         >
-            <div className={`relative isolate max-h-[85vh] overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}>
+            <div className={`relative flex max-h-[85dvh] w-full flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}>
                 <LiquidGlassOpticalLayers />
 
-                <div className="relative z-10 flex items-start justify-between gap-4 border-b border-white/[0.08] bg-white/[0.025] px-5 py-5 sm:px-7 sm:py-6">
+                <div className="relative z-10 flex w-full shrink-0 items-center justify-between gap-4 bg-white/[0.025] p-6 sm:px-8 sm:pb-6 sm:pt-8">
                     <div className="min-w-0">
-                        <h2 className="text-xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400 sm:text-2xl">
+                        <h2 className="bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-xl font-black text-transparent">
                             {title}
                         </h2>
                     </div>
                     <button
                         type="button"
                         onClick={onClose}
-                        className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/[0.06] text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-[6px] transition hover:-translate-y-0.5 hover:bg-white/[0.1] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400"
                         aria-label="Cerrar"
                     >
-                        <X className="h-4 w-4" />
+                        <X className="h-5 w-5" />
                     </button>
                 </div>
 
-                <div className="relative z-10 px-5 pb-5 sm:px-7 sm:pb-7">
+                <div className="relative z-10 min-h-0 flex-1 overflow-y-auto p-6 pb-8 sm:px-8">
                     {children}
                 </div>
             </div>
@@ -726,10 +727,10 @@ export default function ListDetailsPage() {
 
             <ListActionDialog open={actionDialog === 'edit'} onClose={() => setActionDialog(null)} title="Editar lista">
                 <form className="mt-5 space-y-4" onSubmit={(event) => { event.preventDefault(); handleSaveEdit() }}>
-                    <label className="block space-y-2 text-sm font-bold text-zinc-300">Nombre
+                    <label className="block space-y-3 text-sm font-bold text-zinc-300">Nombre
                         <input value={editName} onChange={(event) => setEditName(event.target.value)} maxLength={60} autoFocus className="h-11 w-full rounded-xl bg-white/10 px-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50" />
                     </label>
-                    <label className="block space-y-2 text-sm font-bold text-zinc-300">Descripción
+                    <label className="block space-y-3 text-sm font-bold text-zinc-300">Descripción
                         <textarea value={editDesc} onChange={(event) => setEditDesc(event.target.value)} maxLength={200} className="h-28 w-full resize-none rounded-xl bg-white/10 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50" />
                     </label>
                     <div className="flex justify-end gap-3">
