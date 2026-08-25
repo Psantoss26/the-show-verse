@@ -26,6 +26,10 @@ export function AnimatedSection({
   className = "",
   delay = 0,
   margin = "-100px",
+  // Las superficies liquid glass deben pintar su fondo, refracción y contenido
+  // en el mismo frame. Esta opción conserva el wrapper y el orden del DOM,
+  // pero evita que Framer las monte primero transparentes.
+  renderImmediately = false,
 }) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin });
@@ -38,9 +42,19 @@ export function AnimatedSection({
   return (
     <motion.div
       ref={ref}
-      initial={hidden}
-      animate={isInView || shouldReduceMotion ? { opacity: 1, y: 0 } : hidden}
-      transition={baseTransition(delay, 0.46, shouldReduceMotion)}
+      initial={renderImmediately ? false : hidden}
+      animate={
+        renderImmediately
+          ? false
+          : isInView || shouldReduceMotion
+            ? { opacity: 1, y: 0 }
+            : hidden
+      }
+      transition={
+        renderImmediately
+          ? { duration: 0 }
+          : baseTransition(delay, 0.46, shouldReduceMotion)
+      }
       className={className}
     >
       {children}
