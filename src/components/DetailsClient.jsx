@@ -225,7 +225,6 @@ import {
   createUserList as backendCreateUserList,
   addMovieToList as backendAddMovieToList,
   removeMovieFromList as backendRemoveMovieFromList,
-  getListDetails as backendGetListDetails,
 } from "@/lib/api/backendLists";
 
 // -- Utilidades de video: filtrado, ranking, URLs de embed/thumbnail --
@@ -2008,7 +2007,8 @@ export default function DetailsClient({
 
   /**
    * Comprueba en cuáles listas está presente el título actual.
-   * Realiza peticiones en paralelo (concurrencia 5) para cada lista del usuario.
+   * Resuelve la presencia con una sola petición autenticada, sin descargar el
+   * contenido completo de cada lista.
    * @param {Object} options
    * @param {Array}  options.lists    - Listas a comprobar (si no se pasa, las carga)
    * @param {boolean} options.silent  - true = no muestra spinner de carga principal
@@ -2033,43 +2033,37 @@ export default function DetailsClient({
           : await loadListsIfNeeded({ abortRef });
       if (abortRef?.current) return;
 
-      const ids = base.map(getListId).filter(Boolean);
-      const concurrency = 5;
-      let idx = 0;
-      const nextMap = {};
+      if (base.length === 0) {
+        setMembershipMap({});
+        return;
+      }
 
-      // Presencia por lista: pedimos los items de cada lista y comprobamos el
-      // identificador y tipo de contenido guardados en nuestra BBDD.
-      const worker = async () => {
-        while (!abortRef?.current && idx < ids.length) {
-          const listId = ids[idx++];
-          const lid = String(listId);
-          try {
-            const details = await backendGetListDetails({ listId: lid });
-            const items = Array.isArray(details?.items) ? details.items : [];
-            const present = items.some(
-              (it) =>
-                String(it?.id) === String(movieId) &&
-                (it?.media_type || "movie") === endpointType,
-            );
-            nextMap[lid] = !!present;
-          } catch {
-            nextMap[lid] = false;
-          }
-        }
-      };
-
-      await Promise.all(
-        Array.from({ length: Math.min(concurrency, ids.length) }, () =>
-          worker(),
-        ),
-      );
+      const controller = new AbortController();
+      if (abortRef) abortRef.abortMembership = () => controller.abort();
+      const membershipParams = new URLSearchParams({
+        tmdbId: String(movieId),
+        mediaType: endpointType,
+      });
+      const response = await fetch(`/api/lists?${membershipParams.toString()}`, {
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.error || payload?.message || "Error cargando listas");
+      }
       if (abortRef?.current) return;
-      setMembershipMap(nextMap);
+      const membership = payload?.membership;
+      setMembershipMap(
+        membership && typeof membership === "object" && !Array.isArray(membership)
+          ? membership
+          : {},
+      );
     } catch (e) {
-      if (!abortRef?.current)
+      if (!abortRef?.current && e?.name !== "AbortError")
         setListsError(e?.message || "Error cargando listas");
     } finally {
+      if (abortRef) delete abortRef.abortMembership;
       if (!abortRef?.current) {
         if (!silent) setListsLoading(false);
         else setListsPresenceLoading(false);
@@ -2090,6 +2084,7 @@ export default function DetailsClient({
     loadPresenceForLists({ silent: true, abortRef });
     return () => {
       abortRef.current = true;
+      abortRef.abortMembership?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canUseLists, movieId, endpointType]);
@@ -10005,6 +10000,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 variant={isBackdropPoster ? "backdrop" : "normal"}
                 layoutId="detailsTabMobile"
                 mobileLayout
+                enableMobileTabSwipe
                 mediaType={type}
                 originalTitle={
                   type === "movie" ? data.original_title : data.original_name

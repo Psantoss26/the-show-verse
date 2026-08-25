@@ -4,6 +4,8 @@
 import OptimizedImage from "@/components/OptimizedImage";
 import useModalGuard from "@/hooks/useModalGuard";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { ExternalLink, MonitorPlay, X } from 'lucide-react'
 
 function hostLabel(href) {
@@ -20,6 +22,7 @@ export default function ExternalLinksModal({
     links,
     mode = 'links',
 }) {
+    const [portalReady, setPortalReady] = useState(false)
     const items = Array.isArray(links) ? links.filter((x) => x?.href) : []
     const isPlatformsMode = mode === 'platforms'
     const modalTitle = isPlatformsMode ? 'Plataformas disponibles' : 'Enlaces externos'
@@ -33,14 +36,21 @@ export default function ExternalLinksModal({
     // Bloquea scroll de fondo + cierra con Escape mientras el modal está abierto.
     useModalGuard({ open, onClose })
 
+    // DetalleModal crea su propio contexto de apilado. El portal evita que el
+    // velo quede por detrás de esa ficha y permite difuminar el viewport entero,
+    // igual que los modales de visto, puntuación y tráiler.
+    useEffect(() => setPortalReady(true), [])
+
     // Igual que los modales de las acciones: el cristal y su animación CSS se
     // aplican en el primer frame. Framer Motion los aplicaba después del montaje
     // y, en móvil, dejaba ver una entrada sin el acabado final.
     if (!open) return null
+    if (!portalReady) return null
 
-    return (
+    return createPortal(
         <div
-            className="fixed inset-0 z-[1200] flex items-center justify-center p-4"
+            data-detail-modal-layer=""
+            className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
             aria-modal="true"
             role="dialog"
             aria-labelledby="external-links-title"
@@ -141,6 +151,7 @@ export default function ExternalLinksModal({
                             )}
                         </div>
             </div>
-        </div>
+        </div>,
+        document.body,
     )
 }

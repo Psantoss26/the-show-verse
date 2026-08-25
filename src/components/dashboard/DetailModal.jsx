@@ -61,13 +61,11 @@ import {
 import {
   addMovieToList as backendAddMovieToList,
   createUserList as backendCreateUserList,
-  getListDetails as backendGetListDetails,
   removeMovieFromList as backendRemoveMovieFromList,
 } from "@/lib/api/backendLists";
 import useTmdbLists from "@/lib/hooks/useTmdbLists";
 import LiquidButton from "@/components/LiquidButton";
 import {
-  buildListMembershipMap,
   selectOwnedComments,
 } from "@/lib/details/detailActionState";
 
@@ -1386,26 +1384,34 @@ export default function DetailModal({
     }
 
     setListsPresenceLoading(true);
-    Promise.all(
-      lists.map(async (list) => {
-        const listId = list?.id;
-        if (listId == null) return null;
-        try {
-          const details = await backendGetListDetails({ listId });
-          return { listId, items: details?.items || [] };
-        } catch {
-          return { listId, items: [] };
+    const controller = new AbortController();
+    const membershipParams = new URLSearchParams({
+      tmdbId: String(item.id),
+      mediaType: mediaType === "tv" ? "tv" : "movie",
+    });
+
+    fetch(`/api/lists?${membershipParams.toString()}`, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload?.error || payload?.message || "Error cargando listas");
         }
-      }),
-    )
-      .then((snapshots) => {
+        return payload?.membership;
+      })
+      .then((membership) => {
         if (cancelled) return;
         setMembershipMap(
-          buildListMembershipMap(snapshots.filter(Boolean), {
-            tmdbId: item.id,
-            mediaType,
-          }),
+          membership && typeof membership === "object" && !Array.isArray(membership)
+            ? membership
+            : {},
         );
+      })
+      .catch((error) => {
+        if (cancelled || error?.name === "AbortError") return;
+        setMembershipMap({});
       })
       .finally(() => {
         if (!cancelled) setListsPresenceLoading(false);
@@ -1413,6 +1419,7 @@ export default function DetailModal({
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [item?.id, listsLoadingHook, mediaType, userLists]);
 

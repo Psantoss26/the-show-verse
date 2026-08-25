@@ -14,16 +14,34 @@ const MIN_DISTANCE_PX = 48;
 const MAX_OFF_AXIS_RATIO = 0.6;
 const MAX_DURATION_MS = 700;
 
+export function getHorizontalSwipeDirection({
+  startX,
+  startY,
+  startTime,
+  endX,
+  endY,
+  endTime,
+}) {
+  const deltaX = endX - startX;
+  const deltaY = endY - startY;
+  const distance = Math.abs(deltaX);
+
+  if (distance < MIN_DISTANCE_PX) return null;
+  if (Math.abs(deltaY) > distance * MAX_OFF_AXIS_RATIO) return null;
+  if (endTime - startTime > MAX_DURATION_MS) return null;
+
+  return deltaX < 0 ? "left" : "right";
+}
+
 /**
- * Handlers táctiles (`onTouchStart` / `onTouchMove` / `onTouchEnd` /
- * `onTouchCancel`) para spreadear sobre el contenedor que debe responder a
- * deslizamientos horizontales.
+ * Handlers de puntero para spreadear sobre el contenedor que debe responder a
+ * deslizamientos horizontales en pantalla táctil.
  *
- * NO llama a `preventDefault`: el gesto se decide al LEVANTAR el dedo mirando
- * lo recorrido, de modo que mientras tanto el navegador conserva el scroll
- * vertical y el pinch-zoom intactos. El contenedor puede complementar esto con
- * `touch-action: pan-y` cuando quiera priorizar explícitamente el scroll
- * vertical de la página.
+ * NO llama a `preventDefault` durante el arrastre: el gesto se decide al
+ * levantar el dedo mirando lo recorrido, de modo que el navegador conserva el
+ * scroll vertical y el pinch-zoom. Tras un gesto válido sí se descarta el clic
+ * sintético que el navegador emite sobre el botón donde terminó el dedo; sin
+ * ello ese clic vuelve a seleccionar la pestaña original inmediatamente.
  *
  * Con `enabled: false` devuelve un objeto vacío: el contenedor se queda sin
  * listeners (escritorio) en vez de registrarlos para no usarlos.
@@ -34,6 +52,7 @@ export default function useHorizontalSwipe({
   enabled = true,
 } = {}) {
   const startRef = useRef(null);
+  const suppressClickUntilRef = useRef(0);
 
   if (!enabled) return {};
 
@@ -42,41 +61,54 @@ export default function useHorizontalSwipe({
   };
 
   return {
-    onTouchStart: (event) => {
-      if (event.touches.length !== 1) {
+    onPointerDown: (event) => {
+      if (event.pointerType !== "touch" || !event.isPrimary) {
         cancel();
         return;
       }
-      const touch = event.touches[0];
       startRef.current = {
-        x: touch.clientX,
-        y: touch.clientY,
+        pointerId: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
         time: Date.now(),
       };
     },
-    // Un segundo dedo es un zoom, no un deslizamiento.
-    onTouchMove: (event) => {
-      if (event.touches.length > 1) cancel();
+    // Un arrastre claramente vertical es scroll de página, no un cambio de
+    // sección. Lo descartamos pronto para no interpretar su final como swipe.
+    onPointerMove: (event) => {
+      const start = startRef.current;
+      if (!start || event.pointerId !== start.pointerId) return;
+
+      const deltaX = Math.abs(event.clientX - start.x);
+      const deltaY = Math.abs(event.clientY - start.y);
+      if (Math.max(deltaX, deltaY) < MIN_DISTANCE_PX) return;
+      if (deltaY > deltaX * MAX_OFF_AXIS_RATIO) cancel();
     },
-    onTouchEnd: (event) => {
+    onPointerUp: (event) => {
       const start = startRef.current;
       cancel();
-      if (!start) return;
+      if (!start || event.pointerId !== start.pointerId) return;
 
-      const touch = event.changedTouches?.[0];
-      if (!touch) return;
+      const direction = getHorizontalSwipeDirection({
+        startX: start.x,
+        startY: start.y,
+        startTime: start.time,
+        endX: event.clientX,
+        endY: event.clientY,
+        endTime: Date.now(),
+      });
+      if (!direction) return;
 
-      const deltaX = touch.clientX - start.x;
-      const deltaY = touch.clientY - start.y;
-      const distance = Math.abs(deltaX);
-
-      if (distance < MIN_DISTANCE_PX) return;
-      if (Math.abs(deltaY) > distance * MAX_OFF_AXIS_RATIO) return;
-      if (Date.now() - start.time > MAX_DURATION_MS) return;
-
-      if (deltaX < 0) onSwipeLeft?.();
+      suppressClickUntilRef.current = Date.now() + 800;
+      if (direction === "left") onSwipeLeft?.();
       else onSwipeRight?.();
     },
-    onTouchCancel: cancel,
+    onPointerCancel: cancel,
+    onClickCapture: (event) => {
+      if (Date.now() > suppressClickUntilRef.current) return;
+      suppressClickUntilRef.current = 0;
+      event.preventDefault();
+      event.stopPropagation();
+    },
   };
 }
