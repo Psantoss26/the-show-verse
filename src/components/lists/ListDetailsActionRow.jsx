@@ -1,13 +1,16 @@
 "use client";
 
 import LiquidButton from "@/components/LiquidButton";
-import { MOBILE_ACTION_BUTTON_CLASS } from "@/components/details/DetailActionsRow";
+import {
+  DETAIL_ACTION_ITEM_SIZING_CLASS,
+  MOBILE_ACTION_BUTTON_CLASS,
+} from "@/components/details/DetailActionsRow";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 import { LIQUID_GLASS_ELEVATION, LIQUID_GLASS_SURFACE_CARD } from "@/lib/ui/liquidGlass";
 import { ArrowLeft, Eraser, ExternalLink, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 
 const ROW_CLASS = `flex w-full flex-nowrap items-center justify-center gap-1 sm:justify-start sm:gap-3
-  [&>*]:flex-1 [&>*]:min-w-[34px] [&>*]:max-w-[60px] sm:[&>*]:max-w-[52px]
+  ${DETAIL_ACTION_ITEM_SIZING_CLASS}
   ${MOBILE_ACTION_BUTTON_CLASS}`;
 
 function ActionButton({ label, children, disabled, onClick, tone = "blue" }) {

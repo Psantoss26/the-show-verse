@@ -5,7 +5,10 @@ import { ArrowLeft, Layers, MonitorPlay } from "lucide-react";
 import LiquidButton from "@/components/LiquidButton";
 import StarRating from "@/components/StarRating";
 import TraktWatchedControl from "@/components/trakt/TraktWatchedControl";
-import { MOBILE_ACTION_BUTTON_CLASS } from "@/components/details/DetailActionsRow";
+import {
+  DETAIL_ACTION_ITEM_SIZING_CLASS,
+  MOBILE_ACTION_BUTTON_CLASS,
+} from "@/components/details/DetailActionsRow";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 import {
   LIQUID_GLASS_ELEVATION,
@@ -13,7 +16,7 @@ import {
 } from "@/lib/ui/liquidGlass";
 
 const ROW_CLASS = `flex w-full flex-nowrap items-center justify-center gap-1 sm:justify-start sm:gap-3
-  [&>*]:flex-1 [&>*]:min-w-[34px] [&>*]:max-w-[60px] sm:[&>*]:max-w-[52px]
+  ${DETAIL_ACTION_ITEM_SIZING_CLASS}
   ${MOBILE_ACTION_BUTTON_CLASS}`;
 
 function ActionButton({ label, onClick, children }) {

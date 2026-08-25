@@ -330,7 +330,9 @@ export function ActionShareButton({ title, text, url, iconOnly = false }) {
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
       className={[
-        "group/share relative isolate inline-grid h-10 w-10 transform-gpu place-items-center overflow-hidden rounded-xl bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 shadow-none backdrop-blur-[6px] transition-all duration-300 hover:bg-white/[0.08] hover:text-white hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/30",
+        `group/share relative isolate inline-grid h-10 w-10 transform-gpu place-items-center overflow-hidden ${
+          iconOnly ? "rounded-full text-zinc-200" : "rounded-xl"
+        } bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 shadow-none backdrop-blur-[6px] transition-all duration-300 hover:bg-white/[0.08] hover:text-white hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/30`,
         iconOnly
           ? ""
           : "sm:inline-flex sm:h-auto sm:w-auto sm:items-center sm:justify-center sm:gap-2 sm:px-3 sm:py-2",
