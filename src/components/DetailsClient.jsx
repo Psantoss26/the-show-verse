@@ -30,6 +30,7 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import "swiper/swiper-bundle.css";
 // Carrusel con flechas COMPARTIDO (mismo componente que usa DetailModal).
 import DetailsArrowCarousel from "@/components/details/DetailsArrowCarousel";
+import StreamingProviderLogo from "@/components/details/StreamingProviderLogo";
 
 // -- Animaciones con Framer Motion --
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -9801,17 +9802,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       aria-label={provider.title}
                       className="group/provider relative flex-shrink-0 cursor-pointer transform transition-transform hover:z-10 hover:scale-110 hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400"
                     >
-                      <OptimizedImage
-                        src={provider.icon}
-                        alt=""
-                        className="w-9 h-9 lg:w-11 lg:h-11 rounded-xl shadow-lg object-contain bg-white/5"
+                      <StreamingProviderLogo
+                        provider={provider}
                         onError={(e) => {
-                          e.target.style.display = "none";
+                          e.currentTarget.style.visibility = "hidden";
                         }}
                       />
-                      {provider.isPlexProvider && (
-                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full ring-2 ring-black" />
-                      )}
                       <div className="pointer-events-none absolute top-full mt-2 left-1/2 z-[100] -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/provider:scale-100 group-hover/provider:opacity-100 group-hover/provider:delay-[2000ms]">
                         {provider.subtitle || provider.title}
                       </div>

@@ -163,6 +163,7 @@ export default function TraktListDetailsClient({ username, listId }) {
                         error: null,
                         list: json?.list || null,
                         ratingSummary: json?.ratingSummary || null,
+                        imdbRatingItems: Array.isArray(json?.imdbRatingItems) ? json.imdbRatingItems : [],
                         items,
                         page: 1,
                         // El endpoint {list, items} no trae paginación: la
@@ -181,6 +182,7 @@ export default function TraktListDetailsClient({ username, listId }) {
                         error: e?.message || 'Error',
                     list: p.list,
                     ratingSummary: p.ratingSummary,
+                    imdbRatingItems: p.imdbRatingItems,
                         items: p.items,
                         page: p.page || 1,
                         hasMore: p.hasMore,
@@ -218,6 +220,9 @@ export default function TraktListDetailsClient({ username, listId }) {
                     error: null,
                         list: json?.list || p.list,
                         ratingSummary: json?.ratingSummary || p.ratingSummary,
+                        imdbRatingItems: Array.isArray(json?.imdbRatingItems)
+                            ? json.imdbRatingItems
+                            : p.imdbRatingItems,
                     items,
                     page: nextPage,
                     hasMore: computeHasMore(json?.list || p.list, items.length),
@@ -257,13 +262,13 @@ export default function TraktListDetailsClient({ username, listId }) {
     const items = Array.isArray(state.items) ? state.items : []
     const creatorUsername = list?.user?.username || username || 'Usuario'
     const listItemCount = Number(list?.item_count || items.length)
-    const { ratingsByKey: imdbRatings, summary: imdbSummary } = useListImdbRatings(items, { totalCount: listItemCount })
+    const imdbRatingItems = state.imdbRatingItems.length > 0
+        ? state.imdbRatingItems
+        : items
+    const { ratingsByKey: imdbRatings, summary: imdbSummary } = useListImdbRatings(imdbRatingItems, { totalCount: listItemCount })
 
     const firstPoster = items.find((item) => item?.posterPath)?.posterPath
     const firstBackdrop = firstPoster
-    const posterImages = items
-        .map((item) => tmdbImg(item?.posterPath, 'w342'))
-        .filter(Boolean)
 
     // Item shape nuevo (community_list_items): { tmdbId, mediaType, title, posterPath, addedAt }.
     const getTraktMeta = useCallback((it, index) => {
@@ -302,8 +307,7 @@ export default function TraktListDetailsClient({ username, listId }) {
             title={list?.name || 'Lista'}
             description={list?.description || ''}
             sourceLabel="Lista de la comunidad"
-            posterImage={tmdbImg(firstPoster)}
-            posterImages={posterImages}
+            posterItems={items}
             backdropImage={tmdbImg(firstBackdrop, 'original')}
             scoreboardStats={[
                 { icon: ListVideo, label: 'ELEMENTOS', value: listItemCount, tooltip: 'Títulos de la lista' },

@@ -9,7 +9,86 @@ import { ArrowLeft, Film, ListVideo } from 'lucide-react'
 import { useIsHistoryNavigation } from '@/lib/hooks/useIsHistoryNavigation'
 import DetailsScoreboardPanel from '@/components/details/DetailsScoreboardPanel'
 import DetailsInfoTabs from '@/components/details/DetailsInfoTabs'
-import { buildPosterCollageTiles } from '@/lib/lists/posterCollage'
+import { useEffect, useMemo, useState } from 'react'
+import {
+    buildPosterCollageTargets,
+    buildPosterCollageTiles,
+    getPosterCollageLayout,
+} from '@/lib/lists/posterCollage'
+import { pickBestFavoriteEnglishPoster } from '@/lib/details/tmdbImages'
+import { fetchTmdbImages } from '@/lib/tmdb/imageRequests'
+
+const finalEnglishPosterCache = new Map()
+
+function posterUrl(filePath) {
+    return filePath ? `https://image.tmdb.org/t/p/w342${filePath}` : null
+}
+
+function preloadPoster(src) {
+    if (!src || typeof window === 'undefined') return Promise.resolve(null)
+    return new Promise((resolve) => {
+        const image = new Image()
+        image.onload = () => resolve(src)
+        image.onerror = () => resolve(null)
+        image.src = src
+    })
+}
+
+async function resolveEnglishPoster(target, priority) {
+    if (finalEnglishPosterCache.has(target.key)) {
+        return finalEnglishPosterCache.get(target.key)
+    }
+
+    const request = fetchTmdbImages(target.mediaType, target.tmdbId, { priority })
+        .then((images) => pickBestFavoriteEnglishPoster(images?.posters || [])?.file_path || null)
+        .catch(() => null)
+
+    finalEnglishPosterCache.set(target.key, request)
+    const posterPath = await request
+    finalEnglishPosterCache.set(target.key, posterPath)
+    return posterPath
+}
+
+function useFinalEnglishPosterImages(items) {
+    const targets = useMemo(() => buildPosterCollageTargets(items), [items])
+    const targetKey = targets.map((target) => target.key).join('|')
+    const [state, setState] = useState({ key: '', pending: false, images: [] })
+
+    useEffect(() => {
+        let cancelled = false
+
+        if (!targets.length) {
+            setState({ key: targetKey, pending: false, images: [] })
+            return undefined
+        }
+
+        setState({ key: targetKey, pending: true, images: [] })
+        void Promise.all(
+            targets.map(async (target, index) => {
+                const posterPath = await resolveEnglishPoster(
+                    target,
+                    index === 0 ? 'high' : 'normal',
+                )
+                return preloadPoster(posterUrl(posterPath))
+            }),
+        ).then((images) => {
+            if (cancelled) return
+            setState({
+                key: targetKey,
+                pending: false,
+                images: images.filter(Boolean),
+            })
+        })
+
+        return () => {
+            cancelled = true
+        }
+    }, [targetKey])
+
+    return state.key === targetKey
+        ? state
+        : { key: targetKey, pending: targets.length > 0, images: [] }
+}
 
 function TabButton({ active, disabled, onClick, icon: Icon, children }) {
     return (
@@ -45,17 +124,25 @@ function PosterCover({ src, priority = false }) {
     )
 }
 
-function PosterCollage({ images, fallbackImage }) {
+function PosterCollage({ images, pending }) {
     const tiles = buildPosterCollageTiles(images)
+    const layout = getPosterCollageLayout(tiles.length)
+
+    if (pending) {
+        return <div className="h-full w-full animate-pulse bg-zinc-900" aria-hidden="true" />
+    }
 
     if (tiles.length > 1) {
         return (
             <div
-                className="grid h-full w-full grid-cols-3 grid-rows-3 gap-px overflow-hidden bg-black/70"
+                className={`grid h-full w-full gap-px overflow-hidden bg-black/70 ${layout.gridClassName}`}
                 aria-hidden="true"
             >
                 {tiles.map((src, index) => (
-                    <div key={`${src}-${index}`} className="relative min-h-0 overflow-hidden bg-zinc-900">
+                    <div
+                        key={src}
+                        className={`relative min-h-0 overflow-hidden bg-zinc-900 ${layout.tileClassNames[index]}`}
+                    >
                         <PosterCover src={src} priority={index === 0} />
                     </div>
                 ))}
@@ -63,8 +150,8 @@ function PosterCollage({ images, fallbackImage }) {
         )
     }
 
-    if (fallbackImage || tiles[0]) {
-        return <PosterCover src={fallbackImage || tiles[0]} priority />
+    if (tiles[0]) {
+        return <PosterCover src={tiles[0]} priority />
     }
 
     return (
@@ -79,7 +166,7 @@ function PosterCollage({ images, fallbackImage }) {
  *
  * Props:
  * - title, description
- * - posterImages?: URL[] (portadas ya disponibles para el mosaico de portada)
+ * - posterItems?: Array (títulos TMDb para resolver el mosaico inglés final)
  * - backHref?: string (si lo pasas, usa Link; si no, router.back())
  * - rightActions?: ReactNode (botones arriba a la derecha)
  * - showTopBar?: boolean (oculta la barra superior cuando la navegación vive en las acciones)
@@ -93,8 +180,7 @@ function PosterCollage({ images, fallbackImage }) {
 export default function UnifiedListDetailsLayout({
     title,
     description,
-    posterImage,
-    posterImages = [],
+    posterItems = [],
     backdropImage,
     sourceLabel = 'Lista',
     stats = [],
@@ -115,6 +201,7 @@ export default function UnifiedListDetailsLayout({
     const isBackNav = useIsHistoryNavigation()
     const hasTabs = Array.isArray(tabs) && tabs.length > 0 && !!activeTab && typeof onTabChange === 'function'
     const hasInfoTabs = Boolean(description)
+    const finalPosterArtwork = useFinalEnglishPosterImages(posterItems)
 
     return (
         <div className="min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-purple-500/30">
@@ -168,7 +255,10 @@ export default function UnifiedListDetailsLayout({
                         <div className="relative overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/35 shadow-[0_24px_70px_rgba(0,0,0,0.35)] backdrop-blur-[28px] aspect-[2/3]">
                             <div className="pointer-events-none absolute inset-0 z-20 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]" />
                             <div className="relative z-10 h-full w-full bg-neutral-950">
-                                <PosterCollage images={posterImages} fallbackImage={posterImage} />
+                                <PosterCollage
+                                    images={finalPosterArtwork.images}
+                                    pending={finalPosterArtwork.pending}
+                                />
                             </div>
                         </div>
 

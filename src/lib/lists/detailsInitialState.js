@@ -14,6 +14,7 @@ export function resolveCommunityListDetailsInitialState(cached) {
     error: null,
     list: cached?.list || null,
     ratingSummary: cached?.ratingSummary || null,
+    imdbRatingItems: Array.isArray(cached?.imdbRatingItems) ? cached.imdbRatingItems : [],
     items: Array.isArray(cached?.items) ? cached.items : [],
     page: cached?.page || 1,
     hasMore: Boolean(cached?.hasMore),

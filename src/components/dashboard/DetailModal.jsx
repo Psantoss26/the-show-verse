@@ -80,6 +80,7 @@ import { dashboardDetailHref } from "@/lib/dashboard/detailHref";
 // Componentes reales de la ficha completa (standalone) para que las tarjetas,
 // badges, pestañas y acciones sean IDÉNTICAS a DetailsClient.
 import DetailsScoreboardPanel from "@/components/details/DetailsScoreboardPanel";
+import StreamingProviderLogo from "@/components/details/StreamingProviderLogo";
 import {
   buildTmdbHref,
   buildTraktHref,
@@ -2950,14 +2951,7 @@ export default function DetailModal({
                       aria-label={`Abrir ${prov.title}`}
                       className="relative shrink-0 transition-transform duration-300 hover:scale-110 active:scale-95"
                     >
-                      <img
-                        src={prov.icon}
-                        alt=""
-                        className="h-11 w-11 rounded-xl object-contain shadow-lg"
-                      />
-                      {prov.isPlexProvider && (
-                        <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-green-500 ring-2 ring-black" />
-                      )}
+                      <StreamingProviderLogo provider={prov} />
                     </a>
                   ))}
                 </div>
@@ -3025,14 +3019,7 @@ export default function DetailModal({
                         aria-label={`Abrir ${prov.title}`}
                         className="relative shrink-0 transition-transform duration-300 hover:scale-110 active:scale-95"
                       >
-                        <img
-                          src={prov.icon}
-                          alt=""
-                          className="h-11 w-11 rounded-xl object-contain shadow-lg"
-                        />
-                        {prov.isPlexProvider && (
-                          <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-green-500 ring-2 ring-black" />
-                        )}
+                        <StreamingProviderLogo provider={prov} />
                       </a>
                     ))}
                   </div>
