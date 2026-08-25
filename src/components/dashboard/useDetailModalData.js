@@ -265,6 +265,26 @@ function buildPlexProvider(plexUrl) {
   };
 }
 
+// Conserva todos los destinos que expone /api/plex. `createPlatformItem` decide
+// después cuál abrir según escritorio, Chrome Android o la app nativa, igual que
+// en DetailsClient; no debemos reducirlo a una sola URL en la ficha rápida.
+function buildPlexUrl(result) {
+  return {
+    web: result?.plexUrl || null,
+    mobile: result?.plexMobileUrl || null,
+    mobileAlt: result?.plexMobileAltUrl || null,
+    mobileRaw: result?.plexMobileRawUrl || null,
+    play: result?.plexPlayUrl || null,
+    playLegacy: result?.plexPlayLegacyUrl || null,
+    playRaw: result?.plexPlayRawUrl || null,
+    androidIntent: result?.plexAndroidIntentUrl || null,
+    androidIntentPlay: result?.plexAndroidIntentPlayUrl || null,
+    universal: result?.plexUniversalUrl || null,
+    slug: result?.plexSlugUrl || null,
+    androidSlugIntent: result?.plexAndroidSlugIntentUrl || null,
+  };
+}
+
 // Normaliza la respuesta de /api/streaming (JustWatch) a la forma mínima que
 // consume la ficha rápida: { name, logo_path, url }. Dedupe por nombre y recorta
 // a los primeros ~6. `logo_path` viene como ruta de TMDb (p. ej. "/abc.jpg").
@@ -310,6 +330,9 @@ export function useDetailModalData(item) {
       const seasonNumber = item.seasonNumber;
       const episodeNumber = item.episodeNumber;
       let cancelledEp = false;
+      // Esta llamada ya incluye `external_ids` por defecto. La comparten los
+      // datos del episodio y las plataformas para no repetir una petición TMDb.
+      const showDetailsPromise = getDetails("tv", showId).catch(() => null);
 
       setLoading(true);
       setData({
@@ -333,7 +356,7 @@ export function useDetailModalData(item) {
       (async () => {
         try {
           const [showDetails, epRes, epCreditsRes] = await Promise.all([
-            getDetails("tv", showId).catch(() => null),
+            showDetailsPromise,
             fetch(
               `/api/tmdb/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`,
               { cache: "no-store" },
@@ -549,10 +572,13 @@ export function useDetailModalData(item) {
         }
       })();
 
-      // Plataformas de la SERIE (los episodios se ven en las mismas).
+      // Plataformas de la SERIE (los episodios se ven en las mismas) y Plex.
+      // Conservamos el mismo contrato de enlaces que DetailsClient: JustWatch
+      // abre fuera y Plex selecciona su destino web/deep-link desde
+      // `createPlatformItem`.
       (async () => {
         try {
-          const showDetails = await getDetails("tv", showId).catch(() => null);
+          const showDetails = await showDetailsPromise;
           const streamTitle = (
             showDetails?.name ||
             item.showName ||
@@ -565,18 +591,40 @@ export function useDetailModalData(item) {
             : null;
           if (y) params.append("year", y);
           params.append("tmdbId", String(showId));
-          const streamRes = await fetch(`/api/streaming?${params.toString()}`);
-          if (!streamRes.ok || cancelledEp) return;
-          const streamJson = await streamRes.json();
-          const providers = normalizeProviders(streamJson?.providers, 10);
-          if (!cancelledEp && providers.length) {
+
+          const imdbId = showDetails?.external_ids?.imdb_id || item.imdb_id || null;
+          if (imdbId) params.append("imdbId", imdbId);
+
+          const [streamResult, plexResult] = await Promise.all([
+            fetch(`/api/streaming?${params.toString()}`)
+              .then((response) => (response.ok ? response.json() : null))
+              .catch(() => null),
+            fetch(`/api/plex?${params.toString()}`)
+              .then((response) => (response.ok ? response.json() : null))
+              .catch(() => null),
+          ]);
+          if (cancelledEp) return;
+
+          const providers = normalizeProviders(streamResult?.providers, 10);
+          const plexProvider = plexResult?.available
+            ? buildPlexProvider(buildPlexUrl(plexResult))
+            : null;
+          if (providers.length || plexProvider) {
             setData((prev) => ({
               ...prev,
-              providers: mergeModalProviders(providers, prev.providers),
+              providers: mergeModalProviders(
+                providers,
+                plexProvider ? [plexProvider] : [],
+                prev.providers,
+              ),
             }));
           }
         } catch {
-          // sin plataformas
+          // Plataformas/Plex son best-effort.
+        } finally {
+          if (!cancelledEp) {
+            setData((prev) => ({ ...prev, providersResolved: true }));
+          }
         }
       })();
 
@@ -1124,20 +1172,7 @@ export function useDetailModalData(item) {
         const result = await res.json();
         if (!result?.available) return;
 
-        const plexProvider = buildPlexProvider({
-          web: result.plexUrl || null,
-          mobile: result.plexMobileUrl || null,
-          mobileAlt: result.plexMobileAltUrl || null,
-          mobileRaw: result.plexMobileRawUrl || null,
-          play: result.plexPlayUrl || null,
-          playLegacy: result.plexPlayLegacyUrl || null,
-          playRaw: result.plexPlayRawUrl || null,
-          androidIntent: result.plexAndroidIntentUrl || null,
-          androidIntentPlay: result.plexAndroidIntentPlayUrl || null,
-          universal: result.plexUniversalUrl || null,
-          slug: result.plexSlugUrl || null,
-          androidSlugIntent: result.plexAndroidSlugIntentUrl || null,
-        });
+        const plexProvider = buildPlexProvider(buildPlexUrl(result));
 
         if (!cancelled && plexProvider) {
           setData((prev) => ({

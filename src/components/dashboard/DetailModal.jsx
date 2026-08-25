@@ -2864,7 +2864,6 @@ export default function DetailModal({
             >
               <div className="w-[calc(100%_+_1rem)] min-w-0 sm:w-auto sm:flex-1">
                 <DetailActionsRow
-                  fillMobile
                   mobileGapClass="gap-1.5"
                   onTrailer={handleToggleTrailer}
                   trailerAvailable
@@ -2979,7 +2978,6 @@ export default function DetailModal({
               >
                 <div className="w-[calc(100%_+_1rem)] min-w-0 sm:w-auto sm:flex-1">
                   <DetailActionsRow
-                    fillMobile
                     mobileGapClass="gap-1.5"
                     onTrailer={handleToggleTrailer}
                     trailerAvailable
@@ -3214,6 +3212,8 @@ export default function DetailModal({
                     stopNestedModalOpeningEvent(event);
                     setExternalLinksOpen(true);
                   }}
+                  externalLinksMenuOnly
+                  showExternalLinksLabel
                   share={{
                     title,
                     text: `Echa un vistazo a ${title} en The Show Verse`,
@@ -3392,11 +3392,11 @@ export default function DetailModal({
                             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent opacity-80 transition-opacity duration-500 group-hover:opacity-100" />
 
                             <div className="absolute bottom-0 left-0 right-0 p-3 pb-4 transition-transform duration-500 ease-out translate-y-2 group-hover:translate-y-0">
-                              <p className="text-white font-extrabold text-xs sm:text-sm leading-tight line-clamp-1 drop-shadow-sm">
+                              <p className="text-white font-extrabold text-[11px] sm:text-xs leading-tight line-clamp-1 drop-shadow-sm">
                                 {person?.name}
                               </p>
                               {person?.character && (
-                                <p className="mt-0.5 text-zinc-300 group-hover:text-yellow-400 text-[10px] sm:text-xs font-semibold leading-tight line-clamp-1 transition-colors duration-300 drop-shadow-sm">
+                                <p className="mt-0.5 text-zinc-300 group-hover:text-yellow-400 text-[9px] sm:text-[10px] font-semibold leading-tight line-clamp-1 transition-colors duration-300 drop-shadow-sm">
                                   {person.character}
                                 </p>
                               )}

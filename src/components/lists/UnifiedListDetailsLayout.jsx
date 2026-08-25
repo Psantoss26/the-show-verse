@@ -211,7 +211,7 @@ export default function UnifiedListDetailsLayout({
                                 showDetailsTab={false}
                                 showProductionTab={false}
                                 showTabsMenu={false}
-                                scrollableSynopsis
+                                expandableSynopsis
                             />
                         ) : null}
 
