@@ -294,7 +294,7 @@ export default function TraktEpisodesWatchedModal({
         return {
           id,
           startedAt,
-          label: r?.label || `Rewatch · ${formatDateTime(startedAt)}`,
+          label: `Rewatch · ${formatDate(startedAt)}`,
         };
       })
       .filter(Boolean)
@@ -309,7 +309,7 @@ export default function TraktEpisodesWatchedModal({
     return normalizedPlays.map((iso) => ({
       id: iso,
       startedAt: iso,
-      label: `Rewatch · ${formatDateTime(iso)}`,
+      label: `Rewatch · ${formatDate(iso)}`,
     }));
   }, [normalizedRuns, normalizedPlays]);
 
@@ -336,7 +336,6 @@ export default function TraktEpisodesWatchedModal({
       ...rewatchItems.map((item) => ({
         id: item.id,
         label: item.label,
-        mobileLabel: formatDateTime(item.startedAt),
         kind: "rewatch",
       })),
     ],
@@ -1005,7 +1004,7 @@ export default function TraktEpisodesWatchedModal({
                 <span
                   className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
                     isRewatchView
-                      ? "bg-purple-500/15 text-purple-100 border border-purple-300/25"
+                      ? "bg-purple-500/15 text-purple-100"
                       : "bg-white/10 text-white/85 "
                   }`}
                   aria-label={
@@ -1087,11 +1086,23 @@ export default function TraktEpisodesWatchedModal({
                             : "bg-black/30 text-white/80 hover:bg-white/10"
                         }`}
                       >
-                        <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-red-500/10 text-red-400 shrink-0">
-                          <Tv className="w-3.5 h-3.5" />
+                        <span
+                          className={`inline-flex h-6 w-6 items-center justify-center rounded-md shrink-0 ${
+                            isRewatchView
+                              ? "bg-purple-500/10 text-purple-300"
+                              : "bg-red-500/10 text-red-400"
+                          }`}
+                        >
+                          {isRewatchView ? (
+                            <History className="w-3.5 h-3.5" />
+                          ) : (
+                            <Tv className="w-3.5 h-3.5" />
+                          )}
                         </span>
                         <span className="flex-1 text-left truncate">
-                          {activeViewLabel}
+                          {isRewatchView
+                            ? formatDate(currentRewatchStartedAt)
+                            : activeViewLabel}
                         </span>
                         <ChevronDown
                           className={`w-4 h-4 text-zinc-500 transition-transform ${viewMenuOpen ? "rotate-180" : ""}`}
@@ -1120,17 +1131,21 @@ export default function TraktEpisodesWatchedModal({
                                     }}
                                     className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2.5 transition ${
                                       active
-                                        ? "bg-emerald-500/12 text-emerald-300"
-                                        : "text-zinc-300 hover:bg-white/5"
+                                        ? item.kind === "rewatch"
+                                          ? "bg-purple-500/12 text-purple-200"
+                                          : "bg-emerald-500/12 text-emerald-300"
+                                        : item.kind === "rewatch"
+                                          ? "text-purple-200 hover:bg-purple-500/10"
+                                          : "text-zinc-300 hover:bg-white/5"
                                     }`}
                                   >
                                     {item.kind === "global" ? (
                                       <Tv className="w-4 h-4 text-red-400 shrink-0" />
                                     ) : (
-                                      <History className="w-4 h-4 text-emerald-400 shrink-0" />
+                                      <History className="w-4 h-4 text-purple-400 shrink-0" />
                                     )}
                                     <span className="flex-1 truncate">
-                                      {item.mobileLabel || item.label}
+                                      {item.label}
                                     </span>
                                     {active && (
                                       <Check className="w-4 h-4 shrink-0" />
@@ -1291,7 +1306,12 @@ export default function TraktEpisodesWatchedModal({
 
             {/* Selector de vista */}
             <div
-              className="relative shrink-0 w-[122px] xl:w-[168px]"
+              className={`relative shrink-0 ${
+                // `w-max` absorbe solo el ancho que libera Añadir/Rewatch al
+                // pasar a icono, sin alterar los gaps ni el tamaño de los demás
+                // controles de la barra.
+                isRewatchView ? "w-max" : "w-[122px] xl:w-[168px]"
+              }`}
               data-view-menu=""
             >
               <button
@@ -1305,11 +1325,23 @@ export default function TraktEpisodesWatchedModal({
                     : "bg-black/30 text-white/80 hover:bg-white/10"
                 }`}
               >
-                <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-red-500/10 text-red-400 shrink-0">
-                  <Tv className="w-3 h-3" />
+                <span
+                  className={`inline-flex h-6 w-6 items-center justify-center rounded-md shrink-0 ${
+                    isRewatchView
+                      ? "bg-purple-500/10 text-purple-300"
+                      : "bg-red-500/10 text-red-400"
+                  }`}
+                >
+                  {isRewatchView ? (
+                    <History className="w-3.5 h-3.5" />
+                  ) : (
+                    <Tv className="w-3.5 h-3.5" />
+                  )}
                 </span>
                 <span className="flex-1 text-left truncate">
-                  {activeViewLabel}
+                  {isRewatchView
+                    ? `Rewatch · ${formatDate(currentRewatchStartedAt)}`
+                    : activeViewLabel}
                 </span>
                 <ChevronDown
                   className={`w-3.5 h-3.5 text-zinc-500 transition-transform ${viewMenuOpen ? "rotate-180" : ""}`}
@@ -1338,14 +1370,18 @@ export default function TraktEpisodesWatchedModal({
                             }}
                             className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2.5 transition ${
                               active
-                                ? "bg-emerald-500/12 text-emerald-300"
-                                : "text-zinc-300 hover:bg-white/5"
+                                ? item.kind === "rewatch"
+                                  ? "bg-purple-500/12 text-purple-200"
+                                  : "bg-emerald-500/12 text-emerald-300"
+                                : item.kind === "rewatch"
+                                  ? "text-purple-200 hover:bg-purple-500/10"
+                                  : "text-zinc-300 hover:bg-white/5"
                             }`}
                           >
                             {item.kind === "global" ? (
                               <Tv className="w-4 h-4 text-red-400 shrink-0" />
                             ) : (
-                              <History className="w-4 h-4 text-emerald-400 shrink-0" />
+                              <History className="w-4 h-4 text-purple-400 shrink-0" />
                             )}
                             <span className="flex-1 truncate">
                               {item.label}
@@ -1361,12 +1397,12 @@ export default function TraktEpisodesWatchedModal({
             </div>
 
             {/* Lista / Tabla */}
-            <div className="flex shrink-0 gap-1 rounded-xl bg-black/30 p-1 backdrop-blur-md">
+            <div className="flex h-10 shrink-0 gap-1 rounded-xl bg-black/30 p-1 backdrop-blur-md xl:h-11">
               <button
                 type="button"
                 onClick={() => setViewMode("list")}
                 aria-label="Vista lista"
-                className={`w-9 h-8 rounded-lg text-xs font-bold inline-flex items-center justify-center transition-all ${
+                className={`h-full w-9 rounded-lg text-xs font-bold inline-flex items-center justify-center transition-all ${
                   viewMode === "list"
                     ? "bg-white/15 text-white shadow"
                     : "text-white/45 hover:bg-white/10 hover:text-white"
@@ -1378,7 +1414,7 @@ export default function TraktEpisodesWatchedModal({
                 type="button"
                 onClick={() => setViewMode("table")}
                 aria-label="Vista tabla"
-                className={`w-9 h-8 rounded-lg text-xs font-bold inline-flex items-center justify-center transition-all ${
+                className={`h-full w-9 rounded-lg text-xs font-bold inline-flex items-center justify-center transition-all ${
                   viewMode === "table"
                     ? "bg-white/15 text-white shadow"
                     : "text-white/45 hover:bg-white/10 hover:text-white"
@@ -1410,10 +1446,12 @@ export default function TraktEpisodesWatchedModal({
               type="button"
               disabled={!isConnected}
               onClick={() => openAddPlayDialog("play")}
-              className={`h-10 xl:h-11 inline-flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-4 rounded-xl text-[11px] xl:text-sm font-semibold transition whitespace-nowrap shrink-0 ${
+              className={`h-10 xl:h-11 inline-flex items-center justify-center rounded-xl text-[11px] xl:text-sm font-semibold transition whitespace-nowrap shrink-0 ${
                 !isConnected
                   ? "opacity-50 cursor-not-allowed bg-black/25 text-white/30"
                   : "bg-black/30 text-white/75 hover:bg-white/10"
+              } ${
+                isRewatchView ? "w-10 xl:w-11" : "gap-1.5 xl:gap-2 px-2.5 xl:px-4"
               }`}
               aria-label={
                 !isConnected
@@ -1422,8 +1460,12 @@ export default function TraktEpisodesWatchedModal({
               }
             >
               <Plus className="w-4 h-4" />
-              <span className="hidden xl:inline">Añadir / Rewatch</span>
-              <span className="xl:hidden">Añadir</span>
+              {!isRewatchView && (
+                <>
+                  <span className="hidden xl:inline">Añadir / Rewatch</span>
+                  <span className="xl:hidden">Añadir</span>
+                </>
+              )}
             </button>
 
             {/* Historial */}
@@ -1496,7 +1538,7 @@ export default function TraktEpisodesWatchedModal({
           )}
 
           {isConnected && isRewatchView && (
-            <div className="rounded-2xl border border-purple-500/20 bg-purple-500/5 px-3.5 py-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="rounded-2xl bg-purple-500/5 px-3.5 py-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <div className="text-[11px] font-black uppercase tracking-wider text-purple-200">
                   Fecha al marcar episodios
@@ -1513,7 +1555,7 @@ export default function TraktEpisodesWatchedModal({
                     onClick={() => setRewatchMarkPreset("today")}
                     className={`px-3 py-2 rounded-xl text-xs font-black transition ${
                       rewatchMarkPreset === "today"
-                        ? "bg-purple-500/15 border border-purple-500/30 text-purple-100"
+                        ? "bg-purple-500/15 text-purple-100"
                         : "bg-black/30 text-white/70 hover:bg-white/10"
                     }`}
                   >
@@ -1524,7 +1566,7 @@ export default function TraktEpisodesWatchedModal({
                     onClick={() => setRewatchMarkPreset("other_date")}
                     className={`px-3 py-2 rounded-xl text-xs font-black whitespace-nowrap transition ${
                       rewatchMarkPreset === "other_date"
-                        ? "bg-purple-500/15 border border-purple-500/30 text-purple-100"
+                        ? "bg-purple-500/15 text-purple-100"
                         : "bg-black/30 text-white/70 hover:bg-white/10"
                     }`}
                   >
