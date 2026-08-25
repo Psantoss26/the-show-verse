@@ -641,25 +641,16 @@ function useShowBackdrop(show) {
 
     let canceled = false;
 
-    // Resolución inmediata solo con rutas ya decididas: preferencia del usuario
-    // o caché. El fallback del item se reserva para el último caso, tras intentar
-    // obtener una imagen con idioma desde TMDb.
-    const { backdrop: userBackdrop } = getArtworkPreference(show.id, type);
+    // Resolución inmediata solo con rutas ya decididas de esta tarjeta o caché.
+    // La vista previa personalizada se usa exclusivamente en DetailModal.
     const cached = movieBackdropCache.get(cacheKey);
     const remembered = continueWatchingBackdropPathMemory.get(memoryKey);
-    const initial =
-      userBackdrop || remembered || (cached != null ? cached : null) || null;
+    const initial = remembered || (cached != null ? cached : null) || null;
 
     setBackdropPath(initial);
     setReady(!!initial);
 
     const resolveBackdrop = async () => {
-      if (userBackdrop) {
-        movieBackdropCache.set(cacheKey, userBackdrop);
-        continueWatchingBackdropPathMemory.set(memoryKey, userBackdrop);
-        return;
-      }
-
       try {
         const fallback =
           (await fetchBestWatchingBackdrop(show.id, type)) ||

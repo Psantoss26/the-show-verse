@@ -126,7 +126,7 @@ export default function AddToListModal(props) {
         <div className="flex-1 overflow-y-auto p-6 sm:px-8 pb-8 space-y-6 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {/* Resumen: ya está en... */}
           {addedLists.length > 0 && (
-            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.04] p-4">
+            <div className="rounded-2xl bg-emerald-500/[0.04] p-4">
               <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-200">
                 Ya está añadida en {addedLists.length}{" "}
                 {addedLists.length === 1 ? "lista" : "listas"}
@@ -162,8 +162,8 @@ export default function AddToListModal(props) {
               <button
                 type="button"
                 onClick={() => setCreateOpen(true)}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-white/10 bg-white/[0.02]
-                           text-zinc-400 text-sm font-bold hover:bg-white/[0.05] hover:text-white transition-all group"
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-white/[0.02]
+                           text-zinc-400 text-sm font-bold hover:bg-white/[0.05] hover:text-white transition-all group focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400/70"
               >
                 <div className="p-1 rounded-md bg-white/5 group-hover:bg-yellow-500 group-hover:text-black transition-colors">
                   <Plus className="w-4 h-4" />
@@ -252,7 +252,7 @@ export default function AddToListModal(props) {
             )}
 
             {!loading && filtered.length === 0 && (
-              <div className="py-10 flex flex-col items-center justify-center text-center rounded-2xl border border-dashed border-white/10 bg-white/[0.01]">
+              <div className="py-10 flex flex-col items-center justify-center text-center rounded-2xl bg-white/[0.01]">
                 <FileText className="w-8 h-8 text-zinc-700 mb-2" />
                 <p className="text-sm text-zinc-400 font-medium">
                   No se encontraron listas
@@ -282,7 +282,7 @@ export default function AddToListModal(props) {
                       "w-full relative overflow-hidden rounded-2xl transition-all duration-300",
                       "flex items-center justify-between gap-4 text-left",
                       present
-                        ? "bg-emerald-500/[0.03] border border-emerald-500/20 hover:bg-emerald-500/[0.05]"
+                        ? "bg-emerald-500/[0.03] hover:bg-emerald-500/[0.05]"
                         : "bg-white/[0.02] hover:bg-white/[0.06] ",
                     ].join(" ")}
                   >

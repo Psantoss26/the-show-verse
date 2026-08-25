@@ -456,7 +456,7 @@ function DetailsToolbarActions({
               <button
                 type="button"
                 onClick={onMoreLinks}
-                className={`${hasMobilePlatformAction ? "hidden sm:flex" : externalLinksMenuOnly ? "" : "sm:hidden"} relative isolate h-10 w-10 shrink-0 transform-gpu items-center justify-center overflow-hidden rounded-full bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 text-zinc-200 shadow-none backdrop-blur-[6px] transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/[0.08] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/30 ${showExternalLinksLabel ? "sm:h-auto sm:w-auto sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2" : ""}`}
+                className={`${hasMobilePlatformAction ? "hidden sm:flex" : externalLinksMenuOnly ? "" : "sm:hidden"} relative isolate h-10 w-10 shrink-0 transform-gpu items-center justify-center overflow-hidden rounded-full bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 text-zinc-200 shadow-none backdrop-blur-[6px] transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/[0.08] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/30 ${showExternalLinksLabel ? "sm:inline-flex sm:h-auto sm:w-auto sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2" : ""}`}
                 title="Enlaces"
                 aria-label="Abrir enlaces externos"
               >

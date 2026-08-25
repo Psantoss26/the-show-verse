@@ -49,7 +49,6 @@ import {
   fetchBestPosterNoLang,
   fetchBestLogo,
   getBestTrailerCached,
-  getArtworkPreference,
   yearOf,
   ratingOf,
   getSpotlightBadge,
@@ -1992,8 +1991,6 @@ export default function FeaturedHero({
       let poster = null;
       let logo = null;
 
-      const { backdrop: userBackdrop } = getArtworkPreference(id);
-
       // El backdrop primario, el póster y el logo son independientes entre sí
       // -- los tres leen la MISMA respuesta de `/images`, deduplicada por
       // `fetchTmdbImages`. Antes se encadenaban con `await` uno detrás de
@@ -2008,9 +2005,7 @@ export default function FeaturedHero({
       // peticiones de fondo del dashboard.
       const [primaryBackdropResult, posterResult, logoResult] =
         await Promise.allSettled([
-          userBackdrop
-            ? Promise.resolve(userBackdrop)
-            : fetchBestBackdropNoLang(id, mediaType, { priority }),
+          fetchBestBackdropNoLang(id, mediaType, { priority }),
           fetchBestPosterNoLang(id, mediaType, { priority }),
           // Orden de preferencia: inglés → español → sin idioma → y, si no,
           // el más votado de cualquier idioma (el fetch trae logos de TODOS

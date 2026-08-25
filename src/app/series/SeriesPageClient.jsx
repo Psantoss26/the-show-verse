@@ -314,11 +314,9 @@ function getTVArtworkPreference(showId) {
   }
   const base = `showverse:tv:${showId}`;
   const poster = window.localStorage.getItem(`${base}:poster`);
-  const backdrop = window.localStorage.getItem(`${base}:backdrop`);
   const background = window.localStorage.getItem(`${base}:background`);
   return {
     poster: poster || null,
-    backdrop: backdrop || null,
     background: background || null,
   };
 }
@@ -628,13 +626,6 @@ function Top10MobileBackdropCardTV({
         setReady(!!path);
       };
 
-      const { backdrop: userBackdrop } = getTVArtworkPreference(show.id);
-      if (userBackdrop) {
-        tvBackdropCache.set(show.id, userBackdrop);
-        revealBackdrop(userBackdrop);
-        return;
-      }
-
       const cached = tvBackdropCache.get(show.id);
       if (cached !== undefined) {
         revealBackdrop(cached);
@@ -822,29 +813,21 @@ function InlinePreviewCard({ show, heightClass, isSpotlight = false }) {
           }
         }
       } else {
-        const { backdrop: userBackdrop } = getTVArtworkPreference(show.id);
-        const userPreferredBackdrop = userBackdrop || null;
-
-        if (userPreferredBackdrop) {
-          tvBackdropCache.set(show.id, userPreferredBackdrop);
-          revealBackdrop(userPreferredBackdrop);
+        const cachedBackdrop = tvBackdropCache.get(show.id);
+        if (cachedBackdrop !== undefined) {
+          revealBackdrop(cachedBackdrop);
         } else {
-          const cachedBackdrop = tvBackdropCache.get(show.id);
-          if (cachedBackdrop !== undefined) {
-            revealBackdrop(cachedBackdrop);
-          } else {
-            try {
-              const preferred = await fetchBestTVBackdrop(show.id);
-              const chosen = preferred || getPreviewBackdropFallback(show);
+          try {
+            const preferred = await fetchBestTVBackdrop(show.id);
+            const chosen = preferred || getPreviewBackdropFallback(show);
 
-              tvBackdropCache.set(show.id, chosen);
+            tvBackdropCache.set(show.id, chosen);
 
-              revealBackdrop(chosen);
-            } catch {
-              const fallback = getPreviewBackdropFallback(show);
-              tvBackdropCache.set(show.id, fallback);
-              revealBackdrop(fallback);
-            }
+            revealBackdrop(chosen);
+          } catch {
+            const fallback = getPreviewBackdropFallback(show);
+            tvBackdropCache.set(show.id, fallback);
+            revealBackdrop(fallback);
           }
         }
       }

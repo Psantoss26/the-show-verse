@@ -44,7 +44,6 @@ import {
   ImageOff,
   ChevronDown,
   Check,
-  PlayCircle,
   Calendar,
   Clock,
   Star,
@@ -515,9 +514,6 @@ function SimilarBackdrop({ rec, onOpen }) {
         </div>
       )}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-        <PlayCircle className="h-11 w-11 text-white/90 drop-shadow-[0_2px_10px_rgba(0,0,0,0.9)]" />
-      </div>
     </div>
   );
 }
@@ -555,10 +551,10 @@ function SeasonDropdown({ seasons, value, onChange, labelId }) {
         aria-expanded={open}
         aria-labelledby={labelId}
         onClick={() => setOpen((o) => !o)}
-        className={`group flex h-11 w-full items-center justify-between rounded-xl border px-4 text-left text-sm font-bold transition-all duration-300 select-none outline-none focus:outline-none focus:ring-0 active:outline-none ${
+        className={`group flex h-11 w-full items-center justify-between rounded-xl border-0 px-4 text-left text-sm font-bold transition-all duration-300 select-none outline-none focus:outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-yellow-400/70 active:outline-none ${
           open
-            ? "border-yellow-500/40 bg-white/[0.08] text-white shadow-[0_0_15px_rgba(234,179,8,0.1)]"
-            : "border-white/10 bg-white/[0.03] text-zinc-300 hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
+            ? "bg-white/[0.08] text-white shadow-[0_0_15px_rgba(234,179,8,0.1)]"
+            : "bg-white/[0.03] text-zinc-300 hover:bg-white/[0.06] hover:text-white"
         }`}
       >
         <span className="truncate">
@@ -580,7 +576,7 @@ function SeasonDropdown({ seasons, value, onChange, labelId }) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
-            className="absolute right-0 z-50 mt-2 max-h-72 w-full min-w-[200px] overflow-y-auto rounded-xl border border-white/10 bg-zinc-950/95 p-1.5 shadow-[0_16px_40px_rgba(0,0,0,0.8)] backdrop-blur-2xl soundtrack-scrollbar outline-none focus:outline-none"
+            className="absolute right-0 z-50 mt-2 max-h-72 w-full min-w-[200px] overflow-y-auto rounded-xl border-0 bg-zinc-950/95 p-1.5 shadow-[0_16px_40px_rgba(0,0,0,0.8)] backdrop-blur-2xl soundtrack-scrollbar outline-none focus:outline-none"
           >
             {seasons.map((season) => {
               const active = season.season_number === value;
@@ -2852,7 +2848,7 @@ export default function DetailModal({
           </div>
 
           {/* CONTENIDO */}
-          <div className="space-y-6 p-5 sm:p-7">
+          <div className="space-y-8 p-5 sm:p-7">
             {/* Fila de acciones — MISMO componente presentacional que la ficha
                 completa (DetailsClient). El tráiler sigue reproduciéndose inline
                 en el hero; el resto abre los modales reutilizables. Se omiten el
@@ -3231,15 +3227,12 @@ export default function DetailModal({
 
             {/* EPISODIO: pestañas Detalles/Sinopsis (mismos componentes que
                 EpisodeDetails). Detalles = Serie/Emisión/Duración/Episodio. */}
-            {/* El hueco hasta la primera sección (Reparto) lo pone el
-                `space-y-6` de la columna —`margin-block-end` de 24px—. Aquí se
-                recorta a 16px: el menú de secciones y su contenido se leen como
-                UN bloque, y 24px lo separaban más de la cuenta de la sección que
-                encabeza. Basta con la clase propia porque `space-y-*` se compila
-                dentro de `:where(...)`, que no tiene especificidad. */}
+            {/* El menú de pestañas y sus tarjetas forman un bloque, pero necesitan
+                aire antes de la siguiente sección. La columna deja 32px entre
+                secciones y este margen mantiene una transición intermedia. */}
             {isEpisode ? (
               <motion.div
-                className="mb-4"
+                className="mb-5"
                 initial={{ opacity: 0, y: 15 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-10px" }}
@@ -3254,7 +3247,7 @@ export default function DetailModal({
                   onChangeTab={setEpisodeTab}
                   layoutId="detailModalEpisodeTab"
                 />
-                <div className="relative min-h-[80px] pt-3">
+                <div className="relative min-h-[80px] pt-4">
                   <AnimatePresence mode="wait" initial={false}>
                     {episodeTab === "synopsis" ? (
                       <motion.div
@@ -3313,7 +3306,7 @@ export default function DetailModal({
                 </div>
               </motion.div>
             ) : (
-              <div className="mb-4">
+              <div className="mb-5">
                 <DetailsInfoTabs
                   variant="normal"
                   layoutId="detailModalTab"
@@ -3348,7 +3341,7 @@ export default function DetailModal({
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-15px" }}
                 transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-                className="space-y-3"
+                className="space-y-4"
               >
                 <h3 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
                   <Users className="h-4 w-4" aria-hidden="true" />
@@ -3417,7 +3410,7 @@ export default function DetailModal({
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-15px" }}
                 transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-                className="space-y-3"
+                className="space-y-4"
               >
                 <h3 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
                   <MonitorPlay className="h-4 w-4" aria-hidden="true" />
@@ -3451,7 +3444,7 @@ export default function DetailModal({
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-15px" }}
                 transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-                className="space-y-3"
+                className="space-y-4"
               >
                 <h3 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
                   <Sparkles className="h-4 w-4" aria-hidden="true" />
@@ -3526,9 +3519,9 @@ export default function DetailModal({
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-15px" }}
                 transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-                className="space-y-4 pb-4"
+                className="space-y-5 pb-4"
               >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <h3 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
                     <Layers className="h-4 w-4" aria-hidden="true" />
                     Temporadas y episodios

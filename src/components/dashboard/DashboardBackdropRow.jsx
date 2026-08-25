@@ -87,7 +87,6 @@ import {
   getBackdropCacheKey,
   movieBackdropCache,
   getPreviewBackdropFallback,
-  getArtworkPreference,
   ratingOf,
   yearOf,
   formatRuntime,
@@ -165,14 +164,13 @@ const dashboardPreviewBackdropFadeStyle = {
 /* =================== HELPERS =================== */
 
 // Backdrop inicial (síncrono) para pintar algo desde el primer render sin
-// esperar a la petición: preferencia del usuario → override → caché → backdrop
-// que ya trae el propio item.
+// esperar a la petición: override de la sección → caché → backdrop que ya trae
+// el propio item. La vista previa elegida en DetailsClient queda reservada para
+// DetailModal y no sustituye el artwork de las tarjetas del dashboard.
 function getInitialItemBackdrop(item, backdropOverride) {
   if (!item?.id) return null;
   const mediaType = getMediaTypeForItem(item);
   const key = getBackdropCacheKey(item, mediaType);
-  const { backdrop: userBackdrop } = getArtworkPreference(item.id, mediaType);
-  if (userBackdrop) return userBackdrop;
   if (backdropOverride) return backdropOverride;
   const cached = movieBackdropCache.get(key);
   if (cached !== undefined) return cached;
@@ -197,14 +195,6 @@ function useItemBackdrop(item, backdropOverride) {
       if (!abort) setBackdropPath(path);
     };
 
-    const { backdrop: userBackdrop } = getArtworkPreference(item.id, type);
-    if (userBackdrop) {
-      movieBackdropCache.set(key, userBackdrop);
-      reveal(userBackdrop);
-      return () => {
-        abort = true;
-      };
-    }
     if (backdropOverride) {
       movieBackdropCache.set(key, backdropOverride);
       reveal(backdropOverride);

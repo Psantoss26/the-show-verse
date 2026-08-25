@@ -4,7 +4,6 @@
 import OptimizedImage from "@/components/OptimizedImage";
 import useModalGuard from "@/hooks/useModalGuard";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
-import { AnimatePresence, motion } from 'framer-motion'
 import { ExternalLink, MonitorPlay, X } from 'lucide-react'
 
 function hostLabel(href) {
@@ -34,34 +33,30 @@ export default function ExternalLinksModal({
     // Bloquea scroll de fondo + cierra con Escape mientras el modal está abierto.
     useModalGuard({ open, onClose })
 
-    return (
-        <AnimatePresence>
-            {open && (
-                <motion.div
-                    className="fixed inset-0 z-[1200] flex items-center justify-center p-4"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    aria-modal="true"
-                    role="dialog"
-                    aria-labelledby="external-links-title"
-                >
-                    {/* Mismo velo que los modales de las acciones principales. */}
-                    <div
-                        className="absolute inset-0 bg-black/60 backdrop-blur-lg"
-                        onClick={onClose}
-                        aria-hidden="true"
-                    />
+    // Igual que los modales de las acciones: el cristal y su animación CSS se
+    // aplican en el primer frame. Framer Motion los aplicaba después del montaje
+    // y, en móvil, dejaba ver una entrada sin el acabado final.
+    if (!open) return null
 
-                    {/* Tarjeta centrada: comparte estructura, cristal y escala de
-                        entrada con los modales de tráiler, lista y soundtrack. */}
-                    <motion.div
-                        initial={{ y: 28, opacity: 0, scale: 0.98 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        exit={{ y: 28, opacity: 0, scale: 0.98 }}
-                        transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-                        className={`relative flex max-h-[85dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
-                    >
+    return (
+        <div
+            className="fixed inset-0 z-[1200] flex items-center justify-center p-4"
+            aria-modal="true"
+            role="dialog"
+            aria-labelledby="external-links-title"
+        >
+            {/* Mismo velo que los modales de las acciones principales. */}
+            <div
+                className="absolute inset-0 bg-black/60 backdrop-blur-lg animate-in fade-in duration-300"
+                onClick={onClose}
+                aria-hidden="true"
+            />
+
+            {/* Tarjeta centrada: comparte estructura, cristal y escala de
+                entrada con los modales de tráiler, lista y soundtrack. */}
+            <div
+                className={`relative flex max-h-[85dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
+            >
                         <div className="flex w-full shrink-0 items-center justify-between bg-white/[0.025] p-6 sm:px-8 sm:pb-6 sm:pt-8">
                             <div className="min-w-0">
                                 <h2
@@ -94,17 +89,8 @@ export default function ExternalLinksModal({
                                 </div>
                             ) : (
                                 <ul className="space-y-2">
-                                    {items.map((it, index) => (
-                                        <motion.li
-                                            key={it.id || it.href}
-                                            initial={{ opacity: 0, y: 10, scale: 0.98 }}
-                                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                                            transition={{
-                                                duration: 0.24,
-                                                delay: index * 0.035,
-                                                ease: [0.22, 1, 0.36, 1],
-                                            }}
-                                        >
+                                    {items.map((it) => (
+                                        <li key={it.id || it.href}>
                                             <a
                                                 href={it.href}
                                                 target={it.target || "_blank"}
@@ -149,14 +135,12 @@ export default function ExternalLinksModal({
                                                     <ExternalLink className="h-4 w-4" />
                                                 </span>
                                             </a>
-                                        </motion.li>
+                                        </li>
                                     ))}
                                 </ul>
                             )}
                         </div>
-                    </motion.div>
-                </motion.div>
-            )}
-        </AnimatePresence>
+            </div>
+        </div>
     )
 }

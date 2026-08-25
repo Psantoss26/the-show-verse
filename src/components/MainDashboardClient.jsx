@@ -647,8 +647,6 @@ function getInitialDashboardPreviewBackdrop(
     );
   }
 
-  const { backdrop: userBackdrop } = getArtworkPreference(movie.id);
-  if (userBackdrop) return userBackdrop;
   if (backdropOverride) return backdropOverride;
 
   const cachedBackdrop = movieBackdropCache.get(
@@ -879,11 +877,7 @@ function InlinePreviewCard({
           }
         }
       } else {
-        const { backdrop: userBackdrop } = getArtworkPreference(movie.id);
-        if (userBackdrop) {
-          movieBackdropCache.set(backdropCacheKey, userBackdrop);
-          revealBackdrop(userBackdrop);
-        } else if (stableBackdropOverride) {
+        if (stableBackdropOverride) {
           movieBackdropCache.set(backdropCacheKey, stableBackdropOverride);
           revealBackdrop(stableBackdropOverride);
         } else {
@@ -2128,14 +2122,11 @@ function InlinePreviewCardAnticipated({
         setBackdropReady(!!path);
       };
 
-      // Backdrop (igual que tu preview normal)
-      const { backdrop: userBackdrop } = getArtworkPreference(movie.id);
+      // El selector de vista previa pertenece a DetailModal; las tarjetas
+      // conservan su artwork propio o el override explícito de la sección.
       const mediaTypeForBackdrop = getMediaTypeForItem(movie);
       const backdropCacheKey = getBackdropCacheKey(movie, mediaTypeForBackdrop);
-      if (userBackdrop) {
-        movieBackdropCache.set(backdropCacheKey, userBackdrop);
-        revealBackdrop(userBackdrop);
-      } else if (stableBackdropOverride) {
+      if (stableBackdropOverride) {
         movieBackdropCache.set(backdropCacheKey, stableBackdropOverride);
         revealBackdrop(stableBackdropOverride);
       } else {
@@ -3910,8 +3901,7 @@ function TopRatedHero({
             const itemKey = getBackdropCacheKey(movie, mediaType);
 
             const override = backdropOverrides?.[id] || null;
-            const { backdrop: userBackdrop } = getArtworkPreference(id);
-            let chosen = override || userBackdrop || null;
+            let chosen = override || null;
             if (!chosen) chosen = await fetchBestBackdrop(id, mediaType);
             if (!chosen)
               chosen = movie?.backdrop_path || movie?.poster_path || null;
@@ -4387,7 +4377,10 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
   }, [dashboardData]);
 
   const [posterOverrides, setPosterOverrides] = useState({});
-  const [backdropOverrides, setBackdropOverrides] = useState({});
+  // La selección de "Vista previa" pertenece a DetailModal. El dashboard no
+  // carga ni propaga esos overrides para que sus tarjetas mantengan el backdrop
+  // editorial que les corresponde.
+  const backdropOverrides = EMPTY_OBJECT;
   const [overridesReady, setOverridesReady] = useState(false);
 
   useEffect(() => {
@@ -4397,7 +4390,6 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
       if (!allMovieIds.length) {
         if (!cancelled) {
           setPosterOverrides({});
-          setBackdropOverrides({});
           setOverridesReady(true);
         }
         return;
@@ -4406,27 +4398,18 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
       if (!cancelled) setOverridesReady(false);
 
       try {
-        const [posters, backdrops] = await Promise.all([
-          fetchArtworkOverrides({
-            type: "movie",
-            kind: "poster",
-            ids: allMovieIds,
-          }).catch(() => ({})),
-          fetchArtworkOverrides({
-            type: "movie",
-            kind: "backdrop",
-            ids: allMovieIds,
-          }).catch(() => ({})),
-        ]);
+        const posters = await fetchArtworkOverrides({
+          type: "movie",
+          kind: "poster",
+          ids: allMovieIds,
+        }).catch(() => ({}));
 
         if (cancelled) return;
         setPosterOverrides(posters || {});
-        setBackdropOverrides(backdrops || {});
       } catch (err) {
         if (cancelled) return;
         console.error("Error cargando overrides (dashboard)", err);
         setPosterOverrides({});
-        setBackdropOverrides({});
       } finally {
         if (!cancelled) setOverridesReady(true);
       }
