@@ -1528,6 +1528,7 @@ export default function EpisodeDetailsClient({
           <DetailsInfoTabs
             layoutId="episodeTabBackdrop"
             mobileLayout
+            enableMobileTabSwipe
             mediaType="tv"
             overview={episode?.overview}
             creators={showCreators}

@@ -273,10 +273,12 @@ export function DetailsTabsMenu({
   activeTab,
   onChangeTab,
   layoutId = "activeTabIndicator",
+  swipeHandlers = {},
 }) {
   return (
     <div
-      className={`relative isolate mb-4 flex w-full flex-wrap items-center gap-x-6 gap-y-0 overflow-hidden rounded-2xl px-4 py-1 max-sm:transform-gpu md:gap-x-8 ${LIQUID_GLASS_BAR} sm:rounded-none sm:border-b sm:border-white/10 sm:bg-transparent sm:bg-none sm:px-2 sm:py-0 sm:shadow-none sm:[backdrop-filter:none]`}
+      {...swipeHandlers}
+      className={`relative isolate mb-4 flex w-full touch-pan-y flex-wrap items-center gap-x-6 gap-y-0 overflow-hidden rounded-2xl px-4 py-1 max-sm:transform-gpu md:gap-x-8 ${LIQUID_GLASS_BAR} sm:touch-auto sm:rounded-none sm:border-b sm:border-white/10 sm:bg-transparent sm:bg-none sm:px-2 sm:py-0 sm:shadow-none sm:[backdrop-filter:none]`}
     >
       {/* Capas ópticas del cristal, las mismas de DetailsSectionMenu. Solo móvil:
           en escritorio no hay cristal que rematar. */}

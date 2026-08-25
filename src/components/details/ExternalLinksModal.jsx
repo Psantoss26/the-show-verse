@@ -5,7 +5,7 @@ import OptimizedImage from "@/components/OptimizedImage";
 import useModalGuard from "@/hooks/useModalGuard";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { AnimatePresence, motion } from 'framer-motion'
-import { ExternalLink, X } from 'lucide-react'
+import { ExternalLink, MonitorPlay, X } from 'lucide-react'
 
 function hostLabel(href) {
     try {
@@ -15,8 +15,21 @@ function hostLabel(href) {
     }
 }
 
-export default function ExternalLinksModal({ open, onClose, links }) {
+export default function ExternalLinksModal({
+    open,
+    onClose,
+    links,
+    mode = 'links',
+}) {
     const items = Array.isArray(links) ? links.filter((x) => x?.href) : []
+    const isPlatformsMode = mode === 'platforms'
+    const modalTitle = isPlatformsMode ? 'Plataformas disponibles' : 'Enlaces externos'
+    const modalSubtitle = isPlatformsMode ? 'Dónde ver este título' : 'Fuentes y plataformas'
+    const emptyMessage = isPlatformsMode
+        ? 'No hay plataformas disponibles para este título.'
+        : 'No hay enlaces disponibles para este título.'
+    const itemNoun = isPlatformsMode ? 'plataforma' : 'enlace externo'
+    const FallbackIcon = isPlatformsMode ? MonitorPlay : ExternalLink
 
     // Bloquea scroll de fondo + cierra con Escape mientras el modal está abierto.
     useModalGuard({ open, onClose })
@@ -55,10 +68,10 @@ export default function ExternalLinksModal({ open, onClose, links }) {
                                     id="external-links-title"
                                     className="bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-xl font-black text-transparent"
                                 >
-                                    Enlaces externos
+                                    {modalTitle}
                                 </h2>
                                 <p className="mt-1 text-xs font-medium uppercase tracking-wide text-zinc-500">
-                                    Fuentes y plataformas
+                                    {modalSubtitle}
                                 </p>
                             </div>
 
@@ -77,7 +90,7 @@ export default function ExternalLinksModal({ open, onClose, links }) {
                                 <div
                                     className="rounded-2xl border border-dashed border-white/10 bg-white/[0.01] px-4 py-10 text-center text-sm font-semibold text-zinc-400"
                                 >
-                                    No hay enlaces disponibles para este título.
+                                    {emptyMessage}
                                 </div>
                             ) : (
                                 <ul className="space-y-2">
@@ -94,30 +107,38 @@ export default function ExternalLinksModal({ open, onClose, links }) {
                                         >
                                             <a
                                                 href={it.href}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
+                                                target={it.target || "_blank"}
+                                                rel={it.rel || "noopener noreferrer"}
                                                 onClick={() => {
                                                     onClose?.()
                                                 }}
-                                                aria-label={`Abrir ${it.label || 'enlace externo'}`}
+                                                aria-label={`Abrir ${it.label || it.title || itemNoun}`}
                                                 className="group/link flex min-h-[4.5rem] w-full items-center gap-3.5 rounded-2xl bg-white/[0.03] p-4 text-left transition duration-300 hover:-translate-y-0.5 hover:bg-white/[0.06] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400"
                                             >
-                                                <span className="grid h-11 w-11 shrink-0 place-items-center overflow-visible">
+                                                <span className="relative grid h-11 w-11 shrink-0 place-items-center overflow-visible">
                                                     {it.icon ? (
-                                                        <OptimizedImage
-                                                            src={it.icon}
-                                                            alt=""
-                                                            className="h-8 w-8 rounded-lg object-contain drop-shadow-[0_6px_12px_rgba(0,0,0,0.45)] transition duration-300 group-hover/link:scale-110"
-                                                            draggable="false"
-                                                        />
+                                                        <>
+                                                            <OptimizedImage
+                                                                src={it.icon}
+                                                                alt=""
+                                                                className="h-8 w-8 rounded-lg object-contain drop-shadow-[0_6px_12px_rgba(0,0,0,0.45)] transition duration-300 group-hover/link:scale-110"
+                                                                draggable="false"
+                                                            />
+                                                            {isPlatformsMode && it.isPlexProvider && (
+                                                                <span
+                                                                    aria-label="Disponible en tu servidor Plex"
+                                                                    className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-black"
+                                                                />
+                                                            )}
+                                                        </>
                                                     ) : (
-                                                        <ExternalLink className="h-5 w-5 text-zinc-300" />
+                                                        <FallbackIcon className="h-5 w-5 text-zinc-300" />
                                                     )}
                                                 </span>
 
                                                 <span className="min-w-0 flex-1">
                                                     <span className="block text-sm font-black leading-tight text-white">
-                                                        {it.label || 'Enlace'}
+                                                        {it.label || it.title || (isPlatformsMode ? 'Plataforma' : 'Enlace')}
                                                     </span>
                                                     <span className="mt-1 block truncate text-xs font-semibold text-zinc-400 transition-colors group-hover/link:text-zinc-300">
                                                         {hostLabel(it.href)}

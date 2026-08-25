@@ -7060,6 +7060,7 @@ export default function DetailsClient({
   // =====================================================================
 
   const [externalLinksOpen, setExternalLinksOpen] = useState(false); // Modal de enlaces externos abierto
+  const [platformsOpen, setPlatformsOpen] = useState(false); // Modal de plataformas disponible en móvil
 
   const isMovie = endpointType === "movie";
 
@@ -8922,6 +8923,13 @@ export default function DetailsClient({
         links={externalLinks}
       />
 
+      <ExternalLinksModal
+        open={platformsOpen}
+        onClose={() => setPlatformsOpen(false)}
+        links={platformItems}
+        mode="platforms"
+      />
+
       {/* Modal de control de visto en Trakt - Para marcar películas como vistas */}
       <TraktWatchedModal
         open={traktWatchedOpen}
@@ -10024,7 +10032,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 showAwardsTab={false}
                 genres={data.genres}
                 platforms={platformItems}
-                platformLinks={[]}
+                showPlatformsTab={false}
+                externalLinks={externalLinks}
+                showExternalLinksTab
               />
               </div>
             </div>
@@ -10131,6 +10141,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 }
                 externalLinks={scoreboardExternalLinks}
                 onMoreLinks={() => setExternalLinksOpen(true)}
+                onMorePlatforms={() => setPlatformsOpen(true)}
                 externalLinksMenuOnly
                 showExternalLinksLabel={!isBackdropPoster}
                 share={{
