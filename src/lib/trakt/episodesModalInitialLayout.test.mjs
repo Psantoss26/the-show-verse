@@ -38,6 +38,68 @@ test("la cabecera de episodios comparte el espaciado de los demás modales", () 
   );
 });
 
+test("un rewatch conserva su icono y etiqueta completos", () => {
+  assert.match(modalSource, /isRewatchView \? "w-max"/);
+  assert.match(modalSource, /isRewatchView \? "w-10 xl:w-11"/);
+  assert.match(modalSource, /isRewatchView \? \(\s*<History className="w-3\.5 h-3\.5"/);
+  assert.match(modalSource, /!isRewatchView && \(/);
+});
+
+test("el selector de escritorio usa el recuadro de icono amplio de Historial", () => {
+  assert.match(
+    modalSource,
+    /inline-flex h-6 w-6 items-center justify-center rounded-md shrink-0/,
+  );
+});
+
+test("el selector móvil de rewatch muestra solo la fecha sin hora", () => {
+  assert.match(
+    modalSource,
+    /isRewatchView\s*\? formatDate\(currentRewatchStartedAt\)\s*: activeViewLabel/g,
+  );
+});
+
+test("el selector de escritorio antepone Rewatch a la fecha", () => {
+  assert.match(
+    modalSource,
+    /isRewatchView\s*\? `Rewatch · \$\{formatDate\(currentRewatchStartedAt\)\}`\s*: activeViewLabel/,
+  );
+});
+
+test("el desplegable conserva el formato y color morado de los rewatch", () => {
+  assert.match(modalSource, /label: `Rewatch · \$\{formatDate\(startedAt\)\}`/);
+  assert.match(modalSource, /label: `Rewatch · \$\{formatDate\(iso\)\}`/);
+  assert.match(modalSource, /bg-purple-500\/12 text-purple-200/);
+  assert.match(modalSource, /History className="w-4 h-4 text-purple-400 shrink-0"/);
+});
+
+test("el cuadro de fecha de rewatch no muestra borde", () => {
+  assert.match(
+    modalSource,
+    /rounded-2xl bg-purple-500\/5 px-3\.5 py-3 flex flex-col gap-3 lg:flex-row/,
+  );
+  assert.doesNotMatch(
+    modalSource,
+    /rounded-2xl border border-purple-500\/20 bg-purple-500\/5/,
+  );
+  assert.doesNotMatch(
+    modalSource,
+    /bg-purple-500\/15 border border-purple-500\/30 text-purple-100/,
+  );
+  assert.doesNotMatch(
+    modalSource,
+    /bg-purple-500\/15 text-purple-100 border border-purple-300\/25/,
+  );
+});
+
+test("el selector de lista o tabla comparte la altura de la barra", () => {
+  assert.match(
+    modalSource,
+    /flex h-10 shrink-0 gap-1 rounded-xl bg-black\/30 p-1 backdrop-blur-md xl:h-11/,
+  );
+  assert.match(modalSource, /h-full w-9 rounded-lg text-xs font-bold/);
+});
+
 test("al cambiar de temporada no se tapa el contenido con un estado de carga", () => {
   assert.doesNotMatch(
     modalSource,
