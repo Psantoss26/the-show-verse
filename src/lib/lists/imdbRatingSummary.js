@@ -1,7 +1,7 @@
-// 48 coincide con la primera página de listas comunitarias: conserva una media
-// útil sin transformar la apertura de una lista grande en decenas de ráfagas a
-// TMDb para resolver identificadores externos.
-const MAX_IMDB_LIST_SAMPLE_SIZE = 48
+// El endpoint de IMDb admite lotes de hasta 250 y resuelve los IDs TMDb con
+// concurrencia limitada. 120 da una media mucho más representativa sin llegar
+// a ese límite ni convertir la apertura de una lista grande en un pico de red.
+const MAX_IMDB_LIST_SAMPLE_SIZE = 120
 
 function validScore(value) {
   const score = Number(value)

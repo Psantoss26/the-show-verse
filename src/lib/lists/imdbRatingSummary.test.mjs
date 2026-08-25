@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  MAX_IMDB_LIST_SAMPLE_SIZE,
   getListImdbItemKey,
   selectListImdbSample,
   summarizeListImdbRatings,
@@ -18,6 +19,19 @@ test('selectListImdbSample deduplicates title ids and distributes a bounded samp
 
   assert.deepEqual(sample.map((item) => item.key), ['movie:1', 'movie:3', 'movie:5'])
   assert.equal(getListImdbItemKey({ id: 2, media_type: 'show' }), 'tv:2')
+})
+
+test('la muestra IMDb por defecto cubre hasta 120 títulos', () => {
+  const items = Array.from({ length: 160 }, (_, index) => ({
+    id: index + 1,
+    media_type: 'movie',
+  }))
+  const sample = selectListImdbSample(items)
+
+  assert.equal(MAX_IMDB_LIST_SAMPLE_SIZE, 120)
+  assert.equal(sample.length, 120)
+  assert.equal(sample[0].key, 'movie:1')
+  assert.equal(sample.at(-1).key, 'movie:160')
 })
 
 test('summarizeListImdbRatings reports rated coverage against the complete list', () => {

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -32,17 +33,70 @@ const RENDER_BATCH_SIZE = 60;
 
 function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
   const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const buttonRef = useRef(null);
+  const menuRef = useRef(null);
+  const [menuStyle, setMenuStyle] = useState(null);
+
+  // Misma capa que los selectores de páginas de usuario: el portal evita que
+  // el blur del panel de filtros se sume al del menú y lo vuelva opaco.
+  const updateMenuPosition = useCallback(() => {
+    if (!buttonRef.current || typeof window === "undefined") return;
+
+    const rect = buttonRef.current.getBoundingClientRect();
+    const menuWidth = Math.min(rect.width, window.innerWidth - 24);
+    const left = Math.min(
+      Math.max(12, rect.left),
+      Math.max(12, window.innerWidth - menuWidth - 12),
+    );
+    const availableBelow = window.innerHeight - rect.bottom - 12;
+
+    setMenuStyle({
+      position: "fixed",
+      top: rect.bottom + 8,
+      left,
+      width: menuWidth,
+      maxHeight: Math.max(64, Math.min(448, availableBelow)),
+      zIndex: 1000,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const onPointerDown = (event) => {
+      const target = event.target;
+      if (ref.current?.contains(target) || menuRef.current?.contains(target)) {
+        return;
+      }
+      setOpen(false);
+    };
+
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    updateMenuPosition();
+    const frame = window.requestAnimationFrame(updateMenuPosition);
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
+  }, [open, updateMenuPosition]);
 
   return (
-    <div className="relative w-full lg:w-auto lg:shrink-0">
+    <div ref={ref} className="relative min-w-0 w-full lg:w-auto lg:shrink-0">
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        onBlur={(e) => {
-          if (!e.currentTarget.parentElement?.contains(e.relatedTarget)) {
-            setOpen(false);
-          }
-        }}
         className="inline-flex h-11 w-full items-center justify-between gap-3 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 px-4 text-sm text-zinc-200 shadow-lg backdrop-blur-lg transition hover:from-white/15 hover:to-white/10 hover:text-white lg:min-w-[145px]"
       >
         <div className="flex min-w-0 items-center gap-2">
@@ -59,19 +113,30 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
         />
       </button>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            tabIndex={-1}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            className="absolute left-0 top-full z-[100] mt-2 w-full overflow-y-auto overflow-x-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 p-2 shadow-2xl backdrop-blur-2xl"
-          >
-            {children({ close: () => setOpen(false) })}
-          </motion.div>
+      {typeof document !== "undefined" &&
+        createPortal(
+          <AnimatePresence>
+            {open && menuStyle && (
+              <motion.div
+                ref={menuRef}
+                initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                transition={{ duration: 0.16, ease: "easeOut" }}
+                className="overflow-y-auto overflow-x-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl [scrollbar-color:#3f3f46_transparent]"
+                style={{
+                  ...menuStyle,
+                  scrollbarWidth: "thin",
+                  scrollbarGutter: "stable",
+                  overscrollBehavior: "contain",
+                }}
+              >
+                {children({ close: () => setOpen(false) })}
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body,
         )}
-      </AnimatePresence>
     </div>
   );
 }
@@ -81,14 +146,14 @@ function DropdownItem({ active, onClick, children }) {
     <button
       type="button"
       onClick={onClick}
-      className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition ${
+      className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition ${
         active
-          ? "bg-white/15 text-white"
-          : "text-zinc-400 hover:bg-white/10 hover:text-white"
+          ? "bg-white/10 font-bold text-white"
+          : "text-zinc-300 hover:bg-white/5 hover:text-white"
       }`}
     >
       <span className="font-medium">{children}</span>
-      {active ? <CheckCircle2 className="h-3.5 w-3.5 text-purple-400" /> : null}
+      {active ? <CheckCircle2 className="h-4 w-4 text-purple-400" /> : null}
     </button>
   );
 }

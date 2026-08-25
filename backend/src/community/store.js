@@ -16,6 +16,7 @@ import { sentimentRowToApi } from './sentiment.js';
 import { getMediaMetadataMap, metadataFor } from '../utils/mediaMetadata.js';
 import { buildRatingSummary, hydrateListRatings, isMissingVoteAverageColumn } from '../utils/listRatings.js';
 import { mergeListItemRatings } from '../utils/listRatingMerge.js';
+import { selectCommunityImdbSummarySample } from './listImdbSummarySample.js';
 
 const communityListItemFields = {
   id: communityListItems.id,
@@ -421,5 +422,8 @@ export async function getCommunityListWithItems({ id, page = 1, limit = 50, view
     list: { ...api.list, user: api.user },
     items: visibleItems,
     ratingSummary: buildRatingSummary(ratedItems),
+    // La muestra para IMDb es deliberadamente ligera: permite una media más
+    // representativa que la primera página sin enviar/renderizar más tarjetas.
+    imdbRatingItems: selectCommunityImdbSummarySample(allRatingRows),
   };
 }

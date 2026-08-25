@@ -559,12 +559,7 @@ export default function ListDetailsPage() {
 
     const addCandidates = addMode === 'search' ? searchRes : catRes
     const coverItem = items.find((item) => item?.poster_path || item?.backdrop_path)
-    const coverPath = coverItem?.poster_path || coverItem?.backdrop_path || null
     const backdropPath = coverItem?.backdrop_path || coverItem?.poster_path || null
-    const posterImages = items
-        .map((item) => item?.poster_path || item?.backdrop_path || null)
-        .filter(Boolean)
-        .map((path) => `https://image.tmdb.org/t/p/w342${path}`)
     const movieCount = items.filter((item) => item?.media_type !== 'tv').length
     const tvCount = items.filter((item) => item?.media_type === 'tv').length
     const visibility = data?.public ? 'Pública' : 'Privada'
@@ -575,8 +570,7 @@ export default function ListDetailsPage() {
             title={data?.name || 'Lista'}
             description={data?.description || ''}
             sourceLabel="Lista de usuario"
-            posterImage={coverPath ? `https://image.tmdb.org/t/p/w500${coverPath}` : null}
-            posterImages={posterImages}
+            posterItems={items}
             backdropImage={backdropPath ? `https://image.tmdb.org/t/p/original${backdropPath}` : null}
             scoreboardStats={[
                 { icon: ListVideo, label: 'ELEMENTOS', value: items.length, tooltip: 'Títulos de la lista' },

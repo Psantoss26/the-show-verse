@@ -175,18 +175,13 @@ export default function CollectionDetailsClient({ collectionId }) {
 
     const collectionPoster = collection?.poster_path || parts.find((movie) => movie?.poster_path)?.poster_path || null
     const collectionBackdrop = collection?.backdrop_path || parts.find((movie) => movie?.backdrop_path)?.backdrop_path || collectionPoster
-    const posterImages = parts
-        .map((movie) => movie?.poster_path || movie?.backdrop_path || null)
-        .filter(Boolean)
-        .map((path) => `https://image.tmdb.org/t/p/w342${path}`)
 
     return (
         <UnifiedListDetailsLayout
             title={collection?.name || 'Colección'}
             description={collection?.description || ''}
             sourceLabel="Colección TMDb"
-            posterImage={collectionPoster ? `https://image.tmdb.org/t/p/w500${collectionPoster}` : null}
-            posterImages={posterImages}
+            posterItems={parts}
             backdropImage={collectionBackdrop ? `https://image.tmdb.org/t/p/original${collectionBackdrop}` : null}
             scoreboardStats={[
                 { icon: Film, label: 'PELÍCULAS', value: parts.length, tooltip: 'Películas de la colección' },
