@@ -33,6 +33,7 @@ import { AnimatedSection } from "@/components/details/AnimatedSection";
 import AnimatedPosterFrame from "@/components/details/AnimatedPosterFrame";
 import StreamingHoverOverlay from "@/components/details/StreamingHoverOverlay";
 import DetailsScoreboardPanel from "@/components/details/DetailsScoreboardPanel";
+import ExternalLinksModal from "@/components/details/ExternalLinksModal";
 import {
   buildTraktHref,
   buildImdbHref,
@@ -44,6 +45,7 @@ import {
   formatDateEs,
   formatCountShort,
 } from "@/lib/details/formatters";
+import { buildTvExternalLinks } from "@/lib/details/tvExternalLinks";
 import {
   fetchSeriesGraphRatingsCached,
   getSeriesGraphEpisodeRating,
@@ -286,6 +288,16 @@ export default function EpisodeDetailsClient({
   const showName = show?.name || "Serie";
   const epName = episode?.name || `Episodio ${episodeNumber}`;
   const traktShowWatchedStorageKey = `showverse:trakt:showWatched:${showId}`;
+  const episodeExternalLinks = useMemo(
+    () =>
+      buildTvExternalLinks({
+        showId,
+        title: showName,
+        originalTitle: show?.original_name,
+        homepage: show?.homepage,
+      }),
+    [showId, showName, show?.original_name, show?.homepage],
+  );
 
   const stillPath = episode?.still_path || null;
   const heroBgPath =
@@ -744,6 +756,7 @@ export default function EpisodeDetailsClient({
   });
   const [watchedBusy, setWatchedBusy] = useState(false);
   const [episodePlaysOpen, setEpisodePlaysOpen] = useState(false);
+  const [platformsOpen, setPlatformsOpen] = useState(false);
   const [episodePlaysLoading, setEpisodePlaysLoading] = useState(false);
   const [episodePlaysLoaded, setEpisodePlaysLoaded] = useState(false);
   const [episodePlays, setEpisodePlays] = useState({
@@ -1511,6 +1524,7 @@ export default function EpisodeDetailsClient({
               }}
               stats={tScoreboard?.stats}
               showFavoritedStat={false}
+              onMorePlatforms={() => setPlatformsOpen(true)}
               share={{
                 title: epName,
                 text: `Echa un vistazo a ${epName} de ${showName} en The Show Verse`,
@@ -1534,9 +1548,11 @@ export default function EpisodeDetailsClient({
             creators={showCreators}
             network={showNetwork}
             productionText={episodeProduction}
-            platforms={episodePlatformItems}
-            showPlatformsTab
+            showPlatformsTab={false}
+            externalLinks={episodeExternalLinks}
+            showExternalLinksTab
             showAwardsTab={false}
+            showAwardsProductionCard={false}
             detailCards={episodeDetailCards}
           />
         </section>
@@ -1694,6 +1710,13 @@ export default function EpisodeDetailsClient({
           onUpdatePlay={handleEpisodeUpdatePlay}
           onRemovePlay={handleEpisodeRemovePlay}
           busy={watchedBusy}
+        />
+
+        <ExternalLinksModal
+          open={platformsOpen}
+          onClose={() => setPlatformsOpen(false)}
+          links={episodePlatformItems}
+          mode="platforms"
         />
       </div>
     </div>

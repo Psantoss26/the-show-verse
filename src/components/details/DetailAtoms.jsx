@@ -275,10 +275,15 @@ export function DetailsTabsMenu({
   layoutId = "activeTabIndicator",
   swipeHandlers = {},
 }) {
+  // En la ficha principal móvil hay exactamente cuatro secciones. La cuadrícula
+  // les reserva cuatro columnas equivalentes: así se centran respecto al ancho
+  // disponible, no respecto a la longitud desigual de cada etiqueta.
+  const hasFourMobileTabs = tabs.length === 4;
+
   return (
     <div
       {...swipeHandlers}
-      className={`relative isolate mb-4 flex w-full touch-pan-y flex-wrap items-center gap-x-6 gap-y-0 overflow-hidden rounded-2xl px-4 py-1 max-sm:transform-gpu md:gap-x-8 ${LIQUID_GLASS_BAR} sm:touch-auto sm:rounded-none sm:border-b sm:border-white/10 sm:bg-transparent sm:bg-none sm:px-2 sm:py-0 sm:shadow-none sm:[backdrop-filter:none]`}
+      className={`relative isolate mb-4 flex w-full touch-pan-y flex-wrap items-center gap-x-6 gap-y-0 overflow-hidden rounded-2xl px-4 py-1 max-sm:transform-gpu md:gap-x-8 ${hasFourMobileTabs ? "max-sm:grid max-sm:grid-cols-4 max-sm:gap-x-0" : ""} ${LIQUID_GLASS_BAR} sm:touch-auto sm:rounded-none sm:border-b sm:border-white/10 sm:bg-transparent sm:bg-none sm:px-2 sm:py-0 sm:shadow-none sm:[backdrop-filter:none]`}
     >
       {/* Capas ópticas del cristal, las mismas de DetailsSectionMenu. Solo móvil:
           en escritorio no hay cristal que rematar. */}
@@ -294,7 +299,7 @@ export function DetailsTabsMenu({
           key={tab.id}
           type="button"
           onClick={() => onChangeTab(tab.id)}
-          className={`relative z-10 rounded-md px-0.5 pb-2 pt-2 text-xs font-bold uppercase tracking-wider transition-colors duration-300 [text-shadow:0_1px_2px_rgba(0,0,0,0.9),0_0_10px_rgba(0,0,0,0.6)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 sm:pt-0 md:text-sm ${
+          className={`relative z-10 rounded-md px-0.5 pb-2 pt-2 text-xs font-bold uppercase tracking-wider transition-colors duration-300 [text-shadow:0_1px_2px_rgba(0,0,0,0.9),0_0_10px_rgba(0,0,0,0.6)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 sm:pt-0 md:text-sm ${hasFourMobileTabs ? "max-sm:justify-self-center max-sm:text-[11px] max-sm:tracking-[0.06em]" : ""} ${
             activeTab === tab.id
               ? "text-white font-extrabold"
               : "text-white/70 hover:text-white"

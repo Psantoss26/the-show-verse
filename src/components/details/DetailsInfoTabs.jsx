@@ -119,6 +119,9 @@ export default function DetailsInfoTabs({
   externalLinks = [],
   showExternalLinksTab = false,
   awardsValue,
+  // Las subfichas de episodios no reciben un agregado de premios propio; no
+  // deben enseñar una tarjeta vacía dentro de Producción.
+  showAwardsProductionCard = true,
   // Listas y colecciones comparten la navegación y las tarjetas, pero no los
   // campos propios de una película. Estas dos colecciones permiten expresar
   // únicamente los metadatos que realmente existen sin falsear etiquetas.
@@ -470,13 +473,15 @@ export default function DetailsInfoTabs({
                     isLoading={metadataLoading}
                     className="w-full"
                   />
-                  <VisualMetaCard
-                    icon={Trophy}
-                    label="Premios"
-                    value={metadataLoading ? null : awardsValue || "—"}
-                    isLoading={metadataLoading}
-                    className="w-full"
-                  />
+                  {showAwardsProductionCard && (
+                    <VisualMetaCard
+                      icon={Trophy}
+                      label="Premios"
+                      value={metadataLoading ? null : awardsValue || "—"}
+                      isLoading={metadataLoading}
+                      className="w-full"
+                    />
+                  )}
                   {mediaType === "movie" ? (
                     <>
                       <VisualMetaCard
