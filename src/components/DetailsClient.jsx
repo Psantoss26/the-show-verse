@@ -11676,7 +11676,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   id="section-sentiment"
                   ref={registerSection("sentiment")}
                 >
-                  <AnimatedSection delay={0.04}>
+                  <AnimatedSection delay={0.04} renderImmediately>
                     {/* ===================================================== */}
                     {/* Trakt: sentimientos - Solo mostrar si no hay error */}
                     {!tSentiment.error && (
@@ -11819,7 +11819,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     id="section-seasons"
                     ref={registerSection("seasons")}
                   >
-                    <AnimatedSection delay={0.04}>
+                    <AnimatedSection delay={0.04} renderImmediately>
                       <section className="mb-12 group/section">
                         <SectionTitle title="Temporadas" icon={Layers} />
 
@@ -11883,9 +11883,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   // juntas forman una banda oscura detrás del
                                   // grupo). Se conserva el anillo ámbar de hover
                                   // de las páginas de la ficha.
-                                  className={`group relative isolate overflow-hidden rounded-2xl transform-gpu text-left w-full ${LIQUID_GLASS_CARD} transition-all hover:-translate-y-1 hover:brightness-110 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]`}
+                                className={`group relative isolate overflow-hidden rounded-2xl transform-gpu text-left w-full ${LIQUID_GLASS_CARD} transition-all hover:-translate-y-1 hover:brightness-110 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]`}
                                   aria-label={`Ver ${titleSeason}`}
                                 >
+                                  <LiquidGlassOpticalLayers />
                                   {/* Fondo decorativo del número de temporada */}
                                   <div className="absolute -right-4 -top-6 text-[100px] font-black text-white/5 select-none transition group-hover:text-white/10 z-0">
                                     {sn}
@@ -12024,7 +12025,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   id="section-comments"
                   ref={registerSection("comments")}
                 >
-                  <AnimatedSection delay={0.04}>
+                  <AnimatedSection delay={0.04} renderImmediately>
                     {/* CRÍTICAS */}
                     {reviews && reviews.length > 0 && (
                       <section className="mb-10 group/section">
@@ -12050,6 +12051,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 key={r.id}
                                 className={`relative isolate flex flex-col gap-4 overflow-hidden rounded-2xl p-6 transform-gpu transition-all ${LIQUID_GLASS_CARD} hover:brightness-110`}
                               >
+                                <LiquidGlassOpticalLayers />
                                 <div className="relative z-10 flex items-center gap-4">
                                   <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10 text-lg font-black text-white shadow-lg">
                                     <Avatar src={avatar} name={r.author} />
@@ -12084,7 +12086,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     )}
                   </AnimatedSection>
 
-                  <AnimatedSection delay={0.04}>
+                  <AnimatedSection delay={0.04} renderImmediately>
                     {/* ===================================================== */}
                     {/* Trakt: comentarios */}
                     <section className="mb-10 group/section">
@@ -12120,7 +12122,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     : "bg-transparent text-zinc-400 hover:bg-white/5 hover:text-white"
                                 }`}
                               >
-                                {t.label}
+                                {tCommentsTab === t.id && (
+                                  <LiquidGlassOpticalLayers />
+                                )}
+                                <span className="relative z-10">{t.label}</span>
                               </button>
                             ))}
                           </div>
@@ -12257,7 +12262,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 </section>
 
                 <section id="section-lists" ref={registerSection("lists")}>
-                  <AnimatedSection delay={0.04}>
+                  <AnimatedSection delay={0.04} renderImmediately>
                     {/* ===================================================== */}
                     {/* Trakt: listas - Solo mostrar si no hay error */}
                     {!tLists.error && (
@@ -12320,8 +12325,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     disabled
                                       ? "pointer-events-none opacity-60"
                                       : "",
-                                  ].join(" ")}
-                                >
+                                ].join(" ")}
+                              >
+                                  <LiquidGlassOpticalLayers />
                                   {/* 1. SECCIÓN VISUAL (PORTADAS APILADAS) */}
                                   <div className="relative z-10 h-52 w-full bg-gradient-to-b from-white/5 to-transparent p-6 overflow-visible">
                                     {previews.length > 0 ? (
