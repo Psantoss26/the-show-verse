@@ -16,6 +16,12 @@ test("el modal de plataformas monta el cristal con la transición inicial común
   assert.doesNotMatch(source, /AnimatePresence|motion\./);
 });
 
+test("el modal de plataformas amplía sus iconos sin alterar los enlaces externos", async () => {
+  const source = await readFile(sourceUrl, "utf8");
+
+  assert.match(source, /isPlatformsMode \? "h-9 w-9" : "h-8 w-8"/);
+});
+
 test("el modal de enlaces se monta sobre DetailModal y cubre todo el viewport", async () => {
   const source = await readFile(sourceUrl, "utf8");
 
