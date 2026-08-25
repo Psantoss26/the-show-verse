@@ -109,6 +109,7 @@ export default function DetailsInfoTabs({
   mobileLayout = false,
   platforms = [],
   platformLinks = [],
+  showPlatformsTab = mobileLayout,
   awardsValue,
   // Listas y colecciones comparten la navegación y las tarjetas, pero no los
   // campos propios de una película. Estas dos colecciones permiten expresar
@@ -130,7 +131,7 @@ export default function DetailsInfoTabs({
   const isBackdrop = variant === "backdrop";
   const hasAwardItems = awardItems.length > 0;
   const hasAwardsTab = showAwardsTab && (awards || hasAwardItems);
-  const hasPlatformsTab = mobileLayout;
+  const hasPlatformsTab = showPlatformsTab;
   const hasCustomDetailCards = Array.isArray(detailCards);
   const hasCustomProductionCards = Array.isArray(productionCards);
 
@@ -521,7 +522,7 @@ export default function DetailsInfoTabs({
             </div>
           )}
 
-          {/* ===== TAB: PLATAFORMAS (solo diseño móvil de DetailsClient) ===== */}
+          {/* ===== TAB: PLATAFORMAS ===== */}
           {activeTab === "platforms" && hasPlatformsTab && (
             <div key="platforms">
               <div className="flex flex-col gap-3">

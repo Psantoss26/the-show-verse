@@ -324,13 +324,13 @@ export function DetailsStatsRow({
 //    - `externalLinks`: array de descriptores { icon, href, title?, fallbackHref?,
 //       wrapperClassName?, key? }. Si está vacío/ausente no se pinta la región de
 //       enlaces (equivale al modo backdrop de DetailsClient).
-//    - `onMoreLinks`: callback del botón "..." móvil (solo se pinta si se pasa).
+//    - `onMoreLinks`: callback del botón "..." que abre el modal de enlaces.
+//    - `externalLinksMenuOnly`: mantiene esos enlaces en el botón también en
+//       escritorio, en vez de desplegarlos como iconos individuales.
 //    - `share`: { title, text?, url? } -> <ActionShareButton>. Se ancla a la
 //       derecha con ml-auto (siempre visible si se pasa).
 // ---------------------------------------------------------------------------
-// Exportado: DetailsClient lo reutiliza para separar plataformas de enlaces
-// externos en el modo de portada backdrop, y así la línea es la MISMA en ambos
-// sitios en vez de dos copias que puedan divergir.
+// Separador compartido de las regiones del marcador.
 export function ToolbarSeparator({ className = "" }) {
   return (
     <div
@@ -376,6 +376,7 @@ function DetailsToolbarActions({
   externalLinks = null,
   streamingProviders = null,
   onMoreLinks,
+  externalLinksMenuOnly = false,
   share = null,
   shareIconOnly = false,
   toolbarActions = null,
@@ -396,7 +397,7 @@ function DetailsToolbarActions({
           </div>
 
           <div className="min-w-0 flex flex-none items-center justify-end gap-2.5 sm:flex-1 sm:gap-3">
-            {/* Versión Desktop: plataformas primero, enlaces externos después */}
+            {/* Versión Desktop: plataformas primero, enlaces externos después. */}
             <div className="hidden sm:flex items-center gap-2.5 sm:gap-3">
               {hasStreamingProviders && (
                 <div className="flex items-center gap-2.5 sm:gap-3">
@@ -409,11 +410,11 @@ function DetailsToolbarActions({
                 </div>
               )}
 
-              {hasStreamingProviders && hasExternalLinks && (
+              {hasStreamingProviders && hasExternalLinks && !externalLinksMenuOnly && (
                 <ToolbarSeparator className="mx-0.5" />
               )}
 
-              {hasExternalLinks && (
+              {hasExternalLinks && !externalLinksMenuOnly && (
                 <>
                   {externalLinks.map((link, i) => {
                     const key = link.key ?? `${link.icon}-${i}`;
@@ -437,21 +438,28 @@ function DetailsToolbarActions({
               )}
             </div>
 
-            {/* Versión Móvil: botón "..." que abre modal de enlaces */}
+            {/* En móvil, y en variantes compactas, el botón "..." abre el
+                modal de enlaces para no recargar la barra. */}
             {onMoreLinks && (
               <button
                 type="button"
                 onClick={onMoreLinks}
-                className="sm:hidden flex isolate transform-gpu items-center justify-center w-10 h-10 rounded-full bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200 transition-all duration-300 hover:text-white hover:bg-white/10"
+                className={`${externalLinksMenuOnly ? "" : "sm:hidden"} relative isolate flex h-10 w-10 shrink-0 transform-gpu items-center justify-center overflow-hidden rounded-full bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 text-zinc-200 shadow-none backdrop-blur-[6px] transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/[0.08] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/30`}
                 title="Enlaces"
                 aria-label="Abrir enlaces externos"
               >
-                <MoreHorizontal className="w-5 h-5" />
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]"
+                />
+                <MoreHorizontal className="relative z-10 h-5 w-5" />
               </button>
             )}
           </div>
 
-          {share && <ToolbarSeparator className="hidden md:block" />}
+          {share && !externalLinksMenuOnly && (
+            <ToolbarSeparator className="hidden md:block" />
+          )}
         </>
       )}
 
@@ -506,6 +514,7 @@ export default function DetailsScoreboardPanel({
   externalLinks = null,
   streamingProviders = null,
   onMoreLinks,
+  externalLinksMenuOnly = false,
   share = null,
   // Modo de portada backdrop: el marcador comparte fila con las puntuaciones y
   // las estadísticas, así que "Compartir" va sin texto para no comerse el ancho.
@@ -580,6 +589,7 @@ export default function DetailsScoreboardPanel({
             externalLinks={externalLinks}
             streamingProviders={streamingProviders}
             onMoreLinks={onMoreLinks}
+            externalLinksMenuOnly={externalLinksMenuOnly}
             share={share}
             shareIconOnly={shareIconOnly}
             toolbarActions={toolbarActions}

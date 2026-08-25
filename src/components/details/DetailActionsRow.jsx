@@ -44,10 +44,26 @@ export const MOBILE_ACTION_BUTTON_CLASS = `
                 [&_[data-liquid-button]:not(.labeled)_.text-lg]:!text-[38cqw] sm:[&_[data-liquid-button]:not(.labeled)_.text-lg]:!text-[18px]
                 [&_[data-liquid-button]:not(.labeled)_.text-xs]:!text-[22cqw] sm:[&_[data-liquid-button]:not(.labeled)_.text-xs]:!text-[12px]`;
 
+// Contrato de tamaño de las acciones circulares de una ficha. Es deliberadamente
+// independiente del número de acciones: ocupan el espacio disponible hasta el
+// tope de DetailsClient (56px en móvil y 48px desde `sm`) y, a partir de ahí,
+// la fila se centra. El `!` protege este límite frente a wrappers de controles
+// compuestos, como TraktWatchedControl.
+//
+// Se exporta porque episodio, temporada y listas comparten el mismo lenguaje
+// visual. Tener el límite en una única clase evita que esas rutas crezcan con
+// menos botones mientras DetailsClient se mantiene compacto.
+const DETAIL_ACTION_ITEM_FLEX_CLASS =
+  "[&>*:not(.separator):not(.labeled)]:!flex-[1_1_0%] [&>*:not(.separator):not(.labeled)]:min-w-[34px]";
+const DETAIL_ACTION_ITEM_CAP_CLASS =
+  "[&>*:not(.separator):not(.labeled)]:!max-w-[56px] sm:[&>*:not(.separator):not(.labeled)]:!max-w-[48px]";
+export const DETAIL_ACTION_ITEM_SIZING_CLASS = `
+                ${DETAIL_ACTION_ITEM_FLEX_CLASS} ${DETAIL_ACTION_ITEM_CAP_CLASS}`;
+
 // Contenedor con el mismo escalado responsivo (container queries) que la fila
 // original de DetailsClient. Se mantiene idéntico para no re-estilar.
 const BASE_ROW_CLASS = `flex flex-nowrap items-center justify-center sm:justify-start sm:gap-3 w-full
-                [&>*:not(.separator):not(.labeled)]:flex-1 [&>*:not(.separator):not(.labeled)]:min-w-[34px] sm:[&>*:not(.separator):not(.labeled)]:max-w-[52px]
+                ${DETAIL_ACTION_ITEM_FLEX_CLASS}
                 [&.labeled-row>*:not(.separator):not(.labeled)]:!flex-none
                 ${MOBILE_ACTION_BUTTON_CLASS}`;
 
@@ -71,7 +87,7 @@ function ActionSlot({
   const delay = index * SLOT_STAGGER;
 
   return (
-    <div className="relative flex-1 min-w-[34px] max-w-[60px] aspect-square">
+    <div className="relative flex-1 min-w-[34px] max-w-[56px] aspect-square">
       <AnimatePresence initial={false}>
         <motion.div
           key={expanded ? "expanded" : "collapsed"}
@@ -153,8 +169,8 @@ export default function DetailActionsRow({
     !play &&
     !trailerLabel;
 
-  // Tope de tamaño de botón en móvil: por defecto 60px; con fillMobile sin tope.
-  const mobileCapClass = fillMobile ? "" : "[&>*:not(.separator)]:max-w-[60px]";
+  // Tope de tamaño de botón en móvil: por defecto 56px; con fillMobile sin tope.
+  const mobileCapClass = fillMobile ? "" : DETAIL_ACTION_ITEM_CAP_CLASS;
   // Tamaño de los botones-icono en labeled-row
   const labeledSizeClass =
     size === "lg"
@@ -286,10 +302,10 @@ export default function DetailActionsRow({
         // era la fila entera y las series entraban de golpe como un bloque, en
         // vez de botón a botón como en las películas.
         <div
-          className={`flex sm:hidden flex-nowrap items-center justify-between w-full ${mobileGapClass} [&>*:not(.separator)]:flex-1 [&>*:not(.separator)]:min-w-[34px] [&>*:not(.separator)]:max-w-[60px] ${MOBILE_ACTION_BUTTON_CLASS}`}
+          className={`flex sm:hidden flex-nowrap items-center justify-between w-full ${mobileGapClass} [&>*:not(.separator)]:flex-1 [&>*:not(.separator)]:min-w-[34px] [&>*:not(.separator)]:max-w-[56px] ${MOBILE_ACTION_BUTTON_CLASS}`}
         >
           {/* Slot 1: Trigger Principal (Play -> X) */}
-          <div className="flex-1 min-w-[34px] max-w-[60px] aspect-square">
+          <div className="flex-1 min-w-[34px] max-w-[56px] aspect-square">
             <LiquidButton
               onClick={() => setMediaExpanded((v) => !v)}
               disabled={!trailerAvailable && !soundtrackAvailable}

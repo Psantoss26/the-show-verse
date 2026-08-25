@@ -5,7 +5,7 @@ import OptimizedImage from "@/components/OptimizedImage";
 import { useMemo, useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 
 import {
   Layers,
@@ -19,10 +19,7 @@ import {
 } from "lucide-react";
 import { offlineMutationFetch } from "@/lib/offline/syncQueue";
 
-import {
-  VisualMetaCard,
-  DetailsTabsMenu,
-} from "@/components/details/DetailAtoms";
+import DetailsInfoTabs from "@/components/details/DetailsInfoTabs";
 import { AnimatedSection } from "@/components/details/AnimatedSection";
 import AnimatedPosterFrame from "@/components/details/AnimatedPosterFrame";
 import StreamingHoverOverlay from "@/components/details/StreamingHoverOverlay";
@@ -34,6 +31,7 @@ import {
   buildImdbHref,
 } from "@/lib/details/ratingLinks";
 import { pickPrimaryProvider } from "@/lib/streaming/platformWordmark";
+import { createPlatformItem } from "@/lib/streaming/providers";
 import {
   formatDateEs,
   formatCountShort,
@@ -292,6 +290,64 @@ export default function SeasonDetailsClient({
   );
 
   const airDate = season?.air_date ? formatDateEs(season.air_date) : null;
+  const seasonPlatformItems = useMemo(
+    () =>
+      showProviders
+        .map((provider) =>
+          createPlatformItem(provider, {
+            endpointType: "tv",
+            justwatchUrl: null,
+            title: showName,
+          }),
+        )
+        .filter((provider) => provider.icon && provider.hasValidLink),
+    [showProviders, showName],
+  );
+  const seasonProduction = useMemo(
+    () =>
+      (Array.isArray(show?.production_companies)
+        ? show.production_companies
+        : []
+      )
+        .map((company) => company?.name)
+        .filter(Boolean)
+        .join(" · "),
+    [show?.production_companies],
+  );
+  const showCreators = useMemo(
+    () =>
+      (Array.isArray(show?.created_by) ? show.created_by : [])
+        .map((creator) => creator?.name)
+        .filter(Boolean)
+        .join(", "),
+    [show?.created_by],
+  );
+  const showNetwork = useMemo(
+    () =>
+      (Array.isArray(show?.networks) ? show.networks : [])
+        .map((network) => network?.name)
+        .filter(Boolean)
+        .join(", "),
+    [show?.networks],
+  );
+  const seasonDetailCards = useMemo(
+    () => [
+      { icon: MonitorPlay, label: "Serie", value: showName },
+      { icon: CalendarIcon, label: "Estreno", value: airDate || "—" },
+      {
+        icon: Layers,
+        label: "Temporada",
+        value:
+          Number(seasonNumber) === 0 ? "Especiales" : String(seasonNumber),
+      },
+      {
+        icon: FilmIcon,
+        label: "Episodios",
+        value: totalEp ? String(totalEp) : "—",
+      },
+    ],
+    [showName, airDate, seasonNumber, totalEp],
+  );
   const seasonVote =
     typeof season?.vote_average === "number" && season.vote_average > 0
       ? season.vote_average
@@ -318,9 +374,6 @@ export default function SeasonDetailsClient({
 
     return sum > 0 ? sum : null;
   }, [season?.vote_count, episodes]);
-
-  // Tabs como DetailsClient
-  const [activeTab, setActiveTab] = useState("details");
 
   const parseScoreboardData = useCallback((r) => {
     if (!r?.found) return null;
@@ -1122,36 +1175,15 @@ export default function SeasonDetailsClient({
             // cristal, igual que DetailsClient.
             className="flex-1 flex flex-col min-w-0 w-full"
           >
-            <div className="mb-5 px-1 flex flex-col items-center lg:items-start text-center lg:text-left w-full">
-              <div className="flex items-center justify-center lg:justify-start gap-2 text-xs font-bold uppercase tracking-widest text-zinc-400">
+            <div className="mb-4 px-1 flex flex-col items-center lg:items-start text-center lg:text-left w-full">
+              <div className="mb-2 flex items-center justify-center lg:justify-start gap-2 text-xs font-bold uppercase tracking-widest text-zinc-400">
                 <Layers className="w-4 h-4" />
                 <span>Serie</span>
               </div>
 
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[1] tracking-tight text-balance drop-shadow-xl mb-3">
+              <h1 className="mb-0 text-4xl font-black leading-[1] tracking-tight text-balance text-white drop-shadow-xl md:text-5xl lg:text-6xl">
                 {seasonName}
               </h1>
-
-              {/* sin nota TMDb aquí (solo en scoreboard) */}
-              <div className="flex flex-wrap items-center justify-center lg:justify-start gap-x-4 gap-y-2 text-base md:text-lg font-medium text-zinc-300">
-                <span className="text-white font-bold tracking-wide">
-                  {showName}
-                </span>
-
-                {totalEp ? (
-                  <>
-                    <span className="text-zinc-600 text-[10px]">●</span>
-                    <span>{totalEp} episodios</span>
-                  </>
-                ) : null}
-
-                {airDate ? (
-                  <>
-                    <span className="text-zinc-600 text-[10px]">●</span>
-                    <span>{airDate}</span>
-                  </>
-                ) : null}
-              </div>
             </div>
 
             <div className="mb-6 px-1">
@@ -1226,76 +1258,18 @@ export default function SeasonDetailsClient({
               }}
             />
 
-            {/* Tabs */}
-            <div>
-              <DetailsTabsMenu
-                tabs={[
-                  { id: "details", label: "Detalles" },
-                  { id: "synopsis", label: "Sinopsis" },
-                ]}
-                activeTab={activeTab}
-                onChangeTab={setActiveTab}
-                layoutId="seasonTabInline"
-              />
-
-              <div className="relative min-h-[100px]">
-                <AnimatePresence mode="wait" initial={false}>
-                  {activeTab === "synopsis" && (
-                    <div key="synopsis">
-                      <div className="relative p-5 sm:p-6 rounded-xl overflow-hidden">
-                        {/* Capa de fondo estilo ScoreboardBar (cristal más claro, difuminado de 15px) */}
-                        <div
-                          className="absolute inset-0 rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[15px] pointer-events-none overflow-hidden"
-                          style={{
-                            WebkitMaskImage:
-                              "-webkit-radial-gradient(white, black)",
-                          }}
-                        />
-                        <p className="relative z-10 text-zinc-200 text-base md:text-lg leading-relaxed text-justify whitespace-pre-line">
-                          {season?.overview?.trim() ||
-                            "No hay descripción disponible."}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {activeTab === "details" && (
-                    <div key="details">
-                      <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
-                        <VisualMetaCard
-                          icon={MonitorPlay}
-                          label="Serie"
-                          value={showName}
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                        />
-                        <VisualMetaCard
-                          icon={CalendarIcon}
-                          label="Estreno"
-                          value={airDate || "—"}
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                        />
-                        <VisualMetaCard
-                          icon={Layers}
-                          label="Temporada"
-                          value={
-                            Number(seasonNumber) === 0
-                              ? "Especiales"
-                              : String(seasonNumber)
-                          }
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                        />
-                        <VisualMetaCard
-                          icon={FilmIcon}
-                          label="Episodios"
-                          value={totalEp ? String(totalEp) : "—"}
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </div>
+            <DetailsInfoTabs
+              layoutId="seasonTabInline"
+              mediaType="tv"
+              overview={season?.overview}
+              creators={showCreators}
+              network={showNetwork}
+              productionText={seasonProduction}
+              platforms={seasonPlatformItems}
+              showPlatformsTab
+              showAwardsTab={false}
+              detailCards={seasonDetailCards}
+            />
           </div>
         </motion.div>
 

@@ -11,7 +11,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { SwiperSlide } from "swiper/react";
 import "swiper/swiper-bundle.css";
 // Carrusel con flechas COMPARTIDO (mismo componente que usan DetailsClient y DetailModal).
@@ -28,10 +28,7 @@ import {
 } from "lucide-react";
 import { offlineMutationFetch } from "@/lib/offline/syncQueue";
 
-import {
-  VisualMetaCard,
-  DetailsTabsMenu,
-} from "@/components/details/DetailAtoms";
+import DetailsInfoTabs from "@/components/details/DetailsInfoTabs";
 import { AnimatedSection } from "@/components/details/AnimatedSection";
 import AnimatedPosterFrame from "@/components/details/AnimatedPosterFrame";
 import StreamingHoverOverlay from "@/components/details/StreamingHoverOverlay";
@@ -41,6 +38,7 @@ import {
   buildImdbHref,
 } from "@/lib/details/ratingLinks";
 import { pickPrimaryProvider } from "@/lib/streaming/platformWordmark";
+import { createPlatformItem } from "@/lib/streaming/providers";
 import { getLocalInProgress } from "@/lib/api/progressClient";
 import {
   formatDateEs,
@@ -323,8 +321,6 @@ export default function EpisodeDetailsClient({
     return { backgroundImage: `url(${url})` };
   }, [heroBgPath]);
 
-  // Tabs
-  const [activeTab, setActiveTab] = useState("details");
   const [isMounted, setIsMounted] = useState(false);
   const [episodeStreamingProviders, setEpisodeStreamingProviders] = useState(
     [],
@@ -335,6 +331,63 @@ export default function EpisodeDetailsClient({
   const primaryEpisodeProvider = useMemo(
     () => pickPrimaryProvider(episodeStreamingProviders),
     [episodeStreamingProviders],
+  );
+  const episodePlatformItems = useMemo(
+    () =>
+      episodeStreamingProviders
+        .map((provider) =>
+          createPlatformItem(provider, {
+            endpointType: "tv",
+            justwatchUrl: null,
+            title: showName,
+          }),
+        )
+        .filter((provider) => provider.icon && provider.hasValidLink),
+    [episodeStreamingProviders, showName],
+  );
+  const episodeProduction = useMemo(
+    () =>
+      (Array.isArray(show?.production_companies)
+        ? show.production_companies
+        : []
+      )
+        .map((company) => company?.name)
+        .filter(Boolean)
+        .join(" · "),
+    [show?.production_companies],
+  );
+  const showCreators = useMemo(
+    () =>
+      (Array.isArray(show?.created_by) ? show.created_by : [])
+        .map((creator) => creator?.name)
+        .filter(Boolean)
+        .join(", "),
+    [show?.created_by],
+  );
+  const showNetwork = useMemo(
+    () =>
+      (Array.isArray(show?.networks) ? show.networks : [])
+        .map((network) => network?.name)
+        .filter(Boolean)
+        .join(", "),
+    [show?.networks],
+  );
+  const episodeDetailCards = useMemo(
+    () => [
+      { icon: MonitorPlay, label: "Serie", value: showName },
+      { icon: CalendarIcon, label: "Emisión", value: airDate || "—" },
+      {
+        icon: ClockIcon,
+        label: "Duración",
+        value: runtime ? `${runtime} min` : "—",
+      },
+      {
+        icon: StarIcon,
+        label: "Episodio",
+        value: `T${seasonNumber} · E${episodeNumber}`,
+      },
+    ],
+    [showName, airDate, runtime, seasonNumber, episodeNumber],
   );
 
   useEffect(() => {
@@ -1277,14 +1330,14 @@ export default function EpisodeDetailsClient({
           initial={{ y: 16 }}
           animate={{ y: 0 }}
           transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-          className="flex flex-col lg:flex-row gap-8 lg:gap-12 mb-10 items-start transform-gpu"
+          className="flex flex-col items-start gap-8 lg:flex-row lg:gap-12 transform-gpu"
         >
           {/* Left still */}
           <motion.div
             initial={{ opacity: 0, x: -20, scale: 0.985 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
             transition={{ duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
-            className="w-full max-w-[520px] lg:max-w-[560px] mx-auto lg:mx-0 flex-shrink-0"
+            className="mx-auto flex w-full max-w-[520px] flex-shrink-0 flex-col gap-5 lg:mx-0 lg:max-w-[560px]"
           >
             <AnimatedPosterFrame
               src={
@@ -1333,36 +1386,43 @@ export default function EpisodeDetailsClient({
               }
             />
 
-            {episodeStreamingProviders.length > 0 && (
-              <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
-                {episodeStreamingProviders.map((provider, index) => (
-                  <motion.a
-                    key={`${provider.provider_id}:${provider.url}`}
-                    href={provider.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label={`Reproducir ${epName} en ${provider.provider_name}`}
-                    initial={{ opacity: 0, y: 10, scale: 0.96 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    transition={{
-                      duration: 0.28,
-                      delay: 0.03 + index * 0.04,
-                      ease: [0.22, 1, 0.36, 1],
-                    }}
-                    className="group/provider relative flex-shrink-0 transform cursor-pointer rounded-xl transition-transform hover:z-10 hover:scale-110 hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400"
-                  >
-                    <OptimizedImage
-                      src={`https://image.tmdb.org/t/p/original${provider.logo_path}`}
-                      alt=""
-                      className="h-9 w-9 rounded-xl bg-white/5 object-contain shadow-lg lg:h-11 lg:w-11"
-                    />
-                    <div className="pointer-events-none absolute top-full left-1/2 z-[100] mt-2 -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/provider:scale-100 group-hover/provider:opacity-100 group-hover/provider:delay-[2000ms]">
-                      {provider.provider_name}
-                    </div>
-                  </motion.a>
-                ))}
+            {/* Plataformas en escritorio; en móvil se muestran desde la pestaña
+                "Plataformas" para conservar el hero compacto. */}
+            {episodePlatformItems.length > 0 ? (
+              <div className="hidden w-full flex-row flex-wrap items-center justify-center gap-3 px-1 py-1 sm:flex">
+                <div className="flex flex-row flex-nowrap items-center gap-2">
+                  {episodePlatformItems.map((provider, index) => (
+                    <motion.a
+                      key={provider.key ?? `${provider.title}-${index}`}
+                      href={provider.href}
+                      initial={{ opacity: 0, y: 10, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{
+                        duration: 0.28,
+                        delay: 0.03 + index * 0.04,
+                        ease: [0.22, 1, 0.36, 1],
+                      }}
+                      target={provider.target}
+                      rel={provider.rel}
+                      aria-label={provider.title}
+                      className="group/provider relative flex-shrink-0 cursor-pointer transform transition-transform hover:z-10 hover:scale-110 hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400"
+                    >
+                      <OptimizedImage
+                        src={provider.icon}
+                        alt=""
+                        className="h-9 w-9 rounded-xl bg-white/5 object-contain shadow-lg lg:h-11 lg:w-11"
+                        onError={(event) => {
+                          event.target.style.display = "none";
+                        }}
+                      />
+                      <div className="pointer-events-none absolute left-1/2 top-full z-[100] mt-2 -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/provider:scale-100 group-hover/provider:opacity-100 group-hover/provider:delay-[2000ms]">
+                        {provider.subtitle || provider.title}
+                      </div>
+                    </motion.a>
+                  ))}
+                </div>
               </div>
-            )}
+            ) : null}
           </motion.div>
 
           {/* Right info + scoreboard */}
@@ -1373,38 +1433,14 @@ export default function EpisodeDetailsClient({
             // cristal, igual que DetailsClient.
             className="flex-1 flex flex-col min-w-0 w-full"
           >
-            <div className="mb-5 px-1 flex flex-col items-center lg:items-start text-center lg:text-left w-full">
-              <div className="text-xs font-bold uppercase tracking-widest text-zinc-400">
+            <div className="mb-4 px-1 flex flex-col items-center lg:items-start text-center lg:text-left w-full">
+              <div className="mb-2 text-xs font-bold uppercase tracking-widest text-zinc-400">
                 Episodio {episodeNumber} · Temporada {seasonNumber}
               </div>
 
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[1] tracking-tight text-balance drop-shadow-xl mb-3">
+              <h1 className="mb-0 text-4xl font-black leading-[1] tracking-tight text-balance text-white drop-shadow-xl md:text-5xl lg:text-6xl">
                 {epName}
               </h1>
-
-              <div className="flex flex-wrap items-center justify-center lg:justify-start gap-x-4 gap-y-2 text-base md:text-lg font-medium text-zinc-300">
-                <span className="text-white font-bold tracking-wide">
-                  {showName}
-                </span>
-
-                {airDate ? (
-                  <>
-                    <span className="text-zinc-600 text-[10px]">●</span>
-                    <span className="inline-flex items-center gap-2">
-                      <CalendarIcon className="w-4 h-4" /> {airDate}
-                    </span>
-                  </>
-                ) : null}
-
-                {runtime ? (
-                  <>
-                    <span className="text-zinc-600 text-[10px]">●</span>
-                    <span className="inline-flex items-center gap-2">
-                      <ClockIcon className="w-4 h-4" /> {runtime} min
-                    </span>
-                  </>
-                ) : null}
-              </div>
             </div>
 
             <div className="mb-6 px-1">
@@ -1485,70 +1521,33 @@ export default function EpisodeDetailsClient({
             backdrop. Por eso sus pestañas se colocan tras el hero: así no
             quedan limitadas a la columna de texto y usan todo el ancho de la
             ficha, como en DetailsClient. */}
-        <section className="mb-10 w-full">
-          <DetailsTabsMenu
-            tabs={[
-              { id: "details", label: "Detalles" },
-              { id: "synopsis", label: "Sinopsis" },
-            ]}
-            activeTab={activeTab}
-            onChangeTab={setActiveTab}
+        <section className="mb-10 w-full sm:hidden">
+          <DetailsInfoTabs
             layoutId="episodeTabBackdrop"
+            mobileLayout
+            mediaType="tv"
+            overview={episode?.overview}
+            creators={showCreators}
+            network={showNetwork}
+            productionText={episodeProduction}
+            platforms={episodePlatformItems}
+            showPlatformsTab
+            showAwardsTab={false}
+            detailCards={episodeDetailCards}
           />
+        </section>
 
-          <div className="relative min-h-[100px]">
-            <AnimatePresence mode="wait" initial={false}>
-              {activeTab === "synopsis" && (
-                <div key="synopsis">
-                  <div className="relative overflow-hidden rounded-xl p-5 sm:p-6">
-                    {/* Capa de fondo estilo ScoreboardBar (cristal más claro, difuminado de 15px) */}
-                    <div
-                      className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit] bg-black/10 bg-gradient-to-br from-white/10 via-transparent to-black/20 backdrop-blur-[15px]"
-                      style={{
-                        WebkitMaskImage:
-                          "-webkit-radial-gradient(white, black)",
-                      }}
-                    />
-                    <p className="relative z-10 whitespace-pre-line text-justify text-base leading-relaxed text-zinc-200 md:text-lg">
-                      {episode?.overview?.trim() ||
-                        "No hay descripción disponible."}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "details" && (
-                <div key="details">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
-                    <VisualMetaCard
-                      icon={MonitorPlay}
-                      label="Serie"
-                      value={showName}
-                      className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                    />
-                    <VisualMetaCard
-                      icon={CalendarIcon}
-                      label="Emisión"
-                      value={airDate || "—"}
-                      className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                    />
-                    <VisualMetaCard
-                      icon={ClockIcon}
-                      label="Duración"
-                      value={runtime ? `${runtime} min` : "—"}
-                      className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                    />
-                    <VisualMetaCard
-                      icon={StarIcon}
-                      label="Episodio"
-                      value={`T${seasonNumber} · E${episodeNumber}`}
-                      className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
-                    />
-                  </div>
-                </div>
-              )}
-            </AnimatePresence>
-          </div>
+        <section className="mt-8 mb-10 hidden w-full sm:block lg:mt-6">
+          <DetailsInfoTabs
+            layoutId="episodeTabBackdropDesktop"
+            mediaType="tv"
+            overview={episode?.overview}
+            creators={showCreators}
+            network={showNetwork}
+            productionText={episodeProduction}
+            showAwardsTab={false}
+            detailCards={episodeDetailCards}
+          />
         </section>
 
         {/* === ESTILOS PARA SSR SWIPER FIX (EVITAR SALTOS) === */}

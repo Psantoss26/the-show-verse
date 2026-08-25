@@ -252,15 +252,8 @@ import {
 // Sección de pestañas (Detalles/Producción/Sinopsis/Premios) compartida con la
 // ficha rápida del dashboard (DetailModal) para que rendericen las MISMAS tarjetas.
 import DetailsInfoTabs from "@/components/details/DetailsInfoTabs";
-import {
-  ExternalLinkButton,
-  UnifiedRateButton,
-} from "@/components/details/DetailHeaderBits";
-// `ToolbarSeparator`: la MISMA línea vertical que usa el scoreboard, reutilizada
-// para separar plataformas de enlaces externos en el modo de portada backdrop.
-import DetailsScoreboardPanel, {
-  ToolbarSeparator,
-} from "@/components/details/DetailsScoreboardPanel";
+import { UnifiedRateButton } from "@/components/details/DetailHeaderBits";
+import DetailsScoreboardPanel from "@/components/details/DetailsScoreboardPanel";
 import {
   buildTmdbHref,
   buildTraktHref,
@@ -9823,29 +9816,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   ))}
                 </div>
 
-                {/* Enlaces externos JUNTO a las plataformas, separados por una
-                    línea vertical. Solo en modo backdrop: ahí se retiran de la
-                    barra de puntuaciones (ver `externalLinks` del scoreboard)
-                    para que no salgan duplicados, así que esto los mueve, no los
-                    copia. En modo póster siguen viviendo en el scoreboard.
-                    Se reutilizan `ToolbarSeparator` y `ExternalLinkButton`, los
-                    mismos que usa el scoreboard, para que el aspecto sea idéntico. */}
-                {isBackdropPoster && scoreboardExternalLinks.length > 0 && (
-                  <>
-                    <ToolbarSeparator className="mx-0.5" />
-                    <div className="flex flex-row flex-nowrap items-center gap-2">
-                      {scoreboardExternalLinks.map((link) => (
-                        <ExternalLinkButton
-                          key={link.key}
-                          icon={link.icon}
-                          title={link.title}
-                          href={link.href}
-                          fallbackHref={link.fallbackHref}
-                        />
-                      ))}
-                    </div>
-                  </>
-                )}
               </StaggerContainer>
             ) : null}
           </div>
@@ -10054,9 +10024,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 showAwardsTab={false}
                 genres={data.genres}
                 platforms={platformItems}
-                platformLinks={
-                  isBackdropPoster ? scoreboardExternalLinks : []
-                }
+                platformLinks={[]}
               />
               </div>
             </div>
@@ -10161,11 +10129,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     ? { value: Math.round(extras.mcScore) }
                     : null
                 }
-                // En modo backdrop los enlaces se muestran junto a las
-                // plataformas (bajo la portada), así que aquí se omiten para no
-                // duplicarlos. En modo póster siguen aquí, como siempre.
-                externalLinks={isBackdropPoster ? null : scoreboardExternalLinks}
+                externalLinks={scoreboardExternalLinks}
                 onMoreLinks={() => setExternalLinksOpen(true)}
+                externalLinksMenuOnly={isBackdropPoster}
                 share={{
                   title,
                   text: `Echa un vistazo a ${title} en The Show Verse`,
