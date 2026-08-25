@@ -13,7 +13,7 @@
 //   - "backdrop": Presupuesto/Recaudación/Canal se muestran SOLO si hay valor
 //                 y el tagline usa comillas rectas " ".
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import {
   CalendarIcon,
@@ -27,6 +27,7 @@ import {
   Trophy,
   Tags,
   BadgeCheck,
+  ChevronDown,
 } from "lucide-react";
 
 import {
@@ -121,17 +122,22 @@ export default function DetailsInfoTabs({
   // Las fichas que solo tienen sinopsis no necesitan una navegación de una
   // única opción: muestran el panel directamente.
   showTabsMenu = true,
-  // Las listas pueden incluir descripciones muy extensas. Se limita solo en
-  // ese contexto para conservar una ficha compacta sin truncar el contenido.
-  scrollableSynopsis = false,
+  // Las listas pueden incluir descripciones muy extensas. Se muestran
+  // inicialmente de forma compacta y se expanden bajo demanda, sin crear un
+  // segundo scroll dentro de la página.
+  expandableSynopsis = false,
 }) {
   const [activeTab, setActiveTab] = useState(() =>
     showDetailsTab ? "details" : showProductionTab ? "production" : "synopsis",
   );
+  const [showFullSynopsis, setShowFullSynopsis] = useState(false);
+  const synopsisId = useId();
   const isBackdrop = variant === "backdrop";
   const hasAwardItems = awardItems.length > 0;
   const hasAwardsTab = showAwardsTab && (awards || hasAwardItems);
   const hasPlatformsTab = showPlatformsTab;
+  const synopsisText = typeof overview === "string" ? overview.trim() : "";
+  const synopsisIsExpandable = expandableSynopsis && synopsisText.length > 420;
   const hasCustomDetailCards = Array.isArray(detailCards);
   const hasCustomProductionCards = Array.isArray(productionCards);
 
@@ -204,14 +210,34 @@ export default function DetailsInfoTabs({
                     {isBackdrop ? `"${tagline}"` : `“${tagline}”`}
                   </div>
                 )}
-                <div
-                  className={scrollableSynopsis ? "sv-scroll max-h-[11rem] overflow-y-auto pr-3 [overscroll-behavior:contain] [scrollbar-gutter:stable] sm:max-h-[13rem]" : ""}
-                  tabIndex={scrollableSynopsis ? 0 : undefined}
-                  aria-label={scrollableSynopsis ? "Sinopsis completa" : undefined}
-                >
-                  <p className="whitespace-pre-line text-justify text-base leading-relaxed text-zinc-200 md:text-lg">
+                <div>
+                  <p
+                    id={synopsisId}
+                    className={`whitespace-pre-line text-justify text-base leading-relaxed text-zinc-200 md:text-lg ${
+                      synopsisIsExpandable && !showFullSynopsis
+                        ? "line-clamp-4 mask-fade-bottom"
+                        : ""
+                    }`}
+                  >
                     {overview || "No hay descripción disponible."}
                   </p>
+                  {synopsisIsExpandable && (
+                    <button
+                      type="button"
+                      onClick={() => setShowFullSynopsis((value) => !value)}
+                      aria-expanded={showFullSynopsis}
+                      aria-controls={synopsisId}
+                      className="mt-2 flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-purple-400 transition-colors hover:text-purple-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-300"
+                    >
+                      {showFullSynopsis ? "Ver menos" : "Ver más"}
+                      <ChevronDown
+                        className={`h-3 w-3 transition-transform ${
+                          showFullSynopsis ? "rotate-180" : ""
+                        }`}
+                        aria-hidden="true"
+                      />
+                    </button>
+                  )}
                 </div>
               </InfoGlassPanel>
             </div>

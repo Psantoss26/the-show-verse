@@ -327,6 +327,7 @@ export function DetailsStatsRow({
 //    - `onMoreLinks`: callback del botón "..." que abre el modal de enlaces.
 //    - `externalLinksMenuOnly`: mantiene esos enlaces en el botón también en
 //       escritorio, en vez de desplegarlos como iconos individuales.
+//    - `showExternalLinksLabel`: muestra la etiqueta del botón desde `sm`.
 //    - `share`: { title, text?, url? } -> <ActionShareButton>. Se ancla a la
 //       derecha con ml-auto (siempre visible si se pasa).
 // ---------------------------------------------------------------------------
@@ -377,6 +378,7 @@ function DetailsToolbarActions({
   streamingProviders = null,
   onMoreLinks,
   externalLinksMenuOnly = false,
+  showExternalLinksLabel = false,
   share = null,
   shareIconOnly = false,
   toolbarActions = null,
@@ -444,7 +446,7 @@ function DetailsToolbarActions({
               <button
                 type="button"
                 onClick={onMoreLinks}
-                className={`${externalLinksMenuOnly ? "" : "sm:hidden"} relative isolate flex h-10 w-10 shrink-0 transform-gpu items-center justify-center overflow-hidden rounded-full bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 text-zinc-200 shadow-none backdrop-blur-[6px] transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/[0.08] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/30`}
+                className={`${externalLinksMenuOnly ? "" : "sm:hidden"} relative isolate flex h-10 w-10 shrink-0 transform-gpu items-center justify-center overflow-hidden rounded-full bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 text-zinc-200 shadow-none backdrop-blur-[6px] transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/[0.08] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/30 ${showExternalLinksLabel ? "sm:inline-flex sm:h-auto sm:w-auto sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2" : ""}`}
                 title="Enlaces"
                 aria-label="Abrir enlaces externos"
               >
@@ -453,6 +455,11 @@ function DetailsToolbarActions({
                   className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]"
                 />
                 <MoreHorizontal className="relative z-10 h-5 w-5" />
+                {showExternalLinksLabel && (
+                  <span className="relative z-10 hidden text-sm font-medium sm:block">
+                    Enlaces
+                  </span>
+                )}
               </button>
             )}
           </div>
@@ -515,6 +522,7 @@ export default function DetailsScoreboardPanel({
   streamingProviders = null,
   onMoreLinks,
   externalLinksMenuOnly = false,
+  showExternalLinksLabel = false,
   share = null,
   // Modo de portada backdrop: el marcador comparte fila con las puntuaciones y
   // las estadísticas, así que "Compartir" va sin texto para no comerse el ancho.
@@ -590,6 +598,7 @@ export default function DetailsScoreboardPanel({
             streamingProviders={streamingProviders}
             onMoreLinks={onMoreLinks}
             externalLinksMenuOnly={externalLinksMenuOnly}
+            showExternalLinksLabel={showExternalLinksLabel}
             share={share}
             shareIconOnly={shareIconOnly}
             toolbarActions={toolbarActions}

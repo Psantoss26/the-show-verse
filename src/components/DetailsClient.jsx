@@ -10131,7 +10131,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 }
                 externalLinks={scoreboardExternalLinks}
                 onMoreLinks={() => setExternalLinksOpen(true)}
-                externalLinksMenuOnly={isBackdropPoster}
+                externalLinksMenuOnly
+                showExternalLinksLabel={!isBackdropPoster}
                 share={{
                   title,
                   text: `Echa un vistazo a ${title} en The Show Verse`,
