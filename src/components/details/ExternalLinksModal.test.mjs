@@ -15,3 +15,13 @@ test("el modal de plataformas monta el cristal con la transición inicial común
   );
   assert.doesNotMatch(source, /AnimatePresence|motion\./);
 });
+
+test("el modal de enlaces se monta sobre DetailModal y cubre todo el viewport", async () => {
+  const source = await readFile(sourceUrl, "utf8");
+
+  assert.match(source, /import\s*\{\s*createPortal\s*\}\s*from\s*["']react-dom["']/);
+  assert.match(source, /return createPortal\(/);
+  assert.match(source, /document\.body/);
+  assert.match(source, /data-detail-modal-layer=""/);
+  assert.match(source, /fixed inset-0 z-\[10000\]/);
+});

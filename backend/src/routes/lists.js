@@ -56,6 +56,11 @@ const listItemSchema = z.object({
   position: z.number().int().min(0).optional(),
 });
 
+const membershipQuerySchema = z.object({
+  tmdbId: z.coerce.number().int().positive(),
+  mediaType: z.enum(['movie', 'tv']),
+});
+
 export default async function listsRoutes(fastify) {
   fastify.addHook('preHandler', fastify.requireAuth);
 
@@ -77,6 +82,33 @@ export default async function listsRoutes(fastify) {
       .orderBy(desc(userLists.updatedAt));
 
     return reply.send({ results: lists });
+  });
+
+  // GET /lists/membership — Devuelve las listas propias que contienen un
+  // título. Evita descargar el detalle completo de cada lista solo para
+  // pintar el estado de un botón en una ficha.
+  fastify.get('/membership', async (req, reply) => {
+    const parsed = membershipQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
+    }
+
+    const { tmdbId, mediaType } = parsed.data;
+    const matches = await db
+      .select({ listId: userListItems.listId })
+      .from(userListItems)
+      .innerJoin(userLists, eq(userListItems.listId, userLists.id))
+      .where(
+        and(
+          eq(userLists.userId, req.user.id),
+          eq(userListItems.tmdbId, tmdbId),
+          eq(userListItems.mediaType, mediaType),
+        ),
+      );
+
+    return reply.send({
+      membership: Object.fromEntries(matches.map(({ listId }) => [String(listId), true])),
+    });
   });
 
   // POST /lists — Crear lista
