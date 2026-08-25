@@ -117,7 +117,7 @@ export default function ExternalLinksModal({
                                                             <OptimizedImage
                                                                 src={it.icon}
                                                                 alt=""
-                                                                className="h-8 w-8 rounded-lg object-contain drop-shadow-[0_6px_12px_rgba(0,0,0,0.45)] transition duration-300 group-hover/link:scale-110"
+                                                                className={`${isPlatformsMode ? "h-9 w-9" : "h-8 w-8"} rounded-lg object-contain drop-shadow-[0_6px_12px_rgba(0,0,0,0.45)] transition duration-300 group-hover/link:scale-110`}
                                                                 draggable="false"
                                                             />
                                                             {isPlatformsMode && it.isPlexProvider && (
