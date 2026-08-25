@@ -24,6 +24,7 @@ import { AnimatedSection } from "@/components/details/AnimatedSection";
 import AnimatedPosterFrame from "@/components/details/AnimatedPosterFrame";
 import StreamingHoverOverlay from "@/components/details/StreamingHoverOverlay";
 import DetailsScoreboardPanel from "@/components/details/DetailsScoreboardPanel";
+import ExternalLinksModal from "@/components/details/ExternalLinksModal";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 import { LIQUID_GLASS_CARD } from "@/lib/ui/liquidGlass";
 import {
@@ -36,6 +37,7 @@ import {
   formatDateEs,
   formatCountShort,
 } from "@/lib/details/formatters";
+import { buildTvExternalLinks } from "@/lib/details/tvExternalLinks";
 import {
   fetchSeriesGraphRatingsCached,
   getSeriesGraphSeasonAggregate,
@@ -239,6 +241,16 @@ export default function SeasonDetailsClient({
   const seasonName =
     season?.name?.trim() ||
     (Number(seasonNumber) === 0 ? "Especiales" : `Temporada ${seasonNumber}`);
+  const seasonExternalLinks = useMemo(
+    () =>
+      buildTvExternalLinks({
+        showId,
+        title: showName,
+        originalTitle: show?.original_name,
+        homepage: show?.homepage,
+      }),
+    [showId, showName, show?.original_name, show?.homepage],
+  );
 
   const posterPath = season?.poster_path || show?.poster_path || null;
   const heroBgPath =
@@ -426,6 +438,7 @@ export default function SeasonDetailsClient({
   );
   const [watchedBusy, setWatchedBusy] = useState(false);
   const [traktEpisodesOpen, setTraktEpisodesOpen] = useState(false);
+  const [platformsOpen, setPlatformsOpen] = useState(false);
   const [episodeBusyKey, setEpisodeBusyKey] = useState("");
 
   // Ref para optimistic updates del modal
@@ -1255,25 +1268,44 @@ export default function SeasonDetailsClient({
               }}
               stats={tScoreboard?.stats}
               showFavoritedStat={false}
+              onMorePlatforms={() => setPlatformsOpen(true)}
               share={{
                 title: seasonName,
                 text: `Echa un vistazo a ${seasonName} de ${showName} en The Show Verse`,
               }}
             />
 
-            <DetailsInfoTabs
-              layoutId="seasonTabInline"
-              enableMobileTabSwipe
-              mediaType="tv"
-              overview={season?.overview}
-              creators={showCreators}
-              network={showNetwork}
-              productionText={seasonProduction}
-              platforms={seasonPlatformItems}
-              showPlatformsTab
-              showAwardsTab={false}
-              detailCards={seasonDetailCards}
-            />
+            <div className="sm:hidden">
+              <DetailsInfoTabs
+                layoutId="seasonTabInlineMobile"
+                enableMobileTabSwipe
+                mediaType="tv"
+                overview={season?.overview}
+                creators={showCreators}
+                network={showNetwork}
+                productionText={seasonProduction}
+                showPlatformsTab={false}
+                externalLinks={seasonExternalLinks}
+                showExternalLinksTab
+                showAwardsTab={false}
+                detailCards={seasonDetailCards}
+              />
+            </div>
+
+            <div className="hidden sm:block">
+              <DetailsInfoTabs
+                layoutId="seasonTabInline"
+                mediaType="tv"
+                overview={season?.overview}
+                creators={showCreators}
+                network={showNetwork}
+                productionText={seasonProduction}
+                platforms={seasonPlatformItems}
+                showPlatformsTab
+                showAwardsTab={false}
+                detailCards={seasonDetailCards}
+              />
+            </div>
           </div>
         </motion.div>
 
@@ -1534,6 +1566,13 @@ export default function SeasonDetailsClient({
         busyKey={episodeBusyKey}
         onToggleEpisodeWatched={toggleEpisodeWatched}
         onToggleShowWatched={toggleSeasonWatched}
+      />
+
+      <ExternalLinksModal
+        open={platformsOpen}
+        onClose={() => setPlatformsOpen(false)}
+        links={seasonPlatformItems}
+        mode="platforms"
       />
     </div>
   );

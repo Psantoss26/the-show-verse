@@ -391,19 +391,24 @@ function DetailsToolbarActions({
   const hasStreamingProviders =
     Array.isArray(streamingProviders) && streamingProviders.length > 0;
   const hasMobilePlatformAction = typeof onMorePlatforms === "function";
+  const hasDesktopInlineActions = hasExternalLinks || hasStreamingProviders;
   const hasInlineActions =
-    hasExternalLinks || hasStreamingProviders || hasMobilePlatformAction;
+    hasDesktopInlineActions || hasMobilePlatformAction;
 
   return (
     <>
       {/* ========== Separador vertical 1 + ENLACES EXTERNOS / STREAMING ========== */}
       {hasInlineActions && (
         <>
-          <div className="flex flex-1 items-center justify-center sm:block sm:flex-none">
+          <div
+            className={`flex flex-1 items-center justify-center sm:block sm:flex-none ${hasDesktopInlineActions ? "" : "sm:hidden"}`}
+          >
             <ToolbarSeparator />
           </div>
 
-          <div className="min-w-0 flex flex-none items-center justify-end gap-2.5 sm:flex-1 sm:gap-3">
+          <div
+            className={`min-w-0 flex flex-none items-center justify-end gap-2.5 sm:flex-1 sm:gap-3 ${hasDesktopInlineActions ? "" : "sm:hidden"}`}
+          >
             {/* Versión Desktop: plataformas primero, enlaces externos después. */}
             <div className="hidden sm:flex items-center gap-2.5 sm:gap-3">
               {hasStreamingProviders && (
@@ -485,7 +490,7 @@ function DetailsToolbarActions({
             )}
           </div>
 
-          {share && !externalLinksMenuOnly && (
+          {share && !externalLinksMenuOnly && hasDesktopInlineActions && (
             <ToolbarSeparator className="hidden md:block" />
           )}
         </>
