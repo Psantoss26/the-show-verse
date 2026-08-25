@@ -284,6 +284,7 @@ export default function TraktListDetailsClient({ username, listId }) {
             voteAverage: it?.voteAverage ?? null,
             imdbRating: imdbRatings[`${mediaType === 'tv' ? 'tv' : 'movie'}:${tmdbId}`]?.rating,
             addedAt: it?.addedAt || '',
+            posterLoading: Boolean(it?._englishPosterPending),
         }
     }, [imdbRatings])
 

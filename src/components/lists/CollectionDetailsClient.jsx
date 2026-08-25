@@ -46,7 +46,7 @@ function writeCollectionDetailsCache(collectionId, data) {
     }
 }
 
-function MovieCard({ movie, idx, imdbRating, disableHover = false }) {
+function MovieCard({ movie, idx, imdbRating, disableHover = false, posterLoading = false }) {
     const href = `/details/movie/${movie.id}`
     const poster = movie.poster_path || movie.backdrop_path || null
     const title = movie.title || 'Película sin título'
@@ -68,6 +68,7 @@ function MovieCard({ movie, idx, imdbRating, disableHover = false }) {
                 posterPath={poster}
                 voteAverage={movie.vote_average}
                 imdbRating={imdbRating}
+                posterLoading={posterLoading}
                 disableHover={disableHover}
             />
         </div>
@@ -204,6 +205,7 @@ export default function CollectionDetailsClient({ collectionId }) {
                             movie={movie}
                             idx={0}
                             imdbRating={meta.imdbRating}
+                            posterLoading={meta.posterLoading}
                             disableHover={viewMode === 'compact'}
                         />
                     )}

@@ -635,6 +635,7 @@ export default function ListDetailsPage() {
                                     posterPath={posterPath}
                                     voteAverage={it?.vote_average}
                                     imdbRating={meta.imdbRating}
+                                    posterLoading={meta.posterLoading}
                                     disableHover={viewMode === 'compact'}
                                 />
                                 {canManage && <button

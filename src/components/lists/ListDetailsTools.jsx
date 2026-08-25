@@ -184,6 +184,7 @@ export function getListItemMeta(item) {
     href,
     voteAverage,
     imdbRating: item?.imdbRating,
+    posterLoading: Boolean(item?._englishPosterPending),
     addedAt,
   };
 }
@@ -392,7 +393,12 @@ export default function FilterableListItems({
     () => visibleGroups.flatMap((group) => group.entries.map((entry) => entry.item)),
     [visibleGroups],
   );
-  const englishPosterItems = useEnglishPosterItems(visibleItems);
+  // No se pinta el poster_path almacenado (que puede estar localizado en
+  // español) durante la resolución asíncrona: cada hueco queda neutro hasta
+  // disponer del artwork inglés final.
+  const englishPosterItems = useEnglishPosterItems(visibleItems, true, {
+    hideOriginalPosters: true,
+  });
   const visibleGroupsWithEnglishPosters = useMemo(() => {
     let itemIndex = 0;
     return visibleGroups.map((group) => ({
@@ -450,6 +456,7 @@ export default function FilterableListItems({
         posterPath={entry.meta.posterPath}
         voteAverage={entry.meta.voteAverage}
         imdbRating={entry.meta.imdbRating}
+        posterLoading={entry.meta.posterLoading}
         disableHover={viewMode === "compact"}
       />
     );
@@ -618,6 +625,7 @@ export default function FilterableListItems({
                         title={entry.meta.title}
                         mediaType={entry.meta.mediaType}
                         posterPath={entry.meta.posterPath}
+                        posterLoading={entry.meta.posterLoading}
                       />
                     </div>
                     <div className="min-w-0 flex-1">

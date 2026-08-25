@@ -7,9 +7,13 @@ import { useState } from "react";
 import { Film, ImageOff, MonitorPlay } from "lucide-react";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 
-function TmdbPoster({ posterPath, alt }) {
+function TmdbPoster({ posterPath, alt, loading = false }) {
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
+
+  if (loading) {
+    return <div className="h-full w-full animate-pulse bg-zinc-900" aria-hidden="true" />;
+  }
 
   if (!posterPath || failed) {
     return (
@@ -74,6 +78,7 @@ export default function ListPosterCard({
   posterPath,
   voteAverage,
   imdbRating,
+  posterLoading = false,
   children,
   onClick,
   className = "",
@@ -83,7 +88,7 @@ export default function ListPosterCard({
     <div
       className={`relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/35 shadow-lg backdrop-blur-[28px] ${className}`}
     >
-      <TmdbPoster posterPath={posterPath} alt={title} />
+      <TmdbPoster posterPath={posterPath} alt={title} loading={posterLoading} />
 
       {!disableHover ? (
         <>
