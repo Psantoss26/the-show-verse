@@ -5,6 +5,7 @@ import test from 'node:test'
 import {
     buildPosterCollageTargets,
     buildPosterCollageTiles,
+    getCompletePosterCollageTileCount,
     getPosterCollageLayout,
 } from './posterCollage.js'
 
@@ -34,8 +35,8 @@ test('buildPosterCollageTiles samples long lists across their full contents', ()
     assert.equal(new Set(tiles).size, 20)
 })
 
-test('getPosterCollageLayout defines a distinct, complete arrangement from two to twenty posters', () => {
-    for (let count = 2; count <= 20; count += 1) {
+test('getPosterCollageLayout defines complete arrangements only', () => {
+    for (const count of [2, 3, 4, 5, 6, 7, 8, 12, 16, 20]) {
         const layout = getPosterCollageLayout(count)
         assert.ok(layout.gridClassName)
         assert.equal(layout.tileClassNames.length, count)
@@ -45,12 +46,23 @@ test('getPosterCollageLayout defines a distinct, complete arrangement from two t
     assert.deepEqual(getPosterCollageLayout(7).tileClassNames, ['col-span-2 row-span-3', '', '', '', '', '', ''])
 })
 
-test('las listas largas crecen de tres a cinco filas sin repetir pósteres', () => {
-    assert.equal(getPosterCollageLayout(9).gridClassName, 'grid-cols-4 grid-rows-3')
+test('las listas largas ocultan la fila final incompleta de la portada', () => {
+    assert.equal(getCompletePosterCollageTileCount(9), 8)
+    assert.equal(getCompletePosterCollageTileCount(11), 8)
+    assert.equal(getCompletePosterCollageTileCount(13), 12)
+    assert.equal(getCompletePosterCollageTileCount(15), 12)
+    assert.equal(getCompletePosterCollageTileCount(17), 16)
+    assert.equal(getCompletePosterCollageTileCount(19), 16)
+
+    assert.equal(buildPosterCollageTiles(Array.from({ length: 11 }, (_, index) => `/${index}.jpg`)).length, 8)
+    assert.equal(buildPosterCollageTiles(Array.from({ length: 15 }, (_, index) => `/${index}.jpg`)).length, 12)
+    assert.equal(buildPosterCollageTiles(Array.from({ length: 19 }, (_, index) => `/${index}.jpg`)).length, 16)
+
+    assert.equal(getPosterCollageLayout(9).gridClassName, 'grid-cols-4 grid-rows-2')
     assert.equal(getPosterCollageLayout(12).gridClassName, 'grid-cols-4 grid-rows-3')
-    assert.equal(getPosterCollageLayout(13).gridClassName, 'grid-cols-4 grid-rows-4')
+    assert.equal(getPosterCollageLayout(13).gridClassName, 'grid-cols-4 grid-rows-3')
     assert.equal(getPosterCollageLayout(16).gridClassName, 'grid-cols-4 grid-rows-4')
-    assert.equal(getPosterCollageLayout(17).gridClassName, 'grid-cols-4 grid-rows-5')
+    assert.equal(getPosterCollageLayout(17).gridClassName, 'grid-cols-4 grid-rows-4')
     assert.equal(getPosterCollageLayout(20).gridClassName, 'grid-cols-4 grid-rows-5')
 })
 

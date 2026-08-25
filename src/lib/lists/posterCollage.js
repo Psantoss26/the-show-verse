@@ -1,6 +1,14 @@
 const DEFAULT_TILE_COUNT = 20
 const MAX_TILE_COUNT = 20
 
+// Las composiciones de dos a ocho carátulas ocupan toda la portada gracias a
+// sus spans. A partir de ahí el mosaico es una cuadrícula de cuatro columnas:
+// reducir al múltiplo inferior evita una última fila con huecos visibles.
+export function getCompletePosterCollageTileCount(tileCount) {
+    const count = Math.max(1, Math.min(Number(tileCount) || 1, MAX_TILE_COUNT))
+    return count <= 8 ? count : Math.floor(count / 4) * 4
+}
+
 function uniformGrid(tileCount, gridClassName) {
     return {
         gridClassName,
@@ -116,7 +124,8 @@ export function buildPosterCollageTiles(images, tileCount = DEFAULT_TILE_COUNT) 
 
     if (posters.length === 0) return []
 
-    const count = Math.max(1, Math.min(Number(tileCount) || DEFAULT_TILE_COUNT, MAX_TILE_COUNT))
+    const requestedCount = Math.max(1, Math.min(Number(tileCount) || DEFAULT_TILE_COUNT, MAX_TILE_COUNT))
+    const count = getCompletePosterCollageTileCount(Math.min(posters.length, requestedCount))
     const representativePosters = posters.length <= count || count === 1
         ? posters.slice(0, count)
         : Array.from(
@@ -128,6 +137,6 @@ export function buildPosterCollageTiles(images, tileCount = DEFAULT_TILE_COUNT) 
 }
 
 export function getPosterCollageLayout(tileCount) {
-    const count = Math.max(2, Math.min(Number(tileCount) || 2, MAX_TILE_COUNT))
+    const count = Math.max(2, getCompletePosterCollageTileCount(tileCount))
     return COLLAGE_LAYOUTS[count]
 }
