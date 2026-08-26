@@ -5,7 +5,6 @@ import DetailsClient from "@/components/DetailsClient";
 import {
   getCredits,
   getRecommendations,
-  getReviews,
   getWatchProviders,
 } from "@/lib/api/tmdb";
 
@@ -15,7 +14,6 @@ const EMPTY_DEFERRED = {
   recommendations: EMPTY_ARRAY,
   providers: EMPTY_ARRAY,
   watchLink: null,
-  reviews: EMPTY_ARRAY,
   initialScoreboard: null,
 };
 
@@ -28,7 +26,6 @@ export default function DetailsPageLoader(props) {
     initialCastData = EMPTY_ARRAY,
     initialProviders = EMPTY_ARRAY,
     initialWatchLink = null,
-    initialReviews = EMPTY_ARRAY,
     initialScoreboard = null,
     initialTraktStatus = null,
     initialShowWatched = null,
@@ -99,34 +96,20 @@ export default function DetailsPageLoader(props) {
 
     const loadSecondaryDeferredData = async () => {
       try {
-        // Si el servidor ya proporcionó reviews/providers, no repetir las peticiones
-        const skipReviews =
-          Array.isArray(initialReviews) && initialReviews.length > 0;
+        // Si el servidor ya proporcionó proveedores, no repetir la petición.
         const skipProviders =
           Array.isArray(initialProviders) && initialProviders.length > 0;
 
-        // Si ambos están cubiertos por el servidor, no hay nada que hacer
-        if (skipReviews && skipProviders) return;
+        if (skipProviders) return;
 
-        const [reviews, watchProviders] = await Promise.all([
-          skipReviews
-            ? Promise.resolve(null)
-            : getReviews(type, id).catch(() => ({ results: [] })),
-          skipProviders
-            ? Promise.resolve(null)
-            : getWatchProviders(type, id, "ES").catch(() => ({
-                providers: [],
-                link: null,
-              })),
-        ]);
+        const watchProviders = await getWatchProviders(type, id, "ES").catch(
+          () => ({ providers: [], link: null }),
+        );
 
         if (cancelled) return;
 
         setDeferredData((prev) => ({
           ...prev,
-          ...(reviews != null
-            ? { reviews: reviews?.results || EMPTY_ARRAY }
-            : {}),
           ...(watchProviders != null
             ? {
                 providers: watchProviders?.providers || EMPTY_ARRAY,
@@ -162,7 +145,6 @@ export default function DetailsPageLoader(props) {
     initialCastData,
     initialProviders,
     initialRecommendations,
-    initialReviews,
   ]);
 
   return (
@@ -178,11 +160,6 @@ export default function DetailsPageLoader(props) {
       initialTraktStatus={initialTraktStatus}
       initialShowWatched={initialShowWatched}
       initialScoreboard={deferredData.initialScoreboard ?? initialScoreboard}
-      reviews={
-        deferredData.reviews !== EMPTY_ARRAY
-          ? deferredData.reviews
-          : initialReviews
-      }
       providers={
         deferredData.providers !== EMPTY_ARRAY
           ? deferredData.providers

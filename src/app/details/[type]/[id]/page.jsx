@@ -6,7 +6,7 @@ import { fetchCommunitySummary } from "@/lib/community/server";
 export const revalidate = 600;
 
 const DETAILS_APPEND_TO_RESPONSE =
-  "external_ids,images,videos,credits,reviews,recommendations";
+  "external_ids,images,videos,credits,recommendations";
 
 export async function generateMetadata({ params }) {
   const p = await params;
@@ -50,9 +50,6 @@ export default async function DetailsPage({ params }) {
   const initialCastData = Array.isArray(data?.credits?.cast)
     ? data.credits.cast
     : [];
-  const initialReviews = Array.isArray(data?.reviews?.results)
-    ? data.reviews.results
-    : [];
   const initialRecommendations = Array.isArray(data?.recommendations?.results)
     ? data.recommendations.results
     : [];
@@ -72,7 +69,6 @@ export default async function DetailsPage({ params }) {
         id={id}
         data={data}
         initialCastData={initialCastData}
-        initialReviews={initialReviews}
         initialRecommendations={initialRecommendations}
         initialSentiment={community?.sentiment || null}
         initialComments={community?.comments || null}
