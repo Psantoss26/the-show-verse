@@ -212,7 +212,6 @@ import {
   formatCountShort,
   stripHtml,
   formatDateTimeEs,
-  mixedCount,
   sumCount,
   translateGenre,
 } from "@/lib/details/formatters";
@@ -1276,7 +1275,6 @@ function RecommendationHoverIndicator({
  * @param {Array}   castData        - Datos del reparto (actores, directores)
  * @param {Object}  providers       - Proveedores de streaming disponibles
  * @param {string}  watchLink       - URL directa para ver el contenido
- * @param {Array}   reviews         - Resenas de usuarios de TMDb
  */
 export default function DetailsClient({
   type,
@@ -1286,7 +1284,6 @@ export default function DetailsClient({
   castData,
   providers,
   watchLink,
-  reviews,
   initialScoreboard,
   initialTraktStatus,
   initialShowWatched,
@@ -4335,7 +4332,7 @@ export default function DetailsClient({
   }, [initialSentiment]);
   const [tSentiment, setTSentiment] = useState(() => initialSentimentState);
 
-  // -- Comentarios de Trakt con paginacion y pestanas --
+  // -- Comentarios de la comunidad con paginación y pestañas --
   const [tCommentsTab, setTCommentsTab] = useState("recent"); // "likes30" (top 30 dias) | "likesAll" (top historico) | "recent"
   // Semilla desde `initialComments` (SSR: { items, pagination }).
   const initialCommentsState = useMemo(() => {
@@ -4345,6 +4342,7 @@ export default function DetailsClient({
         error: "",
         items: [],
         page: 1,
+        pageCount: 0,
         hasMore: false,
         total: 0,
       };
@@ -4358,6 +4356,7 @@ export default function DetailsClient({
       error: "",
       items,
       page: 1,
+      pageCount: Number(pagination.pageCount || 0),
       hasMore: !!(
         pagination.pageCount && pagination.page < pagination.pageCount
       ),
@@ -4365,14 +4364,36 @@ export default function DetailsClient({
     };
   }, [initialComments]);
   const [tComments, setTComments] = useState(() => initialCommentsState);
-  // Pestaña que corresponde a lo que hay ahora mismo en `tComments`, para
-  // distinguir un cambio de pestaña de una paginación (ver el cargador).
-  const commentsTabRef = useRef(tCommentsTab);
   const [commentProfileUsernames, setCommentProfileUsernames] = useState(
     () => new Map(),
   );
   const [ownedCommentIds, setOwnedCommentIds] = useState(() => new Set());
-  const COMMENTS_SECTION_LIMIT = 5;
+  const COMMENTS_PAGE_SIZE = 5;
+  const selectCommentsTab = useCallback((tab) => {
+    if (tab === tCommentsTab) return;
+
+    setTCommentsTab(tab);
+    setTComments((previous) => ({
+      ...previous,
+      items: [],
+      page: 1,
+      pageCount: 0,
+      hasMore: false,
+      total: 0,
+      loading: true,
+      error: "",
+    }));
+  }, [tCommentsTab]);
+  const selectCommentsPage = useCallback((page) => {
+    setTComments((previous) => {
+      const nextPage = Math.min(
+        Math.max(1, Number(page) || 1),
+        Math.max(1, previous.pageCount || 1),
+      );
+      if (previous.loading || nextPage === previous.page) return previous;
+      return { ...previous, page: nextPage, loading: true, error: "" };
+    });
+  }, []);
   const myComments = useMemo(() => {
     return (tComments.items || []).filter((item) =>
       isOwnedComment(item, {
@@ -4599,37 +4620,10 @@ export default function DetailsClient({
     let seedTimers = [];
     let scheduledPoll = false;
 
-    // CAMBIO DE PESTAÑA: se reinicia AQUÍ, y marcando `loading`.
-    //
-    // Antes esto vivía en un efecto aparte que solo vaciaba `items`. Como los
-    // efectos corren en orden de declaración, ese vaciado pasaba DESPUÉS de que
-    // este cargador hubiera pintado la caché, así que dejaba la lista vacía con
-    // `loading: false` -- y esa es justo la combinación que enseña "Sé el primero
-    // en comentar." Con la pestaña recién pulsada, el mensaje se quedaba visible
-    // durante toda la petición. Además tiraba a la basura el pintado instantáneo
-    // de la caché, que era el motivo de guardarla.
-    //
-    // La página NO entra en la condición: este efecto también corre al paginar
-    // ("cargar más"), y ahí hay que conservar lo ya cargado.
-    const tabChanged = commentsTabRef.current !== tCommentsTab;
-    commentsTabRef.current = tCommentsTab;
-    if (tabChanged) {
-      setTComments((p) => ({
-        ...p,
-        items: [],
-        page: 1,
-        hasMore: false,
-        total: 0,
-        loading: true,
-        error: "",
-      }));
-    }
-
     const commentsCacheKey = `showverse:trakt:comments:${traktType}:${id}:${tCommentsTab}`;
 
     const load = async () => {
-      const isLikes30 = tCommentsTab === "likes30";
-      const isFirstPage = isLikes30 || tComments.page === 1;
+      const isFirstPage = tComments.page === 1;
 
       // SWR: pintamos la caché al instante (sin spinner) y revalidamos en 2º
       // plano, así al volver a entrar los comentarios aparecen ya cargados.
@@ -4649,6 +4643,7 @@ export default function DetailsClient({
               loading: false,
               error: "",
               items: cached.items,
+              pageCount: Number(cached.pageCount || 0),
               hasMore: !!cached.hasMore,
               total: Number(cached.total || 0),
             }));
@@ -4659,11 +4654,12 @@ export default function DetailsClient({
       setTComments((p) => ({ ...p, loading: !hadCache, error: "" }));
 
       try {
-        const sort = tCommentsTab === "recent" ? "newest" : "likes";
-
-        // Para likes30: pedimos mas y filtramos por fecha (ultimos 30 dias)
-        const reqLimit = isLikes30 ? 50 : COMMENTS_SECTION_LIMIT;
-        const page = isLikes30 ? 1 : tComments.page;
+        const sort =
+          tCommentsTab === "recent"
+            ? "newest"
+            : tCommentsTab === "likes30"
+              ? "likes30"
+              : "likes";
 
         // Timeout generoso para comentarios adicionales de Trakt
         const r = await withTimeout(
@@ -4671,38 +4667,27 @@ export default function DetailsClient({
             type: traktType,
             tmdbId: id,
             sort,
-            page,
-            limit: reqLimit,
+            page: tComments.page,
+            limit: COMMENTS_PAGE_SIZE,
           }),
           20000,
         );
 
         if (ignore) return;
 
-        let items = Array.isArray(r?.items) ? r.items : [];
+        const items = Array.isArray(r?.items) ? r.items : [];
         const total = Number(r?.pagination?.itemCount || 0);
-        const hasMore = !!(
-          r?.pagination?.pageCount &&
-          r?.pagination?.page < r?.pagination?.pageCount
-        );
-
-        if (isLikes30) {
-          const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
-          items = items.filter((c) => {
-            const t = new Date(c?.created_at || 0).getTime();
-            return Number.isFinite(t) && t >= cutoff;
-          });
-          // Limitar a 20 comentarios para la UI
-          items = items.slice(0, 20);
-        }
+        const pageCount = Number(r?.pagination?.pageCount || 0);
+        const page = Number(r?.pagination?.page || tComments.page) || 1;
 
         setTComments((p) => ({
           ...p,
           loading: false,
           error: "",
-          items:
-            p.page > 1 && !isLikes30 ? [...(p.items || []), ...items] : items,
-          hasMore: !isLikes30 ? hasMore : false,
+          items,
+          page,
+          pageCount,
+          hasMore: page < pageCount,
           total,
         }));
 
@@ -4713,7 +4698,8 @@ export default function DetailsClient({
               commentsCacheKey,
               JSON.stringify({
                 items,
-                hasMore: !isLikes30 ? hasMore : false,
+                pageCount,
+                hasMore: page < pageCount,
                 total,
                 t: Date.now(),
               }),
@@ -4756,7 +4742,7 @@ export default function DetailsClient({
     tCommentsTab,
     tComments.page,
     traktDeferredReady,
-    COMMENTS_SECTION_LIMIT,
+    COMMENTS_PAGE_SIZE,
   ]);
 
   // Carga independiente del análisis de sentimiento para que no dependa
@@ -7578,11 +7564,6 @@ export default function DetailsClient({
   const videosCount = videos?.length || 0;
   const mediaCount = sumCount(postersCount, backdropsCount, videosCount);
 
-  // Trakt comments + TMDb reviews (para el badge tipo "448+4")
-  const traktCommentsCount = Number(tComments?.total || 0);
-  const reviewsCount = Array.isArray(reviews) ? reviews.length : 0;
-  const commentsCount = mixedCount(traktCommentsCount, reviewsCount);
-
   // Otros counts
   const listsCount = Array.isArray(tLists?.items) ? tLists.items.length : 0;
   const castCount = Array.isArray(castData) ? castData.length : 0;
@@ -7792,10 +7773,8 @@ export default function DetailsClient({
       });
     }
 
-    // Comentarios = Trakt + Criticas (unificado)
-    const traktCommentsCount = Number(tComments?.total || 0) || 0;
-    const reviewsCount = Array.isArray(reviews) ? reviews.length : 0;
-    const commentsCount = traktCommentsCount + reviewsCount;
+    // Comentarios comunitarios, almacenados en nuestra BBDD.
+    const commentsCount = Number(tComments?.total || 0) || 0;
 
     items.push({
       id: "comments",
@@ -7820,7 +7799,6 @@ export default function DetailsClient({
     imagesState?.backdrops,
     videos,
     tComments?.total,
-    reviews,
     visibleTraktSeasons.length,
     tLists?.items,
     castDataForUI,
@@ -12029,67 +12007,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   ref={registerSection("comments")}
                 >
                   <AnimatedSection delay={0.04} renderImmediately>
-                    {/* CRÍTICAS */}
-                    {reviews && reviews.length > 0 && (
-                      <section className="mb-10 group/section">
-                        <SectionTitle
-                          title="Críticas de Usuarios"
-                          icon={MessageSquareIcon}
-                        />
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          {reviews.slice(0, 2).map((r) => {
-                            // Sin avatar en TMDB no se pide uno a un servicio
-                            // externo: la inicial se pinta aquí mismo.
-                            const avatar = r.author_details?.avatar_path
-                              ? r.author_details.avatar_path.startsWith(
-                                  "/https",
-                                )
-                                ? r.author_details.avatar_path.slice(1)
-                                : `https://image.tmdb.org/t/p/w185${r.author_details.avatar_path}`
-                              : null;
-
-                            return (
-                              <div
-                                key={r.id}
-                                className={`relative isolate flex flex-col gap-4 overflow-hidden rounded-2xl p-6 transform-gpu transition-all ${LIQUID_GLASS_CARD} hover:brightness-110`}
-                              >
-                                <LiquidGlassOpticalLayers />
-                                <div className="relative z-10 flex items-center gap-4">
-                                  <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10 text-lg font-black text-white shadow-lg">
-                                    <Avatar src={avatar} name={r.author} />
-                                  </span>
-                                  <div>
-                                    <h4 className="font-bold text-white">
-                                      {r.author}
-                                    </h4>
-                                    <div className="flex items-center gap-2 text-xs text-gray-400">
-                                      <span>
-                                        {new Date(
-                                          r.created_at,
-                                        ).toLocaleDateString()}
-                                      </span>
-                                      {r.author_details?.rating && (
-                                        <span className="text-yellow-500 bg-yellow-500/10 px-2 rounded font-bold">
-                                          ★ {r.author_details.rating}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="relative z-10 text-gray-300 text-sm leading-relaxed line-clamp-4 italic">
-                                  "{r.content.replace(/<[^>]*>?/gm, "")}"
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </section>
-                    )}
-                  </AnimatedSection>
-
-                  <AnimatedSection delay={0.04} renderImmediately>
                     {/* ===================================================== */}
                     {/* Trakt: comentarios */}
                     <section className="mb-10 group/section">
@@ -12118,7 +12035,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               <button
                                 key={t.id}
                                 type="button"
-                                onClick={() => setTCommentsTab(t.id)}
+                                onClick={() => selectCommentsTab(t.id)}
+                                aria-pressed={tCommentsTab === t.id}
+                                aria-controls="comments-list"
                                 className={`relative isolate flex transform-gpu items-center justify-center rounded-xl px-4 py-1.5 text-xs font-bold transition-all ${
                                   tCommentsTab === t.id
                                     ? `${LIQUID_GLASS_CARD} text-white`
@@ -12137,7 +12056,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           )}
                         </div>
 
-                        <div className="relative z-10 space-y-4 p-4 sm:p-6">
+                        <div
+                          id="comments-list"
+                          className="relative z-10 space-y-4 p-4 sm:p-6"
+                        >
 
                           {!tComments.loading &&
                             (tComments.items || []).length === 0 && (
@@ -12149,9 +12071,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               </div>
                             )}
 
-                          {(tComments.items || [])
-                            .slice(0, COMMENTS_SECTION_LIMIT)
-                            .map((c) => {
+                          {(tComments.items || []).map((c) => {
                               const user = c?.user || {};
                               const avatar =
                                 user?.images?.avatar?.full ||
@@ -12257,7 +12177,51 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   </div>
                                 </div>
                               );
-                            })}
+                          })}
+
+                          {tComments.pageCount > 1 && (
+                            <nav
+                              className="flex flex-wrap items-center justify-between gap-3 pt-2"
+                              aria-label="Paginación de comentarios"
+                            >
+                              <p
+                                className="text-xs text-zinc-500"
+                                aria-live="polite"
+                              >
+                                Página {tComments.page} de {tComments.pageCount}
+                                {tComments.total > 0
+                                  ? ` · ${tComments.total} comentarios`
+                                  : ""}
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    selectCommentsPage(tComments.page - 1)
+                                  }
+                                  disabled={tComments.loading || tComments.page <= 1}
+                                  className="inline-flex items-center gap-1 rounded-lg bg-white/5 px-3 py-2 text-xs font-bold text-zinc-300 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"
+                                >
+                                  <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                                  Anterior
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    selectCommentsPage(tComments.page + 1)
+                                  }
+                                  disabled={
+                                    tComments.loading ||
+                                    tComments.page >= tComments.pageCount
+                                  }
+                                  className="inline-flex items-center gap-1 rounded-lg bg-white/5 px-3 py-2 text-xs font-bold text-zinc-300 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"
+                                >
+                                  Siguiente
+                                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                                </button>
+                              </div>
+                            </nav>
+                          )}
                         </div>
                       </div>
                     </section>

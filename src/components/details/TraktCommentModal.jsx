@@ -137,7 +137,7 @@ export default function TraktCommentModal({
         <div className="flex w-full items-center justify-between px-5 py-4 sm:px-6 sm:py-6 bg-white/[0.025] shrink-0">
           <div>
             <h3 className="text-lg sm:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400">
-              {editingCommentId ? "Editar reseña" : "Escribir reseña"}
+              {editingCommentId ? "Editar comentario" : "Escribir comentario"}
             </h3>
             <p className="text-[10px] sm:text-xs text-zinc-500 mt-0.5 sm:mt-1 font-medium tracking-wide uppercase">
               {title || "Trakt.tv"}
@@ -176,7 +176,7 @@ export default function TraktCommentModal({
                   setCommentText(e.target.value);
                   if (error) setError("");
                 }}
-                placeholder="Escribe tu reseña o comentario aquí..."
+                placeholder="Escribe tu comentario aquí..."
                 className="w-full min-h-[160px] sm:min-h-[240px] rounded-2xl bg-black/30 p-3.5 sm:p-4 text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50 resize-none transition"
                 disabled={submitting}
               />
@@ -238,7 +238,7 @@ export default function TraktCommentModal({
             {myComments && myComments.length > 0 && (
               <div className="border-t border-white/10 pt-6 space-y-4">
                 <h4 className="text-xs font-black text-zinc-400 tracking-wider uppercase">
-                  Mis opiniones anteriores ({myComments.length})
+                  Mis comentarios anteriores ({myComments.length})
                 </h4>
                 <div className="space-y-4">
                   {myComments.map((comment) => (

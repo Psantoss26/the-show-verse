@@ -38,6 +38,24 @@ test("la cabecera de episodios comparte el espaciado de los demás modales", () 
   );
 });
 
+test("el cierre y las tarjetas de episodios no muestran contornos visuales", () => {
+  assert.match(
+    modalSource,
+    /rounded-full border-0 bg-white\/5 text-white\/70 shadow-none[\s\S]*?aria-label="Cerrar \(Esc\)"/,
+    "el botón de cierre no debe añadir borde ni relieve",
+  );
+  assert.match(
+    modalSource,
+    /group flex cursor-pointer[\s\S]*?rounded-2xl border-0[\s\S]*?shadow-none backdrop-blur-xl/,
+    "cada fila de episodio debe prescindir de borde y sombra",
+  );
+  assert.match(
+    modalSource,
+    /aspect-video w-24[\s\S]*?rounded-xl border-0 bg-black\/30 shadow-none sm:w-32/,
+    "la miniatura no debe recuperar un contorno interior",
+  );
+});
+
 test("un rewatch conserva su icono y etiqueta completos", () => {
   assert.match(modalSource, /isRewatchView \? "w-max"/);
   assert.match(modalSource, /isRewatchView \? "w-10 xl:w-11"/);
