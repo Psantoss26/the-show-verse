@@ -458,7 +458,7 @@ export default function TraktWatchedModal({
             </div>
 
             {!items.length ? (
-              <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-white/10 bg-white/5 py-8 text-center backdrop-blur-xl">
+              <div className="flex flex-col items-center justify-center rounded-3xl bg-white/5 py-8 text-center backdrop-blur-xl">
                 <Clock className="mb-2 w-8 h-8 text-white/25" />
                 <p className="text-sm text-white/45">
                   No hay registros en el historial.

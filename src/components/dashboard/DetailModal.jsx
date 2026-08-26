@@ -134,7 +134,7 @@ import {
   traktUpdateWatchPlay,
   traktRemoveWatchPlay,
   traktGetEpisodePlays,
-  traktSetEpisodeWatched,
+  traktAddEpisodePlay,
 } from "@/lib/api/traktClient";
 
 import { useDetailModalData } from "@/components/dashboard/useDetailModalData";
@@ -935,6 +935,11 @@ export default function DetailModal({
     loading: true,
     busy: false,
   });
+  const [episodePlaysOpen, setEpisodePlaysOpen] = useState(false);
+  const [episodePlays, setEpisodePlays] = useState({
+    plays: 0,
+    history: [],
+  });
   const [epRate, setEpRate] = useState({
     value: null,
     loading: true,
@@ -1097,6 +1102,10 @@ export default function DetailModal({
           episode,
         });
         if (alive) {
+          setEpisodePlays({
+            plays: plays?.plays ?? 0,
+            history: Array.isArray(plays?.history) ? plays.history : [],
+          });
           setEpWatch((s) => ({
             ...s,
             connected: plays?.connected !== false,
@@ -1139,28 +1148,104 @@ export default function DetailModal({
     item?.episodeNumber,
   ]);
 
-  const handleEpisodeWatchedToggle = async () => {
+  const refreshEpisodePlays = async () => {
+    if (item?.media_type !== "episode") return null;
+    const showId = item.showId ?? item.id;
+    if (
+      showId == null ||
+      item.seasonNumber == null ||
+      item.episodeNumber == null
+    ) {
+      return null;
+    }
+
+    const plays = await traktGetEpisodePlays({
+      tmdbId: showId,
+      season: item.seasonNumber,
+      episode: item.episodeNumber,
+    });
+    const nextPlays = Number(plays?.plays ?? 0);
+    setEpisodePlays({
+      plays: nextPlays,
+      history: Array.isArray(plays?.history) ? plays.history : [],
+    });
+    setEpWatch((state) => ({
+      ...state,
+      connected: plays?.connected !== false,
+      watched: nextPlays > 0,
+      plays: nextPlays,
+    }));
+    return plays;
+  };
+
+  const openEpisodePlays = async () => {
     if (item?.media_type !== "episode" || epWatch.busy) return;
     if (requireLogin()) return;
-    const showId = item.showId ?? item.id;
-    const next = !epWatch.watched;
     setEpWatch((s) => ({ ...s, busy: true }));
     try {
-      await traktSetEpisodeWatched({
+      await refreshEpisodePlays();
+    } catch {
+      setError("No se pudo cargar el historial de visionados.");
+    } finally {
+      setEpWatch((s) => ({ ...s, busy: false }));
+      // Aunque la recarga puntual falle, el usuario debe poder abrir el gestor
+      // y registrar un visionado nuevo, igual que en EpisodeDetails.
+      setEpisodePlaysOpen(true);
+    }
+  };
+
+  const handleEpisodeAddPlay = async (watchedAt) => {
+    if (item?.media_type !== "episode" || epWatch.busy) return;
+    const showId = item.showId ?? item.id;
+    setEpWatch((s) => ({ ...s, busy: true }));
+    setError("");
+    try {
+      await traktAddEpisodePlay({
         tmdbId: showId,
         season: item.seasonNumber,
         episode: item.episodeNumber,
-        watched: next,
-        title,
+        watchedAt,
+        title: episodeMeta?.showName || title,
       });
-      setEpWatch((s) => ({
-        ...s,
-        watched: next,
-        plays: next ? Math.max(1, s.plays) : 0,
-        connected: true,
-      }));
+      await refreshEpisodePlays();
     } catch {
-      // error al marcar
+      setError("No se pudo añadir el visionado.");
+    } finally {
+      setEpWatch((s) => ({ ...s, busy: false }));
+    }
+  };
+
+  const handleEpisodeUpdatePlay = async (historyId, watchedAt) => {
+    if (item?.media_type !== "episode" || epWatch.busy) return;
+    const showId = item.showId ?? item.id;
+    setEpWatch((s) => ({ ...s, busy: true }));
+    setError("");
+    try {
+      await traktRemoveWatchPlay({ historyId });
+      await traktAddEpisodePlay({
+        tmdbId: showId,
+        season: item.seasonNumber,
+        episode: item.episodeNumber,
+        watchedAt,
+        title: episodeMeta?.showName || title,
+      });
+      await refreshEpisodePlays();
+    } catch {
+      setError("No se pudo actualizar el visionado.");
+    } finally {
+      setEpWatch((s) => ({ ...s, busy: false }));
+    }
+  };
+
+  const handleEpisodeRemovePlay = async (historyId) => {
+    if (item?.media_type !== "episode" || epWatch.busy) return;
+    setEpWatch((s) => ({ ...s, busy: true }));
+    setError("");
+    try {
+      await traktRemoveWatchPlay({ historyId });
+      await refreshEpisodePlays();
+    } catch {
+      setError("No se pudo eliminar el visionado.");
     } finally {
       setEpWatch((s) => ({ ...s, busy: false }));
     }
@@ -2406,6 +2491,22 @@ export default function DetailModal({
         onRemovePlay={handleTraktRemovePlay}
       />
 
+      {/* Historial de visionados del episodio: el mismo gestor que usa
+          EpisodeDetails, para añadir, editar o borrar plays explícitamente. */}
+      <TraktWatchedModal
+        open={episodePlaysOpen}
+        onClose={() => {
+          setEpisodePlaysOpen(false);
+          void refreshEpisodePlays().catch(() => {});
+        }}
+        plays={episodePlays.plays}
+        history={episodePlays.history}
+        busy={epWatch.busy}
+        onAddPlay={handleEpisodeAddPlay}
+        onUpdatePlay={handleEpisodeUpdatePlay}
+        onRemovePlay={handleEpisodeRemovePlay}
+      />
+
       {/* Visto en Trakt (SERIES) — modal de EPISODIOS vistos: temporadas,
           rewatches y plays. MISMO componente + MISMA lógica (hook compartido)
           que DetailsClient. */}
@@ -2994,7 +3095,7 @@ export default function DetailModal({
                       badge: null,
                       busy: epWatch.busy,
                       loading: epWatch.loading,
-                      onOpen: handleEpisodeWatchedToggle,
+                      onOpen: openEpisodePlays,
                     }}
                     rate={{
                       rating: epRate.value,
