@@ -30,7 +30,7 @@ import StreamingProviderLogo from "@/components/details/StreamingProviderLogo";
 import DetailsScoreboardPanel from "@/components/details/DetailsScoreboardPanel";
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
-import { LIQUID_GLASS_CARD } from "@/lib/ui/liquidGlass";
+import { LIQUID_GLASS_BAR, LIQUID_GLASS_CARD } from "@/lib/ui/liquidGlass";
 import {
   buildTraktHref,
   buildImdbHref,
@@ -47,6 +47,7 @@ import {
   getSeriesGraphSeasonAggregate,
 } from "@/lib/details/seriesGraphRatings";
 import TraktEpisodesWatchedModal from "@/components/trakt/TraktEpisodesWatchedModal";
+import { useTraktEpisodesWatched } from "@/lib/hooks/useTraktEpisodesWatched";
 import SubrouteDetailsActionRow from "@/components/details/SubrouteDetailsActionRow";
 import {
   invalidateTraktGetCache,
@@ -262,6 +263,16 @@ export default function SeasonDetailsClient({
 
   const episodes = Array.isArray(season?.episodes) ? season.episodes : [];
   const totalEp = episodes.length;
+  const seasonModalSeasons = useMemo(
+    () => [
+      {
+        season_number: Number(seasonNumber),
+        episode_count: totalEp,
+        name: seasonName,
+      },
+    ],
+    [seasonNumber, totalEp, seasonName],
+  );
   const initialWatchedBySeason = useMemo(
     () => normalizeWatchedBySeason(initialShowWatched?.watchedBySeason),
     [initialShowWatched],
@@ -670,6 +681,23 @@ export default function SeasonDetailsClient({
     [applyShowWatchedPayload, showId],
   );
 
+  // Comparte la máquina de rewatch con DetailsClient. La ficha de temporada
+  // conserva sus acciones propias para marcar la temporada, pero el modal
+  // recibe los plays, runs y la vista activa de la serie y los muestra solo
+  // para `seasonModalSeasons`.
+  const seasonEpisodesMachine = useTraktEpisodesWatched({
+    mediaType: "tv",
+    tmdbId: Number(showId),
+    title: showName,
+    connected: !!trakt?.connected,
+    seasons: seasonModalSeasons,
+    traktId: trakt?.traktId ?? null,
+    episodesModalOpen: traktEpisodesOpen,
+    initialWatchedBySeason,
+    initialWatchedLoaded: hasInitialShowWatched,
+    onStatusShouldRefresh: () => reloadSeasonTraktState({ background: true }),
+  });
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -886,6 +914,8 @@ export default function SeasonDetailsClient({
               tmdbId: Number(showId),
               season: Number(seasonNumber),
               rating: val ?? null,
+              title: showName,
+              posterPath,
             }),
           },
           {
@@ -915,7 +945,7 @@ export default function SeasonDetailsClient({
         setRatingLoading(false);
       }
     },
-    [showId, seasonNumber],
+    [showId, seasonNumber, showName, posterPath],
   );
 
   useEffect(() => {
@@ -1374,15 +1404,22 @@ export default function SeasonDetailsClient({
               </div>
             </div>
 
-            <div className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1 shrink-0">
+            <div
+              role="group"
+              aria-label="Modo de vista de episodios"
+              className={`relative isolate flex shrink-0 items-center gap-1 overflow-hidden rounded-full p-1 ${LIQUID_GLASS_BAR}`}
+            >
+              {/* Misma refracción y reflejos sutiles que el selector de
+                  secciones de DetailsClient, sin dibujar un borde. */}
+              <LiquidGlassOpticalLayers />
               <button
                 type="button"
                 onClick={() => setEpisodesView("list")}
                 className={[
-                  "h-9 w-9 rounded-full grid place-items-center transition",
+                  "relative z-10 grid h-9 w-9 place-items-center rounded-full transition-[color,background-color,box-shadow,transform] duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-300",
                   episodesView === "list"
-                    ? "bg-white/10 text-white"
-                    : "text-zinc-400 hover:text-white hover:bg-white/10",
+                    ? "bg-white/[0.16] text-white shadow-[0_6px_18px_-8px_rgba(0,0,0,0.9)]"
+                    : "text-white/65 hover:bg-white/[0.08] hover:text-white",
                 ].join(" ")}
                 title="Vista lista"
                 aria-pressed={episodesView === "list"}
@@ -1394,10 +1431,10 @@ export default function SeasonDetailsClient({
                 type="button"
                 onClick={() => setEpisodesView("grid")}
                 className={[
-                  "h-9 w-9 rounded-full grid place-items-center transition",
+                  "relative z-10 grid h-9 w-9 place-items-center rounded-full transition-[color,background-color,box-shadow,transform] duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-300",
                   episodesView === "grid"
-                    ? "bg-white/10 text-white"
-                    : "text-zinc-400 hover:text-white hover:bg-white/10",
+                    ? "bg-white/[0.16] text-white shadow-[0_6px_18px_-8px_rgba(0,0,0,0.9)]"
+                    : "text-white/65 hover:bg-white/[0.08] hover:text-white",
                 ].join(" ")}
                 title="Vista grid"
                 aria-pressed={episodesView === "grid"}
@@ -1603,11 +1640,22 @@ export default function SeasonDetailsClient({
         tmdbId={Number(showId)}
         title={showName}
         connected={!!trakt?.connected}
-        seasons={[{ season_number: Number(seasonNumber) }]}
+        seasons={seasonModalSeasons}
         watchedBySeason={watchedBySeason}
-        busyKey={episodeBusyKey}
+        busyKey={episodeBusyKey || seasonEpisodesMachine.episodeBusyKey}
         onToggleEpisodeWatched={toggleEpisodeWatched}
         onToggleShowWatched={toggleSeasonWatched}
+        showPlays={seasonEpisodesMachine.showPlays}
+        showReleaseDate={show?.first_air_date || null}
+        onAddShowPlay={toggleSeasonWatched}
+        rewatchRuns={seasonEpisodesMachine.rewatchRuns}
+        activeView={seasonEpisodesMachine.activeEpisodesView}
+        onChangeView={seasonEpisodesMachine.changeEpisodesView}
+        onCreateRewatchRun={seasonEpisodesMachine.createRewatchRun}
+        onDeleteRewatchRun={seasonEpisodesMachine.deleteRewatchRun}
+        rewatchStartAt={seasonEpisodesMachine.rewatchStartAt}
+        watchedBySeasonRewatch={seasonEpisodesMachine.rewatchWatchedBySeason}
+        onToggleEpisodeRewatch={seasonEpisodesMachine.toggleEpisodeRewatch}
       />
 
       <ExternalLinksModal

@@ -1,5 +1,6 @@
 "use client";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 
 import { useEffect, useMemo, useState } from "react";
 import useModalGuard from "@/hooks/useModalGuard";
@@ -150,25 +151,27 @@ function CalendarPickerModal({
       />
 
       <div
-        className={`relative w-full max-w-sm overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
+        className={`relative isolate w-full max-w-sm overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_30px_80px_-15px_rgba(0,0,0,0.95)] animate-in zoom-in-95 duration-300 ease-out`}
         role="dialog"
         aria-modal="true"
         aria-label={title}
       >
+        <LiquidGlassOpticalLayers />
+
         {/* Header Calendario */}
-        <div className="flex items-center justify-between px-5 py-4 bg-white/[0.025]">
+        <div className="relative z-10 flex items-center justify-between bg-white/[0.035] px-6 py-5 backdrop-blur-xl">
           <div>
-            <div className="text-sm font-black uppercase tracking-wide text-white drop-shadow-sm">
+            <div className="text-sm font-black uppercase tracking-wide text-white drop-shadow-md">
               {title}
             </div>
-            <div className="mt-0.5 font-mono text-xs font-semibold text-emerald-300">
+            <div className="mt-1 font-mono text-xs font-semibold text-emerald-200">
               {selected ? formatYmdHuman(selected) : "Sin fecha"}
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white"
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
             aria-label="Cerrar"
           >
             <X className="w-5 h-5" />
@@ -176,7 +179,7 @@ function CalendarPickerModal({
         </div>
 
         {/* Navegación Mes */}
-        <div className="p-4 pb-0 flex items-center justify-between mb-4">
+        <div className="relative z-10 flex items-center justify-between px-5 pb-4 pt-5 sm:px-6">
           <button
             type="button"
             onClick={() =>
@@ -184,12 +187,12 @@ function CalendarPickerModal({
                 (d) => new Date(d.getFullYear(), d.getMonth() - 1, 1),
               )
             }
-            className="rounded-full bg-white/5 p-2 text-white/70 transition hover:bg-white/10 hover:text-white"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.055] text-white/70 shadow-sm backdrop-blur-md transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
             aria-label="Mes anterior"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
-          <span className="text-sm font-bold text-white capitalize">
+          <span className="rounded-2xl bg-white/[0.04] px-4 py-2 text-sm font-bold capitalize text-white shadow-sm backdrop-blur-md">
             {monthLabel}
           </span>
           <button
@@ -199,7 +202,7 @@ function CalendarPickerModal({
                 (d) => new Date(d.getFullYear(), d.getMonth() + 1, 1),
               )
             }
-            className="rounded-full bg-white/5 p-2 text-white/70 transition hover:bg-white/10 hover:text-white"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.055] text-white/70 shadow-sm backdrop-blur-md transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
             aria-label="Mes siguiente"
           >
             <ChevronRight className="w-5 h-5" />
@@ -207,12 +210,12 @@ function CalendarPickerModal({
         </div>
 
         {/* Grid */}
-        <div className="px-4 pb-6">
-          <div className="grid grid-cols-7 mb-2">
+        <div className="relative z-10 mx-5 mb-5 rounded-3xl bg-black/[0.12] bg-gradient-to-b from-white/[0.07] via-white/[0.025] to-black/[0.10] p-3.5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_12px_30px_-18px_rgba(0,0,0,0.9)] backdrop-blur-xl sm:mx-6 sm:p-4">
+          <div className="mb-3 grid grid-cols-7">
             {dow.map((d) => (
               <div
                 key={d}
-                className="text-center text-[10px] font-bold text-zinc-500 uppercase"
+                className="text-center text-[10px] font-bold uppercase tracking-wide text-zinc-500"
               >
                 {d}
               </div>
@@ -231,15 +234,16 @@ function CalendarPickerModal({
                   type="button"
                   onClick={() => key && onSelect?.(key)}
                   className={`
-                                        relative aspect-square rounded-lg flex items-center justify-center text-sm font-medium transition-all duration-200
-                                        ${!inMonth ? "text-white/20 opacity-50" : "text-white/70 hover:bg-white/10 hover:text-white"}
-                                        ${isSel ? "!bg-emerald-500 !text-black font-extrabold shadow-[0_0_15px_rgba(16,185,129,0.4)] scale-105 z-10" : ""}
-                                        ${isToday && !isSel ? "bg-white/5 text-white" : ""}
+                    relative z-0 flex aspect-square items-center justify-center rounded-xl text-sm font-medium transition-all duration-200
+                    ${!inMonth ? "text-white/20 opacity-50" : "text-white/70 hover:bg-white/[0.10] hover:text-white"}
+                    ${isSel ? "z-10 !bg-emerald-400 !text-black font-extrabold shadow-[0_0_18px_rgba(52,211,153,0.38)] scale-105" : ""}
+                    ${isToday && !isSel ? "bg-white/[0.08] text-white shadow-sm" : ""}
+                    focus-visible:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300
                                     `}
                 >
                   {d.getDate()}
                   {isToday && !isSel && (
-                    <div className="absolute bottom-1 w-1 h-1 bg-emerald-500 rounded-full" />
+                    <div className="absolute bottom-1 h-1 w-1 rounded-full bg-emerald-400" />
                   )}
                 </button>
               );
@@ -250,7 +254,7 @@ function CalendarPickerModal({
             <button
               type="button"
               onClick={() => onSelect?.(todayYmd())}
-              className="flex-1 rounded-full bg-white/10 py-2.5 text-xs font-bold uppercase tracking-wide text-white/90 backdrop-blur-xl transition hover:bg-white/20 active:scale-95"
+              className="flex-1 rounded-2xl bg-white/[0.08] bg-gradient-to-b from-white/[0.16] to-white/[0.04] py-3 text-xs font-bold uppercase tracking-wide text-white/90 shadow-sm backdrop-blur-xl transition hover:bg-white/[0.14] hover:text-white active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
             >
               Seleccionar Hoy
             </button>

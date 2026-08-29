@@ -44,6 +44,10 @@ import useModalGuard from "@/hooks/useModalGuard";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { profileSectionCacheKey } from "@/lib/profile/sectionCache";
 import {
+  formatActivityRatingTarget,
+  getActivityDetailsHref,
+} from "@/lib/profile/activityRatingTarget";
+import {
   filterPendingHistoryRemovals,
   getPendingListChanges,
   getPendingHistoryRemovals,
@@ -723,9 +727,10 @@ function ActivityTitle({ item, className = "" }) {
   const previewClick = usePreviewOpen();
   if (!item.tmdbId || !item.mediaType) return null;
   const type = item.mediaType === "tv" || item.mediaType === "episode" ? "tv" : "movie";
+  const href = getActivityDetailsHref(item);
   return (
     <Link
-      href={`/details/${type}/${item.tmdbId}`}
+      href={href || `/details/${type}/${item.tmdbId}`}
       onClick={previewClick(item, { mediaType: type, episode: getEpisodePreview(item) })}
       className={`font-bold text-white transition-colors hover:text-emerald-300 ${className}`}
     >
@@ -737,6 +742,7 @@ function ActivityTitle({ item, className = "" }) {
 function ActivityPoster({ item, className = "" }) {
   const previewClick = usePreviewOpen();
   const type = item?.mediaType === "tv" || item?.mediaType === "episode" ? "tv" : "movie";
+  const href = getActivityDetailsHref(item);
   const src = item?.posterPath ? `https://image.tmdb.org/t/p/w185${item.posterPath}` : null;
   const poster = src ? (
     <OptimizedImage src={src} alt={item?.title || ""} className="h-full w-full object-cover" loading="lazy" />
@@ -752,7 +758,7 @@ function ActivityPoster({ item, className = "" }) {
 
   return (
     <Link
-      href={`/details/${type}/${item.tmdbId}`}
+      href={href || `/details/${type}/${item.tmdbId}`}
       onClick={previewClick(item, { mediaType: type, episode: getEpisodePreview(item) })}
       className={`${className} shrink-0 overflow-hidden bg-zinc-900 ring-1 ring-white/10 transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70`}
       aria-label={`Ver ${item.title || "ficha"}`}
@@ -825,6 +831,8 @@ function ActivityRow({ item, actor, compact = false, posterList = false }) {
   const episodeLabel = item.type === "watched" && item.season && item.episode
     ? `S${String(item.season).padStart(2, "0")}E${String(item.episode).padStart(2, "0")} de `
     : "";
+  const ratingTargetLabel =
+    item.type === "rating" ? `${formatActivityRatingTarget(item)} ` : "";
 
   return (
     <article className={`flex min-w-0 items-center gap-3 border-b border-white/[0.07] px-3 last:border-b-0 sm:px-4 ${compact ? "py-2" : "py-3"}`}>
@@ -845,7 +853,7 @@ function ActivityRow({ item, actor, compact = false, posterList = false }) {
       <p className="min-w-0 flex-1 text-sm leading-5 text-zinc-400">
         <span className="font-semibold text-zinc-300">{actor?.displayName || actor?.username || "Este usuario"}</span>{" "}
         {actionText}{" "}
-        {episodeLabel}
+        {ratingTargetLabel || episodeLabel}
         {item.type === "list" ? (
           <Link href={`/lists/${item.id.replace("list:", "")}`} className="font-bold text-white hover:text-emerald-300">{item.name}</Link>
         ) : (

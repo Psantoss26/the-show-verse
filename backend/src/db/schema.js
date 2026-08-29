@@ -191,7 +191,7 @@ export const userRatings = pgTable('user_ratings', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   tmdbId: integer('tmdb_id').notNull(),
-  mediaType: text('media_type').notNull(),                // 'movie' | 'tv' | 'episode'
+  mediaType: text('media_type').notNull(),                // 'movie' | 'tv' | 'season' | 'episode'
   season: integer('season'),
   episode: integer('episode'),
   rating: real('rating').notNull(),                   // 1–10
@@ -201,9 +201,10 @@ export const userRatings = pgTable('user_ratings', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => ({
   uniqueTitleRating: uniqueIndex('idx_ratings_unique_title').on(t.userId, t.tmdbId, t.mediaType).where(sql`media_type IN ('movie', 'tv') AND season IS NULL AND episode IS NULL`),
+  uniqueSeasonRating: uniqueIndex('idx_ratings_unique_season').on(t.userId, t.tmdbId, t.season).where(sql`media_type = 'season' AND season IS NOT NULL AND episode IS NULL`),
   uniqueEpisodeRating: uniqueIndex('idx_ratings_unique_episode').on(t.userId, t.tmdbId, t.season, t.episode).where(sql`media_type = 'episode' AND season IS NOT NULL AND episode IS NOT NULL`),
   userIdIdx: index('idx_ratings_user_id').on(t.userId),
-  mediaTypeCheck: check('chk_ratings_media_type', sql`media_type IN ('movie', 'tv', 'episode')`),
+  mediaTypeCheck: check('chk_ratings_media_type', sql`media_type IN ('movie', 'tv', 'season', 'episode')`),
   ratingCheck: check('chk_ratings_value', sql`rating BETWEEN 1 AND 10`),
 }));
 

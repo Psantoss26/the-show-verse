@@ -53,7 +53,7 @@ test("clasifica solo deslizamientos horizontales breves y suficientes", () => {
   );
 });
 
-test("las pestañas móviles activan un gesto táctil que no termina como clic", async () => {
+test("las pestañas móviles usan la misma captura táctil fiable que Perfil", async () => {
   const [swipeHook, detailsClient, seasonDetails, episodeDetails] = await Promise.all([
     readSource("./useHorizontalSwipe.js"),
     readSource("../components/DetailsClient.jsx"),
@@ -61,10 +61,12 @@ test("las pestañas móviles activan un gesto táctil que no termina como clic",
     readSource("../components/EpisodeDetailsClient.jsx"),
   ]);
 
-  assert.match(swipeHook, /onPointerDown/);
-  assert.match(swipeHook, /onPointerUp/);
+  assert.match(swipeHook, /onTouchStartCapture/);
+  assert.match(swipeHook, /onTouchEndCapture/);
+  assert.match(swipeHook, /onTouchCancelCapture/);
   assert.match(swipeHook, /onClickCapture/);
   assert.match(swipeHook, /event\.stopPropagation\(\)/);
+  assert.match(swipeHook, /shouldStart && !shouldStart\(event\)/);
 
   assert.match(detailsClient, /<DetailsInfoTabs[\s\S]*?mobileLayout[\s\S]*?enableMobileTabSwipe/);
   assert.match(seasonDetails, /<DetailsInfoTabs[\s\S]*?enableMobileTabSwipe/);

@@ -300,6 +300,7 @@ export default function EpisodeDetailsClient({
   );
 
   const stillPath = episode?.still_path || null;
+  const showPosterPath = show?.poster_path || null;
   const heroBgPath =
     stillPath || show?.backdrop_path || show?.poster_path || null;
 
@@ -825,6 +826,8 @@ export default function EpisodeDetailsClient({
               season: Number(seasonNumber),
               episode: Number(episodeNumber),
               rating: next, // null => remove
+              title: showName,
+              posterPath: showPosterPath,
             }),
           },
           {
@@ -852,7 +855,7 @@ export default function EpisodeDetailsClient({
         setRatingLoading(false);
       }
     },
-    [showId, seasonNumber, episodeNumber],
+    [showId, seasonNumber, episodeNumber, showName, showPosterPath],
   );
 
   // Trigger (mismo hueco visual que antes)

@@ -34,8 +34,8 @@ export function getHorizontalSwipeDirection({
 }
 
 /**
- * Handlers de puntero para spreadear sobre el contenedor que debe responder a
- * deslizamientos horizontales en pantalla táctil.
+ * Handlers táctiles en fase de captura para el contenedor que debe responder a
+ * deslizamientos horizontales.
  *
  * NO llama a `preventDefault` durante el arrastre: el gesto se decide al
  * levantar el dedo mirando lo recorrido, de modo que el navegador conserva el
@@ -50,6 +50,7 @@ export default function useHorizontalSwipe({
   onSwipeLeft,
   onSwipeRight,
   enabled = true,
+  shouldStart,
 } = {}) {
   const startRef = useRef(null);
   const suppressClickUntilRef = useRef(0);
@@ -61,40 +62,54 @@ export default function useHorizontalSwipe({
   };
 
   return {
-    onPointerDown: (event) => {
-      if (event.pointerType !== "touch" || !event.isPrimary) {
+    // Misma estrategia que la navegación horizontal de Perfil: la captura
+    // recibe el inicio y el final aunque el dedo haya empezado sobre un botón
+    // del menú. Con Pointer Events algunos navegadores cancelan la secuencia
+    // al resolver su propio gesto de desplazamiento y nunca llega el `pointerup`.
+    onTouchStartCapture: (event) => {
+      if (event.touches.length !== 1) {
         cancel();
         return;
       }
+      if (shouldStart && !shouldStart(event)) {
+        cancel();
+        return;
+      }
+      const touch = event.touches[0];
       startRef.current = {
-        pointerId: event.pointerId,
-        x: event.clientX,
-        y: event.clientY,
+        x: touch.clientX,
+        y: touch.clientY,
         time: Date.now(),
       };
     },
     // Un arrastre claramente vertical es scroll de página, no un cambio de
     // sección. Lo descartamos pronto para no interpretar su final como swipe.
-    onPointerMove: (event) => {
+    onTouchMoveCapture: (event) => {
       const start = startRef.current;
-      if (!start || event.pointerId !== start.pointerId) return;
+      if (!start || event.touches.length !== 1) {
+        cancel();
+        return;
+      }
 
-      const deltaX = Math.abs(event.clientX - start.x);
-      const deltaY = Math.abs(event.clientY - start.y);
+      const touch = event.touches[0];
+
+      const deltaX = Math.abs(touch.clientX - start.x);
+      const deltaY = Math.abs(touch.clientY - start.y);
       if (Math.max(deltaX, deltaY) < MIN_DISTANCE_PX) return;
       if (deltaY > deltaX * MAX_OFF_AXIS_RATIO) cancel();
     },
-    onPointerUp: (event) => {
+    onTouchEndCapture: (event) => {
       const start = startRef.current;
       cancel();
-      if (!start || event.pointerId !== start.pointerId) return;
+      const touch = event.changedTouches?.[0];
+      if (!start || event.changedTouches.length !== 1 || !touch) return;
 
       const direction = getHorizontalSwipeDirection({
         startX: start.x,
         startY: start.y,
         startTime: start.time,
-        endX: event.clientX,
-        endY: event.clientY,
+        endX: touch.clientX,
+        endY: touch.clientY,
         endTime: Date.now(),
       });
       if (!direction) return;
@@ -103,7 +118,7 @@ export default function useHorizontalSwipe({
       if (direction === "left") onSwipeLeft?.();
       else onSwipeRight?.();
     },
-    onPointerCancel: cancel,
+    onTouchCancelCapture: cancel,
     onClickCapture: (event) => {
       if (Date.now() > suppressClickUntilRef.current) return;
       suppressClickUntilRef.current = 0;

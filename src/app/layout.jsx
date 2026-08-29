@@ -10,6 +10,7 @@ import AndroidSessionClaim from "@/components/android/AndroidSessionClaim";
 import OfflineBanner from "@/components/OfflineBanner";
 import OfflineQueueBadge from "@/components/OfflineQueueBadge";
 import ScrollRestoration from "@/components/ScrollRestoration";
+import MobileUserPageSwipeNavigation from "@/components/MobileUserPageSwipeNavigation";
 import { AVATAR_BOOT_SCRIPT } from "@/components/auth/AvatarBootScript";
 import Script from "next/script";
 import { anton, ptSans } from "./fonts";
@@ -81,12 +82,14 @@ export default function RootLayout({ children }) {
           <ServerStatusProvider>
             <ScrollRestoration />
             <Navbar />
-            <div
-              data-scroll-restoration-root
-              className="relative min-h-[100svh] bg-black pb-[calc(5rem+env(safe-area-inset-bottom))] desktop:pb-0"
-            >
-              {children}
-            </div>
+            <MobileUserPageSwipeNavigation>
+              <div
+                data-scroll-restoration-root
+                className="relative min-h-[100svh] bg-black pb-[calc(5rem+env(safe-area-inset-bottom))] desktop:pb-0"
+              >
+                {children}
+              </div>
+            </MobileUserPageSwipeNavigation>
             <PwaManager />
             <AndroidSessionClaim />
             <OfflineBanner />

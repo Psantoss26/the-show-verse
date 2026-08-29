@@ -2969,10 +2969,10 @@ export default function Navbar() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            // El velo solo atenúa la página. Aplicar `backdrop-filter` aquí
-            // aislaría a sus hijos y la barra no podría refractar el mismo fondo
-            // que los paneles de recientes y resultados, que viven en portal.
-            className="fixed inset-0 z-50 flex flex-col bg-black/60 p-4 pt-4"
+            // Igual que los modales de DetailsClient: atenúa y difumina la
+            // página. La barra y los resultados viven por encima (los últimos
+            // en portal), así que permanecen nítidos e interactivos.
+            className="fixed inset-0 z-50 flex flex-col bg-black/60 p-4 pt-4 backdrop-blur-lg"
             onClick={() => setShowMobileSearch(false)}
           >
             <motion.div
