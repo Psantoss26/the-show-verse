@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Layers, MonitorPlay } from "lucide-react";
-import LiquidButton from "@/components/LiquidButton";
+import { ArrowLeft, ArrowRight, Layers, MonitorPlay } from "lucide-react";
 import StarRating from "@/components/StarRating";
 import TraktWatchedControl from "@/components/trakt/TraktWatchedControl";
 import {
@@ -19,23 +18,19 @@ const ROW_CLASS = `flex w-full flex-nowrap items-center justify-center gap-1 sm:
   ${DETAIL_ACTION_ITEM_SIZING_CLASS}
   ${MOBILE_ACTION_BUTTON_CLASS}`;
 
-function ActionButton({ label, onClick, children }) {
-  return (
-    <LiquidButton
-      type="button"
-      liquidGlass
-      groupId="subroute-details-actions"
-      title={label}
-      aria-label={label}
-      onClick={onClick}
-      className="!h-auto !w-full aspect-square"
-    >
-      {children}
-    </LiquidButton>
-  );
-}
-
 function NavigationAction({ href, label, children }) {
+  if (!href) {
+    return (
+      <span
+        aria-disabled="true"
+        title={label}
+        className={`relative isolate flex !h-auto !w-full aspect-square items-center justify-center overflow-hidden rounded-full text-zinc-500 opacity-45 ${LIQUID_GLASS_SURFACE_CARD}`}
+      >
+        <span className="relative z-10">{children}</span>
+      </span>
+    );
+  }
+
   return (
     <Link
       href={href}
@@ -56,17 +51,18 @@ function NavigationAction({ href, label, children }) {
  * líquido que la fila principal de DetailsClient.
  */
 export default function SubrouteDetailsActionRow({
-  onBack,
   seriesHref,
   seasonHref = null,
+  previousHref = null,
+  nextHref = null,
   trakt = null,
   rate = null,
 }) {
   return (
     <div className={ROW_CLASS}>
-      <ActionButton label="Retroceder" onClick={onBack}>
+      <NavigationAction href={previousHref} label="Anterior">
         <ArrowLeft />
-      </ActionButton>
+      </NavigationAction>
 
       <NavigationAction href={seriesHref} label="Ver detalles de la serie">
         <MonitorPlay />
@@ -105,6 +101,10 @@ export default function SubrouteDetailsActionRow({
           step={rate.step}
         />
       ) : null}
+
+      <NavigationAction href={nextHref} label="Siguiente">
+        <ArrowRight />
+      </NavigationAction>
     </div>
   );
 }

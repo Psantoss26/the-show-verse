@@ -68,8 +68,13 @@ export default async function EpisodePage({ params }) {
   const episodePromise = tmdbFetch(
     `/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`,
   );
+  const seasonPromise = tmdbFetch(`/tv/${showId}/season/${seasonNumber}`);
 
-  const [show, episode] = await Promise.all([showPromise, episodePromise]);
+  const [show, episode, season] = await Promise.all([
+    showPromise,
+    episodePromise,
+    seasonPromise,
+  ]);
 
   const showImdbId = show?.external_ids?.imdb_id || null;
 
@@ -84,6 +89,7 @@ export default async function EpisodePage({ params }) {
       episodeNumber={episodeNumber}
       show={show}
       episode={episode}
+      season={season}
       initialScoreboard={null}
       initialShowWatched={null}
       imdb={null}

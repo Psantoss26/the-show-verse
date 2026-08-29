@@ -49,6 +49,7 @@ import {
 import TraktEpisodesWatchedModal from "@/components/trakt/TraktEpisodesWatchedModal";
 import { useTraktEpisodesWatched } from "@/lib/hooks/useTraktEpisodesWatched";
 import SubrouteDetailsActionRow from "@/components/details/SubrouteDetailsActionRow";
+import { getAdjacentSeasonHrefs } from "@/lib/details/subrouteNavigation";
 import {
   invalidateTraktGetCache,
   traktGetShowWatched,
@@ -258,6 +259,10 @@ export default function SeasonDetailsClient({
   );
 
   const posterPath = season?.poster_path || show?.poster_path || null;
+  const adjacentSeasonHrefs = useMemo(
+    () => getAdjacentSeasonHrefs(showId, seasonNumber, show?.seasons),
+    [showId, seasonNumber, show?.seasons],
+  );
   const heroBgPath =
     show?.backdrop_path || season?.poster_path || show?.poster_path || null;
 
@@ -1277,8 +1282,9 @@ export default function SeasonDetailsClient({
 
             <div className="mb-6 px-1">
               <SubrouteDetailsActionRow
-                onBack={() => router.back()}
                 seriesHref={`/details/tv/${showId}`}
+                previousHref={adjacentSeasonHrefs.previousHref}
+                nextHref={adjacentSeasonHrefs.nextHref}
                 trakt={
                   Number(seasonNumber) > 0
                     ? {

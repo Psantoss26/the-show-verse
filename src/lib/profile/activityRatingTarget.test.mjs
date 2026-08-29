@@ -33,3 +33,18 @@ test("describe y enlaza las puntuaciones de serie, temporada y episodio", () => 
     "/details/tv/100/season/2/episode/4",
   );
 });
+
+test("enlaza el historial de actividad de temporadas y episodios a su ficha concreta", () => {
+  assert.equal(
+    getActivityDetailsHref({ type: "watched", mediaType: "tv", tmdbId: 100, season: 3 }),
+    "/details/tv/100/season/3",
+  );
+  assert.equal(
+    getActivityDetailsHref({ type: "watched", mediaType: "tv", tmdbId: 100, season: 0, episode: 2 }),
+    "/details/tv/100/season/0/episode/2",
+  );
+  assert.equal(
+    getActivityDetailsHref({ mediaType: "episode", tmdbId: 100, season_number: 1, episode_number: 4 }),
+    "/details/tv/100/season/1/episode/4",
+  );
+});

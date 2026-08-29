@@ -64,7 +64,7 @@ export const openApiDocument = {
         name: 'mediaType',
         in: 'path',
         required: true,
-        schema: { type: 'string', enum: ['movie', 'tv', 'episode'] },
+        schema: { type: 'string', enum: ['movie', 'tv', 'season', 'episode'] },
       },
       ListId: {
         name: 'id',
@@ -158,7 +158,7 @@ export const openApiDocument = {
           id: { type: 'string', format: 'uuid' },
           userId: { type: 'string', format: 'uuid' },
           tmdbId: { type: 'integer' },
-          mediaType: { type: 'string', enum: ['movie', 'tv', 'episode'] },
+          mediaType: { type: 'string', enum: ['movie', 'tv', 'season', 'episode'] },
           season: { type: 'integer', nullable: true },
           episode: { type: 'integer', nullable: true },
           rating: { type: 'integer', minimum: 1, maximum: 10 },
@@ -820,7 +820,7 @@ export const openApiDocument = {
         summary: 'List user ratings',
         security: [{ bearerAuth: [] }],
         parameters: [
-          { name: 'type', in: 'query', schema: { type: 'string', enum: ['movie', 'tv', 'episode'] } },
+          { name: 'type', in: 'query', schema: { type: 'string', enum: ['movie', 'tv', 'season', 'episode'] } },
           { $ref: '#/components/parameters/Page' },
           { $ref: '#/components/parameters/Limit' },
         ],
@@ -839,9 +839,9 @@ export const openApiDocument = {
                 required: ['tmdbId', 'mediaType', 'rating'],
                 properties: {
                   tmdbId: { type: 'integer', minimum: 1 },
-                  mediaType: { type: 'string', enum: ['movie', 'tv', 'episode'] },
+                  mediaType: { type: 'string', enum: ['movie', 'tv', 'season', 'episode'] },
                   rating: { type: 'integer', minimum: 1, maximum: 10 },
-                  season: { type: 'integer', minimum: 1 },
+                  season: { type: 'integer', minimum: 0 },
                   episode: { type: 'integer', minimum: 1 },
                   title: { type: 'string' },
                 },
@@ -860,7 +860,7 @@ export const openApiDocument = {
         parameters: [
           { $ref: '#/components/parameters/TmdbId' },
           { $ref: '#/components/parameters/RatingMediaType' },
-          { name: 'season', in: 'query', schema: { type: 'integer', minimum: 1 } },
+          { name: 'season', in: 'query', schema: { type: 'integer', minimum: 0 } },
           { name: 'episode', in: 'query', schema: { type: 'integer', minimum: 1 } },
         ],
         responses: { 200: { description: 'Rating deleted.' } },

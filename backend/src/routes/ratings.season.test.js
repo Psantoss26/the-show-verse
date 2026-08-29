@@ -10,7 +10,11 @@ test('el backend acepta una valoración de temporada separada de los episodios',
   ]);
 
   assert.match(route, /z\.enum\(\['movie', 'tv', 'season', 'episode'\]\)/);
+  assert.match(route, /season: z\.number\(\)\.int\(\)\.nonnegative\(\)\.optional\(\)/);
   assert.match(route, /season ratings require season and no episode/);
+  assert.match(route, /season: season \?\? null/);
+  assert.match(route, /ratedAt: new Date\(\)/);
+  assert.match(route, /Number\.isInteger\(seasonNumber\) && seasonNumber >= 0/);
   assert.match(route, /\['movie', 'tv', 'season', 'episode'\]\.includes\(mediaType\)/);
   assert.match(schema, /idx_ratings_unique_season/);
   assert.match(migration, /media_type IN \('movie', 'tv', 'season', 'episode'\)/);
