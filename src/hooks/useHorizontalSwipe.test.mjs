@@ -54,8 +54,9 @@ test("clasifica solo deslizamientos horizontales breves y suficientes", () => {
 });
 
 test("las pestañas móviles usan la misma captura táctil fiable que Perfil", async () => {
-  const [swipeHook, detailsClient, seasonDetails, episodeDetails] = await Promise.all([
+  const [swipeHook, infoTabs, detailsClient, seasonDetails, episodeDetails] = await Promise.all([
     readSource("./useHorizontalSwipe.js"),
+    readSource("../components/details/DetailsInfoTabs.jsx"),
     readSource("../components/DetailsClient.jsx"),
     readSource("../components/SeasonDetailsClient.jsx"),
     readSource("../components/EpisodeDetailsClient.jsx"),
@@ -67,6 +68,11 @@ test("las pestañas móviles usan la misma captura táctil fiable que Perfil", a
   assert.match(swipeHook, /onClickCapture/);
   assert.match(swipeHook, /event\.stopPropagation\(\)/);
   assert.match(swipeHook, /shouldStart && !shouldStart\(event\)/);
+
+  assert.match(
+    infoTabs,
+    /ÁREA DE CONTENIDO DE TABS[\s\S]*?<div\s+\{\.\.\.swipeHandlers\}\s+className="relative min-h-\[100px\] touch-pan-y sm:touch-auto"/,
+  );
 
   assert.match(detailsClient, /<DetailsInfoTabs[\s\S]*?mobileLayout[\s\S]*?enableMobileTabSwipe/);
   assert.match(seasonDetails, /<DetailsInfoTabs[\s\S]*?enableMobileTabSwipe/);
