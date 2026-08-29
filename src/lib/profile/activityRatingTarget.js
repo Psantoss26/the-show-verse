@@ -5,8 +5,8 @@ function wholeNumber(value, { min = 0 } = {}) {
 
 function ratingTarget(item) {
   const target = item?.ratingTarget || item?.ratedMediaType;
-  const season = wholeNumber(item?.season);
-  const episode = wholeNumber(item?.episode);
+  const season = wholeNumber(item?.season ?? item?.seasonNumber ?? item?.season_number);
+  const episode = wholeNumber(item?.episode ?? item?.episodeNumber ?? item?.episode_number);
 
   if (target === "episode" || (season != null && episode != null)) {
     return { kind: "episode", season, episode };
@@ -14,7 +14,11 @@ function ratingTarget(item) {
   if (target === "season" || season != null) {
     return { kind: "season", season };
   }
-  return { kind: item?.mediaType === "tv" ? "series" : "movie" };
+  return {
+    kind: ["tv", "show", "season", "episode"].includes(item?.mediaType)
+      ? "series"
+      : "movie",
+  };
 }
 
 function episodeCode(season, episode) {
@@ -37,15 +41,16 @@ export function getActivityDetailsHref(item) {
   const tmdbId = Number(item?.tmdbId);
   if (!Number.isInteger(tmdbId) || tmdbId <= 0) return null;
 
-  if (item?.type === "rating") {
-    const target = ratingTarget(item);
-    if (target.kind === "episode" && target.season != null && target.episode != null) {
-      return `/details/tv/${tmdbId}/season/${target.season}/episode/${target.episode}`;
-    }
-    if (target.kind === "season" && target.season != null) {
-      return `/details/tv/${tmdbId}/season/${target.season}`;
-    }
+  // El feed usa estos mismos campos tanto al puntuar como al registrar un
+  // visionado. Si hay identidad de episodio o temporada, el destino debe ser
+  // su ficha concreta, no la ficha genérica de la serie.
+  const target = ratingTarget(item);
+  if (target.kind === "episode" && target.season != null && target.episode != null) {
+    return `/details/tv/${tmdbId}/season/${target.season}/episode/${target.episode}`;
+  }
+  if (target.kind === "season" && target.season != null) {
+    return `/details/tv/${tmdbId}/season/${target.season}`;
   }
 
-  return `/details/${item?.mediaType === "tv" ? "tv" : "movie"}/${tmdbId}`;
+  return `/details/${target.kind === "series" ? "tv" : "movie"}/${tmdbId}`;
 }

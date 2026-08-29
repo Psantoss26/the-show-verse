@@ -21,6 +21,7 @@ import LevelPanel from "@/components/level/LevelPanel";
 import ProfileSection from "./ProfileSection";
 import { PROFILE_TAB_IDS, profileTabHref } from "./profileRoutes";
 import { translateGenreName } from "@/lib/dashboard/media";
+import { getActivityDetailsHref } from "@/lib/profile/activityRatingTarget";
 import {
   Activity,
   Award,
@@ -336,10 +337,11 @@ function relativeSidebarActivityTime(value) {
 function SidebarActivityTitle({ item }) {
   const previewClick = usePreviewOpen();
   if (!item?.tmdbId || !item?.mediaType) return null;
-  const mediaType = item.mediaType === "tv" ? "tv" : "movie";
+  const mediaType = ["tv", "show", "season", "episode"].includes(item.mediaType) ? "tv" : "movie";
+  const href = getActivityDetailsHref(item) || `/details/${mediaType}/${item.tmdbId}`;
   return (
     <Link
-      href={`/details/${mediaType}/${item.tmdbId}`}
+      href={href}
       onClick={previewClick(item)}
       className="font-extrabold text-white transition-colors hover:text-emerald-400 focus-visible:outline-none focus-visible:text-emerald-400"
     >
@@ -359,8 +361,15 @@ function activityVerbs(isSelf) {
 
 function SidebarActivityText({ item, isSelf = false }) {
   const verb = activityVerbs(isSelf);
-  const episodeLabel = item.type === "watched" && item.season && item.episode
-    ? `S${String(item.season).padStart(2, "0")}E${String(item.episode).padStart(2, "0")} de `
+  const seasonNumber = Number(item?.season ?? item?.seasonNumber ?? item?.season_number);
+  const episodeNumber = Number(item?.episode ?? item?.episodeNumber ?? item?.episode_number);
+  const episodeLabel =
+    item.type === "watched" &&
+    Number.isInteger(seasonNumber) &&
+    seasonNumber >= 0 &&
+    Number.isInteger(episodeNumber) &&
+    episodeNumber >= 0
+    ? `S${String(seasonNumber).padStart(2, "0")}E${String(episodeNumber).padStart(2, "0")} de `
     : "";
 
   if (item.type === "review") {

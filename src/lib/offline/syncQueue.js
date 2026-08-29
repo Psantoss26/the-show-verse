@@ -1,4 +1,4 @@
-// Cola de mutaciones OFFLINE (Fase 2).
+// Cola heredada de mutaciones offline.
 //
 // Cuando el servidor propio (NAS) está caído, las escrituras del usuario (visto,
 // puntuación, favorito, pendiente, historial…) se ENCOLAN en localStorage y se
@@ -6,12 +6,11 @@
 // service worker: por eso el SW no intercepta /api y no puede "bloquear" nada (la
 // causa del revert anterior de PWA offline).
 //
-// Todos los call sites ya llaman:
+// Los call sites mantienen esta función por compatibilidad:
 //   offlineMutationFetch(url, init, { label, dedupeKey })
-// El `dedupeKey` identifica ENTIDAD+acción (p. ej. "tmdb:favorite:tv:123",
-// "trakt:watched:movie:456") y es el MISMO para añadir/quitar, así que la cola
-// colapsa a "last-write-wins": marcar y desmarcar el mismo título offline se
-// resuelven al último intento (no se sincronizan operaciones que se anulan).
+// Las mutaciones nuevas se envían siempre en la petición actual. No se presentan
+// como correctas ni se guardan para sincronizarlas después: el usuario recibe el
+// resultado real del servidor y puede reintentar conscientemente si falla.
 
 const QUEUE_KEY = "showverse:offline:mutationQueue:v1";
 const EVENT_NAME = "showverse:offline-queue";
@@ -56,20 +55,6 @@ function nextId() {
   return `m${Date.now()}_${seq}`;
 }
 
-function isMutation(init) {
-  const m = (init?.method || "GET").toUpperCase();
-  return m === "POST" || m === "PUT" || m === "PATCH" || m === "DELETE";
-}
-
-// Respuesta sintética "ok en cola": el call site sigue con su actualización OPTIMISTA
-// (cacheAddFavorite, cacheAddHistory…) como si la escritura hubiera ido bien.
-function queuedResponse() {
-  return new Response(JSON.stringify({ ok: true, queued: true }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
-}
-
 export function getOfflineQueueCount() {
   return readQueue().length;
 }
@@ -103,39 +88,8 @@ export function enqueueOfflineMutation(entry) {
   return next.length;
 }
 
-export async function offlineMutationFetch(url, init = {}, meta = {}) {
-  // SSR o petición no-mutación → fetch normal (nunca encolamos lecturas).
-  if (!hasWindow() || !isMutation(init)) return fetch(url, init);
-
-  try {
-    const res = await fetch(url, init);
-    if (res.ok) {
-      // Online: aprovechamos para vaciar lo que hubiera pendiente.
-      if (readQueue().length) flushOfflineMutations();
-      return res;
-    }
-    // 5xx (túnel Cloudflare con el NAS caído) → encolar. 4xx = error real del
-    // cliente/validación/auth → devolver tal cual (el call site lo maneja).
-    if (res.status >= 500) {
-      enqueueOfflineMutation({
-        url,
-        init,
-        dedupeKey: meta?.dedupeKey,
-        label: meta?.label,
-      });
-      return queuedResponse();
-    }
-    return res;
-  } catch {
-    // Red caída → encolar y responder "en cola".
-    enqueueOfflineMutation({
-      url,
-      init,
-      dedupeKey: meta?.dedupeKey,
-      label: meta?.label,
-    });
-    return queuedResponse();
-  }
+export async function offlineMutationFetch(url, init = {}) {
+  return fetch(url, init);
 }
 
 let flushing = false;

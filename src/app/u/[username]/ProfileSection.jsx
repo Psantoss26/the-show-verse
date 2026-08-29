@@ -47,6 +47,7 @@ import {
   formatActivityRatingTarget,
   getActivityDetailsHref,
 } from "@/lib/profile/activityRatingTarget";
+import { dedupeActivityItems } from "@/lib/profile/activityItems";
 import {
   filterPendingHistoryRemovals,
   getPendingListChanges,
@@ -726,7 +727,7 @@ function ActivityAvatar({ actor }) {
 function ActivityTitle({ item, className = "" }) {
   const previewClick = usePreviewOpen();
   if (!item.tmdbId || !item.mediaType) return null;
-  const type = item.mediaType === "tv" || item.mediaType === "episode" ? "tv" : "movie";
+  const type = ["tv", "show", "season", "episode"].includes(item.mediaType) ? "tv" : "movie";
   const href = getActivityDetailsHref(item);
   return (
     <Link
@@ -741,7 +742,7 @@ function ActivityTitle({ item, className = "" }) {
 
 function ActivityPoster({ item, className = "" }) {
   const previewClick = usePreviewOpen();
-  const type = item?.mediaType === "tv" || item?.mediaType === "episode" ? "tv" : "movie";
+  const type = ["tv", "show", "season", "episode"].includes(item?.mediaType) ? "tv" : "movie";
   const href = getActivityDetailsHref(item);
   const src = item?.posterPath ? `https://image.tmdb.org/t/p/w185${item.posterPath}` : null;
   const poster = src ? (
@@ -771,7 +772,8 @@ function ActivityPoster({ item, className = "" }) {
 function ActivityReview({ item, actor, compact = false, posterList = false }) {
   const [showSpoiler, setShowSpoiler] = useState(false);
   const previewClick = usePreviewOpen();
-  const type = item.mediaType === "tv" ? "tv" : "movie";
+  const type = ["tv", "show", "season", "episode"].includes(item.mediaType) ? "tv" : "movie";
+  const href = getActivityDetailsHref(item) || `/details/${type}/${item.tmdbId}`;
   const src = item.posterPath ? `https://image.tmdb.org/t/p/w185${item.posterPath}` : null;
 
   return (
@@ -782,7 +784,7 @@ function ActivityReview({ item, actor, compact = false, posterList = false }) {
         ) : (
           <>
             <ActivityAvatar actor={actor} />
-            <Link href={`/details/${type}/${item.tmdbId}`} onClick={previewClick(item)} className="hidden h-28 w-[76px] shrink-0 overflow-hidden rounded-lg bg-zinc-900 ring-1 ring-white/10 sm:block">
+            <Link href={href} onClick={previewClick(item, { mediaType: type, episode: getEpisodePreview(item) })} className="hidden h-28 w-[76px] shrink-0 overflow-hidden rounded-lg bg-zinc-900 ring-1 ring-white/10 sm:block">
               {src ? (
                 <OptimizedImage src={src} alt={item.title || ""} className="h-full w-full object-cover" loading="lazy" />
               ) : (
@@ -828,8 +830,9 @@ function ActivityRow({ item, actor, compact = false, posterList = false }) {
   const actionText = item.type === "watched" && item.completedShow
     ? "ha completado"
     : definition.text;
-  const episodeLabel = item.type === "watched" && item.season && item.episode
-    ? `S${String(item.season).padStart(2, "0")}E${String(item.episode).padStart(2, "0")} de `
+  const watchedEpisode = item.type === "watched" ? getEpisodePreview(item) : null;
+  const episodeLabel = watchedEpisode
+    ? `S${String(watchedEpisode.seasonNumber).padStart(2, "0")}E${String(watchedEpisode.episodeNumber).padStart(2, "0")} de `
     : "";
   const ratingTargetLabel =
     item.type === "rating" ? `${formatActivityRatingTarget(item)} ` : "";
@@ -1583,6 +1586,7 @@ function ProfileContentSection({ username, section, actor }) {
   // la entrada pendiente y este merge deja de añadirla. Las bajas (removedKeys)
   // filtran también los items ya presentes en `items`.
   const sourceItems = useMemo(() => {
+    if (section === "activity") return dedupeActivityItems(items);
     if (!isSelfProfile || !pendingListType) return items;
     const changes = getPendingListChanges(pendingListType);
     if (section !== "watched") {
@@ -1697,10 +1701,10 @@ function ProfileContentSection({ username, section, actor }) {
       setHasMore(cachedSection.hasMore);
       setOffset(cachedSection.offset);
       setStatus("ready");
-      // Las listas que admiten mutaciones conservan la instantánea visible y
-      // revalidan su ventana superior en segundo plano. Las demás secciones
-      // mantienen el comportamiento estático anterior.
-      if (!pendingListType) {
+      // Actividad también se revalida aunque no tenga altas optimistas: al
+      // puntuar desde una ficha se crea o actualiza fuera de esta sección y la
+      // instantánea de sessionStorage no puede quedarse como fuente final.
+      if (!pendingListType && section !== "activity") {
         return () => {
           cancelled = true;
         };
@@ -1765,7 +1769,9 @@ function ProfileContentSection({ username, section, actor }) {
         return;
       }
 
-      let reconciledItems = accumulated;
+      let reconciledItems = section === "activity"
+        ? dedupeActivityItems(accumulated)
+        : accumulated;
       if (cachedSection && section === "watched") {
         reconciledItems = mergeFreshDiaryItems(
           cachedSection.items,
@@ -1782,7 +1788,9 @@ function ProfileContentSection({ username, section, actor }) {
       const nextSection = {
         items: reconciledItems,
         hasMore: more,
-        offset: cachedSection ? reconciledItems.length : nextOffset,
+        // Actividad puede eliminar entradas solapadas: su cursor sigue siendo
+        // el offset del servidor, no el número de elementos ya renderizados.
+        offset: cachedSection && section !== "activity" ? reconciledItems.length : nextOffset,
       };
       cacheProfileSection(cacheKey, nextSection);
       setItems(reconciledItems);
@@ -1832,7 +1840,9 @@ function ProfileContentSection({ username, section, actor }) {
       const nextOffset = Number(data.offset) || offset;
       const nextItems = Array.isArray(data.items) ? data.items : [];
       setItems((currentItems) => {
-        const mergedItems = [...currentItems, ...nextItems];
+        const mergedItems = section === "activity"
+          ? dedupeActivityItems([...currentItems, ...nextItems])
+          : [...currentItems, ...nextItems];
         cacheProfileSection(cacheKey, {
           items: mergedItems,
           hasMore: nextHasMore,

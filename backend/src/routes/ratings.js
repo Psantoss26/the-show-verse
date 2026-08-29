@@ -14,19 +14,21 @@ const ratingSchema = z.object({
   tmdbId: z.number().int().positive(),
   mediaType: z.enum(['movie', 'tv', 'season', 'episode']),
   rating: z.number().min(1).max(10),
-  season: z.number().int().positive().optional(),
+  // TMDb identifica los especiales como temporada 0. SeasonDetails los
+  // expone y permite puntuarlos, así que 0 es una identidad válida.
+  season: z.number().int().nonnegative().optional(),
   episode: z.number().int().positive().optional(),
   title: z.string().optional(),
   posterPath: z.string().optional(),
 }).superRefine((data, ctx) => {
-  if (data.mediaType === 'episode' && (!data.season || !data.episode)) {
+  if (data.mediaType === 'episode' && (data.season == null || data.episode == null)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: 'season and episode are required for episode ratings',
       path: ['season'],
     });
   }
-  if (data.mediaType === 'season' && (!data.season || data.episode)) {
+  if (data.mediaType === 'season' && (data.season == null || data.episode != null)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: 'season ratings require season and no episode',
@@ -114,10 +116,15 @@ export default async function ratingsRoutes(fastify) {
       tmdbId,
       mediaType,
       rating,
-      season: season || null,
-      episode: episode || null,
+      // No usar `||`: la temporada 0 es "Especiales" en TMDb y debe
+      // conservarse como parte de la identidad de la valoración.
+      season: season ?? null,
+      episode: episode ?? null,
       title: title || null,
       posterPath: storedPosterPath,
+      // La actividad se ordena por ratedAt. Al cambiar una nota existente debe
+      // volver a ser actividad reciente, igual que una valoración nueva.
+      ratedAt: new Date(),
       updatedAt: new Date(),
     };
 
@@ -147,21 +154,25 @@ export default async function ratingsRoutes(fastify) {
     const tmdbId = Number(req.params.tmdbId);
     const { mediaType } = req.params;
     const { season, episode } = req.query;
+    const seasonNumber = season == null ? null : Number(season);
+    const episodeNumber = episode == null ? null : Number(episode);
+    const hasValidSeason = Number.isInteger(seasonNumber) && seasonNumber >= 0;
+    const hasValidEpisode = Number.isInteger(episodeNumber) && episodeNumber > 0;
 
     if (!['movie', 'tv', 'season', 'episode'].includes(mediaType) || Number.isNaN(tmdbId)) {
       return reply.status(400).send({ error: 'Invalid rating identity' });
     }
 
-    if (mediaType === 'episode' && (!season || !episode)) {
+    if (mediaType === 'episode' && (!hasValidSeason || !hasValidEpisode)) {
       return reply.status(400).send({ error: 'season and episode are required for episode ratings' });
     }
-    if (mediaType === 'season' && (!season || episode)) {
+    if (mediaType === 'season' && (!hasValidSeason || episode != null)) {
       return reply.status(400).send({ error: 'season is required and episode is not allowed for season ratings' });
     }
 
     await db
       .delete(userRatings)
-      .where(ratingIdentity(req.user.id, tmdbId, mediaType, season, episode));
+      .where(ratingIdentity(req.user.id, tmdbId, mediaType, seasonNumber, episodeNumber));
     return reply.send({ ok: true });
   });
 }

@@ -10,7 +10,6 @@ import {
   useRef,
 } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { SwiperSlide } from "swiper/react";
 import "swiper/swiper-bundle.css";
@@ -52,6 +51,7 @@ import {
 } from "@/lib/details/seriesGraphRatings";
 import TraktWatchedModal from "@/components/trakt/TraktWatchedModal";
 import SubrouteDetailsActionRow from "@/components/details/SubrouteDetailsActionRow";
+import { getAdjacentEpisodeHrefs } from "@/lib/details/subrouteNavigation";
 import {
   invalidateTraktGetCache,
   traktGetItemStatus,
@@ -276,13 +276,13 @@ export default function EpisodeDetailsClient({
   episodeNumber,
   show,
   episode,
+  season,
   initialScoreboard,
   initialShowWatched,
   imdb,
   imdbId,
   imdbUrl,
 }) {
-  const router = useRouter();
   const traktRequestIdRef = useRef(0);
 
   const showName = show?.name || "Serie";
@@ -300,6 +300,16 @@ export default function EpisodeDetailsClient({
   );
 
   const stillPath = episode?.still_path || null;
+  const adjacentEpisodeHrefs = useMemo(
+    () =>
+      getAdjacentEpisodeHrefs(
+        showId,
+        seasonNumber,
+        episodeNumber,
+        season?.episodes,
+      ),
+    [showId, seasonNumber, episodeNumber, season?.episodes],
+  );
   const showPosterPath = show?.poster_path || null;
   const heroBgPath =
     stillPath || show?.backdrop_path || show?.poster_path || null;
@@ -1465,9 +1475,10 @@ export default function EpisodeDetailsClient({
 
             <div className="mb-6 px-1">
               <SubrouteDetailsActionRow
-                onBack={() => router.back()}
                 seriesHref={`/details/tv/${showId}`}
                 seasonHref={`/details/tv/${showId}/season/${seasonNumber}`}
+                previousHref={adjacentEpisodeHrefs.previousHref}
+                nextHref={adjacentEpisodeHrefs.nextHref}
                 trakt={{
                   connected: trakt.connected,
                   watched: trakt.watched,
