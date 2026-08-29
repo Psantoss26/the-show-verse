@@ -10,7 +10,7 @@ import {
 test("las páginas de usuario siguen el orden del navbar móvil y terminan en Perfil", () => {
   assert.deepEqual(MOBILE_USER_PAGE_SWIPE_ROUTES, [
     "/social",
-    "/recommendations",
+    "/lists",
     "/in-progress",
     "/history",
     "/favorites",
@@ -23,7 +23,7 @@ test("un deslizamiento solo navega dentro de los extremos de la secuencia", () =
   assert.equal(getMobileUserPageSwipeDestination("/social", "right"), null);
   assert.equal(
     getMobileUserPageSwipeDestination("/social", "left"),
-    "/recommendations",
+    "/lists",
   );
   assert.equal(
     getMobileUserPageSwipeDestination("/watchlist/", "left"),
@@ -37,10 +37,10 @@ test("un deslizamiento solo navega dentro de los extremos de la secuencia", () =
 });
 
 test("la captura global replica el gesto de Perfil y solo cede a gestos horizontales propios", async () => {
-  const [navigation, layout, recommendations] = await Promise.all([
+  const [navigation, layout, lists] = await Promise.all([
     readFile(new URL("../../components/MobileUserPageSwipeNavigation.jsx", import.meta.url), "utf8"),
     readFile(new URL("../../app/layout.jsx", import.meta.url), "utf8"),
-    readFile(new URL("../../app/recommendations/RecommendationsClient.jsx", import.meta.url), "utf8"),
+    readFile(new URL("../../app/lists/page.jsx", import.meta.url), "utf8"),
   ]);
 
   assert.match(navigation, /onTouchStartCapture/);
@@ -49,7 +49,7 @@ test("la captura global replica el gesto de Perfil y solo cede a gestos horizont
   assert.match(navigation, /MOBILE_USER_PAGE_SWIPE_IGNORE_SELECTOR/);
   assert.match(navigation, /router\.push\(destination\)/);
   assert.match(layout, /<MobileUserPageSwipeNavigation>/);
-  assert.match(recommendations, /<motion\.div\s+data-mobile-page-swipe-ignore/);
+  assert.match(lists, /<Swiper\s+data-mobile-page-swipe-ignore/);
 
   const routes = await readFile(new URL("./mobileUserPageSwipe.js", import.meta.url), "utf8");
   assert.match(routes, /"\[data-mobile-page-swipe-ignore\]"/);

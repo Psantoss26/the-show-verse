@@ -1665,6 +1665,7 @@ export default function Navbar() {
         prefetchNavRoute("/movies");
         prefetchNavRoute("/series");
         prefetchNavRoute("/recommendations");
+        prefetchNavRoute("/lists");
         prefetchNavRoute("/social");
         prefetchNavRoute("/in-progress");
         prefetchNavRoute("/favorites");
@@ -2630,18 +2631,18 @@ export default function Navbar() {
         </Link>
 
         <Link
-          href="/recommendations"
+          href="/lists"
           prefetch
-          {...navPrefetchHandlers("/recommendations")}
-          className={navLinkClassMobileBottom("/recommendations", "green")}
-          aria-current={isActive("/recommendations") ? "page" : undefined}
-          aria-label={t("nav_recommendations", "Recomendaciones")}
-          title={t("nav_recommendations", "Recomendaciones")}
+          {...navPrefetchHandlers("/lists")}
+          className={navLinkClassMobileBottom("/lists", "purple")}
+          aria-current={isActive("/lists") ? "page" : undefined}
+          aria-label={t("nav_lists", "Listas")}
+          title={t("nav_lists", "Listas")}
         >
-          {isActive("/recommendations") && getMobileBottomActiveLens("green")}
+          {isActive("/lists") && getMobileBottomActiveLens("purple")}
           <span className={mobileBottomIconSlotClass}>
-            <ThumbsUp
-              className={`${mobileBottomIconClass} ${isActive("/recommendations") ? "fill-emerald-400/25 text-emerald-300" : ""}`}
+            <ListVideo
+              className={`${mobileBottomIconClass} ${isActive("/lists") ? "text-purple-300" : ""}`}
               strokeWidth={MOBILE_BOTTOM_ICON_STROKE}
               style={{ shapeRendering: "geometricPrecision" }}
             />
