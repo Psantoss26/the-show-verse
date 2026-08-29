@@ -1,7 +1,5 @@
 // /src/app/api/trakt/ratings/route.js
 // Valoraciones de usuario — ÍNTEGRO en el backend propio (/v1/ratings). Sin Trakt.
-// El backend no tiene valoración de TEMPORADA: se mapea a valoración POR EPISODIO
-// (puntuar/leer todos los episodios de la temporada, que comparten valor).
 import { NextResponse } from "next/server";
 import {
   backendFetchJson,
@@ -11,10 +9,6 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const TMDB_API = "https://api.themoviedb.org/3";
-const TMDB_API_KEY =
-  process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
 
 function normalizeType(t) {
   const x = String(t || "")
@@ -35,24 +29,6 @@ function normalizeRating(val) {
   const normalized = Math.round(clamped * 10) / 10;
   if (normalized < 1 || normalized > 10) return null;
   return normalized;
-}
-
-async function fetchSeasonEpisodes(tmdbId, season) {
-  if (!TMDB_API_KEY || !Number.isFinite(tmdbId) || !Number.isFinite(season)) {
-    return [];
-  }
-  try {
-    const url = `${TMDB_API}/tv/${tmdbId}/season/${season}?api_key=${TMDB_API_KEY}&language=es-ES`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) return [];
-    const json = await res.json();
-    const eps = Array.isArray(json?.episodes) ? json.episodes : [];
-    return eps
-      .map((e) => Number(e?.episode_number))
-      .filter((n) => Number.isFinite(n) && n > 0);
-  } catch {
-    return [];
-  }
 }
 
 const secureFor = (req) => ({ secure: req.nextUrl?.protocol === "https:" });
@@ -120,7 +96,7 @@ export async function GET(req) {
 
       const backend = await backendFetchJson(
         req,
-        "/v1/ratings?type=episode&limit=1000",
+        `/v1/ratings?type=${type}&limit=1000`,
       );
       if (!backend.ok) {
         return NextResponse.json(
@@ -139,8 +115,8 @@ export async function GET(req) {
                 Number(it.season) === seasonNumber &&
                 Number(it.episode) === episodeNumber,
             )
-          : // Temporada: valoración representativa = la de cualquier episodio
-            // valorado de la temporada (todos comparten valor al puntuar la temporada).
+          : // La temporada tiene su propia valoración y no representa a sus
+            // episodios, que se puntúan de forma independiente.
             items.find(
               (it) =>
                 Number(it.tmdbId) === showTmdbId &&
@@ -226,38 +202,26 @@ export async function POST(req) {
               }),
             });
     } else if (type === "season") {
-      // No hay valoración de temporada en el backend: puntuar una temporada =
-      // puntuar todos sus episodios.
       const showTmdbId = Number(body?.tmdbId ?? body?.ids?.tmdb);
       const seasonNumber = Number(body?.season ?? body?.seasonNumber);
-      const episodeNumbers = await fetchSeasonEpisodes(showTmdbId, seasonNumber);
-      let anyOk = false;
-      for (const epNum of episodeNumbers) {
-        const res =
-          rating === null
-            ? await backendFetchJson(
-                req,
-                `/v1/ratings/${encodeURIComponent(showTmdbId)}/episode?season=${seasonNumber}&episode=${epNum}`,
-                { method: "DELETE" },
-              )
-            : await backendFetchJson(req, "/v1/ratings", {
-                method: "POST",
-                body: JSON.stringify({
-                  tmdbId: showTmdbId,
-                  mediaType: "episode",
-                  rating,
-                  season: seasonNumber,
-                  episode: epNum,
-                  title: body?.title || undefined,
-                  posterPath: body?.posterPath || undefined,
-                }),
-              });
-        if (res.ok) {
-          anyOk = true;
-          backendResult = res;
-        }
-      }
-      if (!anyOk) backendResult = null;
+      backendResult =
+        rating === null
+          ? await backendFetchJson(
+              req,
+              `/v1/ratings/${encodeURIComponent(showTmdbId)}/season?season=${seasonNumber}`,
+              { method: "DELETE" },
+            )
+          : await backendFetchJson(req, "/v1/ratings", {
+              method: "POST",
+              body: JSON.stringify({
+                tmdbId: showTmdbId,
+                mediaType: "season",
+                rating,
+                season: seasonNumber,
+                title: body?.title || undefined,
+                posterPath: body?.posterPath || undefined,
+              }),
+            });
     } else {
       return NextResponse.json({ error: "Unsupported type" }, { status: 400 });
     }

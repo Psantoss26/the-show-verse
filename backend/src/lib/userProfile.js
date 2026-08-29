@@ -1336,9 +1336,10 @@ export async function getUserActivity(db, targetId, opts = {}) {
       ...row,
       id: `rating:${row.id}`,
       type: 'rating',
-      // Las puntuaciones de episodios conservan la referencia al episodio, pero
-      // se enlazan y se hidratan como su serie padre.
-      mediaType: row.mediaType === 'episode' ? 'tv' : row.mediaType,
+      // La actividad conserva qué se puntuó, pero temporadas y episodios se
+      // hidratan como su serie padre para resolver título y cartel de TMDb.
+      ratingTarget: row.mediaType,
+      mediaType: ['season', 'episode'].includes(row.mediaType) ? 'tv' : row.mediaType,
     })),
     ...listRows.map((row) => ({ ...row, id: `list:${row.id}`, type: 'list' })),
     ...listItemRows.map((row) => ({ ...row, id: `list-item:${row.id}`, type: 'list_item' })),

@@ -1092,9 +1092,9 @@ function CalendarWithPosters({
   return (
     <div className="flex flex-col h-full gap-2 lg:gap-2.5 relative">
       {/* Header */}
-      <div className="flex items-center justify-between bg-zinc-900/40 border border-zinc-800 rounded-xl lg:rounded-2xl px-3 py-2 lg:px-4 lg:py-3 backdrop-blur-sm shrink-0">
+      <div className="flex items-center justify-between bg-zinc-900/40 rounded-xl lg:rounded-2xl px-3 py-2 lg:px-4 lg:py-3 backdrop-blur-sm shrink-0">
         <div className="flex items-center gap-2 lg:gap-3">
-          <div className="p-1.5 lg:p-2 bg-emerald-500/10 rounded-lg lg:rounded-xl border border-emerald-500/20">
+          <div className="p-1.5 lg:p-2 bg-emerald-500/10 rounded-lg lg:rounded-xl">
             <Calendar className="w-4 h-4 lg:w-5 lg:h-5 text-emerald-500" />
           </div>
           <div>
@@ -1107,7 +1107,7 @@ function CalendarWithPosters({
           </div>
         </div>
         <div className="flex items-center gap-1.5 lg:gap-2">
-          <div className="flex gap-1 bg-zinc-900 rounded-lg lg:rounded-xl p-0.5 lg:p-1 border border-zinc-800">
+          <div className="flex gap-1 bg-zinc-900 rounded-lg lg:rounded-xl p-0.5 lg:p-1">
             <button
               onClick={onPrev}
               className="p-1.5 lg:p-2 hover:bg-zinc-800 rounded-md lg:rounded-lg transition text-zinc-300 hover:text-white"
@@ -1123,7 +1123,7 @@ function CalendarWithPosters({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 lg:p-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/30 rounded-lg lg:rounded-xl transition-all text-red-400 hover:text-red-300"
+            className="p-1.5 lg:p-2 bg-red-500/10 hover:bg-red-500/20 rounded-lg lg:rounded-xl transition-all text-red-400 hover:text-red-300"
           >
             <X className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
           </button>
@@ -1135,7 +1135,7 @@ function CalendarWithPosters({
         {dow.map((d) => (
           <div
             key={d}
-            className="text-center text-[10px] lg:text-xs font-bold text-zinc-400 uppercase tracking-wider py-1 lg:py-1.5 bg-zinc-900/30 rounded-md border border-zinc-800/50"
+            className="text-center text-[10px] lg:text-xs font-bold text-zinc-400 uppercase tracking-wider py-1 lg:py-1.5 bg-zinc-900/30 rounded-md"
           >
             {d}
           </div>
@@ -1151,6 +1151,18 @@ function CalendarWithPosters({
           const isToday = ymdLocal(new Date()) === key;
           const isSelected = key === selectedDayKey;
           const hasItems = inMonth && items.length > 0;
+          const visiblePosterCount = Math.min(items.length, MAX_POSTERS);
+          // Cada portada ocupa solo una parte del ancho del grupo para dejar
+          // una franja reconocible de las demás, incluso en los días con muchos
+          // visionados. El ligero desfase vertical conserva la lectura de pila.
+          const stackCardWidth = visiblePosterCount > 1 ? "58%" : "100%";
+          const stackCardHeight = visiblePosterCount > 1 ? "94%" : "100%";
+          const stackStepX =
+            visiblePosterCount > 1
+              ? 42 / (visiblePosterCount - 1)
+              : 0;
+          const stackStepY =
+            visiblePosterCount > 1 ? 6 / (visiblePosterCount - 1) : 0;
 
           return (
             <div
@@ -1161,17 +1173,17 @@ function CalendarWithPosters({
                   : undefined
               }
               className={[
-                "flex flex-col rounded-lg lg:rounded-xl border-2 transition-all relative overflow-visible",
+                "flex flex-col rounded-lg lg:rounded-xl transition-all relative overflow-visible",
                 hasItems ? "cursor-pointer hover:z-10" : "",
                 !inMonth
-                  ? "bg-zinc-900/10 border-zinc-800/20"
+                  ? "bg-zinc-900/10"
                   : isSelected
-                    ? "bg-gradient-to-br from-emerald-500/15 to-emerald-600/10 border-emerald-500/60 shadow-lg shadow-emerald-500/10"
+                    ? "bg-gradient-to-br from-emerald-500/15 to-emerald-600/10 shadow-lg shadow-emerald-500/10"
                     : isToday
-                      ? "bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border-emerald-500/95 shadow-lg shadow-emerald-500/10"
+                      ? "bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 shadow-lg shadow-emerald-500/10"
                       : hasItems
-                        ? "bg-zinc-900/40 border-zinc-800/50 hover:border-emerald-500/30 hover:bg-zinc-900/60"
-                        : "bg-zinc-900/40 border-zinc-800/50",
+                        ? "bg-zinc-900/40 hover:bg-zinc-900/60"
+                        : "bg-zinc-900/40",
               ].join(" ")}
             >
               {/* Número del día + badge count */}
@@ -1252,7 +1264,7 @@ function CalendarWithPosters({
                     const children = Array.from(wrapper.children);
                     children.forEach((child, i) => {
                       child.style.zIndex = String(children.length - i);
-                      child.style.transform = `translateX(${i * 1.5}px) translateY(${i * 1.5}px) scale(1)`;
+                      child.style.transform = "scale(1)";
                       child.style.opacity = "1";
                       child.style.filter = "brightness(1)";
                       child.style.transition = "all 0.25s ease-out";
@@ -1264,18 +1276,21 @@ function CalendarWithPosters({
                     className="relative w-full max-w-[80px] lg:max-w-[100px] aspect-[2/3]"
                   >
                     {items.slice(0, MAX_POSTERS).map((item, idx) => {
-                      const shown = Math.min(items.length, MAX_POSTERS);
                       return (
                         <div
                           key={`${getTmdbId(item)}-${idx}`}
-                          className="absolute inset-0 pointer-events-none"
+                          className="absolute left-0 pointer-events-none"
                           style={{
-                            transform: `translateX(${idx * 1.5}px) translateY(${idx * 1.5}px)`,
-                            zIndex: shown - idx,
+                            width: stackCardWidth,
+                            height: stackCardHeight,
+                            left: `${idx * stackStepX}%`,
+                            top: `${idx * stackStepY}%`,
+                            transform: "scale(1)",
+                            zIndex: visiblePosterCount - idx,
                             transition: "all 0.25s ease-out",
                           }}
                         >
-                          <div className="w-full h-full rounded-md lg:rounded-lg overflow-hidden bg-zinc-900 border border-white/10 shadow-xl shadow-black/50">
+                          <div className="w-full h-full rounded-md lg:rounded-lg overflow-hidden bg-zinc-900 shadow-xl shadow-black/50">
                             <Poster entry={item} className="w-full h-full" />
                           </div>
                         </div>
@@ -1315,11 +1330,11 @@ function CalendarWithPosters({
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: "100%", opacity: 0 }}
               transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
-              className="absolute top-0 right-0 bottom-0 z-50 w-full sm:w-[440px] lg:w-[520px] bg-[#0c0c0c] border-l border-zinc-800 rounded-r-2xl flex flex-col shadow-2xl"
+              className="absolute top-0 right-0 bottom-0 z-50 w-full sm:w-[440px] lg:w-[520px] bg-[#0c0c0c] rounded-r-2xl flex flex-col shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header del drawer */}
-              <div className="shrink-0 p-4 border-b border-zinc-800/80">
+              <div className="shrink-0 p-4">
                 <div className="flex items-center justify-between mb-1">
                   <h3 className="text-base font-bold text-white capitalize">
                     {formatDateHeader(new Date(selectedDayKey), "day")}
@@ -1332,7 +1347,7 @@ function CalendarWithPosters({
                   </button>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                  <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-md">
                     {selectedDayItems.length}{" "}
                     {selectedDayItems.length === 1 ? "visto" : "vistos"}
                   </span>
@@ -1364,7 +1379,7 @@ function CalendarDrawerGroup({ entry, title, type, range }) {
   );
 
   return (
-    <div className="rounded-xl border border-zinc-800/60 overflow-hidden">
+    <div className="rounded-xl overflow-hidden">
       {/* Header del grupo */}
       <button
         onClick={() => setExpanded(!expanded)}
@@ -1410,7 +1425,7 @@ function CalendarDrawerGroup({ entry, title, type, range }) {
             transition={{ duration: 0.25 }}
             className="overflow-hidden"
           >
-            <div className="border-t border-zinc-800/50 bg-zinc-900/30">
+            <div className="bg-zinc-900/30">
               {entry._group.map((sub, subIdx) => {
                 const subMeta = isEpisodeEntry(sub)
                   ? getEpisodeMeta(sub)
@@ -1437,7 +1452,7 @@ function CalendarDrawerGroup({ entry, title, type, range }) {
                     href={subHref || "#"} prefetch
                     className="flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 transition-colors group/sub"
                   >
-                    <div className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-lg border border-white/10 bg-zinc-900 shadow-sm">
+                    <div className="relative aspect-video w-24 shrink-0 overflow-hidden rounded-lg bg-zinc-900 shadow-sm">
                       {finalStill ? (
                         <OptimizedImage
                           src={`https://image.tmdb.org/t/p/w780${finalStill}`}
@@ -1509,7 +1524,7 @@ function DayItemsList({ items }) {
         href={href || "#"} prefetch
         className="flex items-center gap-3.5 p-2.5 rounded-xl hover:bg-white/5 transition-colors group/row"
       >
-        <div className="w-[56px] h-[84px] shrink-0 rounded-lg overflow-hidden bg-zinc-900 border border-white/10 shadow-md">
+        <div className="w-[56px] h-[84px] shrink-0 rounded-lg overflow-hidden bg-zinc-900 shadow-md">
           <Poster entry={entry} className="w-full h-full" />
         </div>
         <div className="flex-1 min-w-0">
@@ -4615,7 +4630,7 @@ export default function HistoryClient() {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 10 }}
               transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
-              className="w-full max-w-[1900px] h-[98vh] flex flex-col bg-[#0a0a0a] rounded-2xl lg:rounded-3xl border border-zinc-800 shadow-2xl overflow-hidden"
+              className="w-full max-w-[1900px] h-[98vh] flex flex-col bg-[#0a0a0a] rounded-2xl lg:rounded-3xl shadow-2xl overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex-1 flex flex-col p-3 lg:p-4 min-h-0">

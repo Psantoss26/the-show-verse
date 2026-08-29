@@ -779,6 +779,7 @@ function SwipeCard({ item, reduceMotion, onAction, forcedExit = null }) {
 
   return (
     <motion.div
+      data-mobile-page-swipe-ignore
       // MÓVIL: sin marco ni fondo; la imagen se funde con la página (vista
       // inmersiva). ESCRITORIO: tarjeta redondeada con sombra.
       className="absolute inset-0 cursor-grab overflow-visible active:cursor-grabbing sm:overflow-hidden sm:rounded-[2rem] sm:bg-zinc-900 sm:shadow-2xl"

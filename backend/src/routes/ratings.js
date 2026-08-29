@@ -1,5 +1,5 @@
 // src/routes/ratings.js
-// Ratings de usuario (películas, series, episodios)
+// Ratings de usuario (películas, series, temporadas, episodios)
 
 import { z } from 'zod';
 import { db } from '../db/client.js';
@@ -12,7 +12,7 @@ import {
 
 const ratingSchema = z.object({
   tmdbId: z.number().int().positive(),
-  mediaType: z.enum(['movie', 'tv', 'episode']),
+  mediaType: z.enum(['movie', 'tv', 'season', 'episode']),
   rating: z.number().min(1).max(10),
   season: z.number().int().positive().optional(),
   episode: z.number().int().positive().optional(),
@@ -23,6 +23,13 @@ const ratingSchema = z.object({
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: 'season and episode are required for episode ratings',
+      path: ['season'],
+    });
+  }
+  if (data.mediaType === 'season' && (!data.season || data.episode)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'season ratings require season and no episode',
       path: ['season'],
     });
   }
@@ -141,12 +148,15 @@ export default async function ratingsRoutes(fastify) {
     const { mediaType } = req.params;
     const { season, episode } = req.query;
 
-    if (!['movie', 'tv', 'episode'].includes(mediaType) || Number.isNaN(tmdbId)) {
+    if (!['movie', 'tv', 'season', 'episode'].includes(mediaType) || Number.isNaN(tmdbId)) {
       return reply.status(400).send({ error: 'Invalid rating identity' });
     }
 
     if (mediaType === 'episode' && (!season || !episode)) {
       return reply.status(400).send({ error: 'season and episode are required for episode ratings' });
+    }
+    if (mediaType === 'season' && (!season || episode)) {
+      return reply.status(400).send({ error: 'season is required and episode is not allowed for season ratings' });
     }
 
     await db
