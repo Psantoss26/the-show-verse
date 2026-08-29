@@ -213,7 +213,13 @@ export default function DetailsInfoTabs({
       ) : null}
 
       {/* ========== ÁREA DE CONTENIDO DE TABS ========== */}
-      <div className="relative min-h-[100px]">
+      {/* El gesto vive también sobre las tarjetas: en móvil se puede cambiar
+          de sección sin volver primero al menú. `touch-pan-y` mantiene el
+          desplazamiento vertical de la página como comportamiento nativo. */}
+      <div
+        {...swipeHandlers}
+        className="relative min-h-[100px] touch-pan-y sm:touch-auto"
+      >
         <AnimatePresence mode="wait">
           {/* ===== TAB: SINOPSIS ===== */}
           {activeTab === "synopsis" && (
