@@ -1,6 +1,6 @@
 export const MOBILE_USER_PAGE_SWIPE_ROUTES = Object.freeze([
   "/social",
-  "/recommendations",
+  "/lists",
   "/in-progress",
   "/history",
   "/favorites",

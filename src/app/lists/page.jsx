@@ -973,6 +973,7 @@ function ListItemsRow({ items, isMobile, accent = "trakt" }) {
           style={{ overflowX: "clip", overflowY: "visible" }}
         >
           <Swiper
+            data-mobile-page-swipe-ignore
             slidesPerView={3}
             spaceBetween={12}
             onSwiper={handleSwiper}
