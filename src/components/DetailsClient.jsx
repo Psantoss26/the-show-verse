@@ -10022,6 +10022,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             >
               <span
                 ref={mobileSecondaryTriggerRef}
+                data-details-mobile-secondary-trigger
                 aria-hidden="true"
                 className="block h-px sm:hidden"
               />

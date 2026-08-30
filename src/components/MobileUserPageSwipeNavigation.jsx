@@ -34,6 +34,18 @@ function getSwipeDestination(pathname, direction) {
       : null;
 }
 
+function isDetailsInitialHeroVisible() {
+  const secondaryTrigger = document.querySelector(
+    "[data-details-mobile-secondary-trigger]",
+  );
+  if (!secondaryTrigger) return false;
+
+  // Es el mismo umbral que DetailsClient usa para revelar el marcador y las
+  // pestañas. Hasta entonces la portada sigue siendo la superficie principal;
+  // al cruzarlo, el gesto horizontal pertenece a las secciones de contenido.
+  return secondaryTrigger.getBoundingClientRect().top >= window.innerHeight - 88;
+}
+
 /**
  * Permite recorrer las vistas personales de la barra inferior sin convertir
  * cada página en un carrusel. Replica la captura táctil del Perfil: se puede
@@ -86,7 +98,11 @@ export default function MobileUserPageSwipeNavigation({ children }) {
   const handleTouchStart = useCallback((event) => {
     // Mismo límite que el Perfil: solo teléfonos. Los layouts de tabletas y
     // escritorio conservan sus propios desplazamientos horizontales.
-    if (window.matchMedia("(min-width: 640px)").matches || event.touches.length !== 1) {
+    if (
+      window.matchMedia("(min-width: 640px)").matches ||
+      event.touches.length !== 1 ||
+      (getUserDetailsSequence(pathname) && !isDetailsInitialHeroVisible())
+    ) {
       pageSwipe.current = null;
       return;
     }
@@ -96,7 +112,7 @@ export default function MobileUserPageSwipeNavigation({ children }) {
       y: event.touches[0].clientY,
       preservesNestedGesture: preservesNestedGesture(event.target),
     };
-  }, []);
+  }, [pathname]);
 
   const handleTouchEnd = useCallback(
     (event) => {

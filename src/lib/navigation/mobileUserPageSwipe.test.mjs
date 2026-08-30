@@ -56,6 +56,9 @@ test("la captura global replica el gesto de Perfil, también en fichas de usuari
   assert.match(navigation, /\(min-width: 640px\)/);
   assert.match(navigation, /MOBILE_USER_PAGE_SWIPE_IGNORE_SELECTOR/);
   assert.match(navigation, /getUserDetailsSequence\(pathname\)/);
+  assert.match(navigation, /isDetailsInitialHeroVisible/);
+  assert.match(navigation, /data-details-mobile-secondary-trigger/);
+  assert.match(navigation, /secondaryTrigger\.getBoundingClientRect\(\)\.top >= window\.innerHeight - 88/);
   assert.match(navigation, /saveUserDetailsSequenceFromLink\(/);
   assert.match(navigation, /target\.closest\('a\[href\^="\/details\/"\]'\)/);
   assert.match(navigation, /event\.currentTarget/);
@@ -65,6 +68,12 @@ test("la captura global replica el gesto de Perfil, también en fichas de usuari
   assert.match(layout, /<MobileUserPageSwipeNavigation>/);
   assert.match(lists, /<Swiper\s+data-mobile-page-swipe-ignore/);
   assert.match(detailsTabs, /"data-mobile-page-swipe-ignore": ""/);
+
+  const detailsClient = await readFile(
+    new URL("../../components/DetailsClient.jsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(detailsClient, /ref=\{mobileSecondaryTriggerRef\}\s+data-details-mobile-secondary-trigger/);
 
   const routes = await readFile(new URL("./mobileUserPageSwipe.js", import.meta.url), "utf8");
   assert.match(routes, /"\[data-mobile-page-swipe-ignore\]"/);
