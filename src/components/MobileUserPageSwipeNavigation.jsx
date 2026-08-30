@@ -4,9 +4,13 @@ import { useCallback, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   getMobileUserPageSwipeDestination,
+  isMobileUserPageSwipeRoute,
   MOBILE_USER_PAGE_SWIPE_IGNORE_SELECTOR,
 } from "@/lib/navigation/mobileUserPageSwipe";
-import { getUserDetailsSequence } from "@/lib/navigation/userDetailsSequence";
+import {
+  getUserDetailsSequence,
+  saveUserDetailsSequenceFromLink,
+} from "@/lib/navigation/userDetailsSequence";
 
 function preservesNestedGesture(target) {
   return (
@@ -62,6 +66,23 @@ export default function MobileUserPageSwipeNavigation({ children }) {
     [pathname, router],
   );
 
+  // La navegación entre títulos necesita la lista ordenada de la página desde
+  // la que se abrió la ficha. Perfil ya tiene un ámbito propio; las páginas
+  // personales del navbar no, así que la capturamos aquí antes de que Link o
+  // una preview cambien de ruta.
+  const captureDetailsSequence = useCallback(
+    (event) => {
+      if (!isMobileUserPageSwipeRoute(pathname)) return;
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      saveUserDetailsSequenceFromLink(
+        target.closest('a[href^="/details/"]'),
+        event.currentTarget,
+      );
+    },
+    [pathname],
+  );
+
   const handleTouchStart = useCallback((event) => {
     // Mismo límite que el Perfil: solo teléfonos. Los layouts de tabletas y
     // escritorio conservan sus propios desplazamientos horizontales.
@@ -113,7 +134,12 @@ export default function MobileUserPageSwipeNavigation({ children }) {
     : {};
 
   return (
-    <div className="min-h-screen" {...swipeHandlers} data-mobile-user-page-swipe>
+    <div
+      className="min-h-screen"
+      {...swipeHandlers}
+      onClickCapture={captureDetailsSequence}
+      data-mobile-user-page-swipe
+    >
       {children}
     </div>
   );

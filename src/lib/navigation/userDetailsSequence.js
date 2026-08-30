@@ -26,7 +26,7 @@ function uniqueDetailsHrefs(links) {
  * se toma después de filtros, grupos y ordenación, por lo que DetailsClient no
  * necesita reproducir esa lógica ni volver a pedir la lista.
  */
-export function saveUserDetailsSequenceFromLink(link) {
+export function saveUserDetailsSequenceFromLink(link, sequenceScope = null) {
   if (typeof window === "undefined" || !(link instanceof HTMLAnchorElement)) {
     return;
   }
@@ -35,7 +35,9 @@ export function saveUserDetailsSequenceFromLink(link) {
   if (!selectedHref) return;
 
   const scope =
-    link.closest("[data-user-details-sequence]") || link.closest("section");
+    sequenceScope instanceof Element && sequenceScope.contains(link)
+      ? sequenceScope
+      : link.closest("[data-user-details-sequence]") || link.closest("section");
   if (!scope) return;
 
   const hrefs = uniqueDetailsHrefs(scope.querySelectorAll('a[href^="/details/"]'));

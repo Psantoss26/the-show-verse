@@ -20,10 +20,12 @@ function normalizePathname(pathname) {
   return normalized || "/";
 }
 
+export function isMobileUserPageSwipeRoute(pathname) {
+  return MOBILE_USER_PAGE_SWIPE_ROUTES.includes(normalizePathname(pathname));
+}
+
 export function getMobileUserPageSwipeDestination(pathname, direction) {
-  const currentIndex = MOBILE_USER_PAGE_SWIPE_ROUTES.indexOf(
-    normalizePathname(pathname),
-  );
+  const currentIndex = MOBILE_USER_PAGE_SWIPE_ROUTES.indexOf(normalizePathname(pathname));
   if (currentIndex === -1) return null;
 
   const offset = direction === "left" ? 1 : direction === "right" ? -1 : 0;
