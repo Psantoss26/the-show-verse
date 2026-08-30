@@ -291,6 +291,7 @@ export function UnifiedRateButton({
 // existían para la versión móvil.
 export function ActionShareButton({ title, text, url, iconOnly = false }) {
   const [copied, setCopied] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
 
   const handleShare = async () => {
     const finalUrl =
@@ -326,9 +327,19 @@ export function ActionShareButton({ title, text, url, iconOnly = false }) {
     <motion.button
       type="button"
       onClick={handleShare}
+      // `w-auto` no se puede interpolar con CSS. Al alternar entre el modo
+      // compacto y el que muestra etiqueta, Framer mide ambos tamaños y anima
+      // la diferencia en los dos sentidos.
+      layout={prefersReducedMotion ? false : "size"}
       initial={{ opacity: 0, y: 8, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      transition={{
+        duration: 0.3,
+        ease: [0.22, 1, 0.36, 1],
+        layout: prefersReducedMotion
+          ? { duration: 0 }
+          : { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
+      }}
       className={[
         `group/share relative isolate inline-grid h-10 w-10 transform-gpu place-items-center overflow-hidden ${
           iconOnly ? "rounded-full text-zinc-200" : "rounded-xl"
