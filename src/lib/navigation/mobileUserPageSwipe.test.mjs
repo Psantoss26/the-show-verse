@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   MOBILE_USER_PAGE_SWIPE_ROUTES,
   getMobileUserPageSwipeDestination,
+  isMobileUserPageSwipeRoute,
 } from "./mobileUserPageSwipe.js";
 
 test("las páginas de usuario siguen el orden del navbar móvil y terminan en Perfil", () => {
@@ -36,6 +37,12 @@ test("un deslizamiento solo navega dentro de los extremos de la secuencia", () =
   assert.equal(getMobileUserPageSwipeDestination("/calendar", "left"), null);
 });
 
+test("las rutas personales del navbar se reconocen para capturar su orden de títulos", () => {
+  assert.equal(isMobileUserPageSwipeRoute("/favorites"), true);
+  assert.equal(isMobileUserPageSwipeRoute("/watchlist/"), true);
+  assert.equal(isMobileUserPageSwipeRoute("/details/movie/550"), false);
+});
+
 test("la captura global replica el gesto de Perfil, también en fichas de usuario, y cede a gestos propios", async () => {
   const [navigation, layout, lists, detailsTabs] = await Promise.all([
     readFile(new URL("../../components/MobileUserPageSwipeNavigation.jsx", import.meta.url), "utf8"),
@@ -49,6 +56,9 @@ test("la captura global replica el gesto de Perfil, también en fichas de usuari
   assert.match(navigation, /\(min-width: 640px\)/);
   assert.match(navigation, /MOBILE_USER_PAGE_SWIPE_IGNORE_SELECTOR/);
   assert.match(navigation, /getUserDetailsSequence\(pathname\)/);
+  assert.match(navigation, /saveUserDetailsSequenceFromLink\(/);
+  assert.match(navigation, /target\.closest\('a\[href\^="\/details\/"\]'\)/);
+  assert.match(navigation, /event\.currentTarget/);
   assert.match(navigation, /detailsSequence\?\.next/);
   assert.match(navigation, /detailsSequence\?\.previous/);
   assert.match(navigation, /router\.push\(destination\)/);
