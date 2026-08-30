@@ -47,3 +47,28 @@ test("no reutiliza la referencia de temporada y episodio como titulo provisional
     /min-h-\[1em\][^>]*>\s*\{resolvedEpisodeTitle\}/,
   );
 });
+
+test("restaura el contenido principal y filtros sin animacion al volver atras", async () => {
+  const source = await readFile(componentPath, "utf8");
+
+  assert.match(
+    source,
+    /className="space-y-6 min-w-0"\s+initial=\{isBackNav \? false : \{ opacity: 0, x: -20 \}\}/,
+  );
+  assert.match(
+    source,
+    /isBackNav \? \{ duration: 0 \} : \{ duration: 0\.5, delay: 0\.3 \}/,
+  );
+  assert.match(
+    source,
+    /isBackNav \? "transition-none" : "transition-all duration-300"/,
+  );
+  assert.match(
+    source,
+    /initial=\{isBackNav \? false : \{ opacity: 0, y: 10 \}\}/,
+  );
+  assert.match(
+    source,
+    /isBackNav \? \{ duration: 0 \} : \{ duration: 0\.4, delay: 0\.5 \}/,
+  );
+});
