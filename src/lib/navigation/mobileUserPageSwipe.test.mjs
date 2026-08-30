@@ -36,20 +36,25 @@ test("un deslizamiento solo navega dentro de los extremos de la secuencia", () =
   assert.equal(getMobileUserPageSwipeDestination("/calendar", "left"), null);
 });
 
-test("la captura global replica el gesto de Perfil y solo cede a gestos horizontales propios", async () => {
-  const [navigation, layout, lists] = await Promise.all([
+test("la captura global replica el gesto de Perfil, también en fichas de usuario, y cede a gestos propios", async () => {
+  const [navigation, layout, lists, detailsTabs] = await Promise.all([
     readFile(new URL("../../components/MobileUserPageSwipeNavigation.jsx", import.meta.url), "utf8"),
     readFile(new URL("../../app/layout.jsx", import.meta.url), "utf8"),
     readFile(new URL("../../app/lists/page.jsx", import.meta.url), "utf8"),
+    readFile(new URL("../../components/details/DetailsInfoTabs.jsx", import.meta.url), "utf8"),
   ]);
 
   assert.match(navigation, /onTouchStartCapture/);
   assert.match(navigation, /onTouchEndCapture/);
   assert.match(navigation, /\(min-width: 640px\)/);
   assert.match(navigation, /MOBILE_USER_PAGE_SWIPE_IGNORE_SELECTOR/);
+  assert.match(navigation, /getUserDetailsSequence\(pathname\)/);
+  assert.match(navigation, /detailsSequence\?\.next/);
+  assert.match(navigation, /detailsSequence\?\.previous/);
   assert.match(navigation, /router\.push\(destination\)/);
   assert.match(layout, /<MobileUserPageSwipeNavigation>/);
   assert.match(lists, /<Swiper\s+data-mobile-page-swipe-ignore/);
+  assert.match(detailsTabs, /"data-mobile-page-swipe-ignore": ""/);
 
   const routes = await readFile(new URL("./mobileUserPageSwipe.js", import.meta.url), "utf8");
   assert.match(routes, /"\[data-mobile-page-swipe-ignore\]"/);

@@ -6,12 +6,28 @@ import {
   getMobileUserPageSwipeDestination,
   MOBILE_USER_PAGE_SWIPE_IGNORE_SELECTOR,
 } from "@/lib/navigation/mobileUserPageSwipe";
+import { getUserDetailsSequence } from "@/lib/navigation/userDetailsSequence";
 
 function preservesNestedGesture(target) {
   return (
     target instanceof Element &&
     Boolean(target.closest(MOBILE_USER_PAGE_SWIPE_IGNORE_SELECTOR))
   );
+}
+
+function getSwipeDestination(pathname, direction) {
+  const pageDestination = getMobileUserPageSwipeDestination(pathname, direction);
+  if (pageDestination) return pageDestination;
+
+  // Las fichas no forman parte del orden fijo del navbar, pero al venir de una
+  // página de usuario sí tienen una secuencia persistida con el mismo contrato
+  // izquierda = siguiente, derecha = anterior.
+  const detailsSequence = getUserDetailsSequence(pathname);
+  return direction === "left"
+    ? detailsSequence?.next || null
+    : direction === "right"
+      ? detailsSequence?.previous || null
+      : null;
 }
 
 /**
@@ -26,8 +42,8 @@ export default function MobileUserPageSwipeNavigation({ children }) {
   const navigatingToRef = useRef(null);
   const pageSwipe = useRef(null);
   const hasAdjacentPage = Boolean(
-    getMobileUserPageSwipeDestination(pathname, "left") ||
-      getMobileUserPageSwipeDestination(pathname, "right"),
+    getSwipeDestination(pathname, "left") ||
+      getSwipeDestination(pathname, "right"),
   );
 
   useEffect(() => {
@@ -36,7 +52,7 @@ export default function MobileUserPageSwipeNavigation({ children }) {
 
   const navigate = useCallback(
     (direction) => {
-      const destination = getMobileUserPageSwipeDestination(pathname, direction);
+      const destination = getSwipeDestination(pathname, direction);
       if (!destination || navigatingToRef.current) return;
 
       navigatingToRef.current = destination;
