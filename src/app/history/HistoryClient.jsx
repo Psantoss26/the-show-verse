@@ -3853,18 +3853,24 @@ export default function HistoryClient() {
           {/* Izquierda */}
           <motion.div
             className="space-y-6 min-w-0"
-            initial={{ opacity: 0, x: -20 }}
+            initial={isBackNav ? false : { opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
+            transition={
+              isBackNav ? { duration: 0 } : { duration: 0.5, delay: 0.3 }
+            }
           >
             {auth.connected && (
               <motion.div
                 ref={filtersRef}
                 data-menu-pinned={filtersPinned}
-                className="sticky top-14 z-[70] space-y-3 mb-3 transition-all duration-300 sm:top-20 lg:mb-6"
-                initial={{ opacity: 0, y: 10 }}
+                className={`sticky top-14 z-[70] space-y-3 mb-3 sm:top-20 lg:mb-6 ${
+                  isBackNav ? "transition-none" : "transition-all duration-300"
+                }`}
+                initial={isBackNav ? false : { opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.5 }}
+                transition={
+                  isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.5 }
+                }
               >
                 {/* Mobile: búsqueda + panel de filtros. Antes de fijarse (sticky),
                     el panel forma parte del flujo y empuja el contenido de abajo.
