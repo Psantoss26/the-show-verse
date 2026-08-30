@@ -24,11 +24,6 @@ import { createPortal } from "react-dom";
 
 // -- Navegacion de Next.js --
 import { useRouter } from "next/navigation";
-import useHorizontalSwipe from "@/hooks/useHorizontalSwipe";
-import {
-  getUserDetailsSequence,
-  getUserDetailsSequenceHref,
-} from "@/lib/navigation/userDetailsSequence";
 
 // -- Carrusel Swiper --
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -323,63 +318,14 @@ const PUBLIC_SCORE_CACHE = new Map(); // clave -> { ts, data }
 const TTL = 1000 * 60 * 5; // Tiempo de vida del cache: 5 minutos
 
 // Revelado por posición del bloque secundario en móvil (marcador + pestañas).
-//
-// Mismo lenguaje de movimiento que la barra inferior de navegación: una ÚNICA
-// curva y duración, y la transición es SIMÉTRICA (se oculta exactamente igual
-// que aparece). Lo que se mueve es el desplazamiento, que el compositor resuelve
-// sin recalcular layout: por eso resulta fluida en todo momento aunque el
-// usuario siga desplazándose.
-//
-// SIN FUNDIDO, y esto NO es una simplificación: se oculta con `invisible` y no
-// con `opacity-0` porque un `opacity` MENOR QUE 1 convierte esta capa en
-// BACKDROP ROOT. Durante los 450ms de la transición, el cristal de todo lo que
-// envuelve —el marcador, el menú de pestañas y las tarjetas de información— se
-// quedaba sin fondo que desenfocar: la pieza entraba PLANA y el vidrio solo
-// "encendía" de golpe en el fotograma en que la opacidad llegaba a 1 exacto.
-// Medido en Chromium con la sonda `backdrop-filter: invert(1)`: con
-// `opacity: 0.99` en el ancestro la sonda queda INERTE; con un desplazamiento en
-// curso, intacta. Es el mismo motivo por el que la entrada `.sv-details-entry`
-// de globals.css tampoco lleva `opacity`, y lo que hace que `DetailsSectionMenu`
-// —que entra solo con un `y: 10 -> 0`— se viera bien desde siempre.
-// `visibility` es discreta pero se interpola justo como hace falta: al mostrar
-// pasa a `visible` en el primer fotograma (la pieza aparece ya con su cristal y
-// solo le queda deslizarse) y al ocultar aguanta visible hasta el final del
-// recorrido, así que la simetría se mantiene.
-//
-// Se hace con transición CSS y no con Framer Motion a propósito: el estado
-// oculto tiene que estar garantizado ya en el primer pintado (antes de que
-// `isMobileViewport` se resuelva) y eso se expresaba con una clase `!important`
-// que PISABA el estilo inline de Framer -- el resultado era que aparecía animado
-// pero se ocultaba de golpe. Con clases, el mismo selector que garantiza el
-// estado oculto es el que se transiciona, así que no hay dos sistemas peleando.
-// `translate` va en la lista de propiedades a propósito: Tailwind v4 no compone
-// `translate-y-*` dentro de `transform`, sino en la propiedad INDEPENDIENTE
-// `translate`. Si no se enumera, el desplazamiento salta de golpe.
-// (`transition-transform` de Tailwind sí las cubre todas; aquí hay que
-// enumerarlas porque el valor es arbitrario.) `visibility` entra en la lista por
-// lo dicho arriba: es la que sustituye al fundido.
-//
-// EL MOVIMIENTO, y por qué es así. Sin fundido —lo impide el cristal— toda la
-// fluidez tiene que salir del propio recorrido, y el que había no daba para
-// tanto: 12px de desplazamiento en 450ms se lee como un corte, porque
-// `visibility` es discreta (al mostrar salta a `visible` en el primer fotograma
-// y al ocultar aguanta hasta el último). O sea: aparecía de golpe y DESPUÉS se
-// movía un pelo. Tres cambios:
-//   - RECORRIDO de 12px a 24px y un `scale` de 0.97 a 1 desde `origin-top`: el
-//     bloque se despliega desde su borde superior en vez de dar un empujoncito.
-//     Con recorrido suficiente el ojo sigue el movimiento y el salto discreto de
-//     `visibility` deja de ser lo que se ve.
-//   - DURACIÓN de 450ms a 320ms al entrar: es la mitad de "mostrarse antes".
-//   - ASIMETRÍA: entrar y salir no se parecen. Las curvas y duraciones de SALIDA
-//     viven en la clase de estado oculto, no aquí, y eso no es un descuido: una
-//     transición usa el `transition-*` del estado DESTINO, así que lo que
-//     escribas en `MOBILE_REVEAL_HIDDEN` es exactamente lo que gobierna el
-//     ocultado. Sale en 200ms con curva de aceleración —lo que se va, se va
-//     rápido— y entra en 320ms con una curva que asienta.
+// No se anima: estos bloques quedan justo después de la acción principal y en
+// dispositivos lentos incluso una transición compuesta se percibe como carga.
+// `visibility` evita pintar o interactuar con ellos antes del umbral, pero al
+// cruzarlo el contenido y su cristal aparecen en el mismo fotograma.
 const MOBILE_REVEAL_BASE =
-  "origin-top transform-gpu transition-[visibility,transform,translate,scale,rotate] duration-[320ms] ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none";
+  "transform-gpu";
 const MOBILE_REVEAL_HIDDEN =
-  "max-sm:invisible max-sm:translate-y-6 max-sm:scale-[0.97] max-sm:pointer-events-none max-sm:duration-[200ms] max-sm:ease-[cubic-bezier(0.4,0,1,1)] max-sm:delay-0";
+  "max-sm:invisible max-sm:pointer-events-none";
 
 // Umbral mínimo que evita revelar el bloque antes de que el usuario haya
 // abandonado el inicio de la ficha. El cruce visual preciso lo calcula el
@@ -1772,45 +1718,6 @@ export default function DetailsClient({
   const [isMobileViewport, setIsMobileViewport] = useState(false); // Viewport <= 640px
   const [mobileSecondaryVisible, setMobileSecondaryVisible] =
     useState(false);
-  const currentDetailsHref = useMemo(
-    () => getUserDetailsSequenceHref(type, id),
-    [id, type],
-  );
-  const [userDetailsSequence, setUserDetailsSequence] = useState(null);
-  const userDetailsNavigationRef = useRef(null);
-
-  // La secuencia solo existe cuando se entra desde una página de usuario. Una
-  // apertura directa de DetailsClient no habilita el gesto ni altera su flujo.
-  useEffect(() => {
-    userDetailsNavigationRef.current = null;
-    setUserDetailsSequence(getUserDetailsSequence(currentDetailsHref));
-  }, [currentDetailsHref]);
-
-  const navigateUserDetailsSequence = useCallback(
-    (direction) => {
-      const destination =
-        direction === "next"
-          ? userDetailsSequence?.next
-          : userDetailsSequence?.previous;
-      if (!destination || userDetailsNavigationRef.current) return;
-
-      userDetailsNavigationRef.current = destination;
-      router.prefetch(destination);
-      router.push(destination);
-    },
-    [router, userDetailsSequence],
-  );
-
-  // El gesto se decide al levantar el dedo: así el scroll vertical y los taps
-  // de las acciones siguen siendo nativos. Solo se monta en el primer bloque
-  // móvil de la ficha, no sobre pestañas ni carruseles del resto de la página.
-  const userDetailsSwipeHandlers = useHorizontalSwipe({
-    enabled:
-      isMobileViewport &&
-      Boolean(userDetailsSequence?.previous || userDetailsSequence?.next),
-    onSwipeLeft: () => navigateUserDetailsSequence("next"),
-    onSwipeRight: () => navigateUserDetailsSequence("previous"),
-  });
 
   // Con barra de progreso ("Viendo XX%") la fila de acciones NO entra junto a la
   // portada: la barra ya ocupa esa zona y encadenar las dos cosas amontonaba
@@ -1960,10 +1867,9 @@ export default function DetailsClient({
   // Ambos comparten esta señal para aparecer y desaparecer como una sola pieza.
   //
   // IntersectionObserver conserva la sincronización ante cambios de layout,
-  // pero su callback se entrega de forma asíncrona y puede llegar tarde durante
-  // un scroll rápido en móviles poco potentes. El listener pasivo calcula el
-  // mismo umbral en el siguiente frame, para que el estado cambie justo al
-  // cruzarlo, sin esperar a que se vacíe la cola del observador.
+  // pero su callback se entrega de forma asíncrona. El listener pasivo calcula
+  // el umbral en el MISMO evento de scroll, sin esperar a rAF, que en móviles
+  // saturados puede llegar varios fotogramas después del cruce.
   useEffect(() => {
     if (!isMobileViewport) {
       setMobileSecondaryVisible(false);
@@ -1974,7 +1880,6 @@ export default function DetailsClient({
     const trigger = mobileSecondaryTriggerRef.current;
     if (!trigger) return undefined;
 
-    let frame = 0;
     const syncVisibility = () => {
       const triggerTop = trigger.getBoundingClientRect().top;
       const revealLine = window.innerHeight - 88;
@@ -1987,16 +1892,8 @@ export default function DetailsClient({
       );
     };
 
-    const scheduleSync = () => {
-      if (frame) return;
-      frame = window.requestAnimationFrame(() => {
-        frame = 0;
-        syncVisibility();
-      });
-    };
-
     const observer = new IntersectionObserver(
-      scheduleSync,
+      syncVisibility,
       {
         root: null,
         // Reserva el espacio cubierto por la navegación inferior flotante.
@@ -2007,14 +1904,13 @@ export default function DetailsClient({
 
     observer.observe(trigger);
     syncVisibility();
-    window.addEventListener("scroll", scheduleSync, { passive: true });
-    window.addEventListener("resize", scheduleSync, { passive: true });
+    window.addEventListener("scroll", syncVisibility, { passive: true });
+    window.addEventListener("resize", syncVisibility, { passive: true });
 
     return () => {
-      if (frame) window.cancelAnimationFrame(frame);
       observer.disconnect();
-      window.removeEventListener("scroll", scheduleSync);
-      window.removeEventListener("resize", scheduleSync);
+      window.removeEventListener("scroll", syncVisibility);
+      window.removeEventListener("resize", syncVisibility);
     };
   }, [id, isMobileViewport]);
 
@@ -9346,7 +9242,6 @@ export default function DetailsClient({
                   overlay abre la plataforma. `group/still` habilita el overlay. */}
               <div
                 ref={posterWrapRef}
-                {...userDetailsSwipeHandlers}
                 onPointerMove={(e) =>
                   setPosterTargetFromPointer(e.clientX, e.clientY)
                 }
@@ -9962,9 +9857,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 // se veían -- efecto "aparecen sin imagen y un instante
                 // después vuelven a aparecer con imagen".
                 //
-                // Con barra de progreso NO se usa `invisible`: ahí la fila la
-                // oculta el revelado por scroll con su propia opacidad, y
-                // `visibility` cortaría esa transición.
+                // Con barra de progreso, esta fila usa el mismo revelado
+                // instantáneo por scroll que el marcador y las pestañas.
                 mobileActionsWaitForScroll ||
                 (detailsEntryReady && currentLowLoaded && inProgressChecked)
                   ? ""
@@ -9975,7 +9869,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 <div className="relative -top-2 sm:top-0">
                   <div
                     ref={mobileActionRowRef}
-                    {...userDetailsSwipeHandlers}
                     className={
                       mobileActionsWaitForScroll
                         ? // CON BARRA DE PROGRESO: la fila no entra con la
@@ -10061,17 +9954,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 segunda fila de plataformas/estado/premios fuera de la jerarquía
                 informativa. */}
             <div className={`${detailsEntryReady ? "sv-details-entry" : ""} sv-details-entry--tabs order-3 mb-2 w-full sm:hidden`}>
-              {/* El revelado por posición va en una capa PROPIA, por dentro del
+              {/* El revelado por posición va en una capa propia, por dentro del
                   contenedor estable. Comparte señal con el marcador para que
-                  ambos aparezcan y desaparezcan como una sola pieza, sin que
-                  una opacidad de carga atenúe el cristal de las tarjetas. */}
+                  ambos estén disponibles exactamente en el mismo umbral. */}
               <div
-                // SIN `will-change` en el estado visible: `will-change: opacity`
-                // convierte esta capa en BACKDROP ROOT, y con ella el cristal de
-                // lo que envuelve (marcador, pestañas y tarjetas) se quedaba sin
-                // fondo que desenfocar -- plano en vez de vidrio. El hint solo
-                // haría falta MIENTRAS se transiciona, y el compositor ya promueve
-                // la capa por su cuenta durante una transición de opacity/translate.
+                // Sin `will-change`: no hay transición pendiente y mantener una
+                // capa extra perjudica a los dispositivos de menor rendimiento.
                 className={`${MOBILE_REVEAL_BASE} ${
                   mobileSecondaryVisible ? "" : MOBILE_REVEAL_HIDDEN
                 }`}
@@ -10138,12 +10026,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 className="block h-px sm:hidden"
               />
               <div
-                // SIN `will-change` en el estado visible: `will-change: opacity`
-                // convierte esta capa en BACKDROP ROOT, y con ella el cristal de
-                // lo que envuelve (marcador, pestañas y tarjetas) se quedaba sin
-                // fondo que desenfocar -- plano en vez de vidrio. El hint solo
-                // haría falta MIENTRAS se transiciona, y el compositor ya promueve
-                // la capa por su cuenta durante una transición de opacity/translate.
+                // Sin `will-change`: no hay transición pendiente y mantener una
+                // capa extra perjudica a los dispositivos de menor rendimiento.
                 className={`${MOBILE_REVEAL_BASE} ${
                   mobileSecondaryVisible ? "" : MOBILE_REVEAL_HIDDEN
                 }`}

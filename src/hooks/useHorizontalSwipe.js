@@ -51,6 +51,7 @@ export default function useHorizontalSwipe({
   onSwipeRight,
   enabled = true,
   shouldStart,
+  suppressClickAfterSwipe = true,
 } = {}) {
   const startRef = useRef(null);
   const suppressClickUntilRef = useRef(0);
@@ -114,9 +115,15 @@ export default function useHorizontalSwipe({
       });
       if (!direction) return;
 
-      suppressClickUntilRef.current = Date.now() + 800;
-      if (direction === "left") onSwipeLeft?.();
-      else onSwipeRight?.();
+      const handled =
+        direction === "left" ? onSwipeLeft?.() : onSwipeRight?.();
+
+      // Un gesto que no puede completar ninguna acción (por ejemplo, intentar
+      // ir más allá del primer o último título) no debe comerse el siguiente
+      // toque. Las pestañas conservan el comportamiento anterior por defecto.
+      if (suppressClickAfterSwipe && handled !== false) {
+        suppressClickUntilRef.current = Date.now() + 800;
+      }
     },
     onTouchCancelCapture: cancel,
     onClickCapture: (event) => {

@@ -185,11 +185,16 @@ export default function DetailsInfoTabs({
     });
   };
 
-  const swipeHandlers = useHorizontalSwipe({
+  const tabSwipeHandlers = useHorizontalSwipe({
     enabled: enableMobileTabSwipe,
     onSwipeLeft: () => goToAdjacentTab(1),
     onSwipeRight: () => goToAdjacentTab(-1),
   });
+  // El navegador global de páginas cede el gesto a estas pestañas cuando su
+  // propio swipe está activo, igual que hace con los carruseles.
+  const swipeHandlers = enableMobileTabSwipe
+    ? { ...tabSwipeHandlers, "data-mobile-page-swipe-ignore": "" }
+    : tabSwipeHandlers;
 
   const genresValue = Array.isArray(genres)
     ? genres

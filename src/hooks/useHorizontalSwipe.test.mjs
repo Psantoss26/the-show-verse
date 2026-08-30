@@ -68,6 +68,8 @@ test("las pestañas móviles usan la misma captura táctil fiable que Perfil", a
   assert.match(swipeHook, /onClickCapture/);
   assert.match(swipeHook, /event\.stopPropagation\(\)/);
   assert.match(swipeHook, /shouldStart && !shouldStart\(event\)/);
+  assert.match(swipeHook, /suppressClickAfterSwipe = true/);
+  assert.match(swipeHook, /suppressClickAfterSwipe && handled !== false/);
 
   assert.match(
     infoTabs,
