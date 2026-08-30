@@ -1946,7 +1946,7 @@ function ProfileContentSection({ username, section, actor }) {
           </p>
         </div>
       ) : (
-        <div className="space-y-7">
+        <div className="space-y-7" data-user-details-sequence>
           {groups.map((group) => (
             <section key={group.key}>
               {group.label

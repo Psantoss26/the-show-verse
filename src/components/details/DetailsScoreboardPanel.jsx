@@ -27,7 +27,7 @@
 // formatShortNumber para garantizar que ambos consumidores rindan igual.
 
 import { Fragment } from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import NextImage from "next/image";
 import { Eye, Play, List, Heart, MoreHorizontal, MonitorPlay } from "lucide-react";
 
@@ -386,6 +386,7 @@ function DetailsToolbarActions({
   shareIconOnly = false,
   toolbarActions = null,
 }) {
+  const prefersReducedMotion = useReducedMotion();
   const hasExternalLinks =
     Array.isArray(externalLinks) && externalLinks.length > 0;
   const hasStreamingProviders =
@@ -453,9 +454,19 @@ function DetailsToolbarActions({
             {/* En móvil, y en variantes compactas, el botón "..." abre el
                 modal de enlaces para no recargar la barra. */}
             {onMoreLinks && (
-              <button
+              <motion.button
                 type="button"
                 onClick={onMoreLinks}
+                // El cambio entre h-10/w-10 y el tamaño automático de la
+                // etiqueta no es animable por CSS. `layout="size"` conserva
+                // la misma curva al expandirse y al contraerse.
+                layout={prefersReducedMotion ? false : "size"}
+                initial={false}
+                transition={
+                  prefersReducedMotion
+                    ? { duration: 0 }
+                    : { layout: { duration: 0.3, ease: [0.22, 1, 0.36, 1] } }
+                }
                 className={`${hasMobilePlatformAction ? "hidden sm:flex" : externalLinksMenuOnly ? "" : "sm:hidden"} relative isolate h-10 w-10 shrink-0 transform-gpu items-center justify-center overflow-hidden rounded-full bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 text-zinc-200 shadow-none backdrop-blur-[6px] transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/[0.08] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/30 ${showExternalLinksLabel ? "sm:inline-flex sm:h-auto sm:w-auto sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2" : ""}`}
                 title="Enlaces"
                 aria-label="Abrir enlaces externos"
@@ -470,7 +481,7 @@ function DetailsToolbarActions({
                     Enlaces
                   </span>
                 )}
-              </button>
+              </motion.button>
             )}
 
             {hasMobilePlatformAction && (

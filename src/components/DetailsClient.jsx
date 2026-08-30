@@ -24,6 +24,11 @@ import { createPortal } from "react-dom";
 
 // -- Navegacion de Next.js --
 import { useRouter } from "next/navigation";
+import useHorizontalSwipe from "@/hooks/useHorizontalSwipe";
+import {
+  getUserDetailsSequence,
+  getUserDetailsSequenceHref,
+} from "@/lib/navigation/userDetailsSequence";
 
 // -- Carrusel Swiper --
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -1767,6 +1772,45 @@ export default function DetailsClient({
   const [isMobileViewport, setIsMobileViewport] = useState(false); // Viewport <= 640px
   const [mobileSecondaryVisible, setMobileSecondaryVisible] =
     useState(false);
+  const currentDetailsHref = useMemo(
+    () => getUserDetailsSequenceHref(type, id),
+    [id, type],
+  );
+  const [userDetailsSequence, setUserDetailsSequence] = useState(null);
+  const userDetailsNavigationRef = useRef(null);
+
+  // La secuencia solo existe cuando se entra desde una página de usuario. Una
+  // apertura directa de DetailsClient no habilita el gesto ni altera su flujo.
+  useEffect(() => {
+    userDetailsNavigationRef.current = null;
+    setUserDetailsSequence(getUserDetailsSequence(currentDetailsHref));
+  }, [currentDetailsHref]);
+
+  const navigateUserDetailsSequence = useCallback(
+    (direction) => {
+      const destination =
+        direction === "next"
+          ? userDetailsSequence?.next
+          : userDetailsSequence?.previous;
+      if (!destination || userDetailsNavigationRef.current) return;
+
+      userDetailsNavigationRef.current = destination;
+      router.prefetch(destination);
+      router.push(destination);
+    },
+    [router, userDetailsSequence],
+  );
+
+  // El gesto se decide al levantar el dedo: así el scroll vertical y los taps
+  // de las acciones siguen siendo nativos. Solo se monta en el primer bloque
+  // móvil de la ficha, no sobre pestañas ni carruseles del resto de la página.
+  const userDetailsSwipeHandlers = useHorizontalSwipe({
+    enabled:
+      isMobileViewport &&
+      Boolean(userDetailsSequence?.previous || userDetailsSequence?.next),
+    onSwipeLeft: () => navigateUserDetailsSequence("next"),
+    onSwipeRight: () => navigateUserDetailsSequence("previous"),
+  });
 
   // Con barra de progreso ("Viendo XX%") la fila de acciones NO entra junto a la
   // portada: la barra ya ocupa esa zona y encadenar las dos cosas amontonaba
@@ -2795,11 +2839,13 @@ export default function DetailsClient({
       ...(data?.images?.backdrops ? data.images.backdrops : []),
     ];
     const bestPath = pickBestBackdropForPreview(allBackdrops);
-    return bestPath || data?.backdrop_path || null;
+    // `data.backdrop_path` no trae su metadato de idioma, así que no puede ser
+    // un fallback seguro para este modo. Si no existe arte inglés, no se abre la
+    // vista previa antes que degradar a un backdrop localizado.
+    return bestPath || null;
   }, [
     imagesState?.backdrops,
     data?.images?.backdrops,
-    data?.backdrop_path,
     artworkInitialized,
     remoteArtworkChecked,
   ]);
@@ -9300,6 +9346,7 @@ export default function DetailsClient({
                   overlay abre la plataforma. `group/still` habilita el overlay. */}
               <div
                 ref={posterWrapRef}
+                {...userDetailsSwipeHandlers}
                 onPointerMove={(e) =>
                   setPosterTargetFromPointer(e.clientX, e.clientY)
                 }
@@ -9928,6 +9975,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 <div className="relative -top-2 sm:top-0">
                   <div
                     ref={mobileActionRowRef}
+                    {...userDetailsSwipeHandlers}
                     className={
                       mobileActionsWaitForScroll
                         ? // CON BARRA DE PROGRESO: la fila no entra con la

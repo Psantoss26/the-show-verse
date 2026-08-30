@@ -181,6 +181,7 @@ function ProfilePosterGrid({
   return (
     <div
       data-profile-horizontal-scroll
+      data-user-details-sequence
       data-profile-swipe-exempt={prioritizeHorizontalScroll || undefined}
       role="region"
       aria-label={label}

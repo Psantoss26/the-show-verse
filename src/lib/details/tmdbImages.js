@@ -387,17 +387,21 @@ export const pickBestBackdropForPreview = (list, opts = {}) => {
     const preferSet = new Set((preferLangs || []).map(norm).filter(Boolean))
     const isPreferredLang = (img) => preferSet.has(norm(img?.iso_639_1))
 
-    // Mantener orden + minWidth (si no hay, cae al original)
-    const pool0 = minWidth > 0 ? list.filter((b) => (b?.width || 0) >= minWidth) : list
-    const pool = pool0.length ? pool0 : list
+    // El idioma es una regla dura para el modo Póster → Backdrop. Antes se
+    // filtraba toda la lista por resolución y SOLO DESPUÉS se buscaba inglés:
+    // si el backdrop inglés medía menos de `minWidth` y uno español no, se
+    // eliminaba el inglés y la función devolvía `null`. DetailsClient acababa
+    // cayendo al `backdrop_path` localizado. La resolución solo decide ENTRE
+    // candidatos ingleses; si ninguno llega al mínimo, se conserva el mejor
+    // inglés disponible en vez de abandonar la preferencia de idioma.
+    const preferred = list.filter(isPreferredLang)
+    if (!preferred.length) return null
 
-    // ✅ SOLO 3 primeras EN (en orden). Si no hay EN, devolvemos null (siempre EN)
-    const top3en = []
-    for (const b of pool) {
-        if (isPreferredLang(b)) top3en.push(b)
-        if (top3en.length === 3) break
-    }
-    if (!top3en.length) return null
+    const sizedPreferred = minWidth > 0
+        ? preferred.filter((b) => (b?.width || 0) >= minWidth)
+        : preferred
+    const pool = sizedPreferred.length ? sizedPreferred : preferred
+    const top3en = pool.slice(0, 3)
 
     const isRes = (b, w, h) => (b?.width || 0) === w && (b?.height || 0) === h
 
