@@ -376,21 +376,10 @@ const MOBILE_REVEAL_BASE =
 const MOBILE_REVEAL_HIDDEN =
   "max-sm:invisible max-sm:translate-y-6 max-sm:scale-[0.97] max-sm:pointer-events-none max-sm:duration-[200ms] max-sm:ease-[cubic-bezier(0.4,0,1,1)] max-sm:delay-0";
 
-// Escalonado de ENTRADA para la capa de pestañas: entra justo detrás del
-// marcador para que la columna se lea de arriba abajo en vez de moverse como una
-// losa. Solo a la entrada; al ocultar, `MOBILE_REVEAL_HIDDEN` pone `delay-0` y
-// las dos se van a la vez.
-const MOBILE_REVEAL_STAGGERED = "max-sm:delay-[70ms]";
-
-// Umbrales de scroll del revelado. El de OCULTAR tiene que quedar POR DEBAJO del
-// de MOSTRAR: al revés, la franja entre ambos cumple las dos condiciones a la vez
-// y el ocultado —que va en cada evento de scroll— gana siempre, así que el bloque
-// no llegaba a aparecer nunca. La banda entre los dos valores es la histéresis:
-// sin ella, el punto justo de cruce haría parpadear el bloque al arrastrar.
-// El "ocultarse antes" de verdad no lo dan estos números sino el centinela (ver
-// el observador): estos son la red de seguridad para el tope de la página.
+// Umbral mínimo que evita revelar el bloque antes de que el usuario haya
+// abandonado el inicio de la ficha. El cruce visual preciso lo calcula el
+// centinela contra el borde superior de la navegación inferior.
 const MOBILE_REVEAL_SHOW_AT_PX = 16;
-const MOBILE_REVEAL_HIDE_AT_PX = 8;
 
 function normalizePlayableVideos(rawVideos) {
   const source = Array.isArray(rawVideos?.results)
@@ -1861,6 +1850,12 @@ export default function DetailsClient({
   // información) no compite con la portada al entrar. Se revela al cruzar por
   // primera vez el navbar inferior y se oculta al volver al inicio de la ficha.
   // Ambos comparten esta señal para aparecer y desaparecer como una sola pieza.
+  //
+  // IntersectionObserver conserva la sincronización ante cambios de layout,
+  // pero su callback se entrega de forma asíncrona y puede llegar tarde durante
+  // un scroll rápido en móviles poco potentes. El listener pasivo calcula el
+  // mismo umbral en el siguiente frame, para que el estado cambie justo al
+  // cruzarlo, sin esperar a que se vacíe la cola del observador.
   useEffect(() => {
     if (!isMobileViewport) {
       setMobileSecondaryVisible(false);
@@ -1871,28 +1866,29 @@ export default function DetailsClient({
     const trigger = mobileSecondaryTriggerRef.current;
     if (!trigger) return undefined;
 
-    const hideAtTop = () => {
-      if (window.scrollY <= MOBILE_REVEAL_HIDE_AT_PX) setMobileSecondaryVisible(false);
+    let frame = 0;
+    const syncVisibility = () => {
+      const triggerTop = trigger.getBoundingClientRect().top;
+      const revealLine = window.innerHeight - 88;
+      const nextVisible =
+        window.scrollY > MOBILE_REVEAL_SHOW_AT_PX &&
+        triggerTop <= revealLine;
+
+      setMobileSecondaryVisible((current) =>
+        current === nextVisible ? current : nextVisible,
+      );
+    };
+
+    const scheduleSync = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        syncVisibility();
+      });
     };
 
     const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          if (window.scrollY > MOBILE_REVEAL_SHOW_AT_PX) {
-            setMobileSecondaryVisible(true);
-          }
-          return;
-        }
-        // Dejó de cruzarse Y SIGUE POR DEBAJO del área: el usuario ha subido
-        // más allá del centinela. Se oculta aquí, anclado a la posición real del
-        // bloque, en vez de esperar al tope exacto de la página.
-        // La comprobación de `top > 0` NO es opcional: el centinela también deja
-        // de cruzarse al salir por ARRIBA (bajando mucho), y sin ella el bloque
-        // se escondería justo cuando más falta hace.
-        if (entry.boundingClientRect.top > 0) {
-          setMobileSecondaryVisible(false);
-        }
-      },
+      scheduleSync,
       {
         root: null,
         // Reserva el espacio cubierto por la navegación inferior flotante.
@@ -1902,12 +1898,15 @@ export default function DetailsClient({
     );
 
     observer.observe(trigger);
-    hideAtTop();
-    window.addEventListener("scroll", hideAtTop, { passive: true });
+    syncVisibility();
+    window.addEventListener("scroll", scheduleSync, { passive: true });
+    window.addEventListener("resize", scheduleSync, { passive: true });
 
     return () => {
+      if (frame) window.cancelAnimationFrame(frame);
       observer.disconnect();
-      window.removeEventListener("scroll", hideAtTop);
+      window.removeEventListener("scroll", scheduleSync);
+      window.removeEventListener("resize", scheduleSync);
     };
   }, [id, isMobileViewport]);
 
@@ -9961,7 +9960,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 // fondo que desenfocar -- plano en vez de vidrio. El hint solo
                 // haría falta MIENTRAS se transiciona, y el compositor ya promueve
                 // la capa por su cuenta durante una transición de opacity/translate.
-                className={`${MOBILE_REVEAL_BASE} ${MOBILE_REVEAL_STAGGERED} ${
+                className={`${MOBILE_REVEAL_BASE} ${
                   mobileSecondaryVisible ? "" : MOBILE_REVEAL_HIDDEN
                 }`}
                 inert={isMobileViewport && !mobileSecondaryVisible}

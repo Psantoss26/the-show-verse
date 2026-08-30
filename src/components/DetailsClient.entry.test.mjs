@@ -12,4 +12,8 @@ test("DetailsClient waits for client readiness before starting entry animations"
   assert.match(source, /detailsEntryReady \? "sv-details-entry" : ""/);
   assert.match(source, /detailsEntryReady && currentLowLoaded/);
   assert.match(source, /detailsEntryReady && currentLowLoaded && inProgressChecked/);
+  assert.match(source, /const syncVisibility = \(\) => \{/);
+  assert.match(source, /trigger\.getBoundingClientRect\(\)\.top/);
+  assert.match(source, /window\.addEventListener\("scroll", scheduleSync, \{ passive: true \}\)/);
+  assert.doesNotMatch(source, /max-sm:delay-\[70ms\]/);
 });
