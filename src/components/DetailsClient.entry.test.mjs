@@ -16,4 +16,7 @@ test("DetailsClient waits for client readiness before starting entry animations"
   assert.match(source, /trigger\.getBoundingClientRect\(\)\.top/);
   assert.match(source, /window\.addEventListener\("scroll", scheduleSync, \{ passive: true \}\)/);
   assert.doesNotMatch(source, /max-sm:delay-\[70ms\]/);
+  assert.match(source, /function DetailsHeroTitle\(\{ children \}\)/);
+  assert.match(source, /const nextIsCompact = availableWidth > 0 && naturalWidth > availableWidth/);
+  assert.match(source, /text-\[2\.125rem\] md:text-\[2\.75rem\] lg:text-\[3\.35rem\]/);
 });

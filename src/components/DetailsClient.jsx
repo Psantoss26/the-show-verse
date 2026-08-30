@@ -381,6 +381,70 @@ const MOBILE_REVEAL_HIDDEN =
 // centinela contra el borde superior de la navegación inferior.
 const MOBILE_REVEAL_SHOW_AT_PX = 16;
 
+// El título del hero mantiene su jerarquía normal cuando cabe en una fila. Si
+// no cabe, se compacta un paso medido para compensar la segunda línea sin
+// convertirlo en un estilo distinto. La medición se hace con una copia invisible
+// sin saltos de línea: el h1 visible sigue usando `text-balance` para repartir
+// bien las palabras cuando finalmente se parte.
+function DetailsHeroTitle({ children }) {
+  const titleRef = useRef(null);
+  const measureRef = useRef(null);
+  const [isCompact, setIsCompact] = useState(false);
+
+  const syncCompactSize = useCallback(() => {
+    const titleNode = titleRef.current;
+    const measureNode = measureRef.current;
+    if (!titleNode || !measureNode) return;
+
+    const availableWidth = titleNode.getBoundingClientRect().width;
+    const naturalWidth = measureNode.getBoundingClientRect().width;
+    const nextIsCompact = availableWidth > 0 && naturalWidth > availableWidth;
+
+    setIsCompact((current) =>
+      current === nextIsCompact ? current : nextIsCompact,
+    );
+  }, []);
+
+  useLayoutEffect(() => {
+    const titleNode = titleRef.current;
+    if (!titleNode) return undefined;
+
+    syncCompactSize();
+    const observer = new ResizeObserver(syncCompactSize);
+    observer.observe(titleNode);
+
+    let cancelled = false;
+    document.fonts?.ready?.then(() => {
+      if (!cancelled) syncCompactSize();
+    });
+
+    return () => {
+      cancelled = true;
+      observer.disconnect();
+    };
+  }, [children, syncCompactSize]);
+
+  return (
+    <h1
+      ref={titleRef}
+      className={`hidden sm:block font-black leading-[1] tracking-tight text-balance text-white drop-shadow-xl mb-3 ${
+        isCompact
+          ? "text-[2.125rem] md:text-[2.75rem] lg:text-[3.35rem]"
+          : "text-4xl md:text-5xl lg:text-6xl"
+      }`}
+    >
+      {children}
+      <span
+        ref={measureRef}
+        aria-hidden="true"
+        className="pointer-events-none absolute invisible whitespace-nowrap text-4xl md:text-5xl lg:text-6xl font-black leading-[1] tracking-tight"
+      >
+        {children}
+      </span>
+    </h1>
+  );
+}
+
 function normalizePlayableVideos(rawVideos) {
   const source = Array.isArray(rawVideos?.results)
     ? rawVideos.results
@@ -9805,9 +9869,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             <FadeIn delay={0.06} className="hidden sm:order-none sm:mb-6 sm:flex sm:flex-col sm:items-center sm:gap-0 sm:px-1 sm:text-center md:items-start md:text-left">
               {/* En MÓVIL (&lt;640) el título va como LOGO sobre la portada (ver poster
                   card); el h1 de texto se muestra de sm: en adelante. */}
-              <h1 className="hidden sm:block text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[1] tracking-tight text-balance drop-shadow-xl mb-3">
+              <DetailsHeroTitle>
                 {title}
-              </h1>
+              </DetailsHeroTitle>
 
               {headerAwardsValue && (
                 <div className="order-2 mb-0 flex items-center justify-center gap-2 text-center text-xs font-bold text-emerald-300 drop-shadow-md sm:order-none sm:mb-3 sm:justify-start sm:text-left sm:text-sm">
