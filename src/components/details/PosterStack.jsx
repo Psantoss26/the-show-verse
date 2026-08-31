@@ -4,7 +4,11 @@
 import OptimizedImage from "@/components/OptimizedImage";
 import { useState } from 'react'
 
-export default function PosterStack({ posters = [] }) {
+export default function PosterStack({
+    posters = [],
+    alt = "Poster",
+    preventNavigation = true,
+}) {
     const [hovered, setHovered] = useState(null)
 
     const imgs = posters.slice(0, 5)
@@ -45,27 +49,28 @@ export default function PosterStack({ posters = [] }) {
                         }}
                         onMouseEnter={() => setHovered(idx)}
                         onClick={(e) => {
+                            if (!preventNavigation) return
                             e.preventDefault()
                             setHovered(h => (h === idx ? null : idx))
                         }}
                     >
                         <div
                             className={`
-                relative h-40 w-28 overflow-hidden rounded-xl border bg-zinc-900 shadow-2xl transition-all duration-300
+                relative h-40 w-28 overflow-hidden rounded-xl bg-zinc-900 shadow-2xl transition-all duration-300
                 ${isHover
-                                    ? 'scale-110 border-white/40 ring-1 ring-white/50 shadow-[0_0_30px_rgba(99,102,241,0.5)]'
-                                    : 'scale-100 border-white/10 shadow-black/60'
+                                    ? 'scale-110 shadow-[0_0_30px_rgba(99,102,241,0.5)]'
+                                    : 'scale-100 shadow-black/60'
                                 }
                 ${isAnyoneHovered && !isHover ? 'brightness-[0.4] blur-[0.5px]' : 'brightness-100'}
               `}
                         >
                             <OptimizedImage
                                 src={src}
-                                alt="Poster"
+                                alt={`${alt}: título ${idx + 1}`}
                                 loading="lazy"
                                 className="h-full w-full object-cover"
                             />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-white/10 opacity-60" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
                         </div>
                     </div>
                 )

@@ -10638,14 +10638,14 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             {/* VERSIÓN DESKTOP: Tabs y filtros visibles */}
                             <div className="hidden sm:flex items-center gap-3 flex-wrap justify-end h-10 md:h-11">
                               {/* Tabs de tipo de imagen: Portada, Vista previa, Fondo y Logo */}
-                              <div className="flex isolate transform-gpu items-center rounded-xl p-1 w-fit h-10 md:h-11 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
+                              <div className="flex isolate transform-gpu items-center rounded-2xl p-1 w-fit h-10 md:h-11 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
                                 {["posters", "backdrops", "background", "logos"].map(
                                   (tab) => (
                                     <button
                                       key={tab}
                                       type="button"
                                       onClick={() => setActiveImagesTab(tab)}
-                                      className={`h-8 md:h-9 px-3 rounded-lg text-xs font-semibold transition-all
+                                      className={`h-8 md:h-9 px-3 rounded-xl text-xs font-semibold transition-all
               ${
                 activeImagesTab === tab
                   ? "bg-white/10 text-white shadow-md"
@@ -10673,7 +10673,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   type="button"
                                   onClick={() => setResMenuOpen((v) => !v)}
                                   className="h-10 md:h-11 inline-flex isolate transform-gpu items-center justify-between gap-2 min-w-[150px]
-            px-3 rounded-xl transition-all duration-300
+            px-3 rounded-2xl transition-all duration-300
             bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]
             text-sm text-zinc-200 hover:bg-black/30"
                                   aria-label="Resolución"
@@ -10759,13 +10759,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               {activeImagesTab !== "background" &&
                                 activeImagesTab !== "backdrops" && (
                                 <div
-                                  className="flex isolate transform-gpu rounded-xl p-1 h-10 md:h-11 items-center bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]"
+                                  className="flex isolate transform-gpu rounded-2xl p-1 h-10 md:h-11 items-center bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]"
                                   aria-label="Idioma"
                                 >
                                   <button
                                     type="button"
                                     onClick={() => setLangES((v) => !v)}
-                                    className={`h-8 md:h-9 px-3 rounded-lg text-xs font-semibold transition-all
+                                    className={`h-8 md:h-9 px-3 rounded-xl text-xs font-semibold transition-all
                 ${langES ? "bg-white/10 text-white shadow-md" : "text-zinc-400 hover:text-white hover:bg-white/10"}`}
                                     style={{
                                       WebkitTapHighlightColor: "transparent",
@@ -10776,7 +10776,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   <button
                                     type="button"
                                     onClick={() => setLangEN((v) => !v)}
-                                    className={`h-8 md:h-9 px-3 rounded-lg text-xs font-semibold transition-all
+                                    className={`h-8 md:h-9 px-3 rounded-xl text-xs font-semibold transition-all
                 ${langEN ? "bg-white/10 text-white shadow-md" : "text-zinc-400 hover:text-white hover:bg-white/10"}`}
                                     style={{
                                       WebkitTapHighlightColor: "transparent",
@@ -10795,7 +10795,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 setArtworkControlsOpen((v) => !v);
                                 setResMenuOpen(false);
                               }}
-                              className="sm:hidden inline-flex isolate items-center justify-center w-10 h-10 rounded-xl
+                              className="sm:hidden inline-flex isolate items-center justify-center w-10 h-10 rounded-2xl
         transition-all duration-300 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200
         hover:bg-black/30 transform-gpu hover:-translate-y-0.5"
                               aria-label="Filtros"
@@ -10807,7 +10807,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             <button
                               type="button"
                               onClick={handleResetArtwork}
-                              className="inline-flex isolate items-center justify-center w-10 h-10 md:w-11 md:h-11 rounded-xl
+                              className="inline-flex isolate items-center justify-center w-10 h-10 md:w-11 md:h-11 rounded-2xl
         transition-all bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] transform-gpu
         text-red-400 hover:bg-red-500/20 hover:text-red-300 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)]"
                               aria-label="Restaurar valores por defecto"
@@ -10834,13 +10834,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 <div className="flex flex-wrap items-center gap-2">
                                   {/* Las etiquetas hacen explícita la categoría seleccionable,
                                       además de conservar su icono visual. */}
-                                  <div className="flex isolate transform-gpu rounded-xl p-1 h-10 items-center bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
+                                  <div className="flex isolate transform-gpu rounded-2xl p-1 h-10 items-center bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
                                     <button
                                       type="button"
                                       onClick={() =>
                                         setActiveImagesTab("posters")
                                       }
-                                      className={`px-2.5 h-full rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                                      className={`px-2.5 h-full rounded-xl transition-all flex items-center justify-center gap-1.5 ${
                                         activeImagesTab === "posters"
                                           ? "bg-white/10 text-white shadow-md"
                                           : "text-zinc-400 hover:text-white hover:bg-white/10"
@@ -10859,7 +10859,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       onClick={() =>
                                         setActiveImagesTab("logos")
                                       }
-                                      className={`px-2.5 h-full rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                                      className={`px-2.5 h-full rounded-xl transition-all flex items-center justify-center gap-1.5 ${
                                         activeImagesTab === "logos"
                                           ? "bg-white/10 text-white shadow-md"
                                           : "text-zinc-400 hover:text-white hover:bg-white/10"
@@ -10884,7 +10884,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       type="button"
                                       onClick={() => setResMenuOpen((v) => !v)}
                                       className="h-10 w-full inline-flex isolate transform-gpu items-center justify-between gap-2
-                  px-3 rounded-xl transition text-sm
+                  px-3 rounded-2xl transition text-sm
                   bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200 hover:bg-black/30"
                                       aria-label="Resolución"
                                       style={{
@@ -10977,13 +10977,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       móvil se mantiene neutro y no necesita este filtro. */}
                                   {activeImagesTab === "logos" && (
                                     <div
-                                      className="flex isolate transform-gpu rounded-xl p-1 h-10 items-center bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]"
+                                      className="flex isolate transform-gpu rounded-2xl p-1 h-10 items-center bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]"
                                       aria-label="Idioma de los logos"
                                     >
                                       <button
                                         type="button"
                                         onClick={() => setLangES((value) => !value)}
-                                        className={`px-3 h-full rounded-lg text-xs font-medium transition-all flex items-center justify-center ${
+                                        className={`px-3 h-full rounded-xl text-xs font-medium transition-all flex items-center justify-center ${
                                           langES
                                             ? "bg-white/10 text-white shadow-md"
                                             : "text-zinc-400 hover:text-white hover:bg-white/10"
@@ -10999,7 +10999,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       <button
                                         type="button"
                                         onClick={() => setLangEN((value) => !value)}
-                                        className={`px-3 h-full rounded-lg text-xs font-medium transition-all flex items-center justify-center ${
+                                        className={`px-3 h-full rounded-xl text-xs font-medium transition-all flex items-center justify-center ${
                                           langEN
                                             ? "bg-white/10 text-white shadow-md"
                                             : "text-zinc-400 hover:text-white hover:bg-white/10"
