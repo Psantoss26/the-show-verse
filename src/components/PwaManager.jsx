@@ -87,25 +87,13 @@ export default function PwaManager() {
     }
 
     if (shouldRegister) {
-      let refreshing = false;
-      // Al activarse un SW nuevo (actualización), recargamos UNA vez para servir
-      // los assets frescos. Guardado con flag para no entrar en bucle de recargas.
-      const onControllerChange = () => {
-        if (refreshing) return;
-        refreshing = true;
-        window.location.reload();
-      };
-      navigator.serviceWorker.addEventListener(
-        "controllerchange",
-        onControllerChange,
-      );
-
       navigator.serviceWorker
         .register(SW_URL, { scope: "/" })
         .then((registration) => {
           // Flujo de actualización: cuando hay un worker nuevo instalado y ya
-          // había uno controlando, le pedimos que active y (vía controllerchange)
-          // recargamos para tomar el código nuevo.
+          // había uno controlando, le pedimos que active. `clients.claim()` hará
+          // que controle las peticiones posteriores sin recargar el documento
+          // que el usuario ya está viendo.
           registration.addEventListener("updatefound", () => {
             const nw = registration.installing;
             if (!nw) return;

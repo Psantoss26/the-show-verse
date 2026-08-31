@@ -125,7 +125,7 @@ test("solo se resuelve el artwork de los cinco primeros títulos", async () => {
   assert.equal("_listPreviewPoster" in items[5], false);
 });
 
-test("grid usa backdrops sin recorte y lista muestra cinco posters completos", () => {
+test("grid replica las tarjetas de DetailsClient y lista muestra cinco posters completos", () => {
   const collage = coverCollage.slice(
     coverCollage.indexOf("function ListCoverBackdropCollage"),
   );
@@ -133,8 +133,8 @@ test("grid usa backdrops sin recorte y lista muestra cinco posters completos", (
     listsPage.indexOf("function ListPreviewPosterStrip"),
     listsPage.indexOf("function Dropdown"),
   );
-  // La tarjeta de la cuadrícula tiene que seguir usando el colage compartido,
-  // en /lists y en el perfil.
+  // El colage de backdrops sigue cubierto para el perfil; la cuadrícula de
+  // /lists se valida aparte como pila de pósteres.
   const profileSection = readFileSync(
     new URL("../../app/u/[username]/ProfileSection.jsx", import.meta.url),
     "utf8",
@@ -142,6 +142,10 @@ test("grid usa backdrops sin recorte y lista muestra cinco posters completos", (
   const listMode = listsPage.slice(
     listsPage.indexOf("const ListModeRow"),
     listsPage.indexOf("export default function ListsPage"),
+  );
+  const gridMode = listsPage.slice(
+    listsPage.indexOf("const GridListCard"),
+    listsPage.indexOf("const RowListSection"),
   );
 
   assert.match(collage, /_listPreviewBackdrop/);
@@ -153,6 +157,17 @@ test("grid usa backdrops sin recorte y lista muestra cinco posters completos", (
   assert.match(posterStrip, /_listPreviewPoster/);
   assert.match(posterStrip, /object-contain/);
   assert.match(listMode, /<ListPreviewPosterStrip/);
-  assert.match(listsPage, /<ListCoverBackdropCollage/);
+
+  assert.match(gridMode, /<PosterStack[\s\S]*posters={previewPosters}/);
+  assert.match(gridMode, /preventNavigation={false}/);
+  assert.match(gridMode, /LIQUID_GLASS_CARD/);
+  assert.match(gridMode, /<LiquidGlassOpticalLayers/);
+  assert.match(gridMode, /rounded-3xl/);
+  assert.match(gridMode, /h-52/);
+  assert.doesNotMatch(gridMode, /<ListCoverBackdropCollage/);
+  assert.match(
+    listsPage,
+    /grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4/,
+  );
   assert.match(profileSection, /<ListCoverBackdropCollage/);
 });

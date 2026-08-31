@@ -50,6 +50,16 @@ test("PwaManager registra el SW con el sello de build", async () => {
   );
 });
 
+test("PwaManager no recarga el documento cuando el SW toma el control", async () => {
+  const source = await read("src/components/PwaManager.jsx");
+
+  assert.doesNotMatch(
+    source,
+    /window\.location\.reload\(\)/,
+    "activar o actualizar el service worker no debe provocar una segunda carga visible de la página",
+  );
+});
+
 test("next.config expone el sello al cliente", async () => {
   const source = await read("next.config.ts");
 

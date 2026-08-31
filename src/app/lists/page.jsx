@@ -25,14 +25,21 @@ import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { useAuth } from "@/context/AuthContext";
 import { formatPageTitle } from "@/lib/pageTitle";
 import LiquidButton from "@/components/LiquidButton";
+import Avatar from "@/components/ui/Avatar";
+import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
+import PosterStack from "@/components/details/PosterStack";
 import {
   titleStateKey,
   useViewerTitleStates,
 } from "@/components/social/useViewerTitleStates";
-import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import {
+  LIQUID_GLASS_CARD,
+  LIQUID_GLASS_PANEL,
+} from "@/lib/ui/liquidGlass";
 import { resolveListItemIndicator } from "@/lib/lists/listItemHoverIndicator";
 import { enrichListPreviewArtwork } from "@/lib/lists/previewArtwork";
 import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
+import { stripHtml } from "@/lib/details/formatters";
 
 import {
   Loader2,
@@ -57,12 +64,11 @@ import {
   Heart,
   BookmarkPlus,
   Eye,
+  ThumbsUp,
 } from "lucide-react";
 import useTraktLists from "@/lib/hooks/useTraktLists";
 import ListPosterCard from "@/components/lists/ListPosterCard";
-import ListCoverBackdropCollage, {
-  TmdbImg,
-} from "@/components/lists/ListCoverBackdropCollage";
+import { TmdbImg } from "@/components/lists/ListCoverBackdropCollage";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 
 // ================== UTILS & CACHE ==================
@@ -317,6 +323,18 @@ function ListPreviewPosterStrip({ items = [], alt = "" }) {
       ))}
     </div>
   );
+}
+
+function getPosterStackUrls(items = []) {
+  return items
+    .slice(0, 5)
+    .map((item) => item?._listPreviewPoster || item?.poster_path || null)
+    .filter(Boolean)
+    .map((filePath) =>
+      /^https?:\/\//i.test(filePath)
+        ? filePath
+        : `https://image.tmdb.org/t/p/w342${filePath}`,
+    );
 }
 
 function Dropdown({ valueLabel, icon: Icon, children, className = "" }) {
@@ -1151,50 +1169,110 @@ const GridListCard = memo(function GridListCard({
 
   const isLoading = itemsState == null;
   const items = Array.isArray(itemsState) ? itemsState : [];
+  const previewPosters = getPosterStackUrls(items);
+  const description = stripHtml(list?.description);
+  const itemCount = Number(list?.item_count || 0);
+  const likes = Number(list?.likes || 0);
+  const username = list?.user?.username || list?.user?.name || null;
+  const avatar = list?.user?.images?.avatar?.full || null;
+  const SourceIcon =
+    list?.source === "collections"
+      ? Layers
+      : list?.source === "trakt"
+        ? Users
+        : ListVideo;
+  const sourceLabel =
+    list?.source === "collections"
+      ? "Colección TMDb"
+      : list?.source === "trakt"
+        ? username || "Comunidad"
+        : "Mi lista";
 
   return (
-    <div ref={ref}>
-      {/* ✅ antes: Link fijo a /lists/:id (rompía Trakt/Colecciones) */}
-      <ListNavWrapper list={list} className="group block h-full">
-        <div className="h-full bg-zinc-900/40 border border-white/5 rounded-2xl overflow-hidden md:hover:border-white/10 md:hover:bg-zinc-900/60 transition-all flex flex-col relative">
-          <div className="aspect-video w-full bg-zinc-950 relative overflow-hidden md:group-hover:opacity-90 transition-opacity">
+    <div ref={ref} className="group/card relative h-full">
+      <ListNavWrapper
+        list={list}
+        className="group block h-full rounded-3xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-indigo-400"
+      >
+        <article
+          data-list-showcase-card={list?.source || "unknown"}
+          className={`relative isolate flex h-full flex-col overflow-hidden rounded-3xl transform-gpu transition-all duration-500 ${LIQUID_GLASS_CARD} hover:brightness-110 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(99,102,241,0.95)]`}
+        >
+          <LiquidGlassOpticalLayers />
+
+          <div className="relative z-10 h-52 w-full overflow-visible bg-gradient-to-b from-white/5 to-transparent p-6">
             {isLoading ? (
-              <div className="w-full h-full animate-pulse bg-zinc-900/40" />
+              <div className="flex h-full w-full items-center justify-center">
+                <div className="h-40 w-56 animate-pulse rounded-2xl bg-white/[0.06]" />
+              </div>
+            ) : previewPosters.length > 0 ? (
+              <div className="flex h-full w-full items-center justify-center overflow-visible">
+                <PosterStack
+                  posters={previewPosters}
+                  alt={list?.name || "Lista"}
+                  preventNavigation={false}
+                />
+              </div>
             ) : (
-              <ListCoverBackdropCollage items={items} alt={list.name} />
+              <div className="flex h-full items-center justify-center opacity-10">
+                <ListVideo className="h-20 w-20" />
+              </div>
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent opacity-60" />
-
-            <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold text-white border border-white/10 flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
-              {list.item_count} items
-            </div>
           </div>
 
-          <div className="p-4 flex flex-col flex-1">
-            <div className="flex justify-between items-start gap-2">
-              <h3 className="text-lg font-bold text-white leading-tight line-clamp-1 md:group-hover:text-purple-400 transition-colors">
-                {list.name}
+          <div className="relative z-10 flex flex-1 flex-col justify-between bg-black/25 p-5">
+            <div>
+              <h3 className="line-clamp-1 text-lg font-bold leading-tight text-white transition-colors group-hover:text-indigo-400">
+                {list?.name || "Lista"}
               </h3>
-            </div>
-            <p className="text-sm text-zinc-400 mt-1 line-clamp-2 leading-relaxed flex-1">
-              {list.description || (
-                <span className="italic opacity-50">Sin descripción</span>
+              {description && (
+                <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-zinc-400">
+                  {description}
+                </p>
               )}
-            </p>
-          </div>
+            </div>
 
-          {canUse && (
-            <button
-              onClick={(e) => onDelete(e, list.id)}
-              className="absolute top-2 right-2 p-2 bg-black/50 md:hover:bg-red-600/80 text-white/70 md:hover:text-white rounded-full backdrop-blur-md transition-all opacity-0 md:group-hover:opacity-100 focus:opacity-100"
-              title="Borrar lista"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          )}
-        </div>
+            <footer className="mt-4 flex items-center justify-between gap-3 border-t border-white/5 pt-4">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10 text-[10px] font-black text-white ring-1 ring-white/20">
+                  {list?.source === "trakt" ? (
+                    <Avatar src={avatar} name={sourceLabel} />
+                  ) : (
+                    <SourceIcon aria-hidden="true" className="h-3.5 w-3.5" />
+                  )}
+                </span>
+                <span className="max-w-[120px] truncate text-xs font-medium text-zinc-300 transition-colors group-hover:text-white">
+                  {sourceLabel}
+                </span>
+              </div>
+
+              <div className="flex shrink-0 items-center gap-3 text-xs font-bold text-zinc-500">
+                <span className="rounded bg-white/5 px-1.5 py-0.5 text-zinc-300">
+                  {itemCount} items
+                </span>
+                {list?.source === "trakt" && (
+                  <span className="flex items-center gap-1 transition-colors group-hover:text-pink-500">
+                    <ThumbsUp aria-hidden="true" className="h-3 w-3" />
+                    {likes}
+                  </span>
+                )}
+              </div>
+            </footer>
+          </div>
+        </article>
       </ListNavWrapper>
+
+      {canUse && (
+        <button
+          type="button"
+          onClick={(e) => onDelete(e, list.id)}
+          className="absolute right-3 top-3 z-40 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white/70 opacity-100 backdrop-blur-md transition-all hover:bg-red-600/80 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400 sm:opacity-0 sm:group-hover/card:opacity-100 sm:focus-visible:opacity-100"
+          title="Borrar lista"
+          aria-label={`Borrar ${list?.name || "lista"}`}
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      )}
     </div>
   );
 });
@@ -2405,9 +2483,13 @@ export default function ListsPage() {
             ) : (
               <>
                 {viewMode === "grid" && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {contentLists.map((l, index) => (
-                      <ListEntrance key={`${l.source}-${l.id}`} index={index}>
+                      <ListEntrance
+                        key={`${l.source}-${l.id}`}
+                        index={index}
+                        className="h-full"
+                      >
                         <GridListCard
                           list={l}
                           itemsState={itemsMap[getListCacheKey(l)]}
