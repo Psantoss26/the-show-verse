@@ -32,10 +32,7 @@ import {
   titleStateKey,
   useViewerTitleStates,
 } from "@/components/social/useViewerTitleStates";
-import {
-  LIQUID_GLASS_CARD,
-  LIQUID_GLASS_PANEL,
-} from "@/lib/ui/liquidGlass";
+import { LIQUID_GLASS_CARD, LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { resolveListItemIndicator } from "@/lib/lists/listItemHoverIndicator";
 import { enrichListPreviewArtwork } from "@/lib/lists/previewArtwork";
 import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
@@ -193,11 +190,12 @@ function readListsMenuPrefs() {
         : "rows",
       // Migración silenciosa de las preferencias antiguas: "tmdb" era el
       // nombre histórico de las listas propias, no su proveedor real.
-      source: parsed?.source === "tmdb"
-        ? "personal"
-        : VALID_SOURCES.has(parsed?.source)
-          ? parsed.source
-          : "trakt",
+      source:
+        parsed?.source === "tmdb"
+          ? "personal"
+          : VALID_SOURCES.has(parsed?.source)
+            ? parsed.source
+            : "trakt",
     };
   } catch {
     return null;
@@ -607,7 +605,12 @@ function formatIndicatorScore(value) {
   return Number.isInteger(score) ? String(score) : score.toFixed(1);
 }
 
-function ListItemHoverIndicator({ mediaType, viewerState, tmdbScore, imdbScore }) {
+function ListItemHoverIndicator({
+  mediaType,
+  viewerState,
+  tmdbScore,
+  imdbScore,
+}) {
   const indicator = resolveListItemIndicator({
     mediaType,
     favorite: viewerState?.favorite,
@@ -1029,10 +1032,14 @@ function ListItemsRow({ items, isMobile, accent = "trakt" }) {
                     item={item}
                     isMobile={isMobile}
                     accent={accent}
-                    viewerState={viewerStates[titleStateKey({
-                      tmdbId: item?.id,
-                      mediaType: mt,
-                    })]}
+                    viewerState={
+                      viewerStates[
+                        titleStateKey({
+                          tmdbId: item?.id,
+                          mediaType: mt,
+                        })
+                      ]
+                    }
                   />
                 </SwiperSlide>
               );
@@ -1829,9 +1836,7 @@ export default function ListsPage() {
           },
         );
         const j = await res.json().catch(() => ({}));
-        await resolveAndStorePreview(
-          Array.isArray(j?.items) ? j.items : [],
-        );
+        await resolveAndStorePreview(Array.isArray(j?.items) ? j.items : []);
       } catch (e) {
         if (e?.name === "AbortError") {
           // vuelve a “no pedido” para que pueda pedirse después
@@ -2279,45 +2284,15 @@ export default function ListsPage() {
                         <StretchHorizontal className="h-4 w-4" />
                       </button>
                       {canEdit && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => setCreateOpen(true)}
-                            aria-label="Crear lista"
-                            title="Crear lista"
-                            className="flex h-full flex-1 items-center justify-center rounded-lg px-2.5 text-purple-400 transition-all hover:bg-purple-500/15 hover:text-purple-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-purple-400"
-                          >
-                            <Plus className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setMobileDeleteMode((active) => !active)
-                            }
-                            aria-label={
-                              mobileDeleteMode
-                                ? "Salir del modo borrar"
-                                : "Borrar listas"
-                            }
-                            title={
-                              mobileDeleteMode
-                                ? "Salir del modo borrar"
-                                : "Borrar listas"
-                            }
-                            aria-pressed={mobileDeleteMode}
-                            className={`flex h-full flex-1 items-center justify-center rounded-lg px-2.5 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-red-400 ${
-                              mobileDeleteMode
-                                ? "bg-red-500/15 text-red-400"
-                                : "text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
-                            }`}
-                          >
-                            {mobileDeleteMode ? (
-                              <X className="h-4 w-4" />
-                            ) : (
-                              <Trash2 className="h-4 w-4" />
-                            )}
-                          </button>
-                        </>
+                        <button
+                          type="button"
+                          onClick={() => setCreateOpen(true)}
+                          aria-label="Crear lista"
+                          title="Crear lista"
+                          className="flex h-full flex-1 items-center justify-center rounded-lg px-2.5 text-purple-400 transition-all hover:bg-purple-500/15 hover:text-purple-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-purple-400"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </button>
                       )}
                     </div>
                   </div>
