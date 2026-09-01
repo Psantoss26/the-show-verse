@@ -1027,14 +1027,20 @@ function getSeasonNumber(season) {
 }
 
 // Tarjeta de un premio (usada por la sección "Premios", tras Colección).
-function AwardCard({ item }) {
+function AwardCard({ item, enableHover = false }) {
   const people = Array.isArray(item?.people) ? item.people.filter(Boolean) : [];
   const visual = getAwardVisual(item?.groupName);
   const categoryLabel = formatAwardCategory(item?.category, item?.groupName);
   const groupLabel = formatAwardGroupName(item?.groupName);
 
   return (
-    <article className="block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md lg:hover:shadow-yellow-900/20 transition-all duration-300 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]">
+    <article
+      className={`block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md transform-gpu transition-all duration-300 motion-reduce:transition-none ${
+        enableHover
+          ? "hover:-translate-y-1 hover:brightness-110 hover:shadow-yellow-900/20"
+          : ""
+      }`}
+    >
       <div
         className="aspect-[2/3] overflow-hidden relative flex flex-col"
         style={{ background: visual.background }}
@@ -1074,7 +1080,11 @@ function AwardCard({ item }) {
           </div>
 
           {item?.groupImageUrl && (
-            <div className="mt-3 flex h-20 w-20 items-center justify-center sm:mt-4 sm:h-24 sm:w-24">
+            <div
+              className={`mt-3 flex h-20 w-20 items-center justify-center transform-gpu transition-transform duration-500 ease-out sm:mt-4 sm:h-24 sm:w-24 motion-reduce:transition-none ${
+                enableHover ? "group-hover:scale-110" : ""
+              }`}
+            >
               <OptimizedImage
                 src={item.groupImageUrl}
                 alt=""
@@ -1154,22 +1164,126 @@ function pickDefaultHeroLogo(logos) {
   return [...logos].sort((a, b) => score(b) - score(a))[0]?.file_path || null;
 }
 
-// Muestra primero una variante ligera del logo y conserva la calidad original
-// como estado final. La original se descarga después de que w500 ya sea
-// visible y se intercambia solo cuando está cargada y decodificada, así una
-// conexión móvil nunca deja el hueco del logo vacío por esperar un PNG grande.
-function ProgressiveHeroLogo({ path, title }) {
-  const [previewPathLoaded, setPreviewPathLoaded] = useState(null);
-  const [originalPathReady, setOriginalPathReady] = useState(null);
-  const previewLoaded = previewPathLoaded === path;
-  const useOriginal = originalPathReady === path;
+const ORIGINAL_UPGRADE_BLOCKED_CONNECTIONS = new Set([
+  "slow-2g",
+  "2g",
+  "3g",
+]);
+
+function canRequestOriginalWithoutContention() {
+  if (typeof navigator === "undefined") return false;
+  const connection =
+    navigator.connection ||
+    navigator.mozConnection ||
+    navigator.webkitConnection;
+
+  if (!connection) return true;
+  if (connection.saveData) return false;
+  return !ORIGINAL_UPGRADE_BLOCKED_CONNECTIONS.has(connection.effectiveType);
+}
+
+// Autoriza una mejora no crítica solo cuando la página y la imagen ligera ya
+// están listas. En navegadores con requestIdleCallback se espera a un hueco real
+// del hilo principal; el fallback se ejecuta después de `load` y conserva la
+// petición con prioridad de red baja en el elemento que consume el resultado.
+function useDeferredOriginalUpgrade({ path, previewLoaded, enabled = true }) {
+  const [approvedPath, setApprovedPath] = useState(null);
 
   useEffect(() => {
-    if (!path || !previewLoaded || useOriginal) return undefined;
+    if (!enabled || !path || !previewLoaded || approvedPath === path) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    let idleId = null;
+    let fallbackTimer = null;
+    let scheduled = false;
+    const connection =
+      navigator.connection ||
+      navigator.mozConnection ||
+      navigator.webkitConnection;
+
+    const approve = () => {
+      scheduled = false;
+      if (
+        cancelled ||
+        document.visibilityState !== "visible" ||
+        !canRequestOriginalWithoutContention()
+      ) {
+        return;
+      }
+      setApprovedPath(path);
+    };
+
+    const scheduleWhenIdle = () => {
+      if (
+        cancelled ||
+        scheduled ||
+        document.visibilityState !== "visible" ||
+        !canRequestOriginalWithoutContention()
+      ) {
+        return;
+      }
+
+      scheduled = true;
+      if (typeof window.requestIdleCallback === "function") {
+        // Sin timeout: una página ocupada no debe forzar esta descarga opcional.
+        idleId = window.requestIdleCallback(approve);
+      } else {
+        // Safari no implementa requestIdleCallback. Al llegar aquí `load` ya ha
+        // terminado; el margen adicional evita competir con tareas poscarga.
+        fallbackTimer = window.setTimeout(approve, 1500);
+      }
+    };
+
+    const scheduleAfterLoad = () => {
+      if (document.readyState === "complete") scheduleWhenIdle();
+    };
+
+    if (document.readyState === "complete") {
+      scheduleWhenIdle();
+    } else {
+      window.addEventListener("load", scheduleAfterLoad, { once: true });
+    }
+    document.addEventListener("visibilitychange", scheduleWhenIdle);
+    connection?.addEventListener?.("change", scheduleWhenIdle);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("load", scheduleAfterLoad);
+      document.removeEventListener("visibilitychange", scheduleWhenIdle);
+      connection?.removeEventListener?.("change", scheduleWhenIdle);
+      if (idleId != null) window.cancelIdleCallback?.(idleId);
+      if (fallbackTimer != null) window.clearTimeout(fallbackTimer);
+    };
+  }, [approvedPath, enabled, path, previewLoaded]);
+
+  return approvedPath === path;
+}
+
+// Muestra primero una variante ligera del logo y conserva la calidad original
+// como estado final. La original se descarga a baja prioridad después de que
+// w500, la página y el hilo principal estén listos, y se intercambia solo cuando
+// está cargada y decodificada.
+function ProgressiveHeroLogo({ path, title }) {
+  const [previewPathLoaded, setPreviewPathLoaded] = useState(null);
+  const [previewPathFailed, setPreviewPathFailed] = useState(null);
+  const [originalPathReady, setOriginalPathReady] = useState(null);
+  const previewLoaded = previewPathLoaded === path;
+  const previewFailed = previewPathFailed === path;
+  const useOriginal = originalPathReady === path || previewFailed;
+  const canStartOriginal = useDeferredOriginalUpgrade({
+    path,
+    previewLoaded,
+  });
+
+  useEffect(() => {
+    if (!path || !canStartOriginal || useOriginal) return undefined;
 
     let cancelled = false;
     const image = new Image();
     image.decoding = "async";
+    image.fetchPriority = "low";
     image.onload = async () => {
       try {
         await image.decode?.();
@@ -1183,7 +1297,7 @@ function ProgressiveHeroLogo({ path, title }) {
     return () => {
       cancelled = true;
     };
-  }, [path, previewLoaded, useOriginal]);
+  }, [canStartOriginal, path, useOriginal]);
 
   if (!path) return null;
 
@@ -1191,17 +1305,17 @@ function ProgressiveHeroLogo({ path, title }) {
     <OptimizedImage
       src={`https://image.tmdb.org/t/p/${useOriginal ? "original" : "w500"}${path}`}
       alt={title}
-      priority
+      priority={!useOriginal || previewFailed}
       unoptimized
       decoding="async"
-      fetchPriority="high"
+      fetchPriority={useOriginal && !previewFailed ? "low" : "high"}
       onLoad={() => {
         if (!useOriginal) setPreviewPathLoaded(path);
       }}
       onError={() => {
         // Mantiene el fallback que existía: si TMDb no sirve w500, se prueba la
         // ruta original directamente.
-        if (!useOriginal) setOriginalPathReady(path);
+        if (!useOriginal) setPreviewPathFailed(path);
       }}
       className="relative z-10 h-auto max-h-24 w-auto max-w-[85%] object-contain drop-shadow-[0_3px_14px_rgba(0,0,0,0.85)]"
     />
@@ -1718,6 +1832,7 @@ export default function DetailsClient({
   const [isMobileViewport, setIsMobileViewport] = useState(false); // Viewport <= 640px
   const [mobileSecondaryVisible, setMobileSecondaryVisible] =
     useState(false);
+  const pointerCardHoverEnabled = supportsHover && !isMobileViewport;
 
   // Con barra de progreso ("Viendo XX%") la fila de acciones NO entra junto a la
   // portada: la barra ya ocupa esa zona y encadenar las dos cosas amontonaba
@@ -3586,6 +3701,12 @@ export default function DetailsClient({
     [posterLayoutMode, displayPosterPath, isBackdropPath],
   );
 
+  // En móvil, el modo póster utiliza la portada neutra (sin título impreso),
+  // igual que DetailModal. Se calcula aquí para compartir una única estrategia
+  // de calidad entre el hero de fondo y la tarjeta visible.
+  const mobilePosterPath =
+    isMobileViewport && !isBackdropPoster ? mobileNeutralPosterPath : null;
+
   // Backdrop de FONDO de la ficha.
   //
   // MISMO CRITERIO QUE DetailModal, y con la misma función: `pickHeroBackdropPath`
@@ -3709,14 +3830,20 @@ export default function DetailsClient({
     return isMobileViewport ? mobile : desktop;
   })();
 
-  // Tamaño de TMDb para `heroBackgroundPath`/`prevBackgroundPath` como fondo
-  // CSS (`background-image`). En MÓVIL es el mismo póster que ya se pinta en
-  // w780 como <img> (ver `posterHighUrl`): pedirlo TAMBIÉN en "original" aquí
-  // descargaba el mismo archivo pesado (varios MB) una SEGUNDA vez solo para
-  // mostrarlo desenfocado (`.hero-bg-base` le aplica `blur(4px)` en móvil, que
-  // ya borra cualquier detalle por encima de w780). Escritorio no se toca: ahí
-  // es el backdrop panorámico, no el póster, y no forma parte de esta mejora.
-  const heroBackgroundSize = isMobileViewport ? "w780" : "original";
+  const mobilePosterOriginalRequestReady = useDeferredOriginalUpgrade({
+    path: mobilePosterPath || displayPosterPath,
+    previewLoaded: posterLowLoaded,
+    enabled: isMobileViewport && posterViewMode !== "preview",
+  });
+
+  // El fondo móvil comparte primero la URL w500 de la portada LCP. Solo cambia
+  // a original cuando esa descarga diferida ya terminó en la capa HIGH; así el
+  // CSS reutiliza la caché y nunca inicia por su cuenta una petición pesada.
+  const heroBackgroundSize =
+    isMobileViewport &&
+    !(mobilePosterOriginalRequestReady && posterHighLoaded)
+      ? "w500"
+      : "original";
 
   // =====================================================================
   // ESTADOS DE CUENTA (TMDb)
@@ -8526,7 +8653,15 @@ export default function DetailsClient({
           setBackdropImgError(false);
         } else {
           const isLowPreloaded = checkIfLoaded(posterLowUrl);
-          const isHighPreloaded = checkIfLoaded(posterHighUrl);
+          // Asignar una URL a `new Image()` no es una consulta de caché pura:
+          // cuando falta, inicia la descarga. En móvil eso se saltaría el gate
+          // load + idle de la original, así que solo se sondea HIGH donde sigue
+          // siendo un recurso crítico (escritorio).
+          const isMobileRequest =
+            window.matchMedia?.("(max-width: 640px)")?.matches === true;
+          const isHighPreloaded = isMobileRequest
+            ? false
+            : checkIfLoaded(posterHighUrl);
 
           if (isLowPreloaded) {
             setPosterLowLoaded(true);
@@ -8607,11 +8742,6 @@ export default function DetailsClient({
       ? isBackdropPath(prevPosterPath)
       : isBackdropPoster;
 
-  // MÓVIL (modo poster, sin preview): usar el poster SIN IDIOMA (textless), como en
-  // DetailModal. En escritorio o preview se mantiene el poster normal.
-  const mobilePosterPath =
-    isMobileViewport && !isBackdropPoster ? mobileNeutralPosterPath : null;
-
   // URLs basadas en el modo de vista
   const posterLowUrl =
     posterViewMode === "preview" && previewBackdropPath
@@ -8622,24 +8752,19 @@ export default function DetailsClient({
           ? `https://image.tmdb.org/t/p/w342${displayPosterPath}`
           : null;
 
-  // MÓVIL: alta calidad para el póster de portada. Antes pedía "original"
-  // (varios MB, sin redimensionar por TMDb: 2000px+ de ancho en muchos
-  // pósters) para un ancho renderizado real de ~390-430px -- con `unoptimized`
-  // (sin pasar por el optimizador de Next.js) esa descarga entera bloqueaba la
-  // carga final del póster en redes móviles. `w780` es el bucket de póster
-  // más grande de TMDb aparte de "original" (cubre incluso pantallas 2x sin
-  // recortar), igual que ya usa escritorio, y pesa una fracción del tamaño.
+  // La URL final siempre apunta al archivo original de TMDb. En móvil no se
+  // monta durante la carga crítica: `mobilePosterOriginalRequestReady` la
+  // habilita después de load + idle y únicamente en una conexión adecuada.
+  const posterHighPath = mobilePosterPath || displayPosterPath;
   const posterHighUrl =
     posterViewMode === "preview" && previewBackdropPath
       ? `https://image.tmdb.org/t/p/w1280${previewBackdropPath}`
-      : mobilePosterPath
-        ? `https://image.tmdb.org/t/p/w780${mobilePosterPath}`
-        : displayPosterPath
-          ? `https://image.tmdb.org/t/p/w780${displayPosterPath}`
-          : null;
-  // En móvil la versión w780 es la imagen final y candidata a LCP. Se le da
-  // prioridad alta; la versión w500 sigue siendo un fallback inmediato, pero
-  // no debe retrasar el inicio de la descarga de máxima calidad.
+      : posterHighPath
+        ? buildOriginalImageUrl(posterHighPath)
+        : null;
+  const deferPosterOriginal = isMobileViewport && posterViewMode !== "preview";
+  const shouldRenderPosterHigh =
+    !deferPosterOriginal || mobilePosterOriginalRequestReady;
   const posterLoadToken = posterLoadTokenRef.current;
 
   // Estados unificados: usar backdrop states si estamos en preview, sino poster states
@@ -9353,7 +9478,11 @@ export default function DetailsClient({
                             className="absolute inset-0 z-0 poster-mobile-fade max-sm:hidden"
                           >
                             <OptimizedImage
-                              src={`https://image.tmdb.org/t/p/${posterAspectIsBackdrop ? "w1280" : "w780"}${prevPosterPath}`}
+                              src={
+                                posterAspectIsBackdrop
+                                  ? `https://image.tmdb.org/t/p/w1280${prevPosterPath}`
+                                  : buildOriginalImageUrl(prevPosterPath)
+                              }
                               alt={title}
                               className="absolute inset-0 w-full h-full object-cover"
                               style={{
@@ -9390,6 +9519,7 @@ export default function DetailsClient({
                           }
                           loading="eager"
                           decoding="async"
+                          fetchPriority="high"
                           // RED DE SEGURIDAD PARA IMÁGENES EN CACHÉ.
                           // Si la imagen ya está en caché, el navegador puede
                           // completar la carga ANTES de que React enganche
@@ -9465,23 +9595,24 @@ ${currentLowLoaded ? "opacity-100" : "opacity-0"}`}
                           }}
                         />
 
-                        {/* HIGH: se monta inmediatamente, en paralelo a LOW.
-                            Antes esperaba al onLoad de w500, creando una cadena
-                            w500 → original especialmente lenta con datos móviles. */}
-                        {posterHighUrl && (
+                        {/* HIGH: escritorio conserva la carga inmediata. En
+                            móvil se monta tras load + idle y con prioridad baja;
+                            LOW ya ha resuelto el LCP y permanece visible durante
+                            toda la descarga y decodificación de la original. */}
+                        {posterHighUrl && shouldRenderPosterHigh && (
                           <OptimizedImage
                             src={posterHighUrl}
                             alt={title}
-                            priority
+                            priority={!deferPosterOriginal}
                             unoptimized
                             sizes={
                               isBackdropPoster
                                 ? "(max-width: 1024px) 100vw, 600px"
                                 : "(max-width: 1024px) 280px, 320px"
                             }
-                            loading="eager"
+                            loading={deferPosterOriginal ? "lazy" : "eager"}
                             decoding="async"
-                            fetchPriority="high"
+                            fetchPriority={deferPosterOriginal ? "low" : "high"}
                             ref={(el) => {
                               if (!el || !el.complete || !el.naturalWidth)
                                 return;
@@ -10261,7 +10392,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           <SwiperSlide key={actor.id}>
                             <Link
                               href={`/details/person/${actor.id}`}
-                              className="block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md lg:hover:shadow-yellow-900/20 transition-all duration-300 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]"
+                              className="block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md lg:hover:shadow-yellow-900/20 transition-all duration-300"
                             >
                               <div className="aspect-[2/3] overflow-hidden relative">
                                 {actor.profile_path ? (
@@ -10364,7 +10495,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           const enableHover =
                             supportsHover && !isMobileViewport;
                           const recCardClass = enableHover
-                            ? "block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md lg:hover:shadow-yellow-900/20 transition-all duration-300 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]"
+                            ? "block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md lg:hover:shadow-yellow-900/20 transition-all duration-300"
                             : "block relative bg-zinc-900 rounded-xl overflow-hidden shadow-md";
                           const recImageClass = enableHover
                             ? "w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
@@ -10496,7 +10627,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           const enableHover =
                             supportsHover && !isMobileViewport;
                           const colCardClass = enableHover
-                            ? "block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md lg:hover:shadow-yellow-900/20 transition-all duration-300 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]"
+                            ? "block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md lg:hover:shadow-yellow-900/20 transition-all duration-300"
                             : "block relative bg-zinc-900 rounded-xl overflow-hidden shadow-md";
                           const colImageClass = enableHover
                             ? "w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
@@ -10595,7 +10726,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   : ""
                               }
                             >
-                              <AwardCard item={award} />
+                              <AwardCard
+                                item={award}
+                                enableHover={pointerCardHoverEnabled}
+                              />
                             </div>
                           </SwiperSlide>
                         );
@@ -11317,7 +11451,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   <div className="relative z-10 aspect-video bg-white/5">
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
                                     <div className="absolute inset-0 flex items-center justify-center">
-                                      <div className="w-14 h-14 rounded-full bg-yellow-400/10 border border-yellow-300/10" />
+                                      <div className="w-14 h-14 rounded-full bg-yellow-400/10" />
                                     </div>
                                   </div>
 
@@ -11384,17 +11518,19 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       type="button"
                                       onClick={() => openVideo(v)}
                                       aria-label={v.name || "Ver vídeo"}
-                                      className="relative isolate w-full h-full text-left flex flex-col rounded-2xl overflow-hidden bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu transition-all group after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]"
+                                      className="relative isolate w-full h-full text-left flex flex-col rounded-2xl overflow-hidden bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu transition-all group"
                                     >
                                       <div className="relative z-10 aspect-video overflow-hidden">
                                         <OptimizedImage
                                           src={thumb || fallback}
                                           alt={v.name || "Video"}
-                                          className="w-full h-full object-cover transform-gpu transition-transform duration-500 hover:scale-[1.05]"
+                                          className="w-full h-full object-cover transform-gpu scale-100 transition-transform duration-500 group-hover:scale-[1.05] motion-reduce:transition-none"
                                         />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                                         <div className="absolute inset-0 flex items-center justify-center">
-                                          <div className="w-14 h-14 rounded-full bg-yellow-400/15 border border-yellow-300/25 flex items-center justify-center transition-transform hover:scale-105 backdrop-blur-md">
+                                          <div
+                                            className="w-14 h-14 rounded-full bg-yellow-400/15 flex scale-100 items-center justify-center transition-transform group-hover:scale-105 backdrop-blur-md motion-reduce:transition-none"
+                                          >
                                             <Play className="w-7 h-7 text-yellow-200 translate-x-[1px]" />
                                           </div>
                                         </div>
@@ -11495,7 +11631,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 >
                                   <div className="relative z-10 aspect-square bg-white/5">
                                     <div className="absolute inset-0 flex items-center justify-center">
-                                      <div className="w-14 h-14 rounded-full bg-yellow-400/10 border border-yellow-300/10" />
+                                      <div className="w-14 h-14 rounded-full bg-yellow-400/10" />
                                     </div>
                                   </div>
                                   <div className="relative z-10 flex flex-col shrink-0 h-[144px] p-4 w-full">
@@ -11559,7 +11695,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       aria-label={
                                         track.trackName || "Reproducir música"
                                       }
-                                      className="relative isolate w-full h-full text-left flex flex-col rounded-2xl overflow-hidden bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu transition-all group after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]"
+                                      className="relative isolate w-full h-full text-left flex flex-col rounded-2xl overflow-hidden bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-lg shadow-lg transform-gpu transition-all group"
                                     >
                                       <div className="relative z-10 aspect-square overflow-hidden bg-black/40">
                                         {/* Fondo desenfocado para rellenar los bordes de la portada cuadrada */}
@@ -11585,11 +11721,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                           loading="lazy"
                                           decoding="async"
                                           fetchPriority="low"
-                                          className="absolute inset-0 w-full h-full object-contain transform-gpu transition-transform duration-500 group-hover:scale-[1.05] drop-shadow-2xl"
+                                          className="absolute inset-0 w-full h-full object-contain transform-gpu scale-100 transition-transform duration-500 group-hover:scale-[1.05] drop-shadow-2xl motion-reduce:transition-none"
                                         />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent pointer-events-none" />
                                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                          <div className="w-14 h-14 rounded-full bg-yellow-400/15 border border-yellow-300/25 flex items-center justify-center transition-transform group-hover:scale-105 backdrop-blur-md">
+                                          <div className="w-14 h-14 rounded-full bg-yellow-400/15 flex scale-100 items-center justify-center transition-transform group-hover:scale-105 backdrop-blur-md motion-reduce:transition-none">
                                             <Music2 className="w-7 h-7 text-yellow-200" />
                                           </div>
                                         </div>
@@ -11858,9 +11994,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   // Cristal de TARJETA compartido: van en rejilla,
                                   // así que sin sombra propia (varias sombras
                                   // juntas forman una banda oscura detrás del
-                                  // grupo). Se conserva el anillo ámbar de hover
-                                  // de las páginas de la ficha.
-                                className={`group relative isolate overflow-hidden rounded-2xl transform-gpu text-left w-full ${LIQUID_GLASS_CARD} transition-all hover:-translate-y-1 hover:brightness-110 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]`}
+                                  // grupo). Conserva elevación y luminosidad al
+                                  // hover, sin dibujar un contorno cromático.
+                                  className={`group relative isolate overflow-hidden rounded-2xl transform-gpu text-left w-full ${LIQUID_GLASS_CARD} transition-all hover:-translate-y-1 hover:brightness-110`}
                                   aria-label={`Ver ${titleSeason}`}
                                 >
                                   <LiquidGlassOpticalLayers />
@@ -12280,10 +12416,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     // forman una banda oscura detrás del grupo).
                                     "group relative isolate flex flex-col overflow-hidden rounded-3xl transform-gpu transition-all duration-500",
                                     LIQUID_GLASS_CARD,
-                                    // Conserva su acento índigo propio (no el amarillo
-                                    // de la ficha): aquí solo cambia la CALIDAD del
-                                    // borde, no el color que ya tenía.
-                                    "after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(99,102,241,0.95)]",
                                     "hover:brightness-110",
                                     disabled
                                       ? "pointer-events-none opacity-60"
