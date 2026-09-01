@@ -1158,6 +1158,7 @@ const GridListCard = memo(function GridListCard({
   itemsState,
   ensureListItems,
   canUse,
+  mobileDeleteMode,
   onDelete,
 }) {
   const cacheKey = `${list?.source || "unknown"}:${String(list?.id || "")}`;
@@ -1266,7 +1267,11 @@ const GridListCard = memo(function GridListCard({
         <button
           type="button"
           onClick={(e) => onDelete(e, list.id)}
-          className="absolute right-3 top-3 z-40 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white/70 opacity-100 backdrop-blur-md transition-all hover:bg-red-600/80 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400 sm:opacity-0 sm:group-hover/card:opacity-100 sm:focus-visible:opacity-100"
+          className={`absolute right-3 top-3 z-40 h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white/70 opacity-0 backdrop-blur-md transition-all hover:bg-red-600/80 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400 lg:group-hover/card:opacity-100 lg:focus-visible:opacity-100 ${
+            mobileDeleteMode
+              ? "flex max-lg:bg-red-600/80 max-lg:text-white max-lg:opacity-100"
+              : "hidden lg:flex"
+          }`}
           title="Borrar lista"
           aria-label={`Borrar ${list?.name || "lista"}`}
         >
@@ -1282,6 +1287,9 @@ const RowListSection = memo(function RowListSection({
   itemsState,
   ensureListItems,
   isMobile,
+  canUse,
+  mobileDeleteMode,
+  onDelete,
 }) {
   const cacheKey = `${list?.source || "unknown"}:${String(list?.id || "")}`;
   const [ref, inView] = useInView();
@@ -1296,7 +1304,7 @@ const RowListSection = memo(function RowListSection({
 
   return (
     <section ref={ref} className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 border-b border-white/5 pb-3">
+      <div className="flex items-start justify-between gap-3 border-b border-white/5 pb-3 sm:items-end">
         <div className="min-w-0">
           <div className="flex items-center gap-3 min-w-0">
             <ListNavWrapper
@@ -1320,7 +1328,17 @@ const RowListSection = memo(function RowListSection({
             </p>
           )}
         </div>
-
+        {canUse && mobileDeleteMode ? (
+          <button
+            type="button"
+            onClick={(event) => onDelete(event, list.id)}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-600/80 text-white backdrop-blur-md transition-colors hover:bg-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400 lg:hidden"
+            title="Borrar lista"
+            aria-label={`Borrar ${list?.name || "lista"}`}
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        ) : null}
       </div>
 
       {isLoading ? (
@@ -1341,6 +1359,7 @@ const ListModeRow = memo(function ListModeRow({
   itemsState,
   ensureListItems,
   canUse,
+  mobileDeleteMode,
   onDelete,
 }) {
   const cacheKey = `${list?.source || "unknown"}:${String(list?.id || "")}`;
@@ -1387,9 +1406,15 @@ const ListModeRow = memo(function ListModeRow({
 
             {canUse && (
               <button
+                type="button"
                 onClick={(e) => onDelete(e, list.id)}
-                className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition"
-                title="Borrar"
+                className={`h-10 w-10 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-red-500/10 hover:text-red-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400 ${
+                  mobileDeleteMode
+                    ? "flex bg-red-500/15 text-red-400"
+                    : "hidden lg:flex"
+                }`}
+                title="Borrar lista"
+                aria-label={`Borrar ${list?.name || "lista"}`}
               >
                 <Trash2 className="w-4 h-4" />
               </button>
@@ -1432,6 +1457,7 @@ export default function ListsPage() {
   const deferredQuery = useDeferredValue(query);
   const [sortMode, setSortMode] = useState("items_desc");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [mobileDeleteMode, setMobileDeleteMode] = useState(false);
   const filtersRef = useRef(null);
   const { isSticky: filtersSticky, isPinned: filtersPinned } =
     useStickyToolbarState(filtersRef);
@@ -1440,6 +1466,16 @@ export default function ListsPage() {
   // ✅ NUEVO: selector de fuente
   const [source, setSource] = useState("trakt"); // 'personal' | 'trakt' | 'collections'
   const [prefsHydrated, setPrefsHydrated] = useState(false);
+
+  useEffect(() => {
+    if (!mobileFiltersOpen && mobileDeleteMode) {
+      setMobileDeleteMode(false);
+    }
+  }, [mobileFiltersOpen, mobileDeleteMode]);
+
+  useEffect(() => {
+    setMobileDeleteMode(false);
+  }, [source]);
 
   const trakt = useTraktLists({ mode: "popular" });
   const [featuredCollections, setFeaturedCollections] = useState([]);
@@ -2243,15 +2279,45 @@ export default function ListsPage() {
                         <StretchHorizontal className="h-4 w-4" />
                       </button>
                       {canEdit && (
-                        <button
-                          type="button"
-                          onClick={() => setCreateOpen(true)}
-                          aria-label="Crear lista"
-                          title="Crear lista"
-                          className="flex h-full flex-1 items-center justify-center rounded-lg px-2.5 text-purple-400 transition-all hover:bg-purple-500/15 hover:text-purple-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-purple-400"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setCreateOpen(true)}
+                            aria-label="Crear lista"
+                            title="Crear lista"
+                            className="flex h-full flex-1 items-center justify-center rounded-lg px-2.5 text-purple-400 transition-all hover:bg-purple-500/15 hover:text-purple-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-purple-400"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setMobileDeleteMode((active) => !active)
+                            }
+                            aria-label={
+                              mobileDeleteMode
+                                ? "Salir del modo borrar"
+                                : "Borrar listas"
+                            }
+                            title={
+                              mobileDeleteMode
+                                ? "Salir del modo borrar"
+                                : "Borrar listas"
+                            }
+                            aria-pressed={mobileDeleteMode}
+                            className={`flex h-full flex-1 items-center justify-center rounded-lg px-2.5 transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-red-400 ${
+                              mobileDeleteMode
+                                ? "bg-red-500/15 text-red-400"
+                                : "text-zinc-400 hover:bg-red-500/10 hover:text-red-400"
+                            }`}
+                          >
+                            {mobileDeleteMode ? (
+                              <X className="h-4 w-4" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>
@@ -2495,6 +2561,7 @@ export default function ListsPage() {
                           itemsState={itemsMap[getListCacheKey(l)]}
                           ensureListItems={ensureListItems}
                           canUse={canEdit}
+                          mobileDeleteMode={mobileDeleteMode}
                           onDelete={handleDelete}
                         />
                       </ListEntrance>
@@ -2511,6 +2578,9 @@ export default function ListsPage() {
                           itemsState={itemsMap[getListCacheKey(l)]}
                           ensureListItems={ensureListItems}
                           isMobile={isMobile}
+                          canUse={canEdit}
+                          mobileDeleteMode={mobileDeleteMode}
+                          onDelete={handleDelete}
                         />
                       </ListEntrance>
                     ))}
@@ -2526,6 +2596,7 @@ export default function ListsPage() {
                           itemsState={itemsMap[getListCacheKey(l)]}
                           ensureListItems={ensureListItems}
                           canUse={canEdit}
+                          mobileDeleteMode={mobileDeleteMode}
                           onDelete={handleDelete}
                         />
                       </ListEntrance>
