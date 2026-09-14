@@ -44,11 +44,12 @@ test("las rutas personales del navbar se reconocen para capturar su orden de tí
 });
 
 test("la captura global replica el gesto de Perfil, también en fichas de usuario, y cede a gestos propios", async () => {
-  const [navigation, layout, lists, detailsTabs] = await Promise.all([
+  const [navigation, layout, lists, detailsTabs, traktEpisodesModal] = await Promise.all([
     readFile(new URL("../../components/MobileUserPageSwipeNavigation.jsx", import.meta.url), "utf8"),
     readFile(new URL("../../app/layout.jsx", import.meta.url), "utf8"),
     readFile(new URL("../../app/lists/page.jsx", import.meta.url), "utf8"),
     readFile(new URL("../../components/details/DetailsInfoTabs.jsx", import.meta.url), "utf8"),
+    readFile(new URL("../../components/trakt/TraktEpisodesWatchedModal.jsx", import.meta.url), "utf8"),
   ]);
 
   assert.match(navigation, /onTouchStartCapture/);
@@ -68,6 +69,11 @@ test("la captura global replica el gesto de Perfil, también en fichas de usuari
   assert.match(layout, /<MobileUserPageSwipeNavigation>/);
   assert.match(lists, /<Swiper\s+data-mobile-page-swipe-ignore/);
   assert.match(detailsTabs, /"data-mobile-page-swipe-ignore": ""/);
+  assert.equal(
+    (traktEpisodesModal.match(/data-mobile-page-swipe-ignore/g) || []).length,
+    2,
+    "los dos modos del modal de vistos deben ceder el gesto al modal",
+  );
 
   const detailsClient = await readFile(
     new URL("../../components/DetailsClient.jsx", import.meta.url),
