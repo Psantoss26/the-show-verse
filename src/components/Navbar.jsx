@@ -47,6 +47,7 @@ import {
   UserRoundSearch,
   ChevronDown,
   Sparkles,
+  Menu,
 } from "lucide-react";
 import WatchNextAssistant from "@/components/WatchNextAssistant";
 import NetflixSyncListener from "@/components/NetflixSyncListener";
@@ -1984,22 +1985,6 @@ export default function Navbar() {
   }, [profileMenuOpen]);
 
   const mobileTopIsCompact = isScrolled || isImmersiveRoute;
-  // ¿La barra superior está pintando ya su cristal? Es transparente sobre un
-  // hero sin desplazar y en las rutas inmersivas hasta que se hace scroll; en el
-  // resto de páginas siempre lo lleva. Lo usa el selector para NO poner su propio
-  // fondo encima de otro: dos cristales superpuestos se leen como un parche.
-  const mobileTopBarHasGlass =
-    !heroNavMode && (!isImmersiveRoute || isScrolled);
-
-  // Los tres dashboards del selector superior en móvil. El color del rótulo es
-  // el de la sección (el mismo criterio que la barra inferior): solo se ve uno
-  // a la vez, así que tiñe sin ensuciar.
-  const MOBILE_DASHBOARDS = [
-    { href: "/", label: t("nav_home", "Inicio"), Icon: HomeIcon, tone: "text-amber-200" },
-    { href: "/movies", label: t("nav_movies", "Películas"), Icon: FilmIcon, tone: "text-sky-200" },
-    { href: "/series", label: t("nav_series", "Series"), Icon: TvIcon, tone: "text-fuchsia-200" },
-  ];
-
   // El encogido al compactar está calibrado para un móvil de 390px, donde la
   // barra se queda en 48px y los controles necesitan ceder sitio. En tablet la
   // barra compactada mide 56px y aplicar ese mismo 0,82 dejaba el selector en
@@ -2397,117 +2382,41 @@ export default function Navbar() {
             mobileTopIsCompact ? "h-12 md:h-14" : "h-16"
           }`}
         >
-          {/* Izquierda: SELECTOR DE DASHBOARD.
-              El destino en el que estás muestra su NOMBRE y los otros dos solo
-              su icono. Es lo que permite meter tres secciones en menos espacio
-              del que ocupaban antes dos botones sueltos, y de paso la barra dice
-              siempre dónde estás sin gastar una línea de título.
-              La escala en compacto se hereda del resto de controles. */}
+          {/* Izquierda: el menú lateral concentra la navegación principal en
+              móvil y evita duplicar Inicio, Películas y Series en la cabecera. */}
           <div
-            className={`flex flex-shrink-0 origin-left items-center transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${mobileTopControlScaleClass}`}
+            className={`flex flex-shrink-0 origin-left items-center gap-0.5 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${mobileTopControlScaleClass}`}
           >
-            <LayoutGroup id="mobile-top-dashboards">
-              {/* `gap-1` separa los tres destinos: pegados, los iconos de 24px
-                  dentro de cajas de 32px dejaban solo 8px entre ellos y el
-                  grupo se leía como un bloque. El hueco se paga recortando el
-                  relleno de la cápsula activa (abajo), porque el ancho
-                  disponible lo marca el logo centrado. */}
-              <div
-                className={`flex items-center gap-1 md:gap-0.5 rounded-full p-[3px] transition-colors duration-300 motion-reduce:transition-none ${
-                  mobileTopBarHasGlass ? "" : LIQUID_GLASS_BAR
-                }`}
-                role="navigation"
-                aria-label={t("nav_dashboards", "Secciones principales")}
-              >
-                {MOBILE_DASHBOARDS.map(({ href, label, Icon, tone }) => {
-                  const active = isActive(href);
-                  return (
-                    <Link
-                      key={href}
-                      href={href}
-                      prefetch
-                      {...navPrefetchHandlers(href)}
-                      aria-label={label}
-                      aria-current={active ? "page" : undefined}
-                      // En tablet el destino mide 40px, lo mismo que la caja
-                      // del logo y que el botón de buscar: con `h-9` la píldora
-                      // se quedaba corta respecto a esos dos y sobraba franja
-                      // por arriba y por abajo en la barra compactada.
-                      //
-                      // En MÓVIL crece solo al compactar (32px -> 36px). Se toca
-                      // el ALTO y no la escala del grupo a propósito: el ancho
-                      // aquí lo manda el logo centrado -- con «Películas», el
-                      // rótulo más largo, no queda holgura -- y el alto no
-                      // arrastra ancho, porque los destinos inactivos van a `w-8`
-                      // fijo y el activo se mide por su `px`. Así la píldora gana
-                      // presencia sin acercarse al logo.
-                      className={`relative flex ${
-                        mobileTopIsCompact ? "h-9" : "h-8"
-                      } md:h-10 shrink-0 items-center justify-center rounded-full transition-[width,padding,color,height] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
-                        active
-                          ? `px-1.5 md:px-3.5 max-[359px]:w-8 max-[359px]:px-0 ${tone}`
-                          : "w-8 md:w-auto md:px-3.5 text-white/70 hover:text-white"
-                      }`}
-                    >
-                      {active && (
-                        // La cápsula viaja de una sección a otra en vez de
-                        // aparecer y desaparecer: es lo que hace que el cambio se
-                        // lea como UN selector y no como tres botones.
-                        <motion.span
-                          aria-hidden="true"
-                          layoutId="mobile-top-dashboard"
-                          className="absolute inset-0 rounded-full bg-white/[0.14] shadow-[inset_0_1px_1px_rgba(255,255,255,0.22)]"
-                          transition={{ type: "spring", stiffness: 420, damping: 34 }}
-                        />
-                      )}
-                      {/* En pantallas de menos de 360px el rótulo no cabe sin
-                          empujar al logo: ahí la sección activa se queda con su
-                          icono, resaltado por la cápsula. */}
-                      {/* EN TABLET, TEXTO EN LOS TRES. En movil solo el activo lleva
-                          rotulo y los otros dos van con icono, porque no cabe mas;
-                          a partir de `md` sobra ancho de sobra, asi que se leen los
-                          tres nombres como en escritorio. */}
-                      <span
-                        className={`relative z-10 whitespace-nowrap text-[12.5px] md:text-[13.5px] font-extrabold tracking-tight drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)] md:inline ${
-                          active ? "hidden min-[360px]:inline" : "hidden"
-                        }`}
-                      >
-                        {label}
-                      </span>
-                      {/* Mismo tamaño que el resto de iconos de la barra
-                          (buscar, perfil): así el selector pesa lo mismo que
-                          ellos en los dos estados, porque todos escalan juntos.
-                          La caja del botón sigue siendo de 32px, de modo que el
-                          selector no gana ancho. */}
-                      <Icon
-                        className={`relative z-10 h-6 w-6 drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)] md:hidden ${
-                          active ? "min-[360px]:hidden" : ""
-                        }`}
-                        strokeWidth={2.2}
-                        aria-hidden="true"
-                      />
-                    </Link>
-                  );
-                })}
-              </div>
-            </LayoutGroup>
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(true)}
+              aria-label={t("open_menu", "Abrir menú")}
+              aria-controls="mobile-navigation-drawer"
+              aria-expanded={mobileMenuOpen}
+              aria-haspopup="dialog"
+              className="grid h-11 w-11 place-items-center rounded-full text-white transition-[background-color,transform] duration-200 hover:bg-white/10 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+            >
+              <Menu className="h-6 w-6" strokeWidth={2.2} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowMobileSearch(true)}
+              className="grid h-11 w-11 place-items-center rounded-full text-white transition-[background-color,transform] duration-200 hover:bg-white/10 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+              aria-label="Buscar"
+            >
+              <SearchIcon className="h-6 w-6" aria-hidden="true" />
+            </button>
           </div>
 
-          {/* Centro: el logo ABRE EL MENÚ LATERAL.
-              Ya no hace falta que lleve a Inicio —eso lo cubre el selector— así
-              que hereda el papel del botón de hamburguesa sin ocupar un hueco
-              propio.
+          {/* Centro: el logo lleva al dashboard de Inicio.
 
               Va CENTRADO EN LA PANTALLA (posición absoluta), no repartiendo el
-              hueco sobrante: como el rótulo del selector cambia de ancho según
-              la sección, con un centrado por flex el logo se desplazaba unos
-              píxeles al navegar. El ancho del selector está ajustado para que
-              ni con «Películas» —el rótulo más largo— llegue a tocarlo. */}
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen(true)}
-            aria-label={t("open_menu", "Abrir menú")}
-            aria-haspopup="dialog"
+              hueco sobrante: así no se desplaza con los controles de los lados. */}
+          <Link
+            href="/"
+            prefetch
+            {...navPrefetchHandlers("/")}
+            aria-label={t("nav_home", "Inicio")}
             className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none active:scale-95 ${mobileTopControlScaleClass}`}
           >
             {/* TAMAÑO REAL DEL LOGO. El PNG lleva mucho margen transparente: su
@@ -2520,26 +2429,18 @@ export default function Navbar() {
             <span className="flex h-10 w-[56px] items-center justify-center overflow-hidden">
               <OptimizedImage
                 src="/logo-TSV-sinFondo.png"
-                alt="The Show Verse"
+                alt=""
                 width={40}
                 height={40}
                 className="h-full w-[40px] object-contain scale-[2.8] origin-center"
               />
             </span>
-          </button>
+          </Link>
 
-          {/* Derecha: búsqueda y perfil mantienen la misma escala que el resto. */}
+          {/* Derecha: perfil. */}
           <div
             className={`flex flex-shrink-0 origin-right items-center gap-2 pr-1 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${mobileTopControlScaleClass}`}
           >
-            <button
-              onClick={() => setShowMobileSearch(true)}
-              className="p-2 rounded-full transition-colors text-white hover:bg-white/10"
-              aria-label="Buscar"
-            >
-              <SearchIcon className="w-6 h-6 text-white" />
-            </button>
-
             {profileAuthLoading ? (
               <UserAvatarBoot />
             ) : !account ? (
@@ -2738,6 +2639,10 @@ export default function Navbar() {
             onClick={() => setMobileMenuOpen(false)}
           >
             <motion.aside
+              id="mobile-navigation-drawer"
+              role="dialog"
+              aria-modal="true"
+              aria-label={t("mobile_bottom_nav_label", "Navegación principal")}
               initial={{ x: -320 }}
               animate={{ x: 0 }}
               exit={{ x: -320 }}
