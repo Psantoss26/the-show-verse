@@ -28,7 +28,7 @@ import {
 import { usePersonalizedFeatured } from "@/lib/dashboard/featuredPersonalize";
 import "swiper/swiper-bundle.css";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/offline/useOfflineRouter";
 import {
   Heart,
   BookmarkPlus,

@@ -7,7 +7,6 @@ const SHELL_CACHE = `showverse-shell-${VERSION}`;
 const ASSET_CACHE = `showverse-assets-${VERSION}`;
 const META_CACHE = "showverse-offline-meta-v1";
 const DATA_PREFIX = "showverse-offline-data-v1-";
-const OFFLINE_URL = "/offline.html";
 const META_URL = new URL("/__offline/session", self.location.origin).href;
 const READ_POSTS = new Set(["/api/backend/items/states", "/api/imdb/ratings"]);
 let sessionPromise;
@@ -16,6 +15,7 @@ let epoch = 0;
 let identityChange = Promise.resolve();
 let originProbe;
 let storageFull = false;
+const titlePreparations = new Map();
 
 const absolute = (path) => new URL(path, self.location.origin).href;
 const unavailable = (response) => response.status >= 500 || [408, 429].includes(response.status);
@@ -219,31 +219,56 @@ async function apiRead(request) {
 
 async function immutable(request) {
   // An offline document from a previous build must retain its matching chunks.
+  const current = await caches.open(ASSET_CACHE);
+  const currentSaved = await current.match(request);
+  if (currentSaved) return currentSaved;
   const saved = await caches.match(request);
-  if (saved) return saved;
+  if (saved) {
+    // Shared hashes may still live only in an older build. Retain a current
+    // copy before PRUNE_BUILDS retires that build's cache.
+    await safePut(current, request, saved.clone());
+    return saved;
+  }
   const response = await network(request);
-  if (response.ok) await safePut(await caches.open(ASSET_CACHE), request, response.clone());
+  if (response.ok) await safePut(current, request, response.clone());
   return response;
 }
 async function documentKey(request) {
   const url = new URL(canonical(request));
+  // Detail query strings carry presentation / preview context, not another title.
+  if (/^\/details\/(movie|tv)\/\d+\/?$/.test(url.pathname)) {
+    url.search = "";
+    url.pathname = url.pathname.replace(/\/$/, "");
+  }
+  url.hash = "";
   url.searchParams.set("__owner", (await session()).owner || "anonymous");
   return url.href;
 }
+async function savedDocument(request) {
+  const key = await documentKey(request);
+  const names = (await caches.keys()).filter((name) => name.startsWith("showverse-shell-"));
+  names.sort((a, b) => a === SHELL_CACHE ? -1 : b === SHELL_CACHE ? 1 : 0);
+  for (const name of names) {
+    const saved = await (await caches.open(name)).match(key);
+    if (saved) return saved;
+  }
+  return null;
+}
 async function saveDocument(request, response, generation = epoch) {
   const key = await documentKey(request);
-  await safePut(await caches.open(SHELL_CACHE), key, response.clone(), generation);
+  const copy = response.clone();
   const html = await response.text();
   const assets = new Set([...html.matchAll(/(?:src|href)=["']([^"']+)["']/g)]
     .map((match) => absolute(match[1].replaceAll("&amp;", "&")))
     .filter((url) => new URL(url).origin === self.location.origin && new URL(url).pathname.startsWith("/_next/static/")));
   // Includes CSS/fonts and page entry chunks even when reached through Next's
   // client router, which otherwise only stores an RSC fragment, not a document.
-  await Promise.all([...assets].map((url) => immutable(new Request(url)).catch(() => null)));
+  const loaded = await Promise.all([...assets].map((url) => immutable(new Request(url)).catch(() => null)));
+  if (loaded.some((asset) => !asset?.ok)) return false;
+  return safePut(await caches.open(SHELL_CACHE), key, copy, generation);
 }
 async function navigation(request) {
   const generation = epoch;
-  const key = await documentKey(request);
   try {
     if (Date.now() < offlineUntil) throw new Error("offline");
     const response = await network(request);
@@ -255,17 +280,50 @@ async function navigation(request) {
   } catch {
     await confirmOriginFailure();
     if (generation === epoch) {
-      const names = (await caches.keys()).filter((name) => name.startsWith("showverse-shell-")).reverse();
-      // Current build first. Older documents are used ONLY while unreachable.
-      names.sort((a, b) => a === SHELL_CACHE ? -1 : b === SHELL_CACHE ? 1 : 0);
-      for (const name of names) {
-        const saved = await (await caches.open(name)).match(key);
-        if (saved) return offlineResponse(saved);
-      }
+      const saved = await savedDocument(request);
+      if (saved) return offlineResponse(saved);
     }
-    // Serving '/' here renders the wrong page under the requested URL.
-    return (await caches.match(absolute(OFFLINE_URL))) || new Response("Página aún no guardada para consulta sin conexión.", { status: 503 });
+    // A navigation response with 204 leaves the current document in place.
+    // This also protects address-bar / unguarded navigations without replacing
+    // the app with an offline screen, an error document, or the wrong route.
+    return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
   }
+}
+
+async function prepareTitle(message) {
+  const { mediaType, id } = message;
+  if (!["movie", "tv"].includes(mediaType) || !/^\d+$/.test(String(id))) return { ok: false };
+  const key = `${(await session()).owner}:${mediaType}:${id}`;
+  if (titlePreparations.has(key)) return titlePreparations.get(key);
+  const work = (async () => {
+    await apiRead(new Request(absolute("/api/auth/me"), { credentials: "include" }));
+    const generation = epoch;
+    const path = `/details/${mediaType}/${id}`;
+    const type = mediaType === "tv" ? "show" : "movie";
+    const qs = `type=${type}&tmdbId=${id}`;
+    const paths = [
+      `/api/trakt/item/status?${qs}`, `/api/trakt/${type}/watched?tmdbId=${id}`,
+      `/api/trakt/scoreboard?${qs}`, `/api/trakt/scoreboard?${qs}&includeStats=0`,
+      `/api/trakt/stats?${qs}`, `/api/community/${mediaType}/${id}/sentiment`,
+      `/api/community/${mediaType}/${id}/comments?tab=comments&page=1&limit=20`,
+      `/api/community/${mediaType}/${id}/lists?limit=20`,
+    ];
+    if (mediaType === "tv") for (const season of message.seasons || []) {
+      if (Number.isInteger(season) && season >= 0) paths.push(`/api/tmdb/tv/${id}/season/${season}`);
+    }
+    // Owned by event.waitUntil, not by the lifetime of DetailsClient/modal.
+    await Promise.all([
+      navigation(new Request(absolute(path), { headers: { Accept: "text/html" }, credentials: "include" })),
+      (async () => {
+        for (let start = 0; start < paths.length && generation === epoch; start += 4) {
+          await Promise.all(paths.slice(start, start + 4).map((url) => apiRead(new Request(absolute(url), { credentials: "include" })).catch(() => null)));
+        }
+      })(),
+    ]);
+    return { ok: generation === epoch && Boolean(await savedDocument(path)) };
+  })().finally(() => titlePreparations.delete(key));
+  titlePreparations.set(key, work);
+  return work;
 }
 
 async function health(request) {
@@ -279,13 +337,7 @@ async function health(request) {
 }
 
 self.addEventListener("install", (event) => {
-  event.waitUntil((async () => {
-    try {
-      const response = await fetch(OFFLINE_URL, { cache: "reload" });
-      if (response.ok) await (await caches.open(SHELL_CACHE)).put(absolute(OFFLINE_URL), response);
-    } catch { /* next online visit retries */ }
-    await self.skipWaiting();
-  })());
+  event.waitUntil(self.skipWaiting());
 });
 self.addEventListener("activate", (event) => {
   // Do not erase private snapshots on deploy. Page preparation replaces saved
@@ -300,6 +352,11 @@ self.addEventListener("message", (event) => {
     if (message?.type === "OFFLINE_CLEAR") await changeOwner(null);
     if (message?.type === "OFFLINE_PREPARE_BEGIN") storageFull = false;
     if (message?.type === "OFFLINE_STATUS") result = { owner: (await session()).owner, online: Date.now() >= offlineUntil, storageFull };
+    if (message?.type === "OFFLINE_PREPARE_TITLE") result = await prepareTitle(message);
+    if (message?.type === "OFFLINE_HAS_ROUTE") {
+      const url = new URL(message.path, self.location.origin);
+      result = { available: url.origin === self.location.origin && !url.pathname.startsWith("/api/") && Boolean(await savedDocument(url.href)) };
+    }
     if (message?.type === "OFFLINE_COLLECTION") {
       const owner = (await session()).owner;
       result = { ok: false };
@@ -313,7 +370,7 @@ self.addEventListener("message", (event) => {
       const url = new URL(message.path, self.location.origin);
       if (url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
       const response = await navigation(new Request(url, { headers: { Accept: "text/html" }, credentials: "include" }));
-      result = { ok: response.ok && response.headers.get("X-Showverse-Offline") !== "1" };
+      result = { ok: response.status === 200 && !response.redirected && response.headers.get("X-Showverse-Offline") !== "1" && Boolean(await savedDocument(url.href)) };
     }
     if (message?.type === "OFFLINE_ROUTES") {
       const owner = (await session()).owner || "anonymous";
@@ -351,10 +408,6 @@ self.addEventListener("fetch", (event) => {
         const saved = await cache.match(request);
         if (saved) return saved;
         const response = await fetch(request);
-        if (response.ok && ["/api/auth/login", "/api/auth/register", "/api/auth/google/native"].includes(url.pathname)) {
-          const auth = await response.clone().json().catch(() => null);
-          if (auth?.user?.id) await changeOwner(String(auth.user.id));
-        }
         if (response.ok || response.type === "opaque") {
           try { await cache.put(request, response.clone()); } catch { /* quota */ }
         }
@@ -370,6 +423,10 @@ self.addEventListener("fetch", (event) => {
         if (url.pathname === "/api/auth/logout") await changeOwner(null);
         if (Date.now() < offlineUntil) return jsonResponse({ offline: true, error: "Modo sin conexión: solo consulta. No se ha guardado ningún cambio." });
         const response = await fetch(request);
+        if (response.ok && ["/api/auth/login", "/api/auth/register", "/api/auth/google/native"].includes(url.pathname)) {
+          const auth = await response.clone().json().catch(() => null);
+          if (auth?.user?.id) await changeOwner(String(auth.user.id));
+        }
         // Writes are never replayed. Refresh cached reads after a confirmed write.
         if (response.ok) await broadcast({ type: "OFFLINE_DATA_CHANGED" });
         return response;

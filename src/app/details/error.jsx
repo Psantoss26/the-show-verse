@@ -10,7 +10,7 @@
 // lugar de un falso 404. `reset()` vuelve a renderizar el segmento, lo que
 // repite el fetch en el servidor.
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { RefreshCw, ArrowLeft } from "lucide-react";
 
 export default function DetailsError({ error, reset }) {

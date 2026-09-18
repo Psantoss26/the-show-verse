@@ -110,7 +110,9 @@ test('navigation keeps the actual title document, not a home shell at a differen
   await sw.navigate('/details/movie/42');
   sw.network(() => new Response('NAS down', { status: 502 }));
   assert.match(await (await sw.navigate('/details/movie/42')).text(), /Movie 42/);
-  assert.equal((await sw.navigate('/details/movie/99')).status, 503);
+  const missing = await sw.navigate('/details/movie/99');
+  assert.equal(missing.status, 204);
+  assert.equal(await missing.text(), '');
 });
 
 test('mutations are rejected offline without a network write or queue', async () => {
@@ -150,4 +152,62 @@ test('a broken integration does not put a healthy app in global offline mode', a
   sw.network((request) => new URL(request.url).pathname === '/api/health' ? json({ok:true}) : json({error:'upstream'}, 503));
   await sw.read('/api/soundtrack');
   assert.equal((await sw.message({type:'OFFLINE_STATUS'})).online, true);
+});
+
+test('successful login switches snapshot ownership before subsequent account reads', async () => {
+  const sw = harness(); await sw.login('alice');
+  sw.network(() => json({ secret: 'alice' }));
+  await sw.read('/api/favorites');
+  sw.network(() => json({ user: { id: 'bob' } }));
+  assert.equal((await sw.fetch('/api/auth/login', { method: 'POST', body: '{}' })).status, 200);
+  assert.equal((await sw.message({ type: 'OFFLINE_STATUS' })).owner, 'bob');
+  sw.network(() => { throw new Error('NAS down'); });
+  assert.equal((await sw.read('/api/favorites')).status, 503);
+});
+
+test('shared assets survive pruning their original build cache', async () => {
+  const sw = harness();
+  const path = `${origin}/_next/static/shared.js`;
+  await (await sw.caches.open('showverse-assets-older')).put(path, new Response('shared module'));
+  sw.network(() => { throw new Error('offline'); });
+  assert.equal(await (await sw.fetch('/_next/static/shared.js')).text(), 'shared module');
+  await sw.message({ type: 'PRUNE_BUILDS' });
+  assert.equal(await (await sw.fetch('/_next/static/shared.js')).text(), 'shared module');
+});
+
+test('availability is account scoped and detail display queries reuse the saved title', async () => {
+  const sw = harness(); await sw.login('alice');
+  sw.network(() => new Response('<html>Title with complete data</html>', { headers: { 'Content-Type': 'text/html' } }));
+  await sw.navigate('/details/movie/42');
+  assert.equal((await sw.message({ type: 'OFFLINE_HAS_ROUTE', path: '/details/movie/42?from=profile#cast' })).available, true);
+  assert.equal((await sw.message({ type: 'OFFLINE_HAS_ROUTE', path: '/details/movie/99' })).available, false);
+  assert.equal((await sw.message({ type: 'OFFLINE_HAS_ROUTE', path: 'https://other.test/details/movie/42' })).available, false);
+  await sw.login('bob');
+  assert.equal((await sw.message({ type: 'OFFLINE_HAS_ROUTE', path: '/details/movie/42' })).available, false);
+});
+
+test('a page with an unavailable entry chunk is not advertised as saved', async () => {
+  const sw = harness(); await sw.login('alice');
+  sw.network((request) => new URL(request.url).pathname.startsWith('/_next/')
+    ? new Response('unavailable', { status: 503 })
+    : new Response('<html><script src="/_next/static/missing.js"></script></html>', { headers: { 'Content-Type': 'text/html' } }));
+  await sw.navigate('/details/movie/42');
+  assert.equal((await sw.message({ type: 'OFFLINE_HAS_ROUTE', path: '/details/movie/42' })).available, false);
+});
+
+test('worker-owned title preparation saves the document and supporting reads', async () => {
+  const sw = harness(); await sw.login('alice');
+  const reads = [];
+  sw.network((request) => {
+    const path = new URL(request.url).pathname; reads.push(path);
+    if (path === '/api/auth/me') return json({ authenticated: true, user: { id: 'alice' } });
+    if (path.startsWith('/details/')) return new Response('<html>Complete series</html>', { headers: { 'Content-Type': 'text/html' } });
+    return json({ watched: true, rating: 9 });
+  });
+  const result = await sw.message({ type: 'OFFLINE_PREPARE_TITLE', mediaType: 'tv', id: 42, seasons: [1, 2] });
+  assert.equal(result.ok, true);
+  assert(reads.includes('/api/tmdb/tv/42/season/2'));
+  sw.network(() => { throw new Error('NAS off'); });
+  assert.match(await (await sw.navigate('/details/tv/42?from=history')).text(), /Complete series/);
+  assert.equal((await (await sw.read('/api/trakt/item/status?type=show&tmdbId=42')).json()).rating, 9);
 });

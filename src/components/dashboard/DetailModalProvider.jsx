@@ -30,7 +30,8 @@ import {
 } from "react";
 import { AnimatePresence } from "framer-motion";
 
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/offline/useOfflineRouter";
+import { isServerReachable } from "@/lib/offline/client";
 
 import { getMediaTypeForItem } from "@/lib/dashboard/media";
 import { dashboardDetailHref } from "@/lib/dashboard/detailHref";
@@ -154,7 +155,7 @@ export default function DetailModalProvider({ children, placement = "center" }) 
       if (!item || item.id == null || typeof window === "undefined") return;
 
       // MÓVIL: se navega siempre a la ficha completa; la preview es de escritorio.
-      if (isMobile) {
+      if (isMobile || !isServerReachable()) {
         let href;
         if (
           item.media_type === "episode" &&

@@ -8,7 +8,7 @@ import { Navigation, FreeMode } from "swiper/modules";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import NextImage from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/offline/useOfflineRouter";
 import {
   Play,
   Pause,

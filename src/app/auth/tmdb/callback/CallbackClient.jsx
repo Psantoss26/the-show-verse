@@ -2,7 +2,8 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from "next/navigation";
+import { useRouter } from "@/lib/offline/useOfflineRouter";
 
 export default function CallbackClient() {
   const router = useRouter()

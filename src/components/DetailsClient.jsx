@@ -23,7 +23,7 @@ import {
 import { createPortal } from "react-dom";
 
 // -- Navegacion de Next.js --
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/offline/useOfflineRouter";
 
 // -- Carrusel Swiper --
 import { Swiper, SwiperSlide } from "swiper/react";

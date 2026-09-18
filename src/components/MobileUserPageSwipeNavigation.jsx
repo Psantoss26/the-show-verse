@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import { useRouter } from "@/lib/offline/useOfflineRouter";
 import {
   getMobileUserPageSwipeDestination,
   isMobileUserPageSwipeRoute,
@@ -73,7 +74,9 @@ export default function MobileUserPageSwipeNavigation({ children }) {
 
       navigatingToRef.current = destination;
       router.prefetch(destination);
-      router.push(destination);
+      Promise.resolve(router.push(destination)).then((opened) => {
+        if (opened === false) navigatingToRef.current = null;
+      });
     },
     [pathname, router],
   );

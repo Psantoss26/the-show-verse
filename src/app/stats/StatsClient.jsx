@@ -1,5 +1,7 @@
 "use client";
 
+import { loadProfileCharts } from "@/lib/profile/loadProfileCharts";
+
 
 import OptimizedImage from "@/components/OptimizedImage";
 import Avatar from "@/components/ui/Avatar";
@@ -198,27 +200,27 @@ const ChartLoading = ({ className = "h-[300px]" }) => (
   <div className={`${className} min-w-0 w-full animate-pulse rounded-2xl bg-white/5`} />
 );
 const MonthlyActivityChart = dynamic(
-  () => import("./profileCharts").then((m) => m.MonthlyActivityChart),
+  () => loadProfileCharts().then((m) => m.MonthlyActivityChart),
   { ssr: false, loading: () => <ChartLoading /> },
 );
 const TimeDistributionChart = dynamic(
-  () => import("./profileCharts").then((m) => m.TimeDistributionChart),
+  () => loadProfileCharts().then((m) => m.TimeDistributionChart),
   { ssr: false, loading: () => <ChartLoading className="h-[250px]" /> },
 );
 const HourOfDayChart = dynamic(
-  () => import("./profileCharts").then((m) => m.HourOfDayChart),
+  () => loadProfileCharts().then((m) => m.HourOfDayChart),
   { ssr: false, loading: () => <ChartLoading /> },
 );
 const DayOfWeekChart = dynamic(
-  () => import("./profileCharts").then((m) => m.DayOfWeekChart),
+  () => loadProfileCharts().then((m) => m.DayOfWeekChart),
   { ssr: false, loading: () => <ChartLoading /> },
 );
 const GenreRadarChart = dynamic(
-  () => import("./profileCharts").then((m) => m.GenreRadarChart),
+  () => loadProfileCharts().then((m) => m.GenreRadarChart),
   { ssr: false, loading: () => <ChartLoading /> },
 );
 const RatingsBarChart = dynamic(
-  () => import("./profileCharts").then((m) => m.RatingsBarChart),
+  () => loadProfileCharts().then((m) => m.RatingsBarChart),
   { ssr: false, loading: () => <ChartLoading /> },
 );
 

@@ -4,7 +4,7 @@
 import OptimizedImage from "@/components/OptimizedImage";
 import { useMemo, useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { motion } from "framer-motion";
 
 import {

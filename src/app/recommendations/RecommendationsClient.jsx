@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/offline/useOfflineRouter";
 import {
   AnimatePresence,
   motion,
@@ -39,6 +39,8 @@ import AddToListModal from "@/components/details/AddToListModal";
 import { MOBILE_ACTION_BUTTON_CLASS } from "@/components/details/DetailActionsRow";
 import { DetailsRatingsBadges } from "@/components/details/DetailsScoreboardPanel";
 import { formatCountShort } from "@/lib/details/formatters";
+import { isServerReachable } from "@/lib/offline/client";
+import { useServerOnline } from "@/context/ServerStatusContext";
 import { useAuth } from "@/context/AuthContext";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { markAsFavorite, markInWatchlist } from "@/lib/api/tmdb";
@@ -360,7 +362,7 @@ export default function RecommendationsClient() {
   const runAction = useCallback(
     async (action) => {
       const item = deck[0];
-      if (!item || busy) return;
+      if (!isServerReachable() || !item || busy) return;
 
       // La carta avanza YA: esperar a la red dejaría la baraja congelada tras
       // cada gesto y el flujo dejaría de sentirse continuo.
@@ -382,7 +384,7 @@ export default function RecommendationsClient() {
   const runActionFromButton = useCallback(
     (action) => {
       const item = deck[0];
-      if (!item || busy || pendingExit) return;
+      if (!isServerReachable() || !item || busy || pendingExit) return;
 
       const mark =
         action === SWIPE_ACTIONS.FAVORITE
@@ -406,7 +408,7 @@ export default function RecommendationsClient() {
   // Un gesto rápido se equivoca con facilidad, y sin esto el error sería
   // irreversible (sobre todo el descarte, que es permanente).
   const undoLast = useCallback(async () => {
-    if (!lastAction || busy) return;
+    if (!isServerReachable() || !lastAction || busy) return;
     const { item, action } = lastAction;
     setLastAction(null);
     consumedRef.current.delete(cardKey(item));
@@ -652,6 +654,7 @@ export default function RecommendationsClient() {
               </RecommendationActionButton>
               <RecommendationActionButton
                 label="Más información"
+                mutation={false}
                 onClick={() => {
                   if (currentDetailsHref) router.push(currentDetailsHref);
                 }}
@@ -716,6 +719,7 @@ export default function RecommendationsClient() {
 // CARTA DESLIZABLE
 // ----------------------------
 function SwipeCard({ item, reduceMotion, onAction, forcedExit = null }) {
+  const online = useServerOnline();
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const [exiting, setExiting] = useState(null);
@@ -735,6 +739,7 @@ function SwipeCard({ item, reduceMotion, onAction, forcedExit = null }) {
   const favoriteOpacity = useTransform(y, [-140, -40, 0], [1, 0, 0]);
 
   const handleDragEnd = (_event, info) => {
+    if (!isServerReachable()) return;
     const action = resolveSwipeAction(info);
     if (!action) return; // vuelve solo a su sitio (dragSnapToOrigin)
     setExiting(action);
@@ -787,7 +792,7 @@ function SwipeCard({ item, reduceMotion, onAction, forcedExit = null }) {
       // El arrastre sigue activo con "reducir movimiento": es manipulación
       // directa (la carta sigue al dedo), no una animación que se pueda sufrir.
       // Lo que se reduce es el vuelo de salida, que sí es movimiento autónomo.
-      drag
+      drag={online}
       dragSnapToOrigin
       dragElastic={0.6}
       dragMomentum={false}
@@ -985,6 +990,7 @@ function SwipeStamp({
 // móvil de DetailsClient, para que tamaño y acabado sean idénticos. El escalado
 // del icono lo aporta MOBILE_ACTION_BUTTON_CLASS, puesto en la fila.
 function RecommendationActionButton({
+  mutation = true,
   label,
   onClick,
   disabled = false,
@@ -992,12 +998,15 @@ function RecommendationActionButton({
   activeColor = "blue",
   children,
 }) {
+  const online = useServerOnline();
   return (
     <div className="aspect-square min-w-[34px] max-w-[60px] flex-1">
       <LiquidButton
         liquidGlass
         onClick={onClick}
         disabled={disabled}
+        readOnly={mutation && !online}
+        data-online-only={mutation ? "true" : undefined}
         active={active}
         activeColor={activeColor}
         groupId="details-actions"

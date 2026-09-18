@@ -1,9 +1,11 @@
 "use client";
 
+import { loadProfileCharts } from "@/lib/profile/loadProfileCharts";
+
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { motion, useReducedMotion } from "framer-motion";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import OptimizedImage from "@/components/OptimizedImage";
@@ -49,27 +51,27 @@ const ChartLoading = ({ className = "h-[280px]" }) => (
   <div className={`${className} w-full animate-pulse rounded-2xl bg-white/[0.035]`} />
 );
 const MonthlyActivityChart = dynamic(
-  () => import("@/app/stats/profileCharts").then((module) => module.MonthlyActivityChart),
+  () => loadProfileCharts().then((module) => module.MonthlyActivityChart),
   { ssr: false, loading: () => <ChartLoading /> },
 );
 const TimeDistributionChart = dynamic(
-  () => import("@/app/stats/profileCharts").then((module) => module.TimeDistributionChart),
+  () => loadProfileCharts().then((module) => module.TimeDistributionChart),
   { ssr: false, loading: () => <ChartLoading className="h-[250px]" /> },
 );
 const HourOfDayChart = dynamic(
-  () => import("@/app/stats/profileCharts").then((module) => module.HourOfDayChart),
+  () => loadProfileCharts().then((module) => module.HourOfDayChart),
   { ssr: false, loading: () => <ChartLoading /> },
 );
 const DayOfWeekChart = dynamic(
-  () => import("@/app/stats/profileCharts").then((module) => module.DayOfWeekChart),
+  () => loadProfileCharts().then((module) => module.DayOfWeekChart),
   { ssr: false, loading: () => <ChartLoading /> },
 );
 const GenreRadarChart = dynamic(
-  () => import("@/app/stats/profileCharts").then((module) => module.GenreRadarChart),
+  () => loadProfileCharts().then((module) => module.GenreRadarChart),
   { ssr: false, loading: () => <ChartLoading /> },
 );
 const RatingsBarChart = dynamic(
-  () => import("@/app/stats/profileCharts").then((module) => module.RatingsBarChart),
+  () => loadProfileCharts().then((module) => module.RatingsBarChart),
   { ssr: false, loading: () => <ChartLoading /> },
 );
 

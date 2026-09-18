@@ -14,7 +14,8 @@ import {
   useState,
 } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { createPortal } from "react-dom";
 import "@/app/globals.css";
 import { useAuth } from "@/context/AuthContext";

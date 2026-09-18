@@ -3,7 +3,7 @@
 
 import OptimizedImage from "@/components/OptimizedImage";
 import { useEffect, useLayoutEffect, useMemo, useState, useCallback, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { Heart, Loader2, ExternalLink, ChevronDown, UserRound, ListVideo } from 'lucide-react'
 import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayout'
 import ListDetailsActionRow from '@/components/lists/ListDetailsActionRow'
