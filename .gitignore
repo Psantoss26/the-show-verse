@@ -20,6 +20,10 @@ build/
 !.env.example
 # Ficheros de entorno de los despliegues (NAS): contienen secretos.
 deploy/**/*.env
+.local/
+*.dump
+*.backup
+*.sql.gz
 
 # --- Logs / depuración ---
 npm-debug.log*
