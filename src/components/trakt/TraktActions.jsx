@@ -133,7 +133,7 @@ export default function TraktActions({ mediaType, tmdbId }) {
       <div className="text-[11px] text-white/60">{label}</div>
 
       <div className="flex items-center gap-2">
-        <button
+        <button data-online-only="true"
           onClick={toggleWatched}
           disabled={disabled}
           className={`inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all duration-300 ${

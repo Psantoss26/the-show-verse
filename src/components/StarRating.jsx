@@ -1,4 +1,5 @@
 "use client";
+import { useServerOnline } from "@/context/ServerStatusContext";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 
 import { useEffect, useId, useRef, useState } from "react";
@@ -41,7 +42,8 @@ export default function StarRating({
   disabled = false,
   liquidGlass = false,
 }) {
-  const effectiveDisabled = disabled || loading;
+  const serverOnline = useServerOnline();
+  const effectiveDisabled = disabled || loading || !serverOnline;
 
   const rateFn = onRate || onRating;
   const clearFn = onClear || onClearRating;
@@ -154,7 +156,8 @@ export default function StarRating({
       {/* --- BOTÓN TRIGGER --- */}
       <LiquidButton
         liquidGlass={liquidGlass}
-        disabled={effectiveDisabled}
+        disabled={disabled || loading}
+        readOnly={!serverOnline}
         onClick={handleOpen}
         active={hasRating}
         activeColor="yellow"
@@ -288,7 +291,7 @@ export default function StarRating({
 
                 <div className="flex items-center gap-3 pt-2">
                   {hasRating && (
-                    <button
+                    <button data-online-only="true"
                       type="button"
                       onClick={handleClear}
                       className="flex h-12 w-12 items-center justify-center rounded-full bg-white/5 text-white/45 backdrop-blur-xl transition hover:bg-red-500/15 hover:text-red-300 disabled:opacity-50"
@@ -299,7 +302,7 @@ export default function StarRating({
                     </button>
                   )}
 
-                  <button
+                  <button data-online-only="true"
                     type="button"
                     onClick={handleSave}
                     disabled={effectiveDisabled}

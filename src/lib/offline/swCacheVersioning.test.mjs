@@ -71,12 +71,10 @@ test("next.config expone el sello al cliente", async () => {
   );
 });
 
-test("activate sigue retirando toda caché showverse que no sea la del build actual", async () => {
+test("los datos privados sobreviven al build y los assets solo se podan tras preparar documentos", async () => {
   const source = await read("public/sw.js");
-
-  // Es lo que se lleva por delante las cachés del build anterior (y las `v2`
-  // heredadas). Sin este filtro, versionar los nombres solo acumularía más.
-  assert.match(source, /k\.startsWith\("showverse-"\)/);
+  assert.match(source, /showverse-offline-data-v1-/);
+  assert.match(source, /PRUNE_BUILDS/);
   assert.match(source, /k !== SHELL_CACHE/);
   assert.match(source, /k !== ASSET_CACHE/);
 });

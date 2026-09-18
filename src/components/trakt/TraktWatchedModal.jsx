@@ -1,4 +1,5 @@
 "use client";
+import { useServerOnline } from "@/context/ServerStatusContext";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 
@@ -280,6 +281,7 @@ export default function TraktWatchedModal({
   busy,
   busyKey,
 }) {
+  const serverOnline = useServerOnline();
   const isBusy = !!(busy || busyKey);
 
   // Hooks y lógica (igual que antes)
@@ -340,17 +342,17 @@ export default function TraktWatchedModal({
     setCalOpen(false);
   };
   const doAdd = async () => {
-    if (!newDate || isBusy) return;
+    if (!newDate || isBusy || !serverOnline) return;
     await onAddPlay?.(newDate);
     setNewDate(todayYmd());
   };
   const doSaveEdit = async () => {
-    if (!editingId || !editDate || isBusy) return;
+    if (!editingId || !editDate || isBusy || !serverOnline) return;
     await onUpdatePlay?.(editingId, editDate);
     stopEdit();
   };
   const doRemove = async (id) => {
-    if (!id || isBusy) return;
+    if (!id || isBusy || !serverOnline) return;
     await onRemovePlay?.(id);
     if (editingId === id) stopEdit();
   };
@@ -425,7 +427,7 @@ export default function TraktWatchedModal({
                 <button
                   type="button"
                   onClick={openCalendarForNew}
-                  disabled={isBusy}
+                  disabled={isBusy || !serverOnline}
                   className="flex flex-1 items-center gap-3 rounded-2xl bg-white/5 px-4 py-3 text-left backdrop-blur-md shadow-sm transition hover:bg-white/10 disabled:opacity-50"
                 >
                   <CalendarDays className="w-5 h-5 text-emerald-200/80" />
@@ -439,10 +441,10 @@ export default function TraktWatchedModal({
                   </div>
                 </button>
 
-                <button
+                <button data-online-only="true"
                   type="button"
                   onClick={doAdd}
-                  disabled={isBusy}
+                  disabled={isBusy || !serverOnline}
                   className="flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-full border border-emerald-200/30 bg-emerald-400/90 font-extrabold text-black shadow-[0_10px_30px_-10px_rgba(52,211,153,0.65)] transition-all hover:bg-emerald-300 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
                   aria-label="Añadir visionado"
                 >
@@ -515,16 +517,16 @@ export default function TraktWatchedModal({
                             <button
                               type="button"
                               onClick={() => startEdit(it.id, it.watchedAt)}
-                              disabled={isBusy}
+                              disabled={isBusy || !serverOnline}
                               className="rounded-full p-2 text-white/45 transition hover:bg-white/10 hover:text-white"
                               aria-label="Editar"
                             >
                               <Pencil className="w-4 h-4" />
                             </button>
-                            <button
+                            <button data-online-only="true"
                               type="button"
                               onClick={() => doRemove(it.id)}
-                              disabled={isBusy}
+                              disabled={isBusy || !serverOnline}
                               className="rounded-full p-2 text-white/45 transition hover:bg-red-500/15 hover:text-red-300"
                               aria-label="Eliminar"
                             >
@@ -541,7 +543,7 @@ export default function TraktWatchedModal({
                             <button
                               type="button"
                               onClick={openCalendarForEdit}
-                              disabled={isBusy}
+                              disabled={isBusy || !serverOnline}
                               className="flex flex-1 items-center justify-between rounded-2xl bg-white/5 px-3 py-2.5 text-sm text-white/85 shadow-sm transition hover:bg-white/10 "
                             >
                               <span className="font-mono">
@@ -549,10 +551,10 @@ export default function TraktWatchedModal({
                               </span>
                               <CalendarDays className="w-4 h-4 text-yellow-200" />
                             </button>
-                            <button
+                            <button data-online-only="true"
                               type="button"
                               onClick={doSaveEdit}
-                              disabled={isBusy}
+                              disabled={isBusy || !serverOnline}
                               className="rounded-full border border-yellow-200/30 bg-yellow-300/90 px-4 py-2 text-sm font-bold text-black transition hover:bg-yellow-200 active:scale-95"
                             >
                               Guardar
@@ -560,7 +562,7 @@ export default function TraktWatchedModal({
                             <button
                               type="button"
                               onClick={stopEdit}
-                              disabled={isBusy}
+                              disabled={isBusy || !serverOnline}
                               className="rounded-full bg-white/5 px-3 py-2 text-sm font-bold text-white/60 transition hover:bg-white/10 hover:text-white"
                               aria-label="Cancelar"
                             >

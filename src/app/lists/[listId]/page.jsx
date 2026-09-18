@@ -638,7 +638,7 @@ export default function ListDetailsPage() {
                                     posterLoading={meta.posterLoading}
                                     disableHover={viewMode === 'compact'}
                                 />
-                                {canManage && <button
+                                {canManage && <button data-online-only="true"
                                     type="button"
                                     disabled={busyId === id}
                                     onClick={(e) => {
@@ -708,7 +708,7 @@ export default function ListDetailsPage() {
                                         <div key={`${addMode}-${mediaType}-${id}`} className="relative">
                                             <ListPosterCard href={`/details/${mediaType}/${id}`} title={title} year={year} mediaType={mediaType} posterPath={item?.poster_path || item?.backdrop_path || null} voteAverage={item?.vote_average} />
                                             {inList ? <div className="absolute left-2 top-2 z-20 inline-flex items-center gap-1 rounded-md bg-emerald-500/90 px-2 py-0.5 text-[10px] font-bold text-white"><Check className="h-3 w-3" />Añadido</div> : null}
-                                            <button
+                                            <button data-online-only="true"
                                                 type="button"
                                                 aria-label={`Añadir ${title}`}
                                                 disabled={busyId === id || inList}

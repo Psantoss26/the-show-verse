@@ -1,4 +1,5 @@
 "use client";
+import { useOfflineTitle } from "@/lib/offline/useOfflineTitle";
 
 // /src/components/dashboard/DetailModal.jsx
 // Ficha rápida (vista previa) que se abre desde las tarjetas del dashboard sobre
@@ -642,6 +643,7 @@ export default function DetailModal({
   const { session, account } = useAuth();
   const { openDetailModal } = useDetailModal();
   const { loading, data } = useDetailModalData(item);
+  useOfflineTitle(item?.media_type || item?.mediaType || (item?.first_air_date ? "tv" : "movie"), item?.id || item?.tmdbId, data);
 
   const scrollContainerRef = useRef(null);
   const panelRef = useRef(null);

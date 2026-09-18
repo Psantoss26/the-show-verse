@@ -6,6 +6,7 @@
 // y reseñas). Componente 100% PRESENTACIONAL: toda la lógica/estado vive en el
 // consumidor (DetailsClient o DetailModal), que pasa handlers + flags por props.
 
+import { useServerOnline } from "@/context/ServerStatusContext";
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import BaseLiquidButton from "@/components/LiquidButton";
@@ -158,6 +159,7 @@ export default function DetailActionsRow({
   commentsActive = false,
   onComments,
 }) {
+  const serverOnline = useServerOnline();
   const [mediaExpanded, setMediaExpanded] = useState(false);
 
   const shouldCombineMedia =
@@ -232,6 +234,8 @@ export default function DetailActionsRow({
   const favoriteButton = onToggleFavorite ? (
     <LiquidButton
       onClick={onToggleFavorite}
+      data-online-only="true"
+      readOnly={!serverOnline}
       disabled={favoriteLoading}
       active={favorite}
       activeColor="red"
@@ -250,6 +254,8 @@ export default function DetailActionsRow({
   const watchlistButton = onToggleWatchlist ? (
     <LiquidButton
       onClick={onToggleWatchlist}
+      data-online-only="true"
+      readOnly={!serverOnline}
       disabled={watchlistLoading}
       active={watchlist}
       activeColor="blue"
@@ -268,6 +274,8 @@ export default function DetailActionsRow({
   const addToListButton = onAddToList ? (
     <LiquidButton
       onClick={onAddToList}
+      data-online-only="true"
+      readOnly={!serverOnline}
       disabled={listBusy}
       active={listActive}
       activeColor="purple"
@@ -626,7 +634,9 @@ export default function DetailActionsRow({
         {onToggleFavorite && (
           <LiquidButton
             onClick={onToggleFavorite}
-            disabled={favoriteLoading}
+            data-online-only="true"
+      readOnly={!serverOnline}
+      disabled={favoriteLoading}
             active={favorite}
             activeColor="red"
             groupId="details-actions"
@@ -657,7 +667,9 @@ export default function DetailActionsRow({
         {onToggleWatchlist && (
           <LiquidButton
             onClick={onToggleWatchlist}
-            disabled={watchlistLoading}
+            data-online-only="true"
+      readOnly={!serverOnline}
+      disabled={watchlistLoading}
             active={watchlist}
             activeColor="blue"
             groupId="details-actions"
@@ -688,7 +700,9 @@ export default function DetailActionsRow({
         {onAddToList && (
           <LiquidButton
             onClick={onAddToList}
-            disabled={listBusy}
+            data-online-only="true"
+      readOnly={!serverOnline}
+      disabled={listBusy}
             active={listActive}
             activeColor="purple"
             groupId="details-actions"

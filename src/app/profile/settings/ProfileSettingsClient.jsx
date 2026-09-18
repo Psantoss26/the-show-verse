@@ -1,6 +1,9 @@
 "use client";
 
+import OnlineOnlyForm from "@/components/OnlineOnlyForm";
 import Link from "next/link";
+import { useServerOnline } from "@/context/ServerStatusContext";
+import OfflineStorageStatus from "@/components/OfflineStorageStatus";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -177,6 +180,8 @@ function SettingsBackground() {
 }
 
 function ToggleRow({ icon: Icon, title, description, checked, disabled, onChange }) {
+  const online = useServerOnline();
+  disabled = disabled || !online;
   return (
     <div className={`${GLASS_PANEL} rounded-2xl p-4 sm:p-5 flex items-start justify-between gap-4 group`}>
       <div className="flex min-w-0 items-start gap-4">
@@ -211,6 +216,8 @@ function ToggleRow({ icon: Icon, title, description, checked, disabled, onChange
 }
 
 function SettingActionRow({ icon: Icon, avatarSrc, avatarName, title, description, buttonLabel = "Cambiar", disabled, onClick }) {
+  const online = useServerOnline();
+  disabled = disabled || !online;
   return (
     <div className={`${GLASS_PANEL} rounded-2xl p-4 sm:p-5 flex items-center justify-between gap-4 group`}>
       <div className="flex min-w-0 items-center gap-4">
@@ -346,7 +353,7 @@ function ProfileNamesModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <OnlineOnlyForm onSubmit={handleSubmit} className="space-y-4">
           {error && (
             <div
               role="alert"
@@ -438,7 +445,7 @@ function ProfileNamesModal({
               Guardar cambios
             </button>
           </div>
-        </form>
+        </OnlineOnlyForm>
       </motion.div>
     </div>
   );
@@ -565,7 +572,7 @@ function AccountSecurityModal({
         </div>
 
         <div className="space-y-5">
-          <form onSubmit={requestEmailChange} className="rounded-2xl border border-white/[0.08] bg-black/25 p-4">
+          <OnlineOnlyForm onSubmit={requestEmailChange} className="rounded-2xl border border-white/[0.08] bg-black/25 p-4">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div className="flex items-center gap-2.5">
                 <Mail className="h-4.5 w-4.5 text-emerald-400" />
@@ -610,9 +617,9 @@ function AccountSecurityModal({
               {emailState.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
               Enviar verificación
             </button>
-          </form>
+          </OnlineOnlyForm>
 
-          <form onSubmit={changePassword} className="rounded-2xl border border-white/[0.08] bg-black/25 p-4">
+          <OnlineOnlyForm onSubmit={changePassword} className="rounded-2xl border border-white/[0.08] bg-black/25 p-4">
             <div className="mb-4 flex items-center gap-2.5">
               <KeyRound className="h-4.5 w-4.5 text-emerald-400" />
               <div>
@@ -635,7 +642,7 @@ function AccountSecurityModal({
               {passwordState.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
               {hasPassword ? "Cambiar contraseña" : "Crear contraseña"}
             </button>
-          </form>
+          </OnlineOnlyForm>
         </div>
       </motion.div>
     </div>
@@ -832,7 +839,7 @@ function AvatarModal({ isOpen, onClose, currentAvatarUrl, userName, onSave, load
             )}
           </div>
           {previewUrl && (
-            <button
+            <button data-online-only="true"
               type="button"
               onClick={handleRemove}
               className="mt-2.5 text-xs font-semibold text-red-400 hover:text-red-300 transition flex items-center gap-1"
@@ -865,7 +872,7 @@ function AvatarModal({ isOpen, onClose, currentAvatarUrl, userName, onSave, load
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <OnlineOnlyForm onSubmit={handleSubmit} className="space-y-4">
           {error && (
             <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300">
               {error}
@@ -934,13 +941,15 @@ function AvatarModal({ isOpen, onClose, currentAvatarUrl, userName, onSave, load
               {optimizing ? "Optimizando" : "Guardar foto"}
             </button>
           </div>
-        </form>
+        </OnlineOnlyForm>
       </motion.div>
     </div>
   );
 }
 
 function SegmentedField({ label, value, options, disabled, onChange }) {
+  const online = useServerOnline();
+  disabled = disabled || !online;
   const colsClass = options.length === 3 ? "grid-cols-3" : "grid-cols-2";
   return (
     <div className={`${GLASS_PANEL} rounded-2xl p-4 sm:p-5`}>
@@ -1193,7 +1202,7 @@ function ImportPanel({
           <Link2 className="mr-2 h-4 w-4" />
           {connectLabel}
         </a>
-        <button
+        <button data-online-only="true"
           type="button"
           onClick={handleImport}
           disabled={running}
@@ -1845,6 +1854,7 @@ function ProfileSettingsClient() {
             </div>
           </div>
         </header>
+        <OfflineStorageStatus />
 
         {/* Profile Info Summary Card */}
         <div className="mb-8 rounded-3xl bg-gradient-to-r from-emerald-950/20 to-indigo-950/20 border border-white/[0.06] p-4 sm:p-6 flex flex-row items-center justify-between gap-4 backdrop-blur-xl relative overflow-hidden">
@@ -2138,7 +2148,7 @@ function ProfileSettingsClient() {
                         </div>
                       </div>
                       {isNetflixConnected ? (
-                        <button
+                        <button data-online-only="true"
                           type="button"
                           onClick={handleDisconnectNetflix}
                           aria-label="Desconectar"
@@ -2149,7 +2159,7 @@ function ProfileSettingsClient() {
                           <span className="hidden sm:inline">Desconectar</span>
                         </button>
                       ) : (
-                        <button
+                        <button data-online-only="true"
                           type="button"
                           onClick={handleConnectNetflix}
                           aria-label="Conectar"
@@ -2308,7 +2318,7 @@ function ProfileSettingsClient() {
                     </div>
                     {plex.connected ? (
                       <div className="flex flex-col gap-2 self-start sm:self-auto shrink-0">
-                        <button
+                        <button data-online-only="true"
                           type="button"
                           onClick={handleSyncPlex}
                           disabled={plexSync.running}
@@ -2323,7 +2333,7 @@ function ProfileSettingsClient() {
                           )}
                           <span className="hidden sm:inline">{plexSync.running ? "Sincronizando…" : "Sincronizar"}</span>
                         </button>
-                        <button
+                        <button data-online-only="true"
                           type="button"
                           onClick={handleDisconnectPlex}
                           aria-label="Desconectar"
@@ -2335,7 +2345,7 @@ function ProfileSettingsClient() {
                         </button>
                       </div>
                     ) : (
-                      <button
+                      <button data-online-only="true"
                         type="button"
                         onClick={handleConnectPlex}
                         disabled={plexConnecting}
@@ -2379,7 +2389,7 @@ function ProfileSettingsClient() {
                       </div>
                     </div>
                     {spotify.connected ? (
-                      <button
+                      <button data-online-only="true"
                         type="button"
                         onClick={handleDisconnectSpotify}
                         aria-label="Desconectar"
@@ -2630,7 +2640,7 @@ function ProfileSettingsClient() {
                         >
                           Cancelar
                         </button>
-                        <button
+                        <button data-online-only="true"
                           type="button"
                           onClick={handleConnectNetflix}
                           className="flex-1 min-h-11 items-center justify-center rounded-xl bg-red-600 text-xs sm:text-sm font-bold text-white transition hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500"

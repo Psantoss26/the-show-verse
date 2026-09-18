@@ -1,5 +1,6 @@
 "use client";
 
+import { useServerOnline } from "@/context/ServerStatusContext";
 import LiquidButton from "@/components/LiquidButton";
 import {
   DETAIL_ACTION_ITEM_SIZING_CLASS,
@@ -13,7 +14,8 @@ const ROW_CLASS = `flex w-full flex-nowrap items-center justify-center gap-1 sm:
   ${DETAIL_ACTION_ITEM_SIZING_CLASS}
   ${MOBILE_ACTION_BUTTON_CLASS}`;
 
-function ActionButton({ label, children, disabled, onClick, tone = "blue" }) {
+function ActionButton({ label, children, disabled, onClick, tone = "blue", mutation = false }) {
+  const online = useServerOnline();
   return (
     <LiquidButton
       type="button"
@@ -23,6 +25,7 @@ function ActionButton({ label, children, disabled, onClick, tone = "blue" }) {
       aria-label={label}
       activeColor={tone}
       disabled={disabled}
+      readOnly={mutation && !online}
       onClick={onClick}
       className="!w-full !h-auto aspect-square"
     >
@@ -70,10 +73,10 @@ export default function ListDetailsActionRow({
       </ActionButton>
       {favoriteAction}
       <ActionLink href={externalHref} label={externalLabel} />
-      {onAdd ? <ActionButton label="Añadir títulos" onClick={onAdd} tone="purple"><Plus /></ActionButton> : null}
-      {onEdit ? <ActionButton label="Editar lista" onClick={onEdit} tone="yellow"><Pencil /></ActionButton> : null}
-      {onClear ? <ActionButton label="Vaciar lista" onClick={onClear} disabled={clearDisabled || clearing} tone="yellow">{clearing ? <Loader2 className="animate-spin" /> : <Eraser />}</ActionButton> : null}
-      {onDelete ? <ActionButton label="Borrar lista" onClick={onDelete} disabled={deleting} tone="red">{deleting ? <Loader2 className="animate-spin" /> : <Trash2 />}</ActionButton> : null}
+      {onAdd ? <ActionButton mutation label="Añadir títulos" onClick={onAdd} tone="purple"><Plus /></ActionButton> : null}
+      {onEdit ? <ActionButton mutation label="Editar lista" onClick={onEdit} tone="yellow"><Pencil /></ActionButton> : null}
+      {onClear ? <ActionButton mutation label="Vaciar lista" onClick={onClear} disabled={clearDisabled || clearing} tone="yellow">{clearing ? <Loader2 className="animate-spin" /> : <Eraser />}</ActionButton> : null}
+      {onDelete ? <ActionButton mutation label="Borrar lista" onClick={onDelete} disabled={deleting} tone="red">{deleting ? <Loader2 className="animate-spin" /> : <Trash2 />}</ActionButton> : null}
     </div>
   );
 }

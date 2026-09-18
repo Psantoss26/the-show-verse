@@ -2575,7 +2575,7 @@ export default function InProgressClient({
                 >
                   Cancelar
                 </button>
-                <button
+                <button data-online-only="true"
                   onClick={handleDisconnect}
                   className="flex-1 py-2.5 rounded-xl bg-red-600 text-white font-semibold text-sm hover:bg-red-500 transition"
                 >

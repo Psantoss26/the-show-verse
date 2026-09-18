@@ -1271,7 +1271,7 @@ const GridListCard = memo(function GridListCard({
       </ListNavWrapper>
 
       {canUse && (
-        <button
+        <button data-online-only="true"
           type="button"
           onClick={(e) => onDelete(e, list.id)}
           className={`absolute right-3 top-3 z-40 h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white/70 opacity-0 backdrop-blur-md transition-all hover:bg-red-600/80 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400 lg:group-hover/card:opacity-100 lg:focus-visible:opacity-100 ${
@@ -1336,7 +1336,7 @@ const RowListSection = memo(function RowListSection({
           )}
         </div>
         {canUse && mobileDeleteMode ? (
-          <button
+          <button data-online-only="true"
             type="button"
             onClick={(event) => onDelete(event, list.id)}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-600/80 text-white backdrop-blur-md transition-colors hover:bg-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400 lg:hidden"
@@ -1412,7 +1412,7 @@ const ListModeRow = memo(function ListModeRow({
             </div>
 
             {canUse && (
-              <button
+              <button data-online-only="true"
                 type="button"
                 onClick={(e) => onDelete(e, list.id)}
                 className={`h-10 w-10 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-red-500/10 hover:text-red-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400 ${

@@ -17,6 +17,7 @@ import {
 import { AUTH_USER_CACHE_KEY } from "@/lib/auth/authUserCache";
 import { finalizeLogout } from "@/lib/auth/logoutFinalization";
 import { setLocalStorageItem } from "@/lib/storage/localStorageBudget";
+import { clearOfflineAccount, requireOnline } from "@/lib/offline/client";
 
 const AuthContext = createContext(null);
 const LEGACY_STORAGE_KEYS = ["tmdb_session", "tmdb_session_id", "tmdb_account"];
@@ -217,6 +218,17 @@ export const AuthProvider = ({ children }) => {
 
   const applyUser = useCallback((nextUser) => {
     const normalized = nextUser || null;
+    const previous = readAuthUserCache();
+    if (previous?.id && previous.id !== normalized?.id) {
+      // The older page caches are unscoped. Retire them too when the account
+      // changes, so neither a reload nor another route can resurrect them.
+      try {
+        const disabled = localStorage.getItem("showverse:sw:disabled");
+        localStorage.clear();
+        sessionStorage.clear();
+        if (disabled) localStorage.setItem("showverse:sw:disabled", disabled);
+      } catch { /* private mode */ }
+    }
     setUser(normalized);
     writeAuthUserCache(normalized);
     return normalized;
@@ -249,6 +261,7 @@ export const AuthProvider = ({ children }) => {
   }, [syncPreferenceCookies]);
 
   const savePreferences = useCallback(async (nextPreferences) => {
+    requireOnline();
     setPreferences(nextPreferences);
     syncPreferenceCookies(nextPreferences);
     writeAuthPreferencesCache(nextPreferences);
@@ -473,6 +486,7 @@ export const AuthProvider = ({ children }) => {
 
   const updateProfile = useCallback(
     async (patch) => {
+      requireOnline();
       const res = await fetch("/api/auth/me", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -497,6 +511,7 @@ export const AuthProvider = ({ children }) => {
     } catch (e) {
       console.warn("No se pudo cerrar la sesión en backend", e);
     } finally {
+      await clearOfflineAccount();
       cleanLegacyStorage();
       writeAuthPreferencesCache(null);
       setPreferences(DEFAULT_PREFERENCES);

@@ -136,6 +136,7 @@ import {
   getExternalIds,
 } from "@/lib/api/tmdb";
 import { fetchOmdbByImdb } from "@/lib/api/omdb"; // Datos extra de OMDb (RT, MC, premios)
+import { useOfflineTitle } from "@/lib/offline/useOfflineTitle";
 import { cacheAddRating, cacheRemoveRating } from "@/lib/userLists/optimisticListCache";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
 import { fetchTmdbAwards } from "@/lib/api/tmdbAwards";
@@ -1409,6 +1410,7 @@ export default function DetailsClient({
   initialComments,
   initialLists,
 }) {
+  useOfflineTitle(type, id, data);
   const router = useRouter();
   const prefetchSeasonDetails = useCallback(
     (seasonNumber) => {

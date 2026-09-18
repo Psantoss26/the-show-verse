@@ -1,4 +1,5 @@
 "use client";
+import { useServerOnline } from "@/context/ServerStatusContext";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 
 
@@ -146,6 +147,7 @@ export default function TraktEpisodesWatchedModal({
 
   onToggleShowWatched, // marcar serie completa (global)
 }) {
+  const serverOnline = useServerOnline();
   const router = useRouter();
   const [activeSeason, setActiveSeason] = useState(null);
   const [displaySeason, setDisplaySeason] = useState(null);
@@ -922,10 +924,10 @@ export default function TraktEpisodesWatchedModal({
                   </button>
 
                   {movieWatched ? (
-                    <button
+                    <button data-online-only="true"
                       type="button"
                       onClick={() => !busyMovie && onToggleMovieWatched?.(null)}
-                      disabled={busyMovie}
+                      disabled={busyMovie || !serverOnline}
                       className={`${ButtonBase} flex-1 py-3 bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20`}
                     >
                       {busyMovie ? (
@@ -936,7 +938,7 @@ export default function TraktEpisodesWatchedModal({
                       Quitar de vistos
                     </button>
                   ) : (
-                    <button
+                    <button data-online-only="true"
                       type="button"
                       onClick={() =>
                         !busyMovie &&
@@ -945,7 +947,7 @@ export default function TraktEpisodesWatchedModal({
                             new Date().toISOString(),
                         )
                       }
-                      disabled={busyMovie}
+                      disabled={busyMovie || !serverOnline}
                       className={`${ButtonBase} flex-1 py-3 bg-emerald-600 text-white hover:bg-emerald-500 shadow-lg shadow-emerald-900/20`}
                     >
                       {busyMovie ? (
@@ -1085,7 +1087,7 @@ export default function TraktEpisodesWatchedModal({
                       <button
                         type="button"
                         onClick={() => setViewMenuOpen((v) => !v)}
-                        disabled={!isConnected}
+                        disabled={!isConnected || !serverOnline}
                         aria-label="Cambiar vista (Global o Rewatch por visionado)"
                         className={`h-10 w-full inline-flex items-center gap-2 rounded-xl px-3.5 text-sm font-semibold transition ${
                           !isConnected
@@ -1194,7 +1196,7 @@ export default function TraktEpisodesWatchedModal({
                   <div className="grid grid-cols-2 items-center gap-2">
                     <button
                       type="button"
-                      disabled={!isConnected}
+                      disabled={!isConnected || !serverOnline}
                       onClick={() => openAddPlayDialog("play")}
                       aria-label="Añadir un play completo o crear un rewatch vacío"
                       className={`min-w-0 w-full h-10 inline-flex items-center justify-center gap-1 px-2 rounded-xl text-[11px] font-semibold transition whitespace-nowrap ${
@@ -1255,9 +1257,9 @@ export default function TraktEpisodesWatchedModal({
                         <Filter className="w-4 h-4" />
                       </button>
 
-                      <button
+                      <button data-online-only="true"
                         type="button"
-                        disabled={!canToggleShow}
+                        disabled={!canToggleShow || !serverOnline}
                         onClick={onClickToggleShow}
                         aria-label={
                           !isConnected
@@ -1324,7 +1326,7 @@ export default function TraktEpisodesWatchedModal({
               <button
                 type="button"
                 onClick={() => setViewMenuOpen((v) => !v)}
-                disabled={!isConnected}
+                disabled={!isConnected || !serverOnline}
                 aria-label="Cambiar vista (Global o Rewatch por visionado)"
                 className={`h-10 xl:h-11 w-full inline-flex items-center gap-2 rounded-xl px-2.5 xl:px-3 text-[11px] xl:text-sm font-semibold transition ${
                   !isConnected
@@ -1451,7 +1453,7 @@ export default function TraktEpisodesWatchedModal({
             {/* Añadir visionado */}
             <button
               type="button"
-              disabled={!isConnected}
+              disabled={!isConnected || !serverOnline}
               onClick={() => openAddPlayDialog("play")}
               className={`h-10 xl:h-11 inline-flex items-center justify-center rounded-xl text-[11px] xl:text-sm font-semibold transition whitespace-nowrap shrink-0 ${
                 !isConnected
@@ -1507,9 +1509,9 @@ export default function TraktEpisodesWatchedModal({
             </button>
 
             {/* Marcar / Quitar serie */}
-            <button
+            <button data-online-only="true"
               type="button"
-              disabled={!canToggleShow}
+              disabled={!canToggleShow || !serverOnline}
               onClick={onClickToggleShow}
               // Mismo botón que el de la fila móvil, sin aro por el mismo
               // motivo: el tinte y el icono ya dicen en qué estado está.
@@ -1780,9 +1782,9 @@ export default function TraktEpisodesWatchedModal({
                                 </p>
                               </div>
 
-                              <button
+                              <button data-online-only="true"
                                 type="button"
-                                disabled={busy}
+                                disabled={busy || !serverOnline}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   toggleEpisode(sn, en);
@@ -1874,10 +1876,10 @@ export default function TraktEpisodesWatchedModal({
                         const busy = busyKey === key;
 
                         return (
-                          <button
+                          <button data-online-only="true"
                             key={en}
                             type="button"
-                            disabled={busy}
+                            disabled={busy || !serverOnline}
                             onClick={() => toggleEpisode(sn, en)}
                             className={`w-9 h-9 rounded-lg text-xs font-bold flex items-center justify-center transition ${
                               w
@@ -2104,6 +2106,7 @@ export default function TraktEpisodesWatchedModal({
                         addPlayBusy ||
                         (addPlayMode === "rewatch" && !hasCreateRewatchHandler)
                       }
+                      data-online-only="true"
                       onClick={onConfirmAddPlay}
                       className="py-3 rounded-2xl font-black text-sm transition flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50"
                     >
@@ -2224,7 +2227,7 @@ export default function TraktEpisodesWatchedModal({
                                 onClick={() =>
                                   handleDeleteRewatch(item.id, item.startedAt)
                                 }
-                                disabled={deleteRunBusyId === item.id}
+                                disabled={deleteRunBusyId === item.id || !serverOnline}
                                 className="px-2.5 py-2 rounded-xl text-xs font-black bg-red-500/10 text-red-300 hover:bg-red-500/15 transition disabled:opacity-60"
                                 aria-label="Borrar rewatch"
                               >

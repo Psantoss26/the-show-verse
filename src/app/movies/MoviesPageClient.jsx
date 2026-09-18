@@ -1265,7 +1265,7 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
                 )}
               </LiquidButton>
 
-              <LiquidButton
+              <LiquidButton data-online-only="true"
                 onClick={handleToggleFavorite}
                 loading={loadingStates || updating}
                 active={favorite}
@@ -1277,7 +1277,7 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
                 <Heart className={favorite ? "fill-current" : ""} />
               </LiquidButton>
 
-              <LiquidButton
+              <LiquidButton data-online-only="true"
                 onClick={handleToggleWatchlist}
                 loading={loadingStates || updating}
                 active={watchlist}

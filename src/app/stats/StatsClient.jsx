@@ -2337,7 +2337,7 @@ export default function StatsClient({ connectNext = "/profile" }) {
                 >
                   Cancelar
                 </button>
-                <button
+                <button data-online-only="true"
                   type="button"
                   onClick={handleDisconnect}
                   className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-semibold text-white transition hover:bg-red-500"

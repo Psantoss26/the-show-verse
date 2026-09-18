@@ -573,7 +573,7 @@ function HistoryCornerIndicator({
 
   if (editMode) {
     return (
-      <button
+      <button data-online-only="true"
         onClick={onDelete}
         className={`${getHistoryIndicatorClass({
           side: "right",
@@ -4733,7 +4733,7 @@ export default function HistoryClient() {
                   >
                     Cancelar
                   </button>
-                  <button
+                  <button data-online-only="true"
                     onClick={handleDisconnect}
                     className="flex-1 py-2.5 px-4 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-lg transition-colors"
                   >
