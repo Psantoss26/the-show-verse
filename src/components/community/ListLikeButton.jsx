@@ -6,6 +6,7 @@
 // Mismo trato que el de las reseñas: optimista, reversible y idempotente en el
 // servidor. Sin sesión enseña el recuento pero no invita a pulsar.
 
+import { useServerOnline } from "@/context/ServerStatusContext";
 import { useState } from "react";
 import { Heart, Loader2 } from "lucide-react";
 import LiquidButton from "@/components/LiquidButton";
@@ -18,11 +19,12 @@ export default function ListLikeButton({
   className = "",
   liquidGlass = false,
 }) {
+  const online = useServerOnline();
   const [state, setState] = useState({ liked: Boolean(liked), likes: Number(likes) || 0 });
   const [pending, setPending] = useState(false);
 
   const toggle = async () => {
-    if (!canLike || pending || !listId) return;
+    if (!online || !canLike || pending || !listId) return;
     const next = !state.liked;
     const previous = state;
 
@@ -61,6 +63,7 @@ export default function ListLikeButton({
         active={active}
         activeColor="red"
         disabled={!canLike || pending}
+        readOnly={!online}
         onClick={toggle}
         className={`!h-auto !w-full aspect-square ${className}`}
       >
@@ -82,7 +85,7 @@ export default function ListLikeButton({
     <button
       type="button"
       onClick={toggle}
-      disabled={pending}
+      disabled={pending || !online}
       aria-pressed={active}
       className={`${shared} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/70 disabled:opacity-60 ${
         active

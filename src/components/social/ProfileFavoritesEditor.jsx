@@ -403,7 +403,7 @@ export default function ProfileFavoritesEditor() {
                 const typeFull = typeItems.length >= MAX_PER_TYPE;
                 const disabled = alreadyAdded || typeFull;
                 return (
-                  <button
+                  <button data-online-only="true"
                     key={keyOf(result)}
                     type="button"
                     onClick={() => add(result)}

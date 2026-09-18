@@ -203,7 +203,7 @@ export default function AddToListModal(props) {
                     className="w-full rounded-xl bg-black/40 px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none focus:focus:bg-black/60 transition"
                   />
 
-                  <button
+                  <button data-online-only="true"
                     type="button"
                     onClick={onCreateList}
                     disabled={creating || !String(newName || "").trim()}
@@ -317,7 +317,7 @@ export default function AddToListModal(props) {
                       </div>
                     </Link>
 
-                    <button
+                    <button data-online-only="true"
                       type="button"
                       onClick={() => {
                         if (busy) return;

@@ -1,5 +1,6 @@
 "use client";
 
+import { useServerOnline } from "@/context/ServerStatusContext";
 import { useCallback, useEffect, useState } from "react";
 import { UserPlus, UserCheck, Loader2 } from "lucide-react";
 
@@ -12,13 +13,14 @@ export default function FollowButton({
   size = "md",
   className = "",
 }) {
+  const serverOnline = useServerOnline();
   const [following, setFollowing] = useState(Boolean(initialFollowing));
   const [busy, setBusy] = useState(false);
 
   useEffect(() => setFollowing(Boolean(initialFollowing)), [initialFollowing]);
 
   const toggle = useCallback(async () => {
-    if (busy) return;
+    if (busy || !serverOnline) return;
     setBusy(true);
     const next = !following;
     setFollowing(next);
@@ -36,7 +38,7 @@ export default function FollowButton({
     } finally {
       setBusy(false);
     }
-  }, [busy, following, username, onChange]);
+  }, [busy, following, username, onChange, serverOnline]);
 
   const dims =
     size === "sm" ? "h-8 px-3 text-xs" : "h-10 px-5 text-sm";
@@ -45,7 +47,7 @@ export default function FollowButton({
     <button
       type="button"
       onClick={toggle}
-      disabled={busy}
+      disabled={busy || !serverOnline}
       className={`inline-flex items-center justify-center gap-1.5 rounded-full font-bold transition-all active:scale-[0.98] disabled:opacity-60 ${dims} ${
         following
           ? "border border-white/15 bg-white/5 text-zinc-200 hover:border-red-400/40 hover:bg-red-500/10 hover:text-red-300"

@@ -1,4 +1,5 @@
 "use client";
+import OnlineOnlyForm from "@/components/OnlineOnlyForm";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 
 import { useEffect, useState, useRef } from "react";
@@ -158,7 +159,7 @@ export default function TraktCommentModal({
         <div className="flex-1 overflow-y-auto sv-scroll">
           <div className="px-5 py-5 sm:px-6 sm:py-6 space-y-5 sm:space-y-6">
             {/* Form */}
-            <form onSubmit={handleSubmit} className="flex flex-col space-y-4">
+            <OnlineOnlyForm onSubmit={handleSubmit} className="flex flex-col space-y-4">
               {/* Sin el aviso del mínimo, esta fila solo tiene algo que decir
                   mientras se edita. Va CONDICIONAL y no como fila vacía: el
                   `space-y-4` del formulario le reservaría su hueco igualmente y
@@ -232,7 +233,7 @@ export default function TraktCommentModal({
                   </button>
                 </div>
               </div>
-            </form>
+            </OnlineOnlyForm>
 
             {/* Previous Comments Section */}
             {myComments && myComments.length > 0 && (
@@ -268,7 +269,7 @@ export default function TraktCommentModal({
                           {confirmDeleteId === comment.id ? (
                             <div className="flex items-center gap-1.5 animate-in fade-in slide-in-from-right-1 duration-200 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-xl">
                               <span className="text-[11px] font-bold text-rose-300 mr-1">¿Eliminar?</span>
-                              <button
+                              <button data-online-only="true"
                                 type="button"
                                 onClick={() => handleConfirmDelete(comment.id)}
                                 disabled={deletingCommentId === comment.id}
@@ -301,7 +302,7 @@ export default function TraktCommentModal({
                             // globo del ratón y no siempre lo anuncian los
                             // lectores de pantalla.
                             <div className="flex items-center gap-1">
-                              <button
+                              <button data-online-only="true"
                                 type="button"
                                 onClick={() => handleStartEdit(comment)}
                                 className="rounded-full p-2 text-white/45 transition hover:bg-white/10 hover:text-white"
@@ -332,7 +333,7 @@ export default function TraktCommentModal({
                               <AlertTriangle className="w-4 h-4" />
                               Esta reseña contiene spoilers
                             </p>
-                            <button
+                            <button data-online-only="true"
                               type="button"
                               onClick={() => {
                                 setRevealedSpoilers((prev) => {

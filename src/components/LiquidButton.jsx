@@ -17,6 +17,7 @@ export default function LiquidButton({
   children,
   onClick,
   disabled = false,
+  readOnly = false,
   active = false,
   className = "",
   title = "",
@@ -556,7 +557,8 @@ export default function LiquidButton({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onMouseMove={handleMouseMove}
-      disabled={disabled || loading}
+      disabled={disabled || loading || readOnly}
+      data-online-only={readOnly ? "true" : undefined}
       aria-label={title}
       data-liquid-button="true"
       data-group-id={groupId}

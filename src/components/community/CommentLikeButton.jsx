@@ -8,6 +8,7 @@
 // doble clic no puede desincronizar nada. Sin sesión el botón no desaparece —
 // sigue mostrando el recuento— pero no invita a pulsar.
 
+import { useServerOnline } from "@/context/ServerStatusContext";
 import { useState } from "react";
 import { ThumbsUp } from "lucide-react";
 
@@ -20,11 +21,12 @@ export default function CommentLikeButton({
   canLike = false,
   className = "",
 }) {
+  const online = useServerOnline();
   const [state, setState] = useState({ liked: Boolean(liked), likes: Number(likes) || 0 });
   const [pending, setPending] = useState(false);
 
   const toggle = async () => {
-    if (!canLike || pending || !commentId) return;
+    if (!online || !canLike || pending || !commentId) return;
     const next = !state.liked;
     const previous = state;
 
@@ -66,7 +68,7 @@ export default function CommentLikeButton({
     <button
       type="button"
       onClick={toggle}
-      disabled={pending}
+      disabled={pending || !online}
       aria-pressed={active}
       aria-label={active ? "Quitar me gusta" : "Me gusta"}
       className={`flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 disabled:opacity-60 ${

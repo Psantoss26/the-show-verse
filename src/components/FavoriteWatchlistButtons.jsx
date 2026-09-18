@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useServerOnline } from "@/context/ServerStatusContext";
 import { useAuth } from "@/context/AuthContext";
 import {
   getMediaAccountStates,
@@ -10,6 +11,7 @@ import {
 import { Heart, BookmarkPlus, Loader2, LogIn } from "lucide-react";
 
 export default function FavoriteWatchlistButtons({ type, mediaId }) {
+  const serverOnline = useServerOnline();
   const { session, account } = useAuth();
   const [loadingStates, setLoadingStates] = useState(true);
   const [favorite, setFavorite] = useState(false);
@@ -52,7 +54,7 @@ export default function FavoriteWatchlistButtons({ type, mediaId }) {
   }
 
   const handleToggleFavorite = async () => {
-    if (updating) return;
+    if (updating || !serverOnline) return;
     setUpdating(true);
     setError("");
     const next = !favorite;
@@ -78,7 +80,7 @@ export default function FavoriteWatchlistButtons({ type, mediaId }) {
   };
 
   const handleToggleWatchlist = async () => {
-    if (updating) return;
+    if (updating || !serverOnline) return;
     setUpdating(true);
     setError("");
     const next = !watchlist;
@@ -120,7 +122,7 @@ export default function FavoriteWatchlistButtons({ type, mediaId }) {
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap gap-3">
         {/* FAVORITO */}
-        <button
+        <button data-online-only="true"
           onClick={handleToggleFavorite}
           disabled={isBusy}
           className={`group/favbtn relative ${baseBtn} ${favClass}`}
@@ -138,7 +140,7 @@ export default function FavoriteWatchlistButtons({ type, mediaId }) {
         </button>
 
         {/* PENDIENTES */}
-        <button
+        <button data-online-only="true"
           onClick={handleToggleWatchlist}
           disabled={isBusy}
           className={`group/watchbtn relative ${baseBtn} ${watchClass}`}

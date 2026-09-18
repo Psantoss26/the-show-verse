@@ -1263,3 +1263,8 @@ svg.recharts-surface *:focus {
   -webkit-backdrop-filter: blur(7px) saturate(190%) brightness(1.06);
   backdrop-filter: blur(7px) saturate(190%) brightness(1.06);
 }
+
+/* Preserve the saved active colors, badges and ratings in read-only mode. */
+[data-offline-blocked="true"] {
+  cursor: not-allowed !important;
+}

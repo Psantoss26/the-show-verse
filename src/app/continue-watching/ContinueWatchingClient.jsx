@@ -1620,7 +1620,7 @@ function AddProgressModal({ existingKeys, onAdded, onClose }) {
 
                 return (
                   <li key={key}>
-                    <button
+                    <button data-online-only="true"
                       type="button"
                       onClick={() => handleAdd(item)}
                       disabled={alreadyAdded || Boolean(addingKey)}

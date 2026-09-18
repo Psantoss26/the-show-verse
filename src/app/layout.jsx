@@ -7,6 +7,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { SITE_TITLE_SHORT } from "@/lib/pageTitle";
 import PwaManager from "@/components/PwaManager";
 import AndroidSessionClaim from "@/components/android/AndroidSessionClaim";
+import OfflineManager from "@/components/OfflineManager";
 import OfflineBanner from "@/components/OfflineBanner";
 import ScrollRestoration from "@/components/ScrollRestoration";
 import MobileUserPageSwipeNavigation from "@/components/MobileUserPageSwipeNavigation";
@@ -90,6 +91,7 @@ export default function RootLayout({ children }) {
               </div>
             </MobileUserPageSwipeNavigation>
             <PwaManager />
+            <OfflineManager />
             <AndroidSessionClaim />
             <OfflineBanner />
             <Analytics />
