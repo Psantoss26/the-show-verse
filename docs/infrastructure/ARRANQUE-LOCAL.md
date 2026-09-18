@@ -1,133 +1,121 @@
-# ▶️ Arranque local — guía exacta (paso a paso, verificada)
+# Desarrollo local con copia de producción
 
-Cómo levantar **el proyecto completo** (web + backend + BBDD + caché) en tu máquina,
-en cualquier momento. Verificado end-to-end el 2026-07-04:
-`/health` ok · dashboard 16 filas · calendario con episodios reales · home SSR HTTP 200.
+La web se ejecuta en http://localhost:3000 y la API en http://localhost:3001.
+PostgreSQL 18 y Redis 7 viven en Docker, con puertos publicados solo en loopback.
+Los datos persisten al cerrar las terminales y al ejecutar `npm run db:down`.
 
-- **Web:** http://localhost:3000
-- **API:** http://localhost:3001  (health: http://localhost:3001/health)
+## Arranque diario: dos terminales
 
----
-
-## ✅ Requisito previo (una sola vez): usar Docker sin sudo
-
-Ya tienes Docker instalado y estás en el grupo `docker`, pero tu sesión necesita
-recargarlo. **Cierra sesión y vuelve a entrar (o reinicia) UNA vez.** Comprueba:
+Desde la raíz del repositorio:
 
 ```bash
-docker ps          # debe listar contenedores SIN sudo
+npm run dev
 ```
 
-> Si aún diera `permission denied`, no habías reiniciado la sesión. Alternativa sin
-> reiniciar: `su - pablo` (te pide contraseña) abre una shell con el grupo activo.
-> Y siempre puedes usar `sudo docker ...` como último recurso. (`newgrp` no está
-> instalado en este sistema, no lo uses.)
-
----
-
-## 🟢 Arranque de cada día (2 terminales)
+Desde `backend/`, en otra terminal:
 
 ```bash
-cd ~/Documentos/GitHub/the-show-verse
+npm run dev
 ```
 
-**Terminal 1 — datos + API:**
+El backend arranca automáticamente los contenedores, espera a que estén sanos,
+aplica las migraciones y se inicia con recarga automática. La web puede arrancarse
+antes, pero las rutas de datos necesitan que la API esté lista. Usa `Ctrl+C` para
+parar cada proceso; los contenedores conservan los datos.
+
+## Primera instalación
+
+Necesitas Node.js 22+, Docker Engine y Docker Compose v2, accesibles con `docker ps`.
+En Ubuntu puedes instalarlos con:
 
 ```bash
-npm run db:up          # Postgres :5432 + Redis :6379 (idempotente; no rompe si ya están)
-npm run backend:dev    # API en http://localhost:3001  (deja esta terminal abierta)
+sudo apt-get update
+sudo apt-get install -y docker.io docker-compose-v2
+sudo systemctl enable --now docker
+sudo usermod -aG docker "$USER"
 ```
 
-**Terminal 2 — web:**
+Tras añadirte al grupo, cierra sesión y vuelve a entrar para activar los permisos.
+Instala las dependencias de ambos proyectos:
 
 ```bash
-npm run dev            # Web en http://localhost:3000  (deja esta terminal abierta)
+npm ci
+npm --prefix backend ci
+npm run local:setup
 ```
 
-Abre **http://localhost:3000**. Listo. Para parar: `Ctrl+C` en cada terminal.
-Los contenedores puedes dejarlos corriendo (arrancan solos al encender el PC gracias
-a `restart: unless-stopped`); para pararlos: `npm run db:down`.
+Conserva tus archivos `.env` con las claves de TMDb y Google. Si no existen, copia
+las plantillas `.env.example` y `backend/.env.example` y rellena las claves necesarias.
+Las integraciones externas requieren sus propias credenciales y conectividad.
+Google necesita autorizar `http://localhost:3000/api/auth/google/callback`.
 
-> El primer `npm run dev` compila con Turbopack y la primera carga tarda unos
-> segundos; es normal.
+`local:setup` y ambos comandos `dev` generan/actualizan los valores administrados en:
 
----
+- `.env.development.local`: API y callbacks locales, sin puerta de acceso privada.
+- `backend/.env.local`: Postgres/Redis locales, CORS local y JWT propios persistentes.
+  Las claves de Stripe y Resend se vacían para desarrollo.
 
-## 🔵 Primera vez / entorno nuevo (si clonas el repo en otra máquina)
+Se conservan las demás variables y los `.env` originales. Los archivos locales y
+volcados no se versionan. El backend no carga `.env.local` en producción ni en tests.
+El arranque local rechaza URLs remotas de PostgreSQL/Redis antes de abrir conexiones.
+
+## Copiar producción del NAS
+
+Para el backend antes de sustituir su base de datos. Desde la raíz:
 
 ```bash
-# 1) Docker + Compose (Ubuntu) — ver 01-local-development.md §0 para el detalle.
-# 2) Variables de entorno:
-cp backend/.env.example backend/.env     # rellena claves reales: TMDB, JWT, Google…
-cp .env.example .env                     # claves de la web (TMDB, OMDB…)
-#    (backend/.env.local y .env.local ya existen y apuntan todo a local)
-# 3) Datos + esquema:
-npm run db:up
-npm run backend:migrate                  # crea las 14 tablas (solo la 1ª vez)
-# 4) Arrancar (ver "Arranque de cada día")
+PROD_SSH_HOST=pablo@192.168.1.126 npm run db:sync-prod
 ```
 
----
+SSH solicita la contraseña si no tienes una clave configurada. No se guardan
+contraseñas SSH. Por defecto usa el puerto 22 y el contenedor
+`theshowverse-postgres-1`; puedes cambiarlos con `PROD_SSH_PORT` y `PROD_PG_CONTAINER`.
+La única operación sobre producción es `pg_dump`.
 
-## 🎬 Funcionalidad completa
-
-Con lo anterior la app funciona al 100% con una BBDD **vacía pero migrada**: puedes
-registrarte, iniciar sesión (Google), añadir favoritos/pendientes, ver dashboards,
-calendario, etc. Los datos se guardan en tu Postgres local.
-
-### (Opcional) Trabajar con los datos de producción
-Para probar con datos reales, vuelca la BBDD del NAS y restáurala en local:
+También puedes restaurar un volcado existente en formato custom (`pg_dump -Fc`):
 
 ```bash
-# En el NAS:
-docker compose -f deploy/nas/docker-compose.yml exec -T postgres \
-  pg_dump -U tsv -Fc theshowverse > theshowverse.dump
-# Copia theshowverse.dump a tu máquina y:
-npm run db:sync-prod -- theshowverse.dump
+npm run db:sync-prod -- /ruta/a/produccion.dump
 ```
 
-> No sincroniza en vivo: es una copia puntual. Local y producción son BBDD
-> independientes (mismo esquema; datos iguales solo en el momento del volcado).
+El script arranca los servicios locales, comprueba el volcado, pide confirmación,
+guarda la base local anterior en `.local/backups/`, recrea **solo** la base local,
+restaura en una transacción, aplica migraciones y vacía la caché Redis local.
+Cualquier error interrumpe el proceso; no se anuncia éxito si fallan las migraciones.
+Para automatizar una sustitución ya autorizada: `npm run db:sync-prod -- --yes fichero.dump`.
+Si falla, puedes restaurar el archivo `local-before-sync-*.dump` con el mismo comando.
 
----
+Los snapshots contienen datos privados: se crean con permisos restringidos y se
+excluyen de Git. Es una copia puntual; los cambios locales no se replican al NAS.
+Inicia sesión de nuevo en localhost: los JWT locales son distintos de producción.
 
-## 🔎 Comprobar que todo está arriba
+## Comprobaciones
 
 ```bash
-docker ps                                   # tsv-local-db y tsv-local-redis "healthy"
-curl -s http://localhost:3001/health        # {"status":"ok",...}
-curl -s http://localhost:3001/v1/calendar/episodes | head -c 200   # episodios
-# y abre http://localhost:3000 en el navegador
+docker compose -f deploy/local/docker-compose.yml ps
+curl --fail http://localhost:3001/health
+curl --fail http://localhost:3001/ready
+curl --fail -o /dev/null -w '%{http_code}\n' http://localhost:3000
 ```
 
----
+`/ready` comprueba las conexiones a Postgres y Redis. Para las pruebas automatizadas:
 
-## 🧰 Comandos útiles
+```bash
+node --test scripts/local-env.test.mjs
+npm --prefix backend test
+```
 
-| Comando | Qué hace |
-|---|---|
-| `npm run db:up` / `db:down` | Levanta / para Postgres + Redis. |
-| `npm run db:logs` | Logs de los contenedores de datos. |
-| `npm run db:reset` | **Borra** los datos locales y vuelve a levantar (empezar de cero). |
-| `npm run backend:migrate` | Aplica migraciones pendientes. |
-| `npm run backend:dev` | API con recarga en caliente (:3001). |
-| `npm run dev` | Web con recarga en caliente (:3000). |
-| `npm run db:sync-prod -- fichero.dump` | Carga datos de producción en local. |
-| `npm --prefix backend test` | Tests del backend. |
+## Comandos auxiliares
 
----
+| Comando en la raíz | Acción |
+| --- | --- |
+| `npm run local:setup` | Prepara la configuración local sin arrancar servicios. |
+| `npm run db:up` | Arranca Postgres/Redis y espera a que estén sanos. |
+| `npm run db:down` | Para los contenedores, conservando datos. |
+| `npm run db:logs` | Consulta logs de Postgres/Redis. |
+| `npm run db:reset` | **Elimina** los volúmenes locales y vuelve a arrancar. |
+| `npm run backend:dev` | Equivale a `npm run dev` desde `backend/`. |
 
-## 🛟 Problemas frecuentes
-
-| Síntoma | Solución |
-|---|---|
-| `permission denied ... docker.sock` al usar `npm run db:*` | No reiniciaste la sesión tras instalar Docker. Cierra sesión/entra, o usa `sudo docker ...`. |
-| `DATABASE_URL environment variable is required` | Falta `backend/.env`. `cp backend/.env.example backend/.env`. |
-| La web no llega al backend | Backend caído o `.env.local` cambiado. Debe tener `BACKEND_API_BASE_URL=http://localhost:3001`. |
-| Puerto 3000/3001/5432 ocupado | Ya hay un proceso escuchando: `ss -ltnp \| grep -E ':3000\|:3001\|:5432'` y ciérralo. |
-| Error de hidratación en el dashboard | Ya corregido; refresca la página (dev recarga en caliente). |
-| El backend arranca pero los dashboards salen vacíos | Falta `TMDB_API_KEY` en `backend/.env`. |
-
----
-
-Referencia ampliada: [01 · Desarrollo local](./01-local-development.md).
+Si los puertos 3000, 3001, 5432 o 6379 están ocupados, cierra el servicio que los
+ocupe antes de arrancar. Si Docker muestra `permission denied`, comprueba la
+pertenencia al grupo `docker` en una nueva sesión.

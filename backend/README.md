@@ -13,33 +13,20 @@ Backend REST construido con **Fastify + PostgreSQL + Redis** para The Show Verse
 
 ## Arrancar en desarrollo
 
-### 1. Prerrequisitos
+Instala las dependencias en la raíz y en `backend/` con `npm ci`.
+Con Docker y Compose disponibles, ejecuta desde esta carpeta:
 
 ```bash
-# PostgreSQL y Redis deben estar corriendo
-# Opción A: Docker Compose (recomendado)
-docker compose up db redis -d
-
-# Opción B: Tu NAS (si tienes PostgreSQL y Redis ahí)
+npm run dev
 ```
 
-### 2. Configurar variables de entorno
+El comando prepara la configuración local, arranca PostgreSQL y Redis, espera a
+que estén listos y aplica las migraciones antes de arrancar la API en
+`http://localhost:3001`. En otra terminal ejecuta `npm run dev` desde la raíz para
+la web en `http://localhost:3000`.
 
-```bash
-cp .env.example .env
-# Edita .env con tus valores
-```
-
-### 3. Instalar y migrar
-
-```bash
-npm install
-npm run db:generate   # Genera archivos SQL de migración
-npm run db:migrate    # Aplica las migraciones
-npm run dev           # Arranca con --watch (hot reload)
-```
-
-La API estará disponible en `http://localhost:3001`
+Para importar la copia de producción y configurar claves externas, consulta
+[Arranque local](../docs/infrastructure/ARRANQUE-LOCAL.md).
 
 ## Producción (Docker)
 
