@@ -4,8 +4,9 @@ import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useServerOnline } from "@/context/ServerStatusContext";
-import { isServerReachable, saveOfflineRoute, workerMessage } from "@/lib/offline/client";
+import { isServerReachable, reportConnection, saveOfflineRoute, workerMessage } from "@/lib/offline/client";
 import { prepareOfflineAccount } from "@/lib/offline/prepare";
+import { openSavedRoute } from "@/lib/offline/navigation";
 
 export default function OfflineManager() {
   const { user, hydrated } = useAuth();
@@ -15,18 +16,23 @@ export default function OfflineManager() {
 
   useEffect(() => {
     if (!online || !user?.id) return;
-    const timer = setTimeout(() => { void saveOfflineRoute(window.location.pathname + window.location.search); }, 1800);
-    return () => clearTimeout(timer);
+    const save = () => { void saveOfflineRoute(window.location.pathname + window.location.search); };
+    save();
+    navigator.serviceWorker?.addEventListener("controllerchange", save);
+    return () => navigator.serviceWorker?.removeEventListener("controllerchange", save);
   }, [path, online, user?.id]);
 
   useEffect(() => {
     if (!hydrated || !user?.id || !online || !("serviceWorker" in navigator)) return;
     let timer;
     let cancelled = false;
+    let refreshPending = false;
     const start = () => {
       clearTimeout(timer);
       timer = setTimeout(async () => {
-        if (cancelled || !navigator.serviceWorker.controller || active.current) return;
+        if (cancelled || !navigator.serviceWorker.controller) return;
+        if (active.current) { refreshPending = true; return; }
+        refreshPending = false;
         const controller = new AbortController();
         active.current = controller;
         try {
@@ -35,7 +41,10 @@ export default function OfflineManager() {
           if (result) localStorage.setItem(`showverse:offline:prepared:${user.id}`, JSON.stringify(result));
         } catch (error) {
           if (!controller.signal.aborted) console.warn("No se completó la copia para consulta sin conexión", error);
-        } finally { if (active.current === controller) active.current = null; }
+        } finally {
+          if (active.current === controller) active.current = null;
+          if (refreshPending && !cancelled) start();
+        }
       }, 5000);
     };
     const message = (event) => {
@@ -71,7 +80,7 @@ export default function OfflineManager() {
       const url = new URL(link.href);
       if (url.origin !== window.location.origin || url.pathname.startsWith("/api/") || url.href === window.location.href || (url.pathname === location.pathname && url.hash)) return;
       event.preventDefault(); event.stopImmediatePropagation();
-      window.location.assign(url.href);
+      void openSavedRoute(url.href);
     };
     const submit = (event) => {
       if (!isServerReachable() && event.target?.closest('[data-online-only="true"]')) {
@@ -81,7 +90,9 @@ export default function OfflineManager() {
     document.addEventListener("click", click, true);
     document.addEventListener("submit", submit, true);
     // Ask the controlling worker immediately on an offline document reload.
-    void workerMessage({ type: "OFFLINE_STATUS" });
+    void workerMessage({ type: "OFFLINE_STATUS" }).then((status) => {
+      if (status?.online === false) reportConnection(false);
+    });
     return () => {
       document.removeEventListener("click", click, true);
       document.removeEventListener("submit", submit, true);

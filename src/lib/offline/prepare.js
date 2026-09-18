@@ -1,3 +1,4 @@
+import { loadProfileCharts } from "@/lib/profile/loadProfileCharts";
 import { workerMessage, saveOfflineRoute, PREPARATION_EVENT } from "./client";
 
 export const USER_ROUTES = [
@@ -14,6 +15,7 @@ const READS = [
   "/api/trakt/history?type=all&limit=all&enrich=0",
   "/api/trakt/show/in-progress", "/api/trakt/show/completed", "/api/progress",
   "/api/profile?posters=0", "/api/lists", "/api/auth/connections",
+  "/api/community/lists/discover?sort=items_desc&limit=30",
   "/api/recommendations?type=all&limit=40", "/api/recommendations?type=movie&limit=40", "/api/recommendations?type=tv&limit=40",
 ];
 
@@ -50,6 +52,12 @@ export async function prepareOfflineAccount(user, { signal, onProgress = () => {
   for (const path of READS) await attempt(path, async () => {
     const payload = await read(path);
     if (path === "/api/lists") for (const item of payload.results || []) if (item.id) listIds.add(item.id);
+    if (path.startsWith("/api/community/lists/discover")) {
+      for (const item of payload.results || []) {
+        const id = item.list?.id;
+        if (id) await attempt(`community-list:${id}`, () => read(`/api/community/lists/${encodeURIComponent(id)}?limit=12`));
+      }
+    }
   });
   // Exhaust pagination, including sections the user has not opened. Record a
   // complete collection only when every page succeeded (never a partial empty).
@@ -97,7 +105,7 @@ export async function prepareOfflineAccount(user, { signal, onProgress = () => {
     });
   }
   // Profile charts are lazy modules. Prepare them before the origin disappears.
-  await attempt("profile-charts", () => import("@/app/stats/profileCharts"));
+  await attempt("profile-charts", loadProfileCharts);
   const storage = await workerMessage({ type: "OFFLINE_STATUS" });
   if (storage?.storageFull) failures.push("storage-full");
   // Keep previous build assets until every known document has its replacement.

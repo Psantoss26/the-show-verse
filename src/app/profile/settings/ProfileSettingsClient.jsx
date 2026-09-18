@@ -179,9 +179,9 @@ function SettingsBackground() {
   );
 }
 
-function ToggleRow({ icon: Icon, title, description, checked, disabled, onChange }) {
+function ToggleRow({ icon: Icon, title, description, checked, disabled: disabledProp, onChange }) {
   const online = useServerOnline();
-  disabled = disabled || !online;
+  const disabled = disabledProp || !online;
   return (
     <div className={`${GLASS_PANEL} rounded-2xl p-4 sm:p-5 flex items-start justify-between gap-4 group`}>
       <div className="flex min-w-0 items-start gap-4">
@@ -215,9 +215,9 @@ function ToggleRow({ icon: Icon, title, description, checked, disabled, onChange
   );
 }
 
-function SettingActionRow({ icon: Icon, avatarSrc, avatarName, title, description, buttonLabel = "Cambiar", disabled, onClick }) {
+function SettingActionRow({ icon: Icon, avatarSrc, avatarName, title, description, buttonLabel = "Cambiar", disabled: disabledProp, onClick }) {
   const online = useServerOnline();
-  disabled = disabled || !online;
+  const disabled = disabledProp || !online;
   return (
     <div className={`${GLASS_PANEL} rounded-2xl p-4 sm:p-5 flex items-center justify-between gap-4 group`}>
       <div className="flex min-w-0 items-center gap-4">
@@ -947,9 +947,9 @@ function AvatarModal({ isOpen, onClose, currentAvatarUrl, userName, onSave, load
   );
 }
 
-function SegmentedField({ label, value, options, disabled, onChange }) {
+function SegmentedField({ label, value, options, disabled: disabledProp, onChange }) {
   const online = useServerOnline();
-  disabled = disabled || !online;
+  const disabled = disabledProp || !online;
   const colsClass = options.length === 3 ? "grid-cols-3" : "grid-cols-2";
   return (
     <div className={`${GLASS_PANEL} rounded-2xl p-4 sm:p-5`}>

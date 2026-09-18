@@ -2,7 +2,8 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from "next/navigation";
+import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { Loader2, AlertCircle, CheckCircle } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 

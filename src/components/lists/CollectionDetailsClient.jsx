@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useState, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { Clock3, ExternalLink, Film } from 'lucide-react'
 import ListPosterCard from '@/components/lists/ListPosterCard'
 import FilterableListItems from '@/components/lists/ListDetailsTools'

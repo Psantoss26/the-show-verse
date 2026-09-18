@@ -6,7 +6,7 @@ import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import OptimizedImage from "@/components/OptimizedImage";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { motion, AnimatePresence } from "framer-motion";
 import useModalGuard from "@/hooks/useModalGuard";
 import {

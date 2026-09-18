@@ -1,5 +1,7 @@
 "use client";
 import { useOfflineTitle } from "@/lib/offline/useOfflineTitle";
+import { isServerReachable } from "@/lib/offline/client";
+import { openSavedRoute } from "@/lib/offline/navigation";
 
 // /src/components/dashboard/DetailModal.jsx
 // Ficha rápida (vista previa) que se abre desde las tarjetas del dashboard sobre
@@ -18,7 +20,7 @@ import {
   useTransform,
 } from "framer-motion";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/offline/useOfflineRouter";
 import NextImage from "next/image";
 import { createPortal } from "react-dom";
 import OptimizedImage from "@/components/OptimizedImage";
@@ -2059,6 +2061,10 @@ export default function DetailModal({
   // que nadie consume la deja colgada en sessionStorage).
   const goToDetailsRoute = async (href, transitionKey) => {
     if (navigatingToFullDetails || !href) return;
+    if (!isServerReachable()) {
+      await openSavedRoute(href);
+      return;
+    }
 
     if (transitionKey) {
       try {

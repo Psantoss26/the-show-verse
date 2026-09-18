@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { useSelectedLayoutSegment, useRouter } from "next/navigation";
+import { useSelectedLayoutSegment } from "next/navigation";
+import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { useAuth } from "@/context/AuthContext";
 import DetailModalProvider from "@/components/dashboard/DetailModalProvider";
 import ProfileClient from "@/app/u/[username]/ProfileClient";

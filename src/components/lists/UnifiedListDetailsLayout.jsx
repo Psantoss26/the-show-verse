@@ -3,7 +3,7 @@
 
 import OptimizedImage from "@/components/OptimizedImage";
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, Film, ListVideo } from 'lucide-react'
 import { useIsHistoryNavigation } from '@/lib/hooks/useIsHistoryNavigation'
