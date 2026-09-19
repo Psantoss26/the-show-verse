@@ -1092,10 +1092,7 @@ export function useDetailModalData(item) {
     // Plataformas de streaming disponibles (JustWatch vía /api/streaming). Se usa
     // el título/año semilla del item (equivalen a los de TMDb). Best-effort:
     // nunca lanza; si falla, providers se queda en [] y no se pinta la fila.
-    (async () => {
-      // Se marca como resuelta pase lo que pase —sin título, error de red, sin
-      // resultados—, no solo en el camino feliz: si no, el hueco reservado no
-      // se liberaría nunca en los títulos sin plataformas.
+    const streamingTask = (async () => {
       try {
         const streamTitle = (item.title || item.name || "").trim();
         if (!streamTitle) return;
@@ -1119,17 +1116,13 @@ export function useDetailModalData(item) {
         }
       } catch {
         // sin plataformas: no se muestra la fila
-      } finally {
-        if (!cancelled) {
-          setData((prev) => ({ ...prev, providersResolved: true }));
-        }
       }
     })();
 
     // Plex local: mismo endpoint que DetailsClient. Si está disponible, se
     // combina con JustWatch reservándole hueco para que no desaparezca si hay
     // muchos providers externos.
-    (async () => {
+    const plexTask = (async () => {
       try {
         // MISMAS SEÑAS QUE DetailsClient. Antes se preguntaba con lo que traía la
         // TARJETA (la semilla), y los listados de TMDb NO devuelven `imdb_id`:
@@ -1184,6 +1177,14 @@ export function useDetailModalData(item) {
         // Plex es best-effort: si no está conectado/disponible, se omite.
       }
     })();
+
+    // Revelar las acciones solo cuando ambas fuentes hayan terminado,
+    // también si no hay resultados o alguna consulta falla.
+    Promise.all([streamingTask, plexTask]).then(() => {
+      if (!cancelled) {
+        setData((prev) => ({ ...prev, providersResolved: true }));
+      }
+    });
 
     return () => {
       cancelled = true;
