@@ -28,6 +28,9 @@ class MediaListenerService : NotificationListenerService() {
     private var msm: MediaSessionManager? = null
     private var polling = false
 
+    private val resolutions = ResolutionRetry()
+    private val lastSignals = HashMap<String, PlaybackSignal>()
+    private val lastObservationAt = HashMap<String, Long>()
     private val playingSince = HashMap<String, Long>()
     private val lastKeyByPackage = HashMap<String, String>()
     private val loggedNotes = HashSet<String>() // para no repetir el mismo aviso
@@ -42,8 +45,9 @@ class MediaListenerService : NotificationListenerService() {
     private val puntos = PuntoDeReproduccion()
 
     private val sessionsListener =
-        MediaSessionManager.OnActiveSessionsChangedListener { list ->
-            if ((list?.size ?: 0) > 0) startPolling() else stopPolling()
+        MediaSessionManager.OnActiveSessionsChangedListener { _ ->
+            // Even an empty list needs one final poll to flush stopped sessions.
+            startPolling()
         }
 
     private val pollRunnable = object : Runnable {
@@ -55,6 +59,7 @@ class MediaListenerService : NotificationListenerService() {
 
     override fun onListenerConnected() {
         prefs = Prefs(this)
+        if (prefs.isPaired()) ProgressOutbox.schedule(this)
         val manager = getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
         msm = manager
         try {
@@ -69,8 +74,20 @@ class MediaListenerService : NotificationListenerService() {
     }
 
     override fun onListenerDisconnected() {
+        if (::prefs.isInitialized && !prefs.paused) {
+            lastKeyByPackage.keys.toList().forEach { volcarProgresoCacheado(it) }
+        }
+        resolutions.clear()
         stopPolling()
         msm?.removeOnActiveSessionsChangedListener(sessionsListener)
+        requestRebind(component)
+    }
+
+    override fun onDestroy() {
+        stopPolling()
+        resolutions.clear()
+        msm?.removeOnActiveSessionsChangedListener(sessionsListener)
+        super.onDestroy()
     }
 
     private fun startPolling() {
@@ -107,6 +124,16 @@ class MediaListenerService : NotificationListenerService() {
 
 
     private fun pollOnce() {
+        if (prefs.paused || !prefs.isPaired()) {
+            resolutions.clear()
+            playingSince.clear()
+            lastKeyByPackage.keys.toList().forEach { puntos.olvidar(it) }
+            lastKeyByPackage.clear()
+            syncedByPackage.clear()
+            lastObservationAt.clear()
+            lastSignals.clear()
+            return
+        }
         val manager = msm ?: return
         val sessions = try {
             manager.getActiveSessions(component)
@@ -121,6 +148,15 @@ class MediaListenerService : NotificationListenerService() {
             prefs.addSeen(pkg)
             val playing = controller.playbackState?.state == PlaybackState.STATE_PLAYING
             if (!playing) continue
+            if (!prefs.isEnabled(pkg)) {
+                resolutions.forget(pkg)
+                playingSince.remove(pkg)
+                syncedByPackage.remove(pkg)
+                lastKeyByPackage.remove(pkg)
+                lastSignals.remove(pkg)
+                puntos.olvidar(pkg)
+                continue
+            }
             playingNow.add(pkg)
             noteOnce("detected:$pkg", "Detectado reproduciendo: ${Platforms.nameFor(pkg)}")
             evaluate(controller, pkg)
@@ -132,6 +168,9 @@ class MediaListenerService : NotificationListenerService() {
             // resolución: usa la posición viva de la sesión (si sigue, pausada) o
             // la última conocida.
             flushProgressOnStop(pkg, sessions)
+            resolutions.forget(pkg)
+            lastObservationAt.remove(pkg)
+            lastSignals.remove(pkg)
             playingSince.remove(pkg)
             loggedNotes.removeAll { it.endsWith(":$pkg") }
             // Al parar, olvidamos la resolución y la clave: si se reanuda el mismo
@@ -161,10 +200,6 @@ class MediaListenerService : NotificationListenerService() {
         if (now - since < MIN_WATCH_MS) return // aún no lleva 15s reproduciendo
 
         val md = controller.metadata
-        if (md == null) {
-            noteOnce("nometa:$pkg", "Reproduciendo en ${Platforms.nameFor(pkg)} pero sin metadatos")
-            return
-        }
         // Posición REAL o, si la app no la publica, ESTIMADA por reloj desde que
         // empezamos a mirar. La estimación sirve para que el título aparezca en
         // "Continuar viendo", pero se marca como tal: no vale para dar nada por
@@ -185,20 +220,20 @@ class MediaListenerService : NotificationListenerService() {
         val notif = notifExtrasFor(pkg)
         val raw = RawMetadata(
             packageName = pkg,
-            title = md.getString(MediaMetadata.METADATA_KEY_TITLE),
-            artist = md.getString(MediaMetadata.METADATA_KEY_ARTIST),
-            album = md.getString(MediaMetadata.METADATA_KEY_ALBUM),
-            albumArtist = md.getString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST),
-            displayTitle = md.getString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE),
-            displaySubtitle = md.getString(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE),
-            displayDescription = md.getString(MediaMetadata.METADATA_KEY_DISPLAY_DESCRIPTION),
+            title = md?.getString(MediaMetadata.METADATA_KEY_TITLE),
+            artist = md?.getString(MediaMetadata.METADATA_KEY_ARTIST),
+            album = md?.getString(MediaMetadata.METADATA_KEY_ALBUM),
+            albumArtist = md?.getString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST),
+            displayTitle = md?.getString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE),
+            displaySubtitle = md?.getString(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE),
+            displayDescription = md?.getString(MediaMetadata.METADATA_KEY_DISPLAY_DESCRIPTION),
             queueTitle = controller.queueTitle?.toString(),
             notifTitle = notif.first,
             notifText = notif.second,
             notifSubText = notif.third,
-            artUri = md.getString(MediaMetadata.METADATA_KEY_ART_URI)
-                ?: md.getString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI),
-            durationMs = md.getLong(MediaMetadata.METADATA_KEY_DURATION),
+            artUri = md?.getString(MediaMetadata.METADATA_KEY_ART_URI)
+                ?: md?.getString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI),
+            durationMs = md?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L,
             positionMs = posMs,
         )
 
@@ -280,8 +315,19 @@ class MediaListenerService : NotificationListenerService() {
         // siga latiendo mientras se reproduce el mismo título.
         maybeSendProgress(pkg, signal)
 
-        if (claveAnterior == key) return
         lastKeyByPackage[pkg] = key
+        lastSignals[pkg] = signal
+        if (syncedByPackage[pkg] == null && resolutions.needsRecovery(pkg) && now - (lastObservationAt[pkg] ?: 0L) >= PROGRESS_PING_MS) {
+            lastObservationAt[pkg] = now
+            try {
+                val observation = SyncClient.signalJson(signal).put("recordProgress", true)
+                    .put("estimated", posicionEstimada)
+                ProgressOutbox.enqueue(this, prefs.origin ?: return, prefs.token ?: return, observation)
+            } catch (_: Exception) {
+                prefs.addLog("No se pudo guardar la observación pendiente")
+            }
+        }
+        val ticket = resolutions.begin(pkg, key, now) ?: return
 
         val token = prefs.token ?: return
         val origin = prefs.origin ?: return
@@ -290,19 +336,20 @@ class MediaListenerService : NotificationListenerService() {
         // indicador). El "visto" ya no se marca al detectar, sino al 90% vía pings.
         SyncClient.send(origin, token, signal, resolveOnly = true) { ok, err, synced ->
             handler.post {
-                if (ok) {
+                if (prefs.paused || prefs.token != token || prefs.origin != origin || lastKeyByPackage[pkg] != key) return@post
+                if (!resolutions.finish(pkg, ticket, ok && synced != null, SystemClock.elapsedRealtime())) return@post
+                if (ok && synced != null) {
                     prefs.addLog("✓ Detectado: ${signal.mainTitle}")
                     // Acceso rápido: notificación "en progreso" con enlace a la ficha.
                     QuickAccessNotifier.show(this, prefs, synced, R.string.notif_watching)
                     if (synced != null) {
                         syncedByPackage[pkg] = synced
                         lastProgressAtByPackage.remove(pkg) // fuerza un ping inmediato
-                        maybeSendProgress(pkg, signal)
+                        val point = puntos.de(pkg)
+                        maybeSendProgress(pkg, signal.copy(positionSec = point?.posSec, durationSec = point?.durSec))
                     }
                 } else {
-                    // NO reintentamos el mismo título: reenviar cada 3s satura el
-                    // endpoint y agrava el 429. Se enviará el próximo título nuevo.
-                    prefs.addLog("✗ Fallo: $err")
+                    prefs.addLog("Reintentaremos la identificación: ${err ?: "sin coincidencia"}")
                 }
             }
         }
@@ -368,10 +415,11 @@ class MediaListenerService : NotificationListenerService() {
         val token = prefs.token ?: return
         val origin = prefs.origin ?: return
         SyncClient.sendProgress(
-            origin, token, synced, positionSec, durationSec, Platforms.idFor(pkg),
+            this, origin, token, synced, positionSec, durationSec, Platforms.idFor(pkg),
             estimated = puntos.de(pkg)?.estimado == true,
         ) { ok, completed ->
             handler.post {
+                if (prefs.paused || prefs.token != token || syncedByPackage[pkg] !== synced) return@post
                 when {
                     ok && completed -> {
                         prefs.addLog("✓ Visto al completar: ${synced.title ?: "#${synced.tmdbId}"}")
@@ -381,7 +429,7 @@ class MediaListenerService : NotificationListenerService() {
                     }
                     ok -> noteOnce(
                         "cw:$pkg:${synced.tmdbId}:${synced.season}:${synced.episode}",
-                        "✓ En Continuar viendo: ${synced.title ?: "#${synced.tmdbId}"}",
+                        "Progreso guardado para sincronizar: ${synced.title ?: "#${synced.tmdbId}"}",
                     )
                     else -> noteOnce(
                         "cwfail:$pkg:${synced.tmdbId}",
@@ -434,13 +482,22 @@ class MediaListenerService : NotificationListenerService() {
 
     /** Tronco común de los dos volcados. */
     private fun enviarVolcado(pkg: String, posSec: Long, durSec: Long, estimado: Boolean) {
-        val synced = syncedByPackage[pkg] ?: return
-        if (posSec <= 0L) return
+        val synced = syncedByPackage[pkg]
+        if (posSec <= 0L || prefs.paused || !prefs.isEnabled(pkg)) return
+        if (synced == null) {
+            val signal = lastSignals[pkg] ?: return
+            try {
+                val payload = SyncClient.signalJson(signal.copy(positionSec = posSec, durationSec = durSec))
+                    .put("recordProgress", true).put("estimated", estimado)
+                ProgressOutbox.enqueue(this, prefs.origin ?: return, prefs.token ?: return, payload)
+            } catch (_: Exception) { prefs.addLog("No se pudo guardar el último punto de reproducción") }
+            return
+        }
 
         val token = prefs.token ?: return
         val origin = prefs.origin ?: return
         SyncClient.sendProgress(
-            origin, token, synced, posSec, durSec, Platforms.idFor(pkg),
+            this, origin, token, synced, posSec, durSec, Platforms.idFor(pkg),
             estimated = estimado,
         ) { ok, completed ->
             handler.post {

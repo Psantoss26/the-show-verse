@@ -11,6 +11,7 @@ import java.util.Locale
 /** Almacenamiento cifrado del token/origen de emparejamiento y preferencias. */
 class Prefs(context: Context) {
 
+    private val appContext = context.applicationContext
     private val prefs: SharedPreferences
 
     init {
@@ -26,17 +27,36 @@ class Prefs(context: Context) {
         )
     }
 
+    val deviceId: String
+        get() {
+            prefs.getString("sync_device_id", null)?.let { return it }
+            val id = java.util.UUID.randomUUID().toString()
+            prefs.edit().putString("sync_device_id", id).commit()
+            return id
+        }
+
     var token: String?
         get() = prefs.getString(KEY_TOKEN, null)
-        set(value) = prefs.edit().putString(KEY_TOKEN, value).apply()
+        set(value) {
+            val edit = prefs.edit().putString(KEY_TOKEN, value)
+            if (value != token) edit.remove(KEY_PENDING_PROGRESS)
+            edit.apply()
+        }
 
     var origin: String?
         get() = prefs.getString(KEY_ORIGIN, null)
-        set(value) = prefs.edit().putString(KEY_ORIGIN, value).apply()
+        set(value) {
+            val edit = prefs.edit().putString(KEY_ORIGIN, value)
+            if (value != origin) edit.remove(KEY_PENDING_PROGRESS)
+            edit.apply()
+        }
 
     var paused: Boolean
         get() = prefs.getBoolean(KEY_PAUSED, false)
-        set(value) = prefs.edit().putBoolean(KEY_PAUSED, value).apply()
+        set(value) {
+            prefs.edit().putBoolean(KEY_PAUSED, value).apply()
+            if (!value && isPaired()) ProgressOutbox.schedule(appContext)
+        }
 
     /** Indicador de acceso rápido a la ficha (notificación). Activado por defecto. */
     var indicatorEnabled: Boolean
@@ -115,7 +135,7 @@ class Prefs(context: Context) {
     }
 
     fun clearPairing() {
-        prefs.edit().remove(KEY_TOKEN).remove(KEY_ORIGIN).apply()
+        prefs.edit().remove(KEY_TOKEN).remove(KEY_ORIGIN).remove(KEY_PENDING_PROGRESS).apply()
     }
 
     /** Registro de eventos visible en la app (para diagnosticar sin adb). */
@@ -133,7 +153,11 @@ class Prefs(context: Context) {
 
     fun clearLogs() = prefs.edit().remove(KEY_LOGS).apply()
 
+    val pendingProgress: String? get() = prefs.getString(KEY_PENDING_PROGRESS, null)
+    fun savePendingProgress(value: String): Boolean = prefs.edit().putString(KEY_PENDING_PROGRESS, value).commit()
+
     companion object {
+        private const val KEY_PENDING_PROGRESS = "streaming_pending_progress"
         private const val KEY_TOKEN = "token"
         private const val KEY_ORIGIN = "origin"
         private const val KEY_PAUSED = "paused"

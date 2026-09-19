@@ -12,6 +12,7 @@ import {
   matchEpisodeCandidates,
 } from "@/lib/netflix/streamingResolve";
 import { normalizeText } from "@/lib/netflix/resolve";
+import { createRequestCache } from "@/lib/netflix/requestCache";
 import { buildQueryVariants } from "@/lib/netflix/queryVariants";
 
 export const runtime = "nodejs";
@@ -19,6 +20,7 @@ export const dynamic = "force-dynamic";
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const TMDB_API = "https://api.themoviedb.org/3";
+const metadataCache = createRequestCache();
 
 async function searchTmdbDirectLang(query, mediaType, language) {
   const url = new URL(`${TMDB_API}/search/${mediaType}`);
@@ -89,13 +91,15 @@ function cleanEpisodeName(name) {
     .trim();
 }
 
-async function tmdbJson(url) {
-  try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-    return res.ok ? await res.json() : null;
-  } catch (e) {
-    return null;
-  }
+function tmdbJson(url) {
+  return metadataCache(url, async () => {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      return res.ok ? await res.json() : null;
+    } catch {
+      return null;
+    }
+  });
 }
 
 // Localiza la temporada buscando el episodio en TODAS las temporadas de la serie.
@@ -189,7 +193,7 @@ async function findSeasonByEpisodeName(tmdbId, episodeName, episodeNumber = null
 export async function POST(request) {
   let backendResult = null;
   const backendRequest = async (path, init) => {
-    const result = await backendFetchJson(request, path, init);
+    const result = await backendFetchJson(request, path, { signal: AbortSignal.timeout(8000), ...init });
     if (result?.refreshedTokens) backendResult = result;
     return result;
   };
@@ -239,6 +243,11 @@ export async function POST(request) {
       // Modo "solo resolver": para el indicador en la FICHA del título (navegando,
       // sin reproducir). Resuelve el título pero NO lo inserta en el historial.
       resolveOnly,
+      recordProgress,
+      positionSec,
+      estimated,
+      eventId,
+      observedAt,
     } = await request.json().catch(() => ({}));
     const durationSecNum = Number(durationSec);
     const safeDurationSec = Number.isFinite(durationSecNum) && durationSecNum > 0
@@ -250,6 +259,9 @@ export async function POST(request) {
       ? authHeader.slice(7).trim()
       : "";
 
+    if (recordProgress && (!syncToken || !eventId || !observedAt)) {
+      return respond({ error: "Authenticated eventId and observedAt are required" }, { status: syncToken ? 400 : 401 });
+    }
     if (!mainTitle && !showName) {
       return respond({ error: "mainTitle is required" }, { status: 400 });
     }
@@ -448,7 +460,7 @@ export async function POST(request) {
     if (isTv && tmdbId && episode != null && season != null && TMDB_API_KEY) {
       try {
         const epUrl = `https://api.themoviedb.org/3/tv/${tmdbId}/season/${season}/episode/${episode}?api_key=${TMDB_API_KEY}&language=es-ES`;
-        const epRes = await fetch(epUrl);
+        const epRes = await fetch(epUrl, { signal: AbortSignal.timeout(8000) });
         if (epRes.ok) {
           const epData = await epRes.json();
           if (epData.name) tmdbEpisodeName = epData.name;
@@ -466,6 +478,27 @@ export async function POST(request) {
     if (!tmdbId) {
       console.error("[Extension Sync] Could not resolve TMDb entity for:", query);
       return respond({ error: `Could not resolve TMDb entity for: ${query}` }, { status: 404 });
+    }
+
+    // Observación guardada sin conexión: resolver y aplicar el punto original,
+    // usando la misma identidad de evento en cada reintento.
+    if (recordProgress) {
+      if (!syncToken) return respond({ error: "Sync token is required" }, { status: 401 });
+      const baseUrl = getBackendBaseUrl();
+      if (!baseUrl) return respond({ error: "Backend unavailable" }, { status: 503 });
+      const response = await fetch(`${baseUrl}/v1/auth/netflix/progress`, {
+        method: "POST", cache: "no-store", signal: AbortSignal.timeout(15_000),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${syncToken}` },
+        body: JSON.stringify({
+          tmdbId, mediaType, season: season ?? 0, episode: episode ?? 0,
+          title: resolvedTitle, posterPath: posterPath || null, platform, confidence,
+          positionSeconds: Math.max(0, Math.round(Number(positionSec) || 0)),
+          runtimeSeconds: Math.max(0, Math.round(safeDurationSec || 0)),
+          estimated: estimated === true, eventId, observedAt,
+        }),
+      });
+      const progress = await response.json().catch(() => ({}));
+      return respond(progress, { status: response.status });
     }
 
     // Modo "solo resolver" (indicador en la ficha, sin reproducir): devolvemos la
@@ -525,6 +558,7 @@ export async function POST(request) {
           Authorization: `Bearer ${syncToken}`,
         },
         cache: "no-store",
+        signal: AbortSignal.timeout(15_000),
         body: JSON.stringify({
           ...body,
           platform,

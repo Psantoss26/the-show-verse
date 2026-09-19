@@ -14,6 +14,7 @@ import {
   connectedAccounts,
   watchHistory,
   watchProgress,
+  streamingEvents,
 } from '../db/schema.js';
 import {
   signAccessToken,
@@ -30,7 +31,7 @@ import {
   REWATCH_COMPLETION_COOLDOWN_MS,
 } from '../lib/rewatchCompletion.js';
 import { getRuntimeSeconds } from '../lib/tmdbRuntime.js';
-import { eq, and, gt, lt, isNull, sql } from 'drizzle-orm';
+import { eq, and, gt, lt, isNull, sql, desc } from 'drizzle-orm';
 
 const BCRYPT_ROUNDS = 12;
 const EMAIL_CHANGE_TOKEN_TTL_MS = 30 * 60 * 1000;
@@ -93,6 +94,7 @@ const googleAuthSchema = z.object({
 });
 
 const netflixConnectSchema = z.object({
+  deviceId: z.string().uuid().optional(),
   email: z.string().email(),
   profileName: z.string().min(1).max(120).optional(),
 });
@@ -119,6 +121,8 @@ const netflixSyncSchema = z.object({
 // Progreso de reproducción en curso (position/duration) desde la extensión o la
 // app Android. season/episode 0 = película o sin episodio concreto.
 const netflixProgressSchema = z.object({
+  eventId: z.string().uuid().optional(),
+  observedAt: z.string().datetime().optional(),
   tmdbId: z.number().int().positive(),
   mediaType: z.enum(['movie', 'tv']),
   season: z.number().int().min(0).optional(),
@@ -1088,11 +1092,12 @@ export default async function authRoutes(fastify) {
       .where(eq(connectedAccounts.userId, req.user.id));
 
     const connections = ['tmdb', 'google', 'trakt', 'netflix'].map((provider) => {
-      const conn = accounts.find((a) => a.provider === provider);
+      const conn = accounts.find((a) => a.provider === provider && a.metadata?.syncMode === 'browser-extension')
+        || accounts.find((a) => a.provider === provider);
       return {
         provider,
         connected: !!conn,
-        email: conn?.providerUid || null,
+        email: conn?.metadata?.email || (conn?.providerUid?.startsWith("mobile:") ? "Android" : conn?.providerUid) || null,
         metadata: conn?.metadata || {},
       };
     });
@@ -1109,7 +1114,9 @@ export default async function authRoutes(fastify) {
       return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
     }
 
-    const { email, profileName } = parsed.data;
+    const { email, profileName, deviceId } = parsed.data;
+    // El correo de una cuenta compartida no identifica al usuario de The Show Verse.
+    const providerUid = `browser:${req.user.id}:${deviceId || 'legacy'}`;
     const syncToken = `tsv_netflix_${nanoid(48)}`;
     const now = new Date();
 
@@ -1118,7 +1125,7 @@ export default async function authRoutes(fastify) {
       .values({
         userId: req.user.id,
         provider: 'netflix',
-        providerUid: email,
+        providerUid,
         accessToken: hashToken(syncToken),
         metadata: {
           email,
@@ -1158,9 +1165,11 @@ export default async function authRoutes(fastify) {
   // /netflix/sync (por hash de token) la encuentre. Devuelve el token en claro.
   // ──────────────────────────────────────────────
   fastify.post('/netflix/pair-mobile', { preHandler: fastify.requireAuth }, async (req, reply) => {
+    const parsed = z.object({ deviceId: z.string().uuid().optional() }).safeParse(req.body || {});
+    if (!parsed.success) return reply.status(400).send({ error: 'Invalid deviceId' });
     const syncToken = `tsv_netflix_${nanoid(48)}`;
     const now = new Date();
-    const providerUid = `mobile:${req.user.id}`;
+    const providerUid = `mobile:${req.user.id}:${parsed.data.deviceId || nanoid(16)}`;
     const metadata = {
       profileName: 'Android',
       connectedAt: now.toISOString(),
@@ -1342,6 +1351,13 @@ export default async function authRoutes(fastify) {
       tmdbId, mediaType, positionSeconds, runtimeSeconds, platform, title, posterPath,
       confidence, estimated,
     } = parsed.data;
+    if (Boolean(parsed.data.eventId) !== Boolean(parsed.data.observedAt)) {
+      return reply.status(400).send({ error: 'eventId and observedAt must be provided together' });
+    }
+    const observedAt = parsed.data.observedAt ? new Date(parsed.data.observedAt) : new Date();
+    if (observedAt.getTime() > Date.now() + 5 * 60_000) {
+      return reply.status(400).send({ error: 'observedAt is in the future' });
+    }
     const isTv = mediaType === 'tv';
     // Clave del índice único: 0 para película o episodio desconocido.
     const season = isTv ? (parsed.data.season ?? 0) : 0;
@@ -1363,128 +1379,156 @@ export default async function authRoutes(fastify) {
     const COMPLETE_AT = 0.9;
     const userId = account.userId;
 
-    // ── Completado (≥90% y con duración conocida): registrar play + quitar de
-    // "Continuar viendo". Regla del "cruce del 90%" (ver lib/rewatchCompletion.js):
-    // la fila de watch_progress SOLO existe mientras percent < 0.9, así que si
-    // existía al llegar aquí es que veníamos reproduciendo por debajo del umbral y
-    // lo cruzamos AHORA → un play nuevo (primer visionado O rewatch). Los pings de
-    // cola (95%, 98%…) de una misma sesión ya no tienen fila y se colapsan por el
-    // cooldown. Esto permite re-sincronizar el mismo episodio el mismo día como un
-    // rewatch (antes: bucket de 12 h que lo descartaba).
-    // Con posición DEDUCIDA no se completa nunca: el porcentaje saldría de
-    // comparar el rato que llevamos mirando contra la duración de TMDb, y eso daba
-    // por vistos episodios que no se habían terminado. Se sigue actualizando
-    // "Continuar viendo" más abajo.
-    if (effectiveRuntime > 0 && percent >= COMPLETE_AT && !estimated) {
-      const now = new Date();
-      // Valores tal y como se guardan en watch_history (null para película o
-      // episodio desconocido); watch_progress usa el sentinel 0 (season/episode).
-      const storedSeason = isTv ? (season || null) : null;
-      const storedEpisode = isTv ? (episode || null) : null;
-
-      // 1) Quitar de "Continuar viendo" y saber si HABÍA una sesión en curso (<90%).
-      const removedProgress = await db
-        .delete(watchProgress)
-        .where(and(
-          eq(watchProgress.userId, userId),
-          eq(watchProgress.tmdbId, tmdbId),
-          eq(watchProgress.mediaType, mediaType),
-          eq(watchProgress.season, season),
-          eq(watchProgress.episode, episode),
-        ))
-        .returning({ id: watchProgress.id });
-      const wasInProgress = removedProgress.length > 0;
-
-      // 2) Sin fila (pings de cola tras completar, o salto directo al final): mira
-      //    si ya hay un play del MISMO ítem dentro del cooldown para no duplicar.
-      let hasRecentPlay = false;
-      if (!wasInProgress) {
-        const cooldownSince = new Date(now.getTime() - REWATCH_COMPLETION_COOLDOWN_MS);
-        const [recent] = await db
-          .select({ id: watchHistory.id })
-          .from(watchHistory)
-          .where(and(
-            eq(watchHistory.userId, userId),
-            eq(watchHistory.tmdbId, tmdbId),
-            eq(watchHistory.mediaType, mediaType),
-            storedSeason == null ? isNull(watchHistory.season) : eq(watchHistory.season, storedSeason),
-            storedEpisode == null ? isNull(watchHistory.episode) : eq(watchHistory.episode, storedEpisode),
-            gt(watchHistory.watchedAt, cooldownSince),
-          ))
-          .limit(1);
-        hasRecentPlay = Boolean(recent);
+    const entityKey = `${mediaType}:${tmdbId}:${season}:${episode}`;
+    const result = await db.transaction(async (tx) => {
+      // Serializa dispositivos y peticiones simultáneas para el mismo contenido.
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${userId + ':' + entityKey}, 0))`);
+      const eventId = parsed.data.eventId;
+      if (eventId) {
+        const [receipt] = await tx.select().from(streamingEvents).where(and(
+          eq(streamingEvents.userId, userId), eq(streamingEvents.eventId, eventId),
+        )).limit(1);
+        if (receipt) return { ...receipt.result, replayed: true };
+        const [latest] = await tx.select().from(streamingEvents).where(and(
+          eq(streamingEvents.userId, userId), eq(streamingEvents.entityKey, entityKey),
+        )).orderBy(desc(streamingEvents.observedAt)).limit(1);
+        if (latest && latest.observedAt > observedAt) {
+          return { ok: true, completed: false, ignored: 'stale_event' };
+        }
       }
+      const outcome = await (async () => {
+        // ── Completado (≥90% y con duración conocida): registrar play + quitar de
+        // "Continuar viendo". Regla del "cruce del 90%" (ver lib/rewatchCompletion.js):
+        // la fila de watch_progress SOLO existe mientras percent < 0.9, así que si
+        // existía al llegar aquí es que veníamos reproduciendo por debajo del umbral y
+        // lo cruzamos AHORA → un play nuevo (primer visionado O rewatch). Los pings de
+        // cola (95%, 98%…) de una misma sesión ya no tienen fila y se colapsan por el
+        // cooldown. Esto permite re-sincronizar el mismo episodio el mismo día como un
+        // rewatch (antes: bucket de 12 h que lo descartaba).
+        // Con posición DEDUCIDA no se completa nunca: el porcentaje saldría de
+        // comparar el rato que llevamos mirando contra la duración de TMDb, y eso daba
+        // por vistos episodios que no se habían terminado. Se sigue actualizando
+        // "Continuar viendo" más abajo.
+        if (effectiveRuntime > 0 && percent >= COMPLETE_AT && !estimated) {
+          const now = observedAt;
+          // Valores tal y como se guardan en watch_history (null para película o
+          // episodio desconocido); watch_progress usa el sentinel 0 (season/episode).
+          const storedSeason = isTv ? (season || null) : null;
+          const storedEpisode = isTv ? (episode || null) : null;
 
-      const recorded = shouldRecordCompletion({ wasInProgress, hasRecentPlay });
+          // 1) Quitar de "Continuar viendo" y saber si HABÍA una sesión en curso (<90%).
+          const removedProgress = await tx
+            .delete(watchProgress)
+            .where(and(
+              eq(watchProgress.userId, userId),
+              eq(watchProgress.tmdbId, tmdbId),
+              eq(watchProgress.mediaType, mediaType),
+              eq(watchProgress.season, season),
+              eq(watchProgress.episode, episode),
+            ))
+            .returning({ id: watchProgress.id });
+          const wasInProgress = removedProgress.length > 0;
 
-      let item = null;
-      if (recorded) {
-        [item] = await db
-          .insert(watchHistory)
+          // 2) Sin fila (pings de cola tras completar, o salto directo al final): mira
+          //    si ya hay un play del MISMO ítem dentro del cooldown para no duplicar.
+          let hasRecentPlay = false;
+          if (!wasInProgress) {
+            const cooldownSince = new Date(now.getTime() - REWATCH_COMPLETION_COOLDOWN_MS);
+            const [recent] = await tx
+              .select({ id: watchHistory.id })
+              .from(watchHistory)
+              .where(and(
+                eq(watchHistory.userId, userId),
+                eq(watchHistory.tmdbId, tmdbId),
+                eq(watchHistory.mediaType, mediaType),
+                storedSeason == null ? isNull(watchHistory.season) : eq(watchHistory.season, storedSeason),
+                storedEpisode == null ? isNull(watchHistory.episode) : eq(watchHistory.episode, storedEpisode),
+                gt(watchHistory.watchedAt, cooldownSince),
+              ))
+              .limit(1);
+            hasRecentPlay = Boolean(recent);
+          }
+
+          const recorded = shouldRecordCompletion({ wasInProgress, hasRecentPlay });
+
+          let item = null;
+          if (recorded) {
+            [item] = await tx
+              .insert(watchHistory)
+              .values({
+                userId,
+                tmdbId,
+                mediaType,
+                season: storedSeason,
+                episode: storedEpisode,
+                watchedAt: now,
+                runtimeMins: effectiveRuntime ? Math.round(effectiveRuntime / 60) : null,
+                title: title || null,
+                posterPath: posterPath || null,
+                // La que traiga el cliente; 'high' solo si no la manda (clientes viejos).
+                confidence: confidence || 'high',
+              })
+              .returning();
+          }
+
+          return { ok: true, completed: true, recorded, duplicate: !recorded, percent: 1, item };
+        }
+
+        // ── En curso: upsert del progreso.
+        await tx
+          .insert(watchProgress)
           .values({
             userId,
             tmdbId,
             mediaType,
-            season: storedSeason,
-            episode: storedEpisode,
-            watchedAt: now,
-            runtimeMins: effectiveRuntime ? Math.round(effectiveRuntime / 60) : null,
+            season,
+            episode,
+            positionSeconds,
+            runtimeSeconds: effectiveRuntime,
+            percent,
+            platform: platform || null,
             title: title || null,
             posterPath: posterPath || null,
-            // La que traiga el cliente; 'high' solo si no la manda (clientes viejos).
-            confidence: confidence || 'high',
+            updatedAt: observedAt,
           })
-          .returning();
+          .onConflictDoUpdate({
+            target: [
+              watchProgress.userId,
+              watchProgress.tmdbId,
+              watchProgress.mediaType,
+              watchProgress.season,
+              watchProgress.episode,
+            ],
+            set: {
+              // Una posición DEDUCIDA no puede hacer retroceder una real ya guardada:
+              // al retomar por el minuto 40, la estimación empieza en 0 y mandaba
+              // "Continuar viendo" al principio. Con posición real se guarda tal cual
+              // (un rebobinado del usuario es legítimo).
+              positionSeconds: estimated
+                ? sql`GREATEST(${watchProgress.positionSeconds}, ${positionSeconds})`
+                : positionSeconds,
+              runtimeSeconds: effectiveRuntime,
+              percent: estimated
+                ? sql`GREATEST(${watchProgress.percent}, ${percent})`
+                : percent,
+              platform: platform || null,
+              title: title || null,
+              posterPath: posterPath || null,
+              updatedAt: observedAt,
+            },
+          });
+
+        return { ok: true, completed: false, percent };
+      })();
+      if (eventId) {
+        // No duplicar los metadatos del historial en cada recibo.
+        const receiptResult = { ...outcome };
+        delete receiptResult.item;
+        await tx.insert(streamingEvents).values({ userId, eventId, entityKey, observedAt, result: receiptResult });
       }
-
-      return reply.send({ ok: true, completed: true, recorded, duplicate: !recorded, percent: 1, item });
-    }
-
-    // ── En curso: upsert del progreso.
-    await db
-      .insert(watchProgress)
-      .values({
-        userId,
-        tmdbId,
-        mediaType,
-        season,
-        episode,
-        positionSeconds,
-        runtimeSeconds: effectiveRuntime,
-        percent,
-        platform: platform || null,
-        title: title || null,
-        posterPath: posterPath || null,
-        updatedAt: new Date(),
-      })
-      .onConflictDoUpdate({
-        target: [
-          watchProgress.userId,
-          watchProgress.tmdbId,
-          watchProgress.mediaType,
-          watchProgress.season,
-          watchProgress.episode,
-        ],
-        set: {
-          // Una posición DEDUCIDA no puede hacer retroceder una real ya guardada:
-          // al retomar por el minuto 40, la estimación empieza en 0 y mandaba
-          // "Continuar viendo" al principio. Con posición real se guarda tal cual
-          // (un rebobinado del usuario es legítimo).
-          positionSeconds: estimated
-            ? sql`GREATEST(${watchProgress.positionSeconds}, ${positionSeconds})`
-            : positionSeconds,
-          runtimeSeconds: effectiveRuntime,
-          percent: estimated
-            ? sql`GREATEST(${watchProgress.percent}, ${percent})`
-            : percent,
-          platform: platform || null,
-          title: title || null,
-          posterPath: posterPath || null,
-          updatedAt: new Date(),
-        },
-      });
-
-    return reply.send({ ok: true, completed: false, percent });
+      return outcome;
+    });
+    return reply.send(result);
   });
 
   // ──────────────────────────────────────────────

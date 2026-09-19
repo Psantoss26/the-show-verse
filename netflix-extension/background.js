@@ -1,3 +1,5 @@
+importScripts("sync-reliability.js");
+
 // background.js - Service worker with dynamic origin resolution and diagnostic logging
 
 async function addLog(message, type = "info") {
@@ -312,7 +314,7 @@ function ensureActivityAlarm() {
 }
 
 // ── Sitios de streaming añadidos por el usuario (content scripts dinámicos) ──
-const CUSTOM_SITE_JS = ["detection-core.js", "platform-enhancers.js", "content.js"];
+const CUSTOM_SITE_JS = ["sync-reliability.js", "detection-core.js", "platform-enhancers.js", "content.js"];
 
 function customSiteScriptId(origin) {
   let host = origin;
@@ -372,6 +374,55 @@ function reregisterCustomSites() {
   });
 }
 
+// Cola duradera: los mensajes se guardan antes de confirmar su recepción.
+const PROGRESS_OUTBOX_KEY = "streamingProgressOutbox";
+const PROGRESS_ALARM = "streamingProgressRetry";
+async function syncOwner(config) {
+  const bytes = new TextEncoder().encode(`${config.showVerseOrigin}|${config.netflixSyncToken}`);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, "0")).join("");
+}
+const progressOutbox = TSVSyncReliability.createOutbox({
+  read: async () => (await chrome.storage.local.get(PROGRESS_OUTBOX_KEY))[PROGRESS_OUTBOX_KEY],
+  write: async state => { await chrome.storage.local.set({ [PROGRESS_OUTBOX_KEY]: state }); },
+  send: async (payload, owner) => {
+    const config = await getStored(["showVerseOrigin", "netflixSyncToken", SYNC_PAUSED_KEY]);
+    if (config[SYNC_PAUSED_KEY] || !config.netflixSyncToken || await syncOwner(config) !== owner) return { paused: true };
+    const res = await fetch(`${config.showVerseOrigin}/api/netflix/${payload.recordProgress ? "extension-sync" : "extension-progress"}`, {
+      method: "POST", credentials: "omit", signal: AbortSignal.timeout(25_000),
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.netflixSyncToken}` },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json().catch(() => null);
+    return { status: res.status, valid: json?.ok === true,
+      retryAfter: Math.min(3600, Number(res.headers.get("Retry-After")) || 0) * 1000 };
+  },
+});
+async function drainProgress() {
+  const config = await getStored(["showVerseOrigin", "netflixSyncToken", SYNC_PAUSED_KEY]);
+  if (!config.showVerseOrigin || !config.netflixSyncToken || config[SYNC_PAUSED_KEY]) return;
+  await progressOutbox.drain(await syncOwner(config));
+}
+function ensureProgressAlarm() {
+  chrome.alarms.create(PROGRESS_ALARM, { periodInMinutes: 1 });
+}
+chrome.runtime.onInstalled.addListener(ensureProgressAlarm);
+chrome.runtime.onStartup.addListener(() => { ensureProgressAlarm(); drainProgress().catch(() => {}); });
+chrome.alarms.onAlarm.addListener(alarm => {
+  if (alarm.name === PROGRESS_ALARM) drainProgress().catch(() => {});
+});
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local") return;
+  if (changes.netflixSyncToken || changes.showVerseOrigin) {
+    getStored(["showVerseOrigin", "netflixSyncToken"]).then(async config => {
+      if (!config.netflixSyncToken) await progressOutbox.clear();
+      else await progressOutbox.rebind(await syncOwner(config));
+    }).catch(() => {});
+  }
+  if (changes[SYNC_PAUSED_KEY]?.newValue === false) drainProgress().catch(() => {});
+});
+ensureProgressAlarm();
+
 chrome.runtime.onInstalled.addListener(ensureActivityAlarm);
 chrome.runtime.onStartup.addListener(ensureActivityAlarm);
 chrome.runtime.onInstalled.addListener(reregisterCustomSites);
@@ -427,11 +478,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.action === "registerOrigin") {
-    const { origin } = message;
-    chrome.storage.local.set({ showVerseOrigin: origin }, () => {
-      addLog(`App vinculada en origin: ${origin}`, "info");
-      sendResponse({ success: true });
-    });
+    // Una pestaña de preview/local no debe redirigir los envíos de una cuenta vinculada.
+    getStored(["netflixSyncToken"]).then(config => {
+      if (!config.netflixSyncToken && sender.url && new URL(sender.url).origin === message.origin) {
+        return setStored({ showVerseOrigin: message.origin });
+      }
+    }).then(() => sendResponse({ success: true }));
     return true;
   }
 
@@ -510,6 +562,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       "netflixAccountEmail",
       "netflixProfileName",
       "netflixConnectedAt",
+      PROGRESS_OUTBOX_KEY,
       SYNC_PAUSED_KEY
     ], (result) => {
       sendResponse({
@@ -519,6 +572,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         origin: result.showVerseOrigin || "",
         email: result.netflixAccountEmail || "",
         profileName: result.netflixProfileName || "",
+        pending: result[PROGRESS_OUTBOX_KEY]?.entries?.length || 0,
+        lastSyncError: result[PROGRESS_OUTBOX_KEY]?.lastError || null,
         connectedAt: result.netflixConnectedAt || null
       });
     });
@@ -550,7 +605,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       })
       .catch((err) => {
         addLog(`Error al detectar cuenta: ${err.message}`, "error");
-        sendResponse({ success: false, error: err.message });
+        sendResponse({ success: false, error: err.message, status: 0 });
       });
     return true; // Keep message channel open for async response
   }
@@ -577,6 +632,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       console.log(`[The Show Verse SW] Syncing "${mainTitle}" to: ${origin}/api/netflix/extension-sync`);
 
       fetch(`${origin}/api/netflix/extension-sync`, {
+        signal: AbortSignal.timeout(25_000),
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -593,12 +649,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         } else {
           const errorMsg = json.error || `HTTP ${res.status}`;
           addLog(`Fallo al sincronizar: ${errorMsg}`, "error");
-          sendResponse({ success: false, error: errorMsg });
+          sendResponse({ success: false, error: errorMsg, status: res.status });
         }
       })
       .catch((err) => {
         addLog(`Error de conexión: ${err.message}`, "error");
-        sendResponse({ success: false, error: err.message });
+        sendResponse({ success: false, error: err.message, status: 0 });
       });
     });
     return true; // Keep message channel open for async response
@@ -644,6 +700,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
 
       fetch(`${origin}/api/netflix/extension-sync`, {
+        signal: AbortSignal.timeout(25_000),
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -682,88 +739,35 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         } else {
           const errorMsg = json.error || `HTTP ${res.status}`;
           addLog(`Fallo al sincronizar: ${errorMsg}`, "error");
-          sendResponse({ success: false, error: errorMsg });
+          sendResponse({ success: false, error: errorMsg, status: res.status });
         }
       })
       .catch((err) => {
         addLog(`Error de conexión: ${err.message}`, "error");
-        sendResponse({ success: false, error: err.message });
+        sendResponse({ success: false, error: err.message, status: 0 });
       });
     });
     return true;
   }
 
-  // 3c. Progreso de reproducción (posición/duración) del contenido ya resuelto.
-  // Alimenta "Continuar viendo"; al 90% el servidor lo marca como visto.
-  if (message.action === "syncProgress") {
-    const {
-      tmdbId,
-      mediaType,
-      season,
-      episode,
-      title,
-      posterPath,
-      platform,
-      positionSeconds,
-      runtimeSeconds,
-      confidence,
-    } = message;
-
-    chrome.storage.local.get(["showVerseOrigin", "netflixSyncToken", SYNC_PAUSED_KEY], (result) => {
-      const origin = result.showVerseOrigin || "http://localhost:3000";
-      const syncToken = result.netflixSyncToken || "";
-      if (result[SYNC_PAUSED_KEY]) {
-        sendResponse({ success: false, paused: true });
-        return;
-      }
-      if (!syncToken) {
-        sendResponse({ success: false, error: "Sin token de sincronización." });
-        return;
-      }
-
-      fetch(`${origin}/api/netflix/extension-progress`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${syncToken}`,
-        },
-        body: JSON.stringify({
-          tmdbId,
-          mediaType,
-          season: season || undefined,
-          episode: episode || undefined,
-          title: title || undefined,
-          posterPath: posterPath || undefined,
-          platform: platform || undefined,
-          positionSeconds,
-          runtimeSeconds,
-          // Con qué seguridad se resolvió el título: el backend la guarda tal cual
-          // si el contenido llega a completarse.
-          confidence: confidence || undefined,
-        }),
-        credentials: "omit",
-      })
-        .then(async (res) => {
-          const json = await res.json().catch(() => ({}));
-          if (res.ok) {
-            if (json.completed) {
-              addLog(`Marcado como visto al completar: "${title || tmdbId}"`, "success");
-            }
-            sendResponse({
-              success: true,
-              completed: Boolean(json.completed),
-              percent: json.percent,
-            });
-          } else {
-            sendResponse({ success: false, error: json.error || `HTTP ${res.status}` });
-          }
-        })
-        .catch((err) => {
-          sendResponse({ success: false, error: err.message });
-        });
-    });
+  // Progreso confirmado al persistir; el transporte reintenta aunque se cierre la pestaña.
+  if (message.action === "syncProgress" || message.action === "queuePlayback") {
+    (async () => {
+      const config = await getStored(["showVerseOrigin", "netflixSyncToken", SYNC_PAUSED_KEY]);
+      if (config[SYNC_PAUSED_KEY]) return { success: false, paused: true };
+      if (!config.netflixSyncToken || !config.showVerseOrigin) return { success: false, status: 401, error: "Vuelve a vincular la extensión." };
+      const fields = ["recordProgress", "mainTitle", "subTitle", "showName", "episodeName", "movieTitle", "seasonEpisodeText", "tabTitle", "durationSec", "positionSec", "seriesFromHint", "queueTitle", "albumArtist", "notifTitle", "notifText", "notifSubText", "tmdbId", "mediaType", "season", "episode", "title", "posterPath", "platform", "positionSeconds", "runtimeSeconds", "confidence", "estimated"];
+      const payload = Object.fromEntries(fields.filter(k => message[k] != null).map(k => [k, message[k]]));
+      if (message.action === "queuePlayback") payload.recordProgress = true;
+      payload.eventId = crypto.randomUUID();
+      payload.observedAt = new Date().toISOString();
+      await progressOutbox.enqueue(await syncOwner(config), payload);
+      drainProgress().catch(() => {});
+      return { success: true, queued: true };
+    })().then(sendResponse).catch(err => sendResponse({ success: false, error: err.message }));
     return true;
   }
+
 });
 
 chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
@@ -788,7 +792,7 @@ chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => 
       })
       .catch((err) => {
         addLog(`Error al detectar cuenta: ${err.message}`, "error");
-        sendResponse({ success: false, error: err.message });
+        sendResponse({ success: false, error: err.message, status: 0 });
       });
     return true;
   }

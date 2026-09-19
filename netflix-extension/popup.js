@@ -31,7 +31,8 @@ document.addEventListener("DOMContentLoaded", () => {
     "netflixAccountEmail",
     "netflixProfileName",
     "streamingSyncPaused",
-    "indicatorEnabled"
+    "indicatorEnabled",
+    "streamingProgressOutbox"
   ], (result) => {
     const origin = result.showVerseOrigin || "http://localhost:3000";
     console.log("[The Show Verse Popup] Querying auth status from:", origin);
@@ -49,10 +50,13 @@ document.addEventListener("DOMContentLoaded", () => {
         if (log.type === "success") color = "#34d399";
         if (log.type === "error") color = "#f87171";
         
-        logItem.innerHTML = `
-          <span class="log-message" style="color: ${color};" title="${log.message}">${log.message}</span>
-          <span class="log-time">${log.time}</span>
-        `;
+        const message = document.createElement("span");
+        message.className = `log-msg ${log.type || "info"}`;
+        message.textContent = log.message;
+        const time = document.createElement("span");
+        time.className = "log-time";
+        time.textContent = log.time;
+        logItem.append(message, time);
         logsList.appendChild(logItem);
       });
     }
@@ -62,7 +66,10 @@ document.addEventListener("DOMContentLoaded", () => {
       statusDot.className = result.streamingSyncPaused ? "dot dot-orange" : "dot dot-green";
       statusText.textContent = result.streamingSyncPaused
         ? "Sincronización pausada"
-        : "Sincronización activa";
+        : result.streamingProgressOutbox?.lastError
+          || (result.streamingProgressOutbox?.entries?.length
+            ? `Sincronización activa · ${result.streamingProgressOutbox.entries.length} envíos pendientes`
+            : "Sincronización activa");
 
       userInfo.style.display = "block";
       userEmail.textContent = `${result.netflixAccountEmail || "Netflix"} · ${result.netflixProfileName || "Principal"}`;

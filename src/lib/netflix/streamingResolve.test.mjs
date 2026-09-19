@@ -272,3 +272,19 @@ test("matchEpisodeByName casa por substring (título parcial o con prefijo)", ()
     { season: 4, episode: 5 },
   );
 });
+
+
+test("episode numbers never authorize an unrelated TV search result", async () => {
+  const result = await resolveStreamingEntity({
+    query: "Texto ilegible del reproductor", expectedMediaType: "tv",
+    search: async () => [peakyShow],
+  });
+  assert.equal(result, null);
+});
+
+test("an ambiguous episode name is left unresolved", () => {
+  assert.equal(matchEpisodeByName({ episodeName: "Piloto", seasonEpisodes: [
+    { season_number: 1, episode_number: 1, name: "Piloto" },
+    { season_number: 2, episode_number: 1, name: "Piloto" },
+  ] }), null);
+});

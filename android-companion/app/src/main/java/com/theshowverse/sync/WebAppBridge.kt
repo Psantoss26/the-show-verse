@@ -58,11 +58,13 @@ class WebAppBridge(
     fun syncStatus(): String {
         val json = JSONObject()
         json.put("paired", prefs.isPaired())
+        json.put("deviceId", prefs.deviceId)
         json.put("origin", prefs.origin ?: "")
         json.put("notificationAccess", tieneAccesoNotificaciones())
         json.put("accessibilityGranted", accesibilidadConcedida())
         json.put("accessibilityEnabled", prefs.a11yEnabled)
         json.put("paused", prefs.paused)
+        json.put("pendingSyncEvents", ProgressOutbox.pendingCount(activity))
         json.put("indicator", prefs.indicatorEnabled)
         json.put("version", appVersion())
         return json.toString()

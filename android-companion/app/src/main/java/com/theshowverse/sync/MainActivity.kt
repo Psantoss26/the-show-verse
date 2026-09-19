@@ -43,6 +43,7 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         prefs = Prefs(this)
+        if (prefs.isPaired()) ProgressOutbox.schedule(this)
         requestNotifPermissionIfNeeded()
 
         binding.grantButton.setOnClickListener {
@@ -135,6 +136,10 @@ class MainActivity : AppCompatActivity() {
             !access -> getString(R.string.status_no_access)
             prefs.paused -> getString(R.string.status_paused)
             else -> getString(R.string.status_active, prefs.origin ?: "")
+        }
+        val pending = ProgressOutbox.pendingCount(this)
+        if (prefs.isPaired() && pending > 0) {
+            binding.statusText.append("\n$pending envíos pendientes de sincronizar")
         }
         binding.grantButton.visibility = if (access) View.GONE else View.VISIBLE
 

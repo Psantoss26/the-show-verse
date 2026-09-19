@@ -39,6 +39,7 @@ export async function POST(request) {
         Authorization: `Bearer ${syncToken}`,
       },
       cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
       body: JSON.stringify(body),
     }).catch(() => null);
 

@@ -1,6 +1,7 @@
 package com.theshowverse.sync
 
 import android.util.Log
+import android.content.Context
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaType
@@ -24,17 +25,11 @@ object SyncClient {
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(25, TimeUnit.SECONDS)
+        .callTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    fun send(
-        origin: String,
-        token: String,
-        signal: PlaybackSignal,
-        resolveOnly: Boolean = false,
-        onResult: (Boolean, String?, SyncedInfo?) -> Unit,
-    ) {
-        val json = JSONObject().apply {
+    fun signalJson(signal: PlaybackSignal, resolveOnly: Boolean = false): JSONObject = JSONObject().apply {
             put("platform", signal.platformId)
             put("platformName", signal.platformName)
             put("mainTitle", signal.mainTitle ?: return@apply)
@@ -59,6 +54,15 @@ object SyncClient {
             if (signal.seriesFromHint) put("seriesFromHint", true)
             if (resolveOnly) put("resolveOnly", true)
         }
+
+    fun send(
+        origin: String,
+        token: String,
+        signal: PlaybackSignal,
+        resolveOnly: Boolean = false,
+        onResult: (Boolean, String?, SyncedInfo?) -> Unit,
+    ) {
+        val json = signalJson(signal, resolveOnly)
 
         val url = origin.trimEnd('/') + "/api/netflix/extension-sync"
         val request = Request.Builder()
@@ -107,6 +111,7 @@ object SyncClient {
      * upsert de "Continuar viendo" y, al 90%, lo marca como visto (completed=true).
      */
     fun sendProgress(
+        context: Context,
         origin: String,
         token: String,
         synced: SyncedInfo,
@@ -132,44 +137,29 @@ object SyncClient {
             if (estimated) put("estimated", true)
         }
 
-        val url = origin.trimEnd('/') + "/api/netflix/extension-progress"
+        try {
+            ProgressOutbox.enqueue(context, origin, token, json)
+            onResult(true, false) // recibido de forma duradera; aún no confirmado por servidor
+        } catch (e: Exception) {
+            Log.w(TAG, "Unable to persist progress", e)
+            onResult(false, false)
+        }
+    }
+
+    data class Delivery(val status: Int, val valid: Boolean, val completed: Boolean = false)
+
+    /** Worker-only blocking transport; requests never outlive their timeout. */
+    fun deliver(origin: String, token: String, payload: JSONObject): Delivery {
+        val endpoint = if (payload.optBoolean("recordProgress")) "extension-sync" else "extension-progress"
         val request = Request.Builder()
-            .url(url)
-            .addHeader("Authorization", "Bearer $token")
-            .addHeader(
-                "User-Agent",
-                "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
-            )
-            .addHeader("Accept", "application/json")
-            .post(json.toString().toRequestBody(JSON))
-            .build()
-
-        client.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                Log.w(TAG, "Progress failed: ${e.message}")
-                onResult(false, false)
-            }
-
-            override fun onResponse(call: Call, response: Response) {
-                response.use {
-                    val body = try {
-                        it.body?.string()
-                    } catch (e: Exception) {
-                        null
-                    }
-                    if (it.isSuccessful) {
-                        val completed = try {
-                            JSONObject(body ?: "{}").optBoolean("completed", false)
-                        } catch (e: Exception) {
-                            false
-                        }
-                        onResult(true, completed)
-                    } else {
-                        onResult(false, false)
-                    }
-                }
-            }
-        })
+            .url(origin.trimEnd('/') + "/api/netflix/" + endpoint)
+            .header("Authorization", "Bearer $token")
+            .header("Accept", "application/json")
+            .post(payload.toString().toRequestBody(JSON)).build()
+        return client.newCall(request).execute().use {
+            val body = try { JSONObject(it.body?.string() ?: "{}") } catch (_: Exception) { JSONObject() }
+            Delivery(it.code, body.optBoolean("ok"), body.optBoolean("completed"))
+        }
     }
 
     /** Extrae el objeto `synced` de la respuesta del endpoint (o null). */

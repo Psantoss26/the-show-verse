@@ -1,3 +1,4 @@
+/* eslint @typescript-eslint/no-require-imports: "off" -- Buildless extension modules also run in CommonJS tests. */
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const D = require("./detection-core.js");
