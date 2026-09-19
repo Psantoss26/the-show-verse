@@ -115,16 +115,10 @@ export function matchEpisodeByName({ episodeName, seasonEpisodes }) {
   if (!episodeName || !Array.isArray(seasonEpisodes)) return null;
   const q = normalizeText(episodeName);
   if (!q || q.length < 2) return null;
-  // 1. Coincidencia exacta del nombre normalizado.
-  let hit = seasonEpisodes.find((e) => normalizeText(e?.name) === q);
-  // 2. Uno contiene al otro (endurecido): cubre títulos parciales o con prefijo
-  //    distinto ("El proyecto Nina" ⊂ "Capítulo cinco: El proyecto Nina").
-  if (!hit) {
-    hit = seasonEpisodes.find((e) => reliableInclusion(normalizeText(e?.name), q));
-  }
-  return hit
-    ? { season: hit.season_number, episode: hit.episode_number }
-    : null;
+  const { exact, partial } = matchEpisodeCandidates({ episodeName, seasonEpisodes });
+  if (exact.length === 1) return exact[0];
+  if (!exact.length && partial.length === 1) return partial[0];
+  return null;
 }
 
 // Candidatos de episodio en un CONJUNTO de episodios de varias temporadas,
@@ -212,7 +206,7 @@ export async function resolveStreamingEntity({
   if (expectedMediaType === "tv") {
     const results = await search("tv");
     const entity = pickTmdbResult(results, query, "tv");
-    if (!entity) return null;
+    if (!isPlausibleMatch(entity, query, "tv")) return null;
     // El episodio viene por número (el llamador ya lo parseó) → alta si exacto.
     return {
       kind: "resolved",

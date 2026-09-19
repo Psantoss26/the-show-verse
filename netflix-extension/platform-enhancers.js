@@ -1,3 +1,4 @@
+/* eslint @typescript-eslint/no-require-imports: "off" -- Buildless extension modules also run in CommonJS tests. */
 // platform-enhancers.js — Refinadores OPCIONALES por plataforma.
 //
 // La detección base (detection-core.js) es Media-Session-first y funciona en

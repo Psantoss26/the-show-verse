@@ -13,9 +13,10 @@ export const dynamic = "force-dynamic";
 // devuelve para construir el deep link theshowverse://pair.
 export async function POST(request) {
   try {
+    const body = await request.json().catch(() => ({}));
     const backend = await backendFetchJson(request, "/v1/auth/netflix/pair-mobile", {
       method: "POST",
-      body: JSON.stringify({}),
+      body: JSON.stringify({ deviceId: body.deviceId }),
     });
 
     if (!backend.ok) {

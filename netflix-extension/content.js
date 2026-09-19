@@ -16,7 +16,8 @@
 
   const D = self.TSVDetection;
   const E = self.TSVEnhancers;
-  if (!D) {
+  const R = self.TSVSyncReliability;
+  if (!D || !R) {
     console.warn("[The Show Verse] detection-core.js no está cargado; sync inactivo.");
     return;
   }
@@ -624,6 +625,13 @@
   console.log(`[The Show Verse] Observador universal activo (${platformName}).`);
 
   let lastKey = null;
+  let generation = 0;
+  let resolving = false;
+  let resolved = false;
+  let attempts = 0;
+  let retryAt = 0;
+  let lastQueuedObservationAt = 0;
+  let lastPlaybackSignal = null;
   let lastDebug = 0;
   let pollTimer = null;
   let syncPaused = false;
@@ -794,8 +802,8 @@
           confidence: synced.confidence,
         },
         (resp) => {
-          if (!extensionAlive()) return;
-          if (chrome.runtime.lastError) {
+          if (!extensionAlive() || currentSynced !== synced) return;
+          if (chrome.runtime.lastError || !resp?.success) {
             // Service worker no respondió: reintentamos en el próximo ciclo.
             lastProgressPingAt = 0;
             return;
@@ -812,11 +820,32 @@
     }
   }
 
+  function queueObservation(signal, force = false) {
+    if (!signal || syncPaused || !extensionAlive()) return;
+    if (!force && Date.now() - lastQueuedObservationAt < PROGRESS_PING_MS) return;
+    lastQueuedObservationAt = Date.now();
+    try {
+      chrome.runtime.sendMessage({ action: "queuePlayback", ...signal, platform: platformId,
+        mainTitle: signal.showName || signal.movieTitle || signal.tabTitle }, response => {
+        if (extensionAlive() && (chrome.runtime.lastError || !response?.success)) lastQueuedObservationAt = 0;
+      });
+    } catch { lastQueuedObservationAt = 0; }
+  }
+
   // Envío INMEDIATO del progreso (ignora la cadencia): al pausar, terminar,
   // cambiar de pestaña o cerrar. Así se guarda el punto EXACTO de reproducción
   // al salir, sin esperar al siguiente ciclo de 30 s.
   function flushProgress() {
-    if (syncPaused || !currentSynced || !currentSyncedKey) return;
+    if (syncPaused) return;
+    const liveSignal = buildSignal();
+    if (liveSignal && R.contentKey(platformId, liveSignal) !== lastKey) {
+      flushPreviousProgress();
+      return;
+    }
+    if (!currentSynced || !currentSyncedKey) {
+      queueObservation(liveSignal || lastPlaybackSignal, true);
+      return;
+    }
     const video = getMainVideo();
     const cache =
       lastSeenProgress && lastSeenProgress.key === currentSyncedKey
@@ -842,7 +871,10 @@
   // visto ni salía de "Continuar viendo". No sirve mirar el <video>: cuando
   // detectamos el cambio ya está reproduciendo el episodio nuevo.
   function flushPreviousProgress() {
-    if (!currentSynced || !currentSyncedKey) return;
+    if (!currentSynced || !currentSyncedKey) {
+      queueObservation(lastPlaybackSignal, true);
+      return;
+    }
     const cache = lastSeenProgress;
     if (!cache || cache.key !== currentSyncedKey) return;
     const point = D.pickProgressPoint(null, cache);
@@ -903,7 +935,7 @@
       return;
     }
 
-    const key = `${platformId}:${signal.contentId || `${mainTitle}|${signal.episodeName || ""}`}`;
+    const key = R.contentKey(platformId, signal);
 
     // Ya resolvimos este contenido: enviamos progreso (Continuar viendo + visto
     // al 90%). Va ANTES del corte por dedup para que siga latiendo cada ciclo.
@@ -911,20 +943,27 @@
     // Engancha pausa/fin del vídeo para volcar el punto exacto al salir.
     ensureVideoListeners(getMainVideo());
 
-    if (key === lastKey) return;
-
-    // El contenido cambia (normalmente, el siguiente episodio que arranca solo):
-    // primero se guarda el punto al que se dejó el anterior.
-    flushPreviousProgress();
-
-    // Optimista: marcamos el contenido como intentado ANTES de enviar para no
-    // reintentar en bucle títulos que no resuelvan (el servidor deduplica igual).
-    lastKey = key;
-    // Contenido nuevo: reiniciamos el estado de progreso.
-    currentSynced = null;
-    currentSyncedKey = null;
-    lastProgressPingAt = 0;
-    lastSeenProgress = null;
+    if (key !== lastKey) {
+      flushPreviousProgress();
+      lastKey = key;
+      generation++;
+      resolving = false;
+      resolved = false;
+      attempts = 0;
+      retryAt = 0;
+      lastQueuedObservationAt = 0;
+      currentSynced = null;
+      currentSyncedKey = null;
+      lastProgressPingAt = 0;
+    }
+    lastSeenProgress = { key, positionSec: signal.positionSec, durationSec: signal.durationSec };
+    lastPlaybackSignal = signal;
+    // También conserva puntos aún sin resolver: si se cierra la pestaña sin
+    // red, la cola puede identificarlos y registrarlos al recuperar conexión.
+    if (!resolved && attempts > 0) queueObservation(signal);
+    if (resolved || resolving || Date.now() < retryAt) return;
+    resolving = true;
+    const requestGeneration = generation;
 
     try {
       chrome.runtime.sendMessage(
@@ -942,12 +981,13 @@
           resolveOnly: true,
         },
         (response) => {
-          if (!extensionAlive()) return;
-          if (chrome.runtime.lastError) {
-            // El service worker no respondió (transitorio): permitimos reintentar.
-            lastKey = null;
+          if (!extensionAlive() || syncPaused || requestGeneration !== generation || key !== lastKey) return;
+          resolving = false;
+          if (chrome.runtime.lastError || !response?.success || !response?.synced?.tmdbId) {
+            retryAt = Date.now() + R.retryDelay(attempts++, response?.status || 0);
             return;
           }
+          resolved = true;
           if (response && response.success) {
             // Acceso rápido: si el título se resolvió, mostramos el indicador con
             // enlace directo a su página de detalles en The Show Verse y
@@ -957,7 +997,7 @@
               currentSynced = synced;
               currentSyncedKey = key;
               lastProgressPingAt = 0;
-              maybeSendProgress(signal, key); // crea la entrada de Continuar viendo ya
+              if (lastSeenProgress?.key === key) maybeSendProgress(lastSeenProgress, key);
               if (response.origin) {
                 const url = D.buildDetailsUrl(response.origin, synced);
                 if (url) {
@@ -981,6 +1021,8 @@
 
   function applyPausedState(paused) {
     syncPaused = Boolean(paused);
+    generation++;
+    resolving = false;
     if (syncPaused) {
       stop();
     } else {
@@ -1002,6 +1044,13 @@
       if (areaName !== "local") return;
       if (changes.streamingSyncPaused) {
         applyPausedState(changes.streamingSyncPaused.newValue);
+      }
+      if (changes.netflixSyncToken) {
+        generation++;
+        lastKey = null;
+        currentSynced = null;
+        lastPlaybackSignal = null;
+        resolving = false;
       }
       if (changes.indicatorEnabled) {
         indicatorEnabled = changes.indicatorEnabled.newValue !== false;

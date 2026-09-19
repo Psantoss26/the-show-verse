@@ -133,6 +133,7 @@ class AccessibilityStreamingService : AccessibilityService() {
         val textosDePantalla = analysis.candidates
         SyncClient.send(origin, token, signal, resolveOnly = true) { ok, _, synced ->
             handler.post {
+                if (p.paused || p.token != token || p.origin != origin || pendingPkg != pkg || lastText != primary) return@post
                 if (!ok || synced == null) return@post
 
                 // CORROBORACIÓN. Resolver contra TMDb es BUSCAR, y una búsqueda casi

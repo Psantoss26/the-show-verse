@@ -37,7 +37,7 @@ import { useAuth } from "@/context/AuthContext";
 import Avatar, { getInitial } from "@/components/ui/Avatar";
 import ProfileFavoritesEditor from "@/components/social/ProfileFavoritesEditor";
 import AndroidSyncPanel from "@/components/settings/AndroidSyncPanel";
-import { pairDevice, useSyncStatus } from "@/lib/android/appBridge";
+import { pairDevice, readSyncStatus, useSyncStatus } from "@/lib/android/appBridge";
 import { useTranslation } from "@/lib/i18n";
 import {
   getPlexConnection,
@@ -1424,6 +1424,8 @@ function ProfileSettingsClient() {
       const res = await fetch("/api/netflix/pair-mobile", {
         method: "POST",
         credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deviceId: readSyncStatus()?.deviceId }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json?.syncToken) {
@@ -1628,11 +1630,22 @@ function ProfileSettingsClient() {
 
       setConnectStep(2);
 
+      let deviceId;
+      try {
+        deviceId = localStorage.getItem("tsv.streaming.browserDeviceId");
+        if (!deviceId) {
+          deviceId = crypto.randomUUID();
+          localStorage.setItem("tsv.streaming.browserDeviceId", deviceId);
+        }
+      } catch {
+        deviceId = crypto.randomUUID();
+      }
       const res = await fetch("/api/netflix/connect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: selectedEmail,
+          deviceId,
           profileName: selectedProfile,
         }),
       });
@@ -1715,7 +1728,7 @@ function ProfileSettingsClient() {
 
 
   const handleDisconnectNetflix = async () => {
-    if (!confirm("¿Seguro que deseas desvincular tu cuenta de Netflix?")) return;
+    if (!confirm("¿Quieres desvincular la sincronización de streaming de todos tus dispositivos?")) return;
     setSaving(true);
     try {
       const res = await fetch("/api/netflix/disconnect", { method: "POST" });
@@ -2142,8 +2155,8 @@ function ProfileSettingsClient() {
                           </div>
                           <p className="mt-1 hidden sm:block text-xs sm:text-sm text-zinc-400 leading-relaxed">
                             {isNetflixConnected
-                              ? `Vinculado como ${netflixAccountInfo.email}. Registrando en tiempo real lo que ves en tus plataformas de streaming.`
-                              : "Vincula la extensión oficial (instalación guiada) para registrar automáticamente y en tiempo real lo que ves en tus plataformas de streaming, sin subir archivos."}
+                              ? `Vinculado como ${netflixAccountInfo.email}. Sincroniza la reproducción de servicios compatibles y recupera los envíos pendientes al volver la conexión.`
+                              : "Vincula la extensión para sincronizar lo que reproduces en servicios compatibles de este navegador. No necesitas tener Netflix."}
                           </p>
                         </div>
                       </div>

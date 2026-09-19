@@ -543,3 +543,17 @@ export const recommendationDismissals = pgTable('recommendation_dismissals', {
   userIdIdx: index('idx_recommendation_dismissals_user').on(t.userId, t.dismissedAt),
   mediaTypeCheck: check('chk_recommendation_dismissals_media_type', sql`media_type IN ('movie', 'tv')`),
 }));
+
+// Recibos de progreso: reintentos seguros incluso tras completar y borrar progreso.
+export const streamingEvents = pgTable('streaming_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  eventId: uuid('event_id').notNull(),
+  entityKey: text('entity_key').notNull(),
+  observedAt: timestamp('observed_at', { withTimezone: true }).notNull(),
+  result: jsonb('result').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  eventUnique: uniqueIndex('idx_streaming_event_unique').on(t.userId, t.eventId),
+  entityTime: index('idx_streaming_event_entity_time').on(t.userId, t.entityKey, t.observedAt),
+}));
