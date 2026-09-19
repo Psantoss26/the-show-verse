@@ -289,7 +289,7 @@ export function UnifiedRateButton({
 // estadísticas y "Compartir" escrito se llevaba un trozo de ancho que allí hace
 // falta. El texto no se pierde: pasa al tooltip y al `aria-label`, que ya
 // existían para la versión móvil.
-export function ActionShareButton({ title, text, url, iconOnly = false }) {
+export function ActionShareButton({ title, text, url, iconOnly = false, animateEntrance = true }) {
   const [copied, setCopied] = useState(false);
   const prefersReducedMotion = useReducedMotion();
 
@@ -331,7 +331,7 @@ export function ActionShareButton({ title, text, url, iconOnly = false }) {
       // compacto y el que muestra etiqueta, Framer mide ambos tamaños y anima
       // la diferencia en los dos sentidos.
       layout={prefersReducedMotion ? false : "size"}
-      initial={{ opacity: 0, y: 8, scale: 0.98 }}
+      initial={animateEntrance ? { opacity: 0, y: 8, scale: 0.98 } : false}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{
         duration: 0.3,

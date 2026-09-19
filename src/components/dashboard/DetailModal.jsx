@@ -83,7 +83,6 @@ import { dashboardDetailHref } from "@/lib/dashboard/detailHref";
 // Componentes reales de la ficha completa (standalone) para que las tarjetas,
 // badges, pestañas y acciones sean IDÉNTICAS a DetailsClient.
 import DetailsScoreboardPanel from "@/components/details/DetailsScoreboardPanel";
-import StreamingProviderLogo from "@/components/details/StreamingProviderLogo";
 import {
   buildTmdbHref,
   buildTraktHref,
@@ -929,6 +928,7 @@ export default function DetailModal({
   };
 
   const [externalLinksOpen, setExternalLinksOpen] = useState(false);
+  const [platformsOpen, setPlatformsOpen] = useState(false);
   // Pestaña activa de la variante de episodio (Detalles / Sinopsis).
   const [episodeTab, setEpisodeTab] = useState("details");
   // Acciones de EPISODIO (visto Trakt + puntuación), como en EpisodeDetails.
@@ -2127,15 +2127,6 @@ export default function DetailModal({
 
   const scoreboard = data.scoreboard || null;
   const scoreStats = scoreboard?.stats || {};
-  const hasScoreStats = Object.values(scoreStats).some(
-    (v) => typeof v === "number",
-  );
-  const hasRatings =
-    !!data.tmdbRating ||
-    typeof data.imdbRating === "number" ||
-    typeof scoreboard?.rating === "number" ||
-    hasScoreStats;
-
   const hasMetaRow =
     !!data.year ||
     !!data.runtime ||
@@ -2146,7 +2137,6 @@ export default function DetailModal({
   const streamingProviders = useMemo(() => {
     const providers = Array.isArray(data.providers) ? data.providers : [];
     return dedupeStreamingProviders(providers)
-      .slice(0, 6)
       .map((provider) =>
         createPlatformItem(provider, {
           endpointType: mediaType,
@@ -2156,7 +2146,6 @@ export default function DetailModal({
       )
       .filter((provider) => provider.icon && provider.hasValidLink);
   }, [data.providers, mediaType, title]);
-  const hasProviders = streamingProviders.length > 0;
 
   const titleQuery = title.trim();
   const yearIso = data.year ? String(data.year).trim() : "";
@@ -2366,7 +2355,6 @@ export default function DetailModal({
     officialSiteUrl,
     seriesGraphUrl,
   ]);
-  const hasExternalLinks = externalLinks.length > 0;
 
   const ratingActionValue =
     userRating ??
@@ -2405,6 +2393,7 @@ export default function DetailModal({
     soundtrackOpen ||
     commentModalOpen ||
     externalLinksOpen ||
+    platformsOpen ||
     traktWatchedOpen ||
     traktEpisodesOpen ||
     episodeRatingsOpen;
@@ -2467,6 +2456,14 @@ export default function DetailModal({
         onDelete={handleCommentDelete}
         title={title}
         myComments={myComments}
+      />
+
+      <ExternalLinksModal
+        open={platformsOpen}
+        onClose={() => setPlatformsOpen(false)}
+        links={streamingProviders}
+        mode="platforms"
+        loading={!data.providersResolved}
       />
 
       {/* Enlaces externos — mismo listado que la ficha completa */}
@@ -3047,37 +3044,11 @@ export default function DetailModal({
                   }}
                 />
               </div>
-
-              {hasProviders ? (
-                <div className="flex shrink-0 flex-wrap items-center justify-center gap-3 self-center sm:justify-end">
-                  {streamingProviders.map((prov) => (
-                    <a
-                      key={prov.key}
-                      href={prov.href}
-                      target={prov.target}
-                      rel={prov.rel}
-                      title={prov.subtitle || prov.title}
-                      aria-label={`Abrir ${prov.title}`}
-                      className="relative shrink-0 transition-transform duration-300 hover:scale-110 active:scale-95"
-                    >
-                      <StreamingProviderLogo provider={prov} />
-                    </a>
-                  ))}
-                </div>
-              ) : !data.providersResolved ? (
-                /* HUECO RESERVADO mientras no se sabe si hay plataformas.
-                   La consulta a /api/streaming (y la de Plex) terminan DESPUÉS del
-                   resto, así que esta fila aparecía tarde y empujaba hacia abajo
-                   premios, características, marcador y pestañas. `h-11` es el alto
-                   de un logo, que es lo que mide la fila con una sola línea. */
-                <div aria-hidden="true" className="h-11 shrink-0 self-center" />
-              ) : null}
             </DetailModalActionsReveal>
             )}
 
             {/* EPISODIO: fila de acciones FUERA del ScoreboardBar (como en pelis/
-                series): botones de visionado + puntuación a la izquierda y las
-                plataformas de streaming a la derecha. */}
+                series): botones de visionado y puntuación. */}
             {isEpisode && (
               <DetailModalActionsReveal
                 className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left"
@@ -3115,31 +3086,6 @@ export default function DetailModal({
                     }}
                   />
                 </div>
-
-                {hasProviders ? (
-                  <div className="flex shrink-0 flex-wrap items-center justify-center gap-3 self-center sm:justify-end">
-                    {streamingProviders.map((prov) => (
-                      <a
-                        key={prov.key}
-                        href={prov.href}
-                        target={prov.target}
-                        rel={prov.rel}
-                        title={prov.subtitle || prov.title}
-                        aria-label={`Abrir ${prov.title}`}
-                        className="relative shrink-0 transition-transform duration-300 hover:scale-110 active:scale-95"
-                      >
-                        <StreamingProviderLogo provider={prov} />
-                      </a>
-                    ))}
-                  </div>
-                ) : !data.providersResolved ? (
-                  /* HUECO RESERVADO mientras no se sabe si hay plataformas.
-                     La consulta a /api/streaming (y la de Plex) terminan DESPUÉS del
-                     resto, así que esta fila aparecía tarde y empujaba hacia abajo
-                     premios, características, marcador y pestañas. `h-11` es el alto
-                     de un logo, que es lo que mide la fila con una sola línea. */
-                  <div aria-hidden="true" className="h-11 shrink-0 self-center" />
-                ) : null}
               </DetailModalActionsReveal>
             )}
 
@@ -3231,102 +3177,104 @@ export default function DetailModal({
             {/* Panel de puntuaciones + plataformas: MISMO componente
                 presentacional que DetailsClient (badges CompactBadge + fila de
                 stats), con plataformas integradas en la barra superior. */}
-            {(hasRatings || hasExternalLinks || isEpisode) && (
-              <div>
-                <DetailsScoreboardPanel
-                  loading={loading}
-                  // El pie de estadísticas de Trakt llega en su propia consulta
-                  // y, al montarse, hacía crecer el panel y empujaba hacia
-                  // abajo las pestañas. Con esto el panel nace ya con su alto
-                  // final. `scoreboardResolved` se marca en TODAS las salidas
-                  // de esa consulta —incluida "este título no está en
-                  // Trakt"—, así que el hueco siempre acaba liberándose.
-                  statsPending={!data.scoreboardResolved}
-                  tmdb={{
-                    value:
-                      data.tmdbRating != null
-                        ? data.tmdbRating
-                        : data.tmdbRatingResolved
-                          ? null
-                          : undefined,
-                    sub:
-                      data.tmdbRating != null
-                        ? formatCountShort(data.tmdbVotes)
+            <div>
+              <DetailsScoreboardPanel
+                loading={loading}
+                // El pie de estadísticas de Trakt llega en su propia consulta
+                // y, al montarse, hacía crecer el panel y empujaba hacia
+                // abajo las pestañas. Con esto el panel nace ya con su alto
+                // final. `scoreboardResolved` se marca en TODAS las salidas
+                // de esa consulta —incluida "este título no está en
+                // Trakt"—, así que el hueco siempre acaba liberándose.
+                statsPending={!data.scoreboardResolved}
+                tmdb={{
+                  value:
+                    data.tmdbRating != null
+                      ? data.tmdbRating
+                      : data.tmdbRatingResolved
+                        ? null
                         : undefined,
-                    href: buildTmdbHref({ type: mediaType, tmdbId: item?.id }),
-                    pending:
-                      !data.tmdbRatingResolved && data.tmdbRating == null,
-                  }}
-                  // Trakt conserva enlace (canónico o búsqueda por TMDb). El badge
-                  // no aparece mientras la nota está pendiente; "-" queda solo
-                  // para ausencia confirmada.
-                  trakt={{
-                    value:
-                      typeof scoreboard?.rating === "number"
-                        ? Number(scoreboard.rating).toFixed(1)
-                        : data.scoreboardResolved
-                          ? null
-                          : undefined,
-                    sub: scoreboard?.votes
-                      ? formatCountShort(scoreboard.votes)
+                  sub:
+                    data.tmdbRating != null
+                      ? formatCountShort(data.tmdbVotes)
                       : undefined,
-                    href: buildTraktHref({
-                      href: scoreboard?.traktUrl || traktStatus?.traktUrl,
-                      title,
-                    }),
-                    pending:
-                      !data.scoreboardResolved &&
-                      typeof scoreboard?.rating !== "number",
-                  }}
-                  traktPublic={null}
-                  imdb={{
-                    value:
-                      typeof data.imdbRating === "number"
-                        ? data.imdbRating.toFixed(1)
-                        : data.imdbRatingResolved
-                          ? null
-                          : undefined,
-                    sub:
-                      typeof data.imdbRating === "number"
-                        ? formatCountShort(data.imdbVotes)
+                  href: buildTmdbHref({ type: mediaType, tmdbId: item?.id }),
+                  pending:
+                    !data.tmdbRatingResolved && data.tmdbRating == null,
+                }}
+                // Trakt conserva enlace (canónico o búsqueda por TMDb). El badge
+                // no aparece mientras la nota está pendiente; "-" queda solo
+                // para ausencia confirmada.
+                trakt={{
+                  value:
+                    typeof scoreboard?.rating === "number"
+                      ? Number(scoreboard.rating).toFixed(1)
+                      : data.scoreboardResolved
+                        ? null
                         : undefined,
-                    href: buildImdbHref({ imdbId: data.imdbId, title }),
-                    pending:
-                      !data.imdbRatingResolved &&
-                      typeof data.imdbRating !== "number",
-                  }}
-                  rt={
-                    data.rtScore != null
-                      ? { value: Math.round(data.rtScore) }
-                      : null
-                  }
-                  mc={
-                    data.mcScore != null
-                      ? { value: Math.round(data.mcScore) }
-                      : null
-                  }
-                  externalLinks={externalLinks}
-                  streamingProviders={[]}
-                  onMoreLinks={(event) => {
-                    stopNestedModalOpeningEvent(event);
-                    setExternalLinksOpen(true);
-                  }}
-                  externalLinksMenuOnly
-                  showExternalLinksLabel
-                  share={{
+                  sub: scoreboard?.votes
+                    ? formatCountShort(scoreboard.votes)
+                    : undefined,
+                  href: buildTraktHref({
+                    href: scoreboard?.traktUrl || traktStatus?.traktUrl,
                     title,
-                    text: `Echa un vistazo a ${title} en The Show Verse`,
-                    url:
-                      typeof window !== "undefined" && item?.id
-                        ? `${window.location.origin}/details/${mediaType}/${item.id}`
+                  }),
+                  pending:
+                    !data.scoreboardResolved &&
+                    typeof scoreboard?.rating !== "number",
+                }}
+                traktPublic={null}
+                imdb={{
+                  value:
+                    typeof data.imdbRating === "number"
+                      ? data.imdbRating.toFixed(1)
+                      : data.imdbRatingResolved
+                        ? null
                         : undefined,
-                  }}
-                  stats={scoreStats}
-                  showFavoritedStat={!isEpisode}
-                  className="max-sm:-mx-2 max-sm:w-[calc(100%+1rem)]"
-                />
-              </div>
-            )}
+                  sub:
+                    typeof data.imdbRating === "number"
+                      ? formatCountShort(data.imdbVotes)
+                      : undefined,
+                  href: buildImdbHref({ imdbId: data.imdbId, title }),
+                  pending:
+                    !data.imdbRatingResolved &&
+                    typeof data.imdbRating !== "number",
+                }}
+                rt={
+                  data.rtScore != null
+                    ? { value: Math.round(data.rtScore) }
+                    : null
+                }
+                mc={
+                  data.mcScore != null
+                    ? { value: Math.round(data.mcScore) }
+                    : null
+                }
+                externalLinks={externalLinks}
+                onMorePlatforms={(event) => {
+                  stopNestedModalOpeningEvent(event);
+                  setPlatformsOpen(true);
+                }}
+                platformsMenuOnly
+                onMoreLinks={(event) => {
+                  stopNestedModalOpeningEvent(event);
+                  setExternalLinksOpen(true);
+                }}
+                externalLinksMenuOnly
+                showExternalLinksLabel
+                share={{
+                  title,
+                  text: `Echa un vistazo a ${title} en The Show Verse`,
+                  url:
+                    typeof window !== "undefined" && item?.id
+                      ? `${window.location.origin}/details/${mediaType}/${item.id}`
+                      : undefined,
+                }}
+                stats={scoreStats}
+                showFavoritedStat={!isEpisode}
+                className="max-sm:-mx-2 max-sm:w-[calc(100%+1rem)]"
+              />
+            </div>
 
             {/* EPISODIO: pestañas Detalles/Sinopsis (mismos componentes que
                 EpisodeDetails). Detalles = Serie/Emisión/Duración/Episodio. */}

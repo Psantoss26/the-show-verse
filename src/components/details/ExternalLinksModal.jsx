@@ -21,6 +21,7 @@ export default function ExternalLinksModal({
     onClose,
     links,
     mode = 'links',
+    loading = false,
 }) {
     const [portalReady, setPortalReady] = useState(false)
     const items = Array.isArray(links) ? links.filter((x) => x?.href) : []
@@ -91,12 +92,19 @@ export default function ExternalLinksModal({
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-6 pb-8 sm:px-8">
+                            {loading && (
+                                <p role="status" className="mb-4 text-center text-sm font-medium text-zinc-400">
+                                    {isPlatformsMode ? 'Cargando plataformas disponibles…' : 'Cargando enlaces…'}
+                                </p>
+                            )}
                             {items.length === 0 ? (
-                                <div
-                                    className="rounded-2xl border border-dashed border-white/10 bg-white/[0.01] px-4 py-10 text-center text-sm font-semibold text-zinc-400"
-                                >
-                                    {emptyMessage}
-                                </div>
+                                !loading && (
+                                    <div
+                                        className="rounded-2xl border border-dashed border-white/10 bg-white/[0.01] px-4 py-10 text-center text-sm font-semibold text-zinc-400"
+                                    >
+                                        {emptyMessage}
+                                    </div>
+                                )
                             ) : (
                                 <ul className="space-y-2">
                                     {items.map((it) => (

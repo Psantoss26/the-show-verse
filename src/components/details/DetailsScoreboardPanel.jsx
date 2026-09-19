@@ -329,6 +329,8 @@ export function DetailsStatsRow({
 //       plataformas, sin modificar la composición de escritorio.
 //    - `externalLinksMenuOnly`: mantiene esos enlaces en el botón también en
 //       escritorio, en vez de desplegarlos como iconos individuales.
+//    - `platformsMenuOnly`: muestra plataformas en un botón etiquetado también
+//      en escritorio (variante de DetailModal).
 //    - `showExternalLinksLabel`: muestra la etiqueta del botón desde `sm`.
 //    - `share`: { title, text?, url? } -> <ActionShareButton>. Se ancla a la
 //       derecha con ml-auto (siempre visible si se pasa).
@@ -380,6 +382,7 @@ function DetailsToolbarActions({
   streamingProviders = null,
   onMoreLinks,
   onMorePlatforms,
+  platformsMenuOnly = false,
   externalLinksMenuOnly = false,
   showExternalLinksLabel = false,
   share = null,
@@ -391,10 +394,24 @@ function DetailsToolbarActions({
     Array.isArray(externalLinks) && externalLinks.length > 0;
   const hasStreamingProviders =
     Array.isArray(streamingProviders) && streamingProviders.length > 0;
-  const hasMobilePlatformAction = typeof onMorePlatforms === "function";
-  const hasDesktopInlineActions = hasExternalLinks || hasStreamingProviders;
+  const hasPlatformAction = typeof onMorePlatforms === "function";
+  const hasMobilePlatformAction = hasPlatformAction && !platformsMenuOnly;
+  const hasDesktopInlineActions =
+    hasExternalLinks || hasStreamingProviders || (hasPlatformAction && platformsMenuOnly);
   const hasInlineActions =
-    hasDesktopInlineActions || hasMobilePlatformAction;
+    hasDesktopInlineActions || hasPlatformAction;
+
+  const shareButton = share ? (
+    <div className={`${platformsMenuOnly ? "" : "ml-auto"} shrink-0 max-sm:[&>button]:!grid max-sm:[&>button]:!place-items-center max-sm:[&>button]:!isolate max-sm:[&>button]:!transform-gpu max-sm:[&>button]:!overflow-hidden max-sm:[&>button]:!w-10 max-sm:[&>button]:!h-10 max-sm:[&>button]:!p-0 max-sm:[&>button]:!rounded-full max-sm:[&>button]:!border-0 max-sm:[&>button]:!ring-0 max-sm:[&>button]:!outline-none max-sm:[&>button]:[-webkit-tap-highlight-color:transparent] max-sm:[&>button]:!bg-black/[0.04] max-sm:[&>button]:!bg-gradient-to-br max-sm:[&>button]:!from-white/10 max-sm:[&>button]:!via-transparent max-sm:[&>button]:!to-black/10 max-sm:[&>button]:!backdrop-blur-[6px] max-sm:[&>button]:!shadow-none max-sm:[&>button]:!text-zinc-200 max-sm:[&>button]:!transition-all max-sm:[&>button]:!duration-300 hover:max-sm:[&>button]:!text-white hover:max-sm:[&>button]:!bg-white/[0.08] hover:max-sm:[&>button]:!-translate-y-0.5 hover:max-sm:[&>button]:!border-0 hover:max-sm:[&>button]:!ring-0 focus:max-sm:[&>button]:!outline-none focus:max-sm:[&>button]:!border-0 focus:max-sm:[&>button]:!ring-0 active:max-sm:[&>button]:!border-0 active:max-sm:[&>button]:!ring-0 max-sm:[&>button>span]:!hidden max-sm:[&>button>svg]:!block max-sm:[&>button>svg]:!h-5 max-sm:[&>button>svg]:!w-5 max-sm:[&>button>svg]:!shrink-0`}>
+      <ActionShareButton
+        title={share.title}
+        text={share.text}
+        url={share.url}
+        iconOnly={shareIconOnly}
+        animateEntrance={!platformsMenuOnly}
+      />
+    </div>
+  ) : null;
 
   return (
     <>
@@ -411,45 +428,76 @@ function DetailsToolbarActions({
             className={`min-w-0 flex flex-none items-center justify-end gap-2.5 sm:flex-1 sm:gap-3 ${hasDesktopInlineActions ? "" : "sm:hidden"}`}
           >
             {/* Versión Desktop: plataformas primero, enlaces externos después. */}
-            <div className="hidden sm:flex items-center gap-2.5 sm:gap-3">
-              {hasStreamingProviders && (
-                <div className="flex items-center gap-2.5 sm:gap-3">
-                  {streamingProviders.map((provider, i) => (
-                    <StreamingProviderButton
-                      key={provider.key ?? `${provider.title}-${i}`}
-                      provider={provider}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {hasStreamingProviders && hasExternalLinks && !externalLinksMenuOnly && (
-                <ToolbarSeparator className="mx-0.5" />
-              )}
-
-              {hasExternalLinks && !externalLinksMenuOnly && (
-                <>
-                  {externalLinks.map((link, i) => {
-                    const key = link.key ?? `${link.icon}-${i}`;
-                    const btn = (
-                      <ExternalLinkButton
-                        icon={link.icon}
-                        title={link.title}
-                        href={link.href}
-                        fallbackHref={link.fallbackHref}
+            {(!platformsMenuOnly || !externalLinksMenuOnly) && (
+              <div className="hidden sm:flex items-center gap-2.5 sm:gap-3">
+                {hasStreamingProviders && !platformsMenuOnly && (
+                  <div className="flex items-center gap-2.5 sm:gap-3">
+                    {streamingProviders.map((provider, i) => (
+                      <StreamingProviderButton
+                        key={provider.key ?? `${provider.title}-${i}`}
+                        provider={provider}
                       />
-                    );
-                    return link.wrapperClassName ? (
-                      <div key={key} className={link.wrapperClassName}>
-                        {btn}
-                      </div>
-                    ) : (
-                      <Fragment key={key}>{btn}</Fragment>
-                    );
-                  })}
-                </>
-              )}
-            </div>
+                    ))}
+                  </div>
+                )}
+
+                {hasStreamingProviders && !platformsMenuOnly && hasExternalLinks && !externalLinksMenuOnly && (
+                  <ToolbarSeparator className="mx-0.5" />
+                )}
+
+                {hasExternalLinks && !externalLinksMenuOnly && (
+                  <>
+                    {externalLinks.map((link, i) => {
+                      const key = link.key ?? `${link.icon}-${i}`;
+                      const btn = (
+                        <ExternalLinkButton
+                          icon={link.icon}
+                          title={link.title}
+                          href={link.href}
+                          fallbackHref={link.fallbackHref}
+                        />
+                      );
+                      return link.wrapperClassName ? (
+                        <div key={key} className={link.wrapperClassName}>
+                          {btn}
+                        </div>
+                      ) : (
+                        <Fragment key={key}>{btn}</Fragment>
+                      );
+                    })}
+                  </>
+                )}
+              </div>
+            )}
+
+            {hasPlatformAction && (
+              <motion.button
+                type="button"
+                onClick={onMorePlatforms}
+                layout={prefersReducedMotion ? false : "size"}
+                initial={false}
+                transition={
+                  prefersReducedMotion
+                    ? { duration: 0 }
+                    : { layout: { duration: 0.3, ease: [0.22, 1, 0.36, 1] } }
+                }
+                aria-haspopup="dialog"
+                className={`relative isolate flex h-10 w-10 shrink-0 transform-gpu items-center justify-center overflow-hidden rounded-full bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 text-zinc-200 shadow-none backdrop-blur-[6px] transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/[0.08] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/30 ${platformsMenuOnly ? "sm:inline-flex sm:h-auto sm:w-auto sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2" : "sm:hidden"}`}
+                title="Plataformas"
+                aria-label="Abrir plataformas disponibles"
+              >
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]"
+                />
+                <MonitorPlay aria-hidden="true" className="relative z-10 h-5 w-5" />
+                {platformsMenuOnly && (
+                  <span className="relative z-10 hidden text-sm font-medium sm:block">
+                    Plataformas
+                  </span>
+                )}
+              </motion.button>
+            )}
 
             {/* En móvil, y en variantes compactas, el botón "..." abre el
                 modal de enlaces para no recargar la barra. */}
@@ -467,7 +515,7 @@ function DetailsToolbarActions({
                     ? { duration: 0 }
                     : { layout: { duration: 0.3, ease: [0.22, 1, 0.36, 1] } }
                 }
-                className={`${hasMobilePlatformAction ? "hidden sm:flex" : externalLinksMenuOnly ? "" : "sm:hidden"} relative isolate h-10 w-10 shrink-0 transform-gpu items-center justify-center overflow-hidden rounded-full bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 text-zinc-200 shadow-none backdrop-blur-[6px] transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/[0.08] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/30 ${showExternalLinksLabel ? "sm:inline-flex sm:h-auto sm:w-auto sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2" : ""}`}
+                className={`${hasMobilePlatformAction ? "hidden sm:flex" : externalLinksMenuOnly ? "flex" : "sm:hidden"} relative isolate h-10 w-10 shrink-0 transform-gpu items-center justify-center overflow-hidden rounded-full bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 text-zinc-200 shadow-none backdrop-blur-[6px] transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/[0.08] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/30 ${showExternalLinksLabel ? "sm:inline-flex sm:h-auto sm:w-auto sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2" : ""}`}
                 title="Enlaces"
                 aria-label="Abrir enlaces externos"
               >
@@ -483,22 +531,7 @@ function DetailsToolbarActions({
                 )}
               </motion.button>
             )}
-
-            {hasMobilePlatformAction && (
-              <button
-                type="button"
-                onClick={onMorePlatforms}
-                className="relative isolate flex h-10 w-10 shrink-0 transform-gpu items-center justify-center overflow-hidden rounded-full bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 text-zinc-200 shadow-none backdrop-blur-[6px] transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/[0.08] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/30 sm:hidden"
-                title="Plataformas"
-                aria-label="Abrir plataformas disponibles"
-              >
-                <span
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]"
-                />
-                <MonitorPlay className="relative z-10 h-5 w-5" />
-              </button>
-            )}
+            {platformsMenuOnly && shareButton}
           </div>
 
           {share && !externalLinksMenuOnly && hasDesktopInlineActions && (
@@ -507,17 +540,8 @@ function DetailsToolbarActions({
         </>
       )}
 
-      {/* ========== Botón de Compartir (anclado a la derecha con ml-auto) ========== */}
-      {share && (
-        <div className="ml-auto shrink-0 max-sm:[&>button]:!grid max-sm:[&>button]:!place-items-center max-sm:[&>button]:!isolate max-sm:[&>button]:!transform-gpu max-sm:[&>button]:!overflow-hidden max-sm:[&>button]:!w-10 max-sm:[&>button]:!h-10 max-sm:[&>button]:!p-0 max-sm:[&>button]:!rounded-full max-sm:[&>button]:!border-0 max-sm:[&>button]:!ring-0 max-sm:[&>button]:!outline-none max-sm:[&>button]:[-webkit-tap-highlight-color:transparent] max-sm:[&>button]:!bg-black/[0.04] max-sm:[&>button]:!bg-gradient-to-br max-sm:[&>button]:!from-white/10 max-sm:[&>button]:!via-transparent max-sm:[&>button]:!to-black/10 max-sm:[&>button]:!backdrop-blur-[6px] max-sm:[&>button]:!shadow-none max-sm:[&>button]:!text-zinc-200 max-sm:[&>button]:!transition-all max-sm:[&>button]:!duration-300 hover:max-sm:[&>button]:!text-white hover:max-sm:[&>button]:!bg-white/[0.08] hover:max-sm:[&>button]:!-translate-y-0.5 hover:max-sm:[&>button]:!border-0 hover:max-sm:[&>button]:!ring-0 focus:max-sm:[&>button]:!outline-none focus:max-sm:[&>button]:!border-0 focus:max-sm:[&>button]:!ring-0 active:max-sm:[&>button]:!border-0 active:max-sm:[&>button]:!ring-0 max-sm:[&>button>span]:!hidden max-sm:[&>button>svg]:!block max-sm:[&>button>svg]:!h-5 max-sm:[&>button>svg]:!w-5 max-sm:[&>button>svg]:!shrink-0">
-          <ActionShareButton
-            title={share.title}
-            text={share.text}
-            url={share.url}
-            iconOnly={shareIconOnly}
-          />
-        </div>
-      )}
+      {/* Fuera de la variante compacta, Compartir conserva su posición. */}
+      {!platformsMenuOnly && shareButton}
 
       {toolbarActions && (
         <>
@@ -559,6 +583,7 @@ export default function DetailsScoreboardPanel({
   streamingProviders = null,
   onMoreLinks,
   onMorePlatforms,
+  platformsMenuOnly = false,
   externalLinksMenuOnly = false,
   showExternalLinksLabel = false,
   share = null,
@@ -637,6 +662,7 @@ export default function DetailsScoreboardPanel({
             streamingProviders={streamingProviders}
             onMoreLinks={onMoreLinks}
             onMorePlatforms={onMorePlatforms}
+            platformsMenuOnly={platformsMenuOnly}
             externalLinksMenuOnly={externalLinksMenuOnly}
             showExternalLinksLabel={showExternalLinksLabel}
             share={share}
