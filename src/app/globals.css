@@ -1273,3 +1273,17 @@ svg.recharts-surface *:focus {
 [data-scroll-restoration-root]:has([data-embedded-details]) {
   padding-bottom: 0;
 }
+
+/* El modo móvil de DetailsClient vive dentro de un iframe en los drawers de
+   las páginas de usuario. Ocultar la barra en el contenedor padre no afecta al
+   documento embebido, así que se aplica aquí sin desactivar su desplazamiento. */
+html:has([data-embedded-details]) {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html:has([data-embedded-details])::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
