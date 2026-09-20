@@ -1,0 +1,23 @@
+/* Consulta el hueco que DEJAN las puntuaciones, no el ancho de la ventana.
+   22rem reserva los tres botones etiquetados, sus gaps y un pequeño margen.
+   La consulta no cambia el tamaño del contenedor: evita oscilaciones al plegar. */
+.actionsViewport {
+  container: detail-score-actions / inline-size;
+  flex: 1 1 0%;
+  min-inline-size: 9rem;
+}
+
+@container detail-score-actions (width < 22rem) {
+  .actionRow button {
+    inline-size: 2.5rem;
+    block-size: 2.5rem;
+    min-inline-size: 2.5rem;
+    padding: 0;
+    gap: 0;
+    border-radius: 9999px;
+  }
+
+  .actionRow button > span:not([aria-hidden]) {
+    display: none;
+  }
+}

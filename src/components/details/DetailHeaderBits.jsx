@@ -1,6 +1,7 @@
 // src/components/details/DetailHeaderBits.jsx
 "use client";
 
+import { canonicalDetailsHref } from "@/lib/navigation/embeddedDetails";
 import OptimizedImage from "@/components/OptimizedImage";
 import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
@@ -295,7 +296,9 @@ export function ActionShareButton({ title, text, url, iconOnly = false, animateE
 
   const handleShare = async () => {
     const finalUrl =
-      url || (typeof window !== "undefined" ? window.location.href : "");
+      url || (typeof window !== "undefined"
+        ? canonicalDetailsHref(window.location.href, window.location.origin).href
+        : "");
     if (!finalUrl) return;
 
     // Dentro de la app de Android no existe navigator.share: el WebView no

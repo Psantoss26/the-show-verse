@@ -24,6 +24,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -37,7 +38,7 @@ import { getMediaTypeForItem } from "@/lib/dashboard/media";
 import { dashboardDetailHref } from "@/lib/dashboard/detailHref";
 import DetailModal from "@/components/dashboard/DetailModal";
 import useModalGuard from "@/hooks/useModalGuard";
-import { useIsMobile } from "@/lib/hooks/useMediaQuery";
+import { useIsMobile, useMediaQuery } from "@/lib/hooks/useMediaQuery";
 
 const DetailModalContext = createContext({
   openDetailModal: null,
@@ -49,6 +50,8 @@ export function useDetailModal() {
   return useContext(DetailModalContext);
 }
 
+const DRAWER_VIEW_STORAGE_KEY = "showverse:detailModalView";
+const CONTENT_VIEW_STORAGE_KEY = "showverse:detailModalContentView";
 const PREVIEW_PARAM = "preview";
 const PREVIEW_RE = /^(movie|tv)-(\d+)$/;
 const EPISODE_RE = /^ep-(\d+)-(\d+)-(\d+)$/;
@@ -124,9 +127,70 @@ export default function DetailModalProvider({ children, placement = "center" }) 
   // En móvil el drawer derecho no aplica: si se abre el modal, es centrado.
   const effectivePlacement = placement === "right" && !isMobile ? "right" : "center";
 
+  const [drawerView, setDrawerView] = useState("overlay");
+  const [contentView, setContentView] = useState(null);
+  const isTablet = useMediaQuery(
+    "(min-width: 768px) and (max-width: 1023px), (min-width: 768px) and (hover: none), (min-width: 768px) and (pointer: coarse)",
+  );
+  const effectiveContentView = contentView ?? (isTablet ? "mobile" : "modal");
+  const contentRef = useRef(null);
+  const drawerWidthRef = useRef(null);
+
+  useEffect(() => {
+    try {
+      const storedContentView = window.localStorage.getItem(CONTENT_VIEW_STORAGE_KEY);
+      if (storedContentView === "mobile" || storedContentView === "modal") {
+        setContentView(storedContentView);
+      }
+      if (window.localStorage.getItem(DRAWER_VIEW_STORAGE_KEY) === "docked") {
+        setDrawerView("docked");
+      }
+    } catch {
+      // La vista sigue funcionando cuando el almacenamiento no está disponible.
+    }
+  }, []);
+
+  const changeDrawerView = useCallback((view) => {
+    if (view !== "overlay" && view !== "docked") return;
+    setDrawerView(view);
+    try {
+      window.localStorage.setItem(DRAWER_VIEW_STORAGE_KEY, view);
+    } catch {
+      // Conserva la elección durante esta sesión.
+    }
+  }, []);
+
+  const changeContentView = useCallback((view) => {
+    if (view !== "mobile" && view !== "modal") return;
+    setContentView(view);
+    try {
+      window.localStorage.setItem(CONTENT_VIEW_STORAGE_KEY, view);
+    } catch {
+      // Conserva la elección en memoria si el almacenamiento no está disponible.
+    }
+  }, []);
+
   // Pila de niveles abiertos. El item activo es el de arriba.
   const [stack, setStack] = useState([]);
   const activeItem = stack.length > 0 ? stack[stack.length - 1] : null;
+  const docked =
+    activeItem != null && effectivePlacement === "right" && drawerView === "docked";
+
+  // Una propiedad NO heredada evita recalcular el estilo de todas las tarjetas
+  // en cada movimiento. El panel y este margen se escriben en el mismo frame.
+  const updateDrawerWidth = useCallback((width) => {
+    drawerWidthRef.current = width;
+    if (docked && contentRef.current) {
+      contentRef.current.style.marginRight = `${width}px`;
+    }
+  }, [docked]);
+
+  useLayoutEffect(() => {
+    if (!contentRef.current) return;
+    contentRef.current.style.marginRight = docked
+      ? (drawerWidthRef.current == null ? "50vw" : `${drawerWidthRef.current}px`)
+      : "";
+  }, [docked]);
 
   // ¿La entrada actual es un CAMBIO (mismo nivel o profundizar) con la ficha ya
   // abierta? Dispara fundido cruzado (en vez de deslizar). Se pasa como `custom`
@@ -276,7 +340,12 @@ export default function DetailModalProvider({ children, placement = "center" }) 
 
   return (
     <DetailModalContext.Provider value={value}>
-      {children}
+      <div
+        ref={contentRef}
+        className="min-w-0 @container/detail-page"
+      >
+        {children}
+      </div>
 
       <AnimatePresence custom={switching}>
         {activeItem && (
@@ -285,6 +354,12 @@ export default function DetailModalProvider({ children, placement = "center" }) 
             item={activeItem}
             onClose={closeDetailModal}
             placement={effectivePlacement}
+            drawerView={drawerView}
+            contentView={effectiveContentView}
+            tabletViewport={isTablet}
+            onContentViewChange={changeContentView}
+            onDrawerViewChange={changeDrawerView}
+            onDrawerWidthChange={updateDrawerWidth}
             // `custom` de AnimatePresence solo llega al panel que SALE. El que
             // ENTRA usa el `custom` de su propio motion.div, así que hay que
             // pasarle `switching` explícitamente; sin esto, al cambiar de título

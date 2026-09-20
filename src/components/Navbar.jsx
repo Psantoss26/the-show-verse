@@ -1383,6 +1383,12 @@ function TopBarGlassLayers({ className = "" }) {
 }
 
 export default function Navbar() {
+  const pathname = usePathname();
+  if (pathname?.startsWith("/embed/details/")) return null;
+  return <NavbarContent />;
+}
+
+function NavbarContent() {
   const { account, hydrated } = useAuth();
   const { t } = useTranslation();
   const pathname = usePathname();

@@ -92,3 +92,45 @@ test("se respeta el ancho pedido cuando está dentro del rango", () => {
   assert.equal(clampDrawerWidth(700, 2541), DRAWER_MIN_PX);
   assert.equal(clampDrawerWidth(9999, 2541), 1271);
 });
+
+test("la ficha móvil acoplada mantiene viewport móvil y espacio para la página", async () => {
+  const { clampMobileDetailsWidth } = await import("./detailModalSizing.js");
+  for (const viewport of [768, 820, 1024, 1180, 1366]) {
+    const min = clampMobileDetailsWidth(0, viewport);
+    const max = clampMobileDetailsWidth(10000, viewport);
+    assert.ok(min >= 320);
+    assert.ok(max < 640);
+    assert.ok(viewport - max >= viewport * 0.4);
+    assert.ok(max > min);
+    assert.equal(clampMobileDetailsWidth(400, viewport), 400);
+  }
+});
+
+
+test("la proporción móvil cabe en ambas orientaciones incluso con un ancho guardado excesivo", async () => {
+  const { clampMobileDetailsWidth, MOBILE_DETAILS_ASPECT_RATIO: ratio } = await import("./detailModalSizing.js");
+  for (const [viewportWidth, viewportHeight] of [[1024, 768], [768, 1024], [1180, 820], [820, 1180], [1366, 1024]]) {
+    for (const requested of [0, 320, 400, 10000, undefined]) {
+      const width = clampMobileDetailsWidth(requested, viewportWidth, viewportHeight);
+      const height = width / ratio;
+      assert.ok(height <= viewportHeight);
+      assert.ok(width < 640);
+      assert.ok(width <= viewportWidth * 0.6);
+      assert.ok(width >= Math.min(320, Math.floor(viewportHeight * ratio)));
+    }
+  }
+  assert.equal(clampMobileDetailsWidth(undefined, 1024, 768), 354);
+});
+
+
+test("DetailModal conserva al menos 120px de arrastre en tablets pequeñas y grandes", () => {
+  for (const viewport of [768, 800, 820, 1024, 1180, 1366]) {
+    const min = clampDrawerWidth(0, viewport, { tablet: true });
+    const max = clampDrawerWidth(10000, viewport, { tablet: true });
+    assert.ok(max - min >= DRAWER_MIN_TRAVEL_PX);
+    assert.ok(min >= 320);
+    assert.ok(max <= Math.round(viewport * DRAWER_MAX_VIEWPORT_SHARE));
+    const requested = min + 60;
+    assert.equal(clampDrawerWidth(requested, viewport, { tablet: true }), requested);
+  }
+});

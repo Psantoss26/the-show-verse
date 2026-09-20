@@ -27,6 +27,7 @@
 // formatShortNumber para garantizar que ambos consumidores rindan igual.
 
 import { Fragment } from "react";
+import styles from "./DetailsScoreboardPanel.module.css";
 import { motion, useReducedMotion } from "framer-motion";
 import NextImage from "next/image";
 import { Eye, Play, List, Heart, MoreHorizontal, MonitorPlay } from "lucide-react";
@@ -429,8 +430,9 @@ function DetailsToolbarActions({
           </div>
 
           <div
-            className={`min-w-0 flex flex-none items-center justify-end gap-2.5 sm:flex-1 sm:gap-3 ${hasDesktopInlineActions ? "" : "sm:hidden"}`}
+            className={`min-w-0 flex flex-none items-center justify-end gap-2.5 sm:flex-1 sm:gap-3 ${hasDesktopInlineActions ? "" : "sm:hidden"} ${platformsMenuOnly ? styles.actionsViewport : ""}`}
           >
+            <div className={`flex w-full items-center justify-end gap-2.5 sm:gap-3 ${platformsMenuOnly ? styles.actionRow : ""}`}>
             {/* Versión Desktop: plataformas primero, enlaces externos después. */}
             {(!platformsMenuOnly || !externalLinksMenuOnly) && (
               <div className="hidden sm:flex items-center gap-2.5 sm:gap-3">
@@ -536,6 +538,7 @@ function DetailsToolbarActions({
               </motion.button>
             )}
             {platformsMenuOnly && shareButton}
+            </div>
           </div>
 
           {share && !externalLinksMenuOnly && hasDesktopInlineActions && (
