@@ -117,9 +117,9 @@ function cacheProfile(key, profile) {
 function ProfileBackdrop() {
   return (
     <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden="true">
-      <div className="absolute -top-[10%] -left-[5%] aspect-square w-[60vw] max-w-[800px] rounded-full bg-emerald-600/15 blur-[120px] sm:blur-[150px]" />
-      <div className="absolute top-[15%] -right-[5%] aspect-square w-[55vw] max-w-[700px] rounded-full bg-emerald-700/20 blur-[120px] sm:blur-[150px]" />
-      <div className="absolute -bottom-[10%] left-[15%] aspect-square w-[65vw] max-w-[800px] rounded-full bg-teal-800/25 blur-[120px] sm:blur-[150px]" />
+      <div className="absolute -top-[10%] -left-[5%] aspect-square w-[60vw] max-w-[800px] rounded-full bg-emerald-600/15 blur-[120px] @[640px]/detail-page:blur-[150px]" />
+      <div className="absolute top-[15%] -right-[5%] aspect-square w-[55vw] max-w-[700px] rounded-full bg-emerald-700/20 blur-[120px] @[640px]/detail-page:blur-[150px]" />
+      <div className="absolute -bottom-[10%] left-[15%] aspect-square w-[65vw] max-w-[800px] rounded-full bg-teal-800/25 blur-[120px] @[640px]/detail-page:blur-[150px]" />
     </div>
   );
 }
@@ -136,7 +136,7 @@ function ProfilePendingSurface() {
 // Utilidades de presentación
 // ─────────────────────────────────────────────
 
-function ProfileAvatar({ user, size = "h-22 w-22 sm:h-26 sm:w-26" }) {
+function ProfileAvatar({ user, size = "h-22 w-22 @[640px]/detail-page:h-26 @[640px]/detail-page:w-26" }) {
   return (
     <div className={`flex ${size} items-center justify-center overflow-hidden rounded-full bg-neutral-800 text-3xl font-black text-white ring-2 ring-white/10`}>
       <Avatar
@@ -149,14 +149,14 @@ function ProfileAvatar({ user, size = "h-22 w-22 sm:h-26 sm:w-26" }) {
 }
 
 function CountStat({ value, label, href, icon: Icon, iconClassName = "text-emerald-400" }) {
-  const className = "relative flex min-w-0 flex-1 flex-col items-center justify-center overflow-hidden rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 px-4 py-3 text-center shadow-lg transition duration-300 hover:-translate-y-0.5 hover:from-white/[0.16] hover:to-white/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 sm:min-w-[120px] sm:px-5 sm:py-4";
+  const className = "relative flex min-w-0 flex-1 flex-col items-center justify-center overflow-hidden rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 px-4 py-3 text-center shadow-lg transition duration-300 hover:-translate-y-0.5 hover:from-white/[0.16] hover:to-white/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 @[640px]/detail-page:min-w-[120px] @[640px]/detail-page:px-5 @[640px]/detail-page:py-4";
   const body = (
     <>
       <span className={`relative z-10 mb-1 inline-flex h-7 w-7 items-center justify-center ${iconClassName}`}>
         <Icon className="h-6 w-6" aria-hidden="true" />
       </span>
-      <span className="relative z-10 block text-xl font-black tracking-tight text-white drop-shadow-md sm:text-2xl lg:text-3xl">{value ?? 0}</span>
-      <span className="relative z-10 mt-0.5 block text-[9px] font-bold uppercase tracking-wider text-zinc-300 sm:text-[10px]">
+      <span className="relative z-10 block text-xl font-black tracking-tight text-white drop-shadow-md @[640px]/detail-page:text-2xl @[1024px]/detail-page:text-3xl">{value ?? 0}</span>
+      <span className="relative z-10 mt-0.5 block text-[9px] font-bold uppercase tracking-wider text-zinc-300 @[640px]/detail-page:text-[10px]">
         {label}
       </span>
     </>
@@ -187,12 +187,12 @@ function ProfilePosterGrid({
       data-profile-swipe-exempt={prioritizeHorizontalScroll || undefined}
       role="region"
       aria-label={label}
-      className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-5 sm:overflow-visible sm:pb-0"
+      className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden @[640px]/detail-page:grid @[640px]/detail-page:grid-cols-5 @[640px]/detail-page:overflow-visible @[640px]/detail-page:pb-0"
     >
       {items.map((item) => (
         <div
           key={`${item.mediaType}:${item.tmdbId}`}
-          className="w-[calc((100%_-_1.5rem)_/_3)] shrink-0 snap-start sm:w-auto"
+          className="w-[calc((100%_-_1.5rem)_/_3)] shrink-0 snap-start @[640px]/detail-page:w-auto"
         >
           <PosterTile
             item={item}
@@ -270,7 +270,7 @@ function PendingPreview({ username, items, onOpen }) {
       />
       {pendingItems.length ? (
         /* Mazo de pósters apilados sin fondo ni borde contenedor */
-        <div className="relative flex h-[170px] sm:h-[190px] w-full items-center justify-start overflow-visible py-3">
+        <div className="relative flex h-[170px] @[640px]/detail-page:h-[190px] w-full items-center justify-start overflow-visible py-3">
           {pendingItems.map((item, index) => {
             const source = item.posterPath ? `https://image.tmdb.org/t/p/w342${item.posterPath}` : null;
             const href = `/details/${item.mediaType === "tv" ? "tv" : "movie"}/${item.tmdbId}`;
@@ -307,7 +307,7 @@ function PendingPreview({ username, items, onOpen }) {
         </div>
       ) : pendingStatus === "loading" ? (
         // Misma altura que el mazo de pósters para que al cargar no salte lo de debajo.
-        <div className="flex h-[170px] sm:h-[190px] w-full items-center justify-center rounded-2xl border border-white/[0.06] bg-white/[0.025]">
+        <div className="flex h-[170px] @[640px]/detail-page:h-[190px] w-full items-center justify-center rounded-2xl border border-white/[0.06] bg-white/[0.025]">
           <Loader2 className="h-5 w-5 animate-spin text-emerald-400/70" aria-label="Cargando pendientes" />
         </div>
       ) : (
@@ -925,7 +925,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
 
   return (
     <div
-      className="min-h-screen bg-black text-zinc-100 pb-0 lg:pb-24"
+      className="min-h-screen bg-black text-zinc-100 pb-0 @[1024px]/detail-page:pb-24"
       onTouchStartCapture={handleProfileTouchStart}
       onTouchEndCapture={handleProfileTouchEnd}
       onTouchCancelCapture={() => { profileSwipe.current = null; }}
@@ -933,26 +933,26 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
       {/* Fondo decorativo sutil */}
       <ProfileBackdrop />
 
-      <div className="relative z-10 mx-auto max-w-[1600px] px-4 pb-8 pt-4 sm:px-6 sm:py-8 lg:px-8 lg:py-12">
+      <div className="relative z-10 mx-auto max-w-[1600px] px-4 pb-8 pt-4 @[640px]/detail-page:px-6 @[640px]/detail-page:py-8 @[1024px]/detail-page:px-8 @[1024px]/detail-page:py-12">
         {/* ── CABECERA ── */}
-        <header className="sv-profile-entry sv-profile-entry--header flex flex-wrap items-center gap-3 lg:flex-nowrap lg:justify-between lg:gap-6">
-          <ProfileAvatar user={user} size="h-16 w-16 shrink-0 sm:h-26 sm:w-26" />
+        <header className="sv-profile-entry sv-profile-entry--header flex flex-wrap items-center gap-3 @[1024px]/detail-page:flex-nowrap @[1024px]/detail-page:justify-between @[1024px]/detail-page:gap-6">
+          <ProfileAvatar user={user} size="h-16 w-16 shrink-0 @[640px]/detail-page:h-26 @[640px]/detail-page:w-26" />
           <div className="min-w-0 flex-1 text-left">
-            <div className="flex min-w-0 items-center justify-between gap-2 lg:justify-start lg:gap-4">
-              <h1 className="min-w-0 flex-1 truncate text-[clamp(1.35rem,6vw,2rem)] font-black leading-[0.95] tracking-[-0.06em] text-white lg:flex-none sm:text-[clamp(2.25rem,4.1vw,3.5rem)]">
+            <div className="flex min-w-0 items-center justify-between gap-2 @[1024px]/detail-page:justify-start @[1024px]/detail-page:gap-4">
+              <h1 className="min-w-0 flex-1 truncate text-[clamp(1.35rem,6vw,2rem)] font-black leading-[0.95] tracking-[-0.06em] text-white @[1024px]/detail-page:flex-none @[640px]/detail-page:text-[clamp(2.25rem,4.1vw,3.5rem)]">
                 {user.displayName}<span className="text-emerald-400">.</span>
               </h1>
               {isSelf ? (
-                <div className="flex shrink-0 items-center gap-1 sm:gap-2" aria-label="Acciones de perfil">
+                <div className="flex shrink-0 items-center gap-1 @[640px]/detail-page:gap-2" aria-label="Acciones de perfil">
                   <LiquidButton
                     onClick={() => window.location.assign("/profile/settings")}
                     disabled={syncing}
                     activeColor="teal"
                     groupId="profile-header-actions"
                     title="Configuración"
-                    className="!h-10 !w-10 sm:!h-12 sm:!w-12 !border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent shadow-lg backdrop-blur-md hover:!bg-white/15"
+                    className="!h-10 !w-10 @[640px]/detail-page:!h-12 @[640px]/detail-page:!w-12 !border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent shadow-lg backdrop-blur-md hover:!bg-white/15"
                   >
-                    <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <Settings className="h-4 w-4 @[640px]/detail-page:h-5 @[640px]/detail-page:w-5" />
                   </LiquidButton>
                   <LiquidButton
                     onClick={() => setRefreshToken((value) => value + 1)}
@@ -961,9 +961,9 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
                     activeColor="green"
                     groupId="profile-header-actions"
                     title="Sincronizar"
-                    className="!h-10 !w-10 sm:!h-12 sm:!w-12 !border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent shadow-lg backdrop-blur-md hover:!bg-white/15"
+                    className="!h-10 !w-10 @[640px]/detail-page:!h-12 @[640px]/detail-page:!w-12 !border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent shadow-lg backdrop-blur-md hover:!bg-white/15"
                   >
-                    <RotateCcw className={`h-4 w-4 sm:h-5 sm:w-5 ${syncing ? "animate-spin" : ""}`} />
+                    <RotateCcw className={`h-4 w-4 @[640px]/detail-page:h-5 @[640px]/detail-page:w-5 ${syncing ? "animate-spin" : ""}`} />
                   </LiquidButton>
                   <LiquidButton
                     onClick={() => logout({ redirectTo: "/login" })}
@@ -971,9 +971,9 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
                     activeColor="red"
                     groupId="profile-header-actions"
                     title="Desconectar"
-                    className="!h-10 !w-10 sm:!h-12 sm:!w-12 !border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent !text-red-400 shadow-lg backdrop-blur-md hover:!bg-white/15 hover:!text-red-300"
+                    className="!h-10 !w-10 @[640px]/detail-page:!h-12 @[640px]/detail-page:!w-12 !border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent !text-red-400 shadow-lg backdrop-blur-md hover:!bg-white/15 hover:!text-red-300"
                   >
-                    <LogOut className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <LogOut className="h-4 w-4 @[640px]/detail-page:h-5 @[640px]/detail-page:w-5" />
                   </LiquidButton>
                 </div>
               ) : (
@@ -983,7 +983,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
                 />
               )}
             </div>
-            <p className="mt-0.5 truncate text-xs font-semibold tracking-tight text-zinc-500 sm:mt-2 sm:text-sm">@{user.username}</p>
+            <p className="mt-0.5 truncate text-xs font-semibold tracking-tight text-zinc-500 @[640px]/detail-page:mt-2 @[640px]/detail-page:text-sm">@{user.username}</p>
             {user.bio && (
               <p className="mt-3 max-w-xl text-sm leading-relaxed text-zinc-400">
                 {user.bio}
@@ -992,7 +992,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
           </div>
 
           {/* Contadores */}
-          <div className="order-3 grid w-full grid-cols-4 gap-2 sm:gap-3 lg:order-none lg:w-auto lg:pl-4">
+          <div className="order-3 grid w-full grid-cols-4 gap-2 @[640px]/detail-page:gap-3 @[1024px]/detail-page:order-none @[1024px]/detail-page:w-auto @[1024px]/detail-page:pl-4">
             <CountStat value={counts.films} label="Películas" icon={Film} iconClassName="text-sky-400" />
             <CountStat value={stats.completedShows} label="Series" icon={CheckCircle2} iconClassName="text-violet-400" />
             <CountStat
@@ -1042,14 +1042,14 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
             )}
           </div>
         ) : tab !== "profile" ? (
-          <div className="sv-profile-entry sv-profile-entry--content mt-5 sm:mt-6">
+          <div className="sv-profile-entry sv-profile-entry--content mt-5 @[640px]/detail-page:mt-6">
             {/* `key={tab}` remonta la sección al cambiar de pestaña: evita un
                 render intermedio con el layout nuevo pero los items del layout
                 anterior (que no comparten forma de `key`) → aviso de keys. */}
             <ProfileSection key={tab} username={user.username} section={tab} actor={user} />
           </div>
         ) : (
-        <div className="mt-8 grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_400px]">
+        <div className="mt-8 grid grid-cols-1 gap-8 @[1280px]/detail-page:grid-cols-[minmax(0,1fr)_360px] @[1536px]/detail-page:grid-cols-[minmax(0,1fr)_400px]">
           {/* ── COLUMNA PRINCIPAL ── */}
           <div className="sv-profile-entry sv-profile-entry--content space-y-10">
             {/* Favoritos curados, separados por tipo para mostrar cinco de cada uno. */}
@@ -1111,7 +1111,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
           </div>
 
           {/* ── COLUMNA LATERAL ── */}
-          <aside className="sv-profile-entry sv-profile-entry--aside space-y-8 xl:sticky xl:top-24 xl:self-start">
+          <aside className="sv-profile-entry sv-profile-entry--aside space-y-8 @[1280px]/detail-page:sticky @[1280px]/detail-page:top-24 @[1280px]/detail-page:self-start">
             {/* Nivel y experiencia: encabeza el lateral, antes del resumen del mes */}
             <ProfileLevelSidebar
               level={profile.level}
@@ -1226,7 +1226,7 @@ function ProfileTabs({ tab, username, sections, onNavigate, routeBase }) {
       data-profile-horizontal-scroll
       data-profile-swipe-exempt
       aria-label="Secciones del perfil"
-      className="mt-3 flex gap-1 overflow-x-auto border-b border-white/10 pb-px snap-x snap-proximity overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] sm:mt-8 [&::-webkit-scrollbar]:hidden"
+      className="mt-3 flex gap-1 overflow-x-auto border-b border-white/10 pb-px snap-x snap-proximity overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] @[640px]/detail-page:mt-8 [&::-webkit-scrollbar]:hidden"
     >
       {items.map((it) => {
         const active = tab === it.id;
@@ -1253,13 +1253,13 @@ function ProfileTabs({ tab, username, sections, onNavigate, routeBase }) {
             scroll={false}
             onClick={handleNavigate}
             data-profile-tab-active={active || undefined}
-            className={`relative flex w-[calc((100%_-_0.75rem)_/_4)] shrink-0 snap-start items-center justify-center whitespace-nowrap px-0 py-2.5 text-[clamp(0.625rem,2.7vw,0.6875rem)] font-bold uppercase tracking-normal transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400/70 sm:w-auto sm:justify-start sm:px-3.5 sm:text-xs sm:tracking-widest ${
+            className={`relative flex w-[calc((100%_-_0.75rem)_/_4)] shrink-0 snap-start items-center justify-center whitespace-nowrap px-0 py-2.5 text-[clamp(0.625rem,2.7vw,0.6875rem)] font-bold uppercase tracking-normal transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400/70 @[640px]/detail-page:w-auto @[640px]/detail-page:justify-start @[640px]/detail-page:px-3.5 @[640px]/detail-page:text-xs @[640px]/detail-page:tracking-widest ${
               active ? "text-white" : "text-zinc-500 hover:text-zinc-300"
             }`}
           >
             {it.label}
             {typeof it.count === "number" && (
-              <span className={`ml-1.5 hidden text-[10px] font-semibold tracking-normal sm:inline ${active ? "text-emerald-400" : "text-zinc-600"}`}>
+              <span className={`ml-1.5 hidden text-[10px] font-semibold tracking-normal @[640px]/detail-page:inline ${active ? "text-emerald-400" : "text-zinc-600"}`}>
                 {it.count}
               </span>
             )}
@@ -1322,9 +1322,9 @@ function ProfileLevelSidebar({ level, username, routeBase, onNavigate }) {
 
 function StatCell({ value, label }) {
   return (
-    <div className="min-w-0 rounded-xl bg-zinc-900/40 px-1.5 py-2.5 text-center shadow-sm sm:px-2">
-      <span className="block text-base font-black leading-none text-white sm:text-lg">{value ?? 0}</span>
-      <span className="mt-1 block text-[8px] font-bold uppercase leading-3 tracking-[0.08em] text-zinc-500 sm:text-[9px]">
+    <div className="min-w-0 rounded-xl bg-zinc-900/40 px-1.5 py-2.5 text-center shadow-sm @[640px]/detail-page:px-2">
+      <span className="block text-base font-black leading-none text-white @[640px]/detail-page:text-lg">{value ?? 0}</span>
+      <span className="mt-1 block text-[8px] font-bold uppercase leading-3 tracking-[0.08em] text-zinc-500 @[640px]/detail-page:text-[9px]">
         {label}
       </span>
     </div>
@@ -1340,7 +1340,7 @@ function formatProfileTime(minutes) {
 function AnalyticsCard({ title, icon: Icon, iconClassName = "text-emerald-400", children, className = "" }) {
   return (
     <section
-      className={`min-w-0 rounded-xl bg-zinc-900/30 p-4 shadow-sm sm:p-5 ${className}`}
+      className={`min-w-0 rounded-xl bg-zinc-900/30 p-4 shadow-sm @[640px]/detail-page:p-5 ${className}`}
     >
       <div className="mb-3 flex items-center gap-2.5">
         {/* El icono va SUELTO: sin pastilla de fondo ni borde. Antes vivía dentro
@@ -1377,12 +1377,12 @@ function ProfileAnalytics({ analytics }) {
   const hasActivity = analytics.monthlyActivity?.some((item) => item.total > 0);
   return (
     <section className="space-y-4">
-      <div className="grid min-w-0 gap-4 xl:grid-cols-12">
+      <div className="grid min-w-0 gap-4 @[1280px]/detail-page:grid-cols-12">
         <AnalyticsCard
           title="Actividad mensual"
           icon={Activity}
           iconClassName="text-indigo-400"
-          className="xl:col-span-6"
+          className="@[1280px]/detail-page:col-span-6"
         >
           {hasActivity ? (
             <MonthlyActivityChart data={analytics.monthlyActivity} />
@@ -1394,7 +1394,7 @@ function ProfileAnalytics({ analytics }) {
           title="Tiempo de visionado"
           icon={PieChart}
           iconClassName="text-violet-400"
-          className="xl:col-span-3"
+          className="@[1280px]/detail-page:col-span-3"
         >
           {analytics.totalMinutes > 0 ? (
             <TimeDistributionChart
@@ -1407,12 +1407,12 @@ function ProfileAnalytics({ analytics }) {
         </AnalyticsCard>
         <aside
           aria-label="Resumen de hábitos"
-          className="grid min-w-0 grid-cols-3 gap-2 sm:grid-cols-2 xl:col-span-3"
+          className="grid min-w-0 grid-cols-3 gap-2 @[640px]/detail-page:grid-cols-2 @[1280px]/detail-page:col-span-3"
         >
           <HabitMetrics insights={analytics.insights} />
         </aside>
       </div>
-      <div className="grid min-w-0 gap-4 md:grid-cols-2">
+      <div className="grid min-w-0 gap-4 @[768px]/detail-page:grid-cols-2">
         <AnalyticsCard title="Hora del día" icon={Clock3} iconClassName="text-pink-400">
           {hasActivity ? <HourOfDayChart data={analytics.hourOfDay || []} /> : <EmptyChart />}
         </AnalyticsCard>
@@ -1474,10 +1474,10 @@ function HabitMetric({ icon: Icon, label, value, tone = "emerald" }) {
       <span className={`relative z-10 mb-1 inline-flex h-6 w-6 items-center justify-center drop-shadow-[0_0_5px_currentColor] ${toneClass}`}>
         <Icon className="h-5 w-5" aria-hidden="true" />
       </span>
-      <span className="relative z-10 block max-w-full truncate text-base font-black tracking-tight text-white drop-shadow-md sm:text-lg">
+      <span className="relative z-10 block max-w-full truncate text-base font-black tracking-tight text-white drop-shadow-md @[640px]/detail-page:text-lg">
         {value}
       </span>
-      <span className="relative z-10 mt-0.5 block max-w-full truncate text-[8px] font-bold uppercase tracking-wider text-zinc-300 sm:text-[9px]">
+      <span className="relative z-10 mt-0.5 block max-w-full truncate text-[8px] font-bold uppercase tracking-wider text-zinc-300 @[640px]/detail-page:text-[9px]">
         {label}
       </span>
     </div>

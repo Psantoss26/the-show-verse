@@ -52,7 +52,7 @@ export const DRAWER_MAX_VIEWPORT_SHARE = 0.7;
 // cero equivale a un control que no responde.
 export const DRAWER_MIN_TRAVEL_PX = 120;
 
-export function clampDrawerWidth(width, viewportWidth) {
+export function clampDrawerWidth(width, viewportWidth, { tablet = false } = {}) {
   const vw = viewportWidth || 1280;
   const medioViewport = Math.round(vw * 0.5);
   const techo = Math.round(vw * DRAWER_MAX_VIEWPORT_SHARE);
@@ -70,6 +70,24 @@ export function clampDrawerWidth(width, viewportWidth) {
 
   // Se sigue acotando por si el máximo cayera por debajo del mínimo (ventanas
   // estrechas): ahí el cajón queda fijo al máximo en lugar de romperse.
-  const min = Math.min(DRAWER_MIN_PX, max);
+  // En tablet debe quedar recorrido incluso si no caben los 896px de escritorio.
+  const min = tablet
+    ? Math.min(560, max - DRAWER_MIN_TRAVEL_PX)
+    : Math.min(DRAWER_MIN_PX, max);
   return Math.max(min, Math.min(Math.round(width || 0), max));
+}
+
+// Proporción de un teléfono vertical moderno (ancho / alto).
+export const MOBILE_DETAILS_ASPECT_RATIO = 9 / 19.5;
+
+// La ficha conserva tanto la proporción móvil como espacio para la página.
+// El límite por altura impide que el teléfono se salga de la pantalla.
+export function clampMobileDetailsWidth(width, viewportWidth, viewportHeight = Infinity) {
+  const max = Math.min(
+    639,
+    Math.floor(viewportWidth * 0.6),
+    Math.floor(viewportHeight * MOBILE_DETAILS_ASPECT_RATIO),
+  );
+  const min = Math.min(320, max);
+  return Math.max(min, Math.min(Math.round(width ?? max), max));
 }

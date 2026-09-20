@@ -1268,3 +1268,8 @@ svg.recharts-surface *:focus {
 [data-offline-blocked="true"] {
   cursor: not-allowed !important;
 }
+
+/* La ficha embebida conserva su viewport móvil; la navegación pertenece al padre. */
+[data-scroll-restoration-root]:has([data-embedded-details]) {
+  padding-bottom: 0;
+}

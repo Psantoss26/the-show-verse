@@ -550,9 +550,9 @@ function ProfileMenuDropdown({ label, valueLabel, icon: Icon, options, value, on
       >
         <span className="flex min-w-0 items-center gap-2">
           <Icon className="h-4 w-4 shrink-0 text-emerald-400" aria-hidden="true" />
-          <span className="hidden text-xs font-bold uppercase tracking-wider text-zinc-500 sm:inline">{label}:</span>
-          <span className="hidden min-w-0 truncate font-semibold text-white sm:inline">{valueLabel}</span>
-          <span className="min-w-0 truncate font-semibold text-white sm:hidden">{valueLabel}</span>
+          <span className="hidden text-xs font-bold uppercase tracking-wider text-zinc-500 @[640px]/detail-page:inline">{label}:</span>
+          <span className="hidden min-w-0 truncate font-semibold text-white @[640px]/detail-page:inline">{valueLabel}</span>
+          <span className="min-w-0 truncate font-semibold text-white @[640px]/detail-page:hidden">{valueLabel}</span>
         </span>
         <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
       </button>
@@ -647,8 +647,8 @@ function ProfileSectionToolbar({ section, controls, onChange }) {
 
 
   return (
-    <section aria-label="Opciones de la sección" className="relative z-20 mb-5 space-y-2 sm:mb-6">
-      <div className="flex gap-2 lg:hidden">
+    <section aria-label="Opciones de la sección" className="relative z-20 mb-5 space-y-2 @[640px]/detail-page:mb-6">
+      <div className="flex gap-2 @[1024px]/detail-page:hidden">
         <label className="relative min-w-0 flex-1">
           <span className="sr-only">Buscar en esta sección</span>
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-400" aria-hidden="true" />
@@ -683,7 +683,7 @@ function ProfileSectionToolbar({ section, controls, onChange }) {
         </button>
       </div>
 
-      <div className="hidden grid-cols-1 gap-2 lg:grid lg:grid-cols-[minmax(13rem,1.35fr)_repeat(3,minmax(10rem,1fr))_minmax(10rem,0.8fr)]">
+      <div className="hidden grid-cols-1 gap-2 @[1024px]/detail-page:grid @[1024px]/detail-page:grid-cols-[minmax(13rem,1.35fr)_repeat(3,minmax(10rem,1fr))_minmax(10rem,0.8fr)]">
         <label className="relative min-w-0">
           <span className="sr-only">Buscar en esta sección</span>
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-400" aria-hidden="true" />
@@ -705,7 +705,7 @@ function ProfileSectionToolbar({ section, controls, onChange }) {
         <ProfileViewMode value={controls.view} options={options.views} onChange={handleViewChange} />
       </div>
 
-      <div id={`profile-menu-${section}`} className={`${mobileControlsOpen ? "grid" : "hidden"} grid-cols-2 gap-2 lg:hidden`}>
+      <div id={`profile-menu-${section}`} className={`${mobileControlsOpen ? "grid" : "hidden"} grid-cols-2 gap-2 @[1024px]/detail-page:hidden`}>
         <ProfileMenuDropdown label={section === "activity" ? "Acción" : "Tipo"} valueLabel={filterLabel} icon={Filter} options={options.filters} value={controls.filter} onChange={(filter) => onChange({ filter })} />
         <ProfileMenuDropdown label="Ordenar" valueLabel={sortLabel} icon={ArrowUpDown} options={options.sorts} value={controls.sort} onChange={(sort) => onChange({ sort })} />
         <ProfileMenuDropdown label="Agrupar" valueLabel={groupLabel} icon={Layers3} options={options.groups} value={controls.group} onChange={(group) => onChange({ group })} />
@@ -777,14 +777,14 @@ function ActivityReview({ item, actor, compact = false, posterList = false }) {
   const src = item.posterPath ? `https://image.tmdb.org/t/p/w185${item.posterPath}` : null;
 
   return (
-    <article className={`rounded-xl border border-white/[0.09] bg-gradient-to-br from-white/[0.07] via-white/[0.035] to-transparent shadow-[0_16px_38px_rgba(0,0,0,0.2)] ${compact ? "p-3" : "p-4 sm:p-5"}`}>
-      <div className="flex gap-3 sm:gap-4">
+    <article className={`rounded-xl border border-white/[0.09] bg-gradient-to-br from-white/[0.07] via-white/[0.035] to-transparent shadow-[0_16px_38px_rgba(0,0,0,0.2)] ${compact ? "p-3" : "p-4 @[640px]/detail-page:p-5"}`}>
+      <div className="flex gap-3 @[640px]/detail-page:gap-4">
         {posterList ? (
           <ActivityPoster item={item} className="h-32 w-[5.4rem] rounded-lg" />
         ) : (
           <>
             <ActivityAvatar actor={actor} />
-            <Link href={href} onClick={previewClick(item, { mediaType: type, episode: getEpisodePreview(item) })} className="hidden h-28 w-[76px] shrink-0 overflow-hidden rounded-lg bg-zinc-900 ring-1 ring-white/10 sm:block">
+            <Link href={href} onClick={previewClick(item, { mediaType: type, episode: getEpisodePreview(item) })} className="hidden h-28 w-[76px] shrink-0 overflow-hidden rounded-lg bg-zinc-900 ring-1 ring-white/10 @[640px]/detail-page:block">
               {src ? (
                 <OptimizedImage src={src} alt={item.title || ""} className="h-full w-full object-cover" loading="lazy" />
               ) : (
@@ -805,7 +805,7 @@ function ActivityReview({ item, actor, compact = false, posterList = false }) {
               Contiene spoilers — mostrar reseña
             </button>
           ) : (
-            <p className="mt-3 whitespace-pre-line text-sm leading-6 text-zinc-200 sm:text-[15px] sm:leading-7">{item.body}</p>
+            <p className="mt-3 whitespace-pre-line text-sm leading-6 text-zinc-200 @[640px]/detail-page:text-[15px] @[640px]/detail-page:leading-7">{item.body}</p>
           )}
           <time dateTime={item.createdAt} className="mt-3 block text-xs font-medium text-zinc-500">
             {relativeActivityTime(item.createdAt)}
@@ -838,7 +838,7 @@ function ActivityRow({ item, actor, compact = false, posterList = false }) {
     item.type === "rating" ? `${formatActivityRatingTarget(item)} ` : "";
 
   return (
-    <article className={`flex min-w-0 items-center gap-3 border-b border-white/[0.07] px-3 last:border-b-0 sm:px-4 ${compact ? "py-2" : "py-3"}`}>
+    <article className={`flex min-w-0 items-center gap-3 border-b border-white/[0.07] px-3 last:border-b-0 @[640px]/detail-page:px-4 ${compact ? "py-2" : "py-3"}`}>
       {posterList ? (
         <ActivityPoster item={item} className="h-[4.25rem] w-[2.85rem] rounded-lg" />
       ) : (
@@ -1038,8 +1038,8 @@ function ProfileListCard({ item }) {
   return (
     <div ref={ref} className="h-full">
       <Link href={`/lists/${item.id}`} className="group block h-full">
-        <div className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-white/5 bg-zinc-900/40 transition-all md:hover:border-white/10 md:hover:bg-zinc-900/60">
-          <div className="relative aspect-video w-full overflow-hidden bg-zinc-950 transition-opacity md:group-hover:opacity-90">
+        <div className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-white/5 bg-zinc-900/40 transition-all @[768px]/detail-page:hover:border-white/10 @[768px]/detail-page:hover:bg-zinc-900/60">
+          <div className="relative aspect-video w-full overflow-hidden bg-zinc-950 transition-opacity @[768px]/detail-page:group-hover:opacity-90">
             {loading ? (
               <div className="h-full w-full animate-pulse bg-zinc-900/40" />
             ) : (
@@ -1054,7 +1054,7 @@ function ProfileListCard({ item }) {
           </div>
 
           <div className="flex flex-1 flex-col p-4">
-            <h3 className="line-clamp-1 text-lg font-bold leading-tight text-white transition-colors md:group-hover:text-purple-400">
+            <h3 className="line-clamp-1 text-lg font-bold leading-tight text-white transition-colors @[768px]/detail-page:group-hover:text-purple-400">
               {item.name}
             </h3>
             <p className="mt-1 line-clamp-2 flex-1 text-sm leading-relaxed text-zinc-400">
@@ -1281,8 +1281,8 @@ function DiaryGroupedEpisodesModal({ entry, onClose }) {
 }
 
 const PROFILE_POSTER_GRID_CLASS = Object.freeze({
-  grid: "grid gap-3 grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-6",
-  compact: "grid gap-2 grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8",
+  grid: "grid gap-3 grid-cols-3 @[640px]/detail-page:grid-cols-4 @[768px]/detail-page:grid-cols-5 @[1024px]/detail-page:grid-cols-6 @[1280px]/detail-page:grid-cols-6",
+  compact: "grid gap-2 grid-cols-4 @[640px]/detail-page:grid-cols-5 @[768px]/detail-page:grid-cols-6 @[1024px]/detail-page:grid-cols-7 @[1280px]/detail-page:grid-cols-8",
 });
 
 function profilePosterGridClass(view) {
@@ -1345,9 +1345,9 @@ function DiaryPosterItems({ items, view, viewerTitleStates, animateWithin }) {
               cornerOverlay={grouped ? (
                 <>
                   <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-20 bg-gradient-to-b from-black/50 via-black/10 to-transparent" />
-                  <div className={`pointer-events-none absolute left-0 top-0 z-30 flex items-center justify-center rounded-br-2xl bg-emerald-500/15 text-emerald-300 shadow-sm backdrop-blur-md ${compactCard ? "p-1.5 sm:p-2" : "p-2 sm:p-2.5"}`}>
-                    <div className={`flex items-center font-bold ${compactCard ? "gap-1 text-[10px] sm:text-xs" : "gap-1 text-xs sm:text-sm"}`}>
-                      <Layers className={compactCard ? "h-3.5 w-3.5 sm:h-4 sm:w-4" : "h-4 w-4 sm:h-[18px] sm:w-[18px]"} aria-hidden="true" />
+                  <div className={`pointer-events-none absolute left-0 top-0 z-30 flex items-center justify-center rounded-br-2xl bg-emerald-500/15 text-emerald-300 shadow-sm backdrop-blur-md ${compactCard ? "p-1.5 @[640px]/detail-page:p-2" : "p-2 @[640px]/detail-page:p-2.5"}`}>
+                    <div className={`flex items-center font-bold ${compactCard ? "gap-1 text-[10px] @[640px]/detail-page:text-xs" : "gap-1 text-xs @[640px]/detail-page:text-sm"}`}>
+                      <Layers className={compactCard ? "h-3.5 w-3.5 @[640px]/detail-page:h-4 @[640px]/detail-page:w-4" : "h-4 w-4 @[640px]/detail-page:h-[18px] @[640px]/detail-page:w-[18px]"} aria-hidden="true" />
                       <span>{group.length}</span>
                     </div>
                   </div>
@@ -1988,7 +1988,7 @@ function ProfileContentSection({ username, section, actor }) {
                   breakpoints la tarjeta sale EXACTAMENTE del mismo tamaño en las
                   dos páginas, con cuatro por fila a partir de `xl`. */}
               {config.layout === "lists" ? (
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div className="grid grid-cols-1 gap-6 @[640px]/detail-page:grid-cols-2 @[1024px]/detail-page:grid-cols-3 @[1280px]/detail-page:grid-cols-4">
                   {group.items.map((item, index) => (
                     <ProfileEntrance key={item.id} index={index} total={group.items.length} animateWithin={entranceCount}>
                       <ProfileListCard item={item} />
@@ -2035,7 +2035,7 @@ function ProfileContentSection({ username, section, actor }) {
 
 function SocialColumn({ title, empty, relation, data, loadingMore, onLoadMore }) {
   return (
-    <section className="min-w-0 rounded-xl bg-zinc-900/30 p-4 shadow-sm sm:p-5">
+    <section className="min-w-0 rounded-xl bg-zinc-900/30 p-4 shadow-sm @[640px]/detail-page:p-5">
       <h2 className="mb-4 border-b border-white/10 pb-2 text-xs font-bold uppercase tracking-widest text-zinc-400">
         {title}
       </h2>
@@ -2154,7 +2154,7 @@ function ProfileSocialSection({ username }) {
   }
 
   return (
-    <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+    <div className="grid min-w-0 gap-4 @[1024px]/detail-page:grid-cols-2">
       <SocialColumn
         title="Seguidores"
         relation="followers"

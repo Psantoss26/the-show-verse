@@ -11,7 +11,7 @@ import { openSavedRoute } from "@/lib/offline/navigation";
 // pestañas Detalles/Producción/Sinopsis, reparto, similares y
 // sentimientos) SIN importar sus internos: se replican los estilos.
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   motion,
   AnimatePresence,
@@ -29,6 +29,8 @@ import {
   Play,
   Heart,
   BookmarkPlus,
+  Pin,
+  Smartphone,
   ArrowUpRight,
   Trophy,
   Award,
@@ -54,7 +56,8 @@ import {
 
 import { useAuth } from "@/context/AuthContext";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
-import { clampDrawerWidth } from "@/lib/ui/detailModalSizing";
+import { clampDrawerWidth, clampMobileDetailsWidth, MOBILE_DETAILS_ASPECT_RATIO } from "@/lib/ui/detailModalSizing";
+import MobileDetailsFrame from "@/components/dashboard/MobileDetailsFrame";
 import { getBackendItemStatus } from "@/lib/api/itemStatus";
 import { markAsFavorite, markInWatchlist } from "@/lib/api/tmdb";
 import {
@@ -638,8 +641,23 @@ export default function DetailModal({
   onClose,
   placement = "center",
   switching = false,
+  drawerView = "overlay",
+  contentView = "modal",
+  tabletViewport = false,
+  onContentViewChange,
+  onDrawerViewChange,
+  onDrawerWidthChange,
 }) {
   const isRightPlacement = placement === "right";
+  const isDocked = isRightPlacement && drawerView === "docked";
+  const mobileDetails = isRightPlacement && contentView === "mobile";
+  const panelRightGap = mobileDetails && !tabletViewport ? 24 : 0;
+  const clampPanelWidth = useCallback(
+    (width, viewportWidth) => mobileDetails
+      ? clampMobileDetailsWidth(width, viewportWidth, window.innerHeight)
+      : clampDrawerWidth(width, viewportWidth, { tablet: tabletViewport }),
+    [mobileDetails, tabletViewport],
+  );
   const router = useRouter();
   const prefersReducedMotion = useReducedMotion();
   const { session, account } = useAuth();
@@ -777,19 +795,36 @@ export default function DetailModal({
   const [panelWidth, setPanelWidth] = useState(initialDrawerWidth);
   const panelWidthRef = useRef(panelWidth);
 
+  useEffect(() => {
+    if (isRightPlacement) onDrawerWidthChange?.(panelWidth + panelRightGap);
+  }, [isRightPlacement, panelWidth, panelRightGap, onDrawerWidthChange]);
+
   // Reajusta el ancho si cambia el tamaño de la ventana (no desbordar / no romper).
   useEffect(() => {
     if (!isRightPlacement || typeof window === "undefined") return undefined;
     const onResize = () => {
       setPanelWidth((w) => {
-        const next = clampDrawerWidth(w, window.innerWidth);
+        const next = clampPanelWidth(w, window.innerWidth);
         panelWidthRef.current = next;
         return next;
       });
     };
+    let preferredWidth = initialDrawerWidth();
+    if (mobileDetails) {
+      preferredWidth = window.innerHeight * MOBILE_DETAILS_ASPECT_RATIO;
+      try {
+        const stored = Number(window.localStorage.getItem("showverse:mobileDetailsWidth"));
+        if (stored > 0) preferredWidth = stored;
+      } catch {
+        // El panel funciona también sin almacenamiento.
+      }
+    }
+    const nextWidth = clampPanelWidth(preferredWidth, window.innerWidth);
+    panelWidthRef.current = nextWidth;
+    setPanelWidth(nextWidth);
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, [isRightPlacement]);
+  }, [isRightPlacement, clampPanelWidth, mobileDetails]);
 
   // Expone el ancho del drawer en una CSS var global mientras está abierto, para
   // que otros overlays superpuestos (p. ej. el modal de episodios agrupados del
@@ -801,7 +836,7 @@ export default function DetailModal({
     const root = document.documentElement;
     const id = ++drawerWidthVarSeq;
     drawerWidthVarOwner = id;
-    root.style.setProperty("--sv-drawer-width", `${panelWidth}px`);
+    root.style.setProperty("--sv-drawer-width", `${panelWidth + panelRightGap}px`);
     return () => {
       // Solo limpia si NINGUNA instancia posterior tomó el relevo. Al cambiar de
       // título, el drawer saliente que AnimatePresence mantiene montado ejecuta su
@@ -812,9 +847,13 @@ export default function DetailModal({
         root.style.removeProperty("--sv-drawer-width");
       }
     };
-  }, [isRightPlacement, panelWidth]);
+  }, [isRightPlacement, panelWidth, panelRightGap]);
 
   const resizingRef = useRef(false);
+  const resizeCleanupRef = useRef(null);
+
+  useEffect(() => () => resizeCleanupRef.current?.(), [isRightPlacement, isDocked, mobileDetails]);
+
   const nestedModalOpenRef = useRef(false);
 
   const stopNestedModalOpeningEvent = (event) => {
@@ -848,6 +887,8 @@ export default function DetailModal({
   useEffect(() => {
     if (!isRightPlacement || typeof document === "undefined") return undefined;
 
+    if (isDocked) return undefined;
+
     const onDocumentClick = (event) => {
       // 1) Otra tarjeta de preview: `usePreviewOpen` llama a preventDefault() justo
       //    en ese caso, así que el drawer CAMBIA de título en vez de cerrarse, que
@@ -872,13 +913,14 @@ export default function DetailModal({
 
     document.addEventListener("click", onDocumentClick);
     return () => document.removeEventListener("click", onDocumentClick);
-  }, [isRightPlacement, onClose]);
+  }, [isRightPlacement, isDocked, onClose]);
 
   // Arrastre del borde izquierdo. Durante el gesto se escribe el ancho DIRECTAMENTE
   // en el DOM del panel (sin re-render del modal, para que sea fluido); al soltar se
   // reconcilia el estado y se persiste.
   const beginResize = (event) => {
-    if (!isRightPlacement || typeof window === "undefined") return;
+    if (!isRightPlacement || typeof window === "undefined" || event.button !== 0) return;
+    resizeCleanupRef.current?.();
     event.preventDefault();
     event.stopPropagation();
     // El cierre por clic fuera debe ignorar este gesto: si arrastras el tirador y
@@ -887,50 +929,74 @@ export default function DetailModal({
     // justo al terminar de redimensionar.
     resizingRef.current = true;
     const vw = window.innerWidth;
+    const startX = event.clientX;
+    const startWidth = panelWidth;
     panelWidthRef.current = panelWidth;
     const prevUserSelect = document.body.style.userSelect;
     const prevCursor = document.body.style.cursor;
     document.body.style.userSelect = "none";
     document.body.style.cursor = "col-resize";
 
-    const onMove = (moveEvent) => {
-      // Drawer anclado a la derecha: el ancho = distancia del puntero al borde dcho.
-      const next = clampDrawerWidth(vw - moveEvent.clientX, vw);
-      panelWidthRef.current = next;
+    let frame = null;
+    let appliedWidth = panelWidth;
+    const pointerId = event.pointerId;
+    const resizeHandle = event.currentTarget;
+    resizeHandle.setPointerCapture?.(pointerId);
+    const applyWidth = () => {
+      frame = null;
+      const next = panelWidthRef.current;
+      if (next === appliedWidth) return;
+      appliedWidth = next;
       if (panelRef.current) panelRef.current.style.width = `${next}px`;
-      // NO se toca `--sv-drawer-width` aquí. Escribir una custom property en
-      // :root invalida el estilo de TODO el documento, y con la rejilla de una
-      // página de usuario detrás eso costaba 46,7 ms por movimiento (medido),
-      // frente a 0,06 ms del ancho del panel: era el 99 % del coste del gesto y
-      // lo que impedía que el arrastre fuese fluido.
-      // La var se reconcilia al soltar (efecto de `panelWidth`), y no se pierde
-      // nada: sus dos consumidores —el modal de episodios agrupados de Historial
-      // y el de ProfileSection— animan `right` con `transition duration-300`, así
-      // que nunca seguían el puntero fotograma a fotograma; ahora se deslizan a
-      // su sitio al terminar el gesto, que es justo lo que esa transición hace.
+      if (isDocked) onDrawerWidthChange?.(next + panelRightGap);
     };
-    const onUp = () => {
+    const onMove = (moveEvent) => {
+      if (moveEvent.pointerId !== pointerId) return;
+      panelWidthRef.current = clampPanelWidth(startWidth + startX - moveEvent.clientX, vw);
+      // Agrupa los eventos de puntero: solo una escritura por frame, sin lecturas
+      // de layout ni renders de React. La variable global se actualiza al soltar.
+      if (frame === null) frame = window.requestAnimationFrame(applyWidth);
+    };
+    const cleanup = () => {
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      frame = null;
+      if (resizeHandle.hasPointerCapture?.(pointerId)) resizeHandle.releasePointerCapture(pointerId);
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onCancel);
+      window.removeEventListener("blur", onCancel);
       document.body.style.userSelect = prevUserSelect;
       document.body.style.cursor = prevCursor;
-      // El `click` llega DESPUÉS del pointerup, así que la bandera no puede
-      // limpiarse aquí mismo: se libera en el siguiente tick, ya pasado ese click.
+      resizeCleanupRef.current = null;
+      // El click posterior al pointerup no debe cerrar el modo superpuesto.
       window.setTimeout(() => {
         resizingRef.current = false;
       }, 0);
+    };
+    const finish = () => {
+      cleanup();
+      applyWidth();
       setPanelWidth(panelWidthRef.current);
       try {
-        window.localStorage.setItem(
-          RESIZE_STORAGE_KEY,
-          String(panelWidthRef.current),
-        );
+        window.localStorage.setItem(mobileDetails ? "showverse:mobileDetailsWidth" : RESIZE_STORAGE_KEY, String(panelWidthRef.current));
       } catch {
         // localStorage no disponible
       }
     };
+    const onUp = (upEvent) => {
+      if (upEvent.pointerId !== pointerId) return;
+      panelWidthRef.current = clampPanelWidth(startWidth + startX - upEvent.clientX, vw);
+      finish();
+    };
+    const onCancel = (cancelEvent) => {
+      if (cancelEvent.type === "pointercancel" && cancelEvent.pointerId !== pointerId) return;
+      finish();
+    };
+    resizeCleanupRef.current = cleanup;
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
+    window.addEventListener("blur", onCancel);
   };
 
   const [externalLinksOpen, setExternalLinksOpen] = useState(false);
@@ -2576,6 +2642,7 @@ export default function DetailModal({
           ? "justify-end pointer-events-none"
           : "justify-center"
       }`}
+      style={{ paddingRight: panelRightGap }}
       role="dialog"
       aria-modal={isRightPlacement ? undefined : "true"}
       aria-label={title || "Ficha rápida"}
@@ -2649,6 +2716,7 @@ export default function DetailModal({
           willChange: panelSettled ? "auto" : "transform",
           // Drawer derecho: ancho controlado (redimensionable). Centrado: Tailwind.
           ...(isRightPlacement ? { width: panelWidth } : null),
+          ...(mobileDetails ? { aspectRatio: MOBILE_DETAILS_ASPECT_RATIO } : null),
         }}
         // OJO: el panel NO lleva `backdrop-blur`. Su desenfoque lo pinta la capa
         // hermana de abajo. Motivo: un elemento con `backdrop-filter` crea un
@@ -2665,7 +2733,7 @@ export default function DetailModal({
         // el modal centrado y en el drawer y siguen siendo idénticos.
         className={`relative z-10 flex flex-col overflow-hidden bg-black/[0.47] bg-gradient-to-br from-white/[0.12] via-transparent to-white/[0.04] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] ${
           isRightPlacement
-            ? "h-full max-w-[50vw] rounded-l-2xl pointer-events-auto"
+            ? `${mobileDetails ? "h-auto min-h-0 self-center" : "h-full"} rounded-l-2xl pointer-events-auto`
             : "mt-[4vh] h-[96vh] w-[95vw] max-w-[1080px] rounded-t-2xl"
         }`}
       >
@@ -2702,9 +2770,9 @@ export default function DetailModal({
             aria-orientation="vertical"
             aria-label="Redimensionar panel"
             title="Arrastra para redimensionar"
-            className="group absolute inset-y-0 left-0 z-40 flex w-3 cursor-col-resize touch-none items-center justify-center"
+            className={`group absolute inset-y-0 left-0 z-40 flex cursor-col-resize touch-none items-center justify-center ${tabletViewport ? "w-6" : "w-3"}`}
           >
-            <div className="h-16 w-1 rounded-full bg-white/15 transition-colors duration-200 group-hover:bg-white/45" />
+            <div className={`h-16 w-1 rounded-full transition-colors duration-200 group-hover:bg-white/45 ${tabletViewport ? "bg-white/35" : "bg-white/15"}`} />
           </div>
         )}
 
@@ -2728,13 +2796,45 @@ export default function DetailModal({
               miden sus hijos y crece hacia la izquierda, de modo que al
               expandirse una, la otra se aparta sola. */}
           <div className="absolute right-4 top-4 z-30 flex items-center gap-2">
+            {isRightPlacement && onDrawerViewChange && (
+              <button
+                type="button"
+                onClick={() => onDrawerViewChange(isDocked ? "overlay" : "docked")}
+                disabled={navigatingToFullDetails}
+                aria-label="Acoplar panel lateral"
+                aria-pressed={isDocked}
+                className={`group flex h-10 w-10 shrink-0 select-none items-center justify-center rounded-full transition-all duration-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${DETAIL_MODAL_GLASS_CONTROL}`}
+              >
+                <Pin
+                  aria-hidden="true"
+                  fill={isDocked ? "currentColor" : "none"}
+                  className={`h-5 w-5 transition-transform duration-300 group-hover:scale-110 motion-reduce:transition-none ${isDocked ? "text-white" : ""}`}
+                />
+              </button>
+            )}
+            {isRightPlacement && onContentViewChange && (
+              <button
+                type="button"
+                onClick={() => onContentViewChange(mobileDetails ? "modal" : "mobile")}
+                disabled={navigatingToFullDetails}
+                aria-label="Mostrar ficha móvil"
+                aria-pressed={mobileDetails}
+                className={`group flex h-10 w-10 shrink-0 select-none items-center justify-center rounded-full transition-all duration-300 ${DETAIL_MODAL_GLASS_CONTROL}`}
+              >
+                <Smartphone
+                  aria-hidden="true"
+                  fill={mobileDetails ? "currentColor" : "none"}
+                  className={`h-5 w-5 transition-transform duration-300 group-hover:scale-110 motion-reduce:transition-none ${mobileDetails ? "text-white" : ""}`}
+                />
+              </button>
+            )}
             {/* Ficha de la temporada: solo en la variante de episodio. */}
             {seasonHref && (
               <button
                 type="button"
                 onClick={goToSeasonDetails}
                 disabled={navigatingToFullDetails}
-                className={`group flex h-10 w-10 select-none items-center justify-center gap-0 overflow-hidden rounded-full px-0 transition-all duration-300 ease-out hover:w-[150px] hover:gap-1.5 hover:px-3 ${DETAIL_MODAL_GLASS_CONTROL}`}
+                className={`group flex h-10 w-10 select-none items-center justify-center gap-0 overflow-hidden rounded-full px-0 transition-all duration-300 ease-out ${mobileDetails ? "" : "hover:w-[150px] hover:gap-1.5 hover:px-3"} ${DETAIL_MODAL_GLASS_CONTROL}`}
                 // La temporada 0 son los especiales: "Ver temporada 0" no dice
                 // nada a quien lo escuche en un lector de pantalla.
                 aria-label={
@@ -2747,7 +2847,7 @@ export default function DetailModal({
                 <div className="flex h-5 w-5 shrink-0 items-center justify-center transition-transform duration-300 group-hover:scale-110">
                   <Layers className="h-5 w-5 shrink-0" />
                 </div>
-                <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-bold leading-normal tracking-wide opacity-0 transition-[max-width,opacity] duration-200 group-hover:max-w-[104px] group-hover:opacity-100 translate-y-[1px]">
+                <span className={`max-w-0 overflow-hidden whitespace-nowrap text-xs font-bold leading-normal tracking-wide opacity-0 transition-[max-width,opacity] duration-200 ${mobileDetails ? "hidden" : "group-hover:max-w-[104px] group-hover:opacity-100"} translate-y-[1px]`}>
                   Ver temporada
                 </span>
               </button>
@@ -2758,14 +2858,14 @@ export default function DetailModal({
               type="button"
               onClick={goToFullDetails}
               disabled={navigatingToFullDetails}
-              className={`group flex h-10 w-10 select-none items-center justify-center gap-0 overflow-hidden rounded-full px-0 transition-all duration-300 ease-out hover:w-[166px] hover:gap-1.5 hover:px-3 ${DETAIL_MODAL_GLASS_CONTROL}`}
+              className={`group flex h-10 w-10 select-none items-center justify-center gap-0 overflow-hidden rounded-full px-0 transition-all duration-300 ease-out ${mobileDetails ? "" : "hover:w-[166px] hover:gap-1.5 hover:px-3"} ${DETAIL_MODAL_GLASS_CONTROL}`}
               aria-label="Ver ficha completa"
               aria-busy={navigatingToFullDetails ? "true" : undefined}
             >
               <div className="flex h-5 w-5 shrink-0 items-center justify-center transition-transform duration-300 group-hover:rotate-45">
                 <ArrowUpRight className="h-5 w-5 shrink-0" />
               </div>
-              <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-bold leading-normal tracking-wide opacity-0 transition-[max-width,opacity] duration-200 group-hover:max-w-[120px] group-hover:opacity-100 translate-y-[1px]">
+              <span className={`max-w-0 overflow-hidden whitespace-nowrap text-xs font-bold leading-normal tracking-wide opacity-0 transition-[max-width,opacity] duration-200 ${mobileDetails ? "hidden" : "group-hover:max-w-[120px] group-hover:opacity-100"} translate-y-[1px]`}>
                 Ver ficha completa
               </span>
             </button>
@@ -2774,8 +2874,16 @@ export default function DetailModal({
           {/* Contenedor con scroll interno (barra oculta) */}
           <div
             ref={scrollContainerRef}
-            className="flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
           >
+          {mobileDetails ? (
+            <MobileDetailsFrame
+              href={dashboardDetailHref(item, mediaType)}
+              title={title}
+              onClose={onClose}
+            />
+          ) : (
+          <>
           {/* HERO: póster textless en móvil, backdrop panorámico en sm+.
               El fondo se desvanece a transparente por abajo (sin borde) para que la
               imagen (enmascarada) se funda con el panel translúcido de contenido y
@@ -3750,6 +3858,8 @@ export default function DetailModal({
               </motion.section>
             )}
           </div>
+          </>
+          )}
           </div>
         </div>
       </motion.div>
