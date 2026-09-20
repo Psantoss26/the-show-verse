@@ -18,6 +18,7 @@ export default async function EmbeddedDetailsPage({ params, searchParams }) {
       <DetailsPage
         params={Promise.resolve({ type, id })}
         searchParams={searchParams}
+        embedded
       />
     );
   } else if (type === "tv" && seasonKey === "season" && /^\d+$/.test(season || "")) {
