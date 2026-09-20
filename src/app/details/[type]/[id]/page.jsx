@@ -3,6 +3,7 @@ import DetailsPageLoader from "@/components/DetailsPageLoader";
 import MobilePosterPreload from "@/components/details/MobilePosterPreload";
 import { getDetails } from "@/lib/api/tmdb";
 import { fetchCommunitySummary } from "@/lib/community/server";
+import { readEmbeddedDetailsSeed } from "@/lib/navigation/embeddedDetails";
 export const revalidate = 600;
 
 const DETAILS_APPEND_TO_RESPONSE =
@@ -23,7 +24,7 @@ export async function generateMetadata({ params }) {
   };
 }
 
-export default async function DetailsPage({ params }) {
+export default async function DetailsPage({ params, searchParams }) {
   const p = await params;
   const type = String(p?.type || "").toLowerCase();
   const id = p?.id;
@@ -31,6 +32,13 @@ export default async function DetailsPage({ params }) {
   if (!id || (type !== "movie" && type !== "tv")) {
     notFound();
   }
+
+  // Solo lo rellena la ficha móvil del drawer (`/embed/details/...`), con lo
+  // que el DetailModal de escritorio ya sabía del título al abrir el iframe.
+  // En una visita normal a `/details/...` no hay estos parámetros y el
+  // resultado es `null`, igual que antes.
+  const sp = searchParams ? await searchParams : null;
+  const initialTraktStatus = readEmbeddedDetailsSeed(sp);
 
   // `throwOnUnavailable`: un fallo TEMPORAL de TMDb/red lanza en vez de
   // devolver `null`. Así `notFound()` (permanente) solo se dispara ante un 404
@@ -73,6 +81,7 @@ export default async function DetailsPage({ params }) {
         initialSentiment={community?.sentiment || null}
         initialComments={community?.comments || null}
         initialLists={community?.lists?.items || null}
+        initialTraktStatus={initialTraktStatus}
       />
     </>
   );

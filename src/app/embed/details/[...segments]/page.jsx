@@ -7,14 +7,19 @@ import EmbeddedDetailsBridge from "@/components/details/EmbeddedDetailsBridge";
 export const metadata = { title: "Ficha", robots: { index: false, follow: false } };
 export const revalidate = 600;
 
-export default async function EmbeddedDetailsPage({ params }) {
+export default async function EmbeddedDetailsPage({ params, searchParams }) {
   const { segments } = await params;
   const [type, id, seasonKey, season, episodeKey, episode] = segments;
   if (!["movie", "tv"].includes(type) || !/^\d+$/.test(id || "")) notFound();
 
   let content;
   if (segments.length === 2) {
-    content = <DetailsPage params={Promise.resolve({ type, id })} />;
+    content = (
+      <DetailsPage
+        params={Promise.resolve({ type, id })}
+        searchParams={searchParams}
+      />
+    );
   } else if (type === "tv" && seasonKey === "season" && /^\d+$/.test(season || "")) {
     if (segments.length === 4) {
       content = <SeasonPage params={Promise.resolve({ id, season })} />;

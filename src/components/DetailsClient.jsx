@@ -278,6 +278,7 @@ import DetailsMetaGenresRow, {
   getStatusBadgeClass,
 } from "@/components/details/DetailsMetaGenresRow";
 import { pickPrimaryProvider } from "@/lib/streaming/platformWordmark";
+import { sendEmbeddedDetailsAction } from "@/lib/navigation/embeddedDetails";
 import {
   createPlatformItem,
   dedupeStreamingProviders,
@@ -8794,6 +8795,19 @@ export default function DetailsClient({
   // opacidad nunca cambiaba, la transición de 500ms no se disparaba y el póster
   // aparecía de golpe. Retirada: ya no la usa nadie.
 
+  // Avisa al drawer padre (si estamos embebidos -- no-op si no, ver
+  // `sendEmbeddedDetailsAction`) de que el póster del hero YA está pintado.
+  // Es la señal que usa `MobileDetailsPreviewOverlay` para retirar su propia
+  // portada -- sembrada al instante con datos que el DetailModal de escritorio
+  // ya tenía -- y descubrir esta ficha real. Sin esto, el padre no tiene forma
+  // de saber cuándo el `<iframe>` terminó de hidratarse y pintar su portada: el
+  // evento nativo `load` del iframe llega ANTES (la imagen del póster no tiene
+  // `src` hasta que React hidrata y resuelve `remoteArtworkChecked`), así que
+  // usarlo habría reproducido el mismo parpadeo/negro que se quiere evitar.
+  useEffect(() => {
+    if (currentLowLoaded) sendEmbeddedDetailsAction("hero-ready");
+  }, [currentLowLoaded]);
+
   // Limpiar transicion suavemente solo despues de cargar (evita destellos en internet lento)
   useEffect(() => {
     if (currentLowLoaded && prevPosterPath) {
@@ -8870,13 +8884,23 @@ export default function DetailsClient({
 
     if (typeof window === "undefined") return;
 
+    // `(hover: hover) and (pointer: fine)` por sí solo detecta "hay ratón", no
+    // "es un dispositivo de escritorio": en el drawer lateral embebido
+    // (`/embed/details/...` dentro de un `<iframe>`) el viewport es estrecho
+    // como el de un móvil, pero el navegador SIGUE teniendo ratón, así que el
+    // media query daba `true` y el póster/logo quedaban inclinándose y
+    // flotando solos -- un efecto que en un móvil táctil real nunca ocurre
+    // (ahí `hover: hover` no matchea). Con `isMobileViewport` se replica el
+    // mismo criterio que ya usa `pointerCardHoverEnabled` para el resto de
+    // tarjetas: el hero se queda fijo y estático siempre que el viewport sea
+    // de tipo móvil, tenga ratón o no.
     const media = window.matchMedia("(hover: hover) and (pointer: fine)");
-    const update = () => setPoster3dEnabled(media.matches);
+    const update = () => setPoster3dEnabled(media.matches && !isMobileViewport);
 
     update();
     media.addEventListener?.("change", update);
     return () => media.removeEventListener?.("change", update);
-  }, [prefersReducedMotion]);
+  }, [prefersReducedMotion, isMobileViewport]);
 
   const setPosterTargetFromPointer = useCallback(
     (clientX, clientY) => {
@@ -9368,7 +9392,13 @@ export default function DetailsClient({
               {/* Wrapper: solo perspectiva + captura puntero. Ya NO cicla al
                   pulsar en toda la portada: el cambio póster/backdrop se hace
                   solo en las zonas laterales (flechas), y el botón play del
-                  overlay abre la plataforma. `group/still` habilita el overlay. */}
+                  overlay abre la plataforma. `group/still` habilita el overlay
+                  -- vía `:hover` real de CSS, no una media query -- así que
+                  solo se declara si `pointerCardHoverEnabled` (desktop de
+                  verdad): en el drawer embebido el ratón SÍ puede posarse
+                  sobre la portada y disparar ese `:hover`, y ahí el overlay
+                  "Ver en <plataforma>" tampoco debe aparecer, igual que en un
+                  móvil táctil real. */}
               <div
                 ref={posterWrapRef}
                 onPointerMove={(e) =>
@@ -9384,7 +9414,7 @@ export default function DetailsClient({
                   e.currentTarget.setPointerCapture?.(e.pointerId);
                   setPosterTargetFromPointer(e.clientX, e.clientY);
                 }}
-                className="group/still relative"
+                className={`relative ${pointerCardHoverEnabled ? "group/still" : ""}`}
                 style={{
                   touchAction: "pan-y",
                 }}
@@ -9743,9 +9773,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       {/* Visual de las flechas (degradado + chevron) DENTRO del
                           marco: se inclina/flota con la imagen = integrado. El
                           clic lo recibe la zona transparente de la capa fija.
-                          Solo escritorio (`supportsHover`), igual que esas zonas. */}
+                          Solo escritorio de verdad (`pointerCardHoverEnabled`,
+                          no `supportsHover` a secas): en el drawer embebido el
+                          viewport es de tipo móvil aunque haya ratón, y ahí
+                          tampoco deben aparecer -- igual que el resto del hero. */}
                       <AnimatePresence>
-                        {supportsHover &&
+                        {pointerCardHoverEnabled &&
                           isPosterHovered &&
                           posterViewMode === "poster" && (
                             <motion.div
@@ -9761,7 +9794,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           )}
                       </AnimatePresence>
                       <AnimatePresence>
-                        {supportsHover &&
+                        {pointerCardHoverEnabled &&
                           isPosterHovered &&
                           posterViewMode === "preview" && (
                             <motion.div
@@ -9821,11 +9854,15 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       dentro del marco, integrada; aquí solo está el área de clic,
                       fija, para que siempre registre.
 
-                      SOLO ESCRITORIO: van tras `supportsHover`, así que en táctil
-                      ni se montan y la portada se queda siempre en modo póster.
-                      La variante que existía para móvil (pulsar en cualquier parte
-                      del póster para alternar) NO se restaura a propósito. */}
-                  {supportsHover &&
+                      SOLO ESCRITORIO: van tras `pointerCardHoverEnabled`
+                      (`supportsHover` + viewport que no sea de tipo móvil,
+                      para que el drawer embebido -- ratón sobre un viewport
+                      angosto -- se comporte como táctil real), así que en
+                      táctil ni se montan y la portada se queda siempre en modo
+                      póster. La variante que existía para móvil (pulsar en
+                      cualquier parte del póster para alternar) NO se restaura
+                      a propósito. */}
+                  {pointerCardHoverEnabled &&
                     isPosterHovered &&
                     posterViewMode === "poster" && (
                       <div
@@ -9841,7 +9878,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       />
                     )}
 
-                  {supportsHover &&
+                  {pointerCardHoverEnabled &&
                     isPosterHovered &&
                     posterViewMode === "preview" && (
                       <div
