@@ -87,6 +87,8 @@ import {
   buildTmdbHref,
   buildTraktHref,
   buildImdbHref,
+  buildRottenTomatoesHref,
+  buildMetacriticHref,
 } from "@/lib/details/ratingLinks";
 import {
   formatCountShort,
@@ -3242,12 +3244,18 @@ export default function DetailModal({
                 }}
                 rt={
                   data.rtScore != null
-                    ? { value: Math.round(data.rtScore) }
+                    ? {
+                        value: Math.round(data.rtScore),
+                        href: buildRottenTomatoesHref({ title: data.originalTitle || title }),
+                      }
                     : null
                 }
                 mc={
                   data.mcScore != null
-                    ? { value: Math.round(data.mcScore) }
+                    ? {
+                        value: Math.round(data.mcScore),
+                        href: buildMetacriticHref({ title: data.originalTitle || title }),
+                      }
                     : null
                 }
                 externalLinks={externalLinks}
