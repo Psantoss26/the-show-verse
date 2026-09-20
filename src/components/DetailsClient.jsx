@@ -254,12 +254,11 @@ import {
 import DetailsInfoTabs from "@/components/details/DetailsInfoTabs";
 import { UnifiedRateButton } from "@/components/details/DetailHeaderBits";
 import DetailsScoreboardPanel from "@/components/details/DetailsScoreboardPanel";
+import useRatingLinks from "@/lib/details/useRatingLinks";
 import {
   buildTmdbHref,
   buildTraktHref,
   buildImdbHref,
-  buildRottenTomatoesHref,
-  buildMetacriticHref,
 } from "@/lib/details/ratingLinks";
 // Fila de botones de acción principal (tráiler, favorito, pendiente, puntuar,
 // listas, reseñas, soundtrack…): componente PRESENTACIONAL compartido con la
@@ -6460,6 +6459,7 @@ export default function DetailsClient({
     rtScore: null,
     mcScore: null,
   });
+  const ratingLinks = useRatingLinks({ type: endpointType, tmdbId: id });
   const [externalScoresLoading, setExternalScoresLoading] = useState(true);
   // Se recupera el getter (antes descartado). Arranca en `true`: los premios se
   // piden SIEMPRE al montar, así que desde el primer frame el menú puede
@@ -10226,7 +10226,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   tScoreboard?.external?.rtAudience != null ||
                   extras.rtScore != null
                     ? {
-                        href: buildRottenTomatoesHref({ title: originalTitle || title }),
+                        href: ratingLinks.rt,
                         value:
                           tScoreboard?.external?.rtAudience != null
                             ? Math.round(tScoreboard.external.rtAudience)
@@ -10240,7 +10240,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   extras.mcScore != null
                     ? {
                         value: Math.round(extras.mcScore),
-                        href: buildMetacriticHref({ title: originalTitle || title }),
+                        href: ratingLinks.mc,
                       }
                     : null
                 }

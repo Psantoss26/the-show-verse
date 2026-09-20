@@ -1,7 +1,7 @@
 // src/lib/details/ratingLinks.js
 //
 // Enlaces de "página correspondiente" para los badges de puntuación (TMDb, Trakt,
-// IMDb, Rotten Tomatoes, Metacritic) de las páginas de detalles. La idea es que el icono de cada servicio
+// IMDb) de las páginas de detalles. La idea es que el icono de cada servicio
 // aparezca con un enlace utilizable, aunque el título todavía no tenga
 // puntuación: si el llamante ya conoce la URL canónica se usa esa; si no, se cae a
 // una búsqueda por título para los servicios que no permiten URL directa.
@@ -36,20 +36,4 @@ export function buildImdbHref({ href, imdbId, title } = {}) {
   const q = (title || "").trim();
   if (q) return `https://www.imdb.com/find/?q=${encodeURIComponent(q)}&s=tt`;
   return undefined;
-}
-
-// Estos proveedores usan slugs propios que no se pueden deducir del título.
-// Preferir la ficha canónica cuando se conozca; si no, buscar por título.
-export function buildRottenTomatoesHref({ href, title } = {}) {
-  if (href) return href;
-  const q = (title || "").trim();
-  if (!q) return undefined;
-  return `https://www.rottentomatoes.com/search?search=${encodeURIComponent(q)}`;
-}
-
-export function buildMetacriticHref({ href, title } = {}) {
-  if (href) return href;
-  const q = (title || "").trim();
-  if (!q) return undefined;
-  return `https://www.metacritic.com/search/${encodeURIComponent(q)}/`;
 }
