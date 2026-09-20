@@ -83,12 +83,11 @@ import { dashboardDetailHref } from "@/lib/dashboard/detailHref";
 // Componentes reales de la ficha completa (standalone) para que las tarjetas,
 // badges, pestañas y acciones sean IDÉNTICAS a DetailsClient.
 import DetailsScoreboardPanel from "@/components/details/DetailsScoreboardPanel";
+import useRatingLinks from "@/lib/details/useRatingLinks";
 import {
   buildTmdbHref,
   buildTraktHref,
   buildImdbHref,
-  buildRottenTomatoesHref,
-  buildMetacriticHref,
 } from "@/lib/details/ratingLinks";
 import {
   formatCountShort,
@@ -686,6 +685,11 @@ export default function DetailModal({
     (!data.detailsResolved || data.detailsKey !== detailKey);
   const episodeMeta = data.episodeMeta || null;
   const title = data.title || item?.title || item?.name || "";
+  const ratingLinks = useRatingLinks({
+    type: mediaType,
+    tmdbId: item?.id,
+    enabled: !isEpisode,
+  });
   const backdropPath = data.backdropPath || item?.backdrop_path || null;
   // HERO: usa SOLO el arte FINAL (heroBackdropPath / heroPosterPath), que se fija
   // una única vez y YA PRECARGADO en useDetailModalData. Nunca la semilla del item:
@@ -3246,7 +3250,7 @@ export default function DetailModal({
                   data.rtScore != null
                     ? {
                         value: Math.round(data.rtScore),
-                        href: buildRottenTomatoesHref({ title: data.originalTitle || title }),
+                        href: ratingLinks.rt,
                       }
                     : null
                 }
@@ -3254,7 +3258,7 @@ export default function DetailModal({
                   data.mcScore != null
                     ? {
                         value: Math.round(data.mcScore),
-                        href: buildMetacriticHref({ title: data.originalTitle || title }),
+                        href: ratingLinks.mc,
                       }
                     : null
                 }
