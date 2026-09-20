@@ -57,7 +57,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { clampDrawerWidth, clampMobileDetailsWidth, MOBILE_DETAILS_ASPECT_RATIO } from "@/lib/ui/detailModalSizing";
-import MobileDetailsFrame from "@/components/dashboard/MobileDetailsFrame";
+import MobileDetailsFrameStack from "@/components/dashboard/MobileDetailsFrameStack";
 import { getBackendItemStatus } from "@/lib/api/itemStatus";
 import { markAsFavorite, markInWatchlist } from "@/lib/api/tmdb";
 import {
@@ -82,6 +82,7 @@ import {
   fetchBestBackdrop,
 } from "@/lib/dashboard/media";
 import { dashboardDetailHref } from "@/lib/dashboard/detailHref";
+import { buildEmbeddedDetailsHref } from "@/lib/navigation/embeddedDetails";
 
 // Componentes reales de la ficha completa (standalone) para que las tarjetas,
 // badges, pestañas y acciones sean IDÉNTICAS a DetailsClient.
@@ -796,7 +797,9 @@ export default function DetailModal({
   const panelWidthRef = useRef(panelWidth);
 
   useEffect(() => {
-    if (isRightPlacement) onDrawerWidthChange?.(panelWidth + panelRightGap);
+    // El hueco de la ficha "mobile" va a los DOS lados (ver `marginLeft` del
+    // panel), así que lo reservado para el resto de la página es el doble.
+    if (isRightPlacement) onDrawerWidthChange?.(panelWidth + panelRightGap * 2);
   }, [isRightPlacement, panelWidth, panelRightGap, onDrawerWidthChange]);
 
   // Reajusta el ancho si cambia el tamaño de la ventana (no desbordar / no romper).
@@ -836,7 +839,7 @@ export default function DetailModal({
     const root = document.documentElement;
     const id = ++drawerWidthVarSeq;
     drawerWidthVarOwner = id;
-    root.style.setProperty("--sv-drawer-width", `${panelWidth + panelRightGap}px`);
+    root.style.setProperty("--sv-drawer-width", `${panelWidth + panelRightGap * 2}px`);
     return () => {
       // Solo limpia si NINGUNA instancia posterior tomó el relevo. Al cambiar de
       // título, el drawer saliente que AnimatePresence mantiene montado ejecuta su
@@ -948,7 +951,7 @@ export default function DetailModal({
       if (next === appliedWidth) return;
       appliedWidth = next;
       if (panelRef.current) panelRef.current.style.width = `${next}px`;
-      if (isDocked) onDrawerWidthChange?.(next + panelRightGap);
+      if (isDocked) onDrawerWidthChange?.(next + panelRightGap * 2);
     };
     const onMove = (moveEvent) => {
       if (moveEvent.pointerId !== pointerId) return;
@@ -1032,6 +1035,16 @@ export default function DetailModal({
   const [userRating, setUserRating] = useState(null);
   const [ratingLoading, setRatingLoading] = useState(false);
   const [navigatingToFullDetails, setNavigatingToFullDetails] = useState(false);
+  // Id del item al que pertenecen de verdad `favorite`/`watchlist`/`userRating`
+  // ahora mismo. Al cambiar de título esos estados no se limpian de inmediato
+  // (siguen mostrando los del anterior hasta que resuelve el fetch de abajo),
+  // así que sin esto se podría "sembrar" la ficha móvil con el favorito de OTRO
+  // título. Solo se actualiza dentro del `if (!cancel)` de esa carga, nunca antes.
+  const [resolvedStatusItemId, setResolvedStatusItemId] = useState(null);
+  // Ver comentario en `resolvedStatusItemId` arriba: `favorite`/`watchlist`/
+  // `userRating` solo pertenecen de verdad a ESTE item cuando coincide con el
+  // id resuelto.
+  const mobileStatusFresh = resolvedStatusItemId === (item?.id ?? null);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -1054,6 +1067,7 @@ export default function DetailModal({
         // Sin sesión no hay fetch: salimos del estado de carga inicial (que arranca
         // en `true`) para que los botones no se queden con el spinner.
         setLoadingStates(false);
+        setResolvedStatusItemId(item?.id ?? null);
         return;
       }
       try {
@@ -1072,6 +1086,7 @@ export default function DetailModal({
                 : Number(st.rating);
             setUserRating(rating);
           }
+          setResolvedStatusItemId(item.id);
         }
       } catch {
         // silencio
@@ -2125,6 +2140,28 @@ export default function DetailModal({
     data.episodeMeta?.seasonNumber,
   ]);
 
+  // Precarga el DOCUMENTO del iframe embebido (`/embed/details/...`) en cuanto
+  // se abre el drawer derecho, esté mostrando ya la vista "mobile" o todavía la
+  // "modal". Así, si el usuario alterna a "mobile" para este MISMO título (el
+  // caso más habitual), el documento ya está caliente en vez de arrancar de
+  // cero. No ayuda al cambiar a OTRO título -- no se puede precargar lo que aún
+  // no se sabe que se va a abrir -- pero cubre el caso de alternar sin cerrar.
+  // `router.prefetch` (arriba) no sirve aquí: opera sobre la caché del router
+  // de esta página, y el iframe navega en un contexto de navegación aparte que
+  // no la consulta.
+  useEffect(() => {
+    if (!isRightPlacement || !item?.id || typeof document === "undefined") {
+      return undefined;
+    }
+    const link = document.createElement("link");
+    link.rel = "prefetch";
+    link.href = buildEmbeddedDetailsHref(dashboardDetailHref(item, mediaType), null);
+    document.head.appendChild(link);
+    return () => {
+      link.remove();
+    };
+  }, [isRightPlacement, item?.id, mediaType]);
+
   // Navegación del modal a una ruta de `/details` con la transición de morfeo.
   // Está extraída de `goToFullDetails` porque ahora hay DOS destinos: la ficha
   // del episodio y la de su temporada. `transitionKey` solo lo usa
@@ -2637,10 +2674,18 @@ export default function DetailModal({
 
   return (
     <div
-      className={`fixed inset-0 z-[9999] flex ${
+      className={`fixed inset-y-0 z-[9999] flex ${
+        // `left-0 w-screen` en vez de `inset-x-0` (equivalente a `right-0`):
+        // <html> reserva SIEMPRE el hueco de la scrollbar (`scrollbar-gutter:
+        // stable`, ver globals.css), y ese hueco reduce el viewport que usa
+        // `right: 0` aunque no haya scrollbar real pintada. El resultado era un
+        // margen fantasma de ~15px entre el panel y el borde de la ventana.
+        // `100vw` no se ve afectado por esa reserva, así que el panel llega de
+        // verdad hasta el borde. El modal centrado no ancla a un borde, así que
+        // mantiene `inset-x-0` (sin este desajuste).
         isRightPlacement
-          ? "justify-end pointer-events-none"
-          : "justify-center"
+          ? "left-0 w-screen justify-end pointer-events-none"
+          : "inset-x-0 justify-center"
       }`}
       style={{ paddingRight: panelRightGap }}
       role="dialog"
@@ -2716,7 +2761,12 @@ export default function DetailModal({
           willChange: panelSettled ? "auto" : "transform",
           // Drawer derecho: ancho controlado (redimensionable). Centrado: Tailwind.
           ...(isRightPlacement ? { width: panelWidth } : null),
-          ...(mobileDetails ? { aspectRatio: MOBILE_DETAILS_ASPECT_RATIO } : null),
+          // La ficha "mobile" flota separada del borde: el hueco de la derecha
+          // ya lo pone `paddingRight` en el contenedor; este margen replica el
+          // mismo valor a la izquierda para que quede centrada en su columna.
+          ...(mobileDetails
+            ? { aspectRatio: MOBILE_DETAILS_ASPECT_RATIO, marginLeft: panelRightGap }
+            : null),
         }}
         // OJO: el panel NO lleva `backdrop-blur`. Su desenfoque lo pinta la capa
         // hermana de abajo. Motivo: un elemento con `backdrop-filter` crea un
@@ -2733,7 +2783,13 @@ export default function DetailModal({
         // el modal centrado y en el drawer y siguen siendo idénticos.
         className={`relative z-10 flex flex-col overflow-hidden bg-black/[0.47] bg-gradient-to-br from-white/[0.12] via-transparent to-white/[0.04] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] ${
           isRightPlacement
-            ? `${mobileDetails ? "h-auto min-h-0 self-center" : "h-full"} rounded-l-2xl pointer-events-auto`
+            ? mobileDetails
+              // Flota separada de los dos bordes: esquinas redondeadas en las
+              // cuatro, no solo las de la izquierda (a diferencia del panel
+              // "modal", pegado al borde derecho, donde las de la derecha no
+              // se ven).
+              ? "h-auto min-h-0 self-center rounded-2xl pointer-events-auto"
+              : "h-full rounded-l-2xl pointer-events-auto"
             : "mt-[4vh] h-[96vh] w-[95vw] max-w-[1080px] rounded-t-2xl"
         }`}
       >
@@ -2877,11 +2933,14 @@ export default function DetailModal({
             className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
           >
           {mobileDetails ? (
-            <MobileDetailsFrame
-              href={dashboardDetailHref(item, mediaType)}
-              title={title}
-              onClose={onClose}
-            />
+            <div className="relative h-full w-full">
+              <MobileDetailsFrameStack
+                href={dashboardDetailHref(item, mediaType)}
+                seed={mobileStatusFresh ? { favorite, watchlist, rating: userRating } : null}
+                title={title}
+                onClose={onClose}
+              />
+            </div>
           ) : (
           <>
           {/* HERO: póster textless en móvil, backdrop panorámico en sm+.
