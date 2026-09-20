@@ -258,6 +258,8 @@ import {
   buildTmdbHref,
   buildTraktHref,
   buildImdbHref,
+  buildRottenTomatoesHref,
+  buildMetacriticHref,
 } from "@/lib/details/ratingLinks";
 // Fila de botones de acción principal (tráiler, favorito, pendiente, puntuar,
 // listas, reseñas, soundtrack…): componente PRESENTACIONAL compartido con la
@@ -10224,6 +10226,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   tScoreboard?.external?.rtAudience != null ||
                   extras.rtScore != null
                     ? {
+                        href: buildRottenTomatoesHref({ title: originalTitle || title }),
                         value:
                           tScoreboard?.external?.rtAudience != null
                             ? Math.round(tScoreboard.external.rtAudience)
@@ -10235,7 +10238,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 }
                 mc={
                   extras.mcScore != null
-                    ? { value: Math.round(extras.mcScore) }
+                    ? {
+                        value: Math.round(extras.mcScore),
+                        href: buildMetacriticHref({ title: originalTitle || title }),
+                      }
                     : null
                 }
                 externalLinks={scoreboardExternalLinks}

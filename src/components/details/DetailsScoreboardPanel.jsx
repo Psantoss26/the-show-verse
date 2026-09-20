@@ -16,8 +16,8 @@
 //   trakt:       { value, sub, href } | null   (badge Trakt "conectado")
 //   traktPublic: { value, sub } | null         (badge Trakt público sin conexión)
 //   imdb:        { value, sub, href } | null    (badge IMDb)
-//   rt:          { value } | null               (badge Rotten Tomatoes, solo >= sm)
-//   mc:          { value } | null               (badge Metacritic, solo >= sm)
+//   rt:          { value, href } | null               (badge Rotten Tomatoes, solo >= sm)
+//   mc:          { value, href } | null               (badge Metacritic, solo >= sm)
 //   stats:       { watchers, plays, lists, favorited } | null  (fila de stats)
 //   showFavoritedStat: boolean                  (oculta Favoritos cuando no aplica)
 //   toolbarActions: ReactNode | null            (acciones inline al final)
@@ -171,7 +171,9 @@ export function DetailsRatingsBadges({
             logo="/logo-RottenTomatoes.png"
             value={rt.value}
             suffix="%"
-            tooltip="Rotten Tomatoes"
+            href={rt.href}
+            disableHoverLift
+            tooltip={rt.href ? "Ver en Rotten Tomatoes" : "Rotten Tomatoes"}
           />
         </div>
       )}
@@ -182,8 +184,10 @@ export function DetailsRatingsBadges({
           <CompactBadge
             logo="/logo-Metacritic.png"
             value={mc.value}
-            suffix="/100"
-            tooltip="Metacritic"
+            suffix="%"
+            href={mc.href}
+            disableHoverLift
+            tooltip={mc.href ? "Ver en Metacritic" : "Metacritic"}
           />
         </div>
       )}
