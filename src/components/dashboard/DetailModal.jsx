@@ -690,16 +690,6 @@ export default function DetailModal({
     prefersReducedMotion ? [1, 1] : [1, 1.08],
   );
 
-  // Opacidad del logo/título: se desvanece más tarde al hacer scroll
-  const logoOpacity = useTransform(
-    scrollY,
-    [0, 300],
-    prefersReducedMotion ? [1, 1] : [1, 0],
-  );
-
-  // Parallax del logo/título: sube ligeramente al desvanecerse
-  const logoY = useTransform(scrollY, [0, 300], heroRange(-20));
-
   // Degradado oscuro: se oscurece sutilmente al hacer scroll
   const darkOverlayOpacity = useTransform(scrollY, [0, 300], heroRange(0.5));
 
@@ -909,6 +899,34 @@ export default function DetailModal({
       }
     };
   }, [isRightPlacement, panelWidth]);
+
+  // RECORRIDO DEL LOGO AL HACER SCROLL.
+  //
+  // Iba fijo en 300px para las dos vistas. En el modal ancho eso es buena parte
+  // de su hero (2:3 o panorámico), pero la ficha de TELÉFONO tiene un hero de
+  // la altura del panel entero: a los 300px la portada apenas ha empezado a
+  // irse y el logo ya había desaparecido.
+  //
+  // En el teléfono el recorrido se ata al alto del panel, que su proporción
+  // deja en `ancho / (9/19.5)`. Empieza a desvanecerse pasada la mitad y
+  // termina justo cuando el logo sale por arriba, en vez de mucho antes.
+  const phonePanelHeight = panelWidth / MOBILE_DETAILS_ASPECT_RATIO;
+  const logoFadeFrom = mobileDetails ? Math.round(phonePanelHeight * 0.4) : 0;
+  const logoFadeTo = mobileDetails ? Math.round(phonePanelHeight * 0.75) : 300;
+
+  // Opacidad del logo/título: se desvanece al acercarse al borde superior
+  const logoOpacity = useTransform(
+    scrollY,
+    [logoFadeFrom, logoFadeTo],
+    prefersReducedMotion ? [1, 1] : [1, 0],
+  );
+
+  // Parallax del logo/título: sube ligeramente al desvanecerse
+  const logoY = useTransform(
+    scrollY,
+    [logoFadeFrom, logoFadeTo],
+    heroRange(-20),
+  );
 
   const resizingRef = useRef(false);
   const resizeCleanupRef = useRef(null);
@@ -3496,12 +3514,16 @@ export default function DetailModal({
             )}
           </div>
 
-          {/* TELÉFONO: la fila de botones cierra el primer pantallazo, pegada
-              al borde inferior del panel igual que en la ficha móvil, donde
-              queda justo encima del navbar. `shrink-0` la protege: la portada
-              es quien cede espacio, nunca los botones. */}
+          {/* TELÉFONO: la fila de botones cierra el primer pantallazo, igual que
+              en la ficha móvil, donde queda justo encima del navbar. `shrink-0`
+              la protege: la portada es quien cede espacio, nunca los botones.
+
+              Este `pb` sube a la vez los botones Y el logo: la portada es
+              `flex-1`, así que lo que se le quita por abajo la encoge, y el
+              logo va anclado a SU borde inferior. Por eso el aire del final se
+              ajusta aquí y no en los dos sitios por separado. */}
           {mobileDetails && (
-            <div className="shrink-0 px-5 pb-7">
+            <div className="shrink-0 px-5 pb-10">
               {actionsNode}
             </div>
           )}
