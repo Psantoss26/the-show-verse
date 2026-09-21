@@ -428,3 +428,25 @@ test("lo que no se ve no se maqueta al redimensionar", async () => {
     /classList\.add\("sv-phone-sections--measuring"\)[\s\S]*?getBoundingClientRect\(\)[\s\S]*?classList\.remove\("sv-phone-sections--measuring"\)/,
   );
 });
+
+test("en el teléfono el logo aguanta hasta salir por arriba", async () => {
+  const modal = await read("../../components/dashboard/DetailModal.jsx");
+
+  // El recorrido iba fijo en 300px para las dos vistas. En el modal ancho eso
+  // es buena parte de su hero; en el teléfono, cuyo hero mide el panel entero,
+  // la portada apenas había empezado a irse y el logo ya no estaba.
+  assert.match(modal, /phonePanelHeight = panelWidth \/ MOBILE_DETAILS_ASPECT_RATIO/);
+  assert.match(modal, /logoFadeFrom = mobileDetails \? .*0\.4.*: 0/);
+  assert.match(modal, /logoFadeTo = mobileDetails \? .*0\.75.*: 300/);
+
+  // Opacidad y desplazamiento comparten recorrido: si se separaran, el logo
+  // terminaría de subir antes o después de desaparecer.
+  assert.match(
+    modal,
+    /logoOpacity = useTransform\(\s*\n\s*scrollY,\s*\n\s*\[logoFadeFrom, logoFadeTo\]/,
+  );
+  assert.match(
+    modal,
+    /logoY = useTransform\(\s*\n\s*scrollY,\s*\n\s*\[logoFadeFrom, logoFadeTo\]/,
+  );
+});
