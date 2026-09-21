@@ -723,8 +723,25 @@ export default function DetailModal({
     ? buildImg(data.heroPosterPath, "w780")
     : null;
   const desktopHeroSrc = heroBackdropSrc;
-  const mobileHeroSrc = heroPosterSrc || heroBackdropSrc;
-  const hasHeroArt = !!(desktopHeroSrc || mobileHeroSrc);
+  // TELÉFONO: el hero ES la portada, igual que en la ficha móvil completa.
+  //
+  // El `|| heroBackdropSrc` de siempre es un respaldo para cuando un título no
+  // tiene portada, pero aquí se leía desde el primer frame: la backdrop suele
+  // resolverse antes que la portada —y más aún cuando hay una selección del
+  // usuario, que añade la comprobación de overrides— así que se pintaba la
+  // backdrop recortada a 9:19.5 y un instante después la sustituía la portada.
+  // Ese es el parpadeo.
+  //
+  // Con `heroPosterResolved` el respaldo solo entra cuando se SABE que no hay
+  // portada; hasta entonces se ve el esqueleto. Es exactamente lo que hace la
+  // ficha móvil, que no calcula ningún arte "por defecto" mientras no ha
+  // resuelto la selección del usuario (`remoteArtworkChecked`).
+  const mobileHeroSrc = mobileDetails
+    ? heroPosterSrc || (data.heroPosterResolved ? heroBackdropSrc : null)
+    : heroPosterSrc || heroBackdropSrc;
+  const hasHeroArt = mobileDetails
+    ? !!mobileHeroSrc
+    : !!(desktopHeroSrc || mobileHeroSrc);
   const seasonSelectId = useId();
   const availableSeasons = useMemo(() => {
     const source = Array.isArray(data.seasons) ? data.seasons : [];
@@ -3151,15 +3168,13 @@ export default function DetailModal({
                     />
                   )}
 
-                  {desktopHeroSrc && !(mobileDetails && mobileHeroSrc) && (
+                  {desktopHeroSrc && !mobileDetails && (
                     <img
                       key={`desktop-${desktopHeroSrc}`}
                       src={desktopHeroSrc}
                       alt={title}
                       className={`sv-hero-art-in sv-hero-art-edge h-full w-full ${
-                        mobileDetails
-                          ? "block object-cover"
-                          : mobileHeroSrc
+                        mobileHeroSrc
                           ? "hidden object-cover sm:block"
                           : backdropPath
                             ? "block object-contain sm:object-cover"
@@ -3272,7 +3287,14 @@ export default function DetailModal({
                 (0.85 alfa, 14px) para el contraste local, exactamente igual que
                 en DetailsClient. */}
 
-            {/* Logo del título sobre el hero (fallback al texto si no hay logo) */}
+            {/* Logo del título sobre el hero (fallback al texto si no hay logo).
+
+                En la ficha de TELÉFONO desaparece cuando la portada ya trae el
+                título impreso: `heroPosterPath` cae a un póster localizado en
+                los títulos sin ninguna versión textless, y ahí el logo
+                duplicaba el título. Mismo criterio que la ficha móvil completa
+                (`mobilePosterHasBurnedTitle`). */}
+            {!(mobileDetails && data.heroPosterHasBurnedTitle && mobileHeroSrc) && (
             <motion.div
               style={{ opacity: logoOpacity, y: logoY }}
               className={`absolute inset-x-0 bottom-0 z-15 flex justify-center p-5 text-center ${
@@ -3312,6 +3334,7 @@ export default function DetailModal({
                 </h2>
               ) : null}
             </motion.div>
+            )}
           </div>
 
           {/* TELÉFONO: la fila de botones cierra el primer pantallazo, pegada

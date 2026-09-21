@@ -40,12 +40,18 @@ import {
   GENRES,
   getMediaTypeForItem,
   getArtworkPreference,
+  getMovieImages,
   fetchBestLogo,
   fetchBestPosterNoLang,
   fetchBestBackdropNoLang,
   preloadImage,
   buildImg,
 } from "@/lib/dashboard/media";
+import { pickModalHeroPosterPath } from "@/lib/details/tmdbImages";
+import {
+  fetchArtworkOverride,
+  readPersistedArtworkOverride,
+} from "@/lib/artworkApi";
 import { dedupeStreamingProviders } from "@/lib/streaming/providers";
 
 // TAMAÑO DEL BACKDROP DEL HERO. `original` es el archivo tal cual lo subió TMDb.
@@ -182,6 +188,26 @@ const EMPTY_DATA = {
   backdropPath: null,
   posterPath: null,
   heroPosterPath: null,
+  // ¿Ha TERMINADO ya la resolución de la portada del hero móvil?
+  //
+  // `heroPosterPath` a null no distingue "todavía no llegó" de "este título no
+  // tiene portada", y esa diferencia es justo la que necesita la ficha de
+  // TELÉFONO: mientras no se sabe, muestra el esqueleto; solo cuando se sabe
+  // que no hay portada puede caer al backdrop. Sin esto caía al backdrop desde
+  // el primer frame y lo sustituía al llegar la portada -- el parpadeo.
+  //
+  // Es la misma señal que `remoteArtworkChecked` en DetailsClient, y por eso se
+  // marca DESPUÉS de haber resuelto también la selección del usuario: si se
+  // abriera antes, se pintaría el arte por defecto y el override llegaría
+  // después.
+  heroPosterResolved: false,
+  // ¿La portada del hero móvil trae el título IMPRESO? `heroPosterPath` no
+  // siempre acaba siendo textless: cuando el título no tiene ningún póster sin
+  // idioma, `pickBestNeutralPosterByResVotes` cae a uno localizado. En ese caso
+  // la portada ya lleva el título y superponerle el logo lo duplica, así que la
+  // ficha de teléfono lo oculta -- mismo criterio que `mobilePosterHasBurnedTitle`
+  // en DetailsClient.
+  heroPosterHasBurnedTitle: false,
   // Backdrop del hero: SOLO el definitivo (textless), fijado una única vez y ya
   // precargado. Hasta que existe se muestra el esqueleto, nunca una imagen
   // intermedia: así el usuario ve aparecer una sola imagen.
@@ -446,10 +472,21 @@ export function useDetailModalData(item) {
               }).catch(() => null)) ||
               showDetails?.poster_path ||
               null;
-            if (!finalPoster || cancelledEp) return;
+            if (cancelledEp) return;
+            // `heroPosterResolved` se marca en TODAS las salidas, incluida
+            // "este episodio no tiene póster de serie": si no, el hero de la
+            // ficha de teléfono se quedaría esperando para siempre.
+            if (!finalPoster) {
+              setData((prev) => ({ ...prev, heroPosterResolved: true }));
+              return;
+            }
             await preloadImage(buildImg(finalPoster, "w780")).catch(() => {});
             if (!cancelledEp) {
-              setData((prev) => ({ ...prev, heroPosterPath: finalPoster }));
+              setData((prev) => ({
+                ...prev,
+                heroPosterPath: finalPoster,
+                heroPosterResolved: true,
+              }));
             }
           })();
         } catch {
@@ -638,7 +675,37 @@ export function useDetailModalData(item) {
     const mediaType = getMediaTypeForItem(item);
     const id = item.id;
     const artworkPreference = getArtworkPreference(id, mediaType);
-    const logoOverride = artworkPreference.logo;
+
+    // SELECCIÓN DEL USUARIO EN "PORTADAS Y FONDOS".
+    //
+    // Se resuelve con el MISMO contrato que DetailsClient, y en el mismo orden:
+    //
+    //   1. La instantánea persistida de preferencias (la que cachea AuthContext
+    //      en localStorage). Es SÍNCRONA, así que cuando existe no hay ninguna
+    //      espera y el hero nace ya con la portada elegida.
+    //   2. Si no hay instantánea, la revalidación remota (`/api/user/preferences`,
+    //      una sola petición compartida por toda la página).
+    //   3. Si tampoco hay respuesta, la copia local por título.
+    //
+    // `null` de la instantánea significa "todavía no se sabe" y `{}` "este
+    // título no tiene selección propia", igual que en la ficha completa: sin esa
+    // distinción no se puede saber si el hueco es una ausencia o una espera.
+    const overrideType = mediaType === "tv" ? "tv" : "movie";
+    const persistedOverride = readPersistedArtworkOverride({
+      type: overrideType,
+      id,
+    });
+    const artworkOverridesPromise = persistedOverride
+      ? Promise.resolve(persistedOverride)
+      : fetchArtworkOverride({ type: overrideType, id }).catch(() => null);
+    // Cuando la instantánea confirma los overrides, MANDA sobre la copia local
+    // por título: esa clave queda obsoleta si el usuario reseteó la portada
+    // desde otro dispositivo. Es el mismo criterio que `initialFor` en
+    // DetailsClient.
+    const overrideFrom = (overrides, kind) =>
+      overrides ? overrides[kind] || null : artworkPreference[kind] || null;
+
+    const logoOverride = overrideFrom(persistedOverride, "logo");
     const backdropOverride = artworkPreference.backdrop;
     const seedLogoPath = logoOverride || item.logoPath || item.logo_path || null;
     // `external_ids` va aquí porque en SERIES el imdb_id no viene en los detalles
@@ -1017,9 +1084,15 @@ export function useDetailModalData(item) {
     // idioma (neutro) y, como último recurso, al español.
     (async () => {
       try {
-        const logoPath =
-          logoOverride ||
-          (await fetchBestLogo(id, mediaType, ["en", null, "es"]));
+        // El logo del usuario puede venir de la instantánea (ya aplicado en la
+        // semilla) o de la revalidación remota, igual que la portada: sin
+        // esperarla, un logo elegido a mano en otro dispositivo no llegaría a
+        // verse nunca en esta ficha.
+        const [artworkOverrides, bestLogo] = await Promise.all([
+          artworkOverridesPromise,
+          fetchBestLogo(id, mediaType, ["en", null, "es"]),
+        ]);
+        const logoPath = overrideFrom(artworkOverrides, "logo") || bestLogo;
         if (!cancelled) {
           setData((prev) => ({
             ...prev,
@@ -1037,30 +1110,86 @@ export function useDetailModalData(item) {
       }
     })();
 
-    // Póster para el hero móvil: textless si existe, si no el del item. Precargado
-    // y fijado una vez (el hero móvil lo usa en exclusiva, sin parpadeo).
+    // PÓSTER DEL HERO MÓVIL. Es la portada que pinta la ficha de TELÉFONO del
+    // drawer, así que tiene que ser EXACTAMENTE la misma que la ficha móvil
+    // completa: si las dos eligieran por su cuenta, el mismo título se vería
+    // con una portada en la vista previa y con otra al abrirla.
+    //
+    // La política es la de `mobileNeutralPosterPath` (DetailsClient), paso a
+    // paso: selección del usuario para móvil -> mejor arte SIN IDIOMA de la
+    // galería (la portada principal se excluye: no trae metadatos de idioma,
+    // así que no puede considerarse textless) -> selección del usuario para
+    // escritorio -> portada principal.
+    //
+    // Antes se usaba `fetchBestPosterNoLang`, que ordena con OTRO criterio
+    // (`pickBestPosterNoLang`) y no mira los overrides: para el mismo título
+    // podía devolver una portada distinta de la que enseña la ficha, y nunca la
+    // que el usuario hubiera elegido a mano.
+    //
+    // Se PRECARGA y se fija una sola vez (el hero móvil la usa en exclusiva,
+    // sin parpadeo).
     (async () => {
+      // `heroPosterResolved` tiene que acabar en `true` pase lo que pase: es la
+      // señal con la que la ficha de teléfono deja de esperar. Si se quedara a
+      // medias por un fallo, el hero se quedaría con el esqueleto para siempre.
+      const markResolved = (extra) => {
+        if (cancelled) return;
+        setData((prev) => ({ ...prev, ...extra, heroPosterResolved: true }));
+      };
       try {
-        const bestPoster = await fetchBestPosterNoLang(id, mediaType, {
-          fallbackToAny: false,
-        }).catch(() => null);
-        // La ficha de TELÉFONO del drawer no tiene nada más que enseñar hasta
-        // que llega este póster: es su primer pantallazo entero. Por eso solo
-        // se espera a `detailsPromise` cuando de verdad hace falta —ni la
-        // textless ni el póster de la tarjeta pulsada existen—, en vez de
-        // esperar SIEMPRE a la más lenta de las dos peticiones. El orden de
-        // preferencia es exactamente el de antes.
-        let finalPoster = bestPoster || item?.poster_path || null;
+        const [images, artworkOverrides] = await Promise.all([
+          getMovieImages(id, mediaType).catch(() => null),
+          artworkOverridesPromise,
+        ]);
+        if (cancelled) return;
+
+        const mainPosterPath = item?.poster_path || null;
+        let finalPoster = pickModalHeroPosterPath({
+          mobilePosterOverride: overrideFrom(artworkOverrides, "mobilePoster"),
+          posterOverride: overrideFrom(artworkOverrides, "poster"),
+          mainPosterPath,
+          posters: images?.posters,
+        });
+
+        // Solo se espera a `detailsPromise` cuando de verdad hace falta (la
+        // tarjeta pulsada no traía portada y no hay nada en la galería), en vez
+        // de esperar SIEMPRE a la más lenta de las dos peticiones: esta portada
+        // es el primer pantallazo entero de la ficha de teléfono.
         if (!finalPoster) {
           const detailsForArt = await detailsPromise;
-          finalPoster = detailsForArt?.poster_path || null;
+          finalPoster =
+            detailsForArt?.poster_path || detailsForArt?.profile_path || null;
         }
-        if (cancelled || !finalPoster) return;
-        await preloadImage(buildImg(finalPoster, "w780"));
         if (cancelled) return;
-        setData((prev) => ({ ...prev, heroPosterPath: finalPoster }));
+        if (!finalPoster) {
+          markResolved();
+          return;
+        }
+
+        // Solo se da por impreso cuando el póster elegido está en la galería Y
+        // declara idioma. Si no aparece o no trae metadatos, NO se asume nada y
+        // el logo se mantiene: ocultarlo ante la duda dejaría títulos sin
+        // identificar.
+        const chosen = (images?.posters || []).find(
+          (poster) => poster?.file_path === finalPoster,
+        );
+        const chosenLang = chosen?.iso_639_1;
+        const hasBurnedTitle =
+          typeof chosenLang === "string" && chosenLang.trim() !== "";
+
+        // La precarga no puede impedir que la portada se fije: si falla (CDN
+        // caído, imagen retirada), el `<img>` la vuelve a pedir por su cuenta y
+        // como mucho entra con su propio fundido. Antes, un rechazo aquí saltaba
+        // al `catch` y dejaba el hero sin portada.
+        await preloadImage(buildImg(finalPoster, "w780")).catch(() => {});
+        markResolved({
+          heroPosterPath: finalPoster,
+          heroPosterHasBurnedTitle: hasBurnedTitle,
+        });
       } catch {
-        // sin póster: el hero móvil mantiene el esqueleto
+        // Sin portada: el hero cae al backdrop, pero solo ahora que se SABE que
+        // no hay ninguna.
+        markResolved();
       }
     })();
 
