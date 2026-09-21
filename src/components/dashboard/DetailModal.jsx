@@ -808,6 +808,34 @@ export default function DetailModal({
   // dependiera de él, se vería un flash transparente hasta que terminase.
   const [panelSettled, setPanelSettled] = useState(false);
 
+  // Las secciones de la ficha de TELÉFONO no se montan hasta que el panel ha
+  // terminado de entrar.
+  //
+  // Son diez secciones con sus carruseles, sus paneles de cristal y nueve
+  // consultas de red que salen todas a la vez. Montándolas durante la entrada,
+  // ese trabajo cae justo encima de los 320ms de la animación y se lleva por
+  // delante los fotogramas: el panel entra a tirones. Esperando a que se
+  // asiente, la entrada solo tiene que pintar portada, logo y botones -- que es
+  // además lo único que se ve sin hacer scroll.
+  //
+  // El temporizador es una RED DE SEGURIDAD, no el camino normal: si la
+  // animación se interrumpe (cambio de título a medias, pestaña en segundo
+  // plano) `onAnimationComplete` puede no llegar nunca, y las secciones no
+  // pueden quedarse sin montar por eso.
+  const [phoneSectionsReady, setPhoneSectionsReady] = useState(false);
+  useEffect(() => {
+    if (!mobileDetails) {
+      setPhoneSectionsReady(false);
+      return undefined;
+    }
+    if (panelSettled) {
+      setPhoneSectionsReady(true);
+      return undefined;
+    }
+    const timer = window.setTimeout(() => setPhoneSectionsReady(true), 500);
+    return () => window.clearTimeout(timer);
+  }, [mobileDetails, panelSettled]);
+
   // Ancho del drawer derecho (redimensionable arrastrando el borde izquierdo).
   const [panelWidth, setPanelWidth] = useState(initialDrawerWidth);
   const panelWidthRef = useRef(panelWidth);
@@ -4115,7 +4143,7 @@ export default function DetailModal({
             {/* Todo lo que va por debajo de los botones en la ficha de
                 TELÉFONO: menú de secciones y secciones, igual que la vista
                 móvil de DetailsClient. */}
-            {mobileDetails && (
+            {mobileDetails && phoneSectionsReady && (
               <PhoneDetailsSections
                 item={item}
                 data={data}

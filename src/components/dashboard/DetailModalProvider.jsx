@@ -64,17 +64,26 @@ export function useDetailModal() {
 // valor por defecto con `var(--x, 0px)` y nadie tiene que limpiar nada.
 const DRAWER_INSET_VAR = "--sv-detail-drawer-inset";
 
+// Último valor publicado. Durante el arrastre esto se llama en CADA fotograma y
+// el tirador devuelve fracciones de píxel: sin este filtro se reescribía una
+// propiedad personalizada de <html> sesenta veces por segundo para, la mitad de
+// las veces, dejar el mismo píxel. Cada escritura invalida el estilo de todo lo
+// que dependa de la variable.
+let publishedDrawerInset = null;
+
 function publishDrawerInset(width) {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   if (width == null) {
+    if (publishedDrawerInset === null) return;
+    publishedDrawerInset = null;
     root.style.removeProperty(DRAWER_INSET_VAR);
     return;
   }
-  root.style.setProperty(
-    DRAWER_INSET_VAR,
-    `${Math.max(0, Math.round(width))}px`,
-  );
+  const next = Math.max(0, Math.round(width));
+  if (next === publishedDrawerInset) return;
+  publishedDrawerInset = next;
+  root.style.setProperty(DRAWER_INSET_VAR, `${next}px`);
 }
 
 const DRAWER_VIEW_STORAGE_KEY = "showverse:detailModalView";

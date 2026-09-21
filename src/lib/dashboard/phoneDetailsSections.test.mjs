@@ -198,3 +198,63 @@ test("las tarjetas de Duración y Premios reciben su valor", async () => {
   assert.match(modal, /durationValue=\{/);
   assert.match(modal, /awardsValue=\{/);
 });
+
+test("los indicadores de la galería son los mismos que en la ficha", async () => {
+  const [phone, details] = await Promise.all([
+    read("../../components/dashboard/PhoneDetailsSections.jsx"),
+    read("../../components/DetailsClient.jsx"),
+  ]);
+
+  // La resolución y el botón de copiar URL solo aparecen al pasar por encima.
+  // Al portar la tarjeta les quité esa condición razonando que en un teléfono
+  // no se verían nunca -- y es cierto --, pero dejarlos fijos añade a cada
+  // tarjeta un rótulo y un botón permanentes que la ficha no tiene.
+  const shared = [
+    "opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0",
+    "scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100",
+    "bg-zinc-400 shadow-[0_0_6px_rgba(255,255,255,0.4)]",
+    "group-hover/link:delay-[2000ms]",
+  ];
+
+  for (const fragment of shared) {
+    assert.ok(phone.includes(fragment), `el panel perdió: ${fragment}`);
+    assert.ok(details.includes(fragment), `la ficha perdió: ${fragment}`);
+  }
+});
+
+test("las secciones no se montan durante la animación de entrada", async () => {
+  const modal = await read("../../components/dashboard/DetailModal.jsx");
+
+  // Diez secciones con sus carruseles y nueve consultas de red montándose
+  // encima de los 320ms de la entrada se llevan por delante los fotogramas.
+  assert.match(modal, /mobileDetails && phoneSectionsReady && \(/);
+  // Y con red de seguridad: si la animación se interrumpe y
+  // `onAnimationComplete` no llega, no pueden quedarse sin montar nunca.
+  assert.match(modal, /setTimeout\(\(\) => setPhoneSectionsReady\(true\)/);
+});
+
+test("el arrastre no repite trabajo que no ha cambiado", async () => {
+  const [provider, phone, css] = await Promise.all([
+    read("../../components/dashboard/DetailModalProvider.jsx"),
+    read("../../components/dashboard/PhoneDetailsSections.jsx"),
+    read("../../app/globals.css"),
+  ]);
+
+  // El tirador devuelve fracciones de píxel en cada fotograma. Sin filtro, se
+  // reescribía una propiedad personalizada de <html> sesenta veces por segundo
+  // para dejar el mismo píxel la mitad de las veces.
+  assert.match(provider, /if \(next === publishedDrawerInset\) return;/);
+
+  // El alto del menú no cambia al arrastrar: redondeado, deja de provocar un
+  // render (y el remontaje del efecto de sección activa) por fotograma.
+  assert.match(phone, /current === next \? current : next/);
+
+  // Y las decenas de superficies de cristal de las secciones dejan de
+  // remuestrear el fondo mientras el panel cambia de tamaño.
+  assert.match(
+    css,
+    /:root\[data-sv-drawer-resizing\] \.sv-phone-sections[\s\S]*?backdrop-filter: none !important;/,
+  );
+  // La contención evita que un cambio dentro de una sección invalide el resto.
+  assert.match(css, /\.sv-phone-section \{\s*\n\s*contain: layout paint style;/);
+});
