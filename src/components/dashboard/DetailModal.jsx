@@ -3828,6 +3828,11 @@ export default function DetailModal({
                   // del panel. Son las mismas props que usa la ficha móvil.
                   mobileLayout={mobileDetails}
                   enableMobileTabSwipe={mobileDetails}
+                  // Las tarjetas ENVUELVEN en vez de irse a una fila que se
+                  // desplaza: el panel se puede estrechar, y en esa fila las
+                  // últimas quedaban fuera de vista a la derecha, alcanzables
+                  // solo desplazando algo que no parece desplazable.
+                  wrapCards
                   showPlatformsTab={false}
                   // TELÉFONO: los enlaces externos son una PESTAÑA más, igual
                   // que en la ficha móvil (Detalles · Producción · Sinopsis ·

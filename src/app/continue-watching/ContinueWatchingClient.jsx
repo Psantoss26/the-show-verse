@@ -359,7 +359,22 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
   const updateMenuPosition = useCallback(() => {
     if (!buttonRef.current || typeof window === "undefined") return;
     const rect = buttonRef.current.getBoundingClientRect();
-    const menuWidth = Math.min(rect.width, window.innerWidth - 24);
+    // EL DESPLEGABLE NO ENCOGE CON SU BOTÓN.
+    //
+    // Medía justo lo que el disparador, que es lo razonable mientras el botón
+    // lleva su rótulo. Pero al estrecharse la barra el botón se queda en un
+    // icono (ver `.sv-page-toolbar-*` en globals.css) y el menú heredaba ese
+    // ancho: sus opciones se partían en dos líneas o se cortaban. El menú es
+    // una capa flotante, no tiene por qué caber en el hueco del botón.
+    //
+    // 224px es el ancho al que entran en una línea las opciones más largas de
+    // estos menús ("Valoración más alta", "Añadido reciente"). El tope sigue
+    // siendo la ventana, así que en pantallas estrechas manda ella.
+    const MENU_MIN_WIDTH = 224;
+    const menuWidth = Math.min(
+      Math.max(rect.width, MENU_MIN_WIDTH),
+      window.innerWidth - 24,
+    );
     const left = Math.min(
       Math.max(12, rect.left),
       Math.max(12, window.innerWidth - menuWidth - 12),
@@ -409,12 +424,12 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-2xl transition-[min-width,background-color,color] text-sm lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10"
+        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-2xl transition-[min-width,background-color,color] text-sm sv-page-toolbar-trigger lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10"
       >
         <div className="flex min-w-0 items-center gap-2">
           {Icon && <Icon className="w-4 h-4 shrink-0 text-emerald-500" />}
-          <span className="text-zinc-500 font-bold text-xs uppercase tracking-wider">{label}:</span>
-          <span className="min-w-0 truncate font-semibold text-white">{valueLabel}</span>
+          <span className="sv-page-toolbar-label text-zinc-500 font-bold text-xs uppercase tracking-wider">{label}:</span>
+          <span className="sv-page-toolbar-value min-w-0 truncate font-semibold text-white">{valueLabel}</span>
         </div>
         <ChevronDown className={`w-3.5 h-3.5 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
@@ -1241,7 +1256,7 @@ export default function ContinueWatchingClient() {
           </div>
 
           {/* Escritorio: Fila única */}
-          <div className="hidden lg:flex gap-3 relative z-10">
+          <div className="sv-page-toolbar hidden lg:flex gap-3 relative z-10">
             <HistorySectionNav className="shrink-0" />
             <div className="relative flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500 z-10 pointer-events-none" />

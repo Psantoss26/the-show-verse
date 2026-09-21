@@ -7,8 +7,10 @@ import {
   DRAWER_MIN_PX,
   DRAWER_MIN_TRAVEL_PX,
   MODAL_CONTENT_PADDING_PX,
-  SCOREBOARD_COMPACT_MIN_CONTENT_PX,
+  DRAWER_TABLET_MIN_PX,
+  SCOREBOARD_FIVE_SCORES_PX,
   SCOREBOARD_MIN_CONTENT_PX,
+  SCOREBOARD_STATS_ONE_ROW_PX,
   clampDrawerWidth,
 } from "./detailModalSizing.js";
 
@@ -19,24 +21,58 @@ const contenido = (w) => w - MODAL_CONTENT_PADDING_PX;
 // pantalla y no hay nada que garantizar (ver el test correspondiente).
 const VENTANAS = [1280, 1366, 1440, 1600, 1792, 1920, 2200, 2541];
 
-test("el mínimo es el de la barra YA COMPACTADA", () => {
-  // El panel sabe ceder por partes: al estrecharse, primero los botones de
-  // plataformas, enlaces y compartir pierden su etiqueta, y después se retiran
-  // Rotten Tomatoes y Metacritic. El suelo es lo que ocupa el resultado de eso,
-  // no la barra completa.
-  assert.equal(contenido(DRAWER_MIN_PX), SCOREBOARD_COMPACT_MIN_CONTENT_PX);
-  assert.equal(DRAWER_MIN_PX, 534);
+test("en escritorio el arrastre se para ANTES de perder puntuaciones", () => {
+  // Por debajo de 40rem de barra, el container query retira Rotten Tomatoes y
+  // Metacritic. En escritorio hay sitio de sobra, así que esa degradación ni se
+  // llega a ofrecer: el tope inferior queda justo encima del umbral.
+  assert.equal(contenido(DRAWER_MIN_PX), SCOREBOARD_FIVE_SCORES_PX);
+  assert.equal(DRAWER_MIN_PX, 696);
 
-  // Y queda MUY por debajo de los dos umbrales que antes lo fijaban: ese es el
-  // margen de estrechamiento que se ha ganado.
+  // Sigue MUY por debajo de los dos umbrales que fijaban el mínimo antiguo: ese
+  // es el margen de estrechamiento ganado.
   assert.ok(contenido(DRAWER_MIN_PX) < SCOREBOARD_MIN_CONTENT_PX);
   assert.ok(contenido(DRAWER_MIN_PX) < CAST_ROW_SIX_CARDS_PX);
 });
 
-test("el mínimo se deriva, no se escribe a mano", () => {
+test("en tablet el cajón no pasa de medio viewport", () => {
+  // El "rescate" que deja al cajón pasar de medio viewport existe para
+  // portátiles estrechos, donde alcanzar un ancho usable importa más. En una
+  // tablet se comía hasta el 70% y dejaba la página en una franja.
+  for (const viewport of [768, 800, 820, 1024, 1180, 1366]) {
+    const max = clampDrawerWidth(99999, viewport, { tablet: true });
+    assert.ok(
+      max <= Math.round(viewport * 0.5),
+      `a ${viewport}px el cajón llega a ${max} (${((max / viewport) * 100).toFixed(1)}%)`,
+    );
+    // Y el tirador sigue teniendo recorrido: el mínimo cede si hace falta.
+    const min = clampDrawerWidth(0, viewport, { tablet: true });
+    assert.ok(max - min >= DRAWER_MIN_TRAVEL_PX, `a ${viewport}px solo hay ${max - min}px`);
+  }
+});
+
+test("en tablet se para donde las estadísticas se partirían en dos filas", () => {
+  // Ahí la pantalla no da para el tope de escritorio, así que se baja más y se
+  // aceptan las dos puntuaciones menos por el camino. El suelo es el último
+  // ancho en el que el marcador se lee de una pasada.
+  assert.equal(contenido(DRAWER_TABLET_MIN_PX), SCOREBOARD_STATS_ONE_ROW_PX);
+  assert.ok(DRAWER_TABLET_MIN_PX < DRAWER_MIN_PX);
+
+  // Nunca por encima de ese tope; en tablets pequeñas queda por debajo, porque
+  // ahí manda el tope duro de medio viewport.
+  for (const viewport of [768, 820, 1024, 1180, 1366]) {
+    const min = clampDrawerWidth(0, viewport, { tablet: true });
+    assert.ok(min <= DRAWER_TABLET_MIN_PX, `a ${viewport}px el mínimo es ${min}`);
+  }
+});
+
+test("los mínimos se derivan, no se escriben a mano", () => {
   assert.equal(
     DRAWER_MIN_PX,
-    SCOREBOARD_COMPACT_MIN_CONTENT_PX + MODAL_CONTENT_PADDING_PX,
+    SCOREBOARD_FIVE_SCORES_PX + MODAL_CONTENT_PADDING_PX,
+  );
+  assert.equal(
+    DRAWER_TABLET_MIN_PX,
+    SCOREBOARD_STATS_ONE_ROW_PX + MODAL_CONTENT_PADDING_PX,
   );
 });
 
@@ -81,26 +117,17 @@ test("el rescate no se come la pantalla en ventanas pequeñas", () => {
 });
 
 test("se respeta el ancho pedido cuando está dentro del rango", () => {
-  // A 2541px el rango es 534 .. 1271.
+  // A 2541px el rango es 696 .. 1271.
   assert.equal(clampDrawerWidth(1000, 2541), 1000);
   assert.equal(clampDrawerWidth(1271, 2541), 1271);
-  // 700px estaba FUERA de rango con el mínimo anterior y ahora es un ancho
-  // válido: es exactamente lo que se ha abierto.
+  // 700px estaba FUERA de rango con el mínimo antiguo (896) y ahora es válido.
   assert.equal(clampDrawerWidth(700, 2541), 700);
   // Fuera de rango, se sigue acotando por ambos lados.
   assert.equal(clampDrawerWidth(300, 2541), DRAWER_MIN_PX);
   assert.equal(clampDrawerWidth(9999, 2541), 1271);
 });
 
-test("la tablet no se queda como la menos capaz de estrecharse", () => {
-  // Tenía un mínimo propio de 560px, escrito cuando el de escritorio eran 896 y
-  // en una tablet el cajón nacía bloqueado. Ahora que el general baja de esa
-  // cifra, ese atajo la dejaría por encima de escritorio.
-  for (const viewport of [768, 820, 1024, 1180, 1366]) {
-    const min = clampDrawerWidth(0, viewport, { tablet: true });
-    assert.ok(min <= DRAWER_MIN_PX, `a ${viewport}px el mínimo es ${min}`);
-  }
-});
+
 
 test("la ficha móvil acoplada mantiene viewport móvil y espacio para la página", async () => {
   const { clampMobileDetailsWidth } = await import("./detailModalSizing.js");
@@ -137,7 +164,14 @@ test("DetailModal conserva al menos 120px de arrastre en tablets pequeñas y gra
     const min = clampDrawerWidth(0, viewport, { tablet: true });
     const max = clampDrawerWidth(10000, viewport, { tablet: true });
     assert.ok(max - min >= DRAWER_MIN_TRAVEL_PX);
-    assert.ok(min >= 320);
+    // Aquí había un suelo de 320px. Con el tope duro de medio viewport ya no
+    // cabe: en una tablet de 768px el máximo son 384px, y conservar el
+    // recorrido del tirador obliga a bajar el mínimo a 264. Entre un tirador
+    // que no se mueve y un cajón que puede quedarse estrecho, se elige lo
+    // segundo: el ancho lo decide quien arrastra, y en esas pantallas la vista
+    // por defecto es la de teléfono, que tiene su propio cálculo.
+    assert.ok(min > 0);
+    assert.ok(min <= DRAWER_TABLET_MIN_PX);
     assert.ok(max <= Math.round(viewport * DRAWER_MAX_VIEWPORT_SHARE));
     const requested = min + 60;
     assert.equal(clampDrawerWidth(requested, viewport, { tablet: true }), requested);

@@ -32,27 +32,42 @@ export const SCOREBOARD_SAFETY_MARGIN_PX = 44;
 // el cajón no debe reorganizar esa fila delante del usuario.
 export const CAST_ROW_SIX_CARDS_PX = 840;
 
-// ANCHO DE LA BARRA YA COMPACTADA: tres insignias (TMDb, Trakt, IMDb) y los
-// botones de plataformas, enlaces y compartir reducidos a iconos redondos.
+// UMBRAL DE LAS CINCO INSIGNIAS (40rem = 640px de barra).
 //
-// Es el suelo REAL de la barra, y el que manda ahora que el panel sabe ceder
-// por partes: al estrecharse, primero los botones pierden su etiqueta
-// (`detail-score-actions`) y después se retiran Rotten Tomatoes y Metacritic
-// (`.optionalScore`), las dos puntuaciones sin recuento de votos. Ver
-// `DetailsScoreboardPanel.module.css`.
+// Por debajo, el container query de `DetailsScoreboardPanel.module.css` retira
+// Rotten Tomatoes y Metacritic. En ESCRITORIO el arrastre se para justo antes:
+// ahí hay sitio de sobra, y perder dos puntuaciones por estrechar es una
+// degradación que no hace falta ofrecer.
+export const SCOREBOARD_FIVE_SCORES_PX = 640;
+
+// UMBRAL DE LAS ESTADÍSTICAS EN UNA SOLA FILA.
 //
-// Desglose: 3 insignias (~78px) + 2 huecos (20px) + los botones en su mínimo
-// (9rem, el `min-inline-size` de `.actionsViewport`) + el hueco de la barra
-// (16px) + su relleno lateral (44px).
-export const SCOREBOARD_COMPACT_MIN_CONTENT_PX = 478;
+// La fila de seguidores/reproducciones/listas/favoritos envuelve cuando sus
+// cuatro insignias no caben (`sm:flex-wrap`), y al hacerlo el panel crece de
+// alto. En TABLET el arrastre se para ahí: es el último ancho en el que el
+// marcador se lee de una pasada.
+//
+// ESTIMADO, no medido en navegador como sí lo fue `SCOREBOARD_MIN_CONTENT_PX`:
+// las cuatro insignias (~113 + ~138 + ~78 + ~98px, donde "REPRODUCCIONES" es la
+// más larga) más tres huecos de 16px y el relleno lateral de 44px, redondeado
+// al alza porque el ancho de cada etiqueta depende de la cifra que muestre.
+export const SCOREBOARD_STATS_ONE_ROW_PX = 500;
+
+// Mínimo de ESCRITORIO: se para antes de que se oculten las dos puntuaciones.
+export const DRAWER_MIN_PX =
+  SCOREBOARD_FIVE_SCORES_PX + MODAL_CONTENT_PADDING_PX;
+
+// Mínimo de TABLET: llega más abajo —ahí la pantalla no da para tanto— y se
+// para cuando las estadísticas están a punto de partirse en dos filas. Las
+// puntuaciones opcionales sí se retiran por el camino, que es lo que permite
+// bajar hasta aquí.
+export const DRAWER_TABLET_MIN_PX =
+  SCOREBOARD_STATS_ONE_ROW_PX + MODAL_CONTENT_PADDING_PX;
 
 // `SCOREBOARD_MIN_CONTENT_PX` y `CAST_ROW_SIX_CARDS_PX` siguen documentando los
-// umbrales de la barra COMPLETA y de las seis tarjetas de Reparto, pero ya no
-// fijan el mínimo: por debajo de ellos el panel no se rompe, solo se reorganiza
-// —la barra suelta lo prescindible y el Reparto pasa a cinco tarjetas—, y eso
-// es preferible a impedir que el panel se estreche.
-export const DRAWER_MIN_PX =
-  SCOREBOARD_COMPACT_MIN_CONTENT_PX + MODAL_CONTENT_PADDING_PX;
+// umbrales de la barra con los botones SIN compactar y de las seis tarjetas de
+// Reparto, pero ya no fijan el mínimo: por debajo de ellos el panel no se
+// rompe, solo se reorganiza.
 
 // Techo del "rescate": el cajón puede pasar de medio viewport para alcanzar su
 // mínimo seguro, pero nunca comerse más de esta fracción de la ventana. Sin
@@ -68,6 +83,23 @@ export function clampDrawerWidth(width, viewportWidth, { tablet = false } = {}) 
   const vw = viewportWidth || 1280;
   const medioViewport = Math.round(vw * 0.5);
   const techo = Math.round(vw * DRAWER_MAX_VIEWPORT_SHARE);
+
+  // TABLET: medio viewport es un tope DURO, no preferido.
+  //
+  // El "rescate" de abajo existe para que en un portátil estrecho el cajón
+  // pueda pasar de medio viewport y alcanzar así un ancho usable. En una
+  // tablet ese rescate se comía hasta el 70% de la pantalla y dejaba la página
+  // reducida a una franja, que es peor que un cajón algo justo. Aquí el mínimo
+  // ya cede por su cuenta (ver `DRAWER_TABLET_MIN_PX`), así que no hace falta
+  // robarle sitio a la página.
+  if (tablet) {
+    const maxTablet = medioViewport;
+    const minTablet = Math.min(
+      DRAWER_TABLET_MIN_PX,
+      maxTablet - DRAWER_MIN_TRAVEL_PX,
+    );
+    return Math.max(minTablet, Math.min(Math.round(width || 0), maxTablet));
+  }
 
   // Medio viewport sigue siendo el tope PREFERIDO, y manda en cuanto la pantalla
   // da de sí. Pero en ventanas de menos de ~1792px ese tope cae por debajo del
@@ -89,9 +121,7 @@ export function clampDrawerWidth(width, viewportWidth, { tablet = false } = {}) 
   // atajo para que en una tablet el cajón no naciera bloqueado. Ahora que el
   // mínimo general baja de esa cifra, ese atajo dejaría a la tablet como la
   // MENOS capaz de estrecharse, que es lo contrario de lo que busca.
-  const min = tablet
-    ? Math.min(DRAWER_MIN_PX, max - DRAWER_MIN_TRAVEL_PX)
-    : Math.min(DRAWER_MIN_PX, max);
+  const min = Math.min(DRAWER_MIN_PX, max);
   return Math.max(min, Math.min(Math.round(width || 0), max));
 }
 

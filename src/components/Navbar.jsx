@@ -2510,7 +2510,10 @@ function NavbarContent() {
         // 30rem→28rem, ~6% en los dos ejes para no deformar la píldora): con la
         // medida anterior pesaba de más sobre el contenido. La lente de la
         // sección activa es un % del alto, así que sigue el cambio sola.
-        className={`desktop:hidden fixed left-1/2 z-30 flex h-14 w-[min(calc(100%_-_3rem),21.5rem)] origin-bottom -translate-x-1/2 items-center rounded-full px-3.5 md:h-[3.75rem] md:w-[min(calc(100%_-_8rem),28rem)] md:px-4 ${LIQUID_GLASS_BAR} bottom-[calc(0.75rem+env(safe-area-inset-bottom))] md:bottom-[calc(1.25rem+env(safe-area-inset-bottom))] transform-gpu transition-transform duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+        // Con el drawer abierto (tablet), esta barra se recoloca en el hueco
+        // que queda a su izquierda: centrada ahí y, si hace falta, más
+        // estrecha. Ver `.sv-navbar-bottom-shift` en globals.css.
+        className={`sv-navbar-bottom-shift desktop:hidden fixed left-1/2 z-30 flex h-14 w-[min(calc(100%_-_3rem),21.5rem)] origin-bottom -translate-x-1/2 items-center rounded-full px-3.5 md:h-[3.75rem] md:w-[min(calc(100%_-_8rem),28rem)] md:px-4 ${LIQUID_GLASS_BAR} bottom-[calc(0.75rem+env(safe-area-inset-bottom))] md:bottom-[calc(1.25rem+env(safe-area-inset-bottom))] transform-gpu transition-transform duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
           bottomNavCompact ? "scale-[0.86]" : "scale-100"
         }`}
       >

@@ -1178,6 +1178,195 @@ html {
   animation-play-state: paused !important;
 }
 
+/* TARJETAS DE DETALLES Y PRODUCCIÓN EN EL DRAWER.
+   ===================================================================
+
+   Tres reglas, en este orden de prioridad:
+
+   1. NO DEJAR HUECO. Las tarjetas se reparten la fila entera.
+   2. TEXTO EN UNA LÍNEA, SIEMPRE. El texto no se parte nunca: la tarjeta
+      mediría más alto que sus vecinas y la fila entera crecería con ella. Por
+      eso cada tarjeta parte de SU CONTENIDO A UNA LÍNEA (`flex-basis: auto`) y
+      no de un ancho igual para todas: con columnas iguales, "The Lord of the
+      Rings: The Return of the King" se partía en dos mientras "$94.0M" dejaba
+      media tarjeta vacía. Con base de contenido, la que necesita ancho se lo
+      queda y el sobrante se reparte a partes iguales.
+
+      Si aun así no entra, se recorta con puntos suspensivos. Es el último
+      recurso y no debería verse: el corte a parejas está puesto por encima del
+      ancho que piden las cuatro tarjetas a una línea.
+   3. SI NO CABEN, DE DOS EN DOS. Nunca tres y una suelta: `50% - medio hueco`
+      es exactamente lo que impide que entre una tercera en la fila.
+
+   El corte en 56rem sale de sumar las cuatro tarjetas de Detalles a una línea:
+   un título original largo (~390px con su icono y relleno) más las otras tres
+   (~150px cada una, donde a veces manda el rótulo y no el valor) y sus tres
+   huecos, unos 870px. Por debajo se pasa a parejas, donde cada tarjeta se
+   lleva media fila y le sobra sitio de sobra para su línea.
+
+   Va por container query porque lo que manda es el ancho de la FILA, que
+   cambia al arrastrar el panel, no el de la ventana. El contenedor es el
+   cuerpo de la pestaña y no la propia fila: un elemento no puede consultarse a
+   sí mismo, y el paso a dos columnas necesita cambiar el `flex-wrap` de la
+   fila. */
+.sv-info-cards-scope {
+  container: sv-info-cards / inline-size;
+}
+
+.sv-info-cards {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0.75rem;
+}
+
+.sv-info-cards > * {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* El texto NO se parte. Una tarjeta a dos líneas mide más alto que sus vecinas
+   y estira la fila entera, que es justo lo que no puede pasar aquí. */
+.sv-info-cards .sv-meta-label,
+.sv-info-cards .sv-meta-value {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@container sv-info-cards (width < 56rem) {
+  .sv-info-cards {
+    flex-wrap: wrap;
+  }
+
+  .sv-info-cards > * {
+    flex: 1 1 calc(50% - 0.375rem);
+  }
+
+  /* FILA PROPIA para la tarjeta que no cabe en media.
+     Es siempre el título original: las otras tres de Detalles —una fecha y dos
+     cifras— nunca se quedan estrechas, así que se reparten la fila siguiente
+     entre ellas. Con reparto en parejas, un título largo se quedaba recortado
+     mientras "$94.0M" desperdiciaba media tarjeta. */
+  .sv-info-cards > .sv-info-card--wide {
+    flex-basis: 100%;
+  }
+}
+
+/* BARRA INFERIOR (tablet) con el drawer abierto.
+   ===================================================================
+
+   Va `fixed left-1/2` con `translateX(-50%)`, es decir centrada en la VENTANA.
+   Con el drawer abierto su mitad derecha queda debajo del panel.
+
+   Se recoloca moviendo `left`, no con otra `transform`: la que ya tiene le
+   sirve para centrarse Y para esconderse al hacer scroll, y una segunda la
+   pisaría. Es el mismo motivo por el que la barra superior táctil usa
+   `margin-right`.
+
+   Y además se ESTRECHA cuando hace falta: en una tablet de 768px con el panel
+   a la mitad, la barra (28rem = 448px) no cabe en los 384px que quedan por
+   mucho que se desplace. Ajustando su ancho al hueco entra entera.
+
+   Solo desde 768px: por debajo no hay drawer —en móvil la ficha se abre como
+   página— y ahí la barra conserva su tamaño de siempre. A partir de ahí, con
+   el drawer cerrado las dos fórmulas dan exactamente el mismo resultado que
+   las utilidades que sustituyen. */
+@media (min-width: 768px) {
+  .sv-navbar-bottom-shift {
+    /* Hueco libre a la izquierda del panel, con un suelo para que la barra no
+       se quede sin sitio en ningún caso. */
+    --sv-bottom-space: max(
+      18rem,
+      calc(100vw - var(--sv-detail-drawer-inset, 0px))
+    );
+
+    left: calc(var(--sv-bottom-space) / 2);
+    width: min(calc(var(--sv-bottom-space) - 2rem), 28rem);
+    transition:
+      left 320ms cubic-bezier(0.22, 1, 0.36, 1),
+      width 320ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 450ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  :root[data-sv-drawer-resizing] .sv-navbar-bottom-shift {
+    transition: none;
+  }
+}
+
+@media (min-width: 768px) and (prefers-reduced-motion: reduce) {
+  .sv-navbar-bottom-shift {
+    transition: none;
+  }
+}
+
+/* BARRA DE FILTROS DE LAS PÁGINAS DE COLECCIÓN.
+   ===================================================================
+
+   Buscador + Tipo/Ordenar/Agrupar + modos de vista, todo en una fila. Sus
+   botones se declaran con `lg:min-w-[140px]` y el valor seleccionado en
+   `lg:whitespace-nowrap`, así que no se encogen ni recortan: cuando el sitio
+   falta, se SOLAPAN unos encima de otros.
+
+   Pasa sobre todo con el drawer de la ficha acoplado, que le quita a la página
+   varios cientos de píxeles. Y no lo arregla una media query: la ventana sigue
+   siendo la misma, lo que ha cambiado es el ancho de la FILA. De ahí el
+   container query, que además cubre escritorio y tablet con un solo umbral.
+
+   Cede en dos pasos, de lo menos a lo más informativo:
+     1. Se va el rótulo ("TIPO:", "ORDENAR:"...), que el icono ya representa.
+     2. Se va el valor seleccionado y el botón suelta su ancho mínimo: quedan
+        el icono y la flecha, que es lo que mantiene visible que se puede
+        desplegar.
+
+   LOS UMBRALES SON EL ANCHO QUE PIDE LA FILA EN CADA ESTADO, sumando sus
+   cinco piezas (buscador, Tipo, Ordenar, Agrupar y los modos de vista) más sus
+   huecos:
+
+     con rótulos   ~1048px  -> 66rem
+     sin rótulos    ~862px  -> 54rem
+     solo iconos    ~574px
+
+   La primera versión de esto los puso en 56rem y 44rem, muy por debajo de lo
+   que la fila necesita: para cuando cedía, los controles llevaban rato
+   tocándose.
+
+   Y el recorte de abajo es lo que hace que TOCARSE sea imposible a cualquier
+   ancho, pase lo que pase con los umbrales. */
+.sv-page-toolbar {
+  container: sv-page-toolbar / inline-size;
+}
+
+/* EL VALOR SE RECORTA DENTRO DE SU BOTÓN, no se sale.
+   La causa real del solape: ese texto lleva `truncate`, pero un
+   `lg:overflow-visible` lo anula en escritorio y deja que se derrame sobre el
+   botón siguiente en vez de recortarse. Los umbrales deciden CUÁNDO se
+   simplifica la barra; esto garantiza que, mientras tanto, nada se monte
+   encima de nada. */
+.sv-page-toolbar .sv-page-toolbar-value {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+@container sv-page-toolbar (width < 66rem) {
+  .sv-page-toolbar-label {
+    display: none;
+  }
+}
+
+@container sv-page-toolbar (width < 54rem) {
+  .sv-page-toolbar-value {
+    display: none;
+  }
+
+  /* `!important` porque compite con la utilidad `lg:min-w-[140px]` del propio
+     botón, que es la que impide que se encoja. */
+  .sv-page-toolbar-trigger {
+    min-width: 0 !important;
+  }
+}
+
 /* BARRA SUPERIOR TÁCTIL (tablet) con el drawer abierto.
    ===================================================================
 
