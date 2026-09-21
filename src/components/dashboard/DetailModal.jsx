@@ -3555,8 +3555,12 @@ export default function DetailModal({
                     !data.imdbRatingResolved &&
                     typeof data.imdbRating !== "number",
                 }}
+                // Rotten Tomatoes y Metacritic se quedan FUERA de la ficha de
+                // teléfono: cinco insignias no caben en ese ancho y empujaban
+                // los botones de la derecha fuera del panel. Las tres que se
+                // conservan (TMDb, Trakt e IMDb) son las que llevan votos.
                 rt={
-                  data.rtScore != null
+                  data.rtScore != null && !mobileDetails
                     ? {
                         value: Math.round(data.rtScore),
                         href: ratingLinks.rt,
@@ -3564,13 +3568,14 @@ export default function DetailModal({
                     : null
                 }
                 mc={
-                  data.mcScore != null
+                  data.mcScore != null && !mobileDetails
                     ? {
                         value: Math.round(data.mcScore),
                         href: ratingLinks.mc,
                       }
                     : null
                 }
+                compactToolbar={mobileDetails}
                 externalLinks={externalLinks}
                 onMorePlatforms={(event) => {
                   stopNestedModalOpeningEvent(event);
@@ -3682,10 +3687,49 @@ export default function DetailModal({
                 <DetailsInfoTabs
                   variant="normal"
                   layoutId="detailModalTab"
+                  // TELÉFONO: las tarjetas se APILAN en vez de ir en una fila
+                  // que se desplaza. Esa fila es `lg:flex-row`, y ese `lg:`
+                  // mira el viewport: en el drawer casa siempre, así que las
+                  // tarjetas salían en horizontal y se cortaban contra el borde
+                  // del panel. Son las mismas props que usa la ficha móvil.
+                  mobileLayout={mobileDetails}
+                  enableMobileTabSwipe={mobileDetails}
+                  showPlatformsTab={false}
                   mediaType={mediaType}
                   originalTitle={data.originalTitle}
+                  // `formatValue` NO significa lo mismo en las dos
+                  // disposiciones de <DetailsInfoTabs>, y hay que pasarle lo
+                  // que espera cada una:
+                  //  - ancha: solo hay tarjeta "Duración" y solo en series, y
+                  //    sale de aquí (la duración de una película vive en la
+                  //    fila de meta, no en una tarjeta).
+                  //  - teléfono: en películas esta ES la "Duración", y en
+                  //    series es el "Formato" (temporadas · capítulos), con la
+                  //    duración del episodio aparte en `durationValue`.
+                  //
+                  // La ficha completa no se topa con esto porque monta DOS
+                  // instancias, una por disposición; el modal monta una sola y
+                  // conmuta. Pasando el valor de la instancia ancha, en el
+                  // teléfono las películas se quedaban con un "—" y las series
+                  // enseñaban la duración en "Formato" y nada en "Duración".
                   formatValue={
-                    mediaType === "tv" ? data.episodeRuntimeValue || "—" : "—"
+                    mobileDetails
+                      ? mediaType === "tv"
+                        ? data.seasonEpisodeValue || "—"
+                        : data.runtime || "—"
+                      : mediaType === "tv"
+                        ? data.episodeRuntimeValue || "—"
+                        : "—"
+                  }
+                  durationValue={
+                    mediaType === "tv" ? data.episodeRuntimeValue || "—" : null
+                  }
+                  // La tarjeta "Premios" de Producción se alimenta de aquí. Sin
+                  // esta prop se quedaba en "—" aunque el título tuviera
+                  // premios: es la MISMA cadena de OMDb que ya formatea la
+                  // línea verde de la cabecera.
+                  awardsValue={
+                    data.awards ? formatDashboardAwards(data.awards) : null
                   }
                   releaseDateValue={data.releaseDateValue}
                   status={data.status}

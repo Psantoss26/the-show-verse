@@ -121,3 +121,80 @@ test("una misma petición de soundtrack no se lanza dos veces", async () => {
     /soundtrackRequestRef\.current = \{ key: null, promise: null \};/,
   );
 });
+
+test("nada se recorta contra los bordes del panel", async () => {
+  const [phone, modal] = await Promise.all([
+    read("../../components/dashboard/PhoneDetailsSections.jsx"),
+    read("../../components/dashboard/DetailModal.jsx"),
+  ]);
+
+  // MENÚ: diez secciones rotuladas no caben en el ancho de un teléfono. Cada
+  // botón lleva `overflow-hidden`, así que al encogerse cortaba su propio texto
+  // a media palabra.
+  assert.match(phone, /iconsOnly/);
+
+  // CARRUSELES: sin desbordamiento visible, o las tarjetas que no caben se
+  // pintan fuera y las corta el borde redondeado del panel. Se busca en los
+  // `className`, no en el archivo entero: el comentario que explica esto lo
+  // nombra y haría fallar al test por citarse a sí mismo.
+  //
+  // Solo los CARRUSELES: la baraja de portadas de una lista sí necesita
+  // desbordar, pero lo hace dentro de su tarjeta, que está en el margen del
+  // contenido y nunca llega al canto del panel.
+  const carousels = [...phone.matchAll(/<DetailsArrowCarousel([\s\S]*?)>/g)].map(
+    (match) => match[1],
+  );
+  assert.ok(carousels.length > 0, "no se encontró ningún carrusel");
+  assert.ok(
+    carousels.every((props) => !props.includes("overflow-visible")),
+    "algún carrusel deja desbordar sus tarjetas fuera del panel",
+  );
+
+  // TARJETAS DE INFORMACIÓN: `mobileLayout` las apila. La fila horizontal es
+  // `lg:flex-row`, y ese `lg:` mira el VIEWPORT: en el drawer casa siempre.
+  assert.match(modal, /mobileLayout=\{mobileDetails\}/);
+
+  // MARCADOR: las insignias ceden el ancho y se recorren, para que los botones
+  // de la derecha queden siempre completos.
+  assert.match(modal, /compactToolbar=\{mobileDetails\}/);
+});
+
+test("el marcador del teléfono deja fuera Rotten Tomatoes y Metacritic", async () => {
+  const modal = await read("../../components/dashboard/DetailModal.jsx");
+
+  // Cinco insignias no caben en ese ancho; se conservan las tres que llevan
+  // votos (TMDb, Trakt, IMDb).
+  assert.match(modal, /data\.rtScore != null && !mobileDetails/);
+  assert.match(modal, /data\.mcScore != null && !mobileDetails/);
+});
+
+test("las filas de portadas muestran TRES tarjetas completas", async () => {
+  const phone = await read("../../components/dashboard/PhoneDetailsSections.jsx");
+
+  // Tres enteras, como la ficha móvil. Un valor fraccionario ("insinuar" una
+  // cuarta a medias) estrecha las tres primeras y la fila se lee recortada.
+  const poster = phone.slice(
+    phone.indexOf("const PHONE_POSTER_CAROUSEL"),
+    phone.indexOf("const PHONE_WIDE_CAROUSEL"),
+  );
+  const values = [...poster.matchAll(/slidesPerView: ([\d.]+)/g)].map((m) => m[1]);
+  assert.ok(values.length > 0, "no se encontró la configuración del carrusel");
+  assert.ok(
+    values.every((value) => value === "3"),
+    `se esperaban 3 tarjetas enteras, hay: ${values.join(", ")}`,
+  );
+});
+
+test("las tarjetas de Duración y Premios reciben su valor", async () => {
+  const modal = await read("../../components/dashboard/DetailModal.jsx");
+
+  // `formatValue` significa cosas distintas en cada disposición de
+  // <DetailsInfoTabs>: en la ancha es la duración (solo series) y en la de
+  // teléfono es la duración en películas y el FORMATO en series. El modal monta
+  // UNA instancia y conmuta, así que el valor tiene que conmutar con ella.
+  assert.match(modal, /formatValue=\{\s*\n\s*mobileDetails/);
+  // Duración del episodio y premios llegan por sus propias props; sin ellas las
+  // tarjetas se quedaban en "—".
+  assert.match(modal, /durationValue=\{/);
+  assert.match(modal, /awardsValue=\{/);
+});

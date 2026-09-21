@@ -13,6 +13,15 @@ export default function DetailsSectionMenu({
   maxWidthClass = "max-w-[1400px]",
   colorScheme = "yellow",
   showLabelsOnMobile = false,
+  // SOLO ICONOS, sin rótulos, independientemente del ancho de VENTANA.
+  //
+  // `showLabelsOnMobile` no sirve para esto: su alternativa es `hidden
+  // sm:inline`, que mira el viewport. En la ficha de teléfono del drawer el
+  // ancho lo pone el panel (320-639px) dentro de una ventana de escritorio, así
+  // que ese `sm:` casa siempre y los rótulos volvían. Con diez secciones en esa
+  // anchura cada botón se encoge por debajo de su texto y, como lleva
+  // `overflow-hidden`, lo recorta a media palabra.
+  iconsOnly = false,
 }) {
   const safeItems = useMemo(
     () => (Array.isArray(items) ? items.filter(Boolean) : []),
@@ -251,7 +260,11 @@ export default function DetailsSectionMenu({
                                 }}
                                 transition={{ duration: 0.3 }}
                                 className={[
-                                  showLabelsOnMobile ? "inline" : "hidden sm:inline",
+                                  iconsOnly
+                                    ? "hidden"
+                                    : showLabelsOnMobile
+                                      ? "inline"
+                                      : "hidden sm:inline",
                                   "text-[11px] sm:text-sm font-semibold tracking-wide sm:tracking-wider uppercase transition-all duration-300",
                                   // MISMO PROBLEMA QUE EL ICONO. Aclarar el gris
                                   // no bastaba —sobre un fondo claro empeora—:
