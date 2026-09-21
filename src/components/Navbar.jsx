@@ -1433,6 +1433,23 @@ function NavbarContent() {
       const availableWidth =
         header.clientWidth - left.offsetWidth - right.offsetWidth - 32;
 
+      // TOPE DEL DESPLAZAMIENTO del bloque derecho cuando se abre el drawer de
+      // la ficha (ver `.sv-navbar-right-shift`). Es este mismo hueco libre: el
+      // carril central está vacío a propósito, así que el bloque puede recorrerlo
+      // entero, pero ni un píxel más o se montaría sobre las secciones.
+      //
+      // Se mide aquí y no en el drawer porque es la única parte que conoce el
+      // ancho real de la barra —traducciones, avatar y zoom incluidos—, que es
+      // justo lo que este observador ya estaba calculando para la búsqueda.
+      //
+      // No hay realimentación con el propio desplazamiento: se aplica con
+      // `transform`, que no toca la maquetación, así que `offsetWidth` no cambia
+      // y este valor no depende de sí mismo.
+      header.style.setProperty(
+        "--sv-navbar-right-shift-max",
+        `${Math.max(0, Math.round(availableWidth))}px`,
+      );
+
       setDesktopSearchCompact((isCompact) => {
         // Histéresis: evitamos que la pestaña «Buscar» oscile al aparecer,
         // pues forma parte de la propia columna izquierda que se está midiendo.
@@ -2183,9 +2200,13 @@ function NavbarContent() {
               Las secciones que antes vivían aquí como una fila de nueve iconos
               (indescifrables sin pasar el ratón por encima) se han mudado al
               desplegable del perfil, en dos columnas. */}
+          {/* Con el drawer de la ficha abierto, este bloque se aparta hacia la
+              izquierda para no quedar debajo. El recorrido sale del carril
+              central vacío y lo acota `--sv-navbar-right-shift-max`; ver
+              `.sv-navbar-right-shift` en globals.css. */}
           <div
             ref={desktopRightRef}
-            className="flex shrink-0 items-center gap-2 pr-12"
+            className="sv-navbar-right-shift flex shrink-0 items-center gap-2 pr-12"
           >
             {/* Buscar va PRIMERO en esta zona: es la acción más frecuente y así
                 queda pegada al contenido, no escondida entre los extremos.

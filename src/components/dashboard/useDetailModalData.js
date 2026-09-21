@@ -10,7 +10,7 @@
 // (premios) + IMDb (nota), y la comunidad de Trakt (sentimientos + scoreboard).
 // Se cancela con un flag al desmontar o cambiar de item.
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
   getDetails,
@@ -260,6 +260,11 @@ const EMPTY_DATA = {
   providersResolved: false,
   seasons: [],
   showReleaseDate: null,
+  // Saga a la que pertenece la película, si pertenece a alguna. La ficha de
+  // TELÉFONO tiene sección de Colección y la necesita para saber si debe
+  // pintarla; `null` significa tanto "no pertenece" como "todavía no se sabe",
+  // y eso basta: la sección simplemente aparece cuando se resuelve.
+  belongsToCollectionId: null,
 };
 
 function mergeModalProviders(...lists) {
@@ -754,6 +759,10 @@ export function useDetailModalData(item) {
         const backdropPath =
           backdropOverride || item?.backdrop_path || source?.backdrop_path || null;
         const posterPath = source?.poster_path || item?.poster_path || null;
+        const belongsToCollectionId =
+          typeof source?.belongs_to_collection?.id === "number"
+            ? source.belongs_to_collection.id
+            : null;
         const year = yearOf(source) || yearOf(item) || null;
 
         // Etiquetas meta: duración real para películas; temporadas/episodios
@@ -918,6 +927,7 @@ export function useDetailModalData(item) {
           overview,
           backdropPath,
           posterPath,
+          belongsToCollectionId,
           year,
           runtime,
           seasonEpisodeValue,
@@ -1326,5 +1336,30 @@ export function useDetailModalData(item) {
     };
   }, [item]);
 
-  return { loading, data };
+  // Aplica en caliente una selección hecha en la galería de "Portadas y fondos"
+  // de la ficha de teléfono. Sin esto, elegir una portada no cambiaría nada
+  // hasta reabrir la ficha: `heroPosterPath` y `logoPath` se fijan UNA vez por
+  // título y no vuelven a resolverse.
+  //
+  // `hasBurnedTitle` viaja con la selección porque quien la hace ya tiene
+  // delante la entrada de la galería y sabe su idioma; recalcularlo aquí
+  // obligaría a volver a pedir las imágenes.
+  const applyArtworkSelection = useCallback(({ kind, filePath, hasBurnedTitle }) => {
+    setData((prev) => {
+      if (kind === "logo") {
+        return { ...prev, logoPath: filePath || null, logoResolved: true };
+      }
+      if (kind === "mobilePoster") {
+        return {
+          ...prev,
+          heroPosterPath: filePath || prev.heroPosterPath,
+          heroPosterResolved: true,
+          heroPosterHasBurnedTitle: Boolean(hasBurnedTitle),
+        };
+      }
+      return prev;
+    });
+  }, []);
+
+  return { loading, data, applyArtworkSelection };
 }

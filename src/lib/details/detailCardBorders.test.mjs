@@ -6,6 +6,14 @@ const detailsClient = readFileSync(
   new URL("../../components/DetailsClient.jsx", import.meta.url),
   "utf8",
 );
+// `AwardCard` se mudó a `@/components/details/AwardCard` para que la ficha de
+// TELÉFONO del DetailModal use la MISMA tarjeta en vez de una copia. Lo que
+// vigila este test —que los premios conserven su elevación al hacer hover—
+// sigue igual; solo cambia de archivo.
+const awardCardSource = readFileSync(
+  new URL("../../components/details/AwardCard.jsx", import.meta.url),
+  "utf8",
+);
 
 test("las tarjetas de las secciones no dibujan contornos al hacer hover", () => {
   assert.doesNotMatch(detailsClient, /hover:after:shadow-\[inset/);
@@ -23,9 +31,8 @@ test("DetailsClient conserva indicadores visibles para el foco de teclado", () =
 });
 
 test("premios conserva su elevación y vídeos limita el hover a la imagen", () => {
-  const awardCard = detailsClient.slice(
-    detailsClient.indexOf("function AwardCard"),
-    detailsClient.indexOf("function SectionTitle"),
+  const awardCard = awardCardSource.slice(
+    awardCardSource.indexOf("function AwardCard"),
   );
   const videoCards = detailsClient.slice(
     detailsClient.indexOf("SECCIÓN: TRÁILER Y VÍDEOS"),

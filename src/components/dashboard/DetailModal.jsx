@@ -116,6 +116,7 @@ import {
 import DetailsArrowCarousel, {
   SwiperSlide,
 } from "@/components/details/DetailsArrowCarousel";
+import PhoneDetailsSections from "@/components/dashboard/PhoneDetailsSections";
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
 // Fila de botones de acción principal (tráiler, favorito, pendiente, puntuar,
 // listas, reseñas, soundtrack…): MISMO componente presentacional que la ficha
@@ -661,7 +662,7 @@ export default function DetailModal({
   const prefersReducedMotion = useReducedMotion();
   const { session, account } = useAuth();
   const { openDetailModal } = useDetailModal();
-  const { loading, data } = useDetailModalData(item);
+  const { loading, data, applyArtworkSelection } = useDetailModalData(item);
   useOfflineTitle(item?.media_type || item?.mediaType || (item?.first_air_date ? "tv" : "movie"), item?.id || item?.tmdbId, data);
 
   const scrollContainerRef = useRef(null);
@@ -954,6 +955,10 @@ export default function DetailModal({
     const prevCursor = document.body.style.cursor;
     document.body.style.userSelect = "none";
     document.body.style.cursor = "col-resize";
+    // Marca el arrastre en <html> para que lo que sigue al ancho del panel
+    // (hoy, el bloque derecho del navbar) se mueva PEGADO al tirador en vez de
+    // ir 320ms por detrás con su transición de apertura.
+    document.documentElement.dataset.svDrawerResizing = "";
 
     let frame = null;
     let appliedWidth = panelWidth;
@@ -966,7 +971,10 @@ export default function DetailModal({
       if (next === appliedWidth) return;
       appliedWidth = next;
       if (panelRef.current) panelRef.current.style.width = `${next}px`;
-      if (isDocked) onDrawerWidthChange?.(next + panelRightGap * 2);
+      // También SUPERPUESTO: el margen del contenido solo importa acoplado,
+      // pero el ancho publicado lo usa además el navbar para apartarse, y el
+      // panel tapa su borde derecho en los dos modos.
+      onDrawerWidthChange?.(next + panelRightGap * 2);
     };
     const onMove = (moveEvent) => {
       if (moveEvent.pointerId !== pointerId) return;
@@ -985,6 +993,7 @@ export default function DetailModal({
       window.removeEventListener("blur", onCancel);
       document.body.style.userSelect = prevUserSelect;
       document.body.style.cursor = prevCursor;
+      delete document.documentElement.dataset.svDrawerResizing;
       resizeCleanupRef.current = null;
       // El click posterior al pointerup no debe cerrar el modo superpuesto.
       window.setTimeout(() => {
@@ -1764,8 +1773,39 @@ export default function DetailModal({
 
   // Versión mínima de la carga de soundtrack de DetailsClient: pide a
   // /api/soundtrack y alimenta el SoundtrackModal (que ya reproduce previews).
-  const loadSoundtrack = async () => {
-    if (!soundtrackTitle) return;
+  // UNA petición por título, compartida por todos los que la piden.
+  //
+  // Llaman aquí el botón de la fila de acciones, el reproductor y la sección de
+  // Soundtrack de la ficha de teléfono. Sin guardián, cada uno lanzaba su propia
+  // consulta a `/api/soundtrack`, y la sección —que la pide al pintarse— la
+  // repetía además en cada render, porque esta función se recrea en cada uno.
+  //
+  // Se guarda la PROMESA, no solo una bandera: dos llamadas simultáneas (abrir
+  // el reproductor mientras la sección aún está cargando) comparten la misma
+  // petición en vez de encadenar dos. El fallo limpia la referencia para que
+  // reintentarlo desde el botón vuelva a pedirla.
+  const soundtrackRequestRef = useRef({ key: null, promise: null });
+
+  const loadSoundtrack = ({ force = false } = {}) => {
+    if (!soundtrackTitle) return Promise.resolve();
+
+    const requestKey = [
+      soundtrackTitle,
+      mediaType,
+      isEpisode ? "episode" : "title",
+      item?.id ?? "",
+    ].join("|");
+    const pending = soundtrackRequestRef.current;
+    if (!force && pending.key === requestKey && pending.promise) {
+      return pending.promise;
+    }
+
+    const promise = runSoundtrackRequest();
+    soundtrackRequestRef.current = { key: requestKey, promise };
+    return promise;
+  };
+
+  const runSoundtrackRequest = async () => {
     setSoundtrackLoading(true);
     setSoundtrackError("");
     try {
@@ -1799,10 +1839,17 @@ export default function DetailModal({
       setSoundtrackError(
         e?.message || "No se pudo cargar la música del título.",
       );
+      // Una petición fallida no se cachea: si no, el botón de reintentar
+      // devolvería siempre el mismo error sin volver a pedir nada.
+      soundtrackRequestRef.current = { key: null, promise: null };
     } finally {
       setSoundtrackLoading(false);
     }
   };
+
+  useEffect(() => {
+    soundtrackRequestRef.current = { key: null, promise: null };
+  }, [item?.id, mediaType]);
 
   const openSoundtrack = (event) => {
     stopNestedModalOpeningEvent(event);
@@ -3352,7 +3399,12 @@ export default function DetailModal({
           <div className={`space-y-8 p-5 ${mobileDetails ? "" : "sm:p-7"}`}>
             {mobileDetails ? null : actionsNode}
 
-            <div className="space-y-3">
+            {/* La línea de premios y la fila de meta+géneros NO se pintan en la
+                ficha de TELÉFONO: en la ficha móvil completa van dentro de un
+                bloque `hidden sm:flex`, porque esos mismos datos ya están en
+                las pestañas de información que hay justo debajo. Repetirlos
+                aquí sería información duplicada que allí no aparece. */}
+            <div className={mobileDetails ? "hidden" : "space-y-3"}>
               {/* Premios / nominaciones: misma línea verde que las previews del
                   dashboard (InlinePreviewCard). Se alimenta de la cadena cruda de
                   OMDb (data.awards) formateada con formatDashboardAwards. */}
@@ -3654,6 +3706,13 @@ export default function DetailModal({
               </div>
             )}
 
+            {/* SECCIONES DEL MODAL (vista normal).
+
+                En la ficha de TELÉFONO no se pintan: allí van las secciones de
+                la ficha móvil completa, que son más y con otro diseño (ver
+                <PhoneDetailsSections/> justo debajo). */}
+            {!mobileDetails && (
+            <>
             {/* Reparto */}
             {data.cast?.length > 0 && (
               <motion.section
@@ -4005,6 +4064,44 @@ export default function DetailModal({
                   </DetailsArrowCarousel>
                 )}
               </motion.section>
+            )}
+            </>
+            )}
+
+            {/* Todo lo que va por debajo de los botones en la ficha de
+                TELÉFONO: menú de secciones y secciones, igual que la vista
+                móvil de DetailsClient. */}
+            {mobileDetails && (
+              <PhoneDetailsSections
+                item={item}
+                data={data}
+                mediaType={mediaType}
+                title={title}
+                scrollContainerRef={scrollContainerRef}
+                onOpenTitle={(rec) => openDetailModal?.(rec)}
+                onOpenSeason={(seasonNumber) =>
+                  goToDetailsRoute(`/details/tv/${item?.id}/season/${seasonNumber}`)
+                }
+                episodesWatched={episodesWatched}
+                imdbId={data.imdbId}
+                canLikeComments={ratingActionConnected}
+                onArtworkSelection={applyArtworkSelection}
+                soundtrack={{
+                  query: soundtrackSearchQuery,
+                  tracks: soundtrackTracks,
+                  loading: soundtrackLoading,
+                  error: soundtrackError,
+                  spotifyUrl: soundtrackSpotifyUrl,
+                  // La sección pide las pistas la primera vez que se pinta: sin
+                  // esto solo se cargarían al abrir el modal de soundtrack, y
+                  // aquí se ven en la propia ficha.
+                  onEnsureLoaded: loadSoundtrack,
+                  onOpen: () => {
+                    setSoundtrackOpen(true);
+                    void loadSoundtrack();
+                  },
+                }}
+              />
             )}
           </div>
           </div>

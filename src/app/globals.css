@@ -1055,6 +1055,52 @@ html {
    real siguen dependiendo del viewport: la ficha completa no tiene panel que
    medir.
    ========================================================================= */
+/* BLOQUE DERECHO DEL NAVBAR (buscar + perfil) mientras hay un drawer de ficha
+   abierto: se aparta hacia la izquierda justo lo que ocupa el panel, para
+   seguir siendo alcanzable en vez de quedar debajo.
+
+   `--sv-detail-drawer-inset` la publica DetailModalProvider en <html> (ausente
+   cuando no hay drawer, de ahí el 0px por defecto) y se actualiza en cada
+   fotograma del arrastre del tirador. `--sv-navbar-right-shift-max` la publica
+   el propio navbar con el hueco libre que mide su ResizeObserver.
+
+   `transform` y no `padding`/`margin` a propósito:
+   - No toca la maquetación, así que el ancho medido del bloque no cambia y el
+     tope no puede depender de sí mismo (realimentación).
+   - Es una propiedad que compone la GPU: durante el arrastre se reposiciona sin
+     recalcular el layout de la barra en cada frame.
+
+   En el extremo —panel más ancho que el carril libre— el bloque se queda pegado
+   a las secciones y el panel sigue tapando parte: no hay sitio físico para
+   más, y es preferible a montarlo encima del logo. */
+.sv-navbar-right-shift {
+  transform: translate3d(
+    calc(
+      -1 *
+        min(
+          var(--sv-detail-drawer-inset, 0px),
+          var(--sv-navbar-right-shift-max, 0px)
+        )
+    ),
+    0,
+    0
+  );
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Arrastrando el tirador del panel, el bloque va pegado a él: la transición es
+   para la APERTURA, no para seguir al puntero. La marca la pone y la quita
+   `beginResize` en DetailModal. */
+:root[data-sv-drawer-resizing] .sv-navbar-right-shift {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-navbar-right-shift {
+    transition: none;
+  }
+}
+
 .sv-phone-fade {
   -webkit-mask-image: var(--sv-poster-fade);
   mask-image: var(--sv-poster-fade);
