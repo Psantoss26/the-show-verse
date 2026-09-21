@@ -32,15 +32,27 @@ export const SCOREBOARD_SAFETY_MARGIN_PX = 44;
 // el cajón no debe reorganizar esa fila delante del usuario.
 export const CAST_ROW_SIX_CARDS_PX = 840;
 
-// El mínimo es EL MAYOR de las dos exigencias, más el relleno del modal.
-// Hoy manda la fila de Reparto (840) sobre el scoreboard (780 + 44 = 824), y el
-// total son 896px. Escrito así, si mañana el scoreboard crece y adelanta al
-// Reparto, el mínimo sube solo en vez de quedarse corto en silencio.
+// ANCHO DE LA BARRA YA COMPACTADA: tres insignias (TMDb, Trakt, IMDb) y los
+// botones de plataformas, enlaces y compartir reducidos a iconos redondos.
+//
+// Es el suelo REAL de la barra, y el que manda ahora que el panel sabe ceder
+// por partes: al estrecharse, primero los botones pierden su etiqueta
+// (`detail-score-actions`) y después se retiran Rotten Tomatoes y Metacritic
+// (`.optionalScore`), las dos puntuaciones sin recuento de votos. Ver
+// `DetailsScoreboardPanel.module.css`.
+//
+// Desglose: 3 insignias (~78px) + 2 huecos (20px) + los botones en su mínimo
+// (9rem, el `min-inline-size` de `.actionsViewport`) + el hueco de la barra
+// (16px) + su relleno lateral (44px).
+export const SCOREBOARD_COMPACT_MIN_CONTENT_PX = 478;
+
+// `SCOREBOARD_MIN_CONTENT_PX` y `CAST_ROW_SIX_CARDS_PX` siguen documentando los
+// umbrales de la barra COMPLETA y de las seis tarjetas de Reparto, pero ya no
+// fijan el mínimo: por debajo de ellos el panel no se rompe, solo se reorganiza
+// —la barra suelta lo prescindible y el Reparto pasa a cinco tarjetas—, y eso
+// es preferible a impedir que el panel se estreche.
 export const DRAWER_MIN_PX =
-  Math.max(
-    SCOREBOARD_MIN_CONTENT_PX + SCOREBOARD_SAFETY_MARGIN_PX,
-    CAST_ROW_SIX_CARDS_PX,
-  ) + MODAL_CONTENT_PADDING_PX;
+  SCOREBOARD_COMPACT_MIN_CONTENT_PX + MODAL_CONTENT_PADDING_PX;
 
 // Techo del "rescate": el cajón puede pasar de medio viewport para alcanzar su
 // mínimo seguro, pero nunca comerse más de esta fracción de la ventana. Sin
@@ -70,9 +82,15 @@ export function clampDrawerWidth(width, viewportWidth, { tablet = false } = {}) 
 
   // Se sigue acotando por si el máximo cayera por debajo del mínimo (ventanas
   // estrechas): ahí el cajón queda fijo al máximo en lugar de romperse.
-  // En tablet debe quedar recorrido incluso si no caben los 896px de escritorio.
+  //
+  // Tablet usa el MISMO mínimo que escritorio, garantizando además el recorrido
+  // del tirador. Antes tenía uno propio de 560px, más alto que el de
+  // escritorio: se escribió cuando el de escritorio eran 896 y hacía falta un
+  // atajo para que en una tablet el cajón no naciera bloqueado. Ahora que el
+  // mínimo general baja de esa cifra, ese atajo dejaría a la tablet como la
+  // MENOS capaz de estrecharse, que es lo contrario de lo que busca.
   const min = tablet
-    ? Math.min(560, max - DRAWER_MIN_TRAVEL_PX)
+    ? Math.min(DRAWER_MIN_PX, max - DRAWER_MIN_TRAVEL_PX)
     : Math.min(DRAWER_MIN_PX, max);
   return Math.max(min, Math.min(Math.round(width || 0), max));
 }

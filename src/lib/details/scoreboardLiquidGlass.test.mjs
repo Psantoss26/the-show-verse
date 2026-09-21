@@ -210,3 +210,25 @@ test("DetailsSectionMenu comparte el liquid glass estable de las barras", async 
   );
   assert.doesNotMatch(sectionMenu, /backdrop-blur-\[50px\]/);
 });
+
+test("la barra cede por partes al estrecharse, en un orden definido", async () => {
+  const [panel, css] = await Promise.all([
+    readFile(scoreboardPath, "utf8"),
+    readFile(new URL("../../components/details/DetailsScoreboardPanel.module.css", import.meta.url), "utf8"),
+  ]);
+
+  // Container query y no media query: lo que manda es el ancho del PANEL, que
+  // el usuario cambia arrastrando, no el de la ventana. Por eso el mismo umbral
+  // sirve para escritorio y para tablet sin duplicar reglas.
+  assert.match(css, /container: detail-scoreboard \/ inline-size;/);
+
+  // 1º los botones pierden su etiqueta...
+  assert.match(css, /@container detail-score-actions \(width < 22rem\)/);
+  // ...y 2º se retiran las dos puntuaciones sin recuento de votos.
+  assert.match(
+    css,
+    /@container detail-scoreboard \(width < 40rem\)[\s\S]*?\.optionalScore \{\s*\n\s*display: none;/,
+  );
+  // Aplicado a Rotten Tomatoes y a Metacritic, y solo a ellas.
+  assert.equal((panel.match(/styles\.optionalScore/g) || []).length, 2);
+});

@@ -187,9 +187,11 @@ export function DetailsRatingsBadges({
         />
       )}
 
-      {/* Badge de Rotten Tomatoes - Solo visible en desktop (>= sm) */}
+      {/* Badge de Rotten Tomatoes - Solo visible en desktop (>= sm), y se
+          retira además cuando la barra se queda estrecha (ver `.optionalScore`
+          en el módulo CSS): es de las dos que no traen recuento de votos. */}
       {rt && (
-        <div className="hidden sm:block">
+        <div className={`hidden sm:block ${styles.optionalScore}`}>
           <CompactBadge
             logo="/logo-RottenTomatoes.png"
             value={rt.value}
@@ -201,9 +203,9 @@ export function DetailsRatingsBadges({
         </div>
       )}
 
-      {/* Badge de Metacritic - Solo visible en desktop (>= sm) */}
+      {/* Badge de Metacritic - mismo criterio que Rotten Tomatoes. */}
       {mc && (
-        <div className="hidden sm:block">
+        <div className={`hidden sm:block ${styles.optionalScore}`}>
           <CompactBadge
             logo="/logo-Metacritic.png"
             value={mc.value}
@@ -674,7 +676,7 @@ export default function DetailsScoreboardPanel({
 
   return (
     <div
-      className={`w-full rounded-2xl ${LIQUID_GLASS_SURFACE} ${className}`}
+      className={`w-full rounded-2xl ${LIQUID_GLASS_SURFACE} ${styles.panel} ${className}`}
     >
       {/* Refracción, reflejo especular y luz difusa compartidos con InfoTabs. */}
       <LiquidGlassOpticalLayers />

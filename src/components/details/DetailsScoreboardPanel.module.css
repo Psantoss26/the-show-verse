@@ -21,3 +21,28 @@
     display: none;
   }
 }
+
+/* LA BARRA DECIDE POR SU ANCHO, no por el de la ventana.
+   ---------------------------------------------------------------
+   El drawer de DetailModal se puede estrechar bastante, y en tablet arranca ya
+   estrecho. Lo que tiene que ceder es siempre lo mismo y en este orden:
+
+     1. Los botones de plataformas, enlaces y compartir pierden su etiqueta y
+        se quedan en iconos redondos  -> `detail-score-actions`, más abajo.
+     2. Si aun así no caben, se retiran Rotten Tomatoes y Metacritic, que son
+        las dos puntuaciones sin recuento de votos y las últimas en llegar.
+
+   Va por container query y no por media query a propósito: lo que manda es el
+   ancho del PANEL, que el usuario cambia arrastrando, no el de la ventana. Así
+   el mismo umbral sirve para escritorio y para tablet sin duplicar reglas. */
+.panel {
+  container: detail-scoreboard / inline-size;
+}
+
+/* 40rem = las cinco insignias con los botones ya compactados. Por debajo, la
+   fila empezaría a apretarse: antes de eso se van estas dos. */
+@container detail-scoreboard (width < 40rem) {
+  .optionalScore {
+    display: none;
+  }
+}

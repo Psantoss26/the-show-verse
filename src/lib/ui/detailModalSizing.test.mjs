@@ -7,6 +7,7 @@ import {
   DRAWER_MIN_PX,
   DRAWER_MIN_TRAVEL_PX,
   MODAL_CONTENT_PADDING_PX,
+  SCOREBOARD_COMPACT_MIN_CONTENT_PX,
   SCOREBOARD_MIN_CONTENT_PX,
   clampDrawerWidth,
 } from "./detailModalSizing.js";
@@ -18,40 +19,35 @@ const contenido = (w) => w - MODAL_CONTENT_PADDING_PX;
 // pantalla y no hay nada que garantizar (ver el test correspondiente).
 const VENTANAS = [1280, 1366, 1440, 1600, 1792, 1920, 2200, 2541];
 
-test("el mínimo respeta LAS DOS restricciones", () => {
-  // 1) El scoreboard: por debajo de 780px de contenido, las puntuaciones y los
-  //    iconos de enlaces se solapan (medido sobre el modal real).
-  assert.ok(contenido(DRAWER_MIN_PX) >= SCOREBOARD_MIN_CONTENT_PX);
-  // 2) La fila de Reparto: su Swiper baja de 6 a 5 tarjetas por debajo de 840px
-  //    de contenedor, y redimensionar no debe reorganizarla.
-  assert.ok(contenido(DRAWER_MIN_PX) >= CAST_ROW_SIX_CARDS_PX);
+test("el mínimo es el de la barra YA COMPACTADA", () => {
+  // El panel sabe ceder por partes: al estrecharse, primero los botones de
+  // plataformas, enlaces y compartir pierden su etiqueta, y después se retiran
+  // Rotten Tomatoes y Metacritic. El suelo es lo que ocupa el resultado de eso,
+  // no la barra completa.
+  assert.equal(contenido(DRAWER_MIN_PX), SCOREBOARD_COMPACT_MIN_CONTENT_PX);
+  assert.equal(DRAWER_MIN_PX, 534);
 
-  // Hoy manda el Reparto; el total son 896px.
-  assert.equal(DRAWER_MIN_PX, 896);
+  // Y queda MUY por debajo de los dos umbrales que antes lo fijaban: ese es el
+  // margen de estrechamiento que se ha ganado.
+  assert.ok(contenido(DRAWER_MIN_PX) < SCOREBOARD_MIN_CONTENT_PX);
+  assert.ok(contenido(DRAWER_MIN_PX) < CAST_ROW_SIX_CARDS_PX);
 });
 
 test("el mínimo se deriva, no se escribe a mano", () => {
-  // Escrito como el MAYOR de las dos exigencias: si mañana el scoreboard crece
-  // y adelanta al Reparto, el mínimo sube solo en vez de quedarse corto.
   assert.equal(
     DRAWER_MIN_PX,
-    Math.max(SCOREBOARD_MIN_CONTENT_PX + 44, CAST_ROW_SIX_CARDS_PX) +
-      MODAL_CONTENT_PADDING_PX,
+    SCOREBOARD_COMPACT_MIN_CONTENT_PX + MODAL_CONTENT_PADDING_PX,
   );
 });
 
-test("por estrecho que se arrastre, Reparto mantiene sus 6 tarjetas", () => {
+test("estrecharse reorganiza, no rompe", () => {
+  // Los dos umbrales de antes siguen documentados porque siguen siendo ciertos
+  // —por debajo de ellos la barra suelta lo prescindible y el Reparto pasa a
+  // menos tarjetas—, pero ya no impiden arrastrar. Cruzarlos es el
+  // comportamiento buscado, no un fallo.
   for (const vw of VENTANAS) {
     const masEstrecho = clampDrawerWidth(0, vw);
     assert.equal(masEstrecho, DRAWER_MIN_PX, `ventana de ${vw}px`);
-    assert.ok(
-      contenido(masEstrecho) >= CAST_ROW_SIX_CARDS_PX,
-      `a ${vw}px la fila de Reparto bajaría a 5 tarjetas`,
-    );
-    assert.ok(
-      contenido(masEstrecho) >= SCOREBOARD_MIN_CONTENT_PX,
-      `a ${vw}px el scoreboard se solaparía`,
-    );
   }
 });
 
@@ -85,12 +81,25 @@ test("el rescate no se come la pantalla en ventanas pequeñas", () => {
 });
 
 test("se respeta el ancho pedido cuando está dentro del rango", () => {
-  // A 2541px el rango es 896 .. 1271.
+  // A 2541px el rango es 534 .. 1271.
   assert.equal(clampDrawerWidth(1000, 2541), 1000);
   assert.equal(clampDrawerWidth(1271, 2541), 1271);
-  // Fuera de rango, se acota por ambos lados.
-  assert.equal(clampDrawerWidth(700, 2541), DRAWER_MIN_PX);
+  // 700px estaba FUERA de rango con el mínimo anterior y ahora es un ancho
+  // válido: es exactamente lo que se ha abierto.
+  assert.equal(clampDrawerWidth(700, 2541), 700);
+  // Fuera de rango, se sigue acotando por ambos lados.
+  assert.equal(clampDrawerWidth(300, 2541), DRAWER_MIN_PX);
   assert.equal(clampDrawerWidth(9999, 2541), 1271);
+});
+
+test("la tablet no se queda como la menos capaz de estrecharse", () => {
+  // Tenía un mínimo propio de 560px, escrito cuando el de escritorio eran 896 y
+  // en una tablet el cajón nacía bloqueado. Ahora que el general baja de esa
+  // cifra, ese atajo la dejaría por encima de escritorio.
+  for (const viewport of [768, 820, 1024, 1180, 1366]) {
+    const min = clampDrawerWidth(0, viewport, { tablet: true });
+    assert.ok(min <= DRAWER_MIN_PX, `a ${viewport}px el mínimo es ${min}`);
+  }
 });
 
 test("la ficha móvil acoplada mantiene viewport móvil y espacio para la página", async () => {
