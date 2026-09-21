@@ -50,6 +50,33 @@ export function useDetailModal() {
   return useContext(DetailModalContext);
 }
 
+// ANCHO QUE EL DRAWER DERECHO OCUPA EN PANTALLA, publicado como variable CSS
+// en <html>.
+//
+// Es la única forma de que lo sepa el NAVBAR. La barra vive en el layout raíz,
+// por ENCIMA de este provider —que monta cada página por su cuenta—, así que no
+// hay contexto que pueda llegar hasta ella. Y aunque lo hubiera, no interesa:
+// durante el arrastre del tirador esto cambia en cada fotograma, y una variable
+// en <html> se escribe en el mismo frame que el panel, sin re-renderizar la
+// barra ni una sola vez.
+//
+// Ausente (no 0) cuando no hay drawer: así cada consumidor decide su propio
+// valor por defecto con `var(--x, 0px)` y nadie tiene que limpiar nada.
+const DRAWER_INSET_VAR = "--sv-detail-drawer-inset";
+
+function publishDrawerInset(width) {
+  if (typeof document === "undefined") return;
+  const root = document.documentElement;
+  if (width == null) {
+    root.style.removeProperty(DRAWER_INSET_VAR);
+    return;
+  }
+  root.style.setProperty(
+    DRAWER_INSET_VAR,
+    `${Math.max(0, Math.round(width))}px`,
+  );
+}
+
 const DRAWER_VIEW_STORAGE_KEY = "showverse:detailModalView";
 const CONTENT_VIEW_STORAGE_KEY = "showverse:detailModalContentView";
 const PREVIEW_PARAM = "preview";
@@ -180,10 +207,24 @@ export default function DetailModalProvider({ children, placement = "center" }) 
   // en cada movimiento. El panel y este margen se escriben en el mismo frame.
   const updateDrawerWidth = useCallback((width) => {
     drawerWidthRef.current = width;
+    // El margen del contenido solo aplica ACOPLADO; la variable se publica
+    // siempre, porque el navbar tiene que apartarse en los dos modos: el panel
+    // tapa el borde derecho igual esté acoplado o superpuesto.
+    publishDrawerInset(width);
     if (docked && contentRef.current) {
       contentRef.current.style.marginRight = `${width}px`;
     }
   }, [docked]);
+
+  // Sin drawer no hay variable. `DetailModal` la escribe mientras está montado
+  // (vía `updateDrawerWidth`), así que aquí solo hay que retirarla al cerrar
+  // —y al desmontar el provider, por si se navega con la ficha abierta—.
+  useLayoutEffect(() => {
+    if (activeItem != null && effectivePlacement === "right") return;
+    publishDrawerInset(null);
+  });
+
+  useEffect(() => () => publishDrawerInset(null), []);
 
   useLayoutEffect(() => {
     if (!contentRef.current) return;
