@@ -181,6 +181,39 @@ export function pickMobileHeroPosterPath({
     )
 }
 
+// Portada del hero móvil del DetailModal (la que pinta su ficha de TELÉFONO).
+//
+// Es la MISMA política que `mobileNeutralPosterPath` en DetailsClient, escrita
+// una sola vez para que las dos superficies no puedan separarse: si el modal
+// eligiera por su cuenta, el mismo título se vería con una portada en la vista
+// previa y con otra al abrir la ficha.
+//
+// A diferencia de `pickMobileHeroPosterPath` —que solo sabe de lo que trae el
+// SSR— aquí entran las selecciones del usuario, que son las que mandan.
+export function pickModalHeroPosterPath({
+    mobilePosterOverride = null,
+    posterOverride = null,
+    mainPosterPath = null,
+    posters
+} = {}) {
+    // La portada principal se descarta de la galería: no trae metadatos de
+    // idioma, así que no puede considerarse textless. Es el equivalente al
+    // filtro `from !== "main"` del cliente.
+    const gallery = (Array.isArray(posters) ? posters : []).filter(
+        (poster) =>
+            poster?.file_path &&
+            (!mainPosterPath || poster.file_path !== mainPosterPath)
+    )
+
+    return (
+        mobilePosterOverride ||
+        pickBestNeutralPosterByResVotes(gallery)?.file_path ||
+        posterOverride ||
+        mainPosterPath ||
+        null
+    )
+}
+
 export const isLanguageNeutralImage = (img) => {
     if (!img?.file_path) return false
     if (!Object.prototype.hasOwnProperty.call(img, 'iso_639_1')) return false

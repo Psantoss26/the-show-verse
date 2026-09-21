@@ -193,17 +193,23 @@ export const movieImagesCache = new Map();
 /* ======== Preferencias de artwork guardadas en localStorage ======== */
 export function getArtworkPreference(movieId, mediaType = "movie") {
   if (typeof window === "undefined") {
-    return { poster: null, backdrop: null, logo: null };
+    return { poster: null, mobilePoster: null, backdrop: null, logo: null };
   }
   const type = mediaType === "tv" ? "tv" : "movie";
   const posterKey = `showverse:${type}:${movieId}:poster`;
+  // La portada de la vista MÓVIL se elige aparte de la de escritorio (pestaña
+  // "Portadas" de DetailsClient en móvil, kind `mobilePoster`). Es la que pinta
+  // el hero de la ficha móvil y, por tanto, la ficha de teléfono del drawer.
+  const mobilePosterKey = `showverse:${type}:${movieId}:mobilePoster`;
   const backdropKey = `showverse:${type}:${movieId}:backdrop`;
   const logoKey = `showverse:${type}:${movieId}:logo`;
   const poster = window.localStorage.getItem(posterKey);
+  const mobilePoster = window.localStorage.getItem(mobilePosterKey);
   const backdrop = window.localStorage.getItem(backdropKey);
   const logo = window.localStorage.getItem(logoKey);
   return {
     poster: poster || null,
+    mobilePoster: mobilePoster || null,
     backdrop: backdrop || null,
     logo: logo || null,
   };
