@@ -55,18 +55,57 @@ function InfoGlassPanel({ children, className = "" }) {
   );
 }
 
-function CustomInfoCards({ cards = [], mobileLayout = false }) {
+// Clases de la FILA de tarjetas y de cada tarjeta.
+//
+// La variante ancha por defecto es una fila que NO envuelve y se desplaza en
+// horizontal (`lg:flex-nowrap` + `lg:overflow-x-auto`). Funciona en la ficha
+// completa, que tiene toda la página de ancho, pero en el drawer —que ahora se
+// puede estrechar bastante— las últimas tarjetas quedaban FUERA, escondidas a
+// la derecha y solo alcanzables desplazando algo que no parece desplazable.
+//
+// Con `wrapCards` la fila envuelve: las tarjetas se reparten en las líneas que
+// hagan falta y ninguna se esconde. `12rem` de base las deja en dos o tres por
+// línea según el ancho del panel, en vez de estirarse una sola por fila.
+export const infoCardsRowClass = ({ mobileLayout, wrapCards }) => {
+  if (mobileLayout) return "flex flex-col gap-3";
+  // El reparto lo lleva `.sv-info-cards` en globals.css, con un container
+  // query: desde CSS se puede mirar el ancho REAL de la fila, que es lo que
+  // decide si las tarjetas caben todas o tienen que ir de dos en dos.
+  if (wrapCards) return "sv-info-cards";
+  return "flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]";
+};
+
+// ¿El título original necesita la fila entera?
+//
+// En modo parejas cada tarjeta se lleva media fila, y ahí caben unos 30
+// caracteres antes de que el texto se recorte. Pasado eso, la tarjeta se queda
+// sola en su fila y Estreno, Presupuesto y Recaudación se reparten la
+// siguiente: esas tres son cortas por naturaleza —una fecha y dos cifras— y no
+// se quedan estrechas por juntarse.
+//
+// Se mide por LONGITUD DEL TEXTO y no por el ancho real del elemento a
+// propósito: medir exigiría un observador que se dispararía en cada fotograma
+// del arrastre del panel, justo el trabajo que se le ha quitado.
+const LONG_ORIGINAL_TITLE_CHARS = 30;
+
+export const isLongOriginalTitle = (value) =>
+  typeof value === "string" && value.trim().length > LONG_ORIGINAL_TITLE_CHARS;
+
+export const infoCardClass = ({ mobileLayout, wrapCards, wide = false }) => {
+  if (mobileLayout) return "w-full";
+  // Las tarjetas de `.sv-info-cards` se dimensionan desde la hoja de estilos:
+  // aquí solo hace falta permitir que se encojan por debajo de su contenido, y
+  // marcar la que pide fila propia.
+  if (wrapCards) return wide ? "min-w-0 sv-info-card--wide" : "min-w-0";
+  return "w-full lg:w-auto lg:flex-auto lg:shrink-0";
+};
+
+function CustomInfoCards({ cards = [], mobileLayout = false, wrapCards = false }) {
   const availableCards = cards.filter((card) => card?.label && card?.value);
   if (!availableCards.length) return null;
 
   return (
-    <div
-      className={
-        mobileLayout
-          ? "flex flex-col gap-3"
-          : "flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]"
-      }
-    >
+    <div className={infoCardsRowClass({ mobileLayout, wrapCards })}>
       {availableCards.map((card, index) => (
         <VisualMetaCard
           key={card.key || `${card.label}-${index}`}
@@ -74,11 +113,7 @@ function CustomInfoCards({ cards = [], mobileLayout = false }) {
           iconContent={card.iconContent}
           label={card.label}
           value={card.value}
-          className={
-            mobileLayout
-              ? "w-full"
-              : "w-full lg:w-auto lg:flex-auto lg:shrink-0"
-          }
+          className={infoCardClass({ mobileLayout, wrapCards })}
         />
       ))}
     </div>
@@ -109,6 +144,10 @@ export default function DetailsInfoTabs({
   genres = [],
   metadataLoading = false,
   mobileLayout = false,
+  // Las tarjetas ENVUELVEN en vez de irse a una fila que se desplaza. Lo pide
+  // el drawer de DetailModal: al estrecharlo, las últimas quedaban fuera de
+  // vista a la derecha. La ficha completa no lo usa y conserva su fila.
+  wrapCards = false,
   // El cambio de pestaña mediante gesto se configura por separado del layout:
   // SeasonDetails comparte este componente entre móvil y escritorio, mientras
   // que EpisodeDetails renderiza una instancia exclusiva para móvil.
@@ -270,9 +309,13 @@ export default function DetailsInfoTabs({
 
           {/* ===== TAB: DETALLES ===== */}
           {activeTab === "details" && (
-            <div key="details">
+            <div key="details" className="sv-info-cards-scope">
               {hasCustomDetailCards ? (
-                <CustomInfoCards cards={detailCards} mobileLayout={mobileLayout} />
+                <CustomInfoCards
+                  cards={detailCards}
+                  mobileLayout={mobileLayout}
+                  wrapCards={wrapCards}
+                />
               ) : mobileLayout ? (
                 <div className="flex flex-col gap-3">
                   <VisualMetaCard
@@ -350,7 +393,7 @@ export default function DetailsInfoTabs({
                   />
                 </div>
               ) : (
-                <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
+                <div className={infoCardsRowClass({ mobileLayout, wrapCards })}>
                   {/* Título Original */}
                   {/* Misma puerta que el resto de la fila. Sin ella conservaba
                       el valor del título ANTERIOR durante el cambio, así que se
@@ -364,7 +407,11 @@ export default function DetailsInfoTabs({
                     value={metadataLoading ? null : originalTitle}
                     isLoading={metadataLoading}
                     expanded={true}
-                    className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                    className={infoCardClass({
+                      mobileLayout,
+                      wrapCards,
+                      wide: isLongOriginalTitle(originalTitle),
+                    })}
                   />
 
                   <VisualMetaCard
@@ -389,7 +436,7 @@ export default function DetailsInfoTabs({
                       label="Duración"
                       value={metadataLoading ? null : formatValue}
                       isLoading={metadataLoading}
-                      className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                      className={infoCardClass({ mobileLayout, wrapCards })}
                     />
                   ) : null}
 
@@ -399,7 +446,7 @@ export default function DetailsInfoTabs({
                     label={mediaType === "movie" ? "Estreno" : "Inicio"}
                     value={metadataLoading ? null : releaseDateValue || "—"}
                     isLoading={metadataLoading}
-                    className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                    className={infoCardClass({ mobileLayout, wrapCards })}
                   />
 
                   {/* Finalización / Última emisión (solo series).
@@ -418,7 +465,7 @@ export default function DetailsInfoTabs({
                           ? lastAirDateValue
                           : lastAirDateValue || "En emisión"
                       }
-                      className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                      className={infoCardClass({ mobileLayout, wrapCards })}
                     />
                   )}
 
@@ -431,7 +478,7 @@ export default function DetailsInfoTabs({
                             icon={BadgeDollarSignIcon}
                             label="Presupuesto"
                             value={budgetValue}
-                            className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                            className={infoCardClass({ mobileLayout, wrapCards })}
                           />
                         )}
                         {revenueValue && (
@@ -439,7 +486,7 @@ export default function DetailsInfoTabs({
                             icon={TrendingUp}
                             label="Recaudación"
                             value={revenueValue}
-                            className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                            className={infoCardClass({ mobileLayout, wrapCards })}
                           />
                         )}
                       </>
@@ -450,14 +497,14 @@ export default function DetailsInfoTabs({
                           label="Presupuesto"
                           value={metadataLoading ? null : budgetValue || "—"}
                           isLoading={metadataLoading}
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                          className={infoCardClass({ mobileLayout, wrapCards })}
                         />
                         <VisualMetaCard
                           icon={TrendingUp}
                           label="Recaudación"
                           value={metadataLoading ? null : revenueValue || "—"}
                           isLoading={metadataLoading}
-                          className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                          className={infoCardClass({ mobileLayout, wrapCards })}
                         />
                       </>
                     ))}
@@ -468,9 +515,13 @@ export default function DetailsInfoTabs({
 
           {/* ===== TAB: PRODUCCIÓN Y EQUIPO ===== */}
           {activeTab === "production" && (
-            <div key="production">
+            <div key="production" className="sv-info-cards-scope">
               {hasCustomProductionCards ? (
-                <CustomInfoCards cards={productionCards} mobileLayout={mobileLayout} />
+                <CustomInfoCards
+                  cards={productionCards}
+                  mobileLayout={mobileLayout}
+                  wrapCards={wrapCards}
+                />
               ) : mobileLayout ? (
                 <div className="flex flex-col gap-3">
                   <VisualMetaCard
@@ -528,7 +579,7 @@ export default function DetailsInfoTabs({
                   />
                 </div>
               ) : (
-                <div className="flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]">
+                <div className={infoCardsRowClass({ mobileLayout, wrapCards })}>
                   {/* Director (Cine) / Creadores (TV) */}
                   <VisualMetaCard
                     icon={Users}
@@ -539,7 +590,7 @@ export default function DetailsInfoTabs({
                         : creators || "Desconocido"
                     }
                     expanded={true}
-                    className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                    className={infoCardClass({ mobileLayout, wrapCards })}
                   />
 
                   {/* Canal (solo TV) */}
@@ -550,7 +601,7 @@ export default function DetailsInfoTabs({
                             icon={MonitorPlay}
                             label="Canal"
                             value={network}
-                            className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                            className={infoCardClass({ mobileLayout, wrapCards })}
                           />
                         )
                       : (
@@ -558,7 +609,7 @@ export default function DetailsInfoTabs({
                             icon={MonitorPlay}
                             label="Canal"
                             value={metadataLoading ? null : network || "—"}
-                            className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                            className={infoCardClass({ mobileLayout, wrapCards })}
                           />
                         ))}
 
@@ -568,7 +619,7 @@ export default function DetailsInfoTabs({
                     label="Producción"
                     value={metadataLoading ? null : productionText || "—"}
                     expanded={true}
-                    className="w-full lg:w-auto lg:flex-auto lg:shrink-0"
+                    className={infoCardClass({ mobileLayout, wrapCards })}
                   />
                 </div>
               )}

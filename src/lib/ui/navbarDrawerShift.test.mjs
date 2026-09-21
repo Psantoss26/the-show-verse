@@ -77,3 +77,31 @@ test('el arrastre del tirador desactiva la transición', async () => {
     /:root\[data-sv-drawer-resizing\] \.sv-navbar-right-shift \{\s*transition: none;/
   )
 })
+
+test("en tablet la barra INFERIOR también se aparta del drawer", async () => {
+  const [navbar, css] = await Promise.all([
+    read("../../components/Navbar.jsx"),
+    read("../../app/globals.css"),
+  ])
+
+  assert.match(navbar, /className=\{`sv-navbar-bottom-shift desktop:hidden fixed/)
+
+  const rule = css.slice(css.indexOf(".sv-navbar-bottom-shift {"))
+  const body = rule.slice(0, rule.indexOf("}"))
+
+  // Se mueve con `left`, no con otra `transform`: la que ya tiene le sirve para
+  // centrarse Y para esconderse al hacer scroll, y una segunda la pisaría.
+  assert.match(body, /left: calc\(var\(--sv-bottom-space\) \/ 2\);/)
+  assert.doesNotMatch(body, /transform:/)
+
+  // Y se estrecha: en una tablet de 768px con el panel a la mitad, la barra de
+  // 28rem no cabe en los 384px que quedan por mucho que se desplace.
+  assert.match(body, /width: min\(calc\(var\(--sv-bottom-space\) - 2rem\), 28rem\);/)
+
+  // Solo desde 768px: por debajo no hay drawer —en móvil la ficha se abre como
+  // página— y la barra conserva su tamaño de siempre.
+  assert.ok(
+    css.lastIndexOf("@media (min-width: 768px)", css.indexOf(".sv-navbar-bottom-shift {")) > -1,
+    "la regla tiene que quedar dentro del breakpoint de tablet",
+  )
+})

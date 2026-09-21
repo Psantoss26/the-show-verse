@@ -60,7 +60,12 @@ export function VisualMetaCard({
         initial={false}
         className="relative z-10 flex min-w-0 flex-1 flex-col"
       >
-        <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-0.5">
+        {/* `sv-meta-label` / `sv-meta-value` son asideros para que quien coloque
+            estas tarjetas pueda decidir si su texto puede partirse en dos
+            líneas. Aquí se mantiene el comportamiento de siempre —se parte— y
+            lo anula la fila del drawer, donde la altura de la tarjeta no puede
+            cambiar (ver `.sv-info-cards` en globals.css). */}
+        <span className="sv-meta-label text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-0.5">
           {label}
         </span>
         {isLoading ? (
@@ -69,7 +74,14 @@ export function VisualMetaCard({
             className="mt-1 block h-3.5 w-20 animate-pulse rounded-full bg-white/15"
           />
         ) : (
-          <span className="text-sm font-bold text-white leading-tight whitespace-normal break-words">
+          <span
+            // Donde el texto no puede partirse (la fila del drawer) se recorta
+            // con puntos suspensivos, así que el valor completo tiene que
+            // quedar a mano. Solo para texto: un valor compuesto no se puede
+            // volcar a un atributo.
+            title={typeof value === "string" ? value : undefined}
+            className="sv-meta-value text-sm font-bold text-white leading-tight whitespace-normal break-words"
+          >
             {value}
           </span>
         )}

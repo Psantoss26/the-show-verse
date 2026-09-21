@@ -450,3 +450,30 @@ test("en el teléfono el logo aguanta hasta salir por arriba", async () => {
     /logoY = useTransform\(\s*\n\s*scrollY,\s*\n\s*\[logoFadeFrom, logoFadeTo\]/,
   );
 });
+
+test("las tarjetas de Detalles y Producción no se esconden a la derecha", async () => {
+  const [tabs, modal] = await Promise.all([
+    read("../../components/details/DetailsInfoTabs.jsx"),
+    read("../../components/dashboard/DetailModal.jsx"),
+  ]);
+
+  // La variante ancha por defecto es una fila que NO envuelve y se desplaza en
+  // horizontal. Funciona en la ficha completa, que tiene toda la página; en el
+  // drawer, que ahora se estrecha bastante, las últimas tarjetas quedaban FUERA
+  // y solo se alcanzaban desplazando algo que no parece desplazable.
+  // El reparto en sí vive en `.sv-info-cards` (globals.css), donde un container
+  // query puede mirar el ancho REAL de la fila y decidir entre una sola línea o
+  // parejas. Aquí solo se comprueba que el drawer lo pide.
+  assert.match(tabs, /if \(wrapCards\) return "sv-info-cards"/);
+  assert.match(tabs, /if \(wrapCards\) return wide \? "min-w-0 sv-info-card--wide" : "min-w-0";/);
+  assert.match(modal, /wrapCards\n/);
+
+  // Las tres filas de tarjetas (las dos escritas a mano y la de tarjetas
+  // personalizadas) salen del MISMO ayudante: si alguna se quedara con la
+  // cadena literal, envolvería en unos sitios y en otros no.
+  assert.equal(
+    (tabs.match(/lg:flex-row lg:flex-nowrap/g) || []).length,
+    1,
+    "la fila que no envuelve solo puede escribirse dentro del ayudante",
+  );
+});
