@@ -57,7 +57,6 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { clampDrawerWidth, clampMobileDetailsWidth, MOBILE_DETAILS_ASPECT_RATIO } from "@/lib/ui/detailModalSizing";
-import MobileDetailsFrameStack from "@/components/dashboard/MobileDetailsFrameStack";
 import { getBackendItemStatus } from "@/lib/api/itemStatus";
 import { markAsFavorite, markInWatchlist } from "@/lib/api/tmdb";
 import {
@@ -82,7 +81,6 @@ import {
   fetchBestBackdrop,
 } from "@/lib/dashboard/media";
 import { dashboardDetailHref } from "@/lib/dashboard/detailHref";
-import { buildEmbeddedDetailsHref } from "@/lib/navigation/embeddedDetails";
 
 // Componentes reales de la ficha completa (standalone) para que las tarjetas,
 // badges, pestañas y acciones sean IDÉNTICAS a DetailsClient.
@@ -1035,16 +1033,6 @@ export default function DetailModal({
   const [userRating, setUserRating] = useState(null);
   const [ratingLoading, setRatingLoading] = useState(false);
   const [navigatingToFullDetails, setNavigatingToFullDetails] = useState(false);
-  // Id del item al que pertenecen de verdad `favorite`/`watchlist`/`userRating`
-  // ahora mismo. Al cambiar de título esos estados no se limpian de inmediato
-  // (siguen mostrando los del anterior hasta que resuelve el fetch de abajo),
-  // así que sin esto se podría "sembrar" la ficha móvil con el favorito de OTRO
-  // título. Solo se actualiza dentro del `if (!cancel)` de esa carga, nunca antes.
-  const [resolvedStatusItemId, setResolvedStatusItemId] = useState(null);
-  // Ver comentario en `resolvedStatusItemId` arriba: `favorite`/`watchlist`/
-  // `userRating` solo pertenecen de verdad a ESTE item cuando coincide con el
-  // id resuelto.
-  const mobileStatusFresh = resolvedStatusItemId === (item?.id ?? null);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -1067,7 +1055,6 @@ export default function DetailModal({
         // Sin sesión no hay fetch: salimos del estado de carga inicial (que arranca
         // en `true`) para que los botones no se queden con el spinner.
         setLoadingStates(false);
-        setResolvedStatusItemId(item?.id ?? null);
         return;
       }
       try {
@@ -1086,7 +1073,6 @@ export default function DetailModal({
                 : Number(st.rating);
             setUserRating(rating);
           }
-          setResolvedStatusItemId(item.id);
         }
       } catch {
         // silencio
@@ -2140,28 +2126,6 @@ export default function DetailModal({
     data.episodeMeta?.seasonNumber,
   ]);
 
-  // Precarga el DOCUMENTO del iframe embebido (`/embed/details/...`) en cuanto
-  // se abre el drawer derecho, esté mostrando ya la vista "mobile" o todavía la
-  // "modal". Así, si el usuario alterna a "mobile" para este MISMO título (el
-  // caso más habitual), el documento ya está caliente en vez de arrancar de
-  // cero. No ayuda al cambiar a OTRO título -- no se puede precargar lo que aún
-  // no se sabe que se va a abrir -- pero cubre el caso de alternar sin cerrar.
-  // `router.prefetch` (arriba) no sirve aquí: opera sobre la caché del router
-  // de esta página, y el iframe navega en un contexto de navegación aparte que
-  // no la consulta.
-  useEffect(() => {
-    if (!isRightPlacement || !item?.id || typeof document === "undefined") {
-      return undefined;
-    }
-    const link = document.createElement("link");
-    link.rel = "prefetch";
-    link.href = buildEmbeddedDetailsHref(dashboardDetailHref(item, mediaType), null);
-    document.head.appendChild(link);
-    return () => {
-      link.remove();
-    };
-  }, [isRightPlacement, item?.id, mediaType]);
-
   // Navegación del modal a una ruta de `/details` con la transición de morfeo.
   // Está extraída de `goToFullDetails` porque ahora hay DOS destinos: la ficha
   // del episodio y la de su temporada. `transitionKey` solo lo usa
@@ -2519,6 +2483,167 @@ export default function DetailModal({
 
     return () => window.clearTimeout(timeoutId);
   }, [hasNestedModalOpen]);
+
+  // Fila de acciones (película/serie y episodio). Vive en una constante y no
+  // suelta dentro del JSX porque tiene DOS sitios posibles: en la vista normal
+  // encabeza la columna de contenido, bajo el hero; en la ficha de TELÉFONO es
+  // la segunda mitad del primer pantallazo, pegada a la portada, y el resto del
+  // contenido queda por debajo (scroll). Es la MISMA fila configurada una sola
+  // vez: duplicarla en las dos ramas habría dejado dos copias de ~120 líneas de
+  // props que se separarían al primer cambio.
+  const actionsNode = (
+    <>
+    {/* Fila de acciones — MISMO componente presentacional que la ficha
+        completa (DetailsClient). El tráiler sigue reproduciéndose inline
+        en el hero; el resto abre los modales reutilizables. Se omiten el
+        control de "visto" de Trakt y la valoración de episodios (no se
+        pasan sus handlers), por lo que no se renderizan. */}
+    {!isEpisode && (
+    <DetailModalActionsReveal
+      className={`flex items-center gap-4 ${
+        mobileDetails
+          ? "w-full justify-center text-center"
+          : "flex-col text-center sm:flex-row sm:items-center sm:justify-between sm:text-left"
+      }`}
+    >
+      <div
+        className={
+          mobileDetails
+            // `sv-phone-actions-reveal` escalona a sus NIETOS, así que tiene que
+            // ir en el elemento que envuelve la fila: `este > fila > botón`.
+            ? "sv-phone-actions-reveal w-full min-w-0"
+            : "w-[calc(100%_+_1rem)] min-w-0 sm:w-auto sm:flex-1"
+        }
+      >
+        <DetailActionsRow
+          mobileGapClass="gap-1.5"
+          forceMobile={mobileDetails}
+          onTrailer={handleToggleTrailer}
+          trailerAvailable
+          trailerLoading={trailerLoading}
+          trailerPlaying={showTrailer}
+          onSoundtrack={openSoundtrack}
+          soundtrackAvailable={!!soundtrackSearchQuery}
+          onEpisodeRatings={
+            mediaType === "tv"
+              ? (event) => {
+                  stopNestedModalOpeningEvent(event);
+                  setEpisodeRatingsOpen(true);
+                }
+              : undefined
+          }
+          episodeRatingsOpen={episodeRatingsOpen}
+          trakt={{
+            connected: traktConnected || traktStatus.connected,
+            // Series: el ojo refleja "algún episodio visto" (misma señal que
+            // DetailsClient). Películas: estado de visionado del título.
+            watched:
+              mediaType === "tv"
+                ? episodesWatched.hasAnyWatchedEpisode(
+                    episodesWatched.watchedBySeason,
+                  )
+                : traktStatus.watched,
+            // Para series no mostramos recuento de plays en el ojo (igual que
+            // DetailsClient, que allí usa un badge de progreso %).
+            plays: mediaType === "tv" ? 0 : traktStatus.plays,
+            // Series En progreso: % de episodios vistos en el botón, igual
+            // que DetailsClient (mismo cálculo, desde el hook compartido).
+            badge:
+              mediaType === "tv" ? episodesWatched.tvProgressBadge : null,
+            busy: !!traktBusy,
+            // Para TV esperamos también a que cargue el estado de episodios
+            // (evita el parpadeo "visto sin %"): mismo criterio que el
+            // watchedActionLoading de DetailsClient.
+            loading:
+              mediaType === "tv"
+                ? traktStatusLoading ||
+                  ((traktConnected || traktStatus.connected) &&
+                    !episodesWatched.watchedBySeasonLoaded)
+                : traktStatusLoading,
+            onOpen: openTraktWatched,
+          }}
+          rate={{
+            rating: ratingActionValue,
+            max: 10,
+            loading: ratingActionLoading,
+            onRate: handleRate,
+            connected: ratingActionConnected,
+            onConnect: () => requireLogin(),
+          }}
+          favorite={favorite}
+          favoriteLoading={loadingStates || updating}
+          onToggleFavorite={handleToggleFavorite}
+          watchlist={watchlist}
+          watchlistLoading={loadingStates || updating}
+          onToggleWatchlist={handleToggleWatchlist}
+          onAddToList={openListsModal}
+          listBusy={listsLoadingHook || listsPresenceLoading}
+          listActive={Object.values(membershipMap || {}).some(Boolean)}
+          showComments={ratingActionConnected}
+          commentsActive={myComments.length > 0}
+          onComments={(event) => {
+            stopNestedModalOpeningEvent(event);
+            setCommentModalOpen(true);
+          }}
+        />
+      </div>
+    </DetailModalActionsReveal>
+    )}
+
+    {/* EPISODIO: fila de acciones FUERA del ScoreboardBar (como en pelis/
+        series): botones de visionado y puntuación. */}
+    {isEpisode && (
+      <DetailModalActionsReveal
+        className={`flex items-center gap-4 ${
+          mobileDetails
+            ? "w-full justify-center text-center"
+            : "flex-col text-center sm:flex-row sm:items-center sm:justify-between sm:text-left"
+        }`}
+      >
+        <div
+          className={
+            mobileDetails
+              ? "sv-phone-actions-reveal w-full min-w-0"
+              : "w-[calc(100%_+_1rem)] min-w-0 sm:w-auto sm:flex-1"
+          }
+        >
+          <DetailActionsRow
+            mobileGapClass="gap-1.5"
+            forceMobile={mobileDetails}
+            onTrailer={handleToggleTrailer}
+            trailerAvailable
+            trailerLoading={trailerLoading}
+            trailerPlaying={showTrailer}
+            onSoundtrack={openSoundtrack}
+            soundtrackAvailable={!!soundtrackSearchQuery}
+            onEpisodeRatings={(event) => {
+              stopNestedModalOpeningEvent(event);
+              setEpisodeRatingsOpen(true);
+            }}
+            episodeRatingsOpen={episodeRatingsOpen}
+            trakt={{
+              connected: epWatch.connected,
+              watched: epWatch.watched,
+              plays: epWatch.plays,
+              badge: null,
+              busy: epWatch.busy,
+              loading: epWatch.loading,
+              onOpen: openEpisodePlays,
+            }}
+            rate={{
+              rating: epRate.value,
+              max: 10,
+              loading: epRate.loading,
+              onRate: handleEpisodeRate,
+              connected: epRate.connected,
+              onConnect: requireLogin,
+            }}
+          />
+        </div>
+      </DetailModalActionsReveal>
+    )}
+    </>
+  );
 
   const modalLayer = (
     <>
@@ -2932,17 +3057,20 @@ export default function DetailModal({
             ref={scrollContainerRef}
             className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
           >
-          {mobileDetails ? (
-            <div className="relative h-full w-full">
-              <MobileDetailsFrameStack
-                href={dashboardDetailHref(item, mediaType)}
-                seed={mobileStatusFresh ? { favorite, watchlist, rating: userRating } : null}
-                title={title}
-                onClose={onClose}
-              />
-            </div>
-          ) : (
-          <>
+          {/* PRIMER PANTALLAZO DE LA FICHA DE TELÉFONO.
+
+              En esa vista lo único que se ve sin hacer scroll es portada +
+              logo + botones, igual que en la ficha móvil real. Se consigue con
+              una columna de la ALTURA EXACTA del panel: la portada se queda con
+              el hueco sobrante (`flex-1`) y los botones ocupan el suyo, así que
+              el resto del contenido empieza justo por debajo del borde
+              inferior. No hay ninguna altura medida ni descontada a mano: si la
+              fila de botones cambia de alto, la portada se ajusta sola.
+
+              `contents` deja la vista normal EXACTAMENTE como estaba: el
+              envoltorio desaparece de la maquetación y hero y contenido siguen
+              siendo hermanos directos de la columna con scroll. */}
+          <div className={mobileDetails ? "flex h-full flex-col" : "contents"}>
           {/* HERO: póster textless en móvil, backdrop panorámico en sm+.
               El fondo se desvanece a transparente por abajo (sin borde) para que la
               imagen (enmascarada) se funda con el panel translúcido de contenido y
@@ -2978,7 +3106,18 @@ export default function DetailModal({
 
               Terminándolo en el 85%, la máscara revela el panel y nada más: la
               transición es la de la imagen al panel, sin oscuros añadidos. */}
-          <div className="relative aspect-[2/3] w-full overflow-hidden bg-gradient-to-b from-neutral-950 from-30% to-transparent to-78% sm:aspect-video">
+          <div
+            className={
+              mobileDetails
+                // Teléfono: la portada se come todo el hueco que dejan los
+                // botones. Sin `aspect-*` y sin el degradado de fondo: aquí la
+                // imagen llega hasta abajo y se funde con el panel por su
+                // propia máscara (`sv-phone-fade`), que es mucho más larga que
+                // la del modal y es la que deja logo y botones sobre oscuro.
+                ? "relative min-h-0 w-full flex-1 overflow-hidden"
+                : "relative aspect-[2/3] w-full overflow-hidden bg-gradient-to-b from-neutral-950 from-30% to-transparent to-78% sm:aspect-video"
+            }
+          >
             {/* Wrapper ESTÁTICO y enmascarado: contiene SOLO la imagen.
                 - Estático (no lleva el parallax): la máscara queda fija
                   respecto al borde inferior, así que al hacer scroll el
@@ -2986,7 +3125,7 @@ export default function DetailModal({
                 - Envuelve solo la imagen: el logo y las demás capas quedan
                   FUERA, así que no se difuminan. Antes la máscara estaba en
                   el contenedor y se comía el logo, que es su hermano. */}
-            <div className="absolute inset-0 sv-hero-fade">
+            <div className={`absolute inset-0 ${mobileDetails ? "sv-phone-fade" : "sv-hero-fade"}`}>
             <motion.div
               style={{
                 y: yParallax,
@@ -3001,19 +3140,26 @@ export default function DetailModal({
                       key={`mobile-${mobileHeroSrc}`}
                       src={mobileHeroSrc}
                       alt={title}
-                      className="sv-hero-art-in block h-full w-full object-contain sm:hidden"
+                      className={`sv-hero-art-in block h-full w-full ${
+                        // `sm:hidden` mira el VIEWPORT: en el drawer de un
+                        // escritorio casa siempre y ocultaría justo la imagen
+                        // que la ficha de teléfono tiene que enseñar.
+                        mobileDetails ? "object-cover" : "object-contain sm:hidden"
+                      }`}
                       loading="eager"
                       fetchPriority="high"
                     />
                   )}
 
-                  {desktopHeroSrc && (
+                  {desktopHeroSrc && !(mobileDetails && mobileHeroSrc) && (
                     <img
                       key={`desktop-${desktopHeroSrc}`}
                       src={desktopHeroSrc}
                       alt={title}
                       className={`sv-hero-art-in sv-hero-art-edge h-full w-full ${
-                        mobileHeroSrc
+                        mobileDetails
+                          ? "block object-cover"
+                          : mobileHeroSrc
                           ? "hidden object-cover sm:block"
                           : backdropPath
                             ? "block object-contain sm:object-cover"
@@ -3036,7 +3182,29 @@ export default function DetailModal({
                     <div className="absolute inset-0 animate-pulse bg-neutral-900" />
                   )}
                   {trailerSrc && (
-                    <div className="absolute inset-0 overflow-hidden">
+                    // El recorte de 180%x140% existe para tapar la cromía de
+                    // YouTube (título arriba, controles abajo) desbordando el
+                    // vídeo por los cuatro lados. Eso funciona en una caja 2:3
+                    // o panorámica, pero la portada del TELÉFONO es 9:19.5: ahí
+                    // ese mismo desbordamiento deja en pantalla una columna
+                    // central del fotograma, sin nada reconocible. Por eso el
+                    // teléfono mete el recorte DENTRO de una banda 16:9 centrada
+                    // —el vídeo se ve entero, con el mismo truco anti-cromía— y
+                    // el resto de la portada queda en negro, como un reproductor.
+                    <div
+                      className={
+                        mobileDetails
+                          ? "absolute inset-0 flex items-center justify-center overflow-hidden bg-black"
+                          : "absolute inset-0 overflow-hidden"
+                      }
+                    >
+                    <div
+                      className={
+                        mobileDetails
+                          ? "relative aspect-video w-full overflow-hidden"
+                          : "contents"
+                      }
+                    >
                       <iframe
                         key={trailer.key}
                         ref={trailerIframeRef}
@@ -3062,6 +3230,7 @@ export default function DetailModal({
                           } catch {}
                         }}
                       />
+                    </div>
                     </div>
                   )}
                 </>
@@ -3106,7 +3275,12 @@ export default function DetailModal({
             {/* Logo del título sobre el hero (fallback al texto si no hay logo) */}
             <motion.div
               style={{ opacity: logoOpacity, y: logoY }}
-              className="absolute inset-x-0 bottom-0 z-15 flex justify-center p-5 text-center sm:block sm:p-7 sm:text-left"
+              className={`absolute inset-x-0 bottom-0 z-15 flex justify-center p-5 text-center ${
+                // Teléfono: el logo respira por debajo. Ese `pb` ES la
+                // separación con la fila de botones, que arranca justo donde
+                // acaba la portada.
+                mobileDetails ? "pb-8" : "sm:block sm:p-7 sm:text-left"
+              }`}
             >
               {data.logoPath ? (
                 <NextImage
@@ -3116,7 +3290,9 @@ export default function DetailModal({
                   width={500}
                   height={200}
                   sizes="(min-width:920px) 460px, 70vw"
-                  className="h-auto max-h-28 w-auto max-w-[85%] object-contain object-center drop-shadow-[0_3px_14px_rgba(0,0,0,0.85)] sm:max-h-36 sm:object-left"
+                  className={`h-auto max-h-28 w-auto max-w-[85%] object-contain object-center drop-shadow-[0_3px_14px_rgba(0,0,0,0.85)] ${
+                    mobileDetails ? "" : "sm:max-h-36 sm:object-left"
+                  }`}
                   loading="eager"
                   priority
                 />
@@ -3127,140 +3303,31 @@ export default function DetailModal({
                 // cargaba se mostraba el texto y luego saltaba al logo.
                 // Con `logoPath` a secas no se distingue "aún no llegó" de
                 // "no existe"; `logoResolved` sí.
-                <h2 className="mx-auto max-w-[85%] text-3xl font-black leading-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)] sm:mx-0 sm:text-5xl">
+                <h2
+                  className={`mx-auto max-w-[85%] text-3xl font-black leading-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)] ${
+                    mobileDetails ? "" : "sm:mx-0 sm:text-5xl"
+                  }`}
+                >
                   {title || <SkeletonBar className="h-8 w-64" />}
                 </h2>
               ) : null}
             </motion.div>
           </div>
 
-          {/* CONTENIDO */}
-          <div className="space-y-8 p-5 sm:p-7">
-            {/* Fila de acciones — MISMO componente presentacional que la ficha
-                completa (DetailsClient). El tráiler sigue reproduciéndose inline
-                en el hero; el resto abre los modales reutilizables. Se omiten el
-                control de "visto" de Trakt y la valoración de episodios (no se
-                pasan sus handlers), por lo que no se renderizan. */}
-            {!isEpisode && (
-            <DetailModalActionsReveal
-              className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left"
-            >
-              <div className="w-[calc(100%_+_1rem)] min-w-0 sm:w-auto sm:flex-1">
-                <DetailActionsRow
-                  mobileGapClass="gap-1.5"
-                  onTrailer={handleToggleTrailer}
-                  trailerAvailable
-                  trailerLoading={trailerLoading}
-                  trailerPlaying={showTrailer}
-                  onSoundtrack={openSoundtrack}
-                  soundtrackAvailable={!!soundtrackSearchQuery}
-                  onEpisodeRatings={
-                    mediaType === "tv"
-                      ? (event) => {
-                          stopNestedModalOpeningEvent(event);
-                          setEpisodeRatingsOpen(true);
-                        }
-                      : undefined
-                  }
-                  episodeRatingsOpen={episodeRatingsOpen}
-                  trakt={{
-                    connected: traktConnected || traktStatus.connected,
-                    // Series: el ojo refleja "algún episodio visto" (misma señal que
-                    // DetailsClient). Películas: estado de visionado del título.
-                    watched:
-                      mediaType === "tv"
-                        ? episodesWatched.hasAnyWatchedEpisode(
-                            episodesWatched.watchedBySeason,
-                          )
-                        : traktStatus.watched,
-                    // Para series no mostramos recuento de plays en el ojo (igual que
-                    // DetailsClient, que allí usa un badge de progreso %).
-                    plays: mediaType === "tv" ? 0 : traktStatus.plays,
-                    // Series En progreso: % de episodios vistos en el botón, igual
-                    // que DetailsClient (mismo cálculo, desde el hook compartido).
-                    badge:
-                      mediaType === "tv" ? episodesWatched.tvProgressBadge : null,
-                    busy: !!traktBusy,
-                    // Para TV esperamos también a que cargue el estado de episodios
-                    // (evita el parpadeo "visto sin %"): mismo criterio que el
-                    // watchedActionLoading de DetailsClient.
-                    loading:
-                      mediaType === "tv"
-                        ? traktStatusLoading ||
-                          ((traktConnected || traktStatus.connected) &&
-                            !episodesWatched.watchedBySeasonLoaded)
-                        : traktStatusLoading,
-                    onOpen: openTraktWatched,
-                  }}
-                  rate={{
-                    rating: ratingActionValue,
-                    max: 10,
-                    loading: ratingActionLoading,
-                    onRate: handleRate,
-                    connected: ratingActionConnected,
-                    onConnect: () => requireLogin(),
-                  }}
-                  favorite={favorite}
-                  favoriteLoading={loadingStates || updating}
-                  onToggleFavorite={handleToggleFavorite}
-                  watchlist={watchlist}
-                  watchlistLoading={loadingStates || updating}
-                  onToggleWatchlist={handleToggleWatchlist}
-                  onAddToList={openListsModal}
-                  listBusy={listsLoadingHook || listsPresenceLoading}
-                  listActive={Object.values(membershipMap || {}).some(Boolean)}
-                  showComments={ratingActionConnected}
-                  commentsActive={myComments.length > 0}
-                  onComments={(event) => {
-                    stopNestedModalOpeningEvent(event);
-                    setCommentModalOpen(true);
-                  }}
-                />
-              </div>
-            </DetailModalActionsReveal>
-            )}
+          {/* TELÉFONO: la fila de botones cierra el primer pantallazo, pegada
+              al borde inferior del panel igual que en la ficha móvil, donde
+              queda justo encima del navbar. `shrink-0` la protege: la portada
+              es quien cede espacio, nunca los botones. */}
+          {mobileDetails && (
+            <div className="shrink-0 px-5 pb-7">
+              {actionsNode}
+            </div>
+          )}
+          </div>
 
-            {/* EPISODIO: fila de acciones FUERA del ScoreboardBar (como en pelis/
-                series): botones de visionado y puntuación. */}
-            {isEpisode && (
-              <DetailModalActionsReveal
-                className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left"
-              >
-                <div className="w-[calc(100%_+_1rem)] min-w-0 sm:w-auto sm:flex-1">
-                  <DetailActionsRow
-                    mobileGapClass="gap-1.5"
-                    onTrailer={handleToggleTrailer}
-                    trailerAvailable
-                    trailerLoading={trailerLoading}
-                    trailerPlaying={showTrailer}
-                    onSoundtrack={openSoundtrack}
-                    soundtrackAvailable={!!soundtrackSearchQuery}
-                    onEpisodeRatings={(event) => {
-                      stopNestedModalOpeningEvent(event);
-                      setEpisodeRatingsOpen(true);
-                    }}
-                    episodeRatingsOpen={episodeRatingsOpen}
-                    trakt={{
-                      connected: epWatch.connected,
-                      watched: epWatch.watched,
-                      plays: epWatch.plays,
-                      badge: null,
-                      busy: epWatch.busy,
-                      loading: epWatch.loading,
-                      onOpen: openEpisodePlays,
-                    }}
-                    rate={{
-                      rating: epRate.value,
-                      max: 10,
-                      loading: epRate.loading,
-                      onRate: handleEpisodeRate,
-                      connected: epRate.connected,
-                      onConnect: requireLogin,
-                    }}
-                  />
-                </div>
-              </DetailModalActionsReveal>
-            )}
+          {/* CONTENIDO */}
+          <div className={`space-y-8 p-5 ${mobileDetails ? "" : "sm:p-7"}`}>
+            {mobileDetails ? null : actionsNode}
 
             <div className="space-y-3">
               {/* Premios / nominaciones: misma línea verde que las previews del
@@ -3917,8 +3984,6 @@ export default function DetailModal({
               </motion.section>
             )}
           </div>
-          </>
-          )}
           </div>
         </div>
       </motion.div>

@@ -37,13 +37,28 @@ function LiquidButton(props) {
 // Se exporta para que otras superficies con fila de acciones propia (la baraja
 // de Recomendaciones) usen EXACTAMENTE el mismo dimensionado, en vez de copiar
 // estas clases y que acaben divergiendo.
-export const MOBILE_ACTION_BUTTON_CLASS = `
+//
+// `forceMobile` (ver el prop del mismo nombre) necesita la mitad MÓVIL de estas
+// clases por separado: en la ficha de teléfono del drawer el ancho de móvil lo
+// pone el panel, no la ventana, así que los `sm:` —que miran el viewport, y en
+// un escritorio SIEMPRE casan— devolverían los iconos al tamaño fijo de
+// escritorio justo donde no toca. De ahí la separación en dos constantes.
+const MOBILE_ACTION_BUTTON_BASE = `
                 [&_[data-liquid-button]:not(.labeled)]:!w-full [&_[data-liquid-button]:not(.labeled)]:!h-auto [&_[data-liquid-button]:not(.labeled)]:aspect-square [&_[data-liquid-button]:not(.labeled)]:[container-type:inline-size]
-                [&_[data-liquid-button]:not(.labeled)_svg]:!w-[46cqw] [&_[data-liquid-button]:not(.labeled)_svg]:!h-[46cqw] sm:[&_[data-liquid-button]:not(.labeled)_svg]:!w-[22px] sm:[&_[data-liquid-button]:not(.labeled)_svg]:!h-[22px]
-                [&_[data-liquid-button]:not(.labeled)_.text-xl]:!text-[42cqw] sm:[&_[data-liquid-button]:not(.labeled)_.text-xl]:!text-[22px]
-                [&_[data-liquid-button]:not(.labeled)_.text-2xl]:!text-[46cqw] sm:[&_[data-liquid-button]:not(.labeled)_.text-2xl]:!text-[24px]
-                [&_[data-liquid-button]:not(.labeled)_.text-lg]:!text-[38cqw] sm:[&_[data-liquid-button]:not(.labeled)_.text-lg]:!text-[18px]
-                [&_[data-liquid-button]:not(.labeled)_.text-xs]:!text-[22cqw] sm:[&_[data-liquid-button]:not(.labeled)_.text-xs]:!text-[12px]`;
+                [&_[data-liquid-button]:not(.labeled)_svg]:!w-[46cqw] [&_[data-liquid-button]:not(.labeled)_svg]:!h-[46cqw]
+                [&_[data-liquid-button]:not(.labeled)_.text-xl]:!text-[42cqw]
+                [&_[data-liquid-button]:not(.labeled)_.text-2xl]:!text-[46cqw]
+                [&_[data-liquid-button]:not(.labeled)_.text-lg]:!text-[38cqw]
+                [&_[data-liquid-button]:not(.labeled)_.text-xs]:!text-[22cqw]`;
+
+const DESKTOP_ACTION_BUTTON_OVERRIDES = `
+                sm:[&_[data-liquid-button]:not(.labeled)_svg]:!w-[22px] sm:[&_[data-liquid-button]:not(.labeled)_svg]:!h-[22px]
+                sm:[&_[data-liquid-button]:not(.labeled)_.text-xl]:!text-[22px]
+                sm:[&_[data-liquid-button]:not(.labeled)_.text-2xl]:!text-[24px]
+                sm:[&_[data-liquid-button]:not(.labeled)_.text-lg]:!text-[18px]
+                sm:[&_[data-liquid-button]:not(.labeled)_.text-xs]:!text-[12px]`;
+
+export const MOBILE_ACTION_BUTTON_CLASS = `${MOBILE_ACTION_BUTTON_BASE} ${DESKTOP_ACTION_BUTTON_OVERRIDES}`;
 
 // Contrato de tamaño de las acciones circulares de una ficha. Es deliberadamente
 // independiente del número de acciones: ocupan el espacio disponible hasta el
@@ -56,17 +71,20 @@ export const MOBILE_ACTION_BUTTON_CLASS = `
 // menos botones mientras DetailsClient se mantiene compacto.
 const DETAIL_ACTION_ITEM_FLEX_CLASS =
   "[&>*:not(.separator):not(.labeled)]:!flex-[1_1_0%] [&>*:not(.separator):not(.labeled)]:min-w-[34px]";
-const DETAIL_ACTION_ITEM_CAP_CLASS =
-  "[&>*:not(.separator):not(.labeled)]:!max-w-[56px] sm:[&>*:not(.separator):not(.labeled)]:!max-w-[48px]";
+const DETAIL_ACTION_ITEM_CAP_MOBILE_CLASS =
+  "[&>*:not(.separator):not(.labeled)]:!max-w-[56px]";
+const DETAIL_ACTION_ITEM_CAP_CLASS = `${DETAIL_ACTION_ITEM_CAP_MOBILE_CLASS} sm:[&>*:not(.separator):not(.labeled)]:!max-w-[48px]`;
 export const DETAIL_ACTION_ITEM_SIZING_CLASS = `
                 ${DETAIL_ACTION_ITEM_FLEX_CLASS} ${DETAIL_ACTION_ITEM_CAP_CLASS}`;
 
 // Contenedor con el mismo escalado responsivo (container queries) que la fila
 // original de DetailsClient. Se mantiene idéntico para no re-estilar.
-const BASE_ROW_CLASS = `flex flex-nowrap items-center justify-center sm:justify-start sm:gap-3 w-full
+const buildBaseRowClass = (forceMobile) => `flex flex-nowrap items-center justify-center w-full ${
+                  forceMobile ? "" : "sm:justify-start sm:gap-3"
+                }
                 ${DETAIL_ACTION_ITEM_FLEX_CLASS}
                 [&.labeled-row>*:not(.separator):not(.labeled)]:!flex-none
-                ${MOBILE_ACTION_BUTTON_CLASS}`;
+                ${forceMobile ? MOBILE_ACTION_BUTTON_BASE : MOBILE_ACTION_BUTTON_CLASS}`;
 
 // Retardo entre celdas para que el cambio se lea de izquierda a derecha, en orden.
 const SLOT_STAGGER = 0.03;
@@ -121,6 +139,15 @@ export default function DetailActionsRow({
   className = "",
   showSeparator = true,
   fillMobile = false,
+  // La ficha de TELÉFONO del drawer (DetailModal con `contentView === "mobile"`)
+  // mide entre 320 y 639px de ANCHO DE PANEL, pero vive en una ventana de
+  // escritorio: los `sm:` de esta fila miran el viewport, así que allí casan
+  // SIEMPRE y devolvían la disposición de escritorio dentro del teléfono
+  // (separador visible, botones alineados a la izquierda con gap-3, iconos a
+  // 22px fijos y, en series, la fila combinada `sm:hidden` directamente
+  // ausente). Con `forceMobile` la fila se compone con su mitad móvil, que es
+  // exactamente la misma que se ve en un teléfono real.
+  forceMobile = false,
   mobileGapClass = "gap-1",
   size = "md",
 
@@ -172,14 +199,18 @@ export default function DetailActionsRow({
     !trailerLabel;
 
   // Tope de tamaño de botón en móvil: por defecto 56px; con fillMobile sin tope.
-  const mobileCapClass = fillMobile ? "" : DETAIL_ACTION_ITEM_CAP_CLASS;
+  const mobileCapClass = fillMobile
+    ? ""
+    : forceMobile
+      ? DETAIL_ACTION_ITEM_CAP_MOBILE_CLASS
+      : DETAIL_ACTION_ITEM_CAP_CLASS;
   // Tamaño de los botones-icono en labeled-row
   const labeledSizeClass =
     size === "lg"
       ? "[&.labeled-row>*:not(.separator):not(.labeled)]:!w-12 [&.labeled-row>*:not(.separator):not(.labeled)]:!h-12 [&.labeled-row_[data-liquid-button]:not(.labeled)_svg]:!h-6 [&.labeled-row_[data-liquid-button]:not(.labeled)_svg]:!w-6"
       : "[&.labeled-row>*:not(.separator):not(.labeled)]:!w-10 [&.labeled-row>*:not(.separator):not(.labeled)]:!h-10";
   const rowClass = [
-    BASE_ROW_CLASS,
+    buildBaseRowClass(forceMobile),
     labeledSizeClass,
     mobileGapClass,
     mobileCapClass,
@@ -310,7 +341,14 @@ export default function DetailActionsRow({
         // era la fila entera y las series entraban de golpe como un bloque, en
         // vez de botón a botón como en las películas.
         <div
-          className={`flex sm:hidden flex-nowrap items-center justify-between w-full ${mobileGapClass} [&>*:not(.separator)]:flex-1 [&>*:not(.separator)]:min-w-[34px] [&>*:not(.separator)]:max-w-[56px] ${MOBILE_ACTION_BUTTON_CLASS}`}
+          // `justify-center`, igual que la fila estándar (películas), y NO
+          // `justify-between`: ambas capan sus botones a 56px, así que en
+          // cuanto la fila es más ancha que los ocho botones más sus huecos
+          // sobra sitio, y `between` lo repartía ENTRE los botones. Resultado:
+          // las series se veían más separadas que las películas con exactamente
+          // los mismos botones. Centrando, el sobrante se va a los extremos y
+          // las dos filas quedan idénticas.
+          className={`flex ${forceMobile ? "" : "sm:hidden"} flex-nowrap items-center justify-center w-full ${mobileGapClass} [&>*:not(.separator)]:flex-1 [&>*:not(.separator)]:min-w-[34px] [&>*:not(.separator)]:max-w-[56px] ${forceMobile ? MOBILE_ACTION_BUTTON_BASE : MOBILE_ACTION_BUTTON_CLASS}`}
         >
           {/* Slot 1: Trigger Principal (Play -> X) */}
           <div className="flex-1 min-w-[34px] max-w-[56px] aspect-square">
@@ -473,7 +511,11 @@ export default function DetailActionsRow({
 
       {/* VISTA ESTÁNDAR (ESCRITORIO Y PELÍCULAS) */}
       <div
-        className={shouldCombineMedia ? `hidden sm:flex ${rowClass}` : rowClass}
+        className={
+          shouldCombineMedia
+            ? `hidden ${forceMobile ? "" : "sm:flex"} ${rowClass}`
+            : rowClass
+        }
       >
         {/* Píldora de REPRODUCCIÓN (Continuar viendo) */}
         {play && (
@@ -599,7 +641,7 @@ export default function DetailActionsRow({
         )}
 
         {showSeparator && (
-          <div className="hidden sm:block w-px h-8 bg-white/35 mx-1 sm:mx-2 shrink-0 separator" />
+          <div className={`hidden ${forceMobile ? "" : "sm:block"} w-px h-8 bg-white/35 mx-1 sm:mx-2 shrink-0 separator`} />
         )}
 
         {/* Control de visto/no visto en Trakt */}
