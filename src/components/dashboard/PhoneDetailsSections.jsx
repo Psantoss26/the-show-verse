@@ -130,6 +130,13 @@ const PHONE_CAROUSEL = {
   showArrows: false,
 };
 
+// Los carruseles NO llevan `!overflow-visible` (que es lo que usan las secciones
+// del modal ancho para que el hover no se recorte). Aquí no hay hover, y con
+// desbordamiento visible las tarjetas que no caben se pintan FUERA del carrusel
+// y las acaba cortando el borde redondeado del panel: se ve media tarjeta
+// pegada al canto. Recortando en el propio carrusel, el corte cae en el margen
+// del contenido, alineado con todo lo demás.
+
 function toRatingNumber(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
@@ -184,14 +191,28 @@ function getSoundtrackSourceBadge(source) {
   };
 }
 
+// TRES tarjetas COMPLETAS por fila, exactamente como la ficha móvil, que usa
+// `slidesPerView={3}` en todas sus filas de portadas y no cambia ese número en
+// ningún salto. Nada de valores fraccionarios "para insinuar que hay más": en
+// este ancho una cuarta tarjeta a medias deja las tres primeras más estrechas y
+// la fila se lee como recortada.
 const PHONE_POSTER_CAROUSEL = {
   ...PHONE_CAROUSEL,
   spaceBetween: 12,
-  slidesPerView: 2.4,
+  slidesPerView: 3,
   breakpoints: {
-    380: { slidesPerView: 3, spaceBetween: 12 },
-    480: { slidesPerView: 3.5, spaceBetween: 14 },
-    560: { slidesPerView: 4, spaceBetween: 14 },
+    480: { slidesPerView: 3, spaceBetween: 14 },
+  },
+};
+
+// Las tarjetas APAISADAS (logos, vídeos, soundtrack) van de dos en dos, que es
+// lo que hace la ficha móvil con ellas: a tres serían ilegibles.
+const PHONE_WIDE_CAROUSEL = {
+  ...PHONE_CAROUSEL,
+  spaceBetween: 12,
+  slidesPerView: 2,
+  breakpoints: {
+    480: { slidesPerView: 2, spaceBetween: 14 },
   },
 };
 
@@ -947,6 +968,10 @@ export default function PhoneDetailsSections({
           items={sectionItems}
           activeId={activeSectionId}
           onChange={scrollToSection}
+          // Diez secciones no caben rotuladas en el ancho de un teléfono: los
+          // botones se encogían por debajo de su texto y lo cortaban a media
+          // palabra ("REPART", "RECOMENDACIO").
+          iconsOnly
         />
       </div>
 
@@ -959,7 +984,7 @@ export default function PhoneDetailsSections({
                 <SectionTitle title="Reparto Principal" icon={Users} />
                 <DetailsArrowCarousel
                   {...PHONE_POSTER_CAROUSEL}
-                  className="pb-2 !overflow-visible"
+                  className="pb-2"
                 >
                   {cast.slice(0, 20).map((actor) => (
                     <SwiperSlide key={actor.id ?? actor.credit_id ?? actor.name}>
@@ -1008,7 +1033,7 @@ export default function PhoneDetailsSections({
                 <SectionTitle title="Recomendaciones" icon={MonitorPlay} />
                 <DetailsArrowCarousel
                   {...PHONE_POSTER_CAROUSEL}
-                  className="pb-2 !overflow-visible"
+                  className="pb-2"
                 >
                   {recommendations.slice(0, 15).map((rec) => (
                     <SwiperSlide key={`${getMediaTypeForItem(rec)}-${rec.id}`}>
@@ -1075,7 +1100,7 @@ export default function PhoneDetailsSections({
                 ) : collectionData?.items?.length ? (
                   <DetailsArrowCarousel
                     {...PHONE_POSTER_CAROUSEL}
-                    className="pb-2 !overflow-visible"
+                    className="pb-2"
                   >
                     {collectionData.items.map((movie) => (
                       <SwiperSlide key={movie.id}>
@@ -1117,7 +1142,7 @@ export default function PhoneDetailsSections({
                 <SectionTitle title="Premios" icon={Trophy} />
                 <DetailsArrowCarousel
                   {...PHONE_POSTER_CAROUSEL}
-                  className="pb-2 !overflow-visible"
+                  className="pb-2"
                 >
                   {awardItems.map((award, index) => {
                     const previous = awardItems[index - 1] || null;
@@ -1297,18 +1322,8 @@ export default function PhoneDetailsSections({
               ) : (
                 <DetailsArrowCarousel
                   key={activeImagesTab}
-                  {...PHONE_CAROUSEL}
-                  spaceBetween={12}
-                  slidesPerView={isLogoTab ? 1.6 : 2.4}
-                  breakpoints={
-                    isLogoTab
-                      ? { 480: { slidesPerView: 2, spaceBetween: 14 } }
-                      : {
-                          380: { slidesPerView: 3, spaceBetween: 12 },
-                          480: { slidesPerView: 3.5, spaceBetween: 14 },
-                        }
-                  }
-                  className="pt-1 pb-3 !overflow-visible"
+                  {...(isLogoTab ? PHONE_WIDE_CAROUSEL : PHONE_POSTER_CAROUSEL)}
+                  className="pt-1 pb-3"
                 >
                   {artworkSelection.ordered.map((img) => {
                     const filePath = img?.file_path;
@@ -1425,13 +1440,7 @@ export default function PhoneDetailsSections({
                   No hay tráileres o vídeos disponibles en TMDb para este título.
                 </div>
               ) : (
-                <DetailsArrowCarousel
-                  {...PHONE_CAROUSEL}
-                  spaceBetween={12}
-                  slidesPerView={1.2}
-                  breakpoints={{ 480: { slidesPerView: 1.6, spaceBetween: 14 } }}
-                  className="pb-2"
-                >
+                <DetailsArrowCarousel {...PHONE_WIDE_CAROUSEL} className="pb-2">
                   {videos.slice(0, 20).map((video) => {
                     const thumb = videoThumbUrl(video);
                     const fallback = data?.backdropPath
@@ -1569,13 +1578,7 @@ export default function PhoneDetailsSections({
                     </div>
                   </div>
                 ) : (
-                  <DetailsArrowCarousel
-                    {...PHONE_CAROUSEL}
-                    spaceBetween={12}
-                    slidesPerView={1.6}
-                    breakpoints={{ 480: { slidesPerView: 2, spaceBetween: 14 } }}
-                    className="pb-2"
-                  >
+                  <DetailsArrowCarousel {...PHONE_WIDE_CAROUSEL} className="pb-2">
                     {soundtrack.tracks.map((track) => {
                       const badge = getSoundtrackSourceBadge(track.source);
                       return (

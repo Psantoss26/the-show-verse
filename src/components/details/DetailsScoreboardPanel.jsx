@@ -92,6 +92,13 @@ export function DetailsRatingsBadges({
   imdb = null,
   rt = null,
   mc = null,
+  // Dentro de un carril que se desplaza (ver `compactToolbar`), la fila tiene
+  // que medir lo que miden sus insignias. Sin esto es un contenedor de bloque
+  // que ocupa el ancho del carril, sus hijos se reparten menos espacio del que
+  // piden y el recuento de votos —que lleva `truncate`— se queda en "8…".
+  // `shrink-0` no lo evitaba: solo actúa cuando la fila es un ÍTEM flex, y
+  // dentro del carril no lo es.
+  compact = false,
 }) {
   const isPendingScore = (score) =>
     !!score && score.pending === true && score.value == null;
@@ -101,7 +108,11 @@ export function DetailsRatingsBadges({
     `${name}-${score?.value == null ? "empty" : "ready"}`;
 
   return (
-    <div className="flex items-center gap-3 sm:gap-5 shrink-0">
+    <div
+      className={`flex items-center gap-3 sm:gap-5 shrink-0 ${
+        compact ? "w-max" : ""
+      }`}
+    >
       {/* Indicador de carga mientras se obtienen las puntuaciones de Trakt */}
       <div className="absolute opacity-0 pointer-events-none w-4 h-4">
         {loading ? (
@@ -597,6 +608,13 @@ export default function DetailsScoreboardPanel({
   // Modo de portada backdrop: el marcador comparte fila con las puntuaciones y
   // las estadísticas, así que "Compartir" va sin texto para no comerse el ancho.
   shareIconOnly = false,
+  // BARRA ESTRECHA (ficha de teléfono del drawer). Las insignias van en un
+  // carril que se DESPLAZA en vez de empujar: por defecto el bloque es
+  // `shrink-0`, igual que los botones de la derecha, así que en un panel
+  // estrecho la fila crecía más que el panel y los botones se salían por el
+  // borde. Aquí las insignias ceden el ancho y se recorren con el dedo, y los
+  // botones quedan siempre completos.
+  compactToolbar = false,
   toolbarActions = null,
   className = "",
   children = null,
@@ -653,16 +671,32 @@ export default function DetailsScoreboardPanel({
       flex items-center gap-2.5 sm:gap-4
       overflow-x-clip sm:overflow-visible overscroll-none [touch-action:pan-y]
     "
+          style={compactToolbar ? { overflow: "hidden" } : undefined}
         >
-          <DetailsRatingsBadges
-            loading={loading}
-            tmdb={tmdb}
-            trakt={trakt}
-            traktPublic={traktPublic}
-            imdb={imdb}
-            rt={rt}
-            mc={mc}
-          />
+          {/* `contents` deja la barra ancha EXACTAMENTE como estaba: el
+              envoltorio desaparece de la maquetación. */}
+          <div
+            className={
+              compactToolbar
+                // `overflow-y-hidden` EXPLÍCITO: con solo `overflow-x-auto`, la
+                // otra dirección pasa de `visible` a `auto` por especificación y
+                // aparecía una barra de scroll VERTICAL de unos pocos píxeles
+                // pegada al carril.
+                ? "min-w-0 flex-1 overflow-x-auto overflow-y-hidden scrollbar-hide overscroll-x-contain [touch-action:pan-y]"
+                : "contents"
+            }
+          >
+            <DetailsRatingsBadges
+              loading={loading}
+              tmdb={tmdb}
+              trakt={trakt}
+              traktPublic={traktPublic}
+              imdb={imdb}
+              rt={rt}
+              mc={mc}
+              compact={compactToolbar}
+            />
+          </div>
 
           <DetailsToolbarActions
             externalLinks={externalLinks}
