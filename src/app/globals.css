@@ -1101,6 +1101,45 @@ html {
   }
 }
 
+/* ===================================================================
+   RENDIMIENTO DE LA FICHA DE TELÉFONO
+
+   El panel cambia de ANCHO Y DE ALTO a la vez mientras se arrastra el tirador
+   (su proporción es fija, así que una cosa arrastra a la otra), y dentro hay
+   diez secciones con decenas de superficies de cristal. Cada `backdrop-filter`
+   vuelve a muestrear el fondo en CADA fotograma del arrastre, y son muchos:
+   los botones de filtro de la galería llegan a `blur(50px)`.
+   =================================================================== */
+
+/* Contención por sección: lo que cambie dentro de una no obliga a recalcular
+   la maquetación ni a repintar las demás. No altera su geometría, así que el
+   menú de secciones sigue midiendo posiciones exactas.
+
+   Aquí NO se usa `content-visibility: auto`, que sería el siguiente escalón:
+   saltarse la maquetación de lo que está fuera de pantalla haría que las
+   secciones no visitadas midieran su tamaño ESTIMADO, y el menú salta a
+   posiciones calculadas con `getBoundingClientRect`. Ganaríamos fotogramas a
+   cambio de que el menú dejara de caer donde debe. */
+.sv-phone-section {
+  contain: layout paint style;
+}
+
+/* MIENTRAS SE ARRASTRA el tirador, las secciones renuncian a su cristal y a sus
+   transiciones. El cristal del propio panel se mantiene —es el marco, y es lo
+   que se está viendo moverse—; lo que se apaga son las decenas de superficies
+   pequeñas de dentro, que es donde está el coste y que además quedan casi todas
+   fuera de pantalla. Al soltar vuelven solas.
+
+   La marca la pone y la quita `beginResize` en DetailModal, la misma que evita
+   que el bloque derecho del navbar vaya por detrás del tirador. */
+:root[data-sv-drawer-resizing] .sv-phone-sections,
+:root[data-sv-drawer-resizing] .sv-phone-sections * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  transition: none !important;
+  animation-play-state: paused !important;
+}
+
 .sv-phone-fade {
   -webkit-mask-image: var(--sv-poster-fade);
   mask-image: var(--sv-poster-fade);

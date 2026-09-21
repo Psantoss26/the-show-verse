@@ -809,9 +809,23 @@ export default function PhoneDetailsSections({
   useEffect(() => {
     const el = menuStickyRef.current;
     if (!el) return undefined;
-    const update = () => setMenuHeight(el.getBoundingClientRect().height || 0);
-    update();
-    const observer = new ResizeObserver(update);
+
+    // Se lee del propio `entry` y se redondea. `getBoundingClientRect()` dentro
+    // del observador fuerza una medición, y el alto del menú no cambia al
+    // arrastrar el tirador: sin redondear, una fracción de píxel bastaba para
+    // provocar un `setState` —y con él un render y el remontaje del efecto de
+    // la sección activa— en cada fotograma del arrastre.
+    const apply = (height) => {
+      const next = Math.round(height || 0);
+      setMenuHeight((current) => (current === next ? current : next));
+    };
+
+    apply(el.getBoundingClientRect().height);
+
+    const observer = new ResizeObserver(([entry]) => {
+      const box = entry?.borderBoxSize?.[0];
+      apply(box ? box.blockSize : entry?.contentRect?.height);
+    });
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
@@ -954,7 +968,7 @@ export default function PhoneDetailsSections({
   ]);
 
   return (
-    <div className="mt-2">
+    <div className="sv-phone-sections mt-2">
       <div
         ref={menuStickyRef}
         className="sticky z-30 py-2"
@@ -977,7 +991,7 @@ export default function PhoneDetailsSections({
 
       <div className="mt-10 space-y-10">
         {/* === REPARTO PRINCIPAL === */}
-        <section id="phone-section-cast" ref={registerSection("cast")}>
+        <section className="sv-phone-section" id="phone-section-cast" ref={registerSection("cast")}>
           <AnimatedSection delay={0.04}>
             {cast.length > 0 && (
               <section className="group/section">
@@ -1026,7 +1040,7 @@ export default function PhoneDetailsSections({
         </section>
 
         {/* === RECOMENDACIONES === */}
-        <section id="phone-section-recs" ref={registerSection("recs")}>
+        <section className="sv-phone-section" id="phone-section-recs" ref={registerSection("recs")}>
           <AnimatedSection delay={0.04}>
             {recommendations.length > 0 && (
               <section className="group/section">
@@ -1068,7 +1082,7 @@ export default function PhoneDetailsSections({
 
         {/* === COLECCIÓN === */}
         {collectionId && (
-          <section id="phone-section-collection" ref={registerSection("collection")}>
+          <section className="sv-phone-section" id="phone-section-collection" ref={registerSection("collection")}>
             <AnimatedSection delay={0.04}>
               <section className="group/section">
                 {/* El encabezado no usa <SectionTitle/>: aquí el título entero
@@ -1136,7 +1150,7 @@ export default function PhoneDetailsSections({
 
         {/* === PREMIOS === */}
         {awardItems.length > 0 && (
-          <section id="phone-section-awards" ref={registerSection("awards")}>
+          <section className="sv-phone-section" id="phone-section-awards" ref={registerSection("awards")}>
             <AnimatedSection delay={0.04}>
               <section className="group/section">
                 <SectionTitle title="Premios" icon={Trophy} />
@@ -1172,7 +1186,7 @@ export default function PhoneDetailsSections({
         )}
 
         {/* === MEDIA: PORTADAS Y FONDOS === */}
-        <section id="phone-section-media" ref={registerSection("media")}>
+        <section className="sv-phone-section" id="phone-section-media" ref={registerSection("media")}>
           <AnimatedSection delay={0.04}>
             <section className="group/section">
               {/* El encabezado y los controles comparten fila, igual que en la
@@ -1347,11 +1361,24 @@ export default function PhoneDetailsSections({
                               select();
                             }
                           }}
-                          className={`group relative w-full rounded-xl overflow-hidden bg-zinc-900 shadow-md cursor-pointer transition-all duration-300 transform-gpu after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 ${
-                            isActive
-                              ? "shadow-[0_0_12px_rgba(16,185,129,0.35)] after:shadow-[inset_0_0_0_2px_rgba(52,211,153,1)]"
-                              : ""
-                          }`}
+                          // Tarjeta VERBATIM de la ficha móvil, indicadores
+                          // incluidos: la resolución y el botón de copiar URL
+                          // solo aparecen al pasar por encima. Al portarla les
+                          // quité esa condición pensando que en un teléfono no
+                          // se verían nunca -- y es cierto, ahí están ocultos--,
+                          // pero dejarlos fijos ensucia cada tarjeta con un
+                          // rótulo y un botón permanentes que la ficha no tiene.
+                          // Con la condición puesta, este panel se comporta
+                          // exactamente como esa misma tarjeta cuando se abre
+                          // con ratón.
+                          className={`group relative w-full rounded-xl overflow-hidden bg-zinc-900 shadow-md cursor-pointer
+                        transition-all duration-300 transform-gpu hover:-translate-y-1
+                        after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300
+                        ${
+                          isActive
+                            ? "shadow-[0_0_12px_rgba(16,185,129,0.35)] after:shadow-[inset_0_0_0_2px_rgba(52,211,153,1)] hover:shadow-[0_0_16px_rgba(16,185,129,0.45)]"
+                            : "hover:shadow-yellow-900/20"
+                        }`}
                           aria-label="Seleccionar"
                         >
                           <div
@@ -1370,18 +1397,20 @@ export default function PhoneDetailsSections({
                               }
                               loading="lazy"
                               decoding="async"
-                              className={`w-full h-full ${isLogoTab ? "object-contain" : "object-cover"}`}
+                              className={`w-full h-full ${isLogoTab ? "object-contain" : "object-cover"} transition-transform duration-500 ease-out transform-gpu
+                            group-hover:scale-[1.08]`}
                             />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                           </div>
 
                           {isActive && (
-                            <div className="absolute top-2 right-2 w-4 h-4 bg-emerald-400 rounded-full shadow-lg shadow-emerald-500/50 ring-2 ring-white/20 z-40" />
+                            <div className="absolute top-2 right-2 w-4 h-4 bg-emerald-400 rounded-full shadow-lg shadow-emerald-500/50 ring-2 ring-white/20" />
                           )}
 
                           {resText && (
-                            <div className="absolute bottom-2.5 left-2.5 z-10 pointer-events-none">
-                              <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-zinc-300 drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
-                                <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
+                            <div className="absolute bottom-2.5 left-2.5 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0 z-10 pointer-events-none">
+                              <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-zinc-300">
+                                <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 shadow-[0_0_6px_rgba(255,255,255,0.4)]" />
                                 {resText}
                               </span>
                             </div>
@@ -1401,10 +1430,13 @@ export default function PhoneDetailsSections({
                                 handleCopyImageUrl(filePath);
                               }
                             }}
-                            className="absolute bottom-0 right-0 z-40 p-2 rounded-tl-xl border-l border-t backdrop-blur-md shadow-sm bg-black/40 border-white/10 text-zinc-300"
+                            className="group/link absolute bottom-0 right-0 z-20 p-2.5 rounded-tl-xl border-l border-t backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-bottom-right scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100 bg-black/40 border-white/10 text-zinc-300 hover:bg-white/20 hover:text-white"
                             aria-label="Copiar URL"
                           >
-                            <LinkIcon className="w-4 h-4" />
+                            <LinkIcon className="w-[18px] h-[18px]" />
+                            <div className="pointer-events-none absolute bottom-full mb-2 right-0 z-[100] scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/link:scale-100 group-hover/link:opacity-100 group-hover/link:delay-[2000ms]">
+                              Copiar URL
+                            </div>
                           </div>
                         </div>
                       </SwiperSlide>
@@ -1653,7 +1685,7 @@ export default function PhoneDetailsSections({
         </section>
 
         {/* === ANÁLISIS DE SENTIMIENTOS === */}
-        <section id="phone-section-sentiment" ref={registerSection("sentiment")}>
+        <section className="sv-phone-section" id="phone-section-sentiment" ref={registerSection("sentiment")}>
           <AnimatedSection delay={0.04} renderImmediately>
             <section className="group/section">
               <SectionTitle title="Análisis de sentimientos" icon={Sparkles} />
@@ -1751,7 +1783,7 @@ export default function PhoneDetailsSections({
 
         {/* === TEMPORADAS (solo series) === */}
         {type === "tv" && (
-          <section id="phone-section-seasons" ref={registerSection("seasons")}>
+          <section className="sv-phone-section" id="phone-section-seasons" ref={registerSection("seasons")}>
             <AnimatedSection delay={0.04} renderImmediately>
               <section className="group/section">
                 <SectionTitle title="Temporadas" icon={Layers} />
@@ -1869,7 +1901,7 @@ export default function PhoneDetailsSections({
 
         {/* === VALORACIÓN DE EPISODIOS (solo series) === */}
         {type === "tv" && (
-          <section id="phone-section-episodes" ref={registerSection("episodes")}>
+          <section className="sv-phone-section" id="phone-section-episodes" ref={registerSection("episodes")}>
             <AnimatedSection delay={0.04}>
               <section className="group/section">
                 <SectionTitle title="Valoración de Episodios" icon={BarChart3} />
@@ -1899,7 +1931,7 @@ export default function PhoneDetailsSections({
         )}
 
         {/* === COMENTARIOS === */}
-        <section id="phone-section-comments" ref={registerSection("comments")}>
+        <section className="sv-phone-section" id="phone-section-comments" ref={registerSection("comments")}>
           <AnimatedSection delay={0.04} renderImmediately>
             <section className="group/section">
               <SectionTitle title="Comentarios" icon={MessageSquare} />
@@ -2055,7 +2087,7 @@ export default function PhoneDetailsSections({
 
         {/* === LISTAS === */}
         {!lists.error && (
-          <section id="phone-section-lists" ref={registerSection("lists")}>
+          <section className="sv-phone-section" id="phone-section-lists" ref={registerSection("lists")}>
             <AnimatedSection delay={0.04} renderImmediately>
               <section className="group/section">
                 <SectionTitle title="Listas" icon={ListVideo} />
