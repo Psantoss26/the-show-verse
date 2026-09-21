@@ -651,7 +651,6 @@ export default function DetailModal({
   const isRightPlacement = placement === "right";
   const isDocked = isRightPlacement && drawerView === "docked";
   const mobileDetails = isRightPlacement && contentView === "mobile";
-  const panelRightGap = mobileDetails && !tabletViewport ? 24 : 0;
   const clampPanelWidth = useCallback(
     (width, viewportWidth) => mobileDetails
       ? clampMobileDetailsWidth(width, viewportWidth, window.innerHeight)
@@ -843,8 +842,8 @@ export default function DetailModal({
   useEffect(() => {
     // El hueco de la ficha "mobile" va a los DOS lados (ver `marginLeft` del
     // panel), así que lo reservado para el resto de la página es el doble.
-    if (isRightPlacement) onDrawerWidthChange?.(panelWidth + panelRightGap * 2);
-  }, [isRightPlacement, panelWidth, panelRightGap, onDrawerWidthChange]);
+    if (isRightPlacement) onDrawerWidthChange?.(panelWidth);
+  }, [isRightPlacement, panelWidth, onDrawerWidthChange]);
 
   // Reajusta el ancho si cambia el tamaño de la ventana (no desbordar / no romper).
   useEffect(() => {
@@ -883,7 +882,7 @@ export default function DetailModal({
     const root = document.documentElement;
     const id = ++drawerWidthVarSeq;
     drawerWidthVarOwner = id;
-    root.style.setProperty("--sv-drawer-width", `${panelWidth + panelRightGap * 2}px`);
+    root.style.setProperty("--sv-drawer-width", `${panelWidth}px`);
     return () => {
       // Solo limpia si NINGUNA instancia posterior tomó el relevo. Al cambiar de
       // título, el drawer saliente que AnimatePresence mantiene montado ejecuta su
@@ -894,7 +893,7 @@ export default function DetailModal({
         root.style.removeProperty("--sv-drawer-width");
       }
     };
-  }, [isRightPlacement, panelWidth, panelRightGap]);
+  }, [isRightPlacement, panelWidth]);
 
   const resizingRef = useRef(false);
   const resizeCleanupRef = useRef(null);
@@ -1002,7 +1001,7 @@ export default function DetailModal({
       // También SUPERPUESTO: el margen del contenido solo importa acoplado,
       // pero el ancho publicado lo usa además el navbar para apartarse, y el
       // panel tapa su borde derecho en los dos modos.
-      onDrawerWidthChange?.(next + panelRightGap * 2);
+      onDrawerWidthChange?.(next);
     };
     const onMove = (moveEvent) => {
       if (moveEvent.pointerId !== pointerId) return;
@@ -1029,8 +1028,16 @@ export default function DetailModal({
       }, 0);
     };
     const finish = () => {
+      // `cleanup()` va PRIMERO: retira la marca de arrastre, y lo que estaba
+      // congelado mientras duraba (el margen de la página acoplada) tiene que
+      // poder aplicarse ya en las dos líneas siguientes.
       cleanup();
       applyWidth();
+      // `applyWidth` se corta solo cuando el ancho no ha cambiado desde el
+      // último fotograma, que es justo lo que pasa al soltar sin mover. El
+      // margen de la página acoplada cuelga de esta publicación, así que se
+      // repite a mano o se quedaría con el valor de antes del arrastre.
+      onDrawerWidthChange?.(panelWidthRef.current);
       setPanelWidth(panelWidthRef.current);
       try {
         window.localStorage.setItem(mobileDetails ? "showverse:mobileDetailsWidth" : RESIZE_STORAGE_KEY, String(panelWidthRef.current));
@@ -2904,7 +2911,6 @@ export default function DetailModal({
           ? "left-0 w-screen justify-end pointer-events-none"
           : "inset-x-0 justify-center"
       }`}
-      style={{ paddingRight: panelRightGap }}
       role="dialog"
       aria-modal={isRightPlacement ? undefined : "true"}
       aria-label={title || "Ficha rápida"}
@@ -2982,7 +2988,7 @@ export default function DetailModal({
           // ya lo pone `paddingRight` en el contenedor; este margen replica el
           // mismo valor a la izquierda para que quede centrada en su columna.
           ...(mobileDetails
-            ? { aspectRatio: MOBILE_DETAILS_ASPECT_RATIO, marginLeft: panelRightGap }
+            ? { aspectRatio: MOBILE_DETAILS_ASPECT_RATIO }
             : null),
         }}
         // OJO: el panel NO lleva `backdrop-blur`. Su desenfoque lo pinta la capa
@@ -2998,14 +3004,25 @@ export default function DetailModal({
         // Fondo del cristal: 0.35 → 0.47. El liquid glass dejaba ver demasiado
         // fondo. Este es el ÚNICO sitio donde se fija, así que sube por igual en
         // el modal centrado y en el drawer y siguen siendo idénticos.
-        className={`relative z-10 flex flex-col overflow-hidden bg-black/[0.47] bg-gradient-to-br from-white/[0.12] via-transparent to-white/[0.04] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] ${
+        className={`sv-drawer-panel relative z-10 flex flex-col overflow-hidden bg-black/[0.47] bg-gradient-to-br from-white/[0.12] via-transparent to-white/[0.04] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] ${
           isRightPlacement
             ? mobileDetails
-              // Flota separada de los dos bordes: esquinas redondeadas en las
-              // cuatro, no solo las de la izquierda (a diferencia del panel
-              // "modal", pegado al borde derecho, donde las de la derecha no
-              // se ven).
-              ? "h-auto min-h-0 self-center rounded-2xl pointer-events-auto"
+              // PEGADA AL BORDE DERECHO, igual que el panel ancho.
+              //
+              // Antes flotaba separada del canto (24px a cada lado y las cuatro
+              // esquinas redondeadas). Eso dejaba un hueco muerto contra el
+              // borde y, sumado al margen que la propia página deja a su
+              // derecha, el panel se veía descentrado en el hueco libre.
+              // Repartir ese hueco moviendo el panel solo cambiaba el problema
+              // de sitio: o seguía descuadrado, o se metía encima de los
+              // botones del navbar. Pegada al borde no hay hueco que repartir.
+              //
+              // Las esquinas de la derecha no se ven, así que no se redondean.
+              // Lo único propio de esta vista es el alto, que lo fija su
+              // proporción de teléfono.
+              // de la derecha no se ven, así que no se redondean. Solo cambia
+              // el alto, que lo fija su proporción de teléfono.
+              ? "h-auto min-h-0 self-center rounded-l-2xl pointer-events-auto"
               : "h-full rounded-l-2xl pointer-events-auto"
             : "mt-[4vh] h-[96vh] w-[95vw] max-w-[1080px] rounded-t-2xl"
         }`}
@@ -3723,6 +3740,12 @@ export default function DetailModal({
                   mobileLayout={mobileDetails}
                   enableMobileTabSwipe={mobileDetails}
                   showPlatformsTab={false}
+                  // TELÉFONO: los enlaces externos son una PESTAÑA más, igual
+                  // que en la ficha móvil (Detalles · Producción · Sinopsis ·
+                  // Enlaces). Ahí es donde viven, y por eso la barra del
+                  // marcador se queda solo con plataformas y compartir.
+                  showExternalLinksTab={mobileDetails}
+                  externalLinks={externalLinks}
                   mediaType={mediaType}
                   originalTitle={data.originalTitle}
                   // `formatValue` NO significa lo mismo en las dos
@@ -3792,7 +3815,7 @@ export default function DetailModal({
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-15px" }}
                 transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-                className="space-y-4"
+                className="sv-drawer-section space-y-4"
               >
                 <h3 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
                   <Users className="h-4 w-4" aria-hidden="true" />
@@ -3861,7 +3884,7 @@ export default function DetailModal({
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-15px" }}
                 transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-                className="space-y-4"
+                className="sv-drawer-section space-y-4"
               >
                 <h3 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
                   <MonitorPlay className="h-4 w-4" aria-hidden="true" />
@@ -3895,7 +3918,7 @@ export default function DetailModal({
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-15px" }}
                 transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-                className="space-y-4"
+                className="sv-drawer-section space-y-4"
               >
                 <h3 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
                   <Sparkles className="h-4 w-4" aria-hidden="true" />

@@ -109,8 +109,19 @@ export function DetailsRatingsBadges({
 
   return (
     <div
-      className={`flex items-center gap-3 sm:gap-5 shrink-0 ${
-        compact ? "w-max" : ""
+      className={`flex items-center gap-3 shrink-0 ${
+        compact
+          // BARRA ESTRECHA: las puntuaciones ENVUELVEN en vez de recorrerse.
+          //
+          // Antes iban en un carril horizontal, y un carril recorta por
+          // definición: a partir de cierto ancho de panel la tercera
+          // puntuación quedaba fuera y solo se podía ver desplazándola. Aquí
+          // tienen que verse las tres SIEMPRE, así que cuando no caben en una
+          // línea pasan a la siguiente y la barra crece de alto. `shrink-0` en
+          // cada insignia impide que se compriman y trunquen su recuento de
+          // votos, que es el otro modo de "recortarse".
+          ? "flex-wrap gap-y-2 [&>*]:shrink-0"
+          : "sm:gap-5"
       }`}
     >
       {/* Indicador de carga mientras se obtienen las puntuaciones de Trakt */}
@@ -404,6 +415,7 @@ function DetailsToolbarActions({
   share = null,
   shareIconOnly = false,
   toolbarActions = null,
+  compactToolbar = false,
 }) {
   const prefersReducedMotion = useReducedMotion();
   const hasExternalLinks =
@@ -517,8 +529,16 @@ function DetailsToolbarActions({
             )}
 
             {/* En móvil, y en variantes compactas, el botón "..." abre el
-                modal de enlaces para no recargar la barra. */}
-            {onMoreLinks && (
+                modal de enlaces para no recargar la barra.
+
+                BARRA ESTRECHA: no se pinta. En un teléfono este botón ya va
+                oculto (`hidden sm:flex` cuando hay plataformas) porque los
+                enlaces viven en su propia pestaña de <DetailsInfoTabs>. Ese
+                `sm:` mira el VIEWPORT, así que en el drawer casa siempre y el
+                botón reaparecía: la barra acababa con tres acciones donde la
+                ficha tiene dos, y ese ancho de más es el que se estaba comiendo
+                la tercera puntuación. */}
+            {onMoreLinks && !compactToolbar && (
               <motion.button
                 type="button"
                 onClick={onMoreLinks}
@@ -675,17 +695,8 @@ export default function DetailsScoreboardPanel({
         >
           {/* `contents` deja la barra ancha EXACTAMENTE como estaba: el
               envoltorio desaparece de la maquetación. */}
-          <div
-            className={
-              compactToolbar
-                // `overflow-y-hidden` EXPLÍCITO: con solo `overflow-x-auto`, la
-                // otra dirección pasa de `visible` a `auto` por especificación y
-                // aparecía una barra de scroll VERTICAL de unos pocos píxeles
-                // pegada al carril.
-                ? "min-w-0 flex-1 overflow-x-auto overflow-y-hidden scrollbar-hide overscroll-x-contain [touch-action:pan-y]"
-                : "contents"
-            }
-          >
+          {/* `contents` deja la barra ancha EXACTAMENTE como estaba. */}
+          <div className={compactToolbar ? "min-w-0 flex-1" : "contents"}>
             <DetailsRatingsBadges
               loading={loading}
               tmdb={tmdb}
@@ -709,6 +720,7 @@ export default function DetailsScoreboardPanel({
             share={share}
             shareIconOnly={shareIconOnly}
             toolbarActions={toolbarActions}
+            compactToolbar={compactToolbar}
           />
         </div>
       )}

@@ -1445,7 +1445,10 @@ function NavbarContent() {
       // No hay realimentación con el propio desplazamiento: se aplica con
       // `transform`, que no toca la maquetación, así que `offsetWidth` no cambia
       // y este valor no depende de sí mismo.
-      header.style.setProperty(
+      // Va en <html> y no en el header para que pueda leerlo cualquier otra
+      // superficie que necesite saber cuánto se ha apartado esta barra, no solo
+      // sus propios descendientes.
+      document.documentElement.style.setProperty(
         "--sv-navbar-right-shift-max",
         `${Math.max(0, Math.round(availableWidth))}px`,
       );
@@ -2404,7 +2407,12 @@ function NavbarContent() {
 
         {/* ---------------- Mobile ---------------- */}
         <div
-          className={`desktop:hidden relative flex items-center justify-between px-2 md:px-3 transition-[height] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+          // Con el drawer abierto, la barra entera se recoge: en TABLET el panel
+          // también tapa su lado derecho. Se aparta la barra, no solo su bloque
+          // de perfil, porque va con `justify-between` y encoger el contenedor
+          // recoloca los tres grupos de una vez (menú, logo y perfil) en vez de
+          // dejar el logo descentrado respecto a lo que se ve.
+          className={`sv-navbar-touch-shift desktop:hidden relative flex items-center justify-between px-2 md:px-3 transition-[height] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
             // Tablet: la barra gana alto para que los controles no queden
             // flotando en una franja pensada para 390px de ancho.
             mobileTopIsCompact ? "h-12 md:h-14" : "h-16"
