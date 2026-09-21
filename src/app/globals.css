@@ -1253,6 +1253,45 @@ html {
   }
 }
 
+/* CALENDARIO LATERAL DEL HISTORIAL.
+   ===================================================================
+
+   Se declaraba con `xl:`, que mira el VIEWPORT: con el drawer acoplado la
+   página se queda sin los 380px de esa columna, pero el `xl:` seguía casando y
+   el calendario se pintaba igual, montándose sobre el contenido.
+
+   Con un container query se retira cuando de verdad no cabe, la rejilla vuelve
+   a una sola columna y su acceso pasa a la barra de filtros —el mismo botón y
+   el mismo modal que usa la vista móvil—, así que no se pierde nada.
+
+   64rem = los 380px de la columna más el ancho mínimo que necesita el listado
+   de la izquierda para no quedarse en una tira. */
+.sv-history-layout-scope {
+  container: sv-history-layout / inline-size;
+}
+
+/* Fuera de ese caso, el botón del calendario no existe: la columna ya está a
+   la vista y un segundo acceso sobraría. */
+.sv-history-calendar-trigger {
+  display: none;
+}
+
+@container sv-history-layout (width < 64rem) {
+  .sv-history-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sv-history-calendar {
+    display: none;
+  }
+}
+
+@container sv-page-toolbar (width < 64rem) {
+  .sv-history-calendar-trigger {
+    display: inline-flex;
+  }
+}
+
 /* BARRA INFERIOR (tablet) con el drawer abierto.
    ===================================================================
 
@@ -1352,6 +1391,31 @@ html {
 @container sv-page-toolbar (width < 66rem) {
   .sv-page-toolbar-label {
     display: none;
+  }
+}
+
+/* EL BUSCADOR TAMBIÉN CEDE. Ocupa el hueco sobrante de la fila (`flex-1`), así
+   que es lo primero que aprieta a los demás cuando el sitio falta. Pasa a un
+   cuadrado con su lupa y recupera su ancho al recibir el foco, que es cuando
+   de verdad hace falta. */
+@container sv-page-toolbar (width < 54rem) {
+  .sv-page-toolbar-search {
+    flex: 0 0 2.75rem;
+    transition: flex-basis 200ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .sv-page-toolbar-search:focus-within {
+    flex: 1 1 10rem;
+  }
+
+  .sv-page-toolbar-search input::placeholder {
+    color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-page-toolbar-search {
+    transition: none;
   }
 }
 

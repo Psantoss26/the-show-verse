@@ -3839,7 +3839,7 @@ export default function FavoritesClient() {
 
           {/* Desktop: Single row */}
           <div className="sv-page-toolbar relative z-10 hidden lg:flex gap-3">
-            <div className="relative flex-1">
+            <div className="sv-page-toolbar-search relative flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-red-500 z-10 pointer-events-none" />
               <input
                 value={q}

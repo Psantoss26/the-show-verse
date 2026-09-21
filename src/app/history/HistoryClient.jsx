@@ -3861,9 +3861,17 @@ export default function HistoryClient() {
           </div>
         </motion.header>
 
-        {/* Layout Principal */}
+        {/* Layout Principal.
+
+            El envoltorio existe para poder CONSULTAR su ancho: el calendario
+            lateral se declaraba con `xl:`, que mira el VIEWPORT, así que con el
+            drawer acoplado seguía pintándose aunque a la página ya no le
+            quedaran los 380px de la columna — y se montaba encima del
+            contenido. Un elemento no puede consultarse a sí mismo y aquí hay
+            que cambiar las columnas de la propia rejilla, de ahí el div. */}
+        <div className="sv-history-layout-scope">
         <div
-          className={`grid grid-cols-1 ${auth.connected && !showCalendarView ? "xl:grid-cols-[1fr_380px]" : "lg:grid-cols-1"} gap-8 items-start`}
+          className={`sv-history-layout grid grid-cols-1 ${auth.connected && !showCalendarView ? "xl:grid-cols-[1fr_380px]" : "lg:grid-cols-1"} gap-8 items-start`}
         >
           {/* Izquierda */}
           <motion.div
@@ -4164,7 +4172,17 @@ export default function HistoryClient() {
                 {/* Desktop: Una sola fila con todo */}
                 <div className="sv-page-toolbar hidden lg:flex gap-3 relative z-10">
                   <HistorySectionNav className="shrink-0" />
-                  <div className="relative flex-1">
+                  {/* Con el calendario lateral retirado por falta de sitio, su
+                      acceso pasa a la barra, igual que en móvil. */}
+                  <button
+                    type="button"
+                    onClick={() => setMobileCalendarOpen(true)}
+                    aria-label="Abrir calendario"
+                    className="sv-history-calendar-trigger h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:bg-black/30"
+                  >
+                    <CalendarDays className="w-4 h-4" />
+                  </button>
+                  <div className="sv-page-toolbar-search relative flex-1">
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500 z-10 pointer-events-none" />
                     <input
                       value={q}
@@ -4605,7 +4623,7 @@ export default function HistoryClient() {
           {/* Derecha: Calendario (Solo visible en desktop y cuando no está en vista calendario) */}
           {auth.connected && !showCalendarView && (
             <motion.div
-              className="hidden xl:block space-y-6 sticky top-20"
+              className="sv-history-calendar hidden xl:block space-y-6 sticky top-20"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5, delay: 0.4 }}
@@ -4632,6 +4650,7 @@ export default function HistoryClient() {
               />
             </motion.div>
           )}
+        </div>
         </div>
       </div>
 
