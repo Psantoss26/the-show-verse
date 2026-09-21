@@ -36,7 +36,15 @@ export default function HistorySectionNav({ className = "" }) {
             }`}
           >
             <Icon className="h-4 w-4 shrink-0" />
-            {active && <span className="hidden lg:inline">{label}</span>}
+            {/* `sv-page-toolbar-label`: el `lg:` mira el VIEWPORT y en una
+                página estrechada por el drawer seguía mostrando el rótulo. Con
+                el marcador, lo retira el mismo container query que a los demás
+                rótulos de la barra. */}
+            {active && (
+              <span className="sv-page-toolbar-label hidden lg:inline">
+                {label}
+              </span>
+            )}
           </Link>
         );
       })}

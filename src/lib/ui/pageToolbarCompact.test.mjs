@@ -143,3 +143,46 @@ test("un título original largo se queda solo en su fila", async () => {
   // un observador que se dispararía en cada fotograma del arrastre del panel.
   assert.doesNotMatch(tabs, /ResizeObserver/);
 });
+
+test("el historial retira su calendario lateral cuando no cabe", async () => {
+  const [history, css] = await Promise.all([
+    read("../../app/history/HistoryClient.jsx"),
+    read("../../app/globals.css"),
+  ]);
+
+  // Se declaraba con `xl:`, que mira el VIEWPORT: con el drawer acoplado la
+  // página se quedaba sin los 380px de la columna, pero el `xl:` seguía casando
+  // y el calendario se pintaba igual, montándose sobre el contenido.
+  assert.match(history, /className="sv-history-layout-scope"/);
+  assert.match(history, /sv-history-layout grid grid-cols-1/);
+  assert.match(history, /sv-history-calendar hidden xl:block/);
+  assert.match(
+    css,
+    /@container sv-history-layout \(width < 64rem\)[\s\S]*?\.sv-history-calendar \{\s*\n\s*display: none;/,
+  );
+
+  // Y su acceso pasa a la barra: el MISMO modal que usa la vista móvil, así que
+  // no se pierde nada al retirarlo.
+  assert.match(history, /sv-history-calendar-trigger/);
+  assert.match(history, /onClick=\{\(\) => setMobileCalendarOpen\(true\)\}/);
+  // Fuera de ese caso no se pinta: la columna ya está a la vista y un segundo
+  // acceso sobraría.
+  assert.match(css, /\.sv-history-calendar-trigger \{\s*\n\s*display: none;/);
+});
+
+test("el buscador y el selector de sección también ceden", async () => {
+  const [css, nav] = await Promise.all([
+    read("../../app/globals.css"),
+    read("../../components/HistorySectionNav.jsx"),
+  ]);
+
+  // El buscador ocupa el hueco sobrante (`flex-1`), así que es lo primero que
+  // aprieta a los demás. Pasa a un cuadrado y recupera su ancho al recibir el
+  // foco, que es cuando de verdad hace falta.
+  assert.match(css, /\.sv-page-toolbar-search \{\s*\n\s*flex: 0 0 2\.75rem;/);
+  assert.match(css, /\.sv-page-toolbar-search:focus-within \{\s*\n\s*flex: 1 1 10rem;/);
+
+  // Y el rótulo de Historial / Continuar viendo se retira con el mismo
+  // marcador que los demás rótulos de la barra.
+  assert.match(nav, /className="sv-page-toolbar-label hidden lg:inline"/);
+});
