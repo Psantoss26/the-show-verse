@@ -1041,14 +1041,20 @@ export function useDetailModalData(item) {
     // y fijado una vez (el hero móvil lo usa en exclusiva, sin parpadeo).
     (async () => {
       try {
-        const [detailsForArt, bestPoster] = await Promise.all([
-          detailsPromise,
-          fetchBestPosterNoLang(id, mediaType, {
-            fallbackToAny: false,
-          }).catch(() => null),
-        ]);
-        const finalPoster =
-          bestPoster || item?.poster_path || detailsForArt?.poster_path || null;
+        const bestPoster = await fetchBestPosterNoLang(id, mediaType, {
+          fallbackToAny: false,
+        }).catch(() => null);
+        // La ficha de TELÉFONO del drawer no tiene nada más que enseñar hasta
+        // que llega este póster: es su primer pantallazo entero. Por eso solo
+        // se espera a `detailsPromise` cuando de verdad hace falta —ni la
+        // textless ni el póster de la tarjeta pulsada existen—, en vez de
+        // esperar SIEMPRE a la más lenta de las dos peticiones. El orden de
+        // preferencia es exactamente el de antes.
+        let finalPoster = bestPoster || item?.poster_path || null;
+        if (!finalPoster) {
+          const detailsForArt = await detailsPromise;
+          finalPoster = detailsForArt?.poster_path || null;
+        }
         if (cancelled || !finalPoster) return;
         await preloadImage(buildImg(finalPoster, "w780"));
         if (cancelled) return;

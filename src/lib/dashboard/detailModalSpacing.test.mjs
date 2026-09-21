@@ -10,7 +10,13 @@ const DETAIL_MODAL = new URL(
 test("las secciones de DetailModal conservan una separación vertical legible", async () => {
   const modal = await readFile(DETAIL_MODAL, "utf8");
 
-  assert.match(modal, /<div className="space-y-8 p-5 sm:p-7">/);
+  // El relleno de escritorio (`sm:p-7`) se retira en la ficha de TELÉFONO del
+  // drawer: ahí el ancho de móvil lo pone el panel, no la ventana, así que ese
+  // `sm:` casaría siempre y ensancharía los márgenes justo donde no toca.
+  assert.match(
+    modal,
+    /<div className=\{`space-y-8 p-5 \$\{mobileDetails \? "" : "sm:p-7"\}`\}>/,
+  );
   assert.equal(
     (modal.match(/className="space-y-4"/g) || []).length,
     3,

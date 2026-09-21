@@ -28,9 +28,20 @@ const recommendationsPath = path.resolve(
 
 test("series and movie mobile action rows share the same button sizing contract", async () => {
   const source = await readFile(componentPath, "utf8");
-  const sharedClassUses = source.match(/\$\{MOBILE_ACTION_BUTTON_CLASS\}/g) || [];
+  // Las dos filas (la combinada de series y la estándar) eligen su contrato de
+  // tamaño con la MISMA expresión: la mitad móvil cuando la fila se fuerza a
+  // móvil —la ficha de teléfono del drawer, donde los `sm:` mirarían el
+  // viewport de escritorio— y el contrato completo en cualquier otro caso.
+  const sharedClassUses =
+    source.match(
+      /\$\{forceMobile \? MOBILE_ACTION_BUTTON_BASE : MOBILE_ACTION_BUTTON_CLASS\}/g,
+    ) || [];
 
   assert.equal(sharedClassUses.length, 2);
+  assert.match(
+    source,
+    /export const MOBILE_ACTION_BUTTON_CLASS = `\$\{MOBILE_ACTION_BUTTON_BASE\} \$\{DESKTOP_ACTION_BUTTON_OVERRIDES\}`;/,
+  );
   assert.match(
     source,
     /\[&_\[data-liquid-button\]:not\(\.labeled\)\]:!w-full/,
