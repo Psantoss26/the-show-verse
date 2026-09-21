@@ -17,8 +17,12 @@ test("las secciones de DetailModal conservan una separación vertical legible", 
     modal,
     /<div className=\{`space-y-8 p-5 \$\{mobileDetails \? "" : "sm:p-7"\}`\}>/,
   );
+  // Esas tres secciones llevan además `sv-drawer-section`, que las CONTIENE
+  // para que al redimensionar el panel un cambio dentro de una no obligue a
+  // recalcular las demás. Lo que vigila este test es la separación, así que se
+  // busca la utilidad, no la cadena de clases completa.
   assert.equal(
-    (modal.match(/className="space-y-4"/g) || []).length,
+    (modal.match(/className="sv-drawer-section space-y-4"/g) || []).length,
     3,
     "Reparto, títulos similares y sentimientos deben separar su encabezado del contenido",
   );

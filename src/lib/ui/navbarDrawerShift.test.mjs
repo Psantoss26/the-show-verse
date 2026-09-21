@@ -20,10 +20,16 @@ test('el provider publica el ancho del drawer en <html>', async () => {
   assert.match(provider, new RegExp(`DRAWER_INSET_VAR = "${INSET_VAR}"`))
   assert.match(provider, /document\.documentElement/)
   // Se publica también SUPERPUESTO: el panel tapa el borde derecho en los dos
-  // modos, no solo acoplado.
-  assert.match(
-    provider,
-    /publishDrawerInset\(width\);\s*\n\s*if \(docked && contentRef\.current\)/
+  // modos, no solo acoplado. La publicación va ANTES de la salida que atiende
+  // únicamente al modo acoplado, que es lo que garantiza que ocurra siempre.
+  const body = provider.slice(provider.indexOf("const updateDrawerWidth"));
+  const publish = body.indexOf("publishDrawerInset(width);");
+  const dockedOnly = body.indexOf("if (!docked || !contentRef.current) return;");
+  assert.ok(publish > -1, "el ancho ya no se publica");
+  assert.ok(dockedOnly > -1, "no se encontró la salida del modo acoplado");
+  assert.ok(
+    publish < dockedOnly,
+    "superpuesto dejaría de publicar el ancho y el navbar no se apartaría",
   )
   // Y se retira al cerrar, o la barra se quedaría apartada sin motivo.
   assert.match(provider, /publishDrawerInset\(null\)/)
@@ -33,6 +39,10 @@ test('el navbar publica el hueco libre como tope', async () => {
   const navbar = await read('../../components/Navbar.jsx')
 
   assert.match(navbar, new RegExp(`"${MAX_VAR}"`))
+  // En <html>, no en el header: la ficha de teléfono acoplada del drawer
+  // también lo lee para no moverse tanto como para tapar esos botones, y
+  // cuelga de otra rama del árbol.
+  assert.match(navbar, /document\.documentElement\.style\.setProperty\(\s*\n\s*"--sv-navbar-right-shift-max"/)
   assert.match(navbar, /className="sv-navbar-right-shift /)
 })
 

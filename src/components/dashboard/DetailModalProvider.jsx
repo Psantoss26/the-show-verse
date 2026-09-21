@@ -220,9 +220,23 @@ export default function DetailModalProvider({ children, placement = "center" }) 
     // siempre, porque el navbar tiene que apartarse en los dos modos: el panel
     // tapa el borde derecho igual esté acoplado o superpuesto.
     publishDrawerInset(width);
-    if (docked && contentRef.current) {
-      contentRef.current.style.marginRight = `${width}px`;
-    }
+    if (!docked || !contentRef.current) return;
+
+    // ACOPLADO Y ARRASTRANDO: el margen NO sigue al tirador fotograma a
+    // fotograma.
+    //
+    // Este margen encoge la PÁGINA ENTERA que hay detrás. Actualizarlo sesenta
+    // veces por segundo obliga a recomponer todas sus filas, sus imágenes y los
+    // carruseles que tenga montados, y ese trabajo no cabe en un fotograma: es
+    // lo que convertía el arrastre en saltos. Durante el gesto el panel se
+    // mueve solo —se comporta como el modo superpuesto, que es lo que ya hace
+    // el 50% de las veces— y la página se recoloca UNA vez al soltar.
+    //
+    // La marca la pone `beginResize` en DetailModal; se consulta en el DOM en
+    // vez de pasarla por contexto para no re-renderizar el árbol al empezar y
+    // al terminar el gesto.
+    if (document.documentElement.hasAttribute("data-sv-drawer-resizing")) return;
+    contentRef.current.style.marginRight = `${width}px`;
   }, [docked]);
 
   // Sin drawer no hay variable. `DetailModal` la escribe mientras está montado

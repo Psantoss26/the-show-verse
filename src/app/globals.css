@@ -1120,24 +1120,78 @@ html {
    secciones no visitadas midieran su tamaño ESTIMADO, y el menú salta a
    posiciones calculadas con `getBoundingClientRect`. Ganaríamos fotogramas a
    cambio de que el menú dejara de caer donde debe. */
-.sv-phone-section {
+.sv-phone-section,
+.sv-drawer-section {
   contain: layout paint style;
 }
 
-/* MIENTRAS SE ARRASTRA el tirador, las secciones renuncian a su cristal y a sus
-   transiciones. El cristal del propio panel se mantiene —es el marco, y es lo
-   que se está viendo moverse—; lo que se apaga son las decenas de superficies
-   pequeñas de dentro, que es donde está el coste y que además quedan casi todas
-   fuera de pantalla. Al soltar vuelven solas.
+/* MIENTRAS SE ARRASTRA el tirador, TODO el panel renuncia a su cristal y a sus
+   transiciones. Vale para las dos vistas del drawer, la ancha y la de teléfono,
+   y para escritorio y tablet.
+
+   Antes esto solo cubría las secciones de la ficha de teléfono, dejando fuera
+   lo que más cuesta: la capa de cristal DEL PROPIO PANEL, que difumina toda la
+   franja de página que hay detrás de un rectángulo de hasta 1000x900 px. Ese
+   desenfoque se vuelve a calcular entero en CADA fotograma del arrastre, porque
+   el rectángulo cambia de tamaño, y ningún otro elemento se le acerca en coste.
+   Mantenerlo "porque es el marco" era la razón por la que el gesto seguía yendo
+   a trompicones.
+
+   Durante el gesto el panel se ve plano y opaco, y recupera el cristal al
+   soltar. Es un intercambio consciente: el acabado se nota al final, los saltos
+   se notan durante todo el arrastre.
 
    La marca la pone y la quita `beginResize` en DetailModal, la misma que evita
    que el bloque derecho del navbar vaya por detrás del tirador. */
-:root[data-sv-drawer-resizing] .sv-phone-sections,
-:root[data-sv-drawer-resizing] .sv-phone-sections * {
+:root[data-sv-drawer-resizing] .sv-drawer-panel,
+:root[data-sv-drawer-resizing] .sv-drawer-panel * {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   transition: none !important;
   animation-play-state: paused !important;
+}
+
+/* BARRA SUPERIOR TÁCTIL (tablet) con el drawer abierto.
+   ===================================================================
+
+   En tablet el drawer tapa el lado derecho de esta barra igual que en
+   escritorio, así que también tiene que apartarse. Aquí se recoge la BARRA
+   ENTERA en vez de solo su bloque de perfil: va con `justify-between`, y
+   encogerla recoloca sus tres grupos de una vez —menú, logo y perfil— en lugar
+   de dejar el logo centrado respecto a una anchura que ya no se ve entera.
+
+   Se usa `margin-right` y no `transform` a propósito: los tres grupos ya llevan
+   su propia `transform` (la escala con la que la barra se compacta al hacer
+   scroll), y una segunda la pisaría.
+
+   El tope deja siempre 16rem para la barra: por debajo de eso sus controles
+   empezarían a apretarse, y es preferible que el panel solape un poco a que el
+   menú y el perfil se monten entre ellos. En la práctica no se alcanza: el
+   drawer de tablet no llega ni a la mitad de la pantalla. */
+.sv-navbar-touch-shift {
+  margin-right: min(
+    var(--sv-detail-drawer-inset, 0px),
+    max(0px, calc(100vw - 16rem))
+  );
+  transition: margin-right 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:root[data-sv-drawer-resizing] .sv-navbar-touch-shift {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-navbar-touch-shift {
+    transition: none;
+  }
+}
+
+/* El tirador tiene que seguir respondiendo al puntero mientras se arrastra: el
+   navegador sintetiza `hover` en táctil y la regla de arriba le quitaría su
+   transición, pero no su interacción. Se deja explícito para que nadie añada
+   `pointer-events: none` a la regla general pensando que ahorra trabajo. */
+:root[data-sv-drawer-resizing] .sv-drawer-panel [role="separator"] {
+  pointer-events: auto;
 }
 
 .sv-phone-fade {
