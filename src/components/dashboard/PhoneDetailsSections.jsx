@@ -861,17 +861,31 @@ export default function PhoneDetailsSections({
     };
   }, [scrollContainerRef, menuHeight]);
 
+  const sectionsRef = useRef(null);
+
   const scrollToSection = useCallback(
     (sid) => {
       const scroller = scrollContainerRef?.current;
       const el = sectionElsRef.current[sid];
       if (!scroller || !el) return;
+
+      // Las secciones se saltan la maquetación mientras están fuera de la
+      // ventana (`content-visibility: auto`), y una que no se ha visto nunca
+      // mide su tamaño ESTIMADO. Medir el salto con eso lo dejaría en el sitio
+      // equivocado, así que se revelan todas mientras dura la medición: una
+      // maquetación completa, una vez por pulsación.
+      const sections = sectionsRef.current;
+      sections?.classList.add("sv-phone-sections--measuring");
+
       const offset = PHONE_STICKY_TOP + menuHeight + 12;
       const top =
         scroller.scrollTop +
         el.getBoundingClientRect().top -
         scroller.getBoundingClientRect().top -
         offset;
+
+      sections?.classList.remove("sv-phone-sections--measuring");
+
       scroller.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
       setActiveSectionId(sid);
     },
@@ -968,7 +982,7 @@ export default function PhoneDetailsSections({
   ]);
 
   return (
-    <div className="sv-phone-sections mt-2">
+    <div ref={sectionsRef} className="sv-phone-sections mt-2">
       <div
         ref={menuStickyRef}
         className="sticky z-30 py-2"

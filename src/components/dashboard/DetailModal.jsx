@@ -673,20 +673,35 @@ export default function DetailModal({
     setModalHostReady(true);
   }, []);
 
+  // ANIMACIÓN DEL HERO AL HACER SCROLL.
+  //
+  // Con "reducir movimiento" los recorridos se quedan a cero: además de ser lo
+  // correcto, ahorra el trabajo por fotograma a quien menos lo tolera. Los
+  // valores se siguen creando siempre (son hooks) y solo cambia su rango.
+  const heroRange = (value) => (prefersReducedMotion ? [0, 0] : [0, value]);
+
   // Parallax del hero: se mueve a 1/3 de la velocidad de scroll
-  const yParallax = useTransform(scrollY, [0, 400], [0, 130]);
-  
+  const yParallax = useTransform(scrollY, [0, 400], heroRange(130));
+
   // Escala del hero: hace un sutil zoom-in al hacer scroll
-  const scale = useTransform(scrollY, [0, 400], [1, 1.08]);
+  const scale = useTransform(
+    scrollY,
+    [0, 400],
+    prefersReducedMotion ? [1, 1] : [1, 1.08],
+  );
 
   // Opacidad del logo/título: se desvanece más tarde al hacer scroll
-  const logoOpacity = useTransform(scrollY, [0, 300], [1, 0]);
+  const logoOpacity = useTransform(
+    scrollY,
+    [0, 300],
+    prefersReducedMotion ? [1, 1] : [1, 0],
+  );
 
   // Parallax del logo/título: sube ligeramente al desvanecerse
-  const logoY = useTransform(scrollY, [0, 300], [0, -20]);
+  const logoY = useTransform(scrollY, [0, 300], heroRange(-20));
 
   // Degradado oscuro: se oscurece sutilmente al hacer scroll
-  const darkOverlayOpacity = useTransform(scrollY, [0, 300], [0, 0.5]);
+  const darkOverlayOpacity = useTransform(scrollY, [0, 300], heroRange(0.5));
 
   // Preview de EPISODIO: variante que reutiliza el mismo diseño (hero, valoraciones,
   // reparto, navegador de temporadas) pero con datos del episodio. Se detecta desde
@@ -987,32 +1002,49 @@ export default function DetailModal({
     // ir 320ms por detrás con su transición de apertura.
     document.documentElement.dataset.svDrawerResizing = "";
 
-    let frame = null;
+    // SEGUIMIENTO 1:1 con el puntero, una escritura por fotograma.
+    //
+    // Aquí hubo un suavizado que acercaba el ancho al objetivo una fracción por
+    // fotograma, para que un frame perdido no se viera como un salto. Absorbía
+    // los saltos, sí, pero a cambio el canto del panel iba ~100ms por detrás
+    // del tirador y el gesto se percibía lento y pesado, que es peor: un
+    // tirador tiene que estar pegado al dedo. El coste hay que quitarlo de
+    // donde está (ver `content-visibility` en las secciones), no disimularlo
+    // retrasando el movimiento.
+    let frame = 0;
     let appliedWidth = panelWidth;
     const pointerId = event.pointerId;
     const resizeHandle = event.currentTarget;
     resizeHandle.setPointerCapture?.(pointerId);
-    const applyWidth = () => {
-      frame = null;
-      const next = panelWidthRef.current;
-      if (next === appliedWidth) return;
-      appliedWidth = next;
-      if (panelRef.current) panelRef.current.style.width = `${next}px`;
+
+    const writeWidth = (width) => {
+      if (panelRef.current) panelRef.current.style.width = `${width}px`;
       // También SUPERPUESTO: el margen del contenido solo importa acoplado,
       // pero el ancho publicado lo usa además el navbar para apartarse, y el
       // panel tapa su borde derecho en los dos modos.
-      onDrawerWidthChange?.(next);
+      onDrawerWidthChange?.(width);
     };
+
+    const applyWidth = () => {
+      frame = 0;
+      const next = panelWidthRef.current;
+      if (next === appliedWidth) return;
+      appliedWidth = next;
+      writeWidth(next);
+    };
+
     const onMove = (moveEvent) => {
       if (moveEvent.pointerId !== pointerId) return;
       panelWidthRef.current = clampPanelWidth(startWidth + startX - moveEvent.clientX, vw);
-      // Agrupa los eventos de puntero: solo una escritura por frame, sin lecturas
-      // de layout ni renders de React. La variable global se actualiza al soltar.
-      if (frame === null) frame = window.requestAnimationFrame(applyWidth);
+      // Agrupa los eventos de puntero: llegan más a menudo que los fotogramas,
+      // así que se escribe una sola vez por frame, sin lecturas de layout ni
+      // renders de React.
+      if (!frame) frame = window.requestAnimationFrame(applyWidth);
     };
+
     const cleanup = () => {
-      if (frame !== null) window.cancelAnimationFrame(frame);
-      frame = null;
+      if (frame) window.cancelAnimationFrame(frame);
+      frame = 0;
       if (resizeHandle.hasPointerCapture?.(pointerId)) resizeHandle.releasePointerCapture(pointerId);
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
@@ -1030,14 +1062,18 @@ export default function DetailModal({
     const finish = () => {
       // `cleanup()` va PRIMERO: retira la marca de arrastre, y lo que estaba
       // congelado mientras duraba (el margen de la página acoplada) tiene que
-      // poder aplicarse ya en las dos líneas siguientes.
+      // poder aplicarse ya en la línea siguiente.
       cleanup();
+      // Al soltar se cuadra con el objetivo SIN suavizar: el retardo tiene
+      // sentido mientras el gesto está vivo, pero el ancho con el que se queda
+      // el panel es el que marcó el puntero, no el que le faltaba por recorrer.
+      // De aquí cuelga además el margen de la página acoplada, congelado
+      // durante todo el arrastre.
+      // `applyWidth` se corta solo cuando el ancho no cambió desde el último
+      // fotograma —soltar sin mover—, así que la publicación se repite: de ella
+      // cuelga el margen de la página acoplada, congelado durante el arrastre.
       applyWidth();
-      // `applyWidth` se corta solo cuando el ancho no ha cambiado desde el
-      // último fotograma, que es justo lo que pasa al soltar sin mover. El
-      // margen de la página acoplada cuelga de esta publicación, así que se
-      // repite a mano o se quedaría con el valor de antes del arrastre.
-      onDrawerWidthChange?.(panelWidthRef.current);
+      writeWidth(panelWidthRef.current);
       setPanelWidth(panelWidthRef.current);
       try {
         window.localStorage.setItem(mobileDetails ? "showverse:mobileDetailsWidth" : RESIZE_STORAGE_KEY, String(panelWidthRef.current));
@@ -3239,6 +3275,27 @@ export default function DetailModal({
               style={{
                 y: yParallax,
                 scale,
+                // CAPA PROPIA, o la imagen se rasteriza entera en cada
+                // fotograma del scroll.
+                //
+                // Esta capa se mueve Y se escala dentro de un contenedor
+                // ENMASCARADO (`sv-hero-fade` / `sv-phone-fade`), y en la
+                // variante ancha la propia imagen lleva además su máscara de
+                // canto (`sv-hero-art-edge`). Sin promocionarla, cada paso del
+                // scroll obliga a repintar el mapa de bits y a volver a aplicar
+                // las máscaras sobre el resultado: eso es lo que se veía como
+                // una imagen que se deforma y un desplazamiento a tirones.
+                // Promocionada, se rasteriza UNA vez y el compositor la mueve y
+                // la escala sin repintar nada.
+                //
+                // OJO con la nota del panel sobre `will-change` y los Backdrop
+                // Root: allí el problema era anunciar `opacity` en un elemento
+                // con descendientes de cristal, que dejaban de muestrear el
+                // fondo. Aquí solo hay imágenes, ningún `backdrop-filter`
+                // debajo, y se anuncia `transform`, que es justo lo que se
+                // anima.
+                willChange: "transform",
+                backfaceVisibility: "hidden",
               }}
               className="absolute inset-0 w-full h-full"
             >
@@ -3347,7 +3404,7 @@ export default function DetailModal({
 
             {/* Dark overlay that increases as we scroll */}
             <motion.div
-              style={{ opacity: darkOverlayOpacity }}
+              style={{ opacity: darkOverlayOpacity, willChange: "opacity" }}
               className="pointer-events-none absolute inset-0 bg-black/60 z-10"
             />
 
@@ -3388,7 +3445,17 @@ export default function DetailModal({
                 (`mobilePosterHasBurnedTitle`). */}
             {!(mobileDetails && data.heroPosterHasBurnedTitle && mobileHeroSrc) && (
             <motion.div
-              style={{ opacity: logoOpacity, y: logoY }}
+              // Mismo motivo que la capa del póster: el logo se desvanece y se
+              // desplaza a la vez, y su imagen lleva un `drop-shadow` fuerte.
+              // Un filtro dentro de un elemento que cambia de opacidad se
+              // recalcula en cada fotograma si la capa no está promocionada, y
+              // ese recálculo es lo que hacía que el logo pareciera
+              // distorsionarse al hacer scroll.
+              style={{
+                opacity: logoOpacity,
+                y: logoY,
+                willChange: "opacity, transform",
+              }}
               className={`absolute inset-x-0 bottom-0 z-15 flex justify-center p-5 text-center ${
                 // Teléfono: el logo respira por debajo. Ese `pb` ES la
                 // separación con la fila de botones, que arranca justo donde

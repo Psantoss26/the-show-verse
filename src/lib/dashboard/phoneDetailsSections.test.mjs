@@ -258,11 +258,11 @@ test("el arrastre no repite trabajo que no ha cambiado", async () => {
     css,
     /:root\[data-sv-drawer-resizing\] \.sv-drawer-panel,\s*\n:root\[data-sv-drawer-resizing\] \.sv-drawer-panel \*[\s\S]*?backdrop-filter: none !important;/,
   );
-  // La contención evita que un cambio dentro de una sección invalide el resto,
-  // en las DOS vistas del drawer.
+  // Y lo que está fuera de la ventana no se maqueta siquiera, que durante un
+  // arrastre son casi todas las secciones.
   assert.match(
     css,
-    /\.sv-phone-section,\s*\n\.sv-drawer-section \{\s*\n\s*contain: layout paint style;/,
+    /\.sv-phone-section,\s*\n\.sv-drawer-section \{\s*\n\s*content-visibility: auto;/,
   );
 });
 
@@ -280,12 +280,12 @@ test("acoplado, la página no se recompone en cada fotograma del arrastre", asyn
     /hasAttribute\("data-sv-drawer-resizing"\)\) return;\s*\n\s*contentRef\.current\.style\.marginRight/,
   );
 
-  // Y al soltar se recoloca una vez. `applyWidth` se corta solo cuando el ancho
-  // no cambió desde el último fotograma —soltar sin mover—, así que la
-  // publicación se repite a mano o el margen se queda como estaba.
+  // Y al soltar se recoloca una vez, cuadrando con el objetivo sin suavizar:
+  // el ancho con el que se queda el panel es el que marcó el puntero, no el
+  // que le faltaba por recorrer.
   assert.match(
     modal,
-    /cleanup\(\);\s*\n\s*applyWidth\(\);[\s\S]*?onDrawerWidthChange\?\.\(panelWidthRef\.current\);/,
+    /cleanup\(\);[\s\S]*?applyWidth\(\);\s*\n\s*writeWidth\(panelWidthRef\.current\);/,
   );
 });
 
@@ -358,4 +358,73 @@ test("en tablet la barra táctil también se aparta del drawer", async () => {
   assert.doesNotMatch(body, /transform:/);
   // Y un suelo de anchura para la barra, o sus controles se apretarían.
   assert.match(body, /max\(0px, calc\(100vw - 16rem\)\)/);
+});
+
+test("las capas que se animan al hacer scroll tienen capa propia", async () => {
+  const modal = await read("../../components/dashboard/DetailModal.jsx");
+
+  // La capa del póster se mueve Y se escala dentro de un contenedor
+  // ENMASCARADO, y en la variante ancha la imagen lleva además su propia
+  // máscara de canto. Sin promocionarla, cada paso del scroll repinta el mapa
+  // de bits y vuelve a aplicar las máscaras encima: eso es lo que se veía como
+  // una imagen deformándose y un desplazamiento a tirones.
+  assert.match(
+    modal,
+    /y: yParallax,\s*\n\s*scale,[\s\S]*?willChange: "transform"/,
+  );
+  // El logo cambia de opacidad y de posición a la vez, y su imagen lleva un
+  // `drop-shadow`: un filtro dentro de una capa sin promocionar se recalcula
+  // en cada fotograma.
+  assert.match(
+    modal,
+    /opacity: logoOpacity,\s*\n\s*y: logoY,\s*\n\s*willChange: "opacity, transform"/,
+  );
+});
+
+test("con reducir movimiento el hero no se anima al hacer scroll", async () => {
+  const modal = await read("../../components/dashboard/DetailModal.jsx");
+
+  // Además de ser lo correcto, ahorra el trabajo por fotograma a quien menos lo
+  // tolera. Los valores se siguen creando siempre —son hooks— y solo cambia su
+  // rango.
+  assert.match(modal, /const heroRange = \(value\) =>\s*\n?\s*\(?prefersReducedMotion \? \[0, 0\] : \[0, value\]\)?/);
+  assert.match(modal, /prefersReducedMotion \? \[1, 1\] : \[1, 1\.08\]/);
+  assert.match(modal, /prefersReducedMotion \? \[1, 1\] : \[1, 0\]/);
+});
+
+test("el tirador va 1:1 con el puntero", async () => {
+  const modal = await read("../../components/dashboard/DetailModal.jsx");
+
+  // Hubo aquí un suavizado que acercaba el ancho al objetivo una fracción por
+  // fotograma para absorber los frames perdidos. Los absorbía, pero dejaba el
+  // canto del panel ~100ms por detrás del tirador y el gesto se percibía lento
+  // y pesado — peor que el salto que arreglaba. El coste se quita de donde
+  // está, no se disimula retrasando el movimiento.
+  assert.doesNotMatch(modal, /SMOOTHING/);
+  assert.doesNotMatch(modal, /renderedWidth/);
+  assert.match(modal, /if \(next === appliedWidth\) return;/);
+});
+
+test("lo que no se ve no se maqueta al redimensionar", async () => {
+  const css = await read("../../app/globals.css");
+
+  const rule = css.slice(css.indexOf(".sv-phone-section,\n.sv-drawer-section {"));
+  const body = rule.slice(0, rule.indexOf("}"));
+  assert.match(body, /content-visibility: auto;/);
+  // Obligatorio con `auto`: sin tamaño intrínseco reservado, saltarse una
+  // sección cambiaría la altura del documento y movería el scroll bajo los
+  // pies. Con `auto` el navegador recuerda además el alto real de cada una.
+  assert.match(body, /contain-intrinsic-size: auto none auto \d+px;/);
+
+  // Y el menú sigue saltando al sitio exacto: se revelan todas mientras se
+  // mide, una vez por pulsación en vez de por fotograma.
+  assert.match(
+    css,
+    /\.sv-phone-sections--measuring \.sv-phone-section \{\s*\n\s*content-visibility: visible;/,
+  );
+  const phone = await read("../../components/dashboard/PhoneDetailsSections.jsx");
+  assert.match(
+    phone,
+    /classList\.add\("sv-phone-sections--measuring"\)[\s\S]*?getBoundingClientRect\(\)[\s\S]*?classList\.remove\("sv-phone-sections--measuring"\)/,
+  );
 });

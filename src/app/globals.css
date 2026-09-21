@@ -1111,18 +1111,45 @@ html {
    los botones de filtro de la galería llegan a `blur(50px)`.
    =================================================================== */
 
-/* Contención por sección: lo que cambie dentro de una no obliga a recalcular
-   la maquetación ni a repintar las demás. No altera su geometría, así que el
-   menú de secciones sigue midiendo posiciones exactas.
+/* LO QUE NO SE VE NO SE MAQUETA.
+   ===================================================================
 
-   Aquí NO se usa `content-visibility: auto`, que sería el siguiente escalón:
-   saltarse la maquetación de lo que está fuera de pantalla haría que las
-   secciones no visitadas midieran su tamaño ESTIMADO, y el menú salta a
-   posiciones calculadas con `getBoundingClientRect`. Ganaríamos fotogramas a
-   cambio de que el menú dejara de caer donde debe. */
+   Redimensionar cambia el ancho del panel —y en la ficha de teléfono también
+   el alto, que va atado a su proporción—, y eso invalida la maquetación de
+   TODO lo que hay dentro en cada fotograma: diez secciones, siete carruseles
+   que recalculan sus diapositivas en cuanto su contenedor cambia de tamaño, y
+   una portada a tamaño de panel que se vuelve a rasterizar. Ese es el coste
+   que hacía el gesto pesado; la contención sola no lo evitaba, porque contener
+   limita a quién afecta un cambio, no ahorra el trabajo de la propia sección.
+
+   Con `content-visibility: auto` el navegador se salta por completo la
+   maquetación y el pintado de las secciones que están fuera de la ventana, que
+   durante un arrastre son casi todas. Sus carruseles dejan de recalcularse
+   porque su caja ya no cambia.
+
+   `contain-intrinsic-size` con `auto` es obligatorio aquí: reserva 480px la
+   primera vez y a partir de ahí el navegador RECUERDA el alto real de cada
+   sección, así que saltársela no altera la altura del documento ni mueve el
+   scroll bajo los pies.
+
+   La contención explícita se conserva para cuando la sección SÍ se está
+   pintando: ahí `content-visibility` ya no aporta nada y `contain` sigue
+   evitando que un cambio interno invalide a las vecinas.
+
+   Degrada solo: donde no se soporte, se ignora y se pierde la mejora. */
 .sv-phone-section,
 .sv-drawer-section {
+  content-visibility: auto;
+  contain-intrinsic-size: auto none auto 480px;
   contain: layout paint style;
+}
+
+/* Saltar a una sección desde el menú se calcula con `getBoundingClientRect`, y
+   una sección que nunca se ha visto mide su tamaño ESTIMADO: el salto caería
+   en el sitio equivocado. Mientras se mide, se revelan todas. Es una
+   maquetación completa, pero ocurre una vez por pulsación, no por fotograma. */
+.sv-phone-sections--measuring .sv-phone-section {
+  content-visibility: visible;
 }
 
 /* MIENTRAS SE ARRASTRA el tirador, TODO el panel renuncia a su cristal y a sus
