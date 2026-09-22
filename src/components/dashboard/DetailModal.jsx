@@ -16,6 +16,7 @@ import {
   motion,
   AnimatePresence,
   useReducedMotion,
+  useMotionValue,
   useScroll,
   useTransform,
 } from "framer-motion";
@@ -845,6 +846,25 @@ export default function DetailModal({
   // Ancho del drawer derecho (redimensionable arrastrando el borde izquierdo).
   const [panelWidth, setPanelWidth] = useState(initialDrawerWidth);
   const panelWidthRef = useRef(panelWidth);
+  // ¿Se está arrastrando el tirador? (lo marca `beginResize`).
+  const resizingRef = useRef(false);
+  // EL ANCHO QUE PINTA EL PANEL vive en un MotionValue, no en el estado.
+  //
+  // Durante el arrastre del tirador el ancho se escribe en el DOM en cada
+  // fotograma, pero el estado `panelWidth` no cambia hasta soltar. Con
+  // `style={{ width: panelWidth }}`, cualquier render de este componente a
+  // mitad del gesto hacía que Framer REAPLICARA el ancho antiguo: el panel
+  // volvía un fotograma a su tamaño anterior y al siguiente saltaba al nuevo.
+  // Ese era el parpadeo, y en tablet se disparaba mucho más porque un gesto
+  // táctil provoca renders (el navegador emite `resize` al mostrar u ocultar su
+  // barra, por ejemplo). Un MotionValue no lo toca React: un render ya no puede
+  // devolver el panel a un ancho viejo.
+  const panelWidthMotion = useMotionValue(panelWidth);
+  useEffect(() => {
+    // Fuera del arrastre, el estado manda (apertura, ajuste a la ventana).
+    if (resizingRef.current) return;
+    panelWidthMotion.set(panelWidth);
+  }, [panelWidth, panelWidthMotion]);
 
   useEffect(() => {
     // El hueco de la ficha "mobile" va a los DOS lados (ver `marginLeft` del
@@ -856,6 +876,9 @@ export default function DetailModal({
   useEffect(() => {
     if (!isRightPlacement || typeof window === "undefined") return undefined;
     const onResize = () => {
+      // Arrastrando, el ancho lo lleva el gesto: este reajuste partiría del
+      // ancho de ANTES del arrastre y lo devolvería a él a mitad del gesto.
+      if (resizingRef.current) return;
       setPanelWidth((w) => {
         const next = clampPanelWidth(w, window.innerWidth);
         panelWidthRef.current = next;
@@ -930,7 +953,6 @@ export default function DetailModal({
     heroRange(-20),
   );
 
-  const resizingRef = useRef(false);
   const resizeCleanupRef = useRef(null);
 
   useEffect(() => () => resizeCleanupRef.current?.(), [isRightPlacement, isDocked, mobileDetails]);
@@ -1038,6 +1060,10 @@ export default function DetailModal({
     resizeHandle.setPointerCapture?.(pointerId);
 
     const writeWidth = (width) => {
+      // El MotionValue es la fuente de verdad del ancho pintado (ver su nota);
+      // la escritura directa lo aplica en este mismo fotograma, sin esperar al
+      // ciclo de Framer.
+      panelWidthMotion.set(width);
       if (panelRef.current) panelRef.current.style.width = `${width}px`;
       // También SUPERPUESTO: el margen del contenido solo importa acoplado,
       // pero el ancho publicado lo usa además el navbar para apartarse, y el
@@ -3054,7 +3080,7 @@ export default function DetailModal({
           // una pista para lo que está POR animarse. Ya quieto, sobra.
           willChange: panelSettled ? "auto" : "transform",
           // Drawer derecho: ancho controlado (redimensionable). Centrado: Tailwind.
-          ...(isRightPlacement ? { width: panelWidth } : null),
+          ...(isRightPlacement ? { width: panelWidthMotion } : null),
           // La ficha "mobile" flota separada del borde: el hueco de la derecha
           // ya lo pone `paddingRight` en el contenedor; este margen replica el
           // mismo valor a la izquierda para que quede centrada en su columna.
