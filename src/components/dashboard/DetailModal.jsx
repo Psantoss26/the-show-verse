@@ -58,7 +58,12 @@ import {
 
 import { useAuth } from "@/context/AuthContext";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
-import { clampDrawerWidth, clampMobileDetailsWidth, MOBILE_DETAILS_ASPECT_RATIO } from "@/lib/ui/detailModalSizing";
+import {
+  clampDrawerWidth,
+  clampMobileDetailsWidth,
+  MOBILE_DETAILS_ASPECT_RATIO,
+  phoneContentScale,
+} from "@/lib/ui/detailModalSizing";
 import { getBackendItemStatus } from "@/lib/api/itemStatus";
 import { markAsFavorite, markInWatchlist } from "@/lib/api/tmdb";
 import {
@@ -640,6 +645,13 @@ const MODAL_ARROW_PROPS = {
 };
 
 /* ================================== MODAL ================================== */
+// Bloques de la ficha de teléfono que se escalan con el ancho del panel en
+// escritorio (`--sv-phone-scale`, ver `phoneContentScale`). `zoom` y no
+// `transform`: cambia también el espacio que ocupan, así que no se solapan con
+// lo de debajo, y sus reglas internas por ancho (container queries) siguen
+// viendo "un teléfono" y se reparten igual que en FullHD, solo que más grandes.
+const PHONE_SCALED_BLOCK_STYLE = { zoom: "var(--sv-phone-scale, 1)" };
+
 export default function DetailModal({
   item,
   onClose,
@@ -1107,7 +1119,16 @@ export default function DetailModal({
       // la escritura directa lo aplica en este mismo fotograma, sin esperar al
       // ciclo de Framer.
       panelWidthMotion.set(width);
-      if (panelRef.current) panelRef.current.style.width = `${width}px`;
+      if (panelRef.current) {
+        panelRef.current.style.width = `${width}px`;
+        // La escala del contenido sigue al ancho también durante el gesto.
+        if (mobileDetails && !tabletViewport) {
+          panelRef.current.style.setProperty(
+            "--sv-phone-scale",
+            String(phoneContentScale(width)),
+          );
+        }
+      }
       // También SUPERPUESTO: el margen del contenido solo importa acoplado,
       // pero el ancho publicado lo usa además el navbar para apartarse, y el
       // panel tapa su borde derecho en los dos modos.
@@ -3138,6 +3159,16 @@ export default function DetailModal({
           willChange: panelSettled ? "auto" : "transform",
           // Drawer derecho: ancho controlado (redimensionable). Centrado: Tailwind.
           ...(isRightPlacement ? { width: panelWidthMotion } : null),
+          // Escala de puntuaciones, pestañas y tarjetas de la ficha de
+          // teléfono (ver `phoneContentScale`). Solo en ordenador: en tablet el
+          // panel ya tiene el tamaño de un teléfono real.
+          ...(mobileDetails
+            ? {
+                "--sv-phone-scale": tabletViewport
+                  ? 1
+                  : phoneContentScale(panelWidth),
+              }
+            : null),
           // La ficha "mobile" flota separada del borde: el hueco de la derecha
           // ya lo pone `paddingRight` en el contenedor; este margen replica el
           // mismo valor a la izquierda para que quede centrada en su columna.
@@ -3697,7 +3728,7 @@ export default function DetailModal({
             {/* Panel de puntuaciones + plataformas: MISMO componente
                 presentacional que DetailsClient (badges CompactBadge + fila de
                 stats), con plataformas integradas en la barra superior. */}
-            <div>
+            <div style={mobileDetails ? PHONE_SCALED_BLOCK_STYLE : undefined}>
               <DetailsScoreboardPanel
                 loading={loading}
                 // El pie de estadísticas de Trakt llega en su propia consulta
@@ -3819,6 +3850,7 @@ export default function DetailModal({
             {isEpisode ? (
               <motion.div
                 className="mb-5"
+                style={mobileDetails ? PHONE_SCALED_BLOCK_STYLE : undefined}
                 initial={{ opacity: 0, y: 15 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-10px" }}
@@ -3892,7 +3924,10 @@ export default function DetailModal({
                 </div>
               </motion.div>
             ) : (
-              <div className="mb-5">
+              <div
+                className="mb-5"
+                style={mobileDetails ? PHONE_SCALED_BLOCK_STYLE : undefined}
+              >
                 <DetailsInfoTabs
                   variant="normal"
                   layoutId="detailModalTab"

@@ -992,15 +992,21 @@ export default function PhoneDetailsSections({
           backfaceVisibility: "hidden",
         }}
       >
-        <DetailsSectionMenu
-          items={sectionItems}
-          activeId={activeSectionId}
-          onChange={scrollToSection}
-          // Diez secciones no caben rotuladas en el ancho de un teléfono: los
-          // botones se encogían por debajo de su texto y lo cortaban a media
-          // palabra ("REPART", "RECOMENDACIO").
-          iconsOnly
-        />
+        {/* Misma escala que puntuaciones y pestañas en escritorio
+            (`--sv-phone-scale`, la fija el panel de DetailModal). Va en un
+            envoltorio INTERIOR: con `zoom` en el propio elemento sticky, su
+            `top` también se escalaría y dejaría de pegarse donde debe. */}
+        <div style={{ zoom: "var(--sv-phone-scale, 1)" }}>
+          <DetailsSectionMenu
+            items={sectionItems}
+            activeId={activeSectionId}
+            onChange={scrollToSection}
+            // Diez secciones no caben rotuladas en el ancho de un teléfono: los
+            // botones se encogían por debajo de su texto y lo cortaban a media
+            // palabra ("REPART", "RECOMENDACIO").
+            iconsOnly
+          />
+        </div>
       </div>
 
       <div className="mt-10 space-y-10">

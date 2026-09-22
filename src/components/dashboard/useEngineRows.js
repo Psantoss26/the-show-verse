@@ -215,9 +215,17 @@ export function useEngineRows(
   useEffect(() => {
     if (deferInitialRowsUntilHydrated && scope !== "anon") return;
     if (initialMappedRows.length === 0) return;
-    setRows((current) =>
-      current.length ? stabilizeRows(current, initialMappedRows) : initialMappedRows,
-    );
+    // Con SESIÓN, las filas del servidor (anónimas) solo rellenan el hueco
+    // mientras no haya otras. Antes sustituían también a las personalizadas, y
+    // el efecto de abajo volvía a ponerlas: cada vez que llegaban filas
+    // iniciales nuevas, los dos efectos se pisaban y las filas cambiaban de
+    // lista a lista. Sin sesión (o sin saberlo aún), se mantienen al día.
+    const isUserScope = Boolean(scope) && scope !== "anon";
+    setRows((current) => {
+      if (!current.length) return initialMappedRows;
+      if (isUserScope) return current;
+      return stabilizeRows(current, initialMappedRows);
+    });
     setLoading(false);
   }, [deferInitialRowsUntilHydrated, initialMappedRows, scope]);
 

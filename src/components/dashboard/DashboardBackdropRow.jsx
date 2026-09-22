@@ -185,14 +185,31 @@ function useItemBackdrop(item, backdropOverride) {
     getInitialItemBackdrop(item, backdropOverride),
   );
 
+  // El efecto depende de la CLAVE del título (tipo + id), no del objeto `item`.
+  // Con el objeto como dependencia, un padre que entregara un objeto nuevo en
+  // cada render —aunque fuese el mismo título— hacía que el efecto volviera a
+  // correr y a llamar a `setState` en cada vuelta, y React acababa cortándolo
+  // con "Maximum update depth exceeded". El título se lee de una ref.
+  const itemKey = item?.id ? getBackdropCacheKey(item, mediaType) : null;
+  const itemRef = useRef(item);
+  // Va ANTES del efecto de abajo: los efectos corren en orden de declaración,
+  // así que cuando aquel lee la ref ya tiene el título de este render.
+  useEffect(() => {
+    itemRef.current = item;
+  });
+
   useEffect(() => {
     let abort = false;
-    if (!item?.id) return undefined;
+    const current = itemRef.current;
+    if (!itemKey || !current?.id) return undefined;
 
-    const type = getMediaTypeForItem(item);
-    const key = getBackdropCacheKey(item, type);
+    const type = getMediaTypeForItem(current);
+    const key = itemKey;
+    // Solo se actualiza si el backdrop CAMBIA: así una ejecución de más del
+    // efecto nunca provoca otro render.
     const reveal = (path) => {
-      if (!abort) setBackdropPath(path);
+      if (abort) return;
+      setBackdropPath((prev) => (prev === path ? prev : path));
     };
 
     if (backdropOverride) {
@@ -212,13 +229,13 @@ function useItemBackdrop(item, backdropOverride) {
 
     (async () => {
       try {
-        const preferred = await fetchBestBackdrop(item.id, type);
-        const chosen = preferred || getPreviewBackdropFallback(item);
+        const preferred = await fetchBestBackdrop(current.id, type);
+        const chosen = preferred || getPreviewBackdropFallback(current);
         movieBackdropCache.set(key, chosen);
         if (chosen) await preloadImage(buildImg(chosen, BACKDROP_SIZE));
         reveal(chosen);
       } catch {
-        const fallback = getPreviewBackdropFallback(item);
+        const fallback = getPreviewBackdropFallback(current);
         movieBackdropCache.set(key, fallback);
         reveal(fallback);
       }
@@ -227,7 +244,7 @@ function useItemBackdrop(item, backdropOverride) {
     return () => {
       abort = true;
     };
-  }, [item, backdropOverride]);
+  }, [itemKey, backdropOverride]);
 
   return { backdropPath, mediaType };
 }
