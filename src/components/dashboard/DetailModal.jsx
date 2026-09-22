@@ -1039,10 +1039,50 @@ export default function DetailModal({
     const prevCursor = document.body.style.cursor;
     document.body.style.userSelect = "none";
     document.body.style.cursor = "col-resize";
-    // Marca el arrastre en <html> para que lo que sigue al ancho del panel
-    // (hoy, el bloque derecho del navbar) se mueva PEGADO al tirador en vez de
-    // ir 320ms por detrás con su transición de apertura.
-    document.documentElement.dataset.svDrawerResizing = "";
+
+    // TÁCTIL (tablet) → el ancho se aplica AL SOLTAR; mientras dura el gesto
+    // solo se mueve una GUÍA del nuevo borde.
+    //
+    // Redimensionar en directo cambia en cada fotograma el ancho del panel y el
+    // margen de la página acoplada: los dos se vuelven a maquetar y a pintar
+    // enteros. Un ordenador lo absorbe; una tablet no llega a tiempo y enseña
+    // zonas sin pintar o del fotograma anterior, que es el PARPADEO del panel y
+    // de la página. La guía se mueve solo con `transform` —no maqueta ni
+    // repinta nada—, así que sigue al dedo sin coste, y el panel y la página se
+    // recolocan UNA vez. Con ratón (ordenador) nada cambia: sigue en directo.
+    const ghostResize = event.pointerType !== "mouse";
+    let ghost = null;
+    let ghostStartLeft = 0;
+    if (ghostResize && panelRef.current) {
+      const rect = panelRef.current.getBoundingClientRect();
+      ghostStartLeft = rect.left;
+      ghost = document.createElement("div");
+      ghost.setAttribute("aria-hidden", "true");
+      Object.assign(ghost.style, {
+        position: "fixed",
+        left: "0px",
+        top: `${rect.top}px`,
+        height: `${rect.height}px`,
+        // Más ancho que la ventana: lo que sobra a la derecha no se ve, y así
+        // la guía cubre siempre hasta el borde sin recalcular su ancho.
+        width: `${vw}px`,
+        transform: `translate3d(${rect.left}px, 0, 0)`,
+        zIndex: "10000",
+        pointerEvents: "none",
+        borderLeft: "2px solid rgba(255, 255, 255, 0.75)",
+        borderTopLeftRadius: "1rem",
+        borderBottomLeftRadius: "1rem",
+        background: "rgba(255, 255, 255, 0.06)",
+        boxShadow: "-8px 0 24px rgba(0, 0, 0, 0.45)",
+        willChange: "transform",
+      });
+      document.body.appendChild(ghost);
+    } else {
+      // Marca el arrastre en <html> para que lo que sigue al ancho del panel
+      // (hoy, el bloque derecho del navbar) se mueva PEGADO al tirador en vez
+      // de ir 320ms por detrás con su transición de apertura.
+      document.documentElement.dataset.svDrawerResizing = "";
+    }
 
     // SEGUIMIENTO 1:1 con el puntero, una escritura por fotograma.
     //
@@ -1079,13 +1119,23 @@ export default function DetailModal({
       writeWidth(next);
     };
 
+    // Modo guía: solo se desplaza la guía (compositor), nada más.
+    const moveGhost = () => {
+      frame = 0;
+      if (!ghost) return;
+      const left = ghostStartLeft + (startWidth - panelWidthRef.current);
+      ghost.style.transform = `translate3d(${left}px, 0, 0)`;
+    };
+
     const onMove = (moveEvent) => {
       if (moveEvent.pointerId !== pointerId) return;
       panelWidthRef.current = clampPanelWidth(startWidth + startX - moveEvent.clientX, vw);
       // Agrupa los eventos de puntero: llegan más a menudo que los fotogramas,
       // así que se escribe una sola vez por frame, sin lecturas de layout ni
       // renders de React.
-      if (!frame) frame = window.requestAnimationFrame(applyWidth);
+      if (!frame) {
+        frame = window.requestAnimationFrame(ghostResize ? moveGhost : applyWidth);
+      }
     };
 
     const cleanup = () => {
@@ -1098,6 +1148,8 @@ export default function DetailModal({
       window.removeEventListener("blur", onCancel);
       document.body.style.userSelect = prevUserSelect;
       document.body.style.cursor = prevCursor;
+      ghost?.remove();
+      ghost = null;
       delete document.documentElement.dataset.svDrawerResizing;
       resizeCleanupRef.current = null;
       // El click posterior al pointerup no debe cerrar el modo superpuesto.
@@ -1115,7 +1167,9 @@ export default function DetailModal({
       // publicación se repite para que el margen de la página acoplada (que
       // ya ha ido siguiendo al tirador durante el gesto) quede en su valor
       // final.
-      applyWidth();
+      // (En modo guía esta es la ÚNICA escritura del gesto: el panel y la
+      // página pasan de una vez al ancho final.)
+      if (!ghostResize) applyWidth();
       writeWidth(panelWidthRef.current);
       setPanelWidth(panelWidthRef.current);
       try {
