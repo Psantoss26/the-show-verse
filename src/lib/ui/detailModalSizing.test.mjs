@@ -177,3 +177,15 @@ test("DetailModal conserva al menos 120px de arrastre en tablets pequeñas y gra
     assert.equal(clampDrawerWidth(requested, viewport, { tablet: true }), requested);
   }
 });
+
+test("la ficha de teléfono escala su contenido con el ancho del panel", async () => {
+  const { phoneContentScale, PHONE_CONTENT_MAX_SCALE } = await import("./detailModalSizing.js");
+  // FullHD (~440px de panel) es la referencia: nada cambia.
+  assert.equal(phoneContentScale(438), 1);
+  // Nunca por debajo de 1: en paneles estrechos se queda como está.
+  assert.equal(phoneContentScale(320), 1);
+  // 2K (~604px): crece, pero menos que el panel (×1,37 era demasiado).
+  assert.equal(phoneContentScale(604), 1.224);
+  // Con techo, para pantallas enormes.
+  assert.equal(phoneContentScale(2000), PHONE_CONTENT_MAX_SCALE);
+});

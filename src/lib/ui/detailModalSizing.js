@@ -139,3 +139,26 @@ export function clampMobileDetailsWidth(width, viewportWidth, viewportHeight = I
   const min = Math.min(320, max);
   return Math.max(min, Math.min(Math.round(width ?? max), max));
 }
+
+// ESCALA DEL CONTENIDO DE LA FICHA DE TELÉFONO en escritorio.
+//
+// El panel crece con la pantalla (su ancho sale del alto de la ventana), pero
+// puntuaciones, estadísticas, pestañas y tarjetas están en píxeles: en una
+// pantalla 2K el panel mide ~600px y esos bloques se veían tan pequeños como en
+// un panel de ~440px (FullHD). Se escalan con el ancho, con FullHD como
+// referencia (escala 1).
+//
+// NO en proporción directa: con escala = ancho / 440, en 2K salía ×1,37 y se
+// veía demasiado grande. Se aplica solo una parte del crecimiento del panel
+// (`PHONE_CONTENT_GROWTH`), así que en 2K queda en ~×1,22, y con un techo más
+// bajo para pantallas enormes.
+export const PHONE_CONTENT_REFERENCE_WIDTH = 440;
+export const PHONE_CONTENT_GROWTH = 0.6;
+export const PHONE_CONTENT_MAX_SCALE = 1.3;
+
+export function phoneContentScale(panelWidth) {
+  const width = Number(panelWidth) || 0;
+  const growth = width / PHONE_CONTENT_REFERENCE_WIDTH - 1;
+  const scale = 1 + Math.max(0, growth) * PHONE_CONTENT_GROWTH;
+  return Math.round(Math.min(PHONE_CONTENT_MAX_SCALE, scale) * 1000) / 1000;
+}
