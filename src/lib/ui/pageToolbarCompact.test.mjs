@@ -179,7 +179,10 @@ test("el buscador y el selector de sección también ceden", async () => {
   // El buscador ocupa el hueco sobrante (`flex-1`), así que es lo primero que
   // aprieta a los demás. Pasa a un cuadrado y recupera su ancho al recibir el
   // foco, que es cuando de verdad hace falta.
-  assert.match(css, /\.sv-page-toolbar-search \{\s*\n\s*flex: 0 0 2\.75rem;/);
+  // Parte de un cuadrado pero CRECE hasta llenar la fila: con `flex: 0 0` el
+  // modo compacto dejaba un hueco vacío a la derecha.
+  assert.match(css, /\.sv-page-toolbar-search \{\s*\n\s*flex: 1 1 2\.75rem;/);
+  assert.doesNotMatch(css, /flex: 0 0 2\.75rem/);
   assert.match(css, /\.sv-page-toolbar-search:focus-within \{\s*\n\s*flex: 1 1 10rem;/);
 
   // Y el rótulo de Historial / Continuar viendo se retira con el mismo
