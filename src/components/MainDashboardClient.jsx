@@ -4436,7 +4436,9 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
   }
 
   return (
-    <DetailModalProvider>
+    // Dashboard: el modal puede abrirse centrado o como panel lateral, a
+    // elección del usuario (con acoplar y vista de teléfono en lateral).
+    <DetailModalProvider placementSwitchable>
       <DashboardHoverBackdropProvider>
         <motion.div
           // El tirón hacia arriba tiene que valer lo que MIDA la barra superior, y esa

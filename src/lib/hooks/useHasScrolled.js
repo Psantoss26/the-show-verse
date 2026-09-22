@@ -106,6 +106,15 @@ export function useTopResetRevealProps(
   });
   const isIntersectingRef = useRef(false);
   const [revealed, setRevealed] = useState(false);
+  // ¿Cabe la sección de sobra SIN hacer scroll?
+  //
+  // Normalmente el hero ocupa casi toda la pantalla y de esta sección solo
+  // asoma el borde: por eso se oculta hasta que el usuario hace scroll. Pero el
+  // hero mide lo que su ANCHO (16:9), y cuando la página se estrecha —drawer de
+  // la ficha acoplado, tablets en vertical— queda un hueco enorme debajo. Ahí
+  // la sección no "asoma": ocupa media pantalla, y dejarla oculta dejaba esa
+  // mitad vacía. Si lo que se ve de ella supera el umbral, se muestra ya.
+  const [roomyFold, setRoomyFold] = useState(false);
 
   useEffect(() => {
     if (!enabled || isBackNav || typeof IntersectionObserver === "undefined")
@@ -130,6 +139,36 @@ export function useTopResetRevealProps(
   }, [enabled, isBackNav, margin, targetRef]);
 
   useEffect(() => {
+    if (!enabled || isBackNav || typeof IntersectionObserver === "undefined")
+      return undefined;
+    const target = targetRef.current;
+    if (!target || typeof window === "undefined") return undefined;
+
+    let observer = null;
+    const observe = () => {
+      observer?.disconnect();
+      // Hueco mínimo para considerarlo "mucho espacio": 200px o la cuarta
+      // parte de la pantalla, lo que sea mayor. Un asomo de 60-120px (lo
+      // habitual con el hero a pantalla casi completa) no llega.
+      const fold = Math.round(Math.max(200, window.innerHeight * 0.25));
+      observer = new IntersectionObserver(
+        ([entry]) => setRoomyFold(entry.isIntersecting),
+        { rootMargin: `0px 0px -${fold}px 0px`, threshold: 0 },
+      );
+      observer.observe(target);
+    };
+    observe();
+    // El umbral depende del alto de la ventana; la posición de la sección la
+    // sigue el propio observador (también cuando el hero cambia de alto al
+    // acoplar o cerrar el drawer).
+    window.addEventListener("resize", observe);
+    return () => {
+      window.removeEventListener("resize", observe);
+      observer?.disconnect();
+    };
+  }, [enabled, isBackNav, targetRef]);
+
+  useEffect(() => {
     if (!enabled || isBackNav) return;
     if (!hasScrolled) {
       setRevealed(false);
@@ -143,7 +182,8 @@ export function useTopResetRevealProps(
     hydrationReady,
     reduceMotion: Boolean(reduceMotion),
     isBackNav,
-    hasScrolled,
-    revealed,
+    // Con hueco de sobra bajo el hero, la sección cuenta como alcanzada.
+    hasScrolled: hasScrolled || roomyFold,
+    revealed: revealed || roomyFold,
   });
 }

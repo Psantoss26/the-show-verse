@@ -127,6 +127,11 @@ function publishDrawerInset(width) {
 
 const DRAWER_VIEW_STORAGE_KEY = "showverse:detailModalView";
 const CONTENT_VIEW_STORAGE_KEY = "showverse:detailModalContentView";
+// Los DASHBOARDS (Inicio, Películas, Series) guardan sus preferencias aparte: que
+// acoples el panel en Inicio no debe cambiar cómo se abre en Favoritos, ni al
+// revés. Solo ellos pueden además elegir entre modal centrado y lateral.
+const DASHBOARD_STORAGE_PREFIX = "showverse:dashboard:";
+const DASHBOARD_PLACEMENT_STORAGE_KEY = "showverse:dashboard:detailModalPlacement";
 const PREVIEW_PARAM = "preview";
 const PREVIEW_RE = /^(movie|tv)-(\d+)$/;
 const EPISODE_RE = /^ep-(\d+)-(\d+)-(\d+)$/;
@@ -193,14 +198,31 @@ function readPreviewFromLocation() {
   return { id, media_type: match[1] };
 }
 
-export default function DetailModalProvider({ children, placement = "center" }) {
+export default function DetailModalProvider({
+  children,
+  placement = "center",
+  // Dashboards: el usuario elige entre modal CENTRADO (`placement`, por
+  // defecto) y panel LATERAL, con los mismos controles que las páginas de
+  // usuario cuando está en lateral.
+  placementSwitchable = false,
+}) {
   const router = useRouter();
   // En MÓVIL, por defecto NO se abre el modal de preview: se navega a la ficha
   // completa (DetailsClient / EpisodeDetails). La preview lateral es solo de
   // escritorio, también para las páginas de usuario y Configuración.
   const isMobile = useIsMobile();
   // En móvil el drawer derecho no aplica: si se abre el modal, es centrado.
-  const effectivePlacement = placement === "right" && !isMobile ? "right" : "center";
+  const [userPlacement, setUserPlacement] = useState(null);
+  const requestedPlacement =
+    placementSwitchable && userPlacement ? userPlacement : placement;
+  const effectivePlacement =
+    requestedPlacement === "right" && !isMobile ? "right" : "center";
+  const drawerViewKey = placementSwitchable
+    ? `${DASHBOARD_STORAGE_PREFIX}detailModalView`
+    : DRAWER_VIEW_STORAGE_KEY;
+  const contentViewKey = placementSwitchable
+    ? `${DASHBOARD_STORAGE_PREFIX}detailModalContentView`
+    : CONTENT_VIEW_STORAGE_KEY;
 
   const [drawerView, setDrawerView] = useState("overlay");
   const [contentView, setContentView] = useState(null);
@@ -213,35 +235,53 @@ export default function DetailModalProvider({ children, placement = "center" }) 
 
   useEffect(() => {
     try {
-      const storedContentView = window.localStorage.getItem(CONTENT_VIEW_STORAGE_KEY);
+      const storedContentView = window.localStorage.getItem(contentViewKey);
       if (storedContentView === "mobile" || storedContentView === "modal") {
         setContentView(storedContentView);
       }
-      if (window.localStorage.getItem(DRAWER_VIEW_STORAGE_KEY) === "docked") {
+      if (window.localStorage.getItem(drawerViewKey) === "docked") {
         setDrawerView("docked");
+      }
+      if (placementSwitchable) {
+        const storedPlacement = window.localStorage.getItem(
+          DASHBOARD_PLACEMENT_STORAGE_KEY,
+        );
+        if (storedPlacement === "right" || storedPlacement === "center") {
+          setUserPlacement(storedPlacement);
+        }
       }
     } catch {
       // La vista sigue funcionando cuando el almacenamiento no está disponible.
     }
-  }, []);
+  }, [contentViewKey, drawerViewKey, placementSwitchable]);
 
   const changeDrawerView = useCallback((view) => {
     if (view !== "overlay" && view !== "docked") return;
     setDrawerView(view);
     try {
-      window.localStorage.setItem(DRAWER_VIEW_STORAGE_KEY, view);
+      window.localStorage.setItem(drawerViewKey, view);
     } catch {
       // Conserva la elección durante esta sesión.
     }
-  }, []);
+  }, [drawerViewKey]);
 
   const changeContentView = useCallback((view) => {
     if (view !== "mobile" && view !== "modal") return;
     setContentView(view);
     try {
-      window.localStorage.setItem(CONTENT_VIEW_STORAGE_KEY, view);
+      window.localStorage.setItem(contentViewKey, view);
     } catch {
       // Conserva la elección en memoria si el almacenamiento no está disponible.
+    }
+  }, [contentViewKey]);
+
+  const changePlacement = useCallback((next) => {
+    if (next !== "right" && next !== "center") return;
+    setUserPlacement(next);
+    try {
+      window.localStorage.setItem(DASHBOARD_PLACEMENT_STORAGE_KEY, next);
+    } catch {
+      // Conserva la elección durante esta sesión.
     }
   }, []);
 
@@ -450,10 +490,16 @@ export default function DetailModalProvider({ children, placement = "center" }) 
       <AnimatePresence custom={switching}>
         {activeItem && (
           <DetailModal
-            key={previewToken(activeItem)}
+            // La colocación forma parte de la identidad: al cambiar de centrado
+            // a lateral (o al revés) sale el panel de una forma y entra el de la
+            // otra, cada uno con su propia animación de entrada y salida.
+            key={`${previewToken(activeItem)}:${effectivePlacement}`}
             item={activeItem}
             onClose={closeDetailModal}
             placement={effectivePlacement}
+            onPlacementChange={
+              placementSwitchable && !isMobile ? changePlacement : undefined
+            }
             drawerView={drawerView}
             contentView={effectiveContentView}
             tabletViewport={isTablet}
