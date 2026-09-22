@@ -1,16 +1,32 @@
 /* TARJETAS QUE SE AMPLÍAN AL PASAR EL RATÓN (ver HoverExpandCard.jsx).
 
-   `.expanded` da a la tarjeta su tamaño ampliado REAL (un 15% más grande con
-   `inset: -7.5%`), así que el póster se pinta a ese tamaño y se ve nítido. La
-   animación NO está aquí: la hace el componente con `transform` (técnica
+   Ampliada, la tarjeta tiene su tamaño REAL (un 15% más grande, en píxeles
+   enteros que calcula el componente), así que el póster se pinta a ese tamaño
+   y se ve nítido. La animación NO está aquí: la hace el componente con `transform` (técnica
    FLIP), que no vuelve a maquetar en cada fotograma y por eso no vibra. */
 .expand {
   z-index: 0;
   transform-origin: center center;
 }
 
+/* MISMA CALIDAD EN REPOSO Y AMPLIADA.
+   Ampliada, la tarjeta va en su propia capa (`will-change: transform`), y ahí
+   Chrome la ajusta a la rejilla de píxeles y reduce el póster con el filtro de
+   las capas. En reposo se pintaba junto con el resto de la página, con otro
+   filtro y otro ajuste: se percibía algo más blanda que al pasar el ratón, y
+   al volver de la animación se notaba el cambio. Con la capa también en
+   reposo, los dos estados se pintan igual.
+   No vuelve el borroso de la escala: al ampliarse cambia su tamaño REAL, así
+   que la capa se vuelve a pintar a su tamaño nuevo, no se estira.
+   Solo donde hay hover (ratón): en táctil no hace falta y ahorra memoria. */
+@media (hover: hover) and (pointer: fine) {
+  .expand {
+    will-change: transform;
+  }
+}
+
+/* El tamaño ampliado (`inset`) lo fija el componente en píxeles enteros. */
 .expanded {
-  inset: -7.5%;
   z-index: var(--sv-hover-expand-z, 100);
   box-shadow:
     0 20px 25px -5px rgb(0 0 0 / 0.5),
