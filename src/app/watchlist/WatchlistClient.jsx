@@ -74,6 +74,13 @@ import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { compareImdbRatings } from "@/lib/userLists/imdbRatingSort";
 
+// Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
+// el mismo escalón que `w1280` en los backdrops. Antes era `w500` y en
+// pantallas de alta densidad se veía blando. No se usa `original` (hasta
+// ~2000x3000 y 1-2 MB por póster): en una rejilla de decenas de tarjetas
+// frenaría la carga sin ganancia visible al tamaño al que se pintan.
+const POSTER_CARD_SIZE = "w780";
+
 // ================== UTILS & CACHE ==================
 
 const containerVariants = {
@@ -1093,7 +1100,7 @@ function getCachedSmartPosterUrl(item, mode = "poster") {
     : null;
   const storedPoster = getStoredImageChoice("poster", key);
   const path = cachedPoster || storedPoster || null;
-  return path ? buildImg(path, "w500") : null;
+  return path ? buildImg(path, POSTER_CARD_SIZE) : null;
 }
 
 function SmartPoster({ item, title, mode = "poster" }) {
@@ -1154,7 +1161,7 @@ function SmartPoster({ item, title, mode = "poster" }) {
 
       const best = await getBestPosterCached(type, id);
       const finalPath = best || fallbackPathRef.current?.path || null;
-      const url = finalPath ? buildImg(finalPath, "w500") : null;
+      const url = finalPath ? buildImg(finalPath, POSTER_CARD_SIZE) : null;
       if (url) await preloadImage(url);
       if (!abort) {
         writeImageChoice("poster", imageKey, best);

@@ -53,6 +53,13 @@ import {
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 
+// Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
+// el mismo escalón que `w1280` en los backdrops. Antes era `w500` y en
+// pantallas de alta densidad se veía blando. No se usa `original` (hasta
+// ~2000x3000 y 1-2 MB por póster): en una rejilla de decenas de tarjetas
+// frenaría la carga sin ganancia visible al tamaño al que se pintan.
+const POSTER_CARD_SIZE = "w780";
+
 // ----------------------------
 // HELPERS
 // ----------------------------
@@ -463,7 +470,7 @@ function SmartPoster({ item, title }) {
       }
 
       if (!finalPath || abort) return;
-      const url = buildImg(finalPath, "w500");
+      const url = buildImg(finalPath, POSTER_CARD_SIZE);
       await preloadImage(url);
       if (!abort) {
         setSrc(url);
