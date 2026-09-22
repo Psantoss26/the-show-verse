@@ -23,6 +23,9 @@ export function CompactBadge({
   animateOnMount = true,
   disableHoverLift = false,
   tooltip,
+  // Fuerza los tamaños de teléfono aunque la ventana sea ancha (ficha de
+  // teléfono del drawer): los `sm:` de abajo miran el viewport, no el panel.
+  phone = false,
 }) {
   const MotionComp = href ? motion.a : onClick ? motion.button : motion.div;
   const isInteractive = !!(href || onClick);
@@ -77,7 +80,7 @@ export function CompactBadge({
 
       <div className="flex flex-col justify-center leading-none min-w-0">
         <div className="flex items-baseline gap-1 min-w-0">
-          <span className="text-lg sm:text-xl font-black text-white/85 group-hover:text-white tracking-tight drop-shadow-sm transition-colors">
+          <span className={`${phone ? "text-lg" : "text-lg sm:text-xl"} font-black text-white/85 group-hover:text-white tracking-tight drop-shadow-sm transition-colors`}>
             {value != null ? value : "-"}
           </span>
 
@@ -98,9 +101,9 @@ export function CompactBadge({
           {sub && (
             <span
               className={`
-                text-[11px] sm:text-xs font-bold text-white/65 group-hover:text-white/80 transition-colors tracking-wide
+                ${phone ? "text-[11px]" : "text-[11px] sm:text-xs"} font-bold text-white/65 group-hover:text-white/80 transition-colors tracking-wide
                 truncate
-                ${hideSubOnMobile ? "hidden sm:inline" : ""}
+                ${hideSubOnMobile ? (phone ? "hidden" : "hidden sm:inline") : ""}
               `}
             >
               {sub}

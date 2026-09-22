@@ -152,6 +152,10 @@ export default function DetailsInfoTabs({
   // SeasonDetails comparte este componente entre móvil y escritorio, mientras
   // que EpisodeDetails renderiza una instancia exclusiva para móvil.
   enableMobileTabSwipe = false,
+  // Menú de pestañas en disposición de teléfono aunque la ventana sea ancha.
+  // Solo lo pide la ficha de teléfono del drawer (en tablet); la ficha completa
+  // decide por el viewport y no lo pasa.
+  phoneMenu = false,
   platforms = [],
   platformLinks = [],
   showPlatformsTab = mobileLayout,
@@ -253,6 +257,7 @@ export default function DetailsInfoTabs({
           onChangeTab={setActiveTab}
           layoutId={layoutId}
           swipeHandlers={swipeHandlers}
+          phone={phoneMenu}
         />
       ) : null}
 

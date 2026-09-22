@@ -43,19 +43,28 @@ import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 
 // Badge de estadística de Trakt (Watchers, Plays, Lists, Favorited).
 // Movido VERBATIM desde DetailsClient para compartirlo con el modal.
-function TraktStatBadge({ icon: Icon, value, label, tooltip, pending = false }) {
+function TraktStatBadge({
+  icon: Icon,
+  value,
+  label,
+  tooltip,
+  pending = false,
+  phone = false,
+}) {
   return (
     <motion.div
       // Ver la nota de DetailAtoms: nada de entrada propia, o el panel se ve
       // vacío mientras sus estadísticas hacen el fundido.
       initial={false}
       whileHover={{ y: -1 }}
-      className="relative flex min-w-0 items-center justify-start select-none group/statbadge py-1 px-0.5 transition-colors duration-200 sm:shrink-0 sm:px-1.5"
+      className={`relative flex min-w-0 items-center justify-start select-none group/statbadge py-1 transition-colors duration-200 ${phone ? "shrink-0 px-1.5" : "px-0.5 sm:shrink-0 sm:px-1.5"}`}
       aria-label={tooltip || label}
     >
-      <div className="grid min-w-0 grid-cols-[1rem_auto] grid-rows-[auto_auto] items-center gap-x-1 sm:grid-cols-[1.25rem_auto] sm:gap-x-2">
-        <Icon className="col-start-1 row-start-1 h-4 w-4 shrink-0 self-center text-zinc-400 transition-colors duration-200 group-hover/statbadge:text-zinc-200 sm:h-5 sm:w-5" />
-        <span className="col-start-2 row-start-1 block self-center text-[11px] font-bold leading-none tracking-tight text-white/90 [font-variant-numeric:tabular-nums] [text-box:trim-both_cap_alphabetic] sm:text-sm">
+      {/* Teléfono del drawer: iconos y cifras del tamaño de escritorio, pero
+          sin la etiqueta de texto, que es lo que no cabe en ese ancho. */}
+      <div className={`grid min-w-0 grid-rows-[auto_auto] items-center ${phone ? "grid-cols-[1.25rem_auto] gap-x-2" : "grid-cols-[1rem_auto] gap-x-1 sm:grid-cols-[1.25rem_auto] sm:gap-x-2"}`}>
+        <Icon className={`col-start-1 row-start-1 shrink-0 self-center text-zinc-400 transition-colors duration-200 group-hover/statbadge:text-zinc-200 ${phone ? "h-5 w-5" : "h-4 w-4 sm:h-5 sm:w-5"}`} />
+        <span className={`col-start-2 row-start-1 block self-center font-bold leading-none tracking-tight text-white/90 [font-variant-numeric:tabular-nums] [text-box:trim-both_cap_alphabetic] ${phone ? "text-sm" : "text-[11px] sm:text-sm"}`}>
           {/* CARGANDO ≠ SIN DATO. Mientras la consulta está en vuelo el hueco
               se reserva con un valor INVISIBLE: ocupa lo mismo, pero no afirma
               nada. El guion queda para cuando ya se sabe que no hay dato. */}
@@ -67,7 +76,7 @@ function TraktStatBadge({ icon: Icon, value, label, tooltip, pending = false }) 
             value || "-"
           )}
         </span>
-        <span className="col-start-2 row-start-2 mt-1 hidden text-[8px] font-bold uppercase leading-none tracking-widest text-zinc-500 transition-colors duration-200 group-hover/statbadge:text-zinc-400 [text-box:trim-both_cap_alphabetic] sm:block sm:text-[9px]">
+        <span className={`col-start-2 row-start-2 mt-1 hidden text-[8px] font-bold uppercase leading-none tracking-widest text-zinc-500 transition-colors duration-200 group-hover/statbadge:text-zinc-400 [text-box:trim-both_cap_alphabetic] ${phone ? "" : "sm:block sm:text-[9px]"}`}>
           {label}
         </span>
       </div>
@@ -99,6 +108,8 @@ export function DetailsRatingsBadges({
   // `shrink-0` no lo evitaba: solo actúa cuando la fila es un ÍTEM flex, y
   // dentro del carril no lo es.
   compact = false,
+  // Disposición de teléfono forzada (ver `phoneLayout` del panel).
+  phone = false,
 }) {
   const isPendingScore = (score) =>
     !!score && score.pending === true && score.value == null;
@@ -121,7 +132,9 @@ export function DetailsRatingsBadges({
           // cada insignia impide que se compriman y trunquen su recuento de
           // votos, que es el otro modo de "recortarse".
           ? "flex-wrap gap-y-2 [&>*]:shrink-0"
-          : "sm:gap-5"
+          : phone
+            ? ""
+            : "sm:gap-5"
       }`}
     >
       {/* Indicador de carga mientras se obtienen las puntuaciones de Trakt */}
@@ -137,6 +150,7 @@ export function DetailsRatingsBadges({
           key={scoreStateKey("tmdb", tmdb)}
           logo="/logo-TMDb.png"
           logoClassName="h-5 sm:h-5"
+          phone={phone}
           value={resolvedValue(tmdb)}
           sub={tmdb.sub}
           href={tmdb.href}
@@ -156,6 +170,7 @@ export function DetailsRatingsBadges({
           disableHoverLift
           onClick={undefined}
           tooltip={trakt.href ? "Ver en Trakt" : "Trakt"}
+          phone={phone}
         />
       )}
 
@@ -169,6 +184,7 @@ export function DetailsRatingsBadges({
           disableHoverLift
           onClick={undefined}
           tooltip="Ver en Trakt"
+          phone={phone}
         />
       )}
 
@@ -178,7 +194,12 @@ export function DetailsRatingsBadges({
           key={scoreStateKey("imdb", imdb)}
           logo="/logo-IMDb.svg"
           logoWrapClassName="min-w-[28px]"
-          logoClassName="!h-5 sm:!h-[22px] !max-h-none !max-w-[34px]"
+          logoClassName={
+            phone
+              ? "!h-5 !max-h-none !max-w-[34px]"
+              : "!h-5 sm:!h-[22px] !max-h-none !max-w-[34px]"
+          }
+          phone={phone}
           value={resolvedValue(imdb)}
           sub={imdb.sub}
           href={imdb.href}
@@ -191,7 +212,7 @@ export function DetailsRatingsBadges({
           retira además cuando la barra se queda estrecha (ver `.optionalScore`
           en el módulo CSS): es de las dos que no traen recuento de votos. */}
       {rt && (
-        <div className={`hidden sm:block ${styles.optionalScore}`}>
+        <div className={`${phone ? "hidden" : "hidden sm:block"} ${styles.optionalScore}`}>
           <CompactBadge
             logo="/logo-RottenTomatoes.png"
             value={rt.value}
@@ -205,7 +226,7 @@ export function DetailsRatingsBadges({
 
       {/* Badge de Metacritic - mismo criterio que Rotten Tomatoes. */}
       {mc && (
-        <div className={`hidden sm:block ${styles.optionalScore}`}>
+        <div className={`${phone ? "hidden" : "hidden sm:block"} ${styles.optionalScore}`}>
           <CompactBadge
             logo="/logo-Metacritic.png"
             value={mc.value}
@@ -239,6 +260,8 @@ export function DetailsStatsRow({
   // llegar la respuesta, el panel crecía y empujaba hacia abajo todo lo que va
   // debajo.
   pending = false,
+  // Disposición de teléfono forzada (ver `phoneLayout` del panel).
+  phone = false,
 }) {
   const customStatItems = Array.isArray(statItems)
     ? statItems.filter((item) => item?.label && item?.value != null)
@@ -250,21 +273,23 @@ export function DetailsStatsRow({
   );
   if (!hasCustomStats && !hasStats && !pending) return null;
 
+  // Teléfono: una sola fila que se desplaza, sin etiquetas. Los `sm:`/`md:`
+  // miran el viewport, así que en la ficha de teléfono del drawer (tablet)
+  // activaban la fila ancha con etiquetas y las stats se partían en dos filas.
+  const statsScrollerClass = `overflow-x-auto scrollbar-hide overscroll-x-contain [touch-action:pan-y] py-2.5 pl-[calc(1.25rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))] ${
+    phone
+      ? ""
+      : "sm:pl-[calc(1.5rem+env(safe-area-inset-left))] sm:pr-[calc(1.25rem+env(safe-area-inset-right))] md:overflow-x-visible"
+  }`;
+  const statsTrackClass = `flex w-max min-w-0 flex-nowrap items-center justify-start gap-x-4 gap-y-1.5 ${
+    phone ? "" : "sm:w-full sm:flex-wrap"
+  }`;
+
   if (hasCustomStats) {
     return (
       <div className="relative z-10 border-t border-white/5 bg-black/[0.04] rounded-b-2xl">
-        <div
-          className="
-          overflow-x-auto scrollbar-hide overscroll-x-contain [touch-action:pan-y]
-          py-2.5
-          pl-[calc(1.25rem+env(safe-area-inset-left))]
-          pr-[calc(0.75rem+env(safe-area-inset-right))]
-          sm:pl-[calc(1.5rem+env(safe-area-inset-left))]
-          sm:pr-[calc(1.25rem+env(safe-area-inset-right))]
-          md:overflow-x-visible
-        "
-        >
-          <div className="flex w-max min-w-0 flex-nowrap items-center justify-start gap-x-4 gap-y-1.5 sm:w-full sm:flex-wrap">
+        <div className={statsScrollerClass}>
+          <div className={statsTrackClass}>
             {customStatItems.map((item, index) => (
               <TraktStatBadge
                 key={item.key || `${item.label}-${index}`}
@@ -276,6 +301,7 @@ export function DetailsStatsRow({
                 }
                 label={item.label}
                 tooltip={item.tooltip}
+                phone={phone}
               />
             ))}
           </div>
@@ -293,24 +319,15 @@ export function DetailsStatsRow({
   return (
     <div className="relative z-10 border-t border-white/5 bg-black/[0.04] rounded-b-2xl">
       {/* Scroller con padding + safe-area para que no se recorte en bordes */}
-      <div
-        className="
-        overflow-x-auto scrollbar-hide overscroll-x-contain [touch-action:pan-y]
-        py-2.5
-        pl-[calc(1.25rem+env(safe-area-inset-left))]
-        pr-[calc(0.75rem+env(safe-area-inset-right))]
-        sm:pl-[calc(1.5rem+env(safe-area-inset-left))]
-        sm:pr-[calc(1.25rem+env(safe-area-inset-right))]
-        md:overflow-x-visible
-      "
-      >
-        <div className="flex w-max min-w-0 flex-nowrap items-center justify-start gap-x-4 gap-y-1.5 sm:w-full sm:flex-wrap">
+      <div className={statsScrollerClass}>
+        <div className={statsTrackClass}>
           {/* Watchers - Usuarios que siguen este contenido */}
           <TraktStatBadge
             icon={Eye}
             value={statValue(stats?.watchers)}
             pending={!hasStats && pending}
             label="SEGUIDORES"
+            phone={phone}
             tooltip="Seguidores"
           />
 
@@ -320,6 +337,7 @@ export function DetailsStatsRow({
             value={statValue(stats?.plays)}
             pending={!hasStats && pending}
             label="REPRODUCCIONES"
+            phone={phone}
             tooltip="Reproducciones"
           />
 
@@ -329,6 +347,7 @@ export function DetailsStatsRow({
             value={statValue(stats?.lists)}
             pending={!hasStats && pending}
             label="LISTAS"
+            phone={phone}
             tooltip="En listas"
           />
 
@@ -338,6 +357,7 @@ export function DetailsStatsRow({
               value={statValue(stats?.favorited)}
             pending={!hasStats && pending}
               label="FAVORITOS"
+              phone={phone}
               tooltip="Favoritos"
             />
           )}
@@ -418,6 +438,7 @@ function DetailsToolbarActions({
   shareIconOnly = false,
   toolbarActions = null,
   compactToolbar = false,
+  phone = false,
 }) {
   const prefersReducedMotion = useReducedMotion();
   const hasExternalLinks =
@@ -432,12 +453,12 @@ function DetailsToolbarActions({
     hasDesktopInlineActions || hasPlatformAction;
 
   const shareButton = share ? (
-    <div className={`${platformsMenuOnly ? "" : "ml-auto"} shrink-0 max-sm:[&>button]:!grid max-sm:[&>button]:!place-items-center max-sm:[&>button]:!isolate max-sm:[&>button]:!transform-gpu max-sm:[&>button]:!overflow-hidden max-sm:[&>button]:!w-10 max-sm:[&>button]:!h-10 max-sm:[&>button]:!p-0 max-sm:[&>button]:!rounded-full max-sm:[&>button]:!border-0 max-sm:[&>button]:!ring-0 max-sm:[&>button]:!outline-none max-sm:[&>button]:[-webkit-tap-highlight-color:transparent] max-sm:[&>button]:!bg-black/[0.04] max-sm:[&>button]:!bg-gradient-to-br max-sm:[&>button]:!from-white/10 max-sm:[&>button]:!via-transparent max-sm:[&>button]:!to-black/10 max-sm:[&>button]:!backdrop-blur-[6px] max-sm:[&>button]:!shadow-none max-sm:[&>button]:!text-zinc-200 max-sm:[&>button]:!transition-all max-sm:[&>button]:!duration-300 hover:max-sm:[&>button]:!text-white hover:max-sm:[&>button]:!bg-white/[0.08] hover:max-sm:[&>button]:!-translate-y-0.5 hover:max-sm:[&>button]:!border-0 hover:max-sm:[&>button]:!ring-0 focus:max-sm:[&>button]:!outline-none focus:max-sm:[&>button]:!border-0 focus:max-sm:[&>button]:!ring-0 active:max-sm:[&>button]:!border-0 active:max-sm:[&>button]:!ring-0 max-sm:[&>button>span]:!hidden max-sm:[&>button>svg]:!block max-sm:[&>button>svg]:!h-5 max-sm:[&>button>svg]:!w-5 max-sm:[&>button>svg]:!shrink-0`}>
+    <div className={`${platformsMenuOnly ? "" : "ml-auto"} shrink-0 ${phone ? "[&>button]:!rounded-full [&>button>svg]:!h-5 [&>button>svg]:!w-5" : ""} max-sm:[&>button]:!grid max-sm:[&>button]:!place-items-center max-sm:[&>button]:!isolate max-sm:[&>button]:!transform-gpu max-sm:[&>button]:!overflow-hidden max-sm:[&>button]:!w-10 max-sm:[&>button]:!h-10 max-sm:[&>button]:!p-0 max-sm:[&>button]:!rounded-full max-sm:[&>button]:!border-0 max-sm:[&>button]:!ring-0 max-sm:[&>button]:!outline-none max-sm:[&>button]:[-webkit-tap-highlight-color:transparent] max-sm:[&>button]:!bg-black/[0.04] max-sm:[&>button]:!bg-gradient-to-br max-sm:[&>button]:!from-white/10 max-sm:[&>button]:!via-transparent max-sm:[&>button]:!to-black/10 max-sm:[&>button]:!backdrop-blur-[6px] max-sm:[&>button]:!shadow-none max-sm:[&>button]:!text-zinc-200 max-sm:[&>button]:!transition-all max-sm:[&>button]:!duration-300 hover:max-sm:[&>button]:!text-white hover:max-sm:[&>button]:!bg-white/[0.08] hover:max-sm:[&>button]:!-translate-y-0.5 hover:max-sm:[&>button]:!border-0 hover:max-sm:[&>button]:!ring-0 focus:max-sm:[&>button]:!outline-none focus:max-sm:[&>button]:!border-0 focus:max-sm:[&>button]:!ring-0 active:max-sm:[&>button]:!border-0 active:max-sm:[&>button]:!ring-0 max-sm:[&>button>span]:!hidden max-sm:[&>button>svg]:!block max-sm:[&>button>svg]:!h-5 max-sm:[&>button>svg]:!w-5 max-sm:[&>button>svg]:!shrink-0`}>
       <ActionShareButton
         title={share.title}
         text={share.text}
         url={share.url}
-        iconOnly={shareIconOnly}
+        iconOnly={shareIconOnly || phone}
         animateEntrance={!platformsMenuOnly}
       />
     </div>
@@ -449,17 +470,20 @@ function DetailsToolbarActions({
       {hasInlineActions && (
         <>
           <div
-            className={`flex flex-1 items-center justify-center sm:block sm:flex-none ${hasDesktopInlineActions ? "" : "sm:hidden"}`}
+            className={`flex flex-1 items-center justify-center ${phone ? "" : `sm:block sm:flex-none ${hasDesktopInlineActions ? "" : "sm:hidden"}`}`}
           >
             <ToolbarSeparator />
           </div>
 
           <div
-            className={`min-w-0 flex flex-none items-center justify-end gap-2.5 sm:flex-1 sm:gap-3 ${hasDesktopInlineActions ? "" : "sm:hidden"} ${platformsMenuOnly ? styles.actionsViewport : ""}`}
+            // Teléfono: los botones miden lo suyo (`flex-none`) y el resto del
+            // ancho es para las puntuaciones. Con `sm:flex-1` se quedaban con
+            // la mitad de la barra y la tercera puntuación bajaba de línea.
+            className={`min-w-0 flex flex-none items-center justify-end gap-2.5 ${phone ? "" : `sm:flex-1 sm:gap-3 ${hasDesktopInlineActions ? "" : "sm:hidden"} ${platformsMenuOnly ? styles.actionsViewport : ""}`}`}
           >
-            <div className={`flex w-full items-center justify-end gap-2.5 sm:gap-3 ${platformsMenuOnly ? styles.actionRow : ""}`}>
+            <div className={`flex w-full items-center justify-end gap-2.5 ${phone ? "" : `sm:gap-3 ${platformsMenuOnly ? styles.actionRow : ""}`}`}>
             {/* Versión Desktop: plataformas primero, enlaces externos después. */}
-            {(!platformsMenuOnly || !externalLinksMenuOnly) && (
+            {!phone && (!platformsMenuOnly || !externalLinksMenuOnly) && (
               <div className="hidden sm:flex items-center gap-2.5 sm:gap-3">
                 {hasStreamingProviders && !platformsMenuOnly && (
                   <div className="flex items-center gap-2.5 sm:gap-3">
@@ -513,7 +537,7 @@ function DetailsToolbarActions({
                     : { layout: { duration: 0.3, ease: [0.22, 1, 0.36, 1] } }
                 }
                 aria-haspopup="dialog"
-                className={`relative isolate flex h-10 w-10 shrink-0 transform-gpu items-center justify-center overflow-hidden rounded-full bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 text-zinc-200 shadow-none backdrop-blur-[6px] transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/[0.08] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/30 ${platformsMenuOnly ? "sm:inline-flex sm:h-auto sm:w-auto sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2" : "sm:hidden"}`}
+                className={`relative isolate flex h-10 w-10 shrink-0 transform-gpu items-center justify-center overflow-hidden rounded-full bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 text-zinc-200 shadow-none backdrop-blur-[6px] transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/[0.08] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/30 ${phone ? "" : platformsMenuOnly ? "sm:inline-flex sm:h-auto sm:w-auto sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2" : "sm:hidden"}`}
                 title="Plataformas"
                 aria-label="Abrir plataformas disponibles"
               >
@@ -522,7 +546,7 @@ function DetailsToolbarActions({
                   className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]"
                 />
                 <MonitorPlay aria-hidden="true" className="relative z-10 h-5 w-5" />
-                {platformsMenuOnly && (
+                {platformsMenuOnly && !phone && (
                   <span className="relative z-10 hidden text-sm font-medium sm:block">
                     Plataformas
                   </span>
@@ -574,7 +598,7 @@ function DetailsToolbarActions({
             </div>
           </div>
 
-          {share && !externalLinksMenuOnly && hasDesktopInlineActions && (
+          {share && !phone && !externalLinksMenuOnly && hasDesktopInlineActions && (
             <ToolbarSeparator className="hidden md:block" />
           )}
         </>
@@ -637,6 +661,11 @@ export default function DetailsScoreboardPanel({
   // borde. Aquí las insignias ceden el ancho y se recorren con el dedo, y los
   // botones quedan siempre completos.
   compactToolbar = false,
+  // Disposición de TELÉFONO forzada, igual que la de una pantalla < 640px.
+  // La usa la ficha de teléfono del drawer: en tablet la ventana supera `sm` y
+  // todos los `sm:`/`md:` de este bloque se activaban aunque el panel sea
+  // estrecho, con lo que puntuaciones, stats y botones se partían en dos filas.
+  phoneLayout = false,
   toolbarActions = null,
   className = "",
   children = null,
@@ -683,7 +712,10 @@ export default function DetailsScoreboardPanel({
 
       {hasToolbar && (
         <div
-          className="
+          className={
+            phoneLayout
+              ? "relative z-10 py-3 pl-[calc(1.25rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))] flex items-center gap-2.5 overflow-x-clip overscroll-none [touch-action:pan-y]"
+              : `
       relative z-10
       py-3
       pl-[calc(1.25rem+env(safe-area-inset-left))]
@@ -692,13 +724,27 @@ export default function DetailsScoreboardPanel({
       sm:pr-[calc(1.25rem+env(safe-area-inset-right))]
       flex items-center gap-2.5 sm:gap-4
       overflow-x-clip sm:overflow-visible overscroll-none [touch-action:pan-y]
-    "
+    `
+          }
           style={compactToolbar ? { overflow: "hidden" } : undefined}
         >
           {/* `contents` deja la barra ancha EXACTAMENTE como estaba: el
               envoltorio desaparece de la maquetación. */}
           {/* `contents` deja la barra ancha EXACTAMENTE como estaba. */}
-          <div className={compactToolbar ? "min-w-0 flex-1" : "contents"}>
+          {/* Teléfono: las puntuaciones parten de su ancho natural
+              (`flex-initial`) y solo ceden —pasando a otra línea— si de verdad
+              no caben. Con `flex-1` se repartían el ancho a partes iguales con
+              el separador, que también es `flex-1`, y con la mitad de la barra
+              la tercera puntuación bajaba de fila aunque hubiera sitio. */}
+          <div
+            className={
+              compactToolbar
+                ? phoneLayout
+                  ? "min-w-0 flex-initial"
+                  : "min-w-0 flex-1"
+                : "contents"
+            }
+          >
             <DetailsRatingsBadges
               loading={loading}
               tmdb={tmdb}
@@ -708,6 +754,7 @@ export default function DetailsScoreboardPanel({
               rt={rt}
               mc={mc}
               compact={compactToolbar}
+              phone={phoneLayout}
             />
           </div>
 
@@ -723,6 +770,7 @@ export default function DetailsScoreboardPanel({
             shareIconOnly={shareIconOnly}
             toolbarActions={toolbarActions}
             compactToolbar={compactToolbar}
+            phone={phoneLayout}
           />
         </div>
       )}
@@ -732,6 +780,7 @@ export default function DetailsScoreboardPanel({
         statItems={statItems}
         showFavoritedStat={showFavoritedStat}
         pending={statsPending}
+        phone={phoneLayout}
       />
 
       {children}

@@ -3734,6 +3734,10 @@ export default function DetailModal({
                     : null
                 }
                 compactToolbar={mobileDetails}
+                // En tablet la ventana supera `sm` aunque el drawer sea
+                // estrecho: sin esto el marcador salía con la disposición
+                // ancha y puntuaciones y stats se partían en dos filas.
+                phoneLayout={mobileDetails}
                 externalLinks={externalLinks}
                 onMorePlatforms={(event) => {
                   stopNestedModalOpeningEvent(event);
@@ -3852,6 +3856,7 @@ export default function DetailModal({
                   // del panel. Son las mismas props que usa la ficha móvil.
                   mobileLayout={mobileDetails}
                   enableMobileTabSwipe={mobileDetails}
+                  phoneMenu={mobileDetails}
                   // Las tarjetas ENVUELVEN en vez de irse a una fila que se
                   // desplaza: el panel se puede estrechar, y en esa fila las
                   // últimas quedaban fuera de vista a la derecha, alcanzables
