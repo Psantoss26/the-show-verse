@@ -366,6 +366,15 @@ function SearchBar({
   const [loadingMore, setLoadingMore] = useState(false);
   const [remoteHasMore, setRemoteHasMore] = useState(false);
   const resultsScrollRef = useRef(null);
+  const resultsListRef = useRef(null);
+  // MÓVIL: tantos resultados por página como QUEPAN en pantalla, para que el
+  // desplegable se vea entero —con el selector de página al pie— sin tener que
+  // hacer scroll. En escritorio se mantienen 8 (ver `SEARCH_RESULTS_PAGE_SIZE`).
+  const [mobilePageSize, setMobilePageSize] = useState(
+    SEARCH_RESULTS_PAGE_SIZE,
+  );
+  const mobilePageSizeRef = useRef(SEARCH_RESULTS_PAGE_SIZE);
+  const resultsPageSize = isMobile ? mobilePageSize : SEARCH_RESULTS_PAGE_SIZE;
   // Estado de la paginación remota de la búsqueda en curso: consulta, filtro y
   // siguiente página de cada endpoint. `key` identifica la búsqueda para
   // descartar cargas que lleguen después de cambiar de consulta o de filtro.
@@ -471,6 +480,79 @@ function SearchBar({
       window.removeEventListener("scroll", schedulePositionUpdate, true);
     };
   }, [showDropdown, isMobile]);
+
+  // MÓVIL: cuántos resultados caben entre el borde superior del desplegable y
+  // el inferior de la pantalla VISIBLE (con el teclado abierto, `visualViewport`
+  // es más bajo que la ventana), descontando el selector de página del pie.
+  // Se mide la altura REAL de una fila ya pintada, así que sigue a la fuente y
+  // al zoom del sistema.
+  useLayoutEffect(() => {
+    if (!isMobile || !showDropdown || !dropdownPosition || !query.trim()) {
+      return undefined;
+    }
+    if (typeof window === "undefined") return undefined;
+
+    // Pie con el selector (botones de 36px + relleno + borde) y relleno de la
+    // lista.
+    const FOOTER_PX = 50;
+    const LIST_PADDING_PX = 16;
+    // MARGEN INFERIOR: el desplegable no debe llegar al borde de la pantalla.
+    // Con 16px se quedaba pegado abajo; ahora se reservan al menos 48px (o el
+    // 6% del alto visible, lo que sea mayor) más la zona segura del sistema
+    // (la barra de gestos del teléfono), que `env()` solo expone desde CSS.
+    const MIN_SCREEN_MARGIN_PX = 48;
+    const SCREEN_MARGIN_RATIO = 0.06;
+    const readSafeAreaBottom = () => {
+      const probe = document.createElement("div");
+      probe.style.cssText =
+        "position:fixed;visibility:hidden;pointer-events:none;padding-bottom:env(safe-area-inset-bottom)";
+      document.body.appendChild(probe);
+      const value = Number.parseFloat(getComputedStyle(probe).paddingBottom) || 0;
+      probe.remove();
+      return value;
+    };
+    const safeAreaBottom = readSafeAreaBottom();
+
+    let frameId = 0;
+    const measure = () => {
+      frameId = 0;
+      const row = resultsListRef.current?.firstElementChild;
+      const rowHeight = row?.getBoundingClientRect().height || 88;
+      const viewport = window.visualViewport;
+      const visibleBottom = viewport
+        ? viewport.offsetTop + viewport.height
+        : window.innerHeight;
+      const visibleHeight = viewport ? viewport.height : window.innerHeight;
+      const screenMargin =
+        Math.max(MIN_SCREEN_MARGIN_PX, visibleHeight * SCREEN_MARGIN_RATIO) +
+        safeAreaBottom;
+      const available =
+        visibleBottom -
+        dropdownPosition.top -
+        FOOTER_PX -
+        LIST_PADDING_PX -
+        screenMargin;
+      const next = Math.max(1, Math.min(20, Math.floor(available / rowHeight)));
+      const current = mobilePageSizeRef.current;
+      if (current === next) return;
+      mobilePageSizeRef.current = next;
+      setMobilePageSize(next);
+      // Se conserva a la vista el primer resultado de la página actual.
+      setResultsPage((page) => Math.floor((page * current) / next));
+    };
+    const schedule = () => {
+      if (!frameId) frameId = window.requestAnimationFrame(measure);
+    };
+
+    measure();
+    window.visualViewport?.addEventListener("resize", schedule);
+    window.addEventListener("resize", schedule);
+    return () => {
+      if (frameId) window.cancelAnimationFrame(frameId);
+      window.visualViewport?.removeEventListener("resize", schedule);
+      window.removeEventListener("resize", schedule);
+    };
+  }, [isMobile, showDropdown, dropdownPosition, query, results.length]);
 
   useLayoutEffect(() => {
     if (!showFilterMenu || !filterButtonRef.current || !searchRef.current) {
@@ -990,7 +1072,7 @@ function SearchBar({
 
   const resultsPageCount = Math.max(
     1,
-    Math.ceil(results.length / SEARCH_RESULTS_PAGE_SIZE),
+    Math.ceil(results.length / resultsPageSize),
   );
   const hasPrevResultsPage = resultsPage > 0;
   const hasNextResultsPage =
@@ -1391,7 +1473,11 @@ function SearchBar({
                 >
                   <div
                     ref={resultsScrollRef}
-                    className="max-h-[70vh] overflow-y-auto no-scrollbar"
+                    // Móvil: el alto lo dan las filas que caben (ver
+                    // `mobilePageSize`); el tope del 70% cortaba justo esas
+                    // filas y hacía volver el scroll. Queda un tope al alto
+                    // de pantalla solo como red de seguridad.
+                    className={`${isMobile ? "max-h-[calc(100dvh-5rem)]" : "max-h-[70vh]"} overflow-y-auto no-scrollbar`}
                   >
                     {!query.trim() ? (
               <div className="p-2">
@@ -1476,11 +1562,11 @@ function SearchBar({
                     </p>
                   </div>
                 ) : (
-                  <div className="p-2">
+                  <div ref={resultsListRef} className="p-2">
                     {results
                       .slice(
-                        resultsPage * SEARCH_RESULTS_PAGE_SIZE,
-                        (resultsPage + 1) * SEARCH_RESULTS_PAGE_SIZE,
+                        resultsPage * resultsPageSize,
+                        (resultsPage + 1) * resultsPageSize,
                       )
                       .map((item) => {
                     const isCollection = item.media_type === "collection";
