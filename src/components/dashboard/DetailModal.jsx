@@ -31,6 +31,7 @@ import {
   Heart,
   BookmarkPlus,
   Pin,
+  PanelRight,
   Smartphone,
   ArrowUpRight,
   Trophy,
@@ -650,6 +651,8 @@ export default function DetailModal({
   onContentViewChange,
   onDrawerViewChange,
   onDrawerWidthChange,
+  // Solo en los dashboards: alterna entre modal centrado y panel lateral.
+  onPlacementChange,
 }) {
   const isRightPlacement = placement === "right";
   const isDocked = isRightPlacement && drawerView === "docked";
@@ -3237,6 +3240,36 @@ export default function DetailModal({
               miden sus hijos y crece hacia la izquierda, de modo que al
               expandirse una, la otra se aparta sola. */}
           <div className="absolute right-4 top-4 z-30 flex items-center gap-2">
+            {/* Centrado ↔ lateral (solo dashboards). En lateral aparecen además
+                los mismos controles que en las páginas de usuario: acoplar y
+                vista de teléfono. */}
+            {onPlacementChange && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  stopNestedModalOpeningEvent(event);
+                  onPlacementChange(isRightPlacement ? "center" : "right");
+                }}
+                disabled={navigatingToFullDetails}
+                aria-label={
+                  isRightPlacement
+                    ? "Mostrar como modal centrado"
+                    : "Mostrar como panel lateral"
+                }
+                title={
+                  isRightPlacement
+                    ? "Mostrar como modal centrado"
+                    : "Mostrar como panel lateral"
+                }
+                aria-pressed={isRightPlacement}
+                className={`group flex h-10 w-10 shrink-0 select-none items-center justify-center rounded-full transition-all duration-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${DETAIL_MODAL_GLASS_CONTROL}`}
+              >
+                <PanelRight
+                  aria-hidden="true"
+                  className={`h-5 w-5 transition-transform duration-300 group-hover:scale-110 motion-reduce:transition-none ${isRightPlacement ? "text-white" : ""}`}
+                />
+              </button>
+            )}
             {isRightPlacement && onDrawerViewChange && (
               <button
                 type="button"

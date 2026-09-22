@@ -2028,7 +2028,9 @@ export default function MoviesPageClient({
   }
 
   return (
-    <DetailModalProvider>
+    // Dashboard: el modal puede abrirse centrado o como panel lateral, a
+    // elección del usuario (con acoplar y vista de teléfono en lateral).
+    <DetailModalProvider placementSwitchable>
       <DashboardHoverBackdropProvider>
         <motion.div
           className={`relative min-h-screen [overflow-x:clip] bg-black text-white selection:bg-amber-500/30 ${
