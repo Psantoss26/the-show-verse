@@ -78,7 +78,12 @@ const HERO_MOBILE_MEDIA = `not all and ${HERO_WIDE_QUERY}`;
 // referencia (hero de un monitor FullHD) y se escala entero con `scale`, así
 // ocupa siempre la misma fracción del hero sea cual sea la pantalla, en vez de
 // medir lo mismo en px en un portátil de 13" que en un monitor de 27".
-const HERO_UI_REF_WIDTH = 2200;
+// El ALTO es el límite principal (el bloque vive en la franja inferior). El
+// ancho solo frena cuando el bloque empezaría a comerse el centro de la
+// imagen: con 1700 el bloque (más su margen) se queda en ~40% del ancho. Así,
+// en un hero estrecho pero alto (ventana partida, panel lateral acoplado) no
+// se encoge tanto como si también fuera bajo.
+const HERO_UI_REF_WIDTH = 1700;
 const HERO_UI_REF_HEIGHT = 1080;
 const HERO_UI_MIN_SCALE = 0.6;
 // Con puntero táctil (tablet en horizontal) no se baja de aquí para que los

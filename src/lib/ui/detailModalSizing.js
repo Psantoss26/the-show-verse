@@ -128,12 +128,32 @@ export function clampDrawerWidth(width, viewportWidth, { tablet = false } = {}) 
 // Proporción de un teléfono vertical moderno (ancho / alto).
 export const MOBILE_DETAILS_ASPECT_RATIO = 9 / 19.5;
 
-// ANCHO MÍNIMO de la ficha de teléfono: el de un teléfono estrecho real, que es
-// para lo que está maquetada. MEDIDO: la fila de acciones del hero (tráiler,
-// soundtrack, vistos, puntuar, favorito, pendientes y listas) necesita ~295px
-// incluso con los botones ya encogidos, y por debajo se recortaba por los dos
-// lados.
-export const MOBILE_DETAILS_MIN_PX = 360;
+// ANCHO MÍNIMO de la ficha de teléfono. No es un número a ojo: es el ancho por
+// debajo del cual el marcador se degrada, MEDIDO en el navegador sobre el panel
+// real (17 títulos de los destacados de Películas y Series, sesión sin Trakt).
+//
+// 1) Las tres puntuaciones (TMDb, IMDb y Trakt) se parten en dos filas por
+//    debajo de 393px: en la barra estrecha las insignias ENVUELVEN, que es su
+//    forma de no recortarse.
+export const PHONE_RATINGS_ONE_ROW_PX = 393;
+
+// 2) La fila de seguidores/reproducciones/listas/favoritos es un carril con
+//    scroll horizontal, y por debajo de 431px deja parte fuera. El ancho que
+//    necesita depende de las CIFRAS de cada título ("312.2K REPRODUCCIONES" es
+//    de las más largas), así que este es el peor caso de la muestra.
+export const PHONE_STATS_NO_SCROLL_PX = 431;
+
+// Margen sobre la medida: las cifras crecen con el tiempo y una fuente puede
+// medir un pelo distinto. Lo justo para no quedarse al filo.
+export const PHONE_MIN_SAFETY_MARGIN_PX = 9;
+
+// Manda el mayor de los dos, que hoy es el de las estadísticas. Con este ancho
+// caben de sobra la fila de acciones del hero (tráiler, soundtrack, vistos,
+// puntuar, favorito, pendientes y listas), que necesita ~295px y era el motivo
+// anterior de este mínimo.
+export const MOBILE_DETAILS_MIN_PX =
+  Math.max(PHONE_RATINGS_ONE_ROW_PX, PHONE_STATS_NO_SCROLL_PX) +
+  PHONE_MIN_SAFETY_MARGIN_PX;
 
 // La ficha conserva la proporción móvil mientras quepa en alto. En pantallas
 // anchas y bajas (tablets en horizontal, portátiles de poca altura) ese ancho

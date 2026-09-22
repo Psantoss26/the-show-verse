@@ -56,7 +56,6 @@ import {
   MonitorPlay,
   Sparkles,
   Image as ImageIcon,
-  Link as LinkIcon,
   Music2,
   Play,
   RotateCcw,
@@ -99,7 +98,6 @@ import VideoModal from "@/components/details/VideoModal";
 import { fetchTmdbAwards } from "@/lib/api/tmdbAwards";
 import { getMediaTypeForItem, getMovieImages } from "@/lib/dashboard/media";
 import { getVideos } from "@/lib/api/tmdb";
-import { buildOriginalImageUrl } from "@/lib/details/images";
 import {
   uniqBy,
   isPlayableVideo,
@@ -152,12 +150,6 @@ function imgResBucket(img) {
   if (long >= 1920) return "1080p";
   if (long >= 1280) return "720p";
   return "sd";
-}
-
-function imgResLabel(img) {
-  const w = Number(img?.width || 0);
-  const h = Number(img?.height || 0);
-  return w > 0 && h > 0 ? `${w}×${h}` : null;
 }
 
 const RES_FILTERS = [
@@ -376,19 +368,6 @@ export default function PhoneDetailsSections({
     saveArtworkOverrides({ type: overrideType, id, changes });
     onArtworkSelection?.({ kind: "logo", filePath: null });
   }, [cacheArtworkOverrides, overrideType, id, mobilePosterKey, logoKey, onArtworkSelection]);
-
-  const handleCopyImageUrl = useCallback(async (filePath) => {
-    const url = buildOriginalImageUrl(filePath);
-    try {
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(url);
-      } else {
-        window.prompt("Copiar URL:", url);
-      }
-    } catch {
-      window.prompt("Copiar URL:", url);
-    }
-  }, []);
 
   const isLogoTab = activeImagesTab === "logos";
 
@@ -1363,7 +1342,6 @@ export default function PhoneDetailsSections({
                     const filePath = img?.file_path;
                     if (!filePath) return null;
                     const isActive = artworkSelection.activePath === filePath;
-                    const resText = imgResLabel(img);
                     const select = () =>
                       isLogoTab
                         ? handleSelectLogo(filePath, img)
@@ -1381,23 +1359,22 @@ export default function PhoneDetailsSections({
                               select();
                             }
                           }}
-                          // Tarjeta VERBATIM de la ficha móvil, indicadores
-                          // incluidos: la resolución y el botón de copiar URL
-                          // solo aparecen al pasar por encima. Al portarla les
-                          // quité esa condición pensando que en un teléfono no
-                          // se verían nunca -- y es cierto, ahí están ocultos--,
-                          // pero dejarlos fijos ensucia cada tarjeta con un
-                          // rótulo y un botón permanentes que la ficha no tiene.
-                          // Con la condición puesta, este panel se comporta
-                          // exactamente como esa misma tarjeta cuando se abre
-                          // con ratón.
+                          // Tarjeta de la ficha móvil SIN nada de hover: esta es
+                          // la vista de TELÉFONO, y un teléfono no tiene puntero.
+                          // Los efectos al pasar por encima (elevar la tarjeta,
+                          // ampliar la imagen, el velo, la resolución y el botón
+                          // de copiar URL) solo se veían al abrir el panel con
+                          // ratón, y en una tablet se quedaban pegados tras
+                          // tocar, porque el navegador mantiene :hover hasta el
+                          // siguiente toque. Lo único que distingue una tarjeta
+                          // es su estado de seleccionada.
                           className={`group relative w-full rounded-xl overflow-hidden bg-zinc-900 shadow-md cursor-pointer
-                        transition-all duration-300 transform-gpu hover:-translate-y-1
+                        transition-all duration-300 transform-gpu
                         after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300
                         ${
                           isActive
-                            ? "shadow-[0_0_12px_rgba(16,185,129,0.35)] after:shadow-[inset_0_0_0_2px_rgba(52,211,153,1)] hover:shadow-[0_0_16px_rgba(16,185,129,0.45)]"
-                            : "hover:shadow-yellow-900/20"
+                            ? "shadow-[0_0_12px_rgba(16,185,129,0.35)] after:shadow-[inset_0_0_0_2px_rgba(52,211,153,1)]"
+                            : ""
                         }`}
                           aria-label="Seleccionar"
                         >
@@ -1417,47 +1394,14 @@ export default function PhoneDetailsSections({
                               }
                               loading="lazy"
                               decoding="async"
-                              className={`w-full h-full ${isLogoTab ? "object-contain" : "object-cover"} transition-transform duration-500 ease-out transform-gpu
-                            group-hover:scale-[1.08]`}
+                              className={`w-full h-full ${isLogoTab ? "object-contain" : "object-cover"}`}
                             />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                           </div>
 
                           {isActive && (
                             <div className="absolute top-2 right-2 w-4 h-4 bg-emerald-400 rounded-full shadow-lg shadow-emerald-500/50 ring-2 ring-white/20" />
                           )}
 
-                          {resText && (
-                            <div className="absolute bottom-2.5 left-2.5 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0 z-10 pointer-events-none">
-                              <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-zinc-300">
-                                <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 shadow-[0_0_6px_rgba(255,255,255,0.4)]" />
-                                {resText}
-                              </span>
-                            </div>
-                          )}
-
-                          <div
-                            role="button"
-                            tabIndex={0}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleCopyImageUrl(filePath);
-                            }}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter" || event.key === " ") {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                handleCopyImageUrl(filePath);
-                              }
-                            }}
-                            className="group/link absolute bottom-0 right-0 z-20 p-2.5 rounded-tl-xl border-l border-t backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-bottom-right scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100 bg-black/40 border-white/10 text-zinc-300 hover:bg-white/20 hover:text-white"
-                            aria-label="Copiar URL"
-                          >
-                            <LinkIcon className="w-[18px] h-[18px]" />
-                            <div className="pointer-events-none absolute bottom-full mb-2 right-0 z-[100] scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/link:scale-100 group-hover/link:opacity-100 group-hover/link:delay-[2000ms]">
-                              Copiar URL
-                            </div>
-                          </div>
                         </div>
                       </SwiperSlide>
                     );
