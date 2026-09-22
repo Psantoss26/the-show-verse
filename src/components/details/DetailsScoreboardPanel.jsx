@@ -714,7 +714,7 @@ export default function DetailsScoreboardPanel({
         <div
           className={
             phoneLayout
-              ? "relative z-10 py-3 pl-[calc(1.25rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))] flex items-center gap-2.5 overflow-x-clip overscroll-none [touch-action:pan-y]"
+              ? "relative z-10 py-3 pl-[calc(1.25rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))] flex items-center gap-2.5 overflow-x-clip overscroll-x-none [touch-action:pan-y]"
               : `
       relative z-10
       py-3
@@ -723,9 +723,15 @@ export default function DetailsScoreboardPanel({
       sm:pl-[calc(1.5rem+env(safe-area-inset-left))]
       sm:pr-[calc(1.25rem+env(safe-area-inset-right))]
       flex items-center gap-2.5 sm:gap-4
-      overflow-x-clip sm:overflow-visible overscroll-none [touch-action:pan-y]
+      overflow-x-clip sm:overflow-visible overscroll-x-none [touch-action:pan-y]
     `
           }
+          // SOLO en horizontal (`overscroll-x-none`, no `overscroll-none`). Con
+          // `overflow: hidden` esta fila es un contenedor de scroll, y bloquear
+          // el encadenamiento en los DOS ejes impedía que un arrastre vertical
+          // sobre las puntuaciones llegara al scroll del panel: era la única
+          // zona de la ficha de teléfono donde no se podía desplazar con el
+          // dedo. Lo que había que evitar era el rebote lateral.
           style={compactToolbar ? { overflow: "hidden" } : undefined}
         >
           {/* `contents` deja la barra ancha EXACTAMENTE como estaba: el
