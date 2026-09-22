@@ -1209,21 +1209,18 @@ html {
       columnas iguales, "$94.0M" dejaba media tarjeta vacía. La que necesita
       ancho se lo queda y el sobrante se reparte a partes iguales.
 
-      La EXCEPCIÓN es el título original, la única tarjeta con texto largo: en
-      vez de exigir todo su título en una línea (hasta ~390px), parte de 16rem
-      y, si no le basta, pasa a DOS líneas. Era ella la que obligaba a partir la
-      fila en cuanto el panel se estrechaba un poco. Las demás —una fecha y dos
-      cifras— siguen en una línea; si el título ocupa dos, la fila crece con
+      El título original parte también de su ancho a una línea y aprovecha
+      el espacio libre de las demás antes de pasar a DOS líneas. Solo él se
+      encoge cuando falta espacio; las demás conservan el ancho de su contenido.
+      Si el título ocupa dos líneas, la fila crece con
       ella y las vecinas se estiran a su misma altura (`align-items: stretch`).
    3. SI NO CABEN, EN DOS FILAS COMO MÁXIMO: de dos en dos (`50% - medio
       hueco` impide que entre una tercera en la fila) o, si el título es tan
       largo que necesita su propia fila, él arriba y las otras tres juntas
       debajo (1 + 3). Nunca tres filas.
 
-   El corte en 44rem sale de sumar las cuatro tarjetas de Detalles: el título
-   a 16rem (256px) más las otras tres (~150px cada una, donde a veces manda el
-   rótulo y no el valor) y sus tres huecos, unos 740px. Antes estaba en 56rem
-   porque el título contaba entero a una línea, y la fila se partía a la mínima.
+   El corte en 44rem mantiene el reparto en parejas en paneles estrechos;
+   por encima, el título puede envolver sin obligar a partir la fila.
 
    Va por container query porque lo que manda es el ancho de la FILA, que
    cambia al arrastrar el panel, no el de la ventana. El contenedor es el
@@ -1258,10 +1255,9 @@ html {
   text-overflow: ellipsis;
 }
 
-/* El título original parte de 16rem en vez de su ancho a una línea (con
-   `flex-basis: auto`, el `width` es la base) y puede crecer como el resto. */
+/* Reservar primero el ancho del título completo antes de repartir sobrante. */
 .sv-info-cards > .sv-info-card--title {
-  width: 16rem;
+  width: max-content;
 }
 
 /* ...y su valor puede ir a DOS líneas; a partir de la tercera, recorte. */
@@ -1294,6 +1290,14 @@ html {
      dos cifras, y caben de sobra en un tercio. */
   .sv-info-cards:has(> .sv-info-card--wide) > :not(.sv-info-card--wide) {
     flex: 1 1 0;
+  }
+}
+
+/* En una sola fila, las tarjetas cortas conservan su ancho por contenido.
+   El título solo envuelve tras agotar el espacio libre de sus vecinas. */
+@container sv-info-cards (width >= 44rem) {
+  .sv-info-cards:has(> .sv-info-card--title) > :not(.sv-info-card--title) {
+    flex-shrink: 0;
   }
 }
 

@@ -131,10 +131,9 @@ test("un título original largo se queda solo en su fila", async () => {
   // cifras— nunca se quedan estrechas, así que se reparten la fila siguiente.
   assert.match(tabs, /const LONG_ORIGINAL_TITLE_CHARS = 30;/);
   assert.match(tabs, /wide: isLongOriginalTitle\(originalTitle\)/);
-  // Y es la única que puede ir a dos líneas: parte de 16rem en vez de exigir
-  // todo su título en una, que era lo que partía la fila a la mínima.
+  // Parte del ancho del título completo antes de recurrir a dos líneas.
   assert.match(tabs, /title: true,/);
-  assert.match(css, /\.sv-info-cards > \.sv-info-card--title \{\s*\n\s*width: 16rem;/);
+  assert.match(css, /\.sv-info-cards > \.sv-info-card--title \{\s*\n\s*width: max-content;/);
   assert.match(css, /\.sv-info-card--title \.sv-meta-value \{[\s\S]*?-webkit-line-clamp: 2;/);
   assert.match(css, /@container sv-info-cards \(width < 44rem\)/);
   assert.match(tabs, /return `min-w-0\$\{wide \? " sv-info-card--wide" : ""\}\$\{title \? " sv-info-card--title" : ""\}`;/);
