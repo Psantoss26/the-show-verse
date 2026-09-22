@@ -1334,8 +1334,10 @@ html {
    Es un container query y no una media query porque, con el drawer de la ficha
    acoplado, la ventana no cambia pero la zona sí se estrecha.
 
-   64rem = los 380px de la columna más el ancho mínimo que necesita el listado
-   de la izquierda para no quedarse en una tira. */
+   80rem (1280px) = los 380px de la columna, su hueco, y ~870px para el
+   listado. Con 64rem el calendario seguía a la vista con la ficha lateral
+   abierta, dejando al listado ~620px y sus tarjetas diminutas: ahí es mejor
+   pasarlo al botón y dar el ancho a las tarjetas. */
 .sv-history-layout-scope {
   container: sv-history-layout / inline-size;
 }
@@ -1349,7 +1351,7 @@ html {
   display: inline-flex;
 }
 
-@container sv-history-layout (width >= 64rem) {
+@container sv-history-layout (width >= 80rem) {
   .sv-history-layout--calendar {
     grid-template-columns: minmax(0, 1fr) 380px;
   }

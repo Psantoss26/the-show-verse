@@ -102,21 +102,20 @@ test("las tarjetas de Detalles y Producción llenan la fila o van en parejas", a
   assert.match(pairs.slice(0, 260), /flex: 1 1 calc\(50% - 0\.375rem\);/);
 });
 
-test("el desplegable no encoge con su botón", async () => {
-  // Medía justo lo que el disparador. Al compactarse la barra el botón se queda
-  // en un icono, y el menú heredaba ese ancho: sus opciones se partían en dos
-  // líneas o se cortaban. Es una capa flotante, no tiene por qué caber en el
-  // hueco del botón.
+test("el desplegable mide lo que su contenido, sin encoger con su botón", async () => {
+  // Medía justo lo que el disparador; al compactarse la barra el botón se queda
+  // en un icono y el menú heredaba ese ancho. Después se le puso un mínimo fijo
+  // de 224px, y los menús cortos ("Día / Mes / Año") quedaban demasiado anchos.
+  // Ahora: tan ancho como su contenido, nunca menos que su botón y con la
+  // ventana como tope.
   for (const page of PAGES) {
     const source = await read(`../../app/${page}.jsx`);
-    assert.match(source, /const MENU_MIN_WIDTH = 224;/, page);
-    assert.match(
-      source,
-      /Math\.max\(rect\.width, MENU_MIN_WIDTH\)/,
-      page,
-    );
-    // El tope sigue siendo la ventana: en pantallas estrechas manda ella.
-    assert.match(source, /window\.innerWidth - 24,/, page);
+    assert.doesNotMatch(source, /MENU_MIN_WIDTH/, page);
+    assert.match(source, /width: "max-content",/, page);
+    assert.match(source, /minWidth: rect\.width,/, page);
+    assert.match(source, /const menuMaxWidth = window\.innerWidth - 24;/, page);
+    // Se coloca con el ancho REAL del menú para no salirse por la derecha.
+    assert.match(source, /menuRef\.current\?\.offsetWidth/, page);
   }
 });
 
@@ -171,7 +170,7 @@ test("el historial muestra el calendario lateral O su botón, nunca los dos", as
   assert.doesNotMatch(history, /sv-history-calendar hidden xl:block/);
 
   // UN SOLO umbral decide las dos cosas: con sitio, calendario y sin botón.
-  const wide = css.slice(css.indexOf("@container sv-history-layout (width >= 64rem)"));
+  const wide = css.slice(css.indexOf("@container sv-history-layout (width >= 80rem)"));
   assert.match(wide.slice(0, 400), /\.sv-history-calendar \{\s*\n\s*display: block;/);
   assert.match(wide.slice(0, 400), /\.sv-history-calendar-trigger \{\s*\n\s*display: none;/);
   // El botón ya no depende del ancho de la barra de filtros.
