@@ -74,6 +74,7 @@ import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { compareImdbRatings } from "@/lib/userLists/imdbRatingSort";
 import HoverExpandCard from "@/components/ui/HoverExpandCard";
+import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 
 // Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
 // el mismo escalón que `w1280` en los backdrops. Antes era `w500` y en
@@ -1460,17 +1461,16 @@ function InlineDropdown({
     // ancho: sus opciones se partían en dos líneas o se cortaban. El menú es
     // una capa flotante, no tiene por qué caber en el hueco del botón.
     //
-    // 224px es el ancho al que entran en una línea las opciones más largas de
-    // estos menús ("Valoración más alta", "Añadido reciente"). El tope sigue
-    // siendo la ventana, así que en pantallas estrechas manda ella.
-    const MENU_MIN_WIDTH = 224;
-    const menuWidth = Math.min(
-      Math.max(rect.width, MENU_MIN_WIDTH),
-      window.innerWidth - 24,
-    );
+    // Ahora mide lo que su CONTENIDO: antes llevaba un mínimo fijo de 224px
+    // (lo que ocupan "Valoración más alta" o "Añadido reciente"), y los menús
+    // cortos como "Día / Mes / Año" quedaban mucho más anchos de lo necesario.
+    // El tope sigue siendo la ventana, así que en pantallas estrechas manda ella.
+    const menuMaxWidth = window.innerWidth - 24;
+    // Ancho REAL del menú ya pintado (en la primera llamada aún no existe).
+    const measured = menuRef.current?.offsetWidth || rect.width;
     const left = Math.min(
       Math.max(12, rect.left),
-      Math.max(12, window.innerWidth - menuWidth - 12),
+      Math.max(12, window.innerWidth - Math.min(measured, menuMaxWidth) - 12),
     );
 
     const availableBelow = window.innerHeight - rect.bottom - 12;
@@ -1480,7 +1480,11 @@ function InlineDropdown({
       position: "fixed",
       top: rect.bottom + 8,
       left,
-      width: menuWidth,
+      // Tan ancho como su contenido (opciones en una línea), nunca más
+      // estrecho que su botón y nunca más ancho que la ventana.
+      width: "max-content",
+      minWidth: rect.width,
+      maxWidth: menuMaxWidth,
       maxHeight: menuMaxHeight,
       zIndex: 1000,
     });
@@ -1576,11 +1580,18 @@ function DropdownItem({ active, onClick, children }) {
     <button
       type="button"
       onClick={onClick}
-      className={`w-full px-3 py-2 rounded-xl text-left text-sm transition flex items-center justify-between
+      className={`w-full px-3 py-2 rounded-xl text-left text-sm transition flex items-center justify-between gap-6
         ${active ? "bg-white/10 text-white font-bold" : "text-zinc-300 hover:bg-white/5 hover:text-white"}`}
     >
-      <span className="font-medium">{children}</span>
-      {active && <CheckCircle2 className="w-4 h-4 text-blue-500" />}
+      <span className="font-medium whitespace-nowrap">{children}</span>
+      {/* El hueco de la marca se reserva SIEMPRE: el menú mide lo que su
+          contenido (`max-content`), y así su ancho no cambia según qué opción
+          esté elegida ni el texto queda pegado al icono. */}
+      {active ? (
+        <CheckCircle2 className="w-4 h-4 shrink-0 text-blue-500" />
+      ) : (
+        <span aria-hidden="true" className="w-4 h-4 shrink-0" />
+      )}
     </button>
   );
 }
@@ -1930,6 +1941,8 @@ const WatchlistCard = memo(function WatchlistCard({
 
 // ================== MAIN COMPONENT ==================
 export default function WatchlistClient() {
+  // Buscador de la barra: con texto si cabe, o solo icono (ver el hook).
+  const toolbarSearchFitRef = usePageToolbarSearchFit();
   const {
     session,
     account,
@@ -3371,7 +3384,7 @@ export default function WatchlistClient() {
           </AnimatePresence>
 
           {/* Desktop: Single row */}
-          <div className="sv-page-toolbar relative z-10 hidden lg:flex gap-3">
+          <div ref={toolbarSearchFitRef} className="sv-page-toolbar relative z-10 hidden lg:flex gap-3">
             <div className="sv-page-toolbar-search relative flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-500 z-10 pointer-events-none" />
               <input
