@@ -10,19 +10,29 @@ const files = {
   personal: new URL("../../app/lists/[listId]/page.jsx", import.meta.url),
 };
 
-test("el bootstrap del avatar usa el cargador de scripts de Next", async () => {
+test("el bootstrap del avatar va como <script> plano en el <head> del layout raíz", async () => {
   const [avatarSource, layoutSource] = await Promise.all([
     readFile(files.avatar, "utf8"),
     readFile(files.layout, "utf8"),
   ]);
 
+  // El script es una cadena: ningún componente CLIENTE lo renderiza (React 19
+  // avisa de que un <script> creado en el cliente nunca se ejecuta).
   assert.match(avatarSource, /export const AVATAR_BOOT_SCRIPT/);
   assert.doesNotMatch(avatarSource, /<script/);
   assert.doesNotMatch(avatarSource, /export default function AvatarBootScript/);
-  assert.match(layoutSource, /import Script from "next\/script"/);
-  assert.match(layoutSource, /id="avatar-boot"/);
-  assert.match(layoutSource, /strategy="beforeInteractive"/);
-  assert.match(layoutSource, /__html: AVATAR_BOOT_SCRIPT/);
+
+  // Lo emite el layout raíz, que es un componente de SERVIDOR, dentro de su
+  // <head>: va en el HTML inicial y se ejecuta antes de hidratar. Con
+  // `next/script` + `beforeInteractive` en el <body>, Next 16 + React 19
+  // rompían la hidratación y React acababa creando el <script> en el cliente.
+  assert.doesNotMatch(layoutSource, /["']use client["']/);
+  assert.doesNotMatch(layoutSource, /from ["']next\/script["']/);
+  assert.doesNotMatch(layoutSource, /strategy="beforeInteractive"/);
+  assert.match(
+    layoutSource,
+    /<head>\s*<script\s+id="avatar-boot"\s+dangerouslySetInnerHTML=\{\{ __html: AVATAR_BOOT_SCRIPT \}\}/,
+  );
 });
 
 test("las fichas de listas no leen sessionStorage durante el primer render", async () => {

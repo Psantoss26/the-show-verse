@@ -8,8 +8,8 @@ import { AUTH_USER_CACHE_KEY } from "@/lib/auth/authUserCache";
 // la caché. En una recarga eso son unas décimas en las que el avatar se ve
 // vacío, justo el estado que el respaldo de la inicial debía evitar.
 //
-// El layout raíz lo registra con `next/script` y `beforeInteractive`, de modo
-// que Next lo incluye en el HTML inicial antes de hidratar el navbar. Deja en
+// El layout raíz lo incluye como etiqueta script plana en su head, de modo que va en
+// el HTML inicial y se ejecuta antes de hidratar el navbar. Deja en
 // :root la foto y la inicial del usuario de este dispositivo, y `.avatar-boot`
 // (globals.css) las consume. Sin caché no toca nada y el hueco sigue latiendo.
 //

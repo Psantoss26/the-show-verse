@@ -475,7 +475,7 @@ test("las tarjetas de Detalles y Producción no se esconden a la derecha", async
   // query puede mirar el ancho REAL de la fila y decidir entre una sola línea o
   // parejas. Aquí solo se comprueba que el drawer lo pide.
   assert.match(tabs, /if \(wrapCards\) return "sv-info-cards"/);
-  assert.match(tabs, /if \(wrapCards\) return wide \? "min-w-0 sv-info-card--wide" : "min-w-0";/);
+  assert.match(tabs, /return `min-w-0\$\{wide \? " sv-info-card--wide" : ""\}/);
   assert.match(modal, /wrapCards\n/);
 
   // Las tres filas de tarjetas (las dos escritas a mano y la de tarjetas

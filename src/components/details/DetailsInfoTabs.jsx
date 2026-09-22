@@ -91,12 +91,21 @@ const LONG_ORIGINAL_TITLE_CHARS = 30;
 export const isLongOriginalTitle = (value) =>
   typeof value === "string" && value.trim().length > LONG_ORIGINAL_TITLE_CHARS;
 
-export const infoCardClass = ({ mobileLayout, wrapCards, wide = false }) => {
+export const infoCardClass = ({
+  mobileLayout,
+  wrapCards,
+  wide = false,
+  // Tarjeta del título original: puede ir a DOS líneas (ver
+  // `.sv-info-card--title` en globals.css).
+  title = false,
+}) => {
   if (mobileLayout) return "w-full";
   // Las tarjetas de `.sv-info-cards` se dimensionan desde la hoja de estilos:
   // aquí solo hace falta permitir que se encojan por debajo de su contenido, y
   // marcar la que pide fila propia.
-  if (wrapCards) return wide ? "min-w-0 sv-info-card--wide" : "min-w-0";
+  if (wrapCards) {
+    return `min-w-0${wide ? " sv-info-card--wide" : ""}${title ? " sv-info-card--title" : ""}`;
+  }
   return "w-full lg:w-auto lg:flex-auto lg:shrink-0";
 };
 
@@ -416,6 +425,7 @@ export default function DetailsInfoTabs({
                       mobileLayout,
                       wrapCards,
                       wide: isLongOriginalTitle(originalTitle),
+                      title: true,
                     })}
                   />
 

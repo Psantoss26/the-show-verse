@@ -71,19 +71,58 @@ const DRAWER_INSET_VAR = "--sv-detail-drawer-inset";
 // que dependa de la variable.
 let publishedDrawerInset = null;
 
+// ARRASTRANDO, la variable NO se escribe en <html>.
+//
+// Cambiar una propiedad personalizada en la raíz invalida el estilo de TODO el
+// documento, porque la heredan todos sus elementos. Hacerlo en cada fotograma
+// del arrastre recalculaba la página entera sesenta (o ciento veinte) veces
+// por segundo, aunque la variable solo la leen tres piezas del navbar. Durante
+// el gesto se escribe directamente en esas piezas —el mismo valor, en el propio
+// elemento que la consume—, y en <html> una sola vez al soltar.
+const DRAWER_INSET_CONSUMERS =
+  ".sv-navbar-right-shift, .sv-navbar-bottom-shift, .sv-navbar-touch-shift";
+let dragInsetTargets = null;
+
+function isDrawerResizing() {
+  return document.documentElement.hasAttribute("data-sv-drawer-resizing");
+}
+
+function releaseDragInsetTargets() {
+  if (!dragInsetTargets) return;
+  for (const el of dragInsetTargets) el.style.removeProperty(DRAWER_INSET_VAR);
+  dragInsetTargets = null;
+}
+
 function publishDrawerInset(width) {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   if (width == null) {
+    releaseDragInsetTargets();
     if (publishedDrawerInset === null) return;
     publishedDrawerInset = null;
     root.style.removeProperty(DRAWER_INSET_VAR);
     return;
   }
   const next = Math.max(0, Math.round(width));
+  const value = `${next}px`;
+
+  if (isDrawerResizing()) {
+    // Se buscan una vez por gesto: el navbar no se monta ni desmonta mientras.
+    if (!dragInsetTargets) {
+      dragInsetTargets = Array.from(
+        document.querySelectorAll(DRAWER_INSET_CONSUMERS),
+      );
+    }
+    for (const el of dragInsetTargets) el.style.setProperty(DRAWER_INSET_VAR, value);
+    return;
+  }
+
+  // Fin del gesto (o cambio fuera de él): el valor vuelve a vivir en <html> y
+  // las copias locales se retiran para que no se queden desfasadas.
+  releaseDragInsetTargets();
   if (next === publishedDrawerInset) return;
   publishedDrawerInset = next;
-  root.style.setProperty(DRAWER_INSET_VAR, `${next}px`);
+  root.style.setProperty(DRAWER_INSET_VAR, value);
 }
 
 const DRAWER_VIEW_STORAGE_KEY = "showverse:detailModalView";
