@@ -99,6 +99,7 @@ import {
 import { formatDashboardAwards } from "@/lib/details/awardsText";
 import AddToListModal from "@/components/details/AddToListModal";
 import SoundtrackModal from "@/components/details/SoundtrackModal";
+import VideoModal from "@/components/details/VideoModal";
 import TraktCommentModal from "@/components/details/TraktCommentModal";
 import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
 import TraktWatchedModal from "@/components/trakt/TraktWatchedModal";
@@ -1789,17 +1790,15 @@ export default function DetailModal({
   };
 
   /* --------------------------------- trailer --------------------------------- */
+  // El tráiler se abre en el MISMO modal de vídeo que la ficha completa
+  // (DetailsClient), con sus controles y su sonido. Antes se reproducía dentro
+  // de la portada del propio drawer, sustituyendo a la imagen.
   const [showTrailer, setShowTrailer] = useState(false);
   const [trailer, setTrailer] = useState(null);
   const [trailerLoading, setTrailerLoading] = useState(false);
-  const trailerIframeRef = useRef(null);
 
   const handleToggleTrailer = async (e) => {
-    stopDrawerActionEvent(e);
-    if (showTrailer) {
-      setShowTrailer(false);
-      return;
-    }
+    stopNestedModalOpeningEvent(e);
     try {
       setTrailerLoading(true);
       setError("");
@@ -1810,7 +1809,7 @@ export default function DetailModal({
         setError("No hay tráiler disponible para este título.");
         return;
       }
-      setTrailer(t);
+      setTrailer({ ...t, name: t.name || `Tráiler - ${title}` });
       setShowTrailer(true);
     } catch {
       setTrailer(null);
@@ -1820,17 +1819,6 @@ export default function DetailModal({
       setTrailerLoading(false);
     }
   };
-
-  const trailerSrc = trailer?.key
-    ? `https://www.youtube-nocookie.com/embed/${trailer.key}` +
-      `?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1` +
-      `&controls=0&iv_load_policy=3&disablekb=1&fs=0` +
-      `&enablejsapi=1&origin=${
-        typeof window !== "undefined"
-          ? encodeURIComponent(window.location.origin)
-          : ""
-      }`
-    : null;
 
   /* --------------------------------- soundtrack -------------------------------- */
   const [soundtrackOpen, setSoundtrackOpen] = useState(false);
@@ -2643,7 +2631,8 @@ export default function DetailModal({
     platformsOpen ||
     traktWatchedOpen ||
     traktEpisodesOpen ||
-    episodeRatingsOpen;
+    episodeRatingsOpen ||
+    showTrailer;
 
   useEffect(() => {
     if (hasNestedModalOpen) {
@@ -2668,8 +2657,8 @@ export default function DetailModal({
   const actionsNode = (
     <>
     {/* Fila de acciones — MISMO componente presentacional que la ficha
-        completa (DetailsClient). El tráiler sigue reproduciéndose inline
-        en el hero; el resto abre los modales reutilizables. Se omiten el
+        completa (DetailsClient). Todas las acciones, tráiler incluido,
+        abren los mismos modales reutilizables. Se omiten el
         control de "visto" de Trakt y la valoración de episodios (no se
         pasan sus handlers), por lo que no se renderizan. */}
     {!isEpisode && (
@@ -2695,7 +2684,6 @@ export default function DetailModal({
           onTrailer={handleToggleTrailer}
           trailerAvailable
           trailerLoading={trailerLoading}
-          trailerPlaying={showTrailer}
           onSoundtrack={openSoundtrack}
           soundtrackAvailable={!!soundtrackSearchQuery}
           onEpisodeRatings={
@@ -2787,8 +2775,7 @@ export default function DetailModal({
             onTrailer={handleToggleTrailer}
             trailerAvailable
             trailerLoading={trailerLoading}
-            trailerPlaying={showTrailer}
-            onSoundtrack={openSoundtrack}
+              onSoundtrack={openSoundtrack}
             soundtrackAvailable={!!soundtrackSearchQuery}
             onEpisodeRatings={(event) => {
               stopNestedModalOpeningEvent(event);
@@ -2821,6 +2808,15 @@ export default function DetailModal({
 
   const modalLayer = (
     <>
+      {/* Tráiler: el MISMO modal de vídeo que la ficha completa. */}
+      <VideoModal
+        open={showTrailer}
+        onClose={() => setShowTrailer(false)}
+        video={trailer}
+        videos={trailer ? [trailer] : []}
+        onVideoChange={setTrailer}
+      />
+
       {/* Modal "Añadir a una lista" — mismo componente que la ficha completa */}
       <AddToListModal
         open={listModalOpen}
@@ -3338,7 +3334,7 @@ export default function DetailModal({
               }}
               className="absolute inset-0 w-full h-full"
             >
-              {!showTrailer && hasHeroArt && (
+              {hasHeroArt && (
                 <>
                   {mobileHeroSrc && (
                     <img
@@ -3375,69 +3371,10 @@ export default function DetailModal({
                 </>
               )}
 
-              {!showTrailer && !hasHeroArt && (
+              {!hasHeroArt && (
                 <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900" />
               )}
 
-              {showTrailer && (
-                <>
-                  {(trailerLoading || !trailerSrc) && (
-                    <div className="absolute inset-0 animate-pulse bg-neutral-900" />
-                  )}
-                  {trailerSrc && (
-                    // El recorte de 180%x140% existe para tapar la cromía de
-                    // YouTube (título arriba, controles abajo) desbordando el
-                    // vídeo por los cuatro lados. Eso funciona en una caja 2:3
-                    // o panorámica, pero la portada del TELÉFONO es 9:19.5: ahí
-                    // ese mismo desbordamiento deja en pantalla una columna
-                    // central del fotograma, sin nada reconocible. Por eso el
-                    // teléfono mete el recorte DENTRO de una banda 16:9 centrada
-                    // —el vídeo se ve entero, con el mismo truco anti-cromía— y
-                    // el resto de la portada queda en negro, como un reproductor.
-                    <div
-                      className={
-                        mobileDetails
-                          ? "absolute inset-0 flex items-center justify-center overflow-hidden bg-black"
-                          : "absolute inset-0 overflow-hidden"
-                      }
-                    >
-                    <div
-                      className={
-                        mobileDetails
-                          ? "relative aspect-video w-full overflow-hidden"
-                          : "contents"
-                      }
-                    >
-                      <iframe
-                        key={trailer.key}
-                        ref={trailerIframeRef}
-                        className="pointer-events-none absolute left-1/2 top-1/2 h-[180%] w-[140%] -translate-x-1/2 -translate-y-1/2"
-                        src={trailerSrc}
-                        title={`Tráiler - ${title}`}
-                        allow="autoplay; encrypted-media; picture-in-picture"
-                        allowFullScreen={false}
-                        onLoad={() => {
-                          try {
-                            const win = trailerIframeRef.current?.contentWindow;
-                            if (!win) return;
-                            const target = "https://www.youtube-nocookie.com";
-                            const cmd = (func, args = []) =>
-                              win.postMessage(
-                                JSON.stringify({ event: "command", func, args }),
-                                target,
-                                );
-                            setTimeout(() => {
-                              cmd("unMute");
-                              cmd("setVolume", [30]);
-                            }, 120);
-                          } catch {}
-                        }}
-                      />
-                    </div>
-                    </div>
-                  )}
-                </>
-              )}
             </motion.div>
             </div>
 
@@ -3450,7 +3387,7 @@ export default function DetailModal({
             {/* El arte de portada abre la ficha completa con la misma transición
                 que el control superior derecho. El botón queda bajo el logo y
                 los controles, para no interceptar sus interacciones. */}
-            {!showTrailer && hasHeroArt && (
+            {hasHeroArt && (
               <button
                 type="button"
                 onClick={goToFullDetails}
