@@ -2041,7 +2041,6 @@ export default function SeriesPageClient({
               >
                 <FeaturedHero
                   items={featuredItems}
-                  isMobile={isMobile}
                   deferInitialBackdrop
                 />
               </div>

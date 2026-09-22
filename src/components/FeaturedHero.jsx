@@ -4,6 +4,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -66,6 +67,40 @@ const HERO_SWIPE_THRESHOLD_PX = 60;
 const YOUTUBE_QUALITY_HINT = "highres";
 const YOUTUBE_QUALITY_MIN = "hd1080";
 const YOUTUBE_QUALITY_RETRY_DELAYS = [150, 750, 1800, 3200];
+
+// Layout ANCHO (backdrop + información en la esquina). Misma condición que la
+// variante `hero-wide:` de globals.css; lo demás (móvil y tablet en vertical)
+// usa el layout móvil con póster.
+const HERO_WIDE_QUERY = "(min-width: 40rem) and (min-aspect-ratio: 4 / 5)";
+const HERO_MOBILE_MEDIA = `not all and ${HERO_WIDE_QUERY}`;
+
+// Escala del bloque de información en el layout ancho. Se diseña a tamaño de
+// referencia (hero de un monitor FullHD) y se escala entero con `scale`, así
+// ocupa siempre la misma fracción del hero sea cual sea la pantalla, en vez de
+// medir lo mismo en px en un portátil de 13" que en un monitor de 27".
+const HERO_UI_REF_WIDTH = 2200;
+const HERO_UI_REF_HEIGHT = 1080;
+const HERO_UI_MIN_SCALE = 0.6;
+// Con puntero táctil (tablet en horizontal) no se baja de aquí para que los
+// botones sigan siendo cómodos de pulsar.
+const HERO_UI_MIN_SCALE_TOUCH = 0.66;
+const HERO_UI_MAX_SCALE = 1.1;
+// Alto de hero por debajo del cual los mínimos anteriores se relajan.
+const HERO_UI_MIN_FIT_HEIGHT = 700;
+
+function subscribeHeroWide(onChange) {
+  const mq = window.matchMedia(HERO_WIDE_QUERY);
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
+}
+
+function useHeroMobileLayout() {
+  return useSyncExternalStore(
+    subscribeHeroWide,
+    () => !window.matchMedia(HERO_WIDE_QUERY).matches,
+    () => false,
+  );
+}
 
 function uniquePaths(paths) {
   return [...new Set(paths.filter(Boolean))];
@@ -308,7 +343,7 @@ function HeroActionButton({
       disabled={disabled || loading}
       data-hero-action-button="true"
       onClick={handleClick}
-      className={`group/hero-action relative isolate flex h-9 w-9 items-center justify-center overflow-visible rounded-full border border-white/10 bg-black/20 bg-gradient-to-br from-white/10 via-white/[0.02] to-black/40 text-white backdrop-blur-[50px] transition-[scale,background-color,color,box-shadow,border-color] duration-300 ease-out hover:scale-110 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 cursor-default disabled:opacity-60 sm:h-10 sm:w-10 [&_svg]:h-5 [&_svg]:w-5 ${className}`}
+      className={`group/hero-action relative isolate flex h-9 w-9 items-center justify-center overflow-visible rounded-full border border-white/10 bg-black/20 bg-gradient-to-br from-white/10 via-white/[0.02] to-black/40 text-white backdrop-blur-[50px] transition-[scale,background-color,color,box-shadow,border-color] duration-300 ease-out hover:scale-110 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 cursor-default disabled:opacity-60 hero-wide:h-10 hero-wide:w-10 [&_svg]:h-5 [&_svg]:w-5 ${className}`}
       style={{
         containerType: "inline-size",
         backgroundColor:
@@ -1130,7 +1165,7 @@ function FeaturedSlide({
 
   return (
     <div
-      className="relative w-full h-full bg-black sm:bg-transparent cursor-pointer sm:absolute sm:inset-0 sm:h-full sm:w-full sm:block select-none"
+      className="relative w-full h-full bg-black hero-wide:bg-transparent cursor-pointer hero-wide:absolute hero-wide:inset-0 hero-wide:h-full hero-wide:w-full hero-wide:block select-none"
       onClick={openPreviewModal}
     >
       {/* FONDO enmascarado (solo desktop): envuelve imagen + sombras + base negra
@@ -1141,14 +1176,14 @@ function FeaturedSlide({
           `contents` en móvil = sin caja (no altera el layout móvil, que muestra el
           póster en flujo relativo); en desktop es la caja absoluta enmascarada. El
           CONTENIDO (logo/botones/indicadores) queda FUERA del wrapper → nítido. */}
-      <div className="contents sm:absolute sm:inset-0 sm:block sm:bg-black sm:[-webkit-mask-image:var(--sv-hero-fade)] sm:[mask-image:var(--sv-hero-fade)]">
+      <div className="contents hero-wide:absolute hero-wide:inset-0 hero-wide:block hero-wide:bg-black hero-wide:[-webkit-mask-image:var(--sv-hero-fade)] hero-wide:[mask-image:var(--sv-hero-fade)]">
       {/* Fondo/Poster: en móvil se muestra arriba (relative), en escritorio de fondo (absolute) */}
       <div
         className={`w-full ${
           showTrailer
             ? "absolute inset-0 h-full aspect-auto"
             : "relative aspect-[2/3]"
-        } sm:absolute sm:inset-0 sm:h-full sm:aspect-auto`}
+        } hero-wide:absolute hero-wide:inset-0 hero-wide:h-full hero-wide:aspect-auto`}
       >
         {!showTrailer && shouldLoadMedia && bgSrc && (
           <div
@@ -1161,7 +1196,7 @@ function FeaturedSlide({
           >
             <picture className="absolute inset-0 block h-full w-full">
               {posterSrc && (
-                <source media="(max-width: 639px)" srcSet={posterSrc} />
+                <source media={HERO_MOBILE_MEDIA} srcSet={posterSrc} />
               )}
               {maxBackdropSrc && (
                 <source
@@ -1170,7 +1205,7 @@ function FeaturedSlide({
                 />
               )}
               {backdropSrc && (
-                <source media="(min-width: 640px)" srcSet={backdropSrc} />
+                <source media={HERO_WIDE_QUERY} srcSet={backdropSrc} />
               )}
               {/* La selección responsive requiere <picture>; Next Image está
                   configurado como unoptimized y no generaría srcset. */}
@@ -1183,10 +1218,14 @@ function FeaturedSlide({
                 decoding="async"
                 fetchPriority={isActive ? "high" : "low"}
                 onLoad={() => setLoadedBackdropSrc(bgSrc)}
+                // Escritorio/tablet: `cover` para que el backdrop quede pegado
+                // a los cuatro bordes del hero con cualquier proporción de
+                // pantalla; se recorta lo que sobre, conservando la parte alta
+                // (caras y sujeto suelen estar arriba del centro).
                 className={`absolute inset-0 h-full w-full ${
                   isMobile
                     ? "object-contain object-top"
-                    : "object-contain object-right"
+                    : "object-cover object-[50%_25%]"
                 }`}
                 // Fundido mínimo en el borde inferior de la propia imagen para
                 // que su corte nunca sea una línea dura durante la carga.
@@ -1262,65 +1301,27 @@ function FeaturedSlide({
         )}
       </div>
 
-      {/* Difuminado lateral izquierdo (solo escritorio): oscurece la zona de
-          logo/información/botones, fundiéndose hacia el centro-derecha. */}
+      {/* Sombreado de la esquina inferior izquierda (solo layout ancho): oscurece
+          SOLO la zona donde vive la información. Va en porcentajes del hero, y
+          el bloque de información escala con el hero, así que ambos crecen y
+          encogen juntos y el resto del backdrop queda limpio. */}
       <div
-        className={`hero-side-shade pointer-events-none absolute inset-0 hidden sm:block ${
+        className={`hero-side-shade pointer-events-none absolute inset-0 hidden hero-wide:block ${
           showTrailer ? "opacity-[0.24]" : "opacity-100"
         }`}
         style={{
           background:
+            "radial-gradient(ellipse 62% 78% at 0% 100%," +
+            " rgba(0,0,0,0.82) 0%," +
+            " rgba(0,0,0,0.66) 30%," +
+            " rgba(0,0,0,0.4) 55%," +
+            " rgba(0,0,0,0.16) 78%," +
+            " transparent 100%)," +
             "linear-gradient(to right," +
-            " #000 0%," +
-            " rgba(0,0,0,0.93) 16%," +
-            " rgba(0,0,0,0.74) 30%," +
-            " rgba(0,0,0,0.52) 42%," +
-            " rgba(0,0,0,0.32) 52%," +
-            " rgba(0,0,0,0.17) 62%," +
-            " rgba(0,0,0,0.07) 70%," +
-            " rgba(0,0,0,0.02) 78%," +
-            " transparent 86%)",
-        }}
-      />
-
-      {/* Tapa-hueco lateral izquierdo (solo escritorio): el backdrop es
-          object-contain object-right, así que al ensanchar la ventana queda un
-          hueco a la izquierda cuyo tamaño = 100% - anchoImagen, donde
-          anchoImagen = alto máximo del hero * 16/9. Este panel negro cubre
-          SIEMPRE ese hueco (+2rem de margen) y se funde 14rem dentro de la
-          imagen, escalando con el ancho de la ventana para que el borde
-          izquierdo del backdrop no sea visible nunca. */}
-      <div
-        className={`hero-side-shade hero-backdrop-gap-shade pointer-events-none absolute inset-y-0 left-0 hidden sm:block ${
-          showTrailer ? "opacity-0" : "opacity-100"
-        }`}
-        style={{
-          // max() de los dos huecos posibles: el que deja la relación de
-          // aspecto (pantallas anchas y bajas, altura limitada por
-          // --hero-desktop-max-height) y el que ahora introduce a propósito
-          // --hero-info-image-width en pantallas estrechas de alta densidad,
-          // para que el centro del backdrop no quede tapado. Cada uno suma su
-          // propio margen de fundido (+42rem) para que el borde nunca se vea.
-          width:
-            "max(" +
-            "calc(100% - var(--hero-desktop-max-height, 88dvh) * 16 / 9 + 42rem), " +
-            "calc(100% - var(--hero-info-image-width, 100%) + 42rem)" +
-            ")",
-          background:
-            "linear-gradient(to right," +
-            " #000 0%," +
-            " #000 calc(100% - 40rem)," +
-            " rgba(0,0,0,0.88) calc(100% - 34rem)," +
-            " rgba(0,0,0,0.72) calc(100% - 28rem)," +
-            " rgba(0,0,0,0.56) calc(100% - 23rem)," +
-            " rgba(0,0,0,0.42) calc(100% - 18rem)," +
-            " rgba(0,0,0,0.29) calc(100% - 14rem)," +
-            " rgba(0,0,0,0.19) calc(100% - 10rem)," +
-            " rgba(0,0,0,0.11) calc(100% - 7rem)," +
-            " rgba(0,0,0,0.055) calc(100% - 4.5rem)," +
-            " rgba(0,0,0,0.022) calc(100% - 2.5rem)," +
-            " rgba(0,0,0,0.006) calc(100% - 1rem)," +
-            " transparent 100%)",
+            " rgba(0,0,0,0.5) 0%," +
+            " rgba(0,0,0,0.22) 22%," +
+            " rgba(0,0,0,0.06) 38%," +
+            " transparent 50%)",
         }}
       />
 
@@ -1330,21 +1331,24 @@ function FeaturedSlide({
           hover backdrop) se sustituye por la máscara `--sv-hero-fade` del wrapper:
           ahora el borde funde a TRANSPARENTE y revela lo que hay detrás sin corte. */}
 
-      {/* Contenido: relativo debajo en móvil, absoluto en escritorio */}
-      <div className="absolute bottom-0 left-0 right-0 z-10 w-full bg-gradient-to-t from-black via-black/95 to-transparent px-7 pb-3 pt-12 sm:absolute sm:inset-x-0 sm:bottom-0 sm:bg-none sm:px-20 sm:pb-28 lg:px-40 lg:pb-32 sm:pt-0">
-        <div className="flex max-w-full flex-col items-center text-center sm:block sm:max-w-xl sm:text-left">
+      {/* Contenido. Móvil/tablet vertical: franja inferior a todo el ancho con
+          degradado. Layout ancho: bloque de ancho fijo de referencia anclado a
+          la esquina inferior izquierda y escalado con --hero-ui-scale (ver
+          .hero-info-panel en los estilos). */}
+      <div className="hero-info-panel absolute bottom-0 left-0 right-0 z-10 w-full bg-gradient-to-t from-black via-black/95 to-transparent px-7 pb-3 pt-12">
+        <div className="hero-info-inner flex max-w-full flex-col items-center text-center hero-wide:block hero-wide:text-left">
             {/* Solo el logo del título; no se muestra el título en texto. */}
             {logoSrc ? (
               <div
-                className="hero-reveal hero-logo-reveal hero-info-logo relative mb-5 h-24 w-[72%] max-w-[17rem] sm:mb-8 sm:h-48 sm:max-w-xl lg:h-56 lg:max-w-2xl"
+                className="hero-reveal hero-logo-reveal hero-info-logo relative mb-5 h-24 w-[72%] max-w-[17rem] hero-wide:mb-7 hero-wide:h-44 hero-wide:w-[74%] hero-wide:max-w-none"
                 style={{ "--hero-delay": "80ms" }}
               >
                 <NextImage
                   src={logoSrc}
                   alt={title}
                   fill
-                  sizes="(min-width:1024px) 580px, (min-width:640px) 510px, 72vw"
-                  className="object-contain object-center sm:object-left"
+                  sizes="(min-width:640px) 440px, 72vw"
+                  className="object-contain object-center hero-wide:object-left"
                   style={{
                     // SOLO si el logo es oscuro lo pasamos a blanco para que sea
                     // legible sobre el fondo oscuro; si no, sombra normal.
@@ -1358,7 +1362,7 @@ function FeaturedSlide({
               </div>
             ) : logoResolved ? (
               <h2
-                className="hero-reveal hero-title-reveal hero-info-title mb-5 text-3xl font-black uppercase tracking-wide text-white drop-shadow-[0_4px_16px_rgba(0,0,0,0.95)] sm:mb-8 sm:text-5xl lg:text-6xl text-center sm:text-left"
+                className="hero-reveal hero-title-reveal hero-info-title mb-5 text-3xl font-black uppercase tracking-wide text-white drop-shadow-[0_4px_16px_rgba(0,0,0,0.95)] hero-wide:mb-8 hero-wide:text-6xl text-center hero-wide:text-left"
                 style={{ "--hero-delay": "80ms" }}
               >
                 {title}
@@ -1369,16 +1373,16 @@ function FeaturedSlide({
                  de texto solo aparece si se confirma que NO hay logo). */
               <div
                 aria-hidden="true"
-                className="hero-info-logo mb-5 h-24 w-[72%] max-w-[17rem] sm:mb-8 sm:h-48 sm:max-w-xl lg:h-56 lg:max-w-2xl"
+                className="hero-info-logo mb-5 h-24 w-[72%] max-w-[17rem] hero-wide:mb-7 hero-wide:h-44 hero-wide:w-[74%] hero-wide:max-w-none"
               />
             )}
 
             {/* Botones de acción ARRIBA (sobre los datos y puntuaciones).
                 Contenedor relativo: el indicador "ahora sonando" se posiciona de
                 forma absoluta debajo para no desplazar la información. */}
-            <div className="hero-info-actions relative mb-4 w-full max-w-full sm:mb-6 sm:w-auto">
+            <div className="hero-info-actions relative mb-4 w-full max-w-full hero-wide:mb-6 hero-wide:w-auto">
             <div
-              className="hero-reveal flex flex-nowrap items-center justify-center gap-1.5 sm:justify-start sm:gap-3 w-full max-w-full"
+              className="hero-reveal flex flex-nowrap items-center justify-center gap-1.5 hero-wide:justify-start hero-wide:gap-3 w-full max-w-full"
               style={{ "--hero-delay": "130ms" }}
             >
               {/* Fila de acciones COMPARTIDA con DetailsClient/DetailModal y las
@@ -1596,7 +1600,7 @@ function FeaturedSlide({
 
             {overview && !isMobile && (
               <p
-                className="hero-reveal hero-info-overview mb-4 line-clamp-2 max-w-xl text-xs leading-relaxed text-neutral-200/90 sm:mb-5 sm:line-clamp-3 sm:text-base"
+                className="hero-reveal hero-info-overview mb-4 line-clamp-2 max-w-xl text-xs leading-relaxed text-neutral-200/90 hero-wide:mb-5 hero-wide:line-clamp-3 hero-wide:text-base"
                 style={{ "--hero-delay": "290ms" }}
               >
                 {overview}
@@ -1694,48 +1698,47 @@ function FeaturedSlide({
           will-change: opacity, transform, filter;
         }
 
-        /* Encoge el backdrop de escritorio y lo re-ancla a la derecha (ver
-           --hero-info-image-width, definida en .featured-hero-shell más
-           abajo) para que su centro no quede tapado por la columna de
-           información en pantallas estrechas. left:auto deja que el nuevo
-           width mande; right se conserva en 0 desde el inset-0 de Tailwind. */
-        .hero-backdrop-reveal-desktop {
-          left: auto;
-          width: var(--hero-info-image-width, 100%);
+        /* Bloque de información en layout ANCHO. Se maqueta SIEMPRE al mismo
+           tamaño de referencia (36rem de ancho, logo 11rem...) y se escala
+           entero con --hero-ui-scale, que FeaturedHero calcula a partir del
+           tamaño real del hero. Así logo, botones y textos guardan la misma
+           proporción entre sí y respecto al backdrop en cualquier pantalla,
+           sin reflujo ni saltos por breakpoints, y el bloque se queda en su
+           esquina ocupando solo una fracción del hero. scale no afecta al
+           layout, así que el ancho fijo no desborda: se ve ya escalado.
+           Tambien los margenes al borde escalan, con un minimo para no pisar
+           las flechas laterales ni los indicadores.
+           OJO: esto es un template literal, aqui NO pueden ir acentos graves. */
+        @media (min-width: 40rem) and (min-aspect-ratio: 4 / 5) {
+          .hero-info-panel {
+            left: max(4.75rem, calc(var(--hero-ui-scale, 1) * 9rem));
+            right: auto;
+            bottom: max(3.5rem, calc(var(--hero-ui-scale, 1) * 7.5rem));
+            width: 36rem;
+            padding: 0;
+            background: none;
+            scale: var(--hero-ui-scale, 1);
+            transform-origin: left bottom;
+          }
         }
 
-        /* Columna de información (escritorio) más compacta cuando el hero
-           tiene poca altura disponible (ventanas bajas, portátiles de poca
-           pulgada en horizontal, zoom del navegador...): logo/título, huecos
-           entre bloques y sinopsis se encogen para que el conjunto quepa sin
-           apretarse contra el borde superior ni tapar la imagen. Ligado a la
-           ALTURA del viewport (no al ancho), y solo en escritorio -- en móvil
-           la columna ya vive en flujo normal debajo del póster, sin este
-           problema. */
-        @media (min-width: 640px) and (max-height: 50rem) {
-          .hero-info-logo {
-            height: 7rem;
-            max-width: 22rem;
-            margin-bottom: 1.25rem;
+        /* Tablet en VERTICAL (layout movil a mas ancho que un telefono): el
+           mismo bloque que en movil, ampliado para que no quede diminuto. */
+        @media (min-width: 40rem) and (max-aspect-ratio: 4 / 5) {
+          .hero-info-inner {
+            zoom: 1.2;
           }
+        }
 
-          .hero-info-title {
-            font-size: 2.25rem;
-            margin-bottom: 1.25rem;
+        @media (min-width: 48rem) and (max-aspect-ratio: 4 / 5) {
+          .hero-info-inner {
+            zoom: 1.35;
           }
+        }
 
-          .hero-info-actions {
-            margin-bottom: 1rem;
-          }
-
-          .hero-info-meta {
-            margin-bottom: 0.375rem;
-          }
-
-          .hero-info-overview {
-            margin-bottom: 0.75rem;
-            -webkit-line-clamp: 2;
-            line-clamp: 2;
+        @media (min-width: 60rem) and (max-aspect-ratio: 4 / 5) {
+          .hero-info-inner {
+            zoom: 1.5;
           }
         }
 
@@ -1753,15 +1756,6 @@ function FeaturedSlide({
         @media (min-width: 64rem) and (hover: hover) and (pointer: fine) {
           .hero-info-overview {
             display: -webkit-box;
-          }
-        }
-
-        /* Si aun así el conjunto sigue sin caber (ventanas muy bajas), se
-           retira directamente la sinopsis: es el bloque menos esencial y el
-           que más alto ocupa. */
-        @media (min-width: 640px) and (max-height: 41.25rem) {
-          .hero-info-overview {
-            display: none;
           }
         }
 
@@ -1923,9 +1917,11 @@ function FeaturedSlide({
  * ==================================================================== */
 export default function FeaturedHero({
   items = [],
-  isMobile,
   deferInitialBackdrop = false,
 }) {
+  // El layout lo decide el propio hero (no el `isMobile` por ancho de los
+  // dashboards): una tablet en vertical usa también el layout móvil.
+  const isMobile = useHeroMobileLayout();
   const assetsRef = useRef({});
   const resolvingAssetsRef = useRef(new Set());
   const lastBackdropChoiceRef = useRef(new Map());
@@ -1961,6 +1957,44 @@ export default function FeaturedHero({
   useEffect(() => {
     if (activeIndex >= list.length) setActiveIndex(0);
   }, [activeIndex, list.length]);
+
+  // Escala del bloque de información del layout ancho (ver .hero-info-panel).
+  // Se escribe como variable CSS directamente en el <section> para no
+  // re-renderizar al redimensionar. Layout effect: la primera medida se aplica
+  // antes de pintar, sin salto de tamaño al montar.
+  const hasHero = list.length > 0;
+  useLayoutEffect(() => {
+    const el = heroSectionRef.current;
+    if (!el) return;
+    const coarse = window.matchMedia("(pointer: coarse)");
+    const apply = (width, height) => {
+      if (!width || !height) return;
+      const raw = Math.min(
+        width / HERO_UI_REF_WIDTH,
+        height / HERO_UI_REF_HEIGHT,
+      );
+      // El mínimo mantiene legibles textos y botones, pero cede en heros
+      // muy bajos (p. ej. un móvil en horizontal) para que el bloque no
+      // suba hasta la barra superior.
+      const min = Math.min(
+        coarse.matches ? HERO_UI_MIN_SCALE_TOUCH : HERO_UI_MIN_SCALE,
+        height / HERO_UI_MIN_FIT_HEIGHT,
+      );
+      const scale = Math.min(HERO_UI_MAX_SCALE, Math.max(min, raw));
+      el.style.setProperty("--hero-ui-scale", scale.toFixed(3));
+    };
+    const rect = el.getBoundingClientRect();
+    apply(rect.width, rect.height);
+    const observer = new ResizeObserver(([entry]) => {
+      const box = entry.borderBoxSize?.[0];
+      apply(
+        box?.inlineSize ?? entry.contentRect.width,
+        box?.blockSize ?? entry.contentRect.height,
+      );
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasHero]);
 
   useEffect(() => {
     const heroHost = heroSectionRef.current?.parentElement;
@@ -2357,11 +2391,11 @@ export default function FeaturedHero({
           : "pointer-events-none invisible opacity-0"
       }`}
     >
-      <span className="inline-flex translate-y-[6px] sm:translate-y-0">
+      <span className="inline-flex translate-y-[6px] hero-wide:translate-y-0">
         <span className="hero-scroll-cue inline-flex drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
           <ChevronDown
             aria-hidden="true"
-            className="h-7 w-7 transition-transform duration-300 group-hover:translate-y-0.5 sm:h-8 sm:w-8"
+            className="h-7 w-7 transition-transform duration-300 group-hover:translate-y-0.5 hero-wide:h-8 hero-wide:w-8"
           />
         </span>
       </span>
@@ -2372,7 +2406,7 @@ export default function FeaturedHero({
     <>
       <section
         ref={heroSectionRef}
-        className="featured-hero-shell relative isolate w-full touch-pan-y overflow-hidden bg-black sm:bg-transparent h-[calc(100svh-7.8rem-env(safe-area-inset-bottom))] sm:h-auto sm:aspect-video sm:max-h-[var(--hero-desktop-max-height)]"
+        className="featured-hero-shell relative isolate w-full touch-pan-y overflow-hidden bg-black hero-wide:bg-transparent h-[calc(100svh-7.8rem-env(safe-area-inset-bottom))] hero-wide:h-[var(--hero-wide-height)]"
         aria-label="Contenido destacado"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -2409,7 +2443,7 @@ export default function FeaturedHero({
                 event.stopPropagation();
                 goToPrevious();
               }}
-              className="group/arrow absolute left-4 top-1/2 z-20 hidden h-14 w-14 -translate-y-1/2 items-center justify-center text-white drop-shadow-[0_3px_10px_rgba(0,0,0,0.95)] transition-transform duration-300 hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300/70 sm:flex"
+              className="group/arrow absolute left-4 top-1/2 z-20 hidden h-14 w-14 -translate-y-1/2 items-center justify-center text-white drop-shadow-[0_3px_10px_rgba(0,0,0,0.95)] transition-transform duration-300 hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300/70 hero-wide:flex"
             >
               <ChevronLeft className="h-9 w-9 transition-transform duration-300 group-hover/arrow:-translate-x-0.5" />
             </button>
@@ -2420,7 +2454,7 @@ export default function FeaturedHero({
                 event.stopPropagation();
                 goToNext();
               }}
-              className="group/arrow absolute right-4 top-1/2 z-20 hidden h-14 w-14 -translate-y-1/2 items-center justify-center text-white drop-shadow-[0_3px_10px_rgba(0,0,0,0.95)] transition-transform duration-300 hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300/70 sm:flex"
+              className="group/arrow absolute right-4 top-1/2 z-20 hidden h-14 w-14 -translate-y-1/2 items-center justify-center text-white drop-shadow-[0_3px_10px_rgba(0,0,0,0.95)] transition-transform duration-300 hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300/70 hero-wide:flex"
             >
               <ChevronRight className="h-9 w-9 transition-transform duration-300 group-hover/arrow:translate-x-0.5" />
             </button>
@@ -2428,22 +2462,22 @@ export default function FeaturedHero({
         )}
 
         {!isMobile && (
-          <div className="absolute bottom-[3.25rem] left-1/2 z-20 -translate-x-1/2">
+          <div className="absolute bottom-[4.25rem] left-1/2 z-20 -translate-x-1/2">
             {indicators && indicators}
           </div>
         )}
       </section>
 
       {!isMobile && (
-        <div className="pointer-events-none relative z-20 hidden h-0 sm:block">
-          <div className="pointer-events-auto absolute left-1/2 top-2 -translate-x-1/2">
+        <div className="pointer-events-none relative z-20 hidden h-0 hero-wide:block">
+          <div className="pointer-events-auto absolute bottom-1.5 left-1/2 -translate-x-1/2">
             {scrollCue}
           </div>
         </div>
       )}
 
       {isMobile && (
-        <div className="relative h-14 bg-black sm:hidden">
+        <div className="relative h-14 bg-black hero-wide:hidden">
           {indicators && (
             <div className="absolute left-1/2 top-1 -translate-x-1/2">
               {indicators}
@@ -2456,56 +2490,17 @@ export default function FeaturedHero({
       )}
 
       <style jsx>{`
+        /* Alto del hero en layout ancho: TODO el alto visible, sin franja
+           vacía debajo, sea cual sea la proporción del monitor (16:9, 16:10,
+           4:3, ultrapanorámico...). El backdrop va en cover: en pantallas más
+           altas que 16:9 se amplía y se recorta por los lados; en las más
+           anchas, por arriba y abajo. svh y no dvh: en tablet el alto no salta
+           al mostrarse u ocultarse la barra del navegador.
+           Tope de 80vw (proporción 5:4): en ventanas casi cuadradas llenar el
+           alto obligaría a recortar más de la mitad del ancho del backdrop, y
+           ahí es preferible dejar algo de hueco debajo. */
         .featured-hero-shell {
-          --hero-desktop-max-height: 92dvh;
-          /* Ancho reservado por la columna de información (logo + botones +
-             sinopsis): padding lateral (sm:px-20 = 5rem) + su max-width
-             (sm:max-w-xl = 36rem) = 41rem = 656px. Se usa para calcular cuánto
-             hay que encoger y desplazar el backdrop a la derecha en pantallas
-             estrechas -- ver --hero-info-image-width más abajo. */
-          --hero-info-panel-px: 656px;
-        }
-
-        /* Pantallas grandes (FullHD y panorámicas): el hero ocupa casi toda la
-           altura visible, dejando solo un pequeño margen inferior. Se amplía el
-           rango de relación de aspecto hasta 3/1 para cubrir también monitores
-           anchos/ultrapanorámicos, donde antes quedaba demasiado negro abajo. */
-        @media (min-width: 100rem) and (min-height: 53.125rem) and (min-aspect-ratio: 3 / 2) and (max-aspect-ratio: 3 / 1) {
-          .featured-hero-shell {
-            --hero-desktop-max-height: 95dvh;
-          }
-        }
-
-        /* De 1024px en adelante el padding lateral pasa a lg:px-40 = 10rem, así
-           que el hueco reservado crece a 10rem + 36rem = 46rem = 736px. */
-        @media (min-width: 1024px) {
-          .featured-hero-shell {
-            --hero-info-panel-px: 736px;
-          }
-        }
-
-        /* Ancho del backdrop de escritorio, encogido y anclado a la derecha
-           para que su CENTRO quede SIEMPRE fuera de la columna de información,
-           sea cual sea el ancho de la ventana (no solo su relación de
-           aspecto). En pantallas grandes (p. ej. un monitor 27" 16:9) el hueco
-           de la columna es una fracción pequeña del ancho total y la fórmula
-           satura en el 100% -- el backdrop se ve exactamente igual que antes.
-           En pantallas más estrechas pero de alta resolución (p. ej. una
-           tablet/portátil de 12" 2K, donde la columna de información -que mide
-           lo mismo en px- ocupa una fracción mucho mayor del ancho) el
-           backdrop se encoge y se desplaza a la derecha lo justo para que su
-           punto medio no quede tapado. Deducción: si el backdrop (ancho W,
-           anclado a la derecha) reproduce la imagen completa sin recortar,
-           su centro cae en pantalla a 100% - W/2; igualando eso al borde
-           derecho de la columna (--hero-info-panel-px) y despejando W:
-           W = 2 * (100vw - panel). El suelo del 50% evita que se encoja de
-           más en ventanas de escritorio muy estrechas (~640-700px). */
-        .featured-hero-shell {
-          --hero-info-image-width: clamp(
-            50%,
-            calc((100vw - var(--hero-info-panel-px)) * 2),
-            100%
-          );
+          --hero-wide-height: min(100svh, 80vw);
         }
 
         .hero-scroll-cue {

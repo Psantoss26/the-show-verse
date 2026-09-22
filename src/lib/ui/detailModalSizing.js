@@ -128,15 +128,30 @@ export function clampDrawerWidth(width, viewportWidth, { tablet = false } = {}) 
 // Proporción de un teléfono vertical moderno (ancho / alto).
 export const MOBILE_DETAILS_ASPECT_RATIO = 9 / 19.5;
 
-// La ficha conserva tanto la proporción móvil como espacio para la página.
-// El límite por altura impide que el teléfono se salga de la pantalla.
+// ANCHO MÍNIMO de la ficha de teléfono: el de un teléfono estrecho real, que es
+// para lo que está maquetada. MEDIDO: la fila de acciones del hero (tráiler,
+// soundtrack, vistos, puntuar, favorito, pendientes y listas) necesita ~295px
+// incluso con los botones ya encogidos, y por debajo se recortaba por los dos
+// lados.
+export const MOBILE_DETAILS_MIN_PX = 360;
+
+// La ficha conserva la proporción móvil mientras quepa en alto. En pantallas
+// anchas y bajas (tablets en horizontal, portátiles de poca altura) ese ancho
+// saldría por debajo del mínimo, así que el ancho NUNCA baja de
+// `MOBILE_DETAILS_MIN_PX`: ahí el panel se limita al alto de la ventana (ver
+// `max-h-full` en DetailModal) y queda algo más ancho que un teléfono; la
+// portada es `object-cover`, así que hace zoom y lo cubre pegada a los bordes.
+// El 60% del viewport sigue siendo el techo para dejar sitio a la página.
 export function clampMobileDetailsWidth(width, viewportWidth, viewportHeight = Infinity) {
-  const max = Math.min(
-    639,
-    Math.floor(viewportWidth * 0.6),
-    Math.floor(viewportHeight * MOBILE_DETAILS_ASPECT_RATIO),
+  const min = Math.min(MOBILE_DETAILS_MIN_PX, Math.floor(viewportWidth * 0.6));
+  const max = Math.max(
+    min,
+    Math.min(
+      639,
+      Math.floor(viewportWidth * 0.6),
+      Math.floor(viewportHeight * MOBILE_DETAILS_ASPECT_RATIO),
+    ),
   );
-  const min = Math.min(320, max);
   return Math.max(min, Math.min(Math.round(width ?? max), max));
 }
 

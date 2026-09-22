@@ -2049,7 +2049,6 @@ export default function MoviesPageClient({
               >
                 <FeaturedHero
                   items={featuredItems}
-                  isMobile={isMobile}
                   deferInitialBackdrop
                 />
               </div>
