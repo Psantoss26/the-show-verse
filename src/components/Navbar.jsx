@@ -22,7 +22,7 @@ import { useAuth } from "@/context/AuthContext";
 import UserAvatar, { UserAvatarBoot } from "@/components/auth/UserAvatar";
 import Avatar from "@/components/ui/Avatar";
 import { useTranslation } from "@/lib/i18n";
-import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   FilmIcon,
   TvIcon,
@@ -1690,6 +1690,89 @@ function TopBarGlassLayers({ className = "" }) {
   );
 }
 
+// CÁPSULA DE LA SECCIÓN ACTIVA de la barra inferior.
+//
+// Es UN solo elemento dentro de la barra, colocado con la posición del botón
+// activo RELATIVA a la barra (`offsetLeft`/`offsetTop`). Así nunca puede
+// aparecer fuera de ella.
+//
+// Antes cada botón montaba su propia cápsula con un `layoutId` de Framer, que
+// anima desde la ÚLTIMA POSICIÓN EN PANTALLA que recuerda. Al pasar por una
+// página sin sección activa (una ficha, por ejemplo) la cápsula se desmontaba,
+// y al volver Framer la traía desde donde la vio por última vez: si en ese
+// momento la barra estaba escondida por el scroll, compactada o apartada por el
+// drawer, la cápsula entraba volando desde fuera de la barra.
+//
+// Ahora solo se DESLIZA al cambiar directamente de una sección a otra. Si antes
+// no había ninguna activa, aparece ya en su sitio con un fundido.
+function BottomNavActiveLens({ activeKey, circleClassName }) {
+  const lensRef = useRef(null);
+  const shownRef = useRef(false);
+
+  useLayoutEffect(() => {
+    const lens = lensRef.current;
+    // La barra es el PADRE directo de la cápsula. No se pasa por ref: en el
+    // primer montaje React ejecuta este efecto (del hijo) antes de asignar la
+    // ref del <nav>, que aún valdría `null`, y la cápsula no se colocaba.
+    const nav = lens?.parentElement;
+    if (!nav || !lens) return undefined;
+
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+    const place = (slide) => {
+      const link = activeKey
+        ? nav.querySelector('a[aria-current="page"]')
+        : null;
+      if (!link) {
+        lens.style.transition = "opacity 150ms ease-out";
+        lens.style.opacity = "0";
+        shownRef.current = false;
+        return;
+      }
+      // La transición se fija ANTES de mover la cápsula: sin deslizamiento,
+      // solo se anima la opacidad y el salto de posición no se ve.
+      lens.style.transition =
+        slide && !reduceMotion
+          ? "transform 380ms cubic-bezier(0.22, 1, 0.36, 1), width 380ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease-out"
+          : "opacity 200ms ease-out";
+      lens.style.width = `${link.offsetWidth}px`;
+      lens.style.height = `${link.offsetHeight}px`;
+      lens.style.transform = `translate3d(${link.offsetLeft}px, ${link.offsetTop}px, 0)`;
+      lens.style.opacity = "1";
+      shownRef.current = true;
+    };
+
+    place(shownRef.current);
+
+    // La barra cambia de ancho (rotación, drawer de tablet): se recoloca sin
+    // deslizar. Solo ante un cambio REAL de tamaño: el observador también avisa
+    // al empezar a observar, y ese aviso pisaría el deslizamiento recién puesto.
+    let lastWidth = nav.offsetWidth;
+    const observer =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => {
+            if (nav.offsetWidth === lastWidth) return;
+            lastWidth = nav.offsetWidth;
+            place(false);
+          })
+        : null;
+    observer?.observe(nav);
+    return () => observer?.disconnect();
+  }, [activeKey]);
+
+  return (
+    <span
+      ref={lensRef}
+      aria-hidden="true"
+      className="pointer-events-none absolute left-0 top-0 z-0 flex items-center justify-center opacity-0"
+    >
+      <span className={circleClassName} />
+    </span>
+  );
+}
+
 export default function Navbar() {
   const pathname = usePathname();
   if (pathname?.startsWith("/embed/details/")) return null;
@@ -2182,13 +2265,9 @@ function NavbarContent() {
 
   // Lente de la sección activa: un CÍRCULO de cristal líquido (Liquid Glass) con
   // desenfoque de fondo, iluminación especular en el canto, refracción óptica y
-  // resplandor tonal adaptado a la identidad de cada sección.
-  //
-  // El `layoutId` va en una capa que ocupa la celda ENTERA y el círculo es un
-  // hijo centrado: así Framer anima la posición de la celda (el deslizamiento
-  // entre secciones) sin pelearse con la transformación que centraría el
-  // círculo.
-  const getMobileBottomActiveLens = (tone = "blue") => {
+  // resplandor tonal adaptado a la identidad de cada sección. La coloca y la
+  // mueve <BottomNavActiveLens>; aquí solo se decide su aspecto.
+  const getMobileBottomLensCircleClass = (tone = "blue") => {
     const TONE_CONFIGS = {
       gold: {
         glow: "shadow-[0_4px_16px_rgba(0,0,0,0.6),0_0_22px_rgba(252,211,77,0.45),inset_0_1px_1.5px_rgba(255,255,255,0.32),inset_0_-2px_4px_rgba(0,0,0,0.3)]",
@@ -2217,19 +2296,7 @@ function NavbarContent() {
     };
 
     const config = TONE_CONFIGS[tone] || TONE_CONFIGS.blue;
-
-    return (
-      <motion.span
-        aria-hidden="true"
-        layoutId="mobile-bottom-nav-active"
-        className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center"
-        transition={{ type: "spring", stiffness: 420, damping: 34, mass: 0.7 }}
-      >
-        <span
-          className={`block aspect-square h-[88%] rounded-full backdrop-blur-[14px] backdrop-saturate-[200%] backdrop-contrast-[1.1] ${config.bg} ${config.glow}`}
-        />
-      </motion.span>
-    );
+    return `block aspect-square h-[88%] rounded-full backdrop-blur-[14px] backdrop-saturate-[200%] backdrop-contrast-[1.1] ${config.bg} ${config.glow}`;
   };
 
   // Las fichas conservan siempre la presencia compacta de su entrada. Así el
@@ -2371,6 +2438,15 @@ function NavbarContent() {
   // su conexión necesaria si la cuenta correspondiente no está enlazada.
   const favHref = "/favorites";
   const watchHref = "/watchlist";
+  // Sección activa de la barra inferior y su tono, para la cápsula.
+  const mobileBottomActive = [
+    { href: "/social", tone: "pink" },
+    { href: "/lists", tone: "purple" },
+    { href: "/in-progress", tone: "green" },
+    { href: "/history", tone: "green" },
+    { href: favHref, tone: "red" },
+    { href: watchHref, tone: "blue" },
+  ].find((entry) => isActive(entry.href));
   const loginHref = `/login?next=${encodeURIComponent(
     pathname || "/",
   )}`;
@@ -2838,8 +2914,6 @@ function NavbarContent() {
       </nav>
 
       {/* ===================== BOTTOM BAR (MÓVIL) ===================== */}
-      {/* LayoutGroup acota el `layoutId` de la cápsula activa a esta barra. */}
-      <LayoutGroup id="mobile-bottom-nav">
       <nav
         aria-label={t("mobile_bottom_nav_label", "Navegación principal")}
         // Píldora flotante con margen amplio a los lados. Solo se anima
@@ -2895,6 +2969,13 @@ function NavbarContent() {
           className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[radial-gradient(130%_100%_at_50%_0%,rgba(255,255,255,0.08)_0%,transparent_75%)]"
         />
 
+        <BottomNavActiveLens
+          activeKey={mobileBottomActive?.href || null}
+          circleClassName={getMobileBottomLensCircleClass(
+            mobileBottomActive?.tone,
+          )}
+        />
+
         <Link
           href="/social"
           prefetch
@@ -2904,7 +2985,6 @@ function NavbarContent() {
           aria-label={t("nav_social", "Social")}
           title={t("nav_social", "Social")}
         >
-          {isActive("/social") && getMobileBottomActiveLens("pink")}
           <span className={mobileBottomIconSlotClass}>
             <Users
               className={`${mobileBottomIconClass} ${isActive("/social") ? "text-pink-300" : ""}`}
@@ -2923,7 +3003,6 @@ function NavbarContent() {
           aria-label={t("nav_lists", "Listas")}
           title={t("nav_lists", "Listas")}
         >
-          {isActive("/lists") && getMobileBottomActiveLens("purple")}
           <span className={mobileBottomIconSlotClass}>
             <ListVideo
               className={`${mobileBottomIconClass} ${isActive("/lists") ? "text-purple-300" : ""}`}
@@ -2942,7 +3021,6 @@ function NavbarContent() {
           aria-label={t("nav_in_progress", "En Progreso")}
           title={t("nav_in_progress", "En Progreso")}
         >
-          {isActive("/in-progress") && getMobileBottomActiveLens("green")}
           <span className={mobileBottomIconSlotClass}>
             <Play
               className={`${mobileBottomIconClass} ${isActive("/in-progress") ? "fill-emerald-400 text-emerald-300" : ""}`}
@@ -2961,7 +3039,6 @@ function NavbarContent() {
           aria-label={t("nav_history", "Historial")}
           title={t("nav_history", "Historial")}
         >
-          {isActive("/history") && getMobileBottomActiveLens("green")}
           <span className={mobileBottomIconSlotClass}>
             <Eye
               className={`${mobileBottomIconClass} ${isActive("/history") ? "fill-emerald-400/25" : ""}`}
@@ -2980,7 +3057,6 @@ function NavbarContent() {
           aria-label={t("nav_favorites", "Favoritas")}
           title={t("nav_favorites", "Favoritas")}
         >
-          {isActive(favHref) && getMobileBottomActiveLens("red")}
           <span className={mobileBottomIconSlotClass}>
             <Heart
               className={`${mobileBottomIconClass} ${isActive(favHref) ? "fill-red-400 text-red-400" : ""}`}
@@ -2999,7 +3075,6 @@ function NavbarContent() {
           aria-label={t("nav_watchlist", "Pendientes")}
           title={t("nav_watchlist", "Pendientes")}
         >
-          {isActive(watchHref) && getMobileBottomActiveLens("blue")}
           <span className={mobileBottomIconSlotClass}>
             <Bookmark
               className={`${mobileBottomIconClass} ${isActive(watchHref) ? "fill-sky-400 text-sky-300" : ""}`}
@@ -3009,7 +3084,6 @@ function NavbarContent() {
           </span>
         </Link>
       </nav>
-      </LayoutGroup>
 
       {/* ===================== DRAWER MENÚ (MÓVIL) ===================== */}
       <AnimatePresence>
