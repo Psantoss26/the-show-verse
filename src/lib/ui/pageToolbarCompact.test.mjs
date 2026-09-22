@@ -131,7 +131,13 @@ test("un título original largo se queda solo en su fila", async () => {
   // cifras— nunca se quedan estrechas, así que se reparten la fila siguiente.
   assert.match(tabs, /const LONG_ORIGINAL_TITLE_CHARS = 30;/);
   assert.match(tabs, /wide: isLongOriginalTitle\(originalTitle\)/);
-  assert.match(tabs, /return wide \? "min-w-0 sv-info-card--wide" : "min-w-0";/);
+  // Y es la única que puede ir a dos líneas: parte de 16rem en vez de exigir
+  // todo su título en una, que era lo que partía la fila a la mínima.
+  assert.match(tabs, /title: true,/);
+  assert.match(css, /\.sv-info-cards > \.sv-info-card--title \{\s*\n\s*width: 16rem;/);
+  assert.match(css, /\.sv-info-card--title \.sv-meta-value \{[\s\S]*?-webkit-line-clamp: 2;/);
+  assert.match(css, /@container sv-info-cards \(width < 44rem\)/);
+  assert.match(tabs, /return `min-w-0\$\{wide \? " sv-info-card--wide" : ""\}\$\{title \? " sv-info-card--title" : ""\}`;/);
 
   // Fila entera, y SOLO dentro del modo parejas: en una sola fila ya tiene su
   // ancho por contenido y no hay nada que forzar.
@@ -144,30 +150,31 @@ test("un título original largo se queda solo en su fila", async () => {
   assert.doesNotMatch(tabs, /ResizeObserver/);
 });
 
-test("el historial retira su calendario lateral cuando no cabe", async () => {
+test("el historial muestra el calendario lateral O su botón, nunca los dos", async () => {
   const [history, css] = await Promise.all([
     read("../../app/history/HistoryClient.jsx"),
     read("../../app/globals.css"),
   ]);
 
-  // Se declaraba con `xl:`, que mira el VIEWPORT: con el drawer acoplado la
-  // página se quedaba sin los 380px de la columna, pero el `xl:` seguía casando
-  // y el calendario se pintaba igual, montándose sobre el contenido.
+  // La zona de contenido es el contenedor que se consulta, y las dos columnas
+  // salen de una clase propia en vez de `xl:`, que miraba el VIEWPORT.
   assert.match(history, /className="sv-history-layout-scope"/);
   assert.match(history, /sv-history-layout grid grid-cols-1/);
-  assert.match(history, /sv-history-calendar hidden xl:block/);
-  assert.match(
-    css,
-    /@container sv-history-layout \(width < 64rem\)[\s\S]*?\.sv-history-calendar \{\s*\n\s*display: none;/,
-  );
+  assert.match(history, /sv-history-layout--calendar/);
+  assert.doesNotMatch(history, /xl:grid-cols-\[1fr_380px\]/);
+  assert.match(history, /className="sv-history-calendar space-y-6/);
+  assert.doesNotMatch(history, /sv-history-calendar hidden xl:block/);
 
-  // Y su acceso pasa a la barra: el MISMO modal que usa la vista móvil, así que
-  // no se pierde nada al retirarlo.
+  // UN SOLO umbral decide las dos cosas: con sitio, calendario y sin botón.
+  const wide = css.slice(css.indexOf("@container sv-history-layout (width >= 64rem)"));
+  assert.match(wide.slice(0, 400), /\.sv-history-calendar \{\s*\n\s*display: block;/);
+  assert.match(wide.slice(0, 400), /\.sv-history-calendar-trigger \{\s*\n\s*display: none;/);
+  // El botón ya no depende del ancho de la barra de filtros.
+  assert.doesNotMatch(css, /@container sv-page-toolbar \(width < 64rem\) \{\s*\n\s*\.sv-history-calendar-trigger/);
+
+  // Y su acceso es el MISMO modal que usa la vista móvil.
   assert.match(history, /sv-history-calendar-trigger/);
   assert.match(history, /onClick=\{\(\) => setMobileCalendarOpen\(true\)\}/);
-  // Fuera de ese caso no se pinta: la columna ya está a la vista y un segundo
-  // acceso sobraría.
-  assert.match(css, /\.sv-history-calendar-trigger \{\s*\n\s*display: none;/);
 });
 
 test("el buscador y el selector de sección también ceden", async () => {

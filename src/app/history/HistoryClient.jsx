@@ -3882,7 +3882,10 @@ export default function HistoryClient() {
             que cambiar las columnas de la propia rejilla, de ahí el div. */}
         <div className="sv-history-layout-scope">
         <div
-          className={`sv-history-layout grid grid-cols-1 ${auth.connected && !showCalendarView ? "xl:grid-cols-[1fr_380px]" : "lg:grid-cols-1"} gap-8 items-start`}
+          // Las dos columnas las pone `.sv-history-layout--calendar` en
+          // globals.css, con el MISMO umbral que muestra el calendario lateral
+          // y oculta su botón en la barra: nunca se ven los dos a la vez.
+          className={`sv-history-layout grid grid-cols-1 ${auth.connected && !showCalendarView ? "sv-history-layout--calendar" : ""} gap-8 items-start`}
         >
           {/* Izquierda */}
           <motion.div
@@ -4184,7 +4187,9 @@ export default function HistoryClient() {
                 <div className="sv-page-toolbar hidden lg:flex gap-3 relative z-10">
                   <HistorySectionNav className="shrink-0" />
                   {/* Con el calendario lateral retirado por falta de sitio, su
-                      acceso pasa a la barra, igual que en móvil. */}
+                      acceso pasa a la barra, igual que en móvil. Solo existe
+                      cuando hay calendario lateral que sustituir. */}
+                  {auth.connected && !showCalendarView && (
                   <button
                     type="button"
                     onClick={() => setMobileCalendarOpen(true)}
@@ -4193,6 +4198,7 @@ export default function HistoryClient() {
                   >
                     <CalendarDays className="w-4 h-4" />
                   </button>
+                  )}
                   <div className="sv-page-toolbar-search relative flex-1">
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500 z-10 pointer-events-none" />
                     <input
@@ -4634,7 +4640,8 @@ export default function HistoryClient() {
           {/* Derecha: Calendario (Solo visible en desktop y cuando no está en vista calendario) */}
           {auth.connected && !showCalendarView && (
             <motion.div
-              className="sv-history-calendar hidden xl:block space-y-6 sticky top-20"
+              // Visible solo si la zona mide al menos 64rem (ver globals.css).
+              className="sv-history-calendar space-y-6 sticky top-20"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5, delay: 0.4 }}

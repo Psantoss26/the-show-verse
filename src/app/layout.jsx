@@ -12,7 +12,6 @@ import OfflineBanner from "@/components/OfflineBanner";
 import ScrollRestoration from "@/components/ScrollRestoration";
 import MobileUserPageSwipeNavigation from "@/components/MobileUserPageSwipeNavigation";
 import { AVATAR_BOOT_SCRIPT } from "@/components/auth/AvatarBootScript";
-import Script from "next/script";
 import { anton, ptSans } from "./fonts";
 
 export const metadata = {
@@ -54,16 +53,24 @@ export default function RootLayout({ children }) {
     // `suppressHydrationWarning`: AvatarBootScript marca <html> antes de
     // hidratar, y React no debe leer ese atributo como una discrepancia.
     <html lang="es" data-scroll-behavior="smooth" suppressHydrationWarning>
+      {/* <script> PLANO en el <head> del layout raíz (componente de servidor),
+          no `next/script` con `beforeInteractive`.
+
+          Va en el HTML inicial y el navegador lo ejecuta al leerlo, antes de
+          hidratar: es lo que necesita el avatar. Con `next/script` dentro del
+          <body>, en Next 16 + React 19 el nodo que emitía el servidor no
+          coincidía con lo que renderizaba el cliente: la hidratación fallaba,
+          React regeneraba el árbol y, al crear el <script> en el cliente,
+          avisaba de que un script dentro de un componente nunca se ejecuta. */}
+      <head>
+        <script
+          id="avatar-boot"
+          dangerouslySetInnerHTML={{ __html: AVATAR_BOOT_SCRIPT }}
+        />
+      </head>
       <body
         className={`${ptSans.className} ${ptSans.variable} ${anton.variable} bg-black text-white antialiased`}
       >
-        {/* Debe declararse directamente en el root layout: Next lo inyecta
-            antes de hidratar, sin que React intente renderizar un <script>. */}
-        <Script
-          id="avatar-boot"
-          strategy="beforeInteractive"
-          dangerouslySetInnerHTML={{ __html: AVATAR_BOOT_SCRIPT }}
-        />
         {/* Adelanta la conexión a TMDb (arte) y a YouTube (trailers de las
             vistas previas) para que el iframe del trailer cargue lo antes
             posible y se reproduzca de forma casi instantánea al hacer hover. */}
