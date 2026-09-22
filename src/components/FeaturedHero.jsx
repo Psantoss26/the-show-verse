@@ -72,18 +72,21 @@ function uniquePaths(paths) {
 }
 
 /* =================== PREFERENCIA GLOBAL DE SOUNDTRACK ===================
- * El soundtrack del Hero suena por defecto. Si el usuario lo silencia con el
- * botón de volumen, la elección se guarda y aplica a TODOS los FeaturedHero.
+ * El soundtrack del Hero está SILENCIADO por defecto. Si el usuario activa el
+ * sonido con el botón de volumen, la elección se guarda y aplica a TODOS los
+ * FeaturedHero (y lo mismo si después lo vuelve a silenciar).
  */
 const SOUNDTRACK_MUTED_KEY = "showverse:hero:soundtrack-muted";
 const SOUNDTRACK_MUTED_EVENT = "showverse:hero-soundtrack-muted";
 
 function readSoundtrackMuted() {
-  if (typeof window === "undefined") return false;
+  if (typeof window === "undefined") return true;
   try {
-    return window.localStorage.getItem(SOUNDTRACK_MUTED_KEY) === "1";
+    // Sin preferencia guardada ("nunca ha tocado el botón") → silenciado. Solo
+    // un "0" explícito, que se guarda al activar el sonido, lo deja sonar.
+    return window.localStorage.getItem(SOUNDTRACK_MUTED_KEY) !== "0";
   } catch {
-    return false;
+    return true;
   }
 }
 
@@ -100,7 +103,9 @@ function writeSoundtrackMuted(muted) {
 // Hook compartido: lee la preferencia, escucha cambios y permite alternarla o
 // asignarla explícitamente desde los controles del reproductor.
 function useSoundtrackMuted() {
-  const [muted, setMuted] = useState(false);
+  // Arranca silenciado también antes de leer la preferencia: si empezara en
+  // `false`, el reproductor podría sonar un instante hasta que corre el efecto.
+  const [muted, setMuted] = useState(true);
 
   useEffect(() => {
     setMuted(readSoundtrackMuted());
