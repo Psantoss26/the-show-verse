@@ -1079,18 +1079,15 @@ export default function DetailModal({
       }, 0);
     };
     const finish = () => {
-      // `cleanup()` va PRIMERO: retira la marca de arrastre, y lo que estaba
-      // congelado mientras duraba (el margen de la página acoplada) tiene que
-      // poder aplicarse ya en la línea siguiente.
+      // `cleanup()` va PRIMERO: retira la marca de arrastre, que devuelve al
+      // panel su cristal y a la página sus transiciones.
       cleanup();
-      // Al soltar se cuadra con el objetivo SIN suavizar: el retardo tiene
-      // sentido mientras el gesto está vivo, pero el ancho con el que se queda
-      // el panel es el que marcó el puntero, no el que le faltaba por recorrer.
-      // De aquí cuelga además el margen de la página acoplada, congelado
-      // durante todo el arrastre.
-      // `applyWidth` se corta solo cuando el ancho no cambió desde el último
-      // fotograma —soltar sin mover—, así que la publicación se repite: de ella
-      // cuelga el margen de la página acoplada, congelado durante el arrastre.
+      // Al soltar se cuadra con el ancho EXACTO del puntero: el último
+      // fotograma pendiente puede no haberse aplicado todavía. `applyWidth`
+      // se corta solo cuando el ancho no cambió —soltar sin mover—, así que la
+      // publicación se repite para que el margen de la página acoplada (que
+      // ya ha ido siguiendo al tirador durante el gesto) quede en su valor
+      // final.
       applyWidth();
       writeWidth(panelWidthRef.current);
       setPanelWidth(panelWidthRef.current);

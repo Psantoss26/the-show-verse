@@ -1178,6 +1178,16 @@ html {
   animation-play-state: paused !important;
 }
 
+/* LA PÁGINA DE DETRÁS SE REORGANIZA EN DIRECTO mientras se arrastra el
+   tirador del drawer acoplado (su margen sigue al panel en cada fotograma, ver
+   `updateDrawerWidth` en DetailModalProvider). Sus transiciones se apagan
+   durante el gesto: con ellas, cada tarjeta ANIMABA su cambio de tamaño y
+   posición y el contenido iba por detrás del tirador en vez de pegado a él. */
+:root[data-sv-drawer-resizing] [data-detail-page-content],
+:root[data-sv-drawer-resizing] [data-detail-page-content] * {
+  transition: none !important;
+}
+
 /* TARJETAS DE DETALLES Y PRODUCCIÓN EN EL DRAWER.
    ===================================================================
 
