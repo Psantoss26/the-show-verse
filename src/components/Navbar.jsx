@@ -53,6 +53,7 @@ import {
 import WatchNextAssistant from "@/components/WatchNextAssistant";
 import NetflixSyncListener from "@/components/NetflixSyncListener";
 import { fuzzySimilarity, tokenFuzzyMatches } from "@/lib/search/fuzzy";
+import { buildSearchHref } from "@/lib/search/searchPage";
 import {
   addSearchHistory,
   clearSearchHistory,
@@ -275,6 +276,7 @@ function SearchBar({
   onEscape,
 }) {
   const { t } = useTranslation();
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -769,6 +771,27 @@ function SearchBar({
     if (onResultClick) onResultClick();
   };
 
+  // Página de resultados completos (paginada) para la consulta y el filtro
+  // actuales. El desplegable solo enseña los primeros.
+  const allResultsHref = query.trim()
+    ? buildSearchHref({ q: query, type: activeFilter })
+    : null;
+
+  const closeSearchUi = () => {
+    const trimmed = query.trim();
+    if (trimmed) setSearchHistory(addSearchHistory(trimmed));
+    setShowDropdown(false);
+    setShowFilterMenu(false);
+    inputRef.current?.blur();
+    if (onResultClick) onResultClick();
+  };
+
+  const openAllResults = () => {
+    if (!allResultsHref) return;
+    closeSearchUi();
+    router.push(allResultsHref);
+  };
+
   const handleFilterToggle = () => {
     const nextOpen = !showFilterMenu;
     setShowFilterMenu(nextOpen);
@@ -892,7 +915,11 @@ function SearchBar({
       ref={searchRef}
     >
       <form
-        onSubmit={(e) => e.preventDefault()}
+        // Enter abre TODOS los resultados de la búsqueda, paginados.
+        onSubmit={(e) => {
+          e.preventDefault();
+          openAllResults();
+        }}
         className={`relative w-full ${formClassName}`}
       >
         <div
@@ -1327,9 +1354,19 @@ function SearchBar({
                     })}
                   </div>
                 )}
-                {results.length > 8 && (
-                  <div className="px-4 py-2 text-center text-xs text-neutral-500 border-t border-white/10">
-                    Mostrando 8 de {results.length} resultados
+                {allResultsHref && results.length > 0 && (
+                  <div className="border-t border-white/10 p-2">
+                    <Link
+                      href={allResultsHref}
+                      onClick={closeSearchUi}
+                      className="group flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold text-white/80 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white/80"
+                    >
+                      <SearchIcon
+                        className="h-4 w-4 shrink-0 text-amber-300/80"
+                        aria-hidden="true"
+                      />
+                      <span>{t("search_see_all", "Ver todos los resultados")}</span>
+                    </Link>
                   </div>
                 )}
               </>

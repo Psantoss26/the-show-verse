@@ -286,6 +286,10 @@ export function DetailsTabsMenu({
   onChangeTab,
   layoutId = "activeTabIndicator",
   swipeHandlers = {},
+  // Fuerza la disposición de teléfono aunque la ventana sea ancha (ficha de
+  // teléfono del drawer en tablet). Los `sm:`/`max-sm:` de abajo miran el
+  // viewport: en tablet salía el menú de escritorio y "Enlaces" bajaba de fila.
+  phone = false,
 }) {
   // En la ficha principal móvil hay exactamente cuatro secciones. La cuadrícula
   // les reserva cuatro columnas equivalentes: así se centran respecto al ancho
@@ -295,13 +299,17 @@ export function DetailsTabsMenu({
   return (
     <div
       {...swipeHandlers}
-      className={`relative isolate mb-4 flex w-full touch-pan-y flex-wrap items-center gap-x-6 gap-y-0 overflow-hidden rounded-2xl px-4 py-1 max-sm:transform-gpu md:gap-x-8 ${hasFourMobileTabs ? "max-sm:grid max-sm:grid-cols-4 max-sm:gap-x-0" : ""} ${LIQUID_GLASS_BAR} sm:touch-auto sm:rounded-none sm:border-b sm:border-white/10 sm:bg-transparent sm:bg-none sm:px-2 sm:py-0 sm:shadow-none sm:[backdrop-filter:none]`}
+      className={
+        phone
+          ? `relative isolate mb-4 w-full touch-pan-y items-center gap-y-0 overflow-hidden rounded-2xl px-4 py-1 transform-gpu ${hasFourMobileTabs ? "grid grid-cols-4 gap-x-0" : "flex flex-wrap gap-x-6"} ${LIQUID_GLASS_BAR}`
+          : `relative isolate mb-4 flex w-full touch-pan-y flex-wrap items-center gap-x-6 gap-y-0 overflow-hidden rounded-2xl px-4 py-1 max-sm:transform-gpu md:gap-x-8 ${hasFourMobileTabs ? "max-sm:grid max-sm:grid-cols-4 max-sm:gap-x-0" : ""} ${LIQUID_GLASS_BAR} sm:touch-auto sm:rounded-none sm:border-b sm:border-white/10 sm:bg-transparent sm:bg-none sm:px-2 sm:py-0 sm:shadow-none sm:[backdrop-filter:none]`
+      }
     >
       {/* Capas ópticas del cristal, las mismas de DetailsSectionMenu. Solo móvil:
           en escritorio no hay cristal que rematar. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 rounded-[inherit] sm:hidden"
+        className={`pointer-events-none absolute inset-0 rounded-[inherit] ${phone ? "" : "sm:hidden"}`}
       >
         <LiquidGlassOpticalLayers />
       </div>
@@ -311,7 +319,13 @@ export function DetailsTabsMenu({
           key={tab.id}
           type="button"
           onClick={() => onChangeTab(tab.id)}
-          className={`relative z-10 rounded-md px-0.5 pb-2 pt-2 text-xs font-bold uppercase tracking-wider transition-colors duration-300 [text-shadow:0_1px_2px_rgba(0,0,0,0.9),0_0_10px_rgba(0,0,0,0.6)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 sm:pt-0 md:text-sm ${hasFourMobileTabs ? "max-sm:justify-self-center max-sm:text-[11px] max-sm:tracking-[0.06em]" : ""} ${
+          className={`relative z-10 rounded-md px-0.5 pb-2 pt-2 font-bold uppercase transition-colors duration-300 [text-shadow:0_1px_2px_rgba(0,0,0,0.9),0_0_10px_rgba(0,0,0,0.6)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 ${
+            phone
+              ? hasFourMobileTabs
+                ? "justify-self-center text-[11px] tracking-[0.06em]"
+                : "text-xs tracking-wider"
+              : `text-xs tracking-wider sm:pt-0 md:text-sm ${hasFourMobileTabs ? "max-sm:justify-self-center max-sm:text-[11px] max-sm:tracking-[0.06em]" : ""}`
+          } ${
             activeTab === tab.id
               ? "text-white font-extrabold"
               : "text-white/70 hover:text-white"
@@ -322,7 +336,7 @@ export function DetailsTabsMenu({
           {activeTab === tab.id && (
             <motion.div
               layoutId={layoutId}
-              className="absolute bottom-0.5 left-0 right-0 h-0.5 bg-gradient-to-r from-yellow-500 to-amber-500 rounded-full shadow-[0_1.5px_6px_rgba(245,158,11,0.5)] z-20 sm:bottom-0"
+              className={`absolute bottom-0.5 left-0 right-0 h-0.5 bg-gradient-to-r from-yellow-500 to-amber-500 rounded-full shadow-[0_1.5px_6px_rgba(245,158,11,0.5)] z-20 ${phone ? "" : "sm:bottom-0"}`}
               transition={{ type: "spring", stiffness: 380, damping: 30 }}
             />
           )}
