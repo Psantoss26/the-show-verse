@@ -2717,7 +2717,9 @@ function MobileDayTitlesModal({ dayKey, items, onClose }) {
 
   return createPortal(
     <motion.div
-      className="fixed inset-0 z-[130] flex items-center justify-center p-4"
+      // Encima del overlay del calendario (`z-[10000]`), que a su vez va
+      // encima del drawer de la ficha.
+      className="fixed inset-0 z-[10010] flex items-center justify-center p-4"
       data-detail-modal-layer=""
       onClick={onClose}
       initial={{ opacity: 0 }}
@@ -2810,7 +2812,16 @@ function MobileCalendarOverlay({
   return createPortal(
     <>
       <motion.div
-        className="fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto p-4 sm:p-6"
+        // POR ENCIMA DEL DRAWER DE LA FICHA (`z-[9999]`). Con el calendario
+        // lateral retirado por falta de sitio, este overlay se abre desde la
+        // barra también en escritorio, y a `z-[120]` quedaba DETRÁS del panel:
+        // la parte derecha del calendario no se veía ni se podía pulsar.
+        //
+        // `data-detail-modal-layer`: el drawer superpuesto se cierra al pulsar
+        // fuera de él, y el calendario está fuera; con la marca, usarlo no
+        // cierra la ficha que hay abierta.
+        data-detail-modal-layer=""
+        className="fixed inset-0 z-[10000] flex items-start justify-center overflow-y-auto p-4 sm:p-6"
         onClick={onClose}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}

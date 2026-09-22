@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect } from "react";
+import {
+  installTouchScrollGuard,
+  uninstallTouchScrollGuard,
+} from "@/lib/ui/touchScrollGuard";
 
 // Bloqueo del scroll de la página mientras hay un modal abierto.
 //
@@ -17,6 +21,11 @@ import { useEffect } from "react";
 //
 // Usa un CONTADOR global: el scroll solo se restaura cuando se cierran TODOS los
 // modales (un modal puede abrir otro encima; no se debe reactivar antes).
+//
+// En pantallas TÁCTILES lo anterior no basta: un arrastre sobre algo que no se
+// desplaza (o sobre una lista ya en su tope) se encadena hasta la página y
+// provoca el «tirar para actualizar» o un clic sintético que cierra el modal.
+// Mientras dure el bloqueo se activa además la guardia de `touchScrollGuard`.
 //
 // Uso:  useBodyScrollLock(open)   // se bloquea mientras `active` sea true.
 
@@ -35,10 +44,13 @@ export default function useBodyScrollLock(active = true) {
         htmlOverflow: html.style.overflow,
         htmlOverscroll: html.style.overscrollBehavior,
         bodyOverflow: body.style.overflow,
+        bodyOverscroll: body.style.overscrollBehavior,
       };
       html.style.overflow = "hidden";
       html.style.overscrollBehavior = "none";
       body.style.overflow = "hidden";
+      body.style.overscrollBehavior = "none";
+      installTouchScrollGuard();
     }
     lockCount += 1;
 
@@ -48,6 +60,8 @@ export default function useBodyScrollLock(active = true) {
         html.style.overflow = saved.htmlOverflow;
         html.style.overscrollBehavior = saved.htmlOverscroll;
         body.style.overflow = saved.bodyOverflow;
+        body.style.overscrollBehavior = saved.bodyOverscroll;
+        uninstallTouchScrollGuard();
         saved = null;
       }
     };
