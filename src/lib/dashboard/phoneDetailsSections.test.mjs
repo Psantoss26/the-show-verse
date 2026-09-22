@@ -266,23 +266,33 @@ test("el arrastre no repite trabajo que no ha cambiado", async () => {
   );
 });
 
-test("acoplado, la página no se recompone en cada fotograma del arrastre", async () => {
-  const [provider, modal] = await Promise.all([
+test("acoplado, la página se reorganiza en directo durante el arrastre", async () => {
+  const [provider, modal, css] = await Promise.all([
     read("../../components/dashboard/DetailModalProvider.jsx"),
     read("../../components/dashboard/DetailModal.jsx"),
+    read("../../app/globals.css"),
   ]);
 
-  // Ese margen encoge la PÁGINA ENTERA de detrás: actualizarlo sesenta veces
-  // por segundo obliga a recomponer todas sus filas y carruseles, y ese trabajo
-  // no cabe en un fotograma.
+  // El margen de la página acoplada sigue al tirador en cada fotograma: no se
+  // congela durante el gesto para saltar de golpe al soltar.
+  assert.doesNotMatch(
+    provider,
+    /hasAttribute\("data-sv-drawer-resizing"\)\) return;/,
+  );
   assert.match(
     provider,
-    /hasAttribute\("data-sv-drawer-resizing"\)\) return;\s*\n\s*contentRef\.current\.style\.marginRight/,
+    /if \(!docked \|\| !contentRef\.current\) return;[\s\S]*?contentRef\.current\.style\.marginRight = `\$\{width\}px`;/,
   );
 
-  // Y al soltar se recoloca una vez, cuadrando con el objetivo sin suavizar:
-  // el ancho con el que se queda el panel es el que marcó el puntero, no el
-  // que le faltaba por recorrer.
+  // Mientras dura el gesto, el contenido no anima sus cambios: con las
+  // transiciones activas las tarjetas irían por detrás del tirador.
+  assert.match(provider, /data-detail-page-content=""/);
+  assert.match(
+    css,
+    /:root\[data-sv-drawer-resizing\] \[data-detail-page-content\] \* \{\s*\n\s*transition: none !important;/,
+  );
+
+  // Y al soltar se cuadra con el ancho exacto del puntero.
   assert.match(
     modal,
     /cleanup\(\);[\s\S]*?applyWidth\(\);\s*\n\s*writeWidth\(panelWidthRef\.current\);/,

@@ -222,20 +222,16 @@ export default function DetailModalProvider({ children, placement = "center" }) 
     publishDrawerInset(width);
     if (!docked || !contentRef.current) return;
 
-    // ACOPLADO Y ARRASTRANDO: el margen NO sigue al tirador fotograma a
-    // fotograma.
+    // ACOPLADO Y ARRASTRANDO: el margen SIGUE al tirador en directo, y la
+    // página se reorganiza mientras se redimensiona, no al soltar.
     //
-    // Este margen encoge la PÁGINA ENTERA que hay detrás. Actualizarlo sesenta
-    // veces por segundo obliga a recomponer todas sus filas, sus imágenes y los
-    // carruseles que tenga montados, y ese trabajo no cabe en un fotograma: es
-    // lo que convertía el arrastre en saltos. Durante el gesto el panel se
-    // mueve solo —se comporta como el modo superpuesto, que es lo que ya hace
-    // el 50% de las veces— y la página se recoloca UNA vez al soltar.
-    //
-    // La marca la pone `beginResize` en DetailModal; se consulta en el DOM en
-    // vez de pasarla por contexto para no re-renderizar el árbol al empezar y
-    // al terminar el gesto.
-    if (document.documentElement.hasAttribute("data-sv-drawer-resizing")) return;
+    // Antes se congelaba durante el gesto para ahorrar trabajo, pero entonces
+    // el panel tapaba o destapaba la página y el contenido saltaba de golpe al
+    // final. `DetailModal` ya agrupa el arrastre en una escritura por
+    // fotograma, así que aquí llega como mucho una vez por frame; y mientras
+    // dura el gesto las transiciones del contenido se apagan (ver
+    // `[data-detail-page-content]` en globals.css) para que las tarjetas se
+    // recoloquen pegadas al tirador en vez de animar cada cambio.
     contentRef.current.style.marginRight = `${width}px`;
   }, [docked]);
 
@@ -406,6 +402,7 @@ export default function DetailModalProvider({ children, placement = "center" }) 
     <DetailModalContext.Provider value={value}>
       <div
         ref={contentRef}
+        data-detail-page-content=""
         className="min-w-0 @container/detail-page"
       >
         {children}

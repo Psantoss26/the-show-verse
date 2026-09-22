@@ -1083,13 +1083,17 @@ export default function DetailsClient({
   // que no hace falta esperar (usuario no autenticado) o en cuanto responde
   // la comprobación remota (autenticado).
   const [remoteArtworkChecked, setRemoteArtworkChecked] = useState(false);
-  // VISTA MÓVIL + RED EXTERNA: la ficha renuncia a los overrides de artwork.
-  // La comprobación es una ida y vuelta al NAS por el túnel y es lo único que
-  // separa a la ficha de empezar a descargar la portada en una primera visita;
-  // como las selecciones son rutas de TMDb, renunciar a ellas no cambia de
-  // dónde se descarga la portada, solo cuál se elige (ver
+  // VISTA MÓVIL + RED EXTERNA: la ficha no ESPERA a la consulta remota de
+  // overrides de artwork. Es una ida y vuelta al NAS por el túnel y era lo único
+  // que separaba a la ficha de empezar a descargar la portada (ver
   // `shouldSkipRemoteArtwork`). Se decide en el efecto de layout de abajo, no
   // aquí: en el primer render no se puede leer `window`.
+  //
+  // Lo que NO se hace es renunciar a la selección del usuario: la copia de este
+  // dispositivo y la instantánea de la sesión se leen sin red y se aplican
+  // igual que en escritorio. Antes también se descartaban, así que la portada
+  // elegida en "Portadas y fondos" se veía al elegirla pero, al recargar, la
+  // ficha volvía a la automática.
   const [artworkOverridesSkipped, setArtworkOverridesSkipped] = useState(false);
   // ...salvo que se llegue a "Portadas y fondos": esa galería sí necesita saber
   // qué tienes elegido, así que al acercarse a pantalla se hace la consulta que
@@ -2740,21 +2744,16 @@ export default function DetailsClient({
     // mantiene el comportamiento anterior de esperar a la comprobación remota.
     // `{}` = hay instantánea y este título no tiene selección propia, lo que
     // confirma el caso negativo con la misma certeza que el servidor.
-    const persistedOverride = skipOverrides
-      ? null
-      : readPersistedArtworkOverride({
-          type: endpointType,
-          id,
-        });
+    // Se lee también en móvil + red externa: es localStorage, no cuesta red.
+    const persistedOverride = readPersistedArtworkOverride({
+      type: endpointType,
+      id,
+    });
 
     // La selección se aplica en el MISMO efecto que abre la puerta: si se
     // abriera antes de aplicarla, se pintaría la imagen por defecto y el
     // override llegaría después -- el parpadeo que este estado evita.
     const initialFor = (kind, storageKey, localValue) => {
-      // Renunciando a los overrides no se hereda tampoco la copia por título:
-      // el criterio automático tiene que partir de cero, o seguiría saliendo la
-      // portada elegida a mano en visitas anteriores desde este dispositivo.
-      if (skipOverrides) return null;
       if (!persistedOverride) return localValue;
       const filePath = persistedOverride[kind] || null;
       // La instantánea manda sobre la copia por título: si el usuario reseteó
@@ -2763,10 +2762,8 @@ export default function DetailsClient({
       return filePath;
     };
 
-    // Las rutas "base" son el último recurso del criterio automático, así que
-    // al renunciar también tienen que quedar vacías.
-    setBaseBackdropPath(skipOverrides ? null : initialBackdrop);
-    setBasePosterPath(skipOverrides ? null : initialPoster);
+    setBaseBackdropPath(initialBackdrop);
+    setBasePosterPath(initialPoster);
     setSelectedPosterPath(initialFor("poster", posterStorageKey, initialPoster));
     setSelectedMobilePosterPath(
       initialFor("mobilePoster", mobilePosterStorageKey, initialMobilePoster),
@@ -2781,8 +2778,8 @@ export default function DetailsClient({
     // Nuevo título: solo se vuelve a cerrar la puerta cuando NO hay
     // instantánea que confirme sus overrides. La revalidación remota de más
     // abajo sigue corriendo y sigue siendo la fuente de verdad.
-    // Renunciando a los overrides la puerta se abre de inmediato: no hay nada
-    // que esperar, el criterio automático ya es la respuesta definitiva.
+    // En móvil + red externa la puerta se abre de inmediato con la selección
+    // local: la consulta remota no se espera (se hace al llegar a la galería).
     setRemoteArtworkChecked(skipOverrides || Boolean(persistedOverride));
     // No activar posterResolved hasta que initArtwork termine
 
@@ -2844,12 +2841,9 @@ export default function DetailsClient({
   // La revalidación remota de abajo se mantiene intacta: si otro dispositivo
   // cambió una selección, la respuesta más reciente sigue siendo la fuente de
   // verdad y actualiza esta vista.
+  // En móvil + red externa también se aplica: son las preferencias que ya trae
+  // la sesión, sin ninguna consulta extra al NAS.
   const cachedArtworkOverride = useMemo(() => {
-    // Renunciando a los overrides (móvil + red externa) tampoco se aplica la
-    // instantánea local: la ficha se pinta con el criterio automático hasta que
-    // se llegue a la galería.
-    if (artworkOverridesSkipped && !artworkGalleryReached) return null;
-
     return resolveCachedArtworkOverride({
       preferences,
       cached: preferencesCached,
@@ -2858,8 +2852,6 @@ export default function DetailsClient({
       id,
     });
   }, [
-    artworkOverridesSkipped,
-    artworkGalleryReached,
     authenticated,
     preferencesCached,
     preferences,
