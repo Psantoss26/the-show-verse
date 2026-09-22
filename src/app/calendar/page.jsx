@@ -55,6 +55,7 @@ import { formatPageTitle } from "@/lib/pageTitle";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import useModalGuard from "@/hooks/useModalGuard";
 import { useAuth } from "@/context/AuthContext";
+import HoverExpandCard from "@/components/ui/HoverExpandCard";
 
 const TYPE_FILTERS = [
   { id: "all", label: "Todo" },
@@ -392,16 +393,9 @@ const CalendarCompactCard = memo(function CalendarCompactCard({
       }}
     >
       <Link href={item.href} className="block">
-        <motion.div
-          className="relative aspect-[2/3] compact-card group overflow-hidden rounded-lg bg-zinc-900 shadow-md transition-shadow duration-300"
-          whileHover={{
-            scale: 1.15,
-            zIndex: 100,
-            boxShadow:
-              "0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5)",
-          }}
-          transition={{ type: "spring", stiffness: 300, damping: 20 }}
-          style={{ transformOrigin: "center center" }}
+        <HoverExpandCard
+          cellClassName="aspect-[2/3]"
+          className="compact-card group overflow-hidden rounded-lg bg-zinc-900 shadow-md"
         >
           <div className="absolute inset-0 rounded-[inherit] overflow-hidden">
             <TmdbPoster
@@ -415,7 +409,7 @@ const CalendarCompactCard = memo(function CalendarCompactCard({
               compact
             />
           </div>
-        </motion.div>
+        </HoverExpandCard>
       </Link>
     </motion.div>
   );

@@ -46,6 +46,7 @@ import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 import { pickBestBackdropByLangResVotes } from "@/lib/dashboard/media";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import HoverExpandCard from "@/components/ui/HoverExpandCard";
 
 
 // ================== CONSTANTS ==================
@@ -975,26 +976,11 @@ function LibraryMediaCard({
         layout
       >
         <div className="block">
-          <motion.article
-            className={`relative ${aspectRatio} group rounded-lg overflow-hidden bg-zinc-900 shadow-md ${canOpen ? "cursor-pointer" : ""}`}
-            whileHover={
-              canOpen && enableHoverLift
-                ? {
-                    scale: 1.15,
-                    zIndex: 100,
-                    boxShadow:
-                      "0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5)",
-                  }
-                : undefined
-            }
-            transition={
-              enableHoverLift
-                ? { type: "spring", stiffness: 300, damping: 20 }
-                : { duration: 0 }
-            }
-            style={{
-              transformOrigin: "center center",
-            }}
+          <HoverExpandCard
+            as="article"
+            cellClassName={aspectRatio}
+            className={`group rounded-lg overflow-hidden bg-zinc-900 shadow-md ${canOpen ? "cursor-pointer" : ""}`}
+            enabled={canOpen && enableHoverLift}
             onClick={openItem}
           >
             {renderMedia()}
@@ -1003,7 +989,7 @@ function LibraryMediaCard({
               resolution={primaryRes}
               compact
             />
-          </motion.article>
+          </HoverExpandCard>
         </div>
       </motion.div>
     );

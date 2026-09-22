@@ -77,6 +77,7 @@ import { titleMatchesQuery } from "@/lib/search/titleMatching";
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { compareImdbRatings } from "@/lib/userLists/imdbRatingSort";
+import HoverExpandCard from "@/components/ui/HoverExpandCard";
 
 // Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
 // el mismo escalón que `w1280` en los backdrops. Antes era `w500` y en
@@ -2091,18 +2092,9 @@ const FavoriteCard = memo(function FavoriteCard({
           onClick={onPreviewClick}
           className="block"
         >
-          <motion.div
-            className={`relative ${aspectRatio} group overflow-hidden rounded-lg bg-zinc-900 shadow-md transition-shadow duration-300`}
-            whileHover={{
-              scale: 1.15,
-              zIndex: 100,
-              boxShadow:
-                "0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5)",
-            }}
-            transition={{ type: "spring", stiffness: 300, damping: 20 }}
-            style={{
-              transformOrigin: "center center",
-            }}
+          <HoverExpandCard
+            cellClassName={aspectRatio}
+            className="group overflow-hidden rounded-lg bg-zinc-900 shadow-md"
           >
             <SmartPoster item={item} title={title} mode={effectiveImageMode} />
             <FavoriteHoverIndicator
@@ -2112,7 +2104,7 @@ const FavoriteCard = memo(function FavoriteCard({
               rating={userRating}
               compact
             />
-          </motion.div>
+          </HoverExpandCard>
         </Link>
       </motion.div>
     );
