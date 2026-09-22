@@ -51,7 +51,9 @@ export function VisualMetaCard({
       // Animarlo desde opacity 0 dejaba la cáscara visible y vacía durante ese
       // cuarto de segundo, que es justo lo que se veía al cargar la ficha.
         initial={false}
-        className="relative z-10 shrink-0 text-zinc-300"
+        // `sv-meta-icon`: asidero para que la fila del drawer pueda retirarlo
+        // cuando la tarjeta se queda muy estrecha (ver `.sv-info-cards`).
+        className="sv-meta-icon relative z-10 shrink-0 text-zinc-300"
       >
         {iconContent || (Icon ? <Icon className="w-5 h-5" /> : null)}
       </motion.div>

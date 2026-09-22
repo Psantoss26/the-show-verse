@@ -1215,8 +1215,10 @@ html {
       fila en cuanto el panel se estrechaba un poco. Las demás —una fecha y dos
       cifras— siguen en una línea; si el título ocupa dos, la fila crece con
       ella y las vecinas se estiran a su misma altura (`align-items: stretch`).
-   3. SI NO CABEN, DE DOS EN DOS. Nunca tres y una suelta: `50% - medio hueco`
-      es exactamente lo que impide que entre una tercera en la fila.
+   3. SI NO CABEN, EN DOS FILAS COMO MÁXIMO: de dos en dos (`50% - medio
+      hueco` impide que entre una tercera en la fila) o, si el título es tan
+      largo que necesita su propia fila, él arriba y las otras tres juntas
+      debajo (1 + 3). Nunca tres filas.
 
    El corte en 44rem sale de sumar las cuatro tarjetas de Detalles: el título
    a 16rem (256px) más las otras tres (~150px cada una, donde a veces manda el
@@ -1281,10 +1283,34 @@ html {
     flex: 1 1 calc(50% - 0.375rem);
   }
 
-  /* FILA PROPIA para el título largo, que en media fila quedaría apretado.
-     Las otras tres de Detalles son cortas y se reparten la fila siguiente. */
+  /* FILA PROPIA para el título largo, que en media fila quedaría apretado. */
   .sv-info-cards > .sv-info-card--wide {
     flex-basis: 100%;
+  }
+
+  /* ...y las demás, TODAS en la fila siguiente: 1 + 3, nunca tres filas.
+     Con el reparto en parejas quedaban dos en la segunda y una suelta en una
+     tercera. Con base 0 se reparten la fila a partes iguales; son una fecha y
+     dos cifras, y caben de sobra en un tercio. */
+  .sv-info-cards:has(> .sv-info-card--wide) > :not(.sv-info-card--wide) {
+    flex: 1 1 0;
+  }
+}
+
+/* MUY ESTRECHO (panel de teléfono al mínimo): en un tercio de fila el icono y el
+   relleno se comían el sitio del texto, y la fecha o el rótulo se recortaban
+   ("17 dic …"). Esas tres tarjetas sueltan el icono y parte del relleno; el
+   rótulo ya dice qué es cada cifra. */
+@container sv-info-cards (width < 30rem) {
+  .sv-info-cards:has(> .sv-info-card--wide) > :not(.sv-info-card--wide) {
+    gap: 0.5rem;
+    padding: 0.75rem;
+  }
+
+  .sv-info-cards:has(> .sv-info-card--wide)
+    > :not(.sv-info-card--wide)
+    .sv-meta-icon {
+    display: none;
   }
 }
 

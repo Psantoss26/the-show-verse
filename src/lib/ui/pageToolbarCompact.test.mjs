@@ -144,6 +144,12 @@ test("un título original largo se queda solo en su fila", async () => {
   const pairs = css.slice(css.indexOf("@container sv-info-cards"));
   const block = pairs.slice(0, pairs.indexOf("\n}\n") + 3);
   assert.match(block, /\.sv-info-cards > \.sv-info-card--wide \{\s*\n\s*flex-basis: 100%;/);
+  // Y las demás van TODAS a la fila siguiente (1 + 3): con parejas quedaban
+  // dos debajo y una suelta en una tercera fila.
+  assert.match(
+    block,
+    /\.sv-info-cards:has\(> \.sv-info-card--wide\) > :not\(\.sv-info-card--wide\) \{\s*\n\s*flex: 1 1 0;/,
+  );
 
   // Se decide por LONGITUD del texto, no midiendo el elemento: medir exigiría
   // un observador que se dispararía en cada fotograma del arrastre del panel.
