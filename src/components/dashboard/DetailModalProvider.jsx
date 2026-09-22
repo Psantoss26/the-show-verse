@@ -229,7 +229,7 @@ export default function DetailModalProvider({
   const isTablet = useMediaQuery(
     "(min-width: 768px) and (max-width: 1023px), (min-width: 768px) and (hover: none), (min-width: 768px) and (pointer: coarse)",
   );
-  const effectiveContentView = contentView ?? (isTablet ? "mobile" : "modal");
+  const preferredContentView = contentView ?? (isTablet ? "mobile" : "modal");
   const contentRef = useRef(null);
   const drawerWidthRef = useRef(null);
 
@@ -288,6 +288,14 @@ export default function DetailModalProvider({
   // Pila de niveles abiertos. El item activo es el de arriba.
   const [stack, setStack] = useState([]);
   const activeItem = stack.length > 0 ? stack[stack.length - 1] : null;
+
+  // La ficha de TELÉFONO está maquetada para películas y series. Un EPISODIO
+  // tiene otra ficha (serie de origen, temporada, número, ficha de la
+  // temporada...) que no cabe en ella, así que se abre siempre en el modal
+  // ancho. No se toca la preferencia guardada: al volver a una película o una
+  // serie, la vista de teléfono sigue donde estaba.
+  const isEpisodeItem = activeItem?.media_type === "episode";
+  const effectiveContentView = isEpisodeItem ? "modal" : preferredContentView;
   const docked =
     activeItem != null && effectivePlacement === "right" && drawerView === "docked";
 
@@ -503,7 +511,9 @@ export default function DetailModalProvider({
             drawerView={drawerView}
             contentView={effectiveContentView}
             tabletViewport={isTablet}
-            onContentViewChange={changeContentView}
+            // Sin el interruptor de ficha de teléfono en un episodio: ahí esa
+            // vista no se ofrece.
+            onContentViewChange={isEpisodeItem ? undefined : changeContentView}
             onDrawerViewChange={changeDrawerView}
             onDrawerWidthChange={updateDrawerWidth}
             // `custom` de AnimatePresence solo llega al panel que SALE. El que

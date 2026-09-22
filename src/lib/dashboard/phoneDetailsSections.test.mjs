@@ -199,28 +199,31 @@ test("las tarjetas de Duración y Premios reciben su valor", async () => {
   assert.match(modal, /awardsValue=\{/);
 });
 
-test("los indicadores de la galería son los mismos que en la ficha", async () => {
+test("la galería del panel de teléfono no tiene efectos de hover", async () => {
   const [phone, details] = await Promise.all([
     read("../../components/dashboard/PhoneDetailsSections.jsx"),
     read("../../components/DetailsClient.jsx"),
   ]);
 
-  // La resolución y el botón de copiar URL solo aparecen al pasar por encima.
-  // Al portar la tarjeta les quité esa condición razonando que en un teléfono
-  // no se verían nunca -- y es cierto --, pero dejarlos fijos añade a cada
-  // tarjeta un rótulo y un botón permanentes que la ficha no tiene.
-  const shared = [
+  // La vista de TELÉFONO se comporta como un teléfono: sin puntero no hay
+  // hover, y en una tablet esos efectos se quedaban pegados tras tocar una
+  // tarjeta. La resolución y el botón de copiar URL solo existían al pasar por
+  // encima, así que se van con ellos. En la ficha con ratón siguen igual.
+  const soloConPuntero = [
     "opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-1 group-hover:translate-y-0",
     "scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100",
     "bg-zinc-400 shadow-[0_0_6px_rgba(255,255,255,0.4)]",
     "group-hover/link:delay-[2000ms]",
+    "group-hover:scale-[1.08]",
+    "hover:-translate-y-1",
   ];
 
-  for (const fragment of shared) {
-    assert.ok(phone.includes(fragment), `el panel perdió: ${fragment}`);
+  for (const fragment of soloConPuntero) {
+    assert.ok(!phone.includes(fragment), `el panel de teléfono conserva: ${fragment}`);
     assert.ok(details.includes(fragment), `la ficha perdió: ${fragment}`);
   }
 });
+
 
 test("las secciones no se montan durante la animación de entrada", async () => {
   const modal = await read("../../components/dashboard/DetailModal.jsx");
@@ -445,7 +448,12 @@ test("en el teléfono el logo aguanta hasta salir por arriba", async () => {
   // El recorrido iba fijo en 300px para las dos vistas. En el modal ancho eso
   // es buena parte de su hero; en el teléfono, cuyo hero mide el panel entero,
   // la portada apenas había empezado a irse y el logo ya no estaba.
-  assert.match(modal, /phonePanelHeight = panelWidth \/ MOBILE_DETAILS_ASPECT_RATIO/);
+  // Y mide el alto REAL: con el ancho mínimo en pantallas bajas el panel se
+  // para en el alto de la ventana en vez de seguir su proporción.
+  assert.match(
+    modal,
+    /phonePanelHeight = Math\.min\(\s*\n\s*panelWidth \/ MOBILE_DETAILS_ASPECT_RATIO,\s*\n\s*typeof window/,
+  );
   assert.match(modal, /logoFadeFrom = mobileDetails \? .*0\.4.*: 0/);
   assert.match(modal, /logoFadeTo = mobileDetails \? .*0\.75.*: 300/);
 

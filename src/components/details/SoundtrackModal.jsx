@@ -225,8 +225,13 @@ export default function SoundtrackModal({
                 <div className="w-11 h-11" />
               )}
 
-              <div className="flex flex-col items-center">
-                <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/80 truncate max-w-[200px] text-center drop-shadow-sm">
+              {/* El título de la película o serie se muestra ENTERO: envuelve
+                  en varias líneas en vez de recortarse. La columna ocupa el
+                  hueco que dejan los dos botones (`flex-1` + `min-w-0`), y el
+                  texto parte por palabras; solo un título de una sola palabra
+                  larguísima partiría por letras. */}
+              <div className="flex min-w-0 flex-1 flex-col items-center px-2">
+                <div className="w-full text-[11px] font-bold uppercase tracking-[0.2em] text-white/80 text-center text-balance [overflow-wrap:anywhere] drop-shadow-sm">
                   {title || "Soundtrack"}
                 </div>
                 <div className="text-[10px] font-semibold text-white/40 mt-1">
@@ -272,7 +277,11 @@ export default function SoundtrackModal({
               <h4 className="text-2xl sm:text-3xl font-black text-white drop-shadow-md text-balance">
                 {selectedTrack.trackName}
               </h4>
-              <p className="text-base sm:text-lg font-medium text-white/70 line-clamp-1 drop-shadow-sm">
+              {/* Hasta DOS líneas de intérpretes: con una sola se cortaban
+                  nombres que caben de sobra, y algunas pistas acreditan a diez
+                  o más y empujaban los controles fuera del modal. Pasadas las
+                  dos líneas se recorta con puntos suspensivos. */}
+              <p className="text-base sm:text-lg font-medium text-white/70 line-clamp-2 [overflow-wrap:anywhere] drop-shadow-sm">
                 {selectedTrack.artistName}
               </p>
             </div>

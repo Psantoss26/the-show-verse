@@ -138,7 +138,8 @@ test("la ficha móvil acoplada mantiene viewport móvil y espacio para la págin
     assert.ok(max < 640);
     assert.ok(viewport - max >= viewport * 0.4);
     assert.ok(max > min);
-    assert.equal(clampMobileDetailsWidth(400, viewport), 400);
+    // Un ancho pedido dentro del rango se respeta tal cual.
+    assert.equal(clampMobileDetailsWidth(min + 10, viewport), min + 10);
   }
 });
 
@@ -148,6 +149,9 @@ test("la ficha de teléfono nunca baja del ancho mínimo y conserva la proporci�
     clampMobileDetailsWidth,
     MOBILE_DETAILS_ASPECT_RATIO: ratio,
     MOBILE_DETAILS_MIN_PX,
+    PHONE_RATINGS_ONE_ROW_PX,
+    PHONE_STATS_NO_SCROLL_PX,
+    PHONE_MIN_SAFETY_MARGIN_PX,
   } = await import("./detailModalSizing.js");
   for (const [viewportWidth, viewportHeight] of [[1024, 768], [768, 1024], [1180, 820], [820, 1180], [1366, 1024], [1280, 600], [1024, 600], [1366, 700]]) {
     for (const requested of [0, 320, 400, 10000, undefined]) {
@@ -164,6 +168,17 @@ test("la ficha de teléfono nunca baja del ancho mínimo y conserva la proporci�
   assert.equal(clampMobileDetailsWidth(undefined, 1024, 768), MOBILE_DETAILS_MIN_PX);
   // Pantalla baja: la proporción daría 276px; se ensancha al mínimo.
   assert.equal(clampMobileDetailsWidth(undefined, 1280, 600), MOBILE_DETAILS_MIN_PX);
+  // El mínimo sale de lo MEDIDO en el panel real, no de un número a ojo: el
+  // mayor de los dos umbrales del marcador más su margen.
+  assert.equal(
+    MOBILE_DETAILS_MIN_PX,
+    Math.max(PHONE_RATINGS_ONE_ROW_PX, PHONE_STATS_NO_SCROLL_PX) +
+      PHONE_MIN_SAFETY_MARGIN_PX,
+  );
+  // Y el ancho siempre deja las puntuaciones en una fila y las estadísticas
+  // sin scroll.
+  assert.ok(MOBILE_DETAILS_MIN_PX >= PHONE_RATINGS_ONE_ROW_PX);
+  assert.ok(MOBILE_DETAILS_MIN_PX >= PHONE_STATS_NO_SCROLL_PX);
   // Con alto de sobra manda la proporción.
   assert.equal(clampMobileDetailsWidth(undefined, 1366, 1024), Math.floor(1024 * ratio));
 });
