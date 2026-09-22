@@ -950,7 +950,12 @@ export default function DetailModal({
   // En el teléfono el recorrido se ata al alto del panel, que su proporción
   // deja en `ancho / (9/19.5)`. Empieza a desvanecerse pasada la mitad y
   // termina justo cuando el logo sale por arriba, en vez de mucho antes.
-  const phonePanelHeight = panelWidth / MOBILE_DETAILS_ASPECT_RATIO;
+  // Con el ancho mínimo en pantallas bajas el panel se para en el alto de la
+  // ventana (`max-h-full`), así que el recorrido usa el alto REAL.
+  const phonePanelHeight = Math.min(
+    panelWidth / MOBILE_DETAILS_ASPECT_RATIO,
+    typeof window !== "undefined" ? window.innerHeight : Infinity,
+  );
   const logoFadeFrom = mobileDetails ? Math.round(phonePanelHeight * 0.4) : 0;
   const logoFadeTo = mobileDetails ? Math.round(phonePanelHeight * 0.75) : 300;
 
@@ -3207,7 +3212,10 @@ export default function DetailModal({
               // proporción de teléfono.
               // de la derecha no se ven, así que no se redondean. Solo cambia
               // el alto, que lo fija su proporción de teléfono.
-              ? "h-auto min-h-0 self-center rounded-l-2xl pointer-events-auto"
+              // `max-h-full`: si el ancho mínimo no deja sitio a la proporción
+              // de teléfono (pantallas bajas), el alto se para en el de la
+              // ventana y el panel queda más ancho que 9:19.5.
+              ? "h-auto max-h-full min-h-0 self-center rounded-l-2xl pointer-events-auto"
               : "h-full rounded-l-2xl pointer-events-auto"
             : "mt-[4vh] h-[96vh] w-[95vw] max-w-[1080px] rounded-t-2xl"
         }`}

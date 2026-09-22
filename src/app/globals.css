@@ -28,6 +28,18 @@
   }
 }
 
+/* Layout ANCHO del FeaturedHero (backdrop de fondo + información en la esquina
+ * inferior izquierda). Lo que no es `hero-wide:` usa el layout móvil (póster +
+ * información debajo): móviles y también tablets en VERTICAL, donde un
+ * backdrop 16:9 quedaría como una franja estrecha. El umbral 4/5 deja fuera a
+ * las tablets en vertical (≈3/4, 2/3) pero no a ventanas de escritorio casi
+ * cuadradas. Debe coincidir con HERO_WIDE_QUERY de FeaturedHero.jsx. */
+@custom-variant hero-wide {
+  @media (min-width: 40rem) and (min-aspect-ratio: 4 / 5) {
+    @slot;
+  }
+}
+
 /* La app es SIEMPRE oscura: no existe tema claro. Estos dos tokens venían del
    boilerplate de create-next-app con su par claro/oscuro (#ffffff / #0a0a0a) y
    el único sitio que los consume es la regla `body` de más abajo.

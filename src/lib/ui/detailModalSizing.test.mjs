@@ -143,19 +143,29 @@ test("la ficha móvil acoplada mantiene viewport móvil y espacio para la págin
 });
 
 
-test("la proporción móvil cabe en ambas orientaciones incluso con un ancho guardado excesivo", async () => {
-  const { clampMobileDetailsWidth, MOBILE_DETAILS_ASPECT_RATIO: ratio } = await import("./detailModalSizing.js");
-  for (const [viewportWidth, viewportHeight] of [[1024, 768], [768, 1024], [1180, 820], [820, 1180], [1366, 1024]]) {
+test("la ficha de teléfono nunca baja del ancho mínimo y conserva la proporción cuando cabe", async () => {
+  const {
+    clampMobileDetailsWidth,
+    MOBILE_DETAILS_ASPECT_RATIO: ratio,
+    MOBILE_DETAILS_MIN_PX,
+  } = await import("./detailModalSizing.js");
+  for (const [viewportWidth, viewportHeight] of [[1024, 768], [768, 1024], [1180, 820], [820, 1180], [1366, 1024], [1280, 600], [1024, 600], [1366, 700]]) {
     for (const requested of [0, 320, 400, 10000, undefined]) {
       const width = clampMobileDetailsWidth(requested, viewportWidth, viewportHeight);
-      const height = width / ratio;
-      assert.ok(height <= viewportHeight);
+      // Nunca más estrecha que un teléfono real: la fila de acciones se recortaría.
+      assert.ok(width >= MOBILE_DETAILS_MIN_PX);
       assert.ok(width < 640);
       assert.ok(width <= viewportWidth * 0.6);
-      assert.ok(width >= Math.min(320, Math.floor(viewportHeight * ratio)));
+      // Por encima del mínimo, la proporción de teléfono cabe en alto.
+      if (width > MOBILE_DETAILS_MIN_PX) assert.ok(width / ratio <= viewportHeight);
     }
   }
-  assert.equal(clampMobileDetailsWidth(undefined, 1024, 768), 354);
+  // Tablet 1024x768: la proporción daría 354px, por debajo del mínimo.
+  assert.equal(clampMobileDetailsWidth(undefined, 1024, 768), MOBILE_DETAILS_MIN_PX);
+  // Pantalla baja: la proporción daría 276px; se ensancha al mínimo.
+  assert.equal(clampMobileDetailsWidth(undefined, 1280, 600), MOBILE_DETAILS_MIN_PX);
+  // Con alto de sobra manda la proporción.
+  assert.equal(clampMobileDetailsWidth(undefined, 1366, 1024), Math.floor(1024 * ratio));
 });
 
 

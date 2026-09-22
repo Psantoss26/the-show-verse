@@ -4458,7 +4458,6 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
             >
               <FeaturedHero
                 items={featuredItems}
-                isMobile={isMobile}
                 deferInitialBackdrop
               />
             </div>
