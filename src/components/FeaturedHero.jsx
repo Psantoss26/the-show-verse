@@ -1624,25 +1624,32 @@ function FeaturedSlide({
         soundtrackVisible &&
         soundtrackTrack &&
         !isMobile && (
-          <HeroSoundtrackPlayer
-            track={soundtrackTrack}
-            isPlaying={soundtrackPlaying}
-            progress={soundtrackProgress}
-            duration={soundtrackDuration}
-            volume={soundtrackVolume}
-            muted={soundtrackMuted}
-            position={soundtrackTrackIndex + 1}
-            total={soundtrackTracks.length}
-            hasPrevious={soundtrackHasPrevious}
-            hasNext={soundtrackHasNext}
-            onPrevious={handleSoundtrackPrevious}
-            onNext={handleSoundtrackNext}
-            onTogglePlayback={handleSoundtrackTogglePlayback}
-            onSeek={handleSoundtrackSeek}
-            onToggleMute={handleSoundtrackToggleMute}
-            onVolumeChange={handleSoundtrackVolumeChange}
-            onInteractionChange={onSoundtrackInteractionChange}
-          />
+          // Ventana del soundtrack SOLO en escritorio (variante `desktop:`:
+          // ancho de escritorio y puntero fino con hover). En tablet no se
+          // muestra; el botón de sonido del hero sigue controlando la música.
+          // `contents` no genera caja: el reproductor se sigue posicionando
+          // respecto al slide.
+          <div className="hidden desktop:contents">
+            <HeroSoundtrackPlayer
+              track={soundtrackTrack}
+              isPlaying={soundtrackPlaying}
+              progress={soundtrackProgress}
+              duration={soundtrackDuration}
+              volume={soundtrackVolume}
+              muted={soundtrackMuted}
+              position={soundtrackTrackIndex + 1}
+              total={soundtrackTracks.length}
+              hasPrevious={soundtrackHasPrevious}
+              hasNext={soundtrackHasNext}
+              onPrevious={handleSoundtrackPrevious}
+              onNext={handleSoundtrackNext}
+              onTogglePlayback={handleSoundtrackTogglePlayback}
+              onSeek={handleSoundtrackSeek}
+              onToggleMute={handleSoundtrackToggleMute}
+              onVolumeChange={handleSoundtrackVolumeChange}
+              onInteractionChange={onSoundtrackInteractionChange}
+            />
+          </div>
         )}
 
       {mediaType === "tv" && (
