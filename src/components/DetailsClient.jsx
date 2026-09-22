@@ -154,6 +154,7 @@ import TraktWatchedControl from "@/components/trakt/TraktWatchedControl"; // Bot
 import TraktWatchedModal from "@/components/trakt/TraktWatchedModal"; // Modal de historial de visionados
 import TraktEpisodesWatchedModal from "@/components/trakt/TraktEpisodesWatchedModal"; // Modal de episodios vistos
 import { useTraktEpisodesWatched } from "@/lib/hooks/useTraktEpisodesWatched";
+import { statusRetryDelay } from "@/lib/trakt/statusRetry";
 // -- API client de Trakt: estado, visionados, ratings, comentarios, listas, temporadas --
 import {
   traktGetItemStatus,
@@ -3714,18 +3715,23 @@ export default function DetailsClient({
   const traktBackgroundSyncAtRef = useRef(0);
   const traktResolvedIdRef = useRef(initialTraktId ?? null);
   const traktStatusRequestIdRef = useRef(0);
-  // Reintento ACOTADO del estado del título. Un fallo transitorio dejaba los
-  // botones desmarcados hasta que el usuario pulsaba uno; con esto el estado
-  // acaba llegando siempre, sin intervención y sin bucles: un intento por
-  // petición fallida, y se cancela si llega otra petición más reciente.
+  // Reintento del estado del título. Un fallo transitorio dejaba los botones
+  // cargando o desmarcados hasta que el usuario pulsaba uno; con esto el estado
+  // acaba llegando siempre, sin intervención: un intento por petición fallida,
+  // con espera creciente (ver `statusRetryDelay`), y se cancela si llega otra
+  // petición más reciente. La comparten `reloadTraktStatus` (series) y
+  // `loadTraktMovieWatched` (películas).
+  //
+  // Antes eran solo tres intentos en ~8s y SOLO en `reloadTraktStatus`: las
+  // películas no reintentaban nunca, y en series una racha de 429/503 (rate
+  // limit del backend al pasar por varios títulos seguidos) agotaba los tres
+  // dentro de la misma ventana. En ambos casos `actionStateReady` no llegaba a
+  // ponerse en true y los botones se quedaban en "cargando" para siempre.
   const traktStatusRetryRef = useRef({ id: 0, intentos: 0, timer: null });
-  // Tres intentos con espera creciente. Con uno solo bastaba que el reintento
-  // pillara otro fallo para que el estado se quedara sin cargar: los botones se
-  // quedaban en "Cargando estado…" indefinidamente.
-  const REINTENTOS_ESTADO_MS = [900, 2200, 4500];
   // Referencia a la última versión de `reloadTraktStatus`, para poder
   // reintentar desde dentro de ella sin crear una dependencia circular.
   const reloadTraktStatusRef = useRef(null);
+  const loadTraktMovieWatchedRef = useRef(null);
   const movieWatchedRequestIdRef = useRef(0);
 
   useEffect(() => {
@@ -4802,8 +4808,13 @@ export default function DetailsClient({
           /aborted|fetch|network|server error|HTTP 5/i.test(e?.message || "");
 
         // REINTENTO: el estado de los botones no puede quedarse sin cargar por
-        // un fallo pasajero. Se reintenta UNA vez por petición fallida, y solo
+        // un fallo pasajero. Se reintenta una vez por petición fallida, y solo
         // si esta sigue siendo la más reciente.
+        if (!isTransient && requestId === traktStatusRequestIdRef.current) {
+          // No se arregla reintentando: botones con el estado que haya en vez
+          // de dejarlos cargando para siempre.
+          setActionStateReady(true);
+        }
         if (isTransient && requestId === traktStatusRequestIdRef.current) {
           const retry = traktStatusRetryRef.current;
           // Cada petición fallida continúa la serie de intentos del título; no
@@ -4813,15 +4824,12 @@ export default function DetailsClient({
             retry.id = requestId;
             retry.intentos = (retry.intentos || 0) + 1;
           }
-          const espera = REINTENTOS_ESTADO_MS[retry.intentos - 1];
-          if (espera != null) {
-            if (retry.timer) window.clearTimeout(retry.timer);
-            retry.timer = window.setTimeout(() => {
-              retry.timer = null;
-              if (requestId !== traktStatusRequestIdRef.current) return;
-              reloadTraktStatusRef.current?.({ background: true, force: true });
-            }, espera);
-          }
+          if (retry.timer) window.clearTimeout(retry.timer);
+          retry.timer = window.setTimeout(() => {
+            retry.timer = null;
+            if (requestId !== traktStatusRequestIdRef.current) return;
+            reloadTraktStatusRef.current?.({ background: true, force: true });
+          }, statusRetryDelay(retry.intentos));
         }
 
         let nextState = null;
@@ -4969,6 +4977,10 @@ export default function DetailsClient({
 
         if (requestId === movieWatchedRequestIdRef.current) {
           setActionStateReady(true);
+          const retry = traktStatusRetryRef.current;
+          if (retry.timer) window.clearTimeout(retry.timer);
+          retry.timer = null;
+          retry.intentos = 0;
         }
         return nextState;
       } catch (e) {
@@ -4976,12 +4988,39 @@ export default function DetailsClient({
         const isRateLimit = /rate limit|temporalmente no disponible/i.test(
           e?.message || "",
         );
+        // Ver la nota de `isAuthRejection` en `reloadTraktStatus`.
+        const isAuthRejection =
+          typeof e?.status === "number" && (e.status === 401 || e.status === 403);
         const isTransient =
           e?.code === "TRAKT_TRANSIENT" ||
           isTimeout ||
           isRateLimit ||
+          isAuthRejection ||
           (typeof e?.status === "number" && e.status >= 500) ||
           /aborted|fetch|network|server error|HTTP 5/i.test(e?.message || "");
+
+        // Un error que no se arregla reintentando: se muestran los botones con
+        // el estado que haya en vez de dejarlos cargando para siempre.
+        if (!isTransient && requestId === movieWatchedRequestIdRef.current) {
+          setActionStateReady(true);
+        }
+
+        // Mismo reintento que `reloadTraktStatus` (ver `traktStatusRetryRef`).
+        // Faltaba aquí, que es por donde cargan SIEMPRE las películas.
+        if (isTransient && requestId === movieWatchedRequestIdRef.current) {
+          const retry = traktStatusRetryRef.current;
+          const retryKey = `movie:${requestId}`;
+          if (retry.id !== retryKey) {
+            retry.id = retryKey;
+            retry.intentos = (retry.intentos || 0) + 1;
+          }
+          if (retry.timer) window.clearTimeout(retry.timer);
+          retry.timer = window.setTimeout(() => {
+            retry.timer = null;
+            if (requestId !== movieWatchedRequestIdRef.current) return;
+            loadTraktMovieWatchedRef.current?.({ background: true, force: true });
+          }, statusRetryDelay(retry.intentos));
+        }
 
         let nextState = null;
         setTrakt((prev) => {
@@ -4995,7 +5034,11 @@ export default function DetailsClient({
             loading: false,
             // Igual que en `reloadTraktStatus`: un fallo transitorio no prueba
             // desconexión, y en un montaje nuevo `prev.connected` es false.
-            connected: isTransient ? prev.connected || hasBackendSessionRef.current : false,
+            connected: isAuthRejection
+              ? true
+              : isTransient
+                ? prev.connected || hasBackendSessionRef.current
+                : false,
             error: background
               ? prev.error
               : isTransient
@@ -5011,6 +5054,10 @@ export default function DetailsClient({
     },
     [endpointType, id, reloadTraktStatus, traktType],
   );
+
+  useEffect(() => {
+    loadTraktMovieWatchedRef.current = loadTraktMovieWatched;
+  }, [loadTraktMovieWatched]);
 
   const confirmMovieTraktStatus = useCallback(
     async ({
@@ -5615,9 +5662,6 @@ export default function DetailsClient({
     trakt.connected,
     trakt.error,
     watchedBySeasonLoaded,
-    trakt.watched,
-    trakt.plays,
-    trakt.history,
     hasInitialTraktStatus,
     hasCachedTraktStatus,
     hasInitialShowWatched,

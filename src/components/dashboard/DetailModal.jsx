@@ -148,6 +148,7 @@ import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
 // Máquina de episodios vistos (series) COMPARTIDA con DetailsClient: misma
 // lógica de toggles, rewatches, plays y persistencia en localStorage.
 import { useTraktEpisodesWatched } from "@/lib/hooks/useTraktEpisodesWatched";
+import { statusRetryDelay } from "@/lib/trakt/statusRetry";
 
 const DETAILS_ROUTE_TRANSITION_KEY = "showverse:details-route-transition";
 const DETAILS_ROUTE_REVEAL_MIN_MS = 500;
@@ -2161,23 +2162,46 @@ export default function DetailModal({
 
   useEffect(() => {
     let cancel = false;
-    (async () => {
+    let retryTimer = null;
+    let intentos = 0;
+    const load = async () => {
       if (!item) return;
       try {
         setTraktStatusLoading(true);
         const st = await traktGetItemStatus({
           type: traktType,
           tmdbId: item.id,
+          force: intentos > 0,
         });
-        if (!cancel) applyTraktStatus(st);
-      } catch {
+        if (cancel) return;
+        applyTraktStatus(st);
+        setTraktStatusLoading(false);
+      } catch (e) {
+        if (cancel) return;
+        // `traktGetItemStatus` solo lanza ante fallos que no dicen nada del
+        // estado real (503 degradado, 429, red, timeout). Se reintenta como en
+        // DetailsClient en vez de dar el título por "no visto".
+        const status = e?.status;
+        const reintentable =
+          e?.code === "TRAKT_TRANSIENT" ||
+          e?.name === "TimeoutError" ||
+          typeof status !== "number" ||
+          status >= 500 ||
+          status === 429 ||
+          status === 401;
+        if (reintentable) {
+          intentos += 1;
+          retryTimer = window.setTimeout(load, statusRetryDelay(intentos));
+          return;
+        }
         // sin estado de Trakt: botón en "no visto"
-      } finally {
-        if (!cancel) setTraktStatusLoading(false);
+        setTraktStatusLoading(false);
       }
-    })();
+    };
+    void load();
     return () => {
       cancel = true;
+      if (retryTimer) window.clearTimeout(retryTimer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item, traktType]);

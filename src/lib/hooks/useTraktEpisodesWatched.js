@@ -24,6 +24,7 @@
 // el estado de rewatch/vista es coherente entre ambas superficies.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { statusRetryDelay } from "@/lib/trakt/statusRetry";
 import {
   traktGetShowWatched,
   traktGetShowPlays,
@@ -183,6 +184,10 @@ export function useTraktEpisodesWatched({
   // Ref compartida si el consumidor la aporta; si no, la interna.
   const traktResolvedIdRef = externalTraktResolvedIdRef || internalResolvedIdRef;
   const showWatchedInitiatedRef = useRef(false);
+  // Reintento de la carga de episodios vistos mientras no se haya podido
+  // cargar nunca. Sin él, un fallo pasajero dejaba `watchedBySeasonLoaded` en
+  // false y el botón de visto de la serie cargando indefinidamente.
+  const showWatchedRetryRef = useRef({ intentos: 0, timer: null });
 
   useEffect(() => {
     if (traktId != null && !externalTraktResolvedIdRef) {
@@ -497,6 +502,10 @@ export function useTraktEpisodesWatched({
           r?.watchedBySeason || {},
           { loaded: r?.connected !== false },
         );
+        const retry = showWatchedRetryRef.current;
+        if (retry.timer) window.clearTimeout(retry.timer);
+        retry.timer = null;
+        retry.intentos = 0;
         return {
           ok: true,
           connected: r?.connected !== false,
@@ -504,6 +513,19 @@ export function useTraktEpisodesWatched({
           watchedBySeason: nextWatchedBySeason,
         };
       } catch {
+        if (
+          requestId === watchedBySeasonRequestIdRef.current &&
+          !watchedBySeasonLoadedRef.current
+        ) {
+          const retry = showWatchedRetryRef.current;
+          retry.intentos += 1;
+          if (retry.timer) window.clearTimeout(retry.timer);
+          retry.timer = window.setTimeout(() => {
+            retry.timer = null;
+            if (watchedBySeasonLoadedRef.current) return;
+            void loadTraktShowWatchedRef.current?.({ allowDisconnected: true });
+          }, statusRetryDelay(retry.intentos));
+        }
         return {
           ok: false,
           connected: !!connected,
@@ -683,6 +705,13 @@ export function useTraktEpisodesWatched({
     if (type !== "tv") return;
     showWatchedInitiatedRef.current = true;
     void loadTraktShowWatchedRef.current?.({ allowDisconnected: true });
+    const retry = showWatchedRetryRef.current;
+    return () => {
+      // Al cambiar de título (o desmontar) el reintento pendiente sobra.
+      if (retry.timer) window.clearTimeout(retry.timer);
+      retry.timer = null;
+      retry.intentos = 0;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, type]);
 
