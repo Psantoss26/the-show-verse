@@ -1394,31 +1394,6 @@ html {
   }
 }
 
-/* EL BUSCADOR TAMBIÉN CEDE. Ocupa el hueco sobrante de la fila (`flex-1`), así
-   que es lo primero que aprieta a los demás cuando el sitio falta. Pasa a un
-   cuadrado con su lupa y recupera su ancho al recibir el foco, que es cuando
-   de verdad hace falta. */
-@container sv-page-toolbar (width < 54rem) {
-  .sv-page-toolbar-search {
-    flex: 0 0 2.75rem;
-    transition: flex-basis 200ms cubic-bezier(0.22, 1, 0.36, 1);
-  }
-
-  .sv-page-toolbar-search:focus-within {
-    flex: 1 1 10rem;
-  }
-
-  .sv-page-toolbar-search input::placeholder {
-    color: transparent;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .sv-page-toolbar-search {
-    transition: none;
-  }
-}
-
 @container sv-page-toolbar (width < 54rem) {
   .sv-page-toolbar-value {
     display: none;
@@ -1429,7 +1404,75 @@ html {
   .sv-page-toolbar-trigger {
     min-width: 0 !important;
   }
+
+  /* Ya en icono y flecha, el desplegable no cede más: su envoltorio lleva
+     `min-w-0` y se estrechaba por debajo de su propio botón, que asomaba sobre
+     el siguiente. Lo que falte lo absorbe el buscador, que es el que puede
+     quedarse en un cuadrado. */
+  .sv-page-toolbar > :has(> .sv-page-toolbar-trigger) {
+    flex-shrink: 0;
+  }
 }
+
+/* EL BUSCADOR TAMBIÉN CEDE, PERO SIN DEJAR HUECO. Ocupa el hueco sobrante de
+   la fila, así que es lo primero que aprieta a los demás cuando el sitio falta.
+
+   Antes, en modo compacto, pasaba a un cuadrado de ancho FIJO, sin crecer. Al
+   mismo tiempo los desplegables se quedan en icono y flecha, así que la fila
+   pasaba de pedir ~862px a ~574px de golpe: con el drawer abierto, en anchos
+   intermedios sobraban cientos de píxeles y quedaban vacíos a la derecha.
+
+   Ahora parte de 2.75rem pero CRECE (`flex-grow: 1`) hasta llenar lo que quede:
+   la barra ocupa siempre todo el ancho, y el buscador solo se queda en un
+   cuadrado cuando de verdad no hay más sitio. Al recibir el foco pide al menos
+   10rem, que es cuando hace falta poder escribir. */
+@container sv-page-toolbar (width < 54rem) {
+  .sv-page-toolbar-search {
+    flex: 1 1 2.75rem;
+    min-width: 2.75rem;
+    transition: flex-basis 200ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .sv-page-toolbar-search:focus-within {
+    flex: 1 1 10rem;
+  }
+}
+
+/* El texto de ayuda solo se oculta cuando el BUSCADOR es estrecho (el cuadrado
+   con la lupa), no por estar la barra en modo compacto: si el buscador ha
+   crecido para ocupar el sitio libre, el placeholder cabe y se ve. */
+.sv-page-toolbar .sv-page-toolbar-search {
+  container: sv-page-toolbar-search / inline-size;
+}
+
+@container sv-page-toolbar-search (width < 10rem) {
+  input::placeholder {
+    color: transparent;
+  }
+
+  /* EN EL CUADRADO, EL CAMPO NO PUEDE SER MÁS ANCHO QUE SU CAJA. Lleva
+     `pl-10 pr-10` (40px por lado) y con `border-box` el relleno no se encoge:
+     el campo nunca bajaba de 80px, se salía de su hueco de 44px y quedaba
+     debajo del botón siguiente (en el Historial, el de Tipo). Aquí el relleno
+     izquierdo deja sitio solo a la lupa y el derecho desaparece. */
+  input {
+    padding-left: 2.5rem;
+    padding-right: 0;
+  }
+
+  /* La X de borrar caería encima de la lupa. Al enfocar, el buscador se
+     ensancha (ver `:focus-within` arriba) y vuelve a aparecer. */
+  button {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-page-toolbar-search {
+    transition: none;
+  }
+}
+
 
 /* BARRA SUPERIOR TÁCTIL (tablet) con el drawer abierto.
    ===================================================================
