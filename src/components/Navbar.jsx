@@ -47,13 +47,15 @@ import {
   SlidersHorizontal,
   UserRoundSearch,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
   Sparkles,
   Menu,
 } from "lucide-react";
 import WatchNextAssistant from "@/components/WatchNextAssistant";
 import NetflixSyncListener from "@/components/NetflixSyncListener";
 import { fuzzySimilarity, tokenFuzzyMatches } from "@/lib/search/fuzzy";
-import { buildSearchHref } from "@/lib/search/searchPage";
 import {
   addSearchHistory,
   clearSearchHistory,
@@ -101,6 +103,27 @@ const FUZZY_MIN_SIMILARITY = 0.7;
 // consulta (≥ esta longitud) no devuelve nada, se reintenta con un prefijo
 // recortado (la errata suele ir al final) y el fuzzy re-rankea el resultado real.
 const SEARCH_FALLBACK_MIN_LEN = 5;
+// Resultados por página del desplegable. Las flechas del pie recorren las
+// siguientes páginas y, al agotar lo ya cargado, piden más a TMDb.
+const SEARCH_RESULTS_PAGE_SIZE = 8;
+// Páginas de TMDb que la búsqueda inicial ya trae de cada endpoint; la carga
+// incremental continúa a partir de la siguiente.
+const SEARCH_INITIAL_TMDB_PAGES = {
+  "/search/movie": 2,
+  "/search/tv": 2,
+  "/search/person": 2,
+  "/search/collection": 1,
+};
+// Endpoints que se siguen paginando para cada filtro. `/search/multi` no hace
+// falta: sus resultados ya salen de los tres primeros.
+const SEARCH_MORE_ENDPOINTS = {
+  all: ["/search/movie", "/search/tv", "/search/person"],
+  movies: ["/search/movie"],
+  series: ["/search/tv"],
+  people: ["/search/person"],
+  collections: ["/search/collection"],
+  users: [],
+};
 // Relevancia mínima de título (fuzzy) para conservar un candidato del fallback,
 // y así no colar ruido del prefijo corto (que puede devolver cientos de títulos).
 const FALLBACK_TITLE_MIN_SIMILARITY = 0.6;
@@ -265,6 +288,48 @@ function dedupeSearchResults(results) {
   return out;
 }
 
+/**
+ * Una página de un endpoint de búsqueda de TMDb en todos los idiomas de
+ * búsqueda. Cada resultado lleva `_search_language` para el emparejado de
+ * títulos, igual que en la búsqueda inicial.
+ */
+async function fetchTmdbSearchPage(path, query, page, signal) {
+  const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+  const payloads = await Promise.all(
+    SEARCH_LANGUAGES.map(async (language) => {
+      const params = new URLSearchParams({
+        api_key: apiKey || "",
+        language,
+        query,
+        page: String(page),
+        include_adult: "false",
+      });
+      const res = await fetch(
+        `https://api.themoviedb.org/3${path}?${params.toString()}`,
+        { signal },
+      );
+      if (!res.ok) return { language, payload: { results: [] } };
+      return { language, payload: await res.json() };
+    }),
+  );
+  return {
+    totalPages: Math.max(
+      0,
+      ...payloads.map(({ payload }) => Number(payload?.total_pages) || 0),
+    ),
+    items: payloads.flatMap(({ language, payload }) =>
+      (payload?.results || []).map((item) => ({
+        ...item,
+        _search_language: language,
+      })),
+    ),
+  };
+}
+
+function searchResultKey(item) {
+  return `${item?.media_type}:${item?.id}`;
+}
+
 /* ====================================================================
  * Componente de Búsqueda Reutilizable (Lógica y UI)
  * ==================================================================== */
@@ -276,7 +341,6 @@ function SearchBar({
   onEscape,
 }) {
   const { t } = useTranslation();
-  const router = useRouter();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -297,6 +361,21 @@ function SearchBar({
   const [dropdownPosition, setDropdownPosition] = useState(null);
   const [filterMenuPosition, setFilterMenuPosition] = useState(null);
   const pendingCollectionRef = useRef(null); // colección precargada lista para mostrar
+  // Paginación del desplegable.
+  const [resultsPage, setResultsPage] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [remoteHasMore, setRemoteHasMore] = useState(false);
+  const resultsScrollRef = useRef(null);
+  // Estado de la paginación remota de la búsqueda en curso: consulta, filtro y
+  // siguiente página de cada endpoint. `key` identifica la búsqueda para
+  // descartar cargas que lleguen después de cambiar de consulta o de filtro.
+  const remoteSearchRef = useRef(null);
+  const loadMoreAbortRef = useRef(null);
+  // Resultados ya mostrados, para saber qué trae de NUEVO cada carga.
+  const resultsRef = useRef(results);
+  useEffect(() => {
+    resultsRef.current = results;
+  }, [results]);
   const activeFilterOption =
     SEARCH_FILTER_OPTIONS.find((option) => option.id === activeFilter) ||
     SEARCH_FILTER_OPTIONS[0];
@@ -449,6 +528,15 @@ function SearchBar({
 
   // Búsqueda multi y colección en paralelo
   useEffect(() => {
+    // Cualquier consulta o filtro nuevo vuelve a la primera página y cancela
+    // la carga de más resultados de la búsqueda anterior.
+    setResultsPage(0);
+    setRemoteHasMore(false);
+    setLoadingMore(false);
+    remoteSearchRef.current = null;
+    loadMoreAbortRef.current?.abort();
+    loadMoreAbortRef.current = null;
+
     if (!query.trim()) {
       setResults([]);
       setCompletedSearch(null);
@@ -529,6 +617,7 @@ function SearchBar({
             return res.json();
           };
 
+          const totalPages = {};
           const fetchResults = async (path, page = 1) => {
             const payloads = await Promise.all(
               SEARCH_LANGUAGES.map((language) =>
@@ -538,6 +627,14 @@ function SearchBar({
                 })),
               ),
             );
+            if (page === 1) {
+              totalPages[path] = Math.max(
+                0,
+                ...payloads.map(
+                  ({ payload }) => Number(payload?.total_pages) || 0,
+                ),
+              );
+            }
             return payloads.flatMap(({ language, payload }) =>
               (payload.results || []).map((item) => ({
                 ...item,
@@ -622,12 +719,14 @@ function SearchBar({
               title: collection.name,
             }));
 
-          return { items, collResults };
+          return { items, collResults, totalPages };
         };
 
         const userResultsPromise =
           activeFilter === "all" ? fetchUserResults() : Promise.resolve([]);
-        let { items, collResults } = await fetchAndAssemble(trimmedQuery);
+        let { items, collResults, totalPages } =
+          await fetchAndAssemble(trimmedQuery);
+        let usedPrefixFallback = false;
         if (activeFilter === "people") {
           items = items.filter(isActorOrDirector);
         }
@@ -679,6 +778,7 @@ function SearchBar({
             if (filtered.length) {
               items = filtered;
               collResults = alt.collResults;
+              usedPrefixFallback = true;
             }
           }
         }
@@ -716,6 +816,27 @@ function SearchBar({
         // colección para que no desplace los títulos más relevantes al escribir.
         pendingCollectionRef.current =
           activeFilter === "all" ? sortedCollections[0] || null : null;
+
+        // Qué endpoints admiten más páginas. Con el fallback por prefijo no se
+        // sigue paginando: sus resultados se filtran por parecido con la
+        // consulta original y las páginas siguientes serían casi todo ruido.
+        const moreEndpoints = usedPrefixFallback
+          ? []
+          : (SEARCH_MORE_ENDPOINTS[activeFilter] || [])
+              .map((path) => ({
+                path,
+                nextPage: (SEARCH_INITIAL_TMDB_PAGES[path] || 1) + 1,
+                totalPages: totalPages[path] || 0,
+              }))
+              .filter((endpoint) => endpoint.nextPage <= endpoint.totalPages);
+        remoteSearchRef.current = {
+          key: `${activeFilter}|${trimmedQuery}`,
+          query: trimmedQuery,
+          normalizedQuery,
+          filter: activeFilter,
+          endpoints: moreEndpoints,
+        };
+        setRemoteHasMore(moreEndpoints.length > 0);
 
         setResults(nextResults);
         setShowDropdown(true);
@@ -757,6 +878,144 @@ function SearchBar({
     });
   }, [showCollection, activeFilter]);
 
+  // Pide a TMDb la siguiente página de cada endpoint de la búsqueda en curso
+  // y añade al final los resultados que aún no estaban. Devuelve cuántos ha
+  // añadido. Si una página no trae nada nuevo (todo duplicado o filtrado)
+  // sigue con la siguiente, hasta un máximo de rondas.
+  const loadMoreResults = async () => {
+    const remote = remoteSearchRef.current;
+    if (!remote || remote.endpoints.length === 0) return 0;
+
+    const controller = new AbortController();
+    loadMoreAbortRef.current?.abort();
+    loadMoreAbortRef.current = controller;
+    const isCurrent = () =>
+      remoteSearchRef.current?.key === remote.key && !controller.signal.aborted;
+
+    setLoadingMore(true);
+    try {
+      for (let round = 0; round < 3 && remote.endpoints.length > 0; round += 1) {
+        const pages = await Promise.all(
+          remote.endpoints.map(async (endpoint) => ({
+            endpoint,
+            page: await fetchTmdbSearchPage(
+              endpoint.path,
+              remote.query,
+              endpoint.nextPage,
+              controller.signal,
+            ),
+          })),
+        );
+        if (!isCurrent()) return 0;
+
+        const media = [];
+        const collections = [];
+        for (const { endpoint, page } of pages) {
+          if (endpoint.path === "/search/collection") {
+            collections.push(
+              ...page.items.map((collection) => ({
+                ...collection,
+                media_type: "collection",
+                title: collection.name,
+              })),
+            );
+          } else {
+            const fallbackType =
+              endpoint.path === "/search/movie"
+                ? "movie"
+                : endpoint.path === "/search/tv"
+                  ? "tv"
+                  : "person";
+            media.push(
+              ...page.items
+                .map((item) => normalizeSearchResult(item, fallbackType))
+                .filter(Boolean),
+            );
+          }
+          endpoint.nextPage += 1;
+          if (page.totalPages) endpoint.totalPages = page.totalPages;
+        }
+        remote.endpoints = remote.endpoints.filter(
+          (endpoint) => endpoint.nextPage <= endpoint.totalPages,
+        );
+
+        const seenCollections = new Set();
+        const batch = [
+          ...dedupeSearchResults(media).filter(
+            (item) => item.media_type !== "person" || isActorOrDirector(item),
+          ),
+          ...collections.filter((collection) => {
+            if (!collection?.id || seenCollections.has(collection.id)) {
+              return false;
+            }
+            seenCollections.add(collection.id);
+            return true;
+          }),
+        ].sort(
+          (a, b) =>
+            scoreSearchResult(b, remote.normalizedQuery) -
+              scoreSearchResult(a, remote.normalizedQuery) ||
+            (b.popularity || 0) - (a.popularity || 0),
+        );
+
+        const known = new Set(resultsRef.current.map(searchResultKey));
+        const fresh = batch.filter((item) => !known.has(searchResultKey(item)));
+        setRemoteHasMore(remote.endpoints.length > 0);
+        if (fresh.length > 0) {
+          resultsRef.current = [...resultsRef.current, ...fresh];
+          setResults((prev) => {
+            const prevKeys = new Set(prev.map(searchResultKey));
+            const toAdd = fresh.filter(
+              (item) => !prevKeys.has(searchResultKey(item)),
+            );
+            return toAdd.length ? [...prev, ...toAdd] : prev;
+          });
+          return fresh.length;
+        }
+      }
+      setRemoteHasMore(remote.endpoints.length > 0);
+      return 0;
+    } catch (err) {
+      if (err?.name !== "AbortError") {
+        console.error("Error cargando más resultados de búsqueda:", err);
+      }
+      return 0;
+    } finally {
+      if (loadMoreAbortRef.current === controller) {
+        loadMoreAbortRef.current = null;
+        setLoadingMore(false);
+      }
+    }
+  };
+
+  const resultsPageCount = Math.max(
+    1,
+    Math.ceil(results.length / SEARCH_RESULTS_PAGE_SIZE),
+  );
+  const hasPrevResultsPage = resultsPage > 0;
+  const hasNextResultsPage =
+    resultsPage + 1 < resultsPageCount || remoteHasMore;
+
+  const goToResultsPage = (nextPage) => {
+    setResultsPage(nextPage);
+    resultsScrollRef.current?.scrollTo({ top: 0 });
+  };
+
+  const handlePrevResultsPage = () => {
+    if (hasPrevResultsPage) goToResultsPage(resultsPage - 1);
+  };
+
+  const handleNextResultsPage = async () => {
+    if (loadingMore) return;
+    if (resultsPage + 1 < resultsPageCount) {
+      goToResultsPage(resultsPage + 1);
+      return;
+    }
+    if (!remoteHasMore) return;
+    const added = await loadMoreResults();
+    if (added > 0) goToResultsPage(resultsPage + 1);
+  };
+
   const handleResultClick = (item) => {
     const selectedTitle =
       item.media_type === "user"
@@ -767,29 +1026,9 @@ function SearchBar({
     setShowFilterMenu(false);
     setQuery("");
     setResults([]);
+    setResultsPage(0);
     inputRef.current?.blur();
     if (onResultClick) onResultClick();
-  };
-
-  // Página de resultados completos (paginada) para la consulta y el filtro
-  // actuales. El desplegable solo enseña los primeros.
-  const allResultsHref = query.trim()
-    ? buildSearchHref({ q: query, type: activeFilter })
-    : null;
-
-  const closeSearchUi = () => {
-    const trimmed = query.trim();
-    if (trimmed) setSearchHistory(addSearchHistory(trimmed));
-    setShowDropdown(false);
-    setShowFilterMenu(false);
-    inputRef.current?.blur();
-    if (onResultClick) onResultClick();
-  };
-
-  const openAllResults = () => {
-    if (!allResultsHref) return;
-    closeSearchUi();
-    router.push(allResultsHref);
   };
 
   const handleFilterToggle = () => {
@@ -915,11 +1154,7 @@ function SearchBar({
       ref={searchRef}
     >
       <form
-        // Enter abre TODOS los resultados de la búsqueda, paginados.
-        onSubmit={(e) => {
-          e.preventDefault();
-          openAllResults();
-        }}
+        onSubmit={(e) => e.preventDefault()}
         className={`relative w-full ${formClassName}`}
       >
         <div
@@ -1154,7 +1389,10 @@ function SearchBar({
                   onClick={(event) => event.stopPropagation()}
                   className={`fixed z-[99999] overflow-hidden rounded-2xl text-white ${LIQUID_GLASS_PANEL}`}
                 >
-                  <div className="max-h-[70vh] overflow-y-auto no-scrollbar">
+                  <div
+                    ref={resultsScrollRef}
+                    className="max-h-[70vh] overflow-y-auto no-scrollbar"
+                  >
                     {!query.trim() ? (
               <div className="p-2">
                 <div className="flex items-center justify-between gap-3 px-3 pt-2 pb-1.5">
@@ -1239,7 +1477,12 @@ function SearchBar({
                   </div>
                 ) : (
                   <div className="p-2">
-                    {results.slice(0, 8).map((item) => {
+                    {results
+                      .slice(
+                        resultsPage * SEARCH_RESULTS_PAGE_SIZE,
+                        (resultsPage + 1) * SEARCH_RESULTS_PAGE_SIZE,
+                      )
+                      .map((item) => {
                     const isCollection = item.media_type === "collection";
                     const isUser = item.media_type === "user";
                     const resultLabel =
@@ -1354,19 +1597,47 @@ function SearchBar({
                     })}
                   </div>
                 )}
-                {allResultsHref && results.length > 0 && (
-                  <div className="border-t border-white/10 p-2">
-                    <Link
-                      href={allResultsHref}
-                      onClick={closeSearchUi}
-                      className="group flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold text-white/80 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white/80"
+                {results.length > 0 &&
+                  (hasPrevResultsPage || hasNextResultsPage) && (
+                  <div className="flex items-center justify-between gap-2 border-t border-white/10 px-2 py-1.5">
+                    <button
+                      type="button"
+                      onClick={handlePrevResultsPage}
+                      disabled={!hasPrevResultsPage}
+                      aria-label={t(
+                        "search_prev_page",
+                        "Resultados anteriores",
+                      )}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/80"
                     >
-                      <SearchIcon
-                        className="h-4 w-4 shrink-0 text-amber-300/80"
-                        aria-hidden="true"
-                      />
-                      <span>{t("search_see_all", "Ver todos los resultados")}</span>
-                    </Link>
+                      <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+                    </button>
+                    <span
+                      className="text-xs font-semibold tabular-nums text-white/50"
+                      aria-live="polite"
+                    >
+                      {t("search_page_label", "Página")} {resultsPage + 1}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleNextResultsPage}
+                      disabled={!hasNextResultsPage || loadingMore}
+                      aria-label={t(
+                        "search_next_page",
+                        "Más resultados",
+                      )}
+                      aria-busy={loadingMore || undefined}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/80"
+                    >
+                      {loadingMore ? (
+                        <Loader2
+                          className="h-5 w-5 animate-spin motion-reduce:animate-none"
+                          aria-hidden="true"
+                        />
+                      ) : (
+                        <ChevronRight className="h-5 w-5" aria-hidden="true" />
+                      )}
+                    </button>
                   </div>
                 )}
               </>
@@ -1465,6 +1736,10 @@ function NavbarContent() {
     if (!header || !left || !right) return undefined;
 
     let frameId = 0;
+    // Último valor escrito en <html> y si la barra de búsqueda está animando
+    // su ancho. Ver la nota de `--sv-navbar-right-shift-max` más abajo.
+    let publishedShiftMax = null;
+    let searchWidthAnimating = false;
     const updateSearchLayout = () => {
       frameId = 0;
       const availableWidth =
@@ -1485,10 +1760,23 @@ function NavbarContent() {
       // Va en <html> y no en el header para que pueda leerlo cualquier otra
       // superficie que necesite saber cuánto se ha apartado esta barra, no solo
       // sus propios descendientes.
-      document.documentElement.style.setProperty(
-        "--sv-navbar-right-shift-max",
-        `${Math.max(0, Math.round(availableWidth))}px`,
-      );
+      //
+      // ESCRIBIR EN <html> ES CARO: cambiar una variable en la raíz invalida los
+      // estilos de TODA la página. Al abrir la búsqueda, el bloque derecho se
+      // ensancha durante 300ms y este observador salta en cada fotograma; con
+      // una escritura por fotograma la página entera —con sus paneles de
+      // cristal y `backdrop-filter`— se recalculaba 60 veces por segundo, y la
+      // apertura de la barra se veía lenta y a saltos. Por eso solo se escribe
+      // cuando el valor cambia y nunca a mitad de esa animación: al terminar
+      // (`transitionend`) se publica el valor final de una vez.
+      const nextShiftMax = `${Math.max(0, Math.round(availableWidth))}px`;
+      if (!searchWidthAnimating && nextShiftMax !== publishedShiftMax) {
+        publishedShiftMax = nextShiftMax;
+        document.documentElement.style.setProperty(
+          "--sv-navbar-right-shift-max",
+          nextShiftMax,
+        );
+      }
 
       setDesktopSearchCompact((isCompact) => {
         // Histéresis: evitamos que la pestaña «Buscar» oscile al aparecer,
@@ -1502,6 +1790,22 @@ function NavbarContent() {
       if (!frameId) frameId = window.requestAnimationFrame(updateSearchLayout);
     };
 
+    // Transición de ANCHO de la barra de búsqueda: es el hijo directo del
+    // bloque derecho que anima `width` al abrirse y cerrarse.
+    const isSearchWidthTransition = (event) =>
+      event.propertyName === "width" && event.target?.parentElement === right;
+    const handleTransitionRun = (event) => {
+      if (isSearchWidthTransition(event)) searchWidthAnimating = true;
+    };
+    const handleTransitionEnd = (event) => {
+      if (!isSearchWidthTransition(event)) return;
+      searchWidthAnimating = false;
+      scheduleUpdate();
+    };
+    right.addEventListener("transitionrun", handleTransitionRun);
+    right.addEventListener("transitionend", handleTransitionEnd);
+    right.addEventListener("transitioncancel", handleTransitionEnd);
+
     const observer = new ResizeObserver(scheduleUpdate);
     observer.observe(header);
     observer.observe(left);
@@ -1510,6 +1814,9 @@ function NavbarContent() {
 
     return () => {
       observer.disconnect();
+      right.removeEventListener("transitionrun", handleTransitionRun);
+      right.removeEventListener("transitionend", handleTransitionEnd);
+      right.removeEventListener("transitioncancel", handleTransitionEnd);
       if (frameId) window.cancelAnimationFrame(frameId);
     };
   }, []);
