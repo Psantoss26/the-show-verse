@@ -1,0 +1,18 @@
+/* TARJETAS QUE SE AMPLÍAN AL PASAR EL RATÓN (ver HoverExpandCard.jsx).
+
+   `.expanded` da a la tarjeta su tamaño ampliado REAL (un 15% más grande con
+   `inset: -7.5%`), así que el póster se pinta a ese tamaño y se ve nítido. La
+   animación NO está aquí: la hace el componente con `transform` (técnica
+   FLIP), que no vuelve a maquetar en cada fotograma y por eso no vibra. */
+.expand {
+  z-index: 0;
+  transform-origin: center center;
+}
+
+.expanded {
+  inset: -7.5%;
+  z-index: var(--sv-hover-expand-z, 100);
+  box-shadow:
+    0 20px 25px -5px rgb(0 0 0 / 0.5),
+    0 8px 10px -6px rgb(0 0 0 / 0.5);
+}

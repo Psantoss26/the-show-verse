@@ -64,6 +64,7 @@ import {
   buildSeasonEpisodeMetadata,
   historyEpisodeMetadataKey,
 } from "@/lib/history/episodeSeasonMetadata";
+import HoverExpandCard from "@/components/ui/HoverExpandCard";
 
 // Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
 // el mismo escalón que `w1280` en los backdrops. Antes era `w500` y en
@@ -2110,18 +2111,9 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
   const disabledCls = busy ? "opacity-60 pointer-events-none grayscale" : "";
 
   const CardInner = (
-    <motion.div
-      className={`relative aspect-[2/3] compact-card group overflow-hidden rounded-lg bg-zinc-900 shadow-md transition-shadow duration-300 ${disabledCls}`}
-      whileHover={{
-        scale: 1.15,
-        zIndex: 100,
-        boxShadow:
-          "0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5)",
-      }}
-      transition={{ type: "spring", stiffness: 300, damping: 20 }}
-      style={{
-        transformOrigin: "center center",
-      }}
+    <HoverExpandCard
+      cellClassName="aspect-[2/3]"
+      className={`compact-card group overflow-hidden rounded-lg bg-zinc-900 shadow-md ${disabledCls}`}
     >
       <div className="absolute inset-0 rounded-[inherit] overflow-hidden">
         {/* Poster Image */}
@@ -2179,7 +2171,7 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
         onDelete={handleDeleteClick}
         compact
       />
-    </motion.div>
+    </HoverExpandCard>
   );
 
   const isBackNav = useIsHistoryNavigation();

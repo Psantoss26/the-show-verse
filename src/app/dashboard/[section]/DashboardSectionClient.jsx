@@ -37,6 +37,7 @@ import {
 } from "@/lib/search/titleMatching";
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
+import HoverExpandCard from "@/components/ui/HoverExpandCard";
 
 const MOVIE_GENRES = {
   28: "Acción",
@@ -538,18 +539,10 @@ function SectionCard({
           prefetch={false}
           className="block rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
         >
-          <motion.div
-            className={`relative ${aspect} group rounded-lg overflow-hidden bg-zinc-900 shadow-md after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(245,158,11,0.95)]`}
-            whileHover={{
-              scale: 1.15,
-              zIndex: 50,
-              boxShadow:
-                "0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5)",
-            }}
-            transition={{ type: "spring", stiffness: 300, damping: 20 }}
-            style={{
-              transformOrigin: "center center",
-            }}
+          <HoverExpandCard
+            cellClassName={aspect}
+            className="group rounded-lg overflow-hidden bg-zinc-900 shadow-md after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(245,158,11,0.95)]"
+            zIndex={50}
           >
             <PosterImage
               item={item}
@@ -603,7 +596,7 @@ function SectionCard({
                 </div>
               </div>
             </div>
-          </motion.div>
+          </HoverExpandCard>
         </Link>
       </motion.div>
     );
