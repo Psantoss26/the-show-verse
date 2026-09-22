@@ -112,12 +112,33 @@ await fastify.register(authPlugin);
 // de authPlugin porque necesita req.user.
 await fastify.register(levelInvalidationPlugin);
 
+// Cuentas exentas del rate limit global. Se comprueba el EMAIL además del
+// username: la cuenta que entra con Google no tiene por qué llamarse igual, y
+// con solo el username el límite de 200/min seguía aplicándose a esa sesión.
+// Se pueden añadir más con RATE_LIMIT_ALLOWLIST (emails o usernames separados
+// por comas).
+const RATE_LIMIT_ALLOWLIST = new Set(
+  ['psantos26', 'pablosantoshernandez26@gmail.com', ...(process.env.RATE_LIMIT_ALLOWLIST || '').split(',')]
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean),
+);
+
+function isRateLimitExempt(user) {
+  if (!user) return false;
+  const username = String(user.username || '').toLowerCase();
+  const email = String(user.email || '').toLowerCase();
+  return (
+    (username && RATE_LIMIT_ALLOWLIST.has(username)) ||
+    (email && RATE_LIMIT_ALLOWLIST.has(email))
+  );
+}
+
 // Rate limiting global (ejecutado en preHandler para tener req.user disponible)
 await fastify.register(fastifyRateLimit, {
   max: 200,
   timeWindow: '1 minute',
   hook: 'preHandler',
-  allowList: (req) => req.user?.username === 'psantos26',
+  allowList: (req) => isRateLimitExempt(req.user),
   redis: await (async () => {
     try {
       const r = getRedis();

@@ -21,6 +21,17 @@ let traktAuthBootstrapPromise = null;
 let traktAuthBootstrapAt = 0;
 let traktAuthBootstrapValue = null;
 const inFlightGetRequests = new Map();
+const GET_REQUEST_TIMEOUT_MS = 20000;
+
+// Fallo pasajero (servidor caído o saturado, rate limit, red, timeout): no dice
+// nada sobre si la cuenta está conectada.
+function isTransientRequestError(error) {
+  if (error?.code === "TRAKT_TRANSIENT") return true;
+  if (error?.name === "TimeoutError" || error?.name === "AbortError") return true;
+  const status = error?.status;
+  if (typeof status === "number") return status >= 500 || status === 429;
+  return /fetch|network|timeout|aborted/i.test(error?.message || "");
+}
 
 function matchQueryValue(urlString, key, expected) {
   if (expected == null) return false;
@@ -77,7 +88,15 @@ async function fetchGetJsonDeduped(
   }
 
   const promise = (async () => {
-    const res = await fetch(fetchUrl, { cache, credentials });
+    // Timeout REAL (aborta la petición). Sin él, una petición que no llegaba a
+    // responder dejaba su promesa colgada en `inFlightGetRequests` y cualquier
+    // consulta posterior a la misma URL se enganchaba a ella: los botones de
+    // estado se quedaban cargando para siempre.
+    const res = await fetch(fetchUrl, {
+      cache,
+      credentials,
+      signal: AbortSignal.timeout(GET_REQUEST_TIMEOUT_MS),
+    });
     const json = await safeJson(res);
     if (!res.ok) {
       const err = new Error(json?.error || `HTTP ${res.status}`);
@@ -417,6 +436,11 @@ export async function traktGetShowWatched({ tmdbId, traktId } = {}) {
     }
     return json; // { watchedBySeason }
   } catch (error) {
+    // Igual que en `traktGetItemStatus`: un fallo transitorio NO es "no
+    // conectado". Para quien tiene el estado en el backend `auth.connected` es
+    // siempre false, así que convertirlo en `{connected:false}` dejaba los
+    // episodios sin cargar y el botón de visto de la serie cargando sin fin.
+    if (isTransientRequestError(error)) throw error;
     const auth = await ensureTraktAuthReady().catch(() => ({
       connected: false,
     }));

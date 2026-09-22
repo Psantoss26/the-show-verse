@@ -13,6 +13,8 @@ function normalizeType(type) {
   return type === "tv" || type === "show" ? "tv" : "movie";
 }
 
+const STATUS_TIMEOUT_MS = 15000;
+
 export async function getBackendItemStatus({ type, tmdbId, signal } = {}) {
   if (tmdbId == null || !type) return emptyStatus();
 
@@ -24,7 +26,15 @@ export async function getBackendItemStatus({ type, tmdbId, signal } = {}) {
     try {
       const res = await fetch(
         `/api/backend/item/status?type=${mediaType}&tmdbId=${encodeURIComponent(tmdbId)}`,
-        { cache: "no-store", credentials: "include", signal },
+        {
+          cache: "no-store",
+          credentials: "include",
+          // Timeout real: una petición colgada dejaba la promesa en `inFlight`
+          // y cualquier otra consulta del mismo título se enganchaba a ella.
+          signal: signal
+            ? AbortSignal.any([signal, AbortSignal.timeout(STATUS_TIMEOUT_MS)])
+            : AbortSignal.timeout(STATUS_TIMEOUT_MS),
+        },
       );
       const json = await res.json().catch(() => null);
       if (!res.ok || !json) return emptyStatus();
