@@ -65,6 +65,13 @@ import {
   historyEpisodeMetadataKey,
 } from "@/lib/history/episodeSeasonMetadata";
 
+// Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
+// el mismo escalón que `w1280` en los backdrops. Antes era `w500` y en
+// pantallas de alta densidad se veía blando. No se usa `original` (hasta
+// ~2000x3000 y 1-2 MB por póster): en una rejilla de decenas de tarjetas
+// frenaría la carga sin ganancia visible al tamaño al que se pintan.
+const POSTER_CARD_SIZE = "w780";
+
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const HISTORY_PAGE_SIZE = 200;
 const HISTORY_CACHE_KEY = "showverse:history:items:v4";
@@ -1735,7 +1742,7 @@ function Poster({ entry, className = "" }) {
   }, [entry, hasBeenInView, type, id]);
 
   const src = posterPath
-    ? `https://image.tmdb.org/t/p/w500${posterPath}`
+    ? `https://image.tmdb.org/t/p/${POSTER_CARD_SIZE}${posterPath}`
     : null;
 
   return (

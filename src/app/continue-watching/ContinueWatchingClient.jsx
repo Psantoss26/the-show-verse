@@ -55,6 +55,13 @@ import {
   preloadImage,
 } from "@/lib/dashboard/media";
 
+// Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
+// el mismo escalón que `w1280` en los backdrops. Antes era `w500` y en
+// pantallas de alta densidad se veía blando. No se usa `original` (hasta
+// ~2000x3000 y 1-2 MB por póster): en una rejilla de decenas de tarjetas
+// frenaría la carga sin ganancia visible al tamaño al que se pintan.
+const POSTER_CARD_SIZE = "w780";
+
 // ----------------------------
 // HELPERS
 // ----------------------------
@@ -265,7 +272,7 @@ function SmartImage({ item, kind, alt, imgClassName = "" }) {
       else if (cache.has(key)) finalPath = cache.get(key) || fallbackPath;
       else finalPath = (await cachedImage(type, id, kind)) || fallbackPath;
       if (!finalPath || abort) return;
-      const url = buildImg(finalPath, kind === "poster" ? "w500" : "w1280");
+      const url = buildImg(finalPath, kind === "poster" ? POSTER_CARD_SIZE : "w1280");
       await preloadImage(url);
       if (!abort) {
         setSrc(url);
