@@ -32,6 +32,24 @@ import {
 let lockCount = 0;
 let saved = null; // valores previos de html/body antes del primer bloqueo
 
+/**
+ * ¿Hay algún modal abierto ahora mismo?
+ *
+ * El contador que lleva este módulo es la única señal GLOBAL y fiable que existe:
+ * lo incrementa todo diálogo que pasa por `useModalGuard`, sin que cada uno tenga
+ * que anunciarse, y sirve igual si el modal se pinta en el árbol o en un portal.
+ *
+ * Lo consulta el gesto de deslizar entre títulos (MobileUserPageSwipeNavigation):
+ * con un modal delante, arrastrar el dedo es interactuar con ÉL —o simplemente
+ * desplazar su contenido—, nunca pedir el título siguiente.
+ *
+ * No incluye los modales declarados con `lockScroll: false`, que a propósito
+ * dejan seguir usando la página de debajo.
+ */
+export function isBodyScrollLocked() {
+  return lockCount > 0;
+}
+
 export default function useBodyScrollLock(active = true) {
   useEffect(() => {
     if (!active || typeof document === "undefined") return undefined;
