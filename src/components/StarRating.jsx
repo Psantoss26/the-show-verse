@@ -41,6 +41,13 @@ export default function StarRating({
 
   disabled = false,
   liquidGlass = false,
+
+  // Disparador propio en lugar del LiquidButton (p. ej. el botón compacto del
+  // modal de episodios). Recibe { onClick, hasRating, rating, label, loading,
+  // disabled, readOnly } y reutiliza el mismo diálogo de puntuación.
+  renderTrigger,
+  // Capa del diálogo: por encima de un modal padre con z-index mayor.
+  layerClassName = "z-[10000]",
 }) {
   const serverOnline = useServerOnline();
   const effectiveDisabled = disabled || loading || !serverOnline;
@@ -154,6 +161,17 @@ export default function StarRating({
   return (
     <>
       {/* --- BOTÓN TRIGGER --- */}
+      {typeof renderTrigger === "function" ? (
+        renderTrigger({
+          onClick: handleOpen,
+          hasRating,
+          rating: hasRating ? fmt(rating) : null,
+          label: hasRating ? `Tu puntuación: ${fmt(rating)}` : "Puntuar",
+          loading,
+          disabled: disabled || loading,
+          readOnly: !serverOnline,
+        })
+      ) : (
       <LiquidButton
         liquidGlass={liquidGlass}
         disabled={disabled || loading}
@@ -179,6 +197,7 @@ export default function StarRating({
           <Star className="w-5 h-5" />
         )}
       </LiquidButton>
+      )}
 
       {/* --- MODAL --- */}
       {mounted &&
@@ -186,7 +205,7 @@ export default function StarRating({
         createPortal(
           <div
             data-detail-modal-layer=""
-            className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6"
+            className={`fixed inset-0 ${layerClassName} flex items-center justify-center p-4 sm:p-6`}
             onPointerDown={stopModalEvent}
             onMouseDown={stopModalEvent}
             onClick={stopModalEvent}

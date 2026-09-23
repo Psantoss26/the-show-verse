@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+
+// Pila de modales abiertos (los que escuchan Escape). Con modales apilados
+// —p. ej. el selector de puntuación sobre el modal de episodios— Escape debe
+// cerrar SOLO el de encima, no todos a la vez.
+const escapeStack = [];
 import useBodyScrollLock from "@/hooks/useBodyScrollLock";
 
 // Comportamiento COMÚN de todos los diálogos modales de la app, en un solo sitio:
@@ -25,12 +30,29 @@ export default function useModalGuard({
   // Debe llamarse SIEMPRE (regla de hooks); internamente solo bloquea si `open`.
   useBodyScrollLock(open && lockScroll);
 
+  // Último onClose en un ref: la posición en la pila depende solo de CUÁNDO se
+  // abrió el modal, no de que el padre se re-renderice con otro onClose.
+  const onCloseRef = useRef(onClose);
   useEffect(() => {
-    if (!open || !closeOnEsc || typeof onClose !== "function") return undefined;
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  const hasOnClose = typeof onClose === "function";
+
+  useEffect(() => {
+    if (!open || !closeOnEsc || !hasOnClose) return undefined;
+    const token = {};
+    escapeStack.push(token);
     const onKeyDown = (event) => {
-      if (event.key === "Escape") onClose();
+      if (event.key !== "Escape") return;
+      if (escapeStack[escapeStack.length - 1] !== token) return;
+      onCloseRef.current?.();
     };
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, closeOnEsc, onClose]);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      const index = escapeStack.indexOf(token);
+      if (index !== -1) escapeStack.splice(index, 1);
+    };
+  }, [open, closeOnEsc, hasOnClose]);
 }

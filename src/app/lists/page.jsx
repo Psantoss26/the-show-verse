@@ -234,6 +234,45 @@ function writeSessionJsonCache(key, data) {
   }
 }
 
+// Colecciones destacadas: una sola petición compartida por la precarga en
+// segundo plano y por el cambio de pestaña, para que pulsar "Colecciones"
+// mientras la precarga vuela no dispare una segunda petición, sino que espere
+// a la que ya está en curso. Una respuesta vacía o fallida no se memoriza.
+const FEATURED_COLLECTIONS_CACHE_KEY = "showverse:lists:featured-collections:v1";
+let featuredCollectionsRequest = null;
+
+function readCachedFeaturedCollections() {
+  const cached = readSessionJsonCache(
+    FEATURED_COLLECTIONS_CACHE_KEY,
+    LISTS_SOURCE_CACHE_TTL_MS,
+  );
+  return Array.isArray(cached) && cached.length > 0 ? cached : null;
+}
+
+function loadFeaturedCollections({ force = false } = {}) {
+  if (!force) {
+    const cached = readCachedFeaturedCollections();
+    if (cached) return Promise.resolve(cached);
+  }
+  if (!force && featuredCollectionsRequest) return featuredCollectionsRequest;
+
+  const request = fetch("/api/tmdb/collections/featured", {
+    cache: force ? "no-cache" : "default",
+  })
+    .then((res) => res.json().catch(() => ({})))
+    .then((j) => (Array.isArray(j?.collections) ? j.collections : []))
+    .catch(() => [])
+    .then((cols) => {
+      if (cols.length > 0) writeSessionJsonCache(FEATURED_COLLECTIONS_CACHE_KEY, cols);
+      if (featuredCollectionsRequest === request && cols.length === 0) {
+        featuredCollectionsRequest = null;
+      }
+      return cols;
+    });
+  featuredCollectionsRequest = request;
+  return request;
+}
+
 /* --- Hook SIMPLE: layout móvil SOLO por anchura (NO por touch) --- */
 const useIsMobileLayout = (breakpointPx = 768) => {
   const [isMobile, setIsMobile] = useState(() => {
@@ -1486,6 +1525,7 @@ export default function ListsPage() {
 
   const trakt = useTraktLists({ mode: "popular" });
   const [featuredCollections, setFeaturedCollections] = useState([]);
+  const featuredCollectionsCount = featuredCollections.length;
   const [collectionsLoading, setCollectionsLoading] = useState(false);
   const [collectionsResolvedKey, setCollectionsResolvedKey] = useState(null);
   const [searchedCollections, setSearchedCollections] = useState([]);
@@ -1554,6 +1594,36 @@ export default function ListsPage() {
     setCachedActiveLists(Array.isArray(cached) ? cached : []);
   }, [activeListsCacheKey]);
 
+  // ✅ precarga las colecciones destacadas en segundo plano estando en otra
+  // pestaña. Antes solo se pedían al pulsar "Colecciones", y la primera vez de
+  // cada sesión la página seguía mostrando las listas anteriores un par de
+  // segundos hasta que llegaban. Se espera a que el navegador esté ocioso para
+  // no competir con la carga de la fuente visible.
+  useEffect(() => {
+    if (!prefsHydrated || source === "collections") return;
+    if (featuredCollectionsCount > 0) return;
+
+    let alive = true;
+    const run = () => {
+      loadFeaturedCollections().then((cols) => {
+        if (alive && cols.length > 0) setFeaturedCollections(cols);
+      });
+    };
+
+    if (typeof window.requestIdleCallback === "function") {
+      const idleId = window.requestIdleCallback(run, { timeout: 2000 });
+      return () => {
+        alive = false;
+        window.cancelIdleCallback(idleId);
+      };
+    }
+    const timeoutId = window.setTimeout(run, 600);
+    return () => {
+      alive = false;
+      window.clearTimeout(timeoutId);
+    };
+  }, [prefsHydrated, source, featuredCollectionsCount]);
+
   // ✅ carga colecciones destacadas cuando toca
   useEffect(() => {
     if (source !== "collections") {
@@ -1562,35 +1632,23 @@ export default function ListsPage() {
     if (deferredQuery.trim()) {
       return;
     }
-    if (featuredCollections.length > 0) {
+    if (featuredCollectionsCount > 0) {
       setCollectionsResolvedKey("featured");
       return;
     }
 
     let alive = true;
-    (async () => {
-      try {
-        setCollectionsLoading(true);
-        const res = await fetch("/api/tmdb/collections/featured", {
-          cache: "force-cache",
-        });
-        const j = await res.json().catch(() => ({}));
-        if (!alive) return;
-        const cols = Array.isArray(j?.collections) ? j.collections : [];
-        setFeaturedCollections(cols);
-      } catch {
-        if (alive) setFeaturedCollections([]);
-      } finally {
-        if (alive) {
-          setCollectionsResolvedKey("featured");
-          setCollectionsLoading(false);
-        }
-      }
-    })();
+    setCollectionsLoading(true);
+    loadFeaturedCollections().then((cols) => {
+      if (!alive) return;
+      setFeaturedCollections(cols);
+      setCollectionsResolvedKey("featured");
+      setCollectionsLoading(false);
+    });
     return () => {
       alive = false;
     };
-  }, [source, deferredQuery, featuredCollections.length]);
+  }, [source, deferredQuery, featuredCollectionsCount]);
 
   // ✅ búsqueda dinámica de colecciones
   useEffect(() => {
@@ -1909,13 +1967,8 @@ export default function ListsPage() {
       setSearchedCollections([]);
       setFeaturedCollections([]);
       setCollectionsLoading(true);
-      fetch("/api/tmdb/collections/featured", { cache: "force-cache" })
-        .then((r) => r.json().catch(() => ({})))
-        .then((j) =>
-          setFeaturedCollections(
-            Array.isArray(j?.collections) ? j.collections : [],
-          ),
-        )
+      loadFeaturedCollections({ force: true })
+        .then((cols) => setFeaturedCollections(cols))
         .finally(() => setCollectionsLoading(false));
     }
   };
@@ -1936,7 +1989,11 @@ export default function ListsPage() {
           ? !!personalInitialized
           : source === "trakt"
             ? !!trakt?.initialized
-            : collectionsResolvedKey === collectionsQueryKey;
+            : collectionsResolvedKey === collectionsQueryKey ||
+              // Destacadas ya precargadas: listas en este mismo render, sin
+              // esperar al efecto que marca `collectionsResolvedKey`.
+              (collectionsQueryKey === "featured" &&
+                featuredCollectionsCount > 0);
 
   useEffect(() => {
     if (hasCompletedInitialLoad) return;

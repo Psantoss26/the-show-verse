@@ -9,11 +9,15 @@ import Link from "next/link";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { motion, AnimatePresence } from "framer-motion";
 import useModalGuard from "@/hooks/useModalGuard";
+import { getLocalInProgress } from "@/lib/api/progressClient";
+import { offlineMutationFetch } from "@/lib/offline/syncQueue";
+import StarRating from "@/components/StarRating";
 import {
   Check,
   Eye,
   EyeOff,
   Loader2,
+  MonitorPlay,
   X,
   Search,
   List,
@@ -26,6 +30,7 @@ import {
   ChevronDown,
   Trash2,
   SlidersHorizontal,
+  Star,
 } from "lucide-react";
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
@@ -587,6 +592,149 @@ export default function TraktEpisodesWatchedModal({
     () => new Set(watchedBySeasonActive?.[displaySn] || []),
     [watchedBySeasonActive, displaySn],
   );
+
+  // Puntuaciones del usuario de los episodios de ESTA serie: "S{n}E{m}" -> nota.
+  // Se piden todas de una vez al abrir el modal para mostrar la nota (o la
+  // estrella para puntuar) junto al botón de visto de cada episodio.
+  const [episodeRatings, setEpisodeRatings] = useState({});
+  const [ratingsConnected, setRatingsConnected] = useState(true);
+  const [ratingBusyKey, setRatingBusyKey] = useState(null);
+
+  useEffect(() => {
+    if (!open || isMovie || !tmdbId) {
+      setEpisodeRatings({});
+      return;
+    }
+
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/trakt/ratings?type=episode&tmdbId=${Number(tmdbId)}`,
+          { cache: "no-store", signal: controller.signal },
+        );
+        if (res.status === 401) {
+          setRatingsConnected(false);
+          setEpisodeRatings({});
+          return;
+        }
+        setRatingsConnected(true);
+        const j = await res.json().catch(() => ({}));
+        const next = {};
+        for (const r of Array.isArray(j?.results) ? j.results : []) {
+          const sn = Number(r?.season);
+          const en = Number(r?.episode);
+          const rating = Number(r?.rating);
+          if (!Number.isInteger(sn) || !Number.isInteger(en)) continue;
+          if (!Number.isFinite(rating)) continue;
+          next[`S${sn}E${en}`] = rating;
+        }
+        setEpisodeRatings(next);
+      } catch (e) {
+        if (e?.name !== "AbortError") setEpisodeRatings({});
+      }
+    })();
+
+    return () => controller.abort();
+  }, [open, isMovie, tmdbId]);
+
+  // Devuelve false si falla para que el selector de puntuación siga abierto.
+  const rateEpisode = useCallback(
+    async (sn, en, val) => {
+      const key = `S${sn}E${en}`;
+      const next = val == null || Number(val) <= 0 ? null : Number(val);
+      setRatingBusyKey(key);
+      try {
+        const res = await offlineMutationFetch(
+          "/api/trakt/ratings",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              type: "episode",
+              tmdbId: Number(tmdbId), // TMDb ID de la SERIE
+              season: Number(sn),
+              episode: Number(en),
+              rating: next, // null => quitar
+              title,
+            }),
+          },
+          {
+            label:
+              next == null
+                ? "Quitar valoracion de episodio"
+                : "Guardar valoracion de episodio",
+            dedupeKey: `trakt:episode-rating:${tmdbId}:${sn}:${en}`,
+          },
+        );
+
+        if (res.status === 401) {
+          setRatingsConnected(false);
+          return false;
+        }
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(j?.error || "Rating failed");
+
+        setEpisodeRatings((prev) => {
+          const updated = { ...prev };
+          if (next == null) delete updated[key];
+          else updated[key] = next;
+          return updated;
+        });
+        return true;
+      } catch (e) {
+        console.error(e);
+        return false;
+      } finally {
+        setRatingBusyKey((current) => (current === key ? null : current));
+      }
+    },
+    [tmdbId, title],
+  );
+
+  const goToLogin = useCallback(() => {
+    const nextPath = `${window.location.pathname}${window.location.search}`;
+    window.location.href = `/login?next=${encodeURIComponent(nextPath)}`;
+  }, []);
+
+  // Progreso de reproduccion local ("Continuar viendo") por episodio de ESTA
+  // serie: "S{n}E{m}" -> % (1..99). Un episodio con progreso se pinta como
+  // "en curso" (MonitorPlay + ámbar, el acento de Continuar viendo) en lugar
+  // de visto / no visto. Se refresca en cada apertura del modal.
+  const [inProgressByKey, setInProgressByKey] = useState({});
+
+  useEffect(() => {
+    if (!open || isMovie || !tmdbId) {
+      setInProgressByKey({});
+      return;
+    }
+
+    let abort = false;
+    (async () => {
+      const rows = await getLocalInProgress();
+      if (abort) return;
+
+      const next = {};
+      for (const r of Array.isArray(rows) ? rows : []) {
+        if (r?.mediaType !== "tv" || Number(r?.tmdbId) !== Number(tmdbId)) {
+          continue;
+        }
+        const sn = Number(r?.season);
+        const en = Number(r?.episode);
+        if (!Number.isInteger(sn) || !Number.isInteger(en)) continue;
+        const pct =
+          typeof r?.percent === "number"
+            ? Math.round(Math.min(1, Math.max(0, r.percent)) * 100)
+            : 0;
+        if (pct >= 1 && pct < 100) next[`S${sn}E${en}`] = pct;
+      }
+      setInProgressByKey(next);
+    })();
+
+    return () => {
+      abort = true;
+    };
+  }, [open, isMovie, tmdbId]);
 
   const canLoadSelectedSeason = Boolean(
     TMDB_API_KEY && tmdbId && selectedSn != null,
@@ -1634,7 +1782,7 @@ export default function TraktEpisodesWatchedModal({
                         // color del rótulo, no por un aro. Con el aro fuera, la
                         // rama inactiva tampoco necesita su borde transparente:
                         // solo existía para reservarle el hueco de 1px.
-                        className={`w-full text-left px-4 py-3 rounded-xl transition-all flex justify-between items-center group ${
+                        className={`w-full text-left px-4 py-3 rounded-xl transition-all flex justify-between items-center gap-3 group ${
                           active
                             ? isRewatchView
                               ? "bg-purple-500/10"
@@ -1642,9 +1790,12 @@ export default function TraktEpisodesWatchedModal({
                             : "hover:bg-white/10"
                         }`}
                       >
-                        <div>
+                        {/* `min-w-0 flex-1` + el `gap-3` del botón: un título
+                            largo pasa a la siguiente línea con margen respecto
+                            a la flecha en lugar de pegarse a ella. */}
+                        <div className="min-w-0 flex-1">
                           <div
-                            className={`text-sm font-bold ${
+                            className={`text-sm font-bold break-words ${
                               active
                                 ? isRewatchView
                                   ? "text-purple-200"
@@ -1654,12 +1805,12 @@ export default function TraktEpisodesWatchedModal({
                           >
                             {seasonLabelText(sn, s.name)}
                           </div>
-                          <div className="text-[10px] text-zinc-500 mt-0.5">
+                          <div className="mt-1 text-xs font-medium tabular-nums text-zinc-400 2xl:text-[13px]">
                             {watched} / {total} vistos
                           </div>
                         </div>
                         <ChevronRight
-                          className={`w-4 h-4 ${
+                          className={`w-4 h-4 shrink-0 ${
                             active
                               ? isRewatchView
                                 ? "text-purple-400"
@@ -1722,6 +1873,8 @@ export default function TraktEpisodesWatchedModal({
                       const busy = busyKey === key;
 
                       const watched = watchedSet.has(en);
+                      const progressPct = inProgressByKey[key] ?? null;
+                      const inProgress = progressPct != null;
                       const img = tmdbImg(ep.still_path);
 
                       return (
@@ -1731,6 +1884,10 @@ export default function TraktEpisodesWatchedModal({
                           tabIndex={0}
                           onClick={() => openEpisodeDetails(sn, en)}
                           onKeyDown={(e) => {
+                            // Solo la propia fila: Enter/Espacio en sus botones
+                            // o en el selector de puntuación (portal, que en
+                            // React burbujea hasta aquí) no abren el episodio.
+                            if (e.target !== e.currentTarget) return;
                             if (e.key === "Enter" || e.key === " ") {
                               e.preventDefault();
                               openEpisodeDetails(sn, en);
@@ -1756,7 +1913,11 @@ export default function TraktEpisodesWatchedModal({
                               </div>
                             )}
 
-                            {watched && (
+                            {inProgress ? (
+                              <div className="absolute inset-0 flex items-center justify-center bg-amber-500/20 backdrop-blur-[1px]">
+                                <MonitorPlay className="w-7 h-7 text-amber-300 drop-shadow-md" />
+                              </div>
+                            ) : watched && (
                               <div
                                 className={`absolute inset-0 flex items-center justify-center backdrop-blur-[1px] ${
                                   isRewatchView
@@ -1782,6 +1943,48 @@ export default function TraktEpisodesWatchedModal({
                                 </p>
                               </div>
 
+                              <div className="flex shrink-0 items-center gap-1.5">
+                              <StarRating
+                                rating={episodeRatings[key] ?? null}
+                                loading={ratingBusyKey === key}
+                                connected={ratingsConnected}
+                                onConnect={goToLogin}
+                                onRate={(val) => rateEpisode(sn, en, val)}
+                                layerClassName="z-[100000]"
+                                renderTrigger={({
+                                  onClick,
+                                  hasRating,
+                                  rating,
+                                  label,
+                                  loading,
+                                  disabled,
+                                  readOnly,
+                                }) => (
+                                  <button data-online-only="true"
+                                    type="button"
+                                    disabled={disabled || readOnly}
+                                    onClick={onClick}
+                                    title={label}
+                                    aria-label={`${label}. Episodio ${en}`}
+                                    className={`inline-flex h-9 w-9 items-center justify-center rounded-lg transition shrink-0 ${
+                                      hasRating
+                                        ? "text-yellow-300 bg-yellow-500/10 hover:bg-yellow-500/20"
+                                        : "text-zinc-500 hover:text-white hover:bg-white/10"
+                                    }`}
+                                  >
+                                    {loading ? (
+                                      <Loader2 className="w-5 h-5 animate-spin" />
+                                    ) : hasRating ? (
+                                      <span className="text-sm font-black leading-none tracking-tighter">
+                                        {rating}
+                                      </span>
+                                    ) : (
+                                      <Star className="w-5 h-5" />
+                                    )}
+                                  </button>
+                                )}
+                              />
+
                               <button data-online-only="true"
                                 type="button"
                                 disabled={busy || !serverOnline}
@@ -1789,14 +1992,18 @@ export default function TraktEpisodesWatchedModal({
                                   e.stopPropagation();
                                   toggleEpisode(sn, en);
                                 }}
-                                className={`p-2 rounded-lg transition shrink-0 ${
-                                  watched
+                                className={`inline-flex h-9 w-9 items-center justify-center rounded-lg transition shrink-0 ${
+                                  inProgress
+                                    ? "text-amber-300 bg-amber-500/10 hover:bg-amber-500/20"
+                                    : watched
                                     ? isRewatchView
                                       ? "text-purple-200 bg-purple-500/10 hover:bg-purple-500/20"
                                       : "text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20"
                                     : "text-zinc-500 hover:text-white hover:bg-white/10"
                                 }`}
-                                aria-label={
+                                aria-label={`${
+                                  inProgress ? `Viendo (${progressPct}%). ` : ""
+                                }${
                                   isRewatchView
                                     ? watched
                                       ? "Quitar de vistos (este rewatch)"
@@ -1804,16 +2011,19 @@ export default function TraktEpisodesWatchedModal({
                                     : watched
                                       ? "Quitar de vistos"
                                       : "Marcar como visto"
-                                }
+                                }`}
                               >
                                 {busy ? (
                                   <Loader2 className="w-5 h-5 animate-spin" />
+                                ) : inProgress ? (
+                                  <MonitorPlay className="w-5 h-5" />
                                 ) : watched ? (
                                   <EyeOff className="w-5 h-5" />
                                 ) : (
                                   <Eye className="w-5 h-5" />
                                 )}
                               </button>
+                              </div>
                             </div>
 
                             <p className="text-xs sm:text-sm text-zinc-400 line-clamp-2 leading-relaxed max-h-[2.8rem] overflow-hidden hidden sm:block">
@@ -1873,6 +2083,7 @@ export default function TraktEpisodesWatchedModal({
                       {nums.map((en) => {
                         const w = watchedSetLocal.has(en);
                         const key = `S${sn}E${en}`;
+                        const progressPct = inProgressByKey[key] ?? null;
                         const busy = busyKey === key;
 
                         return (
@@ -1882,7 +2093,9 @@ export default function TraktEpisodesWatchedModal({
                             disabled={busy || !serverOnline}
                             onClick={() => toggleEpisode(sn, en)}
                             className={`w-9 h-9 rounded-lg text-xs font-bold flex items-center justify-center transition ${
-                              w
+                              progressPct != null
+                                ? "bg-amber-500 text-black"
+                                : w
                                 ? isRewatchView
                                   ? "bg-purple-600 text-white"
                                   : "bg-emerald-600 text-white"

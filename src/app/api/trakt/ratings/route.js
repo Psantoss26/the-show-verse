@@ -37,6 +37,8 @@ const secureFor = (req) => ({ secure: req.nextUrl?.protocol === "https:" });
 // GET: leer la valoración del usuario (backend propio)
 //   ?type=movie|show|episode|season&tmdbId=..&season=..&episode=..
 //   (sin type → lista completa de valoraciones)
+//   ?type=episode&tmdbId=.. SIN episode → todas las valoraciones de episodios
+//   de esa serie: { results: [{ season, episode, rating }] }
 // ======================
 export async function GET(req) {
   try {
@@ -107,6 +109,22 @@ export async function GET(req) {
       const items = Array.isArray(backend.json?.results)
         ? backend.json.results
         : [];
+
+      if (type === "episode" && !url.searchParams.has("episode")) {
+        const res = NextResponse.json({
+          results: items
+            .filter((it) => Number(it.tmdbId) === showTmdbId)
+            .map((it) => ({
+              season: Number(it.season),
+              episode: Number(it.episode),
+              rating: it.rating,
+            })),
+          source: "backend",
+        });
+        setBackendAuthCookies(res, backend, secureFor(req));
+        return res;
+      }
+
       const found =
         type === "episode"
           ? items.find(
