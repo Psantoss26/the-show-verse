@@ -334,10 +334,21 @@ class MediaListenerService : NotificationListenerService() {
         prefs.addLog("Enviando: ${signal.mainTitle}${signal.episodeName?.let { " — $it" } ?: ""}")
         // resolveOnly: solo RESOLVEMOS el título (para "Continuar viendo" y el
         // indicador). El "visto" ya no se marca al detectar, sino al 90% vía pings.
-        SyncClient.send(origin, token, signal, resolveOnly = true) { ok, err, synced ->
+        SyncClient.send(origin, token, signal, resolveOnly = true) { ok, err, synced, status ->
             handler.post {
                 if (prefs.paused || prefs.token != token || prefs.origin != origin || lastKeyByPackage[pkg] != key) return@post
-                if (!resolutions.finish(pkg, ticket, ok && synced != null, SystemClock.elapsedRealtime())) return@post
+                // 404/422 = el servidor entendió la petición y no supo identificar el
+                // título. No es un fallo transitorio, así que no tiene sentido
+                // guardar observaciones de este contenido para reenviarlas luego.
+                val unresolvable = status == 404 || status == 422
+                if (!resolutions.finish(
+                        pkg,
+                        ticket,
+                        ok && synced != null,
+                        SystemClock.elapsedRealtime(),
+                        unresolvable,
+                    )
+                ) return@post
                 if (ok && synced != null) {
                     prefs.addLog("✓ Detectado: ${signal.mainTitle}")
                     // Acceso rápido: notificación "en progreso" con enlace a la ficha.
@@ -348,6 +359,20 @@ class MediaListenerService : NotificationListenerService() {
                         val point = puntos.de(pkg)
                         maybeSendProgress(pkg, signal.copy(positionSec = point?.posSec, durationSec = point?.durSec))
                     }
+                } else if (unresolvable && signal.episode != null && signal.showName == null) {
+                    // CAUSA CONCRETA, no un error genérico. Aquí se sabe que es un
+                    // episodio (hay número) pero NO de qué serie: la app no publica
+                    // el nombre de la serie en su MediaSession y el servidor solo ha
+                    // recibido el nombre del EPISODIO, que TMDb no puede buscar. Sin
+                    // esto el registro decía "no se pudo resolver" y no había forma
+                    // de saber que lo que falta es la serie ni cómo aportarla.
+                    noteOnce(
+                        "noshow:$pkg",
+                        "${Platforms.nameFor(pkg)} no dice de qué SERIE es este episodio " +
+                            "(solo su nombre y T${signal.season ?: "?"}:E${signal.episode}). " +
+                            "Activa la detección por accesibilidad en Ajustes y abre la ficha " +
+                            "de la serie antes de reproducir.",
+                    )
                 } else {
                     prefs.addLog("Reintentaremos la identificación: ${err ?: "sin coincidencia"}")
                 }

@@ -111,7 +111,7 @@ class MainActivity : AppCompatActivity() {
             tabTitle = "Interstellar",
         )
         prefs.addLog("Prueba enviada a $origin")
-        SyncClient.send(origin, token, test) { ok, err, _ ->
+        SyncClient.send(origin, token, test) { ok, err, _, _ ->
             runOnUiThread {
                 prefs.addLog(if (ok) "Prueba: ✓ OK (mira el historial)" else "Prueba: ✗ $err")
                 render()

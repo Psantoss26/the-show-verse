@@ -57,6 +57,32 @@ object ProgressOutbox {
         }
         check(prefs.savePendingProgress(remaining.toString()))
     }
+    /**
+     * Manda un evento al FINAL de la cola.
+     *
+     * La entrega iba siempre por el primero, y al volver con `retry` lo dejaba
+     * donde estaba: un título que el servidor no sabe identificar se quedaba de
+     * tapón y nada de lo que hubiera detrás salía. Como además se vuelve a encolar
+     * una observación de ese mismo título cada 30 s mientras se reproduce, la cola
+     * se llenaba de tapones más rápido de lo que se vaciaba y dejaba de sincronizar
+     * TODO, incluido el progreso de otras películas que sí se habían resuelto.
+     *
+     * Reordenar es seguro: el servidor deduplica por `eventId` e ignora los puntos
+     * anteriores al último confirmado de ese contenido (`observedAt`), así que el
+     * orden de ENTREGA no altera el resultado.
+     */
+    internal fun rotate(prefs: Prefs, eventId: String) = synchronized(storageLock) {
+        val entries = read(prefs)
+        val reordered = JSONArray()
+        var moved: JSONObject? = null
+        for (i in 0 until entries.length()) {
+            val entry = entries.getJSONObject(i)
+            if (entry.getJSONObject("payload").optString("eventId") == eventId) moved = entry
+            else reordered.put(entry)
+        }
+        if (moved != null) reordered.put(moved)
+        check(prefs.savePendingProgress(reordered.toString()))
+    }
     internal fun resolutionFailure(prefs: Prefs, eventId: String): Int = synchronized(storageLock) {
         val entries = read(prefs)
         var attempts = 0
@@ -85,26 +111,37 @@ object ProgressOutbox {
 class ProgressWorker(context: Context, params: WorkerParameters) : Worker(context, params) {
     override fun doWork(): Result = synchronized(ProgressOutbox.deliveryLock) {
         val prefs = Prefs(applicationContext)
+        // Eventos ya intentados EN ESTA PASADA. Los que no se pueden entregar
+        // todavía se mandan al final de la cola en vez de bloquearla, así que
+        // reencontrarse con uno ya intentado significa haber dado la vuelta
+        // entera: no queda nada entregable ahora y se reintenta más tarde.
+        val attempted = HashSet<String>()
         repeat(20) {
             if (isStopped || prefs.paused || !prefs.isPaired()) return@synchronized Result.success()
             val origin = prefs.origin ?: return@synchronized Result.success()
             val token = prefs.token ?: return@synchronized Result.success()
             val entry = ProgressOutbox.first(prefs) ?: return@synchronized Result.success()
             val payload = entry.getJSONObject("payload")
+            val eventId = payload.getString("eventId")
+            if (!attempted.add(eventId)) return@synchronized Result.retry()
             val response = try { SyncClient.deliver(origin, token, payload) }
                 catch (_: Exception) { return@synchronized Result.retry() }
             if (prefs.origin != origin || prefs.token != token) return@synchronized Result.success()
             if (response.status in 200..299 && response.valid) {
-                ProgressOutbox.remove(prefs, payload.getString("eventId"))
+                ProgressOutbox.remove(prefs, eventId)
                 if (response.completed) prefs.addLog("✓ Visionado confirmado: ${payload.optString("title", payload.optString("mainTitle"))}")
             } else if (response.status in listOf(400, 404, 410, 413, 422)) {
                 if (response.status in listOf(404, 422) &&
-                    ProgressOutbox.resolutionFailure(prefs, payload.getString("eventId")) < 3) {
-                    return@synchronized Result.retry()
+                    ProgressOutbox.resolutionFailure(prefs, eventId) < 3) {
+                    // "No sé qué título es esto" es un problema de ESTE evento, no
+                    // de la conexión: se le deja otra oportunidad más tarde, pero
+                    // al final de la cola, para que los demás salgan ya.
+                    ProgressOutbox.rotate(prefs, eventId)
+                    return@repeat
                 }
                 // A malformed/unresolvable observation must not block all later episodes.
                 prefs.addLog("No se pudo sincronizar un evento (HTTP ${response.status}).")
-                ProgressOutbox.remove(prefs, payload.getString("eventId"))
+                ProgressOutbox.remove(prefs, eventId)
             } else {
                 if (response.status == 401 || response.status == 403) {
                     prefs.addLog("Vinculación caducada o revocada: vuelve a vincular la app.")
