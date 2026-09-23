@@ -684,6 +684,24 @@ export default function DetailModal({
 
   const scrollContainerRef = useRef(null);
   const panelRef = useRef(null);
+  // ¿Este clic es el REZAGADO del gesto que ABRIÓ la ficha?
+  //
+  // En táctil, quien abre lo hace en `pointerup` (ver FeaturedHero: el `click`
+  // sintetizado llega tarde, o no llega, mientras el hero anima). El navegador
+  // emite ese `click` justo después, cuando el drawer ya está montado y su cierre
+  // por "clic fuera" ya escucha en `document`. Como su destino queda fuera del
+  // panel —que acaba de taparlo—, se leía como un clic fuera: la ficha se abría y
+  // se cerraba sola.
+  //
+  // No basta con que quien abre cancele su propio clic: ese clic puede dispararse
+  // sobre otro elemento y no llegar a pasar por él. La ventana es corta a
+  // propósito, solo cubre el arrastre del mismo gesto; nadie cierra a propósito un
+  // modal 300 ms después de abrirlo.
+  //
+  // El modal CENTRADO no lo necesita: su velo solo cierra si la pulsación EMPEZÓ
+  // en él (`backdropPressRef`), y la del gesto que abre empezó en el hero.
+  const [openedAt] = useState(() => Date.now());
+  const OPENING_CLICK_GRACE_MS = 350;
   // El hero táctil abre en pointerup. Su click posterior puede caer en el
   // backdrop recién montado: solo cerramos si el gesto empezó en este fondo.
   const backdropPressRef = useRef(false);
@@ -1045,23 +1063,9 @@ export default function DetailModal({
 
     if (isDocked) return undefined;
 
-    // EL CLIC QUE ABRE NO PUEDE CERRAR.
-    //
-    // En táctil, quien abre la ficha lo hace en `pointerup` (ver FeaturedHero: el
-    // `click` sintetizado llega tarde o no llega mientras el hero anima). El
-    // navegador emite ese `click` JUSTO DESPUÉS, cuando este listener ya está
-    // puesto, y como su destino queda fuera del panel se leía como "clic fuera":
-    // el drawer se abría y se cerraba solo. No vale con que el que abre cancele
-    // su propio clic, porque ese clic puede dispararse sobre otro elemento —el
-    // panel recién montado tapa el punto que se tocó— y no pasar por él.
-    //
-    // La ventana es corta a propósito: solo cubre el clic que viene arrastrado
-    // del mismo gesto. Nadie cierra a propósito un modal 300 ms después de abrirlo.
-    const openedAt = performance.now();
-    const CLOSING_GRACE_MS = 350;
-
     const onDocumentClick = (event) => {
-      if (performance.now() - openedAt < CLOSING_GRACE_MS) return;
+      // 0) El clic rezagado del gesto que abrió esta ficha (ver `openedAt`).
+      if (Date.now() - openedAt < OPENING_CLICK_GRACE_MS) return;
       // 1) Otra tarjeta de preview: `usePreviewOpen` llama a preventDefault() justo
       //    en ese caso, así que el drawer CAMBIA de título en vez de cerrarse, que
       //    es el comportamiento que el diseño actual permite. Un clic con
@@ -1085,7 +1089,7 @@ export default function DetailModal({
 
     document.addEventListener("click", onDocumentClick);
     return () => document.removeEventListener("click", onDocumentClick);
-  }, [isRightPlacement, isDocked, onClose]);
+  }, [isRightPlacement, isDocked, onClose, openedAt]);
 
   // Arrastre del borde izquierdo. Durante el gesto se escribe el ancho DIRECTAMENTE
   // en el DOM del panel (sin re-render del modal, para que sea fluido); al soltar se
