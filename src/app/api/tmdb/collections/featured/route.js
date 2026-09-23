@@ -134,7 +134,8 @@ export async function GET() {
       { ok: true, collections: uniqueById },
       {
         headers: {
-          "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=7200",
+          "Cache-Control":
+            "public, max-age=600, s-maxage=3600, stale-while-revalidate=7200",
         },
       },
     );
