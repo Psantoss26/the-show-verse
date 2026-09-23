@@ -684,17 +684,20 @@ export default function DetailModal({
 
   const scrollContainerRef = useRef(null);
   const panelRef = useRef(null);
-  // Momento de apertura, para descartar el clic que viene del MISMO gesto que
-  // abrió la ficha (ver la nota del cierre por clic fuera, más abajo). El modal
-  // centrado lo necesita igual que el drawer: su velo ocupa toda la pantalla, así
-  // que ese clic rezagado caía sobre él y lo cerraba al instante.
-  const openedAtRef = useRef(0);
-  if (openedAtRef.current === 0 && typeof performance !== "undefined") {
-    openedAtRef.current = performance.now();
-  }
-  const isOpeningClick = () =>
-    typeof performance !== "undefined" &&
-    performance.now() - openedAtRef.current < 350;
+  // El hero táctil abre en pointerup. Su click posterior puede caer en el
+  // backdrop recién montado: solo cerramos si el gesto empezó en este fondo.
+  const backdropPressRef = useRef(false);
+  const handleBackdropPointerDown = (event) => {
+    backdropPressRef.current = event.button === 0 && event.isPrimary;
+  };
+  const handleBackdropPointerCancel = () => {
+    backdropPressRef.current = false;
+  };
+  const handleBackdropClick = () => {
+    const startedOnBackdrop = backdropPressRef.current;
+    backdropPressRef.current = false;
+    if (startedOnBackdrop && !navigatingToFullDetails) onClose?.();
+  };
   const { scrollY } = useScroll({ container: scrollContainerRef });
   const [modalHostReady, setModalHostReady] = useState(false);
 
@@ -3169,7 +3172,9 @@ export default function DetailModal({
           // verdad aísla el modal. El elemento se mantiene (sin fondo) porque es
           // la superficie que captura el clic-fuera para cerrar.
           className="fixed inset-0 backdrop-blur-xl"
-          onClick={navigatingToFullDetails ? undefined : onClose}
+          onPointerDown={handleBackdropPointerDown}
+          onPointerCancel={handleBackdropPointerCancel}
+          onClick={handleBackdropClick}
         />
       )}
 
