@@ -2239,9 +2239,35 @@ function ContinueWatchingSection({
     };
 
     load();
+
+    // AL VOLVER A LA PÁGINA SE VUELVE A PREGUNTAR.
+    //
+    // Esta fila la alimenta lo que se reproduce FUERA de la web: la extensión del
+    // navegador y la app de Android. Su progreso llega al servidor mientras la
+    // pestaña está en segundo plano o el móvil en otra app, así que cargarla solo
+    // al montar significaba que un episodio recién visto no aparecía hasta
+    // recargar a mano —justo lo que se percibe como "no se ha sincronizado"
+    // cuando en realidad sí—. Al recuperar el foco se relee.
+    //
+    // Con un mínimo entre consultas: volver de otra pestaña no debe convertirse
+    // en una petición por cada cambio de foco.
+    let lastLoadAt = Date.now();
+    const REFRESH_MIN_MS = 30_000;
+    const refreshOnReturn = () => {
+      if (abort || document.visibilityState !== "visible") return;
+      if (Date.now() - lastLoadAt < REFRESH_MIN_MS) return;
+      lastLoadAt = Date.now();
+      attempt = 0;
+      load();
+    };
+    document.addEventListener("visibilitychange", refreshOnReturn);
+    window.addEventListener("focus", refreshOnReturn);
+
     return () => {
       abort = true;
       if (timer) window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", refreshOnReturn);
+      window.removeEventListener("focus", refreshOnReturn);
     };
   }, [authenticated, authReady, hasExternalShows]);
 

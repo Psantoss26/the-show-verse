@@ -63,6 +63,7 @@ export default function AndroidSyncPanel({
   const a11yConcedida = !!status?.accessibilityGranted;
   const a11yActiva = a11yConcedida && !!status?.accessibilityEnabled;
   const pausada = !!status?.paused;
+  const pendientes = Number(status?.pendingSyncEvents) || 0;
 
   return (
     <div className="space-y-2 border-t border-white/5 pt-4">
@@ -100,6 +101,21 @@ export default function AndroidSyncPanel({
           }
         }}
       />
+
+      {/* ENVÍOS PENDIENTES. El puente ya publicaba este número pero no se
+          enseñaba en ninguna parte, y era el único dato que distinguía "ya está
+          en tu historial" de "sigue en la cola del móvil": el registro de la app
+          dice «Progreso guardado para sincronizar» en cuanto el evento entra en
+          la cola local, no cuando el servidor lo acepta. Mientras esto marque 0,
+          todo lo detectado ha llegado. */}
+      {emparejado && pendientes > 0 ? (
+        <p className="flex items-center gap-2 text-[11px] text-amber-400/90">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+          {pendientes === 1
+            ? "1 envío pendiente de sincronizar."
+            : `${pendientes} envíos pendientes de sincronizar.`}
+        </p>
+      ) : null}
 
       {pairing ? (
         <p className="flex items-center gap-2 text-[11px] text-zinc-400">
