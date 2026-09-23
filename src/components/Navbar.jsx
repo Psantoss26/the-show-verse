@@ -3017,7 +3017,13 @@ function NavbarContent() {
         // Con el drawer abierto (tablet), esta barra se recoloca en el hueco
         // que queda a su izquierda: centrada ahí y, si hace falta, más
         // estrecha. Ver `.sv-navbar-bottom-shift` en globals.css.
-        className={`sv-navbar-bottom-shift desktop:hidden fixed left-1/2 z-30 flex h-14 w-[min(calc(100%_-_3rem),21.5rem)] origin-bottom -translate-x-1/2 items-center rounded-full px-3.5 md:h-[3.75rem] md:w-[min(calc(100%_-_8rem),28rem)] md:px-4 ${LIQUID_GLASS_BAR} bottom-[calc(0.75rem+env(safe-area-inset-bottom))] md:bottom-[calc(1.25rem+env(safe-area-inset-bottom))] transform-gpu transition-transform duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+        //
+        // SEPARACIÓN DEL BORDE: la misma en teléfono y en tablet (0.75rem sobre
+        // el área segura). La tablet tenía 1.25rem y la barra quedaba demasiado
+        // despegada del canto inferior; se iguala al valor del teléfono en vez de
+        // inventar un tercer número, que es además el que ya está calibrado con
+        // la escala de compactado al hacer scroll.
+        className={`sv-navbar-bottom-shift desktop:hidden fixed left-1/2 z-30 flex h-14 w-[min(calc(100%_-_3rem),21.5rem)] origin-bottom -translate-x-1/2 items-center rounded-full px-3.5 md:h-[3.75rem] md:w-[min(calc(100%_-_8rem),28rem)] md:px-4 ${LIQUID_GLASS_BAR} bottom-[calc(0.75rem+env(safe-area-inset-bottom))] transform-gpu transition-transform duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
           bottomNavCompact ? "scale-[0.86]" : "scale-100"
         }`}
       >

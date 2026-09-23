@@ -303,6 +303,18 @@ export default function DetailModalProvider({
   // en cada movimiento. El panel y este margen se escriben en el mismo frame.
   const updateDrawerWidth = useCallback((width) => {
     drawerWidthRef.current = width;
+    // EL PANEL QUE SE ESTÁ CERRANDO YA NO MANDA.
+    //
+    // Al cerrar, `activeItem` pasa a null y el cierre retira el hueco, pero el
+    // panel sigue MONTADO mientras dura su animación de salida (AnimatePresence)
+    // y vuelve a informar de su ancho —basta con que cambie la identidad de esta
+    // misma función—. Esa notificación tardía volvía a publicar el hueco justo
+    // después de haberlo retirado, así que el navbar se quedaba apartado hacia un
+    // panel que ya no existe y solo volvía a su sitio en el siguiente render,
+    // deslizándose con su transición de 320 ms: eso es el parpadeo al cerrar.
+    // Se nota sobre todo en TABLET, que es donde la ficha se abre como drawer y
+    // por tanto donde el hueco llega a publicarse.
+    if (activeItem == null || effectivePlacement !== "right") return;
     // El margen del contenido solo aplica ACOPLADO; la variable se publica
     // siempre, porque el navbar tiene que apartarse en los dos modos: el panel
     // tapa el borde derecho igual esté acoplado o superpuesto.
@@ -320,15 +332,19 @@ export default function DetailModalProvider({
     // `[data-detail-page-content]` en globals.css) para que las tarjetas se
     // recoloquen pegadas al tirador en vez de animar cada cambio.
     contentRef.current.style.marginRight = `${width}px`;
-  }, [docked]);
+  }, [docked, activeItem, effectivePlacement]);
 
   // Sin drawer no hay variable. `DetailModal` la escribe mientras está montado
   // (vía `updateDrawerWidth`), así que aquí solo hay que retirarla al cerrar
   // —y al desmontar el provider, por si se navega con la ficha abierta—.
+  // Con DEPENDENCIAS: antes se ejecutaba en cada render, y cada pasada competía
+  // con el panel que aún se está cerrando por quién escribe la variable. El hueco
+  // solo depende de si hay ficha abierta y de dónde se coloca, así que basta con
+  // reaccionar a esos dos.
   useLayoutEffect(() => {
     if (activeItem != null && effectivePlacement === "right") return;
     publishDrawerInset(null);
-  });
+  }, [activeItem, effectivePlacement]);
 
   useEffect(() => () => publishDrawerInset(null), []);
 
