@@ -129,7 +129,18 @@ class ProgressWorker(context: Context, params: WorkerParameters) : Worker(contex
             if (prefs.origin != origin || prefs.token != token) return@synchronized Result.success()
             if (response.status in 200..299 && response.valid) {
                 ProgressOutbox.remove(prefs, eventId)
-                if (response.completed) prefs.addLog("✓ Visionado confirmado: ${payload.optString("title", payload.optString("mainTitle"))}")
+                val nombre = payload.optString("title", payload.optString("mainTitle"))
+                if (response.completed) {
+                    prefs.addLog("✓ Visionado confirmado: $nombre")
+                } else {
+                    // ENTREGA CONFIRMADA POR EL SERVIDOR, que no es lo mismo que
+                    // "guardado para sincronizar": ese mensaje solo dice que el
+                    // evento entró en la cola local. Sin esta línea no había forma
+                    // de distinguir un progreso ya guardado en "Continuar viendo"
+                    // de uno atascado en la cola, y lo segundo se leía como lo
+                    // primero.
+                    prefs.addLog("✓ Progreso sincronizado: $nombre")
+                }
             } else if (response.status in listOf(400, 404, 410, 413, 422)) {
                 if (response.status in listOf(404, 422) &&
                     ProgressOutbox.resolutionFailure(prefs, eventId) < 3) {
