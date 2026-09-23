@@ -730,6 +730,25 @@ export default function DetailModal({
     tmdbId: item?.id,
     enabled: !isEpisode,
   });
+  // Insignia de Rotten Tomatoes / Metacritic para el marcador.
+  //
+  // Las dos llegan en la MISMA respuesta que la nota de IMDb, así que
+  // `imdbRatingResolved` es también su señal de "ya se sabe si hay dato". Mientras
+  // no se sabe se manda `pending` en lugar de `null`: así la insignia reserva su
+  // hueco en vez de ocupar cero. Sin eso, la barra nacía con las puntuaciones
+  // ausentes, los botones de la derecha recibían más ancho del que les va a tocar
+  // y se pintaban con etiqueta hasta que llegaban las notas y se compactaban de
+  // golpe. Ya resuelto y sin dato vuelve a ser `null`: la insignia no se pinta, que
+  // es lo correcto para una película sin nota en esos sitios.
+  const optionalScoreBadge = (value, href) => {
+    // Fuera de la ficha de teléfono: cinco insignias no caben en ese ancho y
+    // empujaban los botones de la derecha fuera del panel. Las tres que se
+    // conservan (TMDb, Trakt e IMDb) son las que llevan votos.
+    if (mobileDetails) return null;
+    if (value != null) return { value: Math.round(value), href };
+    return data.imdbRatingResolved ? null : { pending: true };
+  };
+
   const backdropPath = data.backdropPath || item?.backdrop_path || null;
   // HERO: usa SOLO el arte FINAL (heroBackdropPath / heroPosterPath), que se fija
   // una única vez y YA PRECARGADO en useDetailModalData. Nunca la semilla del item:
@@ -3384,10 +3403,24 @@ export default function DetailModal({
             </button>
           </div>
 
-          {/* Contenedor con scroll interno (barra oculta) */}
+          {/* Contenedor con scroll interno (barra oculta).
+
+              SIN REBOTE DE OVERSCROLL (`overscroll-y-none`). Al llegar al tope, el
+              estirado elástico mueve la imagen del hero unos píxeles pero NO su
+              máscara, que vive en el contenedor: al desincronizarse se marca el
+              canto del difuminado y la portada parece deformarse en ese último
+              tirón, en vez de quedarse quieta. Sin rebote no hay estirado.
+
+              En globals.css hay una nota que dice no volver a poner esto: es para
+              el póster de la ficha MÓVIL, que se desplaza con el documento y ahí
+              `overscroll-behavior` desactivaría además el «tirar para recargar» de
+              Chrome. Aquí el scroll es de un CONTENEDOR interno, y el gesto de
+              recarga solo lo gobierna el scroller raíz, así que esa contrapartida
+              no existe. De paso, el gesto tampoco se encadena a la página de
+              debajo al llegar al tope. */}
           <div
             ref={scrollContainerRef}
-            className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            className="min-h-0 flex-1 overflow-y-auto overscroll-y-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
           >
           {/* PRIMER PANTALLAZO DE LA FICHA DE TELÉFONO.
 
@@ -3799,26 +3832,10 @@ export default function DetailModal({
                     !data.imdbRatingResolved &&
                     typeof data.imdbRating !== "number",
                 }}
-                // Rotten Tomatoes y Metacritic se quedan FUERA de la ficha de
-                // teléfono: cinco insignias no caben en ese ancho y empujaban
-                // los botones de la derecha fuera del panel. Las tres que se
-                // conservan (TMDb, Trakt e IMDb) son las que llevan votos.
-                rt={
-                  data.rtScore != null && !mobileDetails
-                    ? {
-                        value: Math.round(data.rtScore),
-                        href: ratingLinks.rt,
-                      }
-                    : null
-                }
-                mc={
-                  data.mcScore != null && !mobileDetails
-                    ? {
-                        value: Math.round(data.mcScore),
-                        href: ratingLinks.mc,
-                      }
-                    : null
-                }
+                // Ver `optionalScoreBadge`: fuera de la ficha de teléfono, y con
+                // hueco reservado mientras la respuesta de OMDb está en vuelo.
+                rt={optionalScoreBadge(data.rtScore, ratingLinks.rt)}
+                mc={optionalScoreBadge(data.mcScore, ratingLinks.mc)}
                 compactToolbar={mobileDetails}
                 // En tablet la ventana supera `sm` aunque el drawer sea
                 // estrecho: sin esto el marcador salía con la disposición

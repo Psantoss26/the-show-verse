@@ -118,6 +118,34 @@ export function DetailsRatingsBadges({
   const scoreStateKey = (name, score) =>
     `${name}-${score?.value == null ? "empty" : "ready"}`;
 
+  // CARGANDO ≠ SIN DATO, y el hueco se reserva (misma regla que TraktStatBadge,
+  // más abajo). Mientras la consulta está en vuelo la insignia se pinta INVISIBLE
+  // con cifras de relleno: ocupa su sitio, pero no se ve, no afirma nada, no se
+  // puede enfocar y no la anuncia el lector de pantalla.
+  //
+  // RESERVARLO NO ES COSMÉTICO. Los botones de la derecha (plataformas, enlaces,
+  // compartir) pierden su etiqueta por CONSULTA DE CONTENEDOR sobre el hueco que
+  // DEJAN estas insignias —ver el módulo CSS—. Si una insignia pendiente no ocupa
+  // nada, ese hueco nace más ancho del que va a tener, así que al abrir otro
+  // título en el mismo panel los botones aparecían un instante con su etiqueta y
+  // se compactaban de golpe en cuanto llegaban las puntuaciones. Con el hueco
+  // reservado, la barra nace ya con su disposición final.
+  // `placeholder` son las cifras de relleno, con la forma típica de cada
+  // insignia: nota y recuento ("8,4" · "12 k") en TMDb/Trakt/IMDb, y solo el
+  // porcentaje en Rotten Tomatoes y Metacritic, que no llevan recuento —pasarles
+  // uno les añadiría una segunda línea y cambiaría el ALTO de la barra. Así el
+  // hueco reservado mide prácticamente lo que va a medir el real. Sin `href` la
+  // insignia no es un enlace, así que tampoco entra en el orden de tabulación.
+  const scoreSlot = (score, render, placeholder = { value: "0.0", sub: "00 k" }) => {
+    if (!score) return null;
+    if (!isPendingScore(score)) return render(score);
+    return (
+      <div className="invisible" aria-hidden="true">
+        {render({ ...score, ...placeholder, href: undefined })}
+      </div>
+    );
+  };
+
   return (
     <div
       className={`flex items-center gap-3 shrink-0 ${
@@ -145,53 +173,53 @@ export function DetailsRatingsBadges({
       </div>
 
       {/* Badge de TMDb - Muestra la puntuación promedio y número de votos */}
-      {tmdb && !isPendingScore(tmdb) && (
+      {scoreSlot(tmdb, (score) => (
         <CompactBadge
-          key={scoreStateKey("tmdb", tmdb)}
+          key={scoreStateKey("tmdb", score)}
           logo="/logo-TMDb.png"
           logoClassName="h-5 sm:h-5"
           phone={phone}
-          value={resolvedValue(tmdb)}
-          sub={tmdb.sub}
-          href={tmdb.href}
+          value={resolvedValue(score)}
+          sub={score.sub}
+          href={score.href}
           disableHoverLift
-          tooltip={tmdb.href ? "Ver en TMDb" : "TMDb"}
+          tooltip={score.href ? "Ver en TMDb" : "TMDb"}
         />
-      )}
+      ))}
 
       {/* Badge de Trakt - Muestra puntuación en formato decimal cuando el usuario está conectado */}
-      {trakt && !isPendingScore(trakt) && (
+      {scoreSlot(trakt, (score) => (
         <CompactBadge
-          key={scoreStateKey("trakt", trakt)}
+          key={scoreStateKey("trakt", score)}
           logo="/logo-Trakt.png"
-          value={resolvedValue(trakt)}
-          sub={trakt.sub}
-          href={trakt.href}
+          value={resolvedValue(score)}
+          sub={score.sub}
+          href={score.href}
           disableHoverLift
           onClick={undefined}
-          tooltip={trakt.href ? "Ver en Trakt" : "Trakt"}
+          tooltip={score.href ? "Ver en Trakt" : "Trakt"}
           phone={phone}
         />
-      )}
+      ))}
 
       {/* Badge de Trakt alternativo cuando no hay conexión pero existe score público */}
-      {traktPublic && !isPendingScore(traktPublic) && (
+      {scoreSlot(traktPublic, (score) => (
         <CompactBadge
-          key={scoreStateKey("trakt-public", traktPublic)}
+          key={scoreStateKey("trakt-public", score)}
           logo="/logo-Trakt.png"
-          value={resolvedValue(traktPublic)}
-          sub={traktPublic.sub}
+          value={resolvedValue(score)}
+          sub={score.sub}
           disableHoverLift
           onClick={undefined}
           tooltip="Ver en Trakt"
           phone={phone}
         />
-      )}
+      ))}
 
       {/* Badge de IMDb - Muestra rating y votos, enlaza al título en IMDb */}
-      {imdb && !isPendingScore(imdb) && (
+      {scoreSlot(imdb, (score) => (
         <CompactBadge
-          key={scoreStateKey("imdb", imdb)}
+          key={scoreStateKey("imdb", score)}
           logo="/logo-IMDb.svg"
           logoWrapClassName="min-w-[28px]"
           logoClassName={
@@ -200,42 +228,50 @@ export function DetailsRatingsBadges({
               : "!h-5 sm:!h-[22px] !max-h-none !max-w-[34px]"
           }
           phone={phone}
-          value={resolvedValue(imdb)}
-          sub={imdb.sub}
-          href={imdb.href}
+          value={resolvedValue(score)}
+          sub={score.sub}
+          href={score.href}
           disableHoverLift
-          tooltip={imdb.href ? "Ver en IMDb" : "IMDb"}
+          tooltip={score.href ? "Ver en IMDb" : "IMDb"}
         />
-      )}
+      ))}
 
       {/* Badge de Rotten Tomatoes - Solo visible en desktop (>= sm), y se
           retira además cuando la barra se queda estrecha (ver `.optionalScore`
           en el módulo CSS): es de las dos que no traen recuento de votos. */}
-      {rt && (
-        <div className={`${phone ? "hidden" : "hidden sm:block"} ${styles.optionalScore}`}>
-          <CompactBadge
-            logo="/logo-RottenTomatoes.png"
-            value={rt.value}
-            suffix="%"
-            href={rt.href}
-            disableHoverLift
-            tooltip={rt.href ? "Ver en Rotten Tomatoes" : "Rotten Tomatoes"}
-          />
-        </div>
+      {scoreSlot(
+        rt,
+        (score) => (
+          <div className={`${phone ? "hidden" : "hidden sm:block"} ${styles.optionalScore}`}>
+            <CompactBadge
+              logo="/logo-RottenTomatoes.png"
+              value={score.value}
+              suffix="%"
+              href={score.href}
+              disableHoverLift
+              tooltip={score.href ? "Ver en Rotten Tomatoes" : "Rotten Tomatoes"}
+            />
+          </div>
+        ),
+        { value: "00" },
       )}
 
       {/* Badge de Metacritic - mismo criterio que Rotten Tomatoes. */}
-      {mc && (
-        <div className={`${phone ? "hidden" : "hidden sm:block"} ${styles.optionalScore}`}>
-          <CompactBadge
-            logo="/logo-Metacritic.png"
-            value={mc.value}
-            suffix="%"
-            href={mc.href}
-            disableHoverLift
-            tooltip={mc.href ? "Ver en Metacritic" : "Metacritic"}
-          />
-        </div>
+      {scoreSlot(
+        mc,
+        (score) => (
+          <div className={`${phone ? "hidden" : "hidden sm:block"} ${styles.optionalScore}`}>
+            <CompactBadge
+              logo="/logo-Metacritic.png"
+              value={score.value}
+              suffix="%"
+              href={score.href}
+              disableHoverLift
+              tooltip={score.href ? "Ver en Metacritic" : "Metacritic"}
+            />
+          </div>
+        ),
+        { value: "00" },
       )}
     </div>
   );

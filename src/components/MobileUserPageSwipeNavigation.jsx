@@ -12,6 +12,7 @@ import {
   getUserDetailsSequence,
   saveUserDetailsSequenceFromLink,
 } from "@/lib/navigation/userDetailsSequence";
+import { isBodyScrollLocked } from "@/hooks/useBodyScrollLock";
 
 function preservesNestedGesture(target) {
   return (
@@ -101,9 +102,18 @@ export default function MobileUserPageSwipeNavigation({ children }) {
   const handleTouchStart = useCallback((event) => {
     // Mismo límite que el Perfil: solo teléfonos. Los layouts de tabletas y
     // escritorio conservan sus propios desplazamientos horizontales.
+    //
+    // CON UN MODAL DELANTE NO HAY GESTO. Los diálogos de los botones de acción
+    // (añadir a lista, puntuar, plataformas, enlaces, banda sonora…) se abren
+    // ENCIMA de la ficha, y algunos se pintan dentro de este árbol, así que sus
+    // arrastres llegaban hasta aquí: desplazar el contenido del modal, o
+    // simplemente errar un toque, cambiaba de título por debajo y dejaba el
+    // diálogo sobre una ficha que ya no era la suya. Un arrastre con un modal
+    // abierto le pertenece al modal, nunca a la navegación de fondo.
     if (
       window.matchMedia("(min-width: 640px)").matches ||
       event.touches.length !== 1 ||
+      isBodyScrollLocked() ||
       (getUserDetailsSequence(pathname) && !isDetailsInitialHeroVisible())
     ) {
       pageSwipe.current = null;
@@ -124,7 +134,10 @@ export default function MobileUserPageSwipeNavigation({ children }) {
       if (
         !gesture ||
         gesture.preservesNestedGesture ||
-        event.changedTouches.length !== 1
+        event.changedTouches.length !== 1 ||
+        // El gesto empezó sin modal pero ha abierto uno por el camino (el dedo
+        // acabó sobre un botón de acción): tampoco entonces se cambia de título.
+        isBodyScrollLocked()
       ) {
         return;
       }
