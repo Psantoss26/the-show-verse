@@ -104,8 +104,18 @@ export async function searchProgressTitles(query, { signal } = {}) {
   return normalizeProgressSearchResults(json?.results);
 }
 
-export async function addManualProgress(item) {
+// `options` (opcional, como en las entradas automáticas):
+//   { percent: 0..0.89, platform: id corto | null, season, episode }
+export async function addManualProgress(item, options = {}) {
   const mediaType = item?.media_type === "tv" ? "tv" : "movie";
+  const { percent, platform, season, episode } = options;
+  const extra = {};
+  if (typeof percent === "number" && Number.isFinite(percent)) extra.percent = percent;
+  if (platform !== undefined) extra.platform = platform || null;
+  if (mediaType === "tv" && Number(season) > 0 && Number(episode) > 0) {
+    extra.season = Number(season);
+    extra.episode = Number(episode);
+  }
   const res = await fetch("/api/progress", {
     method: "POST",
     credentials: "include",
@@ -115,6 +125,7 @@ export async function addManualProgress(item) {
       mediaType,
       title: item?.title || item?.name || "",
       posterPath: item?.poster_path || null,
+      ...extra,
     }),
   });
   const json = await res.json().catch(() => ({}));

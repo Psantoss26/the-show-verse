@@ -9,7 +9,11 @@ import Link from "next/link";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { motion, AnimatePresence } from "framer-motion";
 import useModalGuard from "@/hooks/useModalGuard";
-import { getLocalInProgress } from "@/lib/api/progressClient";
+import {
+  dismissLocalProgress,
+  getLocalInProgress,
+} from "@/lib/api/progressClient";
+import FadePresence from "@/components/ui/FadePresence";
 import { offlineMutationFetch } from "@/lib/offline/syncQueue";
 import StarRating from "@/components/StarRating";
 import {
@@ -701,6 +705,8 @@ export default function TraktEpisodesWatchedModal({
   // serie: "S{n}E{m}" -> % (1..99). Un episodio con progreso se pinta como
   // "en curso" (MonitorPlay + ámbar, el acento de Continuar viendo) en lugar
   // de visto / no visto. Se refresca en cada apertura del modal.
+  // Valor: { pct, id } — `id` es la fila de watch_progress, necesaria para
+  // quitar el episodio de "Continuar viendo" (DELETE /api/progress?id=).
   const [inProgressByKey, setInProgressByKey] = useState({});
 
   useEffect(() => {
@@ -726,7 +732,9 @@ export default function TraktEpisodesWatchedModal({
           typeof r?.percent === "number"
             ? Math.round(Math.min(1, Math.max(0, r.percent)) * 100)
             : 0;
-        if (pct >= 1 && pct < 100) next[`S${sn}E${en}`] = pct;
+        if (pct >= 1 && pct < 100) {
+          next[`S${sn}E${en}`] = { pct, id: r?.id != null ? String(r.id) : null };
+        }
       }
       setInProgressByKey(next);
     })();
@@ -934,7 +942,10 @@ export default function TraktEpisodesWatchedModal({
         return;
       }
 
-      // Rewatch
+      // Rewatch. `next` = ¿se va a marcar? (el episodio aún no está en esta vista)
+      const next = !(watchedBySeasonActive?.[sn] || [])
+        .map(Number)
+        .includes(Number(en));
       if (typeof onToggleEpisodeRewatch !== "function") {
         throw new Error(
           "Falta pasar onToggleEpisodeRewatch para marcar episodios en rewatch.",
@@ -971,6 +982,69 @@ export default function TraktEpisodesWatchedModal({
       setShowError(e?.message || "Error al actualizar el episodio");
     }
   };
+
+  // Botón de estado de un episodio (lista y tabla):
+  //   - no visto y sin progreso → se marca visto directamente;
+  //   - en "Continuar viendo"   → confirmar y QUITAR SU PROGRESO (no se marca
+  //     visto: antes el botón llamaba a toggleEpisode y lo daba por visto);
+  //   - visto                   → confirmar antes de desmarcarlo.
+  const [pendingUnmark, setPendingUnmark] = useState(null);
+  const [unmarkBusy, setUnmarkBusy] = useState(false);
+  // Último contenido mostrado: el diálogo lo sigue pintando mientras se
+  // desvanece al cerrarse (pendingUnmark ya es null).
+  const lastPendingRef = useRef(null);
+  if (pendingUnmark) lastPendingRef.current = pendingUnmark;
+  const shownPending = pendingUnmark || lastPendingRef.current;
+
+  const handleEpisodeStatusClick = (sn, en, { watched, name } = {}) => {
+    const key = `S${sn}E${en}`;
+    const progress = inProgressByKey[key];
+    if (progress) {
+      setPendingUnmark({ sn, en, name, kind: "progress", pct: progress.pct, id: progress.id });
+      return;
+    }
+    if (watched) {
+      setPendingUnmark({ sn, en, name, kind: "watched" });
+      return;
+    }
+    toggleEpisode(sn, en);
+  };
+
+  const cancelUnmark = useCallback(() => {
+    if (!unmarkBusy) setPendingUnmark(null);
+  }, [unmarkBusy]);
+
+  const confirmUnmark = async () => {
+    const pending = pendingUnmark;
+    if (!pending || unmarkBusy) return;
+    setUnmarkBusy(true);
+    try {
+      if (pending.kind === "watched") {
+        await toggleEpisode(pending.sn, pending.en);
+      } else {
+        const ok = pending.id ? await dismissLocalProgress(pending.id) : false;
+        if (!ok) {
+          setShowError("No se pudo quitar el episodio de Continuar viendo");
+        } else {
+          setInProgressByKey((prev) => {
+            const nextMap = { ...prev };
+            delete nextMap[`S${pending.sn}E${pending.en}`];
+            return nextMap;
+          });
+        }
+      }
+    } finally {
+      setUnmarkBusy(false);
+      setPendingUnmark(null);
+    }
+  };
+
+  // Escape cierra SOLO la confirmación (useModalGuard atiende al de encima).
+  useModalGuard({
+    open: Boolean(pendingUnmark),
+    onClose: cancelUnmark,
+    lockScroll: false,
+  });
 
   const openEpisodeDetails = useCallback(
     (sn, en) => {
@@ -1873,7 +1947,7 @@ export default function TraktEpisodesWatchedModal({
                       const busy = busyKey === key;
 
                       const watched = watchedSet.has(en);
-                      const progressPct = inProgressByKey[key] ?? null;
+                      const progressPct = inProgressByKey[key]?.pct ?? null;
                       const inProgress = progressPct != null;
                       const img = tmdbImg(ep.still_path);
 
@@ -1990,7 +2064,10 @@ export default function TraktEpisodesWatchedModal({
                                 disabled={busy || !serverOnline}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  toggleEpisode(sn, en);
+                                  handleEpisodeStatusClick(sn, en, {
+                                    watched,
+                                    name: ep.name,
+                                  });
                                 }}
                                 className={`inline-flex h-9 w-9 items-center justify-center rounded-lg transition shrink-0 ${
                                   inProgress
@@ -2001,17 +2078,17 @@ export default function TraktEpisodesWatchedModal({
                                       : "text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20"
                                     : "text-zinc-500 hover:text-white hover:bg-white/10"
                                 }`}
-                                aria-label={`${
-                                  inProgress ? `Viendo (${progressPct}%). ` : ""
-                                }${
-                                  isRewatchView
-                                    ? watched
-                                      ? "Quitar de vistos (este rewatch)"
-                                      : "Marcar como visto (este rewatch)"
-                                    : watched
-                                      ? "Quitar de vistos"
-                                      : "Marcar como visto"
-                                }`}
+                                aria-label={
+                                  inProgress
+                                    ? `Viendo (${progressPct}%). Quitar de Continuar viendo`
+                                    : isRewatchView
+                                      ? watched
+                                        ? "Quitar de vistos (este rewatch)"
+                                        : "Marcar como visto (este rewatch)"
+                                      : watched
+                                        ? "Quitar de vistos"
+                                        : "Marcar como visto"
+                                }
                               >
                                 {busy ? (
                                   <Loader2 className="w-5 h-5 animate-spin" />
@@ -2083,7 +2160,7 @@ export default function TraktEpisodesWatchedModal({
                       {nums.map((en) => {
                         const w = watchedSetLocal.has(en);
                         const key = `S${sn}E${en}`;
-                        const progressPct = inProgressByKey[key] ?? null;
+                        const progressPct = inProgressByKey[key]?.pct ?? null;
                         const busy = busyKey === key;
 
                         return (
@@ -2091,7 +2168,9 @@ export default function TraktEpisodesWatchedModal({
                             key={en}
                             type="button"
                             disabled={busy || !serverOnline}
-                            onClick={() => toggleEpisode(sn, en)}
+                            onClick={() =>
+                              handleEpisodeStatusClick(sn, en, { watched: w })
+                            }
                             className={`w-9 h-9 rounded-lg text-xs font-bold flex items-center justify-center transition ${
                               progressPct != null
                                 ? "bg-amber-500 text-black"
@@ -2101,15 +2180,17 @@ export default function TraktEpisodesWatchedModal({
                                   : "bg-emerald-600 text-white"
                                 : "bg-black/30 text-white/55 hover:bg-white/10 hover:text-white"
                             } ${busy ? "opacity-50" : ""}`}
-                            aria-label={
-                              isRewatchView
-                                ? w
-                                  ? "Quitar (rewatch)"
-                                  : "Marcar (rewatch)"
-                                : w
-                                  ? "Quitar de vistos"
-                                  : "Marcar como visto"
-                            }
+                            aria-label={`Episodio ${en}: ${
+                              progressPct != null
+                                ? `viendo (${progressPct}%). Quitar de Continuar viendo`
+                                : isRewatchView
+                                  ? w
+                                    ? "quitar (rewatch)"
+                                    : "marcar (rewatch)"
+                                  : w
+                                    ? "quitar de vistos"
+                                    : "marcar como visto"
+                            }`}
                           >
                             {busy ? (
                               <Loader2 className="w-3 h-3 animate-spin" />
@@ -2472,6 +2553,81 @@ export default function TraktEpisodesWatchedModal({
             </motion.div>
           )}
         </AnimatePresence>
+        {/* Confirmación al desmarcar un episodio visto o quitarlo de
+            "Continuar viendo". Vive dentro del panel (lo cubre) para no
+            competir con las capas del modal. */}
+        <FadePresence
+          show={Boolean(pendingUnmark)}
+          className="absolute inset-0 z-[70] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+          onClick={cancelUnmark}
+        >
+          {shownPending && (
+            <div
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="episode-unmark-title"
+              aria-describedby="episode-unmark-desc"
+              onClick={(e) => e.stopPropagation()}
+              className={`w-full max-w-sm rounded-3xl p-6 ${LIQUID_GLASS_PANEL}`}
+            >
+              <div className="flex items-start gap-3">
+                <span
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                    shownPending.kind === "progress"
+                      ? "bg-amber-500/15 text-amber-300"
+                      : "bg-emerald-500/15 text-emerald-300"
+                  }`}
+                  aria-hidden="true"
+                >
+                  {shownPending.kind === "progress" ? (
+                    <MonitorPlay className="h-5 w-5" />
+                  ) : (
+                    <EyeOff className="h-5 w-5" />
+                  )}
+                </span>
+                <div className="min-w-0">
+                  <h3 id="episode-unmark-title" className="text-base font-bold text-white">
+                    {shownPending.kind === "progress"
+                      ? "¿Quitar de Continuar viendo?"
+                      : "¿Quitar de vistos?"}
+                  </h3>
+                  <p id="episode-unmark-desc" className="mt-1.5 text-sm leading-relaxed text-zinc-300">
+                    <span className="font-semibold text-white">
+                      T{shownPending.sn} · E{shownPending.en}
+                      {shownPending.name ? ` · ${shownPending.name}` : ""}
+                    </span>
+                    <br />
+                    {shownPending.kind === "progress"
+                      ? `Se borrará su progreso (${shownPending.pct}%). No se marcará como visto.`
+                      : isRewatchView
+                        ? "Se desmarcará como visto en este rewatch."
+                        : "Se desmarcará como visto."}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-6 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  autoFocus
+                  onClick={cancelUnmark}
+                  disabled={unmarkBusy}
+                  className="h-11 rounded-xl bg-white/5 text-sm font-bold text-zinc-200 transition hover:bg-white/10 hover:text-white disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60"
+                >
+                  Cancelar
+                </button>
+                <button data-online-only="true"
+                  type="button"
+                  onClick={confirmUnmark}
+                  disabled={unmarkBusy || !serverOnline}
+                  className="flex h-11 items-center justify-center gap-2 rounded-xl bg-red-500/90 text-sm font-bold text-white transition hover:bg-red-500 disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-300"
+                >
+                  {unmarkBusy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                  Quitar
+                </button>
+              </div>
+            </div>
+          )}
+        </FadePresence>
       </motion.div>
     </div>
   );

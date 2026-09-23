@@ -27,6 +27,9 @@ import {
   Plus,
   Check,
   AlertCircle,
+  ChevronLeft,
+  Minus,
+  MonitorPlay,
 } from "lucide-react";
 
 import {
@@ -43,6 +46,7 @@ import { useAuth } from "@/context/AuthContext";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import useModalGuard from "@/hooks/useModalGuard";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import FadePresence from "@/components/ui/FadePresence";
 import {
   normalizeSearchText,
   titleMatchesQuery,
@@ -134,6 +138,15 @@ const PLATFORM_LABELS = {
   rtve: "RTVE",
   plex: "Plex",
 };
+// Plataformas elegibles al añadir a mano, en el orden del selector. Mismos ids
+// que el backend (MANUAL_PROGRESS_PLATFORMS) y que las entradas automáticas.
+const MANUAL_PLATFORMS = [
+  "netflix", "primevideo", "max", "disney", "appletv", "movistar",
+  "crunchyroll", "plex",
+];
+// Por debajo del 90%: a partir de ahí se da por visto (ver backend).
+const MANUAL_MAX_PCT = 89;
+
 function platformLabel(platform) {
   if (!platform) return null;
   const key = String(platform).toLowerCase().replace(/[^a-z0-9]+/g, "");
@@ -502,6 +515,7 @@ function DropdownItem({ active, onClick, children }) {
 function DeleteTrigger({ onClick, className = "" }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       title="Quitar de Continuar viendo"
       aria-label="Quitar de Continuar viendo"
@@ -514,13 +528,12 @@ function DeleteTrigger({ onClick, className = "" }) {
 
 // Overlay de confirmación "¿Quitar?" que cubre la tarjeta (igual UX que el
 // borrado del Historial). `rounded` iguala el radio de la tarjeta de cada vista.
-function DeleteConfirm({ busy, onCancel, onConfirm, rounded = "rounded-2xl" }) {
+function DeleteConfirm({ show, busy, onCancel, onConfirm, rounded = "rounded-2xl" }) {
+  // Entrada y salida por CSS (FadePresence): las de Framer dejaban un fotograma
+  // intermedio al terminar, visible como parpadeo al abrir y al cancelar.
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.2 }}
+    <FadePresence
+      show={show}
       className={`absolute inset-0 z-40 flex items-center justify-center gap-2 px-3 bg-black/95 ${rounded}`}
       onClick={(e) => {
         e.preventDefault();
@@ -544,7 +557,7 @@ function DeleteConfirm({ busy, onCancel, onConfirm, rounded = "rounded-2xl" }) {
       >
         {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
       </button>
-    </motion.div>
+    </FadePresence>
   );
 }
 
@@ -629,13 +642,13 @@ const ProgressCard = memo(function ProgressCard({
   if (viewMode === "compact") {
     return (
       <motion.div initial={isBackNav ? false : { opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.35, delay: isBackNav ? 0 : animDelay, ease: "easeOut" }}>
-        <Link href={href} prefetch={false} onClick={onPreviewClick} className="relative block overflow-hidden rounded-xl bg-zinc-900/30 transition-colors group hover:bg-zinc-900/60 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]">
+        <Link href={href} prefetch={false} onClick={onPreviewClick} draggable={false} className="relative block overflow-hidden rounded-xl [-webkit-tap-highlight-color:transparent] bg-zinc-900/30 transition-colors group hover:bg-zinc-900/60 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]">
           <div className={`relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4 ${canDelete ? "pr-12 sm:pr-14" : ""}`}>
             <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md bg-zinc-900 shrink-0">
               <SmartImage item={item} kind="backdrop" alt={title} />
             </div>
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
-              <h4 className="text-white font-bold text-base leading-tight truncate group-hover:text-emerald-300 transition-colors">{title}</h4>
+              <h4 className={`text-white font-bold text-base leading-tight truncate group-hover:text-emerald-300 transition-colors ${confirmDel ? "invisible" : ""}`}>{title}</h4>
               <div className="flex items-center gap-2 text-xs text-zinc-500 flex-wrap">
                 <span className={`font-bold px-1.5 py-0.5 rounded text-[10px] ${colors.bg} ${colors.text}`}>{pct}%</span>
                 {code && (
@@ -674,22 +687,19 @@ const ProgressCard = memo(function ProgressCard({
                 <Clock className="w-3.5 h-3.5 text-zinc-400" /> {lastWatched}
               </div>
             </div>
-            {canDelete && (
+            {canDelete && !confirmDel && (
               <DeleteTrigger
                 onClick={handleTrash}
                 className="absolute top-1/2 right-2 sm:right-3 -translate-y-1/2 z-30 h-9 w-9"
               />
             )}
-            <AnimatePresence>
-              {confirmDel && (
-                <DeleteConfirm
-                  busy={busy}
-                  onCancel={handleCancel}
-                  onConfirm={handleConfirm}
-                  rounded="rounded-xl"
-                />
-              )}
-            </AnimatePresence>
+            <DeleteConfirm
+              show={confirmDel}
+              busy={busy}
+              onCancel={handleCancel}
+              onConfirm={handleConfirm}
+              rounded="rounded-xl"
+            />
           </div>
         </Link>
       </motion.div>
@@ -699,7 +709,7 @@ const ProgressCard = memo(function ProgressCard({
   if (viewMode === "poster") {
     return (
       <motion.div initial={isBackNav ? false : { opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.35, delay: isBackNav ? 0 : animDelay, ease: "easeOut" }}>
-        <Link href={href} prefetch={false} onClick={onPreviewClick} className="block">
+        <Link href={href} prefetch={false} onClick={onPreviewClick} draggable={false} className="block [-webkit-tap-highlight-color:transparent]">
           <div className="relative aspect-[2/3] group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-emerald-900/20 transition-all after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]">
             <SmartImage item={item} kind="poster" alt={title} />
 
@@ -709,22 +719,19 @@ const ProgressCard = memo(function ProgressCard({
               pct={pct}
               progressColor={colors.text}
             />
-            {canDelete && (
+            {canDelete && !confirmDel && (
               <DeleteTrigger
                 onClick={handleTrash}
                 className="absolute top-2 right-2 z-30 h-9 w-9"
               />
             )}
-            <AnimatePresence>
-              {confirmDel && (
-                <DeleteConfirm
-                  busy={busy}
-                  onCancel={handleCancel}
-                  onConfirm={handleConfirm}
-                  rounded="rounded-xl"
-                />
-              )}
-            </AnimatePresence>
+            <DeleteConfirm
+              show={confirmDel}
+              busy={busy}
+              onCancel={handleCancel}
+              onConfirm={handleConfirm}
+              rounded="rounded-xl"
+            />
           </div>
         </Link>
       </motion.div>
@@ -734,7 +741,7 @@ const ProgressCard = memo(function ProgressCard({
   // ==== CARDS (por defecto) ====
   return (
     <motion.div initial={isBackNav ? false : { opacity: 0, y: 30, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.4, delay: isBackNav ? 0 : animDelay, ease: [0.25, 0.46, 0.45, 0.94] }}>
-      <Link href={href} prefetch={false} onClick={onPreviewClick} className="block group">
+      <Link href={href} prefetch={false} onClick={onPreviewClick} draggable={false} className="block group [-webkit-tap-highlight-color:transparent]">
         <div
           className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg transition-all duration-300 hover:shadow-xl"
           onMouseEnter={(e) => {
@@ -749,7 +756,9 @@ const ProgressCard = memo(function ProgressCard({
             <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-black/10" />
             <div className="absolute top-3 right-3">
               {canDelete ? (
-                <DeleteTrigger onClick={handleTrash} className="h-10 w-10" />
+                confirmDel ? null : (
+                  <DeleteTrigger onClick={handleTrash} className="h-10 w-10" />
+                )
               ) : (
                 <div className="flex items-center justify-center rounded-full bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-lg border border-white/10">
                   <CircularProgress pct={pct} colors={colors} size={40} />
@@ -763,7 +772,7 @@ const ProgressCard = memo(function ProgressCard({
               </div>
             ) : null}
             <div className="absolute bottom-0 left-0 right-0 p-4 pr-16">
-              <h3 className="text-white font-black text-lg lg:text-xl leading-tight line-clamp-1 group-hover:text-emerald-200 transition-colors">{title}</h3>
+              <h3 className={`text-white font-black text-lg lg:text-xl leading-tight line-clamp-1 group-hover:text-emerald-200 transition-colors ${confirmDel ? "invisible" : ""}`}>{title}</h3>
             </div>
             {/* Platform logo badge - bottom right corner */}
             {platform && (
@@ -813,16 +822,13 @@ const ProgressCard = memo(function ProgressCard({
               </span>
             </div>
           </div>
-          <AnimatePresence>
-            {confirmDel && (
-              <DeleteConfirm
-                busy={busy}
-                onCancel={handleCancel}
-                onConfirm={handleConfirm}
-                rounded="rounded-2xl"
-              />
-            )}
-          </AnimatePresence>
+          <DeleteConfirm
+            show={confirmDel}
+            busy={busy}
+            onCancel={handleCancel}
+            onConfirm={handleConfirm}
+            rounded="rounded-2xl"
+          />
         </div>
       </Link>
     </motion.div>
@@ -1454,6 +1460,13 @@ function AddProgressModal({ existingKeys, onAdded, onClose }) {
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState("");
   const [addingKey, setAddingKey] = useState("");
+  // Título elegido: se pasa a configurar progreso inicial, plataforma y (serie)
+  // episodio antes de añadirlo, como las entradas automáticas.
+  const [selected, setSelected] = useState(null);
+  const [pctValue, setPctValue] = useState(0);
+  const [platformValue, setPlatformValue] = useState("");
+  const [seasonValue, setSeasonValue] = useState("");
+  const [episodeValue, setEpisodeValue] = useState("");
   const inputRef = useRef(null);
   const previousFocusRef = useRef(null);
 
@@ -1504,13 +1517,46 @@ function AddProgressModal({ existingKeys, onAdded, onClose }) {
     };
   }, [query]);
 
-  const handleAdd = async (item) => {
+  const handleSelect = (item) => {
     const key = `${item.media_type}:${item.id}`;
     if (addingKey || existingKeys.has(key)) return;
+    setError("");
+    setPctValue(0);
+    setPlatformValue("");
+    setSeasonValue("");
+    setEpisodeValue("");
+    setSelected(item);
+  };
+
+  const backToSearch = () => {
+    if (addingKey) return;
+    setError("");
+    setSelected(null);
+    window.requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
+  const selectedIsTv = selected?.media_type === "tv";
+  const hasSeason = String(seasonValue).trim() !== "";
+  const hasEpisode = String(episodeValue).trim() !== "";
+  const episodeIncomplete = selectedIsTv && hasSeason !== hasEpisode;
+
+  const handleAdd = async (event) => {
+    event?.preventDefault?.();
+    if (!selected || addingKey) return;
+    if (episodeIncomplete) {
+      setError("Indica temporada y episodio, o deja ambos vacíos.");
+      return;
+    }
+    const key = `${selected.media_type}:${selected.id}`;
     setAddingKey(key);
     setError("");
     try {
-      const row = await addManualProgress(item);
+      const row = await addManualProgress(selected, {
+        percent: Math.min(MANUAL_MAX_PCT, Math.max(0, Number(pctValue) || 0)) / 100,
+        platform: platformValue || null,
+        season: selectedIsTv && hasSeason ? Number(seasonValue) : undefined,
+        episode: selectedIsTv && hasEpisode ? Number(episodeValue) : undefined,
+      });
       onAdded(row);
     } catch (addError) {
       setError(addError?.message || "No se pudo añadir el título");
@@ -1554,9 +1600,9 @@ function AddProgressModal({ existingKeys, onAdded, onClose }) {
             </h2>
             <p
               id="add-progress-description"
-              className="mt-1 text-xs font-medium uppercase tracking-wide text-zinc-500"
+              className="mt-1 text-sm font-medium text-zinc-400"
             >
-              Busca una película o serie
+              {selected ? "Elige el progreso y la plataforma" : "Busca una película o serie"}
             </p>
           </div>
           <button
@@ -1570,7 +1616,25 @@ function AddProgressModal({ existingKeys, onAdded, onClose }) {
           </button>
         </header>
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-6 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:px-8 sm:pb-8">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:px-8 sm:pb-8 sm:pt-6">
+          {selected ? (
+            <AddProgressConfig
+              item={selected}
+              pct={pctValue}
+              onPctChange={setPctValue}
+              platform={platformValue}
+              onPlatformChange={setPlatformValue}
+              season={seasonValue}
+              onSeasonChange={setSeasonValue}
+              episode={episodeValue}
+              onEpisodeChange={setEpisodeValue}
+              error={error}
+              adding={Boolean(addingKey)}
+              onBack={backToSearch}
+              onSubmit={handleAdd}
+            />
+          ) : (
+          <>
           <div className="relative group">
             <label htmlFor="add-progress-search" className="sr-only">
               Buscar película o serie
@@ -1658,7 +1722,7 @@ function AddProgressModal({ existingKeys, onAdded, onClose }) {
                   <li key={key}>
                     <button data-online-only="true"
                       type="button"
-                      onClick={() => handleAdd(item)}
+                      onClick={() => handleSelect(item)}
                       disabled={alreadyAdded || Boolean(addingKey)}
                       className={`group relative flex w-full items-center gap-3 overflow-hidden rounded-2xl border p-3 text-left transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 ${
                         alreadyAdded
@@ -1736,10 +1800,306 @@ function AddProgressModal({ existingKeys, onAdded, onClose }) {
               })}
             </ul>
           )}
+          </>
+          )}
         </div>
       </motion.section>
     </motion.div>,
     document.body,
+  );
+}
+
+// Icono cuadrado de cada plataforma en el selector del alta manual. Solo se
+// ofrecen las que tienen logotipo.
+const MANUAL_PLATFORM_ICONS = {
+  netflix: "/netflix.png",
+  primevideo: "/amazonprimevideo.png",
+  max: "/hbomax.png",
+  disney: "/disney.png",
+  appletv: "/appletv.png",
+  movistar: "/movistar.png",
+  crunchyroll: "/crunchyroll.png",
+  plex: "/plex.png",
+};
+
+function PlatformBadge({ id }) {
+  const icon = MANUAL_PLATFORM_ICONS[id];
+  if (!icon) {
+    return (
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-zinc-300">
+        <X className="h-4 w-4" aria-hidden="true" />
+      </span>
+    );
+  }
+  return (
+    <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-black/40">
+      <OptimizedImage src={icon} alt="" width={32} height={32} className="h-8 w-8 object-contain" />
+    </span>
+  );
+}
+
+// Campo numérico con botones − / + (sin las flechas nativas, diminutas y
+// distintas en cada navegador).
+function StepperField({ id, label, value, onChange }) {
+  const num = Number(value);
+  const hasValue = String(value).trim() !== "" && Number.isFinite(num);
+  const step = (delta) => {
+    const next = Math.max(1, (hasValue ? num : 0) + delta);
+    onChange(String(next));
+  };
+  const buttonClass =
+    "flex h-12 w-11 shrink-0 items-center justify-center text-zinc-300 transition hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-emerald-400";
+  return (
+    <div>
+      <label htmlFor={id} className="mb-1.5 block text-xs font-semibold text-zinc-300">
+        {label}
+      </label>
+      <div className="flex items-center overflow-hidden rounded-xl bg-black/30 ring-1 ring-white/10 transition focus-within:ring-emerald-400/60">
+        <button
+          type="button"
+          onClick={() => step(-1)}
+          disabled={!hasValue || num <= 1}
+          aria-label={`Bajar ${label.toLowerCase()}`}
+          className={buttonClass}
+        >
+          <Minus className="h-4 w-4" aria-hidden="true" />
+        </button>
+        <input
+          id={id}
+          type="number"
+          inputMode="numeric"
+          min={1}
+          step={1}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Nº"
+          className="h-12 min-w-0 flex-1 bg-transparent text-center text-base font-bold tabular-nums text-white outline-none placeholder:text-zinc-500 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        />
+        <button
+          type="button"
+          onClick={() => step(1)}
+          aria-label={`Subir ${label.toLowerCase()}`}
+          className={buttonClass}
+        >
+          <Plus className="h-4 w-4" aria-hidden="true" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ConfigSection({ icon: Icon, title, hint, children }) {
+  return (
+    <section className="space-y-3 rounded-2xl bg-gradient-to-br from-white/[0.07] to-white/[0.02] p-3.5 shadow-lg sm:p-5">
+      <div className="flex items-center gap-2">
+        <Icon className="h-4 w-4 text-emerald-400" aria-hidden="true" />
+        <h3 className="text-sm font-bold text-white">{title}</h3>
+        {hint && <span className="text-xs font-medium text-zinc-400">{hint}</span>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+const PCT_PRESETS = [0, 25, 50, 75];
+
+// Paso 2 del alta manual: progreso inicial, plataforma y (serie) episodio.
+function AddProgressConfig({
+  item,
+  pct,
+  onPctChange,
+  platform,
+  onPlatformChange,
+  season,
+  onSeasonChange,
+  episode,
+  onEpisodeChange,
+  error,
+  adding,
+  onBack,
+  onSubmit,
+}) {
+  const isTv = item.media_type === "tv";
+  const year = String(item.release_date || "").slice(0, 4);
+  const poster = item.poster_path ? buildImg(item.poster_path, "w342") : null;
+  const colors = getProgressColor(pct);
+  const fill = (pct / MANUAL_MAX_PCT) * 100;
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-4">
+      {/* Título elegido */}
+      <div className="flex items-center gap-4 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 p-3 shadow-lg">
+        <div className="h-24 w-16 shrink-0 overflow-hidden rounded-xl bg-zinc-900 shadow-md">
+          {poster ? (
+            <OptimizedImage src={poster} alt="" width={128} height={192} className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-zinc-600">
+              {isTv ? <Tv className="h-6 w-6" /> : <Film className="h-6 w-6" />}
+            </div>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="line-clamp-2 text-base font-black leading-tight text-white sm:text-lg">
+            {item.title}
+          </p>
+          <p className="mt-1.5 flex items-center gap-1.5 text-sm text-zinc-300">
+            {isTv ? (
+              <Tv className="h-3.5 w-3.5 text-zinc-400" aria-hidden="true" />
+            ) : (
+              <Film className="h-3.5 w-3.5 text-zinc-400" aria-hidden="true" />
+            )}
+            {isTv ? "Serie" : "Película"}
+            {year ? <span className="text-zinc-400">· {year}</span> : null}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onBack}
+          disabled={adding}
+          className="flex h-10 shrink-0 items-center gap-1 rounded-xl bg-white/5 px-3 text-xs font-bold text-zinc-200 transition hover:bg-white/10 hover:text-white disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+        >
+          <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+          Cambiar
+        </button>
+      </div>
+
+      {isTv && (
+        <ConfigSection icon={Tv} title="Episodio" hint="Opcional">
+          <div className="grid grid-cols-2 gap-3">
+            <StepperField id="add-progress-season" label="Temporada" value={season} onChange={onSeasonChange} />
+            <StepperField id="add-progress-episode" label="Episodio" value={episode} onChange={onEpisodeChange} />
+          </div>
+        </ConfigSection>
+      )}
+
+      <ConfigSection icon={TrendingUp} title="Progreso inicial">
+        <div className="flex items-end justify-between gap-3">
+          <span
+            className={`rounded-lg px-2 py-1 text-xs font-bold ${
+              pct === 0 ? "bg-white/10 text-zinc-300" : `${colors.bg} ${colors.text}`
+            }`}
+          >
+            {pct === 0 ? "Sin empezar" : colors.label}
+          </span>
+          <output
+            htmlFor="add-progress-pct"
+            className={`text-3xl font-black leading-none tabular-nums ${pct === 0 ? "text-zinc-300" : colors.text}`}
+          >
+            {pct}
+            <span className="ml-0.5 text-base font-bold">%</span>
+          </output>
+        </div>
+
+        {/* Pista como la de las tarjetas; el range nativo va encima,
+            transparente, para conservar teclado y lectores de pantalla. */}
+        <div className="relative flex h-8 items-center">
+          <input
+            id="add-progress-pct"
+            type="range"
+            min={0}
+            max={MANUAL_MAX_PCT}
+            step={1}
+            value={pct}
+            onChange={(e) => onPctChange(Number(e.target.value))}
+            aria-valuetext={`${pct}%`}
+            className="peer absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+          />
+          <div className="h-2.5 w-full overflow-hidden rounded-full bg-zinc-800/80">
+            <div
+              className={`h-full rounded-full bg-gradient-to-r ${colors.bar}`}
+              style={{ width: `${fill}%`, boxShadow: `0 0 10px ${colors.stroke}55` }}
+            />
+          </div>
+          <div
+            className="pointer-events-none absolute top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-zinc-950 bg-white shadow-[0_0_14px_rgba(255,255,255,0.35)] transition-shadow peer-focus-visible:ring-2 peer-focus-visible:ring-emerald-400 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-zinc-950"
+            style={{ left: `clamp(10px, ${fill}%, calc(100% - 10px))` }}
+          />
+        </div>
+
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex gap-1.5">
+            {PCT_PRESETS.map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => onPctChange(value)}
+                aria-pressed={pct === value}
+                className={`h-8 rounded-lg px-2.5 text-xs font-bold tabular-nums transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 ${
+                  pct === value
+                    ? "bg-emerald-500/20 text-emerald-300"
+                    : "bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                {value}%
+              </button>
+            ))}
+          </div>
+          <span className="text-right text-xs text-zinc-400">
+            Máx. {MANUAL_MAX_PCT}%
+          </span>
+        </div>
+        <p className="text-xs leading-relaxed text-zinc-400">
+          A partir del 90% el título se da por visto y sale de Continuar viendo.
+        </p>
+      </ConfigSection>
+
+      <ConfigSection icon={MonitorPlay} title="Plataforma">
+        <fieldset>
+          <legend className="sr-only">Plataforma</legend>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {["", ...MANUAL_PLATFORMS].map((id) => {
+              const checked = platform === id;
+              return (
+                <label
+                  key={id || "none"}
+                  className={`relative flex h-12 cursor-pointer items-center gap-2 rounded-xl px-2 text-[13px] font-semibold sm:gap-2.5 sm:px-2.5 sm:text-sm transition has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-emerald-400 ${
+                    checked
+                      ? "bg-emerald-500/15 text-white ring-2 ring-emerald-400/70"
+                      : "bg-black/25 text-zinc-200 ring-1 ring-white/10 hover:bg-white/[0.07] hover:text-white"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="add-progress-platform"
+                    value={id}
+                    checked={checked}
+                    onChange={() => onPlatformChange(id)}
+                    className="sr-only"
+                  />
+                  <PlatformBadge id={id} />
+                  <span className="min-w-0 flex-1 truncate">
+                    {id ? platformLabel(id) : "Ninguna"}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
+      </ConfigSection>
+
+      {error && (
+        <div
+          role="alert"
+          className="flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm font-medium text-red-300"
+        >
+          <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+          {error}
+        </div>
+      )}
+
+      <button data-online-only="true"
+        type="submit"
+        disabled={adding}
+        className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 transition hover:from-emerald-400 hover:to-emerald-500 active:scale-[0.98] disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
+      >
+        {adding ? (
+          <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+        ) : (
+          <Plus className="h-4 w-4" aria-hidden="true" />
+        )}
+        Añadir a Continuar viendo
+      </button>
+    </form>
   );
 }
 

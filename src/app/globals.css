@@ -386,6 +386,53 @@ html:not([data-avatar-boot]) .avatar-boot-chevron {
   animation: fadeIn 0.6s ease-out forwards;
 }
 
+/* Entrada de los overlays de confirmación de borrado (Historial, Continuar
+   viendo). Es CSS y no Framer a propósito: con Framer Motion 12 la animación de
+   opacidad, al terminar, dejaba UN fotograma con la opacidad inicial (0) antes
+   de fijar la final (medido: 0.99 → 0 → 1), y eso era el parpadeo del fondo
+   negro al pulsar la papelera. Sin `fill-mode`: al acabar manda el estilo en
+   línea (opacidad 1). La salida es `sv-fade-out`, con FadePresence. */
+@keyframes sv-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.sv-fade-in {
+  animation: sv-fade-in 200ms ease-out;
+}
+
+/* Salida (ver FadePresence): `forwards` la deja a 0 hasta que se desmonta, sin
+   el fotograma a opacidad 1 que dejaba Framer al terminar la salida. */
+@keyframes sv-fade-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+.sv-fade-out {
+  animation: sv-fade-out 160ms ease-in forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-fade-in {
+    animation: none;
+  }
+
+  .sv-fade-out {
+    animation: none;
+    opacity: 0;
+  }
+}
+
 .animate-slide-left {
   animation: slideInFromLeft 0.5s ease-out forwards;
 }
