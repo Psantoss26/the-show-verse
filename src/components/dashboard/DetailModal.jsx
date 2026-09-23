@@ -684,6 +684,17 @@ export default function DetailModal({
 
   const scrollContainerRef = useRef(null);
   const panelRef = useRef(null);
+  // Momento de apertura, para descartar el clic que viene del MISMO gesto que
+  // abrió la ficha (ver la nota del cierre por clic fuera, más abajo). El modal
+  // centrado lo necesita igual que el drawer: su velo ocupa toda la pantalla, así
+  // que ese clic rezagado caía sobre él y lo cerraba al instante.
+  const openedAtRef = useRef(0);
+  if (openedAtRef.current === 0 && typeof performance !== "undefined") {
+    openedAtRef.current = performance.now();
+  }
+  const isOpeningClick = () =>
+    typeof performance !== "undefined" &&
+    performance.now() - openedAtRef.current < 350;
   const { scrollY } = useScroll({ container: scrollContainerRef });
   const [modalHostReady, setModalHostReady] = useState(false);
 
@@ -1031,7 +1042,23 @@ export default function DetailModal({
 
     if (isDocked) return undefined;
 
+    // EL CLIC QUE ABRE NO PUEDE CERRAR.
+    //
+    // En táctil, quien abre la ficha lo hace en `pointerup` (ver FeaturedHero: el
+    // `click` sintetizado llega tarde o no llega mientras el hero anima). El
+    // navegador emite ese `click` JUSTO DESPUÉS, cuando este listener ya está
+    // puesto, y como su destino queda fuera del panel se leía como "clic fuera":
+    // el drawer se abría y se cerraba solo. No vale con que el que abre cancele
+    // su propio clic, porque ese clic puede dispararse sobre otro elemento —el
+    // panel recién montado tapa el punto que se tocó— y no pasar por él.
+    //
+    // La ventana es corta a propósito: solo cubre el clic que viene arrastrado
+    // del mismo gesto. Nadie cierra a propósito un modal 300 ms después de abrirlo.
+    const openedAt = performance.now();
+    const CLOSING_GRACE_MS = 350;
+
     const onDocumentClick = (event) => {
+      if (performance.now() - openedAt < CLOSING_GRACE_MS) return;
       // 1) Otra tarjeta de preview: `usePreviewOpen` llama a preventDefault() justo
       //    en ese caso, así que el drawer CAMBIA de título en vez de cerrarse, que
       //    es el comportamiento que el diseño actual permite. Un clic con

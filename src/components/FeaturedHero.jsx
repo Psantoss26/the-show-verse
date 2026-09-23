@@ -64,6 +64,17 @@ const HERO_BACKDROP_MAX_SIZE = "original";
 const HERO_POSTER_SIZE = "w780";
 const HERO_AUTO_ADVANCE_MS = 6000;
 const HERO_SWIPE_THRESHOLD_PX = 60;
+// Cuánto puede moverse el dedo y seguir contando como TOQUE (abrir la ficha).
+//
+// Estaba en 10px, y entre ese valor y el umbral de deslizamiento (60px) quedaba
+// una franja muerta: un toque que se movía 15 o 20px no era ni toque ni
+// deslizamiento, así que no pasaba NADA. En una tablet eso ocurre a todas horas
+// —el hero ocupa media pantalla y se pulsa con el pulgar, sin precisión—, y es lo
+// que se percibía como "muchas veces no se abre". 24px es la tolerancia habitual
+// de un toque táctil y sigue muy por debajo de los 60px, así que un toque y un
+// deslizamiento se distinguen igual de bien. Un arrastre para hacer scroll
+// recorre mucho más que esto, por lo que tampoco se confunde con un toque.
+const HERO_TAP_MAX_MOVE_PX = 24;
 const YOUTUBE_QUALITY_HINT = "highres";
 const YOUTUBE_QUALITY_MIN = "hd1080";
 const YOUTUBE_QUALITY_RETRY_DELAYS = [150, 750, 1800, 3200];
@@ -2337,7 +2348,7 @@ export default function FeaturedHero({
       const onInteractive = event.target?.closest?.(
         'button, a, input, label, select, textarea, [role="button"], [role="slider"]',
       );
-      if (Math.hypot(dx, dy) <= 10 && !onInteractive) {
+      if (Math.hypot(dx, dy) <= HERO_TAP_MAX_MOVE_PX && !onInteractive) {
         // Si el navegador sí llega a emitir el click, handleClickCapture lo
         // cancelará al ver suppressClickRef activo, evitando doble navegación.
         suppressClickRef.current = true;
