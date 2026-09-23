@@ -16,27 +16,29 @@ const EXIT_FALLBACK_MS = 220;
 // termina con `forwards` (se queda a 0) y el nodo se desmonta después, así que
 // no hay ningún fotograma intermedio visible.
 //
+// El montaje y el paso a "cerrándose" se deciden EN EL MISMO RENDER que cambia
+// `show`, no en un efecto: un efecto corre después de pintar, y ese fotograma
+// de más se veía. Al abrir, la tarjeta ya había ocultado su papelera y su
+// título pero el overlay aún no existía (la portada "parpadeaba" sin nada
+// encima); al cerrar, el overlay seguía un fotograma sin su clase de salida.
+//
 // Uso:  <FadePresence show={confirmDel} className="absolute inset-0 …">…</FadePresence>
 export default function FadePresence({ show, className = "", children, ...props }) {
-  const [mounted, setMounted] = useState(show);
-  const [closing, setClosing] = useState(false);
+  const [rendered, setRendered] = useState(show);
+
+  // Ajuste de estado durante el render (patrón admitido por React): se vuelve
+  // a renderizar antes de confirmar, sin fotograma intermedio.
+  if (show && !rendered) setRendered(true);
+
+  const closing = rendered && !show;
 
   useEffect(() => {
-    if (show) {
-      setMounted(true);
-      setClosing(false);
-      return undefined;
-    }
-    if (!mounted) return undefined;
-    setClosing(true);
-    const timer = window.setTimeout(() => {
-      setMounted(false);
-      setClosing(false);
-    }, EXIT_FALLBACK_MS);
+    if (!closing) return undefined;
+    const timer = window.setTimeout(() => setRendered(false), EXIT_FALLBACK_MS);
     return () => window.clearTimeout(timer);
-  }, [show, mounted]);
+  }, [closing]);
 
-  if (!mounted) return null;
+  if (!rendered) return null;
 
   return (
     <div
@@ -45,10 +47,7 @@ export default function FadePresence({ show, className = "", children, ...props 
       className={`${closing ? "sv-fade-out pointer-events-none" : "sv-fade-in"} ${className}`}
       onAnimationEnd={(event) => {
         props.onAnimationEnd?.(event);
-        if (closing && event.target === event.currentTarget) {
-          setMounted(false);
-          setClosing(false);
-        }
+        if (closing && event.target === event.currentTarget) setRendered(false);
       }}
     >
       {children}
