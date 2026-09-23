@@ -730,14 +730,25 @@ export default function DetailModal({
   // valores se siguen creando siempre (son hooks) y solo cambia su rango.
   const heroRange = (value) => (prefersReducedMotion ? [0, 0] : [0, value]);
 
+  // EN TABLET LA IMAGEN DEL HERO NO SE MUEVE CON EL SCROLL.
+  //
+  // El parallax y el zoom se aplican desde JS al recibir cada evento de
+  // scroll. Con ratón van a la par, pero en táctil el scroll lo mueve el
+  // compositor (inercia incluida) y los eventos llegan después: la imagen iba
+  // siempre un paso por detrás, se veía deformarse al escalar y, con un gesto
+  // brusco, se salía de sus límites antes de recolocarse. Fija, se desplaza
+  // con el contenido como en la ficha móvil, sin depender de JS.
+  const pinnedHero = prefersReducedMotion || tabletViewport;
+  const pinnedHeroRange = (value) => (pinnedHero ? [0, 0] : [0, value]);
+
   // Parallax del hero: se mueve a 1/3 de la velocidad de scroll
-  const yParallax = useTransform(scrollY, [0, 400], heroRange(130));
+  const yParallax = useTransform(scrollY, [0, 400], pinnedHeroRange(130));
 
   // Escala del hero: hace un sutil zoom-in al hacer scroll
   const scale = useTransform(
     scrollY,
     [0, 400],
-    prefersReducedMotion ? [1, 1] : [1, 1.08],
+    pinnedHero ? [1, 1] : [1, 1.08],
   );
 
   // Degradado oscuro: se oscurece sutilmente al hacer scroll
@@ -1021,7 +1032,7 @@ export default function DetailModal({
   const logoY = useTransform(
     scrollY,
     [logoFadeFrom, logoFadeTo],
-    heroRange(-20),
+    pinnedHeroRange(-20),
   );
 
   const resizeCleanupRef = useRef(null);
