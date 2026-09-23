@@ -2485,7 +2485,7 @@ export default function FeaturedHero({
         )}
 
         {!isMobile && (
-          <div className="absolute bottom-[4.25rem] left-1/2 z-20 -translate-x-1/2">
+          <div className="hero-wide-indicators absolute bottom-[4.25rem] left-1/2 z-20 -translate-x-1/2">
             {indicators && indicators}
           </div>
         )}
@@ -2524,6 +2524,16 @@ export default function FeaturedHero({
            ahí es preferible dejar algo de hueco debajo. */
         .featured-hero-shell {
           --hero-wide-height: min(100svh, 80vw);
+        }
+
+        /* Tablet con navbar inferior: 3.75rem de barra + 0.75rem de margen
+           al borde + 1rem de separación, además del área segura. */
+        @media (min-width: 768px) and (max-width: 1023px),
+          (min-width: 768px) and (hover: none),
+          (min-width: 768px) and (pointer: coarse) {
+          .hero-wide-indicators {
+            bottom: calc(5.5rem + env(safe-area-inset-bottom));
+          }
         }
 
         .hero-scroll-cue {
