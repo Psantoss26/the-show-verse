@@ -36,8 +36,17 @@ function safeSendMessage(message, callback) {
 // <html>/<body>) para no romper la hidratación de React: respondemos solo cuando
 // la app lo pide.
 document.addEventListener("request-tsv-ext-ping", () => {
+  // `getManifest()` funciona en un content script y no necesita al service worker,
+  // así que la versión llega también por esta vía (la que se usa cuando la
+  // mensajería por ID no está disponible).
+  let version = "";
+  try {
+    version = (extAlive() && chrome.runtime.getManifest().version) || "";
+  } catch (e) {
+    version = "";
+  }
   document.dispatchEvent(
-    new CustomEvent("response-tsv-ext-ping", { detail: { installed: true } }),
+    new CustomEvent("response-tsv-ext-ping", { detail: { installed: true, version } }),
   );
 });
 

@@ -132,20 +132,27 @@ function pingExtensionBridge(timeout = 700) {
       document.removeEventListener("response-tsv-ext-ping", onResponse);
       resolve(value);
     };
-    const onResponse = () => finish(true);
+    const onResponse = (event) => finish(event?.detail || { installed: true });
     document.addEventListener("response-tsv-ext-ping", onResponse);
     document.dispatchEvent(new CustomEvent("request-tsv-ext-ping"));
-    window.setTimeout(() => finish(false), timeout);
+    window.setTimeout(() => finish(null), timeout);
   });
 }
 
-// Comprueba si la extensión está instalada. La mensajería externa (por ID)
-// funciona incluso en pestañas ya abiertas justo tras instalarla desde la Store;
-// el puente del content script es la señal secundaria.
+// Comprueba si la extensión está instalada y con qué versión. La mensajería
+// externa (por ID) funciona incluso en pestañas ya abiertas justo tras instalarla
+// desde la Store; el puente del content script es la señal secundaria.
+//
+// Devuelve `{ installed, version }`. `version` puede venir vacía con una extensión
+// anterior a la 3.0, que aún no la publicaba en el ping.
 async function detectNetflixExtension() {
   const ping = await sendNetflixExtensionMessage({ action: "ping" });
-  if (ping?.installed || ping?.success) return true;
-  return pingExtensionBridge(700);
+  if (ping?.installed || ping?.success) {
+    return { installed: true, version: String(ping.version || "") };
+  }
+  const bridge = await pingExtensionBridge(700);
+  if (!bridge) return { installed: false, version: "" };
+  return { installed: true, version: String(bridge.version || "") };
 }
 
 function TSVSyncAndroidIcon({ className = "h-10 w-10" }) {
@@ -1418,6 +1425,25 @@ function ProfileSettingsClient() {
     refresh: refreshAndroidSync,
   } = useSyncStatus();
 
+  // Versión de la extensión del navegador, para poder comprobar tras actualizarla
+  // a mano que se está ejecutando la que se acaba de cargar. Cadena vacía cuando
+  // no está instalada o cuando es anterior a la 3.0 (no publicaba la versión).
+  //
+  // Se relee cada vez que se entra en «Conexiones» —y no una sola vez al montar—
+  // porque recargar la extensión no recarga la página: si no, seguiría enseñando
+  // la versión anterior justo cuando se quiere comprobar la nueva.
+  const [extensionVersion, setExtensionVersion] = useState("");
+  useEffect(() => {
+    if (activeTab !== "connections" || inAndroidApp) return undefined;
+    let cancelled = false;
+    detectNetflixExtension().then((present) => {
+      if (!cancelled) setExtensionVersion(present.version);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, inAndroidApp]);
+
   const handlePairAndroid = useCallback(async () => {
     setAndroidPair({ loading: true, link: "", error: "" });
     try {
@@ -1607,7 +1633,8 @@ function ProfileSettingsClient() {
       // sesión de Netflix.
       if (!detailsResult) {
         const present = await detectNetflixExtension();
-        if (!present) {
+        setExtensionVersion(present.version);
+        if (!present.installed) {
           timers.forEach(clearTimeout);
           setConnectLoading(false);
           setAwaitingInstall(true);
@@ -1691,7 +1718,8 @@ function ProfileSettingsClient() {
     setAwaitingInstall(false);
 
     const present = await detectNetflixExtension();
-    if (!present) {
+    setExtensionVersion(present.version);
+    if (!present.installed) {
       // No instalada: abrimos la Chrome Web Store para instalación de un clic y
       // pasamos a estado de espera; un poller continuará en cuanto se instale.
       setConnectLoading(false);
@@ -1713,7 +1741,8 @@ function ProfileSettingsClient() {
     let cancelled = false;
     const intervalId = window.setInterval(async () => {
       const present = await detectNetflixExtension();
-      if (present && !cancelled) {
+      if (present.installed && !cancelled) {
+        setExtensionVersion(present.version);
         window.clearInterval(intervalId);
         setAwaitingInstall(false);
         proceedNetflixConnect();
@@ -2152,6 +2181,14 @@ function ProfileSettingsClient() {
                                 Automático
                               </span>
                             )}
+                            {extensionVersion && (
+                              <span
+                                className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-300 font-mono tracking-normal"
+                                title="Versión de la extensión instalada en este navegador"
+                              >
+                                Extensión {extensionVersion}
+                              </span>
+                            )}
                           </div>
                           <p className="mt-1 hidden sm:block text-xs sm:text-sm text-zinc-400 leading-relaxed">
                             {isNetflixConnected
@@ -2206,6 +2243,18 @@ function ProfileSettingsClient() {
                             <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400">
                               Android App
                             </span>
+                            {/* Versión de la app: solo se puede saber desde dentro
+                                de ella (la pregunta el puente nativo). En el
+                                navegador no hay forma de conocer el APK instalado,
+                                así que ahí no se enseña nada en vez de inventarlo. */}
+                            {inAndroidApp && androidSyncStatus?.version && (
+                              <span
+                                className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-300 font-mono tracking-normal"
+                                title="Versión de la app instalada en este dispositivo"
+                              >
+                                v{androidSyncStatus.version}
+                              </span>
+                            )}
                           </div>
                           <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
                             {inAndroidApp

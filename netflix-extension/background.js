@@ -772,7 +772,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
   if (message.action === "ping") {
-    sendResponse({ success: true, installed: true });
+    // La versión viaja en el ping para que Ajustes → Conexiones pueda mostrarla:
+    // es la única forma de comprobar, tras actualizar a mano la extensión, que el
+    // navegador está ejecutando la versión que se acaba de cargar.
+    sendResponse({
+      success: true,
+      installed: true,
+      version: chrome.runtime.getManifest().version,
+    });
     return false;
   }
 
