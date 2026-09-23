@@ -325,7 +325,20 @@ export async function POST(request) {
         (Number.isInteger(episodeIn) && episodeIn > 0) ||
         (Number.isInteger(seasonIn) && seasonIn > 0);
     }
-    if (isTv && !namedSeriesEvidence && runsLikeAFilm) isTv = false;
+    // La duración solo desempata cuando la clasificación de serie se apoya SOLO en
+    // un número suelto que mandó el cliente, sin ningún campo dedicado detrás: ese
+    // es el caso de "John Wick: Capítulo 2", donde el número vive en el nombre de
+    // la película. Un badge "T4:E5" sí es evidencia dedicada, y hay episodios que
+    // pasan de 70 minutos: ahí la duración no puede mandar.
+    if (
+      isTv &&
+      !namedSeriesEvidence &&
+      episodeFromEvidence == null &&
+      seasonFromEvidence == null &&
+      runsLikeAFilm
+    ) {
+      isTv = false;
+    }
 
     let season = null;
     let episode = null;
@@ -388,6 +401,27 @@ export async function POST(request) {
     // que resolviese cualquier cosa, así que el texto de una notificación o un
     // badge podía "resolver" por relevancia de búsqueda libre un título sin
     // relación y era ese el que se guardaba.
+    // ES UN EPISODIO Y NO SABEMOS DE QUÉ SERIE. Entonces ninguna consulta vale
+    // como aproximación: todas salen del nombre del EPISODIO, del subtítulo o del
+    // badge, que es texto ruidoso. Buscar eso en el catálogo de series devuelve
+    // casi siempre algo, y el filtro de parecido lo da por bueno en cuanto el
+    // título del candidato aparece DENTRO de la consulta — así es como un
+    // "Capítulo cinco: La Nina" acababa registrado como la serie "La Niña", que no
+    // tiene nada que ver. Es justo lo que manda Netflix en Android, que nunca
+    // publica la serie.
+    //
+    // Sin el nombre de la serie solo se acepta una coincidencia EXACTA (que sí
+    // puede llegar, p. ej. si el título de la notificación es la serie). Si no la
+    // hay, mejor no registrar nada: un episodio ajeno en el historial cuesta más
+    // de deshacer que una sincronización perdida.
+    //
+    // Se mira la EVIDENCIA de episodio, no la clasificación final: da igual que la
+    // duración haya acabado tratándolo como película, porque el resolutor sigue
+    // pudiendo devolver una serie por parecido. Y no afecta a las películas, que
+    // no traen ningún número de episodio.
+    const hasEpisodeNumber =
+      episodeFromEvidence != null || (Number.isInteger(episodeIn) && episodeIn > 0);
+    const requireExactMatch = !showName && (isTv || hasEpisodeNumber);
     let resolution = null;
     let fallback = null;
     for (const variant of rankedVariants) {
@@ -404,7 +438,9 @@ export async function POST(request) {
         query = variant.query;
         break;
       }
-      if (variant.strong && !fallback) fallback = { candidate, query: variant.query };
+      if (!requireExactMatch && variant.strong && !fallback) {
+        fallback = { candidate, query: variant.query };
+      }
     }
     if (!resolution && fallback) {
       resolution = fallback.candidate;

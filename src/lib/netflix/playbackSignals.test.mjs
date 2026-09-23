@@ -84,6 +84,17 @@ const SHOWS = [
       5: [{ episode_number: 14, name: "Ozymandias" }],
     },
   },
+  // Serie REAL cuyo nombre aparece DENTRO del nombre de un episodio de otra
+  // serie ("Capítulo cinco: La Nina"). Es el caso que registraba títulos sin
+  // ninguna relación cuando el reproductor no decía de qué serie era el episodio.
+  {
+    id: 888,
+    name: "La Niña",
+    popularity: 12,
+    vote_count: 200,
+    seasons: [{ season_number: 1, episode_count: 80 }],
+    episodes: { 1: [{ episode_number: 1, name: "Reclutada" }] },
+  },
   // Serie que se llama igual que una película del catálogo: comprueba que una
   // duración de largometraje no se registre como serie solo porque el nombre de
   // la serie coincida exacto y el de la película lleve un subtítulo.
@@ -485,6 +496,46 @@ test("Android: película con el título en la MediaSession", async () => {
   });
   assert.equal(synced(result).mediaType, "movie");
   assert.equal(synced(result).tmdbId, 264660);
+});
+
+test("Episodio sin serie conocida: no se registra una serie que solo aparece en su nombre", async () => {
+  // Lo que manda Netflix en Android: el nombre del EPISODIO y "T4:E5", nunca la
+  // serie. Buscar ese texto en el catálogo de series encontraba "La Niña" dentro
+  // de "Capítulo cinco: La Nina" y lo daba por bueno.
+  const result = await sync({
+    platform: "com.netflix.mediaclient",
+    mainTitle: "Capítulo cinco: La Nina",
+    movieTitle: "Capítulo cinco: La Nina",
+    tabTitle: "Capítulo cinco: La Nina",
+    seasonEpisodeText: "T4:E5 - Capítulo cinco: La Nina",
+    season: 4,
+    episode: 5,
+    durationSec: 4200,
+  });
+  assert.notEqual(synced(result).tmdbId, 888, "no puede resolver a «La Niña»");
+  assert.equal(result.status, 404, JSON.stringify(result.body));
+  assert.equal(result.sent.length, 0);
+});
+
+test("Episodio de más de 70 minutos: la duración no lo convierte en película", async () => {
+  // Stranger Things T4 tiene episodios de más de una hora. El desempate por
+  // duración solo puede actuar cuando el número de episodio sale de un título,
+  // nunca cuando hay un badge dedicado.
+  const result = await sync({
+    platform: "netflix",
+    mainTitle: "Stranger Things",
+    showName: "Stranger Things",
+    episodeName: "Capítulo cinco: La Nina",
+    subTitle: "Capítulo cinco: La Nina",
+    seasonEpisodeText: "T4:E5",
+    season: 4,
+    episode: 5,
+    durationSec: 4800,
+  });
+  assert.equal(synced(result).mediaType, "tv");
+  assert.equal(synced(result).tmdbId, 66732);
+  assert.equal(synced(result).season, 4);
+  assert.equal(synced(result).episode, 5);
 });
 
 // ── Casos límite ──────────────────────────────────────────────────────────────
