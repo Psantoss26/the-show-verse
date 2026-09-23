@@ -21,7 +21,7 @@ export function pickTmdbResult(results, query, mediaType, { exactOnly = false } 
   return exact || (exactOnly ? null : candidates[0]);
 }
 
-function isExactTitle(entity, query, mediaType) {
+export function isExactTitle(entity, query, mediaType) {
   if (!entity) return false;
   const q = normalizeText(query);
   return (
@@ -196,11 +196,18 @@ export async function resolveStreamingEntity({
 }) {
   // Nivel serie (sin episodio conocido): confianza baja, pero SÍ se registra
   // (fallback show-level) en vez de descartarse.
+  //
+  // `exact` viaja en TODAS las resoluciones porque el llamador prueba varias
+  // consultas (queryVariants) de fiabilidad muy distinta: un candidato EXACTO
+  // vale venga de donde venga, mientras que uno aproximado solo es aceptable si
+  // la consulta salió de una fuente fiable. Sin este dato el llamador se
+  // quedaba con lo primero que resolviera, aunque fuese un texto de relleno.
   const showLevel = (entity) => ({
     kind: "show_level",
     mediaType: "tv",
     entity,
     confidence: "low",
+    exact: isExactTitle(entity, query, "tv"),
   });
 
   if (expectedMediaType === "tv") {
@@ -208,14 +215,13 @@ export async function resolveStreamingEntity({
     const entity = pickTmdbResult(results, query, "tv");
     if (!isPlausibleMatch(entity, query, "tv")) return null;
     // El episodio viene por número (el llamador ya lo parseó) → alta si exacto.
+    const exact = isExactTitle(entity, query, "tv");
     return {
       kind: "resolved",
       mediaType: "tv",
       entity,
-      confidence: scoreConfidence({
-        exactTitle: isExactTitle(entity, query, "tv"),
-        episodeSource: "number",
-      }),
+      exact,
+      confidence: scoreConfidence({ exactTitle: exact, episodeSource: "number" }),
     };
   }
 
@@ -249,7 +255,7 @@ export async function resolveStreamingEntity({
   if (exactShow && exactMovie) {
     const byDuration = decideByDuration(durationSec);
     if (byDuration === "movie") {
-      return { kind: "resolved", mediaType: "movie", entity: exactMovie, confidence: "high" };
+      return { kind: "resolved", mediaType: "movie", entity: exactMovie, confidence: "high", exact: true };
     }
     if (byDuration === "tv") {
       return showLevel(exactShow);
@@ -258,10 +264,27 @@ export async function resolveStreamingEntity({
     const moviePop = Number(exactMovie.popularity) || 0;
     return showPop >= moviePop
       ? showLevel(exactShow)
-      : { kind: "resolved", mediaType: "movie", entity: exactMovie, confidence: "high" };
+      : { kind: "resolved", mediaType: "movie", entity: exactMovie, confidence: "high", exact: true };
   }
 
   if (exactShow && !exactMovie) {
+    // Sin ninguna pista de serie y con duración de largometraje, el título exacto
+    // de una serie no debe ganarle a una película plausible: pasa cuando TMDb
+    // escribe la película con una variante del nombre ("… (Otro día para matar)")
+    // y existe una serie que se llama justo como el título detectado. Con pista de
+    // serie (`preferTv`) no se aplica: un episodio largo seguiría siendo episodio.
+    if (!preferTv && decideByDuration(durationSec) === "movie") {
+      const movie = pickTmdbResult(movieResults, query, "movie");
+      if (isPlausibleMatch(movie, query, "movie")) {
+        return {
+          kind: "resolved",
+          mediaType: "movie",
+          entity: movie,
+          confidence: "medium",
+          exact: false,
+        };
+      }
+    }
     return showLevel(exactShow);
   }
 
@@ -271,6 +294,7 @@ export async function resolveStreamingEntity({
       mediaType: "movie",
       entity: exactMovie,
       confidence: "high",
+      exact: true,
     };
   }
 
@@ -292,6 +316,7 @@ export async function resolveStreamingEntity({
     mediaType: "movie",
     entity: movie,
     confidence: isExactTitle(movie, query, "movie") ? "high" : "medium",
+    exact: isExactTitle(movie, query, "movie"),
   });
 
   // Candidato plausible de película Y de serie: mismo desempate que arriba

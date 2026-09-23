@@ -100,7 +100,14 @@ export function beforeColon(value) {
 
 // Normaliza el título para buscar en TMDb: quita el prefijo de la plataforma, los
 // descriptores de temporada/episodio del final y un año entre paréntesis final.
-export function cleanSearchTitle(raw) {
+//
+// `stripEpisodeMarkers` decide si se quitan los descriptores de temporada/episodio.
+// En una SERIE hay que quitarlos (lo que se busca en TMDb es el nombre de la
+// serie), pero en una PELÍCULA esos mismos patrones se comen parte del nombre
+// real: "John Wick: Capítulo 2" quedaba en "John Wick", que en TMDb es OTRA
+// película. Por eso el llamador prueba las dos formas y prioriza según lo que sepa
+// del contenido; ver `buildRankedQueryVariants`.
+export function cleanSearchTitle(raw, { stripEpisodeMarkers = true } = {}) {
   let t = String(raw || "").trim();
   // Bucle hasta estabilizar: un mismo título puede tener VARIAS capas de basura
   // ("Temporada 1 <episodio> - Ver en Crunchyroll en castellano").
@@ -110,14 +117,18 @@ export function cleanSearchTitle(raw) {
     prev = t;
     t = t
       .replace(PLATFORM_PREFIX_RE, "")                       // "Netflix - X"
-      .replace(LEADING_SEASON_EPISODE_RE, "")               // "Temporada 1 X"
       .replace(PLATFORM_WATCH_SUFFIX_RE, "")                // "X - Ver en Crunchyroll en castellano"
       .replace(LANGUAGE_SUFFIX_RE, "")                      // "X en castellano" / "X (VOSE)"
-      .replace(/\s*[-:|–·]\s*(temporada|season|saison|staffel)\s*\.?\s*\d+.*$/i, "") // "X - Temporada 2"
-      .replace(/\s*[-:|–·]\s*(episodio|episode|cap[ií]tulo|chapter|folge|ep)\s*\.?\s*\d+.*$/i, "")
-      .replace(/\s*[-:|–·]\s*[TS]\s*\d+\s*[:x\s]\s*E?\s*\d+.*$/i, "")
       .replace(/\s*[([{]\s*\d{4}\s*[)\]}]\s*$/, "")          // "(2021)" al final
       .trim();
+    if (stripEpisodeMarkers) {
+      t = t
+        .replace(LEADING_SEASON_EPISODE_RE, "")             // "Temporada 1 X"
+        .replace(/\s*[-:|–·]\s*(temporada|season|saison|staffel)\s*\.?\s*\d+.*$/i, "") // "X - Temporada 2"
+        .replace(/\s*[-:|–·]\s*(episodio|episode|cap[ií]tulo|chapter|folge|ep)\s*\.?\s*\d+.*$/i, "")
+        .replace(/\s*[-:|–·]\s*[TS]\s*\d+\s*[:x\s]\s*E?\s*\d+.*$/i, "")
+        .trim();
+    }
   }
   return t;
 }
@@ -149,38 +160,78 @@ export function showNameFromTab(tabTitle) {
 // mainTitle; en películas al revés. En ambos casos se incluyen TODAS las fuentes
 // como respaldo, para no fallar aunque la clasificación serie/película sea errónea.
 // Además, por cada base: la parte antes de ":" y la versión sin sufijos de edición.
-export function buildQueryVariants({
+export function buildQueryVariants(input = {}) {
+  return buildRankedQueryVariants(input).map((v) => v.query);
+}
+
+// Igual que `buildQueryVariants` pero conservando de QUÉ campo salió cada consulta
+// y si esa fuente es FIABLE (`strong`).
+//
+// POR QUÉ IMPORTA. Las fuentes no valen lo mismo. `showName`, `mainTitle` o el
+// nombre de serie del título de pestaña los publica el reproductor y describen lo
+// que se está viendo. En cambio el texto de una notificación de Android, el
+// subtítulo o el badge de temporada son campos de relleno: traen "T1:E1",
+// "Ver ahora", el nombre del perfil o la descripción del episodio. Buscar eso en
+// TMDb devuelve, por relevancia de búsqueda libre, un título APROXIMADO sin
+// ninguna relación; y como el llamador se quedaba con la primera consulta que
+// resolviese algo, ese título acababa en el historial. Marcando la fuente, quien
+// resuelve puede exigir coincidencia EXACTA a las consultas poco fiables y
+// aceptar aproximaciones solo de las fiables.
+export function buildRankedQueryVariants({
   showName,
   mainTitle,
+  movieTitle,
   tabTitle,
   queueTitle,
   albumArtist,
   showCandidates,
+  weakCandidates,
   isSeries,
 } = {}) {
   const showFromTab = showNameFromTab(tabTitle);
   // Fuentes del nombre de la SERIE cuando `title` es el episodio: queueTitle,
-  // albumArtist y una lista abierta `showCandidates` (p. ej. los extras de la
+  // albumArtist y una lista abierta `showCandidates` (p. ej. el título de la
   // notificación de Android). Así, venga la serie del campo que venga, se prueba.
-  const extra = Array.isArray(showCandidates) ? showCandidates : [];
-  const showSources = [showName, queueTitle, albumArtist, ...extra, showFromTab];
+  const strongExtra = Array.isArray(showCandidates) ? showCandidates : [];
+  const weakExtra = Array.isArray(weakCandidates) ? weakCandidates : [];
+  const showSources = [showName, queueTitle, albumArtist, ...strongExtra, showFromTab];
   // Los clientes solo rellenan `showName` en SERIES, así que su presencia ya
   // implica serie aunque no venga la marca isSeries.
   const seriesLike = Boolean(isSeries) || Boolean(String(showName || "").trim());
-  const ordered = seriesLike
-    ? [...showSources, mainTitle]
-    : [mainTitle, ...showSources];
+  const mainSources = [mainTitle, movieTitle];
+  const ordered = (
+    seriesLike ? [...showSources, ...mainSources] : [...mainSources, ...showSources]
+  )
+    .map((value) => ({ value, strong: true }))
+    // Las fuentes poco fiables van SIEMPRE al final, después de todas las buenas.
+    .concat(weakExtra.map((value) => ({ value, strong: false })));
 
-  const bases = ordered.map((v) => String(v || "").trim()).filter(Boolean);
+  const bases = ordered
+    .map((b) => ({ ...b, value: String(b.value || "").trim() }))
+    .filter((b) => b.value);
   const variants = [];
-  const add = (value) => {
-    const c = cleanSearchTitle(value);
-    if (c && c.length >= 2 && !isBarePlatformName(c) && !variants.includes(c)) {
-      variants.push(c);
-    }
+  const seen = new Set();
+  const add = ({ value, strong }, options) => {
+    const c = cleanSearchTitle(value, options);
+    if (!c || c.length < 2 || isBarePlatformName(c)) return;
+    if (seen.has(c)) return;
+    seen.add(c);
+    variants.push({ query: c, strong });
   };
-  bases.forEach(add);
-  bases.map(beforeColon).filter(Boolean).forEach(add);
-  bases.map(stripEditionSuffix).forEach(add);
-  return variants.slice(0, 5);
+  // En una serie interesa el nombre de la serie, así que se prueba primero el
+  // título SIN descriptores de temporada/episodio. En una película se prueba
+  // primero el título ÍNTEGRO: quitarlos mutila nombres como "John Wick:
+  // Capítulo 2". La otra forma va detrás, como respaldo, en los dos casos.
+  const passes = seriesLike
+    ? [{ stripEpisodeMarkers: true }, { stripEpisodeMarkers: false }]
+    : [{ stripEpisodeMarkers: false }, { stripEpisodeMarkers: true }];
+  for (const options of passes) {
+    bases.forEach((b) => add(b, options));
+  }
+  bases.forEach((b) => add({ ...b, value: beforeColon(b.value) }));
+  bases.forEach((b) => add({ ...b, value: stripEditionSuffix(b.value) }));
+  // Tope de consultas. Cada una cuesta hasta tres peticiones por tipo de medio, y
+  // solo se agotan cuando nada resuelve —justo el caso en el que el cliente va a
+  // reintentar de todas formas—, así que no compensa alargar más la lista.
+  return variants.slice(0, 6);
 }

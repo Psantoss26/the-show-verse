@@ -1,8 +1,57 @@
 # Sincronización de streaming: recuperación y pruebas
 
-Esta implementación refuerza la integración propia: extensión 2.9 y Android 1.2
-(versionCode 3). Los fallos encontrados en reintentos, cambios de episodio,
+Esta implementación refuerza la integración propia: extensión 3.0 y Android 1.3
+(versionCode 4). Los fallos encontrados en reintentos, cambios de episodio,
 persistencia y vinculación eran corregibles sin sustituir el sistema.
+
+## Clasificación película/episodio
+
+Lo que decide si algo es una película o un episodio son los campos que el
+reproductor DEDICA a describir un episodio: el nombre de la serie, el del
+episodio y el badge de temporada/episodio. El **título principal no cuenta**, ni
+en el cliente ni en el servidor, porque hay películas que llevan un número de
+capítulo en su propio nombre: «John Wick: Capítulo 2» hacía saltar el patrón de
+episodio, se buscaba solo en el catálogo de series y se guardaba como el episodio
+2 de una serie sin relación. Una vez que un campo dedicado confirma que es un
+episodio, el título sí puede aportar los números que falten.
+
+Por el mismo motivo, el título de una película no se recorta por esos patrones
+antes de buscarlo en TMDb: «John Wick: Capítulo 2» quedaba en «John Wick», que es
+otra película. En series sí se recorta, porque lo que hay que buscar es el nombre
+de la serie.
+
+El número de episodio en un campo dedicado, aunque no se sepa de qué serie es,
+nunca se declara película: buscar el nombre de un episodio en el catálogo de cine
+devuelve la película que más se le parezca. Sin serie no se guarda nada.
+
+## Consultas a TMDb por fiabilidad
+
+Un mismo contenido produce varias consultas posibles. No valen lo mismo: el
+nombre de la serie, el título principal o el de la pestaña los publica el
+reproductor, mientras que el texto de una notificación, el subtítulo o el badge
+«T1:E1» son campos de relleno que traen la descripción del episodio, el nombre
+del perfil o la duración. La búsqueda libre de TMDb casi nunca devuelve vacío, así
+que una consulta de relleno «resolvía» por relevancia un título sin relación y,
+como bastaba con que algo resolviera, era ese el que se guardaba.
+
+Ahora gana la primera consulta con coincidencia **exacta** en TMDb, venga de donde
+venga. Una coincidencia aproximada solo se acepta de una fuente fiable, y solo si
+ninguna otra consulta da una exacta.
+
+## Lectura del título en el navegador
+
+El título del reproductor de Netflix son elementos hermanos: `<h4>` con la serie y
+sendos `<span>` con «T4:E5» y el nombre del episodio. `textContent` los pega sin
+separación («Stranger ThingsT4:E5»), y ahí el patrón de temporada no casa porque
+exige un límite antes de la «T». La temporada se perdía justo en la plataforma más
+usada, el episodio quedaba sin ella y acababa registrado a nivel serie. El texto
+se lee ahora separando los hijos.
+
+De ese bloque de título, además, solo se leen temporada y episodio tras quitar el
+nombre de la serie; si no se puede separar, se exige una marca de temporada, que
+ningún nombre de película trae. Y cuando el reproductor da los dos números, manda
+sobre el rastreo genérico del DOM, que recorre toda la página y puede haber cogido
+el badge de una fila de recomendaciones.
 
 ## Flujo
 
@@ -61,6 +110,22 @@ npm run lint
 npm run build
 ```
 
+La detección se prueba reproductor a reproductor, con película y con episodio, en
+dos mitades que comparten las mismas señales:
+
+- `netflix-extension/players.test.js` reconstruye el DOM real de cada reproductor
+  (con su estructura de nodos, que es la que rompía la lectura) sobre el DOM mínimo
+  de `netflix-extension/fake-dom.js`, y comprueba la señal completa: si es serie o
+  película, la serie, el episodio y sus números.
+- `src/lib/netflix/playbackSignals.test.mjs` pasa esas señales por el endpoint real
+  contra un TMDb simulado que se comporta como el de verdad —su búsqueda libre
+  devuelve siempre algo— y comprueba qué se guarda: tipo, id de TMDb, temporada y
+  episodio, y qué llega al backend en los pings de progreso.
+
+Ese arnés transpila el endpoint a ESNext. Con el objetivo por omisión (ES5)
+TypeScript degrada los spreads de iteradores del endpoint y algunos devuelven
+listas vacías: las pruebas pasaban sin ejercitar el camino.
+
 La prueba de integración usa PostgreSQL real y requiere una base **desechable** con
 las migraciones aplicadas. No usar la base de producción:
 
@@ -76,11 +141,18 @@ cd android-companion
 gradle testDebugUnitTest assembleDebug
 ```
 
-Se comprobaron automáticamente persistencia y reintentos de la extensión,
-respuestas tardías entre episodios, cierre antes de resolución, observaciones
-sin conexión, coincidencias ambiguas, escrituras concurrentes, repetición de
-eventos, progreso antiguo, visionados repetidos, tokens revocados y vinculaciones
-independientes. También se compilaron la web y el APK y se ejecutaron los tests JVM.
+Se comprobaron automáticamente la detección de cada reproductor (película y
+episodio), la clasificación película/serie, la resolución a TMDb frente a
+resultados señuelo, la persistencia y los reintentos de la extensión, las
+respuestas tardías entre episodios, el cierre antes de resolución, las
+observaciones sin conexión, las coincidencias ambiguas, las escrituras
+concurrentes, la repetición de eventos, el progreso antiguo, los visionados
+repetidos, los tokens revocados y las vinculaciones independientes.
+
+Los cambios de la app Android (`SignalBuilder`) llevan sus pruebas JVM en
+`SignalBuilderTest`, pero **no se han compilado ni ejecutado**: la máquina donde se
+hicieron no tiene JDK, Gradle ni Android SDK. Antes de publicar el APK hay que
+ejecutar el comando de arriba.
 
 ## Matriz de comprobación con cuentas reales
 

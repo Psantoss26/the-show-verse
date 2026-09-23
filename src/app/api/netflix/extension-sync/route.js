@@ -13,10 +13,19 @@ import {
 } from "@/lib/netflix/streamingResolve";
 import { normalizeText } from "@/lib/netflix/resolve";
 import { createRequestCache } from "@/lib/netflix/requestCache";
-import { buildQueryVariants } from "@/lib/netflix/queryVariants";
+import { buildRankedQueryVariants } from "@/lib/netflix/queryVariants";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// Temporada y episodio en los formatos e idiomas que usan las plataformas:
+// "T4:E1", "S4 E1", "Temporada 4: Episodio 1", "Season 4 · Episode 1", "Cap. 1".
+// Ambos exigen que delante haya un límite (principio o carácter no alfabético):
+// sin esa guarda, "PARTE3" o "SUITE3" casaban su "E3" interior como episodio 3.
+const SEASON_TEXT_RE =
+  /(?:^|[^a-z])(?:T|S|Temporada|Season|Saison|Staffel)\s*\.?\s*(\d{1,3})/i;
+const EPISODE_TEXT_RE =
+  /(?:^|[^a-z])(?:E|Ep|Episodio|Episode|Cap[ií]tulo|Chapter|Folge)\s*\.?\s*(\d{1,3})/i;
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const TMDB_API = "https://api.themoviedb.org/3";
@@ -217,6 +226,10 @@ export async function POST(request) {
       // Señales enriquecidas (PlaybackSignal) — opcionales, con retrocompat.
       showName,
       episodeName,
+      // Título de una PELÍCULA según el cliente. Su presencia (sin ningún campo de
+      // serie) es la clasificación que ya hizo el reproductor y el servidor debe
+      // respetar: los números de su título no son temporadas ni episodios.
+      movieTitle,
       seasonEpisodeText,
       // Título de la pestaña/app (p. ej. "Stranger Things - Netflix"): fuente más
       // fiable del nombre de la SERIE cuando la plataforma no expone artist/album.
@@ -262,38 +275,74 @@ export async function POST(request) {
     if (recordProgress && (!syncToken || !eventId || !observedAt)) {
       return respond({ error: "Authenticated eventId and observedAt are required" }, { status: syncToken ? 400 : 401 });
     }
-    if (!mainTitle && !showName) {
+    if (!mainTitle && !showName && !movieTitle) {
       return respond({ error: "mainTitle is required" }, { status: 400 });
     }
 
     console.log(`[Extension Sync] ${platform} watch detected: "${mainTitle}" - "${subTitle}" (Content ID: ${resolvedVideoId})`);
 
-    // 1. Detectar temporada/episodio. La extensión puede enviarlos ya parseados;
-    // si no, los inferimos del título completo (main + subtítulo) en varios
-    // formatos: "T4:E1", "S4 E1", "Temporada 4: Episodio 1", "Season 4 Episode 1".
-    const combined = `${mainTitle || showName || ""} ${subTitle || episodeName || ""} ${seasonEpisodeText || ""}`;
-    let isTv = false;
+    // 1. Clasificar película/serie y detectar temporada/episodio.
+    //
+    // REGLA: solo cuentan como evidencia de EPISODIO los campos que el reproductor
+    // dedica a ello — el nombre de la serie (`showName`), el del episodio
+    // (`episodeName`/`subTitle`) y el badge de temporada/episodio
+    // (`seasonEpisodeText`). El TÍTULO PRINCIPAL no vale nunca para clasificar,
+    // porque hay películas que llevan un número de "capítulo" en su propio nombre:
+    // "John Wick: Capítulo 2" hacía saltar el patrón de episodio, la película se
+    // buscaba SOLO como serie y acababa registrada como el episodio 2 de una serie
+    // sin ninguna relación. Es la misma regla que ya aplica el cliente en
+    // `detection-core.js` (buildPlaybackSignal) y que el servidor deshacía.
+    const episodeEvidence = [subTitle, episodeName, seasonEpisodeText]
+      .filter(Boolean)
+      .join(" ");
+    const numberFrom = (text, re) => {
+      const match = String(text || "").match(re);
+      const value = match ? parseInt(match[1], 10) : NaN;
+      return Number.isInteger(value) && value > 0 ? value : null;
+    };
+    const seasonFromEvidence = numberFrom(episodeEvidence, SEASON_TEXT_RE);
+    const episodeFromEvidence = numberFrom(episodeEvidence, EPISODE_TEXT_RE);
+
+    // El cliente ya clasificó: mandó `movieTitle` y ningún campo de serie. Los
+    // números que aparezcan en ese título no son temporadas ni episodios.
+    const clientSaysMovie =
+      Boolean(movieTitle) && !showName && !episodeName && !seasonEpisodeText;
+    // El reproductor NOMBRA la serie o el episodio (evidencia textual, no numérica).
+    const namedSeriesEvidence = Boolean(showName) || Boolean(episodeName) || Boolean(subTitle);
+    // Duración de largometraje: ningún episodio con nombre llega aquí sin que además
+    // se conozca su serie, así que una pieza tan larga sin serie ni nombre de
+    // episodio es una película, por muchos números que traiga el título.
+    const runsLikeAFilm = safeDurationSec != null && safeDurationSec >= 70 * 60;
+
+    let isTv =
+      Boolean(showName) ||
+      Boolean(episodeName) ||
+      episodeFromEvidence != null ||
+      seasonFromEvidence != null;
+    if (!isTv && !clientSaysMovie) {
+      // Números ya parseados por el cliente (extensión / app Android).
+      isTv =
+        (Number.isInteger(episodeIn) && episodeIn > 0) ||
+        (Number.isInteger(seasonIn) && seasonIn > 0);
+    }
+    if (isTv && !namedSeriesEvidence && runsLikeAFilm) isTv = false;
+
     let season = null;
     let episode = null;
-
-    const sMatch = combined.match(/(?:^|[^a-z])(?:T|S|Temporada|Season|Saison|Staffel)\s*\.?\s*(\d{1,3})/i);
-    const eMatch = combined.match(/(?:E|Ep|Episodio|Episode|Cap[ií]tulo|Chapter|Folge)\s*\.?\s*(\d{1,3})/i);
-    const seasonFromText = sMatch ? parseInt(sMatch[1], 10) : null;
-
-    if (Number.isInteger(episodeIn) && episodeIn > 0) {
-      isTv = true;
-      episode = episodeIn;
+    if (isTv) {
+      episode =
+        Number.isInteger(episodeIn) && episodeIn > 0 ? episodeIn : episodeFromEvidence;
       // La temporada NUNCA se asume 1 (antes se registraba T1 al ver la T4): usa
       // la enviada por el cliente o la del texto; si no hay, queda null y más
       // abajo se decide (T1 solo si la serie tiene 1 temporada, o nivel serie).
-      season = Number.isInteger(seasonIn) && seasonIn > 0 ? seasonIn : seasonFromText;
-    } else if (eMatch) {
-      isTv = true;
-      episode = parseInt(eMatch[1], 10);
-      season = seasonFromText;
-    } else if (sMatch) {
-      // Temporada sin episodio identificable: se resolverá a nivel serie.
-      season = seasonFromText;
+      season =
+        Number.isInteger(seasonIn) && seasonIn > 0 ? seasonIn : seasonFromEvidence;
+      // Con la clasificación de serie ya establecida por un campo dedicado, el
+      // título principal SÍ puede aportar los números ("Stranger Things T4:E5").
+      if (episode == null && namedSeriesEvidence) {
+        episode = numberFrom(mainTitle, EPISODE_TEXT_RE);
+        if (season == null) season = numberFrom(mainTitle, SEASON_TEXT_RE);
+      }
     }
 
     // 2. Construir variantes de consulta (nombre de serie/principal, nombre de la
@@ -301,21 +350,23 @@ export async function POST(request) {
     // Episodio", y sin sufijos de edición) para maximizar la resolución. En series
     // se prioriza el nombre de la SERIE (no el del episodio) — clave para que los
     // episodios no fallen cuando la plataforma no expone artist/album.
-    const isSeries = isTv || Boolean(episodeName) || Number.isInteger(seasonIn);
-    const queryVariants = buildQueryVariants({
+    const rankedVariants = buildRankedQueryVariants({
       showName,
       mainTitle,
+      movieTitle,
       tabTitle,
       queueTitle,
       albumArtist,
-      // subTitle y seasonEpisodeText como candidatos de respaldo del nombre de la
-      // SERIE: algunas apps (HBO Max) esconden ahí el nombre de la serie cuando el
-      // `title` es el episodio. Van al final (baja prioridad) para no pisar las
-      // fuentes fiables cuando existen.
-      showCandidates: [notifTitle, notifText, notifSubText, subTitle, seasonEpisodeText],
-      isSeries,
+      // El título de la notificación de Android suele ser el nombre de la SERIE
+      // cuando la MediaSession no lo expone (Netflix): fuente fiable.
+      showCandidates: [notifTitle],
+      // Campos de RELLENO: traen el episodio, su descripción o el badge "T1:E1".
+      // Algunas apps (HBO Max) sí esconden ahí el nombre de la serie, así que se
+      // prueban — pero solo se aceptan si dan una coincidencia EXACTA en TMDb.
+      weakCandidates: [notifText, notifSubText, subTitle, seasonEpisodeText],
+      isSeries: isTv,
     });
-    if (!queryVariants.length) {
+    if (!rankedVariants.length) {
       return respond({ error: "Empty title after cleanup" }, { status: 422 });
     }
 
@@ -324,32 +375,51 @@ export async function POST(request) {
     let resolvedTitle = "";
     let posterPath = "";
     let confidence = null;
-    let query = queryVariants[0];
+    let query = rankedVariants[0].query;
 
     // 3. Resolver contra el proxy backend y, si falla o no devuelve resultados,
     // contra TMDb directamente (es-ES + en-US). Cuando no hay números de episodio
     // comparamos coincidencias exactas de película y serie para no confundir una
-    // serie con una película derivada. Se prueban EN ORDEN las variantes de
-    // consulta hasta que una resuelve, de la más específica a la más agresiva.
+    // serie con una película derivada.
+    //
+    // Se prueban las variantes en orden de fiabilidad y gana la primera con título
+    // EXACTO. Una coincidencia APROXIMADA solo se acepta de una fuente fiable y
+    // solo si ninguna otra variante da una exacta: antes valía la primera variante
+    // que resolviese cualquier cosa, así que el texto de una notificación o un
+    // badge podía "resolver" por relevancia de búsqueda libre un título sin
+    // relación y era ese el que se guardaba.
     let resolution = null;
-    for (const variant of queryVariants) {
-      resolution = await resolveStreamingEntity({
-        query: variant,
-        expectedMediaType: isTv ? "tv" : null,
-        preferTv: Boolean(subTitle || episodeName || showName),
+    let fallback = null;
+    for (const variant of rankedVariants) {
+      const candidate = await resolveStreamingEntity({
+        query: variant.query,
+        expectedMediaType: episode != null ? "tv" : null,
+        preferTv: isTv,
         durationSec: safeDurationSec,
-        search: (type) => searchTmdbCandidates(backendRequest, variant, type),
+        search: (type) => searchTmdbCandidates(backendRequest, variant.query, type),
       });
-      if (resolution) {
-        query = variant;
+      if (!candidate) continue;
+      if (candidate.exact) {
+        resolution = candidate;
+        query = variant.query;
         break;
       }
+      if (variant.strong && !fallback) fallback = { candidate, query: variant.query };
+    }
+    if (!resolution && fallback) {
+      resolution = fallback.candidate;
+      query = fallback.query;
     }
 
     if (resolution?.kind === "resolved") {
       const entity = resolution.entity;
       tmdbId = entity.id;
       mediaType = resolution.mediaType;
+      isTv = resolution.mediaType === "tv";
+      if (!isTv) {
+        season = null;
+        episode = null;
+      }
       resolvedTitle =
         resolution.mediaType === "tv" ? entity.name : entity.title;
       posterPath = entity.poster_path;
@@ -428,14 +498,20 @@ export async function POST(request) {
       // 2. Varias temporadas: localizar la temporada por el NOMBRE del episodio,
       //    apoyándose también en el NÚMERO conocido (episodio Nº N cuyo nombre
       //    casa, o única temporada con ≥N episodios).
-      if (season == null && episodeName) {
+      //
+      //    Se intenta también SIN nombre de episodio: con solo el número, la última
+      //    escalera de `findSeasonByEpisodeName` aún puede acertar cuando una sola
+      //    temporada tiene suficientes episodios. Antes hacía falta el nombre, así
+      //    que un reproductor que solo muestra "E7" se quedaba a nivel serie y el
+      //    episodio no llegaba nunca a "Continuar viendo".
+      if (season == null) {
         const hit = await findSeasonByEpisodeName(tmdbId, episodeName, episode);
         if (hit) {
           season = hit.season;
           episode = hit.episode;
           confidence = "medium";
           console.log(
-            `[Extension Sync] Temporada fijada por nombre de episodio: "${episodeName}" → T${season}E${episode}`,
+            `[Extension Sync] Temporada fijada para el episodio "${episodeName || `E${episode}`}" → T${season}E${episode}`,
           );
         }
       }
