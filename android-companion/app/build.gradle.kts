@@ -19,7 +19,7 @@ fun signingSecret(property: String, environment: String): String? =
     (keystoreProperties.getProperty(property) ?: System.getenv(environment))
         ?.takeIf { it.isNotBlank() }
 
-val appVersionName = "1.2"
+val appVersionName = "1.3"
 
 // Cliente OAuth WEB de Google (el mismo que usa la web). Es el `serverClientId`
 // que se le pasa a Credential Manager, y es lo que hace que el `aud` del token
@@ -43,7 +43,7 @@ android {
         targetSdk = 35
         // App oficial: numeración nueva. La APK sideload anterior era
         // com.theshowverse.sync 2.2 (versionCode 13) y es otro paquete.
-        versionCode = 3
+        versionCode = 4
         versionName = appVersionName
 
         // Origen que carga el shell mientras el usuario no configure otro.

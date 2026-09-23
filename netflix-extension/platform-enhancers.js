@@ -26,6 +26,24 @@
   const clean = (t) => (D ? D.clean(t) : (t || "").replace(/\s+/g, " ").trim());
   const parseSE = (t) => (D ? D.parseSeasonEpisode(t) : {});
 
+  // Texto de un elemento SEPARANDO el de cada hijo con un espacio.
+  //
+  // `textContent` pega los hijos sin nada en medio, y el título del reproductor de
+  // Netflix son elementos hermanos: <h4>Stranger Things</h4><span>T4:E5</span>.
+  // Leído en crudo sale "Stranger ThingsT4:E5", y ahí el patrón de TEMPORADA no
+  // casa —exige un límite antes de la "T" y delante tiene la "s" de "Things"—, así
+  // que se perdía la temporada justo en la plataforma más usada: el episodio se
+  // quedaba sin temporada y acababa registrado a nivel serie.
+  function textOf(el) {
+    if (!el) return "";
+    const children = el.children;
+    if (!children || children.length === 0) return clean(el.textContent);
+    const parts = [];
+    for (let i = 0; i < children.length; i += 1) parts.push(textOf(children[i]));
+    const joined = clean(parts.filter(Boolean).join(" "));
+    return joined || clean(el.textContent);
+  }
+
   function firstText(doc, selectors) {
     for (const sel of selectors || []) {
       let el = null;
@@ -34,10 +52,47 @@
       } catch (e) {
         el = null;
       }
-      const txt = el && clean(el.textContent);
+      const txt = el && textOf(el);
       if (txt) return txt;
     }
     return "";
+  }
+
+  // Quita `prefix` del principio de `text` (sin distinguir mayúsculas). Devuelve
+  // null si no estaba, para que el llamador sepa si el recorte llegó a ocurrir.
+  function stripPrefix(text, prefix) {
+    const t = clean(text);
+    const p = clean(prefix);
+    if (!t || !p) return null;
+    if (t.toLowerCase().indexOf(p.toLowerCase()) !== 0) return null;
+    return t.slice(p.length).replace(/^\s*[-–—·:.]\s*/, "").trim();
+  }
+
+  const SEASON_MARKER_RE =
+    /(?:^|[^a-z])(?:T|S|Temporada|Season|Saison|Staffel)\s*\.?\s*\d{1,3}/i;
+
+  /**
+   * Texto del que se pueden leer temporada y episodio SIN riesgo de confundirlos
+   * con el nombre de la obra.
+   *
+   * El subtítulo del reproductor (`subSel`) es un campo dedicado: solo existe en
+   * series y se usa tal cual. `seSel`, en cambio, es el bloque de título COMPLETO
+   * —en Netflix incluye el nombre de la serie— y de ahí solo se puede leer lo que
+   * quede tras quitar ese nombre: hay películas que llevan un número de "capítulo"
+   * en el suyo ("John Wick: Capítulo 2") y leerlo entero las convertía en el
+   * episodio 2 de una serie inexistente. Si no se pudo separar el título, se exige
+   * además una marca de TEMPORADA, que ningún nombre de película trae.
+   */
+  function seasonEpisodeSource(doc, r, signal) {
+    const subtitle = firstText(doc, r.subSel);
+    if (subtitle) return subtitle;
+    if (!r.seSel) return "";
+    const full = firstText(doc, r.seSel);
+    if (!full) return "";
+    const showTxt = signal.showName || firstText(doc, r.titleSel);
+    const withoutShow = stripPrefix(full, showTxt);
+    if (withoutShow !== null) return withoutShow;
+    return SEASON_MARKER_RE.test(full) ? full : "";
   }
 
   const REFINERS = [
@@ -144,15 +199,26 @@
     try {
       // Temporada/episodio desde el texto que contiene AMBOS (badge o el título
       // completo del reproductor). La temporada solo se fija si aparece de verdad.
-      const seText = firstText(doc, r.seSel || r.subSel);
+      const seText = seasonEpisodeSource(doc, r, out);
       if (seText) {
         const se = parseSE(seText);
-        if (se && se.episode != null && out.episode == null) out.episode = se.episode;
-        if (se && se.season != null && out.season == null) out.season = se.season;
-        // Enviamos el texto completo como seasonEpisodeText: el servidor también
-        // reparsea la temporada de aquí, por si el cliente no la fijó.
-        if (se && se.episode != null && !out.seasonEpisodeText) {
+        // El título del reproductor es la fuente MÁS específica que existe: lo
+        // publica el propio reproductor para lo que está sonando. Cuando trae
+        // temporada Y episodio manda sobre el rastreo genérico del DOM
+        // (findSeasonEpisodeBadge), que recorre toda la página y puede haber
+        // cogido el badge de una fila de recomendaciones o del "siguiente
+        // episodio". Con solo el episodio se completa lo que falte, sin pisar.
+        if (se && se.episode != null && se.season != null) {
+          out.season = se.season;
+          out.episode = se.episode;
           out.seasonEpisodeText = seText;
+        } else if (se && se.episode != null) {
+          if (out.episode == null) out.episode = se.episode;
+          // Enviamos el texto completo como seasonEpisodeText: el servidor también
+          // reparsea la temporada de aquí, por si el cliente no la fijó.
+          if (!out.seasonEpisodeText) out.seasonEpisodeText = seText;
+        } else if (se && se.season != null && out.season == null) {
+          out.season = se.season;
         }
       }
     } catch (e) {

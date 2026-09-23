@@ -8,7 +8,11 @@ import * as variants from './queryVariants.js';
 import * as cache from './requestCache.js';
 
 const source = await readFile(new URL('../../app/api/netflix/extension-sync/route.js', import.meta.url), 'utf8');
-const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+// Con el target por defecto (ES5) TypeScript degrada los spreads de iteradores del
+// route y algunos devuelven listas vacías: la prueba pasaba sin ejercitar el camino.
+const compiled = ts.transpileModule(source, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ESNext },
+}).outputText;
 function handler() {
   const dependencies = {
     'next/server': { NextResponse: { json: (body, init) => ({ body, status: init?.status || 200 }) } },

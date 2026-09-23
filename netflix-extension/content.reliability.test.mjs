@@ -18,9 +18,13 @@ function player() {
     navigator: {},
     document: { title: 'Test Show', querySelectorAll: selector => selector === 'video' ? [video] : [], getElementById: () => null, addEventListener() {} },
     window: { addEventListener: (name, fn) => { listeners[name] = fn; } },
+    // La detección se sustituye por una señal controlada: lo que se prueba aquí es
+    // el TRANSPORTE (reintentos, respuestas tardías, cierre de pestaña), no la
+    // lectura del reproductor — eso lo cubre players.test.js con DOM real.
     self: { TSVSyncReliability: reliability, TSVDetection: {
-      findSeasonEpisodeBadge: () => '',
-      buildPlaybackSignal: () => ({ contentId: 'series', showName: 'Test Show', episodeName: `Episode ${episode}`, season: 1, episode, durationSec: video.duration, positionSec: video.currentTime }),
+      isBarePlatformName: () => false,
+      composePlaybackSignal: () => ({ contentId: 'series', showName: 'Test Show', episodeName: `Episode ${episode}`, season: 1, episode, durationSec: video.duration, positionSec: video.currentTime }),
+      fillMissingTitles: signal => signal,
       pickProgressPoint: (live, cached) => live || cached,
     } },
     chrome: { runtime: { id: 'test', sendMessage: (message, callback) => { sent.push({ message, callback }); } },

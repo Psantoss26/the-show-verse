@@ -117,12 +117,60 @@ class SignalBuilderTest {
         )
         val sig = SignalBuilder.build(raw, "Netflix")
         assertNull(sig.showName)
-        assertEquals(
-            "A ti, dentro de 2000 años - La caída de Shiganshina, parte 1",
-            sig.movieTitle,
-        )
+        // Tampoco se declara PELÍCULA: el marcador "T1:E1" dice que es un episodio,
+        // y mandarlo como película hacía que el servidor buscase el nombre del
+        // episodio en el catálogo de cine y guardase lo que más se le pareciera.
+        assertNull(sig.movieTitle)
         assertEquals(1, sig.season)
         assertEquals(1, sig.episode)
+    }
+
+    @Test
+    fun keepsMovieWithChapterNumberInItsOwnTitle() {
+        // "John Wick: Capítulo 2" contiene el patrón de episodio en su propio nombre.
+        // Leerlo del título la convertía en el episodio 2 de una serie inexistente.
+        val raw = RawMetadata(
+            packageName = "com.netflix.mediaclient",
+            title = "John Wick: Capítulo 2",
+            displayTitle = "John Wick: Capítulo 2",
+            durationMs = 7_500_000,
+            positionMs = 600_000,
+        )
+        val sig = SignalBuilder.build(raw, "Netflix")
+        assertEquals("John Wick: Capítulo 2", sig.movieTitle)
+        assertNull(sig.showName)
+        assertNull(sig.episode)
+        assertNull(sig.season)
+        assertNull(sig.seasonEpisodeText)
+    }
+
+    @Test
+    fun readsNumbersFromTheTitleOnlyOnceTheSeriesIsKnown() {
+        // Con la serie ya identificada (artist), el título SÍ puede aportar los
+        // números que ningún campo dedicado traía.
+        val raw = RawMetadata(
+            packageName = "com.netflix.mediaclient",
+            title = "T4:E5 Capítulo cinco",
+            artist = "Stranger Things",
+        )
+        val sig = SignalBuilder.build(raw, "Netflix")
+        assertEquals("Stranger Things", sig.showName)
+        assertEquals(4, sig.season)
+        assertEquals(5, sig.episode)
+    }
+
+    @Test
+    fun movieSubtitleIsNotSentAsSeasonEpisodeText() {
+        // El subtítulo de una película no es evidencia de episodio: enviarlo como
+        // `seasonEpisodeText` hacía que el servidor lo tratase como tal.
+        val raw = RawMetadata(
+            packageName = "com.wbd.stream",
+            title = "Dune: Parte Dos",
+            displaySubtitle = "Ciencia ficción · 2024",
+        )
+        val sig = SignalBuilder.build(raw, "Max")
+        assertNull(sig.seasonEpisodeText)
+        assertNull(sig.episode)
     }
 
     @Test

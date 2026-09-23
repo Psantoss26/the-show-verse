@@ -13,6 +13,8 @@
   // Cada cuánto se envía el progreso de reproducción (posición/duración) para
   // "Continuar viendo". Al 90% el servidor lo marca como visto automáticamente.
   const PROGRESS_PING_MS = 30000;
+  // Mismo umbral que aplica el servidor para dar un título por visto.
+  const COMPLETE_AT = 0.9;
 
   const D = self.TSVDetection;
   const E = self.TSVEnhancers;
@@ -52,14 +54,17 @@
   }
 
   // Nombres de plataforma "a secas" — nunca deben usarse como título: buscar
-  // "Netflix" en TMDb devuelve una película basura ("Netflix Tudum 2025"…).
-  const PLATFORM_NAME_SET = new Set(
-    Object.values(PLATFORM_NAMES)
-      .concat(["HBO", "Star+", "Paramount+", "Amazon", "Disney", "Pluto", "Rakuten"])
-      .map((s) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()),
+  // "Netflix" en TMDb devuelve una película basura ("Netflix Tudum 2025"…). La
+  // lista viva está en detection-core (una sola fuente, compartida con la señal de
+  // reproducción); aquí solo se añaden los nombres que salen de PLATFORM_NAMES.
+  const EXTRA_NAME_SET = new Set(
+    Object.values(PLATFORM_NAMES).map((s) =>
+      s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(),
+    ),
   );
   function isBarePlatformName(t) {
-    return PLATFORM_NAME_SET.has(
+    if (D.isBarePlatformName(t)) return true;
+    return EXTRA_NAME_SET.has(
       String(t || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(),
     );
   }
@@ -682,31 +687,17 @@
     const video = getMainVideo();
     if (!video || video.currentTime < MIN_WATCH_SECONDS) return null;
 
-    let seasonEpisodeText = "";
-    try {
-      seasonEpisodeText = D.findSeasonEpisodeBadge(document);
-    } catch (e) {
-      seasonEpisodeText = "";
-    }
-
-    let signal = D.buildPlaybackSignal({
+    const signal = D.composePlaybackSignal({
       host: location.hostname,
       url: location.href,
       contentId: null,
       mediaSession: mediaSessionRaw(),
       tabTitle: document.title,
-      seasonEpisodeText,
       durationSec: isFinite(video.duration) ? Math.round(video.duration) : undefined,
       positionSec: Math.round(video.currentTime),
+      doc: document,
+      enhance: E ? E.enhance : null,
     });
-
-    if (E) {
-      try {
-        signal = E.enhance(location.hostname, signal, document);
-      } catch (e) {
-        /* refinador falló: seguimos con la señal base */
-      }
-    }
 
     // Cache del último título bueno para ESTE vídeo: si ahora tenemos serie/peli
     // (overlay visible) lo guardamos; si no (overlay oculto, elemento fuera del
@@ -729,46 +720,12 @@
       if (signal.episode == null) signal.episode = lastGood.episode;
     }
 
-    // Respaldo JSON-LD: Prime Video y Max no exponen artist/album en la Media
-    // Session, así que el nombre de la SERIE se pierde y el "title" (episodio) se
-    // toma por película → el episodio no resuelve (404). Los datos estructurados de
-    // la ficha/reproductor sí traen la serie + temporada/episodio: los usamos para
-    // completar y, si el episodio se había tomado por película, reclasificarlo.
-    if (!signal.showName) {
-      const ld = D.detectFromJsonLd(document);
-      if (ld) {
-        if (ld.showName) {
-          signal.showName = ld.showName;
-          if (signal.movieTitle && !signal.episodeName) {
-            signal.episodeName = signal.movieTitle;
-            signal.movieTitle = undefined;
-          }
-        } else if (ld.movieTitle && !signal.movieTitle) {
-          signal.movieTitle = ld.movieTitle;
-        }
-        if (!signal.episodeName && ld.episodeName) signal.episodeName = ld.episodeName;
-        if (signal.season == null && ld.season != null) signal.season = ld.season;
-        if (signal.episode == null && ld.episode != null) signal.episode = ld.episode;
-      }
-    }
-
-    // Último recurso: título desde la pestaña si Media Session no dio nombre —
-    // pero NUNCA un nombre de plataforma suelto ("Netflix"), que resolvería a una
-    // película sin relación. Si la señal tiene evidencia de EPISODIO (números S×E
-    // o nombre de episodio), el nombre de la pestaña es el de la SERIE (caso Prime
-    // sin JSON-LD): va a showName para que el servidor resuelva como TV.
-    if (!signal.showName && !signal.movieTitle) {
-      const fromTab = D.stripPlatformPrefix(document.title, [platformName]);
-      if (fromTab && !isBarePlatformName(fromTab)) {
-        if (signal.episode != null || signal.episodeName) {
-          signal.showName = fromTab;
-        } else {
-          signal.movieTitle = fromTab;
-        }
-      }
-    }
-
-    return signal;
+    // Completa por JSON-LD y, en último recurso, por el título de la pestaña.
+    return D.fillMissingTitles(signal, {
+      doc: document,
+      tabTitle: document.title,
+      platformName,
+    });
   }
 
   // Envía el progreso (posición/duración) del contenido ya resuelto, como mucho
@@ -786,6 +743,13 @@
     if (now - lastProgressPingAt < PROGRESS_PING_MS) return;
     lastProgressPingAt = now;
     const synced = currentSynced;
+    // El servidor marca como visto al 90% y saca el título de "Continuar viendo".
+    // Este ping es el que cruza el umbral, así que después ya no hay nada que
+    // enviar de este contenido. Hace falta decidirlo AQUÍ: el service worker
+    // encola el envío y responde "guardado en cola" sin esperar al servidor, por
+    // lo que su respuesta nunca trae `completed` y sin esto se seguía sondeando
+    // un episodio ya terminado hasta cambiar de contenido.
+    const crossesCompletion = pos / dur >= COMPLETE_AT;
     try {
       chrome.runtime.sendMessage(
         {
@@ -808,7 +772,7 @@
             lastProgressPingAt = 0;
             return;
           }
-          if (resp && resp.completed) {
+          if (resp.completed || crossesCompletion) {
             // Ya marcado como visto (≥90%): dejamos de sondear este contenido.
             currentSynced = null;
             currentSyncedKey = null;

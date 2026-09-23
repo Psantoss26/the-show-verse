@@ -297,10 +297,115 @@
     return `${base}/details/${type}/${id}`;
   }
 
+  // Nombres de plataforma "a secas". Nunca valen como título: buscar "Netflix" en
+  // TMDb devuelve cualquier cosa ("Netflix Tudum 2025"…). Cuando la captura falla,
+  // el título de la pestaña suele quedarse justo en esto.
+  const PLATFORM_BARE_NAMES = [
+    "netflix", "prime video", "amazon prime video", "amazon", "max", "hbo max",
+    "hbo", "disney", "disney plus", "star", "star plus", "paramount",
+    "paramount plus", "apple tv", "apple tv plus", "movistar", "movistar plus",
+    "filmin", "skyshowtime", "pluto", "pluto tv", "rakuten", "rakuten tv",
+    "atresplayer", "rtve", "rtve play", "crunchyroll", "plex",
+  ];
+  const BARE_NAME_SET = new Set(PLATFORM_BARE_NAMES);
+
+  function isBarePlatformName(value) {
+    const normalized = String(value || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+    return BARE_NAME_SET.has(normalized);
+  }
+
+  // Señal de reproducción a partir de TODAS las fuentes de la página, en el orden
+  // de fiabilidad: badge de temporada/episodio del DOM → Media Session → refinador
+  // de la plataforma. `doc` y `enhance` se inyectan para poder probarlo sin
+  // navegador; `enhance` es opcional (si falla, se mantiene la señal base).
+  function composePlaybackSignal(input) {
+    const i = input || {};
+    const doc = i.doc;
+    let seasonEpisodeText = "";
+    try {
+      seasonEpisodeText = doc ? findSeasonEpisodeBadge(doc) : "";
+    } catch (e) {
+      seasonEpisodeText = "";
+    }
+
+    let signal = buildPlaybackSignal({
+      host: i.host,
+      url: i.url,
+      contentId: i.contentId || null,
+      mediaSession: i.mediaSession,
+      tabTitle: i.tabTitle,
+      seasonEpisodeText,
+      durationSec: i.durationSec,
+      positionSec: i.positionSec,
+    });
+
+    if (typeof i.enhance === "function") {
+      try {
+        signal = i.enhance(i.host, signal, doc) || signal;
+      } catch (e) {
+        /* refinador falló: seguimos con la señal base */
+      }
+    }
+    return signal;
+  }
+
+  // Completa los nombres que la reproducción no dio, de más fiable a menos:
+  // datos estructurados JSON-LD de la página y, en último lugar, el título de la
+  // pestaña. Devuelve una copia. Puro: `doc` inyectado.
+  function fillMissingTitles(signal, options) {
+    const out = { ...(signal || {}) };
+    const o = options || {};
+    const doc = o.doc;
+
+    // Prime Video y Max no exponen artist/album en la Media Session, así que el
+    // nombre de la SERIE se pierde y el `title` (el episodio) se toma por película
+    // → el episodio no resuelve (404). Los datos estructurados de la ficha/
+    // reproductor sí traen la serie + temporada/episodio: los usamos para completar
+    // y, si el episodio se había tomado por película, reclasificarlo.
+    if (!out.showName && doc) {
+      const ld = detectFromJsonLd(doc);
+      if (ld) {
+        if (ld.showName) {
+          out.showName = ld.showName;
+          if (out.movieTitle && !out.episodeName) {
+            out.episodeName = out.movieTitle;
+            out.movieTitle = undefined;
+          }
+        } else if (ld.movieTitle && !out.movieTitle) {
+          out.movieTitle = ld.movieTitle;
+        }
+        if (!out.episodeName && ld.episodeName) out.episodeName = ld.episodeName;
+        if (out.season == null && ld.season != null) out.season = ld.season;
+        if (out.episode == null && ld.episode != null) out.episode = ld.episode;
+      }
+    }
+
+    // Último recurso: el título de la pestaña — pero NUNCA un nombre de plataforma
+    // suelto ("Netflix"), que resolvería a una película sin relación. Si la señal
+    // tiene evidencia de EPISODIO (números S×E o nombre de episodio), lo que trae la
+    // pestaña es el nombre de la SERIE (caso Prime sin JSON-LD): va a showName para
+    // que el servidor resuelva como TV.
+    if (!out.showName && !out.movieTitle) {
+      const fromTab = stripPlatformPrefix(o.tabTitle || "", [o.platformName]);
+      if (fromTab && !isBarePlatformName(fromTab)) {
+        if (out.episode != null || out.episodeName) out.showName = fromTab;
+        else out.movieTitle = fromTab;
+      }
+    }
+
+    return out;
+  }
+
   return {
     clean,
     parseSeasonEpisode,
     stripPlatformPrefix,
+    isBarePlatformName,
+    composePlaybackSignal,
+    fillMissingTitles,
     findSeasonEpisodeBadge,
     largestArtwork,
     buildPlaybackSignal,
