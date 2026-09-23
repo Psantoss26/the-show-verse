@@ -55,12 +55,21 @@ object SyncClient {
             if (resolveOnly) put("resolveOnly", true)
         }
 
+    /**
+     * Resuelve el título contra el servidor.
+     *
+     * El callback recibe tambien el CODIGO HTTP: quien llama necesita distinguir
+     * "no hay red / el servidor ha fallado" —transitorio, merece la pena reintentar
+     * y guardar el punto para luego— de "no se que titulo es este" (404/422), que
+     * volvera a fallar igual por muchas veces que se reenvie lo mismo. `0` cuando
+     * la peticion ni siquiera llego a salir.
+     */
     fun send(
         origin: String,
         token: String,
         signal: PlaybackSignal,
         resolveOnly: Boolean = false,
-        onResult: (Boolean, String?, SyncedInfo?) -> Unit,
+        onResult: (Boolean, String?, SyncedInfo?, Int) -> Unit,
     ) {
         val json = signalJson(signal, resolveOnly)
 
@@ -80,7 +89,7 @@ object SyncClient {
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
                 Log.w(TAG, "Sync failed: ${e.message}")
-                onResult(false, e.message, null)
+                onResult(false, e.message, null, 0)
             }
 
             override fun onResponse(call: Call, response: Response) {
@@ -91,13 +100,14 @@ object SyncClient {
                         null
                     }
                     if (it.isSuccessful) {
-                        onResult(true, null, parseSynced(body))
+                        onResult(true, null, parseSynced(body), it.code)
                     } else {
                         val snippet = body?.take(200)
                         onResult(
                             false,
                             "HTTP ${it.code}" + if (snippet.isNullOrBlank()) "" else ": $snippet",
                             null,
+                            it.code,
                         )
                     }
                 }

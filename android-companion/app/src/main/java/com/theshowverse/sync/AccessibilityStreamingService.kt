@@ -131,7 +131,7 @@ class AccessibilityStreamingService : AccessibilityService() {
             notifSubText = analysis.candidates.getOrNull(3),
         )
         val textosDePantalla = analysis.candidates
-        SyncClient.send(origin, token, signal, resolveOnly = true) { ok, _, synced ->
+        SyncClient.send(origin, token, signal, resolveOnly = true) { ok, _, synced, _ ->
             handler.post {
                 if (p.paused || p.token != token || p.origin != origin || pendingPkg != pkg || lastText != primary) return@post
                 if (!ok || synced == null) return@post
