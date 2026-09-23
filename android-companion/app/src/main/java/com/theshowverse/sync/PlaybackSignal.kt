@@ -35,9 +35,33 @@ data class PlaybackSignal(
     val mainTitle: String?
         get() = showName ?: movieTitle ?: tabTitle
 
-    /** Clave de deduplicación local (equivalente al lastKey de la extensión). */
+    /**
+     * Clave de deduplicación local: identifica QUÉ SE ESTÁ REPRODUCIENDO. Mientras
+     * no cambia, la resolución ya hecha sigue valiendo y el progreso se sigue
+     * enviando; en cuanto cambia, se vuelca el punto anterior y se resuelve de nuevo.
+     *
+     * Por eso NO puede depender de campos que van y vienen entre sondeos. El nombre
+     * de la serie de un episodio suele venir de una pista externa (la ficha que se
+     * abrió antes, ver [RecentDetail]), que caduca y puede faltar en cualquier
+     * lectura: con `mainTitle` dentro de la clave, cada parpadeo se tomaba por un
+     * cambio de contenido y se tiraba la resolución recién hecha, se olvidaba el
+     * punto de reproducción y se reiniciaba la cadencia de envío. Entre parpadeo y
+     * parpadeo no daba tiempo a completar una petición, así que el episodio se
+     * detectaba bien una y otra vez pero su progreso no llegaba a enviarse NUNCA
+     * —mientras que las películas, cuyo título sale siempre de la propia sesión, sí
+     * funcionaban—.
+     *
+     * Un episodio ya queda identificado por su nombre y sus números, así que el de
+     * la serie solo entra en la clave cuando lo dice la propia reproducción.
+     */
     val dedupKey: String
-        get() = "$platformId:${mainTitle ?: ""}|${episodeName ?: ""}|${season ?: ""}|${episode ?: ""}"
+        get() {
+            val serieEstable = if (seriesFromHint) null else showName
+            if (episode != null || !episodeName.isNullOrBlank()) {
+                return "$platformId:${serieEstable ?: ""}|${episodeName ?: ""}|${season ?: ""}|${episode ?: ""}"
+            }
+            return "$platformId:${mainTitle ?: ""}"
+        }
 }
 
 /**
