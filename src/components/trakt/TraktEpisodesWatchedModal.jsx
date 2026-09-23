@@ -1805,7 +1805,7 @@ export default function TraktEpisodesWatchedModal({
                           >
                             {seasonLabelText(sn, s.name)}
                           </div>
-                          <div className="mt-1 text-xs font-medium tabular-nums text-zinc-400 2xl:text-[13px]">
+                          <div className="mt-1 text-[11px] font-medium tabular-nums text-zinc-400 2xl:text-xs">
                             {watched} / {total} vistos
                           </div>
                         </div>
