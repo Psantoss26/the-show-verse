@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import FadePresence from "@/components/ui/FadePresence";
 import {
   ChevronDown,
   ChevronLeft,
@@ -1969,40 +1970,33 @@ const HistoryItemCard = memo(function HistoryItemCard({
       />
 
       {/* Confirmación de borrado */}
-      <AnimatePresence>
-        {confirmDel && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="absolute inset-0 bg-black/95 z-20 flex items-center justify-center px-3 gap-2 rounded-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <span className="text-red-200 text-[10px] sm:text-xs lg:text-sm font-bold tracking-wide">
-              ¿Eliminar?
-            </span>
-            <button
-              onClick={handleCancel}
-              className="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors flex items-center justify-center"
-              aria-label="Cancelar"
-            >
-              <X className="w-4 h-4" />
-            </button>
-            <button
-              onClick={handleConfirm}
-              className="p-2 rounded-lg bg-red-600 hover:bg-red-500 text-white transition-colors flex items-center justify-center"
-              aria-label="Borrar"
-            >
-              {busy ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Trash2 className="w-4 h-4" />
-              )}
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <FadePresence
+        show={confirmDel}
+        className="absolute inset-0 bg-black/95 z-20 flex items-center justify-center px-3 gap-2 rounded-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <span className="text-red-200 text-[10px] sm:text-xs lg:text-sm font-bold tracking-wide">
+          ¿Eliminar?
+        </span>
+        <button
+          onClick={handleCancel}
+          className="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors flex items-center justify-center"
+          aria-label="Cancelar"
+        >
+          <X className="w-4 h-4" />
+        </button>
+        <button
+          onClick={handleConfirm}
+          className="p-2 rounded-lg bg-red-600 hover:bg-red-500 text-white transition-colors flex items-center justify-center"
+          aria-label="Borrar"
+        >
+          {busy ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Trash2 className="w-4 h-4" />
+          )}
+        </button>
+      </FadePresence>
     </div>
   );
 
@@ -2140,42 +2134,35 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
         <HistoryHoverIndicator type={type} dateParts={watchedDate} compact />
 
         {/* Delete confirmation overlay */}
-        <AnimatePresence>
-          {confirmDel && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="absolute inset-0 bg-black/95 z-30 flex flex-col items-center justify-center p-3 text-center pointer-events-auto"
-              onClick={(e) => e.stopPropagation()}
+        <FadePresence
+          show={confirmDel}
+          className="absolute inset-0 bg-black/95 z-30 flex flex-col items-center justify-center p-3 text-center pointer-events-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p className="text-red-200 text-[11px] sm:text-xs lg:text-sm font-bold mb-2.5 tracking-wide">
+            ¿Eliminar del historial?
+          </p>
+          <div className="flex gap-2 w-full">
+            <button
+              onClick={handleCancel}
+              className="flex-1 p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors flex items-center justify-center"
+              aria-label="Cancelar"
             >
-              <p className="text-red-200 text-[11px] sm:text-xs lg:text-sm font-bold mb-2.5 tracking-wide">
-                ¿Eliminar del historial?
-              </p>
-              <div className="flex gap-2 w-full">
-                <button
-                  onClick={handleCancel}
-                  className="flex-1 p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors flex items-center justify-center"
-                  aria-label="Cancelar"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={handleConfirm}
-                  className="flex-1 p-2 rounded-lg bg-red-600 hover:bg-red-500 text-white transition-colors flex items-center justify-center"
-                  aria-label="Borrar"
-                >
-                  {busy ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              <X className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleConfirm}
+              className="flex-1 p-2 rounded-lg bg-red-600 hover:bg-red-500 text-white transition-colors flex items-center justify-center"
+              aria-label="Borrar"
+            >
+              {busy ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Trash2 className="w-4 h-4" />
+              )}
+            </button>
+          </div>
+        </FadePresence>
       </div>
       <HistoryCornerIndicator
         editMode={editMode}
@@ -2371,42 +2358,35 @@ const HistoryGridCard = memo(function HistoryGridCard({
         )}
 
         {/* Confirmación de borrado */}
-        <AnimatePresence>
-          {confirmDel && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="absolute inset-0 bg-black/95 z-30 flex flex-col items-center justify-center p-4 text-center"
-              onClick={(e) => e.stopPropagation()}
+        <FadePresence
+          show={confirmDel}
+          className="absolute inset-0 bg-black/95 z-30 flex flex-col items-center justify-center p-4 text-center"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p className="text-red-200 text-xs sm:text-sm lg:text-base font-bold mb-3 tracking-wide">
+            ¿Eliminar del historial?
+          </p>
+          <div className="flex gap-2 w-full">
+            <button
+              onClick={handleCancel}
+              className="flex-1 p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors flex items-center justify-center"
+              aria-label="Cancelar"
             >
-              <p className="text-red-200 text-xs sm:text-sm lg:text-base font-bold mb-3 tracking-wide">
-                ¿Eliminar del historial?
-              </p>
-              <div className="flex gap-2 w-full">
-                <button
-                  onClick={handleCancel}
-                  className="flex-1 p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors flex items-center justify-center"
-                  aria-label="Cancelar"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={handleConfirm}
-                  className="flex-1 p-2 rounded-lg bg-red-600 hover:bg-red-500 text-white transition-colors flex items-center justify-center"
-                  aria-label="Borrar"
-                >
-                  {busy ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              <X className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleConfirm}
+              className="flex-1 p-2 rounded-lg bg-red-600 hover:bg-red-500 text-white transition-colors flex items-center justify-center"
+              aria-label="Borrar"
+            >
+              {busy ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Trash2 className="w-4 h-4" />
+              )}
+            </button>
+          </div>
+        </FadePresence>
       </div>
       <HistoryCornerIndicator
         editMode={editMode}
@@ -2538,39 +2518,33 @@ function EpisodeSubItem({
         </button>
       )}
 
-      <AnimatePresence>
-        {confirmDel && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 z-10 flex items-center justify-center gap-3 bg-black/75 px-3 backdrop-blur-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <span className="text-red-200 text-xs sm:text-sm font-bold tracking-wide">
-              ¿Eliminar?
-            </span>
-            <button
-              onClick={handleCancel}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-300 transition hover:bg-white/10 hover:text-white"
-              aria-label="Cancelar"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={handleConfirm}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-red-400/30 bg-red-500/20 text-red-200 transition hover:bg-red-500/35 hover:text-white"
-              aria-label="Borrar"
-            >
-              {isBusy ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Trash2 className="w-3.5 h-3.5" />
-              )}
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <FadePresence
+        show={confirmDel}
+        className="absolute inset-0 z-10 flex items-center justify-center gap-3 bg-black/75 px-3 backdrop-blur-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <span className="text-red-200 text-xs sm:text-sm font-bold tracking-wide">
+          ¿Eliminar?
+        </span>
+        <button
+          onClick={handleCancel}
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-300 transition hover:bg-white/10 hover:text-white"
+          aria-label="Cancelar"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+        <button
+          onClick={handleConfirm}
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-red-400/30 bg-red-500/20 text-red-200 transition hover:bg-red-500/35 hover:text-white"
+          aria-label="Borrar"
+        >
+          {isBusy ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <Trash2 className="w-3.5 h-3.5" />
+          )}
+        </button>
+      </FadePresence>
     </div>
   );
 }

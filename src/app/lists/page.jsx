@@ -65,6 +65,7 @@ import {
 } from "lucide-react";
 import useTraktLists from "@/lib/hooks/useTraktLists";
 import ListPosterCard from "@/components/lists/ListPosterCard";
+import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import { TmdbImg } from "@/components/lists/ListCoverBackdropCollage";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 
@@ -740,6 +741,7 @@ const ListItemCard = memo(function ListItemCard({
   const title = item?.title || item?.name || "—";
   const mediaType = item?.media_type || (item?.title ? "movie" : "tv");
   const href = `/details/${mediaType}/${item.id}`;
+  const previewClick = usePreviewOpen();
   const posterPath = item?.poster_path || item?.backdrop_path || null;
   const posterUrl = posterPath
     ? `https://image.tmdb.org/t/p/w342${posterPath}`
@@ -828,6 +830,7 @@ const ListItemCard = memo(function ListItemCard({
   return (
     <Link
       href={href}
+      onClick={previewClick(item, { mediaType })}
       className="relative z-0 block w-full select-none hover:z-[50] focus:z-[50] focus:outline-none"
       draggable={false}
       onDragStart={(e) => e.preventDefault()}

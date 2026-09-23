@@ -21,6 +21,7 @@ import ListPosterCard, {
   listPosterGridClass,
 } from "@/components/lists/ListPosterCard";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
 import {
@@ -342,6 +343,7 @@ export default function FilterableListItems({
   // Solo quien puede gestionar la lista ve el modo borrar.
   editable = false,
 }) {
+  const previewClick = usePreviewOpen();
   const [q, setQ] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [sortBy, setSortBy] = useState("list-order");
@@ -618,6 +620,19 @@ export default function FilterableListItems({
                   <Link
                     key={`${entry.meta.mediaType}-${entry.meta.id}-${entry.index}-list`}
                     href={entry.meta.href || "#"}
+                    onClick={
+                      entry.meta.href
+                        ? previewClick(
+                            {
+                              id: entry.meta.id,
+                              title: entry.meta.title,
+                              name: entry.meta.title,
+                              poster_path: entry.meta.posterPath,
+                            },
+                            { mediaType: entry.meta.mediaType },
+                          )
+                        : undefined
+                    }
                     className="group flex items-center gap-4 rounded-xl bg-black/[0.08] bg-gradient-to-br from-white/10 via-transparent to-black/15 p-3 shadow-none backdrop-blur-[28px] transition hover:bg-white/10"
                   >
                     <div className="h-20 w-14 shrink-0 overflow-hidden rounded-lg bg-zinc-900">

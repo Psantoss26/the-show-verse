@@ -6,6 +6,10 @@ import Link from "next/link";
 import { useState } from "react";
 import { Film, ImageOff, MonitorPlay } from "lucide-react";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import usePreviewOpen from "@/components/preview/usePreviewOpen";
+
+// Enlace a la ficha de un título: "/details/movie/123" o "/details/tv/456".
+const DETAILS_HREF_RE = /^\/details\/(movie|tv)\/(\d+)(?:[/?#]|$)/;
 
 function TmdbPoster({ posterPath, alt, loading = false }) {
   const [failed, setFailed] = useState(false);
@@ -84,6 +88,24 @@ export default function ListPosterCard({
   className = "",
   disableHover = false,
 }) {
+  // Sin onClick propio, un enlace a la ficha de un título abre la ficha rápida
+  // (drawer lateral) si hay un DetailModalProvider encima; si no, navega.
+  const previewClick = usePreviewOpen();
+  const detailsMatch = typeof href === "string" ? href.match(DETAILS_HREF_RE) : null;
+  const handleClick =
+    onClick ||
+    (detailsMatch
+      ? previewClick(
+          {
+            id: Number(detailsMatch[2]),
+            title,
+            name: title,
+            poster_path: posterPath || null,
+          },
+          { mediaType: detailsMatch[1] },
+        )
+      : undefined);
+
   const content = (
     <div
       className={`relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/35 shadow-lg backdrop-blur-[28px] ${className}`}
@@ -120,7 +142,7 @@ export default function ListPosterCard({
       href={href}
       className="group/card relative block w-full select-none focus:outline-none focus-visible:rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-300"
       draggable={false}
-      onClick={onClick}
+      onClick={handleClick}
       onMouseEnter={handlePrefetch}
       onFocus={handlePrefetch}
       onTouchStart={handlePrefetch}
