@@ -26,11 +26,19 @@ globalThis.window = {
 };
 globalThis.performance = globalThis.window.performance;
 
-const { isHistoryNavigation, notifyPushNavigation } = await import(
-  "./useIsHistoryNavigation.js"
-);
+const { isHistoryNavigation, notifyPushNavigation, syncHistoryPage } =
+  await import("./useIsHistoryNavigation.js");
 
-const popstate = () => listeners.get("popstate")?.();
+// Un `popstate` real llega ya con la URL de DESTINO. Por defecto se simula
+// volver a Favoritos desde otra página (la ficha de un título).
+const popstate = ({ from = "/details/movie/1", to = "/favorites" } = {}) => {
+  const [fromPath, fromSearch = ""] = from.split("?");
+  globalThis.window.location = { pathname: fromPath, search: fromSearch ? `?${fromSearch}` : "" };
+  syncHistoryPage();
+  const [toPath, toSearch = ""] = to.split("?");
+  globalThis.window.location = { pathname: toPath, search: toSearch ? `?${toSearch}` : "" };
+  listeners.get("popstate")?.();
+};
 const limpiar = () => {
   globalThis.window.sessionStorage._d.clear();
   notifyPushNavigation();
@@ -82,4 +90,21 @@ test("el marcador de sesión sigue mandando aunque expire el reloj", () => {
     JSON.stringify({ route: "/watchlist", at: Date.now() }),
   );
   assert.equal(isHistoryNavigation(), false);
+});
+
+test("cerrar la ficha rápida (`?preview=`) NO es volver a la página", () => {
+  limpiar();
+  // Cerrar la preview hace `history.go(-1)`: mismo pathname, solo cambia el
+  // parámetro `preview`. Lo que monte después debe animar su entrada.
+  popstate({ from: "/favorites?preview=movie-550", to: "/favorites" });
+  assert.equal(isHistoryNavigation(), false);
+  // Y retroceder de un nivel de preview a otro, tampoco.
+  popstate({ from: "/favorites?preview=tv-2", to: "/favorites?preview=movie-550" });
+  assert.equal(isHistoryNavigation(), false);
+});
+
+test("volver a la misma ruta con OTRA query sí es navegación de historial", () => {
+  limpiar();
+  popstate({ from: "/favorites?tab=series", to: "/favorites" });
+  assert.equal(isHistoryNavigation(), true);
 });

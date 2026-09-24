@@ -2,7 +2,11 @@
 
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
-import { notifyPushNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import {
+  notifyPushNavigation,
+  syncHistoryPage,
+  wasInPagePopState,
+} from "@/lib/hooks/useIsHistoryNavigation";
 
 const STORAGE_PREFIX = "showverse:scroll-position:";
 const HISTORY_NAVIGATION_MARKER_KEY = "showverse:pending-history-navigation";
@@ -183,7 +187,9 @@ export default function ScrollRestoration() {
       notifyPushNavigation();
       clearRestorationComplete();
       navigationModeRef.current = "push";
-      return originalPushState.apply(this, args);
+      const result = originalPushState.apply(this, args);
+      syncHistoryPage();
+      return result;
     };
 
     window.history.replaceState = function replaceState(...args) {
@@ -193,11 +199,18 @@ export default function ScrollRestoration() {
       } else {
         navigationModeRef.current = "push";
       }
-      return originalReplaceState.apply(this, args);
+      const result = originalReplaceState.apply(this, args);
+      syncHistoryPage();
+      return result;
     };
 
     const handlePopState = () => {
       saveScrollPosition(currentRouteKeyRef.current);
+      // Cerrar (o retroceder dentro de) la ficha rápida solo cambia `?preview=`:
+      // la página no se va a ningún sitio, así que ni marcador de vuelta ni
+      // restauración de scroll. Con ellos, lo que montara después en esta
+      // página se pintaba estático, sin su animación de entrada.
+      if (wasInPagePopState()) return;
       // `popstate` ya se ejecuta con la URL de DESTINO. Persistimos esa ruta
       // para que la página que monte después sepa con certeza que debe usar su
       // snapshot cacheado, aunque el commit del App Router llegue tarde.

@@ -22,11 +22,47 @@ const HISTORY_MARKER_MAX_AGE_MS = 30_000;
 let lastHistoryNavAt = -Infinity;
 let installed = false;
 
+// PÁGINA actual del historial: ruta + query SIN `?preview=`.
+//
+// La ficha rápida (DetailModalProvider) vive en la MISMA página y usa el
+// historial para su `?preview=`: al abrirla empuja una entrada y al cerrarla
+// hace `history.go(-n)`, que emite `popstate`. Ese `popstate` no es volver a
+// una página, pero se contaba como tal: durante los 10 s siguientes cualquier
+// tarjeta o sección que montara (cambiar de vista, de agrupación o de
+// pestaña, cargar más) se pintaba estática, SIN su animación de entrada.
+const PREVIEW_PARAM = "preview";
+let currentPageKey = null;
+let lastPopStateStayedOnPage = false;
+
+function readPageKey() {
+  const params = new URLSearchParams(window.location.search);
+  params.delete(PREVIEW_PARAM);
+  const qs = params.toString();
+  return `${window.location.pathname}${qs ? `?${qs}` : ""}`;
+}
+
+// Tras cada `pushState`/`replaceState` (los parchea <ScrollRestoration>).
+export function syncHistoryPage() {
+  if (typeof window === "undefined") return;
+  currentPageKey = readPageKey();
+}
+
+// ¿El último `popstate` se quedó en la MISMA página (solo cambió `?preview=`)?
+// Lo lee <ScrollRestoration>, cuyo listener corre después del de este módulo.
+export function wasInPagePopState() {
+  return lastPopStateStayedOnPage;
+}
+
 function install() {
   if (installed || typeof window === "undefined") return;
   installed = true;
+  currentPageKey = readPageKey();
   // `pageshow` con persisted = bfcache también cuenta como "volver" a la página.
   window.addEventListener("popstate", () => {
+    const nextPageKey = readPageKey();
+    lastPopStateStayedOnPage = nextPageKey === currentPageKey;
+    currentPageKey = nextPageKey;
+    if (lastPopStateStayedOnPage) return;
     lastHistoryNavAt = window.performance.now();
   });
   window.addEventListener("pageshow", (event) => {
