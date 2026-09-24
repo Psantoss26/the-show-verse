@@ -267,8 +267,20 @@ class MediaListenerService : NotificationListenerService() {
         // Pista de la serie desde la última ficha abierta (misma app, reciente):
         // cubre apps que no exponen la serie en la MediaSession (Netflix), donde
         // `title` es solo el episodio.
-        val hintShowName = RecentDetail.showNameFor(pkg)
-        val signal = SignalBuilder.build(raw, Platforms.nameFor(pkg), hintShowName)
+        val hintShowName = RecentDetail.showNameFor(pkg, since)
+        val built = SignalBuilder.build(raw, Platforms.nameFor(pkg), hintShowName)
+        // Episodio sin serie conocida: se adjuntan los textos que la accesibilidad
+        // ha visto en la pantalla de la app desde poco antes de empezar (la barra
+        // del reproductor suele nombrar la serie). El servidor decide con doble
+        // prueba; aquí solo se descarta el propio nombre del episodio.
+        val signal = if (built.showName == null && (built.episode != null || !built.episodeName.isNullOrBlank())) {
+            built.copy(
+                screenTitles = ScreenTexts.recent(pkg, since - SCREEN_TEXTS_BEFORE_PLAY_MS)
+                    .filterNot { it.equals(built.episodeName, ignoreCase = true) || it.equals(raw.title, ignoreCase = true) },
+            )
+        } else {
+            built
+        }
         if (signal.mainTitle.isNullOrBlank()) {
             noteOnce("notitle:$pkg", "Reproduciendo en ${Platforms.nameFor(pkg)} pero sin título legible")
             return
@@ -359,6 +371,15 @@ class MediaListenerService : NotificationListenerService() {
                         val point = puntos.de(pkg)
                         maybeSendProgress(pkg, signal.copy(positionSec = point?.posSec, durationSec = point?.durSec))
                     }
+                } else if (unresolvable && signal.seriesFromHint) {
+                    // El servidor comprobó el episodio contra la serie de la ficha
+                    // abierta antes y no casa: esa ficha era de OTRO título. No se
+                    // registra nada en vez de guardar una serie ajena.
+                    noteOnce(
+                        "hintmismatch:$pkg:${signal.showName}",
+                        "${Platforms.nameFor(pkg)}: lo que suena no es de «${signal.showName}» " +
+                            "(la ficha abierta antes). No se registra.",
+                    )
                 } else if (unresolvable && signal.episode != null && signal.showName == null) {
                     // CAUSA CONCRETA, no un error genérico. Aquí se sabe que es un
                     // episodio (hay número) pero NO de qué serie: la app no publica
@@ -423,7 +444,7 @@ class MediaListenerService : NotificationListenerService() {
         // como acababan series ajenas en el Historial—. Una pista solo se renueva
         // con datos que vengan de fuera de ella.
         if (!signal.seriesFromHint) {
-            RecentDetail.remember(pkg, synced)
+            RecentDetail.remember(pkg, synced, RecentDetail.Source.PLAYBACK)
         }
         // Solo se exige POSICIÓN (casi siempre disponible ya, viva o estimada). La
         // DURACIÓN es opcional: si la app no la da, se envía 0 y el backend la
@@ -539,5 +560,6 @@ class MediaListenerService : NotificationListenerService() {
         private const val POLL_MS = 3_000L
         private const val MIN_WATCH_MS = 15_000L
         private const val PROGRESS_PING_MS = 30_000L
+        private const val SCREEN_TEXTS_BEFORE_PLAY_MS = 60_000L
     }
 }

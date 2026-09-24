@@ -52,6 +52,9 @@ object SyncClient {
             // El nombre de la serie sale de una ficha vista antes, no de lo que
             // suena: el servidor rebaja la confianza en consecuencia.
             if (signal.seriesFromHint) put("seriesFromHint", true)
+            if (signal.screenTitles.isNotEmpty()) {
+                put("screenTitles", org.json.JSONArray(signal.screenTitles))
+            }
             if (resolveOnly) put("resolveOnly", true)
         }
 

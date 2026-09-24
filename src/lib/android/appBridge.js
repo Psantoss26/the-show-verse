@@ -99,7 +99,45 @@ export function openServerSettings() {
  * la app, o con una versión de la app sin este método, no hace nada.
  */
 export function setAppPullToRefreshLocked(locked) {
-  call("setPullToRefreshLocked", undefined, Boolean(locked));
+  // "missing" distingue una app sin este método (APK anterior) de una llamada
+  // correcta, que devuelve undefined.
+  return call("setPullToRefreshLocked", "missing", Boolean(locked)) !== "missing";
+}
+
+// Bloqueos activos (alertas, búsqueda, menú…): el de la app se libera solo al
+// cerrarse el último.
+let pullLockCount = 0;
+// Alternativa para APKs sin `setPullToRefreshLocked`: el refresco nativo solo
+// se dispara con la página EXACTAMENTE arriba del todo, así que basta con
+// apartarla 1 px mientras dure el bloqueo (y devolverla si nadie la ha movido).
+let nudgedPage = false;
+
+/**
+ * Mientras `active` sea true, arrastrar hacia abajo no recarga la app de
+ * Android: el gesto es del panel o superposición que la web tiene abierto.
+ * Fuera de la app no hace nada.
+ */
+export function useAppPullToRefreshLock(active) {
+  useEffect(() => {
+    if (!active || !isAndroidApp()) return undefined;
+    pullLockCount += 1;
+    if (pullLockCount === 1) {
+      const native = setAppPullToRefreshLocked(true);
+      if (!native && window.scrollY <= 0) {
+        window.scrollTo({ top: 1, behavior: "instant" });
+        nudgedPage = window.scrollY > 0;
+      }
+    }
+    return () => {
+      pullLockCount = Math.max(0, pullLockCount - 1);
+      if (pullLockCount > 0) return;
+      setAppPullToRefreshLocked(false);
+      if (nudgedPage) {
+        nudgedPage = false;
+        if (window.scrollY <= 1) window.scrollTo({ top: 0, behavior: "instant" });
+      }
+    };
+  }, [active]);
 }
 
 /** Compartir con el selector del sistema (en la app) o con la Web Share API. */

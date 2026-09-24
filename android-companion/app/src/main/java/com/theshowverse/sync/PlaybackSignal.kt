@@ -30,6 +30,10 @@ data class PlaybackSignal(
     // de la propia reproducción. El servidor lo usa para bajar la confianza: un
     // dato prestado no puede valer lo mismo que uno que da la MediaSession.
     val seriesFromHint: Boolean = false,
+    // Textos leídos en la pantalla de la app durante la reproducción (ver
+    // ScreenTexts). Solo se rellenan cuando no se sabe la serie; no forman parte
+    // de la identidad del contenido (dedupKey).
+    val screenTitles: List<String> = emptyList(),
 ) {
     /** Título principal (para retrocompat con el endpoint: mainTitle). */
     val mainTitle: String?

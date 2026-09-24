@@ -44,11 +44,32 @@ const MIN_PLAUSIBLE_VOTES = 15;
 // inclusión, ya normalizados)? Evita aceptar un resultado que a TMDb le
 // "parece relevante" por búsqueda libre pero no tiene nada que ver con el
 // texto detectado en pantalla.
+//
+// La inclusión, además, tiene que CUBRIR buena parte del texto más largo. Sin
+// esa proporción bastaba con que un título corto apareciera dentro de cualquier
+// frase: "La Niña" casaba con "Capítulo cinco: La Nina" y un episodio acababa
+// registrado como una serie ajena. Un sufijo o prefijo corto ("Stranger Things
+// 4", "The Office (US)") sigue casando.
+// La proporción se mide sin las palabras de RELLENO que las plataformas añaden al
+// título ("temporada", "episodio", números sueltos, "T1", "E3"…): "Peaky
+// Blinders temporada" sigue siendo Peaky Blinders.
+const MIN_INCLUSION_COVERAGE = 0.6;
+const FILLER_TOKEN_RE =
+  /^(?:temporada|season|saison|staffel|episodio|episode|ep|capitulo|chapter|folge|parte|part|serie|series|pelicula|movie|film|ver|watch|completa|complete|\d+|[tse]\d+)$/;
+
+function withoutFiller(text) {
+  return text.split(" ").filter((token) => token && !FILLER_TOKEN_RE.test(token)).join(" ");
+}
+
 function hasTextualOverlap(entityTitle, query) {
   const a = normalizeText(entityTitle);
   const b = normalizeText(query);
   if (!a || !b || a.length < 3 || b.length < 3) return false;
-  return a === b || a.includes(b) || b.includes(a);
+  if (a === b) return true;
+  const [shorter, longer] = a.length <= b.length ? [a, b] : [b, a];
+  if (!longer.includes(shorter)) return false;
+  const core = withoutFiller(longer) || longer;
+  return shorter.length / Math.max(core.length, shorter.length) >= MIN_INCLUSION_COVERAGE;
 }
 
 // ¿Tiene sentido aceptar este candidato como resolución real? Un título EXACTO

@@ -56,6 +56,8 @@ import {
 import WatchNextAssistant from "@/components/WatchNextAssistant";
 import NetflixSyncListener from "@/components/NetflixSyncListener";
 import AlertsMenu, { AlertsMenuBoot } from "@/components/notifications/AlertsMenu";
+import useBodyScrollLock from "@/hooks/useBodyScrollLock";
+import { useAppPullToRefreshLock } from "@/lib/android/appBridge";
 import { fuzzySimilarity, tokenFuzzyMatches } from "@/lib/search/fuzzy";
 import {
   addSearchHistory,
@@ -2539,14 +2541,17 @@ function NavbarContent() {
   )}`;
   const profileAuthLoading = !hydrated;
 
-  // Bloquear scroll cuando overlays están abiertos
-  useEffect(() => {
-    const locked = showMobileSearch || mobileMenuOpen;
-    document.body.style.overflow = locked ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [showMobileSearch, mobileMenuOpen]);
+  // Con la búsqueda (móvil/tablet) o el menú lateral abiertos, la página de
+  // debajo NO se desplaza. Antes solo se ponía `overflow: hidden` en <body>,
+  // pero quien se desplaza de verdad es <html> (ver useBodyScrollLock), así que
+  // el fondo seguía moviéndose; y en táctil el arrastre acababa en el «tirar
+  // para actualizar». useBodyScrollLock bloquea <html> y <body>, corta el
+  // rebote y activa la guardia táctil: solo se mueve lo que tiene scroll propio
+  // (la lista del menú), nunca la búsqueda ni el fondo.
+  const overlayOpen = showMobileSearch || mobileMenuOpen;
+  useBodyScrollLock(overlayOpen);
+  // En la app de Android, además, su «deslizar para recargar» nativo.
+  useAppPullToRefreshLock(overlayOpen);
 
   return (
     <>
