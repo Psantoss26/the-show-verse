@@ -164,14 +164,30 @@ async function loadShowEpisodes(tmdbId) {
 // serie que no tenía nada que ver. El nombre del episodio es lo que permite
 // comprobarlo. Devuelve true/false, o null si no hay forma de saberlo (sin
 // nombre utilizable o sin datos de TMDb).
-async function episodeBelongsToShow(tmdbId, episodeName) {
+//
+// El NOMBRE no basta para decir que no: la traducción que muestra la plataforma
+// (Netflix España) muchas veces no es la de TMDb, o TMDb no la tiene y devuelve
+// "Episodio 3". Cuando el reproductor da temporada Y episodio (`season`,
+// `episode`: los suyos, no los deducidos aquí), ese par decide: si la serie no lo
+// tiene, la pista es ajena (false); si lo tiene, un nombre distinto no prueba nada
+// (null). Solo sin esos números un nombre que no casa descarta la serie.
+async function episodeBelongsToShow(tmdbId, episodeName, { season = null, episode = null } = {}) {
   if (!tmdbId || !TMDB_API_KEY) return null;
-  const clean = cleanEpisodeName(episodeName);
-  if (!clean || clean.length < 4 || isGenericEpisodeName(clean)) return null;
   const { allEpisodes } = await loadShowEpisodes(tmdbId);
   if (!allEpisodes.length) return null;
+  const numbered = Number.isInteger(season) && season > 0 && Number.isInteger(episode) && episode > 0;
+  const numbersExist = numbered
+    ? allEpisodes.some(
+        (e) => Number(e?.season_number) === season && Number(e?.episode_number) === episode,
+      )
+    : null;
+  const clean = cleanEpisodeName(episodeName);
+  if (!clean || clean.length < 4 || isGenericEpisodeName(clean)) {
+    return numbersExist === false ? false : null;
+  }
   const { exact, partial } = matchEpisodeCandidates({ episodeName: clean, seasonEpisodes: allEpisodes });
-  return exact.length > 0 || partial.length > 0;
+  if (exact.length > 0 || partial.length > 0) return true;
+  return numbersExist === true ? null : false;
 }
 
 async function findSeasonByEpisodeName(tmdbId, episodeName, episodeNumber = null) {
@@ -392,6 +408,10 @@ export async function POST(request) {
         if (season == null) season = numberFrom(mainTitle, SEASON_TEXT_RE);
       }
     }
+
+    // Números que da el PROPIO reproductor, antes de cualquier deducción de más
+    // abajo: son los únicos que valen para comprobar la pista de serie.
+    const playerNumbers = { season, episode };
 
     // 2. Construir variantes de consulta (nombre de serie/principal, nombre de la
     // serie extraído del título de la pestaña, parte antes de ":" para "Serie:
@@ -663,12 +683,13 @@ export async function POST(request) {
     }
 
     // La serie salió de la PISTA de una ficha (no de la reproducción): se exige
-    // que el episodio que suena sea de esa serie. Si su nombre no aparece entre
-    // los episodios de la serie, la pista era de otro título y no se registra
-    // nada: un episodio ajeno en Continuar viendo o en el historial es peor que
-    // una sincronización perdida.
+    // que el episodio que suena sea de esa serie. Si no lo es (ver
+    // episodeBelongsToShow), la pista era de otro título y no se registra nada: un
+    // episodio ajeno en Continuar viendo o en el historial es peor que una
+    // sincronización perdida.
     if (seriesFromHint && isTv) {
-      const belongs = await episodeBelongsToShow(tmdbId, episodeName || subTitle).catch(() => null);
+      const belongs = await episodeBelongsToShow(tmdbId, episodeName || subTitle, playerNumbers)
+        .catch(() => null);
       if (belongs === false) {
         console.warn(
           `[Extension Sync] Pista descartada: "${episodeName || subTitle}" no es un episodio de "${resolvedTitle}".`,

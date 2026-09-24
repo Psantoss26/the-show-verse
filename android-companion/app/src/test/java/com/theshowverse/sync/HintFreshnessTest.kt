@@ -1,6 +1,8 @@
 package com.theshowverse.sync
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -31,5 +33,23 @@ class HintFreshnessTest {
     fun nadaVaMasAllaDeMediaHora() {
         assertFalse(HintFreshness.usable(RecentDetail.Source.PLAYBACK, start + min, start, start + 40 * min))
         assertFalse(HintFreshness.usable(RecentDetail.Source.DETAIL, 0L, start, start + min))
+    }
+
+    @Test
+    fun elMismoEpisodioSeReconoceTrasUnaPausaLarga() {
+        assertTrue(HintFreshness.resumeUsable(start, start + 2 * 60 * min))
+        assertFalse(HintFreshness.resumeUsable(start, start + 7 * 60 * min))
+        assertFalse(HintFreshness.resumeUsable(0L, start))
+    }
+
+    @Test
+    fun laIdentidadDelEpisodioIgnoraNombresGenericos() {
+        assertEquals(
+            HintFreshness.episodeKey("Capítulo uno: La desaparición", 1, 1),
+            HintFreshness.episodeKey("capitulo uno  la desaparicion", 1, 1),
+        )
+        assertNull(HintFreshness.episodeKey("Episodio 3", 1, 3))
+        assertNull(HintFreshness.episodeKey("Capítulo 1", 1, 1))
+        assertNull(HintFreshness.episodeKey(null, 1, 1))
     }
 }
