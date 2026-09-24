@@ -2,7 +2,7 @@
 
 // /src/components/dashboard/DetailModalProvider.jsx
 // Contexto + provider de la "ficha rápida estilo Netflix".
-// Expone `useDetailModal()` -> { openDetailModal, closeDetailModal, activeItem }.
+// Expone `useDetailModal()` -> { openDetailModal, closeDetailModal }.
 //
 // Sincroniza la URL con la History API (SIN navegación de Next.js, para no
 // re-renderizar la página): al abrir se hace `pushState` con `?preview=<token>`,
@@ -43,7 +43,6 @@ import { useIsMobile, useMediaQuery } from "@/lib/hooks/useMediaQuery";
 const DetailModalContext = createContext({
   openDetailModal: null,
   closeDetailModal: () => {},
-  activeItem: null,
 });
 
 export function useDetailModal() {
@@ -123,6 +122,35 @@ function publishDrawerInset(width) {
   if (next === publishedDrawerInset) return;
   publishedDrawerInset = next;
   root.style.setProperty(DRAWER_INSET_VAR, value);
+}
+
+// REORGANIZACIÓN DE LA PÁGINA AL ABRIR, CERRAR O CAMBIAR DE VISTA.
+//
+// El margen del contenido cambia de golpe (una sola vez, en el mismo fotograma
+// en que el panel empieza a entrar) y la rejilla se recoloca a la primera. Lo
+// que la hacía "dar tumbos" eran las transiciones CSS de cada tarjeta, que
+// animaban por su cuenta el salto de tamaño y posición. Mientras dura la
+// entrada del panel se apagan, igual que durante el arrastre del tirador (ver
+// `[data-sv-drawer-reflow]` en globals.css).
+const DRAWER_REFLOW_ATTR = "data-sv-drawer-reflow";
+const DRAWER_REFLOW_MS = 360;
+let drawerReflowTimer = 0;
+
+function markDrawerReflow() {
+  if (typeof document === "undefined") return;
+  const root = document.documentElement;
+  root.setAttribute(DRAWER_REFLOW_ATTR, "");
+  window.clearTimeout(drawerReflowTimer);
+  drawerReflowTimer = window.setTimeout(() => {
+    root.removeAttribute(DRAWER_REFLOW_ATTR);
+  }, DRAWER_REFLOW_MS);
+}
+
+function applyContentMargin(el, value) {
+  if (!el || el.style.marginRight === value) return;
+  // El arrastre del tirador ya tiene su propio modo (`data-sv-drawer-resizing`).
+  if (!isDrawerResizing()) markDrawerReflow();
+  el.style.marginRight = value;
 }
 
 const DRAWER_VIEW_STORAGE_KEY = "showverse:detailModalView";
@@ -331,7 +359,7 @@ export default function DetailModalProvider({
     // dura el gesto las transiciones del contenido se apagan (ver
     // `[data-detail-page-content]` en globals.css) para que las tarjetas se
     // recoloquen pegadas al tirador en vez de animar cada cambio.
-    contentRef.current.style.marginRight = `${width}px`;
+    applyContentMargin(contentRef.current, `${width}px`);
   }, [docked, activeItem, effectivePlacement]);
 
   // Sin drawer no hay variable. `DetailModal` la escribe mientras está montado
@@ -346,13 +374,24 @@ export default function DetailModalProvider({
     publishDrawerInset(null);
   }, [activeItem, effectivePlacement]);
 
-  useEffect(() => () => publishDrawerInset(null), []);
+  useEffect(() => () => {
+    publishDrawerInset(null);
+    window.clearTimeout(drawerReflowTimer);
+    document.documentElement.removeAttribute(DRAWER_REFLOW_ATTR);
+  }, []);
 
+  // Al ACOPLAR, el panel ya ha informado de su ancho definitivo: sus efectos de
+  // layout corren antes que los de este provider en el mismo commit, así que
+  // `drawerWidthRef` trae el valor bueno y el margen se escribe UNA vez. Antes
+  // se partía de un "50vw" provisional que luego se corregía, y la página se
+  // reorganizaba dos veces seguidas.
   useLayoutEffect(() => {
     if (!contentRef.current) return;
-    contentRef.current.style.marginRight = docked
-      ? (drawerWidthRef.current == null ? "50vw" : `${drawerWidthRef.current}px`)
-      : "";
+    if (docked && drawerWidthRef.current == null) return;
+    applyContentMargin(
+      contentRef.current,
+      docked ? `${drawerWidthRef.current}px` : "",
+    );
   }, [docked]);
 
   // ¿La entrada actual es un CAMBIO (mismo nivel o profundizar) con la ficha ya
@@ -496,9 +535,15 @@ export default function DetailModalProvider({
     lockScroll: effectivePlacement !== "right",
   });
 
+  // El valor del contexto NO incluye el item activo: todas las tarjetas de la
+  // página lo consumen (para abrir la ficha) y, con él dentro, abrir o cerrar
+  // el panel re-renderizaba cientos de tarjetas justo mientras la rejilla se
+  // reorganizaba. Ese re-render disparaba sus animaciones `layout` de
+  // framer-motion, cada una con su propio retardo escalonado, y la rejilla
+  // "daba tumbos" hasta asentarse.
   const value = useMemo(
-    () => ({ openDetailModal, closeDetailModal, activeItem }),
-    [openDetailModal, closeDetailModal, activeItem],
+    () => ({ openDetailModal, closeDetailModal }),
+    [openDetailModal, closeDetailModal],
   );
 
   return (

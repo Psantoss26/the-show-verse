@@ -2048,9 +2048,16 @@ const FavoriteCard = memo(function FavoriteCard({
         transition={{
           duration: 0.25,
           delay: shouldAnimate ? animDelay : 0,
+          // La recolocación no hereda el retardo escalonado de la entrada.
+          layout: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
           ease: [0.25, 0.1, 0.25, 1],
         }}
         layout={!isBackNav}
+        // Solo se recoloca al CAMBIAR su posición en la lista (ordenar,
+        // filtrar). Abrir o redimensionar el panel lateral cambia las
+        // columnas, no el orden: ahí la rejilla se reorganiza de una vez
+        // en vez de animar cada tarjeta por separado.
+        layoutDependency={index}
         data-favorite-card=""
       >
         <Link
@@ -2093,9 +2100,16 @@ const FavoriteCard = memo(function FavoriteCard({
         transition={{
           duration: 0.25,
           delay: shouldAnimate ? animDelay : 0,
+          // La recolocación no hereda el retardo escalonado de la entrada.
+          layout: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
           ease: [0.25, 0.1, 0.25, 1],
         }}
         layout={!isBackNav}
+        // Solo se recoloca al CAMBIAR su posición en la lista (ordenar,
+        // filtrar). Abrir o redimensionar el panel lateral cambia las
+        // columnas, no el orden: ahí la rejilla se reorganiza de una vez
+        // en vez de animar cada tarjeta por separado.
+        layoutDependency={index}
         data-favorite-card=""
       >
         <Link
@@ -2132,6 +2146,8 @@ const FavoriteCard = memo(function FavoriteCard({
       transition={{
         duration: 0.2,
         delay: shouldAnimate ? animDelay : 0,
+        // La recolocación no hereda el retardo escalonado de la entrada.
+        layout: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
       }}
       data-favorite-card=""
     >
