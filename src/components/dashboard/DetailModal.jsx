@@ -86,6 +86,10 @@ import {
 import useTmdbLists from "@/lib/hooks/useTmdbLists";
 import LiquidButton from "@/components/LiquidButton";
 import {
+  emitDrawerResize,
+  isDrawerResizeActive,
+} from "@/lib/ui/drawerResizeEvents";
+import {
   selectOwnedComments,
 } from "@/lib/details/detailActionState";
 
@@ -1202,6 +1206,7 @@ export default function DetailModal({
       // (hoy, el bloque derecho del navbar) se mueva PEGADO al tirador en vez
       // de ir 320ms por detrás con su transición de apertura.
       document.documentElement.dataset.svDrawerResizing = "";
+      emitDrawerResize(true);
     }
 
     // SEGUIMIENTO 1:1 con el puntero, una escritura por fotograma.
@@ -1226,12 +1231,20 @@ export default function DetailModal({
       panelWidthMotion.set(width);
       if (panelRef.current) {
         panelRef.current.style.width = `${width}px`;
-        // La escala del contenido sigue al ancho también durante el gesto.
+        // La escala del contenido sigue al ancho también durante el gesto,
+        // pero en pasos de 0,01 mientras se arrastra: la variable la leen casi
+        // todos los elementos de la ficha, y cambiarla en cada píxel obligaba a
+        // recalcular el estilo del panel entero en cada fotograma (~4× más
+        // caro que en el modal ancho). Un paso de 0,01 no se aprecia; al soltar
+        // se escribe el valor exacto.
         if (mobileDetails && !tabletViewport) {
-          panelRef.current.style.setProperty(
-            "--sv-phone-scale",
-            String(phoneContentScale(width)),
-          );
+          const exact = phoneContentScale(width);
+          const scale = isDrawerResizeActive()
+            ? String(Math.round(exact * 100) / 100)
+            : String(exact);
+          if (panelRef.current.style.getPropertyValue("--sv-phone-scale") !== scale) {
+            panelRef.current.style.setProperty("--sv-phone-scale", scale);
+          }
         }
       }
       // También SUPERPUESTO: el margen del contenido solo importa acoplado,
@@ -1279,7 +1292,11 @@ export default function DetailModal({
       document.body.style.cursor = prevCursor;
       ghost?.remove();
       ghost = null;
+      const wasLiveResize = isDrawerResizeActive();
       delete document.documentElement.dataset.svDrawerResizing;
+      // Tras quitar la marca: quien escucha ya ve el gesto terminado y se
+      // recoloca una vez con el ancho final.
+      if (wasLiveResize) emitDrawerResize(false);
       resizeCleanupRef.current = null;
       // El click posterior al pointerup no debe cerrar el modo superpuesto.
       window.setTimeout(() => {
