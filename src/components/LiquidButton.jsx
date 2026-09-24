@@ -85,8 +85,7 @@ export default function LiquidButton({
       secondary: [134, 239, 172],
       glow: "rgba(34, 197, 94, 0.5)",
     },
-    // Esmeralda: el color de "Continuar viendo" en toda la app (emerald-500 /
-    // emerald-300), distinto del verde de "visto".
+    // Esmeralda (emerald-500 / emerald-300), distinto del verde de "visto".
     emerald: {
       rgb: [16, 185, 129],
       secondary: [110, 231, 183],
