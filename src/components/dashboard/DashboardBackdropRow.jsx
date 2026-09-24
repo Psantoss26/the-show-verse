@@ -184,6 +184,12 @@ function useItemBackdrop(item, backdropOverride) {
   const [backdropPath, setBackdropPath] = useState(() =>
     getInitialItemBackdrop(item, backdropOverride),
   );
+  // Valor ya pintado, para no llamar a `setState` si no cambia. Un updater que
+  // devuelve el mismo valor NO es gratis: React programa igualmente el render y
+  // solo lo descarta al ejecutarlo. Con muchas tarjetas montándose a la vez
+  // (hover, recarga en caliente) esas actualizaciones vacías se encadenaban y
+  // React llegaba a cortar con "Maximum update depth exceeded" en este efecto.
+  const backdropPathRef = useRef(backdropPath);
 
   // El efecto depende de la CLAVE del título (tipo + id), no del objeto `item`.
   // Con el objeto como dependencia, un padre que entregara un objeto nuevo en
@@ -208,8 +214,9 @@ function useItemBackdrop(item, backdropOverride) {
     // Solo se actualiza si el backdrop CAMBIA: así una ejecución de más del
     // efecto nunca provoca otro render.
     const reveal = (path) => {
-      if (abort) return;
-      setBackdropPath((prev) => (prev === path ? prev : path));
+      if (abort || backdropPathRef.current === path) return;
+      backdropPathRef.current = path;
+      setBackdropPath(path);
     };
 
     if (backdropOverride) {

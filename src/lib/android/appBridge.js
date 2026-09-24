@@ -92,6 +92,16 @@ export function openServerSettings() {
   call("openServerSettings", undefined);
 }
 
+/**
+ * Bloquea (o libera) "deslizar para recargar" de la app mientras la web tiene
+ * abierto un panel con scroll propio. La app solo ve el scroll de la página:
+ * sin esto, arrastrar hacia abajo dentro del panel recargaba la web. Fuera de
+ * la app, o con una versión de la app sin este método, no hace nada.
+ */
+export function setAppPullToRefreshLocked(locked) {
+  call("setPullToRefreshLocked", undefined, Boolean(locked));
+}
+
 /** Compartir con el selector del sistema (en la app) o con la Web Share API. */
 export function shareFromApp(text, url) {
   if (isAndroidApp()) {

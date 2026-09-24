@@ -212,6 +212,7 @@ class WebAppActivity : AppCompatActivity() {
                 { currentUrl },
                 ::evaluarJs,
                 ::abrirEnNavegador,
+                ::bloquearRecarga,
             ),
             WebAppBridge.NAME,
         )
@@ -247,6 +248,9 @@ class WebAppActivity : AppCompatActivity() {
 
         override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
             currentUrl = url.orEmpty()
+            // Una página nueva no hereda el panel abierto de la anterior: si la
+            // web se fue con el bloqueo puesto, aquí se libera.
+            recargaBloqueada = false
         }
 
         override fun onPageFinished(view: WebView, url: String?) {
@@ -448,10 +452,24 @@ class WebAppActivity : AppCompatActivity() {
         binding.refresh.setProgressViewOffset(false, INICIO_INDICADOR_DP + enDp, FIN_INDICADOR_DP + enDp)
     }
 
+    // La web tiene abierto un panel con scroll propio (ver
+    // WebAppBridge.setPullToRefreshLocked): mientras tanto, arrastrar hacia abajo
+    // es para ese panel, nunca para recargar.
+    private var recargaBloqueada = false
+
+    private fun bloquearRecarga(bloqueada: Boolean) {
+        recargaBloqueada = bloqueada
+        if (!binding.refresh.isRefreshing) {
+            binding.refresh.isEnabled = !bloqueada && binding.webView.scrollY <= 0
+        }
+    }
+
     private fun configurarRefresco() {
         // Deslizar para recargar SOLO cuando la página está arriba del todo: si
         // no, el gesto compite con el scroll y con los carruseles horizontales.
-        binding.refresh.setOnChildScrollUpCallback { _, _ -> binding.webView.scrollY > 0 }
+        binding.refresh.setOnChildScrollUpCallback { _, _ ->
+            recargaBloqueada || binding.webView.scrollY > 0
+        }
 
         // Y, ADEMÁS, se APAGA mientras no estás arriba del todo.
         //
@@ -463,9 +481,9 @@ class WebAppActivity : AppCompatActivity() {
         // entero y los eventos van directos al WebView.
         binding.refresh.isEnabled = true
         binding.webView.setOnScrollChangeListener { _, _, scrollY, _, _ ->
-            val arriba = scrollY <= 0
-            if (binding.refresh.isEnabled != arriba && !binding.refresh.isRefreshing) {
-                binding.refresh.isEnabled = arriba
+            val activo = scrollY <= 0 && !recargaBloqueada
+            if (binding.refresh.isEnabled != activo && !binding.refresh.isRefreshing) {
+                binding.refresh.isEnabled = activo
             }
         }
         binding.refresh.setColorSchemeColors(ContextCompat.getColor(this, R.color.tsv_amber))

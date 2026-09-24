@@ -31,6 +31,7 @@ class WebAppBridge(
     private val currentUrl: () -> String,
     private val evaluarJs: (String) -> Unit,
     private val abrirEnNavegador: (String) -> Unit,
+    private val bloquearRecarga: (Boolean) -> Unit = {},
 ) {
 
     /**
@@ -261,6 +262,21 @@ class WebAppBridge(
             }
             activity.startActivity(Intent.createChooser(enviar, null))
         }
+    }
+
+    /**
+     * Bloquea (o libera) "deslizar para recargar" mientras la web tiene abierto
+     * un panel con scroll propio (el desplegable de alertas).
+     *
+     * El nativo solo ve el scroll de la PÁGINA: con ella arriba del todo, un
+     * arrastre hacia abajo DENTRO del panel se tomaba como "recargar" y la app
+     * recargaba la web en vez de desplazar el panel. Solo la web sabe que hay un
+     * panel encima, así que es ella quien lo avisa.
+     */
+    @JavascriptInterface
+    fun setPullToRefreshLocked(locked: Boolean) {
+        if (!propio()) return
+        activity.runOnUiThread { bloquearRecarga(locked) }
     }
 
     // ---------------------------------------------------------------- privados
