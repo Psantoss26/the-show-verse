@@ -32,6 +32,14 @@ class MediaListenerService : NotificationListenerService() {
     private val lastSignals = HashMap<String, PlaybackSignal>()
     private val lastObservationAt = HashMap<String, Long>()
     private val playingSince = HashMap<String, Long>()
+    // Inicio de la SESIÓN de reproducción por paquete: a diferencia de
+    // `playingSince`, sobrevive a cortes breves (pausa corta, el cargando entre un
+    // episodio y el siguiente, "¿Sigues viendo?"). Es la referencia para saber si
+    // la pista de la serie sigue valiendo (ver RecentDetail): antes se medía con
+    // `playingSince`, que se reinicia con cualquier corte, y la ficha abierta
+    // antes de empezar dejaba de valer a mitad de la sesión.
+    private val sessionStart = HashMap<String, Long>()
+    private val stoppedAt = HashMap<String, Long>()
     private val lastKeyByPackage = HashMap<String, String>()
     private val loggedNotes = HashSet<String>() // para no repetir el mismo aviso
     // Progreso: entidad resuelta por paquete (para enviar posición sin re-resolver)
@@ -127,6 +135,8 @@ class MediaListenerService : NotificationListenerService() {
         if (prefs.paused || !prefs.isPaired()) {
             resolutions.clear()
             playingSince.clear()
+            sessionStart.clear()
+            stoppedAt.clear()
             lastKeyByPackage.keys.toList().forEach { puntos.olvidar(it) }
             lastKeyByPackage.clear()
             syncedByPackage.clear()
@@ -151,6 +161,8 @@ class MediaListenerService : NotificationListenerService() {
             if (!prefs.isEnabled(pkg)) {
                 resolutions.forget(pkg)
                 playingSince.remove(pkg)
+                sessionStart.remove(pkg)
+                stoppedAt.remove(pkg)
                 syncedByPackage.remove(pkg)
                 lastKeyByPackage.remove(pkg)
                 lastSignals.remove(pkg)
@@ -172,6 +184,7 @@ class MediaListenerService : NotificationListenerService() {
             lastObservationAt.remove(pkg)
             lastSignals.remove(pkg)
             playingSince.remove(pkg)
+            stoppedAt[pkg] = SystemClock.elapsedRealtime()
             loggedNotes.removeAll { it.endsWith(":$pkg") }
             // Al parar, olvidamos la resolución y la clave: si se reanuda el mismo
             // título, se vuelve a resolver y a retomar el seguimiento de progreso.
@@ -196,7 +209,14 @@ class MediaListenerService : NotificationListenerService() {
         }
 
         val now = SystemClock.elapsedRealtime()
-        val since = playingSince.getOrPut(pkg) { now }
+        val since = playingSince.getOrPut(pkg) {
+            val parado = stoppedAt.remove(pkg)
+            if (parado == null || now - parado > SESSION_GAP_MS || sessionStart[pkg] == null) {
+                sessionStart[pkg] = now
+            }
+            now
+        }
+        val session = sessionStart[pkg] ?: since
         if (now - since < MIN_WATCH_MS) return // aún no lleva 15s reproduciendo
 
         val md = controller.metadata
@@ -267,8 +287,10 @@ class MediaListenerService : NotificationListenerService() {
         // Pista de la serie desde la última ficha abierta (misma app, reciente):
         // cubre apps que no exponen la serie en la MediaSession (Netflix), donde
         // `title` es solo el episodio.
-        val hintShowName = RecentDetail.showNameFor(pkg, since)
-        val built = SignalBuilder.build(raw, Platforms.nameFor(pkg), hintShowName)
+        val sinPista = SignalBuilder.build(raw, Platforms.nameFor(pkg))
+        val episodeKey = HintFreshness.episodeKey(sinPista.episodeName, sinPista.season, sinPista.episode)
+        val hintShowName = RecentDetail.showNameFor(pkg, session, episodeKey)
+        val built = if (hintShowName == null) sinPista else SignalBuilder.build(raw, Platforms.nameFor(pkg), hintShowName)
         // Episodio sin serie conocida: se adjuntan los textos que la accesibilidad
         // ha visto en la pantalla de la app desde poco antes de empezar (la barra
         // del reproductor suele nombrar la serie). El servidor decide con doble
@@ -363,6 +385,10 @@ class MediaListenerService : NotificationListenerService() {
                 ) return@post
                 if (ok && synced != null) {
                     prefs.addLog("✓ Detectado: ${signal.mainTitle}")
+                    // Serie confirmada por el servidor para ESTE episodio: si se
+                    // reanuda tras una pausa larga, se reconoce sin depender de la
+                    // ficha abierta antes.
+                    RecentDetail.confirmEpisode(pkg, episodeKey, synced)
                     // Acceso rápido: notificación "en progreso" con enlace a la ficha.
                     QuickAccessNotifier.show(this, prefs, synced, R.string.notif_watching)
                     if (synced != null) {
@@ -436,16 +462,16 @@ class MediaListenerService : NotificationListenerService() {
         val synced = syncedByPackage[pkg] ?: return
         // Mantiene viva la pista de la serie durante la reproducción (y la actualiza
         // a lo realmente resuelto): así el episodio que auto-reproduce a continuación
-        // sigue resolviéndose con la serie correcta aunque la MediaSession no la dé.
+        // sigue resolviéndose con la serie correcta aunque la MediaSession no la dé
+        // (Netflix nunca la da, así que su serie SIEMPRE sale de la pista).
         //
-        // PERO no si la serie salió de la propia pista: reescribirla con lo que ella
-        // misma produjo la volvía indefinida —una ficha mal resuelta se
-        // realimentaba y se aplicaba a todo lo que se reprodujera después, que es
-        // como acababan series ajenas en el Historial—. Una pista solo se renueva
-        // con datos que vengan de fuera de ella.
-        if (!signal.seriesFromHint) {
-            RecentDetail.remember(pkg, synced, RecentDetail.Source.PLAYBACK)
-        }
+        // Se renueva también cuando la serie salió de la propia pista: el servidor
+        // ya comprobó que el episodio es de esa serie (si no, no habría `synced`),
+        // y una pista PLAYBACK solo vale dentro de la sesión en curso, así que ya
+        // no puede realimentarse hacia lo que se reproduzca en otra sesión. Sin
+        // renovarla, la ficha caducaba a los 30 min y los episodios siguientes de
+        // una maratón dejaban de sincronizarse.
+        RecentDetail.remember(pkg, synced, RecentDetail.Source.PLAYBACK)
         // Solo se exige POSICIÓN (casi siempre disponible ya, viva o estimada). La
         // DURACIÓN es opcional: si la app no la da, se envía 0 y el backend la
         // rellena desde TMDb. Así el título entra en "Continuar viendo" aunque la
@@ -561,5 +587,7 @@ class MediaListenerService : NotificationListenerService() {
         private const val MIN_WATCH_MS = 15_000L
         private const val PROGRESS_PING_MS = 30_000L
         private const val SCREEN_TEXTS_BEFORE_PLAY_MS = 60_000L
+        // Un corte más corto que esto no empieza una sesión nueva (ver sessionStart).
+        private const val SESSION_GAP_MS = 5 * 60 * 1000L
     }
 }
