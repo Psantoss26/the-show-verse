@@ -27,6 +27,7 @@ import {
   useMemo,
   useCallback,
   useTransition,
+  startTransition,
 } from "react";
 import { createPortal } from "react-dom";
 
@@ -334,10 +335,20 @@ const TTL = 1000 * 60 * 5; // Tiempo de vida del cache: 5 minutos
 // dispositivos lentos incluso una transición compuesta se percibe como carga.
 // `visibility` evita pintar o interactuar con ellos antes del umbral, pero al
 // cruzarlo el contenido y su cristal aparecen en el mismo fotograma.
+//
+// El estado visual lo lleva el atributo `data-mobile-reveal`, que el listener
+// de scroll escribe DIRECTAMENTE en el DOM en el mismo evento; las variantes
+// `data-[mobile-reveal=hidden]` de MOBILE_REVEAL_BASE lo convierten en oculto.
+// (Van como utilidades y no como regla suelta en globals.css: allí el
+// compilador de CSS de Next la descartaba y el marcador salía siempre visible.) Antes dependía solo de un setState: cada cruce re-renderizaba
+// esta ficha entera y, en la PWA de móviles modestos, el marcador tardaba en
+// irse. La regla CSS además anula las transiciones de los descendientes
+// mientras está oculto: `visibility` es animable y los botones de plataformas
+// y compartir (`transition-all duration-300`) la heredaban animada, así que
+// seguían visibles 300 ms después que el panel.
 const MOBILE_REVEAL_BASE =
-  "transform-gpu";
-const MOBILE_REVEAL_HIDDEN =
-  "max-sm:invisible max-sm:pointer-events-none";
+  "transform-gpu max-sm:data-[mobile-reveal=hidden]:invisible max-sm:data-[mobile-reveal=hidden]:pointer-events-none max-sm:data-[mobile-reveal=hidden]:**:!transition-none";
+const MOBILE_REVEAL_ATTR = "data-mobile-reveal";
 
 // Umbral mínimo que evita revelar el bloque antes de que el usuario haya
 // abandonado el inicio de la ficha. El cruce visual preciso lo calcula el
@@ -1507,6 +1518,7 @@ export default function DetailsClient({
     const trigger = mobileSecondaryTriggerRef.current;
     if (!trigger) return undefined;
 
+    let applied = null;
     const syncVisibility = () => {
       const triggerTop = trigger.getBoundingClientRect().top;
       const revealLine = window.innerHeight - 88;
@@ -1514,9 +1526,24 @@ export default function DetailsClient({
         window.scrollY > MOBILE_REVEAL_SHOW_AT_PX &&
         triggerTop <= revealLine;
 
-      setMobileSecondaryVisible((current) =>
-        current === nextVisible ? current : nextVisible,
-      );
+      if (nextVisible === applied) return;
+      applied = nextVisible;
+      // 1) Al DOM en este mismo evento: el marcador, las pestañas y la fila de
+      //    acciones aparecen/desaparecen en el siguiente fotograma, sin esperar
+      //    a que React re-renderice la ficha.
+      document.querySelectorAll(`[${MOBILE_REVEAL_ATTR}]`).forEach((el) => {
+        el.setAttribute(MOBILE_REVEAL_ATTR, nextVisible ? "shown" : "hidden");
+        el.inert = !nextVisible;
+        if (nextVisible) el.removeAttribute("aria-hidden");
+        else el.setAttribute("aria-hidden", "true");
+      });
+      // 2) El estado de React se pone al día sin prisa (mismos valores, así
+      //    que su commit no vuelve a tocar el DOM).
+      startTransition(() => {
+        setMobileSecondaryVisible((current) =>
+          current === nextVisible ? current : nextVisible,
+        );
+      });
     };
 
     const observer = new IntersectionObserver(
@@ -9587,13 +9614,18 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           // arriba hasta quedar TAPADA por el navbar inferior;
                           // ahora espera al primer scroll y aparece con el MISMO
                           // revelado que el marcador y las pestañas, en su sitio.
-                          `${MOBILE_REVEAL_BASE} ${
-                            mobileSecondaryVisible ? "" : MOBILE_REVEAL_HIDDEN
-                          }`
+                          MOBILE_REVEAL_BASE
                         : detailsEntryReady && currentLowLoaded && inProgressChecked
                           ? "sv-mobile-actions-reveal"
                           : ""
                     }
+                    {...(mobileActionsWaitForScroll
+                      ? {
+                          [MOBILE_REVEAL_ATTR]: mobileSecondaryVisible
+                            ? "shown"
+                            : "hidden",
+                        }
+                      : {})}
                     inert={
                       isMobileViewport &&
                       mobileActionsWaitForScroll &&
@@ -9671,9 +9703,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               <div
                 // Sin `will-change`: no hay transición pendiente y mantener una
                 // capa extra perjudica a los dispositivos de menor rendimiento.
-                className={`${MOBILE_REVEAL_BASE} ${
-                  mobileSecondaryVisible ? "" : MOBILE_REVEAL_HIDDEN
-                }`}
+                className={MOBILE_REVEAL_BASE}
+                {...{
+                  [MOBILE_REVEAL_ATTR]: mobileSecondaryVisible ? "shown" : "hidden",
+                }}
                 inert={isMobileViewport && !mobileSecondaryVisible}
                 aria-hidden={
                   isMobileViewport && !mobileSecondaryVisible ? true : undefined
@@ -9740,9 +9773,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               <div
                 // Sin `will-change`: no hay transición pendiente y mantener una
                 // capa extra perjudica a los dispositivos de menor rendimiento.
-                className={`${MOBILE_REVEAL_BASE} ${
-                  mobileSecondaryVisible ? "" : MOBILE_REVEAL_HIDDEN
-                }`}
+                className={MOBILE_REVEAL_BASE}
+                {...{
+                  [MOBILE_REVEAL_ATTR]: mobileSecondaryVisible ? "shown" : "hidden",
+                }}
                 inert={isMobileViewport && !mobileSecondaryVisible}
                 aria-hidden={
                   isMobileViewport && !mobileSecondaryVisible
