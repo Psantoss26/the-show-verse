@@ -84,6 +84,7 @@ export default function SubrouteDetailsActionRow({
           busy={trakt.busy}
           loading={trakt.loading}
           onOpen={trakt.onOpen}
+          continueWatchingPercent={trakt.continueWatchingPercent}
         />
       ) : null}
 

@@ -55,7 +55,7 @@ import {
 } from "lucide-react";
 import WatchNextAssistant from "@/components/WatchNextAssistant";
 import NetflixSyncListener from "@/components/NetflixSyncListener";
-import AlertsMenu from "@/components/notifications/AlertsMenu";
+import AlertsMenu, { AlertsMenuBoot } from "@/components/notifications/AlertsMenu";
 import { fuzzySimilarity, tokenFuzzyMatches } from "@/lib/search/fuzzy";
 import {
   addSearchHistory,
@@ -2752,8 +2752,12 @@ function NavbarContent() {
             </div>
 
             {/* ALERTAS, entre Buscar y Perfil. Solo con sesión: sin cuenta
-                no hay actividad que avisar (el componente no pinta nada). */}
-            {!profileAuthLoading && account ? (
+                no hay actividad que avisar. Mientras la sesión arranca se pinta
+                su marcador, igual que el avatar, para que salga a la vez que
+                Buscar y Perfil. */}
+            {profileAuthLoading ? (
+              <AlertsMenuBoot heroNavMode={heroNavMode} />
+            ) : account ? (
               <AlertsMenu account={account} heroNavMode={heroNavMode} />
             ) : null}
 
@@ -2990,7 +2994,9 @@ function NavbarContent() {
           <div
             className={`flex flex-shrink-0 origin-right items-center gap-2 pr-1 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${mobileTopControlScaleClass}`}
           >
-            {!profileAuthLoading && account ? (
+            {profileAuthLoading ? (
+              <AlertsMenuBoot variant="mobile" />
+            ) : account ? (
               <AlertsMenu account={account} variant="mobile" />
             ) : null}
             {profileAuthLoading ? (

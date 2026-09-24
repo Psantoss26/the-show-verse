@@ -8,6 +8,7 @@ const PREFIX = "showverse:alerts";
 
 export const alertsLastSeenKey = (accountId) => `${PREFIX}:lastSeen:${accountId}`;
 export const alertsDismissedKey = (accountId) => `${PREFIX}:dismissed:${accountId}`;
+export const alertsUnreadKey = (accountId) => `${PREFIX}:unread:${accountId}`;
 
 // Tope de recordatorios descartados que se recuerdan: los recordatorios caducan
 // en el servidor (ventana de días), así que los más antiguos ya no aparecen.

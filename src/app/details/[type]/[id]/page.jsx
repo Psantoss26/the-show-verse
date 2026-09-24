@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import DetailsPageLoader from "@/components/DetailsPageLoader";
 import MobilePosterPreload from "@/components/details/MobilePosterPreload";
 import { getDetails } from "@/lib/api/tmdb";
+import { getShareData, shareMetadata } from "@/lib/share/shareMeta";
 import { fetchCommunitySummary } from "@/lib/community/server";
 import { readEmbeddedDetailsSeed } from "@/lib/navigation/embeddedDetails";
 export const revalidate = 600;
@@ -31,10 +32,10 @@ export async function generateMetadata({ params }) {
     return { title: "Detalles" };
   }
 
-  const data = await getDetails(type, id, { language: "es-ES" }).catch(() => null);
-  return {
-    title: data?.title || data?.name || "Detalles",
-  };
+  // Título + vista previa al compartir (Open Graph): backdrop con idioma y datos
+  // básicos. Ver lib/share/shareMeta.js.
+  const share = await getShareData({ kind: type, id }).catch(() => null);
+  return shareMetadata(share, "Detalles");
 }
 
 export default async function DetailsPage({ params, searchParams, embedded = false }) {

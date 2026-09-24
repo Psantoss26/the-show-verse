@@ -1,4 +1,5 @@
 import SeasonDetailsClient from "@/components/SeasonDetailsClient";
+import { getShareData, shareMetadata } from "@/lib/share/shareMeta";
 
 export const revalidate = 3600; // 1h
 
@@ -23,17 +24,9 @@ export async function generateMetadata({ params }) {
     return { title: "Temporada" };
   }
 
-  const [show, season] = await Promise.all([
-    tmdbFetch(`/tv/${showId}`).catch(() => null),
-    tmdbFetch(`/tv/${showId}/season/${seasonNumber}`).catch(() => null),
-  ]);
-
-  const showName = show?.name || show?.title || "Serie";
-  const seasonName = season?.name || `Temporada ${seasonNumber}`;
-
-  return {
-    title: `${showName} - ${seasonName}`,
-  };
+  // Título + vista previa al compartir (Open Graph). Ver lib/share/shareMeta.js.
+  const share = await getShareData({ kind: "season", id: showId, season: seasonNumber }).catch(() => null);
+  return shareMetadata(share, `Temporada ${seasonNumber}`);
 }
 
 export default async function SeasonPage({ params }) {

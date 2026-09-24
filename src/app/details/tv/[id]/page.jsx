@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import DetailsPageLoader from "@/components/DetailsPageLoader";
 import MobilePosterPreload from "@/components/details/MobilePosterPreload";
 import { getDetails } from "@/lib/api/tmdb";
+import { getShareData, shareMetadata } from "@/lib/share/shareMeta";
 export const revalidate = 600;
 
 const DETAILS_APPEND_TO_RESPONSE =
@@ -13,10 +14,9 @@ export async function generateMetadata({ params }) {
 
   if (!id) return { title: "Detalles" };
 
-  const data = await getDetails("tv", id, { language: "es-ES" }).catch(() => null);
-  return {
-    title: data?.name || data?.title || "Detalles",
-  };
+  // Título + vista previa al compartir (Open Graph). Ver lib/share/shareMeta.js.
+  const share = await getShareData({ kind: "tv", id }).catch(() => null);
+  return shareMetadata(share, "Detalles");
 }
 
 export default async function TvDetailsPage({ params }) {
