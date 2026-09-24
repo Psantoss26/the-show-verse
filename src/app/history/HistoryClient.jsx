@@ -2019,9 +2019,16 @@ const HistoryItemCard = memo(function HistoryItemCard({
         transition={{
           duration: 0.25,
           delay: shouldAnimate ? animDelay : 0,
+          // La recolocación no hereda el retardo escalonado de la entrada.
+          layout: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
           ease: [0.25, 0.1, 0.25, 1],
         }}
         layout={!isBackNav}
+        // Solo se recoloca al CAMBIAR su posición en la lista (ordenar,
+        // filtrar). Abrir o redimensionar el panel lateral cambia las
+        // columnas, no el orden: ahí la rejilla se reorganiza de una vez
+        // en vez de animar cada tarjeta por separado.
+        layoutDependency={index}
       >
         {/* Overlay de borde para que los indicadores queden por debajo */}
         <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]" />
@@ -2038,9 +2045,16 @@ const HistoryItemCard = memo(function HistoryItemCard({
       transition={{
         duration: 0.25,
         delay: shouldAnimate ? animDelay : 0,
+        // La recolocación no hereda el retardo escalonado de la entrada.
+        layout: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
         ease: [0.25, 0.1, 0.25, 1],
       }}
       layout={!isBackNav}
+      // Solo se recoloca al CAMBIAR su posición en la lista (ordenar,
+      // filtrar). Abrir o redimensionar el panel lateral cambia las
+      // columnas, no el orden: ahí la rejilla se reorganiza de una vez
+      // en vez de animar cada tarjeta por separado.
+      layoutDependency={index}
     >
       <Link
         href={href}
@@ -2190,9 +2204,16 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
         transition={{
           duration: 0.25,
           delay: shouldAnimate ? animDelay : 0,
+          // La recolocación no hereda el retardo escalonado de la entrada.
+          layout: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
           ease: [0.25, 0.1, 0.25, 1],
         }}
         layout={!isBackNav}
+        // Solo se recoloca al CAMBIAR su posición en la lista (ordenar,
+        // filtrar). Abrir o redimensionar el panel lateral cambia las
+        // columnas, no el orden: ahí la rejilla se reorganiza de una vez
+        // en vez de animar cada tarjeta por separado.
+        layoutDependency={index}
       >
         <div className="block cursor-pointer">{CardInner}</div>
       </motion.div>
@@ -2207,9 +2228,16 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
       transition={{
         duration: 0.25,
         delay: shouldAnimate ? animDelay : 0,
+        // La recolocación no hereda el retardo escalonado de la entrada.
+        layout: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
         ease: [0.25, 0.1, 0.25, 1],
       }}
       layout={!isBackNav}
+      // Solo se recoloca al CAMBIAR su posición en la lista (ordenar,
+      // filtrar). Abrir o redimensionar el panel lateral cambia las
+      // columnas, no el orden: ahí la rejilla se reorganiza de una vez
+      // en vez de animar cada tarjeta por separado.
+      layoutDependency={index}
     >
       <Link href={href} prefetch onClick={onPreviewClick} className="block">
         {CardInner}

@@ -1252,6 +1252,17 @@ html {
   transition: none !important;
 }
 
+/* Lo mismo mientras el panel ENTRA, SALE o cambia de vista (ficha de teléfono
+   ↔ modal ancho) estando acoplado: el margen de la página cambia UNA vez, en el
+   mismo fotograma en que arranca el panel, y la rejilla se coloca directamente
+   en su sitio. Con las transiciones activas, cada tarjeta animaba su salto de
+   tamaño y posición por separado y el contenido "daba tumbos" hasta asentarse.
+   La marca la pone y la quita `applyContentMargin` en DetailModalProvider. */
+:root[data-sv-drawer-reflow] [data-detail-page-content],
+:root[data-sv-drawer-reflow] [data-detail-page-content] * {
+  transition: none !important;
+}
+
 /* ...y su CRISTAL también se apaga durante el gesto, igual que el del panel.
    La página se reorganiza en cada fotograma y hay que repintarla entera; sus
    `backdrop-filter` (barra de filtros, tarjetas, menús) son con diferencia lo

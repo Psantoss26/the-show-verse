@@ -11,7 +11,15 @@ import { openSavedRoute } from "@/lib/offline/navigation";
 // pestañas Detalles/Producción/Sinopsis, reparto, similares y
 // sentimientos) SIN importar sus internos: se replican los estilos.
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   motion,
   AnimatePresence,
@@ -451,6 +459,21 @@ function initialDrawerWidth() {
       ? stored
       : Math.min(Math.round(vw * 0.95), 1080);
   return clampDrawerWidth(base, vw);
+}
+
+// Ancho PREFERIDO del panel, antes de acotarlo a la ventana. La ficha de
+// teléfono tiene su propio ancho guardado y su propia proporción: partir del
+// ancho del modal ancho la hacía nacer mucho más grande y encoger después.
+function preferredPanelWidth(mobileDetails) {
+  if (!mobileDetails) return initialDrawerWidth();
+  let width = window.innerHeight * MOBILE_DETAILS_ASPECT_RATIO;
+  try {
+    const stored = Number(window.localStorage.getItem("showverse:mobileDetailsWidth"));
+    if (stored > 0) width = stored;
+  } catch {
+    // El panel funciona también sin almacenamiento.
+  }
+  return width;
 }
 
 /* ============================== SUBCOMPONENTES ============================== */
@@ -921,7 +944,15 @@ export default function DetailModal({
   }, [mobileDetails, panelSettled]);
 
   // Ancho del drawer derecho (redimensionable arrastrando el borde izquierdo).
-  const [panelWidth, setPanelWidth] = useState(initialDrawerWidth);
+  // El ancho DEFINITIVO se calcula ya en el primer render —con la vista
+  // (teléfono o modal) y el dispositivo (tablet) correctos—. Antes se partía
+  // del ancho del modal ancho y un efecto lo corregía tras pintar: el panel
+  // entraba grande, encogía y la página se reorganizaba dos veces.
+  const [panelWidth, setPanelWidth] = useState(() =>
+    typeof window === "undefined"
+      ? 1080
+      : clampPanelWidth(preferredPanelWidth(mobileDetails), window.innerWidth),
+  );
   const panelWidthRef = useRef(panelWidth);
   // ¿Se está arrastrando el tirador? (lo marca `beginResize`).
   const resizingRef = useRef(false);
@@ -937,20 +968,23 @@ export default function DetailModal({
   // barra, por ejemplo). Un MotionValue no lo toca React: un render ya no puede
   // devolver el panel a un ancho viejo.
   const panelWidthMotion = useMotionValue(panelWidth);
-  useEffect(() => {
+  useLayoutEffect(() => {
     // Fuera del arrastre, el estado manda (apertura, ajuste a la ventana).
     if (resizingRef.current) return;
     panelWidthMotion.set(panelWidth);
   }, [panelWidth, panelWidthMotion]);
 
-  useEffect(() => {
-    // El hueco de la ficha "mobile" va a los DOS lados (ver `marginLeft` del
-    // panel), así que lo reservado para el resto de la página es el doble.
+  // De layout: el hueco de la página se publica en el mismo commit que monta el
+  // panel, antes del primer fotograma, así que la página se reorganiza una sola
+  // vez y ya con el ancho definitivo.
+  useLayoutEffect(() => {
     if (isRightPlacement) onDrawerWidthChange?.(panelWidth);
   }, [isRightPlacement, panelWidth, onDrawerWidthChange]);
 
   // Reajusta el ancho si cambia el tamaño de la ventana (no desbordar / no romper).
-  useEffect(() => {
+  // De layout para que, al cambiar entre ficha de teléfono y modal ancho, el
+  // nuevo ancho se aplique antes de pintar y no se vea un fotograma intermedio.
+  useLayoutEffect(() => {
     if (!isRightPlacement || typeof window === "undefined") return undefined;
     const onResize = () => {
       // Arrastrando, el ancho lo lleva el gesto: este reajuste partiría del
@@ -962,17 +996,10 @@ export default function DetailModal({
         return next;
       });
     };
-    let preferredWidth = initialDrawerWidth();
-    if (mobileDetails) {
-      preferredWidth = window.innerHeight * MOBILE_DETAILS_ASPECT_RATIO;
-      try {
-        const stored = Number(window.localStorage.getItem("showverse:mobileDetailsWidth"));
-        if (stored > 0) preferredWidth = stored;
-      } catch {
-        // El panel funciona también sin almacenamiento.
-      }
-    }
-    const nextWidth = clampPanelWidth(preferredWidth, window.innerWidth);
+    const nextWidth = clampPanelWidth(
+      preferredPanelWidth(mobileDetails),
+      window.innerWidth,
+    );
     panelWidthRef.current = nextWidth;
     setPanelWidth(nextWidth);
     window.addEventListener("resize", onResize);
@@ -984,7 +1011,7 @@ export default function DetailModal({
   // Historial) puedan centrarse en el espacio libre a la IZQUIERDA sin taparlo.
   // Se limpia al cerrar (y en centrado/móvil nunca se pone → los overlays ocupan
   // la ventana completa como siempre).
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!isRightPlacement || typeof document === "undefined") return undefined;
     const root = document.documentElement;
     const id = ++drawerWidthVarSeq;
