@@ -783,7 +783,7 @@ function ContinueWatchingBaseCard({ show, mode = "continue" }) {
       )}
 
       {/* Overlay inferior: progreso o fecha de emisión + próximo episodio */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-3 pb-2 pt-8">
+      <div className={`pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-3 pb-2 pt-8 ${isCalendar ? "" : "hidden xl:block"}`}>
         {isCalendar && calendar?.countdown ? (
           <div className="mb-1 flex items-center gap-1.5 truncate text-[11px] font-semibold text-white drop-shadow">
             <CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -1686,11 +1686,12 @@ function ContinueWatchingPreviewCard({
       >
         {/* Fila de acciones COMPARTIDA con DetailsClient/DetailModal y las demás
             previews (UN solo layout, como pediste). Calendario: píldora de tráiler.
-            Continuar viendo: en el MISMO slot, píldora "Reproducir T·E" que reanuda
+            Continuar viendo: en el MISMO slot, píldora "Reproducir" que reanuda
             el episodio/película, y el botón de visionado muestra el PROGRESO de ese
             episodio/película concreto. Corta la propagación al onClick de la card. */}
         <div className="mb-3" onClick={(e) => e.stopPropagation()}>
           <DetailActionsRow
+            fitToContainer={!isCalendar}
             onTrailer={isCalendar ? handleToggleTrailer : undefined}
             trailerAvailable={isCalendar}
             trailerLoading={isCalendar ? trailerLoading : false}
@@ -1700,13 +1701,9 @@ function ContinueWatchingPreviewCard({
               isCalendar
                 ? undefined
                 : {
-                    label: ep
-                      ? `Reproducir T${ep.season}·E${ep.number}`
-                      : "Reproducir",
+                    label: "Reproducir",
                     onPlay: handleContinue,
-                    title: ep
-                      ? `Reproducir T${ep.season} E${ep.number}`
-                      : "Reproducir",
+                    title: "Reproducir",
                   }
             }
             onSoundtrack={handleToggleSoundtrack}
@@ -2473,7 +2470,7 @@ function ContinueWatchingSection({
                 "relative flex-shrink-0 transition-all duration-[420ms] ease-[cubic-bezier(0.16,1,0.3,1)]";
               // Escritorio: el ancho lo fija Swiper (según breakpoint) y el alto
               // sale del aspect-video. Móvil: 2 por fila (ancho lo fija Swiper)
-              // con alto fijo para mantener legible el overlay de progreso.
+              // con alto fijo; la barra de progreso queda fuera de la imagen.
               const dimensionClasses = isMobile
                 ? `w-full ${ROW_HEIGHT}`
                 : "w-full aspect-video";
@@ -2550,6 +2547,21 @@ function ContinueWatchingSection({
                       )}
                     </AnimatePresence>
                   </div>
+                  {!isCalendar && (
+                    <div
+                      role="progressbar"
+                      aria-label={`Progreso de reproducción de ${show.title || "este título"}`}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={clampPct(show.pct)}
+                      className="mx-auto mt-2 h-1 w-[85%] overflow-hidden rounded-full bg-white/25 xl:hidden"
+                    >
+                      <div
+                        className="h-full rounded-full bg-emerald-500"
+                        style={{ width: `${clampPct(show.pct)}%` }}
+                      />
+                    </div>
+                  )}
                 </SwiperSlide>
               );
             })}

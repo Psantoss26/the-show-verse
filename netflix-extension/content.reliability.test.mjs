@@ -58,3 +58,73 @@ test('closing before resolution preserves the final observation for offline reco
   assert.equal(pending.message.positionSec, 950);
   assert.equal(pending.message.episode, 1);
 });
+
+// Crunchyroll web: el <video> está en un iframe (static.crunchyroll.com) y el
+// título en la página principal. El iframe solo informa; la página sincroniza.
+function crunchyroll({ subframe }) {
+  let tick, clock = 100_000;
+  const sent = [], posted = [], listeners = {};
+  const video = { readyState: 4, duration: 1440, currentTime: 300, clientWidth: 800, clientHeight: 450, paused: false, ended: false, addEventListener() {} };
+  const host = subframe ? 'static.crunchyroll.com' : 'www.crunchyroll.com';
+  const location = { hostname: host, href: `https://${host}/watch/GZ7UV13VE` };
+  const win = { addEventListener: (name, fn) => { listeners[name] = fn; } };
+  win.self = win;
+  win.top = subframe ? { postMessage: (data) => posted.push(data) } : win;
+  const context = {
+    console: { log() {}, warn() {} },
+    Date: class extends Date { static now() { return clock; } },
+    setInterval: fn => { tick = fn; return 1; }, clearInterval() {},
+    setTimeout, clearTimeout, URL,
+    location,
+    navigator: {},
+    document: { title: 'Frieren', querySelectorAll: selector => selector === 'video' && subframe ? [video] : [], getElementById: () => null, addEventListener() {} },
+    window: win,
+    self: { TSVSyncReliability: reliability, TSVDetection: {
+      isBarePlatformName: () => false,
+      composePlaybackSignal: (i) => ({ contentId: 'GZ7UV13VE', showName: 'Frieren', episodeName: 'La promesa', episode: 12, durationSec: i.durationSec, positionSec: i.positionSec }),
+      fillMissingTitles: signal => signal,
+      pickProgressPoint: (live, cached) => live || cached,
+      stripPlatformPrefix: t => t,
+      detectFromJsonLd: () => null,
+      detectFromMeta: () => '',
+    } },
+    chrome: { runtime: { id: 'test', sendMessage: (message, callback) => { sent.push({ message, callback }); } },
+      storage: { local: { get: (_keys, callback) => callback({ indicatorEnabled: false }) }, onChanged: { addListener() {} } } },
+  };
+  vm.runInNewContext(source, context);
+  const message = (data, origin = 'https://static.crunchyroll.com') =>
+    listeners.message({ data, origin, source: {} });
+  return { tick: () => tick(), sent, posted, message, advance: ms => { clock += ms; }, video, location };
+}
+
+test('Crunchyroll player iframe only reports the video and never syncs on its own', () => {
+  const p = crunchyroll({ subframe: true }); p.tick();
+  assert.equal(p.sent.length, 0);
+  assert.equal(p.posted.length, 1);
+  assert.equal(p.posted[0].currentTime, 300);
+  assert.equal(p.posted[0].duration, 1440);
+});
+
+test('Crunchyroll top page syncs progress using the iframe video', () => {
+  const p = crunchyroll({ subframe: false });
+  p.message({ source: 'tsv-player-frame', event: 'tick', currentTime: 300, duration: 1440, width: 800, height: 450 });
+  p.tick();
+  const watch = p.sent.find(x => x.message.action === 'syncWatch');
+  assert.ok(watch, 'resolves the title playing in the iframe');
+  assert.equal(watch.message.positionSec, 300);
+  watch.callback({ success: true, synced: { tmdbId: 209867, mediaType: 'tv', season: 1, episode: 12 } });
+  const progress = p.sent.find(x => x.message.action === 'syncProgress');
+  assert.ok(progress, 'sends progress once resolved');
+  assert.equal(progress.message.runtimeSeconds, 1440);
+});
+
+test('Crunchyroll top page ignores messages from other origins and stale state', () => {
+  const p = crunchyroll({ subframe: false });
+  p.message({ source: 'tsv-player-frame', currentTime: 300, duration: 1440 }, 'https://evil.example');
+  p.tick();
+  assert.equal(p.sent.filter(x => x.message.action === 'syncWatch').length, 0);
+  p.message({ source: 'tsv-player-frame', currentTime: 300, duration: 1440 });
+  p.location.href = 'https://www.crunchyroll.com/series/GY5P48XEY/frieren';
+  p.tick();
+  assert.equal(p.sent.filter(x => x.message.action === 'syncWatch').length, 0);
+});
