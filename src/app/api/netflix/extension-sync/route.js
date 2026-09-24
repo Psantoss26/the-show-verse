@@ -10,10 +10,15 @@ import {
   searchTmdbCandidatesWithFallback,
   matchEpisodeByName,
   matchEpisodeCandidates,
+  isGenericEpisodeName,
 } from "@/lib/netflix/streamingResolve";
 import { normalizeText } from "@/lib/netflix/resolve";
 import { createRequestCache } from "@/lib/netflix/requestCache";
-import { buildRankedQueryVariants } from "@/lib/netflix/queryVariants";
+import {
+  buildRankedQueryVariants,
+  cleanSearchTitle,
+  isBarePlatformName,
+} from "@/lib/netflix/queryVariants";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -122,12 +127,8 @@ function tmdbJson(url) {
 //   3) Nombre por inclusión fiable (endurecida) único.
 //   4) `episodeNumber` conocido y UNA SOLA temporada tiene ≥N episodios.
 // Devuelve {season, episode} o null.
-async function findSeasonByEpisodeName(tmdbId, episodeName, episodeNumber = null) {
-  if (!tmdbId || !TMDB_API_KEY) return null;
-  const clean = cleanEpisodeName(episodeName);
-  const epNum = Number.isInteger(episodeNumber) && episodeNumber > 0 ? episodeNumber : null;
-  if ((!clean || clean.length < 2) && !epNum) return null;
-
+// Temporadas reales de la serie y TODOS sus episodios (es-ES + en-US, cacheados).
+async function loadShowEpisodes(tmdbId) {
   const showData = await tmdbJson(
     `${TMDB_API}/tv/${tmdbId}?api_key=${TMDB_API_KEY}&language=es-ES`,
   );
@@ -136,7 +137,7 @@ async function findSeasonByEpisodeName(tmdbId, episodeName, episodeNumber = null
     .sort((a, b) => Number(a.season_number) - Number(b.season_number))
     .slice(0, 30); // cota de seguridad para series con muchas temporadas
   const seasonNums = realSeasons.map((s) => Number(s.season_number));
-  if (!seasonNums.length) return null;
+  if (!seasonNums.length) return { realSeasons, allEpisodes: [] };
 
   const allEpisodes = (
     await Promise.all(
@@ -152,6 +153,35 @@ async function findSeasonByEpisodeName(tmdbId, episodeName, episodeNumber = null
       }),
     )
   ).flat();
+  return { realSeasons, allEpisodes };
+}
+
+// ¿El episodio que se está reproduciendo pertenece a ESTA serie? Solo se usa
+// cuando la serie no la ha dicho la reproducción sino la PISTA de una ficha vista
+// antes (app Android). Esa pista puede estar desfasada —otra ficha abierta hace
+// un rato, un banner de la portada— y como nombra un título real de TMDb, la
+// búsqueda lo da por EXACTO: así es como un episodio acababa registrado con una
+// serie que no tenía nada que ver. El nombre del episodio es lo que permite
+// comprobarlo. Devuelve true/false, o null si no hay forma de saberlo (sin
+// nombre utilizable o sin datos de TMDb).
+async function episodeBelongsToShow(tmdbId, episodeName) {
+  if (!tmdbId || !TMDB_API_KEY) return null;
+  const clean = cleanEpisodeName(episodeName);
+  if (!clean || clean.length < 4 || isGenericEpisodeName(clean)) return null;
+  const { allEpisodes } = await loadShowEpisodes(tmdbId);
+  if (!allEpisodes.length) return null;
+  const { exact, partial } = matchEpisodeCandidates({ episodeName: clean, seasonEpisodes: allEpisodes });
+  return exact.length > 0 || partial.length > 0;
+}
+
+async function findSeasonByEpisodeName(tmdbId, episodeName, episodeNumber = null) {
+  if (!tmdbId || !TMDB_API_KEY) return null;
+  const clean = cleanEpisodeName(episodeName);
+  const epNum = Number.isInteger(episodeNumber) && episodeNumber > 0 ? episodeNumber : null;
+  if ((!clean || clean.length < 2) && !epNum) return null;
+
+  const { realSeasons, allEpisodes } = await loadShowEpisodes(tmdbId);
+  if (!realSeasons.length) return null;
 
   // 1) Número de episodio conocido: ¿en qué temporadas casa el NOMBRE del
   //    episodio Nº epNum? Único → fijado con máxima fiabilidad.
@@ -253,6 +283,11 @@ export async function POST(request) {
       // el usuario tenía abierta antes (app Android, apps que no exponen la serie en
       // la MediaSession). Es un dato prestado, así que rebaja la confianza.
       seriesFromHint,
+      // Textos que la accesibilidad leyó en la pantalla de la app DURANTE la
+      // reproducción (la barra del reproductor suele mostrar la serie). Solo los
+      // manda la app Android cuando la sesión no dice de qué serie es el
+      // episodio. Son ruidosos: se usan como último recurso y con doble prueba.
+      screenTitles,
       // Modo "solo resolver": para el indicador en la FICHA del título (navegando,
       // sin reproducir). Resuelve el título pero NO lo inserta en el historial.
       resolveOnly,
@@ -447,6 +482,41 @@ export async function POST(request) {
       query = fallback.query;
     }
 
+    // ÚLTIMO RECURSO para un episodio sin serie: los textos de la pantalla del
+    // reproductor. Se acepta una serie solo con DOBLE PRUEBA: su nombre coincide
+    // EXACTO con uno de esos textos y el nombre del episodio que suena existe en
+    // esa serie. Cualquiera de las dos por separado se da con demasiada facilidad
+    // (una fila de recomendaciones, un botón), las dos a la vez no.
+    let seriesFromScreen = false;
+    const screenQueries = (Array.isArray(screenTitles) ? screenTitles : [])
+      .filter((t) => typeof t === "string" && t.trim().length >= 2 && t.length <= 120)
+      .map((t) => cleanSearchTitle(t))
+      .filter((t) => t && t.length >= 2 && !isBarePlatformName(t))
+      .filter((t, i, all) => all.indexOf(t) === i)
+      .slice(0, 5);
+    if (!resolution && isTv && !showName && screenQueries.length && (episodeName || subTitle)) {
+      for (const screenQuery of screenQueries) {
+        const candidate = await resolveStreamingEntity({
+          query: screenQuery,
+          // Igual que en las variantes normales: con número de episodio se busca
+          // solo serie; sin él, `show_level` permite fijar T/E por el nombre.
+          expectedMediaType: episode != null ? "tv" : null,
+          preferTv: true,
+          durationSec: safeDurationSec,
+          search: (type) => searchTmdbCandidates(backendRequest, screenQuery, type),
+        });
+        if (!candidate?.exact || candidate.mediaType !== "tv") continue;
+        // (show_level también es "tv": su mediaType ya viene fijado a "tv".)
+        const belongs = await episodeBelongsToShow(candidate.entity.id, episodeName || subTitle).catch(() => null);
+        if (belongs !== true) continue;
+        resolution = candidate;
+        query = screenQuery;
+        seriesFromScreen = true;
+        console.log(`[Extension Sync] Serie tomada de la pantalla del reproductor: "${screenQuery}"`);
+        break;
+      }
+    }
+
     if (resolution?.kind === "resolved") {
       const entity = resolution.entity;
       tmdbId = entity.id;
@@ -585,11 +655,30 @@ export async function POST(request) {
     // Serie tomada de una ficha ajena a la reproducción: por buena que fuera la
     // coincidencia en TMDb, el dato de partida no lo dio el reproductor. Nunca
     // "high", para que el historial distinga lo seguro de lo deducido.
-    if (seriesFromHint && confidence === "high") confidence = "medium";
+    if ((seriesFromHint || seriesFromScreen) && confidence === "high") confidence = "medium";
 
     if (!tmdbId) {
       console.error("[Extension Sync] Could not resolve TMDb entity for:", query);
       return respond({ error: `Could not resolve TMDb entity for: ${query}` }, { status: 404 });
+    }
+
+    // La serie salió de la PISTA de una ficha (no de la reproducción): se exige
+    // que el episodio que suena sea de esa serie. Si su nombre no aparece entre
+    // los episodios de la serie, la pista era de otro título y no se registra
+    // nada: un episodio ajeno en Continuar viendo o en el historial es peor que
+    // una sincronización perdida.
+    if (seriesFromHint && isTv) {
+      const belongs = await episodeBelongsToShow(tmdbId, episodeName || subTitle).catch(() => null);
+      if (belongs === false) {
+        console.warn(
+          `[Extension Sync] Pista descartada: "${episodeName || subTitle}" no es un episodio de "${resolvedTitle}".`,
+        );
+        return respond(
+          { error: "Series hint does not match the episode being played", reason: "hint_mismatch" },
+          { status: 422 },
+        );
+      }
+      if (belongs === true && confidence === "low") confidence = "medium";
     }
 
     // Observación guardada sin conexión: resolver y aplicar el punto original,

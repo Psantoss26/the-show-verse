@@ -42,7 +42,7 @@ import {
   getActivityDetailsHref,
 } from "@/lib/profile/activityRatingTarget";
 import { profileTabHref } from "@/app/u/[username]/profileRoutes";
-import { setAppPullToRefreshLocked } from "@/lib/android/appBridge";
+import { useAppPullToRefreshLock } from "@/lib/android/appBridge";
 import { canScrollInDirection } from "@/lib/ui/touchScrollGuard";
 
 // Icono y tono de cada acción: los MISMOS que la Actividad del perfil, para
@@ -407,11 +407,7 @@ export default function AlertsMenu({ account, variant = "desktop", heroNavMode =
   //   - App de Android: su "deslizar para recargar" es nativo y no ve el scroll
   //     del panel, así que se le pide que lo desactive mientras esté abierto.
   const panelReady = open && position != null;
-  useEffect(() => {
-    if (!open) return undefined;
-    setAppPullToRefreshLocked(true);
-    return () => setAppPullToRefreshLocked(false);
-  }, [open]);
+  useAppPullToRefreshLock(open);
 
   useEffect(() => {
     const panel = panelRef.current;

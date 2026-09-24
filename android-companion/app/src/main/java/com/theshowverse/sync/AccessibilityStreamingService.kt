@@ -86,6 +86,10 @@ class AccessibilityStreamingService : AccessibilityService() {
         val analysis = best ?: return
         val winScan = scan?.toString().orEmpty()
 
+        // Textos de ESTA pantalla, sea o no una ficha: durante la reproducción es
+        // la barra del reproductor, que suele nombrar la serie. Ver ScreenTexts.
+        ScreenTexts.record(pkg, analysis.candidates)
+
         // Solo actuamos si la pantalla PARECE una ficha (botón de reproducir
         // reconocido O suficientes señales de detalle) y hay algún candidato.
         if (!analysis.looksLikeDetail || analysis.candidates.isEmpty()) {

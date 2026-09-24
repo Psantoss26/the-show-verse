@@ -288,3 +288,21 @@ test("an ambiguous episode name is left unresolved", () => {
     { season_number: 2, episode_number: 1, name: "Piloto" },
   ] }), null);
 });
+
+test("isPlausibleMatch no acepta un título corto metido dentro de una frase", () => {
+  // Un episodio de Netflix ("Capítulo cinco: La Nina") no es la serie "La Niña".
+  assert.equal(
+    isPlausibleMatch({ name: "La Niña", popularity: 40, vote_count: 300 }, "Capítulo cinco: La Nina", "tv"),
+    false,
+  );
+  // Ni el nombre de un episodio de anime es la serie que comparte una palabra.
+  assert.equal(
+    isPlausibleMatch({ name: "Promesa", popularity: 40, vote_count: 300 }, "E12 - La promesa de los mil años", "tv"),
+    false,
+  );
+  // Un sufijo corto sigue casando.
+  assert.equal(
+    isPlausibleMatch({ name: "The Office", popularity: 90, vote_count: 3000 }, "The Office (US)", "tv"),
+    true,
+  );
+});
