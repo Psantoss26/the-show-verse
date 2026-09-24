@@ -782,8 +782,11 @@ function ContinueWatchingBaseCard({ show, mode = "continue" }) {
         />
       )}
 
-      {/* Overlay inferior: progreso o fecha de emisión + próximo episodio */}
-      <div className={`pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-3 pb-2 pt-8 ${isCalendar ? "" : "hidden xl:block"}`}>
+      {/* Overlay inferior, SOLO en Calendario (fecha de emisión + episodio).
+          En Continuar viendo la tarjeta va limpia: la barra de progreso se pinta
+          DEBAJO y fuera de ella, sin texto, en todos los tamaños; el texto del
+          progreso solo aparece en la vista previa al pasar el ratón. */}
+      <div className={`pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-3 pb-2 pt-8 ${isCalendar ? "" : "hidden"}`}>
         {isCalendar && calendar?.countdown ? (
           <div className="mb-1 flex items-center gap-1.5 truncate text-[11px] font-semibold text-white drop-shadow">
             <CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -1664,7 +1667,19 @@ function ContinueWatchingPreviewCard({
         ) : (
           // Barra de progreso de "Continuar viendo": se conserva sobre el pie del
           // backdrop (aunque haya tráiler) para no perder la referencia visual.
+          // Es el ÚNICO sitio con el texto del progreso (episodio y tiempo
+          // restante): las tarjetas de la fila solo llevan la barra, debajo.
           <div className="absolute inset-x-3 bottom-2 z-10">
+            {ep || show?.remainingLabel ? (
+              <div className="mb-1 flex items-center gap-1 truncate text-[11px] font-semibold text-white drop-shadow">
+                <Play className="h-3 w-3 shrink-0 fill-current text-white" aria-hidden="true" />
+                <span className="truncate">
+                  {ep ? `T${ep.season}·E${ep.number}` : ""}
+                  {ep && show?.remainingLabel ? " · " : ""}
+                  {show?.remainingLabel || ""}
+                </span>
+              </div>
+            ) : null}
             <div className="h-1 w-full overflow-hidden rounded-full bg-white/20">
               <div
                 className="h-full rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"
@@ -2554,7 +2569,7 @@ function ContinueWatchingSection({
                       aria-valuemin={0}
                       aria-valuemax={100}
                       aria-valuenow={clampPct(show.pct)}
-                      className="mx-auto mt-2 h-1 w-[85%] overflow-hidden rounded-full bg-white/25 xl:hidden"
+                      className="mx-auto mt-2 h-1 w-[85%] overflow-hidden rounded-full bg-white/25"
                     >
                       <div
                         className="h-full rounded-full bg-emerald-500"

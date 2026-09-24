@@ -42,6 +42,8 @@ import {
   getActivityDetailsHref,
 } from "@/lib/profile/activityRatingTarget";
 import { profileTabHref } from "@/app/u/[username]/profileRoutes";
+import { setAppPullToRefreshLocked } from "@/lib/android/appBridge";
+import { canScrollInDirection } from "@/lib/ui/touchScrollGuard";
 
 // Icono y tono de cada acción: los MISMOS que la Actividad del perfil, para
 // que una acción se reconozca igual en los dos sitios.
@@ -393,6 +395,54 @@ export default function AlertsMenu({ account, variant = "desktop", heroNavMode =
     };
   }, [open]);
 
+  // GESTOS TÁCTILES DENTRO DEL PANEL: son del panel, nunca de la página.
+  //
+  // En móvil y tablet, arrastrar hacia abajo sobre el desplegable (con la lista
+  // arriba del todo, o sobre algo que no se desplaza) se encadenaba a la página
+  // y disparaba el «tirar para actualizar»: se recargaba la web en vez de
+  // desplazar las alertas. Dos frentes:
+  //   - Navegador: un `touchmove` dentro del panel solo sigue si hay algo en el
+  //     panel que pueda desplazarse en esa dirección (mismo criterio que la
+  //     guardia de los modales, `touchScrollGuard`); si no, se cancela.
+  //   - App de Android: su "deslizar para recargar" es nativo y no ve el scroll
+  //     del panel, así que se le pide que lo desactive mientras esté abierto.
+  const panelReady = open && position != null;
+  useEffect(() => {
+    if (!open) return undefined;
+    setAppPullToRefreshLocked(true);
+    return () => setAppPullToRefreshLocked(false);
+  }, [open]);
+
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!panelReady || !panel) return undefined;
+    let last = null;
+    const onStart = (event) => {
+      const touch = event.touches[0];
+      last = event.touches.length === 1 && touch ? { x: touch.clientX, y: touch.clientY } : null;
+    };
+    const onMove = (event) => {
+      if (event.touches.length !== 1 || !last || !event.cancelable) return;
+      const touch = event.touches[0];
+      const dx = touch.clientX - last.x;
+      const dy = touch.clientY - last.y;
+      last = { x: touch.clientX, y: touch.clientY };
+      if (!dx && !dy) return;
+      for (let el = event.target instanceof Element ? event.target : null; el; el = el.parentElement) {
+        if (canScrollInDirection(el, dx, dy, window.getComputedStyle(el))) return;
+        if (el === panel) break;
+      }
+      event.preventDefault();
+    };
+    panel.addEventListener("touchstart", onStart, { passive: true });
+    // `passive: false`: sin eso `preventDefault()` se ignora.
+    panel.addEventListener("touchmove", onMove, { passive: false });
+    return () => {
+      panel.removeEventListener("touchstart", onStart);
+      panel.removeEventListener("touchmove", onMove);
+    };
+  }, [panelReady]);
+
   // Posición: bajo la barra (con el mismo aire que el menú de Perfil) y con el
   // borde derecho alineado al botón, sin salirse de la pantalla.
   useLayoutEffect(() => {
@@ -504,7 +554,7 @@ export default function AlertsMenu({ account, variant = "desktop", heroNavMode =
                 className={`fixed z-[99999] overflow-hidden rounded-2xl p-2 text-white ${LIQUID_GLASS_PANEL}`}
               >
                 <div className="flex flex-col">
-                  <div className="max-h-[65vh] overflow-y-auto no-scrollbar">
+                  <div className="max-h-[65vh] overflow-y-auto overscroll-contain no-scrollbar">
                     {!alerts ? (
                       <div className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-zinc-300 ${READABLE}`}>
                         {loading ? (
