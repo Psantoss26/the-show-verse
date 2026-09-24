@@ -1,6 +1,7 @@
 // src/app/favorites/FavoritesClient.jsx
 "use client";
 import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
+import LogoutConfirmModal from "@/components/auth/LogoutConfirmModal";
 import { pickBestFavoriteEnglishPoster } from "@/lib/details/tmdbImages";
 
 import OptimizedImage from "@/components/OptimizedImage";
@@ -2166,7 +2167,6 @@ export default function FavoritesClient() {
     session,
     account,
     hydrated,
-    logout,
     updatePreference,
     authenticated,
   } = useAuth();
@@ -2322,27 +2322,23 @@ export default function FavoritesClient() {
     useStickyToolbarState(filtersRef);
   const tmdbLogoutInFlightRef = useRef(false);
 
-  const handleTmdbLogout = useCallback(async () => {
-    if (logoutLoading) return;
+  // Cierre de sesión con confirmación (común a las páginas de usuario, ver
+  // LogoutConfirmModal). Antes de salir se cierra también la sesión HEREDADA de
+  // TMDb (cookie tmdb_session_id) y se vacía la página; mientras tanto se ignoran
+  // las cargas que lleguen tarde. Si TMDb falla, la sesión se cierra igual.
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const prepareTmdbLogout = useCallback(async () => {
     tmdbLogoutInFlightRef.current = true;
     setLogoutLoading(true);
     try {
-      const res = await fetch("/auth/tmdb/logout", {
-        method: "POST",
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error("No se pudo cerrar la sesión de TMDb");
+      await fetch("/auth/tmdb/logout", { method: "POST", cache: "no-store" });
+    } catch {
+      /* la cookie heredada caduca sola; no impide cerrar la sesión */
+    }
       setItems([]);
       setRatedItems([]);
       setLoading(false);
-      logout();
-    } catch (error) {
-      tmdbLogoutInFlightRef.current = false;
-      console.error("Error cerrando sesión TMDb:", error);
-      setLogoutLoading(false);
-      alert("No se pudo cerrar la sesión de TMDb. Inténtalo de nuevo.");
-    }
-  }, [logout, logoutLoading]);
+  }, []);
 
   // Limpieza única al montar: descarta las versiones antiguas de la caché de
   // elecciones, que quedarían huérfanas en localStorage tras subir la clave.
@@ -3494,16 +3490,22 @@ export default function FavoritesClient() {
                     }
                   >
                     <LiquidButton
-                      onClick={handleTmdbLogout}
+                      onClick={() => setShowLogoutModal(true)}
                       disabled={loading || logoutLoading}
                       loading={loading || logoutLoading}
                       activeColor="red"
                       groupId="favorites-header-actions"
-                      title="Desconectar cuenta TMDb"
+                      title="Cerrar sesión"
+                      aria-label="Cerrar sesión"
                       className="!text-red-400 hover:!text-red-300 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent !border-0 shadow-lg backdrop-blur-md hover:!bg-white/15"
                     >
                       <LogOut className="w-5 h-5" />
                     </LiquidButton>
+                    <LogoutConfirmModal
+                      open={showLogoutModal}
+                      onClose={() => setShowLogoutModal(false)}
+                      onBeforeLogout={prepareTmdbLogout}
+                    />
                   </motion.div>
                 </div>
               </div>

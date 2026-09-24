@@ -1597,6 +1597,7 @@ function InlinePreviewCard({
                 onClick={(e) => e.stopPropagation()}
               >
                 <DetailActionsRow
+                  compactLabelWhenTight
                   size="lg"
                   className="labeled-row"
                   showSeparator={false}
@@ -1685,6 +1686,7 @@ function InlinePreviewCard({
               onClick={(e) => e.stopPropagation()}
             >
               <DetailActionsRow
+                compactLabelWhenTight
                 onTrailer={handleToggleTrailer}
                 trailerAvailable
                 trailerLoading={trailerLoading}
@@ -2450,6 +2452,7 @@ function InlinePreviewCardAnticipated({
             El contenedor corta la propagación al onClick de la card. */}
         <div className="mb-3" onClick={(e) => e.stopPropagation()}>
           <DetailActionsRow
+            compactLabelWhenTight
             onTrailer={handleToggleTrailer}
             trailerAvailable
             trailerLoading={trailerLoading}

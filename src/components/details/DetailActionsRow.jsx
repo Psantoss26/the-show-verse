@@ -7,7 +7,7 @@
 // consumidor (DetailsClient o DetailModal), que pasa handlers + flags por props.
 
 import { useServerOnline } from "@/context/ServerStatusContext";
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import BaseLiquidButton from "@/components/LiquidButton";
 import StarRating from "@/components/StarRating";
@@ -150,6 +150,12 @@ export default function DetailActionsRow({
   showSeparator = true,
   fillMobile = false,
   fitToContainer = false,
+  // PÍLDORA ADAPTABLE (vistas previas del dashboard). Si la fila no cabe entera
+  // en su ancho, la píldora con texto —"Reproducir" / "Ver tráiler"— pasa a
+  // ser un botón redondo solo con el icono, como el resto; si vuelve a caber,
+  // recupera el texto. Sin esto, en series (que llevan un botón más) los últimos
+  // botones quedaban cortados por el borde de la tarjeta.
+  compactLabelWhenTight = false,
   // La ficha de TELÉFONO del drawer (DetailModal con `contentView === "mobile"`)
   // mide entre 320 y 639px de ANCHO DE PANEL, pero vive en una ventana de
   // escritorio: los `sm:` de esta fila miran el viewport, así que allí casan
@@ -199,6 +205,51 @@ export default function DetailActionsRow({
 }) {
   const serverOnline = useServerOnline();
   const [mediaExpanded, setMediaExpanded] = useState(false);
+
+  // --- Píldora adaptable (ver `compactLabelWhenTight`).
+  const hasLabelButton = Boolean(play || trailerLabel);
+  const rowRef = useRef(null);
+  const [labelCompact, setLabelCompact] = useState(false);
+  // Ancho que necesitaba la fila CON texto la última vez que no cabía: con la
+  // píldora compacta la fila ya cabe, así que para saber si se puede volver al
+  // texto hay que compararse con lo que ocupaba entonces.
+  const neededWidthRef = useRef(0);
+  useLayoutEffect(() => {
+    const row = rowRef.current;
+    if (!compactLabelWhenTight || !hasLabelButton || !row) {
+      setLabelCompact(false);
+      return undefined;
+    }
+    // La fila puede ocupar también el margen interior derecho de la tarjeta
+    // (menos un poco de aire): es lo que ya se veía bien cuando todo cabía.
+    const slack = () => {
+      for (let el = row.parentElement, i = 0; el && i < 4; el = el.parentElement, i += 1) {
+        const pad = parseFloat(window.getComputedStyle(el).paddingRight) || 0;
+        if (pad > 0) return Math.max(0, pad - 4);
+      }
+      return 0;
+    };
+    const measure = () => {
+      const available = row.clientWidth + slack();
+      if (!row.clientWidth) return;
+      setLabelCompact((compact) => {
+        if (!compact) {
+          if (row.scrollWidth > available + 1) {
+            neededWidthRef.current = row.scrollWidth;
+            return true;
+          }
+          return false;
+        }
+        return available + 1 < neededWidthRef.current;
+      });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(row);
+    return () => observer.disconnect();
+  }, [compactLabelWhenTight, hasLabelButton]);
+  const showLabel = !labelCompact;
+  const trailerTextShown = Boolean(trailerLabel) && showLabel;
 
   const shouldCombineMedia =
     (combineTrailerSoundtrack !== undefined
@@ -522,6 +573,7 @@ export default function DetailActionsRow({
 
       {/* VISTA ESTÁNDAR (ESCRITORIO Y PELÍCULAS) */}
       <div
+        ref={rowRef}
         className={
           shouldCombineMedia
             ? `hidden ${forceMobile ? "" : "sm:flex"} ${rowClass}`
@@ -535,23 +587,33 @@ export default function DetailActionsRow({
             active
             activeColor="yellow"
             groupId="details-actions"
-            className={`labeled shrink-0 !aspect-auto !w-auto !max-w-none !bg-white !text-black ${
-              size === "lg" ? "!h-12 px-5" : "!h-10 px-4"
-            }`}
+            className={
+              showLabel
+                ? `labeled shrink-0 !aspect-auto !w-auto !max-w-none !bg-white !text-black ${
+                    size === "lg" ? "!h-12 px-5" : "!h-10 px-4"
+                  }`
+                : "shrink-0 !bg-white !text-black"
+            }
             title={play.title || play.label || "Reproducir"}
           >
             <Play
               className={`fill-current ${
-                size === "lg" ? "mr-2 h-5 w-5" : "mr-2 h-4 w-4"
+                showLabel
+                  ? size === "lg"
+                    ? "mr-2 h-5 w-5"
+                    : "mr-2 h-4 w-4"
+                  : "ml-0.5 sm:ml-1"
               }`}
             />
-            <span
-              className={`whitespace-nowrap font-bold ${
-                size === "lg" ? "text-sm sm:text-base" : "text-[13px]"
-              }`}
-            >
-              {play.label}
-            </span>
+            {showLabel && (
+              <span
+                className={`whitespace-nowrap font-bold ${
+                  size === "lg" ? "text-sm sm:text-base" : "text-[13px]"
+                }`}
+              >
+                {play.label}
+              </span>
+            )}
           </LiquidButton>
         )}
 
@@ -566,7 +628,7 @@ export default function DetailActionsRow({
             groupId="details-actions"
             className={[
               trailerAvailable ? "!bg-white !text-black" : "",
-              trailerLabel
+              trailerTextShown
                 ? `labeled shrink-0 !aspect-auto !w-auto !max-w-none ${
                     size === "lg" ? "!h-12 px-5" : "!h-10 px-4"
                   }`
@@ -585,7 +647,7 @@ export default function DetailActionsRow({
             {trailerPlaying ? (
               <X
                 className={
-                  trailerLabel
+                  trailerTextShown
                     ? size === "lg"
                       ? "mr-2 h-5 w-5"
                       : "mr-2 h-4 w-4"
@@ -595,7 +657,7 @@ export default function DetailActionsRow({
             ) : (
               <Play
                 className={`fill-current ${
-                  trailerLabel
+                  trailerTextShown
                     ? size === "lg"
                       ? "mr-2 h-5 w-5"
                       : "mr-2 h-4 w-4"
@@ -605,7 +667,7 @@ export default function DetailActionsRow({
                 }`}
               />
             )}
-            {trailerLabel && (
+            {trailerTextShown && (
               <span
                 className={`whitespace-nowrap font-bold ${
                   size === "lg" ? "text-sm sm:text-base" : "text-[13px]"

@@ -1,6 +1,7 @@
 "use client";
 
 import { loadProfileCharts } from "@/lib/profile/loadProfileCharts";
+import LogoutConfirmModal from "@/components/auth/LogoutConfirmModal";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -687,7 +688,9 @@ function buildAnalyticsFromPrivateProfile(payload) {
 // ─────────────────────────────────────────────
 
 export default function ProfileClient({ username, initialTab = "profile", routeBase = null }) {
-  const { user: viewer, logout } = useAuth();
+  const { user: viewer } = useAuth();
+  // Cerrar sesión pide confirmación, igual que en el resto de páginas de usuario.
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const router = useRouter();
   const isBackNav = useIsHistoryNavigation();
   const profileSwipe = useRef(null);
@@ -966,15 +969,20 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
                     <RotateCcw className={`h-4 w-4 @[640px]/detail-page:h-5 @[640px]/detail-page:w-5 ${syncing ? "animate-spin" : ""}`} />
                   </LiquidButton>
                   <LiquidButton
-                    onClick={() => logout({ redirectTo: "/login" })}
+                    onClick={() => setShowLogoutModal(true)}
                     disabled={syncing}
                     activeColor="red"
                     groupId="profile-header-actions"
-                    title="Desconectar"
+                    title="Cerrar sesión"
+                    aria-label="Cerrar sesión"
                     className="!h-10 !w-10 @[640px]/detail-page:!h-12 @[640px]/detail-page:!w-12 !border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent !text-red-400 shadow-lg backdrop-blur-md hover:!bg-white/15 hover:!text-red-300"
                   >
                     <LogOut className="h-4 w-4 @[640px]/detail-page:h-5 @[640px]/detail-page:w-5" />
                   </LiquidButton>
+                  <LogoutConfirmModal
+                    open={showLogoutModal}
+                    onClose={() => setShowLogoutModal(false)}
+                  />
                 </div>
               ) : (
                 <FollowButton

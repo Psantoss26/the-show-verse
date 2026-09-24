@@ -2,6 +2,7 @@
 
 
 import OptimizedImage from "@/components/OptimizedImage";
+import LogoutConfirmModal from "@/components/auth/LogoutConfirmModal";
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
@@ -36,7 +37,6 @@ import {
 import {
   traktAuthStatus,
   traktGetHistory,
-  traktDisconnect,
 } from "@/lib/api/traktClient";
 import LiquidButton from "@/components/LiquidButton";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
@@ -3340,25 +3340,10 @@ export default function HistoryClient() {
     [],
   );
 
-  const handleDisconnect = useCallback(async () => {
-    try {
-      await traktDisconnect();
-      // Limpiar estado local
-      setAuth({ loading: false, connected: false });
-      setRaw([]);
-      setHistoryLoaded(false);
-      setHasMoreHistory(false);
-      hasMoreHistoryRef.current = false;
-      nextHistoryPageRef.current = 1;
-      clearHistoryCache();
-      setShowDisconnectModal(false);
-      // Redirigir a la página principal
-      window.location.href = "/";
-    } catch (error) {
-      console.error("Error desconectando Trakt:", error);
-      setShowDisconnectModal(false);
-      alert("Error al desconectar de Trakt. Por favor, inténtalo de nuevo.");
-    }
+  // Limpieza propia antes de cerrar sesión (ver LogoutConfirmModal): que el
+  // historial de esta cuenta no quede en la caché del navegador.
+  const clearHistoryBeforeLogout = useCallback(() => {
+    clearHistoryCache();
   }, []);
 
   useEffect(() => {
@@ -3776,7 +3761,8 @@ export default function HistoryClient() {
                         loading={loading}
                         activeColor="red"
                         groupId="history-header-actions"
-                        title="Desconectar"
+                        title="Cerrar sesión"
+                        aria-label="Cerrar sesión"
                         className="!text-red-400 hover:!text-red-300 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent !border-0 shadow-lg backdrop-blur-md hover:!bg-white/15"
                       >
                         <LogOut className="w-5 h-5" />
@@ -4732,67 +4718,12 @@ export default function HistoryClient() {
         )}
       </AnimatePresence>
 
-      {/* Modal de Confirmación de Desconexión */}
-      <AnimatePresence>
-        {showDisconnectModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
-            onClick={() => setShowDisconnectModal(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="relative w-full max-w-md bg-neutral-900 rounded-2xl border border-white/10 shadow-2xl p-6"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                onClick={() => setShowDisconnectModal(false)}
-                className="absolute top-4 right-4 p-1 rounded-lg hover:bg-white/10 transition-colors"
-                title="Cerrar"
-              >
-                <X className="w-5 h-5 text-white/70" />
-              </button>
-
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center">
-                    <LogOut className="w-6 h-6 text-red-400" />
-                  </div>
-                  <h2 className="text-xl font-bold text-white">
-                    Desconectar de Trakt
-                  </h2>
-                </div>
-
-                <p className="text-sm text-white/70">
-                  ¿Estás seguro de que quieres desconectar tu cuenta de Trakt?
-                  Perderás el acceso a tu historial de visualizaciones y tendrás
-                  que volver a conectarte.
-                </p>
-
-                <div className="flex gap-3 pt-2">
-                  <button
-                    onClick={() => setShowDisconnectModal(false)}
-                    className="flex-1 py-2.5 px-4 bg-white/5 hover:bg-white/10 text-white font-semibold rounded-lg transition-colors border border-white/10"
-                  >
-                    Cancelar
-                  </button>
-                  <button data-online-only="true"
-                    onClick={handleDisconnect}
-                    className="flex-1 py-2.5 px-4 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-lg transition-colors"
-                  >
-                    Desconectar
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Confirmación de cierre de sesión (común a las páginas de usuario). */}
+      <LogoutConfirmModal
+        open={showDisconnectModal}
+        onClose={() => setShowDisconnectModal(false)}
+        onBeforeLogout={clearHistoryBeforeLogout}
+      />
     </div>
   );
 }

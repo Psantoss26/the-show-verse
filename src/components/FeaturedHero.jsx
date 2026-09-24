@@ -36,6 +36,11 @@ import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
 import { getBackendItemStatus } from "@/lib/api/itemStatus";
 import { resolveFeaturedHeroPoster } from "@/lib/dashboard/featuredHeroMedia";
+import {
+  DEFAULT_SOUNDTRACK_VOLUME,
+  resolveHeroSoundtrackVolume,
+} from "@/lib/dashboard/heroSoundtrack";
+import { useMediaQuery } from "@/lib/hooks/useMediaQuery";
 import DetailActionsRow from "@/components/details/DetailActionsRow";
 import DetailsMetaGenresRow from "@/components/details/DetailsMetaGenresRow";
 import { DetailsRatingsBadges } from "@/components/details/DetailsScoreboardPanel";
@@ -248,7 +253,6 @@ function useSoundtrackVisible() {
 }
 
 /* =================== VOLUMEN DE SOUNDTRACK =================== */
-const DEFAULT_SOUNDTRACK_VOLUME = 0.3;
 const SOUNDTRACK_VOLUME_KEY = "showverse:hero:soundtrack-volume";
 const SOUNDTRACK_VOLUME_EVENT = "showverse:hero-soundtrack-volume";
 
@@ -258,7 +262,7 @@ function readSoundtrackVolume() {
     const val = window.localStorage.getItem(SOUNDTRACK_VOLUME_KEY);
     if (val === null) return DEFAULT_SOUNDTRACK_VOLUME;
     const parsed = parseFloat(val);
-    return isNaN(parsed) ? DEFAULT_SOUNDTRACK_VOLUME : parsed;
+    return resolveHeroSoundtrackVolume(parsed, true);
   } catch {
     return DEFAULT_SOUNDTRACK_VOLUME;
   }
@@ -529,6 +533,21 @@ function FeaturedSlide({
   const [soundtrackProgress, setSoundtrackProgress] = useState(0);
   const [soundtrackDuration, setSoundtrackDuration] = useState(0);
   const audioRef = useRef(null);
+  const desktopSoundtrackLayout = useMediaQuery(
+    "(min-width: 64rem) and (hover: hover) and (pointer: fine)",
+  );
+  const hasSoundtrackPlayer =
+    soundtrackPreferenceReady && desktopSoundtrackLayout && !isMobile;
+  const playbackVolume = resolveHeroSoundtrackVolume(
+    soundtrackVolume,
+    hasSoundtrackPlayer,
+  );
+  // En táctil la pista debe estar preparada antes de pulsar: el botón es el
+  // único control de audio y play() debe ejecutarse dentro de ese gesto.
+  const shouldLoadSoundtrack = soundtrackVisible || !hasSoundtrackPlayer;
+  const soundtrackButtonActive = hasSoundtrackPlayer
+    ? soundtrackVisible
+    : soundtrackPlaying && !soundtrackMuted && playbackVolume > 0;
 
   // Caso concreto: algunos logos son oscuros (texto/arte casi negro) y NO se leen
   // sobre el fondo oscuro de la sección de información. SOLO en ese caso los
@@ -628,7 +647,7 @@ function FeaturedSlide({
       !secondaryReady ||
       !movie?.id ||
       !soundtrackPreferenceReady ||
-      !soundtrackVisible
+      !shouldLoadSoundtrack
     )
       return;
     setSoundtrackTracks([]);
@@ -690,8 +709,12 @@ function FeaturedSlide({
     movie,
     mediaType,
     soundtrackPreferenceReady,
-    soundtrackVisible,
+    shouldLoadSoundtrack,
   ]);
+
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = playbackVolume;
+  }, [soundtrackTrack, playbackVolume]);
 
   // Reproduce el soundtrack cuando el título está activo, no está silenciado y
   // no se está viendo el trailer (que tiene su propio audio). Si el navegador
@@ -715,25 +738,27 @@ function FeaturedSlide({
     }
 
     let unlock = null;
+    let canceled = false;
 
     const play = () =>
       audio.play().catch(() => {
-        if (unlock) return;
+        if (canceled || unlock) return;
         unlock = () => {
           audio.play().catch(() => {});
-          window.removeEventListener("pointerdown", unlock);
+          window.removeEventListener("click", unlock);
           window.removeEventListener("keydown", unlock);
           unlock = null;
         };
-        window.addEventListener("pointerdown", unlock);
+        window.addEventListener("click", unlock);
         window.addEventListener("keydown", unlock);
       });
 
     play();
 
     return () => {
+      canceled = true;
       if (unlock) {
-        window.removeEventListener("pointerdown", unlock);
+        window.removeEventListener("click", unlock);
         window.removeEventListener("keydown", unlock);
         unlock = null;
       }
@@ -746,11 +771,6 @@ function FeaturedSlide({
     soundtrackVisible,
     soundtrackTrack,
   ]);
-
-  useEffect(() => {
-    if (!audioRef.current) return;
-    audioRef.current.volume = soundtrackVolume;
-  }, [soundtrackTrack, soundtrackVolume]);
 
   const soundtrackTrackIndex = soundtrackTrack
     ? soundtrackTracks.findIndex(
@@ -779,15 +799,46 @@ function FeaturedSlide({
     selectSoundtrackTrack(soundtrackTracks[soundtrackTrackIndex + 1]);
   };
 
+  const startSoundtrack = () => {
+    const audio = audioRef.current;
+    if (!audio || !soundtrackTrack) return;
+    const volume = playbackVolume > 0
+      ? playbackVolume
+      : DEFAULT_SOUNDTRACK_VOLUME;
+    if (hasSoundtrackPlayer && soundtrackVolume === 0) setSoundtrackVolume(volume);
+    setSoundtrackMuted(false);
+    audio.volume = volume;
+    audio.muted = false;
+    // No diferir a un efecto: Safari necesita la activación del usuario.
+    audio.play().catch(() => setSoundtrackPlaying(false));
+  };
+
+  const handleSoundtrackButton = () => {
+    if (hasSoundtrackPlayer) {
+      toggleSoundtrackVisible();
+      return;
+    }
+    if (soundtrackButtonActive) {
+      setSoundtrackMuted(true);
+      if (audioRef.current) {
+        audioRef.current.muted = true;
+        audioRef.current.pause();
+      }
+      return;
+    }
+    if (!soundtrackVisible) toggleSoundtrackVisible();
+    setShowTrailer(false);
+    startSoundtrack();
+  };
+
   const handleSoundtrackTogglePlayback = () => {
     const audio = audioRef.current;
     if (!audio) return;
-    if (soundtrackMuted) {
-      setSoundtrackMuted(false);
+    if (soundtrackMuted || playbackVolume === 0 || audio.paused) {
+      startSoundtrack();
       return;
     }
-    if (audio.paused) audio.play().catch(() => {});
-    else audio.pause();
+    audio.pause();
   };
 
   const handleSoundtrackSeek = (event) => {
@@ -810,11 +861,8 @@ function FeaturedSlide({
   };
 
   const handleSoundtrackToggleMute = () => {
-    if (soundtrackMuted || soundtrackVolume === 0) {
-      if (soundtrackVolume === 0) {
-        setSoundtrackVolume(DEFAULT_SOUNDTRACK_VOLUME);
-      }
-      setSoundtrackMuted(false);
+    if (soundtrackMuted || playbackVolume === 0) {
+      startSoundtrack();
       return;
     }
     setSoundtrackMuted(true);
@@ -1420,32 +1468,35 @@ function FeaturedSlide({
                 />
               </div>
 
-              {/* Sonido: toggle del reproductor de soundtrack de fondo (extra
-                  propio del hero), colocado JUSTO tras el tráiler. */}
+              {/* En escritorio abre el reproductor; en táctil controla el sonido. */}
               <LiquidButton
                 onClick={(e) => {
                   e.stopPropagation();
-                  toggleSoundtrackVisible();
+                  handleSoundtrackButton();
                 }}
-                disabled={!soundtrackPreferenceReady}
-                active={soundtrackPreferenceReady && soundtrackVisible}
-                aria-pressed={soundtrackVisible}
+                disabled={!soundtrackPreferenceReady || (!hasSoundtrackPlayer && !soundtrackTrack)}
+                active={soundtrackPreferenceReady && soundtrackButtonActive}
+                aria-pressed={soundtrackButtonActive}
                 activeColor="yellow"
                 groupId="featured-hero-actions"
                 title={
-                  soundtrackVisible ? "Ocultar soundtrack" : "Mostrar soundtrack"
+                  hasSoundtrackPlayer
+                    ? soundtrackVisible ? "Ocultar soundtrack" : "Mostrar soundtrack"
+                    : !soundtrackTrack
+                      ? "Sonido no disponible"
+                      : soundtrackButtonActive ? "Silenciar sonido" : "Reproducir sonido"
                 }
                 className={`shrink-0 ${
                   isMobile
                     ? "!h-10 !w-10 [&_svg]:!h-5 [&_svg]:!w-5"
                     : "!h-12 !w-12 [&_svg]:!h-6 [&_svg]:!w-6"
                 } ${
-                  soundtrackVisible ? "!bg-white !text-black" : ""
+                  soundtrackButtonActive ? "!bg-white !text-black" : ""
                 } ${
                   soundtrackPreferenceReady ? "" : "invisible pointer-events-none"
                 }`}
               >
-                {soundtrackVisible ? <Volume2 /> : <VolumeX />}
+                {soundtrackButtonActive ? <Volume2 /> : <VolumeX />}
               </LiquidButton>
 
               {/* 2) Resto de acciones compartidas: valoración episodios · Trakt ·
@@ -1491,7 +1542,7 @@ function FeaturedSlide({
                 />
               </div>
 
-              {soundtrackVisible && soundtrackTrack?.previewUrl && (
+              {soundtrackTrack?.previewUrl && (
                 <audio
                   ref={audioRef}
                   src={soundtrackTrack.previewUrl}
@@ -1502,7 +1553,7 @@ function FeaturedSlide({
                     setSoundtrackProgress(event.currentTarget.currentTime)
                   }
                   onLoadedMetadata={(event) => {
-                    event.currentTarget.volume = soundtrackVolume;
+                    event.currentTarget.volume = playbackVolume;
                     event.currentTarget.muted =
                       !soundtrackVisible || soundtrackMuted;
                     setSoundtrackDuration(event.currentTarget.duration || 0);

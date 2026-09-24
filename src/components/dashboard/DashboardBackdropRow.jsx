@@ -1138,6 +1138,7 @@ export function BackdropPreviewCard({
             además llama a e.stopPropagation() por robustez. */}
         <div className="mb-3" onClick={(e) => e.stopPropagation()}>
           <DetailActionsRow
+            compactLabelWhenTight
             onTrailer={handleToggleTrailer}
             trailerAvailable
             trailerLoading={trailerLoading}
