@@ -27,6 +27,7 @@ import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { useTranslation } from "@/lib/i18n";
 import {
   addDismissed,
+  alertsTimeline,
   alertsDismissedKey,
   alertsLastSeenKey,
   alertsUnreadKey,
@@ -566,29 +567,20 @@ export default function AlertsMenu({ account, variant = "desktop", heroNavMode =
                         <span>{error || "No tienes alertas."}</span>
                       </div>
                     ) : (
-                      [
-                        { key: "events", kind: "event", items: alerts.events, label: "Novedades" },
-                        { key: "reminders", kind: "reminder", items: alerts.reminders, label: "Recordatorios" },
-                        { key: "actions", kind: "action", items: alerts.actions, label: "Actividad reciente" },
-                      ]
-                        .filter((group) => group.items.length > 0)
-                        .map((group, index) => (
-                          <div key={group.key}>
-                            {index > 0 ? <MenuDivider /> : null}
-                            <ul role="group" aria-label={group.label} className="space-y-1">
-                              {group.items.map((item) => (
-                                <AlertRow
-                                  key={item.id}
-                                  kind={group.kind}
-                                  item={item}
-                                  isNew={isNew(item)}
-                                  onNavigate={close}
-                                  onDismiss={group.kind === "reminder" ? () => dismiss(item.id) : undefined}
-                                />
-                              ))}
-                            </ul>
-                          </div>
-                        ))
+                      // UNA sola lista por fecha: lo más reciente, sea del tipo que
+                      // sea, siempre arriba. Cada fila conserva su icono y texto.
+                      <ul role="group" aria-label={label} className="space-y-1">
+                        {alertsTimeline(alerts).map(({ kind, item }) => (
+                          <AlertRow
+                            key={item.id}
+                            kind={kind}
+                            item={item}
+                            isNew={isNew(item)}
+                            onNavigate={close}
+                            onDismiss={kind === "reminder" ? () => dismiss(item.id) : undefined}
+                          />
+                        ))}
+                      </ul>
                     )}
                   </div>
 

@@ -29,6 +29,29 @@ export function normalizeAlerts(json, dismissed = new Set()) {
   };
 }
 
+// A igualdad de fecha (p. ej. un visto automático, su "Has visto" y su
+// recordatorio llevan la misma hora), primero lo que ha pasado solo, luego lo
+// que hiciste y por último lo que te queda por hacer.
+const KIND_ORDER = { event: 0, action: 1, reminder: 2 };
+
+/**
+ * Todas las alertas en UNA lista, de la más reciente a la más antigua. Antes iban
+ * por secciones (novedades, recordatorios, actividad) y algo recién ocurrido
+ * podía quedar debajo de alertas más viejas de otra sección.
+ * Devuelve `[{ kind, item }]`.
+ */
+export function alertsTimeline(alerts) {
+  const rows = [
+    ...(alerts?.events || []).map((item) => ({ kind: "event", item })),
+    ...(alerts?.actions || []).map((item) => ({ kind: "action", item })),
+    ...(alerts?.reminders || []).map((item) => ({ kind: "reminder", item })),
+  ];
+  return rows.sort((a, b) => {
+    const diff = time(b.item.createdAt) - time(a.item.createdAt);
+    return diff !== 0 ? diff : KIND_ORDER[a.kind] - KIND_ORDER[b.kind];
+  });
+}
+
 /** Nº de alertas posteriores a la última vez que se abrió el desplegable. */
 export function countUnread(alerts, lastSeenAt) {
   const since = time(lastSeenAt);
