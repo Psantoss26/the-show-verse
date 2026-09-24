@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   addDismissed,
+  alertsTimeline,
   countUnread,
   episodeCode,
   normalizeAlerts,
@@ -59,4 +60,17 @@ test("plataforma legible y estreno futuro", () => {
   assert.equal(upcomingRelease("2020-01-01", now), null);
   assert.match(upcomingRelease("2027-12-12", now), /12 dic 2027/);
   assert.equal(upcomingRelease("", now), null);
+});
+
+test("una sola lista, de lo más reciente a lo más antiguo", () => {
+  const out = alertsTimeline({
+    reminders: [{ id: "r", createdAt: "2026-09-20T10:00:00Z" }],
+    events: [{ id: "e-old", createdAt: "2026-09-01T10:00:00Z" }, { id: "e", createdAt: "2026-09-20T10:00:00Z" }],
+    actions: [{ id: "a-new", createdAt: "2026-09-24T09:00:00Z" }, { id: "a", createdAt: "2026-09-20T10:00:00Z" }],
+  });
+  // Lo último que ha pasado va primero aunque sea "actividad"; a igualdad de
+  // hora: lo automático, lo que hiciste y lo pendiente.
+  assert.deepEqual(out.map((r) => r.item.id), ["a-new", "e", "a", "r", "e-old"]);
+  assert.deepEqual(out.map((r) => r.kind), ["action", "event", "action", "reminder", "event"]);
+  assert.deepEqual(alertsTimeline(null), []);
 });
