@@ -55,6 +55,7 @@ import {
 } from "lucide-react";
 import WatchNextAssistant from "@/components/WatchNextAssistant";
 import NetflixSyncListener from "@/components/NetflixSyncListener";
+import AlertsMenu from "@/components/notifications/AlertsMenu";
 import { fuzzySimilarity, tokenFuzzyMatches } from "@/lib/search/fuzzy";
 import {
   addSearchHistory,
@@ -2750,6 +2751,12 @@ function NavbarContent() {
               )}
             </div>
 
+            {/* ALERTAS, entre Buscar y Perfil. Solo con sesión: sin cuenta
+                no hay actividad que avisar (el componente no pinta nada). */}
+            {!profileAuthLoading && account ? (
+              <AlertsMenu account={account} heroNavMode={heroNavMode} />
+            ) : null}
+
             {/* SIN ICONO PROPIO EN LA BARRA: el asistente se abre desde el
                 desplegable de Perfil. El componente sigue montado AQUÍ, y no
                 dentro del desplegable, porque es quien mantiene vivo su panel:
@@ -2979,10 +2986,13 @@ function NavbarContent() {
             </span>
           </Link>
 
-          {/* Derecha: perfil. */}
+          {/* Derecha: alertas y perfil. */}
           <div
             className={`flex flex-shrink-0 origin-right items-center gap-2 pr-1 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${mobileTopControlScaleClass}`}
           >
+            {!profileAuthLoading && account ? (
+              <AlertsMenu account={account} variant="mobile" />
+            ) : null}
             {profileAuthLoading ? (
               <UserAvatarBoot />
             ) : !account ? (
