@@ -18,7 +18,8 @@ export default function TraktWatchedControl({
   // del episodio/película concretos en el propio botón de visionado.
   progressOverride,
   // Porcentaje (1-99) si el contenido está AHORA en "Continuar viendo". El botón
-  // adopta la identidad de esa sección —icono MonitorPlay y color esmeralda— y
+  // adopta la identidad de "en curso" —icono MonitorPlay y color ÁMBAR, el mismo
+  // con el que el modal de episodios vistos marca un episodio a medias— y
   // se llena como una batería hasta ese punto. Tiene prioridad sobre "visto":
   // es el estado actual (también en un revisionado de algo ya visto).
   continueWatchingPercent,
@@ -63,7 +64,7 @@ export default function TraktWatchedControl({
         onClick={(event) => onOpen?.(event)}
         disabled={disabled}
         active={isContinueWatching || hasOverride || visibleWatched}
-        activeColor={isContinueWatching ? "emerald" : "green"}
+        activeColor={isContinueWatching ? "amber" : "green"}
         groupId="details-actions"
         loading={loading}
         title={
