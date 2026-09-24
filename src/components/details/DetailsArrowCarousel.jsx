@@ -16,6 +16,7 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import { FreeMode } from "swiper/modules";
 import { motion, AnimatePresence } from "framer-motion";
 import "swiper/swiper-bundle.css";
+import { onDrawerResize } from "@/lib/ui/drawerResizeEvents";
 
 export { SwiperSlide };
 
@@ -80,6 +81,38 @@ export default function DetailsArrowCarousel({
       window.clearTimeout(t2);
     };
   }, [childrenCount, updateNav]);
+
+  // REDIMENSIONAR EL PANEL LATERAL: el carrusel espera al final del gesto.
+  //
+  // Swiper se recalcula ENTERO en cada cambio de tamaño —breakpoints, ancho y
+  // clases de cada tarjeta, con lecturas de estilo que fuerzan el layout—, y
+  // lo hace por dos vías: su ResizeObserver y, con `observeParents`, cada
+  // cambio del atributo `style` del panel, que durante el arrastre cambia en
+  // cada fotograma. Con varios carruseles en la ficha, ese trabajo era lo que
+  // hacía ir el tirador a tirones. Durante el gesto se desconectan sus eventos
+  // (las tarjetas conservan su tamaño y la fila se recorta por el borde del
+  // panel) y al soltar se recoloca una sola vez con el ancho final.
+  useEffect(() => {
+    let paused = false;
+    return onDrawerResize((active) => {
+      const swiper = swiperRef.current;
+      if (!swiper || swiper.destroyed) {
+        paused = false;
+        return;
+      }
+      if (active && !paused) {
+        paused = true;
+        swiper.detachEvents?.();
+        return;
+      }
+      if (!active && paused) {
+        paused = false;
+        swiper.attachEvents?.();
+        swiper.emit?.("resize");
+        updateNav(swiper);
+      }
+    });
+  }, [updateNav]);
 
   const getStep = useCallback((swiper) => {
     const current = swiper?.params?.slidesPerView;

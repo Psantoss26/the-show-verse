@@ -1236,8 +1236,12 @@ html {
    que el bloque derecho del navbar vaya por detrás del tirador. */
 :root[data-sv-drawer-resizing] .sv-drawer-panel,
 :root[data-sv-drawer-resizing] .sv-drawer-panel * {
-  backdrop-filter: none !important;
+  /* El prefijo ANTES que la estándar: el compilador de CSS funde las dos y se
+     queda con la última. En el orden inverso solo sobrevivía la `-webkit-`,
+     que Chrome ignora, y el panel seguía recalculando su cristal en cada
+     fotograma del arrastre. */
   -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
   transition: none !important;
   animation-play-state: paused !important;
 }
@@ -1269,8 +1273,12 @@ html {
    más caro de ese repintado, porque cada uno vuelve a difuminar lo que tiene
    detrás. Planos durante el arrastre, recuperan el cristal al soltar. */
 :root[data-sv-drawer-resizing] [data-detail-page-content] * {
-  backdrop-filter: none !important;
+  /* El prefijo ANTES que la estándar: el compilador de CSS funde las dos y se
+     queda con la última. En el orden inverso solo sobrevivía la `-webkit-`,
+     que Chrome ignora, y el panel seguía recalculando su cristal en cada
+     fotograma del arrastre. */
   -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }
 
 /* TARJETAS DE DETALLES Y PRODUCCIÓN EN EL DRAWER.

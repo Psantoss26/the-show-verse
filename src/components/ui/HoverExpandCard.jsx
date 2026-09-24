@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useRef } from "react";
 import styles from "./HoverExpandCard.module.css";
 import { applyTmdbResponsiveImage } from "@/lib/ui/tmdbResponsiveImage";
+import {
+  isDrawerResizeActive,
+  onDrawerResize,
+} from "@/lib/ui/drawerResizeEvents";
 
 // Tarjeta de póster que se AMPLÍA al pasar el ratón: nítida y sin vibrar.
 //
@@ -194,16 +198,33 @@ export default function HoverExpandCard({
     if (!card || !cell) return undefined;
 
     let frame = 0;
+    // Arrastrando el tirador del panel lateral acoplado, TODAS las tarjetas de
+    // la página cambian de tamaño en cada fotograma. Se espera al final del
+    // gesto: una sola pasada con el ancho definitivo en vez de un rAF por
+    // tarjeta y fotograma.
+    let deferred = false;
     const update = () => {
       frame = 0;
+      if (isDrawerResizeActive()) {
+        deferred = true;
+        return;
+      }
+      deferred = false;
       const width = cell.offsetWidth * (enabled ? EXPAND : 1);
       card.querySelectorAll("img").forEach((img) => {
         applyTmdbResponsiveImage(img, width);
       });
     };
     const schedule = () => {
+      if (isDrawerResizeActive()) {
+        deferred = true;
+        return;
+      }
       if (!frame) frame = window.requestAnimationFrame(update);
     };
+    const stopDrawerResize = onDrawerResize((active) => {
+      if (!active && deferred) schedule();
+    });
 
     update();
     // Solo `src`: `srcset` y `sizes` los escribe `update`, y observarlos
@@ -222,6 +243,7 @@ export default function HoverExpandCard({
       if (frame) window.cancelAnimationFrame(frame);
       mutations.disconnect();
       resize?.disconnect();
+      stopDrawerResize();
     };
   }, [enabled]);
 
