@@ -384,7 +384,16 @@ const panelVariants = {
 // una propiedad menos. El fundido se conserva SOLO para `switching` (cambio de
 // título con el drawer abierto), donde el crossfade sí es el efecto buscado.
 const DRAWER_EASE_IN = [0.16, 1, 0.3, 1];
-const DRAWER_EASE_OUT = [0.32, 0, 0.67, 0];
+// CIERRE: también desacelera, como la apertura.
+//
+// Antes era un ease-in (`[0.32, 0, 0.67, 0]`, 240 ms): arranca casi parado y
+// acelera al final. Medido fotograma a fotograma, en los primeros ~90 ms el
+// panel se movía 2 px y en los 60 ms siguientes cruzaba media pantalla: se
+// veía "quieto" y luego desaparecía de golpe, sin que se llegara a percibir el
+// deslizamiento. Con una curva que sale rápido y frena, el movimiento se ve
+// desde el primer fotograma y el recorrido entero se lee.
+const DRAWER_EASE_OUT = [0.25, 0.8, 0.25, 1];
+const DRAWER_EXIT_DURATION = 0.28;
 
 const panelVariantsRight = {
   hidden: (switching) =>
@@ -410,7 +419,7 @@ const panelVariantsRight = {
           // Sale deslizando sólido sin lag en la GPU: simétrico y fluido.
           opacity: 1,
           x: "100%",
-          transition: { duration: 0.24, ease: DRAWER_EASE_OUT },
+          transition: { duration: DRAWER_EXIT_DURATION, ease: DRAWER_EASE_OUT },
         },
 };
 
