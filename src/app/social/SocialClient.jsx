@@ -28,14 +28,14 @@ import {
   ArrowUpDown,
   CheckCircle2,
   ChevronDown,
-  Columns3,
   Eye,
   Filter,
   Heart,
+  ImageOff,
   Layers3,
-  LayoutGrid,
-  LayoutList,
-  ListVideo,
+  Image as ImageIcon,
+  List,
+  ListPlus,
   MessageSquare,
   Search,
   SlidersHorizontal,
@@ -43,10 +43,12 @@ import {
   User,
   Users,
   UserRoundCheck,
-  Bookmark,
+  BookmarkPlus,
   X,
 } from "lucide-react";
 
+import OptimizedImage from "@/components/OptimizedImage";
+import Avatar from "@/components/ui/Avatar";
 import { useAuth } from "@/context/AuthContext";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
@@ -55,19 +57,52 @@ import {
   SOCIAL_GROUP_SHORT_LABELS,
   groupSocialFeed,
 } from "@/lib/social/feedGrouping";
+import { episodeCode, relativeTime } from "@/lib/notifications/alerts";
+import {
+  formatActivityRatingTarget,
+  getActivityDetailsHref,
+} from "@/lib/profile/activityRatingTarget";
+import Stars from "@/components/social/Stars";
 
 const PAGE_SIZE = 30;
 
-// Cada tipo de evento con su verbo, icono y color. El color solo tiñe el icono:
-// el acento de la sección es el rosa y no compite con él.
-const EVENTOS = {
-  watched: { verbo: "ha visto", icon: Eye, color: "text-emerald-400" },
-  watchlist: { verbo: "ha añadido a pendientes", icon: Bookmark, color: "text-blue-400" },
-  favorite: { verbo: "ha marcado como favorito", icon: Heart, color: "text-red-400" },
-  rating: { verbo: "ha puntuado", icon: Star, color: "text-yellow-400" },
-  review: { verbo: "ha reseñado", icon: MessageSquare, color: "text-orange-400" },
-  list: { verbo: "ha creado la lista", icon: ListVideo, color: "text-purple-400" },
-  list_item: { verbo: "ha añadido a una lista", icon: ListVideo, color: "text-purple-400" },
+// Icono y tono de cada acción: EXACTAMENTE los de la Actividad del perfil
+// (`ActivityRow` en ProfileSection), para que una acción se vea igual en los
+// dos sitios. Favoritos y Pendientes van rellenos; las puntuaciones no llevan
+// icono en la fila, enseñan la nota.
+const ACCIONES = {
+  watched: { Icono: Eye, tono: "text-emerald-300" },
+  watchlist: { Icono: BookmarkPlus, tono: "text-sky-300", relleno: true },
+  favorite: { Icono: Heart, tono: "text-red-300", relleno: true },
+  rating: { Icono: Star, tono: "text-amber-300" },
+  review: { Icono: MessageSquare, tono: "text-orange-300" },
+  list: { Icono: ListPlus, tono: "text-violet-300" },
+  list_item: { Icono: ListPlus, tono: "text-violet-300" },
+};
+
+// Conjugación: en "Siguiendo" habla el autor del evento ("Ana ha visto…"); en
+// "Yo" se habla en primera persona, como tu propio perfil ("Has visto…").
+const VERBOS = {
+  tercera: {
+    watched: "ha visto",
+    completed: "ha completado",
+    watchlist: "ha añadido a Pendientes",
+    favorite: "ha añadido a Favoritos",
+    rating: "ha puntuado",
+    review: "ha escrito una reseña de",
+    list: "ha creado la lista",
+    list_item: "ha añadido a una lista",
+  },
+  primera: {
+    watched: "Has visto",
+    completed: "Has completado",
+    watchlist: "Has añadido a Pendientes",
+    favorite: "Has añadido a Favoritos",
+    rating: "Has puntuado",
+    review: "Has escrito una reseña de",
+    list: "Has creado la lista",
+    list_item: "Has añadido a una lista",
+  },
 };
 
 const FILTROS = [
@@ -81,10 +116,13 @@ const FILTROS = [
 ];
 
 // Vista y agrupado se RECUERDAN entre visitas, como en las páginas de usuario:
-// quien elige tarjetas espera encontrárselas la próxima vez.
+// quien elige la lista con póster espera encontrársela la próxima vez.
 const CLAVE_VISTA = "showverse:social:viewMode";
 const CLAVE_AGRUPADO = "showverse:social:groupBy";
-const VISTAS = new Set(["list", "compact", "grid"]);
+// Las DOS vistas de la Actividad del perfil: "list" (avatar de quien actúa) y
+// "poster-list" (cartel del título). Un valor antiguo guardado ("compact",
+// "grid") ya no existe y vuelve a la lista.
+const VISTAS = new Set(["list", "poster-list"]);
 
 function leerVistaGuardada() {
   if (typeof window === "undefined") return "list";
@@ -98,21 +136,6 @@ function leerAgrupadoGuardado() {
   return SOCIAL_GROUP_OPTIONS.some(([v]) => v === guardado) ? guardado : "none";
 }
 
-function tiempoRelativo(fecha) {
-  const ms = Date.now() - new Date(fecha).getTime();
-  if (!Number.isFinite(ms)) return "";
-  const min = Math.round(ms / 60000);
-  if (min < 1) return "ahora";
-  if (min < 60) return `hace ${min} min`;
-  const horas = Math.round(min / 60);
-  if (horas < 24) return `hace ${horas} h`;
-  const dias = Math.round(horas / 24);
-  if (dias < 30) return `hace ${dias} d`;
-  const meses = Math.round(dias / 30);
-  if (meses < 12) return `hace ${meses} mes${meses === 1 ? "" : "es"}`;
-  return `hace ${Math.round(meses / 12)} a`;
-}
-
 function tipoDeFiltro(evento) {
   // "Listas" agrupa la creación y los elementos añadidos: para quien lee el
   // feed son la misma acción.
@@ -120,151 +143,223 @@ function tipoDeFiltro(evento) {
   return evento.type;
 }
 
-// Anillo de hover de la sección, con la receta de las páginas de usuario: nada
-// en reposo y un aro de 2,5px del color de la página al pasar por encima. OJO:
-// va con `hover:after`, no con `group-hover:after` —el pseudoelemento es del
-// propio `.group`, y `group-hover:` apunta a sus DESCENDIENTES—.
-const ANILLO_HOVER =
-  "after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(236,72,153,0.95)]";
+function accionDe(evento) {
+  return ACCIONES[evento.type] || ACCIONES.watched;
+}
 
-function EventoTarjeta({ evento, mostrarAutor, vista }) {
-  const soloCartel = vista === "grid";
-  const compacta = vista === "compact";
-  const meta = EVENTOS[evento.type] || {
-    verbo: "ha actualizado",
-    icon: ListVideo,
-    color: "text-zinc-400",
-  };
-  const Icono = meta.icon;
+function hrefDeEvento(evento) {
+  if (evento.type === "list") {
+    // En "Siguiendo" el id va prefijado con el autor ("<autor>:list:<id>").
+    const id = String(evento.id || "").split("list:").pop();
+    return id ? `/lists/${id}` : null;
+  }
+  return getActivityDetailsHref(evento);
+}
+
+// Título enlazado a su ficha, con el mismo peso que en el perfil y el hover en
+// el rosa de la sección.
+function TituloEvento({ evento }) {
   const titulo = evento.title || evento.name || "Sin título";
-  // TAMAÑO DE LA PORTADA SEGÚN LA VISTA. En las filas el cartel mide 44-56px,
-  // así que w185 sobra; en la vista de tarjetas ocupa el ancho de la columna
-  // (~210px en escritorio) y con w185 se veía pastoso al ampliarlo, más aún en
-  // pantallas de 2x y 3x. w500 cubre esos casos sin traerse el original, que
-  // pesa varios megas por cartel.
-  const poster = evento.posterPath
-    ? `https://image.tmdb.org/t/p/${soloCartel ? "w500" : "w185"}${evento.posterPath}`
-    : null;
-  const href =
-    evento.tmdbId && evento.mediaType
-      ? `/details/${evento.mediaType === "tv" ? "tv" : "movie"}/${evento.tmdbId}`
-      : null;
+  const href = hrefDeEvento(evento);
+  if (!href) return <span className="font-bold text-white">{titulo}</span>;
+  return (
+    <Link href={href} prefetch={false} className="font-bold text-white transition-colors hover:text-pink-300">
+      {titulo}
+    </Link>
+  );
+}
 
-  // VISTA DE TARJETAS: solo la portada, con la acción sobreimpresa. Es la que
-  // se corresponde con el "grid" de las páginas de usuario —mismo formato de
-  // cartel, mismas esquinas y mismo anillo de hover—, y la que de verdad se
-  // diferencia de las dos de lista.
-  if (soloCartel) {
-    const contenido = (
-      <div
-        className={`group relative aspect-[2/3] overflow-hidden rounded-xl bg-zinc-900 shadow-md transition-shadow duration-300 ${ANILLO_HOVER}`}
-      >
-        {poster ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={poster} alt={titulo} loading="lazy" className="h-full w-full object-cover" />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <Icono className={`h-6 w-6 ${meta.color}`} />
-          </div>
-        )}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-2">
-          <div className="flex items-center gap-1.5">
-            <Icono className={`h-3 w-3 shrink-0 ${meta.color}`} />
-            <span className="truncate text-[10px] font-bold uppercase tracking-wider text-zinc-300">
-              {mostrarAutor && evento.author ? evento.author.displayName : tiempoRelativo(evento.createdAt)}
-            </span>
-          </div>
-          <p className="truncate text-xs font-bold text-white">{titulo}</p>
-        </div>
-      </div>
-    );
-    return href ? (
-      <Link href={href} prefetch={false} className="block">
-        {contenido}
-      </Link>
-    ) : (
-      contenido
+// Sujeto de la frase: el autor (enlazado a su perfil) o "Has…" en la tuya.
+function SujetoEvento({ evento, mostrarAutor }) {
+  const autor = mostrarAutor ? evento.author : null;
+  if (!autor) return null;
+  const nombre = autor.displayName || autor.username;
+  return (
+    <>
+      {autor.username ? (
+        <Link
+          href={`/u/${encodeURIComponent(autor.username)}`}
+          prefetch={false}
+          className="font-semibold text-zinc-300 transition-colors hover:text-pink-300"
+        >
+          {nombre}
+        </Link>
+      ) : (
+        <span className="font-semibold text-zinc-300">{nombre}</span>
+      )}{" "}
+    </>
+  );
+}
+
+function verboDe(evento, mostrarAutor) {
+  const v = mostrarAutor && evento.author ? VERBOS.tercera : VERBOS.primera;
+  if (evento.type === "watched" && evento.completedShow) return v.completed;
+  return v[evento.type] || v.watched;
+}
+
+function tiempoTitle(fecha) {
+  const d = new Date(fecha);
+  return Number.isNaN(d.getTime()) ? undefined : d.toLocaleString("es-ES");
+}
+
+// Cartel enlazado, como `ActivityPoster` del perfil.
+function CartelEvento({ evento, className = "" }) {
+  const href = hrefDeEvento(evento);
+  const src = evento.posterPath ? `https://image.tmdb.org/t/p/w185${evento.posterPath}` : null;
+  const imagen = src ? (
+    <OptimizedImage src={src} alt={evento.title || ""} className="h-full w-full object-cover" loading="lazy" />
+  ) : (
+    <span className="flex h-full w-full items-center justify-center text-zinc-700">
+      <ImageOff className="h-4 w-4" aria-hidden="true" />
+    </span>
+  );
+  if (!href) {
+    return (
+      <span aria-hidden="true" className={`${className} flex shrink-0 items-center justify-center overflow-hidden bg-zinc-900`}>
+        {imagen}
+      </span>
     );
   }
-
-  // VISTAS DE LISTA: la misma fila para las dos. La única diferencia es el
-  // tamaño —"compact" mete tres por fila— porque son la MISMA vista con más o
-  // menos densidad, igual que en las páginas de usuario.
-  const cuerpo = (
-    <div
-      className={`relative isolate flex items-center overflow-hidden rounded-xl bg-zinc-900/40 shadow-md transition-colors duration-300 hover:bg-zinc-900/65 ${ANILLO_HOVER} ${
-        compacta ? "gap-2.5 p-2" : "gap-3.5 p-3"
-      }`}
+  return (
+    <Link
+      href={href}
+      prefetch={false}
+      aria-label={`Ver ${evento.title || evento.name || "ficha"}`}
+      className={`${className} shrink-0 overflow-hidden bg-zinc-900 ring-1 ring-white/10 transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/70`}
     >
-      <div
-        className={`relative shrink-0 overflow-hidden rounded-lg bg-zinc-900 ${
-          compacta ? "h-16 w-11" : "h-20 w-14"
-        }`}
-      >
-        {poster ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={poster}
-            alt={titulo}
-            loading="lazy"
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <Icono className={`h-5 w-5 ${meta.color}`} />
-          </div>
-        )}
-      </div>
-
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
-          <Icono className={`h-3.5 w-3.5 shrink-0 ${meta.color}`} />
-          <span className="truncate">
-            {mostrarAutor && evento.author ? (
-              <>
-                <span className="text-pink-300">
-                  {evento.author.displayName}
-                </span>{" "}
-                {meta.verbo}
-              </>
-            ) : (
-              meta.verbo
-            )}
-          </span>
-        </div>
-
-        <p
-          className={`truncate font-bold leading-tight text-white ${
-            compacta ? "text-sm" : "text-sm sm:text-base"
-          }`}
-        >
-          {titulo}
-        </p>
-
-        <div className="flex items-center gap-2 text-[11px] text-zinc-500">
-          <span>{tiempoRelativo(evento.createdAt)}</span>
-          {typeof evento.rating === "number" ? (
-            <span className="flex items-center gap-1 text-yellow-400">
-              <Star className="h-3 w-3 fill-current" />
-              {evento.rating}
-            </span>
-          ) : null}
-          {evento.season != null && evento.episode != null ? (
-            <span>
-              T{evento.season}·E{evento.episode}
-            </span>
-          ) : null}
-        </div>
-      </div>
-    </div>
-  );
-
-  return href ? (
-    <Link href={href} prefetch={false} className="block">
-      {cuerpo}
+      {imagen}
     </Link>
-  ) : (
-    cuerpo
+  );
+}
+
+// Avatar de quien actúa, como `ActivityAvatar` del perfil.
+function AvatarEvento({ actor }) {
+  const nombre = actor?.displayName || actor?.username || "Usuario";
+  return (
+    <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-900 text-xs font-black text-zinc-300">
+      <Avatar src={actor?.avatarUrl} name={nombre} alt="" loading="lazy" />
+    </span>
+  );
+}
+
+// La MISMA fila que la Actividad del perfil (`ActivityRow`): sin fondo propio,
+// avatar o cartel según la vista, icono (o la nota) de 32px, la frase y la
+// hora a la derecha.
+function EventoFila({ evento, actor, mostrarAutor, conPoster }) {
+  const { Icono, tono, relleno } = accionDe(evento);
+  const objetivo =
+    evento.type === "rating"
+      ? `${formatActivityRatingTarget(evento)} `
+      : evento.type === "watched"
+        ? episodeCode(evento)
+        : "";
+
+  return (
+    <article className="flex min-w-0 items-center gap-3 px-3 py-3 sm:px-4">
+      {conPoster ? (
+        <CartelEvento evento={evento} className="h-[4.25rem] w-[2.85rem] rounded-lg" />
+      ) : (
+        <AvatarEvento actor={actor} />
+      )}
+      {evento.type === "rating" ? (
+        <span
+          className={`flex h-8 w-8 shrink-0 items-center justify-center text-xl font-black leading-none tabular-nums ${tono}`}
+          aria-hidden="true"
+        >
+          {evento.rating}
+        </span>
+      ) : (
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center ${tono}`} aria-hidden="true">
+          <Icono className={`h-5 w-5 ${relleno ? "fill-current" : ""}`} />
+        </span>
+      )}
+      <p className="min-w-0 flex-1 text-sm leading-5 text-zinc-400">
+        <SujetoEvento evento={evento} mostrarAutor={mostrarAutor} />
+        {verboDe(evento, mostrarAutor)} {objetivo}
+        <TituloEvento evento={evento} />
+        {evento.type === "list_item" && evento.listName ? (
+          <span className="text-zinc-500"> · {evento.listName}</span>
+        ) : null}
+      </p>
+      <time
+        dateTime={evento.createdAt}
+        title={tiempoTitle(evento.createdAt)}
+        className="shrink-0 text-xs font-medium text-zinc-600"
+      >
+        {relativeTime(evento.createdAt)}
+      </time>
+    </article>
+  );
+}
+
+// Reseña: la tarjeta de `ActivityReview` del perfil, con el texto (tapado si
+// tiene spoilers) y la nota en estrellas. En la lista lleva el avatar y, con
+// sitio, el cartel; en la lista con póster, solo el cartel grande.
+function EventoResena({ evento, actor, mostrarAutor, conPoster }) {
+  const [verSpoiler, setVerSpoiler] = useState(false);
+  return (
+    <article className="rounded-xl border border-white/[0.09] bg-gradient-to-br from-white/[0.07] via-white/[0.035] to-transparent p-4 shadow-[0_16px_38px_rgba(0,0,0,0.2)] sm:p-5">
+      <div className="flex gap-3 sm:gap-4">
+        {conPoster ? (
+          <CartelEvento evento={evento} className="h-32 w-[5.4rem] rounded-lg" />
+        ) : (
+          <>
+            <AvatarEvento actor={actor} />
+            <CartelEvento evento={evento} className="hidden h-28 w-[76px] rounded-lg sm:block" />
+          </>
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-zinc-400">
+            <span>
+              <SujetoEvento evento={evento} mostrarAutor={mostrarAutor} />
+              {verboDe(evento, mostrarAutor)}
+            </span>
+            <TituloEvento evento={evento} />
+            {typeof evento.rating === "number" ? <Stars rating={evento.rating} /> : null}
+          </div>
+          {evento.spoiler && !verSpoiler ? (
+            <button
+              type="button"
+              onClick={() => setVerSpoiler(true)}
+              className="mt-3 text-xs font-bold uppercase tracking-widest text-amber-300 transition-colors hover:text-amber-200"
+            >
+              Contiene spoilers — mostrar reseña
+            </button>
+          ) : evento.body ? (
+            <p className="mt-3 whitespace-pre-line text-sm leading-6 text-zinc-200 sm:text-[15px] sm:leading-7">
+              {evento.body}
+            </p>
+          ) : null}
+          <time
+            dateTime={evento.createdAt}
+            title={tiempoTitle(evento.createdAt)}
+            className="mt-3 block text-xs font-medium text-zinc-500"
+          >
+            {relativeTime(evento.createdAt)}
+          </time>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+// Un bloque de eventos con la vista elegida, como `ActivityFeed` del perfil.
+// Lo usan los dos caminos de pintado (con grupos y sin ellos) para que no
+// puedan divergir. `yo` es el actor de los eventos propios (pestaña "Yo").
+function ListaEventos({ eventos, vista, mostrarAutor, yo }) {
+  const conPoster = vista === "poster-list";
+  return (
+    <ol role="list" className="space-y-3">
+      {eventos.map((evento) => {
+        const actor = mostrarAutor && evento.author ? evento.author : yo;
+        const props = { evento, actor, mostrarAutor, conPoster };
+        return (
+          <li key={evento.id} className="min-w-0">
+            {evento.type === "review" ? <EventoResena {...props} /> : <EventoFila {...props} />}
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -321,8 +416,8 @@ export default function SocialClient() {
   const [q, setQ] = useState("");
   const [filtro, setFiltro] = useState("all");
   const [orden, setOrden] = useState("recent");
-  // Las MISMAS tres vistas que las páginas de usuario: una fila por evento,
-  // tres por fila, y tarjetas de cartel.
+  // Las MISMAS dos vistas que la Actividad del perfil: lista con avatar y
+  // lista con póster.
   const [vista, setVistaState] = useState(leerVistaGuardada);
   // Agrupado, como en Historial/Favoritos/Pendientes. Por defecto sin agrupar:
   // un muro de actividad se lee en orden, y quien quiera cortarlo por días lo
@@ -473,7 +568,7 @@ export default function SocialClient() {
     reanclarLista();
   });
 
-  const visibles = useMemo(() => {
+  const filtrados = useMemo(() => {
     const texto = q.trim().toLowerCase();
     let lista = items.filter((evento) => {
       if (filtro !== "all" && tipoDeFiltro(evento) !== filtro) return false;
@@ -489,6 +584,16 @@ export default function SocialClient() {
     }
     return lista;
   }, [items, q, filtro, orden]);
+
+  // Lista con póster: como en el perfil, fuera las acciones sin portada (una
+  // lista creada, por ejemplo), que dejarían un hueco vacío en lugar del cartel.
+  const visibles = useMemo(
+    () =>
+      vista === "poster-list"
+        ? filtrados.filter((evento) => typeof evento.posterPath === "string" && evento.posterPath.trim())
+        : filtrados,
+    [filtrados, vista],
+  );
 
   // `null` cuando no hay que agrupar: quien pinta decide entre una sola rejilla
   // y una cabecera por grupo sin mirar longitudes.
@@ -804,11 +909,13 @@ export default function SocialClient() {
           >
             <Users className="mx-auto mb-4 h-16 w-16 text-zinc-800" />
             <p className="font-medium text-zinc-500">
-              {scope === "following"
-                ? "Todavía no hay actividad de las cuentas que sigues."
-                : "Todavía no tienes actividad."}
+              {filtrados.length > 0
+                ? "No hay acciones con portada para mostrar."
+                : scope === "following"
+                  ? "Todavía no hay actividad de las cuentas que sigues."
+                  : "Todavía no tienes actividad."}
             </p>
-            {scope === "following" ? (
+            {scope === "following" && filtrados.length === 0 ? (
               <Link
                 href="/members"
                 className="mt-4 inline-block text-sm font-bold text-pink-400 hover:underline"
@@ -833,30 +940,22 @@ export default function SocialClient() {
                         primero={indice === 0}
                         isBackNav={isBackNav}
                       />
-                      <div className={clasesDeRejilla(vista)}>
-                        {grupo.items.map((evento) => (
-                          <EventoTarjeta
-                            key={evento.id}
-                            evento={evento}
-                            mostrarAutor={scope === "following"}
-                            vista={vista}
-                          />
-                        ))}
-                      </div>
+                      <ListaEventos
+                        eventos={grupo.items}
+                        vista={vista}
+                        mostrarAutor={scope === "following"}
+                        yo={account}
+                      />
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className={clasesDeRejilla(vista)}>
-                  {visibles.map((evento) => (
-                    <EventoTarjeta
-                      key={evento.id}
-                      evento={evento}
-                      mostrarAutor={scope === "following"}
-                      vista={vista}
-                    />
-                  ))}
-                </div>
+                <ListaEventos
+                  eventos={visibles}
+                  vista={vista}
+                  mostrarAutor={scope === "following"}
+                  yo={account}
+                />
               )}
             </div>
 
@@ -1124,22 +1223,6 @@ function SelectorSimple({
   );
 }
 
-// Cómo se reparte cada vista. Fuera del componente porque la usan los dos
-// caminos de pintado (con grupos y sin ellos) y así no pueden divergir.
-function clasesDeRejilla(vista) {
-  if (vista === "grid") {
-    // Tarjetas de cartel, con el mismo escalado por ancho que las páginas de
-    // usuario: más pequeñas en el móvil, sin llegar nunca al muro diminuto.
-    return "grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6";
-  }
-  if (vista === "compact") {
-    // TRES POR FILA en escritorio, que es lo que distingue esta vista de la de
-    // una fila. En el móvil no caben tres filas con texto: van dos.
-    return "grid grid-cols-2 gap-3 lg:grid-cols-3";
-  }
-  return "flex flex-col gap-3";
-}
-
 // Cabecera de grupo con la misma forma que la de las páginas de usuario:
 // pastilla de cristal, barra de color de la sección, título y recuento.
 function GrupoDivisor({ titulo, cuenta, total, primero, isBackNav }) {
@@ -1177,9 +1260,8 @@ function SelectorVista({ vista, setVista, controlGlass, activo, fill = false }) 
       className={`flex h-11 items-center rounded-2xl p-1 ${fill ? "min-w-0 flex-1" : "shrink-0"} ${controlGlass}`}
     >
       {[
-        ["list", LayoutList, "Lista"],
-        ["compact", Columns3, "Tres por fila"],
-        ["grid", LayoutGrid, "Tarjetas"],
+        ["list", List, "Lista"],
+        ["poster-list", ImageIcon, "Lista con póster"],
       ].map(([valor, Icono, etiqueta]) => (
         <button
           key={valor}

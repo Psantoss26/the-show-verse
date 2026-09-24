@@ -16,7 +16,8 @@ test("DetailsClient waits for client readiness before starting entry animations"
   assert.match(source, /trigger\.getBoundingClientRect\(\)\.top/);
   assert.match(source, /window\.addEventListener\("scroll", syncVisibility, \{ passive: true \}\)/);
   assert.doesNotMatch(source, /window\.requestAnimationFrame\(\(\) => \{\s*frame = 0;\s*syncVisibility\(\);/);
-  assert.match(source, /const MOBILE_REVEAL_HIDDEN =\s*"max-sm:invisible max-sm:pointer-events-none"/);
+  assert.match(source, /const MOBILE_REVEAL_ATTR = "data-mobile-reveal"/);
+  assert.match(source, /el\.setAttribute\(MOBILE_REVEAL_ATTR, nextVisible \? "shown" : "hidden"\)/);
   assert.doesNotMatch(source, /max-sm:delay-\[70ms\]/);
   assert.match(source, /function DetailsHeroTitle\(\{ children \}\)/);
   assert.match(source, /const nextIsCompact = availableWidth > 0 && naturalWidth > availableWidth/);
