@@ -1,8 +1,12 @@
 // src/middleware.js
 import { NextResponse } from 'next/server'
 
-const BOT_UA =
-    /WhatsApp|facebookexternalhit|Facebot|Twitterbot|Slackbot|Discordbot|TelegramBot|LinkedInBot|Pinterest|Googlebot|bingbot/i
+// Clientes que montan la VISTA PREVIA de un enlace compartido (chats, redes).
+const PREVIEW_BOT_UA =
+    /WhatsApp|facebookexternalhit|Facebot|Twitterbot|Slackbot|Discordbot|TelegramBot|LinkedInBot|Pinterest|Viber|SkypeUriPreview|redditbot|Mastodon/i
+// Además, buscadores: reciben la misma página ligera, pero SIN saltarse el
+// acceso privado (en el NAS la web no debe indexarse).
+const BOT_UA = new RegExp(`${PREVIEW_BOT_UA.source}|Googlebot|bingbot`, 'i')
 const ACCESS_COOKIE = 'showverse_device_access'
 const ACCESS_ROUTE = '/api/private-access'
 // Rutas exentas del gate de acceso privado. El gate bloquea TODA la web para
@@ -98,8 +102,36 @@ async function hasPrivateAccess(req) {
     return req.cookies.get(ACCESS_COOKIE)?.value === expected
 }
 
+// Ruta /s/* con la VISTA PREVIA de una ficha (solo etiquetas Open Graph y una
+// redirección), o null si la ruta no es una ficha compartible.
+function shareRewritePath(pathname) {
+    const title = pathname.match(/^\/details\/(movie|tv|person)\/(\d+)\/?$/)
+    if (title) return `/s/${title[1]}/${title[2]}`
+    const season = pathname.match(/^\/details\/tv\/(\d+)\/season\/(\d+)\/?$/)
+    if (season) return `/s/tv/${season[1]}/season/${season[2]}`
+    const episode = pathname.match(/^\/details\/tv\/(\d+)\/season\/(\d+)\/episode\/(\d+)\/?$/)
+    if (episode) return `/s/tv/${episode[1]}/season/${episode[2]}/episode/${episode[3]}`
+    return null
+}
+
 export async function middleware(req) {
     const { pathname } = req.nextUrl
+    const ua = req.headers.get('user-agent') || ''
+
+    // Rastreadores de vista previa (WhatsApp, Telegram…) pidiendo una ficha: se
+    // les sirve la página /s/* equivalente, que solo contiene los datos
+    // públicos de TMDb para la tarjeta. Va ANTES del acceso privado a propósito:
+    // el rastreador nunca tiene la cookie del dispositivo y, sin esto, en el NAS
+    // cualquier enlace compartido salía sin imagen ni título (recibía un 404).
+    // No abre nada más: el resto de la web sigue cerrado para él.
+    const shareTarget = BOT_UA.test(ua) ? shareRewritePath(pathname) : null
+    const rewriteToShare = () => {
+        const url = req.nextUrl.clone()
+        url.pathname = shareTarget
+        url.search = ''
+        return NextResponse.rewrite(url)
+    }
+    if (shareTarget && PREVIEW_BOT_UA.test(ua)) return rewriteToShare()
 
     if (
         isPrivateAccessEnabled(req) &&
@@ -116,29 +148,7 @@ export async function middleware(req) {
         })
     }
 
-    const ua = req.headers.get('user-agent') || ''
-    if (!BOT_UA.test(ua)) return NextResponse.next()
-
-    const url = req.nextUrl.clone()
-
-    let m = pathname.match(/^\/details\/movie\/(\d+)\/?$/)
-    if (m) {
-        url.pathname = `/s/movie/${m[1]}`
-        return NextResponse.rewrite(url)
-    }
-
-    m = pathname.match(/^\/details\/tv\/(\d+)\/?$/)
-    if (m) {
-        url.pathname = `/s/tv/${m[1]}`
-        return NextResponse.rewrite(url)
-    }
-
-    m = pathname.match(/^\/details\/person\/(\d+)\/?$/)
-    if (m) {
-        url.pathname = `/s/person/${m[1]}`
-        return NextResponse.rewrite(url)
-    }
-
+    if (shareTarget) return rewriteToShare()
     return NextResponse.next()
 }
 

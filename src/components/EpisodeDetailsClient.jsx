@@ -1486,6 +1486,8 @@ export default function EpisodeDetailsClient({
                   badge: null,
                   busy: watchedBusy,
                   loading: trakt.loading && !watchedBySeasonLoaded,
+                  // En "Continuar viendo": el botón toma su icono y su color.
+                  continueWatchingPercent: inProgressPct,
                   onOpen: async () => {
                     setWatchedBusy(true);
                     try {

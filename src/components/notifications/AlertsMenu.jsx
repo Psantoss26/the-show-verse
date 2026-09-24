@@ -29,6 +29,7 @@ import {
   addDismissed,
   alertsDismissedKey,
   alertsLastSeenKey,
+  alertsUnreadKey,
   countUnread,
   episodeCode,
   normalizeAlerts,
@@ -218,6 +219,36 @@ function AlertRow({ kind, item, isNew, onNavigate, onDismiss }) {
   );
 }
 
+// Clases del botón de la campana. Las comparten el botón real y el marcador de
+// arranque (AlertsMenuBoot), para que el relevo entre los dos no se note.
+function alertsButtonClass({ variant, open = false, heroNavMode = false }) {
+  return variant === "mobile"
+    ? "relative grid h-11 w-11 place-items-center rounded-full text-white transition-[background-color,transform] duration-200 hover:bg-white/10 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+    : `relative grid h-10 w-10 place-items-center rounded-full transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
+        open ? "bg-white/10 text-white" : "text-zinc-300"
+      } ${heroNavMode ? "drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]" : ""}`;
+}
+
+/**
+ * La campana YA PINTADA EN EL PRIMER FOTOGRAMA, mientras la sesión arranca.
+ *
+ * El botón real depende de la cuenta, que no existe hasta que AuthContext
+ * hidrata: sin esto, la campana aparecía unas décimas después que Buscar y el
+ * perfil. Este marcador es idéntico y sale con el HTML del servidor; solo se
+ * muestra si el dispositivo tiene una sesión guardada (`html[data-avatar-boot]`,
+ * que marca AvatarBootScript antes de hidratar, igual que el avatar), porque
+ * sin sesión ahí no habrá campana.
+ */
+export function AlertsMenuBoot({ variant = "desktop", heroNavMode = false }) {
+  return (
+    <div className="alerts-boot relative" aria-hidden="true">
+      <span className={alertsButtonClass({ variant, heroNavMode })}>
+        <Bell className="h-6 w-6" strokeWidth={variant === "mobile" ? 2.2 : 2} />
+      </span>
+    </div>
+  );
+}
+
 /**
  * Botón de alertas del navbar con su desplegable. Mismo cristal, radio y
  * mecánica de portal que los desplegables de búsqueda y de perfil.
@@ -236,6 +267,9 @@ export default function AlertsMenu({ account, variant = "desktop", heroNavMode =
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [lastSeenAt, setLastSeenAt] = useState(null);
+  // Último contador conocido: el globo sale con la campana, sin esperar a que
+  // termine la petición de alertas.
+  const [cachedUnread, setCachedUnread] = useState(0);
   // Última apertura ANTERIOR a la actual: marca qué filas son nuevas mientras el
   // panel está abierto, aunque abrirlo ya las haya dado por leídas.
   const [seenBeforeOpen, setSeenBeforeOpen] = useState(null);
@@ -260,6 +294,7 @@ export default function AlertsMenu({ account, variant = "desktop", heroNavMode =
       writeStorage(alertsLastSeenKey(accountId), seen);
     }
     setLastSeenAt(seen);
+    setCachedUnread(Number(readStorage(alertsUnreadKey(accountId), 0)) || 0);
   }, [accountId]);
 
   const load = useCallback(async () => {
@@ -398,6 +433,12 @@ export default function AlertsMenu({ account, variant = "desktop", heroNavMode =
     };
   }, [open]);
 
+  const computedUnread = alerts && lastSeenAt ? countUnread(alerts, lastSeenAt) : null;
+  useEffect(() => {
+    if (!accountId || computedUnread == null) return;
+    writeStorage(alertsUnreadKey(accountId), computedUnread);
+  }, [accountId, computedUnread]);
+
   const dismiss = (id) => {
     if (!accountId) return;
     const next = addDismissed(readStorage(alertsDismissedKey(accountId), []), id);
@@ -409,7 +450,7 @@ export default function AlertsMenu({ account, variant = "desktop", heroNavMode =
 
   if (!accountId) return null;
 
-  const unread = alerts ? countUnread(alerts, lastSeenAt) : 0;
+  const unread = alerts ? countUnread(alerts, lastSeenAt) : open ? 0 : cachedUnread;
   const isNew = (item) =>
     new Date(item.createdAt).getTime() > new Date(seenBeforeOpen || 0).getTime();
   const total = alerts
@@ -418,12 +459,7 @@ export default function AlertsMenu({ account, variant = "desktop", heroNavMode =
   const label = t("nav_alerts", "Alertas");
   const activityHref = account?.username ? profileTabHref(account.username, "activity") : null;
 
-  const buttonClass =
-    variant === "mobile"
-      ? "relative grid h-11 w-11 place-items-center rounded-full text-white transition-[background-color,transform] duration-200 hover:bg-white/10 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
-      : `relative grid h-10 w-10 place-items-center rounded-full transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
-          open ? "bg-white/10 text-white" : "text-zinc-300"
-        } ${heroNavMode ? "drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]" : ""}`;
+  const buttonClass = alertsButtonClass({ variant, open, heroNavMode });
 
   return (
     <div ref={wrapperRef} className="relative">

@@ -363,6 +363,11 @@ html:not([data-avatar-boot]) .avatar-boot-chevron {
   display: none;
 }
 
+/* Igual con la campana de alertas: solo hay alertas con sesión. */
+html:not([data-avatar-boot]) .alerts-boot {
+  display: none;
+}
+
 @keyframes avatar-boot-pulse {
 
   50% {

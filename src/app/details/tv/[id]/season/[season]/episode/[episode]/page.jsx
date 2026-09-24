@@ -1,4 +1,5 @@
 import EpisodeDetailsClient from "@/components/EpisodeDetailsClient";
+import { getShareData, shareMetadata } from "@/lib/share/shareMeta";
 
 export const revalidate = 3600; // 1h
 
@@ -28,19 +29,14 @@ export async function generateMetadata({ params }) {
     return { title: "Episodio" };
   }
 
-  const [show, episode] = await Promise.all([
-    tmdbFetch(`/tv/${showId}`).catch(() => null),
-    tmdbFetch(
-      `/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`,
-    ).catch(() => null),
-  ]);
-
-  const showName = show?.name || show?.title || "Serie";
-  const episodeName = episode?.name || `Episodio ${episodeNumber}`;
-
-  return {
-    title: `${showName} - ${episodeName}`,
-  };
+  // Título + vista previa al compartir (Open Graph). Ver lib/share/shareMeta.js.
+  const share = await getShareData({
+    kind: "episode",
+    id: showId,
+    season: seasonNumber,
+    episode: episodeNumber,
+  }).catch(() => null);
+  return shareMetadata(share, `Episodio ${episodeNumber}`);
 }
 
 export default async function EpisodePage({ params }) {
