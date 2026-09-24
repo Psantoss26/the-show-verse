@@ -1250,19 +1250,18 @@ function SearchBar({
           }}
           className={`
             relative flex w-full items-center overflow-hidden rounded-full transition-all duration-300 ease-out group
+            ${LIQUID_GLASS_PANEL}
             ${
-              isMobile
-                ? ""
-                : "bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_30px_-10px_rgba(0,0,0,0.5)] hover:bg-black/30 focus-within:bg-black/40 focus-within:ring-4 focus-within:ring-white/10"
-            }
-            ${
-              isMobile
-                // En el overlay, la barra necesita su propia superficie para
-                // leerse como un control independiente. Comparte exactamente el
-                // cristal de los paneles de recientes y resultados; el relleno
-                // derecho del formulario reserva el hueco del botón de cierre.
-                ? `${LIQUID_GLASS_PANEL} h-12 pl-4 pr-3`
-                : "h-11 pl-4 pr-3"
+              // La barra comparte EXACTAMENTE el cristal de los desplegables de
+              // búsqueda (recientes, resultados, filtros) y del menú de
+              // secciones, en móvil y en escritorio. En escritorio tenía uno
+              // propio —degradado hacia negro, 50px de desenfoque y más oscuro
+              // aún con el foco— y se leía como otra pieza, más apagada, encima
+              // de su propio desplegable.
+              //
+              // En el overlay móvil, el relleno derecho del formulario reserva
+              // el hueco del botón de cierre.
+              isMobile ? "h-12 pl-4 pr-3" : "h-11 pl-4 pr-3"
             }
           `}
         >
