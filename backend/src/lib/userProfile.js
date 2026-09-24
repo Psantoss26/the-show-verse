@@ -906,7 +906,7 @@ export function applySpanishTitles(items, metadataByKey) {
 //   2) lo que siga sin póster se resuelve en TMDb: para 'tv' el póster de la SERIE
 //      (episodios agrupados por serie), para 'movie' el de la película.
 // Muta y devuelve los mismos items. No-op si todos ya tienen ambos datos.
-async function fillMissingPosters(db, targetId, items) {
+export async function fillMissingPosters(db, targetId, items) {
   const missing = items.filter((i) => !i.posterPath || !i.title);
   if (!missing.length) return items;
 

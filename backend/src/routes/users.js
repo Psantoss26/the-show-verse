@@ -34,6 +34,7 @@ import {
   resolveEnglishPosterPaths,
 } from '../lib/userProfile.js';
 import { getLevelSummaries } from '../level/store.js';
+import { getUserNotifications } from '../lib/notifications.js';
 
 const ARTWORK_KINDS = ['poster', 'mobilePoster', 'backdrop', 'background', 'logo'];
 const artworkChangeSchema = z.object({
@@ -214,6 +215,14 @@ export default async function usersRoutes(fastify) {
   fastify.get('/feed/summary', async (req, reply) => {
     const summary = await getSocialSummary(db, req.user.id);
     return reply.send({ summary });
+  });
+
+  // GET /users/notifications — sección de alertas del navbar: actividad propia
+  // reciente, recordatorios de puntuar/reseñar lo visto y lo que ha pasado solo
+  // de "Continuar viendo" a visto.
+  fastify.get('/notifications', async (req, reply) => {
+    const notifications = await getUserNotifications(db, req.user.id);
+    return reply.send(notifications);
   });
 
   fastify.get('/preferences', async (req, reply) => {
