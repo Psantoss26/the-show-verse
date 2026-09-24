@@ -244,6 +244,30 @@ test("Crunchyroll, episodio: la serie sale del enlace a /series/", () => {
   assert.equal(signal.movieTitle, undefined);
 });
 
+// Reproductor actual: el <video> va en un iframe (sin Media Session en la página),
+// la serie en un <h4> dentro del enlace a /series/ y el episodio en un <h1>.
+test("Crunchyroll, episodio sin Media Session: serie del enlace, episodio del h1", () => {
+  const signal = detect({
+    host: "www.crunchyroll.com",
+    url: "https://www.crunchyroll.com/es/watch/GZ7UV13VE/the-promise",
+    tabTitle: "Frieren - Ver en Crunchyroll en castellano",
+    nodes: [
+      h("div", { class: "erc-current-media-info" }, [
+        h("a", { href: "/es/series/GY5P48XEY/frieren", class: "show-title-link" }, [
+          h("h4", { class: "text show-title" }, "Frieren"),
+        ]),
+        h("h1", { class: "heading title" }, "E12 - La promesa"),
+      ]),
+    ],
+    platformName: "Crunchyroll",
+    durationSec: 1440,
+  });
+  assert.equal(signal.showName, "Frieren");
+  assert.equal(signal.episode, 12);
+  assert.equal(signal.movieTitle, undefined);
+  assert.equal(signal.contentId, "GZ7UV13VE");
+});
+
 // ── Plex ───────────────────────────────────────────────────────────────────────
 test("Plex, episodio: título y subtítulo del panel de controles", () => {
   const signal = detect({

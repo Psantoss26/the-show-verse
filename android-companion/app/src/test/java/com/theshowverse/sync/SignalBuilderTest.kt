@@ -270,4 +270,71 @@ class SignalBuilderTest {
         assertNull(sig.showName)
         assertFalse(sig.seriesFromHint)
     }
+    @Test
+    fun crunchyrollEpisodeTitleUsesTheSeriesFromTheDetailScreen() {
+        // Crunchyroll: la sesión solo trae el episodio con su número delante. La
+        // serie sale de la ficha abierta antes (pista de accesibilidad).
+        val raw = RawMetadata(
+            packageName = "com.crunchyroll.crunchyroid",
+            title = "E12 - La promesa",
+        )
+        val sig = SignalBuilder.build(raw, "Crunchyroll", hintShowName = "Frieren")
+        assertEquals("Frieren", sig.showName)
+        assertEquals(12, sig.episode)
+        assertNull(sig.season)
+        assertNull(sig.movieTitle)
+        assertTrue(sig.seriesFromHint)
+
+        // Sin pista sigue siendo un episodio (nunca una película con ese nombre).
+        val sinPista = SignalBuilder.build(raw, "Crunchyroll")
+        assertNull(sinPista.movieTitle)
+        assertEquals(12, sinPista.episode)
+        assertEquals("E12 - La promesa", sinPista.episodeName)
+    }
+
+    @Test
+    fun crunchyrollSeriesInTitleAndEpisodeInSubtitle() {
+        val sig = SignalBuilder.build(
+            RawMetadata(
+                packageName = "com.crunchyroll.crunchyroid",
+                title = "Frieren",
+                displaySubtitle = "T1 E12 - La promesa",
+            ),
+            "Crunchyroll",
+        )
+        assertEquals("Frieren", sig.showName)
+        assertEquals("La promesa", sig.episodeName)
+        assertEquals(1, sig.season)
+        assertEquals(12, sig.episode)
+    }
+
+    @Test
+    fun movieWithChapterNumberIsStillAMovie() {
+        // El número al FINAL del nombre no es un episodio, ni siquiera con pista.
+        val sig = SignalBuilder.build(
+            RawMetadata(packageName = "com.amazon.avod", title = "John Wick: Capítulo 2"),
+            "Prime Video",
+            hintShowName = "The Boys",
+        )
+        assertEquals("John Wick: Capítulo 2", sig.movieTitle)
+        assertNull(sig.showName)
+        assertNull(sig.episode)
+    }
+
+    @Test
+    fun netflixSubtitleWithMarkerIsUnchanged() {
+        // Netflix: dSub = "T1:E1 - <episodio>", igual que el título → no es serie.
+        val sig = SignalBuilder.build(
+            RawMetadata(
+                packageName = "com.netflix.mediaclient",
+                title = "A ti, dentro de 2000 años",
+                displaySubtitle = "T1:E1 - A ti, dentro de 2000 años",
+            ),
+            "Netflix",
+        )
+        assertNull(sig.showName)
+        assertEquals("A ti, dentro de 2000 años", sig.episodeName)
+        assertEquals(1, sig.season)
+        assertEquals(1, sig.episode)
+    }
 }

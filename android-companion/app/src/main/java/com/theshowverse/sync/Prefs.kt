@@ -114,7 +114,14 @@ class Prefs(context: Context) {
     /** Apps activadas para sincronizar. Por defecto, las de streaming conocidas. */
     fun enabledPackages(): Set<String> {
         if (!prefs.contains(KEY_ENABLED)) return Platforms.DEFAULT_ENABLED
-        return prefs.getStringSet(KEY_ENABLED, emptySet())?.toSet() ?: emptySet()
+        val stored = prefs.getStringSet(KEY_ENABLED, emptySet())?.toSet() ?: emptySet()
+        // Las apps conocidas que NO existían cuando se guardó la lista no pueden
+        // estar desactivadas por el usuario (no las llegó a ver): entran activadas.
+        // Sin esto, quien hubiera tocado cualquier interruptor se quedaba sin las
+        // apps añadidas después (p. ej. Prime Video de las tablets Fire).
+        val knownAtSave = prefs.getStringSet(KEY_KNOWN_AT_SAVE, null)?.toSet()
+            ?: Platforms.LEGACY_KNOWN
+        return stored + (Platforms.DEFAULT_ENABLED - knownAtSave)
     }
 
     fun isEnabled(pkg: String): Boolean = enabledPackages().contains(pkg)
@@ -122,7 +129,10 @@ class Prefs(context: Context) {
     fun setEnabled(pkg: String, enabled: Boolean) {
         val next = enabledPackages().toMutableSet()
         if (enabled) next.add(pkg) else next.remove(pkg)
-        prefs.edit().putStringSet(KEY_ENABLED, next).apply()
+        prefs.edit()
+            .putStringSet(KEY_ENABLED, next)
+            .putStringSet(KEY_KNOWN_AT_SAVE, Platforms.DEFAULT_ENABLED)
+            .apply()
     }
 
     /** Paquetes que hemos visto emitir sesiones (para listarlos en la UI). */
@@ -164,6 +174,7 @@ class Prefs(context: Context) {
         private const val KEY_INDICATOR = "indicator_enabled"
         private const val KEY_A11Y = "a11y_enabled"
         private const val KEY_ENABLED = "enabled_packages"
+        private const val KEY_KNOWN_AT_SAVE = "known_packages_at_save"
         private const val KEY_SEEN = "seen_packages"
         private const val KEY_LOGS = "event_logs"
         private const val KEY_WEB_ORIGIN = "web_origin"

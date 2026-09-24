@@ -42,6 +42,29 @@ object SignalBuilder {
         RegexOption.IGNORE_CASE,
     )
 
+    // Texto que EMPIEZA por el número de episodio y sigue con un nombre: "E12 - La
+    // promesa", "Episodio 3: El trato", "S1 E4 · X". Es la forma en que Crunchyroll
+    // (y otras apps de anime) titulan el episodio cuando la sesión no trae la serie.
+    // Se exige separador y texto detrás: "Capítulo 2" a secas, o un número al FINAL
+    // ("John Wick: Capítulo 2"), sigue sin contar como episodio.
+    private val LEADING_EPISODE = Regex(
+        "^\\s*(?:(?:T|S|Temporada|Season|Saison|Staffel)\\s*\\.?\\s*(\\d{1,3})\\s*[:x,]?\\s*)?" +
+            "(?:E|Ep|Episodio|Episode|Cap[ií]tulo|Chapter|Folge)\\s*\\.?\\s*(\\d{1,3})(?!\\d)" +
+            "\\s*[-–—·:.]+\\s*(?=\\S)",
+        RegexOption.IGNORE_CASE,
+    )
+
+    /** (temporada, episodio) si [text] empieza por un marcador de episodio y un nombre. */
+    private fun leadingEpisode(text: String?): Pair<Int?, Int>? {
+        val m = text?.let { LEADING_EPISODE.find(it) } ?: return null
+        val episode = m.groupValues[2].toIntOrNull() ?: return null
+        return m.groupValues[1].toIntOrNull() to episode
+    }
+
+    /** [text] sin su marcador de episodio inicial ("E12 - La promesa" → "La promesa"). */
+    private fun withoutLeadingEpisode(text: String?): String? =
+        text?.let { LEADING_EPISODE.replace(it, "").trim().ifEmpty { null } }
+
     /** Quita un marcador "T1:E1 -"/"Episodio 1:" del principio; null si queda vacío. */
     private fun withoutEpisodeMarker(s: String?): String? =
         s?.let { LEADING_SE_MARKER.replace(it, "").trim().ifEmpty { null } }
@@ -119,7 +142,16 @@ object SignalBuilder {
         // en cualquiera de los textos del mismo grupo y nunca se asume 1.
         val strongCandidates = listOf(subtitle, album, raw.queueTitle.clean())
         val weakCandidates = listOf(title, raw.displayTitle.clean())
-        val strongScan = scan(strongCandidates, SeScan())
+        val scanned = scan(strongCandidates, SeScan())
+        // El título solo cuenta como evidencia de episodio si EMPIEZA por el marcador
+        // ("E12 - La promesa"): ese formato no es el nombre de ninguna película. Es
+        // lo que permite, en Crunchyroll, usar la serie de la ficha abierta antes.
+        val titleEpisode = if (scanned.se == null) leadingEpisode(title) else null
+        val strongScan = if (titleEpisode != null) {
+            SeScan(titleEpisode, title, scanned.seasonAny ?: titleEpisode.first)
+        } else {
+            scanned
+        }
         val hasEpisodeNumber = strongScan.se != null
 
         // ¿El subtítulo aporta el nombre de la SERIE? Solo si, tras quitarle un
@@ -130,7 +162,19 @@ object SignalBuilder {
         //     el propio episodio → NO es serie (antes se mandaba esa basura como
         //     nombre de serie y TMDb resolvía un título sin relación).
         val subtitleCore = withoutEpisodeMarker(subtitle)
-        val subtitleIsSeries = !hasArtistAlbum &&
+        // Al revés que Netflix: el TÍTULO es la serie y el subtítulo el episodio con
+        // su número delante ("E12 - La promesa"). Se reconoce porque el subtítulo
+        // empieza por el marcador y, sin él, no coincide con el título. En Netflix
+        // coinciden ("T1:E1 - X" / "X"), así que ahí no cambia nada.
+        val subtitleEpisodeCore = withoutLeadingEpisode(subtitle)
+        val subtitleIsEpisode = !hasArtistAlbum &&
+            !title.isNullOrBlank() &&
+            leadingEpisode(subtitle) != null &&
+            leadingEpisode(title) == null &&
+            subtitleEpisodeCore != null &&
+            !subtitleEpisodeCore.equals(title, ignoreCase = true) &&
+            !subtitleEpisodeCore.equals(withoutLeadingEpisode(title), ignoreCase = true)
+        val subtitleIsSeries = !subtitleIsEpisode && !hasArtistAlbum &&
             !subtitle.isNullOrBlank() &&
             !title.isNullOrBlank() &&
             !subtitle.equals(title, ignoreCase = true) &&
@@ -160,6 +204,7 @@ object SignalBuilder {
         // pantalla y puede haber quedado desfasada.
         val showTitle: String? = when {
             hasArtistAlbum -> artist ?: album
+            subtitleIsEpisode -> title
             subtitleIsSeries -> subtitle
             hintUsable -> hint
             else -> null
@@ -171,7 +216,11 @@ object SignalBuilder {
         val se = finalScan.se
         val seText = finalScan.seText
         val resolvedSeason = se?.first ?: finalScan.seasonAny
-        val episodeTitle = if (hasArtistAlbum) (title ?: subtitle) else title
+        val episodeTitle = when {
+            hasArtistAlbum -> title ?: subtitle
+            subtitleIsEpisode -> subtitleEpisodeCore
+            else -> title
+        }
         // Un número de episodio en un campo dedicado basta para saber que esto es un
         // EPISODIO, aunque no se haya podido averiguar de qué serie. En ese caso no
         // se manda `movieTitle`: declararlo película hacía que el servidor buscase

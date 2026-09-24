@@ -86,6 +86,16 @@ const buildBaseRowClass = (forceMobile) => `flex flex-nowrap items-center justif
                 [&.labeled-row>*:not(.separator):not(.labeled)]:!flex-none
                 ${forceMobile ? MOBILE_ACTION_BUTTON_BASE : MOBILE_ACTION_BUTTON_CLASS}`;
 
+// Las previews tienen menos ancho que la ficha: centrar la fila y permitir
+// que los círculos se reduzcan por igual, manteniendo su proporción cuadrada.
+const FIT_ACTION_ROW_CLASS = `flex flex-nowrap items-center justify-center w-full gap-3
+                [&>*:not(.separator):not(.labeled)]:!flex-[0_1_40px]
+                [&>*:not(.separator):not(.labeled)]:!min-w-0
+                [&>*:not(.separator):not(.labeled)]:!max-w-10
+                [&>*:not(.separator):not(.labeled)]:!h-auto
+                [&>*:not(.separator):not(.labeled)]:aspect-square
+                ${MOBILE_ACTION_BUTTON_BASE}`;
+
 // Retardo entre celdas para que el cambio se lea de izquierda a derecha, en orden.
 const SLOT_STAGGER = 0.03;
 const SLOT_FADE = 0.22;
@@ -139,6 +149,7 @@ export default function DetailActionsRow({
   className = "",
   showSeparator = true,
   fillMobile = false,
+  fitToContainer = false,
   // La ficha de TELÉFONO del drawer (DetailModal con `contentView === "mobile"`)
   // mide entre 320 y 639px de ANCHO DE PANEL, pero vive en una ventana de
   // escritorio: los `sm:` de esta fila miran el viewport, así que allí casan
@@ -210,10 +221,10 @@ export default function DetailActionsRow({
       ? "[&.labeled-row>*:not(.separator):not(.labeled)]:!w-12 [&.labeled-row>*:not(.separator):not(.labeled)]:!h-12 [&.labeled-row_[data-liquid-button]:not(.labeled)_svg]:!h-6 [&.labeled-row_[data-liquid-button]:not(.labeled)_svg]:!w-6"
       : "[&.labeled-row>*:not(.separator):not(.labeled)]:!w-10 [&.labeled-row>*:not(.separator):not(.labeled)]:!h-10";
   const rowClass = [
-    buildBaseRowClass(forceMobile),
-    labeledSizeClass,
-    mobileGapClass,
-    mobileCapClass,
+    fitToContainer ? FIT_ACTION_ROW_CLASS : buildBaseRowClass(forceMobile),
+    !fitToContainer && labeledSizeClass,
+    !fitToContainer && mobileGapClass,
+    !fitToContainer && mobileCapClass,
     trailerLabel || play ? "labeled-row" : "",
     className,
   ]

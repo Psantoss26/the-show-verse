@@ -162,7 +162,11 @@
       id: "crunchyroll",
       match: /(^|\.)crunchyroll\.com$/,
       contentId: (url) => (url.match(/\/watch\/([A-Za-z0-9]+)/) || [])[1] || null,
+      // El reproductor actual pinta el episodio en un <h1> ("E12 - La promesa") y
+      // la serie en un <h4> DENTRO del enlace a /series/: el <h1> va primero para
+      // no tomar ese <h4> (la serie) por el episodio.
       subSel: [
+        '[class*="current-media-info"] h1',
         '[class*="current-media-info"] h4',
         'h4[class*="title"]',
         '[class*="episode-title"]',

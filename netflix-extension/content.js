@@ -589,10 +589,59 @@
     startDismissTimer();
   }
 
+  // ---- Reproductor en un iframe de otro origen (Crunchyroll) ----
+  // En Crunchyroll web el <video> vive en un iframe (static.crunchyroll.com) que
+  // no sabe qué se está viendo, y el título (serie, episodio, JSON-LD, /watch/<id>)
+  // está en la página principal, que no tiene vídeo. Cada mitad por su cuenta
+  // fallaba: la página solo veía una ficha y el iframe un vídeo sin título, así
+  // que nunca se enviaba progreso. El iframe pasa a ser un mero "informador" del
+  // estado del vídeo y la página principal compone la señal con ambas mitades.
+  // Solo se activa en estas plataformas: el resto sigue exactamente igual.
+  const FRAME_BRIDGE_PLATFORMS = { crunchyroll: /(^|\.)crunchyroll\.com$/i };
+  const FRAME_BRIDGE_SOURCE = "tsv-player-frame";
+  // Sin noticias del iframe durante este tiempo = ya no hay reproductor.
+  const REMOTE_VIDEO_TTL_MS = 6000;
+  const isSubframe = (() => {
+    try {
+      return window.top != null && window.self !== window.top;
+    } catch (e) {
+      return true; // acceso a top bloqueado: solo pasa dentro de un iframe
+    }
+  })();
+  let remoteVideo = null; // último estado recibido del iframe del reproductor
+
+  // Estado del vídeo del iframe como si fuera un <video> local (solo lo que se
+  // lee de él). La posición se extrapola desde el último aviso.
+  function remoteVideoProxy() {
+    const r = remoteVideo;
+    if (!r || Date.now() - r.at > REMOTE_VIDEO_TTL_MS) return null;
+    // Navegación dentro de la SPA (otro episodio, vuelta a la ficha): el estado
+    // era del contenido anterior. El nuevo reproductor avisará enseguida.
+    if (r.href !== location.href) return null;
+    const elapsed = r.paused || r.ended ? 0 : (Date.now() - r.at) / 1000;
+    const currentTime = Math.min(r.duration, r.currentTime + Math.max(0, elapsed));
+    return {
+      remote: true,
+      readyState: 4,
+      duration: r.duration,
+      currentTime,
+      clientWidth: r.width,
+      clientHeight: r.height,
+      mediaSession: r.mediaSession,
+      addEventListener() {}, // pausa/fin llegan por mensaje (ver onFrameMessage)
+    };
+  }
+
   // Devuelve el <video> principal en reproducción (reproductor real grande).
   // Con all_frames evitamos miniaturas/anuncios de frames laterales exigiendo
   // un tamaño mínimo de reproductor.
   function getMainVideo() {
+    const local = getLocalMainVideo();
+    if (local || isSubframe || !bridgeEnabled) return local;
+    return remoteVideoProxy();
+  }
+
+  function getLocalMainVideo() {
     const videos = Array.from(document.querySelectorAll("video")).filter(
       (v) =>
         v.readyState > 0 &&
@@ -627,6 +676,12 @@
   }
 
   const { id: platformId, name: platformName } = platformInfo(location.hostname);
+  const bridgeRe = FRAME_BRIDGE_PLATFORMS[platformId];
+  const bridgeEnabled = Boolean(
+    bridgeRe && bridgeRe.test(String(location.hostname || "").replace(/^www\./, "")),
+  );
+  // Iframe del reproductor de una plataforma con puente: solo informa del vídeo.
+  const reporterOnly = bridgeEnabled && isSubframe;
   console.log(`[The Show Verse] Observador universal activo (${platformName}).`);
 
   let lastKey = null;
@@ -691,7 +746,8 @@
       host: location.hostname,
       url: location.href,
       contentId: null,
-      mediaSession: mediaSessionRaw(),
+      // El iframe del reproductor puede ser quien publique la Media Session.
+      mediaSession: mediaSessionRaw() || (video.remote ? video.mediaSession : null),
       tabTitle: document.title,
       durationSec: isFinite(video.duration) ? Math.round(video.duration) : undefined,
       positionSec: Math.round(video.currentTime),
@@ -801,6 +857,10 @@
   // al salir, sin esperar al siguiente ciclo de 30 s.
   function flushProgress() {
     if (syncPaused) return;
+    if (reporterOnly) {
+      reportFrameVideo("pause");
+      return;
+    }
     const liveSignal = buildSignal();
     if (liveSignal && R.contentKey(platformId, liveSignal) !== lastKey) {
       flushPreviousProgress();
@@ -869,6 +929,10 @@
     }
     if (syncPaused) {
       stop();
+      return;
+    }
+    if (reporterOnly) {
+      reportFrameVideo();
       return;
     }
 
@@ -980,6 +1044,82 @@
       // Contexto invalidado justo al enviar: permitimos reintento y paramos.
       lastKey = null;
       stop();
+    }
+  }
+
+  // Iframe del reproductor: manda a la página principal el estado del vídeo (y la
+  // Media Session, si la publica aquí). No resuelve ni envía nada por su cuenta.
+  let reportedVideo = null;
+  function reportFrameVideo(eventName) {
+    const video = getLocalMainVideo();
+    if (!video) return;
+    if (video !== reportedVideo) {
+      reportedVideo = video;
+      try {
+        video.addEventListener("pause", () => reportFrameVideo("pause"));
+        video.addEventListener("ended", () => reportFrameVideo("ended"));
+      } catch (e) {
+        /* elemento no válido: se reintentará con el siguiente vídeo */
+      }
+    }
+    try {
+      window.top.postMessage(
+        {
+          source: FRAME_BRIDGE_SOURCE,
+          event: eventName || "tick",
+          currentTime: video.currentTime,
+          duration: video.duration,
+          paused: Boolean(video.paused),
+          ended: Boolean(video.ended),
+          width: video.clientWidth,
+          height: video.clientHeight,
+          mediaSession: mediaSessionRaw(),
+        },
+        "*",
+      );
+    } catch (e) {
+      /* sin acceso a la página principal: nada que hacer */
+    }
+  }
+
+  // Página principal: recibe el estado del vídeo del iframe del reproductor. Solo
+  // se aceptan mensajes de un iframe de la misma plataforma (mismo dominio base).
+  function onFrameMessage(event) {
+    const data = event && event.data;
+    if (!data || data.source !== FRAME_BRIDGE_SOURCE) return;
+    if (event.source === window) return;
+    let originHost = "";
+    try {
+      originHost = new URL(event.origin).hostname;
+    } catch (e) {
+      return;
+    }
+    if (!bridgeRe.test(originHost)) return;
+    const duration = Number(data.duration);
+    const currentTime = Number(data.currentTime);
+    if (!isFinite(duration) || duration <= 0 || !isFinite(currentTime) || currentTime < 0) return;
+    remoteVideo = {
+      at: Date.now(),
+      href: location.href,
+      currentTime,
+      duration,
+      paused: Boolean(data.paused),
+      ended: Boolean(data.ended),
+      width: Number(data.width) || 0,
+      height: Number(data.height) || 0,
+      mediaSession: data.mediaSession && typeof data.mediaSession === "object"
+        ? data.mediaSession
+        : null,
+    };
+    // Pausa/fin: guardar el punto exacto al momento, como con un <video> local.
+    if (data.event === "pause" || data.event === "ended") flushProgress();
+  }
+
+  if (bridgeEnabled && !isSubframe) {
+    try {
+      window.addEventListener("message", onFrameMessage);
+    } catch (e) {
+      /* entorno sin window: ignoramos */
     }
   }
 

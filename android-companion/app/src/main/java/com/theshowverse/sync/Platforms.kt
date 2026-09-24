@@ -11,6 +11,9 @@ object Platforms {
     val KNOWN: Map<String, String> = linkedMapOf(
         "com.netflix.mediaclient" to "Netflix",
         "com.amazon.avod.thirdpartyclient" to "Prime Video",
+        // Tablets Fire (Fire OS): Prime Video viene de serie con otro paquete. Sin
+        // él, en esas tablets no se detectaba ni la ficha ni la reproducción.
+        "com.amazon.avod" to "Prime Video",
         "com.amazon.amazonvideo.livingroom" to "Prime Video",
         "com.wbd.stream" to "Max",
         "com.hbo.hbonow" to "Max",
@@ -31,6 +34,22 @@ object Platforms {
 
     /** Paquetes activados por defecto (todas las apps de streaming conocidas). */
     val DEFAULT_ENABLED: Set<String> = KNOWN.keys.toSet()
+
+    /**
+     * Apps conocidas ANTES de que se guardara qué apps conocía la lista al tocar
+     * un interruptor (ver Prefs.enabledPackages). Las que se añadan después de esta
+     * lista entran activadas aunque el usuario ya hubiera personalizado la suya.
+     * No se toca: es una foto del pasado.
+     */
+    val LEGACY_KNOWN: Set<String> = setOf(
+        "com.netflix.mediaclient", "com.amazon.avod.thirdpartyclient",
+        "com.amazon.amazonvideo.livingroom", "com.wbd.stream", "com.hbo.hbonow",
+        "com.disney.disneyplus", "com.crunchyroll.crunchyroid", "com.telefonica.gvp",
+        "es.plus.yomvi", "com.apple.atve.androidtv.appletv", "com.filmin",
+        "com.skyshowtime.skyshowtime", "tv.pluto.android", "com.rakuten.tv",
+        "com.atresmedia.atresplayer", "es.rtve.rtvePlay", "app.plex.android",
+        "com.plexapp.android",
+    )
 
     /** Nombre legible: el conocido, o el propio paquete si es una app añadida. */
     fun nameFor(pkg: String): String = KNOWN[pkg] ?: pkg
