@@ -1705,8 +1705,11 @@ function ContinueWatchingPreviewCard({
             el episodio/película, y el botón de visionado muestra el PROGRESO de ese
             episodio/película concreto. Corta la propagación al onClick de la card. */}
         <div className="mb-3" onClick={(e) => e.stopPropagation()}>
+          {/* Mismo formato que el resto de vistas previas backdrop: botones
+              alineados a la izquierda con su tamaño normal. (Con
+              `fitToContainer` la fila se centraba y encogía los botones.) */}
           <DetailActionsRow
-            fitToContainer={!isCalendar}
+            compactLabelWhenTight
             onTrailer={isCalendar ? handleToggleTrailer : undefined}
             trailerAvailable={isCalendar}
             trailerLoading={isCalendar ? trailerLoading : false}

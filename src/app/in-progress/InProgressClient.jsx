@@ -2,6 +2,7 @@
 
 
 import OptimizedImage from "@/components/OptimizedImage";
+import LogoutConfirmModal from "@/components/auth/LogoutConfirmModal";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, memo } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
@@ -32,7 +33,6 @@ import {
 import {
   traktGetInProgress,
   traktGetCompleted,
-  traktDisconnect,
 } from "@/lib/api/traktClient";
 import { formatPageTitle } from "@/lib/pageTitle";
 import LiquidButton from "@/components/LiquidButton";
@@ -1926,21 +1926,9 @@ export default function InProgressClient({
     }
   }, [activeTab, sortBy]);
 
-  const handleDisconnect = async () => {
-    try {
-      await traktDisconnect();
-      clearSessionCache(IN_PROGRESS_CACHE_KEY);
-      setAuth({ loading: false, connected: false });
-      setItems([]);
-      setStats(null);
-      setCompletedItems([]);
-      setCompletedStats(null);
-      setCompletedLoaded(false);
-      window.location.href = "/";
-    } catch (e) {
-      console.error(e);
-    }
-    setShowDisconnectModal(false);
+  // Limpieza propia antes de cerrar sesión (ver LogoutConfirmModal).
+  const clearInProgressBeforeLogout = () => {
+    clearSessionCache(IN_PROGRESS_CACHE_KEY);
   };
 
   // ----------------------------
@@ -2096,7 +2084,8 @@ export default function InProgressClient({
                       loading={currentLoading || auth.loading}
                       activeColor="red"
                       groupId="inprogress-header-actions"
-                      title="Desconectar"
+                      title="Cerrar sesión"
+                      aria-label="Cerrar sesión"
                       className="!text-red-400 hover:!text-red-300 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent !border-0 shadow-lg backdrop-blur-md hover:!bg-white/15"
                     >
                       <LogOut className="w-5 h-5" />
@@ -2580,48 +2569,12 @@ export default function InProgressClient({
         )}
       </div>
 
-      {/* ========== DISCONNECT MODAL ========== */}
-      <AnimatePresence>
-        {showDisconnectModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center px-4"
-            onClick={() => setShowDisconnectModal(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 max-w-sm w-full text-center"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <LogOut className="w-10 h-10 text-red-500 mx-auto mb-4" />
-              <h3 className="text-lg font-bold text-white mb-2">
-                ¿Desconectar Trakt?
-              </h3>
-              <p className="text-sm text-zinc-400 mb-6">
-                Se eliminará la conexión con tu cuenta de Trakt.
-              </p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowDisconnectModal(false)}
-                  className="flex-1 py-2.5 rounded-xl bg-zinc-800 text-white font-semibold text-sm hover:bg-zinc-700 transition"
-                >
-                  Cancelar
-                </button>
-                <button data-online-only="true"
-                  onClick={handleDisconnect}
-                  className="flex-1 py-2.5 rounded-xl bg-red-600 text-white font-semibold text-sm hover:bg-red-500 transition"
-                >
-                  Desconectar
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Confirmación de cierre de sesión (común a las páginas de usuario). */}
+      <LogoutConfirmModal
+        open={showDisconnectModal}
+        onClose={() => setShowDisconnectModal(false)}
+        onBeforeLogout={clearInProgressBeforeLogout}
+      />
     </div>
   );
 }

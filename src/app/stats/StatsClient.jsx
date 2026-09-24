@@ -1,6 +1,7 @@
 "use client";
 
 import { loadProfileCharts } from "@/lib/profile/loadProfileCharts";
+import LogoutConfirmModal from "@/components/auth/LogoutConfirmModal";
 
 
 import OptimizedImage from "@/components/OptimizedImage";
@@ -1283,7 +1284,6 @@ export default function StatsClient({ connectNext = "/profile" }) {
     user: authUser,
     authenticated,
     hydrated: authHydrated,
-    logout,
   } = useAuth();
   const isMobile = useIsMobileLayout(768);
   const [loading, setLoading] = useState(true);
@@ -1321,17 +1321,10 @@ export default function StatsClient({ connectNext = "/profile" }) {
     };
   }, [handleSyncProfile]);
 
-  const handleDisconnect = useCallback(async () => {
-    try {
-      clearProfileSessionCache();
-      setShowDisconnectModal(false);
-      await logout({ redirectTo: "/login" });
-    } catch (e) {
-      console.error("Error cerrando sesión:", e);
-      setShowDisconnectModal(false);
-      alert("Error al cerrar sesión. Por favor, inténtalo de nuevo.");
-    }
-  }, [logout]);
+  // Limpieza propia antes de cerrar sesión (ver LogoutConfirmModal).
+  const clearStatsBeforeLogout = useCallback(() => {
+    clearProfileSessionCache();
+  }, []);
 
   useEffect(() => {
     let ignore = false;
@@ -2308,49 +2301,12 @@ export default function StatsClient({ connectNext = "/profile" }) {
         )}
       </div>
 
-      <AnimatePresence>
-        {showDisconnectModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"
-            onClick={() => setShowDisconnectModal(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className={`${PROFILE_GLASS_SURFACE} w-full max-w-sm rounded-2xl p-6 text-center`}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <LogOut className="mx-auto mb-4 h-10 w-10 text-red-500" />
-              <h2 className="mb-2 text-lg font-bold text-white">
-                ¿Cerrar sesión?
-              </h2>
-              <p className="mb-6 text-sm text-zinc-400">
-                Saldrás de tu cuenta de The Show Verse en este dispositivo.
-              </p>
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowDisconnectModal(false)}
-                  className="flex-1 rounded-xl bg-zinc-800 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-700"
-                >
-                  Cancelar
-                </button>
-                <button data-online-only="true"
-                  type="button"
-                  onClick={handleDisconnect}
-                  className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-semibold text-white transition hover:bg-red-500"
-                >
-                  Cerrar sesión
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Confirmación de cierre de sesión (común a las páginas de usuario). */}
+      <LogoutConfirmModal
+        open={showDisconnectModal}
+        onClose={() => setShowDisconnectModal(false)}
+        onBeforeLogout={clearStatsBeforeLogout}
+      />
     </div>
     </MotionConfig>
   );

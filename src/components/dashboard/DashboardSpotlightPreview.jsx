@@ -217,6 +217,7 @@ export default function DashboardSpotlightPreview({
             onClick={(event) => event.stopPropagation()}
           >
             <DetailActionsRow
+              compactLabelWhenTight
               size="lg"
               className="labeled-row"
               showSeparator={false}
