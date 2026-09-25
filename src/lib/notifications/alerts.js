@@ -115,7 +115,7 @@ export function platformLabel(platform) {
 }
 
 // Logotipo cuadrado de cada plataforma (mismos ficheros de /public que el
-// selector de Continuar viendo). Sin logotipo, la alerta nombra la plataforma.
+// selector de Continuar viendo), a la derecha de la alerta.
 const PLATFORM_ICONS = {
   netflix: "/netflix.png",
   primevideo: "/amazonprimevideo.png",

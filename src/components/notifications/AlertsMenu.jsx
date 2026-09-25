@@ -116,8 +116,7 @@ function AlertText({ kind, item }) {
   }
   if (kind === "event") {
     if (item.type === "cw_added") {
-      // Con logotipo, la plataforma se muestra a la derecha de la fila.
-      const platform = platformIcon(item.platform) ? null : platformLabel(item.platform);
+      const platform = platformLabel(item.platform);
       return (
         <>
           {code ? `${code.charAt(0).toUpperCase()}${code.slice(1)}` : ""}<Title item={item} /> se ha añadido a Continuar viendo
@@ -144,7 +143,8 @@ function AlertText({ kind, item }) {
     return (
       <>
         Has puntuado {formatActivityRatingTarget(item)} <Title item={item} />
-        {typeof item.rating === "number" ? ` · ${item.rating}/10` : null}
+        {/* La nota se ve a la izquierda, en lugar del icono (como en Actividad). */}
+        {typeof item.rating === "number" ? <span className="sr-only"> · {item.rating}/10</span> : null}
       </>
     );
   }
@@ -183,7 +183,16 @@ function AlertRow({ kind, item, isNew, onNavigate, onDismiss }) {
           </span>
         )}
       </span>
-      <Icon className={`h-5 w-5 shrink-0 ${tone} ${filled ? "fill-current" : ""}`} aria-hidden="true" />
+      {/* Hueco fijo de 32px para que el texto de todas las filas quede alineado. */}
+      {kind === "action" && item.type === "rating" && typeof item.rating === "number" ? (
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center text-xl font-black leading-none tabular-nums ${tone}`} aria-hidden="true">
+          {item.rating}
+        </span>
+      ) : (
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center ${tone}`} aria-hidden="true">
+          <Icon className={`h-5 w-5 ${filled ? "fill-current" : ""}`} />
+        </span>
+      )}
       <span className={`min-w-0 flex-1 ${READABLE}`}>
         <span className="line-clamp-2 leading-snug">
           <AlertText kind={kind} item={item} />
@@ -194,19 +203,15 @@ function AlertRow({ kind, item, isNew, onNavigate, onDismiss }) {
         </span>
       </span>
       {platformSrc ? (
-        <span
+        <OptimizedImage
+          src={platformSrc}
+          alt=""
           title={platformName || undefined}
-          className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-black/40 ring-1 ring-white/10"
-        >
-          <OptimizedImage
-            src={platformSrc}
-            alt={platformName || ""}
-            width={32}
-            height={32}
-            className="h-full w-full object-contain"
-            loading="lazy"
-          />
-        </span>
+          width={32}
+          height={32}
+          className="h-8 w-8 shrink-0 rounded-lg object-contain"
+          loading="lazy"
+        />
       ) : null}
     </>
   );
