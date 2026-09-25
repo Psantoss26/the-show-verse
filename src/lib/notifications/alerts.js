@@ -114,6 +114,28 @@ export function platformLabel(platform) {
   return PLATFORM_LABELS[key] || null;
 }
 
+// Logotipo cuadrado de cada plataforma (mismos ficheros de /public que el
+// selector de Continuar viendo). Sin logotipo, la alerta nombra la plataforma.
+const PLATFORM_ICONS = {
+  netflix: "/netflix.png",
+  primevideo: "/amazonprimevideo.png",
+  prime: "/amazonprimevideo.png",
+  amazon: "/amazonprimevideo.png",
+  max: "/hbomax.png",
+  hbomax: "/hbomax.png",
+  disney: "/disney.png",
+  disneyplus: "/disney.png",
+  crunchyroll: "/crunchyroll.png",
+  plex: "/plex.png",
+  appletv: "/appletv.png",
+  movistar: "/movistar.png",
+};
+
+export function platformIcon(platform) {
+  const key = String(platform || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  return PLATFORM_ICONS[key] || null;
+}
+
 /** Fecha de estreno futura ("12 dic 2027") o null si ya se estrenó. */
 export function upcomingRelease(date, now = Date.now()) {
   const time = Date.parse(date || "");
