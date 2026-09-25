@@ -2,7 +2,26 @@
 "use client";
 
 import { motion, useInView, useReducedMotion } from "framer-motion";
-import { useRef } from "react";
+import { createContext, useContext, useRef } from "react";
+
+// Ficha recuperada al volver atrás (ver `detailsBackSnapshot`): todo lo que
+// cuelga de ella se pinta ya en su estado final, sin entradas animadas, para
+// que la ficha aparezca exactamente como se dejó.
+const DetailsStaticMotionContext = createContext(false);
+
+export const DetailsStaticMotionProvider = DetailsStaticMotionContext.Provider;
+
+export function useDetailsStaticMotion() {
+  return useContext(DetailsStaticMotionContext);
+}
+
+// En una ficha estática cuenta igual que "reducir movimiento": estado final
+// desde el primer fotograma y transición de duración cero.
+function useSkipEntryMotion() {
+  const shouldReduceMotion = useReducedMotion();
+  const isStatic = useDetailsStaticMotion();
+  return shouldReduceMotion || isStatic;
+}
 
 // Referencia estable (no recrear en cada render) para forzar a Framer Motion
 // a animar por JS en vez de WAAPI acelerado -- ver comentario en FadeIn.
@@ -33,7 +52,7 @@ export function AnimatedSection({
 }) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin });
-  const shouldReduceMotion = useReducedMotion();
+  const shouldReduceMotion = useSkipEntryMotion();
 
   const hidden = shouldReduceMotion
     ? { opacity: 1, y: 0 }
@@ -71,7 +90,7 @@ export function FadeIn({
 }) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-50px" });
-  const shouldReduceMotion = useReducedMotion();
+  const shouldReduceMotion = useSkipEntryMotion();
 
   const directions = {
     up: { y: 20 },
@@ -113,7 +132,7 @@ export function FadeIn({
 export function ScaleIn({ children, className = "", delay = 0 }) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-50px" });
-  const shouldReduceMotion = useReducedMotion();
+  const shouldReduceMotion = useSkipEntryMotion();
 
   const initial = shouldReduceMotion
     ? { opacity: 1, scale: 1, y: 0 }
@@ -143,7 +162,7 @@ export function StaggerContainer({
 }) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
-  const shouldReduceMotion = useReducedMotion();
+  const shouldReduceMotion = useSkipEntryMotion();
 
   return (
     <motion.div
@@ -168,7 +187,7 @@ export function StaggerContainer({
 }
 
 export function StaggerItem({ children, className = "" }) {
-  const shouldReduceMotion = useReducedMotion();
+  const shouldReduceMotion = useSkipEntryMotion();
 
   return (
     <motion.div
@@ -197,7 +216,7 @@ export function SlideInFromSide({
 }) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-50px" });
-  const shouldReduceMotion = useReducedMotion();
+  const shouldReduceMotion = useSkipEntryMotion();
 
   const initial = shouldReduceMotion
     ? { opacity: 1, x: 0 }

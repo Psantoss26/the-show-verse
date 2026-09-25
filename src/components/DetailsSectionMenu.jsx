@@ -3,6 +3,7 @@
 import React, { useMemo, useRef, useLayoutEffect, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
+import { useDetailsStaticMotion } from "@/components/details/AnimatedSection";
 import { LIQUID_GLASS_SURFACE } from "@/lib/ui/liquidGlass";
 
 export default function DetailsSectionMenu({
@@ -30,7 +31,9 @@ export default function DetailsSectionMenu({
 
   const containerRef = useRef(null);
   const innerRef = useRef(null);
-  const shouldReduceMotion = useReducedMotion();
+  // La ficha recuperada al volver atrás se pinta estática (sin la entrada).
+  const isStaticDetails = useDetailsStaticMotion();
+  const shouldReduceMotion = useReducedMotion() || isStaticDetails;
 
   const [scale, setScale] = useState(1);
   const [fits, setFits] = useState(true);
@@ -282,7 +285,9 @@ export default function DetailsSectionMenu({
 
                               {item.badge && (
                                 <motion.span
-                                  initial={{ scale: 0, opacity: 0 }}
+                                  initial={
+                                    isStaticDetails ? false : { scale: 0, opacity: 0 }
+                                  }
                                   animate={{ scale: 1, opacity: 1 }}
                                   transition={{
                                     duration: 0.15,
