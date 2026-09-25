@@ -34,6 +34,7 @@ import {
   countUnread,
   episodeCode,
   normalizeAlerts,
+  platformIcon,
   platformLabel,
   relativeTime,
   upcomingRelease,
@@ -115,7 +116,8 @@ function AlertText({ kind, item }) {
   }
   if (kind === "event") {
     if (item.type === "cw_added") {
-      const platform = platformLabel(item.platform);
+      // Con logotipo, la plataforma se muestra a la derecha de la fila.
+      const platform = platformIcon(item.platform) ? null : platformLabel(item.platform);
       return (
         <>
           {code ? `${code.charAt(0).toUpperCase()}${code.slice(1)}` : ""}<Title item={item} /> se ha añadido a Continuar viendo
@@ -168,6 +170,8 @@ function AlertRow({ kind, item, isNew, onNavigate, onDismiss }) {
   const href = getActivityDetailsHref(item);
   const { Icon, tone, filled } = alertIcon(kind, item);
   const src = item.posterPath ? `https://image.tmdb.org/t/p/w185${item.posterPath}` : null;
+  const platformSrc = kind === "event" && item.type === "cw_added" ? platformIcon(item.platform) : null;
+  const platformName = platformSrc ? platformLabel(item.platform) : null;
   const body = (
     <>
       <span className="h-16 w-11 shrink-0 overflow-hidden rounded-lg">
@@ -179,7 +183,7 @@ function AlertRow({ kind, item, isNew, onNavigate, onDismiss }) {
           </span>
         )}
       </span>
-      <Icon className={`h-4 w-4 shrink-0 ${tone} ${filled ? "fill-current" : ""}`} aria-hidden="true" />
+      <Icon className={`h-5 w-5 shrink-0 ${tone} ${filled ? "fill-current" : ""}`} aria-hidden="true" />
       <span className={`min-w-0 flex-1 ${READABLE}`}>
         <span className="line-clamp-2 leading-snug">
           <AlertText kind={kind} item={item} />
@@ -189,6 +193,21 @@ function AlertRow({ kind, item, isNew, onNavigate, onDismiss }) {
           <time dateTime={item.createdAt}>{relativeTime(item.createdAt)}</time>
         </span>
       </span>
+      {platformSrc ? (
+        <span
+          title={platformName || undefined}
+          className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-black/40 ring-1 ring-white/10"
+        >
+          <OptimizedImage
+            src={platformSrc}
+            alt={platformName || ""}
+            width={32}
+            height={32}
+            className="h-full w-full object-contain"
+            loading="lazy"
+          />
+        </span>
+      ) : null}
     </>
   );
   const rowClass = "flex min-w-0 flex-1 items-center gap-3.5 px-3 py-2.5";
