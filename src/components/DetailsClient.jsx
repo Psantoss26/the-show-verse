@@ -62,11 +62,19 @@ import Link from "next/link";
 // Componentes de animacion reutilizables para secciones con entrada animada
 import {
   AnimatedSection,
+  DetailsStaticMotionProvider,
   FadeIn,
   ScaleIn,
   StaggerContainer,
   StaggerItem,
 } from "@/components/details/AnimatedSection";
+import {
+  restoredValue,
+  useDetailsSnapshot,
+  useRestorableEffect,
+  useRestorableLayoutEffect,
+  useSnapshotValues,
+} from "@/lib/details/detailsBackSnapshot";
 
 // -- Iconos de Lucide React usados en todo el componente --
 import {
@@ -928,6 +936,11 @@ export default function DetailsClient({
   initialLists,
 }) {
   useOfflineTitle(type, id, data);
+  // Al VOLVER a esta ficha (atrás/adelante) se recupera el estado con el que se
+  // dejó y no se repiten sus cargas ni sus animaciones de entrada: ver
+  // `detailsBackSnapshot`. `detailsRestored` marca ese montaje.
+  const backSnapshot = useDetailsSnapshot(`${type === "tv" ? "tv" : "movie"}:${id}`);
+  const detailsRestored = backSnapshot.restored;
   const router = useRouter();
   const prefetchSeasonDetails = useCallback(
     (seasonNumber) => {
@@ -963,7 +976,7 @@ export default function DetailsClient({
 
   // -- Estado general de la UI --
   const [showAdminImages, setShowAdminImages] = useState(false); // Panel admin de imagenes (solo admin)
-  const [useBackdrop, setUseBackdrop] = useState(true); // Alternar entre backdrop y poster como fondo
+  const [useBackdrop, setUseBackdrop] = useState(() => restoredValue(backSnapshot, "useBackdrop", true)); // Alternar entre backdrop y poster como fondo
 
   // -- Autenticacion y permisos --
   const {
@@ -992,8 +1005,8 @@ export default function DetailsClient({
   // -- Estado de favoritos y watchlist (TMDb) --
   const [favLoading, setFavLoading] = useState(false); // Cargando accion de favorito
   const [wlLoading, setWlLoading] = useState(false); // Cargando accion de watchlist
-  const [favorite, setFavorite] = useState(false); // Es favorito del usuario
-  const [watchlist, setWatchlist] = useState(false); // Esta en la watchlist del usuario
+  const [favorite, setFavorite] = useState(() => restoredValue(backSnapshot, "favorite", false)); // Es favorito del usuario
+  const [watchlist, setWatchlist] = useState(() => restoredValue(backSnapshot, "watchlist", false)); // Esta en la watchlist del usuario
   const [hasBackendSession, setHasBackendSession] = useState(() => {
     if (typeof window === "undefined") return false;
     const cookie = document.cookie || "";
@@ -1025,10 +1038,11 @@ export default function DetailsClient({
   const recommendationViewerStates = useViewerTitleStates(
     recommendationViewerItems,
     authenticated || hasBackendSession,
+    restoredValue(backSnapshot, "recommendationViewerStates", null),
   );
 
   // -- Puntuacion del usuario en TMDb --
-  const [userRating, setUserRating] = useState(null); // Rating actual (1-10)
+  const [userRating, setUserRating] = useState(() => restoredValue(backSnapshot, "userRating", null)); // Rating actual (1-10)
   const [ratingLoading, setRatingLoading] = useState(false);
   const [ratingError, setRatingError] = useState("");
 
@@ -1038,7 +1052,7 @@ export default function DetailsClient({
   );
 
   // Pestana activa en la seccion de metadatos (details/produccion/sinopsis/premios)
-  const [activeTab, setActiveTab] = useState("details");
+  const [activeTab, setActiveTab] = useState(() => restoredValue(backSnapshot, "activeTab", "details"));
 
   // ====== CLAVES DE LOCALSTORAGE PARA PREFERENCIAS DE IMAGENES ======
   // Cada clave es unica por tipo de contenido e ID para persistir selecciones del usuario
@@ -1059,30 +1073,30 @@ export default function DetailsClient({
   };
 
   // -- Rutas de imagen seleccionadas por el usuario --
-  const [selectedPosterPath, setSelectedPosterPath] = useState(null);
+  const [selectedPosterPath, setSelectedPosterPath] = useState(() => restoredValue(backSnapshot, "selectedPosterPath", null));
   const [selectedMobilePosterPath, setSelectedMobilePosterPath] =
-    useState(null);
+    useState(() => restoredValue(backSnapshot, "selectedMobilePosterPath", null));
   const [selectedPreviewBackdropPath, setSelectedPreviewBackdropPath] =
-    useState(null);
+    useState(() => restoredValue(backSnapshot, "selectedPreviewBackdropPath", null));
 
   // El primer render debe ser determinista para evitar hydration mismatch.
   // La preferencia real del usuario se restaura en cliente justo después.
-  const [posterViewMode, setPosterViewMode] = useState("poster");
+  const [posterViewMode, setPosterViewMode] = useState(() => restoredValue(backSnapshot, "posterViewMode", "poster"));
 
   // Control separado del layout para secuenciar las transiciones de ratio.
-  const [posterLayoutMode, setPosterLayoutMode] = useState("poster");
-  const [posterModeHydrated, setPosterModeHydrated] = useState(false);
+  const [posterLayoutMode, setPosterLayoutMode] = useState(() => restoredValue(backSnapshot, "posterLayoutMode", "poster"));
+  const [posterModeHydrated, setPosterModeHydrated] = useState(() => restoredValue(backSnapshot, "posterModeHydrated", false));
 
   const [isPosterHovered, setIsPosterHovered] = useState(false);
   // -- Imagen de fondo (background) con transicion suave --
-  const [selectedBackgroundPath, setSelectedBackgroundPath] = useState(null);
+  const [selectedBackgroundPath, setSelectedBackgroundPath] = useState(() => restoredValue(backSnapshot, "selectedBackgroundPath", null));
   const [prevBackgroundPath, setPrevBackgroundPath] = useState(null); // Fondo anterior (para crossfade)
   const [isTransitioning, setIsTransitioning] = useState(false); // Animacion de cambio de fondo activa
 
   // -- Imagenes base: evitan SSR/primer render con un poster provisional --
-  const [basePosterPath, setBasePosterPath] = useState(null);
-  const [baseBackdropPath, setBaseBackdropPath] = useState(null);
-  const [artworkInitialized, setArtworkInitialized] = useState(false); // Se pone a true tras la carga inicial
+  const [basePosterPath, setBasePosterPath] = useState(() => restoredValue(backSnapshot, "basePosterPath", null));
+  const [baseBackdropPath, setBaseBackdropPath] = useState(() => restoredValue(backSnapshot, "baseBackdropPath", null));
+  const [artworkInitialized, setArtworkInitialized] = useState(() => restoredValue(backSnapshot, "artworkInitialized", false)); // Se pone a true tras la carga inicial
   // Un usuario autenticado puede tener poster/backdrop/preview/logo personalizados
   // guardados en el servidor (sección "Portadas y fondos"). En una sesión nueva
   // (sin caché local todavía) no hay forma de saberlo hasta que responda
@@ -1093,7 +1107,7 @@ export default function DetailsClient({
   // en `false` siempre (SSR/primer render) y pasa a `true` en cuanto se sabe
   // que no hace falta esperar (usuario no autenticado) o en cuanto responde
   // la comprobación remota (autenticado).
-  const [remoteArtworkChecked, setRemoteArtworkChecked] = useState(false);
+  const [remoteArtworkChecked, setRemoteArtworkChecked] = useState(() => restoredValue(backSnapshot, "remoteArtworkChecked", false));
   // VISTA MÓVIL + RED EXTERNA: la ficha no ESPERA a la consulta remota de
   // overrides de artwork. Es una ida y vuelta al NAS por el túnel y era lo único
   // que separaba a la ficha de empezar a descargar la portada (ver
@@ -1105,17 +1119,17 @@ export default function DetailsClient({
   // igual que en escritorio. Antes también se descartaban, así que la portada
   // elegida en "Portadas y fondos" se veía al elegirla pero, al recargar, la
   // ficha volvía a la automática.
-  const [artworkOverridesSkipped, setArtworkOverridesSkipped] = useState(false);
+  const [artworkOverridesSkipped, setArtworkOverridesSkipped] = useState(() => restoredValue(backSnapshot, "artworkOverridesSkipped", false));
   // ...salvo que se llegue a "Portadas y fondos": esa galería sí necesita saber
   // qué tienes elegido, así que al acercarse a pantalla se hace la consulta que
   // nos habíamos ahorrado. Para entonces la portada lleva rato pintada.
-  const [artworkGalleryReached, setArtworkGalleryReached] = useState(false);
+  const [artworkGalleryReached, setArtworkGalleryReached] = useState(() => restoredValue(backSnapshot, "artworkGalleryReached", false));
 
   // -- Estados de carga progresiva del poster --
   // Se usan para mostrar primero una version de baja calidad y luego la alta
-  const [posterResolved, setPosterResolved] = useState(false); // Ruta del poster determinada
-  const [posterLowLoaded, setPosterLowLoaded] = useState(false); // Imagen baja calidad cargada
-  const [posterHighLoaded, setPosterHighLoaded] = useState(false); // Imagen alta calidad cargada
+  const [posterResolved, setPosterResolved] = useState(() => restoredValue(backSnapshot, "posterResolved", false)); // Ruta del poster determinada
+  const [posterLowLoaded, setPosterLowLoaded] = useState(() => restoredValue(backSnapshot, "posterLowLoaded", false)); // Imagen baja calidad cargada
+  const [posterHighLoaded, setPosterHighLoaded] = useState(() => restoredValue(backSnapshot, "posterHighLoaded", false)); // Imagen alta calidad cargada
   // Ref (no state, para poder leerla desde `initArtwork` sin closures obsoletas):
   // true cuando la portada actual YA terminó su fundido de entrada. Cuando no
   // hay `images` en el SSR (portada aun no cacheada en el servidor) hace falta
@@ -1134,7 +1148,7 @@ export default function DetailsClient({
   // pintar una barra de progreso sobre el poster. null = no esta en curso.
   // Solo aplica a PELICULAS: el progreso de una serie es por episodio (se
   // muestra en EpisodeDetails), no tiene sentido a nivel de ficha de serie.
-  const [inProgressPct, setInProgressPct] = useState(null);
+  const [inProgressPct, setInProgressPct] = useState(() => restoredValue(backSnapshot, "inProgressPct", null));
   // Se resuelve con un fetch real (`/api/progress`), así que no está listo en
   // el primer render. Mientras no lo está, la fila de acciones móvil se
   // mantiene con `max-sm:invisible` (ver el render): invisible pero SIN salir
@@ -1148,9 +1162,9 @@ export default function DetailsClient({
   // usuario esté loggeado). Usar `authenticated` para decidir el valor inicial
   // aquí mostraría la fila igualmente y la ocultaría/rebotaría un instante
   // después al confirmarse la sesión — el mismo salto que se quiere evitar.
-  const [inProgressChecked, setInProgressChecked] = useState(false);
+  const [inProgressChecked, setInProgressChecked] = useState(() => restoredValue(backSnapshot, "inProgressChecked", false));
 
-  useEffect(() => {
+  useRestorableEffect(backSnapshot, "inProgress", () => {
     // Sin confirmar aún si hay sesión: no sabemos si hará falta el fetch de
     // progreso, así que tampoco se puede dar por comprobado.
     if (!authHydrated) return;
@@ -1179,37 +1193,37 @@ export default function DetailsClient({
     return () => {
       abort = true;
     };
-  }, [authHydrated, authenticated, id, endpointType]);
+  }, [authHydrated, authenticated, id, endpointType], inProgressChecked);
 
   // -- Estados de carga progresiva del backdrop (misma logica que poster) --
-  const [backdropResolved, setBackdropResolved] = useState(false);
-  const [backdropLowLoaded, setBackdropLowLoaded] = useState(false);
-  const [backdropHighLoaded, setBackdropHighLoaded] = useState(false);
+  const [backdropResolved, setBackdropResolved] = useState(() => restoredValue(backSnapshot, "backdropResolved", false));
+  const [backdropLowLoaded, setBackdropLowLoaded] = useState(() => restoredValue(backSnapshot, "backdropLowLoaded", false));
+  const [backdropHighLoaded, setBackdropHighLoaded] = useState(() => restoredValue(backSnapshot, "backdropHighLoaded", false));
   const [backdropImgError, setBackdropImgError] = useState(false);
 
   // -- Estado de imagenes disponibles (posters y backdrops) --
   // Se inicializa con la imagen principal de TMDb y se enriquece con fetchs adicionales
-  const [imagesState, setImagesState] = useState(() => ({
+  const [imagesState, setImagesState] = useState(() => restoredValue(backSnapshot, "imagesState", () => ({
     posters: data.poster_path
       ? [{ file_path: data.poster_path, from: "main" }]
       : [],
     backdrops: data.backdrop_path
       ? [{ file_path: data.backdrop_path, from: "main" }]
       : [],
-  }));
-  const [imagesLoading, setImagesLoading] = useState(false);
+  })));
+  const [imagesLoading, setImagesLoading] = useState(() => restoredValue(backSnapshot, "imagesLoading", false));
   const [imagesError, setImagesError] = useState("");
-  const [activeImagesTab, setActiveImagesTab] = useState("posters"); // "posters" | "backdrops" | "backgrounds"
+  const [activeImagesTab, setActiveImagesTab] = useState(() => restoredValue(backSnapshot, "activeImagesTab", "posters")); // "posters" | "backdrops" | "backgrounds"
 
   // ====== PROVEEDORES DE STREAMING (JustWatch) ======
-  const [streamingProviders, setStreamingProviders] = useState([]); // Lista de servicios disponibles
-  const [providersLoading, setProvidersLoading] = useState(true);
-  const [justwatchUrl, setJustwatchUrl] = useState(null); // URL directa a JustWatch
+  const [streamingProviders, setStreamingProviders] = useState(() => restoredValue(backSnapshot, "streamingProviders", [])); // Lista de servicios disponibles
+  const [providersLoading, setProvidersLoading] = useState(() => restoredValue(backSnapshot, "providersLoading", true));
+  const [justwatchUrl, setJustwatchUrl] = useState(() => restoredValue(backSnapshot, "justwatchUrl", null)); // URL directa a JustWatch
 
   // ====== INTEGRACION CON PLEX ======
-  const [plexAvailable, setPlexAvailable] = useState(false); // Contenido disponible en Plex local
-  const [plexUrl, setPlexUrl] = useState(null); // URL para abrir en Plex (web/app)
-  const [plexLoading, setPlexLoading] = useState(true);
+  const [plexAvailable, setPlexAvailable] = useState(() => restoredValue(backSnapshot, "plexAvailable", false)); // Contenido disponible en Plex local
+  const [plexUrl, setPlexUrl] = useState(() => restoredValue(backSnapshot, "plexUrl", null)); // URL para abrir en Plex (web/app)
+  const [plexLoading, setPlexLoading] = useState(() => restoredValue(backSnapshot, "plexLoading", true));
 
   // -- Refs y estado para scroll horizontal de la galeria de imagenes --
   const imagesScrollRef = useRef(null);
@@ -1220,14 +1234,14 @@ export default function DetailsClient({
   // antes de que la ficha fuese visible/interactiva. Esta fase conserva la
   // superficie de carga y activa la entrada cuando el cliente ya está listo.
   const detailsEntryKey = `${endpointType}:${id}`;
-  const [detailsEntry, setDetailsEntry] = useState(() => ({
+  const [detailsEntry, setDetailsEntry] = useState(() => restoredValue(backSnapshot, "detailsEntry", () => ({
     key: detailsEntryKey,
     ready: false,
-  }));
+  })));
   const detailsEntryReady =
     detailsEntry.key === detailsEntryKey && detailsEntry.ready;
 
-  useEffect(() => {
+  useRestorableEffect(backSnapshot, "detailsEntry", () => {
     let firstFrame = 0;
     let secondFrame = 0;
 
@@ -1245,14 +1259,14 @@ export default function DetailsClient({
       window.cancelAnimationFrame(firstFrame);
       window.cancelAnimationFrame(secondFrame);
     };
-  }, [detailsEntryKey]);
+  }, [detailsEntryKey], detailsEntryReady);
 
   // En móvil el alto real de los botones cambia con el ancho disponible y con
   // las acciones que tenga cada título. Se mide para que el hero termine justo
   // antes del navbar inferior, sin dejar metadatos entre ambos.
   const mobileActionRowRef = useRef(null);
   const mobileSecondaryTriggerRef = useRef(null);
-  const [mobileActionRowHeight, setMobileActionRowHeight] = useState(60);
+  const [mobileActionRowHeight, setMobileActionRowHeight] = useState(() => restoredValue(backSnapshot, "mobileActionRowHeight", 60));
   const [isHoveredImages, setIsHoveredImages] = useState(false);
   const [canPrevImages, setCanPrevImages] = useState(false); // Hay scroll a la izquierda
   const [canNextImages, setCanNextImages] = useState(false); // Hay scroll a la derecha
@@ -1335,7 +1349,7 @@ export default function DetailsClient({
   const [listQuery, setListQuery] = useState(""); // Filtro de busqueda en el modal
 
   // Mapa de pertenencia: { listId: true/false } indica si el título está en cada lista.
-  const [membershipMap, setMembershipMap] = useState({});
+  const [membershipMap, setMembershipMap] = useState(() => restoredValue(backSnapshot, "membershipMap", {}));
   const [listsPresenceLoading, setListsPresenceLoading] = useState(false);
   const [busyListId, setBusyListId] = useState(null); // Lista en proceso de modificacion
 
@@ -1349,12 +1363,12 @@ export default function DetailsClient({
   const ratingWrapRef = useRef(null);
 
   // -- Deteccion de capacidades del dispositivo --
-  const [supportsHover, setSupportsHover] = useState(false); // true = desktop con raton
+  const [supportsHover, setSupportsHover] = useState(() => restoredValue(backSnapshot, "supportsHover", false)); // true = desktop con raton
   const [mobileClearOpen, setMobileClearOpen] = useState(false); // Boton de limpiar rating visible en movil
 
-  const [isMobileViewport, setIsMobileViewport] = useState(false); // Viewport <= 640px
+  const [isMobileViewport, setIsMobileViewport] = useState(() => restoredValue(backSnapshot, "isMobileViewport", false)); // Viewport <= 640px
   const [mobileSecondaryVisible, setMobileSecondaryVisible] =
-    useState(false);
+    useState(() => restoredValue(backSnapshot, "mobileSecondaryVisible", false));
   const pointerCardHoverEnabled = supportsHover && !isMobileViewport;
 
   // Con barra de progreso ("Viendo XX%") la fila de acciones NO entra junto a la
@@ -1365,13 +1379,13 @@ export default function DetailsClient({
 
   // Logo del título (arte, textless) para la cabecera MÓVIL (sobre la portada),
   // igual que DetailModal. Best-effort; si no hay logo, cae al título de texto.
-  const [heroLogoPath, setHeroLogoPath] = useState(null);
-  const [selectedLogoPath, setSelectedLogoPath] = useState(null);
-  const [titleLogos, setTitleLogos] = useState([]);
+  const [heroLogoPath, setHeroLogoPath] = useState(() => restoredValue(backSnapshot, "heroLogoPath", null));
+  const [selectedLogoPath, setSelectedLogoPath] = useState(() => restoredValue(backSnapshot, "selectedLogoPath", null));
+  const [titleLogos, setTitleLogos] = useState(() => restoredValue(backSnapshot, "titleLogos", []));
   // ¿Ya terminó el fetch del logo? El título de TEXTO solo se muestra cuando el
   // logo se ha resuelto y NO existe; durante la carga no se muestra nada (el
   // 99% de los títulos tienen logo, así que evitamos el parpadeo texto→logo).
-  const [heroLogoResolved, setHeroLogoResolved] = useState(false);
+  const [heroLogoResolved, setHeroLogoResolved] = useState(() => restoredValue(backSnapshot, "heroLogoResolved", false));
 
   /**
    * Extrae un ID consistente de una lista (puede venir como objeto o como valor directo).
@@ -1570,7 +1584,7 @@ export default function DetailsClient({
 
   // Logos disponibles para la cabecera y la galería móvil. Se cargan una vez y
   // la selección manual se aplica por encima del logo recomendado.
-  useEffect(() => {
+  useRestorableEffect(backSnapshot, "heroLogos", () => {
     const showId = data?.id;
     if (!showId) return undefined;
     let alive = true;
@@ -1599,7 +1613,7 @@ export default function DetailsClient({
     return () => {
       alive = false;
     };
-  }, [data?.id, data?.images?.logos, endpointType]);
+  }, [data?.id, data?.images?.logos, endpointType], heroLogoResolved);
 
   // Cierra el boton de limpiar rating al tocar fuera del wrapper en movil
   useEffect(() => {
@@ -1893,14 +1907,14 @@ export default function DetailsClient({
   // por relevancia y permite reproducirlos en un modal.
   // =====================================================================
 
-  const [videos, setVideos] = useState(initialVideos); // Lista de videos disponibles
-  const [videosLoading, setVideosLoading] = useState(
+  const [videos, setVideos] = useState(() => restoredValue(backSnapshot, "videos", initialVideos)); // Lista de videos disponibles
+  const [videosLoading, setVideosLoading] = useState(() => restoredValue(backSnapshot, "videosLoading", 
     () => !!TMDB_API_KEY && initialVideos.length === 0,
-  );
-  const [videosResolved, setVideosResolved] = useState(
+  ));
+  const [videosResolved, setVideosResolved] = useState(() => restoredValue(backSnapshot, "videosResolved", 
     () => !TMDB_API_KEY || initialVideos.length > 0,
-  );
-  const [videosError, setVideosError] = useState("");
+  ));
+  const [videosError, setVideosError] = useState(() => restoredValue(backSnapshot, "videosError", ""));
   const [videoModalOpen, setVideoModalOpen] = useState(false);
   const [activeVideo, setActiveVideo] = useState(null); // Video seleccionado para el modal
   const [soundtrackModalOpen, setSoundtrackModalOpen] = useState(false);
@@ -1908,10 +1922,10 @@ export default function DetailsClient({
   const [episodeRatingsModalOpen, setEpisodeRatingsModalOpen] = useState(false);
   const [modalHostReady, setModalHostReady] = useState(false);
   const [activeSoundtrackId, setActiveSoundtrackId] = useState(null);
-  const [soundtrackTracks, setSoundtrackTracks] = useState([]);
+  const [soundtrackTracks, setSoundtrackTracks] = useState(() => restoredValue(backSnapshot, "soundtrackTracks", []));
   const [soundtrackLoading, setSoundtrackLoading] = useState(false);
-  const [soundtrackResolved, setSoundtrackResolved] = useState(false);
-  const [soundtrackError, setSoundtrackError] = useState("");
+  const [soundtrackResolved, setSoundtrackResolved] = useState(() => restoredValue(backSnapshot, "soundtrackResolved", false));
+  const [soundtrackError, setSoundtrackError] = useState(() => restoredValue(backSnapshot, "soundtrackError", ""));
   const soundtrackAbortRef = useRef(null);
   const soundtrackInFlightRef = useRef(null);
   const soundtrackLoadedKeyRef = useRef("");
@@ -2107,7 +2121,7 @@ export default function DetailsClient({
   };
 
   // Resetea el modal de video al cambiar de contenido
-  useEffect(() => {
+  useRestorableEffect(backSnapshot, "soundtrackReset", () => {
     setVideoModalOpen(false);
     setActiveVideo(null);
     setSoundtrackModalOpen(false);
@@ -2158,7 +2172,7 @@ export default function DetailsClient({
     soundtrackTracks.length,
   ]);
 
-  useLayoutEffect(() => {
+  useRestorableLayoutEffect(backSnapshot, "videosReset", () => {
     if (!TMDB_API_KEY || !id) {
       setVideos(initialVideos);
       setVideosError("");
@@ -2171,11 +2185,11 @@ export default function DetailsClient({
     setVideosError("");
     setVideosLoading(initialVideos.length === 0);
     setVideosResolved(initialVideos.length > 0);
-  }, [id, endpointType, initialVideos]);
+  }, [id, endpointType, initialVideos], videosResolved);
 
   // Carga los videos de TMDb en espanol e ingles, los fusiona eliminando
   // duplicados, filtra los reproducibles y los ordena por relevancia.
-  useEffect(() => {
+  useRestorableEffect(backSnapshot, "videos", () => {
     let ignore = false;
 
     // Fetch seguro que devuelve array vacio en caso de error
@@ -2231,20 +2245,20 @@ export default function DetailsClient({
     return () => {
       ignore = true;
     };
-  }, [id, endpointType, initialVideos]);
+  }, [id, endpointType, initialVideos], videosResolved && !videosLoading);
 
   // =====================================================================
   // FILTROS DE PORTADAS Y FONDOS
   // Controla la galeria de imagenes con filtros de resolucion e idioma.
   // =====================================================================
 
-  const [imagesResFilter, setImagesResFilter] = useState("all"); // Filtro de resolucion: all | 720p | 1080p | 2k | 4k
-  const [langES, setLangES] = useState(true); // Mostrar imagenes en espanol
-  const [langEN, setLangEN] = useState(true); // Mostrar imagenes en ingles
-  const [artworkPreloadCount, setArtworkPreloadCount] = useState(4); // Numero de imagenes a precargar antes de mostrar
+  const [imagesResFilter, setImagesResFilter] = useState(() => restoredValue(backSnapshot, "imagesResFilter", "all")); // Filtro de resolucion: all | 720p | 1080p | 2k | 4k
+  const [langES, setLangES] = useState(() => restoredValue(backSnapshot, "langES", true)); // Mostrar imagenes en espanol
+  const [langEN, setLangEN] = useState(() => restoredValue(backSnapshot, "langEN", true)); // Mostrar imagenes en ingles
+  const [artworkPreloadCount, setArtworkPreloadCount] = useState(() => restoredValue(backSnapshot, "artworkPreloadCount", 4)); // Numero de imagenes a precargar antes de mostrar
 
   // Controla si la fila de artwork esta lista para mostrarse (precarga completada)
-  const [artworkRowReady, setArtworkRowReady] = useState(false);
+  const [artworkRowReady, setArtworkRowReady] = useState(() => restoredValue(backSnapshot, "artworkRowReady", false));
 
   // Panel movil de filtros (colapsable)
   const [artworkControlsOpen, setArtworkControlsOpen] = useState(false);
@@ -2731,7 +2745,7 @@ export default function DetailsClient({
     setPosterModeHydrated(true);
   }, []);
 
-  useLayoutEffect(() => {
+  useRestorableLayoutEffect(backSnapshot, "artworkReset", () => {
     setPosterResolved(false);
     setPosterLowLoaded(false);
     setPosterHighLoaded(false);
@@ -3008,7 +3022,7 @@ export default function DetailsClient({
    * póster. La imagen visible se solicita directamente desde el markup: esperar
    * aquí una precarga añadía una cadena de red innecesaria en móvil.
    */
-  useEffect(() => {
+  useRestorableEffect(backSnapshot, "artwork", () => {
     let cancelled = false;
 
     const initArtwork = async () => {
@@ -3165,7 +3179,7 @@ export default function DetailsClient({
     data?.poster_path,
     data?.backdrop_path,
     data?.profile_path,
-  ]);
+  ], artworkInitialized && !imagesLoading);
 
   // ---------------------------------------------------------------------------
   // RUTAS DE IMAGEN PARA VISUALIZACION
@@ -3607,9 +3621,9 @@ export default function DetailsClient({
     [endpointType, hasInitialShowWatched, hasInitialTraktStatus],
   );
   const [actionStateReady, setActionStateReady] =
-    useState(hasInitialActionState);
-  const [hasCachedTraktStatus, setHasCachedTraktStatus] = useState(false);
-  const [hasCachedShowWatched, setHasCachedShowWatched] = useState(false);
+    useState(() => restoredValue(backSnapshot, "actionStateReady", hasInitialActionState));
+  const [hasCachedTraktStatus, setHasCachedTraktStatus] = useState(() => restoredValue(backSnapshot, "hasCachedTraktStatus", false));
+  const [hasCachedShowWatched, setHasCachedShowWatched] = useState(() => restoredValue(backSnapshot, "hasCachedShowWatched", false));
 
   const initialAnyEpisodeWatched = useMemo(
     () =>
@@ -3701,8 +3715,8 @@ export default function DetailsClient({
   // =====================================================================
 
   // Estado principal de Trakt para este contenido
-  const [trakt, setTrakt] = useState(buildInitialTraktState);
-  const [traktUsername, setTraktUsername] = useState(null);
+  const [trakt, setTrakt] = useState(() => restoredValue(backSnapshot, "trakt", buildInitialTraktState));
+  const [traktUsername, setTraktUsername] = useState(() => restoredValue(backSnapshot, "traktUsername", null));
 
   // Ver la nota de `hasBackendSessionRef`: disponibilidad por SESIÓN, no por el
   // resultado de la consulta de estado de este título. Va aquí, después del
@@ -3967,12 +3981,12 @@ export default function DetailsClient({
     };
   }, [initialParsedScoreboard]);
 
-  const [tScoreboard, setTScoreboard] = useState(() => initialScoreboardState);
-  const [traktDeferredReady, setTraktDeferredReady] = useState(
+  const [tScoreboard, setTScoreboard] = useState(() => restoredValue(backSnapshot, "tScoreboard", () => initialScoreboardState));
+  const [traktDeferredReady, setTraktDeferredReady] = useState(() => restoredValue(backSnapshot, "traktDeferredReady", 
     () =>
       !!initialParsedScoreboard?.found &&
       hasNumericScoreboardStats(initialParsedScoreboard?.stats),
-  );
+  ));
 
   // =====================================================================
   // TRAKT COMMUNITY: Sentimientos / Comentarios / Temporadas / Listas
@@ -3994,10 +4008,10 @@ export default function DetailsClient({
       sourceCount: Number(initialSentiment.comment_count || 0) || 0,
     };
   }, [initialSentiment]);
-  const [tSentiment, setTSentiment] = useState(() => initialSentimentState);
+  const [tSentiment, setTSentiment] = useState(() => restoredValue(backSnapshot, "tSentiment", () => initialSentimentState));
 
   // -- Comentarios de la comunidad con paginación y pestañas --
-  const [tCommentsTab, setTCommentsTab] = useState("recent"); // "likes30" (top 30 dias) | "likesAll" (top historico) | "recent"
+  const [tCommentsTab, setTCommentsTab] = useState(() => restoredValue(backSnapshot, "tCommentsTab", "recent")); // "likes30" (top 30 dias) | "likesAll" (top historico) | "recent"
   // Semilla desde `initialComments` (SSR: { items, pagination }).
   const initialCommentsState = useMemo(() => {
     if (!initialComments) {
@@ -4027,10 +4041,10 @@ export default function DetailsClient({
       total: Number(pagination.itemCount || 0),
     };
   }, [initialComments]);
-  const [tComments, setTComments] = useState(() => initialCommentsState);
-  const [commentProfileUsernames, setCommentProfileUsernames] = useState(
+  const [tComments, setTComments] = useState(() => restoredValue(backSnapshot, "tComments", () => initialCommentsState));
+  const [commentProfileUsernames, setCommentProfileUsernames] = useState(() => restoredValue(backSnapshot, "commentProfileUsernames", 
     () => new Map(),
-  );
+  ));
   const [ownedCommentIds, setOwnedCommentIds] = useState(() => new Set());
   const COMMENTS_PAGE_SIZE = 5;
   const selectCommentsTab = useCallback((tab) => {
@@ -4071,7 +4085,7 @@ export default function DetailsClient({
   // Los comentarios pueden venir de Trakt y sus handles no tienen por qué
   // pertenecer a The Show Verse. Resolvemos todos los autores visibles de una
   // vez para enlazar solo perfiles que existan realmente en nuestra BBDD.
-  useEffect(() => {
+  useRestorableEffect(backSnapshot, "commentUsernames", () => {
     const usernames = [
       ...new Set(
         (tComments.items || [])
@@ -4198,14 +4212,14 @@ export default function DetailsClient({
 
 
   // -- Temporadas de Trakt (datos de temporadas para series TV) --
-  const [tSeasons, setTSeasons] = useState({
+  const [tSeasons, setTSeasons] = useState(() => restoredValue(backSnapshot, "tSeasons", {
     loading: false,
     error: "",
     items: [],
-  });
+  }));
 
   // -- Listas de Trakt con paginacion (popular/trending) --
-  const [tListsTab, setTListsTab] = useState("popular"); // "popular" | "trending"
+  const [tListsTab, setTListsTab] = useState(() => restoredValue(backSnapshot, "tListsTab", "popular")); // "popular" | "trending"
   // Semilla desde `initialLists` (SSR: array de { list, user, previewPosters }).
   const initialListsState = useMemo(() => {
     const items = Array.isArray(initialLists) ? initialLists : [];
@@ -4218,9 +4232,9 @@ export default function DetailsClient({
       total: items.length,
     };
   }, [initialLists]);
-  const [tLists, setTLists] = useState(() => initialListsState);
+  const [tLists, setTLists] = useState(() => restoredValue(backSnapshot, "tLists", () => initialListsState));
 
-  useEffect(() => {
+  useRestorableEffect(backSnapshot, "scoreboardReset", () => {
     setTScoreboard(initialScoreboardState);
 
     const hasPrefetchedScoreboard =
@@ -4256,7 +4270,7 @@ export default function DetailsClient({
   // Resetear todos los datos de la comunidad de Trakt al cambiar de contenido.
   // Reseed desde los props `initial*` (en vez de a vacio) para que, si el
   // servidor ya trajo datos para el nuevo id, sigan pintados sin flash vacio.
-  useEffect(() => {
+  useRestorableEffect(backSnapshot, "communityReset", () => {
     setTSentiment(initialSentimentState);
     setTComments(initialCommentsState);
     setOwnedCommentIds(new Set());
@@ -4274,7 +4288,7 @@ export default function DetailsClient({
 
   // Carga los comentarios de Trakt segun la pestana activa.
   // likes30: top con likes de los ultimos 30 dias. likesAll: top historico. recent: mas recientes.
-  useEffect(() => {
+  useRestorableEffect(backSnapshot, "comments", () => {
     if (!traktDeferredReady) return;
 
     let ignore = false;
@@ -4407,11 +4421,11 @@ export default function DetailsClient({
     tComments.page,
     traktDeferredReady,
     COMMENTS_PAGE_SIZE,
-  ]);
+  ], !tComments.loading);
 
   // Carga independiente del análisis de sentimiento para que no dependa
   // de la pestaña activa de comentarios.
-  useEffect(() => {
+  useRestorableEffect(backSnapshot, "sentiment", () => {
     if (!traktDeferredReady) return;
 
     let ignore = false;
@@ -4477,10 +4491,10 @@ export default function DetailsClient({
       ignore = true;
       seedTimers.forEach((t) => window.clearTimeout(t));
     };
-  }, [id, traktType, traktDeferredReady]);
+  }, [id, traktType, traktDeferredReady], !tSentiment.loading);
 
   // Carga las temporadas de la serie desde Trakt (con datos extendidos)
-  useEffect(() => {
+  useRestorableEffect(backSnapshot, "seasons", () => {
     if (!traktDeferredReady) return;
 
     let ignore = false;
@@ -4515,11 +4529,11 @@ export default function DetailsClient({
     return () => {
       ignore = true;
     };
-  }, [id, type, traktDeferredReady]);
+  }, [id, type, traktDeferredReady], !tSeasons.loading);
 
   // Carga las listas de Trakt que contienen este contenido (popular o trending)
   // ⏱️ OPTIMIZACIÓN: Cargar DESPUÉS de scoreboard y stats (menor prioridad)
-  useEffect(() => {
+  useRestorableEffect(backSnapshot, "lists", () => {
     if (!traktDeferredReady) return;
 
     let ignore = false;
@@ -4670,10 +4684,10 @@ export default function DetailsClient({
       if (timeoutId) clearTimeout(timeoutId);
       seedTimers.forEach((t) => window.clearTimeout(t));
     };
-  }, [id, traktType, tListsTab, tLists.page, traktDeferredReady]);
+  }, [id, traktType, tListsTab, tLists.page, traktDeferredReady], !tLists.loading);
 
   // Resetear paginacion de listas al cambiar de pestana
-  useEffect(() => {
+  useRestorableEffect(backSnapshot, "listsTabReset", () => {
     setTLists((p) => ({ ...p, items: [], page: 1, hasMore: false, total: 0 }));
   }, [tListsTab]);
 
@@ -5188,7 +5202,7 @@ export default function DetailsClient({
 
   // Carga el scoreboard de Trakt (rating de la comunidad y estadisticas de uso)
   // La nota/votos se cargan primero; las stats llegan despues sin bloquear el badge.
-  useEffect(() => {
+  useRestorableEffect(backSnapshot, "scoreboard", () => {
     let ignore = false;
 
     const hasNumericStats = hasNumericScoreboardStats;
@@ -5355,7 +5369,7 @@ export default function DetailsClient({
     return () => {
       ignore = true;
     };
-  }, [id, traktType, scoreboardLookupTraktId, initialScoreboard]);
+  }, [id, traktType, scoreboardLookupTraktId, initialScoreboard], !tScoreboard.loading);
 
   // Resetear estados de Trakt al cambiar de contenido e hidratar caché local
   useLayoutEffect(() => {
@@ -5967,8 +5981,8 @@ export default function DetailsClient({
       ? data.belongs_to_collection.id
       : null;
 
-  const [collectionData, setCollectionData] = useState(null);
-  const [collectionLoading, setCollectionLoading] = useState(false);
+  const [collectionData, setCollectionData] = useState(() => restoredValue(backSnapshot, "collectionData", null));
+  const [collectionLoading, setCollectionLoading] = useState(() => restoredValue(backSnapshot, "collectionLoading", false));
   const collectionViewerItems = useMemo(
     () =>
       (Array.isArray(collectionData?.items) ? collectionData.items : []).map(
@@ -5979,10 +5993,11 @@ export default function DetailsClient({
   const collectionViewerStates = useViewerTitleStates(
     collectionViewerItems,
     authenticated || hasBackendSession,
+    restoredValue(backSnapshot, "collectionViewerStates", null),
   );
 
   // Carga los datos de la coleccion si la pelicula pertenece a una
-  useEffect(() => {
+  useRestorableEffect(backSnapshot, "collection", () => {
     if (!collectionId) {
       setCollectionData(null);
       setCollectionLoading(false);
@@ -6009,7 +6024,7 @@ export default function DetailsClient({
     return () => {
       alive = false;
     };
-  }, [collectionId]);
+  }, [collectionId], !collectionLoading);
 
   // =====================================================================
   // DATOS EXTRA: IMDb, Rotten Tomatoes, Metacritic y premios
@@ -6018,27 +6033,27 @@ export default function DetailsClient({
   // TMDb aporta premios detallados para la seccion independiente de carrusel.
   // =====================================================================
 
-  const [extras, setExtras] = useState({
+  const [extras, setExtras] = useState(() => restoredValue(backSnapshot, "extras", {
     imdbRating: null,
     imdbVotes: null,
     awards: null,
     awardsDetails: null,
     rtScore: null,
     mcScore: null,
-  });
+  }));
   const ratingLinks = useRatingLinks({ type: endpointType, tmdbId: id });
-  const [externalScoresLoading, setExternalScoresLoading] = useState(true);
+  const [externalScoresLoading, setExternalScoresLoading] = useState(() => restoredValue(backSnapshot, "externalScoresLoading", true));
   // Se recupera el getter (antes descartado). Arranca en `true`: los premios se
   // piden SIEMPRE al montar, así que desde el primer frame el menú puede
   // reservar el hueco de "Premios" en estado de carga, en vez de que aparezca
   // tarde (cuando termina el scraping) y desplace las demás secciones.
-  const [awardsLoading, setAwardsLoading] = useState(true);
+  const [awardsLoading, setAwardsLoading] = useState(() => restoredValue(backSnapshot, "awardsLoading", true));
   // ID de IMDb resuelto (puede venir directo de TMDb o cargarse via getExternalIds)
-  const [resolvedImdbId, setResolvedImdbId] = useState(null);
+  const [resolvedImdbId, setResolvedImdbId] = useState(() => restoredValue(backSnapshot, "resolvedImdbId", null));
 
   // Carga datos de OMDb: rating IMDb, votos, RT y Metacritic.
   // Usa cache en localStorage para evitar peticiones repetidas.
-  useEffect(() => {
+  useRestorableEffect(backSnapshot, "externalScores", () => {
     let abort = false;
 
     const resolveImdbId = async () => {
@@ -6189,10 +6204,10 @@ export default function DetailsClient({
     return () => {
       abort = true;
     };
-  }, [type, id, data?.imdb_id, data?.external_ids?.imdb_id, endpointType]);
+  }, [type, id, data?.imdb_id, data?.external_ids?.imdb_id, endpointType], !externalScoresLoading);
 
   // Carga premios detallados desde TMDb para la seccion independiente.
-  useEffect(() => {
+  useRestorableEffect(backSnapshot, "awards", () => {
     let abort = false;
 
     setAwardsLoading(true);
@@ -6220,7 +6235,7 @@ export default function DetailsClient({
     return () => {
       abort = true;
     };
-  }, [endpointType, id]);
+  }, [endpointType, id], !awardsLoading);
 
   const handleUnifiedRate = async (value) => {
     if (!authenticated && !hasBackendSession && !session) {
@@ -6291,13 +6306,13 @@ export default function DetailsClient({
     userRating ?? (trakt.connected && trakt.rating ? trakt.rating : null);
 
   // ====== RATINGS DE EPISODIOS (solo TV) ======
-  const [ratings, setRatings] = useState(null); // Ratings por episodio
-  const [ratingsError, setRatingsError] = useState(null);
-  const [ratingsLoading, setRatingsLoading] = useState(false);
-  const [seasonImdbRatings, setSeasonImdbRatings] = useState({});
+  const [ratings, setRatings] = useState(() => restoredValue(backSnapshot, "ratings", null)); // Ratings por episodio
+  const [ratingsError, setRatingsError] = useState(() => restoredValue(backSnapshot, "ratingsError", null));
+  const [ratingsLoading, setRatingsLoading] = useState(() => restoredValue(backSnapshot, "ratingsLoading", false));
+  const [seasonImdbRatings, setSeasonImdbRatings] = useState(() => restoredValue(backSnapshot, "seasonImdbRatings", {}));
 
   // Carga los ratings de episodios desde SeriesGraph para series TV.
-  useEffect(() => {
+  useRestorableEffect(backSnapshot, "episodeRatings", () => {
     let ignore = false;
     async function load() {
       if (type !== "tv") {
@@ -6332,7 +6347,7 @@ export default function DetailsClient({
     return () => {
       ignore = true;
     };
-  }, [id, type]);
+  }, [id, type], !ratingsLoading);
 
   const visibleTraktSeasons = useMemo(() => {
     if (!Array.isArray(tSeasons?.items)) return [];
@@ -6385,7 +6400,7 @@ export default function DetailsClient({
     return !seasonStructuresAlign(sgSeasons, airedTmdbSeasons);
   }, [ratings, data?.seasons]);
 
-  useEffect(() => {
+  useRestorableEffect(backSnapshot, "seasonImdbRatings", () => {
     if (
       type !== "tv" ||
       !resolvedImdbId ||
@@ -6757,23 +6772,23 @@ export default function DetailsClient({
         )}`
       : null;
 
-  const [traktHomepage, setTraktHomepage] = useState(null);
+  const [traktHomepage, setTraktHomepage] = useState(() => restoredValue(backSnapshot, "traktHomepage", null));
 
   const tmdbOfficialSiteUrl = useMemo(
     () => normalizeUrl(data?.homepage),
     [data?.homepage],
   );
-  const [officialSiteUrl, setOfficialSiteUrl] = useState(tmdbOfficialSiteUrl);
+  const [officialSiteUrl, setOfficialSiteUrl] = useState(() => restoredValue(backSnapshot, "officialSiteUrl", tmdbOfficialSiteUrl));
 
   // reset al cambiar de item (deja el de TMDb como fallback)
-  useEffect(() => {
+  useRestorableEffect(backSnapshot, "officialSiteReset", () => {
     setOfficialSiteUrl(tmdbOfficialSiteUrl);
   }, [tmdbOfficialSiteUrl, id]);
 
   const canLoadOfficialSite = endpointType !== "tv" || traktDeferredReady;
 
   // pedir official site a Trakt (si existe, pisa el de TMDb)
-  useEffect(() => {
+  useRestorableEffect(backSnapshot, "officialSite", () => {
     if (!id) return;
     if (!canLoadOfficialSite) return;
 
@@ -6808,14 +6823,14 @@ export default function DetailsClient({
       : null;
 
   // ====== External links (resolved) ======
-  const [extLinks, setExtLinks] = useState({
+  const [extLinks, setExtLinks] = useState(() => restoredValue(backSnapshot, "extLinks", {
     justwatch: null,
     letterboxd: null,
     loadingJW: false,
     loadingLB: false,
     errorJW: "",
     errorLB: "",
-  });
+  }));
 
   async function fetchResolvedLink(url, { signal } = {}) {
     const r = await fetch(url, { signal, cache: "no-store" });
@@ -7128,15 +7143,15 @@ export default function DetailsClient({
       : null;
 
   // Director (movie) - fallback si data no trae credits
-  const [movieDirector, setMovieDirector] = useState(() =>
+  const [movieDirector, setMovieDirector] = useState(() => restoredValue(backSnapshot, "movieDirector", () =>
     formatCreditNames(getMovieDirectorsFromCrew(data?.credits?.crew)),
-  );
-  const [movieDirectorsCrew, setMovieDirectorsCrew] = useState(() =>
+  ));
+  const [movieDirectorsCrew, setMovieDirectorsCrew] = useState(() => restoredValue(backSnapshot, "movieDirectorsCrew", () =>
     getMovieDirectorsFromCrew(data?.credits?.crew),
-  );
-  const [movieDirectorLoading, setMovieDirectorLoading] = useState(false);
+  ));
+  const [movieDirectorLoading, setMovieDirectorLoading] = useState(() => restoredValue(backSnapshot, "movieDirectorLoading", false));
 
-  useEffect(() => {
+  useRestorableEffect(backSnapshot, "movieDirector", () => {
     const isMovie = type === "movie";
     if (!isMovie || !id) {
       setMovieDirectorsCrew([]);
@@ -7196,14 +7211,14 @@ export default function DetailsClient({
       alive = false;
       ac.abort();
     };
-  }, [type, id, data?.credits?.crew]);
+  }, [type, id, data?.credits?.crew], !movieDirectorLoading);
 
-  const [tvCreators, setTvCreators] = useState(() =>
+  const [tvCreators, setTvCreators] = useState(() => restoredValue(backSnapshot, "tvCreators", () =>
     Array.isArray(data?.created_by) ? data.created_by : [],
-  );
-  const [tvCreatorsLoading, setTvCreatorsLoading] = useState(false);
+  ));
+  const [tvCreatorsLoading, setTvCreatorsLoading] = useState(() => restoredValue(backSnapshot, "tvCreatorsLoading", false));
 
-  useEffect(() => {
+  useRestorableEffect(backSnapshot, "tvCreators", () => {
     const isTv = type === "tv";
     if (!isTv || !id) {
       setTvCreators([]);
@@ -7250,14 +7265,14 @@ export default function DetailsClient({
       alive = false;
       ac.abort();
     };
-  }, [type, id, data?.created_by]);
+  }, [type, id, data?.created_by], !tvCreatorsLoading);
 
   // Menu global (nuevo)
 
-  const [activeSection, setActiveSection] = useState(() => null);
+  const [activeSection, setActiveSection] = useState(() => restoredValue(backSnapshot, "activeSection", () => null));
 
   // Cuando cambie type, fijar una seccion inicial valida
-  useEffect(() => {
+  useRestorableEffect(backSnapshot, "activeSectionReset", () => {
     setActiveSection(null);
   }, [type, id]);
 
@@ -7290,11 +7305,11 @@ export default function DetailsClient({
   // =====================================================
   // CAST: mantener orden TMDb + evitar cast incompleto
   // =====================================================
-  const [tmdbCast, setTmdbCast] = useState([]);
-  const [tmdbCastLoading, setTmdbCastLoading] = useState(false);
-  const [tmdbCastError, setTmdbCastError] = useState("");
+  const [tmdbCast, setTmdbCast] = useState(() => restoredValue(backSnapshot, "tmdbCast", []));
+  const [tmdbCastLoading, setTmdbCastLoading] = useState(() => restoredValue(backSnapshot, "tmdbCastLoading", false));
+  const [tmdbCastError, setTmdbCastError] = useState(() => restoredValue(backSnapshot, "tmdbCastError", ""));
 
-  useEffect(() => {
+  useRestorableEffect(backSnapshot, "tmdbCast", () => {
     let ignore = false;
     const ac = new AbortController();
 
@@ -7361,7 +7376,7 @@ export default function DetailsClient({
       ignore = true;
       ac.abort();
     };
-  }, [id, endpointType]);
+  }, [id, endpointType], !tmdbCastLoading);
 
   const creativeCreditsForUI = useMemo(() => {
     return buildCreativeCreditsForCast({
@@ -7529,9 +7544,9 @@ export default function DetailsClient({
   const pendingSectionTimerRef = useRef(null);
   const pendingScrollEndCleanupRef = useRef(null);
 
-  const [menuCompact, setMenuCompact] = useState(false);
-  const [menuH, setMenuH] = useState(0);
-  const [activeSectionId, setActiveSectionId] = useState(null);
+  const [menuCompact, setMenuCompact] = useState(() => restoredValue(backSnapshot, "menuCompact", false));
+  const [menuH, setMenuH] = useState(() => restoredValue(backSnapshot, "menuH", 0));
+  const [activeSectionId, setActiveSectionId] = useState(() => restoredValue(backSnapshot, "activeSectionId", null));
 
   const priorityCastResolved = !castSectionLoading;
   const priorityRecommendationsResolved = priorityCastResolved;
@@ -7728,13 +7743,117 @@ export default function DetailsClient({
   }, [sectionItems, activeSection]);
 
   // Estados de cuenta de las recomendaciones: respaldo para sesiones TMDb.
-  const [recAccountStates, setRecAccountStates] = useState({});
+  const [recAccountStates, setRecAccountStates] = useState(() => restoredValue(backSnapshot, "recAccountStates", {}));
   const recAccountStatesRef = useRef({});
   const recAccountStateInFlightRef = useRef(new Set());
-  const [recImdbRatings, setRecImdbRatings] = useState({});
+  const [recImdbRatings, setRecImdbRatings] = useState(() => restoredValue(backSnapshot, "recImdbRatings", {}));
   const recImdbRatingsRef = useRef({});
   const recImdbRatingInFlightRef = useRef(new Set());
   const recImdbRequestScopeRef = useRef(0);
+
+  // Último valor de cada estado restaurable (ver `restoredValue` arriba).
+  useSnapshotValues(backSnapshot, {
+    recommendationViewerStates,
+    collectionViewerStates,
+    useBackdrop,
+    favorite,
+    watchlist,
+    userRating,
+    activeTab,
+    selectedPosterPath,
+    selectedMobilePosterPath,
+    selectedPreviewBackdropPath,
+    posterViewMode,
+    posterLayoutMode,
+    posterModeHydrated,
+    selectedBackgroundPath,
+    basePosterPath,
+    baseBackdropPath,
+    artworkInitialized,
+    remoteArtworkChecked,
+    artworkOverridesSkipped,
+    artworkGalleryReached,
+    posterResolved,
+    posterLowLoaded,
+    posterHighLoaded,
+    inProgressPct,
+    inProgressChecked,
+    backdropResolved,
+    backdropLowLoaded,
+    backdropHighLoaded,
+    imagesState,
+    imagesLoading,
+    activeImagesTab,
+    streamingProviders,
+    providersLoading,
+    justwatchUrl,
+    plexAvailable,
+    plexUrl,
+    plexLoading,
+    detailsEntry,
+    mobileActionRowHeight,
+    membershipMap,
+    supportsHover,
+    isMobileViewport,
+    mobileSecondaryVisible,
+    heroLogoPath,
+    selectedLogoPath,
+    titleLogos,
+    heroLogoResolved,
+    videos,
+    videosLoading,
+    videosResolved,
+    videosError,
+    soundtrackTracks,
+    soundtrackResolved,
+    soundtrackError,
+    imagesResFilter,
+    langES,
+    langEN,
+    artworkPreloadCount,
+    artworkRowReady,
+    actionStateReady,
+    hasCachedTraktStatus,
+    hasCachedShowWatched,
+    trakt,
+    traktUsername,
+    tScoreboard,
+    traktDeferredReady,
+    tSentiment,
+    tCommentsTab,
+    tComments,
+    commentProfileUsernames,
+    tSeasons,
+    tListsTab,
+    tLists,
+    collectionData,
+    collectionLoading,
+    extras,
+    externalScoresLoading,
+    awardsLoading,
+    resolvedImdbId,
+    ratings,
+    ratingsError,
+    ratingsLoading,
+    seasonImdbRatings,
+    traktHomepage,
+    officialSiteUrl,
+    extLinks,
+    movieDirector,
+    movieDirectorsCrew,
+    movieDirectorLoading,
+    tvCreators,
+    tvCreatorsLoading,
+    activeSection,
+    tmdbCast,
+    tmdbCastLoading,
+    tmdbCastError,
+    menuCompact,
+    menuH,
+    activeSectionId,
+    recAccountStates,
+    recImdbRatings,
+  });
 
   useEffect(() => {
     recAccountStatesRef.current = recAccountStates;
@@ -7744,7 +7863,7 @@ export default function DetailsClient({
     recImdbRatingsRef.current = recImdbRatings;
   }, [recImdbRatings]);
 
-  useEffect(() => {
+  useRestorableEffect(backSnapshot, "recStatesReset", () => {
     // reset al cambiar de item
     setRecAccountStates({});
     recAccountStatesRef.current = {};
@@ -8714,9 +8833,13 @@ export default function DetailsClient({
     <div
       data-details-root
       data-details-entry={detailsEntryReady ? "ready" : "loading"}
+      // Vuelta atrás con la instantánea recuperada: sin entradas CSS (ver
+      // globals.css) ni de Framer (DetailsStaticMotionProvider).
+      data-details-restored={detailsRestored ? "" : undefined}
       aria-busy={!detailsEntryReady}
       className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30"
     >
+      <DetailsStaticMotionProvider value={detailsRestored}>
       {/* Equivale a la superficie de `loading.jsx`, pero también cubre una
           recarga directa, donde el servidor puede entregar DetailsClient antes
           de que el navegador haya hidratado sus animaciones. */}
@@ -9287,7 +9410,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         // ocupado. `opacity` y `transform` los compone la GPU
                         // sin volver a rasterizar; la entrada se lee igual.
                         initial={
-                          prefersReducedMotion
+                          prefersReducedMotion || detailsRestored
                             ? false
                             : { opacity: 0, y: 18, scale: 0.94 }
                         }
@@ -9511,7 +9634,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     <motion.a
                       key={provider.key ?? `${provider.title}-${index}`}
                       href={provider.href}
-                      initial={{ opacity: 0, y: 10, scale: 0.96 }}
+                      initial={
+                        detailsRestored ? false : { opacity: 0, y: 10, scale: 0.96 }
+                      }
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       transition={{
                         duration: 0.28,
@@ -12139,6 +12264,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
       {modalHostReady
         ? createPortal(detailsModalLayer, document.body)
         : detailsModalLayer}
+      </DetailsStaticMotionProvider>
     </div>
   );
 }

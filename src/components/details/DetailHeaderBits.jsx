@@ -7,6 +7,7 @@ import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Star, Share2, Check } from "lucide-react";
 import { isAndroidApp, shareFromApp } from "@/lib/android/appBridge";
+import { useDetailsStaticMotion } from "@/components/details/AnimatedSection";
 
 export function CompactBadge({
   logo,
@@ -30,7 +31,9 @@ export function CompactBadge({
   const MotionComp = href ? motion.a : onClick ? motion.button : motion.div;
   const isInteractive = !!(href || onClick);
   const prefersReducedMotion = useReducedMotion();
-  const shouldAnimateOnMount = animateOnMount && !prefersReducedMotion;
+  const isStaticDetails = useDetailsStaticMotion();
+  const shouldAnimateOnMount =
+    animateOnMount && !prefersReducedMotion && !isStaticDetails;
 
   const titleText =
     tooltip ||
@@ -133,6 +136,7 @@ export function ExternalLinkButton({
   loading = false,
   fallbackHref = null,
 }) {
+  const isStaticDetails = useDetailsStaticMotion();
   const finalHref = href || fallbackHref || null;
   const disabled = !finalHref && !loading;
   const isLetterboxdIcon = icon?.includes("logo-Letterboxd");
@@ -141,7 +145,7 @@ export function ExternalLinkButton({
     <motion.button
       type="button"
       disabled={disabled}
-      initial={{ opacity: 0, y: 8, scale: 0.98 }}
+      initial={isStaticDetails ? false : { opacity: 0, y: 8, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
       onClick={(e) => {
@@ -187,9 +191,10 @@ export function ExternalLinkButton({
 }
 
 export function MiniStat({ icon: Icon, value, tooltip }) {
+  const isStaticDetails = useDetailsStaticMotion();
   return (
     <motion.div
-      initial={{ opacity: 0, y: 6 }}
+      initial={isStaticDetails ? false : { opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
       className="relative flex items-center gap-1.5 group group/ministat shrink-0 text-zinc-400 transition-colors"
@@ -215,11 +220,12 @@ export function UnifiedRateButton({
   connected,
   onConnect,
 }) {
+  const isStaticDetails = useDetailsStaticMotion();
   if (!connected) {
     return (
       <motion.button
         onClick={onConnect}
-        initial={{ opacity: 0, y: 8, scale: 0.98 }}
+        initial={isStaticDetails ? false : { opacity: 0, y: 8, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
         className="flex items-center gap-2 px-3 h-9 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
@@ -237,7 +243,7 @@ export function UnifiedRateButton({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8, scale: 0.98 }}
+      initial={isStaticDetails ? false : { opacity: 0, y: 8, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
       className={`
@@ -296,6 +302,7 @@ export function UnifiedRateButton({
 export function ActionShareButton({ title, text, url, iconOnly = false, animateEntrance = true }) {
   const [copied, setCopied] = useState(false);
   const prefersReducedMotion = useReducedMotion();
+  const isStaticDetails = useDetailsStaticMotion();
 
   const handleShare = async () => {
     const finalUrl =
@@ -337,7 +344,9 @@ export function ActionShareButton({ title, text, url, iconOnly = false, animateE
       // compacto y el que muestra etiqueta, Framer mide ambos tamaños y anima
       // la diferencia en los dos sentidos.
       layout={prefersReducedMotion ? false : "size"}
-      initial={animateEntrance ? { opacity: 0, y: 8, scale: 0.98 } : false}
+      initial={
+        animateEntrance && !isStaticDetails ? { opacity: 0, y: 8, scale: 0.98 } : false
+      }
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{
         duration: 0.3,

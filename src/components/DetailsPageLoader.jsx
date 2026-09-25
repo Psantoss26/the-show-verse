@@ -1,7 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import DetailsClient from "@/components/DetailsClient";
+import {
+  restoredValue,
+  useDetailsSnapshot,
+  useRestorableEffect,
+  useSnapshotValues,
+} from "@/lib/details/detailsBackSnapshot";
 import {
   getCredits,
   getRecommendations,
@@ -34,14 +40,29 @@ export default function DetailsPageLoader(props) {
     initialLists = null,
   } = props;
 
-  const [deferredData, setDeferredData] = useState(EMPTY_DEFERRED);
+  // Al volver atrás a esta ficha, lo diferido ya cargado se recupera tal cual
+  // en vez de vaciarse y volver a pedirse (ver `detailsBackSnapshot`).
+  const backSnapshot = useDetailsSnapshot(`loader:${type}:${id}`);
+  const [deferredData, setDeferredData] = useState(() =>
+    restoredValue(backSnapshot, "deferredData", EMPTY_DEFERRED),
+  );
+  // Las dos tandas diferidas han terminado: solo entonces se puede dar por
+  // buena la instantánea (si se salió antes, al volver se piden de nuevo).
+  const [deferredSettled, setDeferredSettled] = useState(() =>
+    restoredValue(backSnapshot, "deferredSettled", {
+      priority: false,
+      secondary: false,
+    }),
+  );
+  useSnapshotValues(backSnapshot, { deferredData, deferredSettled });
   const hasData = !!data;
 
-  useEffect(() => {
+  useRestorableEffect(backSnapshot, "deferredReset", () => {
     setDeferredData(EMPTY_DEFERRED);
+    setDeferredSettled({ priority: false, secondary: false });
   }, [type, id]);
 
-  useEffect(() => {
+  useRestorableEffect(backSnapshot, "deferredLoad", () => {
     if (!type || !id || !hasData || type === "person") return;
 
     let cancelled = false;
@@ -91,6 +112,10 @@ export default function DetailsPageLoader(props) {
         }));
       } catch (error) {
         console.error("Error cargando datos prioritarios del detalle:", error);
+      } finally {
+        if (!cancelled) {
+          setDeferredSettled((prev) => ({ ...prev, priority: true }));
+        }
       }
     };
 
@@ -122,6 +147,10 @@ export default function DetailsPageLoader(props) {
           "Error cargando datos TMDb diferidos del detalle:",
           error,
         );
+      } finally {
+        if (!cancelled) {
+          setDeferredSettled((prev) => ({ ...prev, secondary: true }));
+        }
       }
     };
 
@@ -145,7 +174,7 @@ export default function DetailsPageLoader(props) {
     initialCastData,
     initialProviders,
     initialRecommendations,
-  ]);
+  ], deferredSettled.priority && deferredSettled.secondary);
 
   return (
     <DetailsClient

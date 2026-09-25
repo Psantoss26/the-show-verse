@@ -1811,6 +1811,18 @@ html {
   }
 }
 
+/* Ficha recuperada al VOLVER atrás (DetailsClient + detailsBackSnapshot): se
+   pinta exactamente como se dejó, así que ninguna pieza repite su entrada. */
+[data-details-restored] .sv-details-entry,
+[data-details-restored] .sv-mobile-poster-reveal,
+[data-details-restored] .sv-mobile-actions-reveal > * > * {
+  animation: none;
+}
+
+[data-details-restored] .sv-mobile-poster-entry {
+  transition: none;
+}
+
 /* Capa base del fondo del hero de DetailsClient.
 
    MÓVIL: va DESENFOCADA. Aquí el fondo es el MISMO póster (atenuado y con otro

@@ -21,9 +21,11 @@ function normalizeItems(items) {
 
 // Estados privados del visor para los títulos que se están mostrando en un
 // perfil. Las peticiones se agrupan para no consultar una vez por tarjeta.
-export function useViewerTitleStates(items, enabled = true) {
+// `initialStates` siembra el primer render (p. ej. la ficha recuperada al
+// volver atrás) y la consulta lo actualiza por encima.
+export function useViewerTitleStates(items, enabled = true, initialStates = null) {
   const requestedItems = useMemo(() => normalizeItems(items), [items]);
-  const [states, setStates] = useState({});
+  const [states, setStates] = useState(() => initialStates || {});
 
   useEffect(() => {
     let cancelled = false;
