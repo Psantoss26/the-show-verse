@@ -559,6 +559,12 @@ export default function EpisodeDetailsClient({
     () => parsedInitialScoreboard || defaultScoreboard,
   );
   const [imdbData, setImdbData] = useState(() => imdb || null);
+  // CARGANDO ≠ SIN PUNTUACIÓN. Guardan la ficha cuya consulta ya terminó (con
+  // valor, sin él o con error): hasta entonces la insignia va `pending` y el
+  // panel reserva su hueco en vez de pintar "-" justo antes de la cifra real.
+  const scoreKey = `${showId}:${seasonNumber}:${episodeNumber}`;
+  const [traktScoreSettledKey, setTraktScoreSettledKey] = useState(null);
+  const [imdbScoreSettledKey, setImdbScoreSettledKey] = useState(null);
   const [watchedBySeason, setWatchedBySeason] = useState(
     () => initialWatchedBySeason || {},
   );
@@ -629,9 +635,11 @@ export default function EpisodeDetailsClient({
         }
 
         setTScoreboard(parseScoreboardData(json) || defaultScoreboard);
+        setTraktScoreSettledKey(scoreKey);
       } catch (error) {
         if (!alive || error?.name === "AbortError") return;
         setTScoreboard(defaultScoreboard);
+        setTraktScoreSettledKey(scoreKey);
       }
     }, 80);
 
@@ -648,6 +656,7 @@ export default function EpisodeDetailsClient({
     parseScoreboardData,
     hasNumericScoreboardStats,
     defaultScoreboard,
+    scoreKey,
   ]);
 
   useEffect(() => {
@@ -696,10 +705,12 @@ export default function EpisodeDetailsClient({
 
         if (alive) {
           setImdbData(nextImdb);
+          setImdbScoreSettledKey(scoreKey);
         }
       } catch (error) {
         if (!alive || error?.name === "AbortError") return;
         setImdbData(null);
+        setImdbScoreSettledKey(scoreKey);
       }
     }, 120);
 
@@ -716,6 +727,7 @@ export default function EpisodeDetailsClient({
     imdb,
     showName,
     show?.seasons,
+    scoreKey,
   ]);
 
   useEffect(() => {
@@ -1549,6 +1561,9 @@ export default function EpisodeDetailsClient({
               }}
               trakt={{
                 value: traktDecimal || undefined,
+                pending:
+                  !initialScoreboardHasStats &&
+                  traktScoreSettledKey !== scoreKey,
                 sub: tScoreboard.votes
                   ? formatCountShort(tScoreboard.votes)
                   : undefined,
@@ -1563,6 +1578,8 @@ export default function EpisodeDetailsClient({
                   imdbData?.rating != null
                     ? Number(imdbData.rating).toFixed(1)
                     : undefined,
+                pending:
+                  imdb?.rating == null && imdbScoreSettledKey !== scoreKey,
                 sub: imdbData?.votes
                   ? formatCountShort(imdbData.votes)
                   : undefined,
