@@ -45,6 +45,24 @@ export async function prepareOfflineAccount(user, { signal, onProgress = () => {
   if (!auth.authenticated || String(auth.user?.id) !== String(user.id)) return;
   await workerMessage({ type: "OFFLINE_PREPARE_BEGIN" });
   progress("preparing");
+  // Documents first. They only need HTML plus static assets, and after a deploy
+  // any route not yet refreshed keeps opening offline with the previous build's
+  // code (old banner, old fixes). Waiting for the data sweep below could leave
+  // that window open for minutes.
+  let documentsComplete = true;
+  const savedRoutes = new Set();
+  async function saveRoutes(paths) {
+    for (const path of paths) {
+      if (savedRoutes.has(path)) continue;
+      savedRoutes.add(path);
+      await attempt(path, async () => {
+        const result = await saveOfflineRoute(path);
+        if (!result?.ok) { documentsComplete = false; throw new Error("Document unavailable"); }
+      });
+    }
+  }
+  const saved = await workerMessage({ type: "OFFLINE_ROUTES" });
+  await saveRoutes([...USER_ROUTES, `/u/${encodeURIComponent(user.username)}/followers`, `/u/${encodeURIComponent(user.username)}/following`, ...(saved?.paths || [])]);
   await attempt(`${userPath}/profile`, () => read(`${userPath}/profile`));
   await attempt(`${userPath}/level`, () => read(`${userPath}/level`));
   const entities = new Map();
@@ -95,15 +113,7 @@ export async function prepareOfflineAccount(user, { signal, onProgress = () => {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: titles.slice(start, start + 100) }),
     }));
   }
-  const saved = await workerMessage({ type: "OFFLINE_ROUTES" });
-  const routes = new Set([...USER_ROUTES, `/u/${encodeURIComponent(user.username)}/followers`, `/u/${encodeURIComponent(user.username)}/following`, ...(saved?.paths || []), ...[...listIds].map((id) => `/lists/${encodeURIComponent(id)}`)]);
-  let documentsComplete = true;
-  for (const path of routes) {
-    await attempt(path, async () => {
-      const result = await saveOfflineRoute(path);
-      if (!result?.ok) { documentsComplete = false; throw new Error("Document unavailable"); }
-    });
-  }
+  await saveRoutes([...listIds].map((id) => `/lists/${encodeURIComponent(id)}`));
   // Profile charts are lazy modules. Prepare them before the origin disappears.
   await attempt("profile-charts", loadProfileCharts);
   const storage = await workerMessage({ type: "OFFLINE_STATUS" });

@@ -799,9 +799,11 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
     const href = profileTabHref(username, nextTab, routeBase);
     // Sin conexión el router abriría la ruta guardada con una recarga completa
     // del documento. Todas las secciones comparten este lienzo, así que basta
-    // con cambiar la pestaña local y reflejarla en la URL.
+    // con cambiar la pestaña local y reflejarla en la URL. Se copia el estado
+    // actual (con `__NA`) para que Next NO intercepte el pushState: si no,
+    // lanza una restauración del árbol que, sin servidor, repinta el perfil.
     if (!isServerReachable()) {
-      window.history.pushState(null, "", href);
+      window.history.pushState({ ...window.history.state }, "", href);
       return;
     }
     router.push(href, { scroll: false });

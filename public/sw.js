@@ -370,7 +370,10 @@ self.addEventListener("message", (event) => {
       const url = new URL(message.path, self.location.origin);
       if (url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
       const response = await navigation(new Request(url, { headers: { Accept: "text/html" }, credentials: "include" }));
-      result = { ok: response.status === 200 && !response.redirected && response.headers.get("X-Showverse-Offline") !== "1" && Boolean(await savedDocument(url.href)) };
+      // Only a copy in THIS build's shell counts: an older build's document
+      // would still run that build's code offline.
+      const current = await (await caches.open(SHELL_CACHE)).match(await documentKey(url.href));
+      result = { ok: response.status === 200 && !response.redirected && response.headers.get("X-Showverse-Offline") !== "1" && Boolean(current) };
     }
     if (message?.type === "OFFLINE_ROUTES") {
       const owner = (await session()).owner || "anonymous";

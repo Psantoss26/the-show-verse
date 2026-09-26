@@ -43,6 +43,7 @@ import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import useModalGuard from "@/hooks/useModalGuard";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { profileSectionCacheKey } from "@/lib/profile/sectionCache";
+import { isServerReachable } from "@/lib/offline/client";
 import {
   formatActivityRatingTarget,
   getActivityDetailsHref,
@@ -1516,10 +1517,13 @@ function ProfileContentSection({ username, section, actor }) {
   // En una vuelta desde DetailsClient la instantánea de la sección debe estar
   // disponible en el primer frame, no esperar a que un efecto vuelva a leerla.
   // La ruta normal continúa usando sólo la caché viva en memoria para mantener
-  // la hidratación estable.
+  // la hidratación estable. Sin conexión cada página guardada se abre como un
+  // documento nuevo (memoria vacía): leer la instantánea evita pasar por el
+  // esqueleto al cambiar de sección. La sección solo monta tras resolver el
+  // perfil en el cliente, así que no interviene en la hidratación.
   const [initialSection] = useState(() => {
     const memory = profileSectionCache.get(cacheKey);
-    return memory || (isBackNav ? getCachedProfileSection(cacheKey) : null);
+    return memory || (isBackNav || !isServerReachable() ? getCachedProfileSection(cacheKey) : null);
   });
   const [items, setItems] = useState(() => initialSection?.items || []);
   const [status, setStatus] = useState(() => initialSection ? "ready" : "loading");
