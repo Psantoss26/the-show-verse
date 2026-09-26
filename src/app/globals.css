@@ -1936,6 +1936,12 @@ svg.recharts-surface *:focus {
   backdrop-filter: blur(7px) saturate(190%) brightness(1.06);
 }
 
+/* Imagen que no se pudo cargar (p. ej. sin conexión y fuera de caché): no se
+   muestra el icono de imagen rota ni su texto alternativo. Ver brokenImages.js. */
+img[data-img-broken] {
+  display: none !important;
+}
+
 /* Preserve the saved active colors, badges and ratings in read-only mode. */
 [data-offline-blocked="true"] {
   cursor: not-allowed !important;
