@@ -40,7 +40,6 @@ import {
   BookmarkPlus,
   Pin,
   PanelRight,
-  SquareSquare,
   Smartphone,
   ArrowUpRight,
   Trophy,
@@ -64,6 +63,7 @@ import {
   Clock,
   Star,
 } from "lucide-react";
+import PanelCenter from "@/components/ui/icons/PanelCenter";
 
 import { useAuth } from "@/context/AuthContext";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
@@ -3426,7 +3426,7 @@ export default function DetailModal({
                 {/* El icono anticipa la vista a la que lleva: panel lateral
                     desde el modal centrado y ventana centrada desde el lateral. */}
                 {isRightPlacement ? (
-                  <SquareSquare
+                  <PanelCenter
                     aria-hidden="true"
                     className="h-5 w-5 text-white transition-transform duration-300 group-hover:scale-110 motion-reduce:transition-none"
                   />
