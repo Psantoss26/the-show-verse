@@ -12,12 +12,12 @@ export function useRouter() {
     push(href, options) {
       if (sendEmbeddedDetailsAction("navigate", href)) return;
       if (isServerReachable()) return router.push(href, options);
-      return openSavedRoute(href);
+      return openSavedRoute(href, { navigate: (path) => router.push(path, options) });
     },
     replace(href, options) {
       if (sendEmbeddedDetailsAction("navigate", href)) return;
       if (isServerReachable()) return router.replace(href, options);
-      return openSavedRoute(href, { replace: true });
+      return openSavedRoute(href, { replace: true, navigate: (path) => router.replace(path, options) });
     },
     back() {
       if (!sendEmbeddedDetailsAction("close")) router.back();

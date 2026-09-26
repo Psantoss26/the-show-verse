@@ -29,7 +29,7 @@ function harness() {
   };
   let handler = () => json({ ok: true });
   const context = vm.createContext({
-    URL, URLSearchParams, Request, Response, Headers, TextEncoder, Uint8Array,
+    URL, URLSearchParams, Request, Response, Headers, TextEncoder, Uint8Array, Blob, atob,
     crypto: webcrypto, AbortController, setTimeout, clearTimeout, console, caches,
     fetch: async (request) => handler(request),
     self: { location: { href: `${origin}/sw.js?v=build-a`, origin }, skipWaiting: async () => {},
@@ -133,6 +133,20 @@ test('RSC response is never replayed into a different router tree', async () => 
   const sw = harness(); await sw.context.connectivity(false);
   const response = await sw.fetch('/details/movie/42?_rsc=random', { headers: { RSC: '1' } });
   assert.equal(response.type, 'error');
+});
+
+test('offline RSC navigation replays the saved page full-tree stream, never a prefetch', async () => {
+  const sw = harness(); await sw.login('alice');
+  const push = (entry) => `<script>self.__next_f.push(${JSON.stringify(entry).replaceAll('<', '\\u003c')})</script>`;
+  const html = `<html><body><script>(self.__next_f=self.__next_f||[]).push([0])</script>${push([1, '0:{"b":"build-a","f":[]}\n'])}${push([1, '1:"<b>"\n'])}</body></html>`;
+  sw.network(() => new Response(html, { headers: { 'Content-Type': 'text/html' } }));
+  await sw.navigate('/favorites');
+  sw.network(() => { throw new Error('offline'); }); await sw.context.connectivity(false);
+  const response = await sw.fetch('/favorites?_rsc=abc', { headers: { RSC: '1' } });
+  assert.equal(response.headers.get('Content-Type'), 'text/x-component');
+  assert.equal(await response.text(), '0:{"b":"build-a","f":[]}\n1:"<b>"\n');
+  const prefetch = await sw.fetch('/favorites?_rsc=abc', { headers: { RSC: '1', 'Next-Router-Prefetch': '1' } });
+  assert.equal(prefetch.type, 'error');
 });
 
 test('saved full history serves unseen pages and filters without inventing an empty list', async () => {
