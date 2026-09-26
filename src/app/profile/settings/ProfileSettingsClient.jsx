@@ -192,7 +192,7 @@ function ToggleRow({ icon: Icon, title, description, checked, disabled: disabled
   return (
     <div className={`${GLASS_PANEL} rounded-2xl p-4 sm:p-5 flex items-start justify-between gap-4 group`}>
       <div className="flex min-w-0 items-start gap-4">
-        <div className="rounded-xl bg-white/5 p-2.5 text-emerald-400 ring-1 ring-white/10 group-hover:scale-105 group-hover:bg-white/10 transition-all duration-300">
+        <div className="rounded-xl bg-white/5 p-2.5 text-emerald-400 group-hover:scale-105 group-hover:bg-white/10 transition-all duration-300">
           <Icon className="h-5 w-5" aria-hidden="true" />
         </div>
         <div className="min-w-0">
@@ -206,10 +206,10 @@ function ToggleRow({ icon: Icon, title, description, checked, disabled: disabled
         aria-checked={checked}
         disabled={disabled}
         onClick={() => onChange(!checked)}
-        className={`relative h-8 w-14 shrink-0 rounded-full border transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 mt-1 ${
+        className={`relative h-8 w-14 shrink-0 rounded-full transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 mt-1 ${
           checked
-            ? "border-emerald-400/40 bg-emerald-500/80 shadow-[0_0_12px_rgba(16,185,129,0.3)]"
-            : "border-white/10 bg-white/5"
+            ? "bg-emerald-500/80 shadow-[0_0_12px_rgba(16,185,129,0.3)]"
+            : "bg-white/10"
         }`}
       >
         <span
@@ -232,7 +232,7 @@ function SettingActionRow({ icon: Icon, avatarSrc, avatarName, title, descriptio
             avatar real, y sin imagen la inicial: el icono genérico no dejaba
             ver lo que se está a punto de cambiar. Las demás filas siguen con
             su icono. */}
-        <div className={`h-10 w-10 shrink-0 rounded-xl bg-white/5 text-emerald-400 ring-1 ring-white/10 group-hover:scale-105 group-hover:bg-white/10 transition-all duration-300 flex items-center justify-center overflow-hidden ${avatarName ? "" : "p-2.5"}`}>
+        <div className={`h-10 w-10 shrink-0 rounded-xl bg-white/5 text-emerald-400 group-hover:scale-105 group-hover:bg-white/10 transition-all duration-300 flex items-center justify-center overflow-hidden ${avatarName ? "" : "p-2.5"}`}>
           {avatarName ? (
             <Avatar
               src={avatarSrc}
@@ -253,7 +253,7 @@ function SettingActionRow({ icon: Icon, avatarSrc, avatarName, title, descriptio
         type="button"
         disabled={disabled}
         onClick={onClick}
-        className="min-h-9 px-4 shrink-0 rounded-xl border border-emerald-500/20 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs sm:text-sm font-bold text-emerald-300 transition-all duration-200 flex items-center justify-center gap-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
+        className="min-h-9 px-4 shrink-0 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-xs sm:text-sm font-bold text-emerald-300 transition-all duration-200 flex items-center justify-center gap-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
       >
         <span>{buttonLabel}</span>
       </button>
@@ -337,7 +337,7 @@ function ProfileNamesModal({
       >
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-emerald-500/10 p-2.5 text-emerald-400 border border-emerald-500/20">
+            <div className="rounded-xl bg-emerald-500/10 p-2.5 text-emerald-400 ">
               <AtSign className="h-5 w-5" />
             </div>
             <div>
@@ -565,7 +565,7 @@ function AccountSecurityModal({
       >
         <div className="mb-6 flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-2.5 text-emerald-400">
+            <div className="rounded-xl bg-emerald-500/10 p-2.5 text-emerald-400">
               <Shield className="h-5 w-5" />
             </div>
             <div>
@@ -620,7 +620,7 @@ function AccountSecurityModal({
             )}
             {emailState.error ? <p role="alert" className="mt-3 text-xs text-red-300">{emailState.error}</p> : null}
             {emailState.message ? <p role="status" className="mt-3 text-xs text-emerald-300">{emailState.message}</p> : null}
-            <button type="submit" disabled={emailState.loading} className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 text-xs font-bold text-emerald-200 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60">
+            <button type="submit" disabled={emailState.loading} className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl bg-emerald-500/10 px-4 text-xs font-bold text-emerald-200 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60">
               {emailState.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
               Enviar verificación
             </button>
@@ -809,7 +809,7 @@ function AvatarModal({ isOpen, onClose, currentAvatarUrl, userName, onSave, load
       >
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-emerald-500/10 p-2.5 text-emerald-400 border border-emerald-500/20">
+            <div className="rounded-xl bg-emerald-500/10 p-2.5 text-emerald-400 ">
               <ImageIcon className="h-5 w-5" />
             </div>
             <div>
@@ -858,7 +858,7 @@ function AvatarModal({ isOpen, onClose, currentAvatarUrl, userName, onSave, load
         </div>
 
         {/* Option switcher */}
-        <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-black/40 border border-white/10 mb-4">
+        <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-black/40 mb-4">
           <button
             type="button"
             onClick={() => setMode("file")}
@@ -975,7 +975,7 @@ function SegmentedField({ label, value, options, disabled: disabledProp, onChang
               className={`relative min-h-11 rounded-xl px-2 sm:px-4 text-xs sm:text-sm font-bold transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 overflow-hidden ${
                 active
                   ? "bg-white text-black shadow-lg shadow-white/10"
-                  : "border border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10"
+                  : "bg-white/5 text-zinc-300 hover:bg-white/10"
               }`}
             >
               {active && (
@@ -1202,7 +1202,7 @@ function ImportPanel({
       <div className="mt-6 flex flex-col gap-3 sm:flex-row lg:flex-col xl:flex-row">
         <a
           href={connectHref}
-          className={`flex-1 inline-flex min-h-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-xs sm:text-sm font-bold text-white transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${
+          className={`flex-1 inline-flex min-h-11 items-center justify-center rounded-xl bg-white/5 px-4 text-xs sm:text-sm font-bold text-white transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${
             accent === "sky" ? "focus-visible:outline-sky-400" : "focus-visible:outline-emerald-400"
           }`}
         >
@@ -1879,7 +1879,7 @@ function ProfileSettingsClient() {
               <span className="text-emerald-500">.</span>
             </h1>
 
-            <div className="flex shrink-0 items-center gap-2 text-xs font-bold text-zinc-400 bg-white/5 border border-white/10 rounded-full py-1.5 px-3.5 sm:px-4 h-9 shadow-inner ml-auto">
+            <div className="flex shrink-0 items-center gap-2 text-xs font-bold text-zinc-400 bg-white/5 rounded-full py-1.5 px-3.5 sm:px-4 h-9 shadow-inner ml-auto">
               {saving ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" />
@@ -1901,7 +1901,7 @@ function ProfileSettingsClient() {
         <div className="mb-8 rounded-3xl bg-gradient-to-r from-emerald-950/20 to-indigo-950/20 border border-white/[0.06] p-4 sm:p-6 flex flex-row items-center justify-between gap-4 backdrop-blur-xl relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/[0.04] to-indigo-500/[0.04] pointer-events-none" />
           <div className="flex items-center gap-3.5 sm:gap-4 min-w-0 flex-1">
-            <div className="h-12 w-12 sm:h-14 sm:w-14 overflow-hidden rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0 shadow-lg text-emerald-400">
+            <div className="h-12 w-12 sm:h-14 sm:w-14 overflow-hidden rounded-2xl bg-white/5 flex items-center justify-center shrink-0 shadow-lg text-emerald-400">
               <Avatar
                 src={user?.avatarUrl}
                 name={user?.displayName || user?.username}
@@ -1920,7 +1920,7 @@ function ProfileSettingsClient() {
             </div>
           </div>
           <div className="shrink-0 flex items-center ml-auto">
-            <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full shadow-sm whitespace-nowrap">
+            <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full shadow-sm whitespace-nowrap">
               Plan {user?.plan || "free"}
             </span>
           </div>
@@ -1940,8 +1940,8 @@ function ProfileSettingsClient() {
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center justify-center lg:justify-start gap-1.5 lg:gap-3 px-2.5 sm:px-4 py-2 lg:py-2.5 rounded-xl text-[11px] sm:text-xs lg:text-sm font-bold transition-all duration-300 shrink-0 text-center lg:text-left flex-1 lg:flex-none lg:w-full select-none ${
                     active
-                      ? "bg-white/10 text-white border border-white/10 shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.1),0_4px_10px_rgba(0,0,0,0.25)]"
-                      : "text-zinc-400 hover:text-white hover:bg-white/5 border border-transparent"
+                      ? "bg-white/10 text-white shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.1),0_4px_10px_rgba(0,0,0,0.25)]"
+                      : "text-zinc-400 hover:text-white hover:bg-white/5"
                   }`}
                 >
                   <Icon className="h-4 w-4 lg:h-4.5 lg:w-4.5" />
@@ -1998,10 +1998,20 @@ function ProfileSettingsClient() {
                     <SettingActionRow
                       icon={Shield}
                       title="Correo y contraseña"
+                      // En móvil la fila es estrecha: texto corto para que
+                      // no se corte con "…".
                       description={
-                        user?.emailVerified
-                          ? "Correo verificado y opciones de acceso seguras"
-                          : "Verifica tu correo y administra la contraseña de acceso"
+                        user?.emailVerified ? (
+                          <>
+                            <span className="sm:hidden">Correo verificado</span>
+                            <span className="hidden sm:inline">Correo verificado y opciones de acceso seguras</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="sm:hidden">Verifica tu correo</span>
+                            <span className="hidden sm:inline">Verifica tu correo y administra la contraseña de acceso</span>
+                          </>
+                        )
                       }
                       buttonLabel="Gestionar"
                       onClick={() => setShowAccountSecurityModal(true)}
@@ -2172,18 +2182,18 @@ function ProfileSettingsClient() {
                           <div className="flex items-center gap-2 flex-wrap">
                             <h3 className="text-base font-extrabold text-white tracking-wide">Plataformas de streaming</h3>
                             {isNetflixConnected ? (
-                              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center gap-1">
+                              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center gap-1">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                                 Sincronizado
                               </span>
                             ) : (
-                              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-400">
+                              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 text-zinc-400">
                                 Automático
                               </span>
                             )}
                             {extensionVersion && (
                               <span
-                                className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-300 font-mono tracking-normal"
+                                className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 text-zinc-300 font-mono tracking-normal"
                                 title="Versión de la extensión instalada en este navegador"
                               >
                                 Extensión {extensionVersion}
@@ -2203,7 +2213,7 @@ function ProfileSettingsClient() {
                           onClick={handleDisconnectNetflix}
                           aria-label="Desconectar"
                           title="Desconectar"
-                          className="min-h-10 px-3 sm:px-5 rounded-xl border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-xs sm:text-sm font-bold text-red-400 transition flex items-center justify-center self-start sm:self-auto shrink-0"
+                          className="min-h-10 px-3 sm:px-5 rounded-xl bg-red-500/5 hover:bg-red-500/10 text-xs sm:text-sm font-bold text-red-400 transition flex items-center justify-center self-start sm:self-auto shrink-0"
                         >
                           <Unlink className="h-4 w-4 sm:hidden" aria-hidden="true" />
                           <span className="hidden sm:inline">Desconectar</span>
@@ -2214,7 +2224,7 @@ function ProfileSettingsClient() {
                           onClick={handleConnectNetflix}
                           aria-label="Conectar"
                           title="Conectar"
-                          className="min-h-10 px-3 sm:px-5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs sm:text-sm font-bold text-emerald-300 transition flex items-center justify-center self-start sm:self-auto shrink-0"
+                          className="min-h-10 px-3 sm:px-5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-xs sm:text-sm font-bold text-emerald-300 transition flex items-center justify-center self-start sm:self-auto shrink-0"
                         >
                           <Link2 className="h-4 w-4 sm:hidden" aria-hidden="true" />
                           <span className="hidden sm:inline">Conectar</span>
@@ -2240,7 +2250,7 @@ function ProfileSettingsClient() {
                             <h3 className="text-base font-extrabold text-white tracking-wide">
                               The Show Verse Sync
                             </h3>
-                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400">
                               Android App
                             </span>
                             {/* Versión de la app: solo se puede saber desde dentro
@@ -2249,7 +2259,7 @@ function ProfileSettingsClient() {
                                 así que ahí no se enseña nada en vez de inventarlo. */}
                             {inAndroidApp && androidSyncStatus?.version && (
                               <span
-                                className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-300 font-mono tracking-normal"
+                                className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 text-zinc-300 font-mono tracking-normal"
                                 title="Versión de la app instalada en este dispositivo"
                               >
                                 v{androidSyncStatus.version}
@@ -2272,7 +2282,7 @@ function ProfileSettingsClient() {
                           disabled={androidPair.loading}
                           aria-label="Vincular app Android"
                           title="Vincular app Android"
-                          className="min-h-10 px-3 sm:px-5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 hover:bg-emerald-500/20 text-xs sm:text-sm font-bold text-emerald-300 transition flex items-center justify-center shrink-0 disabled:opacity-60 self-start sm:self-auto"
+                          className="min-h-10 px-3 sm:px-5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-xs sm:text-sm font-bold text-emerald-300 transition flex items-center justify-center shrink-0 disabled:opacity-60 self-start sm:self-auto"
                         >
                           {androidPair.loading ? (
                             <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
@@ -2310,7 +2320,7 @@ function ProfileSettingsClient() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <a
                             href={androidPair.link}
-                            className="min-h-9 px-3.5 rounded-lg border border-emerald-500/30 bg-emerald-500/20 hover:bg-emerald-500/30 text-xs font-bold text-emerald-200 transition flex items-center"
+                            className="min-h-9 px-3.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-xs font-bold text-emerald-200 transition flex items-center"
                           >
                             Abrir app
                           </a>
@@ -2321,7 +2331,7 @@ function ProfileSettingsClient() {
                                 navigator.clipboard.writeText(androidPair.link);
                               }
                             }}
-                            className="min-h-9 px-3.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-xs font-bold text-zinc-300 transition"
+                            className="min-h-9 px-3.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-bold text-zinc-300 transition"
                           >
                             Copiar enlace
                           </button>
@@ -2343,7 +2353,7 @@ function ProfileSettingsClient() {
                         <div className="flex items-center gap-2">
                           <h3 className="text-base font-extrabold text-white tracking-wide">Plex</h3>
                           {plex.connected && (
-                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center gap-1">
+                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center gap-1">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                               Conectado
                             </span>
@@ -2351,7 +2361,7 @@ function ProfileSettingsClient() {
                         </div>
                         <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
                           {plex.connected
-                            ? `Conectado${plex.account?.username ? ` como ${plex.account.username}` : ""}${plex.server?.name ? ` · Servidor: ${plex.server.name}` : " · No se detectó ningún servidor"}.`
+                            ? `Conectado${plex.account?.username ? ` como ${plex.account.username}` : ""}${plex.server?.name ? ` · Servidor: ${plex.server.name}` : "· No se detectó ningún servidor"}.`
                             : "Conecta tu cuenta de Plex (inicio de sesión en plex.tv) y detectaremos tu servidor local automáticamente, sin tokens ni configuración manual."}
                         </p>
                         {plex.connected && plex.server && (
@@ -2386,7 +2396,7 @@ function ProfileSettingsClient() {
                           disabled={plexSync.running}
                           aria-label="Sincronizar historial"
                           title="Sincronizar historial de Plex"
-                          className="min-h-10 px-3 sm:px-5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs sm:text-sm font-bold text-white transition flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                          className="min-h-10 px-3 sm:px-5 rounded-xl bg-white/5 hover:bg-white/10 text-xs sm:text-sm font-bold text-white transition flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                         >
                           {plexSync.running ? (
                             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -2400,7 +2410,7 @@ function ProfileSettingsClient() {
                           onClick={handleDisconnectPlex}
                           aria-label="Desconectar"
                           title="Desconectar"
-                          className="min-h-10 px-3 sm:px-5 rounded-xl border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-xs sm:text-sm font-bold text-red-400 transition flex items-center justify-center"
+                          className="min-h-10 px-3 sm:px-5 rounded-xl bg-red-500/5 hover:bg-red-500/10 text-xs sm:text-sm font-bold text-red-400 transition flex items-center justify-center"
                         >
                           <Unlink className="h-4 w-4 sm:hidden" aria-hidden="true" />
                           <span className="hidden sm:inline">Desconectar</span>
@@ -2413,7 +2423,7 @@ function ProfileSettingsClient() {
                         disabled={plexConnecting}
                         aria-label="Conectar"
                         title="Conectar"
-                        className="min-h-10 px-3 sm:px-5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs sm:text-sm font-bold text-white transition flex items-center justify-center self-start sm:self-auto shrink-0 disabled:opacity-60 disabled:cursor-not-allowed"
+                        className="min-h-10 px-3 sm:px-5 rounded-xl bg-white/5 hover:bg-white/10 text-xs sm:text-sm font-bold text-white transition flex items-center justify-center self-start sm:self-auto shrink-0 disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         {plexConnecting ? (
                           <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -2437,7 +2447,7 @@ function ProfileSettingsClient() {
                         <div className="flex items-center gap-2">
                           <h3 className="text-base font-extrabold text-white tracking-wide">Spotify</h3>
                           {spotify.connected && (
-                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center gap-1">
+                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center gap-1">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                               Conectado
                             </span>
@@ -2456,7 +2466,7 @@ function ProfileSettingsClient() {
                         onClick={handleDisconnectSpotify}
                         aria-label="Desconectar"
                         title="Desconectar"
-                        className="min-h-10 px-3 sm:px-5 rounded-xl border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-xs sm:text-sm font-bold text-red-400 transition flex items-center justify-center self-start sm:self-auto shrink-0"
+                        className="min-h-10 px-3 sm:px-5 rounded-xl bg-red-500/5 hover:bg-red-500/10 text-xs sm:text-sm font-bold text-red-400 transition flex items-center justify-center self-start sm:self-auto shrink-0"
                       >
                         <Unlink className="h-4 w-4 sm:hidden" aria-hidden="true" />
                         <span className="hidden sm:inline">Desconectar</span>
@@ -2466,7 +2476,7 @@ function ProfileSettingsClient() {
                         href="/api/spotify/login?next=/profile/settings"
                         aria-label="Conectar"
                         title="Conectar"
-                        className="min-h-10 px-3 sm:px-5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs sm:text-sm font-bold text-white transition flex items-center justify-center self-start sm:self-auto shrink-0"
+                        className="min-h-10 px-3 sm:px-5 rounded-xl bg-white/5 hover:bg-white/10 text-xs sm:text-sm font-bold text-white transition flex items-center justify-center self-start sm:self-auto shrink-0"
                       >
                         <Link2 className="h-4 w-4 sm:hidden" aria-hidden="true" />
                         <span className="hidden sm:inline">Conectar</span>
@@ -2493,7 +2503,7 @@ function ProfileSettingsClient() {
                       href={`/api/trakt/auth/start?next=${encodeURIComponent("/profile/settings")}`}
                       aria-label="Conectar"
                       title="Conectar"
-                      className="min-h-10 px-3 sm:px-5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs sm:text-sm font-bold text-white transition flex items-center justify-center self-start sm:self-auto shrink-0"
+                      className="min-h-10 px-3 sm:px-5 rounded-xl bg-white/5 hover:bg-white/10 text-xs sm:text-sm font-bold text-white transition flex items-center justify-center self-start sm:self-auto shrink-0"
                     >
                       <Link2 className="h-4 w-4 sm:hidden" aria-hidden="true" />
                       <span className="hidden sm:inline">Conectar</span>
@@ -2509,7 +2519,7 @@ function ProfileSettingsClient() {
                       <div>
                         <div className="flex items-center gap-2">
                           <h3 className="text-base font-extrabold text-white tracking-wide">Letterboxd</h3>
-                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-400">
+                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 text-zinc-400">
                             Próximamente
                           </span>
                         </div>
@@ -2523,7 +2533,7 @@ function ProfileSettingsClient() {
                       disabled
                       aria-label="Conectar"
                       title="Conectar"
-                      className="min-h-10 px-3 sm:px-5 rounded-xl border border-white/10 bg-white/5 text-xs sm:text-sm font-bold text-zinc-400 cursor-not-allowed opacity-60 self-start sm:self-auto shrink-0 flex items-center justify-center"
+                      className="min-h-10 px-3 sm:px-5 rounded-xl bg-white/5 text-xs sm:text-sm font-bold text-zinc-400 cursor-not-allowed opacity-60 self-start sm:self-auto shrink-0 flex items-center justify-center"
                     >
                       <Link2 className="h-4 w-4 sm:hidden" aria-hidden="true" />
                       <span className="hidden sm:inline">Conectar</span>
@@ -2539,7 +2549,7 @@ function ProfileSettingsClient() {
                       <div>
                         <div className="flex items-center gap-2">
                           <h3 className="text-base font-extrabold text-white tracking-wide">Filmaffinity</h3>
-                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-400">
+                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 text-zinc-400">
                             Próximamente
                           </span>
                         </div>
@@ -2553,7 +2563,7 @@ function ProfileSettingsClient() {
                       disabled
                       aria-label="Conectar"
                       title="Conectar"
-                      className="min-h-10 px-3 sm:px-5 rounded-xl border border-white/10 bg-white/5 text-xs sm:text-sm font-bold text-zinc-400 cursor-not-allowed opacity-60 self-start sm:self-auto shrink-0 flex items-center justify-center"
+                      className="min-h-10 px-3 sm:px-5 rounded-xl bg-white/5 text-xs sm:text-sm font-bold text-zinc-400 cursor-not-allowed opacity-60 self-start sm:self-auto shrink-0 flex items-center justify-center"
                     >
                       <Link2 className="h-4 w-4 sm:hidden" aria-hidden="true" />
                       <span className="hidden sm:inline">Conectar</span>
@@ -2591,7 +2601,7 @@ function ProfileSettingsClient() {
 
               {awaitingInstall ? (
                 <div className="py-6 flex flex-col items-center text-center font-sans">
-                  <div className="rounded-2xl h-12 w-12 flex items-center justify-center bg-red-500/10 text-red-400 ring-1 ring-red-500/20 mb-5">
+                  <div className="rounded-2xl h-12 w-12 flex items-center justify-center bg-red-500/10 text-red-400 mb-5">
                     <Chrome className="h-6 w-6" />
                   </div>
                   <h3 className="text-lg font-black text-white leading-tight">
@@ -2610,7 +2620,7 @@ function ProfileSettingsClient() {
                     <button
                       type="button"
                       onClick={() => setShowNetflixModal(false)}
-                      className="flex-1 min-h-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-xs sm:text-sm font-bold text-white transition hover:bg-white/10"
+                      className="flex-1 min-h-11 items-center justify-center rounded-xl bg-white/5 text-xs sm:text-sm font-bold text-white transition hover:bg-white/10"
                     >
                       Cancelar
                     </button>
@@ -2698,7 +2708,7 @@ function ProfileSettingsClient() {
                         <button
                           type="button"
                           onClick={() => setShowNetflixModal(false)}
-                          className="flex-1 min-h-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-xs sm:text-sm font-bold text-white transition hover:bg-white/10"
+                          className="flex-1 min-h-11 items-center justify-center rounded-xl bg-white/5 text-xs sm:text-sm font-bold text-white transition hover:bg-white/10"
                         >
                           Cancelar
                         </button>
