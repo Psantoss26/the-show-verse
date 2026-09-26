@@ -7,6 +7,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
+import { isServerReachable } from "@/lib/offline/client";
 import { motion, useReducedMotion } from "framer-motion";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import OptimizedImage from "@/components/OptimizedImage";
@@ -795,8 +796,31 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
   const navigateToTab = useCallback((nextTab) => {
     if (!PROFILE_TAB_IDS.includes(nextTab) || nextTab === tab) return;
     setPendingTab(nextTab);
-    router.push(profileTabHref(username, nextTab, routeBase), { scroll: false });
+    const href = profileTabHref(username, nextTab, routeBase);
+    // Sin conexión el router abriría la ruta guardada con una recarga completa
+    // del documento. Todas las secciones comparten este lienzo, así que basta
+    // con cambiar la pestaña local y reflejarla en la URL.
+    if (!isServerReachable()) {
+      window.history.pushState(null, "", href);
+      return;
+    }
+    router.push(href, { scroll: false });
   }, [routeBase, router, tab, username]);
+
+  // Atrás/adelante entre secciones creadas sin conexión: el árbol del App
+  // Router no cambió, así que la pestaña se deduce de la URL restaurada.
+  useEffect(() => {
+    const syncFromLocation = () => {
+      if (isServerReachable()) return;
+      const base = profileTabHref(username, "profile", routeBase);
+      const path = window.location.pathname.replace(/\/+$/, "");
+      if (path !== base && !path.startsWith(`${base}/`)) return;
+      const section = path === base ? "profile" : path.slice(base.length + 1);
+      if (PROFILE_TAB_IDS.includes(section)) setPendingTab(section);
+    };
+    window.addEventListener("popstate", syncFromLocation);
+    return () => window.removeEventListener("popstate", syncFromLocation);
+  }, [routeBase, username]);
 
   useEffect(() => {
     const currentProfile = profile;
@@ -1260,6 +1284,7 @@ function ProfileTabs({ tab, username, sections, onNavigate, routeBase }) {
             href={profileTabHref(username, it.id, routeBase)}
             scroll={false}
             onClick={handleNavigate}
+            data-offline-local-nav="true"
             data-profile-tab-active={active || undefined}
             className={`relative flex w-[calc((100%_-_0.75rem)_/_4)] shrink-0 snap-start items-center justify-center whitespace-nowrap px-0 py-2.5 text-[clamp(0.625rem,2.7vw,0.6875rem)] font-bold uppercase tracking-normal transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400/70 @[640px]/detail-page:w-auto @[640px]/detail-page:justify-start @[640px]/detail-page:px-3.5 @[640px]/detail-page:text-xs @[640px]/detail-page:tracking-widest ${
               active ? "text-white" : "text-zinc-500 hover:text-zinc-300"
@@ -1306,6 +1331,7 @@ function ProfileLevelSidebar({ level, username, routeBase, onNavigate }) {
         href={profileTabHref(username, "level", routeBase)}
         scroll={false}
         onClick={goToLevel}
+        data-offline-local-nav="true"
         className="block rounded-2xl bg-zinc-900/40 p-4 shadow-sm transition-colors hover:bg-zinc-900/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70"
         title={`Nivel ${level.level} · ${level.tier?.name || ""}`}
       >

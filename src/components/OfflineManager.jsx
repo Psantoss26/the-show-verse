@@ -7,6 +7,7 @@ import { useServerOnline } from "@/context/ServerStatusContext";
 import { isServerReachable, reportConnection, saveOfflineRoute, workerMessage } from "@/lib/offline/client";
 import { prepareOfflineAccount } from "@/lib/offline/prepare";
 import { openSavedRoute } from "@/lib/offline/navigation";
+import { hideBrokenImages } from "@/lib/offline/brokenImages";
 
 export default function OfflineManager() {
   const { user, hydrated } = useAuth();
@@ -76,6 +77,9 @@ export default function OfflineManager() {
       const control = event.target.closest('[data-online-only="true"]');
       if (control) { event.preventDefault(); event.stopImmediatePropagation(); return; }
       const link = event.target.closest("a[href]");
+      // Enlaces que resuelven la navegación en el propio cliente (pestañas del
+      // perfil): recargar el documento solo provocaría un parpadeo.
+      if (link?.dataset.offlineLocalNav === "true") return;
       if (!link || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || link.target === "_blank" || link.hasAttribute("download")) return;
       const url = new URL(link.href);
       if (url.origin !== window.location.origin || url.pathname.startsWith("/api/") || url.href === window.location.href || (url.pathname === location.pathname && url.hash)) return;
@@ -89,6 +93,7 @@ export default function OfflineManager() {
     };
     document.addEventListener("click", click, true);
     document.addEventListener("submit", submit, true);
+    const stopHidingBrokenImages = hideBrokenImages(document);
     // Ask the controlling worker immediately on an offline document reload.
     void workerMessage({ type: "OFFLINE_STATUS" }).then((status) => {
       if (status?.online === false) reportConnection(false);
@@ -96,6 +101,7 @@ export default function OfflineManager() {
     return () => {
       document.removeEventListener("click", click, true);
       document.removeEventListener("submit", submit, true);
+      stopHidingBrokenImages();
     };
   }, []);
 
