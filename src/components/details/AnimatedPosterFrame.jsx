@@ -6,8 +6,24 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useReducedMotion } from "framer-motion";
 import { ImageOff } from "lucide-react";
 
+// Marca una capa como lista solo cuando la imagen está COMPLETA y decodificada.
+// Así nunca se ve la descarga progresiva (el JPEG pintándose a trozos): la capa
+// permanece transparente y entra con un fundido de una sola vez.
+function markWhenDecoded(img, onReady) {
+  if (!img) return;
+  const done = () => onReady(img.currentSrc || img.src);
+  if (typeof img.decode === "function") img.decode().then(done, done);
+  else done();
+}
+
+const LAYER_CLASS =
+  "absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none";
+
 export default function AnimatedPosterFrame({
   src,
+  // Variante ligera opcional (mismo encuadre, menor tamaño). Se pinta primero y
+  // la de `src` la cubre en cuanto termina, igual que LOW/HIGH en DetailsClient.
+  lowSrc = null,
   alt,
   aspect = "poster",
   className = "",
@@ -35,6 +51,19 @@ export default function AnimatedPosterFrame({
   const lastInputRef = useRef(0);
   const shouldReduceMotion = useReducedMotion();
   const [enabled, setEnabled] = useState(false);
+  // Guardan la URL que terminó de cargar: al cambiar `src` la capa vuelve sola a
+  // transparente sin necesidad de un efecto que resetee el estado.
+  const [lowReadySrc, setLowReadySrc] = useState(null);
+  const [highReadySrc, setHighReadySrc] = useState(null);
+  const [failedSrc, setFailedSrc] = useState(null);
+  const lowVisible = !!lowSrc && lowReadySrc === lowSrc;
+  const highVisible = !!src && highReadySrc === src;
+  const highFailed = !!src && failedSrc === src;
+  // Imagen ya en caché: puede completar antes de que React enganche `onLoad`.
+  const readyRef = (readySrc, setReady, url) => (img) => {
+    if (readySrc === url) return;
+    if (img?.complete && img.naturalWidth > 0) markWhenDecoded(img, () => setReady(url));
+  };
 
   useEffect(() => {
     if (shouldReduceMotion || typeof window === "undefined") {
@@ -176,22 +205,52 @@ export default function AnimatedPosterFrame({
         <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/15 z-30" />
         <div className={`relative bg-neutral-950 overflow-hidden ${aspectClass}`}>
           {src ? (
-            <OptimizedImage
-              src={src}
-              alt={alt}
-              className={`absolute inset-0 w-full h-full object-cover transform-gpu ${imgClassName}`}
-              loading={loading}
-              decoding="async"
-              fetchPriority={fetchPriority}
-              style={{ transform: "translateZ(0) scale(1.02)" }}
-            />
-          ) : (
+            <>
+              {/* LOW permanece opaca DEBAJO durante el fundido de HIGH: si se
+                  retirara al empezar, asomaría el fondo negro en el cruce. */}
+              {lowSrc ? (
+                <OptimizedImage
+                  key={lowSrc}
+                  ref={readyRef(lowReadySrc, setLowReadySrc, lowSrc)}
+                  src={lowSrc}
+                  alt=""
+                  aria-hidden="true"
+                  className={`${LAYER_CLASS} ${lowVisible ? "opacity-100" : "opacity-0"} ${imgClassName}`}
+                  loading={loading}
+                  decoding="async"
+                  fetchPriority={fetchPriority}
+                  onLoad={(event) => markWhenDecoded(event.currentTarget, () => setLowReadySrc(lowSrc))}
+                  style={{ transform: "translateZ(0) scale(1.02)" }}
+                />
+              ) : null}
+              {!highFailed ? (
+                <OptimizedImage
+                  key={src}
+                  ref={readyRef(highReadySrc, setHighReadySrc, src)}
+                  src={src}
+                  alt={alt}
+                  className={`${LAYER_CLASS} ${highVisible ? "opacity-100" : "opacity-0"} ${imgClassName}`}
+                  loading={loading}
+                  decoding="async"
+                  // Con variante ligera, LOW resuelve el primer pintado y la
+                  // grande no le compite el ancho de banda.
+                  fetchPriority={lowSrc ? "auto" : fetchPriority}
+                  onLoad={(event) => markWhenDecoded(event.currentTarget, () => setHighReadySrc(src))}
+                  onError={() => setFailedSrc(src)}
+                  style={{ transform: "translateZ(0) scale(1.02)" }}
+                />
+              ) : null}
+            </>
+          ) : null}
+          {/* Sin imagen. Una que falla al cargar (p. ej. sin conexión) no
+              muestra icono: el marco queda vacío, como en el resto de la app. */}
+          {!src ? (
             <div
               className={`absolute inset-0 flex items-center justify-center ${fallbackClassName}`}
             >
               <ImageOff className="w-10 h-10 text-neutral-700" />
             </div>
-          )}
+          ) : null}
 
           {/* Overlay DENTRO del marco: se inclina con la imagen (integrado). El
               contenedor no captura eventos (así el hover/tilt de la portada sigue

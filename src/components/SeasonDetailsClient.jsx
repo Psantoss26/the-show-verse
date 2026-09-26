@@ -36,7 +36,10 @@ import {
   buildImdbHref,
 } from "@/lib/details/ratingLinks";
 import { pickPrimaryProvider } from "@/lib/streaming/platformWordmark";
-import { createPlatformItem } from "@/lib/streaming/providers";
+import {
+  createPlatformItem,
+  dedupeStreamingProviders,
+} from "@/lib/streaming/providers";
 import {
   formatDateEs,
   formatCountShort,
@@ -324,7 +327,10 @@ export default function SeasonDetailsClient({
   const airDate = season?.air_date ? formatDateEs(season.air_date) : null;
   const seasonPlatformItems = useMemo(
     () =>
-      showProviders
+      // Mismo criterio que DetailsClient: una plataforma con varias ofertas
+      // (con anuncios, canal de Prime…) llega repetida con el mismo id.
+      dedupeStreamingProviders(showProviders)
+        .slice(0, 6)
         .map((provider) =>
           createPlatformItem(provider, {
             endpointType: "tv",
@@ -457,6 +463,12 @@ export default function SeasonDetailsClient({
   const [watchedBySeasonLoaded, setWatchedBySeasonLoaded] = useState(
     hasInitialShowWatched,
   );
+  // Igual que en DetailsClient, el botón de vistos no muestra icono hasta
+  // conocer el estado real (instantánea del servidor, caché o respuesta de
+  // Trakt, incluido un error). Antes se pintaba "no visto" y cambiaba de golpe.
+  const [watchedStateSettled, setWatchedStateSettled] = useState(
+    hasInitialShowWatched,
+  );
   const [watchedBusy, setWatchedBusy] = useState(false);
   const [traktEpisodesOpen, setTraktEpisodesOpen] = useState(false);
   const [platformsOpen, setPlatformsOpen] = useState(false);
@@ -563,6 +575,7 @@ export default function SeasonDetailsClient({
     traktRequestIdRef.current += 1;
     setWatchedBySeason(nextWatchedBySeason || {});
     setWatchedBySeasonLoaded(nextLoaded);
+    setWatchedStateSettled(nextLoaded);
     setTrakt({
       ...nextTrakt,
       watched: watchedEpisodes > 0,
@@ -616,6 +629,7 @@ export default function SeasonDetailsClient({
 
       setWatchedBySeason(nextWatchedBySeason);
       setWatchedBySeasonLoaded(true);
+      setWatchedStateSettled(true);
       setTrakt((prev) => ({
         ...prev,
         loading: false,
@@ -669,6 +683,7 @@ export default function SeasonDetailsClient({
           );
 
         let nextState = null;
+        setWatchedStateSettled(true);
         setTrakt((prev) => {
           nextState = {
             ...prev,
@@ -853,7 +868,9 @@ export default function SeasonDetailsClient({
 
   // Rate (Trakt)
   const [userRating, setUserRating] = useState(null);
-  const [ratingLoading, setRatingLoading] = useState(false);
+  // Arranca cargando: la estrella vacía no se muestra hasta saber si ya hay
+  // una puntuación (mismo criterio que DetailsClient).
+  const [ratingLoading, setRatingLoading] = useState(true);
   const [traktConnected, setTraktConnected] = useState(true);
 
   useEffect(() => {
@@ -864,6 +881,8 @@ export default function SeasonDetailsClient({
   useEffect(() => {
     let alive = true;
     const controller = new AbortController();
+    setUserRating(null);
+    setRatingLoading(true);
     const cancelSchedule = scheduleAfterFirstPaint(async () => {
       try {
         const res = await fetch(
@@ -959,7 +978,7 @@ export default function SeasonDetailsClient({
       () => {
         void reloadSeasonTraktState({ background: true });
       },
-      hasBootstrap ? 2500 : 900,
+      hasBootstrap ? 2500 : 0,
     );
 
     return () => window.clearTimeout(timer);
@@ -1205,6 +1224,11 @@ export default function SeasonDetailsClient({
                   ? `https://image.tmdb.org/t/p/w780${posterPath}`
                   : null
               }
+              lowSrc={
+                posterPath
+                  ? `https://image.tmdb.org/t/p/w342${posterPath}`
+                  : null
+              }
               alt={seasonName}
               aspect="poster"
               overlay={
@@ -1293,7 +1317,9 @@ export default function SeasonDetailsClient({
                         plays: null,
                         badge: seasonProgressBadge,
                         busy: watchedBusy,
-                        loading: trakt.loading && !watchedBySeasonLoaded,
+                        loading:
+                          !watchedStateSettled ||
+                          (trakt.loading && !watchedBySeasonLoaded),
                         onOpen: () => setTraktEpisodesOpen(true),
                       }
                     : null
