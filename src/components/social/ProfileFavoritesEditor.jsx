@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import OptimizedImage from "@/components/OptimizedImage";
-import { Search, Trash2, Plus, Loader2, ImageOff, Check } from "lucide-react";
+import { Search, Trash2, Plus, Loader2, ImageOff, Check, Film, Tv } from "lucide-react";
 import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
 
 const MAX_PER_TYPE = 5;
@@ -36,8 +36,9 @@ function payloadItem(item) {
   };
 }
 
-function FavoriteRow({ type, items, loaded, onRemove, onReorder }) {
+function FavoriteRow({ type, items, loaded, onRemove, onReorder, onAddRequest }) {
   const label = type === "movie" ? "Películas favoritas" : "Series favoritas";
+  const RowIcon = type === "movie" ? Film : Tv;
   const posterItems = useEnglishPosterItems(items);
   const dragRef = useRef(null);
   const dragPreviewRef = useRef(null);
@@ -119,20 +120,21 @@ function FavoriteRow({ type, items, loaded, onRemove, onReorder }) {
 
   return (
     <section aria-labelledby={`profile-favorites-${type}`}>
-      <div className="mb-2 flex items-center justify-between">
-        <h3
+      <div className="mb-3 flex items-center justify-between">
+        <h4
           id={`profile-favorites-${type}`}
-          className="text-[11px] font-bold uppercase tracking-[0.14em] text-zinc-400"
+          className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-zinc-400"
         >
+          <RowIcon className="h-3.5 w-3.5 text-emerald-400/80" aria-hidden="true" />
           {label}
-        </h3>
+        </h4>
         <span className="text-xs tabular-nums text-zinc-500">{items.length}/{MAX_PER_TYPE}</span>
       </div>
-      <div className="grid grid-cols-5 gap-2 sm:gap-3">
+      <div className="grid grid-cols-5 gap-2.5 sm:gap-4">
         {Array.from({ length: MAX_PER_TYPE }).map((_, index) => {
           const item = posterItems[index];
           if (!loaded) {
-            return <div key={index} className="aspect-[2/3] animate-pulse rounded-xl bg-white/5" />;
+            return <div key={index} className="aspect-[2/3] animate-pulse rounded-md bg-white/[0.04]" />;
           }
           if (item) {
             const itemKey = keyOf(item);
@@ -146,12 +148,17 @@ function FavoriteRow({ type, items, loaded, onRemove, onReorder }) {
                 onPointerUp={onPointerEnd}
                 onPointerCancel={clearDrag}
                 onDragStart={(event) => event.preventDefault()}
-                className={`group relative aspect-[2/3] touch-none overflow-hidden rounded-xl bg-zinc-900 ring-1 transition-[transform,box-shadow,ring-color] duration-150 select-none ${
+                // Mismo acabado que las tarjetas de la página Favoritos (con
+                // esquinas algo más cerradas, `rounded-md`, por su menor
+                // tamaño): sin borde en reposo y un borde INTERIOR rojo de
+                // 2,5px al señalarla (capa superior, no recorta la imagen). Ese
+                // mismo borde marca el destino al arrastrar.
+                className={`group relative aspect-[2/3] touch-none overflow-hidden rounded-md bg-zinc-900 shadow-md transition-[transform,opacity] duration-150 select-none ${
                   draggingKey === itemKey
-                    ? "z-10 scale-[0.96] cursor-grabbing opacity-45 ring-emerald-300/90 shadow-[0_12px_24px_rgba(16,185,129,0.25)]"
+                    ? "z-10 scale-[0.96] cursor-grabbing opacity-45"
                     : dropTargetKey === itemKey
-                      ? "scale-[1.035] cursor-grab ring-emerald-300/90 shadow-[0_0_0_2px_rgba(16,185,129,0.18)]"
-                      : "cursor-grab ring-white/10"
+                      ? "scale-[1.035] cursor-grab"
+                      : "cursor-grab"
                 }`}
               >
                 {item.posterPath ? (
@@ -166,6 +173,14 @@ function FavoriteRow({ type, items, loaded, onRemove, onReorder }) {
                     <ImageOff className="h-6 w-6" />
                   </div>
                 )}
+                <div
+                  aria-hidden="true"
+                  className={`pointer-events-none absolute inset-0 z-10 rounded-[inherit] transition-shadow duration-300 ${
+                    dropTargetKey === itemKey || draggingKey === itemKey
+                      ? "shadow-[inset_0_0_0_2.5px_rgba(239,68,68,0.95)]"
+                      : "group-hover:shadow-[inset_0_0_0_2.5px_rgba(239,68,68,0.95)]"
+                  }`}
+                />
                 <button
                   type="button"
                   onPointerDown={(event) => event.stopPropagation()}
@@ -183,14 +198,17 @@ function FavoriteRow({ type, items, loaded, onRemove, onReorder }) {
               </div>
             );
           }
+          // Hueco libre: lleva al buscador, que es donde se añade.
           return (
-            <div
+            <button
               key={`empty-${type}-${index}`}
-              className="flex aspect-[2/3] items-center justify-center rounded-xl border border-dashed border-white/10 bg-white/[0.015] text-zinc-700"
-              aria-hidden="true"
+              type="button"
+              onClick={onAddRequest}
+              aria-label={`Añadir ${type === "movie" ? "película" : "serie"} favorita`}
+              className="flex aspect-[2/3] items-center justify-center rounded-md bg-white/[0.03] text-zinc-600 transition-colors hover:bg-white/[0.06] hover:text-emerald-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
             >
-              <Plus className="h-5 w-5" />
-            </div>
+              <Plus className="h-5 w-5" aria-hidden="true" />
+            </button>
           );
         })}
       </div>
@@ -198,7 +216,7 @@ function FavoriteRow({ type, items, loaded, onRemove, onReorder }) {
         <div
           ref={dragPreviewRef}
           aria-hidden="true"
-          className="pointer-events-none fixed left-0 top-0 z-50 overflow-hidden rounded-xl bg-zinc-900 shadow-[0_20px_42px_rgba(0,0,0,0.5)] ring-2 ring-emerald-300/90 will-change-transform"
+          className="pointer-events-none fixed left-0 top-0 z-50 overflow-hidden rounded-md bg-zinc-900 shadow-[0_20px_42px_rgba(0,0,0,0.5)] will-change-transform"
           style={{
             width: dragPreview.width,
             height: dragPreview.height,
@@ -217,6 +235,7 @@ function FavoriteRow({ type, items, loaded, onRemove, onReorder }) {
               <ImageOff className="h-6 w-6" />
             </div>
           )}
+          <div className="absolute inset-0 rounded-[inherit] shadow-[inset_0_0_0_2.5px_rgba(239,68,68,0.95)]" />
         </div>
       ) : null}
     </section>
@@ -225,7 +244,7 @@ function FavoriteRow({ type, items, loaded, onRemove, onReorder }) {
 
 // Editor de favoritos destacados: cinco películas y cinco series, guardadas
 // por separado para que una categoría nunca desplace a la otra.
-export default function ProfileFavoritesEditor() {
+export default function ProfileFavoritesEditor({ panelClassName = "" }) {
   const [itemsByType, setItemsByType] = useState(EMPTY_FAVORITES);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -236,6 +255,7 @@ export default function ProfileFavoritesEditor() {
   const [searching, setSearching] = useState(false);
   const reqIdRef = useRef(0);
   const persistRequestRef = useRef(0);
+  const searchInputRef = useRef(null);
 
   useEffect(() => () => {
     if (savedTickTimer.current) clearTimeout(savedTickTimer.current);
@@ -364,39 +384,48 @@ export default function ProfileFavoritesEditor() {
 
   const completelyFull = itemsByType.movie.length >= MAX_PER_TYPE && itemsByType.tv.length >= MAX_PER_TYPE;
 
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:p-5">
-      <div className="mb-1 flex items-center justify-between gap-3">
-        <span className="text-xs font-black uppercase tracking-widest text-emerald-400/80">Favoritos del perfil</span>
-        <span className="flex shrink-0 items-center gap-2 text-xs text-zinc-500" aria-live="polite">
-          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-label="Guardando" /> : null}
-          {!saving && savedTick ? <Check className="h-3.5 w-3.5 text-emerald-400" aria-label="Guardado" /> : null}
-          {itemsByType.movie.length + itemsByType.tv.length}/{MAX_PER_TYPE * 2}
-        </span>
-      </div>
-      <p className="mb-5 text-xs text-zinc-500">
-        Elige hasta {MAX_PER_TYPE} películas y {MAX_PER_TYPE} series que aparecerán en tu perfil.
-      </p>
+  const focusSearch = () => {
+    searchInputRef.current?.focus();
+    searchInputRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  };
 
-      <div className="space-y-5">
-        <FavoriteRow type="movie" items={itemsByType.movie} loaded={loaded} onRemove={remove} onReorder={reorder} />
-        <FavoriteRow type="tv" items={itemsByType.tv} loaded={loaded} onRemove={remove} onReorder={reorder} />
+  // El título y el subtítulo van en el mismo panel que los demás grupos de
+  // Preferencias (SegmentedField: "Vista por defecto"…). El buscador y las dos
+  // filas quedan fuera, con todo el ancho de la columna para los pósters.
+  return (
+    <section aria-labelledby="profile-favorites-title" className="space-y-5">
+      <div className={`${panelClassName} rounded-2xl p-4 sm:p-5`}>
+        <div className="flex items-center justify-between gap-3">
+          <h3 id="profile-favorites-title" className="block text-xs font-black uppercase tracking-widest text-emerald-400/80">
+            Favoritos del perfil
+          </h3>
+          <span className="flex shrink-0 items-center gap-1.5 text-xs tabular-nums text-zinc-500" aria-live="polite">
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-label="Guardando" /> : null}
+            {!saving && savedTick ? <Check className="h-3.5 w-3.5 text-emerald-400" aria-label="Guardado" /> : null}
+            {itemsByType.movie.length + itemsByType.tv.length}/{MAX_PER_TYPE * 2}
+          </span>
+        </div>
+        <p className="mt-2 text-xs sm:text-sm text-zinc-400 leading-relaxed">
+          Hasta {MAX_PER_TYPE} películas y {MAX_PER_TYPE} series en tu perfil. Arrastra para ordenarlas.
+        </p>
       </div>
 
       {!completelyFull && (
-        <div className="relative mt-5">
+        <div className="relative w-full">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
           <input
+            ref={searchInputRef}
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar película o serie para añadir…"
-            className="h-10 w-full rounded-full border border-white/10 bg-white/5 pl-10 pr-9 text-sm text-white placeholder:text-zinc-500 outline-none focus:border-emerald-400/50 focus-visible:ring-2 focus-visible:ring-emerald-400/40"
+            placeholder="Añadir película o serie…"
+            aria-label="Buscar película o serie para añadir"
+            className="h-10 w-full rounded-full bg-white/[0.06] pl-10 pr-9 text-sm text-white placeholder:text-zinc-500 outline-none transition-colors focus:bg-white/[0.09] focus-visible:ring-2 focus-visible:ring-emerald-400/40"
           />
           {searching && <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-emerald-400" />}
 
           {results.length > 0 && (
-            <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-2xl border border-white/10 bg-[#141414] shadow-2xl">
+            <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-2xl bg-[#141414] shadow-2xl shadow-black/60">
               {results.map((result) => {
                 const typeItems = itemsByType[result.mediaType] || [];
                 const alreadyAdded = typeItems.some((item) => keyOf(item) === keyOf(result));
@@ -434,6 +463,11 @@ export default function ProfileFavoritesEditor() {
           )}
         </div>
       )}
-    </div>
+
+      <div className="space-y-7">
+        <FavoriteRow type="movie" items={itemsByType.movie} loaded={loaded} onRemove={remove} onReorder={reorder} onAddRequest={focusSearch} />
+        <FavoriteRow type="tv" items={itemsByType.tv} loaded={loaded} onRemove={remove} onReorder={reorder} onAddRequest={focusSearch} />
+      </div>
+    </section>
   );
 }
