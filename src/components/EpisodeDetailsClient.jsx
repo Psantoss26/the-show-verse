@@ -38,7 +38,10 @@ import {
   buildImdbHref,
 } from "@/lib/details/ratingLinks";
 import { pickPrimaryProvider } from "@/lib/streaming/platformWordmark";
-import { createPlatformItem } from "@/lib/streaming/providers";
+import {
+  createPlatformItem,
+  dedupeStreamingProviders,
+} from "@/lib/streaming/providers";
 import { getLocalInProgress } from "@/lib/api/progressClient";
 import {
   formatDateEs,
@@ -357,7 +360,10 @@ export default function EpisodeDetailsClient({
   );
   const episodePlatformItems = useMemo(
     () =>
-      episodeStreamingProviders
+      // Mismo criterio que DetailsClient: una plataforma con varias ofertas
+      // (con anuncios, canal de Prime…) llega repetida con el mismo id.
+      dedupeStreamingProviders(episodeStreamingProviders)
+        .slice(0, 6)
         .map((provider) =>
           createPlatformItem(provider, {
             endpointType: "tv",
@@ -750,7 +756,9 @@ export default function EpisodeDetailsClient({
   // Rating SOLO Trakt + StarRating
   // =========================
   const [userRating, setUserRating] = useState(null);
-  const [ratingLoading, setRatingLoading] = useState(false);
+  // Arranca cargando: la estrella vacía no se muestra hasta saber si ya hay
+  // una puntuación (mismo criterio que DetailsClient).
+  const [ratingLoading, setRatingLoading] = useState(true);
   const [traktConnected, setTraktConnected] = useState(true);
 
   // Estado de Trakt para watched
@@ -766,6 +774,12 @@ export default function EpisodeDetailsClient({
     error: "",
     traktId: initialShowWatched?.traktId ?? null,
   });
+  // Igual que en DetailsClient, el botón de vistos no muestra icono hasta
+  // conocer el estado real (instantánea del servidor, caché o respuesta de
+  // Trakt, incluido un error). Antes se pintaba "no visto" y cambiaba de golpe.
+  const [watchedStateSettled, setWatchedStateSettled] = useState(
+    hasInitialShowWatched,
+  );
   const [watchedBusy, setWatchedBusy] = useState(false);
   const [episodePlaysOpen, setEpisodePlaysOpen] = useState(false);
   const [platformsOpen, setPlatformsOpen] = useState(false);
@@ -781,6 +795,8 @@ export default function EpisodeDetailsClient({
   useEffect(() => {
     let alive = true;
     const controller = new AbortController();
+    setUserRating(null);
+    setRatingLoading(true);
     const cancelSchedule = scheduleAfterFirstPaint(async () => {
       try {
         const res = await fetch(
@@ -809,8 +825,10 @@ export default function EpisodeDetailsClient({
           setUserRating(null);
           setTraktConnected(false);
         }
+      } finally {
+        if (alive) setRatingLoading(false);
       }
-    }, 320);
+    }, 160);
 
     return () => {
       alive = false;
@@ -919,6 +937,7 @@ export default function EpisodeDetailsClient({
     traktRequestIdRef.current += 1;
     setWatchedBySeason(nextWatchedBySeason || {});
     setWatchedBySeasonLoaded(nextLoaded);
+    setWatchedStateSettled(nextLoaded);
     setTrakt({
       ...nextTrakt,
       watched: isWatched,
@@ -947,6 +966,7 @@ export default function EpisodeDetailsClient({
 
       setWatchedBySeason(nextWatchedBySeason);
       setWatchedBySeasonLoaded(true);
+      setWatchedStateSettled(true);
       setTrakt((prev) => ({
         ...prev,
         loading: false,
@@ -994,6 +1014,7 @@ export default function EpisodeDetailsClient({
             traktId: null,
           };
           setTrakt(nextState);
+          setWatchedStateSettled(true);
           setTraktConnected(false);
           return nextState;
         }
@@ -1023,6 +1044,7 @@ export default function EpisodeDetailsClient({
           );
 
         let nextState = null;
+        setWatchedStateSettled(true);
         setTrakt((prev) => {
           nextState = {
             ...prev,
@@ -1075,7 +1097,7 @@ export default function EpisodeDetailsClient({
       () => {
         void reloadEpisodeTraktState({ background: true });
       },
-      hasInitialShowWatched ? 2500 : 900,
+      hasInitialShowWatched ? 2500 : 0,
     );
 
     return () => window.clearTimeout(timer);
@@ -1375,6 +1397,11 @@ export default function EpisodeDetailsClient({
                   ? `https://image.tmdb.org/t/p/original${stillPath}`
                   : null
               }
+              lowSrc={
+                stillPath
+                  ? `https://image.tmdb.org/t/p/w300${stillPath}`
+                  : null
+              }
               alt={epName}
               aspect="video"
               overlay={
@@ -1485,7 +1512,9 @@ export default function EpisodeDetailsClient({
                   plays: episodePlays.plays,
                   badge: null,
                   busy: watchedBusy,
-                  loading: trakt.loading && !watchedBySeasonLoaded,
+                  loading:
+                    !watchedStateSettled ||
+                    (trakt.loading && !watchedBySeasonLoaded),
                   // En "Continuar viendo": el botón toma su icono y su color.
                   continueWatchingPercent: inProgressPct,
                   onOpen: async () => {
