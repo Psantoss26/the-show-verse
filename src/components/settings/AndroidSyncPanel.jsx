@@ -42,7 +42,7 @@ function Fila({ ok, titulo, detalle, accion, onAccion }) {
         <button
           type="button"
           onClick={onAccion}
-          className="min-h-8 shrink-0 rounded-lg border border-emerald-500/30 bg-emerald-500/15 px-3 text-[11px] font-bold text-emerald-200 transition hover:bg-emerald-500/25"
+          className="min-h-8 shrink-0 rounded-lg bg-emerald-500/15 px-3 text-[11px] font-bold text-emerald-200 transition hover:bg-emerald-500/25"
         >
           {accion}
         </button>
@@ -134,7 +134,7 @@ export default function AndroidSyncPanel({
         <button
           type="button"
           onClick={openSyncPanel}
-          className="flex min-h-9 items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3.5 text-xs font-bold text-zinc-300 transition hover:bg-white/10"
+          className="flex min-h-9 items-center gap-1.5 rounded-lg bg-white/5 px-3.5 text-xs font-bold text-zinc-300 transition hover:bg-white/10"
         >
           Panel de sincronización
           <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
@@ -147,7 +147,7 @@ export default function AndroidSyncPanel({
               setSyncPaused(!pausada);
               onRefresh?.();
             }}
-            className="min-h-9 rounded-lg border border-white/10 bg-white/5 px-3.5 text-xs font-bold text-zinc-300 transition hover:bg-white/10"
+            className="min-h-9 rounded-lg bg-white/5 px-3.5 text-xs font-bold text-zinc-300 transition hover:bg-white/10"
           >
             {pausada ? "Reanudar sincronización" : "Pausar sincronización"}
           </button>
