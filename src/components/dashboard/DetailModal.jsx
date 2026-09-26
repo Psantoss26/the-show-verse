@@ -40,6 +40,7 @@ import {
   BookmarkPlus,
   Pin,
   PanelRight,
+  SquareSquare,
   Smartphone,
   ArrowUpRight,
   Trophy,
@@ -3422,10 +3423,19 @@ export default function DetailModal({
                 aria-pressed={isRightPlacement}
                 className={`group flex h-10 w-10 shrink-0 select-none items-center justify-center rounded-full transition-all duration-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${DETAIL_MODAL_GLASS_CONTROL}`}
               >
-                <PanelRight
-                  aria-hidden="true"
-                  className={`h-5 w-5 transition-transform duration-300 group-hover:scale-110 motion-reduce:transition-none ${isRightPlacement ? "text-white" : ""}`}
-                />
+                {/* El icono anticipa la vista a la que lleva: panel lateral
+                    desde el modal centrado y ventana centrada desde el lateral. */}
+                {isRightPlacement ? (
+                  <SquareSquare
+                    aria-hidden="true"
+                    className="h-5 w-5 text-white transition-transform duration-300 group-hover:scale-110 motion-reduce:transition-none"
+                  />
+                ) : (
+                  <PanelRight
+                    aria-hidden="true"
+                    className="h-5 w-5 transition-transform duration-300 group-hover:scale-110 motion-reduce:transition-none"
+                  />
+                )}
               </button>
             )}
             {isRightPlacement && onDrawerViewChange && (
