@@ -66,10 +66,18 @@ const registerSchema = z.object({
   displayName: z.string().max(50).optional(),
 });
 
-const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
-});
+// `identifier` admite el email o el nombre de usuario. `email` se mantiene por
+// compatibilidad con clientes que aún lo envían con ese nombre.
+const loginSchema = z
+  .object({
+    identifier: z.string().trim().min(1).max(320).optional(),
+    email: z.string().trim().min(1).max(320).optional(),
+    password: z.string().min(1).max(128),
+  })
+  .refine((data) => Boolean(data.identifier || data.email), {
+    message: 'identifier is required',
+    path: ['identifier'],
+  });
 
 const changeEmailRequestSchema = z.object({
   email: z.string().trim().email().max(320),
@@ -699,17 +707,32 @@ export default async function authRoutes(fastify) {
       return reply.status(400).send({ error: 'Invalid credentials format' });
     }
 
-    const { email, password } = parsed.data;
+    const { password } = parsed.data;
+    const identifier = (parsed.data.identifier || parsed.data.email).toLowerCase();
 
+    // Con "@" es un email (los usernames no lo admiten); si no, el nombre de
+    // usuario, sin distinguir mayúsculas: los importados de TMDb pueden
+    // conservarlas.
     const [user] = await db
       .select()
       .from(users)
-      .where(eq(users.email, email.toLowerCase()))
+      .where(
+        identifier.includes('@')
+          ? eq(users.email, identifier)
+          : sql`lower(${users.username}) = ${identifier}`,
+      )
       .limit(1);
 
     if (!user || !user.passwordHash) {
       // Timing-safe: siempre hashear aunque no exista
       await bcrypt.hash(password, BCRYPT_ROUNDS);
+      if (user && user.isActive) {
+        // Cuenta creada con Google/TMDb que aún no tiene contraseña: se indica
+        // cómo crearla en vez de un "credenciales incorrectas" sin salida. El
+        // registro ya revela si un email o usuario existe, así que esto no
+        // amplía la enumeración de cuentas.
+        return reply.status(401).send({ error: 'Password not set', code: 'password_not_set' });
+      }
       return reply.status(401).send({ error: 'Invalid credentials' });
     }
 

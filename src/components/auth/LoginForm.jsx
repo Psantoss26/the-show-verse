@@ -22,14 +22,17 @@ function sanitizeNextPath(value) {
 
 function getAuthErrorMessage(error, mode) {
   const raw = String(error?.message || "").toLowerCase();
-  if (error?.status === 401) return "Email o contraseña incorrectos.";
+  if (error?.payload?.code === "password_not_set") {
+    return "Esta cuenta se creó con Google y todavía no tiene contraseña. Entra con Google y créala en Ajustes › Preferencias › Correo y contraseña.";
+  }
+  if (error?.status === 401) return "Usuario, email o contraseña incorrectos.";
   if (error?.status === 409 || raw.includes("already")) {
     return "Ya existe una cuenta con ese email o nombre de usuario.";
   }
   if (error?.status === 400 || raw.includes("validation")) {
     return mode === "register"
       ? "Revisa email, usuario y contraseña. La contraseña debe tener al menos 8 caracteres."
-      : "Introduce un email y contraseña válidos.";
+      : "Introduce tu email o usuario y la contraseña.";
   }
   if (error?.status === 503) {
     return "El backend no está disponible ahora mismo.";
@@ -155,7 +158,7 @@ export default function LoginForm({ next: nextProp }) {
         });
       } else {
         await login({
-          email: form.email.trim(),
+          identifier: form.email.trim(),
           password: form.password,
         });
       }
@@ -270,18 +273,23 @@ export default function LoginForm({ next: nextProp }) {
       <div className="space-y-4">
         <div className="block text-left group">
           <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-zinc-400 transition-colors group-focus-within:text-sky-300">
-            Email
+            {isRegister ? "Email" : "Email o usuario"}
           </span>
           <div className="relative">
             <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-zinc-500 transition-colors group-focus-within:text-sky-300 pointer-events-none" />
+            {/* Al iniciar sesión vale el email o el nombre de usuario: un
+                `type="email"` rechazaría el usuario antes de enviarlo. */}
             <input
-              type="email"
-              autoComplete="email"
+              type={isRegister ? "email" : "text"}
+              autoComplete={isRegister ? "email" : "username"}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               value={form.email}
               onChange={updateField("email")}
               required
               className="h-11 w-full rounded-xl border border-white/10 bg-black/45 pl-11 pr-3.5 text-sm text-white outline-none transition placeholder:text-zinc-600 focus:border-sky-500/40 focus:bg-black/60 focus:shadow-[0_0_15px_rgba(14,165,233,0.1)]"
-              placeholder="tu@email.com"
+              placeholder={isRegister ? "tu@email.com" : "tu@email.com o usuario"}
             />
           </div>
         </div>

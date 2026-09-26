@@ -328,16 +328,18 @@ export const openApiDocument = {
     '/v1/auth/login': {
       post: {
         tags: ['Auth'],
-        summary: 'Login with email and password',
+        summary: 'Login with email or username and password',
+        description: 'Send `identifier` (email or username, case-insensitive). `email` is still accepted as a legacy alias. An existing account without a password (created with Google or TMDb) answers 401 with `code: "password_not_set"`.',
         requestBody: {
           required: true,
           content: {
             'application/json': {
               schema: {
                 type: 'object',
-                required: ['email', 'password'],
+                required: ['password'],
                 properties: {
-                  email: { type: 'string', format: 'email' },
+                  identifier: { type: 'string', description: 'Email or username.' },
+                  email: { type: 'string', description: 'Legacy alias of identifier.' },
                   password: { type: 'string' },
                 },
               },
@@ -346,7 +348,7 @@ export const openApiDocument = {
         },
         responses: {
           200: { description: 'Authenticated.', content: { 'application/json': { schema: { $ref: '#/components/schemas/AuthTokens' } } } },
-          401: { $ref: '#/components/responses/Unauthorized' },
+          401: { description: 'Invalid credentials, or `code: "password_not_set"` for an account without a password.' },
         },
       },
     },
