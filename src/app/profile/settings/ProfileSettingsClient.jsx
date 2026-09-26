@@ -2051,7 +2051,7 @@ function ProfileSettingsClient() {
                         })
                       }
                     />
-                    <ProfileFavoritesEditor />
+                    <ProfileFavoritesEditor panelClassName={GLASS_PANEL} />
                   </div>
 
                   <div className="space-y-4">
