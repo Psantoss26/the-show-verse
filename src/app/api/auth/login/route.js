@@ -24,13 +24,20 @@ export async function POST(request) {
   const result = await backendAuthRequest("/v1/auth/login", {
     method: "POST",
     body: JSON.stringify({
-      email: body?.email,
+      // Email o nombre de usuario. `email` se acepta aún por compatibilidad.
+      identifier: body?.identifier ?? body?.email,
       password: body?.password,
     }),
   });
 
   if (!result.ok) {
-    return authError(result.error || "Login failed", result.status || 500, request);
+    const code = typeof result.json?.code === "string" ? result.json.code : null;
+    return authError(
+      result.error || "Login failed",
+      result.status || 500,
+      request,
+      code ? { code } : null,
+    );
   }
 
   const response = NextResponse.json({

@@ -14,8 +14,8 @@ export const AUTH_JSON_HEADERS = {
   "Content-Type": "application/json",
 };
 
-export function authError(message, status = 500, request = null) {
-  const response = NextResponse.json({ error: message }, { status });
+export function authError(message, status = 500, request = null, extra = null) {
+  const response = NextResponse.json({ ...(extra || {}), error: message }, { status });
   if (status === 401 && request) {
     clearBackendAuthCookies(response, { secure: getCookieSecure(request) });
   }

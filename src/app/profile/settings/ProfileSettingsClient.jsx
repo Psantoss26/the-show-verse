@@ -631,7 +631,7 @@ function AccountSecurityModal({
               <KeyRound className="h-4.5 w-4.5 text-emerald-400" />
               <div>
                 <h4 className="text-sm font-bold text-white">{hasPassword ? "Cambiar contraseña" : "Crear contraseña"}</h4>
-                <p className="mt-0.5 text-xs text-zinc-400">{hasPassword ? "Cerrarás sesión en todos tus dispositivos." : "Añade una contraseña para poder iniciar sesión también con correo."}</p>
+                <p className="mt-0.5 text-xs text-zinc-400">{hasPassword ? "Cerrarás sesión en todos tus dispositivos." : "Añade una contraseña para iniciar sesión también con tu correo o usuario."}</p>
               </div>
             </div>
             {hasPassword && (
@@ -1896,7 +1896,6 @@ function ProfileSettingsClient() {
             </div>
           </div>
         </header>
-        <OfflineStorageStatus />
 
         {/* Profile Info Summary Card */}
         <div className="mb-8 rounded-3xl bg-gradient-to-r from-emerald-950/20 to-indigo-950/20 border border-white/[0.06] p-4 sm:p-6 flex flex-row items-center justify-between gap-4 backdrop-blur-xl relative overflow-hidden">
@@ -2007,6 +2006,7 @@ function ProfileSettingsClient() {
                       buttonLabel="Gestionar"
                       onClick={() => setShowAccountSecurityModal(true)}
                     />
+                    <OfflineStorageStatus panelClassName={GLASS_PANEL} />
                   </div>
 
                   <div className="flex flex-col gap-4">
