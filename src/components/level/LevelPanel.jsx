@@ -28,14 +28,21 @@ function StatCell({ value, label, delay = 0 }) {
   );
 }
 
+// Último detalle recibido por usuario. Al volver a la pestaña Nivel se pinta al
+// instante y se revalida en segundo plano, en lugar de repetir la carga (sin
+// conexión, cada vuelta a la pestaña volvía a pasar por el estado vacío).
+const levelCache = new Map();
+
 export default function LevelPanel({ username, initialSummary = null }) {
-  const [level, setLevel] = useState(null);
-  const [status, setStatus] = useState("loading");
+  const [level, setLevel] = useState(() => levelCache.get(username) || null);
+  const [status, setStatus] = useState(() => (levelCache.has(username) ? "ready" : "loading"));
   const [legendOpen, setLegendOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    setStatus("loading");
+    const cached = levelCache.get(username);
+    setLevel(cached || null);
+    setStatus(cached ? "ready" : "loading");
 
     (async () => {
       try {
@@ -44,11 +51,12 @@ export default function LevelPanel({ username, initialSummary = null }) {
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
+        levelCache.set(username, data);
         if (cancelled) return;
         setLevel(data);
         setStatus("ready");
       } catch {
-        if (!cancelled) setStatus("error");
+        if (!cancelled && !cached) setStatus("error");
       }
     })();
 
