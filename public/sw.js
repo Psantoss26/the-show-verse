@@ -267,6 +267,34 @@ async function saveDocument(request, response, generation = epoch) {
   if (loaded.some((asset) => !asset?.ok)) return false;
   return safePut(await caches.open(SHELL_CACHE), key, copy, generation);
 }
+// The saved document already embeds this route's complete Flight stream in its
+// `self.__next_f.push([1, "..."])` scripts: concatenated, it is byte-identical
+// to the `.rsc` Next itself serves for the route. It is a full-tree (root)
+// payload, so it is valid whatever tree the client currently has. Serving it
+// lets the App Router navigate offline without loading a new document, which
+// in the installed PWA always shows the browser's loading bar. Only documents
+// of THIS build qualify: the client rejects a foreign build id (`b`) anyway and
+// falls back to a document navigation.
+async function savedFlight(request) {
+  const saved = await (await caches.open(SHELL_CACHE)).match(await documentKey(request));
+  if (!saved) return null;
+  const html = await saved.text();
+  const encoder = new TextEncoder();
+  const parts = [];
+  for (const match of html.matchAll(/<script[^>]*>self\.__next_f\.push\(([\s\S]*?)\)<\/script>/g)) {
+    let entry;
+    try { entry = JSON.parse(match[1]); } catch { return null; }
+    if (entry[0] === 1) parts.push(encoder.encode(entry[1]));
+    else if (entry[0] === 3) parts.push(Uint8Array.from(atob(entry[1]), (char) => char.charCodeAt(0)));
+  }
+  if (!parts.length) return null;
+  return new Response(new Blob(parts), {
+    status: 200,
+    headers: { "Content-Type": "text/x-component", "Cache-Control": "no-store", "X-Showverse-Offline": "1" },
+  });
+}
+const isRscPrefetch = (request) => request.headers.has("Next-Router-Prefetch") || request.headers.has("Next-Router-Segment-Prefetch");
+
 async function navigation(request) {
   const generation = epoch;
   try {
@@ -442,14 +470,23 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
   if (url.pathname.startsWith("/_next/static/")) { event.respondWith(immutable(request)); return; }
   if (isRscRequest(request, url)) {
-    // A flight response is tied to a router tree, build and prefetch headers.
-    // Never replay it for a different tree. Next falls back to a full document.
+    // Network flight responses are never cached: they depend on the router tree
+    // sent by the client. Offline, a navigation (not a prefetch, whose segment
+    // format differs) is answered with the full-tree stream of the saved page.
+    // Anything else fails and Next falls back to a document navigation.
     event.respondWith((async () => {
+      const generation = epoch;
       try {
-        if (Date.now() < offlineUntil) return Response.error();
+        if (Date.now() < offlineUntil) throw new Error("offline");
         const response = await network(request);
-        return unavailable(response) ? Response.error() : response;
-      } catch { return Response.error(); }
+        if (unavailable(response)) throw new Error("origin unavailable");
+        return response;
+      } catch {
+        if (isRscPrefetch(request)) return Response.error();
+        await confirmOriginFailure();
+        const saved = generation === epoch ? await savedFlight(request).catch(() => null) : null;
+        return saved || Response.error();
+      }
     })());
     return;
   }

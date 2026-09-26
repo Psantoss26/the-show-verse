@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useServerOnline } from "@/context/ServerStatusContext";
 import { isServerReachable, reportConnection, saveOfflineRoute, workerMessage } from "@/lib/offline/client";
@@ -13,7 +13,11 @@ export default function OfflineManager() {
   const { user, hydrated } = useAuth();
   const online = useServerOnline();
   const path = usePathname();
+  const router = useRouter();
+  const routerRef = useRef(router);
   const active = useRef(null);
+
+  useEffect(() => { routerRef.current = router; }, [router]);
 
   useEffect(() => {
     if (!online || !user?.id) return;
@@ -69,9 +73,10 @@ export default function OfflineManager() {
   }, [hydrated, user?.id, user?.username, online]);
 
   useEffect(() => {
-    // Full document navigation in offline mode avoids replaying Next Flight
-    // responses produced for a different router state. Filters and local tabs
-    // remain usable; saved pages still render their original React components.
+    // Offline links only open routes with a saved copy. They go through the App
+    // Router: the worker answers with the saved page's full-tree Flight stream
+    // (never a network response recorded for another router state), so there
+    // is no document load and no browser loading bar. See openSavedRoute.
     const click = (event) => {
       if (isServerReachable() || !(event.target instanceof Element)) return;
       const control = event.target.closest('[data-online-only="true"]');
@@ -84,7 +89,7 @@ export default function OfflineManager() {
       const url = new URL(link.href);
       if (url.origin !== window.location.origin || url.pathname.startsWith("/api/") || url.href === window.location.href || (url.pathname === location.pathname && url.hash)) return;
       event.preventDefault(); event.stopImmediatePropagation();
-      void openSavedRoute(url.href);
+      void openSavedRoute(url.href, { navigate: (target) => routerRef.current.push(target) });
     };
     const submit = (event) => {
       if (!isServerReachable() && event.target?.closest('[data-online-only="true"]')) {
