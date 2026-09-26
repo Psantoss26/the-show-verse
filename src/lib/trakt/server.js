@@ -208,7 +208,35 @@ export async function exchangeCodeForTokens({ code, redirectUri }) {
   }
 }
 
-export async function refreshAccessToken(refreshToken) {
+// Trakt ROTA el refresh token: al usarlo, el anterior deja de valer. Una ficha
+// lanza a la vez muchas peticiones /api/trakt/* con la misma cookie caducada;
+// si cada una renovaba por su cuenta, la primera ganaba y las demás recibían
+// "session not found" (500), y la respuesta perdedora podía dejar en el
+// navegador un token ya invalidado. Las renovaciones simultáneas del MISMO
+// token comparten una sola petición, y su resultado se reutiliza unos minutos
+// para las peticiones que aún llegan con la cookie antigua.
+const REFRESH_REUSE_MS = 5 * 60 * 1000;
+const refreshesByToken = new Map();
+
+export function refreshAccessToken(refreshToken) {
+  const now = Date.now();
+  for (const [key, entry] of refreshesByToken) {
+    if (now - entry.at > REFRESH_REUSE_MS) refreshesByToken.delete(key);
+  }
+  const existing = refreshesByToken.get(refreshToken);
+  if (existing) return existing.promise;
+
+  const promise = requestTokenRefresh(refreshToken);
+  refreshesByToken.set(refreshToken, { promise, at: now });
+  // Un fallo transitorio (timeout, 5xx) no debe quedar memorizado: la siguiente
+  // petición tiene que poder reintentarlo.
+  promise.catch((error) => {
+    if (!error?.invalidGrant) refreshesByToken.delete(refreshToken);
+  });
+  return promise;
+}
+
+async function requestTokenRefresh(refreshToken) {
   const { clientId, clientSecret } = requireEnv();
 
   // ✅ Añadir timeout de 10 segundos para OAuth
@@ -232,9 +260,14 @@ export async function refreshAccessToken(refreshToken) {
 
     const json = await safeJson(res);
     if (!res.ok) {
-      throw new Error(
+      const error = new Error(
         json?.error_description || json?.error || "Trakt refresh failed",
       );
+      error.status = res.status;
+      // 400/401: Trakt rechaza el refresh token (revocado, ya rotado o
+      // caducado). Reintentar no sirve; la sesión de Trakt hay que rehacerla.
+      error.invalidGrant = res.status === 400 || res.status === 401;
+      throw error;
     }
 
     const createdAtSec = Number(json.created_at || 0);
@@ -1035,12 +1068,21 @@ export async function getValidTraktToken(cookieStore) {
   }
 
   // refresh
-  const refreshedTokens = await refreshAccessToken(refreshToken);
-  return {
-    token: refreshedTokens.access_token,
-    refreshedTokens,
-    shouldClear: false,
-  };
+  try {
+    const refreshedTokens = await refreshAccessToken(refreshToken);
+    return {
+      token: refreshedTokens.access_token,
+      refreshedTokens,
+      shouldClear: false,
+    };
+  } catch (error) {
+    // Refresh token rechazado: se trata como "Trakt desconectado" (401 y se
+    // borran las cookies) en vez de un 500 que se repetía en cada petición.
+    if (error?.invalidGrant) {
+      return { token: null, refreshedTokens: null, shouldClear: true };
+    }
+    throw error;
+  }
 }
 
 // ✅ Watched progress por show (episodios vistos)
