@@ -42,7 +42,13 @@ export async function prepareOfflineAccount(user, { signal, onProgress = () => {
   }
   // Confirm the account before saving any private reads or pages.
   const auth = await read("/api/auth/me");
-  if (!auth.authenticated || String(auth.user?.id) !== String(user.id)) return;
+  if (!auth.authenticated || String(auth.user?.id) !== String(user.id)) {
+    // Antes volvía en silencio y el botón «Actualizar» parecía no hacer nada.
+    // Sin sesión válida en el servidor (p. ej. caducada en este dispositivo)
+    // no se puede copiar nada: se dice.
+    window.dispatchEvent(new CustomEvent(PREPARATION_EVENT, { detail: { phase: "no-session" } }));
+    return;
+  }
   await workerMessage({ type: "OFFLINE_PREPARE_BEGIN" });
   progress("preparing");
   // Documents first. They only need HTML plus static assets, and after a deploy

@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useServerOnline } from "@/context/ServerStatusContext";
-import { isServerReachable, reportConnection, saveOfflineRoute, workerMessage } from "@/lib/offline/client";
+import { isServerReachable, PREPARATION_EVENT, reportConnection, saveOfflineRoute, workerMessage } from "@/lib/offline/client";
 import { prepareOfflineAccount } from "@/lib/offline/prepare";
 import { openSavedRoute } from "@/lib/offline/navigation";
 import { hideBrokenImages } from "@/lib/offline/brokenImages";
@@ -16,8 +16,15 @@ export default function OfflineManager() {
   const router = useRouter();
   const routerRef = useRef(router);
   const active = useRef(null);
+  // `start` del efecto de preparación, para que el botón «Actualizar» de
+  // Ajustes lo pueda lanzar al momento (ver el efecto del evento manual).
+  const startRef = useRef(null);
+  const contextRef = useRef({ hydrated, userId: user?.id, online });
 
   useEffect(() => { routerRef.current = router; }, [router]);
+  useEffect(() => {
+    contextRef.current = { hydrated, userId: user?.id, online };
+  }, [hydrated, user?.id, online]);
 
   useEffect(() => {
     if (!online || !user?.id) return;
@@ -32,10 +39,27 @@ export default function OfflineManager() {
     let timer;
     let cancelled = false;
     let refreshPending = false;
-    const start = () => {
+    const report = (detail) => window.dispatchEvent(new CustomEvent(PREPARATION_EVENT, { detail }));
+    // Las actualizaciones AUTOMÁTICAS (cambio de datos, nuevo service worker)
+    // esperan 5 s para agruparse. La MANUAL (botón «Actualizar») arranca ya y lo
+    // dice desde el primer instante: con la espera y sus salidas silenciosas,
+    // pulsarlo parecía no hacer nada.
+    const start = ({ manual = false } = {}) => {
       clearTimeout(timer);
+      if (manual && !active.current) report({ phase: "preparing", completed: 0 });
       timer = setTimeout(async () => {
-        if (cancelled || !navigator.serviceWorker.controller) return;
+        if (cancelled) return;
+        if (!navigator.serviceWorker.controller) {
+          if (!manual) return;
+          // El service worker puede no controlar aún la página (primera carga,
+          // recarga forzada): se le da un momento antes de rendirse.
+          await Promise.race([
+            new Promise((resolve) => navigator.serviceWorker.addEventListener("controllerchange", resolve, { once: true })),
+            new Promise((resolve) => setTimeout(resolve, 5000)),
+          ]);
+          if (cancelled) return;
+          if (!navigator.serviceWorker.controller) { report({ phase: "no-worker" }); return; }
+        }
         if (active.current) { refreshPending = true; return; }
         refreshPending = false;
         const controller = new AbortController();
@@ -45,32 +69,56 @@ export default function OfflineManager() {
           const result = await prepareOfflineAccount({ id: user.id, username: user.username }, { signal: controller.signal });
           if (result) localStorage.setItem(`showverse:offline:prepared:${user.id}`, JSON.stringify(result));
         } catch (error) {
-          if (!controller.signal.aborted) console.warn("No se completó la copia para consulta sin conexión", error);
+          if (!controller.signal.aborted) {
+            console.warn("No se completó la copia para consulta sin conexión", error);
+            report({ phase: "error" });
+          }
         } finally {
           if (active.current === controller) active.current = null;
           if (refreshPending && !cancelled) start();
         }
-      }, 5000);
+      }, manual ? 0 : 5000);
     };
+    startRef.current = start;
     const message = (event) => {
       if (event.data?.type === "OFFLINE_DATA_CHANGED") start();
       if (event.data?.type === "OFFLINE_STORAGE_FULL") {
         window.dispatchEvent(new CustomEvent("showverse:offline-preparation", { detail: { phase: "storage-full" } }));
       }
     };
-    navigator.serviceWorker.addEventListener("controllerchange", start);
+    const automatic = () => start();
+    navigator.serviceWorker.addEventListener("controllerchange", automatic);
     navigator.serviceWorker.addEventListener("message", message);
-    window.addEventListener("showverse:offline-prepare", start);
     start();
     return () => {
-      window.removeEventListener("showverse:offline-prepare", start);
+      if (startRef.current === start) startRef.current = null;
       cancelled = true;
       clearTimeout(timer);
       active.current?.abort();
-      navigator.serviceWorker.removeEventListener("controllerchange", start);
+      navigator.serviceWorker.removeEventListener("controllerchange", automatic);
       navigator.serviceWorker.removeEventListener("message", message);
     };
   }, [hydrated, user?.id, user?.username, online]);
+
+  // BOTÓN «ACTUALIZAR» DE AJUSTES. Se escucha SIEMPRE: antes solo había oyente
+  // cuando se cumplían todas las condiciones de la preparación, y si faltaba
+  // alguna el aviso se perdía sin más. Ahora, o arranca, o dice por qué no.
+  useEffect(() => {
+    const manual = () => {
+      if (startRef.current) { startRef.current({ manual: true }); return; }
+      const { hydrated: ready, userId, online: reachable } = contextRef.current;
+      const phase = !("serviceWorker" in navigator)
+        ? "no-worker"
+        : !reachable
+          ? "error"
+          : ready && !userId
+            ? "no-session"
+            : null;
+      if (phase) window.dispatchEvent(new CustomEvent(PREPARATION_EVENT, { detail: { phase } }));
+    };
+    window.addEventListener("showverse:offline-prepare", manual);
+    return () => window.removeEventListener("showverse:offline-prepare", manual);
+  }, []);
 
   useEffect(() => {
     // Offline links only open routes with a saved copy. They go through the App
