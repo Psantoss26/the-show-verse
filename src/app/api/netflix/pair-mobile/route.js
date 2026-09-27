@@ -20,9 +20,24 @@ export async function POST(request) {
     });
 
     if (!backend.ok) {
-      return NextResponse.json(
-        { error: backend.error || "No se pudo generar el emparejamiento." },
-        { status: backend.status || 500 },
+      // El refresco ha podido ROTAR el refresh token (el anterior solo vale
+      // 60 s): también en los errores hay que guardar el nuevo, o la sesión
+      // queda muerta en cuanto caduca el token de acceso.
+      const keepTokens = (response) =>
+        setBackendAuthCookies(response, backend, { secure: getCookieSecure(request) });
+      return keepTokens(
+        NextResponse.json(
+          {
+            // Sin sesión válida en este dispositivo (token de acceso caducado y
+            // el de refresco ya no vale): el mensaje técnico del proxy no le dice
+            // al usuario qué hacer.
+            error:
+              backend.skipped && backend.status === 401
+                ? "Tu sesión en este dispositivo ha caducado. Cierra sesión y vuelve a iniciarla para vincularlo."
+                : backend.error || "No se pudo generar el emparejamiento.",
+          },
+          { status: backend.status || 500 },
+        ),
       );
     }
 

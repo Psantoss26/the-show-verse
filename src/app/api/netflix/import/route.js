@@ -94,9 +94,16 @@ export async function POST(request) {
     });
 
     if (!backend.ok) {
-      return NextResponse.json(
-        { error: backend.error || "No se pudo importar la actividad de Netflix." },
-        { status: backend.status || 500 },
+      // El refresco ha podido ROTAR el refresh token (el anterior solo vale
+      // 60 s): también en los errores hay que guardar el nuevo, o la sesión
+      // queda muerta en cuanto caduca el token de acceso.
+      const keepTokens = (response) =>
+        setBackendAuthCookies(response, backend, { secure: getCookieSecure(request) });
+      return keepTokens(
+        NextResponse.json(
+          { error: backend.error || "No se pudo importar la actividad de Netflix." },
+          { status: backend.status || 500 },
+        ),
       );
     }
 
