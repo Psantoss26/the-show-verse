@@ -52,9 +52,14 @@ export async function GET(req) {
         `/v1/ratings?limit=${encodeURIComponent(String(limit))}`,
       );
       if (!backend.ok) {
-        return NextResponse.json(
-          { results: [], page: 1 },
-          { status: backend.status === 401 ? 401 : 200 },
+        // Guarda también aquí los tokens que el refresco haya rotado.
+        return setBackendAuthCookies(
+          NextResponse.json(
+            { results: [], page: 1 },
+            { status: backend.status === 401 ? 401 : 200 },
+          ),
+          backend,
+          secureFor(req),
         );
       }
       const res = NextResponse.json({
@@ -76,9 +81,14 @@ export async function GET(req) {
         `/v1/items/${encodeURIComponent(tmdbId)}/${mediaType}/status`,
       );
       if (!backend.ok) {
-        return NextResponse.json(
-          { found: false, rating: null },
-          { status: backend.status === 401 ? 401 : 200 },
+        // Guarda también aquí los tokens que el refresco haya rotado.
+        return setBackendAuthCookies(
+          NextResponse.json(
+            { found: false, rating: null },
+            { status: backend.status === 401 ? 401 : 200 },
+          ),
+          backend,
+          secureFor(req),
         );
       }
       const res = NextResponse.json({
@@ -101,9 +111,14 @@ export async function GET(req) {
         `/v1/ratings?type=${type}&limit=1000`,
       );
       if (!backend.ok) {
-        return NextResponse.json(
-          { found: false, rating: null },
-          { status: backend.status === 401 ? 401 : 200 },
+        // Guarda también aquí los tokens que el refresco haya rotado.
+        return setBackendAuthCookies(
+          NextResponse.json(
+            { found: false, rating: null },
+            { status: backend.status === 401 ? 401 : 200 },
+          ),
+          backend,
+          secureFor(req),
         );
       }
       const items = Array.isArray(backend.json?.results)

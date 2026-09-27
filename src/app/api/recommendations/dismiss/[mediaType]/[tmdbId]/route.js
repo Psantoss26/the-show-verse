@@ -21,15 +21,24 @@ export async function DELETE(request, { params }) {
   );
 
   if (!backend.ok) {
+    // El refresco ha podido ROTAR el refresh token (el anterior solo vale
+    // 60 s): también en los errores hay que guardar el nuevo, o la sesión
+    // queda muerta en cuanto caduca el token de acceso.
+    const keepTokens = (response) =>
+      setBackendAuthCookies(response, backend, { secure: getCookieSecure(request) });
     if (backend.status === 401 || backend.skipped) {
-      return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 },
+      return keepTokens(
+        NextResponse.json(
+          { error: "Authentication required" },
+          { status: 401 },
+        ),
       );
     }
-    return NextResponse.json(
-      { error: backend.error || "No se pudo deshacer el descarte." },
-      { status: backend.status || 503 },
+    return keepTokens(
+      NextResponse.json(
+        { error: backend.error || "No se pudo deshacer el descarte." },
+        { status: backend.status || 503 },
+      ),
     );
   }
 

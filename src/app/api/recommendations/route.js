@@ -24,19 +24,28 @@ export async function GET(request) {
   );
 
   if (!backend.ok) {
+    // El refresco ha podido ROTAR el refresh token (el anterior solo vale
+    // 60 s): también en los errores hay que guardar el nuevo, o la sesión
+    // queda muerta en cuanto caduca el token de acceso.
+    const keepTokens = (response) =>
+      setBackendAuthCookies(response, backend, { secure: getCookieSecure(request) });
     if (backend.status === 401 || backend.skipped) {
-      return NextResponse.json(
-        { authenticated: false, items: [], error: "Authentication required" },
-        { status: 401 },
+      return keepTokens(
+        NextResponse.json(
+          { authenticated: false, items: [], error: "Authentication required" },
+          { status: 401 },
+        ),
       );
     }
-    return NextResponse.json(
-      {
-        authenticated: true,
-        items: [],
-        error: backend.error || "No se pudieron cargar las recomendaciones.",
-      },
-      { status: backend.status || 503 },
+    return keepTokens(
+      NextResponse.json(
+        {
+          authenticated: true,
+          items: [],
+          error: backend.error || "No se pudieron cargar las recomendaciones.",
+        },
+        { status: backend.status || 503 },
+      ),
     );
   }
 
