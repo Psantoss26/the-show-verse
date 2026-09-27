@@ -6,6 +6,28 @@ const VERSION = new URL(self.location.href).searchParams.get("v") || "unversione
 const SHELL_CACHE = `showverse-shell-${VERSION}`;
 const ASSET_CACHE = `showverse-assets-${VERSION}`;
 const META_CACHE = "showverse-offline-meta-v1";
+// IDENTIDAD DE LA APP: manifiesto e iconos, en una caché ESTABLE (sin versión
+// de build, así que PRUNE_BUILDS no la borra).
+//
+// Antes seguían la ruta genérica: se guardaban en la caché de assets de ESE
+// build solo si el navegador los pedía online, y cada despliegue la retiraba.
+// Sin conexión, el navegador podía leer el manifiesto pero no el icono
+// `maskable`; al revisar el icono de la app instalada se quedaba con el de
+// `purpose: any` —un cuadrado negro a sangre— y el lanzador lo encogía sobre
+// una placa blanca. Se precargan al instalar el service worker, se refrescan
+// en cada petición con red y sin red salen siempre de aquí.
+const IDENTITY_CACHE = "showverse-pwa-identity-v1";
+const IDENTITY_ASSETS = [
+  "/site.webmanifest",
+  "/pwa-maskable-512.png",
+  "/pwa-icon-192.png",
+  "/pwa-icon-512.png",
+  "/pwa-icon-1024.png",
+  "/pwa-apple-icon.png",
+  "/browser-icon.png",
+  "/favicon.ico",
+];
+const isIdentityAsset = (url) => IDENTITY_ASSETS.includes(url.pathname);
 const DATA_PREFIX = "showverse-offline-data-v1-";
 const META_URL = new URL("/__offline/session", self.location.origin).href;
 const READ_POSTS = new Set(["/api/backend/items/states", "/api/imdb/ratings"]);
@@ -364,8 +386,36 @@ async function health(request) {
   } catch { await connectivity(false); return missing(); }
 }
 
+async function cacheIdentity() {
+  const cache = await caches.open(IDENTITY_CACHE);
+  await Promise.all(IDENTITY_ASSETS.map(async (path) => {
+    try {
+      const response = await fetch(path, { cache: "no-cache" });
+      if (response.ok) await cache.put(path, response);
+    } catch { /* sin red: se conserva la copia anterior */ }
+  }));
+}
+// Red primero (un icono nuevo se recoge en cuanto hay conexión) y, sin ella,
+// la copia estable. La clave es la ruta sin query: `?v=2` y similares son la
+// misma imagen.
+async function identity(request) {
+  const cache = await caches.open(IDENTITY_CACHE);
+  const key = new URL(request.url).pathname;
+  try {
+    if (Date.now() < offlineUntil) throw new Error("offline");
+    const response = await network(request);
+    if (unavailable(response)) throw new Error("origin unavailable");
+    if (response.ok) {
+      try { await cache.put(key, response.clone()); } catch { /* cuota */ }
+    }
+    return response;
+  } catch {
+    return (await cache.match(key)) || (await caches.match(request, { ignoreSearch: true })) || Response.error();
+  }
+}
+
 self.addEventListener("install", (event) => {
-  event.waitUntil(self.skipWaiting());
+  event.waitUntil(Promise.all([cacheIdentity(), self.skipWaiting()]));
 });
 self.addEventListener("activate", (event) => {
   // Do not erase private snapshots on deploy. Page preparation replaces saved
@@ -468,6 +518,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
   if (request.method !== "GET") return;
+  if (isIdentityAsset(url)) { event.respondWith(identity(request)); return; }
   if (url.pathname.startsWith("/_next/static/")) { event.respondWith(immutable(request)); return; }
   if (isRscRequest(request, url)) {
     // Network flight responses are never cached: they depend on the router tree
