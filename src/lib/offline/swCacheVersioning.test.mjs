@@ -78,3 +78,31 @@ test("los datos privados sobreviven al build y los assets solo se podan tras pre
   assert.match(source, /k !== SHELL_CACHE/);
   assert.match(source, /k !== ASSET_CACHE/);
 });
+
+// ...salvo la IDENTIDAD DE LA APP (manifiesto e iconos), que NO puede caducar.
+//
+// Iban en la caché de assets del build y cada despliegue la retiraba. Sin
+// conexión, el navegador no encontraba el icono `maskable`, se quedaba con el
+// de `purpose: any` (cuadrado negro a sangre) y el lanzador lo mostraba
+// encogido sobre una placa blanca.
+test("el manifiesto y los iconos de la PWA viven en una caché estable", async () => {
+  const source = await read("public/sw.js");
+  const manifest = JSON.parse(await read("public/site.webmanifest"));
+
+  const cacheName = /const IDENTITY_CACHE = "([^"]+)";/.exec(source)?.[1];
+  assert.ok(cacheName, "sw.js debe declarar IDENTITY_CACHE");
+  assert.doesNotMatch(cacheName, /\$\{|VERSION/, "la caché de identidad no puede llevar la versión del build");
+  assert.ok(
+    !cacheName.startsWith("showverse-shell-") && !cacheName.startsWith("showverse-assets-"),
+    "PRUNE_BUILDS borra las cachés con esos prefijos",
+  );
+
+  const assets = /const IDENTITY_ASSETS = \[([\s\S]*?)\];/.exec(source)?.[1] || "";
+  const listed = new Set([...assets.matchAll(/"([^"]+)"/g)].map((m) => m[1]));
+  assert.ok(listed.has("/site.webmanifest"), "falta el manifiesto");
+  for (const icon of manifest.icons) {
+    assert.ok(listed.has(icon.src), `falta ${icon.src} (${icon.purpose}) en IDENTITY_ASSETS`);
+  }
+  assert.match(source, /isIdentityAsset\(url\)\) \{ event\.respondWith\(identity\(request\)\)/);
+  assert.match(source, /addEventListener\("install"[\s\S]*?cacheIdentity\(\)/, "se precargan al instalar");
+});
