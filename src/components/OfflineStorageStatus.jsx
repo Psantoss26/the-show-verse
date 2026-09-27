@@ -15,7 +15,17 @@ const STATUS_TEXT = {
   preparing: { long: "Preparando la copia de tus páginas…", short: "Preparando…" },
   "storage-full": { long: "No hay espacio suficiente en el dispositivo", short: "Sin espacio" },
   partial: { long: "Copia parcial: algunos datos no estaban disponibles", short: "Copia parcial" },
+  "no-session": {
+    long: "Tu sesión ha caducado en este dispositivo: vuelve a iniciarla para actualizar la copia",
+    short: "Sesión caducada",
+  },
+  "no-worker": {
+    long: "La copia sin conexión no está disponible en este navegador ahora mismo",
+    short: "No disponible",
+  },
+  error: { long: "No se pudo actualizar la copia. Inténtalo de nuevo", short: "Error al actualizar" },
 };
+const WARNING_PHASES = new Set(["partial", "storage-full", "no-session", "no-worker", "error"]);
 
 // Fila de Ajustes con el mismo lenguaje que SettingActionRow (panel de cristal,
 // icono, título, descripción y acción a la derecha). `panelClassName` recibe la
@@ -36,7 +46,7 @@ export default function OfflineStorageStatus({ panelClassName = "" }) {
 
   const phase = state?.phase;
   const preparing = phase === "preparing";
-  const warning = phase === "partial" || phase === "storage-full";
+  const warning = WARNING_PHASES.has(phase);
   const status = STATUS_TEXT[phase] || STATUS_TEXT.idle;
   const updatedAt = state?.updatedAt && !warning && !preparing
     ? new Date(state.updatedAt).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
