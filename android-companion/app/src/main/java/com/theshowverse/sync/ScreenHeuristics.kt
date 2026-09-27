@@ -24,6 +24,15 @@ object ScreenHeuristics {
     // la nota de IMDb ("IMDb 8,1"), y el AÑO de estreno como texto suelto.
     private val IMDB_RE = Regex("^imdb\\s*\\d", RegexOption.IGNORE_CASE)
     private val YEAR_RE = Regex("^(?:19|20)\\d{2}$")
+    // Episodio con su número delante: «T1 E3 - Nombre», «E3 - Nombre», «S1:E3 …».
+    // Son las filas de la lista de episodios de la ficha (Crunchyroll, Prime) y NO
+    // son el título: antes entraban como candidatos y desplazaban al nombre de la
+    // serie fuera de los cuatro que se envían. No cuentan como señal de ficha
+    // porque las tarjetas de "Seguir viendo" de la portada los muestran igual.
+    private val EPISODE_ROW_RE = Regex(
+        "^(?:(?:t|s)\\s*\\d{1,3}\\s*[:·|,-]?\\s*)?e(?:p\\.?)?\\s*\\d{1,4}\\s*[-–—·:.|]|" +
+            "^(?:t|s)\\s*\\d{1,3}\\s*[:·|,-]?\\s*e(?:p\\.?)?\\s*\\d{1,4}\\b",
+    )
 
     /** Normaliza para comparar: minúsculas, sin puntos/puntos suspensivos finales
      *  ("Cargando…" → "cargando") ni espacios de más. */
@@ -49,7 +58,39 @@ object ScreenHeuristics {
         "settings", "configuración", "configuracion", "descargas", "downloads",
         "novedades", "explorar", "browse", "categorías", "categorias", "canales",
         "guía", "guia", "tienda", "store", "ver todo", "ver todos", "see all",
+        // Botones de icono que Crunchyroll y Prime exponen con descripción.
+        "transmitir", "enviar", "enviar a dispositivo", "cast", "chromecast",
+        "google cast", "notificaciones", "notifications", "más", "mas", "more",
+        "filtrar", "filter", "ordenar", "sort", "mostrar más", "mostrar mas",
+        "show more", "leer más", "leer mas", "read more", "ver menos", "show less",
+        "premium", "hazte premium", "prueba gratis", "prueba gratuita",
+        "free trial", "suscribirse", "subscribe", "mi perfil", "my profile",
     )
+
+    // Géneros y etiquetas de idioma que las fichas pintan como texto suelto o en
+    // lista («Acción, Aventura, Fantasía», «Sub | Dob»). Buscarlos en TMDb devuelve
+    // un título real sin relación con la ficha. No son señal de ficha: las tarjetas
+    // de la portada de Crunchyroll también los llevan.
+    private val GENRES = setOf(
+        "acción", "accion", "aventura", "animación", "animacion", "anime", "comedia",
+        "drama", "fantasía", "fantasia", "ciencia ficción", "ciencia ficcion",
+        "romance", "terror", "suspense", "suspenso", "thriller", "misterio",
+        "documental", "crimen", "familia", "música", "musica", "musical",
+        "deportes", "sobrenatural", "histórico", "historico", "bélico", "belico",
+        "western", "infantil", "shonen", "shōnen", "seinen", "shojo", "shōjo",
+        "josei", "isekai", "mecha", "slice of life", "recuentos de la vida",
+        "action", "adventure", "animation", "comedy", "fantasy", "sci-fi",
+        "science fiction", "horror", "mystery", "crime", "family", "music",
+        "sports", "supernatural", "historical", "kids", "psicológico", "psicologico",
+        "sub", "dob", "dub", "subtitulado", "doblado", "subbed", "dubbed",
+    )
+    private val LIST_SEPARATORS = Regex("\\s*[,·•|/]\\s*")
+
+    /** ¿Es un género o una lista de géneros/idiomas? («Acción, Aventura», «Sub | Dob»). */
+    private fun isGenreList(text: String): Boolean {
+        val parts = text.lowercase().split(LIST_SEPARATORS).map { it.trim() }.filter { it.isNotEmpty() }
+        return parts.isNotEmpty() && parts.all { it in GENRES }
+    }
 
     // Nombres de plataforma "a secas": nunca son un título de contenido (buscarlos
     // en TMDb devolvería basura tipo "Netflix Tudum"). Mismo criterio que el backend
@@ -69,11 +110,16 @@ object ScreenHeuristics {
         "seguir viendo", "keep watching", "ver de nuevo", "watch now", "mira ahora",
         "empezar", "reproducir desde el principio", "start over", "restart",
         "empezar de nuevo", "reproduzir", "assistir", "assistir agora",
+        "comenzar a ver", "empezar a ver", "start watching", "ver desde el principio",
+        "watch from the beginning",
     )
     private val PLAY_PREFIXES = setOf(
         "reproducir", "reanudar", "ver t", "ver s", "ver ep", "ver ahora",
         "play s", "play e", "play t", "watch ", "continuar", "resume ",
         "seguir viendo", "reproduzir",
+        // Crunchyroll: «Empezar a ver T1 E1», «Comenzar a ver…», «Continue watching S1 E3».
+        "empezar a ver", "comenzar a ver", "start watching", "continue watching",
+        "keep watching", "ver episodio", "ver película", "ver pelicula",
     )
 
     /** ¿El texto es la etiqueta de un botón de reproducir? (multi-idioma/plataforma). */
@@ -111,6 +157,12 @@ object ScreenHeuristics {
         "herunterladen", "episoden", "staffeln",
         "episodi", "stagioni", "guarda il trailer",
         "baixar", "episódios", "temporadas",
+        // Señales de la FICHA de Crunchyroll.
+        "crunchylista", "crunchylist", "añadir a crunchylista", "agregar a crunchylista",
+        "add to crunchylist", "lista de seguimiento", "añadir a la lista de seguimiento",
+        "agregar a la lista de seguimiento", "quitar de la lista de seguimiento",
+        "más detalles", "mas detalles", "more details",
+        "versiones", "versions", "más episodios", "mas episodios",
     )
     private val DETAIL_PREFIXES = setOf(
         "temporada", "season", "episodio", "episode", "capítulo", "capitulo",
@@ -172,6 +224,8 @@ object ScreenHeuristics {
         if (t.split(WHITESPACE).size > 10) return false // parece sinopsis
         if (!t.any { it.isLetter() }) return false
         if (isPlayLabel(t) || isDetailSignal(t)) return false
+        if (EPISODE_ROW_RE.containsMatchIn(l)) return false // fila de episodio
+        if (isGenreList(t)) return false                     // «Acción, Aventura»
         return true
     }
 

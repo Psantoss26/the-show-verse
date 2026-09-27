@@ -51,6 +51,11 @@ class MediaListenerService : NotificationListenerService() {
     // no puede leerse, y al encadenar con otro contenido. Ver PuntoDeReproduccion:
     // van juntos a propósito.
     private val puntos = PuntoDeReproduccion()
+    // Prime Video / Crunchyroll: posición leída en el reproductor en pantalla y,
+    // por paquete, qué contenido dice la SESIÓN que suena y desde cuándo valen las
+    // lecturas del reproductor para él (ver lecturaDelReproductor).
+    private val playerClock = PlayerClock()
+    private val sessionContent = HashMap<String, Pair<String, Long>>()
 
     private val sessionsListener =
         MediaSessionManager.OnActiveSessionsChangedListener { _ ->
@@ -167,6 +172,8 @@ class MediaListenerService : NotificationListenerService() {
                 lastKeyByPackage.remove(pkg)
                 lastSignals.remove(pkg)
                 puntos.olvidar(pkg)
+                sessionContent.remove(pkg)
+                playerClock.forget(pkg)
                 continue
             }
             playingNow.add(pkg)
@@ -184,6 +191,9 @@ class MediaListenerService : NotificationListenerService() {
             lastObservationAt.remove(pkg)
             lastSignals.remove(pkg)
             playingSince.remove(pkg)
+            // El reloj del reproductor no avanza en pausa; su lectura y el contenido
+            // de la sesión se conservan por si se reanuda (ver sessionContent).
+            playerClock.pause(pkg)
             stoppedAt[pkg] = SystemClock.elapsedRealtime()
             loggedNotes.removeAll { it.endsWith(":$pkg") }
             // Al parar, olvidamos la resolución y la clave: si se reanuda el mismo
@@ -213,6 +223,9 @@ class MediaListenerService : NotificationListenerService() {
             val parado = stoppedAt.remove(pkg)
             if (parado == null || now - parado > SESSION_GAP_MS || sessionStart[pkg] == null) {
                 sessionStart[pkg] = now
+                // Sesión nueva: lo leído en el reproductor antes ya no es de esto.
+                sessionContent.remove(pkg)
+                playerClock.forget(pkg)
             }
             now
         }
@@ -220,25 +233,8 @@ class MediaListenerService : NotificationListenerService() {
         if (now - since < MIN_WATCH_MS) return // aún no lleva 15s reproduciendo
 
         val md = controller.metadata
-        // Posición REAL o, si la app no la publica, ESTIMADA por reloj desde que
-        // empezamos a mirar. La estimación sirve para que el título aparezca en
-        // "Continuar viendo", pero se marca como tal: no vale para dar nada por
-        // visto ni para pisar una posición mejor (ver `estimatedPosition`).
-        val realPosMs = livePositionMs(controller)
-        val posMs = realPosMs ?: (now - since).coerceAtLeast(0L)
-        val posicionEstimada = realPosMs == null
-        if (posicionEstimada) {
-            noteOnce(
-                "nopos:$pkg",
-                "${Platforms.nameFor(pkg)} no publica la posición: se estima para " +
-                    "Continuar viendo, pero no se marcará como visto",
-            )
-        }
-        // OJO: el punto de este paquete NO se escribe aquí. Hasta que se vuelque el
-        // contenido anterior (más abajo), la caché sigue siendo SUYA y no puede
-        // pisarse con lo que acaba de empezar a sonar.
         val notif = notifExtrasFor(pkg)
-        val raw = RawMetadata(
+        val rawSesion = RawMetadata(
             packageName = pkg,
             title = md?.getString(MediaMetadata.METADATA_KEY_TITLE),
             artist = md?.getString(MediaMetadata.METADATA_KEY_ARTIST),
@@ -254,6 +250,41 @@ class MediaListenerService : NotificationListenerService() {
             artUri = md?.getString(MediaMetadata.METADATA_KEY_ART_URI)
                 ?: md?.getString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI),
             durationMs = md?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L,
+        )
+        val lectura = lecturaDelReproductor(pkg, rawSesion, session, now)
+
+        // Posición REAL o, si la app no la publica, la del reproductor en pantalla
+        // (Prime Video, Crunchyroll) o, en último caso, ESTIMADA por reloj desde que
+        // empezamos a mirar. La estimación sirve para que el título aparezca en
+        // "Continuar viendo", pero se marca como tal: no vale para dar nada por
+        // visto ni para pisar una posición mejor (ver `estimatedPosition`). La del
+        // reproductor no es una estimación: es lo que marcaba su barra, avanzado con
+        // el tiempo que lleva sonando.
+        val realPosMs = livePositionMs(controller)
+        val pantallaPosMs = if (lectura != null) playerClock.positionMs(pkg, lectura, now, since) else null
+        val posMs = realPosMs ?: pantallaPosMs ?: (now - since).coerceAtLeast(0L)
+        val posicionEstimada = realPosMs == null && pantallaPosMs == null
+        if (realPosMs == null && pantallaPosMs != null) {
+            noteOnce(
+                "screenpos:$pkg",
+                "${Platforms.nameFor(pkg)} no publica la posición: se toma la del reproductor en pantalla",
+            )
+        }
+        if (posicionEstimada) {
+            noteOnce(
+                "nopos:$pkg",
+                "${Platforms.nameFor(pkg)} no publica la posición: se estima para " +
+                    "Continuar viendo, pero no se marcará como visto",
+            )
+        }
+        // OJO: el punto de este paquete NO se escribe aquí. Hasta que se vuelque el
+        // contenido anterior (más abajo), la caché sigue siendo SUYA y no puede
+        // pisarse con lo que acaba de empezar a sonar.
+        val raw = rawSesion.copy(
+            // Sin duración en la sesión, la del reproductor en pantalla (si la hay).
+            durationMs = rawSesion.durationMs.takeIf { it > 0 }
+                ?: lectura?.durationSec?.let { it * 1000 }
+                ?: 0L,
             positionMs = posMs,
         )
 
@@ -290,7 +321,18 @@ class MediaListenerService : NotificationListenerService() {
         val sinPista = SignalBuilder.build(raw, Platforms.nameFor(pkg))
         val episodeKey = HintFreshness.episodeKey(sinPista.episodeName, sinPista.season, sinPista.episode)
         val hintShowName = RecentDetail.showNameFor(pkg, session, episodeKey)
-        val built = if (hintShowName == null) sinPista else SignalBuilder.build(raw, Platforms.nameFor(pkg), hintShowName)
+        val conPista = if (hintShowName == null) sinPista else SignalBuilder.build(raw, Platforms.nameFor(pkg), hintShowName)
+        // Lo que muestra el reproductor (Prime Video, Crunchyroll) describe lo que
+        // suena AHORA: completa la serie y los números que la sesión no da, y gana a
+        // la pista de una ficha vista antes. Ver PlayerScreen.merge.
+        val built = PlayerScreen.merge(conPista, lectura)
+        if (built !== conPista && built.showName != conPista.showName) {
+            noteOnce(
+                "screenid:$pkg:${built.showName}:${built.season}:${built.episode}",
+                "${Platforms.nameFor(pkg)}: serie tomada del reproductor en pantalla → " +
+                    "«${built.showName}» T${built.season ?: "?"}:E${built.episode ?: "?"}",
+            )
+        }
         // Episodio sin serie conocida: se adjuntan los textos que la accesibilidad
         // ha visto en la pantalla de la app desde poco antes de empezar (la barra
         // del reproductor suele nombrar la serie). El servidor decide con doble
@@ -399,12 +441,12 @@ class MediaListenerService : NotificationListenerService() {
                     }
                 } else if (unresolvable && signal.seriesFromHint) {
                     // El servidor comprobó el episodio contra la serie de la ficha
-                    // abierta antes y no casa: esa ficha era de OTRO título. No se
-                    // registra nada en vez de guardar una serie ajena.
+                    // abierta antes (o la leída en el reproductor) y no casa: era de
+                    // OTRO título. No se registra nada en vez de guardar una serie ajena.
                     noteOnce(
                         "hintmismatch:$pkg:${signal.showName}",
                         "${Platforms.nameFor(pkg)}: lo que suena no es de «${signal.showName}» " +
-                            "(la ficha abierta antes). No se registra.",
+                            "(ficha abierta antes o texto del reproductor). No se registra.",
                     )
                 } else if (unresolvable && signal.episode != null && signal.showName == null) {
                     // CAUSA CONCRETA, no un error genérico. Aquí se sabe que es un
@@ -425,6 +467,32 @@ class MediaListenerService : NotificationListenerService() {
                 }
             }
         }
+    }
+
+    /**
+     * Lectura del reproductor en pantalla que vale para lo que suena en [pkg], o
+     * null. Solo en las apps que la necesitan (Platforms.readsPlayerScreen).
+     *
+     * Una lectura vale para el contenido en curso si se tomó después de que
+     * empezara: desde poco antes de la sesión de reproducción (los controles se ven
+     * al arrancar, a veces antes de que la sesión pase a "reproduciendo") o, si la
+     * sesión ha cambiado de contenido (el siguiente episodio que arranca solo),
+     * desde ese cambio. Así la lectura del episodio anterior no se atribuye al nuevo.
+     */
+    private fun lecturaDelReproductor(pkg: String, rawSesion: RawMetadata, session: Long, now: Long): PlayerReading? {
+        if (!Platforms.readsPlayerScreen(pkg)) return null
+        val clave = SignalBuilder.build(rawSesion, Platforms.nameFor(pkg)).dedupKey
+        val previo = sessionContent[pkg]
+        val desde = when {
+            previo == null -> session - PLAYER_READING_BEFORE_SESSION_MS
+            previo.first != clave -> {
+                playerClock.forget(pkg)
+                now - PLAYER_READING_KEY_CHANGE_MS
+            }
+            else -> previo.second
+        }
+        sessionContent[pkg] = clave to desde
+        return PlayerScreenCache.latest(pkg, desde, now)
     }
 
     // Posición VIVA de la reproducción, o null si la app NO la publica.
@@ -587,6 +655,8 @@ class MediaListenerService : NotificationListenerService() {
         private const val MIN_WATCH_MS = 15_000L
         private const val PROGRESS_PING_MS = 30_000L
         private const val SCREEN_TEXTS_BEFORE_PLAY_MS = 60_000L
+        private const val PLAYER_READING_BEFORE_SESSION_MS = 60_000L
+        private const val PLAYER_READING_KEY_CHANGE_MS = 5_000L
         // Un corte más corto que esto no empieza una sesión nueva (ver sessionStart).
         private const val SESSION_GAP_MS = 5 * 60 * 1000L
     }

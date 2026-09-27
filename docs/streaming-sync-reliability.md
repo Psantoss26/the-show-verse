@@ -53,6 +53,40 @@ ningún nombre de película trae. Y cuando el reproductor da los dos números, m
 sobre el rastreo genérico del DOM, que recorre toda la página y puede haber cogido
 el badge de una fila de recomendaciones.
 
+## Prime Video y Crunchyroll en la app Android
+
+Estas dos apps no publican en su MediaSession de qué serie es el episodio (a veces
+ni su número) y no siempre publican la posición. Sin serie, el servidor no resolvía
+nada o resolvía un título ajeno; sin posición, solo se podía estimar por reloj, y
+una posición estimada nunca marca un episodio como visto.
+
+Su reproductor sí lo muestra cada vez que aparecen los controles: la serie, debajo
+«T1 E3 · Nombre del episodio» y el tiempo junto a la barra de avance. El servicio
+de accesibilidad lo lee (`PlayerScreen`, recorrido en orden de lectura) y lo deja en
+`PlayerScreenCache`. `MediaListenerService` lo combina con la sesión:
+
+- **Identidad.** La serie del reproductor completa lo que la sesión no dice y gana a
+  la pista de una ficha vista antes, pero nunca a la serie que da la propia sesión.
+  Si la lectura contradice a la sesión (otro número u otro nombre de episodio), es
+  de otro contenido y se ignora. Solo valen lecturas tomadas desde poco antes de la
+  sesión de reproducción o, tras un cambio de contenido, desde ese cambio. Viaja
+  como `seriesFromHint`, así que el servidor comprueba que el episodio es de esa
+  serie y no le da confianza máxima.
+- **Posición.** Si la sesión no la publica, se toma la de la pantalla y se avanza con
+  el tiempo que la sesión pasa reproduciendo (no durante las pausas). No se marca como
+  estimada, así que sí puede completar el visionado al 90%.
+- **Ficha.** En la pantalla del reproductor no se busca ficha: el botón de reproducir
+  de los controles en pausa la hacía pasar por una. Se reconocen los botones de
+  Crunchyroll («Empezar a ver T1 E1», «Continue watching S1 E3», «Crunchylista»…), y
+  las filas de episodios, los géneros y los botones de Cast ya no se toman por el
+  título. Crunchyroll analiza todas sus ventanas, como Prime Video.
+
+La lectura del reproductor solo se aplica a estas dos apps. Las mejoras de la
+detección de fichas (botones, filas de episodios, géneros) y el tope de espera del
+servicio de accesibilidad (antes, una pantalla que cambia sin parar no llegaba a
+leerse nunca) valen para todas. Con el indicador desactivado, la accesibilidad sigue
+leyendo Prime Video y Crunchyroll porque alimenta la sincronización; no notifica nada.
+
 ## Flujo
 
 1. El reproductor aporta título, episodio y posición; el servidor resuelve TMDb.
