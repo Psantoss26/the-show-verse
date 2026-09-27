@@ -25,7 +25,13 @@ class AccessibilityStreamingService : AccessibilityService() {
     private var lastAt = 0L
     private var lastDiagText: String? = null
     private var pendingPkg: String? = null
-    private val resolveRunnable = Runnable { processCurrent() }
+    // Desde cuándo hay un procesado pendiente (ver MAX_WAIT_MS).
+    private var pendingSince = 0L
+    private var lastPlayerLog: String? = null
+    private val resolveRunnable = Runnable {
+        pendingSince = 0L
+        processCurrent()
+    }
 
     override fun onServiceConnected() {
         prefs = Prefs(this)
@@ -43,14 +49,28 @@ class AccessibilityStreamingService : AccessibilityService() {
         ) return
         val pkg = e.packageName?.toString() ?: return
         if (!Platforms.KNOWN.containsKey(pkg)) return
-        if (p.paused || !p.indicatorEnabled || !p.a11yEnabled || !p.isPaired()) return
+        if (p.paused || !p.a11yEnabled || !p.isPaired()) return
+        // En Prime Video y Crunchyroll la lectura de la pantalla también alimenta la
+        // sincronización (serie, episodio y tiempo del reproductor), no solo el
+        // acceso rápido: no depende del indicador, que QuickAccessNotifier ya
+        // comprueba antes de notificar nada.
+        if (!p.indicatorEnabled && !Platforms.readsPlayerScreen(pkg)) return
         if (!p.isEnabled(pkg)) return
 
         // Debounce: procesa la pantalla ESTABLE tras un breve silencio (evita
-        // resolver en cada micro-cambio mientras se compone la ficha).
+        // resolver en cada micro-cambio mientras se compone la ficha). Con tope: el
+        // reproductor cambia sin parar (el tiempo, la barra de avance) y, sin él, el
+        // silencio no llegaba nunca y su pantalla no se leía.
+        val now = SystemClock.elapsedRealtime()
+        if (pendingPkg != pkg) pendingSince = 0L
         pendingPkg = pkg
+        if (pendingSince == 0L) pendingSince = now
         handler.removeCallbacks(resolveRunnable)
-        handler.postDelayed(resolveRunnable, DEBOUNCE_MS)
+        if (now - pendingSince >= MAX_WAIT_MS) {
+            handler.post(resolveRunnable)
+        } else {
+            handler.postDelayed(resolveRunnable, DEBOUNCE_MS)
+        }
     }
 
     private fun processCurrent() {
@@ -64,6 +84,11 @@ class AccessibilityStreamingService : AccessibilityService() {
         // ventana") o la pantalla de recientes → 0 señales → no reconocía nada.
         val roots = candidateRoots(pkg)
         if (roots.isEmpty()) return
+
+        // Prime Video y Crunchyroll: si la pantalla es su REPRODUCTOR, se lee (serie,
+        // episodio, tiempo) para la sincronización y no se trata como una ficha: el
+        // botón de reproducir de los controles en pausa la hacía pasar por una.
+        if (Platforms.readsPlayerScreen(pkg) && readPlayerScreen(p, pkg, roots)) return
 
         var best: ScreenAnalysis? = null
         val scan = if (isPrime(pkg)) StringBuilder() else null
@@ -246,15 +271,74 @@ class AccessibilityStreamingService : AccessibilityService() {
 
     private fun isPrime(pkg: String): Boolean = Platforms.nameFor(pkg) == "Prime Video"
 
+    /**
+     * Busca el reproductor en [roots] y, si está, guarda su lectura para
+     * MediaListenerService. Devuelve true si la pantalla ERA un reproductor.
+     */
+    private fun readPlayerScreen(p: Prefs, pkg: String, roots: List<AccessibilityNodeInfo>): Boolean {
+        val now = SystemClock.elapsedRealtime()
+        for (root in roots) {
+            val (texts, seek) = playerTexts(root)
+            val reading = PlayerScreen.parse(texts, seek, now) ?: continue
+            PlayerScreenCache.record(pkg, reading)
+            // Los títulos del reproductor siguen sirviendo de último recurso (ScreenTexts).
+            ScreenTexts.record(pkg, texts.filter { ScreenHeuristics.isLikelyTitle(it) }.take(MAX_CANDIDATES))
+            if (reading.hasIdentity) {
+                val desc = "«${reading.seriesTitle ?: "?"}» T${reading.season ?: "?"}:E${reading.episode ?: "?"}" +
+                    (reading.episodeName?.let { " «$it»" } ?: "")
+                if (desc != lastPlayerLog) {
+                    lastPlayerLog = desc
+                    p.addLog("Reproductor ${Platforms.nameFor(pkg)} en pantalla: $desc")
+                }
+            }
+            return true
+        }
+        return false
+    }
+
+    /**
+     * Textos del árbol en ORDEN DE LECTURA (en profundidad: el título del
+     * reproductor va justo antes que su línea de episodio, cosa que el recorrido
+     * en anchura de analyzeScreen no respeta) y el avance de la barra (0..1).
+     */
+    private fun playerTexts(root: AccessibilityNodeInfo): Pair<List<String>, Double?> {
+        val texts = ArrayList<String>()
+        var seek: Double? = null
+        val stack = ArrayDeque<AccessibilityNodeInfo>()
+        stack.addLast(root)
+        var visited = 0
+        while (stack.isNotEmpty() && visited < MAX_NODES) {
+            val node = stack.removeLast()
+            visited++
+            val isSeekBar = node.className?.toString()?.endsWith("SeekBar") == true
+            if (isSeekBar && seek == null) {
+                node.rangeInfo?.let { r ->
+                    val span = r.max - r.min
+                    if (span > 0f) seek = ((r.current - r.min) / span).toDouble().coerceIn(0.0, 1.0)
+                }
+            }
+            val raw = (node.text ?: node.contentDescription)?.toString()?.trim()
+            if (!raw.isNullOrBlank() && raw != texts.lastOrNull()) texts.add(raw)
+            if (isSeekBar && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                node.stateDescription?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.let { texts.add(it) }
+            }
+            for (i in node.childCount - 1 downTo 0) {
+                node.getChild(i)?.let { stack.addLast(it) }
+            }
+        }
+        return texts to seek
+    }
+
     // Ventanas a analizar. Para el resto de plataformas: solo la ventana activa
-    // (rootInActiveWindow), sin cambios. En Prime se consideran TODAS las ventanas de
-    // aplicación DE PRIME (filtradas por paquete: excluye recientes, gestor de
+    // (rootInActiveWindow), sin cambios. En Prime (y Crunchyroll, cuyo reproductor y
+    // controles de Cast también abren ventanas propias) se consideran TODAS las
+    // ventanas de aplicación DE ESA APP (filtradas por paquete: excluye recientes, gestor de
     // archivos, overlays del sistema como "Controlador de ventana"…), porque la
     // ventana activa/superior no siempre es la ficha; luego processCurrent elige la
     // que más parece una ficha. Requiere `flagRetrieveInteractiveWindows` en la config.
     private fun candidateRoots(pkg: String): List<AccessibilityNodeInfo> {
         val active = rootInActiveWindow
-        if (!isPrime(pkg)) return listOfNotNull(active)
+        if (!Platforms.readsPlayerScreen(pkg)) return listOfNotNull(active)
         val wins = try { windows } catch (e: Exception) { null } ?: return listOfNotNull(active)
         val primeRoots = wins.asSequence()
             .filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
@@ -267,6 +351,7 @@ class AccessibilityStreamingService : AccessibilityService() {
 
     companion object {
         private const val DEBOUNCE_MS = 700L
+        private const val MAX_WAIT_MS = 2_500L
         private const val DEDUP_MS = 60_000L
         // 1600 (antes 900): las fichas de Prime son árboles muy poblados y las
         // señales de detalle (watchlist, IMDb, calidad…) quedaban fuera de la poda

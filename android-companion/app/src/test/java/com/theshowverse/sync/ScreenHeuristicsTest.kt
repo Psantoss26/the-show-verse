@@ -136,4 +136,38 @@ class ScreenHeuristicsTest {
         // Empate total: no es estrictamente mejor.
         assertFalse(ScreenHeuristics.isBetterDetail(true, 3, 2, true, 3, 2))
     }
+
+    @Test
+    fun crunchyrollDetailPlayButtonsAreRecognized() {
+        assertTrue(ScreenHeuristics.isPlayLabel("EMPEZAR A VER T1 E1"))
+        assertTrue(ScreenHeuristics.isPlayLabel("Comenzar a ver T1 E1"))
+        assertTrue(ScreenHeuristics.isPlayLabel("CONTINUAR VIENDO T1 E5"))
+        assertTrue(ScreenHeuristics.isPlayLabel("Start watching S1 E1"))
+        assertTrue(ScreenHeuristics.isPlayLabel("Continue watching S1 E3"))
+        assertTrue(ScreenHeuristics.isDetailSignal("Añadir a Crunchylista"))
+        assertTrue(ScreenHeuristics.isDetailSignal("Lista de seguimiento"))
+    }
+
+    @Test
+    fun episodeRowsGenresAndCastButtonsAreNotTitles() {
+        // Filas de la lista de episodios: ni título ni señal de ficha (la portada
+        // de Crunchyroll las muestra en "Seguir viendo").
+        assertFalse(ScreenHeuristics.isLikelyTitle("T1 E3 - El fin del viaje"))
+        assertFalse(ScreenHeuristics.isLikelyTitle("E12 - La promesa"))
+        assertFalse(ScreenHeuristics.isLikelyTitle("S1:E3 Pilot"))
+        assertFalse(ScreenHeuristics.isDetailSignal("E12 - La promesa"))
+        // Géneros e idiomas.
+        assertFalse(ScreenHeuristics.isLikelyTitle("Acción, Aventura, Fantasía"))
+        assertFalse(ScreenHeuristics.isLikelyTitle("Sub | Dob"))
+        assertFalse(ScreenHeuristics.isLikelyTitle("Anime"))
+        assertFalse(ScreenHeuristics.isDetailSignal("Sub | Dob"))
+        // Botones de icono.
+        assertFalse(ScreenHeuristics.isLikelyTitle("Transmitir"))
+        assertFalse(ScreenHeuristics.isLikelyTitle("Chromecast"))
+        // Títulos de verdad siguen pasando, aunque empiecen por S o T y un número.
+        assertTrue(ScreenHeuristics.isLikelyTitle("Frieren"))
+        assertTrue(ScreenHeuristics.isLikelyTitle("Se7en"))
+        assertTrue(ScreenHeuristics.isLikelyTitle("T2 Trainspotting"))
+        assertTrue(ScreenHeuristics.isLikelyTitle("Dan Da Dan"))
+    }
 }

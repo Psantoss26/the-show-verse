@@ -54,6 +54,15 @@ object Platforms {
     /** Nombre legible: el conocido, o el propio paquete si es una app añadida. */
     fun nameFor(pkg: String): String = KNOWN[pkg] ?: pkg
 
+    /**
+     * Apps cuyo REPRODUCTOR se lee en pantalla (ver PlayerScreen) porque su
+     * MediaSession no dice de qué serie es el episodio ni, a veces, por dónde va.
+     * El resto sigue exactamente como estaba.
+     */
+    private val PLAYER_SCREEN_PLATFORMS = setOf("Prime Video", "Crunchyroll")
+
+    fun readsPlayerScreen(pkg: String): Boolean = KNOWN[pkg] in PLAYER_SCREEN_PLATFORMS
+
     /** Id de plataforma corto para logs/UI. */
     fun idFor(pkg: String): String {
         KNOWN[pkg]?.let { return it.lowercase().replace(Regex("[^a-z0-9]+"), "") }
