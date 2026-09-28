@@ -3,6 +3,7 @@
 
 import OptimizedImage from "@/components/OptimizedImage";
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import {
   useEffect,
   useMemo,
@@ -92,24 +93,27 @@ const LIST_SOURCE_OPTIONS = [
   { value: "collections", label: "Colecciones", Icon: Layers },
 ];
 
+// `borderColor` es el anillo al pasar el ratón por un cartel: casi opaco, como
+// el de ListPosterCard. Con transparencia se mezclaba con carteles claros y se
+// leía blanco en vez del color de la página.
 const LIST_ROW_ACCENTS = {
   personal: {
-    borderColor: "rgba(168, 85, 247, 0.44)",
+    borderColor: "rgba(168, 85, 247, 0.92)",
     shadowColor: "168, 85, 247",
     textClass: "text-purple-400",
   },
   trakt: {
-    borderColor: "rgba(168, 85, 247, 0.44)",
+    borderColor: "rgba(168, 85, 247, 0.92)",
     shadowColor: "168, 85, 247",
     textClass: "text-purple-400",
   },
   collections: {
-    borderColor: "rgba(234, 179, 8, 0.44)",
+    borderColor: "rgba(234, 179, 8, 0.92)",
     shadowColor: "234, 179, 8",
     textClass: "text-yellow-400",
   },
   default: {
-    borderColor: "rgba(168, 85, 247, 0.44)",
+    borderColor: "rgba(168, 85, 247, 0.92)",
     shadowColor: "168, 85, 247",
     textClass: "text-purple-400",
   },
@@ -484,42 +488,82 @@ function ListsSourceSelector({ source, onChange, className = "" }) {
 
 function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
   const [open, setOpen] = useState(false);
-  const [menuMaxHeight, setMenuMaxHeight] = useState(448);
   const ref = useRef(null);
+  const buttonRef = useRef(null);
+  const menuRef = useRef(null);
+  const [menuStyle, setMenuStyle] = useState(null);
+
+  // EL MENÚ VA EN UN PORTAL, con posición fija calculada ANTES de pintarlo:
+  // la misma capa que los selectores de Favoritas y del detalle de una lista.
+  //
+  // Antes iba dentro de la barra de herramientas y parpadeaba al abrir y al
+  // cerrar (verificado fotograma a fotograma en Chromium):
+  //   - La barra lleva su propio `backdrop-blur`, y un desenfoque dentro de otro
+  //     no se compone mientras dura la animación: el menú salía sin blur, con el
+  //     cartel de detrás nítido, y el desenfoque entraba de golpe al final.
+  //   - Al cerrar, su contenedor bajaba de `z-[99999]` a `z-10` en el acto, con
+  //     la salida aún animándose: el menú se hundía entre las tarjetas.
+  //   - Se pintaba con 448px de alto máximo y un fotograma después se recortaba
+  //     al hueco real, con un salto de tamaño al aparecer.
+  const updateMenuPosition = useCallback(() => {
+    if (!buttonRef.current || typeof window === "undefined") return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    const menuMaxWidth = window.innerWidth - 24;
+    // Ancho real del menú ya pintado (en la primera llamada aún no existe).
+    const measured = menuRef.current?.offsetWidth || rect.width;
+    const left = Math.min(
+      Math.max(12, rect.left),
+      Math.max(12, window.innerWidth - Math.min(measured, menuMaxWidth) - 12),
+    );
+    const availableBelow = window.innerHeight - rect.bottom - 12;
+
+    setMenuStyle({
+      position: "fixed",
+      top: rect.bottom + 8,
+      left,
+      width: "max-content",
+      minWidth: rect.width,
+      maxWidth: menuMaxWidth,
+      maxHeight: Math.max(64, Math.min(448, availableBelow)),
+      zIndex: 1000,
+    });
+  }, []);
 
   useEffect(() => {
-    if (!open) return;
-    const onDown = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    if (!open) return undefined;
+    const onPointerDown = (event) => {
+      const target = event.target;
+      if (ref.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
     };
-    const updateMenuSize = () => {
-      if (!ref.current) return;
-      const rect = ref.current.getBoundingClientRect();
-      const availableBelow = window.innerHeight - rect.bottom - 12;
-      setMenuMaxHeight(Math.max(64, Math.min(448, availableBelow)));
-    };
-
-    updateMenuSize();
-    const frame = window.requestAnimationFrame(updateMenuSize);
-    document.addEventListener("pointerdown", onDown);
-    window.addEventListener("resize", updateMenuSize);
-    window.addEventListener("scroll", updateMenuSize, true);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      document.removeEventListener("pointerdown", onDown);
-      window.removeEventListener("resize", updateMenuSize);
-      window.removeEventListener("scroll", updateMenuSize, true);
-    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return undefined;
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
+    return () => {
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
+  }, [open, updateMenuPosition]);
+
+  const toggle = () => {
+    // La posición se calcula en el mismo gesto: el menú nace ya en su sitio y
+    // con su alto final, sin un fotograma intermedio.
+    if (!open) updateMenuPosition();
+    setOpen((v) => !v);
+  };
+
   return (
-    <div
-      ref={ref}
-      className={`relative min-w-0 w-full lg:w-auto lg:shrink ${open ? "z-[99999]" : "z-10"}`}
-    >
+    <div ref={ref} className="relative min-w-0 w-full lg:w-auto lg:shrink">
       <button
+        ref={buttonRef}
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggle}
+        aria-expanded={open}
         className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-2xl transition text-sm lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 focus:outline-none"
       >
         <div className="flex min-w-0 items-center gap-2">
@@ -536,26 +580,32 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
         />
       </button>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            className="absolute left-0 top-full z-[100] mt-2 max-h-[min(70vh,28rem)] w-full overflow-y-auto overflow-x-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl [scrollbar-color:#3f3f46_transparent]"
-            style={{
-              maxHeight: `${menuMaxHeight}px`,
-              scrollbarWidth: "thin",
-              scrollbarGutter: "stable",
-              overscrollBehavior: "contain",
-            }}
-          >
-            <div className="space-y-1">
-              {children({ close: () => setOpen(false) })}
-            </div>
-          </motion.div>
+      {typeof document !== "undefined" &&
+        createPortal(
+          <AnimatePresence>
+            {open && menuStyle && (
+              <motion.div
+                ref={menuRef}
+                initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                transition={{ duration: 0.16, ease: "easeOut" }}
+                className="overflow-y-auto overflow-x-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl [scrollbar-color:#3f3f46_transparent]"
+                style={{
+                  ...menuStyle,
+                  scrollbarWidth: "thin",
+                  scrollbarGutter: "stable",
+                  overscrollBehavior: "contain",
+                }}
+              >
+                <div className="space-y-1">
+                  {children({ close: () => setOpen(false) })}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body,
         )}
-      </AnimatePresence>
     </div>
   );
 }
@@ -1246,7 +1296,7 @@ const GridListCard = memo(function GridListCard({
       >
         <article
           data-list-showcase-card={list?.source || "unknown"}
-          className={`relative isolate flex h-full flex-col overflow-hidden rounded-3xl transform-gpu transition-all duration-500 ${LIQUID_GLASS_CARD} hover:brightness-110 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(99,102,241,0.95)]`}
+          className={`relative isolate flex h-full flex-col overflow-hidden rounded-3xl transform-gpu transition-all duration-500 ${LIQUID_GLASS_CARD} hover:brightness-110 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(168,85,247,0.92)]`}
         >
           <LiquidGlassOpticalLayers />
 
