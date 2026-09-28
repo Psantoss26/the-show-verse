@@ -171,7 +171,9 @@ function AlertRow({ kind, item, isNew, onNavigate, onDismiss }) {
   const href = getActivityDetailsHref(item);
   const { Icon, tone, filled } = alertIcon(kind, item);
   const src = item.posterPath ? `https://image.tmdb.org/t/p/w185${item.posterPath}` : null;
-  const platformSrc = kind === "event" && item.type === "cw_added" ? platformIcon(item.platform) : null;
+  // Con plataforma conocida, su logotipo SUSTITUYE al icono de la alerta en el
+  // hueco de la izquierda (no se enseñan los dos, ni el logotipo aparte).
+  const platformSrc = kind === "event" && item.platform ? platformIcon(item.platform) : null;
   const platformName = platformSrc ? platformLabel(item.platform) : null;
   const body = (
     <>
@@ -185,7 +187,17 @@ function AlertRow({ kind, item, isNew, onNavigate, onDismiss }) {
         )}
       </span>
       {/* Hueco fijo de 32px para que el texto de todas las filas quede alineado. */}
-      {kind === "action" && item.type === "rating" && typeof item.rating === "number" ? (
+      {platformSrc ? (
+        <OptimizedImage
+          src={platformSrc}
+          alt=""
+          title={platformName || undefined}
+          width={32}
+          height={32}
+          className="h-8 w-8 shrink-0 rounded-lg object-contain"
+          loading="lazy"
+        />
+      ) : kind === "action" && item.type === "rating" && typeof item.rating === "number" ? (
         <span className={`flex h-8 w-8 shrink-0 items-center justify-center text-xl font-black leading-none tabular-nums ${tone}`} aria-hidden="true">
           {item.rating}
         </span>
@@ -203,17 +215,6 @@ function AlertRow({ kind, item, isNew, onNavigate, onDismiss }) {
           <time dateTime={item.createdAt}>{relativeTime(item.createdAt)}</time>
         </span>
       </span>
-      {platformSrc ? (
-        <OptimizedImage
-          src={platformSrc}
-          alt=""
-          title={platformName || undefined}
-          width={32}
-          height={32}
-          className="h-8 w-8 shrink-0 rounded-lg object-contain"
-          loading="lazy"
-        />
-      ) : null}
     </>
   );
   const rowClass = "flex min-w-0 flex-1 items-center gap-3.5 px-3 py-2.5";
