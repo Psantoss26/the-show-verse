@@ -11,6 +11,7 @@ import {
   VolumeX,
 } from "lucide-react";
 import { useEffect } from "react";
+import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 
 function formatTime(value) {
   const seconds = Number(value);
@@ -50,7 +51,18 @@ export default function HeroSoundtrackPlayer({
 
   const progressPercent =
     duration > 0 ? Math.min(100, Math.max(0, (progress / duration) * 100)) : 0;
+  const volumePercent = (muted ? 0 : Math.min(1, Math.max(0, volume))) * 100;
+  const playing = isPlaying && !muted;
 
+  // MISMO DISEÑO QUE SoundtrackModal, en compacto: el cristal de los modales
+  // (LIQUID_GLASS_PANEL, sin bordes), la portada con sombra profunda, la barra
+  // de progreso con brillo, los saltos de pista sin fondo y el botón de
+  // reproducir de cristal. En horizontal (portada a la izquierda) para ocupar
+  // una esquina del hero sin taparlo, y con los controles siempre a la vista.
+  //
+  // POSICIÓN: 96px sobre el borde inferior. Más abajo chocaba con el botón
+  // flotante de instalar la app (PwaManager: fijo a 16px del borde, 48px de
+  // alto) en la misma esquina.
   return (
     <aside
       data-hero-soundtrack-player
@@ -79,26 +91,11 @@ export default function HeroSoundtrackPlayer({
           onInteractionChange?.(false);
         }
       }}
-      className="hero-nowplaying group pointer-events-auto absolute bottom-4 right-4 z-40 w-48 overflow-hidden rounded-2xl border border-white/10 bg-black/60 shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.14),0_12px_36px_-12px_rgba(0,0,0,0.85)] backdrop-blur-3xl transition-all duration-300 sm:bottom-6 sm:right-6 sm:w-56 p-2 hidden sm:block"
+      className={`hero-nowplaying pointer-events-auto absolute bottom-24 right-6 z-40 hidden w-[20rem] overflow-hidden rounded-[1.75rem] p-3 text-white sm:block ${LIQUID_GLASS_PANEL}`}
     >
-      {/* Background artwork blur */}
-      {track.artworkUrl && (
-        <OptimizedImage
-          src={track.artworkUrl}
-          alt=""
-          aria-hidden="true"
-          decoding="async"
-          className="pointer-events-none absolute inset-0 h-full w-full scale-150 object-cover opacity-20 blur-2xl"
-        />
-      )}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-black/50 bg-gradient-to-b from-transparent to-black/80"
-      />
-
-      <div className="relative flex flex-col h-full z-10">
-        {/* Cover Art container */}
-        <div className="relative aspect-square w-full overflow-hidden rounded-xl border border-white/10 bg-white/5 shadow-md group/cover">
+      {/* --- PORTADA E INFO --- */}
+      <div className="flex items-center gap-3">
+        <div className="relative h-[4.5rem] w-[4.5rem] shrink-0 overflow-hidden rounded-2xl bg-white/5 shadow-[0_16px_32px_-10px_rgba(0,0,0,0.9)]">
           {track.artworkUrl ? (
             <OptimizedImage
               src={track.artworkUrl}
@@ -108,131 +105,128 @@ export default function HeroSoundtrackPlayer({
             />
           ) : (
             <span className="flex h-full w-full items-center justify-center">
-              <Music2
-                className="h-10 w-10 text-white/35"
-                aria-hidden="true"
-              />
+              <Music2 className="h-7 w-7 text-yellow-300/50" aria-hidden="true" />
             </span>
           )}
-
-          {/* Hover Controls Overlay */}
-          <div className="absolute inset-0 bg-black/70 flex flex-col justify-between p-3 opacity-0 group-hover:opacity-100 group-hover/cover:opacity-100 focus-within:opacity-100 transition-opacity duration-300 pointer-events-none group-hover:pointer-events-auto focus-within:pointer-events-auto">
-            {/* Top Row: Track Position & Volume controls */}
-            <div className="flex justify-between items-center w-full gap-2">
-              <span className="text-[10px] sm:text-xs font-semibold text-white/80 bg-black/40 px-2 py-0.5 rounded-md backdrop-blur-sm select-none">
-                {position}/{total}
-              </span>
-              
-              <div className="flex items-center gap-1.5 bg-black/40 px-2 py-0.5 rounded-md backdrop-blur-sm">
-                <button
-                  type="button"
-                  onClick={onToggleMute}
-                  aria-label={muted || volume === 0 ? "Activar sonido" : "Silenciar"}
-                  className="flex h-5 w-5 items-center justify-center text-white/80 hover:text-white transition"
-                >
-                  {muted || volume === 0 ? (
-                    <VolumeX className="h-3.5 w-3.5" />
-                  ) : (
-                    <Volume2 className="h-3.5 w-3.5" />
-                  )}
-                </button>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  value={muted ? 0 : volume}
-                  onChange={onVolumeChange}
-                  aria-label="Volumen de la preview"
-                  className="w-12 h-1 accent-white cursor-pointer bg-white/20 rounded-full transition-all duration-300 sm:w-16 focus:outline-none"
-                />
-              </div>
-            </div>
-
-            {/* Middle Row: Playback Controls */}
-            <div className="flex items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={onPrevious}
-                disabled={!hasPrevious}
-                aria-label="Pista anterior"
-                className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-white/10 text-white/85 hover:bg-white/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-20 transition"
-              >
-                <SkipBack className="h-4 w-4 sm:h-4.5 sm:w-4.5 fill-current" />
-              </button>
-
-              <button
-                type="button"
-                onClick={onTogglePlayback}
-                aria-label={isPlaying && !muted ? "Pausar preview" : "Reproducir preview"}
-                className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-white text-black hover:scale-105 active:scale-95 transition shadow-sm"
-              >
-                {isPlaying && !muted ? (
-                  <Pause className="h-4.5 w-4.5 sm:h-5.5 sm:w-5.5 fill-current" />
-                ) : (
-                  <Play className="ml-0.5 h-4.5 w-4.5 sm:h-5.5 sm:w-5.5 fill-current" />
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={onNext}
-                disabled={!hasNext}
-                aria-label="Pista siguiente"
-                className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-white/10 text-white/85 hover:bg-white/20 hover:text-white disabled:cursor-not-allowed disabled:opacity-20 transition"
-              >
-                <SkipForward className="h-4 w-4 sm:h-4.5 sm:w-4.5 fill-current" />
-              </button>
-            </div>
-
-            {/* Bottom Row: Progress */}
-            <div className="flex w-full items-center gap-1.5">
-              <span className="w-6 text-right text-[9px] sm:text-[10px] font-medium tabular-nums text-white/70">
-                {formatTime(progress)}
-              </span>
-              <div className="group/progress relative flex h-3 min-w-0 flex-1 items-center">
-                <div className="pointer-events-none absolute inset-x-0 h-0.5 overflow-hidden rounded-full bg-white/20">
-                  <div
-                    className="h-full rounded-full bg-white"
-                    style={{ width: `${progressPercent}%` }}
-                  />
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={duration || 100}
-                  value={Math.min(progress, duration || 100)}
-                  onChange={onSeek}
-                  aria-label="Progreso de la preview"
-                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0 z-20"
-                />
-              </div>
-              <span className="w-6 text-[9px] sm:text-[10px] font-medium tabular-nums text-white/70">
-                {formatTime(duration)}
-              </span>
-            </div>
-          </div>
         </div>
-
-        {/* Text Metadata (Fixed Height to prevent size changes) */}
-        <div className="h-16 flex flex-col justify-center px-1 pt-2">
+        <div className="min-w-0 flex-1 select-none">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/45">
+            Soundtrack · {position} de {total}
+          </p>
           <h3
-            className="truncate text-xs font-bold leading-snug text-white select-none sm:text-sm"
+            className="mt-1 truncate text-sm font-black leading-snug text-white drop-shadow-sm"
             title={track.trackName}
           >
             {track.trackName || "Soundtrack"}
           </h3>
-          {track.artistName && (
+          {track.artistName ? (
             <p
-              className="truncate text-[10px] font-medium text-white/50 select-none mt-0.5 sm:text-xs"
+              className="truncate text-xs font-medium text-white/70 drop-shadow-sm"
               title={track.artistName}
             >
               {track.artistName}
             </p>
-          )}
+          ) : null}
         </div>
+      </div>
+
+      {/* --- PROGRESO --- */}
+      <div className="mt-3 flex items-center gap-2">
+        <span className="w-8 text-right text-[10px] font-semibold tabular-nums text-white/50">
+          {formatTime(progress)}
+        </span>
+        <div className="relative flex h-4 min-w-0 flex-1 items-center">
+          <div className="pointer-events-none absolute inset-x-0 h-1 overflow-hidden rounded-full bg-black/40">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-white/60 to-white shadow-[0_0_10px_rgba(255,255,255,0.5)]"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={duration || 100}
+            value={Math.min(progress, duration || 100)}
+            onChange={onSeek}
+            aria-label="Progreso de la preview"
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          />
+        </div>
+        <span className="w-8 text-[10px] font-semibold tabular-nums text-white/50">
+          {formatTime(duration)}
+        </span>
+      </div>
+
+      {/* --- CONTROLES Y VOLUMEN --- */}
+      <div className="mt-1.5 grid grid-cols-[1fr_auto_1fr] items-center gap-x-3">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onToggleMute}
+            aria-label={muted || volume === 0 ? "Activar sonido" : "Silenciar"}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white/60 transition hover:text-white"
+          >
+            {muted || volume === 0 ? (
+              <VolumeX className="h-4 w-4" />
+            ) : (
+              <Volume2 className="h-4 w-4" />
+            )}
+          </button>
+          <div className="group/volume relative flex h-4 w-11 items-center">
+            <div className="pointer-events-none absolute inset-x-0 h-1 overflow-hidden rounded-full bg-black/40">
+              <div
+                className="h-full rounded-full bg-white/70 transition-colors group-hover/volume:bg-white"
+                style={{ width: `${volumePercent}%` }}
+              />
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={muted ? 0 : volume}
+              onChange={onVolumeChange}
+              aria-label="Volumen de la preview"
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onPrevious}
+            disabled={!hasPrevious}
+            aria-label="Pista anterior"
+            className="text-white/70 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:text-white/70"
+          >
+            <SkipBack className="h-5 w-5 fill-current" />
+          </button>
+          <button
+            type="button"
+            onClick={onTogglePlayback}
+            aria-label={playing ? "Pausar preview" : "Reproducir preview"}
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white shadow-[0_10px_40px_-10px_rgba(255,255,255,0.2)] backdrop-blur-xl transition hover:scale-105 hover:bg-white/20 active:scale-95"
+          >
+            {playing ? (
+              <Pause className="h-5 w-5 fill-current" />
+            ) : (
+              <Play className="ml-0.5 h-5 w-5 fill-current" />
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={onNext}
+            disabled={!hasNext}
+            aria-label="Pista siguiente"
+            className="text-white/70 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:text-white/70"
+          >
+            <SkipForward className="h-5 w-5 fill-current" />
+          </button>
+        </div>
+
+        <div aria-hidden="true" />
       </div>
     </aside>
   );
 }
-
