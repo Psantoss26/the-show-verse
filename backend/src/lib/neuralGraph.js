@@ -1,5 +1,5 @@
 // src/lib/neuralGraph.js
-// Datos de la vista neural del perfil: TODOS los títulos que el usuario ha
+// Datos de la vista neuronal del perfil: TODOS los títulos que el usuario ha
 // registrado (vistos, puntuados, favoritos y pendientes) con sus géneros y
 // sagas, en una sola respuesta compacta. Reglas puras en neuralGraphCore.js.
 //

@@ -1,4 +1,4 @@
-// Simulación de fuerzas de la vista neural, FUERA del hilo principal.
+// Simulación de fuerzas de la vista neuronal, FUERA del hilo principal.
 //
 // Con cientos o miles de nodos, cada paso de la simulación (repulsión con
 // Barnes-Hut, enlaces y colisiones) cuesta milisegundos; en el hilo principal

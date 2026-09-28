@@ -1,6 +1,6 @@
 "use client";
 
-// Datos de la vista neural del perfil, en un módulo LIGERO (sin canvas ni
+// Datos de la vista neuronal del perfil, en un módulo LIGERO (sin canvas ni
 // d3-force) para poder precargarlos desde el perfil antes de abrir la pestaña.
 //
 // Mismo esquema que las demás secciones del perfil (ProfileSection):

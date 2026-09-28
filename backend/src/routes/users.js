@@ -508,7 +508,7 @@ export default async function usersRoutes(fastify) {
   });
   fastify.get('/:username/activity', sectionEndpoint(getUserActivity));
 
-  // GET /users/:username/neural?v=<firma> — vista neural: todos los títulos del
+  // GET /users/:username/neural?v=<firma> — vista neuronal: todos los títulos del
   // usuario con sus géneros y sagas. Con la firma que ya tiene el cliente
   // responde `{ unchanged: true }` sin reconstruir nada.
   fastify.get('/:username/neural', async (req, reply) => {
