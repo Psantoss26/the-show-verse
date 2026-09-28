@@ -185,7 +185,7 @@ function SelectedCard({ node, graph, onClose, onFocusNode }) {
     const series = titles.filter((n) => n.title.mediaType === "tv").length;
     const top = [...titles].sort((a, b) => b.r - a.r).slice(0, 6);
     return (
-      <div className={`pointer-events-auto w-full max-w-sm rounded-[1.75rem] p-4 text-white ${LIQUID_GLASS_PANEL}`}>
+      <div className={`pointer-events-auto w-full max-w-sm rounded-2xl p-4 text-white ${LIQUID_GLASS_PANEL}`}>
         <div className="flex items-start gap-3">
           <span className="mt-1 h-3 w-3 shrink-0 rounded-full" style={{ background: node.color }} aria-hidden="true" />
           <div className="min-w-0 flex-1">
@@ -208,7 +208,7 @@ function SelectedCard({ node, graph, onClose, onFocusNode }) {
                 <button
                   type="button"
                   onClick={() => onFocusNode(graph.nodes.indexOf(n))}
-                  className="max-w-[10rem] truncate rounded-full bg-white/[0.06] px-2.5 py-1 text-[11px] font-semibold text-white/80 transition hover:bg-white/[0.12] hover:text-white"
+                  className="max-w-[10rem] truncate rounded-lg bg-white/[0.06] px-2.5 py-1 text-[11px] font-semibold text-white/80 transition hover:bg-white/[0.12] hover:text-white"
                 >
                   {n.label}
                 </button>
@@ -223,7 +223,7 @@ function SelectedCard({ node, graph, onClose, onFocusNode }) {
   const title = node.title;
   const href = detailsHref(title);
   return (
-    <div className={`pointer-events-auto w-full max-w-sm rounded-[1.75rem] p-3 text-white ${LIQUID_GLASS_PANEL}`}>
+    <div className={`pointer-events-auto w-full max-w-sm rounded-2xl p-3 text-white ${LIQUID_GLASS_PANEL}`}>
       <div className="flex gap-3">
         <div className="h-[6.5rem] w-[4.4rem] shrink-0 overflow-hidden rounded-xl bg-white/5 shadow-[0_16px_32px_-10px_rgba(0,0,0,0.9)]">
           {title.posterPath ? (
@@ -277,7 +277,7 @@ function SelectedCard({ node, graph, onClose, onFocusNode }) {
       <Link
         href={href}
         onClick={previewClick({ tmdbId: title.tmdbId, mediaType: title.mediaType, title: title.title, posterPath: title.posterPath }, { mediaType: title.mediaType })}
-        className="mt-3 flex h-9 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white transition hover:bg-white/20"
+        className="mt-3 flex h-9 items-center justify-center rounded-xl bg-white/10 text-xs font-bold text-white transition hover:bg-white/20"
       >
         Ver ficha
       </Link>
@@ -999,7 +999,7 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
 
   if (status === "error" && !graph) {
     return (
-      <section className="flex min-h-72 flex-col items-center justify-center rounded-[2rem] bg-white/[0.02] px-6 text-center">
+      <section className="flex min-h-72 flex-col items-center justify-center rounded-2xl bg-white/[0.02] px-6 text-center">
         <Network className="h-7 w-7 text-emerald-400/70" />
         <h2 className="mt-4 text-lg font-black text-white">No se pudo cargar la vista neural</h2>
         <p className="mt-1 max-w-sm text-sm text-zinc-500">Vuelve a intentarlo en unos segundos.</p>
@@ -1009,7 +1009,7 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
 
   if (graph && !graph.stats.titles) {
     return (
-      <section className="flex min-h-72 flex-col items-center justify-center rounded-[2rem] bg-white/[0.02] px-6 text-center">
+      <section className="flex min-h-72 flex-col items-center justify-center rounded-2xl bg-white/[0.02] px-6 text-center">
         <Network className="h-7 w-7 text-emerald-400/70" />
         <h2 className="mt-4 text-lg font-black text-white">Aún no hay títulos que conectar</h2>
         <p className="mt-1 max-w-sm text-sm text-zinc-500">
@@ -1073,10 +1073,10 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
         aria-label="Vista neural de títulos"
         className={`relative isolate overflow-hidden bg-[radial-gradient(120%_90%_at_50%_0%,rgba(16,185,129,0.07),transparent_60%),radial-gradient(90%_80%_at_50%_100%,rgba(99,102,241,0.06),transparent_60%)] ${
           fullscreen
-            ? "min-h-0 flex-1 rounded-[2rem]"
+            ? "min-h-0 flex-1 rounded-2xl"
             : // Hasta el borde inferior de la pantalla. En táctil se reserva la
               // barra inferior flotante (56px a 12px del borde + zona segura).
-              "h-[calc(100dvh_-_var(--neural-top,16rem)_-_5.25rem_-_env(safe-area-inset-bottom))] min-h-[320px] rounded-[2rem] bg-white/[0.015] desktop:h-[calc(100dvh_-_var(--neural-top,16rem)_-_1.5rem)]"
+              "h-[calc(100dvh_-_var(--neural-top,16rem)_-_5.25rem_-_env(safe-area-inset-bottom))] min-h-[320px] rounded-2xl bg-white/[0.015] desktop:h-[calc(100dvh_-_var(--neural-top,16rem)_-_1.5rem)]"
         }`}
       >
         <canvas
@@ -1101,7 +1101,7 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
           <>
             {/* Leyenda de los grupos (géneros o décadas). */}
             <div className="pointer-events-none absolute bottom-3 right-3 top-3 hidden w-48 flex-col justify-end @[1024px]/detail-page:flex">
-              <ul className={`pointer-events-auto max-h-full overflow-y-auto overscroll-contain rounded-[1.5rem] p-2 [scrollbar-width:none] ${LIQUID_GLASS_PANEL}`}>
+              <ul className={`pointer-events-auto max-h-full overflow-y-auto overscroll-contain rounded-2xl p-2 [scrollbar-width:none] ${LIQUID_GLASS_PANEL}`}>
                 {legend.map(({ node, index, count }) => (
                   <li key={node.id}>
                     <button
