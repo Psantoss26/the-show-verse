@@ -6,7 +6,7 @@
 // posiciones como Float32Array transferible (sin copia) en cada paso.
 //
 // Mensajes de entrada:
-//   { type: "init", nodes: [{ x, y, r, charge, saga }], links: [[a, b]], instant }
+//   { type: "init", nodes: [{ x, y, r, charge, saga }], links: [[a, b]], instant, resume }
 //   { type: "drag", index, x, y }   fija un nodo mientras se arrastra
 //   { type: "release", index }      lo suelta
 //   { type: "stop" }
@@ -99,9 +99,20 @@ self.onmessage = ({ data }) => {
       .velocityDecay(0.42)
       .stop();
 
-    // Unos pasos sin pintar para no enseñar el arranque caótico. Con
-    // "reducir movimiento" se asienta entera antes de mostrarla.
-    const warm = data.instant ? 400 : Math.min(60, Math.round(12000 / Math.max(1, nodes.length)));
+    // Disposición guardada ya asentada: no se recoloca nada. La simulación
+    // queda parada, lista para cuando se arrastre un nodo.
+    if (data.resume) {
+      simulation.alpha(0);
+      post();
+      self.postMessage({ type: "end" });
+      return;
+    }
+
+    // Sin pasos ocultos: la vista ya está pintando estas posiciones de partida
+    // (agrupadas por hub), así que la red se expande desde ellas de forma
+    // continua; calcular unos pasos sin enseñarlos hacía que saltara de golpe.
+    // Con "reducir movimiento" se asienta entera antes de mostrarla.
+    const warm = data.instant ? 400 : 0;
     for (let i = 0; i < warm && simulation.alpha() >= simulation.alphaMin(); i += 1) simulation.tick();
     post();
     if (data.instant) {
