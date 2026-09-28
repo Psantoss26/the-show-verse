@@ -28,12 +28,19 @@ export function parseEntityKey(entityKey) {
   };
 }
 
-/** Clave de la nota que cierra el recordatorio de un visionado. */
+/**
+ * Clave de la nota que cierra un recordatorio. Película y serie comparten la
+ * forma `mediaType:tmdbId`; la temporada y el episodio llevan su número.
+ */
 export function ratingTargetKey({ mediaType, tmdbId, season, episode }) {
-  if (mediaType === 'tv' && season != null && episode != null) {
-    return `episode:${Number(tmdbId)}:${season}:${episode}`;
+  const id = Number(tmdbId);
+  if (mediaType === 'episode' || (mediaType === 'tv' && season != null && episode != null)) {
+    return `episode:${id}:${season}:${episode}`;
   }
-  return `${mediaType}:${Number(tmdbId)}`;
+  if (mediaType === 'season' || (mediaType === 'tv' && season != null)) {
+    return `season:${id}:${season}`;
+  }
+  return `${mediaType}:${id}`;
 }
 
 /** Clave de la reseña (siempre del título: película o serie). */
@@ -42,44 +49,153 @@ export function reviewTargetKey({ mediaType, tmdbId }) {
 }
 
 /**
- * Recordatorios de puntuar y reseñar lo visto. Uno por TÍTULO —el visionado más
- * reciente—, para que ver una serie del tirón no llene el desplegable con un
- * aviso por episodio. Si lo más reciente ya está puntuado y reseñado, el título
- * no genera aviso (aunque haya episodios anteriores sin nota).
+ * Momento en que un visionado cuenta para las alertas. Lo normal es la fecha
+ * del visionado, pero un "visto" registrado a mano con fecha pasada ("lo vi el
+ * mes pasado") se avisa cuando se registró. Solo si la inserción fue de UN
+ * título (`singleTitle`): una importación mete muchos títulos de golpe y no
+ * debe llenar las alertas de recordatorios de cosas vistas hace años.
+ */
+export function watchEventAt({ watchedAt, createdAt, singleTitle }) {
+  const watched = new Date(watchedAt);
+  const created = new Date(createdAt);
+  if (!singleTitle || Number.isNaN(created.getTime())) return watched;
+  if (Number.isNaN(watched.getTime())) return created;
+  return created > watched ? created : watched;
+}
+
+/**
+ * Visionados con los que se TERMINÓ algo por primera vez: una temporada (todos
+ * sus episodios emitidos vistos) o la serie entera. Mismo criterio que
+ * "series completadas" del perfil.
  *
- * @param watchedRows visionados ordenados del más reciente al más antiguo.
+ * @param rowsAsc visionados de UNA serie (con `id`), del más antiguo al más
+ *        reciente y, a igual fecha, por temporada y episodio.
+ * @param seasonEpisodeCounts temporada -> nº de episodios emitidos.
+ * @param isShowComplete función (playCounts) => boolean.
+ * @returns {{ seasons: Map<string, number>, showRowId: string|null }}
+ *          `seasons`: id del visionado -> temporada que completó.
+ */
+export function completionMarks(rowsAsc, seasonEpisodeCounts, isShowComplete) {
+  const seasons = new Map();
+  let showRowId = null;
+  const playCounts = new Map();
+  const seasonSeen = new Map();
+  for (const row of Array.isArray(rowsAsc) ? rowsAsc : []) {
+    const season = Number(row?.season);
+    const episode = Number(row?.episode);
+    if (!Number.isInteger(season) || season <= 0 || !Number.isInteger(episode) || episode <= 0) continue;
+    const key = `${season}-${episode}`;
+    const isNew = !playCounts.has(key);
+    playCounts.set(key, (playCounts.get(key) || 0) + 1);
+    if (!isNew) continue;
+
+    const aired = Number(seasonEpisodeCounts?.[season] || 0);
+    if (aired > 0 && episode <= aired) {
+      const count = (seasonSeen.get(season) || 0) + 1;
+      seasonSeen.set(season, count);
+      if (count === aired) seasons.set(String(row.id), season);
+    }
+    if (showRowId == null && isShowComplete(playCounts)) showRowId = String(row.id);
+  }
+  return { seasons, showRowId };
+}
+
+/**
+ * Recordatorios de puntuar y reseñar lo terminado:
+ *   - película: puntuar y reseñar;
+ *   - serie completada: puntuar y reseñar la serie;
+ *   - temporada completada: puntuar la temporada;
+ *   - episodio: puntuar el episodio.
+ * La reseña solo se pide al terminar una película o una serie. Cada aviso solo
+ * sale si falta lo que pide, venga el visionado de la sincronización o de un
+ * registro manual.
+ *
+ * Un visionado da UN aviso, el del nivel más alto que falte: el episodio que
+ * cierra una temporada avisa de la temporada, y si además cierra la serie, de
+ * la serie. Por serie hay como mucho un aviso de cada nivel, y el de episodio
+ * solo mira el visionado más reciente, para que ver una serie del tirón no
+ * llene el desplegable con un aviso por episodio.
+ *
+ * @param watchedRows visionados (con `id`) ordenados del más reciente al más
+ *        antiguo; `createdAt` es el momento del aviso.
  * @param ratedKeys   claves `ratingTargetKey` que el usuario ya ha puntuado.
  * @param reviewedKeys claves `reviewTargetKey` con reseña propia.
+ * @param completions `tmdbId` -> resultado de `completionMarks` de esa serie.
  */
-export function buildReminders(watchedRows, ratedKeys, reviewedKeys, { limit = 8 } = {}) {
-  const seen = new Set();
+export function buildReminders(watchedRows, ratedKeys, reviewedKeys, { completions = new Map(), limit = 8 } = {}) {
   const out = [];
-  for (const row of Array.isArray(watchedRows) ? watchedRows : []) {
-    if (!row?.tmdbId || !['movie', 'tv'].includes(row.mediaType)) continue;
-    const key = `${row.mediaType}:${Number(row.tmdbId)}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
+  const seenTitles = new Set();
+  const showState = new Map();
 
-    const needsRating = !ratedKeys.has(ratingTargetKey(row));
-    const needsReview = !reviewedKeys.has(reviewTargetKey(row));
-    if (!needsRating && !needsReview) continue;
-
+  const push = (row, level, needsRating, needsReview) => {
+    const season = level === 'episode' || level === 'season' ? row.season ?? null : null;
+    const episode = level === 'episode' ? row.episode ?? null : null;
+    const target = ratingTargetKey({ mediaType: row.mediaType, tmdbId: row.tmdbId, season, episode });
     out.push({
-      id: `reminder:${ratingTargetKey(row)}:${new Date(row.createdAt).getTime()}`,
+      id: `reminder:${target}:${new Date(row.createdAt).getTime()}`,
       type: 'reminder',
+      level,
       tmdbId: Number(row.tmdbId),
       mediaType: row.mediaType,
-      season: row.mediaType === 'tv' ? row.season ?? null : null,
-      episode: row.mediaType === 'tv' ? row.episode ?? null : null,
+      season,
+      episode,
       title: row.title || null,
       posterPath: row.posterPath || null,
       createdAt: row.createdAt,
       needsRating,
       needsReview,
     });
-    if (out.length >= limit) break;
+  };
+
+  for (const row of Array.isArray(watchedRows) ? watchedRows : []) {
+    if (!row?.tmdbId || !['movie', 'tv'].includes(row.mediaType)) continue;
+    const titleKey = reviewTargetKey(row);
+
+    if (row.mediaType === 'movie') {
+      if (seenTitles.has(titleKey)) continue;
+      seenTitles.add(titleKey);
+      const needsRating = !ratedKeys.has(ratingTargetKey(row));
+      const needsReview = !reviewedKeys.has(titleKey);
+      if (needsRating || needsReview) push(row, 'movie', needsRating, needsReview);
+      continue;
+    }
+
+    // Serie: sin temporada/episodio no hay nada que puntuar por visionado.
+    if (row.season == null || row.episode == null) continue;
+    const state = showState.get(titleKey) || { latestSeen: false, show: false, season: false };
+    showState.set(titleKey, state);
+    const isLatest = !state.latestSeen;
+    state.latestSeen = true;
+
+    const marks = completions.get(Number(row.tmdbId));
+    const rowId = String(row.id);
+
+    if (marks?.showRowId === rowId) {
+      const needsRating = !ratedKeys.has(ratingTargetKey({ mediaType: 'tv', tmdbId: row.tmdbId }));
+      const needsReview = !reviewedKeys.has(titleKey);
+      if (needsRating || needsReview) {
+        if (!state.show) push(row, 'show', needsRating, needsReview);
+        state.show = true;
+        continue;
+      }
+    }
+
+    const completedSeason = marks?.seasons?.get(rowId);
+    if (completedSeason != null) {
+      const seasonKey = ratingTargetKey({ mediaType: 'season', tmdbId: row.tmdbId, season: completedSeason });
+      if (!ratedKeys.has(seasonKey)) {
+        if (!state.season) push({ ...row, season: completedSeason }, 'season', true, false);
+        state.season = true;
+        continue;
+      }
+    }
+
+    if (isLatest && !ratedKeys.has(ratingTargetKey(row))) push(row, 'episode', true, false);
   }
-  return out;
+
+  return out
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, limit);
 }
 
 function sameInstant(a, b) {
@@ -127,30 +243,6 @@ export function detectContinueWatchingAdds(receipts) {
       return { ...entity, id: `cw:${row.id}`, type: 'cw_added', createdAt: row.observedAt };
     })
     .filter(Boolean);
-}
-
-/**
- * Momento en que una serie quedó COMPLETA por primera vez: el visionado con el
- * que el nº de episodios distintos vistos alcanzó los emitidos. Mismo criterio
- * que "series completadas" del perfil (computeShowProgress.baseComplete).
- * Devuelve null si no está completa o no se conoce cuántos episodios tiene.
- *
- * @param rowsAsc visionados de la serie, del más ANTIGUO al más reciente.
- * @param isComplete función (playCounts) => boolean; se inyecta para no acoplar
- *        este módulo al cálculo completo del progreso.
- */
-export function showCompletionTime(rowsAsc, isComplete) {
-  const playCounts = new Map();
-  for (const row of Array.isArray(rowsAsc) ? rowsAsc : []) {
-    const season = Number(row?.season);
-    const episode = Number(row?.episode);
-    if (!Number.isInteger(season) || season <= 0 || !Number.isInteger(episode) || episode <= 0) continue;
-    const key = `${season}-${episode}`;
-    const isNew = !playCounts.has(key);
-    playCounts.set(key, (playCounts.get(key) || 0) + 1);
-    if (isNew && isComplete(playCounts)) return row.watchedAt;
-  }
-  return null;
 }
 
 /**
