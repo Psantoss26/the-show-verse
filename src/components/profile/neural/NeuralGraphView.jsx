@@ -29,6 +29,7 @@ import OptimizedImage from "@/components/OptimizedImage";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import { ProfileMenuDropdown } from "@/app/u/[username]/ProfileSection";
 import { useAuth } from "@/context/AuthContext";
+import { setAppPullToRefreshLocked } from "@/lib/android/appBridge";
 import { readNeuralPreferences, saveNeuralPreferences } from "@/lib/profile/neuralPreferences";
 import {
   getNeuralLayout,
@@ -1002,7 +1003,18 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
       requestDraw();
     };
 
+    // App de Android: su "deslizar para recargar" nativo no ve el gesto del
+    // lienzo y recargaba al arrastrar la red hacia abajo. Se bloquea mientras
+    // haya un dedo encima (fuera de la app no hace nada).
+    let pullLocked = false;
+    const lockPull = (locked) => {
+      if (pullLocked === locked) return;
+      pullLocked = locked;
+      setAppPullToRefreshLocked(locked);
+    };
+
     const onPointerDown = (event) => {
+      if (event.pointerType === "touch") lockPull(true);
       canvas.setPointerCapture?.(event.pointerId);
       const point = local(event);
       pointers.set(event.pointerId, point);
@@ -1056,6 +1068,7 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
 
     const onPointerUp = (event) => {
       pointers.delete(event.pointerId);
+      if (!pointers.size) lockPull(false);
       if (pointers.size < 2) pinch = null;
       if (!down) return;
       const current = down;
@@ -1098,6 +1111,7 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
       canvas.removeEventListener("pointerleave", onPointerLeave);
       canvas.removeEventListener("wheel", onWheel);
       canvas.removeEventListener("dblclick", onDoubleClick);
+      lockPull(false);
     };
   }, [graph, pos, requestDraw, router, zoomBy]);
 
@@ -1286,6 +1300,11 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
       <section
         ref={stageRef}
         aria-label="Vista neuronal de títulos"
+        // El grafo tiene gestos propios (arrastrar, pellizcar): en móvil no
+        // deben cambiar de sección del perfil (data-profile-swipe-exempt) ni
+        // de página de usuario (data-mobile-page-swipe-ignore).
+        data-profile-swipe-exempt
+        data-mobile-page-swipe-ignore
         className={`relative isolate overflow-hidden ${
           fullscreen
             ? "min-h-0 flex-1 rounded-2xl bg-[radial-gradient(120%_90%_at_50%_0%,rgba(16,185,129,0.07),transparent_60%),radial-gradient(90%_80%_at_50%_100%,rgba(99,102,241,0.06),transparent_60%)]"
