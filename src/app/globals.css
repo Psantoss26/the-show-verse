@@ -1966,3 +1966,20 @@ html:has([data-embedded-details])::-webkit-scrollbar {
   display: none;
 }
 
+
+/* Barra de tiempo de las ventanas emergentes (InAppNotifications). No se
+   quita con "reducir movimiento": es un indicador, no un desplazamiento. */
+@keyframes sv-toast-timer {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.sv-toast-timer {
+  animation-name: sv-toast-timer;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}

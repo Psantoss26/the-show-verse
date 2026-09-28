@@ -92,6 +92,29 @@ test("ventanas emergentes: lo nuevo desde que se abrió, por título y sin repet
   const groups = freshAlertGroups(alerts, { since: "2026-09-28T10:00:00Z", shown: new Set(["r2"]) });
   assert.deepEqual(
     groups.map((g) => [g.key, g.rows.map((r) => r.item.id)]),
-    [["tv:1", ["auto:1", "r1"]]],
+    [["tv:1", ["auto:1", "r1"]], ["movie:4", ["a"]]],
   );
+
+  // Lo hecho en este dispositivo ya se avisó al hacerlo.
+  const withoutLocal = freshAlertGroups(alerts, {
+    since: "2026-09-28T10:00:00Z",
+    shown: new Set(["r2"]),
+    skip: (item) => item.tmdbId === 4,
+  });
+  assert.deepEqual(withoutLocal.map((g) => g.key), ["tv:1"]);
+});
+
+import { describeAlertGroup } from "./alerts.js";
+
+test("ventanas emergentes: texto del grupo sin el título", () => {
+  const content = describeAlertGroup([
+    { kind: "event", item: { id: "e", type: "auto_watched", tmdbId: 1, mediaType: "tv", season: 1, episode: 3, title: "Dark", posterPath: "/d.jpg" } },
+    { kind: "reminder", item: { id: "r", tmdbId: 1, mediaType: "tv", season: 1, episode: 3, needsRating: true, needsReview: false } },
+  ]);
+  assert.equal(content.icon, "autoWatched");
+  assert.equal(content.label, "Visto");
+  assert.equal(content.title, "Dark");
+  assert.equal(content.text, "Has terminado S01E03. Puntúa el episodio S01E03");
+  assert.equal(content.posterPath, "/d.jpg");
+  assert.equal(content.target.id, "r");
 });

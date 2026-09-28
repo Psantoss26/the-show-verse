@@ -150,17 +150,20 @@ export function upcomingRelease(date, now = Date.now()) {
 }
 
 /**
- * Alertas que merecen ventana emergente: novedades y recordatorios (no la
- * actividad propia) posteriores a `since` y aún no enseñadas. Agrupadas por
+ * Alertas que merecen ventana emergente: novedades, recordatorios y actividad
+ * propia (lo hecho desde OTRO dispositivo; lo de este ya se avisó al hacerlo,
+ * y `skip` lo descarta) posteriores a `since` y aún no enseñadas. Agrupadas por
  * título, como las notificaciones push, de la más antigua a la más reciente.
  * Devuelve `[{ key, rows: [{ kind, item }] }]`.
  */
-export function freshAlertGroups(alerts, { since, shown = new Set() } = {}) {
+export function freshAlertGroups(alerts, { since, shown = new Set(), skip = () => false } = {}) {
   const from = time(since);
   const rows = [
     ...(alerts?.events || []).map((item) => ({ kind: "event", item })),
+    ...(alerts?.actions || []).map((item) => ({ kind: "action", item })),
     ...(alerts?.reminders || []).map((item) => ({ kind: "reminder", item })),
-  ].filter(({ item }) => item?.id && !shown.has(item.id) && time(item.createdAt) >= from);
+  ].filter(({ kind, item }) =>
+    item?.id && !shown.has(item.id) && time(item.createdAt) >= from && !(kind === "action" && skip(item)));
 
   const groups = new Map();
   for (const row of rows) {
@@ -176,6 +179,84 @@ export function freshAlertGroups(alerts, { since, shown = new Set() } = {}) {
       ),
     }))
     .sort((a, b) => latest(a.rows) - latest(b.rows));
+}
+
+function shortCode(item) {
+  if (item?.season == null || item?.episode == null) return null;
+  const pad = (n) => String(n).padStart(2, "0");
+  return `S${pad(item.season)}E${pad(item.episode)}`;
+}
+
+// Frase de cada alerta SIN el título (el aviso lo pone aparte), con los mismos
+// textos que las notificaciones push (backend/src/lib/pushMessages.js).
+function alertSentence({ kind, item }) {
+  const code = shortCode(item);
+  if (kind === "reminder") {
+    if (!item.needsRating) return "Escribe tu reseña";
+    const verb = item.needsReview ? "Puntúa y reseña" : "Puntúa";
+    if (code) return `${verb} el episodio ${code}`;
+    if (item.season != null) return `${verb} la temporada ${item.season}`;
+    return `${verb} ${item.mediaType === "tv" ? "la serie" : "la película"}`;
+  }
+  if (kind === "event") {
+    if (item.type === "cw_added") {
+      const platform = platformLabel(item.platform);
+      return `${code ? `${code} añadido` : "Añadida"} a Continuar viendo${platform ? ` · ${platform}` : ""}`;
+    }
+    if (item.type === "auto_watched") return code ? `Has terminado ${code}` : "Has terminado la película";
+    if (item.type === "show_completed") return "Has completado la serie";
+    if (item.type === "collection_next") {
+      return item.afterTitle ? `Siguiente de la saga después de ${item.afterTitle}` : "Siguiente de la saga";
+    }
+    return null;
+  }
+  if (item.type === "rating") {
+    return typeof item.rating === "number" ? `Has puntuado con un ${item.rating}/10` : "Has puntuado";
+  }
+  if (item.type === "watchlist") return "Añadida a Pendientes";
+  if (item.type === "favorite") return "Añadida a Favoritas";
+  if (item.completedShow) return "Has completado la serie";
+  return code ? `Has visto ${code}` : "Marcado como visto";
+}
+
+// Icono y rótulo del aviso según la alerta principal del grupo.
+const ALERT_LOOK = {
+  cw_added: { icon: "progress", label: "Continuar viendo" },
+  auto_watched: { icon: "autoWatched", label: "Visto" },
+  show_completed: { icon: "completed", label: "Serie completada" },
+  collection_next: { icon: "saga", label: "Saga" },
+  watched: { icon: "watched", label: "Visto" },
+  rating: { icon: "rate", label: "Nota" },
+  watchlist: { icon: "watchlist", label: "Pendientes" },
+  favorite: { icon: "favorite", label: "Favoritas" },
+  reminder: { icon: "reminder", label: "Recordatorio" },
+  reminderReview: { icon: "reminderReview", label: "Recordatorio" },
+};
+
+/** Icono y rótulo para un tipo de alerta (también el `type` de un push). */
+export function alertLook(type) {
+  return ALERT_LOOK[type] || { icon: "bell", label: "Aviso" };
+}
+
+/**
+ * Contenido del aviso para un grupo de `freshAlertGroups`:
+ * `{ icon, label, title, text, posterPath, target }` (`target`: la alerta a la
+ * que lleva tocarlo; el recordatorio si lo hay, para puntuar directamente).
+ */
+export function describeAlertGroup(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  const primary = list[0];
+  if (!primary) return null;
+  const look = alertLook(
+    primary.kind === "reminder" ? (primary.item.needsRating ? "reminder" : "reminderReview") : primary.item.type,
+  );
+  return {
+    ...look,
+    title: list.find((row) => row.item.title)?.item.title || null,
+    text: list.map(alertSentence).filter(Boolean).join(". "),
+    posterPath: list.find((row) => row.item.posterPath)?.item.posterPath || null,
+    target: list.find((row) => row.kind === "reminder")?.item || list[list.length - 1].item,
+  };
 }
 
 function latest(rows) {

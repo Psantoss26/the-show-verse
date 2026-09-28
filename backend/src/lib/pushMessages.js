@@ -94,7 +94,7 @@ function time(value) {
  *
  * `delivered`: ids ya enviados, que no se repiten ni dentro de un grupo.
  *
- * @returns {Array<{ alertIds: string[], title: string, body: string,
+ * @returns {Array<{ type: string, alertIds: string[], title: string, body: string,
  *   url: string, image: string|null, tag: string }>}
  *   de la más antigua a la más reciente.
  */
@@ -121,7 +121,10 @@ export function buildPushMessages(
     group.sort((a, b) => Number(a.reminder) - Number(b.reminder) || time(a.item.createdAt) - time(b.item.createdAt));
     const target = group.find((alert) => alert.reminder)?.item || group[group.length - 1].item;
     const withPoster = group.find((alert) => alert.item.posterPath)?.item;
+    const primary = group[0];
     messages.push({
+      // Tipo de la alerta principal: la web elige con él icono y rótulo.
+      type: primary.reminder ? (primary.item.needsRating ? 'reminder' : 'reminderReview') : primary.item.type,
       alertIds: group.map((alert) => alert.item.id),
       title: group.find((alert) => alert.item.title)?.item.title || 'The Show Verse',
       body: group.map((alert) => alert.text).join('. '),

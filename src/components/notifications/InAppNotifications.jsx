@@ -3,110 +3,233 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Bell, ImageOff, X as XIcon } from "lucide-react";
+import {
+  Bell,
+  BookmarkMinus,
+  BookmarkPlus,
+  CheckCircle2,
+  DownloadCloud,
+  Eye,
+  EyeOff,
+  Heart,
+  HeartOff,
+  History,
+  ImageIcon,
+  Layers,
+  Link2,
+  ListPlus,
+  ListX,
+  MessageSquarePlus,
+  MessageSquareX,
+  MonitorPlay,
+  Shield,
+  SlidersHorizontal,
+  Sparkles,
+  Star,
+  StarOff,
+  ThumbsDown,
+  ThumbsUp,
+  Trophy,
+  Unlink,
+  UserMinus,
+  UserPlus,
+  UserRound,
+  X as XIcon,
+} from "lucide-react";
 import OptimizedImage from "@/components/OptimizedImage";
-import { AlertText, alertIcon } from "@/components/notifications/AlertsMenu";
 import { useAuth } from "@/context/AuthContext";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import {
   ALERTS_LOADED_EVENT,
   ALERTS_REFRESH_EVENT,
+  alertLook,
+  describeAlertGroup,
   freshAlertGroups,
 } from "@/lib/notifications/alerts";
+import {
+  TOAST_EVENT,
+  installActionFeedback,
+  isRecentLocalAction,
+  resolveTitleArt,
+} from "@/lib/notifications/actionFeedbackClient";
 import { syncDevicePush } from "@/lib/notifications/devicePush";
 import { getActivityDetailsHref } from "@/lib/profile/activityRatingTarget";
 
-// Ventanas emergentes DENTRO de la app para lo que pasa mientras está abierta:
-// un progreso sincronizado, un visto automático, un recordatorio de puntuar…
+// VENTANAS EMERGENTES de la app: el único sitio donde se avisa de algo mientras
+// la app está abierta. Tres fuentes, un solo aspecto (el cristal de la web):
 //
-// Llegan por dos caminos, y se enseñan una sola vez aunque lleguen por los dos:
-//   1. Push (instantáneo): el service worker (Web Push) o la app de Android
-//      (FCM) no pintan notificación del sistema si la app está a la vista y se
-//      lo pasan a la página.
-//   2. Alertas de la campana: al cargarlas (navegar, volver a la pestaña, o el
-//      sondeo de abajo cuando el dispositivo no tiene push) se enseña lo
-//      ocurrido desde que se abrió la app.
+//   1. Acciones de este dispositivo: cualquier cambio que termine bien
+//      (favoritas, notas, vistos, listas, reseñas, ajustes…). Ver
+//      installActionFeedback.
+//   2. Push con la app a la vista: el service worker (Web Push) o la app de
+//      Android (FCM) se lo pasan a la página en vez de pintar la notificación
+//      del sistema.
+//   3. Alertas de la campana: lo ocurrido desde que se abrió la app (sondeo
+//      cada minuto, al navegar o al volver a la pestaña), incluida la actividad
+//      hecha desde otro dispositivo.
+//
+// Otras partes de la web avisan con showToast (actionFeedbackClient.js).
 
-const VISIBLE_MS = 8_000;
+const VISIBLE_MS = 6_000;
 const MAX_TOASTS = 3;
-// Sin push, la campana se consulta cada minuto mientras la app se ve.
 const POLL_MS = 60_000;
 
-function posterUrl(path) {
-  return path ? `https://image.tmdb.org/t/p/w185${path}` : null;
+// Colores de cada aviso: los mismos tonos que la campana y la Actividad del
+// perfil (visto verde, pendientes azul, favoritas rojo, nota ámbar…).
+const TONES = {
+  emerald: { text: "text-emerald-400", bar: "bg-emerald-400", glow: "bg-emerald-500" },
+  sky: { text: "text-sky-400", bar: "bg-sky-400", glow: "bg-sky-500" },
+  red: { text: "text-red-400", bar: "bg-red-400", glow: "bg-red-500" },
+  amber: { text: "text-amber-400", bar: "bg-amber-400", glow: "bg-amber-500" },
+  purple: { text: "text-purple-400", bar: "bg-purple-400", glow: "bg-purple-500" },
+  orange: { text: "text-orange-400", bar: "bg-orange-400", glow: "bg-orange-500" },
+  pink: { text: "text-pink-400", bar: "bg-pink-400", glow: "bg-pink-500" },
+  zinc: { text: "text-zinc-300", bar: "bg-zinc-300", glow: "bg-zinc-400" },
+};
+
+const ICONS = {
+  favorite: { Icon: Heart, tone: "red", filled: true },
+  unfavorite: { Icon: HeartOff, tone: "red" },
+  watchlist: { Icon: BookmarkPlus, tone: "sky", filled: true },
+  unwatchlist: { Icon: BookmarkMinus, tone: "sky" },
+  rate: { Icon: Star, tone: "amber", filled: true },
+  unrate: { Icon: StarOff, tone: "amber" },
+  watched: { Icon: Eye, tone: "emerald" },
+  autoWatched: { Icon: CheckCircle2, tone: "emerald" },
+  unwatched: { Icon: EyeOff, tone: "zinc" },
+  history: { Icon: History, tone: "emerald" },
+  progress: { Icon: MonitorPlay, tone: "emerald" },
+  completed: { Icon: Trophy, tone: "amber", filled: true },
+  saga: { Icon: Layers, tone: "purple" },
+  reminder: { Icon: Star, tone: "amber", filled: true },
+  reminderReview: { Icon: MessageSquarePlus, tone: "orange" },
+  dismiss: { Icon: ThumbsDown, tone: "zinc" },
+  recommend: { Icon: Sparkles, tone: "purple" },
+  list: { Icon: ListPlus, tone: "purple" },
+  listRemove: { Icon: ListX, tone: "purple" },
+  review: { Icon: MessageSquarePlus, tone: "orange" },
+  reviewRemove: { Icon: MessageSquareX, tone: "orange" },
+  like: { Icon: ThumbsUp, tone: "pink", filled: true },
+  unlike: { Icon: ThumbsUp, tone: "zinc" },
+  follow: { Icon: UserPlus, tone: "sky" },
+  unfollow: { Icon: UserMinus, tone: "zinc" },
+  profile: { Icon: UserRound, tone: "emerald" },
+  settings: { Icon: SlidersHorizontal, tone: "emerald" },
+  security: { Icon: Shield, tone: "emerald" },
+  artwork: { Icon: ImageIcon, tone: "purple" },
+  connect: { Icon: Link2, tone: "emerald" },
+  disconnect: { Icon: Unlink, tone: "zinc" },
+  import: { Icon: DownloadCloud, tone: "sky" },
+  bell: { Icon: Bell, tone: "zinc" },
+};
+
+function posterSrc(toast) {
+  if (toast.image) return toast.image;
+  return toast.posterPath ? `https://image.tmdb.org/t/p/w185${toast.posterPath}` : null;
 }
 
 function Toast({ toast, onClose, onOpen }) {
   const reduceMotion = useReducedMotion();
   const [paused, setPaused] = useState(false);
+  const remainingRef = useRef(VISIBLE_MS);
 
-  // `onClose` es estable: el temporizador solo se reinicia al pausar o reanudar.
+  // Se cierra solo; al pasar el ratón o enfocarlo se detiene y luego sigue
+  // desde donde iba (la barra inferior se detiene con él).
   useEffect(() => {
     if (paused) return undefined;
-    const timer = window.setTimeout(() => onClose(toast.id), VISIBLE_MS);
-    return () => window.clearTimeout(timer);
+    const startedAt = Date.now();
+    const timer = window.setTimeout(() => onClose(toast.id), remainingRef.current);
+    return () => {
+      window.clearTimeout(timer);
+      remainingRef.current = Math.max(0, remainingRef.current - (Date.now() - startedAt));
+    };
   }, [paused, onClose, toast.id]);
 
-  const first = toast.rows?.[0];
-  const { Icon, tone, filled } = first ? alertIcon(first.kind, first.item) : { Icon: Bell, tone: "text-amber-400" };
-  const image = toast.image || posterUrl(toast.rows?.find((row) => row.item.posterPath)?.item.posterPath);
+  const { Icon, tone: toneKey, filled } = ICONS[toast.icon] || ICONS.bell;
+  const tone = TONES[toneKey] || TONES.zinc;
+  const src = posterSrc(toast);
+
+  const body = (
+    <>
+      <span className="relative flex h-12 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/[0.04] desktop:h-[4.5rem] desktop:w-12 desktop:rounded-xl">
+        {src ? (
+          <OptimizedImage src={src} alt="" width={48} height={72} className="h-full w-full object-cover" />
+        ) : (
+          <Icon className={`h-5 w-5 desktop:h-6 desktop:w-6 ${tone.text} ${filled ? "fill-current" : ""}`} aria-hidden="true" />
+        )}
+      </span>
+      <span className="min-w-0 flex-1 [text-shadow:0_1px_2px_rgba(0,0,0,0.6)]">
+        <span className={`flex items-center gap-1 text-[10px] font-bold uppercase leading-none tracking-[0.12em] desktop:gap-1.5 desktop:text-[11px] desktop:leading-normal ${tone.text}`}>
+          <Icon className={`h-3 w-3 shrink-0 desktop:h-3.5 desktop:w-3.5 ${filled ? "fill-current" : ""}`} aria-hidden="true" />
+          <span className="truncate">{toast.label || "Aviso"}</span>
+        </span>
+        {toast.title ? (
+          <span className="mt-1 block truncate text-[13px] font-extrabold leading-tight text-white desktop:mt-0.5 desktop:text-[15px]">
+            {toast.title}
+          </span>
+        ) : null}
+        {toast.text ? (
+          <span className="line-clamp-1 text-xs leading-snug text-zinc-300 desktop:mt-0.5 desktop:line-clamp-2 desktop:text-[13px]">{toast.text}</span>
+        ) : null}
+      </span>
+    </>
+  );
 
   return (
     <motion.li
       layout={!reduceMotion}
-      initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -12, scale: 0.98 }}
+      initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -14, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 24 }}
-      transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+      exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 32, scale: 0.97 }}
+      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
       onPointerEnter={() => setPaused(true)}
       onPointerLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
-      className={`pointer-events-auto flex items-stretch overflow-hidden rounded-2xl text-white ${LIQUID_GLASS_PANEL}`}
+      className={`pointer-events-auto relative overflow-hidden rounded-[1.25rem] text-white desktop:rounded-[1.75rem] ${LIQUID_GLASS_PANEL}`}
     >
-      <button
-        type="button"
-        onClick={() => onOpen(toast)}
-        className="flex min-w-0 flex-1 items-center gap-3 p-2 text-left text-sm transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/70"
-      >
-        <span className="h-16 w-11 shrink-0 overflow-hidden rounded-lg">
-          {image ? (
-            <OptimizedImage src={image} alt="" width={44} height={64} className="h-full w-full object-cover" />
-          ) : (
-            <span className="flex h-full w-full items-center justify-center bg-white/5 text-zinc-500">
-              <ImageOff className="h-3.5 w-3.5" aria-hidden="true" />
-            </span>
-          )}
-        </span>
-        <span className={`flex h-8 w-8 shrink-0 items-center justify-center ${tone}`} aria-hidden="true">
-          <Icon className={`h-5 w-5 ${filled ? "fill-current" : ""}`} />
-        </span>
-        <span className="min-w-0 flex-1 leading-snug [text-shadow:0_1px_2px_rgba(0,0,0,0.6)]">
-          {toast.rows ? (
-            toast.rows.map(({ kind, item }) => (
-              <span key={item.id} className="line-clamp-2">
-                <AlertText kind={kind} item={item} />
-              </span>
-            ))
-          ) : (
-            <>
-              <span className="block truncate font-bold">{toast.title}</span>
-              {toast.body ? <span className="line-clamp-2 text-zinc-300">{toast.body}</span> : null}
-            </>
-          )}
-        </span>
-      </button>
-      <button
-        type="button"
-        onClick={() => onClose(toast.id)}
-        aria-label="Cerrar aviso"
-        className="m-2 inline-flex h-7 w-7 shrink-0 items-center justify-center self-start rounded-full text-zinc-400 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-      >
-        <XIcon className="h-3.5 w-3.5" aria-hidden="true" />
-      </button>
+      {/* En táctil el aviso tapa la barra superior: un velo sin bordes para que
+          sus iconos no se transparenten por detrás del cristal. */}
+      <span aria-hidden="true" className="pointer-events-none absolute inset-0 bg-black/35 desktop:hidden" />
+      {/* Reflejo del color de la acción detrás del cartel. */}
+      <span
+        aria-hidden="true"
+        className={`pointer-events-none absolute -left-10 -top-12 h-32 w-32 rounded-full opacity-25 blur-3xl ${tone.glow}`}
+      />
+      <div className="relative flex min-h-[3.5rem] items-center gap-1 px-1.5 py-2.5 pr-1 md:px-2 desktop:min-h-0 desktop:p-2.5 desktop:pr-2">
+        {toast.url ? (
+          <button
+            type="button"
+            onClick={() => onOpen(toast)}
+            className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl text-left desktop:gap-3 desktop:rounded-2xl transition-colors hover:bg-white/[0.04] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+          >
+            {body}
+          </button>
+        ) : (
+          <div className="flex min-w-0 flex-1 items-center gap-2.5 desktop:gap-3">{body}</div>
+        )}
+        <button
+          type="button"
+          onClick={() => onClose(toast.id)}
+          aria-label="Cerrar aviso"
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center self-center rounded-full desktop:h-8 desktop:w-8 desktop:self-start text-zinc-400 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+        >
+          <XIcon className="h-3.5 w-3.5 desktop:h-4 desktop:w-4" aria-hidden="true" />
+        </button>
+      </div>
+      {/* Tiempo restante: un hilo dentro del panel, sin carril ni tocar el
+          borde, para no dibujar un filo en la parte de abajo. */}
+      <span aria-hidden="true" className="pointer-events-none absolute inset-x-5 bottom-1 h-[2px] overflow-hidden rounded-full desktop:inset-x-6 desktop:bottom-1.5">
+        <span
+          className={`sv-toast-timer block h-full origin-left rounded-full opacity-60 ${tone.bar}`}
+          style={{ animationDuration: `${VISIBLE_MS}ms`, animationPlayState: paused ? "paused" : "running" }}
+        />
+      </span>
     </motion.li>
   );
 }
+
+let toastSeq = 0;
 
 export default function InAppNotifications() {
   const { account } = useAuth();
@@ -120,8 +243,26 @@ export default function InAppNotifications() {
   // está en la campana.
   const openedAtRef = useRef(new Date().toISOString());
 
-  const push = useCallback((toast) => {
-    setToasts((current) => [...current.filter((t) => t.key !== toast.key), toast].slice(-MAX_TOASTS));
+  const push = useCallback((incoming) => {
+    toastSeq += 1;
+    const toast = { ...incoming, id: `t${toastSeq}` };
+    // Mismo `key`: el aviso nuevo sustituye al anterior en vez de apilarse.
+    setToasts((current) =>
+      [...current.filter((t) => !toast.key || t.key !== toast.key), toast].slice(-MAX_TOASTS),
+    );
+    // Completar título y cartel si la acción solo traía el id.
+    if (toast.tmdbId && (!toast.title || !toast.posterPath) && !toast.image) {
+      resolveTitleArt(toast.mediaType, toast.tmdbId).then((art) => {
+        if (!art) return;
+        setToasts((current) =>
+          current.map((t) =>
+            t.id === toast.id
+              ? { ...t, title: t.title || art.title, posterPath: t.posterPath || art.posterPath }
+              : t,
+          ),
+        );
+      });
+    }
   }, []);
 
   const close = useCallback((id) => {
@@ -135,6 +276,22 @@ export default function InAppNotifications() {
     },
     [close, router],
   );
+
+  // Avisos de acciones (fetch) y de cualquier parte de la web (showToast).
+  useEffect(() => {
+    if (!accountId) return undefined;
+    installActionFeedback();
+    const onToast = (event) => {
+      const detail = event.detail;
+      if (!detail || (!detail.text && !detail.title)) return;
+      push({
+        ...detail,
+        url: detail.url || (detail.tmdbId ? getActivityDetailsHref(detail) : null),
+      });
+    };
+    window.addEventListener(TOAST_EVENT, onToast);
+    return () => window.removeEventListener(TOAST_EVENT, onToast);
+  }, [accountId, push]);
 
   // Registrar de nuevo el dispositivo con esta cuenta, si ya tenía push.
   useEffect(() => {
@@ -161,10 +318,10 @@ export default function InAppNotifications() {
       if (ids.length && ids.every((id) => shownRef.current.has(id))) return;
       ids.forEach((id) => shownRef.current.add(id));
       push({
-        id: `push:${message.tag || ""}:${Date.now()}`,
-        key: message.tag || `push:${Date.now()}`,
-        title: message.title,
-        body: message.body,
+        ...alertLook(message.type),
+        key: message.tag || null,
+        title: message.title === "The Show Verse" ? null : message.title,
+        text: message.body,
         url: message.url,
         image: message.image || null,
       });
@@ -198,14 +355,18 @@ export default function InAppNotifications() {
       const groups = freshAlertGroups(event.detail.alerts, {
         since: openedAtRef.current,
         shown: shownRef.current,
+        skip: isRecentLocalAction,
       });
       for (const group of groups) {
         group.rows.forEach(({ item }) => shownRef.current.add(item.id));
-        const target = group.rows.find((row) => row.kind === "reminder")?.item || group.rows[group.rows.length - 1].item;
+        const content = describeAlertGroup(group.rows);
+        if (!content?.text) continue;
+        const { target, ...rest } = content;
         push({
-          id: `alerts:${group.key}:${Date.now()}`,
+          ...rest,
           key: `tsv:${group.key}`,
-          rows: group.rows,
+          tmdbId: target.tmdbId,
+          mediaType: target.mediaType,
           url: getActivityDetailsHref(target),
         });
       }
@@ -225,7 +386,14 @@ export default function InAppNotifications() {
   }, [accountId]);
 
   // Capa superior (popover manual): por encima de modales y sin cerrarse al
-  // pulsar fuera. Sin soporte de popover queda como capa fija normal.
+  // pulsar fuera.
+  //
+  // En táctil (móvil y tablet) el aviso va arriba del todo, SOBRE la barra
+  // superior, y la tapa por completo: a todo el ancho (los botones de menú,
+  // buscar, alertas y perfil están pegados a los bordes, a 8-12 px) y con al
+  // menos el alto de sus botones (44 px centrados en una barra de 48-64 px).
+  // Más estrecho dejaba asomar medio botón por los lados. En escritorio va
+  // bajo la barra y a la derecha, sin taparla. Sin soporte de popover queda como capa fija normal.
   useEffect(() => {
     const el = containerRef.current;
     if (!el || typeof el.showPopover !== "function") return;
@@ -241,9 +409,9 @@ export default function InAppNotifications() {
       ref={containerRef}
       popover="manual"
       aria-label="Avisos"
-      className="pointer-events-none fixed inset-auto right-4 top-[calc(env(safe-area-inset-top)+4.5rem)] z-[100000] m-0 w-[min(24rem,calc(100vw-2rem))] overflow-visible border-0 bg-transparent p-0 text-white"
+      className="pointer-events-none fixed inset-auto left-1.5 right-1.5 top-[calc(env(safe-area-inset-top)+0.375rem)] z-[100000] m-0 w-auto max-w-none overflow-visible border-0 bg-transparent p-0 text-white desktop:left-auto desktop:right-4 desktop:top-[calc(env(safe-area-inset-top)+4.5rem)] desktop:w-[24rem]"
     >
-      <ol aria-live="polite" className="flex flex-col gap-2">
+      <ol aria-live="polite" className="flex flex-col gap-1.5 desktop:gap-2.5">
         <AnimatePresence initial={false}>
           {toasts.map((toast) => (
             <Toast key={toast.id} toast={toast} onClose={close} onOpen={open} />
