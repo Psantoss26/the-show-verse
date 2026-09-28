@@ -145,6 +145,7 @@ async function sendFcm(subscription, message) {
     // Mensaje SOLO de datos: así lo recibe siempre la app, que decide si lo
     // enseña dentro (app abierta) o como notificación del sistema.
     const data = {
+      type: message.type || '',
       title: message.title,
       body: message.body,
       url: message.url,

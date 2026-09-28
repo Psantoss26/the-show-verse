@@ -105,9 +105,8 @@ function Title({ item }) {
 }
 
 // Frase de cada alerta, con la misma construcción que la Actividad del perfil
-// ("Has visto S01E02 de <título>"), en primera persona. También la usan las
-// ventanas emergentes (InAppNotifications).
-export function AlertText({ kind, item }) {
+// ("Has visto S01E02 de <título>"), en primera persona.
+function AlertText({ kind, item }) {
   const code = episodeCode(item);
   if (kind === "reminder") {
     // "Puntúa la temporada 2 de", "Puntúa y reseña la película"… La reseña solo
@@ -156,7 +155,7 @@ export function AlertText({ kind, item }) {
   return <>Has visto {code}<Title item={item} /></>;
 }
 
-export function alertIcon(kind, item) {
+function alertIcon(kind, item) {
   if (kind === "reminder") {
     return item.needsRating
       ? { Icon: Star, tone: "text-amber-400", filled: true }
@@ -565,7 +564,7 @@ export default function AlertsMenu({ account, variant = "desktop", heroNavMode =
         {unread > 0 ? (
           <span
             aria-hidden="true"
-            className="absolute right-0.5 top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-red-500 px-1 text-[10px] font-black leading-none text-white shadow-[0_0_0_2px_rgba(0,0,0,0.6)]"
+            className="absolute right-0.5 top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-red-500 px-1 text-[10px] font-black leading-none text-white shadow-[0_2px_8px_rgba(0,0,0,0.45)]"
           >
             {unread > 9 ? "9+" : unread}
           </span>

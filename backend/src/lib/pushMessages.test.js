@@ -17,6 +17,7 @@ test('push: visto automático y su recordatorio van en UNA notificación', () =>
   assert.equal(messages[0].url, '/details/tv/1399/season/1/episode/3');
   assert.equal(messages[0].image, 'https://image.tmdb.org/t/p/w342/p.jpg');
   assert.equal(messages[0].tag, 'tsv:tv:1399');
+  assert.equal(messages[0].type, 'auto_watched');
 });
 
 test('push: textos de película, temporada y serie', () => {

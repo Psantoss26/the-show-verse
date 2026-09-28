@@ -92,6 +92,7 @@ export default async function pushRoutes(fastify) {
       url: '/',
       image: null,
       tag: 'tsv:test',
+      type: 'test',
     });
     return reply.send({ ok: sent > 0, sent, devices: subscriptions.length });
   });

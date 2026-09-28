@@ -10,6 +10,17 @@ enseñarlos:
 | App abierta y a la vista | Ventana emergente dentro de la app (`InAppNotifications`) | Push (instantáneo) o, sin push, sondeo de la campana cada minuto |
 | App cerrada o en segundo plano | Notificación del sistema | Web Push (navegador, PWA, escritorio) o FCM (app de Android) |
 
+Además, **cualquier acción hecha en la web** (favoritas, pendientes, notas,
+vistos, listas, reseñas, seguir, ajustes, conexiones…) muestra su ventana
+emergente al terminar bien. `installActionFeedback`
+(`src/lib/notifications/actionFeedbackClient.js`) envuelve `fetch` y las reglas
+de `src/lib/notifications/actionFeedback.js` traducen cada petición de escritura
+a `/api/*` en un aviso. Una ruta nueva que modifique algo solo necesita su regla
+allí. Otras partes de la web pueden avisar con `showToast(...)`.
+
+Todas las ventanas emergentes usan el mismo diseño liquid glass
+(`LIQUID_GLASS_PANEL`), con los colores de cada sección.
+
 ## Flujo
 
 1. Un cambio que puede generar una alerta termina bien:
