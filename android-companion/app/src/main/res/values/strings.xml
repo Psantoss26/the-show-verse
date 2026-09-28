@@ -27,6 +27,8 @@
     <string name="notif_open_details">Ver en The Show Verse</string>
     <string name="notif_channel_name">Acceso rápido a la ficha</string>
     <string name="notif_channel_desc">Notificación con enlace a la página de detalles del título que estás viendo.</string>
+    <string name="push_channel_name">Avisos</string>
+    <string name="push_channel_desc">Lo sincronizado, lo terminado y lo que falta por puntuar o reseñar.</string>
     <!-- Servicio de accesibilidad (detección de ficha sin reproducir) -->
     <string name="a11y_service_label">Detección de fichas de streaming</string>
     <string name="a11y_service_desc">Permite a The Show Verse Sync detectar el título de la ficha que abres en tus apps de streaming (Netflix, Prime Video, Disney+, Max…) sin necesidad de reproducirlo, para mostrarte un acceso rápido a su página en The Show Verse. Solo lee esas apps y no guarda ni comparte el contenido de la pantalla.</string>

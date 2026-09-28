@@ -1,11 +1,13 @@
 package com.theshowverse.sync
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.DownloadManager
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
@@ -34,6 +36,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
 import com.theshowverse.sync.databinding.ActivityWebBinding
+import org.json.JSONObject
 
 /**
  * LA APP. The Show Verse completo dentro de una carcasa nativa.
@@ -85,6 +88,12 @@ class WebAppActivity : AppCompatActivity() {
             )
         }
 
+    /** Permiso de notificaciones (Android 13+). La web espera la respuesta. */
+    private val permisoPushLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+            responderPermisoPush()
+        }
+
     /** Los ajustes de servidor devuelven aquí para recargar con el origen nuevo. */
     private val serverSettingsLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -112,6 +121,9 @@ class WebAppActivity : AppCompatActivity() {
             binding.webView.reload()
         }
         binding.serverButton.setOnClickListener { abrirAjustesDeServidor() }
+
+        // Token de notificaciones push al día (si la build lleva Firebase).
+        PushNotifications.refreshToken(this, prefs)
 
         aplicarOrigen(recargar = false)
         // Prioridad: el enlace con el que han abierto la app > la última página
@@ -213,6 +225,7 @@ class WebAppActivity : AppCompatActivity() {
                 ::evaluarJs,
                 ::abrirEnNavegador,
                 ::bloquearRecarga,
+                ::pedirPermisoPush,
             ),
             WebAppBridge.NAME,
         )
@@ -386,6 +399,27 @@ class WebAppActivity : AppCompatActivity() {
      */
     private fun evaluarJs(codigo: String) {
         runOnUiThread { binding.webView.evaluateJavascript(codigo, null) }
+    }
+
+    // ------------------------------------------------------ notificaciones push
+
+    private fun pedirPermisoPush() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            PushNotifications.permission(this) == "default"
+        ) {
+            permisoPushLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            responderPermisoPush()
+        }
+    }
+
+    /** Contesta a la web con el permiso final, después de tener el token. */
+    private fun responderPermisoPush() {
+        val estado = PushNotifications.permission(this)
+        val responder = {
+            evaluarJs("window.__tsvPushPermissionResult && window.__tsvPushPermissionResult(${JSONObject.quote(estado)})")
+        }
+        if (estado == "granted") PushNotifications.refreshToken(this, prefs) { responder() } else responder()
     }
 
     // ------------------------------------------------------------- navegación
@@ -579,6 +613,7 @@ class WebAppActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         binding.webView.onResume()
+        aLaVista = this
         // Estando delante, la vigilancia del login sobra: la web reclama la
         // sesión al recuperar el foco.
         LoginWatcher.cancelar()
@@ -589,6 +624,7 @@ class WebAppActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
+        if (aLaVista === this) aLaVista = null
         binding.webView.onPause()
         // Volcado a disco: sin esto se pierde la sesión si el sistema mata la app.
         CookieManager.getInstance().flush()
@@ -607,6 +643,23 @@ class WebAppActivity : AppCompatActivity() {
     companion object {
         private const val INICIO_INDICADOR_DP = -40
         private const val FIN_INDICADOR_DP = 64
+
+        /** Instancia que está delante del usuario, o null con la app en segundo plano. */
+        @Volatile
+        private var aLaVista: WebAppActivity? = null
+
+        /**
+         * Lanza `CustomEvent(nombre, { detail })` en la web si la app está a la
+         * vista. [detalleJson] tiene que ser JSON válido. Devuelve false si no
+         * hay nadie delante (entonces el aviso va a la barra de notificaciones).
+         */
+        fun enviarEventoALaWeb(nombre: String, detalleJson: String): Boolean {
+            val actividad = aLaVista ?: return false
+            actividad.evaluarJs(
+                "window.dispatchEvent(new CustomEvent(${JSONObject.quote(nombre)}, { detail: $detalleJson }))",
+            )
+            return true
+        }
 
         /** Intent explícito para abrir una URL de la web DENTRO de la app. */
         fun intentFor(context: Context, url: String): Intent =

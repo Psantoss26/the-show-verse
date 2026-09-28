@@ -437,3 +437,53 @@ export function useSyncStatus() {
 
   return { inApp, status, refresh: () => setStatus(readSyncStatus()) };
 }
+
+// ---------------------------------------------------------------------------
+// Notificaciones push (Firebase Cloud Messaging).
+//
+// El WebView no recibe Web Push: las notificaciones con la app cerrada llegan
+// por FCM al nativo. La web lee el token por el puente y lo registra en el
+// backend (lib/notifications/devicePush.js). Con la app abierta, el nativo no
+// pinta nada: avisa a la página con el evento `tsv:push` y es la web la que
+// enseña la ventana emergente.
+
+/** ¿Esta build de la app trae Firebase configurado? */
+export function supportsAndroidPush() {
+  return call("pushAvailable", false) === true;
+}
+
+/** "granted" | "denied" | "default" (Android 13+ pide permiso en tiempo de ejecución). */
+export function androidPushPermission() {
+  const value = call("pushPermission", "denied");
+  return ["granted", "denied", "default"].includes(value) ? value : "denied";
+}
+
+/** Token FCM de este dispositivo, o "" si aún no lo tiene. */
+export function androidPushToken() {
+  return call("pushToken", "") || "";
+}
+
+const ESPERA_PERMISO_MS = 60000;
+
+/**
+ * Pide el permiso de notificaciones del sistema. El diálogo es asíncrono: el
+ * nativo responde llamando a `window.__tsvPushPermissionResult(estado)`.
+ * Resuelve con el estado final; nunca rechaza.
+ */
+export function requestAndroidPushPermission() {
+  if (androidPushPermission() === "granted") return Promise.resolve("granted");
+  return new Promise((resolve) => {
+    let hecho = false;
+    const terminar = (estado) => {
+      if (hecho) return;
+      hecho = true;
+      window.clearTimeout(tope);
+      if (window.__tsvPushPermissionResult === receptor) delete window.__tsvPushPermissionResult;
+      resolve(estado);
+    };
+    const receptor = (estado) => terminar(estado === "granted" ? "granted" : androidPushPermission());
+    const tope = window.setTimeout(() => terminar(androidPushPermission()), ESPERA_PERMISO_MS);
+    window.__tsvPushPermissionResult = receptor;
+    if (call("requestPushPermission", false) !== true) terminar(androidPushPermission());
+  });
+}

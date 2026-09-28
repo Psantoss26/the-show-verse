@@ -19,6 +19,15 @@ fun signingSecret(property: String, environment: String): String? =
     (keystoreProperties.getProperty(property) ?: System.getenv(environment))
         ?.takeIf { it.isNotBlank() }
 
+// Notificaciones push (Firebase Cloud Messaging). La configuración del proyecto
+// de Firebase va en app/google-services.json (Consola de Firebase → Configuración
+// del proyecto → Tus apps → Android, paquete com.theshowverse.app). Sin ese
+// fichero la app compila igual y simplemente no ofrece notificaciones push.
+val hasFirebaseConfig = file("google-services.json").exists()
+if (hasFirebaseConfig) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 val appVersionName = "1.3"
 
 // Cliente OAuth WEB de Google (el mismo que usa la web). Es el `serverClientId`
@@ -52,6 +61,7 @@ android {
         // dentro de la app (además del puente JS).
         buildConfigField("String", "UA_SUFFIX", "\"TheShowVerseApp/$appVersionName\"")
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
+        buildConfigField("boolean", "PUSH_CONFIGURED", hasFirebaseConfig.toString())
     }
 
     signingConfigs {
@@ -118,6 +128,10 @@ dependencies {
     implementation("androidx.credentials:credentials:1.3.0")
     implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
+
+    // Notificaciones push (ver hasFirebaseConfig arriba).
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-messaging")
 
     testImplementation("junit:junit:4.13.2")
 }

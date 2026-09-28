@@ -17,6 +17,7 @@ import {
   check,
   real,
   unique,
+  primaryKey,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
@@ -556,4 +557,39 @@ export const streamingEvents = pgTable('streaming_events', {
 }, (t) => ({
   eventUnique: uniqueIndex('idx_streaming_event_unique').on(t.userId, t.eventId),
   entityTime: index('idx_streaming_event_entity_time').on(t.userId, t.entityKey, t.observedAt),
+}));
+
+// ─────────────────────────────────────────────
+// NOTIFICACIONES PUSH
+// ─────────────────────────────────────────────
+// Destinos de notificaciones del dispositivo. `kind`:
+//   - 'web': suscripción Web Push de un navegador (endpoint + claves);
+//   - 'fcm': token de Firebase Cloud Messaging de la app de Android.
+// `endpoint` es la URL de Web Push o el token FCM, único en todo el sistema: si
+// un dispositivo cambia de cuenta, la fila pasa a la nueva.
+export const pushSubscriptions = pgTable('push_subscriptions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  kind: text('kind').notNull(),
+  endpoint: text('endpoint').notNull(),
+  p256dh: text('p256dh'),
+  auth: text('auth'),
+  userAgent: text('user_agent'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  endpointUnique: uniqueIndex('idx_push_subscriptions_endpoint').on(t.endpoint),
+  userIdx: index('idx_push_subscriptions_user').on(t.userId),
+  kindCheck: check('chk_push_subscriptions_kind', sql`kind IN ('web', 'fcm')`),
+}));
+
+// Alertas ya enviadas como push, para no repetir una alerta en cada cálculo.
+// Se podan pasados unos días (las alertas caducan antes).
+export const pushDeliveries = pgTable('push_deliveries', {
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  alertId: text('alert_id').notNull(),
+  sentAt: timestamp('sent_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.userId, t.alertId] }),
+  sentAtIdx: index('idx_push_deliveries_sent_at').on(t.userId, t.sentAt),
 }));

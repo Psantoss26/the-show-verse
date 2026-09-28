@@ -6,6 +6,12 @@
 
 const PREFIX = "showverse:alerts";
 
+// Eventos de ventana entre la campana (AlertsMenu) y las ventanas emergentes
+// (InAppNotifications): la campana avisa al cargar alertas y atiende peticiones
+// de refresco.
+export const ALERTS_LOADED_EVENT = "tsv:alerts-loaded";
+export const ALERTS_REFRESH_EVENT = "tsv:alerts-refresh";
+
 export const alertsLastSeenKey = (accountId) => `${PREFIX}:lastSeen:${accountId}`;
 export const alertsDismissedKey = (accountId) => `${PREFIX}:dismissed:${accountId}`;
 export const alertsUnreadKey = (accountId) => `${PREFIX}:unread:${accountId}`;
@@ -141,4 +147,37 @@ export function upcomingRelease(date, now = Date.now()) {
   const time = Date.parse(date || "");
   if (!Number.isFinite(time) || time <= now) return null;
   return new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short", year: "numeric" }).format(time);
+}
+
+/**
+ * Alertas que merecen ventana emergente: novedades y recordatorios (no la
+ * actividad propia) posteriores a `since` y aún no enseñadas. Agrupadas por
+ * título, como las notificaciones push, de la más antigua a la más reciente.
+ * Devuelve `[{ key, rows: [{ kind, item }] }]`.
+ */
+export function freshAlertGroups(alerts, { since, shown = new Set() } = {}) {
+  const from = time(since);
+  const rows = [
+    ...(alerts?.events || []).map((item) => ({ kind: "event", item })),
+    ...(alerts?.reminders || []).map((item) => ({ kind: "reminder", item })),
+  ].filter(({ item }) => item?.id && !shown.has(item.id) && time(item.createdAt) >= from);
+
+  const groups = new Map();
+  for (const row of rows) {
+    const key = `${row.item.mediaType}:${Number(row.item.tmdbId)}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  }
+  return [...groups]
+    .map(([key, group]) => ({
+      key,
+      rows: group.sort(
+        (a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || time(a.item.createdAt) - time(b.item.createdAt),
+      ),
+    }))
+    .sort((a, b) => latest(a.rows) - latest(b.rows));
+}
+
+function latest(rows) {
+  return Math.max(...rows.map(({ item }) => time(item.createdAt)));
 }
