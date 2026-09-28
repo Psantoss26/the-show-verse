@@ -80,7 +80,7 @@ const GenreRadarChart = dynamic(
   () => loadProfileCharts().then((module) => module.GenreRadarChart),
   { ssr: false, loading: () => <ChartLoading /> },
 );
-// Vista neural: carga diferida (canvas, d3-force y su worker). Mientras se
+// Vista neuronal: carga diferida (canvas, d3-force y su worker). Mientras se
 // descarga se muestra su esqueleto, con el mismo tamaño que el lienzo. El
 // código se precarga en reposo (ver `preloadNeuralView`), así que al abrir la
 // pestaña casi nunca llega a verse.
@@ -191,7 +191,7 @@ function CountStat({ value, label, href, icon: Icon, iconClassName = "text-emera
   return <div className={className}>{body}</div>;
 }
 
-// Tarjeta de recuento en píldora, para la cabecera compacta de la vista neural.
+// Tarjeta de recuento en píldora, para la cabecera compacta de la vista neuronal.
 // Mismo icono y color que CountStat; en móvil solo icono y número.
 function CompactCount({ value, label, href, icon: Icon, iconClassName }) {
   const className = "inline-flex h-8 items-center gap-1.5 rounded-full bg-gradient-to-br from-white/10 to-white/5 px-2.5 text-xs shadow-lg transition hover:from-white/[0.16] hover:to-white/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70";
@@ -735,7 +735,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
   const { user: viewer } = useAuth();
   // Cerrar sesión pide confirmación, igual que en el resto de páginas de usuario.
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  // Cabecera compacta: solo en la vista neural, para que el lienzo gane alto.
+  // Cabecera compacta: solo en la vista neuronal, para que el lienzo gane alto.
   // Por defecto compacta; la preferencia guardada se aplica antes de pintar.
   const [neuralHeaderCollapsed, setNeuralHeaderCollapsed] = useState(NEURAL_DEFAULTS.headerCollapsed);
   const [headerAnimating, setHeaderAnimating] = useState(false);
@@ -800,7 +800,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
       for (const section of PROFILE_TAB_IDS) {
         router.prefetch(profileTabHref(username, section, routeBase));
       }
-      // Código de la vista neural siempre; sus DATOS solo si esta cuenta ya
+      // Código de la vista neuronal siempre; sus DATOS solo si esta cuenta ya
       // la ha usado (es una petición: no se gasta en quien no la abre).
       loadNeuralView().catch(() => {});
       if (hasNeuralPreferences(viewerId)) prefetchNeuralGraph(username);
@@ -1044,10 +1044,10 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
           compactHeader ? "@[640px]/detail-page:pt-4" : "@[640px]/detail-page:pt-8 @[1024px]/detail-page:pt-12"
         }`}
       >
-        {/* ── CABECERA COMPACTA (vista neural) ──
+        {/* ── CABECERA COMPACTA (vista neuronal) ──
             Una fila con avatar y nombre en lugar de la cabecera completa. Se
             pliega y despliega con filas de rejilla (0fr ↔ 1fr), que animan la
-            ALTURA real: el lienzo de la vista neural crece a la vez. */}
+            ALTURA real: el lienzo de la vista neuronal crece a la vez. */}
         <div
           aria-hidden={!compactHeader}
           inert={!compactHeader || undefined}
@@ -1385,7 +1385,7 @@ function ProfileTabs({ tab, username, sections, onNavigate, routeBase, compact =
     { id: "profile", label: "Perfil" },
     { id: "level", label: "Nivel" },
     { id: "statistics", label: "Estadísticas" },
-    { id: "neural", label: "Neural" },
+    { id: "neural", label: "Neuronal" },
     { id: "activity", label: "Actividad", count: sections?.activity },
     { id: "watched", label: "Diario", count: sections?.watched },
     { id: "reviews", label: "Reseñas", count: sections?.reviews },
@@ -1443,7 +1443,7 @@ function ProfileTabs({ tab, username, sections, onNavigate, routeBase, compact =
             href={profileTabHref(username, it.id, routeBase)}
             scroll={false}
             onClick={handleNavigate}
-            // Vista neural: al mostrar intención de abrirla (ratón encima,
+            // Vista neuronal: al mostrar intención de abrirla (ratón encima,
             // foco o dedo), se adelantan su código y sus datos.
             {...(it.id === "neural"
               ? {

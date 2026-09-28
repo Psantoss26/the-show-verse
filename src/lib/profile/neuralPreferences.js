@@ -1,4 +1,4 @@
-// Preferencias de la vista neural del perfil, guardadas en este navegador como
+// Preferencias de la vista neuronal del perfil, guardadas en este navegador como
 // las del resto de páginas (modo de vista de Favoritos, Diario, Historial…).
 // Van por CUENTA: cada usuario que entra en el dispositivo conserva las suyas.
 //
@@ -60,7 +60,7 @@ export function readNeuralPreferences(accountId) {
   return prefs;
 }
 
-/** ¿Esta cuenta ha usado ya la vista neural en este navegador? */
+/** ¿Esta cuenta ha usado ya la vista neuronal en este navegador? */
 export function hasNeuralPreferences(accountId) {
   if (typeof window === "undefined") return false;
   try {

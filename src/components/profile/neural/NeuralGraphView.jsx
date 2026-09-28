@@ -1120,7 +1120,7 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
 
   const searchField = (className, placeholder, inputClass) => (
     <label className={`relative min-w-0 ${className}`}>
-      <span className="sr-only">Buscar en la vista neural</span>
+      <span className="sr-only">Buscar en la vista neuronal</span>
       <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-400" aria-hidden="true" />
       <input
         value={query}
@@ -1203,7 +1203,7 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
     return (
       <section className="flex min-h-72 flex-col items-center justify-center rounded-2xl bg-white/[0.02] px-6 text-center">
         <Network className="h-7 w-7 text-emerald-400/70" />
-        <h2 className="mt-4 text-lg font-black text-white">No se pudo cargar la vista neural</h2>
+        <h2 className="mt-4 text-lg font-black text-white">No se pudo cargar la vista neuronal</h2>
         <p className="mt-1 max-w-sm text-sm text-zinc-500">Vuelve a intentarlo en unos segundos.</p>
       </section>
     );
@@ -1247,7 +1247,7 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
       >
         {/* Sin recorte a la vista: los anillos de foco no deben cortarse. */}
         <div className={`min-h-0 ${!menuShown || menuAnimating ? "overflow-hidden" : ""}`}>
-      <section aria-label="Opciones de la vista neural" className="relative z-20 mb-5 space-y-2 @[640px]/detail-page:mb-6">
+      <section aria-label="Opciones de la vista neuronal" className="relative z-20 mb-5 space-y-2 @[640px]/detail-page:mb-6">
         <div className="flex gap-2 @[1024px]/detail-page:hidden">
           {searchField("flex-1", "Buscar...", "text-base")}
           <button
@@ -1285,7 +1285,7 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
       {/* ── LIENZO ── */}
       <section
         ref={stageRef}
-        aria-label="Vista neural de títulos"
+        aria-label="Vista neuronal de títulos"
         className={`relative isolate overflow-hidden ${
           fullscreen
             ? "min-h-0 flex-1 rounded-2xl bg-[radial-gradient(120%_90%_at_50%_0%,rgba(16,185,129,0.07),transparent_60%),radial-gradient(90%_80%_at_50%_100%,rgba(99,102,241,0.06),transparent_60%)]"
@@ -1322,7 +1322,7 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
           <div className={`pointer-events-auto flex min-w-0 ${searchOpen ? "flex-1 @[1024px]/detail-page:flex-none" : ""}`}>
           {searchOpen ? (
             <label className={`flex h-10 w-full items-center gap-2 rounded-xl pl-3 pr-1 @[1024px]/detail-page:w-72 ${LIQUID_GLASS_PANEL}`}>
-              <span className="sr-only">Buscar en la vista neural</span>
+              <span className="sr-only">Buscar en la vista neuronal</span>
               <Search className="h-4 w-4 shrink-0 text-emerald-400" aria-hidden="true" />
               <input
                 ref={stageSearchRef}
@@ -1358,7 +1358,7 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
             </label>
           ) : (
             <span className={`flex rounded-xl p-1 ${LIQUID_GLASS_PANEL}`}>
-              <StageButton label="Buscar en la vista neural" icon={Search} onClick={() => setSearchOpen(true)} />
+              <StageButton label="Buscar en la vista neuronal" icon={Search} onClick={() => setSearchOpen(true)} />
             </span>
           )}
           </div>
@@ -1440,7 +1440,7 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
 
             {/* Pie: recuento, estado y ficha del nodo seleccionado. */}
             {/* En móvil, por encima de la barra inferior flotante. */}
-            <div className="pointer-events-none absolute inset-x-4 bottom-[calc(5.5rem_+_env(safe-area-inset-bottom))] flex flex-col items-start gap-2 @[640px]/detail-page:inset-x-3 @[640px]/detail-page:bottom-3 @[1024px]/detail-page:right-56">
+            <div className="pointer-events-none absolute inset-x-4 bottom-[calc(5.5rem_+_env(safe-area-inset-bottom))] flex flex-col items-center gap-2 text-center @[640px]/detail-page:items-start @[640px]/detail-page:text-left @[640px]/detail-page:inset-x-3 @[640px]/detail-page:bottom-3 @[1024px]/detail-page:right-56">
               <SelectedCard
                 node={selectedNode}
                 graph={graph}

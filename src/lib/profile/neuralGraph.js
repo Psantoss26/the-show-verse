@@ -1,4 +1,4 @@
-// Reglas PURAS de la vista neural del perfil (sin React ni canvas).
+// Reglas PURAS de la vista neuronal del perfil (sin React ni canvas).
 //
 // El backend manda una carga compacta (backend/src/lib/neuralGraphCore.js):
 //   genres: [[id, nombre]], sagas: [[id, nombre]],

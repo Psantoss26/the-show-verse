@@ -1,5 +1,5 @@
 // src/lib/neuralGraphCore.js
-// Reglas PURAS de la vista neural del perfil (sin BD ni red), para poder
+// Reglas PURAS de la vista neuronal del perfil (sin BD ni red), para poder
 // probarlas con node:test. La consulta y la caché viven en neuralGraph.js.
 //
 // La vista es un grafo al estilo de la de Obsidian: cada título registrado por

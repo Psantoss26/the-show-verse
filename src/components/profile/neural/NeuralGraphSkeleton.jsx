@@ -1,6 +1,6 @@
 "use client";
 
-// Pieza LIGERA de la vista neural (sin canvas ni d3-force): el marco del
+// Pieza LIGERA de la vista neuronal (sin canvas ni d3-force): el marco del
 // lienzo y su esqueleto de carga. La usa el perfil mientras se descarga la
 // vista, y la propia vista mientras llegan los datos, con el MISMO tamaño y
 // forma: el relevo entre una y otra no mueve nada.
@@ -79,7 +79,7 @@ export function NeuralSkeletonArt() {
           <circle key={`c${i}`} cx={hub.x} cy={hub.y} r={hub.r} fill="rgba(16,185,129,0.22)" />
         ))}
       </svg>
-      <span className="sr-only">Cargando la vista neural…</span>
+      <span className="sr-only">Cargando la vista neuronal…</span>
     </div>
   );
 }
@@ -89,7 +89,7 @@ export default function NeuralGraphSkeleton() {
   const ref = useRef(null);
   useStageTop(ref);
   return (
-    <section ref={ref} aria-busy="true" aria-label="Vista neural de títulos" className={`relative isolate overflow-hidden ${NEURAL_STAGE_CLASS}`}>
+    <section ref={ref} aria-busy="true" aria-label="Vista neuronal de títulos" className={`relative isolate overflow-hidden ${NEURAL_STAGE_CLASS}`}>
       <NeuralSkeletonArt />
     </section>
   );

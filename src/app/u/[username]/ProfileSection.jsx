@@ -491,7 +491,7 @@ function relativeActivityTime(value) {
   return new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short", year: "numeric" }).format(date);
 }
 
-// Exportado: la vista neural reutiliza el mismo menú que las demás secciones.
+// Exportado: la vista neuronal reutiliza el mismo menú que las demás secciones.
 export function ProfileMenuDropdown({ label, valueLabel, icon: Icon, options, value, onChange }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
