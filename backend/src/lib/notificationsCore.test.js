@@ -5,6 +5,7 @@ import {
   parseEntityKey,
   ratingTargetKey,
   splitAutoCompleted,
+  watchEventAt,
 } from './notificationsCore.js';
 
 test('parseEntityKey: episodio, película y claves inválidas', () => {
@@ -14,29 +15,96 @@ test('parseEntityKey: episodio, película y claves inválidas', () => {
   assert.equal(parseEntityKey(''), null);
 });
 
-test('recordatorios: uno por título, con lo que falta', () => {
+const at = (h) => `2026-09-20T${String(h).padStart(2, '0')}:00:00.000Z`;
+
+test('recordatorios: película pide nota y reseña; episodio solo nota', () => {
   const rows = [
-    { tmdbId: 1399, mediaType: 'tv', season: 1, episode: 3, createdAt: '2026-09-20T10:00:00Z' },
-    { tmdbId: 1399, mediaType: 'tv', season: 1, episode: 2, createdAt: '2026-09-20T09:00:00Z' },
-    { tmdbId: 603, mediaType: 'movie', season: null, episode: null, createdAt: '2026-09-19T09:00:00Z' },
+    { id: 'e3', tmdbId: 1399, mediaType: 'tv', season: 1, episode: 3, createdAt: at(10) },
+    { id: 'e2', tmdbId: 1399, mediaType: 'tv', season: 1, episode: 2, createdAt: at(9) },
+    { id: 'm', tmdbId: 603, mediaType: 'movie', season: null, episode: null, createdAt: at(8) },
   ];
-  const rated = new Set(['movie:603']);
-  const reviewed = new Set();
-  const out = buildReminders(rows, rated, reviewed);
+  const out = buildReminders(rows, new Set(['movie:603']), new Set());
   assert.equal(out.length, 2);
-  assert.equal(out[0].episode, 3); // el visionado más reciente de la serie
-  assert.equal(out[0].needsRating, true);
-  assert.equal(out[0].needsReview, true);
-  assert.equal(out[1].mediaType, 'movie');
-  assert.equal(out[1].needsRating, false);
-  assert.equal(out[1].needsReview, true);
+  assert.deepEqual(
+    { level: out[0].level, episode: out[0].episode, needsRating: out[0].needsRating, needsReview: out[0].needsReview },
+    { level: 'episode', episode: 3, needsRating: true, needsReview: false },
+  );
+  assert.deepEqual(
+    { level: out[1].level, needsRating: out[1].needsRating, needsReview: out[1].needsReview },
+    { level: 'movie', needsRating: false, needsReview: true },
+  );
 });
 
-test('recordatorios: nada si lo último ya está puntuado y reseñado', () => {
-  const rows = [{ tmdbId: 1399, mediaType: 'tv', season: 1, episode: 3, createdAt: '2026-09-20T10:00:00Z' }];
+test('recordatorios: nada si el episodio más reciente ya está puntuado', () => {
+  const rows = [
+    { id: 'e3', tmdbId: 1399, mediaType: 'tv', season: 1, episode: 3, createdAt: at(10) },
+    { id: 'e2', tmdbId: 1399, mediaType: 'tv', season: 1, episode: 2, createdAt: at(9) },
+  ];
   const rated = new Set([ratingTargetKey(rows[0])]);
-  const reviewed = new Set(['tv:1399']);
-  assert.deepEqual(buildReminders(rows, rated, reviewed), []);
+  assert.deepEqual(buildReminders(rows, rated, new Set()), []);
+});
+
+test('recordatorios: el episodio que cierra la temporada avisa de la temporada', () => {
+  const rows = [{ id: 'e3', tmdbId: 1399, mediaType: 'tv', season: 1, episode: 3, createdAt: at(10) }];
+  const completions = new Map([[1399, { seasons: new Map([['e3', 1]]), showRowId: null }]]);
+  const [reminder, ...rest] = buildReminders(rows, new Set(), new Set(), { completions });
+  assert.equal(rest.length, 0);
+  assert.equal(reminder.level, 'season');
+  assert.equal(reminder.season, 1);
+  assert.equal(reminder.episode, null);
+  assert.equal(reminder.needsReview, false);
+
+  // Temporada ya puntuada: vuelve a avisar del episodio.
+  const out = buildReminders(rows, new Set(['season:1399:1']), new Set(), { completions });
+  assert.equal(out[0].level, 'episode');
+});
+
+test('recordatorios: terminar la serie pide nota y reseña de la serie', () => {
+  const rows = [{ id: 'e3', tmdbId: 1399, mediaType: 'tv', season: 2, episode: 3, createdAt: at(10) }];
+  const completions = new Map([[1399, { seasons: new Map([['e3', 2]]), showRowId: 'e3' }]]);
+  let out = buildReminders(rows, new Set(), new Set(), { completions });
+  assert.equal(out.length, 1);
+  assert.deepEqual(
+    { level: out[0].level, season: out[0].season, needsRating: out[0].needsRating, needsReview: out[0].needsReview },
+    { level: 'show', season: null, needsRating: true, needsReview: true },
+  );
+
+  // Serie puntuada pero sin reseña: sigue el aviso, solo de reseña.
+  out = buildReminders(rows, new Set(['tv:1399']), new Set(), { completions });
+  assert.equal(out[0].level, 'show');
+  assert.equal(out[0].needsRating, false);
+
+  // Serie puntuada y reseñada: baja a la temporada.
+  out = buildReminders(rows, new Set(['tv:1399']), new Set(['tv:1399']), { completions });
+  assert.equal(out[0].level, 'season');
+});
+
+test('recordatorios: temporada anterior terminada y episodio reciente conviven', () => {
+  const rows = [
+    { id: 's2e1', tmdbId: 1399, mediaType: 'tv', season: 2, episode: 1, createdAt: at(12) },
+    { id: 's1e3', tmdbId: 1399, mediaType: 'tv', season: 1, episode: 3, createdAt: at(10) },
+  ];
+  const completions = new Map([[1399, { seasons: new Map([['s1e3', 1]]), showRowId: null }]]);
+  const out = buildReminders(rows, new Set(), new Set(), { completions });
+  assert.deepEqual(out.map((r) => r.level), ['episode', 'season']);
+});
+
+test('claves de nota: filas de user_ratings y visionados casan', () => {
+  assert.equal(ratingTargetKey({ mediaType: 'season', tmdbId: 1, season: 2 }), 'season:1:2');
+  assert.equal(ratingTargetKey({ mediaType: 'episode', tmdbId: 1, season: 2, episode: 3 }), 'episode:1:2:3');
+  assert.equal(ratingTargetKey({ mediaType: 'tv', tmdbId: 1, season: 2, episode: 3 }), 'episode:1:2:3');
+  assert.equal(ratingTargetKey({ mediaType: 'tv', tmdbId: 1 }), 'tv:1');
+});
+
+test('momento del aviso: registro manual con fecha pasada, no importaciones', () => {
+  const watchedAt = '2026-08-01T10:00:00.000Z';
+  const createdAt = '2026-09-20T10:00:00.000Z';
+  assert.equal(watchEventAt({ watchedAt, createdAt, singleTitle: true }).toISOString(), createdAt);
+  assert.equal(watchEventAt({ watchedAt, createdAt, singleTitle: false }).toISOString(), watchedAt);
+  assert.equal(
+    watchEventAt({ watchedAt: createdAt, createdAt: watchedAt, singleTitle: true }).toISOString(),
+    createdAt,
+  );
 });
 
 test('un visto automático no se repite como acción', () => {
@@ -51,7 +119,7 @@ test('un visto automático no se repite como acción', () => {
   assert.deepEqual(out.map((a) => `${a.type}:${a.tmdbId}`), ['watched:603', 'rating:1399']);
 });
 
-import { detectContinueWatchingAdds, nextInCollection, showCompletionTime } from './notificationsCore.js';
+import { completionMarks, detectContinueWatchingAdds, nextInCollection } from './notificationsCore.js';
 
 test('Continuar viendo: primer recibo en curso o tras terminar; no los latidos', () => {
   const out = detectContinueWatchingAdds([
@@ -65,17 +133,23 @@ test('Continuar viendo: primer recibo en curso o tras terminar; no los latidos',
   assert.equal(out[0].episode, 1);
 });
 
-test('serie completada: el visionado que alcanza los emitidos', () => {
+test('temporada y serie terminadas: el visionado que alcanza los emitidos', () => {
+  const counts = { 1: 2, 2: 1 };
   const complete = (plays) => plays.size >= 3;
   const rows = [
-    { season: 1, episode: 1, watchedAt: 'a' },
-    { season: 1, episode: 1, watchedAt: 'b' }, // repetido: no suma
-    { season: 1, episode: 2, watchedAt: 'c' },
-    { season: 1, episode: 3, watchedAt: 'd' },
-    { season: 1, episode: 3, watchedAt: 'e' },
+    { id: 'a', season: 1, episode: 1 },
+    { id: 'b', season: 1, episode: 1 }, // repetido: no suma
+    { id: 'c', season: 1, episode: 2 },
+    { id: 'd', season: 2, episode: 1 },
+    { id: 'e', season: 2, episode: 1 },
   ];
-  assert.equal(showCompletionTime(rows, complete), 'd');
-  assert.equal(showCompletionTime(rows.slice(0, 3), complete), null);
+  const marks = completionMarks(rows, counts, complete);
+  assert.deepEqual([...marks.seasons], [['c', 1], ['d', 2]]);
+  assert.equal(marks.showRowId, 'd');
+
+  const partial = completionMarks(rows.slice(0, 2), counts, complete);
+  assert.equal(partial.seasons.size, 0);
+  assert.equal(partial.showRowId, null);
 });
 
 test('colección: la siguiente por estreno, saltando las ya vistas', () => {

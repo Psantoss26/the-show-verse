@@ -23,13 +23,14 @@ import { computeShowProgress } from './showProgress.js';
 import {
   NOTIFICATION_ACTION_TYPES,
   buildReminders,
+  completionMarks,
   detectContinueWatchingAdds,
   nextInCollection,
   parseEntityKey,
   ratingTargetKey,
   reviewTargetKey,
-  showCompletionTime,
   splitAutoCompleted,
+  watchEventAt,
 } from './notificationsCore.js';
 
 const WINDOW_DAYS = 14;
@@ -111,7 +112,7 @@ async function getContinueWatchingAdds(db, userId, since) {
   return adds;
 }
 
-async function getReminders(db, userId, watched) {
+async function getReminders(db, userId, watched, completions) {
   if (!watched.length) return [];
   const ids = [...new Set(watched.map((row) => Number(row.tmdbId)))];
   const [ratings, reviews] = await Promise.all([
@@ -134,27 +135,26 @@ async function getReminders(db, userId, watched) {
       )),
   ]);
 
-  const ratedKeys = new Set(
-    ratings.map((row) =>
-      row.mediaType === 'episode'
-        ? ratingTargetKey({ mediaType: 'tv', tmdbId: row.tmdbId, season: row.season, episode: row.episode })
-        : `${row.mediaType}:${Number(row.tmdbId)}`,
-    ),
-  );
+  const ratedKeys = new Set(ratings.map((row) => ratingTargetKey(row)));
   const reviewedKeys = new Set(reviews.map((row) => reviewTargetKey(row)));
-  return buildReminders(watched, ratedKeys, reviewedKeys, { limit: REMINDERS_LIMIT });
+  return buildReminders(watched, ratedKeys, reviewedKeys, { completions, limit: REMINDERS_LIMIT });
 }
 
-// Series que se han COMPLETADO dentro de la ventana (por primera vez).
-async function getCompletedShows(db, userId, watched, since) {
+// Temporadas y series TERMINADAS por los visionados de la ventana. Devuelve las
+// marcas de cada serie (para los recordatorios) y las series completadas por
+// primera vez dentro de la ventana (novedad "Has completado la serie").
+async function getShowCompletions(db, userId, watched, since) {
+  const completions = new Map();
+  const completedShows = [];
   const showIds = [...new Set(
     watched.filter((row) => row.mediaType === 'tv' && row.episode != null).map((row) => Number(row.tmdbId)),
   )];
-  if (!showIds.length) return [];
+  if (!showIds.length) return { completions, completedShows };
 
   const [rows, metadata] = await Promise.all([
     db
       .select({
+        id: watchHistory.id,
         tmdbId: watchHistory.tmdbId,
         season: watchHistory.season,
         episode: watchHistory.episode,
@@ -166,12 +166,12 @@ async function getCompletedShows(db, userId, watched, since) {
         eq(watchHistory.mediaType, 'tv'),
         inArray(watchHistory.tmdbId, showIds),
       ))
-      .orderBy(asc(watchHistory.watchedAt))
+      .orderBy(asc(watchHistory.watchedAt), asc(watchHistory.season), asc(watchHistory.episode))
       .limit(5000),
     getMediaMetadataMap(showIds.map((tmdbId) => ({ mediaType: 'tv', tmdbId }))).catch(() => new Map()),
   ]);
 
-  const out = [];
+  const eventAtById = new Map(watched.map((row) => [String(row.id), row.createdAt]));
   for (const tmdbId of showIds) {
     const meta = metadataFor(metadata, 'tv', tmdbId) || {};
     const seasonEpisodeCounts = {};
@@ -181,12 +181,19 @@ async function getCompletedShows(db, userId, watched, since) {
       if (number > 0 && count > 0) seasonEpisodeCounts[number] = count;
     }
     if (!Object.keys(seasonEpisodeCounts).length) continue;
-    const completedAt = showCompletionTime(
-      rows.filter((row) => Number(row.tmdbId) === tmdbId),
+    const showRows = rows.filter((row) => Number(row.tmdbId) === tmdbId);
+    const marks = completionMarks(
+      showRows,
+      seasonEpisodeCounts,
       (playCounts) => computeShowProgress(playCounts, seasonEpisodeCounts).baseComplete,
     );
+    completions.set(tmdbId, marks);
+
+    if (!marks.showRowId) continue;
+    const completedAt = eventAtById.get(marks.showRowId)
+      || showRows.find((row) => String(row.id) === marks.showRowId)?.watchedAt;
     if (!completedAt || new Date(completedAt) < since) continue;
-    out.push({
+    completedShows.push({
       id: `show-completed:${tmdbId}`,
       type: 'show_completed',
       tmdbId,
@@ -196,7 +203,7 @@ async function getCompletedShows(db, userId, watched, since) {
       createdAt: completedAt,
     });
   }
-  return out;
+  return { completions, completedShows };
 }
 
 // Colección de TMDb con caché propia en tmdb_cache (cambia muy poco).
@@ -288,28 +295,47 @@ export async function getUserNotifications(db, userId) {
   const since = new Date(Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
   // Visionados de la ventana: alimentan recordatorios, series completadas y
-  // colecciones, así que se leen una sola vez.
-  const watched = await db
-    .select({
-      tmdbId: watchHistory.tmdbId,
-      mediaType: watchHistory.mediaType,
-      season: watchHistory.season,
-      episode: watchHistory.episode,
-      title: watchHistory.title,
-      posterPath: watchHistory.posterPath,
-      createdAt: watchHistory.watchedAt,
-    })
-    .from(watchHistory)
-    .where(and(eq(watchHistory.userId, userId), gte(watchHistory.watchedAt, since)))
-    .orderBy(desc(watchHistory.watchedAt))
-    .limit(200);
+  // colecciones, así que se leen una sola vez. Entran también los registrados a
+  // mano en la ventana con fecha pasada (ver watchEventAt); `singleTitle` dice
+  // si la inserción fue de un solo título, para dejar fuera las importaciones.
+  const watchedResult = await db.execute(sql`
+    select id, tmdb_id as "tmdbId", media_type as "mediaType", season, episode,
+      title, poster_path as "posterPath", watched_at as "watchedAt", created_at as "createdAt",
+      (min(tmdb_id) over batch = max(tmdb_id) over batch
+        and min(media_type) over batch = max(media_type) over batch) as "singleTitle"
+    from ${watchHistory}
+    where user_id = ${userId}
+      and (watched_at >= ${since.toISOString()} or created_at >= ${since.toISOString()})
+    window batch as (partition by created_at)
+  `);
+  const watched = [...watchedResult]
+    .map((row) => ({
+      id: row.id,
+      tmdbId: Number(row.tmdbId),
+      mediaType: row.mediaType,
+      season: row.season,
+      episode: row.episode,
+      title: row.title,
+      posterPath: row.posterPath,
+      createdAt: watchEventAt(row),
+    }))
+    .filter((row) => row.createdAt >= since)
+    // Del más reciente al más antiguo; a igual momento (una temporada marcada
+    // de golpe), el último episodio primero.
+    .sort((a, b) =>
+      b.createdAt - a.createdAt
+      || (b.season ?? 0) - (a.season ?? 0)
+      || (b.episode ?? 0) - (a.episode ?? 0))
+    .slice(0, 200);
 
-  const [activity, reminders, autoCompleted, cwAdds, completedShows, collectionNext] = await Promise.all([
+  const { completions, completedShows } = await getShowCompletions(db, userId, watched, since)
+    .catch(() => ({ completions: new Map(), completedShows: [] }));
+
+  const [activity, reminders, autoCompleted, cwAdds, collectionNext] = await Promise.all([
     getUserActivity(db, userId, { limit: 40 }),
-    getReminders(db, userId, watched),
+    getReminders(db, userId, watched, completions),
     getAutoCompleted(db, userId, since),
     getContinueWatchingAdds(db, userId, since),
-    getCompletedShows(db, userId, watched, since).catch(() => []),
     getCollectionNext(db, userId, watched).catch(() => []),
   ]);
 

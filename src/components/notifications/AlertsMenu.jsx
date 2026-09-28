@@ -107,12 +107,11 @@ function Title({ item }) {
 function AlertText({ kind, item }) {
   const code = episodeCode(item);
   if (kind === "reminder") {
-    const verb = item.needsRating && item.needsReview
-      ? "Puntúa y reseña "
-      : item.needsRating
-        ? "Puntúa "
-        : "Escribe tu reseña de ";
-    return <>{verb}{item.needsRating ? code : ""}<Title item={item} /></>;
+    // "Puntúa la temporada 2 de", "Puntúa y reseña la película"… La reseña solo
+    // llega de películas y series terminadas.
+    if (!item.needsRating) return <>Escribe tu reseña de <Title item={item} /></>;
+    const verb = item.needsReview ? "Puntúa y reseña" : "Puntúa";
+    return <>{verb} {formatActivityRatingTarget(item)} <Title item={item} /></>;
   }
   if (kind === "event") {
     if (item.type === "cw_added") {
