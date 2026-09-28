@@ -1263,6 +1263,9 @@ export default async function authRoutes(fastify) {
     // Nota: un tv sin temporada/episodio es válido → fallback a nivel serie
     // (episode = null, confidence 'low'). No se rechaza.
 
+    // Notificaciones del dispositivo (plugins/pushDispatch.js).
+    req.pushUserId = account.userId;
+
     const watchedDate = watchedAt ? new Date(watchedAt) : new Date();
     // Dedup con la MISMA regla que syncDedupKey: episodio → 12 h; nivel serie
     // (episode null) → por día. Traemos los visionados recientes de este título
@@ -1401,6 +1404,8 @@ export default async function authRoutes(fastify) {
     const percent = effectiveRuntime > 0 ? Math.min(1, positionSeconds / effectiveRuntime) : 0;
     const COMPLETE_AT = 0.9;
     const userId = account.userId;
+    // Notificaciones del dispositivo (plugins/pushDispatch.js).
+    req.pushUserId = userId;
 
     const entityKey = `${mediaType}:${tmdbId}:${season}:${episode}`;
     const result = await db.transaction(async (tx) => {
@@ -1584,6 +1589,8 @@ export default async function authRoutes(fastify) {
     }
 
     const userId = account.userId;
+    // Notificaciones del dispositivo (plugins/pushDispatch.js).
+    req.pushUserId = userId;
 
     // Normaliza y descarta tv sin temporada/episodio.
     const candidates = [];

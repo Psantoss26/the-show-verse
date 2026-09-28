@@ -26,6 +26,8 @@ import OptimizedImage from "@/components/OptimizedImage";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { useTranslation } from "@/lib/i18n";
 import {
+  ALERTS_LOADED_EVENT,
+  ALERTS_REFRESH_EVENT,
   addDismissed,
   alertsTimeline,
   alertsDismissedKey,
@@ -103,8 +105,9 @@ function Title({ item }) {
 }
 
 // Frase de cada alerta, con la misma construcción que la Actividad del perfil
-// ("Has visto S01E02 de <título>"), en primera persona.
-function AlertText({ kind, item }) {
+// ("Has visto S01E02 de <título>"), en primera persona. También la usan las
+// ventanas emergentes (InAppNotifications).
+export function AlertText({ kind, item }) {
   const code = episodeCode(item);
   if (kind === "reminder") {
     // "Puntúa la temporada 2 de", "Puntúa y reseña la película"… La reseña solo
@@ -153,7 +156,7 @@ function AlertText({ kind, item }) {
   return <>Has visto {code}<Title item={item} /></>;
 }
 
-function alertIcon(kind, item) {
+export function alertIcon(kind, item) {
   if (kind === "reminder") {
     return item.needsRating
       ? { Icon: Star, tone: "text-amber-400", filled: true }
@@ -341,8 +344,11 @@ export default function AlertsMenu({ account, variant = "desktop", heroNavMode =
         return;
       }
       const dismissed = new Set(readStorage(alertsDismissedKey(accountId), []));
-      setAlerts(normalizeAlerts(json, dismissed));
+      const next = normalizeAlerts(json, dismissed);
+      setAlerts(next);
       setError("");
+      // Las ventanas emergentes (InAppNotifications) enseñan lo que acaba de llegar.
+      window.dispatchEvent(new CustomEvent(ALERTS_LOADED_EVENT, { detail: { accountId, alerts: next } }));
     } catch {
       if (request === requestRef.current) setError("No se pudieron cargar las alertas.");
     } finally {
@@ -369,6 +375,17 @@ export default function AlertsMenu({ account, variant = "desktop", heroNavMode =
     refreshIfStale();
     setOpen(false);
   }, [pathname, refreshIfStale]);
+
+  // Petición de refresco inmediato (llega un push, o el sondeo de las ventanas
+  // emergentes). La campana está montada dos veces (barra de escritorio y de
+  // móvil): responde solo la que se ve, para no pedir las alertas dos veces.
+  useEffect(() => {
+    const onRefresh = () => {
+      if (wrapperRef.current?.getClientRects().length) load();
+    };
+    window.addEventListener(ALERTS_REFRESH_EVENT, onRefresh);
+    return () => window.removeEventListener(ALERTS_REFRESH_EVENT, onRefresh);
+  }, [load]);
 
   useEffect(() => {
     const onVisible = () => {

@@ -32,6 +32,7 @@ class WebAppBridge(
     private val evaluarJs: (String) -> Unit,
     private val abrirEnNavegador: (String) -> Unit,
     private val bloquearRecarga: (Boolean) -> Unit = {},
+    private val pedirPermisoPush: () -> Unit = {},
 ) {
 
     /**
@@ -277,6 +278,31 @@ class WebAppBridge(
     fun setPullToRefreshLocked(locked: Boolean) {
         if (!propio()) return
         activity.runOnUiThread { bloquearRecarga(locked) }
+    }
+
+    // ------------------------------------------------------ notificaciones push
+    // La web registra el token en el backend (lib/notifications/devicePush.js).
+
+    /** ¿Esta build lleva Firebase configurado? */
+    @JavascriptInterface
+    fun pushAvailable(): Boolean = propio() && PushNotifications.available(activity)
+
+    /** "granted" | "denied" | "default". */
+    @JavascriptInterface
+    fun pushPermission(): String = if (propio()) PushNotifications.permission(activity) else "denied"
+
+    @JavascriptInterface
+    fun pushToken(): String = if (propio()) prefs.pushToken.orEmpty() else ""
+
+    /**
+     * Pide el permiso del sistema. La respuesta llega después, a
+     * `window.__tsvPushPermissionResult(estado)`, con el token ya pedido.
+     */
+    @JavascriptInterface
+    fun requestPushPermission(): Boolean {
+        if (!propio()) return false
+        activity.runOnUiThread { pedirPermisoPush() }
+        return true
     }
 
     // ---------------------------------------------------------------- privados

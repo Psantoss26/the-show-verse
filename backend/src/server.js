@@ -16,6 +16,7 @@ import { db, closeDb } from './db/client.js';
 import { openApiDocument } from './docs/openapi.js';
 import authPlugin from './plugins/auth.js';
 import levelInvalidationPlugin from './plugins/levelInvalidation.js';
+import pushDispatchPlugin from './plugins/pushDispatch.js';
 import authRoutes from './routes/auth.js';
 import favoritesRoutes from './routes/favorites.js';
 import watchlistRoutes from './routes/watchlist.js';
@@ -33,6 +34,7 @@ import publicUsersRoutes from './routes/publicUsers.js';
 import dashboardRoutes from './routes/dashboard.js';
 import calendarRoutes from './routes/calendar.js';
 import communityRoutes from './routes/community.js';
+import pushRoutes from './routes/push.js';
 import levelRoutes from './routes/level.js';
 import { refreshAllPools } from './dashboard/pools.js';
 
@@ -111,6 +113,9 @@ await fastify.register(authPlugin);
 // Caduca la caché de nivel cuando una mutación cambia algo que da XP. Va después
 // de authPlugin porque necesita req.user.
 await fastify.register(levelInvalidationPlugin);
+
+// Notificaciones del dispositivo tras un visto o un progreso sincronizado.
+await fastify.register(pushDispatchPlugin);
 
 // Cuentas exentas del rate limit global. Se comprueba el EMAIL además del
 // username: la cuenta que entra con Google no tiene por qué llamarse igual, y
@@ -247,6 +252,7 @@ const apiV1 = async (app) => {
   app.register(calendarRoutes, { prefix: '/calendar' });
   app.register(recommendationsRoutes, { prefix: '/recommendations' });
   app.register(communityRoutes, { prefix: '/community' });
+  app.register(pushRoutes, { prefix: '/push' });
 };
 
 await fastify.register(apiV1, { prefix: '/v1' });

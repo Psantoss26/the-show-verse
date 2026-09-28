@@ -109,6 +109,11 @@ class Prefs(context: Context) {
         get() = prefs.getString(KEY_LAST_URL, null)
         set(value) = prefs.edit().putString(KEY_LAST_URL, value).apply()
 
+    /** Token de Firebase Cloud Messaging de este dispositivo (notificaciones push). */
+    var pushToken: String?
+        get() = prefs.getString(KEY_PUSH_TOKEN, null)
+        set(value) = prefs.edit().putString(KEY_PUSH_TOKEN, value).apply()
+
     fun isPaired(): Boolean = !token.isNullOrBlank() && !origin.isNullOrBlank()
 
     /** Apps activadas para sincronizar. Por defecto, las de streaming conocidas. */
@@ -182,5 +187,6 @@ class Prefs(context: Context) {
         private const val KEY_LAST_URL = "last_url"
         private const val KEY_NO_NATIVE_GOOGLE = "no_native_google"
         private const val KEY_GOOGLE_RESULT = "google_result"
+        private const val KEY_PUSH_TOKEN = "push_token"
     }
 }

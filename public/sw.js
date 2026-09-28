@@ -477,6 +477,62 @@ self.addEventListener("message", (event) => {
   })().catch(() => event.ports?.[0]?.postMessage({ ok: false })));
 });
 
+// ── Notificaciones push ─────────────────────────────────────────────────────
+// El backend (backend/src/lib/push.js) manda { title, body, url, image, tag,
+// alertIds }. Con la app A LA VISTA el aviso se enseña dentro, como ventana
+// emergente (InAppNotifications); si no, como notificación del sistema.
+function pushPayload(event) {
+  try {
+    const message = event.data?.json();
+    return message && typeof message.title === "string" ? message : null;
+  } catch {
+    return null;
+  }
+}
+
+async function appWindows() {
+  const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+  return windows.filter((client) => new URL(client.url).origin === self.location.origin);
+}
+
+self.addEventListener("push", (event) => {
+  const message = pushPayload(event);
+  if (!message) return;
+  event.waitUntil((async () => {
+    const windows = await appWindows();
+    if (windows.some((client) => client.focused || client.visibilityState === "visible")) {
+      for (const client of windows) client.postMessage({ type: "TSV_PUSH", message });
+      return;
+    }
+    await self.registration.showNotification(message.title, {
+      body: message.body || "",
+      icon: "/pwa-icon-192.png",
+      badge: "/pwa-icon-192.png",
+      ...(message.image && { image: message.image }),
+      // Mismo título, misma notificación: la nueva sustituye a la anterior.
+      ...(message.tag && { tag: message.tag, renotify: true }),
+      data: { url: message.url || "/" },
+    });
+  })());
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = new URL(event.notification.data?.url || "/", self.location.origin);
+  if (target.origin !== self.location.origin) return;
+  const path = target.pathname + target.search;
+  event.waitUntil((async () => {
+    const [client] = await appWindows();
+    if (client) {
+      // La página navega con el router (sin recargar la app entera).
+      await client.focus();
+      client.postMessage({ type: "TSV_NAVIGATE", path });
+      return;
+    }
+    await self.clients.openWindow(path);
+  })());
+});
+
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);

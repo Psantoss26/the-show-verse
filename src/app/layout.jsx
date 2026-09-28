@@ -6,6 +6,7 @@ import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { SITE_TITLE_SHORT } from "@/lib/pageTitle";
 import PwaManager from "@/components/PwaManager";
+import InAppNotifications from "@/components/notifications/InAppNotifications";
 import AndroidSessionClaim from "@/components/android/AndroidSessionClaim";
 import OfflineManager from "@/components/OfflineManager";
 import OfflineBanner from "@/components/OfflineBanner";
@@ -98,6 +99,7 @@ export default function RootLayout({ children }) {
               </div>
             </MobileUserPageSwipeNavigation>
             <PwaManager />
+            <InAppNotifications />
             <OfflineManager />
             <AndroidSessionClaim />
             <OfflineBanner />

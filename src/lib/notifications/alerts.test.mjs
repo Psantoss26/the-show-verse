@@ -74,3 +74,24 @@ test("una sola lista, de lo más reciente a lo más antiguo", () => {
   assert.deepEqual(out.map((r) => r.kind), ["action", "event", "action", "reminder", "event"]);
   assert.deepEqual(alertsTimeline(null), []);
 });
+
+import { freshAlertGroups } from "./alerts.js";
+
+test("ventanas emergentes: lo nuevo desde que se abrió, por título y sin repetir", () => {
+  const alerts = {
+    events: [
+      { id: "auto:1", type: "auto_watched", tmdbId: 1, mediaType: "tv", createdAt: "2026-09-28T10:05:00Z" },
+      { id: "old", type: "cw_added", tmdbId: 2, mediaType: "tv", createdAt: "2026-09-28T09:00:00Z" },
+    ],
+    reminders: [
+      { id: "r1", tmdbId: 1, mediaType: "tv", createdAt: "2026-09-28T10:05:00Z" },
+      { id: "r2", tmdbId: 3, mediaType: "movie", createdAt: "2026-09-28T10:01:00Z" },
+    ],
+    actions: [{ id: "a", type: "watched", tmdbId: 4, mediaType: "movie", createdAt: "2026-09-28T10:06:00Z" }],
+  };
+  const groups = freshAlertGroups(alerts, { since: "2026-09-28T10:00:00Z", shown: new Set(["r2"]) });
+  assert.deepEqual(
+    groups.map((g) => [g.key, g.rows.map((r) => r.item.id)]),
+    [["tv:1", ["auto:1", "r1"]]],
+  );
+});

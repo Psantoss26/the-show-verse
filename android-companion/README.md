@@ -54,6 +54,17 @@ Lo que la carcasa resuelve y un WebView "pelado" no:
 La decisión de qué es "de casa" y qué es externo está en `WebOrigin`, que es
 código puro y con tests: de ahí depende quién puede usar el puente.
 
+## Notificaciones push
+
+La app recibe los avisos de The Show Verse (progreso sincronizado, vistos,
+recordatorios de puntuar) con **Firebase Cloud Messaging**: el WebView no admite
+Web Push. `PushMessagingService` los recibe; con la app delante se los pasa a la
+web (evento `tsv:push`) y, si no, pinta la notificación del sistema.
+
+Necesita `app/google-services.json` del proyecto de Firebase (paquete
+`com.theshowverse.app`). Sin él la app compila igual, sin push. Puesta en marcha
+completa en [docs/push-notifications.md](../docs/push-notifications.md).
+
 ## Compilar
 
 Hace falta JDK 17 y el SDK de Android (o Android Studio Giraffe+).
