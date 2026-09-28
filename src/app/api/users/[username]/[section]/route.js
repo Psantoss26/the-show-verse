@@ -21,6 +21,7 @@ const ALLOWED = new Set([
   "ratings",
   "lists",
   "activity",
+  "neural",
 ]);
 
 function respond(request, backend, successStatus = 200) {
@@ -38,7 +39,8 @@ export async function GET(request, { params }) {
   }
   const { searchParams } = new URL(request.url);
   const qs = new URLSearchParams();
-  for (const key of ["limit", "offset", "refresh"]) {
+  // `v`: firma del grafo neural que ya tiene el cliente.
+  for (const key of ["limit", "offset", "refresh", "v"]) {
     const v = searchParams.get(key);
     if (v) qs.set(key, v);
   }

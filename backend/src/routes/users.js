@@ -35,6 +35,7 @@ import {
 } from '../lib/userProfile.js';
 import { getLevelSummaries } from '../level/store.js';
 import { getUserNotifications } from '../lib/notifications.js';
+import { getUserNeuralGraph } from '../lib/neuralGraph.js';
 
 const ARTWORK_KINDS = ['poster', 'mobilePoster', 'backdrop', 'background', 'logo'];
 const artworkChangeSchema = z.object({
@@ -506,4 +507,15 @@ export default async function usersRoutes(fastify) {
     return reply.send(page);
   });
   fastify.get('/:username/activity', sectionEndpoint(getUserActivity));
+
+  // GET /users/:username/neural?v=<firma> — vista neural: todos los títulos del
+  // usuario con sus géneros y sagas. Con la firma que ya tiene el cliente
+  // responde `{ unchanged: true }` sin reconstruir nada.
+  fastify.get('/:username/neural', async (req, reply) => {
+    const target = await findUserByUsername(db, req.params.username);
+    if (!target) return reply.status(404).send({ error: 'User not found' });
+    const since = typeof req.query?.v === 'string' ? req.query.v.slice(0, 64) : null;
+    const graph = await getUserNeuralGraph(db, target.id, { since, log: req.log });
+    return reply.send(graph);
+  });
 }
