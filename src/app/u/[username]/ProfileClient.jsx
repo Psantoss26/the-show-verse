@@ -27,6 +27,14 @@ import { PROFILE_TAB_IDS, profileTabHref } from "./profileRoutes";
 import { translateGenreName } from "@/lib/dashboard/media";
 import { getActivityDetailsHref } from "@/lib/profile/activityRatingTarget";
 import {
+  NEURAL_DEFAULTS,
+  hasNeuralPreferences,
+  readNeuralPreferences,
+  saveNeuralPreferences,
+} from "@/lib/profile/neuralPreferences";
+import { prefetchNeuralGraph } from "@/lib/profile/neuralGraphData";
+import NeuralGraphSkeleton from "@/components/profile/neural/NeuralGraphSkeleton";
+import {
   Activity,
   Award,
   BookmarkPlus,
@@ -72,11 +80,16 @@ const GenreRadarChart = dynamic(
   () => loadProfileCharts().then((module) => module.GenreRadarChart),
   { ssr: false, loading: () => <ChartLoading /> },
 );
-// Vista neural: carga diferida (canvas, d3-force y su worker) solo al abrirla.
-const NeuralGraphView = dynamic(
-  () => import("@/components/profile/neural/NeuralGraphView"),
-  { ssr: false, loading: () => <ChartLoading className="h-[72svh] min-h-[480px]" /> },
-);
+// Vista neural: carga diferida (canvas, d3-force y su worker). Mientras se
+// descarga se muestra su esqueleto, con el mismo tamaño que el lienzo. El
+// código se precarga en reposo (ver `preloadNeuralView`), así que al abrir la
+// pestaña casi nunca llega a verse.
+const loadNeuralView = () => import("@/components/profile/neural/NeuralGraphView");
+const NeuralGraphView = dynamic(loadNeuralView, { ssr: false, loading: () => <NeuralGraphSkeleton /> });
+function preloadNeuralView(username) {
+  loadNeuralView().catch(() => {});
+  if (username) prefetchNeuralGraph(username);
+}
 const RatingsBarChart = dynamic(
   () => loadProfileCharts().then((module) => module.RatingsBarChart),
   { ssr: false, loading: () => <ChartLoading /> },
@@ -723,7 +736,8 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
   // Cerrar sesión pide confirmación, igual que en el resto de páginas de usuario.
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   // Cabecera compacta: solo en la vista neural, para que el lienzo gane alto.
-  const [neuralHeaderCollapsed, setNeuralHeaderCollapsed] = useState(false);
+  // Por defecto compacta; la preferencia guardada se aplica antes de pintar.
+  const [neuralHeaderCollapsed, setNeuralHeaderCollapsed] = useState(NEURAL_DEFAULTS.headerCollapsed);
   const [headerAnimating, setHeaderAnimating] = useState(false);
   const router = useRouter();
   const isBackNav = useIsHistoryNavigation();
@@ -757,6 +771,22 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
     setHeaderAnimating(true);
   }, [compactHeader]);
+
+  // Preferencia guardada de la cabecera compacta (por cuenta). Antes del primer
+  // pintado se aplica SIN animación —ni recorte—: es el estado de partida, no un
+  // cambio. Si llega después (la sesión termina de cargar), se anima normal.
+  const paintedRef = useRef(false);
+  useEffect(() => {
+    paintedRef.current = true;
+  }, []);
+  const viewerId = viewer?.id || null;
+  useLayoutEffect(() => {
+    const collapsed = readNeuralPreferences(viewerId).headerCollapsed;
+    if (!paintedRef.current) previousCompactRef.current = tab === "neural" && collapsed;
+    setNeuralHeaderCollapsed(collapsed);
+    // Solo al cambiar de cuenta: la pestaña no debe volver a leerla.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewerId]);
   const [refreshToken, setRefreshToken] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [privateAnalytics, setPrivateAnalytics] = useState(null);
@@ -770,6 +800,10 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
       for (const section of PROFILE_TAB_IDS) {
         router.prefetch(profileTabHref(username, section, routeBase));
       }
+      // Código de la vista neural siempre; sus DATOS solo si esta cuenta ya
+      // la ha usado (es una petición: no se gasta en quien no la abre).
+      loadNeuralView().catch(() => {});
+      if (hasNeuralPreferences(viewerId)) prefetchNeuralGraph(username);
     };
 
     if (typeof window === "undefined") return undefined;
@@ -780,7 +814,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
 
     const timeoutId = window.setTimeout(prefetchSections, 0);
     return () => window.clearTimeout(timeoutId);
-  }, [routeBase, router, username]);
+  }, [routeBase, router, username, viewerId]);
 
   useLayoutEffect(() => {
     const key = profileCacheKey(username);
@@ -1181,11 +1215,15 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
             )}
           </div>
         ) : tab === "neural" ? (
-          <div className="sv-profile-entry sv-profile-entry--content mt-5 @[640px]/detail-page:mt-6">
+          <div className="sv-profile-entry sv-profile-entry--content mt-3 @[640px]/detail-page:mt-6">
             <NeuralGraphView
               username={user.username}
               headerCollapsed={neuralHeaderCollapsed}
-              onToggleHeader={() => setNeuralHeaderCollapsed((current) => !current)}
+              onToggleHeader={() => {
+                const next = !neuralHeaderCollapsed;
+                setNeuralHeaderCollapsed(next);
+                saveNeuralPreferences(viewerId, { headerCollapsed: next });
+              }}
             />
           </div>
         ) : tab !== "profile" ? (
@@ -1405,6 +1443,15 @@ function ProfileTabs({ tab, username, sections, onNavigate, routeBase, compact =
             href={profileTabHref(username, it.id, routeBase)}
             scroll={false}
             onClick={handleNavigate}
+            // Vista neural: al mostrar intención de abrirla (ratón encima,
+            // foco o dedo), se adelantan su código y sus datos.
+            {...(it.id === "neural"
+              ? {
+                  onPointerEnter: () => preloadNeuralView(username),
+                  onFocus: () => preloadNeuralView(username),
+                  onTouchStart: () => preloadNeuralView(username),
+                }
+              : {})}
             data-offline-local-nav="true"
             data-profile-tab-active={active || undefined}
             className={`relative flex w-[calc((100%_-_0.75rem)_/_4)] shrink-0 snap-start items-center justify-center whitespace-nowrap px-0 py-2.5 text-[clamp(0.625rem,2.7vw,0.6875rem)] font-bold uppercase tracking-normal transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400/70 @[640px]/detail-page:w-auto @[640px]/detail-page:justify-start @[640px]/detail-page:px-3.5 @[640px]/detail-page:text-xs @[640px]/detail-page:tracking-widest ${

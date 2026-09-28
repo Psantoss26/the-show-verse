@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  ChevronDown,
   ChevronsDown,
   ChevronsUp,
   Eye,
@@ -12,13 +13,12 @@ import {
   Heart,
   Layers3,
   ListChecks,
-  Loader2,
+  LocateFixed,
   Maximize,
   Minimize,
   Minus,
   Network,
   Plus,
-  Scan,
   Search,
   SlidersHorizontal,
   Star,
@@ -28,6 +28,15 @@ import {
 import OptimizedImage from "@/components/OptimizedImage";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import { ProfileMenuDropdown } from "@/app/u/[username]/ProfileSection";
+import { useAuth } from "@/context/AuthContext";
+import { readNeuralPreferences, saveNeuralPreferences } from "@/lib/profile/neuralPreferences";
+import {
+  getNeuralLayout,
+  neuralLayoutKey,
+  saveNeuralLayout,
+  useNeuralPayload,
+} from "@/lib/profile/neuralGraphData";
+import { NEURAL_STAGE_CLASS, NeuralSkeletonArt, documentTop } from "./NeuralGraphSkeleton";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import {
   FLAG_FAVORITE,
@@ -76,80 +85,6 @@ const MIN_K = 0.06;
 const MAX_K = 6;
 // Zoom a partir del cual se leen los títulos (como el "text fade" de Obsidian).
 const LABEL_K = 1.25;
-const graphCache = new Map();
-const STORAGE_PREFIX = "showverse:neural:v1:";
-
-function readStored(key) {
-  try {
-    const value = JSON.parse(window.sessionStorage.getItem(`${STORAGE_PREFIX}${key}`) || "null");
-    return value?.v ? value : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeStored(key, payload) {
-  try {
-    window.sessionStorage.setItem(`${STORAGE_PREFIX}${key}`, JSON.stringify(payload));
-  } catch {
-    /* sin hueco: queda la caché en memoria de esta pestaña */
-  }
-}
-
-function useNeuralPayload(username) {
-  const key = String(username || "").trim().toLowerCase();
-  const [state, setState] = useState(() => {
-    const cached = graphCache.get(key) || null;
-    return { status: cached ? "ready" : "loading", payload: cached };
-  });
-
-  useEffect(() => {
-    let cancelled = false;
-    let retryTimer = null;
-    let retried = false;
-    const cached = graphCache.get(key) || readStored(key);
-    if (cached) {
-      graphCache.set(key, cached);
-      setState({ status: "ready", payload: cached });
-    }
-
-    const load = async (withStamp) => {
-      const stamp = withStamp && cached && !cached.missing ? cached.v : null;
-      const qs = stamp ? `?v=${encodeURIComponent(stamp)}` : "";
-      const res = await fetch(`/api/users/${encodeURIComponent(username)}/neural${qs}`, {
-        credentials: "include",
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      if (cancelled) return;
-      if (json.unchanged) {
-        setState((current) => ({ ...current, status: "ready" }));
-        return;
-      }
-      graphCache.set(key, json);
-      writeStored(key, json);
-      setState({ status: "ready", payload: json });
-      // Títulos aún sin clasificar: el servidor los completa en segundo plano.
-      // Se vuelve a pedir UNA vez, sin firma, para recibirlos.
-      if (json.missing > 0 && !retried) {
-        retried = true;
-        retryTimer = window.setTimeout(() => load(false).catch(() => {}), 7000);
-      }
-    };
-
-    load(true).catch(() => {
-      if (!cancelled) setState((current) => ({ ...current, status: current.payload ? "ready" : "error" }));
-    });
-    return () => {
-      cancelled = true;
-      window.clearTimeout(retryTimer);
-    };
-  }, [key, username]);
-
-  return state;
-}
-
 // Botón del grupo de la derecha del menú: mismo aspecto que los modos de vista
 // de las secciones del perfil (ProfileViewMode), pero son acciones.
 function MenuViewButton({ label, icon: Icon, onClick, active }) {
@@ -165,6 +100,21 @@ function MenuViewButton({ label, icon: Icon, onClick, active }) {
       }`}
     >
       <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+    </button>
+  );
+}
+
+// Botón de los controles dentro del lienzo (cuando el menú está oculto).
+function StageButton({ label, icon: Icon, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-300 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400/70"
+    >
+      <Icon className="h-4 w-4" aria-hidden="true" />
     </button>
   );
 }
@@ -285,19 +235,27 @@ function SelectedCard({ node, graph, onClose, onFocusNode }) {
   );
 }
 
-// Distancia de un elemento al principio del DOCUMENTO por offsetTop, que no
-// cuenta transformaciones: las animaciones de entrada del perfil desplazan con
-// transform y falsearían una medida con getBoundingClientRect.
-function documentTop(element) {
-  let top = 0;
-  for (let node = element; node; node = node.offsetParent) top += node.offsetTop;
-  return top;
+// ENTRADA ANIMADA. Cada nodo tiene un retraso según su distancia al centro de
+// la red: los hubs (géneros, sagas, décadas) se adelantan y los títulos van
+// apareciendo hacia fuera. Cada uno tarda NODE_REVEAL de la duración total.
+const INTRO_MS = 1100;
+const NODE_REVEAL = 0.32;
+
+function introReveal(intro, index) {
+  const t = (performance.now() - intro.start) / INTRO_MS;
+  const local = Math.min(1, Math.max(0, (t - intro.delays[index]) / NODE_REVEAL));
+  return 1 - (1 - local) ** 3;
 }
 
 export default function NeuralGraphView({ username, headerCollapsed = false, onToggleHeader = null }) {
   const router = useRouter();
   const { status, payload } = useNeuralPayload(username);
-  const [groupBy, setGroupBy] = useState("genre-saga");
+  // Preferencias guardadas (por cuenta). El componente solo existe en el
+  // navegador (dynamic, sin SSR), así que se leen al crear el estado y la
+  // vista nace ya como se dejó: sin pintar antes los valores por defecto.
+  const { user: viewer } = useAuth();
+  const viewerId = viewer?.id || null;
+  const [groupBy, setGroupBy] = useState(() => readNeuralPreferences(viewerId).groupBy);
   const graph = useMemo(() => (payload ? buildNeuralGraph(payload, { groupBy }) : null), [payload, groupBy]);
 
   const containerRef = useRef(null);
@@ -312,10 +270,56 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
   const frameRef = useRef(0);
   const interactedRef = useRef(false);
   const cameraAnimRef = useRef(0);
+  // Entrada animada en curso: { start, delays: Float32Array } o null.
+  const introRef = useRef(null);
+  const introFrameRef = useRef(0);
   const viewRef = useRef({ visible: null, focus: null, matchSet: null, selected: -1 });
 
-  const [filters, setFilters] = useState({ type: "all", record: "all" });
+  const [filters, setFilters] = useState(() => {
+    const prefs = readNeuralPreferences(viewerId);
+    return { type: prefs.type, record: prefs.record };
+  });
   const [menuOpen, setMenuOpen] = useState(false);
+  // Menú oculto por defecto: la vista arranca con todo el alto para la red.
+  const [menuVisible, setMenuVisible] = useState(() => readNeuralPreferences(viewerId).menuVisible);
+  // En MÓVIL el menú está siempre presente (su fila de buscador, centrar y
+  // opciones no ocupa casi nada) y no hay botón para ocultarlo. Mismo corte que
+  // el resto del perfil: 640px.
+  const [narrow, setNarrow] = useState(
+    () => typeof window !== "undefined" && window.matchMedia?.("(max-width: 639px)").matches,
+  );
+  useEffect(() => {
+    const query = window.matchMedia?.("(max-width: 639px)");
+    if (!query) return undefined;
+    const onChange = () => setNarrow(query.matches);
+    onChange();
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
+  const menuShown = narrow || menuVisible;
+  const [menuAnimating, setMenuAnimating] = useState(false);
+  // Guardar lo que cambie. Si la sesión termina de cargar con otra cuenta,
+  // se aplican las preferencias de esa cuenta.
+  const loadedViewerRef = useRef(viewerId);
+  useEffect(() => {
+    if (loadedViewerRef.current === viewerId) return;
+    loadedViewerRef.current = viewerId;
+    const prefs = readNeuralPreferences(viewerId);
+    setGroupBy(prefs.groupBy);
+    setFilters({ type: prefs.type, record: prefs.record });
+    setMenuVisible(prefs.menuVisible);
+  }, [viewerId]);
+  useEffect(() => {
+    if (loadedViewerRef.current !== viewerId) return;
+    saveNeuralPreferences(viewerId, { groupBy, type: filters.type, record: filters.record, menuVisible });
+  }, [filters, groupBy, menuVisible, viewerId]);
+
+  // Buscador dentro del lienzo (con el menú oculto).
+  const [searchOpen, setSearchOpen] = useState(false);
+  const stageSearchRef = useRef(null);
+  useEffect(() => {
+    if (searchOpen) stageSearchRef.current?.focus();
+  }, [searchOpen]);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(-1);
   const [settled, setSettled] = useState(false);
@@ -374,6 +378,9 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
     const P = positionsRef.current;
     const px = (i) => (P ? P[i * 2] : nodes[i].x);
     const py = (i) => (P ? P[i * 2 + 1] : nodes[i].y);
+    // Entrada animada: cuánto se ha revelado cada nodo (0 → 1).
+    const intro = introRef.current;
+    const reveal = intro ? (i) => introReveal(intro, i) : null;
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -407,14 +414,37 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
     ctx.lineCap = "round";
     ctx.lineWidth = 1 / k;
     ctx.strokeStyle = highlight ? "rgba(148,163,184,0.07)" : "rgba(161,161,170,0.24)";
-    ctx.beginPath();
-    for (const [a, b] of graph.links) {
-      if (!visible[a] || !visible[b]) continue;
-      if (!segmentOnScreen(a, b)) continue;
-      ctx.moveTo(px(a), py(a));
-      ctx.lineTo(px(b), py(b));
+    if (reveal) {
+      // Durante la entrada, cada enlace aparece con el MENOS revelado de sus
+      // dos extremos, agrupados en 6 niveles para seguir pintando por lotes.
+      const baseAlpha = highlight ? 0.07 : 0.24;
+      const buckets = Array.from({ length: 6 }, () => []);
+      for (const [a, b] of graph.links) {
+        if (!visible[a] || !visible[b] || !segmentOnScreen(a, b)) continue;
+        const level = Math.min(reveal(a), reveal(b));
+        if (level <= 0) continue;
+        buckets[Math.min(5, Math.ceil(level * 6) - 1)].push(a, b);
+      }
+      buckets.forEach((segments, level) => {
+        if (!segments.length) return;
+        ctx.strokeStyle = `rgba(161,161,170,${(baseAlpha * (level + 1)) / 6})`;
+        ctx.beginPath();
+        for (let j = 0; j < segments.length; j += 2) {
+          ctx.moveTo(px(segments[j]), py(segments[j]));
+          ctx.lineTo(px(segments[j + 1]), py(segments[j + 1]));
+        }
+        ctx.stroke();
+      });
+    } else {
+      ctx.beginPath();
+      for (const [a, b] of graph.links) {
+        if (!visible[a] || !visible[b]) continue;
+        if (!segmentOnScreen(a, b)) continue;
+        ctx.moveTo(px(a), py(a));
+        ctx.lineTo(px(b), py(b));
+      }
+      ctx.stroke();
     }
-    ctx.stroke();
     if (focus) {
       ctx.lineWidth = 1.4 / k;
       ctx.strokeStyle = "rgba(226,232,240,0.55)";
@@ -430,6 +460,30 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
     // Nodos, un trazo por color. Con algo resaltado, primero todo atenuado y
     // luego lo resaltado encima.
     const paintNodes = (filter, alpha) => {
+      if (reveal) {
+        // Entrada: cada nodo crece y aparece con su propio ritmo.
+        for (const group of colorGroups) {
+          for (const i of group.indices) {
+            if (!visible[i] || !filter(i) || !onScreen(i)) continue;
+            const amount = reveal(i);
+            if (amount <= 0) continue;
+            const r = nodes[i].r * (0.35 + 0.65 * amount);
+            ctx.globalAlpha = alpha * amount;
+            ctx.beginPath();
+            ctx.arc(px(i), py(i), r, 0, Math.PI * 2);
+            if (group.pending) {
+              ctx.lineWidth = Math.max(1.2 / k, 0.6);
+              ctx.strokeStyle = group.color;
+              ctx.stroke();
+            } else {
+              ctx.fillStyle = group.color;
+              ctx.fill();
+            }
+          }
+        }
+        ctx.globalAlpha = 1;
+        return;
+      }
       ctx.globalAlpha = alpha;
       for (const group of colorGroups) {
         ctx.beginPath();
@@ -490,6 +544,7 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
       else if (emphasized) alpha = 1;
       else if (highlight) alpha = 0;
       else alpha = node.kind === "saga" ? sagaAlpha : titleAlpha;
+      if (reveal) alpha *= reveal(i);
       if (alpha <= 0.02) continue;
       const priority = (emphasized ? 1e6 : 0) + (mainHub ? 1e5 : node.kind === "saga" ? 1e4 : 0) + node.degree * 10 + node.r;
       candidates.push({ i, alpha, priority });
@@ -539,6 +594,13 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
     ctx.globalAlpha = 1;
   }, [colorGroups, graph]);
 
+  // Último draw, para el observador de tamaño (que no se recrea con él).
+  const drawRef = useRef(draw);
+  useEffect(() => {
+    drawRef.current = draw;
+    draw();
+  }, [draw]);
+
   const requestDraw = useCallback(() => {
     if (!frameRef.current) frameRef.current = window.requestAnimationFrame(draw);
   }, [draw]);
@@ -582,23 +644,47 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
     cameraAnimRef.current = window.requestAnimationFrame(step);
   }, [draw, requestDraw]);
 
+  // Un encuadre pedido antes de que el lienzo tenga tamaño queda PENDIENTE y
+  // se aplica en cuanto se mide (si no, se perdía y la red salía ampliada).
+  const pendingFitRef = useRef(false);
+  // `animate`: true (transición), false (al instante) o "follow": un paso
+  // suave hacia el encuadre, para acompañar a la red mientras se asienta sin
+  // saltos de zoom (con un tope de zoom que no llega a mostrar los títulos).
   const fitView = useCallback((animate = true) => {
     if (!graph) return;
     const { w, h } = sizeRef.current;
-    if (!w || !h) return;
+    if (!w || !h) {
+      // Se recuerda el modo: uno de acompañamiento se aplicará con su tope.
+      pendingFitRef.current = animate === "follow" || animate === "start" ? "start" : "snap";
+      return;
+    }
+    pendingFitRef.current = false;
     const points = [];
     graph.nodes.forEach((node, index) => {
       if (!visibility || visibility[index]) points.push({ ...pos(index), r: node.r });
     });
-    const target = fitCamera(points, w, h, { padding: 40, minK: MIN_K, maxK: 1.6 });
-    if (animate) animateCamera(target);
+    const follow = animate === "follow";
+    const capped = follow || animate === "start";
+    const target = fitCamera(points, w, h, { padding: 40, minK: MIN_K, maxK: capped ? LABEL_K - 0.1 : 1.6 });
+    if (animate === "start") {
+      cameraRef.current = target;
+      requestDraw();
+    } else if (follow) {
+      const cam = cameraRef.current;
+      const ease = 0.14;
+      cameraRef.current = {
+        x: cam.x + (target.x - cam.x) * ease,
+        y: cam.y + (target.y - cam.y) * ease,
+        k: cam.k + (target.k - cam.k) * ease,
+      };
+      requestDraw();
+    } else if (animate) animateCamera(target);
     else {
       cameraRef.current = target;
       requestDraw();
     }
   }, [animateCamera, graph, pos, requestDraw, visibility]);
 
-  // Último fitView, para el observador de tamaño (que no se recrea con él).
   const fitViewRef = useRef(fitView);
   useEffect(() => {
     fitViewRef.current = fitView;
@@ -627,43 +713,117 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
   }, [requestDraw]);
 
   // ── Simulación (worker) ───────────────────────────────────────────────────
+  // La red se PINTA EN CUANTO HAY DATOS, sin esperar al worker:
+  //   - si hay una disposición guardada de esta misma red (misma versión y
+  //     agrupación), con sus posiciones y su cámara, tal como se dejó; el
+  //     worker arranca ya asentado, solo para poder arrastrar nodos;
+  //   - si no, con las posiciones de partida (ya agrupadas por hub), y la
+  //     simulación la va asentando desde ahí.
+  // Al asentarse se guarda la disposición; al salir, también la cámara.
+  const layoutKey = neuralLayoutKey(username, payload, groupBy);
+
+  // Arranca la entrada animada con las posiciones de ese momento (guardadas o
+  // de partida) y la pinta fotograma a fotograma hasta terminar.
+  const startIntro = useCallback(() => {
+    window.cancelAnimationFrame(introFrameRef.current);
+    if (!graph || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      introRef.current = null;
+      return;
+    }
+    const count = graph.nodes.length;
+    const points = new Float32Array(count * 2);
+    let cx = 0;
+    let cy = 0;
+    for (let i = 0; i < count; i += 1) {
+      const p = pos(i);
+      points[i * 2] = p.x;
+      points[i * 2 + 1] = p.y;
+      cx += p.x / count;
+      cy += p.y / count;
+    }
+    let maxDist = 1;
+    const dist = new Float32Array(count);
+    for (let i = 0; i < count; i += 1) {
+      dist[i] = Math.hypot(points[i * 2] - cx, points[i * 2 + 1] - cy);
+      maxDist = Math.max(maxDist, dist[i]);
+    }
+    const delays = new Float32Array(count);
+    for (let i = 0; i < count; i += 1) {
+      const d = dist[i] / maxDist;
+      delays[i] = graph.nodes[i].kind === "title" ? 0.12 + 0.56 * d : 0.42 * d;
+    }
+    introRef.current = { start: performance.now(), delays };
+    const step = () => {
+      drawRef.current();
+      if (performance.now() - introRef.current.start < INTRO_MS) {
+        introFrameRef.current = window.requestAnimationFrame(step);
+      } else {
+        introRef.current = null;
+        drawRef.current();
+      }
+    };
+    introFrameRef.current = window.requestAnimationFrame(step);
+  }, [graph, pos]);
   useEffect(() => {
     if (!graph) return undefined;
-    setSettled(false);
     setSelected(-1);
-    positionsRef.current = null;
-    interactedRef.current = false;
+    const saved = getNeuralLayout(layoutKey, graph.nodes.length);
+    positionsRef.current = saved ? new Float32Array(saved.positions) : null;
+    interactedRef.current = Boolean(saved?.camera);
+    let settledNow = Boolean(saved);
+    setSettled(settledNow);
+    if (saved?.camera) {
+      cameraRef.current = saved.camera;
+      requestDraw();
+    } else if (saved) {
+      fitView(false);
+    } else {
+      // Red nueva: se encuadra la posición de partida sin llegar al zoom de
+      // los títulos; a partir de ahí la cámara la acompaña suavemente.
+      fitView("start");
+    }
+
+    startIntro();
+
     const worker = new Worker(new URL("./neuralGraph.worker.js", import.meta.url), { type: "module" });
     workerRef.current = worker;
-    let first = true;
     worker.onmessage = ({ data }) => {
       if (data.type === "tick") {
         positionsRef.current = data.positions;
-        if (first) {
-          first = false;
-          fitView(false);
-        }
+        // Mientras se asienta, el encuadre acompaña a la red en cada paso (un
+        // alejamiento gradual) salvo que ya se haya movido la cámara a mano.
+        if (!interactedRef.current && !settledNow) fitView("follow");
         requestDraw();
       } else if (data.type === "end") {
+        settledNow = true;
         setSettled(true);
         if (!interactedRef.current) fitView(true);
+        saveNeuralLayout(layoutKey, { positions: positionsRef.current, camera: null });
       }
     };
+    const P = saved?.positions;
     worker.postMessage({
       type: "init",
       // Repulsión: los géneros separan los racimos; una saga repele poco para
       // quedarse DENTRO del suyo, junto a sus películas.
-      nodes: graph.nodes.map((node) => ({
-        x: node.x,
-        y: node.y,
+      nodes: graph.nodes.map((node, i) => ({
+        x: P ? P[i * 2] : node.x,
+        y: P ? P[i * 2 + 1] : node.y,
         r: node.r,
         charge: node.kind === "genre" || node.kind === "decade" ? -320 : node.kind === "saga" ? -40 : -26,
         saga: node.kind === "saga",
       })),
       links: graph.links,
+      resume: Boolean(saved),
       instant: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches || false,
     });
     return () => {
+      // Solo una red asentada: una a medio colocar se volvería a recolocar.
+      if (settledNow && positionsRef.current) {
+        saveNeuralLayout(layoutKey, { positions: positionsRef.current, camera: { ...cameraRef.current } });
+      }
+      window.cancelAnimationFrame(introFrameRef.current);
+      introRef.current = null;
       worker.postMessage({ type: "stop" });
       worker.terminate();
       workerRef.current = null;
@@ -707,7 +867,20 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
     };
   }, [fullscreen, status]);
 
+  // Mientras se anima el menú o la cabecera, la cámara acompaña el cambio de
+  // tamaño del lienzo para que la red no se mueva en pantalla (ver resize).
+  // Solo entonces: al montarse el lienzo se coloca en pasos provisionales, y
+  // compensarlos desplazaba la red al volver a la pestaña.
+  const anchorUntilRef = useRef(0);
+  const layoutTogglesRef = useRef({ headerCollapsed, menuShown });
   useEffect(() => {
+    // Solo si de verdad han cambiado (no por montarse ni por el doble montaje
+    // de desarrollo de React).
+    const previous = layoutTogglesRef.current;
+    if (previous.headerCollapsed !== headerCollapsed || previous.menuShown !== menuShown) {
+      anchorUntilRef.current = performance.now() + 700;
+    }
+    layoutTogglesRef.current = { headerCollapsed, menuShown };
     let frame = 0;
     const until = performance.now() + 600;
     const loop = () => {
@@ -716,26 +889,52 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
     };
     frame = window.requestAnimationFrame(loop);
     return () => window.cancelAnimationFrame(frame);
-  }, [headerCollapsed]);
+    // Cabecera y menú animan su altura durante 300 ms: se mide en CADA
+    // fotograma de la animación (en requestAnimationFrame ya se ve su estado
+    // de ese fotograma), para que el lienzo encaje sin desfase de un cuadro.
+  }, [headerCollapsed, menuShown]);
 
   // ── Tamaño del lienzo ─────────────────────────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) return undefined;
+    // Sin parpadeos al cambiar de tamaño (menú o cabecera que se animan):
+    //   1. Redimensionar un <canvas> lo BORRA. El observador se ejecuta antes
+    //      de pintar, así que se redibuja ahí mismo, no en el fotograma
+    //      siguiente (eso dejaba fotogramas en blanco durante la animación).
+    //      Y solo se redimensiona si el tamaño cambia de verdad.
+    //   2. La red NO se reencuadra: la cámara se corrige para que cada punto
+    //      siga en el mismo sitio de la pantalla mientras se mueven los bordes
+    //      del lienzo. Se ve más o menos red, pero nada salta ni cambia de zoom.
+    let last = null;
     const resize = () => {
       const rect = canvas.getBoundingClientRect();
+      const top = documentTop(canvas);
+      const left = rect.left + window.scrollX;
+      const ratio = Math.min(3, window.devicePixelRatio || 1);
+      const width = Math.max(1, Math.round(rect.width * ratio));
+      const height = Math.max(1, Math.round(rect.height * ratio));
+      if (last && positionsRef.current && performance.now() < anchorUntilRef.current) {
+        const cam = cameraRef.current;
+        cameraRef.current = {
+          ...cam,
+          x: cam.x + (last.left + last.w / 2) - (left + rect.width / 2),
+          y: cam.y + (last.top + last.h / 2) - (top + rect.height / 2),
+        };
+      }
+      last = { top, left, w: rect.width, h: rect.height };
       // Hasta 3x (pantallas retina de móvil) y con la escala REAL del lienzo:
       // redondear el tamaño y dibujar con la escala teórica dejaba el trazo
       // fuera de la rejilla de píxeles, y se veía borroso.
-      const ratio = Math.min(3, window.devicePixelRatio || 1);
-      canvas.width = Math.max(1, Math.round(rect.width * ratio));
-      canvas.height = Math.max(1, Math.round(rect.height * ratio));
+      if (canvas.width !== width) canvas.width = width;
+      if (canvas.height !== height) canvas.height = height;
       sizeRef.current = { w: rect.width, h: rect.height, dpr: canvas.width / Math.max(1, rect.width) };
-      // Si el lienzo cambia de tamaño (cabecera compactada, giro…) y aún no se
-      // ha movido la cámara a mano, la red se reencuadra para aprovecharlo.
-      if (!interactedRef.current && positionsRef.current) fitViewRef.current(false);
-      requestDraw();
+      if (pendingFitRef.current && rect.width && rect.height) {
+        fitViewRef.current(pendingFitRef.current === "start" ? "start" : false);
+      }
+      window.cancelAnimationFrame(frameRef.current);
+      drawRef.current();
     };
     resize();
     const observer = new ResizeObserver(resize);
@@ -749,7 +948,7 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
       window.cancelAnimationFrame(cameraAnimRef.current);
       frameRef.current = 0;
     };
-  }, [requestDraw, status]);
+  }, [status]);
 
   // ── Interacción ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -976,7 +1175,7 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
       />
       <div className={`flex h-11 w-full items-center gap-1 p-1 ${MENU_SURFACE}`}>
         {onToggleHeader && !fullscreen ? (
-          <span className="hidden h-full flex-1 @[1024px]/detail-page:flex">
+          <span className="flex h-full flex-1">
             <MenuViewButton
               label={headerCollapsed ? "Mostrar la cabecera del perfil" : "Compactar la cabecera del perfil"}
               icon={headerCollapsed ? ChevronsDown : ChevronsUp}
@@ -987,7 +1186,10 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
         ) : null}
         <MenuViewButton label="Alejar" icon={Minus} onClick={() => zoomBy(1 / 1.35)} />
         <MenuViewButton label="Acercar" icon={Plus} onClick={() => zoomBy(1.35)} />
-        <MenuViewButton label="Encuadrar todo" icon={Scan} onClick={() => fitView(true)} />
+        {/* Por debajo de 1024px ya está en la fila del buscador: no se repite. */}
+        <span className="hidden h-full flex-1 @[1024px]/detail-page:flex">
+          <MenuViewButton label="Centrar y encuadrar todo" icon={LocateFixed} onClick={() => fitView(true)} />
+        </span>
         <MenuViewButton
           label={fullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
           icon={fullscreen ? Minimize : Maximize}
@@ -1028,23 +1230,34 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
       ref={containerRef}
       className={fullscreen ? "flex h-screen w-screen flex-col overflow-hidden bg-black p-4" : ""}
     >
-      {/* ── MENÚ, fuera del lienzo ── */}
-      <section ref={menuRef} aria-label="Opciones de la vista neural" className="relative z-20 mb-5 space-y-2 @[640px]/detail-page:mb-6">
+      {/* ── MENÚ, fuera del lienzo ──
+          Oculto por defecto; se despliega con el botón de flecha de arriba del
+          lienzo. Filas de rejilla 0fr ↔ 1fr para animar la altura real: el
+          lienzo (que se mide contra lo de encima) crece o encoge a la vez. */}
+      <div
+        ref={menuRef}
+        id="neural-menu"
+        inert={!menuShown || undefined}
+        onTransitionEnd={(event) => {
+          if (event.target === event.currentTarget) setMenuAnimating(false);
+        }}
+        className={`grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+          menuShown ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+        }`}
+      >
+        {/* Sin recorte a la vista: los anillos de foco no deben cortarse. */}
+        <div className={`min-h-0 ${!menuShown || menuAnimating ? "overflow-hidden" : ""}`}>
+      <section aria-label="Opciones de la vista neural" className="relative z-20 mb-5 space-y-2 @[640px]/detail-page:mb-6">
         <div className="flex gap-2 @[1024px]/detail-page:hidden">
           {searchField("flex-1", "Buscar...", "text-base")}
-          {onToggleHeader && !fullscreen ? (
-            <button
-              type="button"
-              onClick={onToggleHeader}
-              className={`flex h-11 w-11 shrink-0 items-center justify-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400/70 ${MENU_SURFACE} ${
-                headerCollapsed ? "text-emerald-400" : "text-zinc-200 hover:bg-white/10"
-              }`}
-              aria-pressed={headerCollapsed}
-              aria-label={headerCollapsed ? "Mostrar la cabecera del perfil" : "Compactar la cabecera del perfil"}
-            >
-              {headerCollapsed ? <ChevronsDown className="h-4 w-4" aria-hidden="true" /> : <ChevronsUp className="h-4 w-4" aria-hidden="true" />}
-            </button>
-          ) : null}
+          <button
+            type="button"
+            onClick={() => fitView(true)}
+            className={`flex h-11 w-11 shrink-0 items-center justify-center text-zinc-200 transition-all hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400/70 ${MENU_SURFACE}`}
+            aria-label="Centrar y encuadrar todo"
+          >
+            <LocateFixed className="h-4 w-4" aria-hidden="true" />
+          </button>
           <button
             type="button"
             onClick={() => setMenuOpen((current) => !current)}
@@ -1066,17 +1279,17 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
           {menuControls}
         </div>
       </section>
+        </div>
+      </div>
 
       {/* ── LIENZO ── */}
       <section
         ref={stageRef}
         aria-label="Vista neural de títulos"
-        className={`relative isolate overflow-hidden bg-[radial-gradient(120%_90%_at_50%_0%,rgba(16,185,129,0.07),transparent_60%),radial-gradient(90%_80%_at_50%_100%,rgba(99,102,241,0.06),transparent_60%)] ${
+        className={`relative isolate overflow-hidden ${
           fullscreen
-            ? "min-h-0 flex-1 rounded-2xl"
-            : // Hasta el borde inferior de la pantalla. En táctil se reserva la
-              // barra inferior flotante (56px a 12px del borde + zona segura).
-              "h-[calc(100dvh_-_var(--neural-top,16rem)_-_5.25rem_-_env(safe-area-inset-bottom))] min-h-[320px] rounded-2xl bg-white/[0.015] desktop:h-[calc(100dvh_-_var(--neural-top,16rem)_-_1.5rem)]"
+            ? "min-h-0 flex-1 rounded-2xl bg-[radial-gradient(120%_90%_at_50%_0%,rgba(16,185,129,0.07),transparent_60%),radial-gradient(90%_80%_at_50%_100%,rgba(99,102,241,0.06),transparent_60%)]"
+            : NEURAL_STAGE_CLASS
         }`}
       >
         <canvas
@@ -1087,20 +1300,125 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
               ? `Red de ${graph.stats.titles} títulos agrupados en ${graph.stats.genres} géneros y ${graph.stats.sagas} sagas`
               : "Cargando la red de títulos"
           }
-          className="absolute inset-0 h-full w-full touch-none cursor-grab select-none"
+          // En móvil la red se funde arriba y abajo en vez de cortarse en seco.
+          className="absolute inset-0 h-full w-full touch-none cursor-grab select-none [-webkit-mask-image:linear-gradient(to_bottom,transparent,black_32px,black_calc(100%_-_32px),transparent)] [mask-image:linear-gradient(to_bottom,transparent,black_32px,black_calc(100%_-_32px),transparent)] @[640px]/detail-page:[-webkit-mask-image:none] @[640px]/detail-page:[mask-image:none]"
         />
 
-        {!graph ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-sm text-zinc-400">
-            <Loader2 className="h-6 w-6 animate-spin text-emerald-400/80" />
-            Construyendo la red…
+        {/* Con el menú OCULTO, lo esencial sigue dentro del lienzo, arriba:
+            a la izquierda el buscador (una lupa que se despliega) y a la
+            derecha los controles de vista en una fila. Con el menú abierto
+            están en él, así que aquí se desvanecen. */}
+        {/* Una sola fila: el buscador ocupa lo que quede y los controles nunca
+            encogen, con un hueco fijo entre ambos. La fila no captura el
+            puntero: entre las dos piezas se sigue arrastrando la red. */}
+        <div
+          aria-hidden={menuShown}
+          inert={menuShown || undefined}
+          // No en móvil: allí el lienzo es estrecho y todo esto está en el menú.
+          className={`pointer-events-none absolute inset-x-3 top-3 z-10 hidden items-start justify-between gap-3 transition-opacity duration-300 motion-reduce:transition-none @[640px]/detail-page:flex ${
+            menuShown ? "opacity-0" : "opacity-100"
+          }`}
+        >
+          <div className={`pointer-events-auto flex min-w-0 ${searchOpen ? "flex-1 @[1024px]/detail-page:flex-none" : ""}`}>
+          {searchOpen ? (
+            <label className={`flex h-10 w-full items-center gap-2 rounded-xl pl-3 pr-1 @[1024px]/detail-page:w-72 ${LIQUID_GLASS_PANEL}`}>
+              <span className="sr-only">Buscar en la vista neural</span>
+              <Search className="h-4 w-4 shrink-0 text-emerald-400" aria-hidden="true" />
+              <input
+                ref={stageSearchRef}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    setQuery("");
+                    setSearchOpen(false);
+                    return;
+                  }
+                  onSearchKey(event);
+                }}
+                onBlur={() => {
+                  if (!query) setSearchOpen(false);
+                }}
+                placeholder="Buscar título, género o saga..."
+                className="min-w-0 flex-1 bg-transparent text-sm text-white placeholder:text-zinc-400 focus:outline-none"
+              />
+              {query ? <span className="shrink-0 text-[11px] font-semibold tabular-nums text-zinc-400">{matches.length}</span> : null}
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery("");
+                  setSearchOpen(false);
+                }}
+                aria-label="Cerrar la búsqueda"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white/10 hover:text-white"
+              >
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            </label>
+          ) : (
+            <span className={`flex rounded-xl p-1 ${LIQUID_GLASS_PANEL}`}>
+              <StageButton label="Buscar en la vista neural" icon={Search} onClick={() => setSearchOpen(true)} />
+            </span>
+          )}
           </div>
-        ) : null}
+
+        <div
+          role="group"
+          aria-label="Controles de la vista"
+          className={`pointer-events-auto flex shrink-0 items-center gap-0.5 rounded-xl p-1 ${LIQUID_GLASS_PANEL}`}
+        >
+          <StageButton label="Alejar" icon={Minus} onClick={() => zoomBy(1 / 1.35)} />
+          <StageButton label="Acercar" icon={Plus} onClick={() => zoomBy(1.35)} />
+          <span className="mx-0.5 h-5 w-px bg-white/10" aria-hidden="true" />
+          <StageButton label="Centrar y encuadrar todo" icon={LocateFixed} onClick={() => fitView(true)} />
+          <StageButton
+            label={fullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+            icon={fullscreen ? Minimize : Maximize}
+            onClick={toggleFullscreen}
+          />
+        </div>
+        </div>
+
+        {/* Mostrar u ocultar el menú, arriba y en el centro del lienzo. */}
+        <button
+          type="button"
+          onClick={() => {
+            // Sin transición (reducir movimiento) no llega transitionend.
+            if (!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) setMenuAnimating(true);
+            setMenuVisible((current) => !current);
+          }}
+          aria-expanded={menuVisible}
+          aria-controls="neural-menu"
+          aria-label={menuVisible ? "Ocultar el menú" : "Mostrar el menú"}
+          title={menuVisible ? "Ocultar el menú" : "Mostrar el menú"}
+          className={`absolute left-1/2 top-1.5 z-10 h-8 w-12 -translate-x-1/2 @[640px]/detail-page:top-3 items-center justify-center rounded-xl text-zinc-300 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 ${LIQUID_GLASS_PANEL} ${
+            // En pantallas estrechas el buscador abierto necesita ese hueco.
+            // (en móvil no hay buscador en el lienzo, así que ahí siempre se ve).
+            // No en móvil (menú siempre presente); en pantallas medianas, el
+            // buscador abierto necesita ese hueco.
+            searchOpen && !menuVisible ? "hidden @[1024px]/detail-page:flex" : "hidden @[640px]/detail-page:flex"
+          }`}
+        >
+          <ChevronDown
+            className={`h-4 w-4 transition-transform duration-300 motion-reduce:transition-none ${menuVisible ? "rotate-180" : ""}`}
+            aria-hidden="true"
+          />
+        </button>
+
+        {/* Mientras llegan los datos (solo la primera vez: después se pinta la
+            copia guardada), el mismo esqueleto que usa el perfil al cargar. */}
+        {!graph ? <NeuralSkeletonArt /> : null}
 
         {graph ? (
           <>
             {/* Leyenda de los grupos (géneros o décadas). */}
-            <div className="pointer-events-none absolute bottom-3 right-3 top-3 hidden w-48 flex-col justify-end @[1024px]/detail-page:flex">
+            <div
+              className={`pointer-events-none absolute bottom-3 right-3 hidden w-48 flex-col justify-end @[1024px]/detail-page:flex ${
+                // Con el menú oculto, arriba a la derecha están los controles.
+                menuShown ? "top-3" : "top-16"
+              }`}
+            >
               <ul className={`pointer-events-auto max-h-full overflow-y-auto overscroll-contain rounded-2xl p-2 [scrollbar-width:none] ${LIQUID_GLASS_PANEL}`}>
                 {legend.map(({ node, index, count }) => (
                   <li key={node.id}>
@@ -1121,7 +1439,8 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
             </div>
 
             {/* Pie: recuento, estado y ficha del nodo seleccionado. */}
-            <div className="pointer-events-none absolute inset-x-3 bottom-3 flex flex-col items-start gap-2 @[1024px]/detail-page:right-56">
+            {/* En móvil, por encima de la barra inferior flotante. */}
+            <div className="pointer-events-none absolute inset-x-4 bottom-[calc(5.5rem_+_env(safe-area-inset-bottom))] flex flex-col items-start gap-2 @[640px]/detail-page:inset-x-3 @[640px]/detail-page:bottom-3 @[1024px]/detail-page:right-56">
               <SelectedCard
                 node={selectedNode}
                 graph={graph}
