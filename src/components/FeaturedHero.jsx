@@ -1868,14 +1868,17 @@ function FeaturedSlide({
           will-change: height;
         }
 
+        /* Sin filter: el reproductor es de cristal (backdrop-filter) y
+           animar un filtro sobre él hace que el desenfoque del fondo entre de
+           golpe al terminar, en vez de con la pieza. */
         @keyframes heroNowPlayingIn {
           from {
             opacity: 0;
-            filter: blur(4px);
+            transform: translateY(8px);
           }
           to {
             opacity: 1;
-            filter: blur(0);
+            transform: none;
           }
         }
 
