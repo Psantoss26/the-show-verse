@@ -72,6 +72,11 @@ const GenreRadarChart = dynamic(
   () => loadProfileCharts().then((module) => module.GenreRadarChart),
   { ssr: false, loading: () => <ChartLoading /> },
 );
+// Vista neural: carga diferida (canvas, d3-force y su worker) solo al abrirla.
+const NeuralGraphView = dynamic(
+  () => import("@/components/profile/neural/NeuralGraphView"),
+  { ssr: false, loading: () => <ChartLoading className="h-[72svh] min-h-[480px]" /> },
+);
 const RatingsBarChart = dynamic(
   () => loadProfileCharts().then((module) => module.RatingsBarChart),
   { ssr: false, loading: () => <ChartLoading /> },
@@ -171,6 +176,31 @@ function CountStat({ value, label, href, icon: Icon, iconClassName = "text-emera
     );
   }
   return <div className={className}>{body}</div>;
+}
+
+// Tarjeta de recuento en píldora, para la cabecera compacta de la vista neural.
+// Mismo icono y color que CountStat; en móvil solo icono y número.
+function CompactCount({ value, label, href, icon: Icon, iconClassName }) {
+  const className = "inline-flex h-8 items-center gap-1.5 rounded-full bg-gradient-to-br from-white/10 to-white/5 px-2.5 text-xs shadow-lg transition hover:from-white/[0.16] hover:to-white/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70";
+  const body = (
+    <>
+      <Icon className={`h-3.5 w-3.5 shrink-0 ${iconClassName}`} aria-hidden="true" />
+      <span className="font-black tabular-nums text-white">{value ?? 0}</span>
+      <span className="hidden text-[10px] font-bold uppercase tracking-wider text-zinc-400 @[1024px]/detail-page:inline">{label}</span>
+    </>
+  );
+  if (href) {
+    return (
+      <Link href={href} className={className} aria-label={`${value ?? 0} ${label}`}>
+        {body}
+      </Link>
+    );
+  }
+  return (
+    <span className={className} aria-label={`${value ?? 0} ${label}`}>
+      {body}
+    </span>
+  );
 }
 
 function ProfilePosterGrid({
@@ -692,6 +722,9 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
   const { user: viewer } = useAuth();
   // Cerrar sesión pide confirmación, igual que en el resto de páginas de usuario.
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  // Cabecera compacta: solo en la vista neural, para que el lienzo gane alto.
+  const [neuralHeaderCollapsed, setNeuralHeaderCollapsed] = useState(false);
+  const [headerAnimating, setHeaderAnimating] = useState(false);
   const router = useRouter();
   const isBackNav = useIsHistoryNavigation();
   const profileSwipe = useRef(null);
@@ -714,6 +747,16 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
   // clic no remonte ni vuelva a animar cabecera, métricas y navegación.
   const [pendingTab, setPendingTab] = useState(null);
   const tab = pendingTab || routeTab;
+  const compactHeader = tab === "neural" && neuralHeaderCollapsed;
+  // Cualquier cambio de la cabecera (botón o cambio de pestaña) se anima con
+  // recorte, para que no asome el contenido mientras crece o encoge.
+  const previousCompactRef = useRef(compactHeader);
+  useEffect(() => {
+    if (previousCompactRef.current === compactHeader) return;
+    previousCompactRef.current = compactHeader;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    setHeaderAnimating(true);
+  }, [compactHeader]);
   const [refreshToken, setRefreshToken] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [privateAnalytics, setPrivateAnalytics] = useState(null);
@@ -962,8 +1005,67 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
       {/* Fondo decorativo sutil */}
       <ProfileBackdrop />
 
-      <div className="relative z-10 mx-auto max-w-[1600px] px-4 pb-8 pt-4 @[640px]/detail-page:px-6 @[640px]/detail-page:py-8 @[1024px]/detail-page:px-8 @[1024px]/detail-page:py-12">
+      <div
+        className={`relative z-10 mx-auto max-w-[1600px] px-4 pb-8 pt-4 transition-[padding] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none @[640px]/detail-page:px-6 @[640px]/detail-page:pb-8 @[1024px]/detail-page:px-8 @[1024px]/detail-page:pb-12 ${
+          compactHeader ? "@[640px]/detail-page:pt-4" : "@[640px]/detail-page:pt-8 @[1024px]/detail-page:pt-12"
+        }`}
+      >
+        {/* ── CABECERA COMPACTA (vista neural) ──
+            Una fila con avatar y nombre en lugar de la cabecera completa. Se
+            pliega y despliega con filas de rejilla (0fr ↔ 1fr), que animan la
+            ALTURA real: el lienzo de la vista neural crece a la vez. */}
+        <div
+          aria-hidden={!compactHeader}
+          inert={!compactHeader || undefined}
+          className={`grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+            compactHeader ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+          }`}
+        >
+          <div className="min-h-0 overflow-hidden">
+            <div className="flex items-center gap-3 py-1.5">
+              <ProfileAvatar user={user} size="h-8 w-8 shrink-0" />
+              <p className="min-w-0 flex-1 truncate text-sm font-black tracking-tight text-white @[640px]/detail-page:text-base">
+                {user.displayName}<span className="text-emerald-400">.</span>
+                <span className="ml-2 hidden text-xs font-semibold text-zinc-500 @[480px]/detail-page:inline">@{user.username}</span>
+              </p>
+              {/* Las cuatro tarjetas de recuento, en píldoras. */}
+              <div className="flex shrink-0 items-center gap-1.5">
+                <CompactCount value={counts.films} label="Películas" icon={Film} iconClassName="text-sky-400" />
+                <CompactCount value={stats.completedShows} label="Series" icon={CheckCircle2} iconClassName="text-violet-400" />
+                <CompactCount
+                  value={counts.following}
+                  label="Siguiendo"
+                  icon={UserRoundCheck}
+                  iconClassName="text-emerald-400"
+                  href={`/u/${user.username}/following`}
+                />
+                <CompactCount
+                  value={counts.followers}
+                  label="Seguidores"
+                  icon={Users}
+                  iconClassName="text-amber-400"
+                  href={`/u/${user.username}/followers`}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* ── CABECERA ── */}
+        <div
+          aria-hidden={compactHeader}
+          inert={compactHeader || undefined}
+          onTransitionEnd={(event) => {
+            if (event.target === event.currentTarget) setHeaderAnimating(false);
+          }}
+          className={`grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+            compactHeader ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"
+          }`}
+        >
+          {/* Sin recorte en reposo: los botones y tarjetas tienen sombras y
+              escalado al pasar el ratón que no deben cortarse. Solo recorta
+              plegada o mientras se anima. */}
+          <div className={`min-h-0 ${compactHeader || headerAnimating ? "overflow-hidden" : ""}`}>
         <header className="sv-profile-entry sv-profile-entry--header flex flex-wrap items-center gap-3 @[1024px]/detail-page:flex-nowrap @[1024px]/detail-page:justify-between @[1024px]/detail-page:gap-6">
           <ProfileAvatar user={user} size="h-16 w-16 shrink-0 @[640px]/detail-page:h-26 @[640px]/detail-page:w-26" />
           <div className="min-w-0 flex-1 text-left">
@@ -1045,6 +1147,8 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
             />
           </div>
         </header>
+          </div>
+        </div>
 
         {/* ── BARRA DE PESTAÑAS ── */}
         <div className="sv-profile-entry sv-profile-entry--tabs">
@@ -1054,6 +1158,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
             sections={sections}
             onNavigate={navigateToTab}
             routeBase={routeBase}
+            compact={compactHeader}
           />
         </div>
 
@@ -1074,6 +1179,14 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
                 </p>
               </section>
             )}
+          </div>
+        ) : tab === "neural" ? (
+          <div className="sv-profile-entry sv-profile-entry--content mt-5 @[640px]/detail-page:mt-6">
+            <NeuralGraphView
+              username={user.username}
+              headerCollapsed={neuralHeaderCollapsed}
+              onToggleHeader={() => setNeuralHeaderCollapsed((current) => !current)}
+            />
           </div>
         ) : tab !== "profile" ? (
           <div className="sv-profile-entry sv-profile-entry--content mt-5 @[640px]/detail-page:mt-6">
@@ -1228,12 +1341,13 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
 
 // Barra de pestañas del perfil. "Perfil" = resumen; el resto muestra su conteo
 // y carga su sección bajo demanda.
-function ProfileTabs({ tab, username, sections, onNavigate, routeBase }) {
+function ProfileTabs({ tab, username, sections, onNavigate, routeBase, compact = false }) {
   const navRef = useRef(null);
   const items = [
     { id: "profile", label: "Perfil" },
     { id: "level", label: "Nivel" },
     { id: "statistics", label: "Estadísticas" },
+    { id: "neural", label: "Neural" },
     { id: "activity", label: "Actividad", count: sections?.activity },
     { id: "watched", label: "Diario", count: sections?.watched },
     { id: "reviews", label: "Reseñas", count: sections?.reviews },
@@ -1260,7 +1374,12 @@ function ProfileTabs({ tab, username, sections, onNavigate, routeBase }) {
       data-profile-horizontal-scroll
       data-profile-swipe-exempt
       aria-label="Secciones del perfil"
-      className="mt-3 flex gap-1 overflow-x-auto border-b border-white/10 pb-px snap-x snap-proximity overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] @[640px]/detail-page:mt-8 [&::-webkit-scrollbar]:hidden"
+      // Con la cabecera compacta, el margen superior se iguala al hueco de
+      // encima para que la fila compacta quede centrada entre la barra de
+      // navegación y las pestañas.
+      className={`flex gap-1 overflow-x-auto border-b border-white/10 pb-px snap-x snap-proximity overscroll-x-contain transition-[margin] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] [scrollbar-width:none] [-ms-overflow-style:none] motion-reduce:transition-none [&::-webkit-scrollbar]:hidden ${
+        compact ? "mt-1.5" : "mt-3 @[640px]/detail-page:mt-8"
+      }`}
     >
       {items.map((it) => {
         const active = tab === it.id;

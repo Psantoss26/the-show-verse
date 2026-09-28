@@ -2,6 +2,7 @@ export const PROFILE_TAB_IDS = Object.freeze([
   "profile",
   "level",
   "statistics",
+  "neural",
   "activity",
   "watched",
   "reviews",
