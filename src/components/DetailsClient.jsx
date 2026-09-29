@@ -359,6 +359,12 @@ const MOBILE_REVEAL_BASE =
   "transform-gpu max-sm:data-[mobile-reveal=hidden]:invisible max-sm:data-[mobile-reveal=hidden]:pointer-events-none max-sm:data-[mobile-reveal=hidden]:**:!transition-none";
 const MOBILE_REVEAL_ATTR = "data-mobile-reveal";
 
+// Aparición animada del marcador al revelarse (solo el marcador; las pestañas y
+// la fila de acciones siguen con el revelado instantáneo). Se reproduce cada vez
+// que el atributo pasa a "shown", como las secciones de los dashboards.
+const MOBILE_SCOREBOARD_REVEAL_ANIMATION =
+  "max-sm:motion-safe:data-[mobile-reveal=shown]:*:animate-sv-mobile-scoreboard-reveal";
+
 // Umbral mínimo que evita revelar el bloque antes de que el usuario haya
 // abandonado el inicio de la ficha. El cruce visual preciso lo calcula el
 // centinela contra el borde superior de la navegación inferior.
@@ -9905,7 +9911,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               <div
                 // Sin `will-change`: no hay transición pendiente y mantener una
                 // capa extra perjudica a los dispositivos de menor rendimiento.
-                className={MOBILE_REVEAL_BASE}
+                // Al revelarse, el panel (hijo directo, el cristal) entra como
+                // las secciones de los dashboards; la animación va en él y no
+                // aquí para no dejar el cristal plano (ver globals.css). Una
+                // ficha restaurada al volver ya se pinta estática.
+                className={`${MOBILE_REVEAL_BASE} ${
+                  detailsRestored ? "" : MOBILE_SCOREBOARD_REVEAL_ANIMATION
+                }`}
                 {...{
                   [MOBILE_REVEAL_ATTR]: mobileSecondaryVisible ? "shown" : "hidden",
                 }}
