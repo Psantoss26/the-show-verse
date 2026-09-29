@@ -193,6 +193,7 @@ import {
 
 // Cache de datos OMDb en localStorage para evitar peticiones repetidas
 import {
+  pickFresherImdbScore,
   readOmdbCache,
   writeOmdbCache,
   extractOmdbExtraScores,
@@ -6138,10 +6139,14 @@ export default function DetailsClient({
 
           if (!Number.isFinite(imdbRating)) return;
 
+          // Dataset de IMDb frente a lo que ya se muestre (caché u OMDb): la
+          // lectura más reciente, no la que llegue la última.
           setExtras((prev) => ({
             ...prev,
-            imdbRating,
-            imdbVotes: Number.isFinite(votes) ? votes : null,
+            ...pickFresherImdbScore(
+              { imdbRating, imdbVotes: Number.isFinite(votes) ? votes : null },
+              { imdbRating: prev.imdbRating, imdbVotes: prev.imdbVotes },
+            ),
           }));
 
           writeOmdbCache(imdbId, {
@@ -6163,8 +6168,10 @@ export default function DetailsClient({
 
           setExtras((prev) => ({
             ...prev,
-            imdbRating: prev.imdbRating ?? omdbImdbRating,
-            imdbVotes: prev.imdbVotes ?? omdbImdbVotes,
+            ...pickFresherImdbScore(
+              { imdbRating: prev.imdbRating, imdbVotes: prev.imdbVotes },
+              { imdbRating: omdbImdbRating, imdbVotes: omdbImdbVotes },
+            ),
             awards,
             rtScore,
             mcScore,

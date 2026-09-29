@@ -4,7 +4,9 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  BookmarkPlus,
   ChevronDown,
+  ChevronRight,
   ChevronsDown,
   ChevronsUp,
   Eye,
@@ -21,7 +23,6 @@ import {
   Plus,
   Search,
   SlidersHorizontal,
-  Star,
   Tv,
   X,
 } from "lucide-react";
@@ -136,7 +137,7 @@ function SelectedCard({ node, graph, onClose, onFocusNode }) {
     const series = titles.filter((n) => n.title.mediaType === "tv").length;
     const top = [...titles].sort((a, b) => b.r - a.r).slice(0, 6);
     return (
-      <div className={`pointer-events-auto w-full max-w-sm rounded-2xl p-4 text-white ${LIQUID_GLASS_PANEL}`}>
+      <div className={`pointer-events-auto w-full max-w-sm rounded-2xl p-4 text-left text-white ${LIQUID_GLASS_PANEL}`}>
         <div className="flex items-start gap-3">
           <span className="mt-1 h-3 w-3 shrink-0 rounded-full" style={{ background: node.color }} aria-hidden="true" />
           <div className="min-w-0 flex-1">
@@ -173,10 +174,18 @@ function SelectedCard({ node, graph, onClose, onFocusNode }) {
 
   const title = node.title;
   const href = detailsHref(title);
+  const openPreview = previewClick(
+    { tmdbId: title.tmdbId, mediaType: title.mediaType, title: title.title, posterPath: title.posterPath },
+    { mediaType: title.mediaType },
+  );
+  // MÓVIL: una sola fila compacta (cartel pequeño, datos y, a la derecha,
+  // cerrar y una flecha para abrir la ficha). Desde 640px, la ficha amplia
+  // con el botón "Ver ficha" debajo. Siempre alineada a la izquierda (el pie
+  // de la vista se centra en móvil).
   return (
-    <div className={`pointer-events-auto w-full max-w-sm rounded-2xl p-3 text-white ${LIQUID_GLASS_PANEL}`}>
-      <div className="flex gap-3">
-        <div className="h-[6.5rem] w-[4.4rem] shrink-0 overflow-hidden rounded-xl bg-white/5 shadow-[0_16px_32px_-10px_rgba(0,0,0,0.9)]">
+    <div className={`pointer-events-auto w-full max-w-sm rounded-2xl p-2 text-left text-white @[640px]/detail-page:p-3 ${LIQUID_GLASS_PANEL}`}>
+      <div className="flex items-center gap-3 @[640px]/detail-page:items-start">
+        <div className="h-[4.25rem] w-[2.85rem] shrink-0 overflow-hidden rounded-lg bg-white/5 shadow-[0_16px_32px_-10px_rgba(0,0,0,0.9)] @[640px]/detail-page:h-[6.5rem] @[640px]/detail-page:w-[4.4rem] @[640px]/detail-page:rounded-xl">
           {title.posterPath ? (
             <OptimizedImage
               src={`https://image.tmdb.org/t/p/w185${title.posterPath}`}
@@ -187,48 +196,67 @@ function SelectedCard({ node, graph, onClose, onFocusNode }) {
             />
           ) : (
             <span className="flex h-full w-full items-center justify-center text-white/30">
-              {title.mediaType === "tv" ? <Tv className="h-6 w-6" /> : <Film className="h-6 w-6" />}
+              {title.mediaType === "tv" ? <Tv className="h-5 w-5" /> : <Film className="h-5 w-5" />}
             </span>
           )}
         </div>
-        <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 flex-1 flex-col gap-1 @[640px]/detail-page:gap-1.5">
           <div className="flex items-start gap-2">
-            <p className="min-w-0 flex-1 text-[10px] font-bold uppercase tracking-[0.2em] text-white/45">
+            <p className="min-w-0 flex-1 truncate text-[10px] font-bold uppercase leading-4 tracking-[0.2em] text-white/45">
               {title.mediaType === "tv" ? "Serie" : "Película"}
               {title.year ? ` · ${title.year}` : ""}
             </p>
-            <button type="button" onClick={onClose} aria-label="Cerrar" className="-mr-1 -mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/5 text-white/70 transition hover:bg-white/10 hover:text-white">
+            <button type="button" onClick={onClose} aria-label="Cerrar" className="-mr-1 -mt-1 hidden h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/5 text-white/70 transition hover:bg-white/10 hover:text-white @[640px]/detail-page:flex">
               <X className="h-3.5 w-3.5" />
             </button>
           </div>
-          <h3 className="line-clamp-2 text-base font-black leading-tight">{title.title}</h3>
+          <h3 className="truncate text-sm font-black leading-5 @[640px]/detail-page:line-clamp-2 @[640px]/detail-page:whitespace-normal @[640px]/detail-page:text-base @[640px]/detail-page:leading-snug">{title.title}</h3>
           {title.genres.length || title.saga ? (
-            <p className="mt-1 line-clamp-1 text-xs text-white/60">
+            <p className="truncate text-xs leading-4 text-white/60">
               {[title.saga, ...title.genres].filter(Boolean).join(" · ")}
             </p>
           ) : null}
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-white/75">
+          {/* Mismos iconos y colores que los registros de Actividad del
+              perfil: visto (ojo), nota (el número en ámbar), favorita
+              (corazón) y pendiente (marcador). */}
+          <div className="flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold leading-5 text-white/75">
             {title.flags & FLAG_WATCHED ? (
-              <span className="inline-flex items-center gap-1">
-                <Eye className="h-3.5 w-3.5 text-emerald-400" />
-                {title.mediaType === "tv" ? `${title.plays} ep.` : title.plays > 1 ? `${title.plays} veces` : "Vista"}
+              <span className="inline-flex items-center gap-1" title="Vista" aria-label="Vista">
+                <Eye className="h-4 w-4 text-emerald-300" aria-hidden="true" />
+                {/* Solo el icono; el número únicamente si aporta algo. */}
+                {title.mediaType === "tv" ? `${title.plays} ep.` : title.plays > 1 ? `${title.plays} veces` : null}
               </span>
             ) : null}
             {title.rating ? (
-              <span className="inline-flex items-center gap-1">
-                <Star className="h-3.5 w-3.5 fill-current text-amber-400" />
+              <span className="text-base font-black leading-none tabular-nums text-amber-300" title="Tu puntuación">
                 {title.rating}
               </span>
             ) : null}
-            {title.flags & FLAG_FAVORITE ? <Heart className="h-3.5 w-3.5 fill-current text-red-400" aria-label="Favorita" /> : null}
-            {title.flags & FLAG_WATCHLIST ? <span className="text-sky-300">Pendiente</span> : null}
+            {title.flags & FLAG_FAVORITE ? (
+              <Heart className="h-4 w-4 fill-current text-red-300" aria-label="Favorita" />
+            ) : null}
+            {title.flags & FLAG_WATCHLIST ? (
+              <BookmarkPlus className="h-4 w-4 fill-current text-sky-300" aria-label="Pendiente" />
+            ) : null}
           </div>
+        </div>
+        {/* Móvil: solo la flecha para abrir la ficha. Se cierra tocando fuera,
+            en la red. */}
+        <div className="flex shrink-0 items-center @[640px]/detail-page:hidden">
+          <Link
+            href={href}
+            onClick={openPreview}
+            aria-label={`Ver ficha de ${title.title}`}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+          >
+            <ChevronRight className="h-4 w-4" aria-hidden="true" />
+          </Link>
         </div>
       </div>
       <Link
         href={href}
-        onClick={previewClick({ tmdbId: title.tmdbId, mediaType: title.mediaType, title: title.title, posterPath: title.posterPath }, { mediaType: title.mediaType })}
-        className="mt-3 flex h-9 items-center justify-center rounded-xl bg-white/10 text-xs font-bold text-white transition hover:bg-white/20"
+        onClick={openPreview}
+        className="mt-3 hidden h-9 items-center justify-center rounded-xl bg-white/10 text-xs font-bold text-white transition hover:bg-white/20 @[640px]/detail-page:flex"
       >
         Ver ficha
       </Link>
