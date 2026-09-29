@@ -2110,6 +2110,7 @@ export default function MoviesPageClient({
                     hydrated={hydrated}
                     backdropOverrides={EMPTY_OBJECT}
                     accent="sky"
+                    replayRevealAtTop={index === 0}
                   />
                 ) : (
                   <SharedRow
@@ -2125,6 +2126,7 @@ export default function MoviesPageClient({
                     spotlight={isSpotlight}
                     showContextBadge={isSpotlight}
                     accent="sky"
+                    replayRevealAtTop={index === 0}
                   />
                 ),
               );

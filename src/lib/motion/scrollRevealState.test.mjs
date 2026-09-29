@@ -57,3 +57,33 @@ test("top reset reveal also keeps browser-only preferences out of hydration", ()
   assert.deepEqual(firstClientRender, server);
   assert.deepEqual(server, { initial: "hidden", animate: "hidden" });
 });
+
+test("top reset reveal stays hidden when returning through history with the scroll at the top", () => {
+  // En móvil la primera sección asoma bajo la navbar inferior: al volver a un
+  // dashboard con el scroll arriba debe seguir oculta, sin animación.
+  assert.deepEqual(
+    resolveTopResetRevealProps({
+      enabled: true,
+      hydrationReady: true,
+      reduceMotion: false,
+      isBackNav: true,
+      hasScrolled: false,
+      revealed: false,
+    }),
+    { initial: false, animate: "hidden" },
+  );
+});
+
+test("top reset reveal appears without animation when history restores a scrolled position", () => {
+  assert.deepEqual(
+    resolveTopResetRevealProps({
+      enabled: true,
+      hydrationReady: true,
+      reduceMotion: false,
+      isBackNav: true,
+      hasScrolled: true,
+      revealed: false,
+    }),
+    { initial: false, animate: "visible" },
+  );
+});
