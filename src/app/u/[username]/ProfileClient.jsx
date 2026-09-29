@@ -34,6 +34,7 @@ import {
 } from "@/lib/profile/neuralPreferences";
 import { prefetchNeuralGraph } from "@/lib/profile/neuralGraphData";
 import NeuralGraphSkeleton from "@/components/profile/neural/NeuralGraphSkeleton";
+import NeuralPreviewCard from "@/components/profile/neural/NeuralPreviewCard";
 import {
   Activity,
   Award,
@@ -1305,6 +1306,25 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
               onNavigate={navigateToTab}
             />
 
+            <ActivitySidebarPreview
+              username={user.username}
+              onOpen={() => navigateToTab("activity")}
+              isSelf={isSelf}
+            />
+
+            {/* Vista previa de la vista neuronal: miniatura que abre la pestaña. */}
+            <section>
+              <SectionHeader
+                label="Vista neuronal"
+                onClick={() => navigateToTab("neural")}
+              />
+              <NeuralPreviewCard
+                username={user.username}
+                onOpen={() => navigateToTab("neural")}
+                onIntent={() => preloadNeuralView(user.username)}
+              />
+            </section>
+
             {/* Resumen del mes actual */}
             <section>
               <SectionHeader
@@ -1318,12 +1338,6 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
                 <StatCell value={formatProfileTime(thisMonth.minutes)} label="Tiempo visto" />
               </dl>
             </section>
-
-            <ActivitySidebarPreview
-              username={user.username}
-              onOpen={() => navigateToTab("activity")}
-              isSelf={isSelf}
-            />
 
             <section>
               <SectionHeader
