@@ -151,25 +151,25 @@ function Toast({ toast, onClose, onOpen }) {
 
   const body = (
     <>
-      <span className="relative flex h-12 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/[0.04] desktop:h-[4.5rem] desktop:w-12 desktop:rounded-xl">
+      <span className="relative flex h-10 w-7 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white/[0.04] md:h-[4.5rem] md:w-12 md:rounded-xl">
         {src ? (
           <OptimizedImage src={src} alt="" width={48} height={72} className="h-full w-full object-cover" />
         ) : (
-          <Icon className={`h-5 w-5 desktop:h-6 desktop:w-6 ${tone.text} ${filled ? "fill-current" : ""}`} aria-hidden="true" />
+          <Icon className={`h-5 w-5 md:h-6 md:w-6 ${tone.text} ${filled ? "fill-current" : ""}`} aria-hidden="true" />
         )}
       </span>
       <span className="min-w-0 flex-1 [text-shadow:0_1px_2px_rgba(0,0,0,0.6)]">
-        <span className={`flex items-center gap-1 text-[10px] font-bold uppercase leading-none tracking-[0.12em] desktop:gap-1.5 desktop:text-[11px] desktop:leading-normal ${tone.text}`}>
-          <Icon className={`h-3 w-3 shrink-0 desktop:h-3.5 desktop:w-3.5 ${filled ? "fill-current" : ""}`} aria-hidden="true" />
+        <span className={`flex items-center gap-1 text-[10px] font-bold uppercase leading-none tracking-[0.12em] md:gap-1.5 md:text-[11px] md:leading-normal ${tone.text}`}>
+          <Icon className={`h-3 w-3 shrink-0 md:h-3.5 md:w-3.5 ${filled ? "fill-current" : ""}`} aria-hidden="true" />
           <span className="truncate">{toast.label || "Aviso"}</span>
         </span>
         {toast.title ? (
-          <span className="mt-1 block truncate text-[13px] font-extrabold leading-tight text-white desktop:mt-0.5 desktop:text-[15px]">
+          <span className="mt-0.5 block truncate text-[13px] font-extrabold leading-tight text-white md:text-[15px]">
             {toast.title}
           </span>
         ) : null}
         {toast.text ? (
-          <span className="line-clamp-1 text-xs leading-snug text-zinc-300 desktop:mt-0.5 desktop:line-clamp-2 desktop:text-[13px]">{toast.text}</span>
+          <span className="line-clamp-1 text-xs leading-snug text-zinc-300 md:mt-0.5 md:line-clamp-2 md:text-[13px]">{toast.text}</span>
         ) : null}
       </span>
     </>
@@ -186,40 +186,37 @@ function Toast({ toast, onClose, onOpen }) {
       onPointerLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
-      className={`pointer-events-auto relative overflow-hidden rounded-[1.25rem] text-white desktop:rounded-[1.75rem] ${LIQUID_GLASS_PANEL}`}
+      className={`pointer-events-auto relative overflow-hidden rounded-[1.25rem] text-white md:rounded-[1.75rem] ${LIQUID_GLASS_PANEL}`}
     >
-      {/* En táctil el aviso tapa la barra superior: un velo sin bordes para que
-          sus iconos no se transparenten por detrás del cristal. */}
-      <span aria-hidden="true" className="pointer-events-none absolute inset-0 bg-black/35 desktop:hidden" />
       {/* Reflejo del color de la acción detrás del cartel. */}
       <span
         aria-hidden="true"
         className={`pointer-events-none absolute -left-10 -top-12 h-32 w-32 rounded-full opacity-25 blur-3xl ${tone.glow}`}
       />
-      <div className="relative flex min-h-[3.5rem] items-center gap-1 px-1.5 py-2.5 pr-1 md:px-2 desktop:min-h-0 desktop:p-2.5 desktop:pr-2">
+      <div className="relative flex items-center gap-1 px-1.5 py-1.5 pr-1 md:p-2.5 md:pr-2">
         {toast.url ? (
           <button
             type="button"
             onClick={() => onOpen(toast)}
-            className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl text-left desktop:gap-3 desktop:rounded-2xl transition-colors hover:bg-white/[0.04] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+            className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl text-left md:gap-3 md:rounded-2xl transition-colors hover:bg-white/[0.04] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
           >
             {body}
           </button>
         ) : (
-          <div className="flex min-w-0 flex-1 items-center gap-2.5 desktop:gap-3">{body}</div>
+          <div className="flex min-w-0 flex-1 items-center gap-2.5 md:gap-3">{body}</div>
         )}
         <button
           type="button"
           onClick={() => onClose(toast.id)}
           aria-label="Cerrar aviso"
-          className="inline-flex h-7 w-7 shrink-0 items-center justify-center self-center rounded-full desktop:h-8 desktop:w-8 desktop:self-start text-zinc-400 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center self-center rounded-full md:h-8 md:w-8 md:self-start text-zinc-400 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
         >
-          <XIcon className="h-3.5 w-3.5 desktop:h-4 desktop:w-4" aria-hidden="true" />
+          <XIcon className="h-3.5 w-3.5 md:h-4 md:w-4" aria-hidden="true" />
         </button>
       </div>
       {/* Tiempo restante: un hilo dentro del panel, sin carril ni tocar el
           borde, para no dibujar un filo en la parte de abajo. */}
-      <span aria-hidden="true" className="pointer-events-none absolute inset-x-5 bottom-1 h-[2px] overflow-hidden rounded-full desktop:inset-x-6 desktop:bottom-1.5">
+      <span aria-hidden="true" className="pointer-events-none absolute inset-x-5 bottom-1 h-[2px] overflow-hidden rounded-full md:inset-x-6 md:bottom-1.5">
         <span
           className={`sv-toast-timer block h-full origin-left rounded-full opacity-60 ${tone.bar}`}
           style={{ animationDuration: `${VISIBLE_MS}ms`, animationPlayState: paused ? "paused" : "running" }}
@@ -388,12 +385,10 @@ export default function InAppNotifications() {
   // Capa superior (popover manual): por encima de modales y sin cerrarse al
   // pulsar fuera.
   //
-  // En táctil (móvil y tablet) el aviso va arriba del todo, SOBRE la barra
-  // superior, y la tapa por completo: a todo el ancho (los botones de menú,
-  // buscar, alertas y perfil están pegados a los bordes, a 8-12 px) y con al
-  // menos el alto de sus botones (44 px centrados en una barra de 48-64 px).
-  // Más estrecho dejaba asomar medio botón por los lados. En escritorio va
-  // bajo la barra y a la derecha, sin taparla. Sin soporte de popover queda como capa fija normal.
+  // Siempre BAJO la barra superior, sin taparla. Desde 768px (tablet y
+  // escritorio) a la derecha y con 24rem de ancho; en móvil, a todo el ancho
+  // con margen lateral y en versión compacta (menos alto). Sin soporte de
+  // popover queda como capa fija normal.
   useEffect(() => {
     const el = containerRef.current;
     if (!el || typeof el.showPopover !== "function") return;
@@ -409,9 +404,9 @@ export default function InAppNotifications() {
       ref={containerRef}
       popover="manual"
       aria-label="Avisos"
-      className="pointer-events-none fixed inset-auto left-1.5 right-1.5 top-[calc(env(safe-area-inset-top)+0.375rem)] z-[100000] m-0 w-auto max-w-none overflow-visible border-0 bg-transparent p-0 text-white desktop:left-auto desktop:right-4 desktop:top-[calc(env(safe-area-inset-top)+4.5rem)] desktop:w-[24rem]"
+      className="pointer-events-none fixed inset-auto left-3 right-3 top-[calc(env(safe-area-inset-top)+4.5rem)] z-[100000] m-0 w-auto max-w-none overflow-visible border-0 bg-transparent p-0 text-white md:left-auto md:right-4 md:w-[24rem]"
     >
-      <ol aria-live="polite" className="flex flex-col gap-1.5 desktop:gap-2.5">
+      <ol aria-live="polite" className="flex flex-col gap-1.5 md:gap-2.5">
         <AnimatePresence initial={false}>
           {toasts.map((toast) => (
             <Toast key={toast.id} toast={toast} onClose={close} onOpen={open} />
