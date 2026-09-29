@@ -139,7 +139,15 @@ function SelectedCard({ node, graph, onClose, onFocusNode }) {
     const isSaga = node.kind === "saga";
     const collectionHref = isSaga && node.id ? `/lists/collection/${node.id}` : null;
     return (
-      <div className={`pointer-events-auto w-full max-w-sm rounded-2xl p-4 text-left text-white ${LIQUID_GLASS_PANEL}`}>
+      <div className={`pointer-events-auto relative w-full max-w-sm rounded-2xl p-4 text-left text-white ${LIQUID_GLASS_PANEL}`}>
+        {/* Móvil: toda la ficha abre la colección (la flecha solo lo indica). */}
+        {collectionHref ? (
+          <Link
+            href={collectionHref}
+            aria-label={`Ver colección ${node.label}`}
+            className="absolute inset-0 rounded-2xl @[640px]/detail-page:hidden"
+          />
+        ) : null}
         <div className="flex items-start gap-3">
           <span className="mt-1 h-3 w-3 shrink-0 rounded-full" style={{ background: node.color }} aria-hidden="true" />
           <div className="min-w-0 flex-1">
@@ -158,13 +166,12 @@ function SelectedCard({ node, graph, onClose, onFocusNode }) {
               tocando fuera, como la ficha de un título) y desde 640px con el
               botón "Ver colección" de abajo. */}
           {collectionHref ? (
-            <Link
-              href={collectionHref}
-              aria-label={`Ver colección ${node.label}`}
-              className="flex h-8 w-8 shrink-0 items-center justify-center self-center rounded-full bg-white/10 text-white transition hover:bg-white/20 @[640px]/detail-page:hidden"
+            <span
+              aria-hidden="true"
+              className="flex h-8 w-8 shrink-0 items-center justify-center self-center rounded-full bg-white/10 text-white @[640px]/detail-page:hidden"
             >
-              <ChevronRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
+              <ChevronRight className="h-4 w-4" />
+            </span>
           ) : null}
           <button
             type="button"
@@ -176,9 +183,11 @@ function SelectedCard({ node, graph, onClose, onFocusNode }) {
           </button>
         </div>
         {top.length ? (
-          <ul className="mt-3 flex flex-wrap gap-1.5">
+          // Los títulos siguen enfocando su nodo; el hueco entre ellos deja
+          // pasar el toque al enlace de la colección.
+          <ul className="pointer-events-none relative mt-3 flex flex-wrap gap-1.5">
             {top.map((n) => (
-              <li key={n.id}>
+              <li key={n.id} className="pointer-events-auto">
                 <button
                   type="button"
                   onClick={() => onFocusNode(graph.nodes.indexOf(n))}
@@ -213,7 +222,14 @@ function SelectedCard({ node, graph, onClose, onFocusNode }) {
   // con el botón "Ver ficha" debajo. Siempre alineada a la izquierda (el pie
   // de la vista se centra en móvil).
   return (
-    <div className={`pointer-events-auto w-full max-w-sm rounded-2xl p-2 text-left text-white @[640px]/detail-page:p-3 ${LIQUID_GLASS_PANEL}`}>
+    <div className={`pointer-events-auto relative w-full max-w-sm rounded-2xl p-2 text-left text-white @[640px]/detail-page:p-3 ${LIQUID_GLASS_PANEL}`}>
+      {/* Móvil: toda la ficha abre el título (la flecha solo lo indica). */}
+      <Link
+        href={href}
+        onClick={openPreview}
+        aria-label={`Ver ficha de ${title.title}`}
+        className="absolute inset-0 z-10 rounded-2xl @[640px]/detail-page:hidden"
+      />
       <div className="flex items-center gap-3 @[640px]/detail-page:items-start">
         <div className="h-[4.25rem] w-[2.85rem] shrink-0 overflow-hidden rounded-lg bg-white/5 shadow-[0_16px_32px_-10px_rgba(0,0,0,0.9)] @[640px]/detail-page:h-[6.5rem] @[640px]/detail-page:w-[4.4rem] @[640px]/detail-page:rounded-xl">
           {title.posterPath ? (
@@ -270,18 +286,14 @@ function SelectedCard({ node, graph, onClose, onFocusNode }) {
             ) : null}
           </div>
         </div>
-        {/* Móvil: solo la flecha para abrir la ficha. Se cierra tocando fuera,
-            en la red. */}
-        <div className="flex shrink-0 items-center @[640px]/detail-page:hidden">
-          <Link
-            href={href}
-            onClick={openPreview}
-            aria-label={`Ver ficha de ${title.title}`}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
-          >
-            <ChevronRight className="h-4 w-4" aria-hidden="true" />
-          </Link>
-        </div>
+        {/* Móvil: la flecha indica que la ficha abre el título. Se cierra
+            tocando fuera, en la red. */}
+        <span
+          aria-hidden="true"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-white @[640px]/detail-page:hidden"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </span>
       </div>
       <Link
         href={href}
