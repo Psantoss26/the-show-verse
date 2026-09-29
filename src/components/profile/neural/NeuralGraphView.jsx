@@ -136,6 +136,8 @@ function SelectedCard({ node, graph, onClose, onFocusNode }) {
       .filter((n) => n.kind === "title");
     const series = titles.filter((n) => n.title.mediaType === "tv").length;
     const top = [...titles].sort((a, b) => b.r - a.r).slice(0, 6);
+    const isSaga = node.kind === "saga";
+    const collectionHref = isSaga && node.id ? `/lists/collection/${node.id}` : null;
     return (
       <div className={`pointer-events-auto w-full max-w-sm rounded-2xl p-4 text-left text-white ${LIQUID_GLASS_PANEL}`}>
         <div className="flex items-start gap-3">
@@ -146,10 +148,30 @@ function SelectedCard({ node, graph, onClose, onFocusNode }) {
             </p>
             <h3 className="truncate text-lg font-black">{node.label}</h3>
             <p className="text-xs text-white/60">
-              {titles.length - series} películas · {series} series
+              {/* Una saga solo reúne películas: no se cuentan series. */}
+              {isSaga
+                ? `${titles.length} ${titles.length === 1 ? "película" : "películas"}`
+                : `${titles.length - series} películas · ${series} series`}
             </p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Cerrar" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/5 text-white/70 transition hover:bg-white/10 hover:text-white">
+          {/* La saga abre su colección: en móvil con la flecha (se cierra
+              tocando fuera, como la ficha de un título) y desde 640px con el
+              botón "Ver colección" de abajo. */}
+          {collectionHref ? (
+            <Link
+              href={collectionHref}
+              aria-label={`Ver colección ${node.label}`}
+              className="flex h-8 w-8 shrink-0 items-center justify-center self-center rounded-full bg-white/10 text-white transition hover:bg-white/20 @[640px]/detail-page:hidden"
+            >
+              <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          ) : null}
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar"
+            className={`h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/5 text-white/70 transition hover:bg-white/10 hover:text-white ${collectionHref ? "hidden @[640px]/detail-page:flex" : "flex"}`}
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -167,6 +189,14 @@ function SelectedCard({ node, graph, onClose, onFocusNode }) {
               </li>
             ))}
           </ul>
+        ) : null}
+        {collectionHref ? (
+          <Link
+            href={collectionHref}
+            className="mt-3 hidden h-9 items-center justify-center rounded-xl bg-white/10 text-xs font-bold text-white transition hover:bg-white/20 @[640px]/detail-page:flex"
+          >
+            Ver colección
+          </Link>
         ) : null}
       </div>
     );
