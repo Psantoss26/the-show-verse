@@ -2102,6 +2102,7 @@ export default function SeriesPageClient({
                     hydrated={hydrated}
                     backdropOverrides={EMPTY_OBJECT}
                     accent="fuchsia"
+                    replayRevealAtTop={index === 0}
                   />
                 ) : (
                   <SharedRow
@@ -2117,6 +2118,7 @@ export default function SeriesPageClient({
                     spotlight={isSpotlight}
                     showContextBadge={isSpotlight}
                     accent="fuchsia"
+                    replayRevealAtTop={index === 0}
                   />
                 ),
               );

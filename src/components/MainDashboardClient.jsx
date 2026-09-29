@@ -2706,6 +2706,9 @@ export function Row({
   spotlight = false, // Fila DESTACADA (×1,6). La elige el padre (una por dashboard).
   showContextBadge = false,
   accent = "amber",
+  // Primera sección tras el FeaturedHero: oculta mientras se está arriba del
+  // todo (en móvil asoma tras la navbar inferior) y se reproduce al volver.
+  replayRevealAtTop = false,
 }) {
   const reduceMotion = useReducedMotion();
   const normalizedItems = Array.isArray(items) ? items : EMPTY_ARRAY;
@@ -2865,7 +2868,15 @@ export function Row({
     : useInView(rowRef, { once: true, margin: "600px" });
   // Revelado: la fila se monta antes (isInView, para tener el Swiper listo) pero
   // solo se anima al entrar en la ventana y SOLO tras hacer scroll.
-  const revealProps = useScrollRevealProps();
+  const standardRevealProps = useScrollRevealProps();
+  const topResetRevealProps = useTopResetRevealProps(
+    rowRef,
+    "-80px",
+    replayRevealAtTop,
+  );
+  const revealProps = replayRevealAtTop
+    ? topResetRevealProps
+    : standardRevealProps;
   const [preloadedBackdrops, setPreloadedBackdrops] = useState(new Set());
 
   // Precargar backdrops cuando el usuario está sobre la fila

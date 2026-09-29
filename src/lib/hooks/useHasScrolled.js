@@ -97,13 +97,12 @@ export function useTopResetRevealProps(
   // sección no cae dentro del margen del IntersectionObserver justo en ese
   // instante y el usuario no vuelve a hacer scroll, `revealed` se queda en
   // `false` para siempre (mismo problema que en `useScrollRevealProps`, ver
-  // su comentario). Se salta el gateo por scroll en este montaje.
+  // su comentario). Por eso en este montaje se ignora el observador y solo
+  // cuenta el scroll: arriba del todo sigue oculta (en móvil asomaría tras la
+  // navbar inferior) y en cuanto hay desplazamiento aparece sin animación.
   const isBackNav = useIsHistoryNavigation();
   const hydrationReady = useHydrationReady();
-  const hasScrolled = useHasScrolled(4, {
-    resetAtTop: true,
-    enabled: enabled && !isBackNav,
-  });
+  const hasScrolled = useHasScrolled(4, { resetAtTop: true, enabled });
   const isIntersectingRef = useRef(false);
   const [revealed, setRevealed] = useState(false);
   // ¿Cabe la sección de sobra SIN hacer scroll?
@@ -139,7 +138,7 @@ export function useTopResetRevealProps(
   }, [enabled, isBackNav, margin, targetRef]);
 
   useEffect(() => {
-    if (!enabled || isBackNav || typeof IntersectionObserver === "undefined")
+    if (!enabled || typeof IntersectionObserver === "undefined")
       return undefined;
     const target = targetRef.current;
     if (!target || typeof window === "undefined") return undefined;
@@ -166,7 +165,7 @@ export function useTopResetRevealProps(
       window.removeEventListener("resize", observe);
       observer?.disconnect();
     };
-  }, [enabled, isBackNav, targetRef]);
+  }, [enabled, targetRef]);
 
   useEffect(() => {
     if (!enabled || isBackNav) return;

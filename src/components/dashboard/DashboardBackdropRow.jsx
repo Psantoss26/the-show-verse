@@ -65,7 +65,10 @@ import {
   DASHBOARD_PREVIEW_OPEN_DELAY_MS,
   DASHBOARD_PREVIEW_REDUCED_TRANSITION,
 } from "@/lib/dashboard/previewTiming";
-import { useScrollRevealProps } from "@/lib/hooks/useHasScrolled";
+import {
+  useScrollRevealProps,
+  useTopResetRevealProps,
+} from "@/lib/hooks/useHasScrolled";
 import OptimizedImage from "@/components/OptimizedImage";
 // Fila de acciones + fila meta/géneros + puntuaciones COMPARTIDAS con
 // DetailsClient/DetailModal: misma UI que la ficha rápida del dashboard.
@@ -1400,15 +1403,25 @@ export default function DashboardBackdropRow({
   backdropOverrides = {},
   accent = "amber",
   labelText,
+  // Primera sección tras el FeaturedHero (ver Row de MainDashboardClient).
+  replayRevealAtTop = false,
 }) {
   const reduceMotion = useReducedMotion();
   const { openDetailModal } = useDetailModal();
   const { showHoverBackdrop, clearHoverBackdrop, prewarmHoverBackdrop } =
     useDashboardHoverBackdrop();
-  const revealProps = useScrollRevealProps();
 
   const swiperRef = useRef(null);
   const rowRef = useRef(null);
+  const standardRevealProps = useScrollRevealProps();
+  const topResetRevealProps = useTopResetRevealProps(
+    rowRef,
+    "-80px",
+    replayRevealAtTop,
+  );
+  const revealProps = replayRevealAtTop
+    ? topResetRevealProps
+    : standardRevealProps;
   const [isHoveredRow, setIsHoveredRow] = useState(false);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
