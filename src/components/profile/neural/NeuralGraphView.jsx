@@ -276,6 +276,31 @@ function introReveal(intro, index) {
   return 1 - (1 - local) ** 3;
 }
 
+// Bloqueo del desplazamiento vertical de la página mientras la vista neuronal
+// ocupa toda la pantalla. Al bloquear se vuelve arriba (se podía llegar a la
+// pestaña con la página desplazada) y se evita el rebote de iOS.
+// `overflow: hidden` en <html> y <body> corta la rueda y el dedo (también en
+// iOS), pero no los desplazamientos por código (restauración de scroll, foco):
+// esos se devuelven arriba al momento mientras dure el bloqueo.
+let pageScrollLocked = false;
+const keepPageAtTop = () => {
+  if (window.scrollY !== 0) window.scrollTo({ top: 0, behavior: "instant" });
+};
+function lockPageScroll(locked) {
+  if (typeof document === "undefined" || pageScrollLocked === locked) return;
+  pageScrollLocked = locked;
+  for (const element of [document.documentElement, document.body]) {
+    element.style.overflowY = locked ? "hidden" : "";
+    element.style.overscrollBehaviorY = locked ? "none" : "";
+  }
+  if (locked) {
+    keepPageAtTop();
+    window.addEventListener("scroll", keepPageAtTop, { passive: true });
+  } else {
+    window.removeEventListener("scroll", keepPageAtTop);
+  }
+}
+
 export default function NeuralGraphView({ username, headerCollapsed = false, onToggleHeader = null }) {
   const router = useRouter();
   const { status, payload } = useNeuralPayload(username);
@@ -878,7 +903,12 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
     let frame = 0;
     const measure = () => {
       frame = 0;
-      stage.style.setProperty("--neural-top", `${Math.round(documentTop(stage))}px`);
+      const top = Math.round(documentTop(stage));
+      stage.style.setProperty("--neural-top", `${top}px`);
+      // SIN DESPLAZAMIENTO VERTICAL: la vista ya ocupa justo la pantalla, y lo
+      // que queda por debajo es relleno de la página. Solo si cabe entera: en
+      // pantallas muy bajas (alto mínimo del lienzo) se deja desplazar.
+      lockPageScroll(top + stage.offsetHeight <= window.innerHeight + 2);
     };
     const schedule = () => {
       if (!frame) frame = window.requestAnimationFrame(measure);
@@ -893,6 +923,7 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
       window.cancelAnimationFrame(frame);
       observer.disconnect();
       window.removeEventListener("resize", schedule);
+      lockPageScroll(false);
     };
   }, [fullscreen, status]);
 
