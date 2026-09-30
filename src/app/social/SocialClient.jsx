@@ -65,6 +65,7 @@ import {
 import Stars from "@/components/social/Stars";
 
 const PAGE_SIZE = 30;
+const FEED_VACIO = { items: [], hasMore: false, offset: 0, loaded: false, error: "" };
 
 // Icono y tono de cada acción: EXACTAMENTE los de la Actividad del perfil
 // (`ActivityRow` en ProfileSection), para que una acción se vea igual en los
@@ -225,7 +226,7 @@ function CartelEvento({ evento, className = "" }) {
       href={href}
       prefetch={false}
       aria-label={`Ver ${evento.title || evento.name || "ficha"}`}
-      className={`${className} shrink-0 overflow-hidden bg-zinc-900 ring-1 ring-white/10 transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/70`}
+      className={`${className} shrink-0 overflow-hidden bg-zinc-900 transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/70`}
     >
       {imagen}
     </Link>
@@ -403,11 +404,16 @@ export default function SocialClient() {
   const isBackNav = useIsHistoryNavigation();
 
   const [scope, setScope] = useState("following");
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [hasMore, setHasMore] = useState(false);
-  const [offset, setOffset] = useState(0);
-  const [error, setError] = useState("");
+  // Un feed POR ALCANCE ("siguiendo" y "yo"). Antes había uno solo que se
+  // vaciaba y se volvía a pedir en cada cambio: hasta que respondía la red se
+  // seguía viendo la lista del otro alcance (y ya redactada como la nueva, con
+  // o sin autor), y luego se sustituía de golpe. Con uno por alcance, volver a
+  // una pestaña ya cargada es instantáneo y el otro se precarga en segundo
+  // plano, así que el primer cambio tampoco espera.
+  const [feeds, setFeeds] = useState({});
+  const feedActual = feeds[scope] || FEED_VACIO;
+  const { items, hasMore, offset, error } = feedActual;
+  const loading = !feedActual.loaded;
 
   // Cifras de la cabecera. Van aparte del feed: no cambian al paginar ni al
   // alternar entre "siguiendo" y "yo", así que se piden una sola vez.
@@ -487,42 +493,92 @@ export default function SocialClient() {
     window.requestAnimationFrame(ajustar);
   }, []);
 
+  // Última petición lanzada por alcance: una respuesta que llega tarde (por
+  // alternar rápido o por una revalidación solapada) no pisa a una más nueva.
+  const peticionRef = useRef({});
+  const feedsRef = useRef(feeds);
+  useLayoutEffect(() => {
+    feedsRef.current = feeds;
+  }, [feeds]);
+
   const cargar = useCallback(
     async ({ scope: alcance, offset: desde = 0, append = false } = {}) => {
-      if (!session || !account?.id) {
-        setLoading(false);
-        return;
-      }
-      if (!append) setLoading(true);
+      if (!session || !account?.id) return;
+      const peticion = (peticionRef.current[alcance] || 0) + 1;
+      peticionRef.current[alcance] = peticion;
+      const marcar = (cambios) =>
+        setFeeds((prev) => ({
+          ...prev,
+          [alcance]: { ...(prev[alcance] || FEED_VACIO), ...cambios },
+        }));
       try {
         const res = await fetch(
           `/api/users/feed?scope=${alcance}&limit=${PAGE_SIZE}&offset=${desde}`,
           { credentials: "include", cache: "no-store" },
         );
         const json = await res.json().catch(() => ({}));
+        if (peticionRef.current[alcance] !== peticion) return;
         if (!res.ok) {
           // Un fallo NO vacía el feed: se conserva lo que hubiera (mismo
           // criterio que las listas de usuario).
-          setError("No se pudo cargar la actividad.");
+          marcar({ loaded: true, error: "No se pudo cargar la actividad." });
           return;
         }
-        setError("");
         const nuevos = Array.isArray(json?.items) ? json.items : [];
-        setItems((prev) => (append ? [...prev, ...nuevos] : nuevos));
-        setHasMore(!!json?.hasMore);
-        setOffset(Number(json?.offset) || desde + nuevos.length);
+        setFeeds((prev) => {
+          const previo = prev[alcance] || FEED_VACIO;
+          return {
+            ...prev,
+            [alcance]: {
+              items: append ? [...previo.items, ...nuevos] : nuevos,
+              hasMore: !!json?.hasMore,
+              offset: Number(json?.offset) || desde + nuevos.length,
+              loaded: true,
+              error: "",
+            },
+          };
+        });
       } catch {
-        setError("No se pudo cargar la actividad.");
-      } finally {
-        setLoading(false);
+        if (peticionRef.current[alcance] !== peticion) return;
+        marcar({ loaded: true, error: "No se pudo cargar la actividad." });
       }
     },
     [session, account?.id],
   );
 
+  // Otra cuenta (cerrar sesión y entrar con otra sin salir de la página): las
+  // listas guardadas son del usuario anterior y no deben verse ni revalidarse.
+  const cuentaId = account?.id ?? null;
+  const cuentaPreviaRef = useRef(cuentaId);
   useEffect(() => {
-    cargar({ scope, offset: 0 });
+    if (cuentaPreviaRef.current === cuentaId) return;
+    cuentaPreviaRef.current = cuentaId;
+    peticionRef.current = {};
+    feedsRef.current = {};
+    setFeeds({});
+  }, [cuentaId]);
+
+  // Al entrar en un alcance: si ya estaba cargado se enseña TAL CUAL y se
+  // revalida en segundo plano (solo si no se ha paginado: sustituir por la
+  // primera página tiraría lo que el usuario ya cargó con "Cargar más"). Si no
+  // estaba, se pide.
+  useEffect(() => {
+    const previo = feedsRef.current[scope];
+    if (!previo?.loaded || previo.offset <= PAGE_SIZE) {
+      cargar({ scope, offset: 0 });
+    }
   }, [cargar, scope]);
+
+  // Precarga del OTRO alcance en cuanto el actual ha llegado, para que el
+  // primer cambio de pestaña ya encuentre su lista.
+  const actualCargado = feedActual.loaded;
+  useEffect(() => {
+    if (!actualCargado) return;
+    const otro = scope === "following" ? "me" : "following";
+    if (!feedsRef.current[otro] && !peticionRef.current[otro]) {
+      cargar({ scope: otro, offset: 0 });
+    }
+  }, [actualCargado, scope, cargar]);
 
   useEffect(() => {
     if (!session || !account?.id) return undefined;

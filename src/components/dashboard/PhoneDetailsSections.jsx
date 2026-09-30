@@ -352,11 +352,12 @@ export default function PhoneDetailsSections({
   const handleResetArtwork = useCallback(() => {
     setSelectedMobilePoster(null);
     setSelectedLogo(null);
-    writeArtworkPreference(mobilePosterKey, null);
-    writeArtworkPreference(logoKey, null);
     // Se restauran TODAS las capas, no solo las dos que se editan aquí: es lo
     // que hace el mismo botón en la ficha completa, y dejar a medias el resto
     // convertiría "restaurar" en algo distinto según desde dónde se pulse.
+    // Eso incluye las copias locales por título: sin borrarlas, una portada o
+    // fondo de escritorio restablecidos aquí reaparecían en este dispositivo
+    // cuando no había instantánea de la cuenta que las desmintiera.
     const changes = [
       { kind: "poster", filePath: null },
       { kind: "backdrop", filePath: null },
@@ -364,10 +365,13 @@ export default function PhoneDetailsSections({
       { kind: "mobilePoster", filePath: null },
       { kind: "logo", filePath: null },
     ];
+    for (const { kind } of changes) {
+      writeArtworkPreference(`showverse:${overrideType}:${id}:${kind}`, null);
+    }
     cacheArtworkOverrides?.({ type: overrideType, id, changes });
     saveArtworkOverrides({ type: overrideType, id, changes });
     onArtworkSelection?.({ kind: "logo", filePath: null });
-  }, [cacheArtworkOverrides, overrideType, id, mobilePosterKey, logoKey, onArtworkSelection]);
+  }, [cacheArtworkOverrides, overrideType, id, onArtworkSelection]);
 
   const isLogoTab = activeImagesTab === "logos";
 

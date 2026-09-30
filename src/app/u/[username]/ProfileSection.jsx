@@ -763,7 +763,7 @@ function ActivityPoster({ item, className = "" }) {
     <Link
       href={href || `/details/${type}/${item.tmdbId}`}
       onClick={previewClick(item, { mediaType: type, episode: getEpisodePreview(item) })}
-      className={`${className} shrink-0 overflow-hidden bg-zinc-900 ring-1 ring-white/10 transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70`}
+      className={`${className} shrink-0 overflow-hidden bg-zinc-900 transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70`}
       aria-label={`Ver ${item.title || "ficha"}`}
     >
       {poster}
@@ -786,7 +786,7 @@ function ActivityReview({ item, actor, compact = false, posterList = false }) {
         ) : (
           <>
             <ActivityAvatar actor={actor} />
-            <Link href={href} onClick={previewClick(item, { mediaType: type, episode: getEpisodePreview(item) })} className="hidden h-28 w-[76px] shrink-0 overflow-hidden rounded-lg bg-zinc-900 ring-1 ring-white/10 @[640px]/detail-page:block">
+            <Link href={href} onClick={previewClick(item, { mediaType: type, episode: getEpisodePreview(item) })} className="hidden h-28 w-[76px] shrink-0 overflow-hidden rounded-lg bg-zinc-900 @[640px]/detail-page:block">
               {src ? (
                 <OptimizedImage src={src} alt={item.title || ""} className="h-full w-full object-cover" loading="lazy" />
               ) : (

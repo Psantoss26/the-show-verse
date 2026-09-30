@@ -1418,9 +1418,11 @@ export default function EpisodeDetailsClient({
               aspect="video"
               overlay={
                 <>
+                  {/* Sin chip "Visto" mientras la barra de "Viendo" ocupa
+                      el pie de la imagen: se solaparían. */}
                   <StreamingHoverOverlay
                     provider={primaryEpisodeProvider}
-                    watched={trakt.watched}
+                    watched={trakt.watched && inProgressPct == null}
                     part="visual"
                   />
 

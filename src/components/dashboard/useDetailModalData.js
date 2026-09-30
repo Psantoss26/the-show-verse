@@ -1215,12 +1215,18 @@ export function useDetailModalData(item) {
       // con el título impreso lo duplicaría), se PRECARGA entera y solo
       // entonces se anuncia, así se ve aparecer una única vez.
       try {
-        const [detailsForArt, bestBackdrop] = await Promise.all([
-          detailsPromise,
-          fetchBestBackdropNoLang(id, mediaType).catch(() => null),
-        ]);
+        // La selección del usuario para la vista previa (kind `backdrop`) se
+        // resuelve como la portada y el logo: instantánea -> revalidación
+        // remota -> copia local. Sin esperarla, un fondo elegido en otro
+        // dispositivo no llegaba nunca al hero de la ficha rápida.
+        const [detailsForArt, bestBackdrop, artworkOverrides] =
+          await Promise.all([
+            detailsPromise,
+            fetchBestBackdropNoLang(id, mediaType).catch(() => null),
+            artworkOverridesPromise,
+          ]);
         const finalBackdrop =
-          backdropOverride ||
+          overrideFrom(artworkOverrides, "backdrop") ||
           bestBackdrop ||
           item?.backdrop_path ||
           detailsForArt?.backdrop_path ||
