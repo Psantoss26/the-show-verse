@@ -108,9 +108,12 @@ function readContinueWatchingCache() {
     ) {
       return null;
     }
-    // La caché pudo escribirse con una versión anterior que duplicaba series:
-    // deduplicamos al leer para no renderizar keys `tv:<id>` repetidas.
-    return dedupeByKey(parsed.shows, (s) => s?.id);
+    // Deduplicamos al leer por la misma clave que usa el carrusel (`uid` de la
+    // fila de progreso), para no renderizar keys repetidas. Las cachés de
+    // versiones anteriores no traen `uid` y caen en `media_type:id`.
+    return dedupeByKey(parsed.shows, (s) =>
+      s?.uid || (s?.id != null ? `${s?.media_type || "tv"}:${s.id}` : null),
+    );
   } catch {
     return null;
   }
@@ -187,9 +190,14 @@ function mapLocalProgressItems(rows) {
       );
       const remainingLabel = formatRemainingTime(Number(r.runtimeSeconds), Number(r.positionSeconds));
       return {
+        // Una tarjeta por FILA de progreso, como en la página "Continuar
+        // viendo": una misma serie puede estar a medias en dos episodios o en
+        // dos plataformas. El id de la fila es la key estable del carrusel.
+        uid: r.id != null ? `progress:${r.id}` : null,
         id: Number(r.tmdbId),
         media_type: isTv ? "tv" : "movie",
         title: r.title || "",
+        platform: r.platform || null,
         backdrop_path: null,
         poster_path: r.posterPath || null,
         overview: null,
@@ -206,14 +214,16 @@ function mapLocalProgressItems(rows) {
     });
 }
 
-// Una tarjeta por título: deduplica por media_type:id (conserva el más reciente)
-// y ordena por lo último reproducido.
-function dedupeLocalByTitle(items) {
+// Una tarjeta por fila de progreso (NO por título: un mismo título puede
+// repetirse con otro episodio u otra plataforma, igual que en la página
+// "Continuar viendo"). Solo descarta filas repetidas y ordena por lo último
+// reproducido.
+function sortLocalProgress(items) {
   const seen = new Set();
   const out = [];
   for (const it of Array.isArray(items) ? items : []) {
     if (!it || it.id == null) continue;
-    const key = `${it.media_type || "tv"}:${it.id}`;
+    const key = it.uid || `${it.media_type || "tv"}:${it.id}`;
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(it);
@@ -2209,10 +2219,10 @@ function ContinueWatchingSection({
     const load = async () => {
       try {
         // SOLO progreso local de streaming: posición real de reproducción de
-        // películas y episodios en curso (una tarjeta por título). NO usa el
+        // películas y episodios en curso (una tarjeta por fila). NO usa el
         // progreso por episodios de Trakt (eso vive en la página "En progreso").
         const localRows = await getLocalInProgress();
-        const mapped = dedupeLocalByTitle(mapLocalProgressItems(localRows));
+        const mapped = sortLocalProgress(mapLocalProgressItems(localRows));
         if (abort) return;
 
         if (mapped.length > 0) {
