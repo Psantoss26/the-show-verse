@@ -49,3 +49,13 @@ test("el panel solo recorta mientras anima y respeta reducir movimiento", () => 
   assert.match(panel, /motion-reduce:!transition-none/);
   assert.match(panel, /prefers-reduced-motion: reduce/);
 });
+
+test("el panel absorbe la separación del contenedor para no dar un bache al montarse/desmontarse", () => {
+  // Con `space-y-*`/`gap` en la barra, la fila anterior conserva su margen
+  // mientras el panel está montado: se anula fuera y se reproduce dentro.
+  assert.match(panel, /function inheritedLeadingGap\(el\)/);
+  assert.match(panel, /marginTop: leadingGap \? -leadingGap/);
+  assert.match(panel, /style={{ height: leadingGap }}/);
+  // Como overlay (barra fijada) no hay nada que compensar.
+  assert.match(panel, /own\.position === "absolute" \|\| own\.position === "fixed"\) return 0/);
+});

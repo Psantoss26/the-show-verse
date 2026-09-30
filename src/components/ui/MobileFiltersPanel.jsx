@@ -25,11 +25,48 @@
 //
 // El margen superior va DENTRO (`gapClassName`), no en el contenedor: así el
 // hueco también se anima y cerrado no ocupa nada.
+//
+// SEPARACIÓN HEREDADA DEL CONTENEDOR. Casi todas las barras apilan sus filas
+// con `space-y-*` (o `gap`): mientras el panel está montado, la fila de encima
+// conserva su margen inferior aunque el panel mida 0, y al desmontarse ese
+// margen desaparece de golpe. Eso era el "bache" al final del cierre (y un
+// salto al empezar a abrir) en todas las páginas salvo las que envuelven el
+// panel en un contenedor propio sin separación. Al montarse, el panel mide el
+// hueco que le deja el hermano anterior, lo anula con un margen negativo y lo
+// reproduce DENTRO, en la parte que se anima: montado y desmontado miden lo
+// mismo y la separación entra y sale con el resto del movimiento.
 
-import { useCallback, useEffect, useLayoutEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 export const MOBILE_FILTERS_PANEL_DURATION_MS = 280;
 const EASING = "cubic-bezier(0.16, 1, 0.3, 1)";
+
+// Hueco entre el hermano visible anterior y el panel (sin contar el margen que
+// pone el propio panel). Fuera de flujo (panel fijado como overlay) no hay
+// nada que compensar.
+function inheritedLeadingGap(el) {
+  const own = window.getComputedStyle(el);
+  if (own.position === "absolute" || own.position === "fixed") return 0;
+  let prev = el.previousElementSibling;
+  while (prev) {
+    const ps = window.getComputedStyle(prev);
+    if (ps.display !== "none" && ps.position !== "absolute" && ps.position !== "fixed") break;
+    prev = prev.previousElementSibling;
+  }
+  if (!prev) return 0;
+  const previousMargin = el.style.marginTop;
+  el.style.marginTop = "0px";
+  const gap = el.getBoundingClientRect().top - prev.getBoundingClientRect().bottom;
+  el.style.marginTop = previousMargin;
+  return Math.max(0, Math.round(gap));
+}
 
 function prefersReducedMotion() {
   return (
@@ -48,9 +85,21 @@ export default function MobileFiltersPanel({
   ref,
   children,
 }) {
+  const rootRef = useRef(null);
   const [present, setPresent] = useState(open);
   const [expanded, setExpanded] = useState(false);
   const [settled, setSettled] = useState(false);
+  const [leadingGap, setLeadingGap] = useState(0);
+
+  useImperativeHandle(ref, () => rootRef.current);
+
+  // Se vuelve a medir si cambia la colocación (p. ej. al fijarse la barra el
+  // panel pasa a overlay y deja de haber hueco que compensar).
+  useLayoutEffect(() => {
+    if (!present || !rootRef.current) return;
+    const gap = inheritedLeadingGap(rootRef.current);
+    setLeadingGap((current) => (current === gap ? current : gap));
+  }, [present, className]);
 
   // Abrir: primero se monta cerrado (0fr) y, ya en el DOM, se expande. Forzar
   // el cálculo de estilos fija el de partida (0fr) para que la transición
@@ -94,12 +143,13 @@ export default function MobileFiltersPanel({
 
   return (
     <div
-      ref={ref}
+      ref={rootRef}
       id={id}
       inert={!open || undefined}
       className={`grid motion-reduce:!transition-none ${className}`}
       style={{
         ...style,
+        marginTop: leadingGap ? -leadingGap : style?.marginTop,
         gridTemplateRows: expanded ? "1fr" : "0fr",
         transition: `grid-template-rows ${transition}`,
       }}
@@ -117,6 +167,7 @@ export default function MobileFiltersPanel({
             transition: `transform ${transition}`,
           }}
         >
+          {leadingGap ? <div aria-hidden="true" style={{ height: leadingGap }} /> : null}
           {contentClassName ? <div className={contentClassName}>{children}</div> : children}
         </div>
       </div>
