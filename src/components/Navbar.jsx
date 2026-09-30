@@ -1897,6 +1897,7 @@ function NavbarContent() {
   // espacio para la barra completa; ResizeObserver lo activa solo cuando toca.
   const [desktopSearchCompact, setDesktopSearchCompact] = useState(false);
   const [desktopSearchOpen, setDesktopSearchOpen] = useState(false);
+  const [tabletSearchOpen, setTabletSearchOpen] = useState(false);
   const desktopHeaderRef = useRef(null);
   const desktopLeftRef = useRef(null);
   const desktopRightRef = useRef(null);
@@ -2405,21 +2406,25 @@ function NavbarContent() {
   // unas líneas más abajo; aquí no sirve un ref porque los desplegables son de
   // SearchBar, otro componente.
   const desktopSearchRef = useRef(null);
+  // TABLET: la misma barra en línea que en escritorio (no el overlay a
+  // pantalla completa del móvil), con su propio estado y ref porque la de
+  // escritorio sigue montada aunque esté oculta por CSS.
+  const tabletSearchRef = useRef(null);
   useEffect(() => {
-    if (!desktopSearchOpen) return undefined;
+    if (!desktopSearchOpen && !tabletSearchOpen) return undefined;
     const fuera = (e) => {
-      if (desktopSearchRef.current?.contains(e.target)) return;
       // Los desplegables de la barra (resultados y filtros) se pintan con
       // `createPortal` al final del body, así que NO cuelgan de la barra: sus
       // raíces se marcan con `data-search-portal` desde SearchBar y aquí se
       // consultan por el DOM. Con los refs no vale, porque viven en OTRO
       // componente (SearchBar) y desde Navbar ni existen.
       if (e.target instanceof Element && e.target.closest("[data-search-portal]")) return;
-      setDesktopSearchOpen(false);
+      if (!desktopSearchRef.current?.contains(e.target)) setDesktopSearchOpen(false);
+      if (!tabletSearchRef.current?.contains(e.target)) setTabletSearchOpen(false);
     };
     document.addEventListener("pointerdown", fuera);
     return () => document.removeEventListener("pointerdown", fuera);
-  }, [desktopSearchOpen]);
+  }, [desktopSearchOpen, tabletSearchOpen]);
 
   // Desplegable del perfil: se cierra al pulsar fuera y con Escape, como
   // cualquier menú del sistema.
@@ -2572,22 +2577,38 @@ function NavbarContent() {
                 // los aportan la capa interna y la fila móvil, GRADUALMENTE con
                 // el scroll (--sv-hero-scroll); en recomendaciones no hay scroll,
                 // así que la barra se queda transparente.
-                "desktop:bg-black/15 desktop:backdrop-blur-[7px] desktop:backdrop-saturate-[190%] desktop:backdrop-brightness-[1.06] desktop:shadow-[0_16px_40px_-8px_rgba(0,0,0,0.75)]"
+                "desktop:bg-black/15 desktop:shadow-[0_16px_40px_-8px_rgba(0,0,0,0.75)]"
               : // RESTO DE PÁGINAS: el mismo cristal líquido en móvil y en
                 // escritorio, en su variante PLANA. El fondo se sigue viendo a
                 // través igual (mismo tinte, desenfoque y saturación); lo que se
                 // quita es el degradado de luz, que era lo que dibujaba la banda
-                // clara en lo alto.
-                `${LIQUID_GLASS_BAR_FLAT} shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]`
+                // clara en lo alto. El cristal lo pone la capa de abajo.
+                "shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]"
         }`}
       >
-        {/* Capas de cristal (canto y reflejo) SOLO en móvil: ahí la barra es
-            estrecha y el relieve se lee como una pieza de vidrio. En escritorio
-            la franja cruza toda la ventana y cualquier relieve se convierte en
-            una banda; allí el cristal se queda plano y uniforme.
+        {/* EL CRISTAL DE LA BARRA VA EN UNA CAPA, NO EN EL <nav>. Un
+            `backdrop-filter` en el <nav> lo convierte en backdrop root, y la
+            barra de búsqueda en línea (escritorio y tablet) vive dentro: se
+            quedaba sin fondo que difuminar y se veía plana, distinta de su
+            desplegable (que va en portal a <body>). Con el cristal en una capa
+            hermana, la barra muestrea la página igual que el desplegable.
+            Las capas de canto y reflejo (solo móvil/tablet) van DENTRO de esta
+            capa, así siguen muestreando lo mismo que cuando colgaban del <nav>.
             Nunca en los estados transparentes, donde añadirían un velo. */}
         {!heroNavMode && !isImmersiveRoute && (
-          <TopBarGlassLayers className="desktop:hidden" />
+          <div
+            aria-hidden
+            className={`pointer-events-none absolute inset-0 -z-10 ${LIQUID_GLASS_BAR_FLAT}`}
+          >
+            <TopBarGlassLayers className="desktop:hidden" />
+          </div>
+        )}
+        {/* Ficha / recomendaciones en escritorio, tras el scroll. */}
+        {isImmersiveRoute && !desktopDetailsNavMode && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 -z-10 hidden backdrop-blur-[7px] backdrop-saturate-[190%] backdrop-brightness-[1.06] desktop:block"
+          />
         )}
 
         {isDetailsRoute && (
@@ -2956,14 +2977,41 @@ function NavbarContent() {
             >
               <Menu className="h-6 w-6" strokeWidth={2.2} aria-hidden="true" />
             </button>
+            {/* MÓVIL: la búsqueda abre el overlay a pantalla completa. */}
             <button
               type="button"
               onClick={() => setShowMobileSearch(true)}
-              className="grid h-11 w-11 place-items-center rounded-full text-white transition-[background-color,transform] duration-200 hover:bg-white/10 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+              className="grid h-11 w-11 place-items-center rounded-full text-white transition-[background-color,transform] duration-200 hover:bg-white/10 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 md:hidden"
               aria-label="Buscar"
             >
               <SearchIcon className="h-6 w-6" aria-hidden="true" />
             </button>
+            {/* TABLET: la barra se despliega EN LÍNEA, como en escritorio. El
+                ancho deja libre el grupo de la derecha (alertas y perfil); el
+                logo se aparta mientras está abierta porque queda debajo. */}
+            <div
+              ref={tabletSearchRef}
+              className={`hidden items-center overflow-hidden rounded-full transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none md:flex ${
+                tabletSearchOpen ? "w-[min(34rem,calc(100vw-13rem))]" : "w-11"
+              }`}
+            >
+              {tabletSearchOpen ? (
+                <SearchBar
+                  autoFocus
+                  onEscape={() => setTabletSearchOpen(false)}
+                  onResultClick={() => setTabletSearchOpen(false)}
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setTabletSearchOpen(true)}
+                  className="grid h-11 w-11 place-items-center rounded-full text-white transition-[background-color,transform] duration-200 hover:bg-white/10 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+                  aria-label="Buscar"
+                >
+                  <SearchIcon className="h-6 w-6" aria-hidden="true" />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Centro: el logo lleva al dashboard de Inicio.
@@ -2975,7 +3023,11 @@ function NavbarContent() {
             prefetch
             {...navPrefetchHandlers("/")}
             aria-label={t("nav_home", "Inicio")}
-            className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none active:scale-95 ${mobileTopControlScaleClass}`}
+            className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none active:scale-95 ${mobileTopControlScaleClass} ${
+              tabletSearchOpen ? "md:pointer-events-none md:opacity-0" : ""
+            }`}
+            aria-hidden={tabletSearchOpen || undefined}
+            tabIndex={tabletSearchOpen ? -1 : undefined}
           >
             {/* TAMAÑO REAL DEL LOGO. El PNG lleva mucho margen transparente: su
                 tinta ocupa el 39,6% del ancho y el 34,2% del alto. Por eso la
@@ -3445,21 +3497,28 @@ function NavbarContent() {
       <AnimatePresence>
         {showMobileSearch && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            // Igual que los modales de DetailsClient: atenúa y difumina la
-            // página. La barra y los resultados viven por encima (los últimos
-            // en portal), así que permanecen nítidos e interactivos.
-            className="fixed inset-0 z-50 flex flex-col bg-black/60 p-4 pt-4 backdrop-blur-lg"
+            className="fixed inset-0 z-50 flex flex-col p-4 pt-4"
             onClick={() => setShowMobileSearch(false)}
           >
+            {/* Igual que los modales de DetailsClient: atenúa y difumina la
+                página. El velo va en una capa HERMANA de la barra, no en su
+                contenedor: con `backdrop-blur` u `opacity` en un ancestro, la
+                barra (LIQUID_GLASS_PANEL) se quedaba sin fondo que difuminar y
+                se veía plana, distinta del desplegable de resultados (en
+                portal). Por lo mismo la barra entra solo con transform. */}
             <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: -20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: -20 }}
+              aria-hidden
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-lg"
+            />
+            <motion.div
+              initial={{ scale: 0.95, y: -20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: -20 }}
               transition={{ duration: 0.2, ease: "easeOut" }}
-              className="w-full"
+              className="relative w-full"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="relative mb-4 w-full">
