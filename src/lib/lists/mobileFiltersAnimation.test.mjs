@@ -7,18 +7,11 @@ const listsPage = readFileSync(
   "utf8",
 );
 
-test("el menú móvil se recorta al animar y libera los desplegables al abrirse", () => {
-  assert.match(
-    listsPage,
-    /initial={{ height: 0, overflow: "hidden" }}/,
-  );
-  assert.match(
-    listsPage,
-    /transitionEnd: { overflow: "visible" }/,
-  );
-  assert.match(listsPage, /exit={{ height: 0, overflow: "hidden" }}/);
+test("el menú móvil usa el panel común, que recorta al animar y libera los desplegables al abrirse", () => {
+  assert.match(listsPage, /<MobileFiltersPanel\s+open={mobileFiltersOpen}/);
+  assert.doesNotMatch(listsPage, /animate={{\s*height: "auto"/);
   assert.doesNotMatch(listsPage, /space-y-2 overflow-hidden lg:hidden/);
-  assert.match(listsPage, /filtersSticky\s*\? "absolute left-0 right-0 top-full"\s*: "relative"/);
+  assert.match(listsPage, /filtersSticky \? "absolute left-0 right-0 top-full" : "relative"/);
 });
 
 test("el botón mantiene sincronizado su estado expandido accesible", () => {

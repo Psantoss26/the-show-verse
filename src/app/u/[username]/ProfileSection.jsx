@@ -60,6 +60,7 @@ import {
   pendingItemKey,
 } from "@/lib/userLists/pendingListAdditions";
 import { LIST_CHANGED_EVENT } from "@/lib/userLists/optimisticListCache";
+import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 
 // Sección de Perfil ↔ lista del store de altas optimistas.
 const PROFILE_PENDING_LIST_BY_SECTION = {
@@ -707,12 +708,19 @@ function ProfileSectionToolbar({ section, controls, onChange }) {
         <ProfileViewMode value={controls.view} options={options.views} onChange={handleViewChange} />
       </div>
 
-      <div id={`profile-menu-${section}`} className={`${mobileControlsOpen ? "grid" : "hidden"} grid-cols-2 gap-2 @[1024px]/detail-page:hidden`}>
+      {/* Mismo despliegue que los menús móviles del resto de páginas. */}
+      <MobileFiltersPanel
+        open={mobileControlsOpen}
+        id={`profile-menu-${section}`}
+        className="@[1024px]/detail-page:hidden"
+        gapClassName=""
+        contentClassName="grid grid-cols-2 gap-2"
+      >
         <ProfileMenuDropdown label={section === "activity" ? "Acción" : "Tipo"} valueLabel={filterLabel} icon={Filter} options={options.filters} value={controls.filter} onChange={(filter) => onChange({ filter })} />
         <ProfileMenuDropdown label="Ordenar" valueLabel={sortLabel} icon={ArrowUpDown} options={options.sorts} value={controls.sort} onChange={(sort) => onChange({ sort })} />
         <ProfileMenuDropdown label="Agrupar" valueLabel={groupLabel} icon={Layers3} options={options.groups} value={controls.group} onChange={(group) => onChange({ group })} />
         <ProfileViewMode value={controls.view} options={options.views} onChange={handleViewChange} />
-      </div>
+      </MobileFiltersPanel>
     </section>
   );
 }

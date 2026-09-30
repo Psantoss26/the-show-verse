@@ -69,6 +69,7 @@ import ListPosterCard from "@/components/lists/ListPosterCard";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import { TmdbImg } from "@/components/lists/ListCoverBackdropCollage";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
+import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 
 // ================== UTILS & CACHE ==================
 const OMDB_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -2246,170 +2247,159 @@ export default function ListsPage() {
           </div>
 
           {/* Mobile: collapsible filters */}
-          <AnimatePresence>
-            {mobileFiltersOpen && (
-              <motion.div
-                id="lists-mobile-filters"
-                initial={{ height: 0, overflow: "hidden" }}
-                animate={{
-                  height: "auto",
-                  overflow: "hidden",
-                  transitionEnd: { overflow: "visible" },
-                }}
-                exit={{ height: 0, overflow: "hidden" }}
-                transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                className={`z-[80] mt-2 origin-top space-y-2 lg:hidden ${
-                  filtersSticky
-                    ? "absolute left-0 right-0 top-full"
-                    : "relative"
-                }`}
+          <MobileFiltersPanel
+            open={mobileFiltersOpen}
+            id="lists-mobile-filters"
+            className={`z-[80] lg:hidden ${
+              filtersSticky ? "absolute left-0 right-0 top-full" : "relative"
+            }`}
+            gapClassName="pt-2"
+            contentClassName="space-y-2"
+          >
+            <div className="space-y-3 pt-1">
+              <div
+                data-lists-mobile-order-view="true"
+                className="flex gap-2"
               >
-                <div className="space-y-3 pt-1">
-                  <div
-                    data-lists-mobile-order-view="true"
-                    className="flex gap-2"
+                <div className="flex-1">
+                  <InlineDropdown
+                    label="Ordenar"
+                    valueLabel={
+                      sortMode.includes("items")
+                        ? sortMode === "items_desc"
+                          ? "Más items"
+                          : "Menos items"
+                        : sortMode.includes("likes")
+                          ? sortMode === "likes_desc"
+                            ? "Más likes"
+                            : "Menos likes"
+                          : sortMode === "name_asc"
+                            ? "A-Z"
+                            : "Z-A"
+                    }
+                    icon={ArrowUpDown}
                   >
-                    <div className="flex-1">
-                      <InlineDropdown
-                        label="Ordenar"
-                        valueLabel={
-                          sortMode.includes("items")
-                            ? sortMode === "items_desc"
-                              ? "Más items"
-                              : "Menos items"
-                            : sortMode.includes("likes")
-                              ? sortMode === "likes_desc"
-                                ? "Más likes"
-                                : "Menos likes"
-                              : sortMode === "name_asc"
-                                ? "A-Z"
-                                : "Z-A"
-                        }
-                        icon={ArrowUpDown}
-                      >
-                        {({ close }) => (
-                          <>
-                            <DropdownItem
-                              active={sortMode === "items_desc"}
-                              onClick={() => {
-                                startTransition(() =>
-                                  setSortMode("items_desc"),
-                                );
-                                close();
-                              }}
-                            >
-                              Más items
-                            </DropdownItem>
-                            <DropdownItem
-                              active={sortMode === "items_asc"}
-                              onClick={() => {
-                                startTransition(() => setSortMode("items_asc"));
-                                close();
-                              }}
-                            >
-                              Menos items
-                            </DropdownItem>
-                            <DropdownItem
-                              active={sortMode === "likes_desc"}
-                              onClick={() => {
-                                startTransition(() =>
-                                  setSortMode("likes_desc"),
-                                );
-                                close();
-                              }}
-                            >
-                              Más likes
-                            </DropdownItem>
-                            <DropdownItem
-                              active={sortMode === "likes_asc"}
-                              onClick={() => {
-                                startTransition(() => setSortMode("likes_asc"));
-                                close();
-                              }}
-                            >
-                              Más likes
-                            </DropdownItem>
-                            <DropdownItem
-                              active={sortMode === "name_asc"}
-                              onClick={() => {
-                                startTransition(() => setSortMode("name_asc"));
-                                close();
-                              }}
-                            >
-                              A-Z
-                            </DropdownItem>
-                            <DropdownItem
-                              active={sortMode === "name_desc"}
-                              onClick={() => {
-                                startTransition(() => setSortMode("name_desc"));
-                                close();
-                              }}
-                            >
-                              Z-A
-                            </DropdownItem>
-                          </>
-                        )}
-                      </InlineDropdown>
-                    </div>
-
-                    <div
-                      data-lists-view-selector="true"
-                      className="flex h-11 flex-1 items-center rounded-2xl bg-gradient-to-br from-white/10 to-white/5 p-1 shadow-lg backdrop-blur-lg"
-                    >
-                      <button
-                        onClick={() =>
-                          startTransition(() => setViewMode("grid"))
-                        }
-                        className={`flex h-full flex-1 items-center justify-center rounded-lg px-2.5 text-sm font-bold transition-all focus:outline-none ${
-                          viewMode === "grid"
-                            ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
-                            : "text-zinc-400 hover:bg-white/10 hover:text-white"
-                        }`}
-                      >
-                        <LayoutGrid className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() =>
-                          startTransition(() => setViewMode("rows"))
-                        }
-                        className={`flex h-full flex-1 items-center justify-center rounded-lg px-2.5 text-sm font-bold transition-all focus:outline-none ${
-                          viewMode === "rows"
-                            ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
-                            : "text-zinc-400 hover:bg-white/10 hover:text-white"
-                        }`}
-                      >
-                        <Rows className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          startTransition(() => setViewMode("list"))
-                        }
-                        className={`flex h-full flex-1 items-center justify-center rounded-lg px-2.5 text-sm font-bold transition-all focus:outline-none ${
-                          viewMode === "list"
-                            ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
-                            : "text-zinc-400 hover:bg-white/10 hover:text-white"
-                        }`}
-                      >
-                        <StretchHorizontal className="h-4 w-4" />
-                      </button>
-                      {canEdit && (
-                        <button
-                          type="button"
-                          onClick={() => setCreateOpen(true)}
-                          aria-label="Crear lista"
-                          title="Crear lista"
-                          className="flex h-full flex-1 items-center justify-center rounded-lg px-2.5 text-purple-400 transition-all hover:bg-purple-500/15 hover:text-purple-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-purple-400"
+                    {({ close }) => (
+                      <>
+                        <DropdownItem
+                          active={sortMode === "items_desc"}
+                          onClick={() => {
+                            startTransition(() =>
+                              setSortMode("items_desc"),
+                            );
+                            close();
+                          }}
                         >
-                          <Plus className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                          Más items
+                        </DropdownItem>
+                        <DropdownItem
+                          active={sortMode === "items_asc"}
+                          onClick={() => {
+                            startTransition(() => setSortMode("items_asc"));
+                            close();
+                          }}
+                        >
+                          Menos items
+                        </DropdownItem>
+                        <DropdownItem
+                          active={sortMode === "likes_desc"}
+                          onClick={() => {
+                            startTransition(() =>
+                              setSortMode("likes_desc"),
+                            );
+                            close();
+                          }}
+                        >
+                          Más likes
+                        </DropdownItem>
+                        <DropdownItem
+                          active={sortMode === "likes_asc"}
+                          onClick={() => {
+                            startTransition(() => setSortMode("likes_asc"));
+                            close();
+                          }}
+                        >
+                          Más likes
+                        </DropdownItem>
+                        <DropdownItem
+                          active={sortMode === "name_asc"}
+                          onClick={() => {
+                            startTransition(() => setSortMode("name_asc"));
+                            close();
+                          }}
+                        >
+                          A-Z
+                        </DropdownItem>
+                        <DropdownItem
+                          active={sortMode === "name_desc"}
+                          onClick={() => {
+                            startTransition(() => setSortMode("name_desc"));
+                            close();
+                          }}
+                        >
+                          Z-A
+                        </DropdownItem>
+                      </>
+                    )}
+                  </InlineDropdown>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+
+                <div
+                  data-lists-view-selector="true"
+                  className="flex h-11 flex-1 items-center rounded-2xl bg-gradient-to-br from-white/10 to-white/5 p-1 shadow-lg backdrop-blur-lg"
+                >
+                  <button
+                    onClick={() =>
+                      startTransition(() => setViewMode("grid"))
+                    }
+                    className={`flex h-full flex-1 items-center justify-center rounded-lg px-2.5 text-sm font-bold transition-all focus:outline-none ${
+                      viewMode === "grid"
+                        ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
+                        : "text-zinc-400 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() =>
+                      startTransition(() => setViewMode("rows"))
+                    }
+                    className={`flex h-full flex-1 items-center justify-center rounded-lg px-2.5 text-sm font-bold transition-all focus:outline-none ${
+                      viewMode === "rows"
+                        ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
+                        : "text-zinc-400 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    <Rows className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      startTransition(() => setViewMode("list"))
+                    }
+                    className={`flex h-full flex-1 items-center justify-center rounded-lg px-2.5 text-sm font-bold transition-all focus:outline-none ${
+                      viewMode === "list"
+                        ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
+                        : "text-zinc-400 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    <StretchHorizontal className="h-4 w-4" />
+                  </button>
+                  {canEdit && (
+                    <button
+                      type="button"
+                      onClick={() => setCreateOpen(true)}
+                      aria-label="Crear lista"
+                      title="Crear lista"
+                      className="flex h-full flex-1 items-center justify-center rounded-lg px-2.5 text-purple-400 transition-all hover:bg-purple-500/15 hover:text-purple-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-purple-400"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </MobileFiltersPanel>
 
           {/* Desktop */}
           <div className="hidden lg:flex gap-3 relative z-10">

@@ -67,6 +67,7 @@ import {
 } from "@/lib/history/episodeSeasonMetadata";
 import HoverExpandCard from "@/components/ui/HoverExpandCard";
 import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
+import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 
 // Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
 // el mismo escalón que `w1280` en los backdrops. Antes era `w500` y en
@@ -3957,231 +3958,223 @@ export default function HistoryClient() {
                 </div>
 
                 {/* Mobile: collapsible filters */}
-                <AnimatePresence>
-                  {mobileFiltersOpen && (
-                    <motion.div
-                      initial={{ height: 0 }}
-                      animate={{ height: "auto" }}
-                      exit={{ height: 0 }}
-                      transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                      className={`z-[80] mt-2 origin-top overflow-hidden ${
-                        filtersSticky
-                          ? "absolute left-0 right-0 top-full"
-                          : "relative"
-                      }`}
-                    >
-                      <div className="space-y-2">
-                        {/* Fila 1 - Tipo y Agrupar */}
-                        <div className="flex gap-2">
-                          <div className="flex-1 min-w-0">
-                            <InlineDropdown
-                              label="Tipo"
-                              valueLabel={
-                                typeFilter === "all"
-                                  ? "Todo"
-                                  : typeFilter === "movies"
-                                    ? "Películas"
-                                    : "Series"
-                              }
-                              icon={Filter}
-                            >
-                              {({ close }) => (
-                                <>
-                                  <DropdownItem
-                                    active={typeFilter === "all"}
-                                    onClick={() => {
-                                      setTypeFilter("all");
-                                      close();
-                                    }}
-                                  >
-                                    Todo
-                                  </DropdownItem>
-                                  <DropdownItem
-                                    active={typeFilter === "movies"}
-                                    onClick={() => {
-                                      setTypeFilter("movies");
-                                      close();
-                                    }}
-                                  >
-                                    Películas
-                                  </DropdownItem>
-                                  <DropdownItem
-                                    active={typeFilter === "shows"}
-                                    onClick={() => {
-                                      setTypeFilter("shows");
-                                      close();
-                                    }}
-                                  >
-                                    Series
-                                  </DropdownItem>
-                                </>
-                              )}
-                            </InlineDropdown>
-                          </div>
-
-                          <div className="flex-1 min-w-0">
-                            <InlineDropdown
-                              label="Agrupar"
-                              valueLabel={
-                                groupBy === "day"
-                                  ? "Día"
-                                  : groupBy === "month"
-                                    ? "Mes"
-                                    : "Año"
-                              }
-                              icon={Calendar}
-                            >
-                              {({ close }) => (
-                                <>
-                                  <DropdownItem
-                                    active={groupBy === "day"}
-                                    onClick={() => {
-                                      setGroupBy("day");
-                                      close();
-                                    }}
-                                  >
-                                    Día
-                                  </DropdownItem>
-                                  <DropdownItem
-                                    active={groupBy === "month"}
-                                    onClick={() => {
-                                      setGroupBy("month");
-                                      close();
-                                    }}
-                                  >
-                                    Mes
-                                  </DropdownItem>
-                                  <DropdownItem
-                                    active={groupBy === "year"}
-                                    onClick={() => {
-                                      setGroupBy("year");
-                                      close();
-                                    }}
-                                  >
-                                    Año
-                                  </DropdownItem>
-                                </>
-                              )}
-                            </InlineDropdown>
-                          </div>
-                        </div>
-
-                        {/* Fila 2 - Ordenar, Vista y Editar */}
-                        <div className="flex gap-2">
-                          <div className="flex-1 min-w-0">
-                            <InlineDropdown
-                              label="Ordenar"
-                              valueLabel={
-                                sortBy === "date-desc"
-                                  ? "Más reciente"
-                                  : sortBy === "date-asc"
-                                    ? "Más antiguo"
-                                    : sortBy === "title-asc"
-                                      ? "A-Z"
-                                      : "Z-A"
-                              }
-                              icon={ArrowUpDown}
-                            >
-                              {({ close }) => (
-                                <>
-                                  <DropdownItem
-                                    active={sortBy === "date-desc"}
-                                    onClick={() => {
-                                      setSortBy("date-desc");
-                                      close();
-                                    }}
-                                  >
-                                    Más reciente
-                                  </DropdownItem>
-                                  <DropdownItem
-                                    active={sortBy === "date-asc"}
-                                    onClick={() => {
-                                      setSortBy("date-asc");
-                                      close();
-                                    }}
-                                  >
-                                    Más antiguo
-                                  </DropdownItem>
-                                  <DropdownItem
-                                    active={sortBy === "title-asc"}
-                                    onClick={() => {
-                                      setSortBy("title-asc");
-                                      close();
-                                    }}
-                                  >
-                                    Título A-Z
-                                  </DropdownItem>
-                                  <DropdownItem
-                                    active={sortBy === "title-desc"}
-                                    onClick={() => {
-                                      setSortBy("title-desc");
-                                      close();
-                                    }}
-                                  >
-                                    Título Z-A
-                                  </DropdownItem>
-                                </>
-                              )}
-                            </InlineDropdown>
-                          </div>
-
-                          <div className="flex-1 flex gap-2">
-                            <div className="flex flex-1 rounded-xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-                              <button
-                                onClick={() => setViewMode("list")}
-                                className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                                  viewMode === "list"
-                                    ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                                    : "text-zinc-400 hover:text-white hover:bg-white/10"
-                                }`}
+                <MobileFiltersPanel
+                  open={mobileFiltersOpen}
+                  className={`z-[80] ${
+                    filtersSticky ? "absolute left-0 right-0 top-full" : "relative"
+                  }`}
+                  gapClassName="pt-2"
+                >
+                  <div className="space-y-2">
+                    {/* Fila 1 - Tipo y Agrupar */}
+                    <div className="flex gap-2">
+                      <div className="flex-1 min-w-0">
+                        <InlineDropdown
+                          label="Tipo"
+                          valueLabel={
+                            typeFilter === "all"
+                              ? "Todo"
+                              : typeFilter === "movies"
+                                ? "Películas"
+                                : "Series"
+                          }
+                          icon={Filter}
+                        >
+                          {({ close }) => (
+                            <>
+                              <DropdownItem
+                                active={typeFilter === "all"}
+                                onClick={() => {
+                                  setTypeFilter("all");
+                                  close();
+                                }}
                               >
-                                <LayoutList className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => setViewMode("compact")}
-                                className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                                  viewMode === "compact"
-                                    ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                                    : "text-zinc-400 hover:text-white hover:bg-white/10"
-                                }`}
+                                Todo
+                              </DropdownItem>
+                              <DropdownItem
+                                active={typeFilter === "movies"}
+                                onClick={() => {
+                                  setTypeFilter("movies");
+                                  close();
+                                }}
                               >
-                                <Grid3x3 className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => setViewMode("grid")}
-                                className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                                  viewMode === "grid"
-                                    ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                                    : "text-zinc-400 hover:text-white hover:bg-white/10"
-                                }`}
+                                Películas
+                              </DropdownItem>
+                              <DropdownItem
+                                active={typeFilter === "shows"}
+                                onClick={() => {
+                                  setTypeFilter("shows");
+                                  close();
+                                }}
                               >
-                                <LayoutGrid className="w-4 h-4" />
-                              </button>
-                            </div>
-
-                            <button
-                              onClick={() => setEditMode(!editMode)}
-                              title={editMode ? "Salir del modo borrar" : "Borrar registros"}
-                              aria-label={editMode ? "Salir del modo borrar" : "Borrar registros"}
-                              aria-pressed={editMode}
-                              className={`h-11 w-11 rounded-2xl text-sm font-bold transition-all flex items-center justify-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
-                                editMode
-                                  ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
-                                  : "text-zinc-200 hover:bg-black/30"
-                              }`}
-                            >
-                              {editMode ? (
-                                <X className="w-4 h-4" />
-                              ) : (
-                                <Trash2 className="w-4 h-4" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
+                                Series
+                              </DropdownItem>
+                            </>
+                          )}
+                        </InlineDropdown>
                       </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+
+                      <div className="flex-1 min-w-0">
+                        <InlineDropdown
+                          label="Agrupar"
+                          valueLabel={
+                            groupBy === "day"
+                              ? "Día"
+                              : groupBy === "month"
+                                ? "Mes"
+                                : "Año"
+                          }
+                          icon={Calendar}
+                        >
+                          {({ close }) => (
+                            <>
+                              <DropdownItem
+                                active={groupBy === "day"}
+                                onClick={() => {
+                                  setGroupBy("day");
+                                  close();
+                                }}
+                              >
+                                Día
+                              </DropdownItem>
+                              <DropdownItem
+                                active={groupBy === "month"}
+                                onClick={() => {
+                                  setGroupBy("month");
+                                  close();
+                                }}
+                              >
+                                Mes
+                              </DropdownItem>
+                              <DropdownItem
+                                active={groupBy === "year"}
+                                onClick={() => {
+                                  setGroupBy("year");
+                                  close();
+                                }}
+                              >
+                                Año
+                              </DropdownItem>
+                            </>
+                          )}
+                        </InlineDropdown>
+                      </div>
+                    </div>
+
+                    {/* Fila 2 - Ordenar, Vista y Editar */}
+                    <div className="flex gap-2">
+                      <div className="flex-1 min-w-0">
+                        <InlineDropdown
+                          label="Ordenar"
+                          valueLabel={
+                            sortBy === "date-desc"
+                              ? "Más reciente"
+                              : sortBy === "date-asc"
+                                ? "Más antiguo"
+                                : sortBy === "title-asc"
+                                  ? "A-Z"
+                                  : "Z-A"
+                          }
+                          icon={ArrowUpDown}
+                        >
+                          {({ close }) => (
+                            <>
+                              <DropdownItem
+                                active={sortBy === "date-desc"}
+                                onClick={() => {
+                                  setSortBy("date-desc");
+                                  close();
+                                }}
+                              >
+                                Más reciente
+                              </DropdownItem>
+                              <DropdownItem
+                                active={sortBy === "date-asc"}
+                                onClick={() => {
+                                  setSortBy("date-asc");
+                                  close();
+                                }}
+                              >
+                                Más antiguo
+                              </DropdownItem>
+                              <DropdownItem
+                                active={sortBy === "title-asc"}
+                                onClick={() => {
+                                  setSortBy("title-asc");
+                                  close();
+                                }}
+                              >
+                                Título A-Z
+                              </DropdownItem>
+                              <DropdownItem
+                                active={sortBy === "title-desc"}
+                                onClick={() => {
+                                  setSortBy("title-desc");
+                                  close();
+                                }}
+                              >
+                                Título Z-A
+                              </DropdownItem>
+                            </>
+                          )}
+                        </InlineDropdown>
+                      </div>
+
+                      <div className="flex-1 flex gap-2">
+                        <div className="flex flex-1 rounded-xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+                          <button
+                            onClick={() => setViewMode("list")}
+                            className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                              viewMode === "list"
+                                ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                                : "text-zinc-400 hover:text-white hover:bg-white/10"
+                            }`}
+                          >
+                            <LayoutList className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setViewMode("compact")}
+                            className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                              viewMode === "compact"
+                                ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                                : "text-zinc-400 hover:text-white hover:bg-white/10"
+                            }`}
+                          >
+                            <Grid3x3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setViewMode("grid")}
+                            className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                              viewMode === "grid"
+                                ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                                : "text-zinc-400 hover:text-white hover:bg-white/10"
+                            }`}
+                          >
+                            <LayoutGrid className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        <button
+                          onClick={() => setEditMode(!editMode)}
+                          title={editMode ? "Salir del modo borrar" : "Borrar registros"}
+                          aria-label={editMode ? "Salir del modo borrar" : "Borrar registros"}
+                          aria-pressed={editMode}
+                          className={`h-11 w-11 rounded-2xl text-sm font-bold transition-all flex items-center justify-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
+                            editMode
+                              ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
+                              : "text-zinc-200 hover:bg-black/30"
+                          }`}
+                        >
+                          {editMode ? (
+                            <X className="w-4 h-4" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </MobileFiltersPanel>
                 </div>
 
                 {/* Desktop: Una sola fila con todo */}

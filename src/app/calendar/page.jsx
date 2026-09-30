@@ -56,6 +56,7 @@ import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import useModalGuard from "@/hooks/useModalGuard";
 import { useAuth } from "@/context/AuthContext";
 import HoverExpandCard from "@/components/ui/HoverExpandCard";
+import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 
 const TYPE_FILTERS = [
   { id: "all", label: "Todo" },
@@ -1365,122 +1366,116 @@ export default function CalendarPage() {
                   </button>
                 </div>
 
-                <AnimatePresence>
-                  {mobileFiltersOpen && (
-                    <motion.div
-                      initial={{ height: 0 }}
-                      animate={{ height: "auto" }}
-                      exit={{ height: 0 }}
-                      transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                      className={`z-[80] mt-2 origin-top overflow-hidden ${
-                        filtersSticky ? "absolute left-0 right-0 top-full" : "relative"
-                      }`}
-                    >
-                      <div className="space-y-2">
-                        {/* Fila 1 - Tipo y Agrupar */}
-                        <div className="flex gap-2">
-                          <div className="min-w-0 flex-1">
-                            <InlineDropdown
-                              label="Tipo"
-                              valueLabel={typeLabel}
-                              icon={Filter}
-                            >
-                              {({ close }) =>
-                                TYPE_FILTERS.map(({ id, label }) => (
-                                  <DropdownItem
-                                    key={id}
-                                    active={typeFilter === id}
-                                    onClick={() => {
-                                      setTypeFilter(id);
-                                      close();
-                                    }}
-                                  >
-                                    {label}
-                                  </DropdownItem>
-                                ))
-                              }
-                            </InlineDropdown>
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <InlineDropdown
-                              label="Agrupar"
-                              valueLabel={groupLabel}
-                              icon={Layers}
-                            >
-                              {({ close }) =>
-                                GROUP_MODES.map(({ id, label }) => (
-                                  <DropdownItem
-                                    key={id}
-                                    active={groupBy === id}
-                                    onClick={() => {
-                                      setGroupBy(id);
-                                      close();
-                                    }}
-                                  >
-                                    {label}
-                                  </DropdownItem>
-                                ))
-                              }
-                            </InlineDropdown>
-                          </div>
-                        </div>
-
-                        {/* Fila 2 - Ordenar y modos de tarjeta */}
-                        <div className="flex gap-2">
-                          <div className="min-w-0 flex-1">
-                            <InlineDropdown
-                              label="Ordenar"
-                              valueLabel={sortLabel}
-                              icon={ArrowUpDown}
-                            >
-                              {({ close }) =>
-                                SORT_MODES.map(({ id, label }) => (
-                                  <DropdownItem
-                                    key={id}
-                                    active={sortBy === id}
-                                    onClick={() => {
-                                      setSortBy(id);
-                                      close();
-                                    }}
-                                  >
-                                    {label}
-                                  </DropdownItem>
-                                ))
-                              }
-                            </InlineDropdown>
-                          </div>
-                          <div className="flex rounded-xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-                            {CARD_VIEWS.map(({ id, label, Icon }) => (
-                              <button
-                                key={id}
-                                type="button"
-                                onClick={() => setCardView(id)}
-                                aria-label={label}
-                                title={label}
-                                className={`px-3 h-full rounded-lg transition-all flex items-center ${
-                                  cardView === id
-                                    ? "bg-gradient-to-br from-yellow-400 to-yellow-500 text-black shadow-lg shadow-yellow-500/20"
-                                    : "text-zinc-400 hover:text-white hover:bg-white/10"
-                                }`}
-                              >
-                                <Icon className="w-4 h-4" />
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={resetToToday}
-                          disabled={isTodaySelected}
-                          className="w-full h-11 flex items-center justify-center gap-2 rounded-2xl text-xs font-bold uppercase tracking-wide transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-yellow-400 hover:text-yellow-300 hover:bg-black/30 disabled:opacity-40 disabled:hover:bg-transparent"
+                <MobileFiltersPanel
+                  open={mobileFiltersOpen}
+                  className={`z-[80] ${
+                    filtersSticky ? "absolute left-0 right-0 top-full" : "relative"
+                  }`}
+                  gapClassName="pt-2"
+                >
+                  <div className="space-y-2">
+                    {/* Fila 1 - Tipo y Agrupar */}
+                    <div className="flex gap-2">
+                      <div className="min-w-0 flex-1">
+                        <InlineDropdown
+                          label="Tipo"
+                          valueLabel={typeLabel}
+                          icon={Filter}
                         >
-                          <RotateCcw className="w-4 h-4" /> Volver a hoy
-                        </button>
+                          {({ close }) =>
+                            TYPE_FILTERS.map(({ id, label }) => (
+                              <DropdownItem
+                                key={id}
+                                active={typeFilter === id}
+                                onClick={() => {
+                                  setTypeFilter(id);
+                                  close();
+                                }}
+                              >
+                                {label}
+                              </DropdownItem>
+                            ))
+                          }
+                        </InlineDropdown>
                       </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                      <div className="min-w-0 flex-1">
+                        <InlineDropdown
+                          label="Agrupar"
+                          valueLabel={groupLabel}
+                          icon={Layers}
+                        >
+                          {({ close }) =>
+                            GROUP_MODES.map(({ id, label }) => (
+                              <DropdownItem
+                                key={id}
+                                active={groupBy === id}
+                                onClick={() => {
+                                  setGroupBy(id);
+                                  close();
+                                }}
+                              >
+                                {label}
+                              </DropdownItem>
+                            ))
+                          }
+                        </InlineDropdown>
+                      </div>
+                    </div>
+
+                    {/* Fila 2 - Ordenar y modos de tarjeta */}
+                    <div className="flex gap-2">
+                      <div className="min-w-0 flex-1">
+                        <InlineDropdown
+                          label="Ordenar"
+                          valueLabel={sortLabel}
+                          icon={ArrowUpDown}
+                        >
+                          {({ close }) =>
+                            SORT_MODES.map(({ id, label }) => (
+                              <DropdownItem
+                                key={id}
+                                active={sortBy === id}
+                                onClick={() => {
+                                  setSortBy(id);
+                                  close();
+                                }}
+                              >
+                                {label}
+                              </DropdownItem>
+                            ))
+                          }
+                        </InlineDropdown>
+                      </div>
+                      <div className="flex rounded-xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+                        {CARD_VIEWS.map(({ id, label, Icon }) => (
+                          <button
+                            key={id}
+                            type="button"
+                            onClick={() => setCardView(id)}
+                            aria-label={label}
+                            title={label}
+                            className={`px-3 h-full rounded-lg transition-all flex items-center ${
+                              cardView === id
+                                ? "bg-gradient-to-br from-yellow-400 to-yellow-500 text-black shadow-lg shadow-yellow-500/20"
+                                : "text-zinc-400 hover:text-white hover:bg-white/10"
+                            }`}
+                          >
+                            <Icon className="w-4 h-4" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={resetToToday}
+                      disabled={isTodaySelected}
+                      className="w-full h-11 flex items-center justify-center gap-2 rounded-2xl text-xs font-bold uppercase tracking-wide transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-yellow-400 hover:text-yellow-300 hover:bg-black/30 disabled:opacity-40 disabled:hover:bg-transparent"
+                    >
+                      <RotateCcw className="w-4 h-4" /> Volver a hoy
+                    </button>
+                  </div>
+                </MobileFiltersPanel>
               </div>
 
               {/* Escritorio: una sola fila con todo */}

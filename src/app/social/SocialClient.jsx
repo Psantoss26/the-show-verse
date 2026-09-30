@@ -63,6 +63,7 @@ import {
   getActivityDetailsHref,
 } from "@/lib/profile/activityRatingTarget";
 import Stars from "@/components/social/Stars";
+import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 
 const PAGE_SIZE = 30;
 const FEED_VACIO = { items: [], hasMore: false, offset: 0, loaded: false, error: "" };
@@ -809,91 +810,83 @@ export default function SocialClient() {
               propio —cada control lleva su cristal—. Antes de fijarse forma
               parte del flujo y empuja el contenido; al fijarse pasa a overlay
               para no desplazar nada. */}
-          <AnimatePresence>
-            {mobileFiltersOpen ? (
-              <motion.div
-                ref={panelRef}
-                initial={{ height: 0 }}
-                animate={{ height: "auto" }}
-                exit={{ height: 0 }}
-                transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                className={`z-[80] origin-top overflow-hidden lg:hidden ${
-                  // Fijado, el panel arranca A RAS del buscador: el hueco de
-                  // 8px dejaba ver por debajo la tarjeta que hubiera detrás. La
-                  // separación se recupera dentro de la superficie.
-                  filtersSticky
-                    ? "absolute left-0 right-0 top-full"
-                    : "relative mt-2"
-                }`}
-              >
-                {/* SUPERFICIE PROPIA cuando el panel es overlay.
-                    Cada control lleva su cristal, pero entre ellos quedaban
-                    huecos por los que se veía —difuminada por el desenfoque de
-                    los controles— la tarjeta que hubiera detrás: esa era la
-                    "banda difuminada sobre el contenido" al abrir el menú. Con
-                    una superficie única el menú tapa lo que cubre. Al principio
-                    de la página el panel va en el flujo y no hay nada detrás,
-                    así que ahí no hace falta. */}
-                <div
-                  className={`space-y-2 ${
-                    filtersSticky
-                      ? "rounded-b-3xl bg-black/90 px-2 pb-2 pt-2 shadow-2xl backdrop-blur-2xl"
-                      : ""
-                  }`}
-                >
-                  {/* Dos controles por fila, como en las páginas de usuario. */}
-                  <div className="flex gap-2">
-                    <div className="min-w-0 flex-1">
-                      <SelectorSimple
-                        icon={Filter}
-                        label="Acción"
-                        opciones={FILTROS}
-                        valor={filtro}
-                        onChange={setFiltro}
-                        compactMobile
-                      />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <SelectorSimple
-                        icon={Layers3}
-                        label="Agrupar"
-                        opciones={SOCIAL_GROUP_OPTIONS}
-                        etiquetasCortas={SOCIAL_GROUP_SHORT_LABELS}
-                        valor={agrupar}
-                        onChange={setAgrupar}
-                        compactMobile
-                      />
-                    </div>
-                  </div>
-
-                  {/* Segunda fila: orden y vistas, para que el menú quede en dos
-                      filas de dos como en las demás páginas. */}
-                  <div className="flex gap-2">
-                    <div className="min-w-0 flex-1">
-                      <SelectorSimple
-                        icon={ArrowUpDown}
-                        label="Orden"
-                        opciones={[
-                          ["recent", "Reciente"],
-                          ["oldest", "Antiguo"],
-                        ]}
-                        valor={orden}
-                        onChange={setOrden}
-                        compactMobile
-                      />
-                    </div>
-                    <SelectorVista
-                      vista={vista}
-                      setVista={setVista}
-                      controlGlass={controlGlass}
-                      activo={activo}
-                      fill
-                    />
-                  </div>
+          <MobileFiltersPanel
+            open={mobileFiltersOpen}
+            ref={panelRef}
+            className={`z-[80] lg:hidden ${
+              filtersSticky ? "absolute left-0 right-0 top-full" : "relative"
+            }`}
+            // Fijado, el panel arranca A RAS del buscador: el hueco de 8px
+            // dejaba ver por debajo la tarjeta que hubiera detrás. La
+            // separación se recupera dentro de la superficie.
+            gapClassName={filtersSticky ? "" : "pt-2"}
+          >
+            {/* SUPERFICIE PROPIA cuando el panel es overlay.
+                Cada control lleva su cristal, pero entre ellos quedaban
+                huecos por los que se veía —difuminada por el desenfoque de
+                los controles— la tarjeta que hubiera detrás: esa era la
+                "banda difuminada sobre el contenido" al abrir el menú. Con
+                una superficie única el menú tapa lo que cubre. Al principio
+                de la página el panel va en el flujo y no hay nada detrás,
+                así que ahí no hace falta. */}
+            <div
+              className={`space-y-2 ${
+                filtersSticky
+                  ? "rounded-b-3xl bg-black/90 px-2 pb-2 pt-2 shadow-2xl backdrop-blur-2xl"
+                  : ""
+              }`}
+            >
+              {/* Dos controles por fila, como en las páginas de usuario. */}
+              <div className="flex gap-2">
+                <div className="min-w-0 flex-1">
+                  <SelectorSimple
+                    icon={Filter}
+                    label="Acción"
+                    opciones={FILTROS}
+                    valor={filtro}
+                    onChange={setFiltro}
+                    compactMobile
+                  />
                 </div>
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
+                <div className="min-w-0 flex-1">
+                  <SelectorSimple
+                    icon={Layers3}
+                    label="Agrupar"
+                    opciones={SOCIAL_GROUP_OPTIONS}
+                    etiquetasCortas={SOCIAL_GROUP_SHORT_LABELS}
+                    valor={agrupar}
+                    onChange={setAgrupar}
+                    compactMobile
+                  />
+                </div>
+              </div>
+
+              {/* Segunda fila: orden y vistas, para que el menú quede en dos
+                  filas de dos como en las demás páginas. */}
+              <div className="flex gap-2">
+                <div className="min-w-0 flex-1">
+                  <SelectorSimple
+                    icon={ArrowUpDown}
+                    label="Orden"
+                    opciones={[
+                      ["recent", "Reciente"],
+                      ["oldest", "Antiguo"],
+                    ]}
+                    valor={orden}
+                    onChange={setOrden}
+                    compactMobile
+                  />
+                </div>
+                <SelectorVista
+                  vista={vista}
+                  setVista={setVista}
+                  controlGlass={controlGlass}
+                  activo={activo}
+                  fill
+                />
+              </div>
+            </div>
+          </MobileFiltersPanel>
 
           {/* Escritorio: todo en una fila */}
           <div className="relative z-10 hidden gap-3 lg:flex">

@@ -50,6 +50,7 @@ import { ExternalLinkButton } from "@/components/details/DetailHeaderBits";
 import DetailsSectionMenu from "./DetailsSectionMenu";
 import useDetailsStickyTop from "@/hooks/useDetailsStickyTop";
 import { careerRange, formatCareerRange } from "@/lib/actor/careerRange";
+import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 
 /* --- CONFIG & UTILS --- */
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
@@ -2665,40 +2666,34 @@ export default function ActorDetails({
                       </button>
                     </div>
 
-                    <AnimatePresence>
-                      {mobileFiltersOpen && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: "auto", opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                          className="overflow-visible lg:hidden"
-                        >
-                          <div className="grid grid-cols-1 gap-2 pt-1 sm:grid-cols-2">
-                            <CreditsFilterDropdowns
-                              mediaFilter={mediaFilter}
-                              setMediaFilter={setMediaFilter}
-                              creditFilter={creditFilter}
-                              setCreditFilter={setCreditFilter}
-                              sort={sort}
-                              setSort={setSort}
-                            />
-                            <YearFilterDropdown
-                              label="Desde"
-                              value={yearFrom}
-                              setValue={setYearFrom}
-                              options={yearOptions}
-                            />
-                            <YearFilterDropdown
-                              label="Hasta"
-                              value={yearTo}
-                              setValue={setYearTo}
-                              options={yearOptions}
-                            />
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                    <MobileFiltersPanel
+                      open={mobileFiltersOpen}
+                      className="lg:hidden"
+                      gapClassName=""
+                    >
+                      <div className="grid grid-cols-1 gap-2 pt-1 sm:grid-cols-2">
+                        <CreditsFilterDropdowns
+                          mediaFilter={mediaFilter}
+                          setMediaFilter={setMediaFilter}
+                          creditFilter={creditFilter}
+                          setCreditFilter={setCreditFilter}
+                          sort={sort}
+                          setSort={setSort}
+                        />
+                        <YearFilterDropdown
+                          label="Desde"
+                          value={yearFrom}
+                          setValue={setYearFrom}
+                          options={yearOptions}
+                        />
+                        <YearFilterDropdown
+                          label="Hasta"
+                          value={yearTo}
+                          setValue={setYearTo}
+                          options={yearOptions}
+                        />
+                      </div>
+                    </MobileFiltersPanel>
 
                     <div className="hidden flex-nowrap items-center gap-3 overflow-x-auto pb-1 lg:flex">
                       <div className="relative min-w-[240px] flex-1">

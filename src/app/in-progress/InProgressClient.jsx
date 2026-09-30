@@ -53,6 +53,7 @@ import {
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
+import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 
 // Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
 // el mismo escalón que `w1280` en los backdrops. Antes era `w500` y en
@@ -2214,35 +2215,55 @@ export default function InProgressClient({
           </div>
 
           {/* Mobile: collapsible filters */}
-          <AnimatePresence>
-            {mobileFiltersOpen && (
-              <motion.div
-                initial={{ height: 0 }}
-                animate={{ height: "auto" }}
-                exit={{ height: 0 }}
-                transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                className={`z-[80] mt-2 origin-top overflow-hidden ${
-                  filtersSticky
-                    ? "absolute left-0 right-0 top-full"
-                    : "relative"
-                }`}
+          <MobileFiltersPanel
+            open={mobileFiltersOpen}
+            className={`z-[80] ${
+              filtersSticky ? "absolute left-0 right-0 top-full" : "relative"
+            }`}
+            gapClassName="pt-2"
+          >
+            <div className="space-y-2">
+              {/* Fila 1: ordenar. El selector de secciones permanece visible
+                  en la barra principal, entre la búsqueda y los filtros. */}
+              <InlineDropdown
+                label="Ordenar"
+                valueLabel={sortLabels[sortBy]}
+                icon={ArrowUpDown}
               >
-                <div className="space-y-2">
-                  {/* Fila 1: ordenar. El selector de secciones permanece visible
-                      en la barra principal, entre la búsqueda y los filtros. */}
+                {({ close }) => (
+                  <>
+                    {Object.entries(sortLabels).map(([key, label]) => (
+                      <DropdownItem
+                        key={key}
+                        active={sortBy === key}
+                        onClick={() => {
+                          setSortBy(key);
+                          close();
+                        }}
+                      >
+                        {label}
+                      </DropdownItem>
+                    ))}
+                  </>
+                )}
+              </InlineDropdown>
+
+              {/* Fila 2: Agrupar + botones de vista */}
+              <div className="flex gap-2 items-center">
+                <div className="flex-1 min-w-0">
                   <InlineDropdown
-                    label="Ordenar"
-                    valueLabel={sortLabels[sortBy]}
-                    icon={ArrowUpDown}
+                    label="Agrupar"
+                    valueLabel={groupLabels[groupBy]}
+                    icon={Layers}
                   >
                     {({ close }) => (
                       <>
-                        {Object.entries(sortLabels).map(([key, label]) => (
+                        {Object.entries(groupLabels).map(([key, label]) => (
                           <DropdownItem
                             key={key}
-                            active={sortBy === key}
+                            active={groupBy === key}
                             onClick={() => {
-                              setSortBy(key);
+                              setGroupBy(key);
                               close();
                             }}
                           >
@@ -2252,74 +2273,46 @@ export default function InProgressClient({
                       </>
                     )}
                   </InlineDropdown>
-
-                  {/* Fila 2: Agrupar + botones de vista */}
-                  <div className="flex gap-2 items-center">
-                    <div className="flex-1 min-w-0">
-                      <InlineDropdown
-                        label="Agrupar"
-                        valueLabel={groupLabels[groupBy]}
-                        icon={Layers}
-                      >
-                        {({ close }) => (
-                          <>
-                            {Object.entries(groupLabels).map(([key, label]) => (
-                              <DropdownItem
-                                key={key}
-                                active={groupBy === key}
-                                onClick={() => {
-                                  setGroupBy(key);
-                                  close();
-                                }}
-                              >
-                                {label}
-                              </DropdownItem>
-                            ))}
-                          </>
-                        )}
-                      </InlineDropdown>
-                    </div>
-                    {/* Grupo de vista: MISMA estructura que WatchingSectionNav
-                        (inline-flex gap-1 p-1, botones px-2.5 py-2 con icono w-4)
-                        para que ocupe EXACTAMENTE el mismo ancho que los 3 botones
-                        de sección de la fila de arriba y las dos filas se alineen. */}
-                    <div className="inline-flex h-11 shrink-0 items-center gap-1 rounded-xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-                      <button
-                        onClick={() => setViewMode("cards")}
-                        className={`flex items-center justify-center rounded-lg px-2.5 py-2 transition-all ${
-                          viewMode === "cards"
-                            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                            : "text-zinc-400 hover:text-white hover:bg-white/10"
-                        }`}
-                      >
-                        <Film className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setViewMode("poster")}
-                        className={`flex items-center justify-center rounded-lg px-2.5 py-2 transition-all ${
-                          viewMode === "poster"
-                            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                            : "text-zinc-400 hover:text-white hover:bg-white/10"
-                        }`}
-                      >
-                        <LayoutGrid className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setViewMode("compact")}
-                        className={`flex items-center justify-center rounded-lg px-2.5 py-2 transition-all ${
-                          viewMode === "compact"
-                            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                            : "text-zinc-400 hover:text-white hover:bg-white/10"
-                        }`}
-                      >
-                        <LayoutList className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                {/* Grupo de vista: MISMA estructura que WatchingSectionNav
+                    (inline-flex gap-1 p-1, botones px-2.5 py-2 con icono w-4)
+                    para que ocupe EXACTAMENTE el mismo ancho que los 3 botones
+                    de sección de la fila de arriba y las dos filas se alineen. */}
+                <div className="inline-flex h-11 shrink-0 items-center gap-1 rounded-xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+                  <button
+                    onClick={() => setViewMode("cards")}
+                    className={`flex items-center justify-center rounded-lg px-2.5 py-2 transition-all ${
+                      viewMode === "cards"
+                        ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                        : "text-zinc-400 hover:text-white hover:bg-white/10"
+                    }`}
+                  >
+                    <Film className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setViewMode("poster")}
+                    className={`flex items-center justify-center rounded-lg px-2.5 py-2 transition-all ${
+                      viewMode === "poster"
+                        ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                        : "text-zinc-400 hover:text-white hover:bg-white/10"
+                    }`}
+                  >
+                    <LayoutGrid className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setViewMode("compact")}
+                    className={`flex items-center justify-center rounded-lg px-2.5 py-2 transition-all ${
+                      viewMode === "compact"
+                        ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                        : "text-zinc-400 hover:text-white hover:bg-white/10"
+                    }`}
+                  >
+                    <LayoutList className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </MobileFiltersPanel>
           </div>
 
           {/* Desktop: Single row */}

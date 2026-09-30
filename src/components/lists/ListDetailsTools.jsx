@@ -28,6 +28,7 @@ import {
   normalizeSearchText,
   titleMatchesQuery,
 } from "@/lib/search/titleMatching";
+import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 
 const INITIAL_RENDER_COUNT = 60;
 const RENDER_BATCH_SIZE = 60;
@@ -509,59 +510,51 @@ export default function FilterableListItems({
           </button>
         </div>
 
-        <AnimatePresence>
-          {mobileFiltersOpen ? (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-              className={`overflow-visible lg:hidden ${
-                filtersSticky
-                  ? "absolute left-0 right-0 top-full z-[80] !mt-2"
-                  : "relative"
-              }`}
-            >
-              {/* DOS CONTROLES POR FILA, como en Historial: antes iban a uno
-                  por fila hasta 640px, así que en un móvil el panel ocupaba
-                  cuatro filas y dejaba medio ancho sin usar. */}
-              <div className="space-y-2 pt-2">
-                <div className="flex gap-2">
-                  <div className="min-w-0 flex-1">
-                    <TypeDropdown
-                      typeFilter={typeFilter}
-                      setTypeFilter={setTypeFilter}
-                    />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <SortDropdown sortBy={sortBy} setSortBy={setSortBy} />
-                  </div>
-                </div>
-
-                {/* Última fila: agrupar + modos de vista + borrar */}
-                <div className="flex gap-2">
-                  <div className="min-w-0 flex-1">
-                    <GroupDropdown groupBy={groupBy} setGroupBy={setGroupBy} />
-                  </div>
-                  <div className="flex min-w-0 flex-1 gap-2">
-                    <ViewSwitcher
-                      viewMode={viewMode}
-                      setViewMode={setViewMode}
-                      className="min-w-0 flex-1"
-                      fill
-                    />
-                    {editable ? (
-                      <DeleteModeToggle
-                        editMode={editMode}
-                        setEditMode={setEditMode}
-                      />
-                    ) : null}
-                  </div>
-                </div>
+        <MobileFiltersPanel
+          open={mobileFiltersOpen}
+          className={`lg:hidden ${
+            filtersSticky ? "absolute left-0 right-0 top-full z-[80]" : "relative"
+          }`}
+          gapClassName={filtersSticky ? "pt-2" : ""}
+        >
+          {/* DOS CONTROLES POR FILA, como en Historial: antes iban a uno
+              por fila hasta 640px, así que en un móvil el panel ocupaba
+              cuatro filas y dejaba medio ancho sin usar. */}
+          <div className="space-y-2 pt-2">
+            <div className="flex gap-2">
+              <div className="min-w-0 flex-1">
+                <TypeDropdown
+                  typeFilter={typeFilter}
+                  setTypeFilter={setTypeFilter}
+                />
               </div>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
+              <div className="min-w-0 flex-1">
+                <SortDropdown sortBy={sortBy} setSortBy={setSortBy} />
+              </div>
+            </div>
+
+            {/* Última fila: agrupar + modos de vista + borrar */}
+            <div className="flex gap-2">
+              <div className="min-w-0 flex-1">
+                <GroupDropdown groupBy={groupBy} setGroupBy={setGroupBy} />
+              </div>
+              <div className="flex min-w-0 flex-1 gap-2">
+                <ViewSwitcher
+                  viewMode={viewMode}
+                  setViewMode={setViewMode}
+                  className="min-w-0 flex-1"
+                  fill
+                />
+                {editable ? (
+                  <DeleteModeToggle
+                    editMode={editMode}
+                    setEditMode={setEditMode}
+                  />
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </MobileFiltersPanel>
 
         <div className="hidden gap-3 lg:flex">
           <div className="relative min-w-[260px] flex-1">

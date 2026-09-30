@@ -36,6 +36,7 @@ import {
   SlidersHorizontal,
   Star,
 } from "lucide-react";
+import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 
@@ -1293,231 +1294,225 @@ export default function TraktEpisodesWatchedModal({
           </div>
 
           {/* Móvil: panel colapsable de filtros */}
-          <AnimatePresence>
-            {mobileFiltersOpen && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.25, ease: "easeInOut" }}
-                className="lg:hidden overflow-visible"
-              >
-                <div className="space-y-2 pt-1">
-                  {/* Fila 1: vista Global/Rewatch + historial */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="relative min-w-0" data-view-menu="">
-                      <button
-                        type="button"
-                        onClick={() => setViewMenuOpen((v) => !v)}
-                        disabled={!isConnected || !serverOnline}
-                        aria-label="Cambiar vista (Global o Rewatch por visionado)"
-                        className={`h-10 w-full inline-flex items-center gap-2 rounded-xl px-3.5 text-sm font-semibold transition ${
-                          !isConnected
-                            ? "opacity-50 cursor-not-allowed bg-black/25 text-white/30"
-                            : "bg-black/30 text-white/80 hover:bg-white/10"
-                        }`}
-                      >
-                        <span
-                          className={`inline-flex h-6 w-6 items-center justify-center rounded-md shrink-0 ${
-                            isRewatchView
-                              ? "bg-purple-500/10 text-purple-300"
-                              : "bg-red-500/10 text-red-400"
-                          }`}
-                        >
-                          {isRewatchView ? (
-                            <History className="w-3.5 h-3.5" />
-                          ) : (
-                            <Tv className="w-3.5 h-3.5" />
-                          )}
-                        </span>
-                        <span className="flex-1 text-left truncate">
-                          {isRewatchView
-                            ? formatDate(currentRewatchStartedAt)
-                            : activeViewLabel}
-                        </span>
-                        <ChevronDown
-                          className={`w-4 h-4 text-zinc-500 transition-transform ${viewMenuOpen ? "rotate-180" : ""}`}
-                        />
-                      </button>
-
-                      <AnimatePresence>
-                        {viewMenuOpen && isConnected && (
-                          <motion.div
-                            initial={{ opacity: 0, y: -6 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -6 }}
-                            transition={{ duration: 0.16, ease: "easeOut" }}
-                            className="absolute left-0 top-full z-40 mt-1 w-full overflow-hidden rounded-xl bg-black/65 shadow-2xl backdrop-blur-2xl"
-                          >
-                            <div className="max-h-56 overflow-y-auto sv-scroll py-1">
-                              {viewMenuItems.map((item) => {
-                                const active = item.id === effectiveViewId;
-                                return (
-                                  <button
-                                    key={item.id}
-                                    type="button"
-                                    onClick={() => {
-                                      changeView(item.id);
-                                      setViewMenuOpen(false);
-                                    }}
-                                    className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2.5 transition ${
-                                      active
-                                        ? item.kind === "rewatch"
-                                          ? "bg-purple-500/12 text-purple-200"
-                                          : "bg-emerald-500/12 text-emerald-300"
-                                        : item.kind === "rewatch"
-                                          ? "text-purple-200 hover:bg-purple-500/10"
-                                          : "text-zinc-300 hover:bg-white/5"
-                                    }`}
-                                  >
-                                    {item.kind === "global" ? (
-                                      <Tv className="w-4 h-4 text-red-400 shrink-0" />
-                                    ) : (
-                                      <History className="w-4 h-4 text-purple-400 shrink-0" />
-                                    )}
-                                    <span className="flex-1 truncate">
-                                      {item.mobileLabel || item.label}
-                                    </span>
-                                    {active && (
-                                      <Check className="w-4 h-4 shrink-0" />
-                                    )}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-
-                    <button
-                      type="button"
-                      disabled={!isConnected || rewatchItems.length === 0}
-                      onClick={() => {
-                        setHistoryQuery("");
-                        setHistoryLimit(60);
-                        setHistoryOpen(true);
-                      }}
-                      className={`h-10 min-w-0 w-full inline-flex items-center justify-center gap-2 px-3 text-sm font-semibold rounded-xl transition whitespace-nowrap ${
-                        !isConnected || rewatchItems.length === 0
-                          ? "opacity-50 cursor-not-allowed bg-black/25 text-white/30"
-                          : "bg-black/30 text-white/75 hover:bg-white/10"
+          <MobileFiltersPanel
+            open={mobileFiltersOpen}
+            className="lg:hidden"
+            gapClassName=""
+          >
+            <div className="space-y-2 pt-1">
+              {/* Fila 1: vista Global/Rewatch + historial */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="relative min-w-0" data-view-menu="">
+                  <button
+                    type="button"
+                    onClick={() => setViewMenuOpen((v) => !v)}
+                    disabled={!isConnected || !serverOnline}
+                    aria-label="Cambiar vista (Global o Rewatch por visionado)"
+                    className={`h-10 w-full inline-flex items-center gap-2 rounded-xl px-3.5 text-sm font-semibold transition ${
+                      !isConnected
+                        ? "opacity-50 cursor-not-allowed bg-black/25 text-white/30"
+                        : "bg-black/30 text-white/80 hover:bg-white/10"
+                    }`}
+                  >
+                    <span
+                      className={`inline-flex h-6 w-6 items-center justify-center rounded-md shrink-0 ${
+                        isRewatchView
+                          ? "bg-purple-500/10 text-purple-300"
+                          : "bg-red-500/10 text-red-400"
                       }`}
                     >
-                      <History className="w-4 h-4 shrink-0 text-emerald-400" />
-                      Historial
-                      {isConnected && rewatchItems.length > 0 && (
-                        <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-white/5 text-zinc-300">
-                          {rewatchItems.length}
-                        </span>
+                      {isRewatchView ? (
+                        <History className="w-3.5 h-3.5" />
+                      ) : (
+                        <Tv className="w-3.5 h-3.5" />
                       )}
-                    </button>
-                  </div>
+                    </span>
+                    <span className="flex-1 text-left truncate">
+                      {isRewatchView
+                        ? formatDate(currentRewatchStartedAt)
+                        : activeViewLabel}
+                    </span>
+                    <ChevronDown
+                      className={`w-4 h-4 text-zinc-500 transition-transform ${viewMenuOpen ? "rotate-180" : ""}`}
+                    />
+                  </button>
 
-                  {/* Fila 2: añadir a la izquierda; controles a la derecha */}
-                  <div className="grid grid-cols-2 items-center gap-2">
+                  <AnimatePresence>
+                    {viewMenuOpen && isConnected && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -6 }}
+                        transition={{ duration: 0.16, ease: "easeOut" }}
+                        className="absolute left-0 top-full z-40 mt-1 w-full overflow-hidden rounded-xl bg-black/65 shadow-2xl backdrop-blur-2xl"
+                      >
+                        <div className="max-h-56 overflow-y-auto sv-scroll py-1">
+                          {viewMenuItems.map((item) => {
+                            const active = item.id === effectiveViewId;
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => {
+                                  changeView(item.id);
+                                  setViewMenuOpen(false);
+                                }}
+                                className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2.5 transition ${
+                                  active
+                                    ? item.kind === "rewatch"
+                                      ? "bg-purple-500/12 text-purple-200"
+                                      : "bg-emerald-500/12 text-emerald-300"
+                                    : item.kind === "rewatch"
+                                      ? "text-purple-200 hover:bg-purple-500/10"
+                                      : "text-zinc-300 hover:bg-white/5"
+                                }`}
+                              >
+                                {item.kind === "global" ? (
+                                  <Tv className="w-4 h-4 text-red-400 shrink-0" />
+                                ) : (
+                                  <History className="w-4 h-4 text-purple-400 shrink-0" />
+                                )}
+                                <span className="flex-1 truncate">
+                                  {item.mobileLabel || item.label}
+                                </span>
+                                {active && (
+                                  <Check className="w-4 h-4 shrink-0" />
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={!isConnected || rewatchItems.length === 0}
+                  onClick={() => {
+                    setHistoryQuery("");
+                    setHistoryLimit(60);
+                    setHistoryOpen(true);
+                  }}
+                  className={`h-10 min-w-0 w-full inline-flex items-center justify-center gap-2 px-3 text-sm font-semibold rounded-xl transition whitespace-nowrap ${
+                    !isConnected || rewatchItems.length === 0
+                      ? "opacity-50 cursor-not-allowed bg-black/25 text-white/30"
+                      : "bg-black/30 text-white/75 hover:bg-white/10"
+                  }`}
+                >
+                  <History className="w-4 h-4 shrink-0 text-emerald-400" />
+                  Historial
+                  {isConnected && rewatchItems.length > 0 && (
+                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-white/5 text-zinc-300">
+                      {rewatchItems.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {/* Fila 2: añadir a la izquierda; controles a la derecha */}
+              <div className="grid grid-cols-2 items-center gap-2">
+                <button
+                  type="button"
+                  disabled={!isConnected || !serverOnline}
+                  onClick={() => openAddPlayDialog("play")}
+                  aria-label="Añadir un play completo o crear un rewatch vacío"
+                  className={`min-w-0 w-full h-10 inline-flex items-center justify-center gap-1 px-2 rounded-xl text-[11px] font-semibold transition whitespace-nowrap ${
+                    !isConnected
+                      ? "opacity-50 cursor-not-allowed bg-black/25 text-white/30"
+                      : "bg-black/30 text-white/75 hover:bg-white/10"
+                  }`}
+                >
+                  <Plus className="w-4 h-4 shrink-0" />
+                  <span className="min-[375px]:hidden">Añadir</span>
+                  <span className="hidden min-[375px]:inline">Añadir / Rewatch</span>
+                </button>
+
+                <div className="grid min-w-0 grid-cols-4 gap-1">
+                  <div
+                    role="group"
+                    aria-label="Modo de vista"
+                    className="col-span-2 flex h-10 overflow-hidden rounded-xl bg-black/30"
+                  >
                     <button
                       type="button"
-                      disabled={!isConnected || !serverOnline}
-                      onClick={() => openAddPlayDialog("play")}
-                      aria-label="Añadir un play completo o crear un rewatch vacío"
-                      className={`min-w-0 w-full h-10 inline-flex items-center justify-center gap-1 px-2 rounded-xl text-[11px] font-semibold transition whitespace-nowrap ${
-                        !isConnected
-                          ? "opacity-50 cursor-not-allowed bg-black/25 text-white/30"
-                          : "bg-black/30 text-white/75 hover:bg-white/10"
+                      onClick={() => setViewMode("list")}
+                      aria-label="Vista lista"
+                      aria-pressed={viewMode === "list"}
+                      className={`h-full min-w-0 flex-1 inline-flex items-center justify-center rounded-l-xl transition-all ${
+                        viewMode === "list"
+                          ? "bg-white/15 text-white shadow"
+                          : "text-white/45 hover:bg-white/10 hover:text-white"
                       }`}
                     >
-                      <Plus className="w-4 h-4 shrink-0" />
-                      <span className="min-[375px]:hidden">Añadir</span>
-                      <span className="hidden min-[375px]:inline">Añadir / Rewatch</span>
+                      <List className="w-3.5 h-3.5" />
                     </button>
-
-                    <div className="grid min-w-0 grid-cols-4 gap-1">
-                      <div
-                        role="group"
-                        aria-label="Modo de vista"
-                        className="col-span-2 flex h-10 overflow-hidden rounded-xl bg-black/30"
-                      >
-                        <button
-                          type="button"
-                          onClick={() => setViewMode("list")}
-                          aria-label="Vista lista"
-                          aria-pressed={viewMode === "list"}
-                          className={`h-full min-w-0 flex-1 inline-flex items-center justify-center rounded-l-xl transition-all ${
-                            viewMode === "list"
-                              ? "bg-white/15 text-white shadow"
-                              : "text-white/45 hover:bg-white/10 hover:text-white"
-                          }`}
-                        >
-                          <List className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setViewMode("table")}
-                          aria-label="Vista tabla"
-                          aria-pressed={viewMode === "table"}
-                          className={`h-full min-w-0 flex-1 inline-flex items-center justify-center rounded-r-xl transition-all ${
-                            viewMode === "table"
-                              ? "bg-white/15 text-white shadow"
-                              : "text-white/45 hover:bg-white/10 hover:text-white"
-                          }`}
-                        >
-                          <Table2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setOnlyUnwatched(!onlyUnwatched)}
-                        aria-label={onlyUnwatched ? "Mostrar no vistos" : "Mostrar todos"}
-                        className={`h-10 w-full inline-flex items-center justify-center rounded-xl transition ${
-                          onlyUnwatched
-                            ? "bg-emerald-500/10 text-emerald-400"
-                            : "bg-black/30 text-white/50 hover:bg-white/10 hover:text-white"
-                        }`}
-                      >
-                        <Filter className="w-4 h-4" />
-                      </button>
-
-                      <button data-online-only="true"
-                        type="button"
-                        disabled={!canToggleShow || !serverOnline}
-                        onClick={onClickToggleShow}
-                        aria-label={
-                          !isConnected
-                            ? "Conecta Trakt"
-                            : isRewatchView
-                              ? "En rewatch no se usa marcar serie completa"
-                              : usableSeasons.length === 0
-                                ? "Sin temporadas disponibles"
-                                : showCompleted
-                                  ? "Quitar serie"
-                                  : "Marcar serie"
-                        }
-                        // Marcar / Quitar serie: el estado lo dicen el tinte y el
-                        // icono; no hace falta duplicarlo con texto en móvil.
-                        className={`h-10 w-full inline-flex items-center justify-center rounded-xl transition
-                          ${
-                            showCompleted
-                              ? "bg-red-500/10 text-red-300 hover:bg-red-500/20"
-                              : "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
-                          }
-                          ${!canToggleShow ? "opacity-50 cursor-not-allowed" : ""}`}
-                      >
-                        {busyShow ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : showCompleted ? (
-                          <EyeOff className="w-4 h-4" />
-                        ) : (
-                          <Eye className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("table")}
+                      aria-label="Vista tabla"
+                      aria-pressed={viewMode === "table"}
+                      className={`h-full min-w-0 flex-1 inline-flex items-center justify-center rounded-r-xl transition-all ${
+                        viewMode === "table"
+                          ? "bg-white/15 text-white shadow"
+                          : "text-white/45 hover:bg-white/10 hover:text-white"
+                      }`}
+                    >
+                      <Table2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setOnlyUnwatched(!onlyUnwatched)}
+                    aria-label={onlyUnwatched ? "Mostrar no vistos" : "Mostrar todos"}
+                    className={`h-10 w-full inline-flex items-center justify-center rounded-xl transition ${
+                      onlyUnwatched
+                        ? "bg-emerald-500/10 text-emerald-400"
+                        : "bg-black/30 text-white/50 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    <Filter className="w-4 h-4" />
+                  </button>
+
+                  <button data-online-only="true"
+                    type="button"
+                    disabled={!canToggleShow || !serverOnline}
+                    onClick={onClickToggleShow}
+                    aria-label={
+                      !isConnected
+                        ? "Conecta Trakt"
+                        : isRewatchView
+                          ? "En rewatch no se usa marcar serie completa"
+                          : usableSeasons.length === 0
+                            ? "Sin temporadas disponibles"
+                            : showCompleted
+                              ? "Quitar serie"
+                              : "Marcar serie"
+                    }
+                    // Marcar / Quitar serie: el estado lo dicen el tinte y el
+                    // icono; no hace falta duplicarlo con texto en móvil.
+                    className={`h-10 w-full inline-flex items-center justify-center rounded-xl transition
+                      ${
+                        showCompleted
+                          ? "bg-red-500/10 text-red-300 hover:bg-red-500/20"
+                          : "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                      }
+                      ${!canToggleShow ? "opacity-50 cursor-not-allowed" : ""}`}
+                  >
+                    {busyShow ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : showCompleted ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              </div>
+            </div>
+          </MobileFiltersPanel>
 
           {/* Desktop: fila única */}
           <div className="hidden lg:flex gap-1.5 xl:gap-3 items-center min-w-0">

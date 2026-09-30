@@ -38,6 +38,7 @@ import {
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import HoverExpandCard from "@/components/ui/HoverExpandCard";
+import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 
 const MOVIE_GENRES = {
   28: "Acción",
@@ -1076,179 +1077,173 @@ export default function DashboardSectionClient({ section }) {
             </button>
           </div>
 
-          <div
-            className={`grid overflow-hidden transition-[grid-template-rows] duration-[280ms] ease-[cubic-bezier(0.16,1,0.3,1)] lg:hidden ${
-              mobileFiltersOpen ? "" : "pointer-events-none"
-            } ${
-              filtersSticky
-                ? "absolute left-0 right-0 top-full z-[80] !mt-2"
-                : "relative"
+          <MobileFiltersPanel
+            open={mobileFiltersOpen}
+            className={`lg:hidden ${
+              filtersSticky ? "absolute left-0 right-0 top-full z-[80]" : "relative"
             }`}
-            style={{ gridTemplateRows: mobileFiltersOpen ? "1fr" : "0fr" }}
+            gapClassName={filtersSticky ? "pt-2" : ""}
+            contentClassName="space-y-1 pt-1 pb-1"
           >
-            <div className="min-h-0">
-              <div className="space-y-1 pt-1 pb-1">
-                <div className="flex gap-2">
-                  <div className="min-w-0 flex-1">
-                    <Dropdown
-                      label="Tipo"
-                      valueLabel={
-                        mediaFilter === "all"
-                          ? "Todo"
-                          : mediaFilter === "movie"
-                            ? "Películas"
-                            : "Series"
-                      }
-                      icon={Filter}
-                    >
-                      {({ close }) => (
-                        <>
-                          {[
-                            ["all", "Todo"],
-                            ["movie", "Películas"],
-                            ["tv", "Series"],
-                          ].map(([key, label]) => (
-                            <DropdownItem
-                              key={key}
-                              active={mediaFilter === key}
-                              onClick={() => {
-                                setMediaFilter(key);
-                                close();
-                              }}
-                            >
-                              {label}
-                            </DropdownItem>
-                          ))}
-                        </>
-                      )}
-                    </Dropdown>
-                  </div>
+            <div className="flex gap-2">
+              <div className="min-w-0 flex-1">
+                <Dropdown
+                  label="Tipo"
+                  valueLabel={
+                    mediaFilter === "all"
+                      ? "Todo"
+                      : mediaFilter === "movie"
+                        ? "Películas"
+                        : "Series"
+                  }
+                  icon={Filter}
+                >
+                  {({ close }) => (
+                    <>
+                      {[
+                        ["all", "Todo"],
+                        ["movie", "Películas"],
+                        ["tv", "Series"],
+                      ].map(([key, label]) => (
+                        <DropdownItem
+                          key={key}
+                          active={mediaFilter === key}
+                          onClick={() => {
+                            setMediaFilter(key);
+                            close();
+                          }}
+                        >
+                          {label}
+                        </DropdownItem>
+                      ))}
+                    </>
+                  )}
+                </Dropdown>
+              </div>
 
-                  <div className="min-w-0 flex-1">
-                    <Dropdown
-                      label="Fuente"
-                      valueLabel={
-                        sourceFilter === "all"
-                          ? "Todas"
-                          : sourceFilter === "trakt"
-                            ? "Trakt"
-                            : "TMDb"
-                      }
-                      icon={SlidersHorizontal}
-                    >
-                      {({ close }) => (
-                        <>
-                          {[
-                            ["all", "Todas"],
-                            ["trakt", "Trakt"],
-                            ["tmdb", "TMDb"],
-                          ].map(([key, label]) => (
-                            <DropdownItem
-                              key={key}
-                              active={sourceFilter === key}
-                              onClick={() => {
-                                setSourceFilter(key);
-                                close();
-                              }}
-                            >
-                              {label}
-                            </DropdownItem>
-                          ))}
-                        </>
-                      )}
-                    </Dropdown>
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <div className="min-w-0 flex-1">
-                    <Dropdown label="Orden" valueLabel={sortLabel} icon={ArrowUpDown}>
-                      {({ close }) => (
-                        <>
-                          {SORT_OPTIONS.map((option) => (
-                            <DropdownItem
-                              key={option.key}
-                              active={sortBy === option.key}
-                              onClick={() => {
-                                setSortBy(option.key);
-                                close();
-                              }}
-                            >
-                              {option.label}
-                            </DropdownItem>
-                          ))}
-                        </>
-                      )}
-                    </Dropdown>
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <Dropdown label="Agrupar" valueLabel={groupLabel} icon={Calendar}>
-                      {({ close }) => (
-                        <>
-                          {GROUP_OPTIONS.map((option) => (
-                            <DropdownItem
-                              key={option.key}
-                              active={groupBy === option.key}
-                              onClick={() => {
-                                setGroupBy(option.key);
-                                close();
-                              }}
-                            >
-                              {option.label}
-                            </DropdownItem>
-                          ))}
-                        </>
-                      )}
-                    </Dropdown>
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <div className="flex flex-1 rounded-2xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-                    {[
-                      ["list", List],
-                      ["compact", Grid2X2],
-                      ["grid", LayoutGrid],
-                    ].map(([mode, Icon]) => (
-                      <button
-                        key={mode}
-                        type="button"
-                        onClick={() => setViewMode(mode)}
-                        className={`flex-1 px-2 h-full rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                          viewMode === mode
-                            ? "bg-gradient-to-br from-amber-400 to-yellow-600 text-black shadow-lg shadow-amber-500/20"
-                            : "text-zinc-400 hover:text-white hover:bg-white/10"
-                        }`}
-                      >
-                        <Icon className="w-4 h-4" />
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="flex flex-1 rounded-2xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-                    {[
-                      ["poster", Film],
-                      ["backdrop", MonitorPlay],
-                    ].map(([mode, Icon]) => (
-                      <button
-                        key={mode}
-                        type="button"
-                        onClick={() => setImageMode(mode)}
-                        className={`flex-1 px-2 h-full rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                          imageMode === mode
-                            ? "bg-gradient-to-br from-amber-400 to-yellow-600 text-black shadow-lg shadow-amber-500/20"
-                            : "text-zinc-400 hover:text-white hover:bg-white/10"
-                        }`}
-                      >
-                        <Icon className="w-4 h-4" />
-                      </button>
-                    ))}
-                  </div>
-                </div>
+              <div className="min-w-0 flex-1">
+                <Dropdown
+                  label="Fuente"
+                  valueLabel={
+                    sourceFilter === "all"
+                      ? "Todas"
+                      : sourceFilter === "trakt"
+                        ? "Trakt"
+                        : "TMDb"
+                  }
+                  icon={SlidersHorizontal}
+                >
+                  {({ close }) => (
+                    <>
+                      {[
+                        ["all", "Todas"],
+                        ["trakt", "Trakt"],
+                        ["tmdb", "TMDb"],
+                      ].map(([key, label]) => (
+                        <DropdownItem
+                          key={key}
+                          active={sourceFilter === key}
+                          onClick={() => {
+                            setSourceFilter(key);
+                            close();
+                          }}
+                        >
+                          {label}
+                        </DropdownItem>
+                      ))}
+                    </>
+                  )}
+                </Dropdown>
               </div>
             </div>
-          </div>
+
+            <div className="flex gap-2">
+              <div className="min-w-0 flex-1">
+                <Dropdown label="Orden" valueLabel={sortLabel} icon={ArrowUpDown}>
+                  {({ close }) => (
+                    <>
+                      {SORT_OPTIONS.map((option) => (
+                        <DropdownItem
+                          key={option.key}
+                          active={sortBy === option.key}
+                          onClick={() => {
+                            setSortBy(option.key);
+                            close();
+                          }}
+                        >
+                          {option.label}
+                        </DropdownItem>
+                      ))}
+                    </>
+                  )}
+                </Dropdown>
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <Dropdown label="Agrupar" valueLabel={groupLabel} icon={Calendar}>
+                  {({ close }) => (
+                    <>
+                      {GROUP_OPTIONS.map((option) => (
+                        <DropdownItem
+                          key={option.key}
+                          active={groupBy === option.key}
+                          onClick={() => {
+                            setGroupBy(option.key);
+                            close();
+                          }}
+                        >
+                          {option.label}
+                        </DropdownItem>
+                      ))}
+                    </>
+                  )}
+                </Dropdown>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <div className="flex flex-1 rounded-2xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+                {[
+                  ["list", List],
+                  ["compact", Grid2X2],
+                  ["grid", LayoutGrid],
+                ].map(([mode, Icon]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setViewMode(mode)}
+                    className={`flex-1 px-2 h-full rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                      viewMode === mode
+                        ? "bg-gradient-to-br from-amber-400 to-yellow-600 text-black shadow-lg shadow-amber-500/20"
+                        : "text-zinc-400 hover:text-white hover:bg-white/10"
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex flex-1 rounded-2xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+                {[
+                  ["poster", Film],
+                  ["backdrop", MonitorPlay],
+                ].map(([mode, Icon]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setImageMode(mode)}
+                    className={`flex-1 px-2 h-full rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                      imageMode === mode
+                        ? "bg-gradient-to-br from-amber-400 to-yellow-600 text-black shadow-lg shadow-amber-500/20"
+                        : "text-zinc-400 hover:text-white hover:bg-white/10"
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          </MobileFiltersPanel>
 
           <div className="relative z-10 hidden gap-3 lg:flex">
             <div className="relative min-w-0 flex-1">
