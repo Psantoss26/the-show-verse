@@ -56,6 +56,7 @@ import {
 import WatchNextAssistant from "@/components/WatchNextAssistant";
 import NetflixSyncListener from "@/components/NetflixSyncListener";
 import AlertsMenu, { AlertsMenuBoot } from "@/components/notifications/AlertsMenu";
+import OfflineBanner from "@/components/OfflineBanner";
 import useBodyScrollLock from "@/hooks/useBodyScrollLock";
 import { useAppPullToRefreshLock } from "@/lib/android/appBridge";
 import { fuzzySimilarity, tokenFuzzyMatches } from "@/lib/search/fuzzy";
@@ -3017,6 +3018,9 @@ function NavbarContent() {
             )}
           </div>
         </div>
+
+        {/* Aviso de servidor caído (móvil/tablet): justo debajo de la barra. */}
+        <OfflineBanner placement="below-nav" />
       </nav>
 
       {/* ===================== BOTTOM BAR (MÓVIL) ===================== */}
