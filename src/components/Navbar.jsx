@@ -22,7 +22,7 @@ import { useAuth } from "@/context/AuthContext";
 import UserAvatar, { UserAvatarBoot } from "@/components/auth/UserAvatar";
 import Avatar from "@/components/ui/Avatar";
 import { useTranslation } from "@/lib/i18n";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useIsPresent } from "framer-motion";
 import {
   FilmIcon,
   TvIcon,
@@ -178,6 +178,12 @@ const SEARCH_FILTER_OPTIONS = [
 //
 // Lo comparte el marcador que ocupa su sitio mientras arranca la sesion: si el
 // recuadro cambia, cambian los dos y la recarga no mueve nada de sitio.
+// Overlay de búsqueda móvil: entrada con desaceleración larga (la misma curva
+// que el resto de la navbar) y salida más corta que acelera al irse.
+const MOBILE_SEARCH_ENTER_S = 0.34;
+const MOBILE_SEARCH_ENTER = { duration: MOBILE_SEARCH_ENTER_S, ease: [0.22, 1, 0.36, 1] };
+const MOBILE_SEARCH_EXIT = { duration: 0.22, ease: [0.4, 0, 1, 1] };
+
 const PROFILE_TRIGGER_SHELL =
   "-mr-1.5 flex items-center gap-2 rounded-full py-1 pl-1 pr-2";
 
@@ -402,6 +408,13 @@ function SearchBar({
     setPortalHostReady(true);
   }, []);
 
+  // Al cerrar el overlay móvil, la barra sigue montada mientras dura su salida
+  // (AnimatePresence) y sus desplegables, que van en portal, no se enteraban:
+  // se quedaban quietos y desaparecían de golpe al final. Con `isPresent` se
+  // repliegan A LA VEZ que la barra. Fuera de un AnimatePresence es siempre
+  // true (escritorio y tablet).
+  const isPresent = useIsPresent();
+
   useEffect(() => {
     if (isMobile) {
       const timer = setTimeout(() => {
@@ -466,6 +479,20 @@ function SearchBar({
     };
 
     updatePosition();
+    // MÓVIL: la barra ENTRA con un transform (baja desde arriba) y el foco
+    // abre el desplegable a mitad de esa entrada. El transform no dispara ni el
+    // ResizeObserver ni resize/scroll, así que el panel se quedaba colocado
+    // donde estaba la barra en ese instante. Se sigue fotograma a fotograma
+    // mientras dura la entrada.
+    let seguimientoId = 0;
+    if (isMobile) {
+      const hasta = performance.now() + MOBILE_SEARCH_ENTER_S * 1000 + 80;
+      const seguir = () => {
+        updatePosition();
+        if (performance.now() < hasta) seguimientoId = window.requestAnimationFrame(seguir);
+      };
+      seguimientoId = window.requestAnimationFrame(seguir);
+    }
     // El desplegable copia el ANCHO de la barra, y en escritorio la barra se
     // ensancha con una animacion de 300ms al desplegarse. Con solo resize/scroll
     // la medida se tomaba a mitad de esa transicion y el panel quedaba mas
@@ -479,6 +506,7 @@ function SearchBar({
     window.addEventListener("scroll", schedulePositionUpdate, true);
     return () => {
       window.cancelAnimationFrame(frameId);
+      window.cancelAnimationFrame(seguimientoId);
       observador?.disconnect();
       window.removeEventListener("resize", schedulePositionUpdate);
       window.removeEventListener("scroll", schedulePositionUpdate, true);
@@ -1373,7 +1401,7 @@ function SearchBar({
       {portalHostReady &&
         createPortal(
           <AnimatePresence>
-            {showFilterMenu && filterMenuPosition && (
+            {isPresent && showFilterMenu && filterMenuPosition && (
               <motion.div
                 ref={filterMenuRef}
                 // Marca para que Navbar sepa que esto es "dentro" de la barra
@@ -1454,7 +1482,8 @@ function SearchBar({
       {portalHostReady &&
         createPortal(
           <AnimatePresence>
-            {showDropdown &&
+            {isPresent &&
+              showDropdown &&
               dropdownPosition &&
               (results.length > 0 ||
                 !query.trim() ||
@@ -3506,19 +3535,22 @@ function NavbarContent() {
                 barra (LIQUID_GLASS_PANEL) se quedaba sin fondo que difuminar y
                 se veía plana, distinta del desplegable de resultados (en
                 portal). Por lo mismo la barra entra solo con transform. */}
+            {/* Velo y barra comparten duración y curva: entran y salen como
+                una sola pieza. La barra BAJA DESDE FUERA de la pantalla en vez
+                de aparecer en su sitio: sin `opacity` (apagaría el cristal),
+                aparecer 20px más arriba se leía como un salto. */}
             <motion.div
               aria-hidden
               initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              animate={{ opacity: 1, transition: MOBILE_SEARCH_ENTER }}
+              exit={{ opacity: 0, transition: MOBILE_SEARCH_EXIT }}
               className="absolute inset-0 bg-black/60 backdrop-blur-lg"
             />
             <motion.div
-              initial={{ scale: 0.95, y: -20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: -20 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              className="relative w-full"
+              initial={{ y: -80, scale: 0.97 }}
+              animate={{ y: 0, scale: 1, transition: MOBILE_SEARCH_ENTER }}
+              exit={{ y: -80, scale: 0.97, transition: MOBILE_SEARCH_EXIT }}
+              className="relative w-full origin-top"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="relative mb-4 w-full">
