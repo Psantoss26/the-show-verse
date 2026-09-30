@@ -27,13 +27,25 @@ const RESTORE_MAX_MS = 5000;
 // consideramos «estable» para dar la restauración por terminada.
 const RESTORE_STABLE_FRAMES = 3;
 const POSITION_TOLERANCE_PX = 2;
+const PREVIEW_PARAM = "preview";
 
 function getCurrentRouteKey() {
   return `${window.location.pathname}${window.location.search}` || "/";
 }
 
-function getStorageKey(pathname) {
-  return `${STORAGE_PREFIX}${pathname || "/"}`;
+// La posición se guarda por PÁGINA, sin `?preview=`. La ficha rápida
+// (DetailModalProvider) añade ese parámetro con `pushState` sin cambiar de
+// página, así que el scroll se va guardando como `/favorites`; pero al ir a la
+// ficha completa desde el drawer y volver con Atrás, la URL de destino es
+// `/favorites?preview=movie-1`. Con la clave literal no se encontraba nada y la
+// página aparecía arriba del todo en vez de donde se había dejado.
+function getStorageKey(routeKey) {
+  const [pathAndSearch] = String(routeKey || "/").split("#");
+  const [path, search = ""] = pathAndSearch.split("?");
+  const params = new URLSearchParams(search);
+  params.delete(PREVIEW_PARAM);
+  const qs = params.toString();
+  return `${STORAGE_PREFIX}${path || "/"}${qs ? `?${qs}` : ""}`;
 }
 
 function markHistoryNavigation() {

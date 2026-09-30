@@ -25,6 +25,11 @@ export function shouldSkipRemoteArtwork({
 }
 let artworkPreferencesRequest = null
 let artworkSaveQueue = Promise.resolve()
+const ARTWORK_SAVE_RETRY_DELAYS_MS = [1000, 3000]
+
+function wait(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms))
+}
 
 export function resolveCachedArtworkOverride({
     preferences,
@@ -226,23 +231,34 @@ export function saveArtworkOverrides({ type, id, changes }) {
     const save = async () => {
         if (!normalizedChanges.length) return true
 
-        try {
-            const response = await fetch('/api/user/preferences', {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                // Una selección contiene solo rutas cortas de TMDb y puede
-                // terminar aunque se navegue al dashboard de inmediato.
-                keepalive: true,
-                credentials: 'include',
-                body: JSON.stringify({ artworkChanges: normalizedChanges })
-            })
-            if (!response.ok) throw new Error(`HTTP ${response.status}`)
-            return true
-        } catch (err) {
-            console.error('Error guardando artwork override', err)
-            return false
+        // Un corte momentáneo del túnel al NAS o un 5xx perdían la selección:
+        // se veía elegida (instantánea local) pero la siguiente revalidación
+        // remota la devolvía a la anterior. Se reintenta solo lo transitorio;
+        // un 4xx (sin sesión, validación) no va a cambiar repitiéndolo.
+        for (let attempt = 0; ; attempt += 1) {
+            let retryable = true
+            try {
+                const response = await fetch('/api/user/preferences', {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    // Una selección contiene solo rutas cortas de TMDb y puede
+                    // terminar aunque se navegue al dashboard de inmediato.
+                    keepalive: true,
+                    credentials: 'include',
+                    body: JSON.stringify({ artworkChanges: normalizedChanges })
+                })
+                if (response.ok) return true
+                retryable = response.status >= 500
+                throw new Error(`HTTP ${response.status}`)
+            } catch (err) {
+                if (!retryable || attempt >= ARTWORK_SAVE_RETRY_DELAYS_MS.length) {
+                    console.error('Error guardando artwork override', err)
+                    return false
+                }
+                await wait(ARTWORK_SAVE_RETRY_DELAYS_MS[attempt])
+            }
         }
     }
 

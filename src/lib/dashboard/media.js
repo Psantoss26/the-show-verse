@@ -7,6 +7,10 @@ import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 import { pickBestBackdropNoLang } from "@/lib/details/tmdbImages";
 import { getMediaTypeForItem } from "./mediaType.mjs";
+import {
+  readArtworkPreference,
+  readPersistedArtworkOverride,
+} from "@/lib/artworkApi";
 
 /* ---------- helpers de formato ---------- */
 export const yearOf = (m) =>
@@ -190,29 +194,38 @@ export const movieExtrasCache = new Map();
 export const movieBackdropCache = new Map();
 export const movieImagesCache = new Map();
 
-/* ======== Preferencias de artwork guardadas en localStorage ======== */
+/* ============ Selecciones de artwork del usuario ("Portadas y fondos") ============ */
+// Mismo contrato que DetailsClient (`initialFor`): la instantánea de
+// preferencias de la CUENTA (la que AuthContext cachea en localStorage y
+// revalida contra el servidor) manda sobre la copia local por título. Antes
+// solo se leía la copia local, así que una portada, fondo o logo elegidos en
+// otro dispositivo —o tras borrar los datos del navegador— no aparecían en el
+// dashboard, Películas, Continuar viendo ni en la ficha rápida, aunque
+// estuvieran guardados en la cuenta. Sin instantánea (sin sesión o primera
+// visita del dispositivo) se usa la copia local, como hasta ahora.
+const ARTWORK_KINDS = ["poster", "mobilePoster", "backdrop", "background", "logo"];
+
 export function getArtworkPreference(movieId, mediaType = "movie") {
-  if (typeof window === "undefined") {
-    return { poster: null, mobilePoster: null, backdrop: null, logo: null };
-  }
+  const empty = Object.fromEntries(ARTWORK_KINDS.map((kind) => [kind, null]));
+  if (typeof window === "undefined") return empty;
+
   const type = mediaType === "tv" ? "tv" : "movie";
-  const posterKey = `showverse:${type}:${movieId}:poster`;
+  const snapshot = readPersistedArtworkOverride({ type, id: movieId });
+  if (snapshot) {
+    return Object.fromEntries(
+      ARTWORK_KINDS.map((kind) => [kind, snapshot[kind] || null]),
+    );
+  }
+
   // La portada de la vista MÓVIL se elige aparte de la de escritorio (pestaña
   // "Portadas" de DetailsClient en móvil, kind `mobilePoster`). Es la que pinta
   // el hero de la ficha móvil y, por tanto, la ficha de teléfono del drawer.
-  const mobilePosterKey = `showverse:${type}:${movieId}:mobilePoster`;
-  const backdropKey = `showverse:${type}:${movieId}:backdrop`;
-  const logoKey = `showverse:${type}:${movieId}:logo`;
-  const poster = window.localStorage.getItem(posterKey);
-  const mobilePoster = window.localStorage.getItem(mobilePosterKey);
-  const backdrop = window.localStorage.getItem(backdropKey);
-  const logo = window.localStorage.getItem(logoKey);
-  return {
-    poster: poster || null,
-    mobilePoster: mobilePoster || null,
-    backdrop: backdrop || null,
-    logo: logo || null,
-  };
+  return Object.fromEntries(
+    ARTWORK_KINDS.map((kind) => [
+      kind,
+      readArtworkPreference(`showverse:${type}:${movieId}:${kind}`) || null,
+    ]),
+  );
 }
 
 export function pickBestBackdropByLangResVotes(list, opts = {}) {

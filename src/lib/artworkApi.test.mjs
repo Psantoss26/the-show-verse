@@ -8,6 +8,7 @@ import {
   readPersistedArtworkOverride,
   readPersistedArtworkOverrides,
   resolveCachedArtworkOverride,
+  saveArtworkOverride,
   shouldSkipRemoteArtwork,
   writeArtworkPreference
 } from './artworkApi.js'
@@ -204,4 +205,43 @@ test('artwork cache changes preserve other titles and remove empty entries', () 
   assert.deepEqual(reset.uiSettings.artworkOverrides, {
     'movie:1': { poster: '/one.jpg' }
   })
+})
+
+// fetch de mentira que devuelve los estados indicados, uno por llamada.
+function mockFetchStatuses(t, statuses) {
+  const calls = []
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    calls.push(JSON.parse(init.body))
+    const status = statuses[Math.min(calls.length - 1, statuses.length - 1)]
+    if (status === 'network') throw new TypeError('Failed to fetch')
+    return { ok: status >= 200 && status < 300, status }
+  })
+  t.mock.method(console, 'error', () => {})
+  return calls
+}
+
+test('a transient failure saving artwork is retried until the account keeps it', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const calls = mockFetchStatuses(t, ['network', 503, 200])
+
+  const saved = saveArtworkOverride({ type: 'tv', id: 7, kind: 'background', filePath: '/b.jpg' })
+  for (let i = 0; i < 20 && calls.length < 3; i += 1) {
+    await new Promise((resolve) => setImmediate(resolve))
+    t.mock.timers.tick(3000)
+  }
+
+  assert.equal(await saved, true)
+  assert.equal(calls.length, 3)
+  assert.deepEqual(calls[2].artworkChanges, [
+    { type: 'tv', id: 7, kind: 'background', filePath: '/b.jpg' }
+  ])
+})
+
+test('a rejected artwork save (4xx) is not retried', async (t) => {
+  const calls = mockFetchStatuses(t, [401])
+
+  const saved = await saveArtworkOverride({ type: 'movie', id: 1, kind: 'logo', filePath: '/l.png' })
+
+  assert.equal(saved, false)
+  assert.equal(calls.length, 1)
 })

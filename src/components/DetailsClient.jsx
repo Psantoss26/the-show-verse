@@ -2394,6 +2394,35 @@ export default function DetailsClient({
     artworkInitialized,
   ]);
 
+  // Backdrop de FONDO de la ficha.
+  //
+  // MISMO CRITERIO QUE DetailModal, y con la misma función: `pickHeroBackdropPath`
+  // (ver tmdbImages.js) resuelve selección del usuario -> mejor textless de la
+  // galería -> portada principal. Antes esta ruta usaba `resolveNeutralBackdropPath`
+  // —que ordena por ÁREA— y el modal ordenaba por ANCHO, así que para el mismo
+  // título la ficha y su vista previa podían enseñar imágenes distintas.
+  //
+  // `baseBackdropPath` ya NO entra como preferida: era el cálculo de la política
+  // anterior (`pickBestBackdropTVNeutralFirst` en la inicialización), y colarlo
+  // aquí como "preferido" mantenía viva justo la elección que se está sustituyendo.
+  const displayBackdropPath = useMemo(() => {
+    // Sin override remoto conocido todavía, no se elige un backdrop "por
+    // defecto" de la galería: se vería sustituido al llegar la selección del
+    // usuario. `selectedBackgroundPath` ya es seguro de usar en cuanto se
+    // conoce (caché local o respuesta remota), pase lo que pase con el resto.
+    if (!remoteArtworkChecked && !selectedBackgroundPath) return null;
+    return pickHeroBackdropPath({
+      backdropPath: data?.backdrop_path,
+      backdrops: imagesState?.backdrops,
+      preferredPaths: [selectedBackgroundPath],
+    });
+  }, [
+    imagesState?.backdrops,
+    selectedBackgroundPath,
+    data?.backdrop_path,
+    remoteArtworkChecked,
+  ]);
+
   // El cambio de modo de la portada es independiente de la pestaña «Vista
   // previa». Aquí se conserva la política localizada del póster (inglés antes
   // que cualquier fallback), que es la que siempre usó la ficha al alternar
@@ -2492,9 +2521,13 @@ export default function DetailsClient({
 
     const currentPreviewActive = selectedPreviewBackdropPath || previewFallback;
 
+    // Fondo: la MISMA ruta que pinta el hero de escritorio (ver
+    // `displayBackdropPath` y `heroBackgroundPath`). Antes se marcaba
+    // `baseBackdropPath || data.backdrop_path`, la política anterior que el
+    // fondo ya no usa, así que la galería señalaba una imagen distinta de la
+    // que se estaba viendo detrás de la ficha.
     const currentBackgroundActive =
-      (selectedBackgroundPath || baseBackdropPath || data?.backdrop_path) ??
-      null;
+      displayBackdropPath || data?.backdrop_path || null;
 
     const activePath = isLogoTab
       ? displayHeroLogoPath
@@ -2582,9 +2615,11 @@ export default function DetailsClient({
 
     const usable = filtered.length ? filtered : relaxed;
 
-    // Reordenar: en Vista previa, el backdrop activo va primero
+    // Reordenar: en TODAS las pestañas la imagen seleccionada va primero y el
+    // resto conserva su orden relativo (al elegir otra, la anterior vuelve a
+    // su sitio original, no se queda en cabeza).
     const ordered = (() => {
-      if (isBackdropTab && activePath && usable.length > 0) {
+      if (activePath && usable.length > 0) {
         const activeIdx = usable.findIndex((x) => x?.file_path === activePath);
         if (activeIdx > 0) {
           // Mover el activo al principio
@@ -2626,10 +2661,67 @@ export default function DetailsClient({
     displayHeroLogoPath,
     detailModalPreviewBackdropFallback,
     selectedPreviewBackdropPath,
-    selectedBackgroundPath,
-    baseBackdropPath,
+    displayBackdropPath,
     data?.backdrop_path,
   ]);
+
+  // REORDENACIÓN ANIMADA (FLIP) al elegir una imagen de la galería.
+  //
+  // La seleccionada pasa a ser la primera y el resto se desplaza un hueco. Sin
+  // animación, las tarjetas «saltaban» de sitio y la elegida desaparecía de la
+  // vista si el carrusel estaba desplazado. Al pulsar se fotografía la posición
+  // en pantalla de cada tarjeta (First); tras el re-render con el nuevo orden,
+  // el carrusel vuelve al inicio y se mide otra vez (Last). Cada tarjeta arranca
+  // desplazada a donde estaba (Invert) y se desliza a su sitio (Play). Al medir
+  // en coordenadas de pantalla, la vuelta al inicio del carrusel queda incluida
+  // en el mismo movimiento.
+  const artworkRowRef = useRef(null);
+  const artworkSwiperRef = useRef(null);
+  const artworkFlipRef = useRef(null);
+
+  const captureArtworkFlip = useCallback(() => {
+    const row = artworkRowRef.current;
+    if (!row) return;
+    const rects = new Map();
+    row.querySelectorAll("[data-artwork-path]").forEach((el) => {
+      rects.set(el.dataset.artworkPath, el.getBoundingClientRect());
+    });
+    artworkFlipRef.current = { rects, at: performance.now() };
+  }, []);
+
+  useLayoutEffect(() => {
+    const snapshot = artworkFlipRef.current;
+    if (!snapshot) return;
+    artworkFlipRef.current = null;
+    // Un clic que no cambia el orden (p. ej. la imagen ya activa) no debe
+    // animar un re-render posterior que no tenga nada que ver.
+    if (performance.now() - snapshot.at > 1000) return;
+
+    const swiper = artworkSwiperRef.current;
+    if (swiper && !swiper.destroyed) {
+      swiper.update?.();
+      swiper.slideTo?.(0, 0);
+    }
+
+    const row = artworkRowRef.current;
+    if (!row) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+
+    row.querySelectorAll("[data-artwork-path]").forEach((el) => {
+      const before = snapshot.rects.get(el.dataset.artworkPath);
+      if (!before) return;
+      const after = el.getBoundingClientRect();
+      const dx = before.left - after.left;
+      if (Math.abs(dx) < 1) return;
+      el.animate(
+        [
+          { transform: `translateX(${dx}px)` },
+          { transform: "translateX(0)" },
+        ],
+        { duration: 480, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
+      );
+    });
+  }, [artworkSelection.ordered]);
 
   // Precarga las primeras N imagenes de la fila actual.
   // No muestra el carrusel hasta que todas las imagenes visibles esten cargadas
@@ -3254,35 +3346,6 @@ export default function DetailsClient({
   // de calidad entre el hero de fondo y la tarjeta visible.
   const mobilePosterPath =
     isMobileViewport && !isBackdropPoster ? mobileNeutralPosterPath : null;
-
-  // Backdrop de FONDO de la ficha.
-  //
-  // MISMO CRITERIO QUE DetailModal, y con la misma función: `pickHeroBackdropPath`
-  // (ver tmdbImages.js) resuelve selección del usuario -> mejor textless de la
-  // galería -> portada principal. Antes esta ruta usaba `resolveNeutralBackdropPath`
-  // —que ordena por ÁREA— y el modal ordenaba por ANCHO, así que para el mismo
-  // título la ficha y su vista previa podían enseñar imágenes distintas.
-  //
-  // `baseBackdropPath` ya NO entra como preferida: era el cálculo de la política
-  // anterior (`pickBestBackdropTVNeutralFirst` en la inicialización), y colarlo
-  // aquí como "preferido" mantenía viva justo la elección que se está sustituyendo.
-  const displayBackdropPath = useMemo(() => {
-    // Sin override remoto conocido todavía, no se elige un backdrop "por
-    // defecto" de la galería: se vería sustituido al llegar la selección del
-    // usuario. `selectedBackgroundPath` ya es seguro de usar en cuanto se
-    // conoce (caché local o respuesta remota), pase lo que pase con el resto.
-    if (!remoteArtworkChecked && !selectedBackgroundPath) return null;
-    return pickHeroBackdropPath({
-      backdropPath: data?.backdrop_path,
-      backdrops: imagesState?.backdrops,
-      preferredPaths: [selectedBackgroundPath],
-    });
-  }, [
-    imagesState?.backdrops,
-    selectedBackgroundPath,
-    data?.backdrop_path,
-    remoteArtworkChecked,
-  ]);
 
   // ¿La portada que se muestra en móvil trae el título IMPRESO?
   //
@@ -9465,9 +9528,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         FIJA de abajo (hermana del contexto 3D), que no se mueve
                         con la inclinación y por tanto sí registra el clic. */}
                     <div className="pointer-events-none absolute inset-0 z-[15]">
+                      {/* Con la barra de "Viendo" en el pie del póster, el
+                          chip "Visto" del hover caería justo detrás de ella:
+                          se oculta mientras hay progreso en curso. */}
                       <StreamingHoverOverlay
                         provider={primaryStreamingProvider}
-                        watched={trakt.watched}
+                        watched={trakt.watched && inProgressPct == null}
                         mode="button"
                         part="visual"
                       />
@@ -10702,7 +10768,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                             <button
                               type="button"
-                              onClick={handleResetArtwork}
+                              onClick={() => {
+                                captureArtworkFlip();
+                                handleResetArtwork();
+                              }}
                               className="inline-flex isolate items-center justify-center w-10 h-10 md:w-11 md:h-11 rounded-2xl
         transition-all bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] transform-gpu
         text-red-400 hover:bg-red-500/20 hover:text-red-300 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)]"
@@ -11009,12 +11078,18 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           }
 
                           return (
-                            <div className="relative overflow-visible">
+                            <div
+                              ref={artworkRowRef}
+                              className="relative overflow-visible"
+                            >
                               {!artworkRowReady && loadingCarousel}
 
                               {artworkRowReady && (
                                 <DetailsArrowCarousel
                                   key={activeImagesTab}
+                                  onSwiper={(swiper) => {
+                                    artworkSwiperRef.current = swiper;
+                                  }}
                                   spaceBetween={12}
                                   slidesPerView={isBackdropLike ? 2 : 3}
                                   breakpoints={breakpoints}
@@ -11052,12 +11127,14 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     return (
                                       <SwiperSlide
                                         key={filePath}
+                                        data-artwork-path={filePath}
                                         className="h-full pt-1 pb-3"
                                       >
                                         <div
                                           role="button"
                                           tabIndex={0}
                                           onClick={() => {
+                                            if (!isActive) captureArtworkFlip();
                                             if (isLogoTab) {
                                               handleSelectLogo(filePath);
                                             } else if (isMobilePosterTab) {
@@ -11079,6 +11156,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                               e.key === " "
                                             ) {
                                               e.preventDefault();
+                                              if (!isActive) captureArtworkFlip();
                                               if (isLogoTab) {
                                                 handleSelectLogo(filePath);
                                               } else if (isMobilePosterTab) {
