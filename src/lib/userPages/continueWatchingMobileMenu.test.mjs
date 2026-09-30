@@ -16,10 +16,7 @@ const mobileMenu = continueWatchingPage.slice(
 );
 
 const sharedMobileMenuPatterns = [
-  /initial={{ height: 0 }}/,
-  /animate={{ height: "auto" }}/,
-  /exit={{ height: 0 }}/,
-  /transition={{ duration: 0\.28, ease: \[0\.16, 1, 0\.3, 1\] }}/,
+  /<MobileFiltersPanel\s+open={mobileFiltersOpen}/,
   /filtersSticky\s*\? "absolute left-0 right-0 top-full"\s*: "relative"/,
   /<div className="space-y-2">/,
 ];

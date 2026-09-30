@@ -47,6 +47,7 @@ import { pickBestBackdropByLangResVotes } from "@/lib/dashboard/media";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import HoverExpandCard from "@/components/ui/HoverExpandCard";
+import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 
 
 // ================== CONSTANTS ==================
@@ -2239,84 +2240,77 @@ export default function BibliotecaClient() {
 
           {/* En flujo antes de fijarse y como overlay cuando la barra ya está
               adherida al navbar móvil. */}
-          <div
-            className={`grid overflow-hidden transition-[grid-template-rows] duration-[280ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
-              mobileFiltersOpen ? "" : "pointer-events-none"
-            } lg:hidden z-[80] ${
-              filtersSticky
-                ? "absolute left-0 right-0"
-                : "relative mt-1"
+          <MobileFiltersPanel
+            open={mobileFiltersOpen}
+            className={`z-[80] lg:hidden ${
+              filtersSticky ? "absolute left-0 right-0" : "relative"
             }`}
-            style={{
-              gridTemplateRows: mobileFiltersOpen ? "1fr" : "0fr",
-              ...(filtersSticky ? { top: "calc(100% + 4px)" } : {}),
-            }}
+            style={filtersSticky ? { top: "calc(100% + 4px)" } : undefined}
+            // En flujo, el hueco de 4px que daba `mt-1` va dentro para que se anime.
+            gapClassName={filtersSticky ? "" : "pt-1"}
+            contentClassName="space-y-1 pt-1 pb-1"
           >
-            <div className="min-h-0">
-              <div className="space-y-1 pt-1 pb-1">
-                <div className="flex gap-2">
-                  <div className="flex-1">{renderTypeDropdown()}</div>
-                  <div className="flex-1">{renderResDropdown()}</div>
+            <div className="flex gap-2">
+              <div className="flex-1">{renderTypeDropdown()}</div>
+              <div className="flex-1">{renderResDropdown()}</div>
+            </div>
+            <div className="flex gap-2">
+              <div className="flex-1">{renderSortDropdown()}</div>
+              <div className="flex-1">{renderGroupDropdown()}</div>
+            </div>
+            <div className="flex gap-2">
+              <div className="flex-1 flex gap-2">
+                <div className="flex rounded-2xl p-1 h-11 items-center flex-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("list")}
+                    className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${viewMode === "list" ? "bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/20" : "text-zinc-400 hover:text-white hover:bg-white/10"}`}
+                    title="Lista"
+                  >
+                    <LayoutList className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("compact")}
+                    className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${viewMode === "compact" ? "bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/20" : "text-zinc-400 hover:text-white hover:bg-white/10"}`}
+                    title="Compacta"
+                  >
+                    <Grid3x3 className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("grid")}
+                    className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${viewMode === "grid" ? "bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/20" : "text-zinc-400 hover:text-white hover:bg-white/10"}`}
+                    title="Grid"
+                  >
+                    <LayoutGrid className="w-4 h-4" />
+                  </button>
                 </div>
-                <div className="flex gap-2">
-                  <div className="flex-1">{renderSortDropdown()}</div>
-                  <div className="flex-1">{renderGroupDropdown()}</div>
-                </div>
-                <div className="flex gap-2">
-                  <div className="flex-1 flex gap-2">
-                    <div className="flex rounded-2xl p-1 h-11 items-center flex-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-                      <button
-                        type="button"
-                        onClick={() => setViewMode("list")}
-                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${viewMode === "list" ? "bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/20" : "text-zinc-400 hover:text-white hover:bg-white/10"}`}
-                        title="Lista"
-                      >
-                        <LayoutList className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setViewMode("compact")}
-                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${viewMode === "compact" ? "bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/20" : "text-zinc-400 hover:text-white hover:bg-white/10"}`}
-                        title="Compacta"
-                      >
-                        <Grid3x3 className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setViewMode("grid")}
-                        className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${viewMode === "grid" ? "bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/20" : "text-zinc-400 hover:text-white hover:bg-white/10"}`}
-                        title="Grid"
-                      >
-                        <LayoutGrid className="w-4 h-4" />
-                      </button>
-                    </div>
-                    {viewMode !== "list" && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setImageMode(
-                            imageMode === "poster" ? "backdrop" : "poster",
-                          )
-                        }
-                        className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${imageMode === "backdrop" ? "text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.3)]" : "text-zinc-200 hover:bg-black/30"}`}
-                        title={
-                          imageMode === "poster"
-                            ? "Cambiar a Backdrop"
-                            : "Cambiar a Poster"
-                        }
-                      >
-                        {imageMode === "poster" ? (
-                          <PosterGlyph className="w-4 h-4" />
-                        ) : (
-                          <BackdropGlyph className="w-4 h-4" />
-                        )}
-                      </button>
+                {viewMode !== "list" && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setImageMode(
+                        imageMode === "poster" ? "backdrop" : "poster",
+                      )
+                    }
+                    className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${imageMode === "backdrop" ? "text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.3)]" : "text-zinc-200 hover:bg-black/30"}`}
+                    title={
+                      imageMode === "poster"
+                        ? "Cambiar a Backdrop"
+                        : "Cambiar a Poster"
+                    }
+                  >
+                    {imageMode === "poster" ? (
+                      <PosterGlyph className="w-4 h-4" />
+                    ) : (
+                      <BackdropGlyph className="w-4 h-4" />
                     )}
-                  </div>
-                </div>
+                  </button>
+                )}
               </div>
             </div>
-          </div>
+          </MobileFiltersPanel>
 
           {/* Desktop filters */}
           <div className="hidden lg:flex gap-3 relative z-10">

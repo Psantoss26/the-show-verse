@@ -59,6 +59,7 @@ import {
   preloadImage,
 } from "@/lib/dashboard/media";
 import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
+import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 
 // Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
 // el mismo escalón que `w1280` en los backdrops. Antes era `w500` y en
@@ -1134,152 +1135,145 @@ export default function ContinueWatchingClient() {
               </button>
             </div>
 
-            <AnimatePresence>
-              {mobileFiltersOpen && (
-                <motion.div
-                  id="continue-watching-mobile-filters"
-                  initial={{ height: 0 }}
-                  animate={{ height: "auto" }}
-                  exit={{ height: 0 }}
-                  transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                  className={`z-[80] mt-2 origin-top overflow-hidden ${filtersSticky
-                    ? "absolute left-0 right-0 top-full"
-                    : "relative"
-                    }`}
-                >
-                  <div className="space-y-2">
-                    {/* Fila 1: Ordenar y acciones de añadir y eliminar. */}
-                    <div className="flex gap-2">
-                      <div className="flex-1 min-w-0">
-                        <InlineDropdown
-                          label="Ordenar"
-                          valueLabel={sortLabels[sortBy]}
-                          icon={ArrowUpDown}
-                        >
-                          {({ close }) => (
-                            <>
-                              {Object.entries(sortLabels).map(([key, label]) => (
-                                <DropdownItem
-                                  key={key}
-                                  active={sortBy === key}
-                                  onClick={() => {
-                                    setSortBy(key);
-                                    close();
-                                  }}
-                                >
-                                  {label}
-                                </DropdownItem>
-                              ))}
-                            </>
-                          )}
-                        </InlineDropdown>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={openAddModal}
-                        title="Añadir título"
-                        aria-label="Añadir título a Continuar viendo"
-                        className="h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl text-zinc-200 transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg hover:bg-black/30 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditMode((v) => !v)}
-                        title={
-                          editMode ? "Salir del modo borrar" : "Quitar títulos"
-                        }
-                        aria-label={
-                          editMode ? "Salir del modo borrar" : "Quitar títulos"
-                        }
-                        aria-pressed={editMode}
-                        className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${editMode
-                          ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
-                          : "text-zinc-200 hover:bg-black/30"
-                          }`}
-                      >
-                        {editMode ? (
-                          <X className="w-4 h-4" />
-                        ) : (
-                          <Trash2 className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
-
-                    {/* Fila 2: Tipo y modos de vista compactos. */}
-                    <div className="flex gap-2">
-                      <div className="flex-1 min-w-0">
-                        <InlineDropdown
-                          label="Tipo"
-                          valueLabel={typeLabels[typeFilter]}
-                          icon={Film}
-                        >
-                          {({ close }) => (
-                            <>
-                              {Object.entries(typeLabels).map(([key, label]) => (
-                                <DropdownItem
-                                  key={key}
-                                  active={typeFilter === key}
-                                  onClick={() => {
-                                    setTypeFilter(key);
-                                    close();
-                                  }}
-                                >
-                                  {label}
-                                </DropdownItem>
-                              ))}
-                            </>
-                          )}
-                        </InlineDropdown>
-                      </div>
-
-                      <div className="inline-flex h-11 shrink-0 items-center gap-1 rounded-2xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-                        <button
-                          type="button"
-                          onClick={() => setViewMode("cards")}
-                          title="Vista de tarjetas"
-                          aria-label="Vista de tarjetas"
-                          aria-pressed={viewMode === "cards"}
-                          className={`flex h-full items-center justify-center rounded-lg px-2.5 text-sm font-bold transition-all ${viewMode === "cards"
-                            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                            : "text-zinc-400 hover:text-white hover:bg-white/10"
-                            }`}
-                        >
-                          <Film className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setViewMode("poster")}
-                          title="Vista de portadas"
-                          aria-label="Vista de portadas"
-                          aria-pressed={viewMode === "poster"}
-                          className={`flex h-full items-center justify-center rounded-lg px-2.5 text-sm font-bold transition-all ${viewMode === "poster"
-                            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                            : "text-zinc-400 hover:text-white hover:bg-white/10"
-                            }`}
-                        >
-                          <LayoutGrid className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setViewMode("compact")}
-                          title="Vista compacta"
-                          aria-label="Vista compacta"
-                          aria-pressed={viewMode === "compact"}
-                          className={`flex h-full items-center justify-center rounded-lg px-2.5 text-sm font-bold transition-all ${viewMode === "compact"
-                            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                            : "text-zinc-400 hover:text-white hover:bg-white/10"
-                            }`}
-                        >
-                          <LayoutList className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
+            <MobileFiltersPanel
+              open={mobileFiltersOpen}
+              id="continue-watching-mobile-filters"
+              className={`z-[80] ${
+                filtersSticky ? "absolute left-0 right-0 top-full" : "relative"
+              }`}
+              gapClassName="pt-2"
+            >
+              <div className="space-y-2">
+                {/* Fila 1: Ordenar y acciones de añadir y eliminar. */}
+                <div className="flex gap-2">
+                  <div className="flex-1 min-w-0">
+                    <InlineDropdown
+                      label="Ordenar"
+                      valueLabel={sortLabels[sortBy]}
+                      icon={ArrowUpDown}
+                    >
+                      {({ close }) => (
+                        <>
+                          {Object.entries(sortLabels).map(([key, label]) => (
+                            <DropdownItem
+                              key={key}
+                              active={sortBy === key}
+                              onClick={() => {
+                                setSortBy(key);
+                                close();
+                              }}
+                            >
+                              {label}
+                            </DropdownItem>
+                          ))}
+                        </>
+                      )}
+                    </InlineDropdown>
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+
+                  <button
+                    type="button"
+                    onClick={openAddModal}
+                    title="Añadir título"
+                    aria-label="Añadir título a Continuar viendo"
+                    className="h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl text-zinc-200 transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg hover:bg-black/30 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditMode((v) => !v)}
+                    title={
+                      editMode ? "Salir del modo borrar" : "Quitar títulos"
+                    }
+                    aria-label={
+                      editMode ? "Salir del modo borrar" : "Quitar títulos"
+                    }
+                    aria-pressed={editMode}
+                    className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${editMode
+                      ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
+                      : "text-zinc-200 hover:bg-black/30"
+                      }`}
+                  >
+                    {editMode ? (
+                      <X className="w-4 h-4" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+
+                {/* Fila 2: Tipo y modos de vista compactos. */}
+                <div className="flex gap-2">
+                  <div className="flex-1 min-w-0">
+                    <InlineDropdown
+                      label="Tipo"
+                      valueLabel={typeLabels[typeFilter]}
+                      icon={Film}
+                    >
+                      {({ close }) => (
+                        <>
+                          {Object.entries(typeLabels).map(([key, label]) => (
+                            <DropdownItem
+                              key={key}
+                              active={typeFilter === key}
+                              onClick={() => {
+                                setTypeFilter(key);
+                                close();
+                              }}
+                            >
+                              {label}
+                            </DropdownItem>
+                          ))}
+                        </>
+                      )}
+                    </InlineDropdown>
+                  </div>
+
+                  <div className="inline-flex h-11 shrink-0 items-center gap-1 rounded-2xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("cards")}
+                      title="Vista de tarjetas"
+                      aria-label="Vista de tarjetas"
+                      aria-pressed={viewMode === "cards"}
+                      className={`flex h-full items-center justify-center rounded-lg px-2.5 text-sm font-bold transition-all ${viewMode === "cards"
+                        ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                        : "text-zinc-400 hover:text-white hover:bg-white/10"
+                        }`}
+                    >
+                      <Film className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("poster")}
+                      title="Vista de portadas"
+                      aria-label="Vista de portadas"
+                      aria-pressed={viewMode === "poster"}
+                      className={`flex h-full items-center justify-center rounded-lg px-2.5 text-sm font-bold transition-all ${viewMode === "poster"
+                        ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                        : "text-zinc-400 hover:text-white hover:bg-white/10"
+                        }`}
+                    >
+                      <LayoutGrid className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("compact")}
+                      title="Vista compacta"
+                      aria-label="Vista compacta"
+                      aria-pressed={viewMode === "compact"}
+                      className={`flex h-full items-center justify-center rounded-lg px-2.5 text-sm font-bold transition-all ${viewMode === "compact"
+                        ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                        : "text-zinc-400 hover:text-white hover:bg-white/10"
+                        }`}
+                    >
+                      <LayoutList className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </MobileFiltersPanel>
           </div>
 
           {/* Escritorio: Fila única */}
