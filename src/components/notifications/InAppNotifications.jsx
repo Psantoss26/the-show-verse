@@ -52,7 +52,6 @@ import {
   isRecentLocalAction,
   resolveTitleArt,
 } from "@/lib/notifications/actionFeedbackClient";
-import { syncDevicePush } from "@/lib/notifications/devicePush";
 import { getActivityDetailsHref } from "@/lib/profile/activityRatingTarget";
 
 // VENTANAS EMERGENTES de la app: el único sitio donde se avisa de algo mientras
@@ -294,18 +293,13 @@ export default function InAppNotifications() {
     return () => window.removeEventListener(TOAST_EVENT, onToast);
   }, [accountId, push]);
 
-  // Registrar de nuevo el dispositivo con esta cuenta, si ya tenía push.
+  // Cambio de cuenta: se descartan los avisos de la anterior.
   useEffect(() => {
     if (!accountId) {
       setToasts([]);
-      return undefined;
+      return;
     }
     openedAtRef.current = new Date().toISOString();
-    syncDevicePush().catch(() => {});
-    // App de Android: FCM renovó el token con la app abierta.
-    const onToken = () => syncDevicePush().catch(() => {});
-    window.addEventListener("tsv:push-token", onToken);
-    return () => window.removeEventListener("tsv:push-token", onToken);
   }, [accountId]);
 
   // Mensajes push con la app a la vista.

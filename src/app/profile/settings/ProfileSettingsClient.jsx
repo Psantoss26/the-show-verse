@@ -40,12 +40,6 @@ import AndroidSyncPanel from "@/components/settings/AndroidSyncPanel";
 import { pairDevice, readSyncStatus, useSyncStatus } from "@/lib/android/appBridge";
 import { useTranslation } from "@/lib/i18n";
 import {
-  disableDevicePush,
-  enableDevicePush,
-  getDevicePushState,
-  sendTestPush,
-} from "@/lib/notifications/devicePush";
-import {
   getPlexConnection,
   clearPlexConnectionCache,
   connectPlexInteractive,
@@ -224,90 +218,6 @@ function ToggleRow({ icon: Icon, title, description, checked, disabled: disabled
           }`}
         />
       </button>
-    </div>
-  );
-}
-
-// Notificaciones del dispositivo (con la app cerrada): Web Push en el navegador
-// y FCM en la app de Android. Con la app abierta los avisos salen dentro como
-// ventana emergente, tengan esto activo o no.
-function DeviceNotificationsRow() {
-  const [state, setState] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
-
-  const refresh = useCallback(() => {
-    getDevicePushState()
-      .then(setState)
-      .catch(() => setState({ kind: null, permission: "denied", enabled: false }));
-  }, []);
-
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  const toggle = async (next) => {
-    setBusy(true);
-    setMessage("");
-    try {
-      if (next) await enableDevicePush();
-      else await disableDevicePush();
-    } catch (err) {
-      setMessage(err?.message || "No se pudo cambiar.");
-    } finally {
-      setBusy(false);
-      refresh();
-    }
-  };
-
-  const test = async () => {
-    setBusy(true);
-    setMessage("");
-    try {
-      await sendTestPush();
-      setMessage("Prueba enviada. Si la app está a la vista, la verás aquí dentro.");
-    } catch (err) {
-      setMessage(err?.message || "No se pudo enviar la prueba.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const description = !state
-    ? "Comprobando…"
-    : !state.kind
-      ? "Este navegador no admite notificaciones."
-      : state.permission === "denied" && !state.enabled
-        ? "Bloqueadas: actívalas en los permisos del navegador o del sistema."
-        : "Avisos de lo sincronizado, lo terminado y lo que falta por puntuar, aunque la app esté cerrada.";
-
-  return (
-    <div className="space-y-2">
-      <ToggleRow
-        icon={Bell}
-        title="Notificaciones en este dispositivo"
-        description={description}
-        checked={Boolean(state?.enabled)}
-        disabled={busy || !state?.kind || (state.permission === "denied" && !state.enabled)}
-        onChange={toggle}
-      />
-      {state?.enabled ? (
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={test}
-            disabled={busy}
-            className="rounded-full bg-white/10 px-4 py-1.5 text-xs font-bold text-white transition hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:opacity-60"
-          >
-            Enviar prueba
-          </button>
-        </div>
-      ) : null}
-      {message ? (
-        <p role="status" className="px-1 text-xs text-zinc-400">
-          {message}
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -2107,7 +2017,6 @@ function ProfileSettingsClient() {
                       onClick={() => setShowAccountSecurityModal(true)}
                     />
                     <OfflineStorageStatus panelClassName={GLASS_PANEL} />
-                    <DeviceNotificationsRow />
                   </div>
 
                   <div className="flex flex-col gap-4">
