@@ -186,7 +186,11 @@ function Toast({ toast, onClose, onOpen }) {
       onPointerLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
-      className={`pointer-events-auto relative overflow-hidden rounded-[1.25rem] text-white md:rounded-[1.75rem] ${LIQUID_GLASS_PANEL}`}
+      // RADIOS CONCÉNTRICOS: el borde del cartel = radio del icono/póster +
+      // el relleno que los separa, para que ambas curvas vayan paralelas.
+      // Móvil: 6px (rounded-md) + 6px (p-1.5) = 12px. Escritorio: 12px
+      // (rounded-xl) + 10px (p-2.5) = 22px. Si cambia uno, cambian los tres.
+      className={`pointer-events-auto relative overflow-hidden rounded-[12px] text-white md:rounded-[22px] ${LIQUID_GLASS_PANEL}`}
     >
       {/* Reflejo del color de la acción detrás del cartel. */}
       <span
@@ -198,7 +202,7 @@ function Toast({ toast, onClose, onOpen }) {
           <button
             type="button"
             onClick={() => onOpen(toast)}
-            className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl text-left md:gap-3 md:rounded-2xl transition-colors hover:bg-white/[0.04] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+            className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md text-left md:gap-3 md:rounded-xl transition-colors hover:bg-white/[0.04] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
           >
             {body}
           </button>
