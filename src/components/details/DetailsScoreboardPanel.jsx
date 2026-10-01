@@ -315,7 +315,7 @@ export function DetailsStatsRow({
   const showTrailing = Boolean(trailing) && !phone;
   if (!hasCustomStats && !hasStats && !pending && !showTrailing) return null;
   const trailingNode = showTrailing ? (
-    <div className={`ml-auto hidden items-center sm:flex ${compactTrailing ? "min-w-[42px] max-w-[166px] flex-1" : "shrink-0"}`}>{trailing}</div>
+    <div className={`ml-auto hidden items-center sm:flex ${compactTrailing ? "min-w-[42px] flex-1" : "shrink-0"}`}>{trailing}</div>
   ) : null;
 
   // Teléfono: una sola fila que se desplaza, sin etiquetas. Los `sm:`/`md:`
