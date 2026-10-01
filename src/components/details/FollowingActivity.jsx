@@ -32,7 +32,6 @@ import { LIQUID_GLASS_SURFACE_CARD } from "@/lib/ui/liquidGlass";
 import {
   activityMarks,
   episodeLabel,
-  formatScore,
   primaryMark,
   relativeTime,
   summaryChips,
@@ -91,29 +90,29 @@ export function hasFollowingActivity(data) {
 
 // Mismo lenguaje de iconos que la actividad del perfil (ProfileSection
 // ActivityRow) y que el menú: visto = ojo verde, en progreso = play, terminada
-// = check, pendiente = marcador azul relleno, favorito = corazón rojo relleno,
+// = check, pendiente = marcador azul, favorito = corazón rojo relleno,
 // lista = violeta y la nota como número ámbar, sin estrella.
 const MARKS = {
-  watched: { icon: Eye, tone: "text-emerald-300" },
-  watching: { icon: Play, tone: "text-emerald-300", fill: true },
-  completed: { icon: CheckCircle2, tone: "text-emerald-300" },
-  watchlist: { icon: BookmarkPlus, tone: "text-sky-300", fill: true },
-  favorite: { icon: Heart, tone: "text-red-300", fill: true },
-  list: { icon: ListPlus, tone: "text-violet-300" },
+  watched: { icon: Eye, tone: "text-emerald-400" },
+  watching: { icon: Play, tone: "text-emerald-400", fill: true },
+  completed: { icon: CheckCircle2, tone: "text-emerald-400" },
+  watchlist: { icon: BookmarkPlus, tone: "text-sky-400" },
+  favorite: { icon: Heart, tone: "text-red-500", fill: true },
+  list: { icon: ListPlus, tone: "text-violet-400" },
 };
 
 /** Icono de una marca. `size` en clases de Tailwind para el icono. */
 function MarkIcon({ mark, iconClassName = "h-4 w-4", ratingClassName = "text-base" }) {
   if (mark.id === "rating") {
     return (
-      <span className={`font-black leading-none tabular-nums text-amber-300 ${ratingClassName}`} aria-hidden="true">
+      <span className={`font-black leading-none tabular-nums text-amber-400 ${ratingClassName}`} aria-hidden="true">
         {mark.value}
       </span>
     );
   }
   const def = MARKS[mark.id] || MARKS.watched;
   const Icon = def.icon;
-  return <Icon aria-hidden="true" className={`${iconClassName} ${def.tone} ${def.fill ? "fill-current" : ""}`} />;
+  return <Icon aria-hidden="true" strokeWidth={2.5} className={`shrink-0 ${iconClassName} ${def.tone} ${def.fill ? "fill-current" : ""}`} />;
 }
 
 function PersonAvatar({ user, className = "h-8 w-8" }) {
@@ -205,7 +204,7 @@ export function FollowingActivityStrip({ data, onOpen, className = "" }) {
         {chips.length ? (
           <span className="mt-0.5 flex flex-wrap gap-x-2.5 gap-y-0.5 text-xs text-zinc-300">
             {chips.map((chip) => (
-              <span key={chip.id} className={chip.id === "rating" ? "font-black tabular-nums text-amber-300" : ""}>
+              <span key={chip.id} className={chip.id === "rating" ? "font-black tabular-nums text-amber-400" : ""}>
                 {chip.label}
                 {chip.hint ? <span className="font-normal text-zinc-400"> {chip.hint}</span> : null}
               </span>
@@ -225,7 +224,7 @@ function ReviewQuote({ review }) {
   const [revealed, setRevealed] = useState(!review.spoiler);
   return (
     <figure className="mt-3 rounded-2xl bg-black/25 p-3">
-      <MessageSquareQuote aria-hidden="true" className="mb-1.5 h-4 w-4 text-violet-300" />
+      <MessageSquareQuote aria-hidden="true" strokeWidth={2.5} className="mb-1.5 h-4 w-4 text-violet-400" />
       <blockquote className="relative">
         <p className={`whitespace-pre-line text-sm leading-relaxed text-zinc-200 ${revealed ? "" : "select-none blur-[5px]"}`} aria-hidden={!revealed}>
           {review.body}
@@ -279,12 +278,12 @@ function PersonCard({ item, mediaType }) {
             perfil). Cada icono lleva su texto para lectores de pantalla y en el
             tooltip. */}
         {marks.length ? (
-          <ul className="flex shrink-0 items-center gap-2.5" aria-label="Su actividad con este título">
+          <ul className="flex shrink-0 items-center gap-2.5 [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.65))]" aria-label="Su actividad con este título">
             {marks.map((mark) => (
               <li key={mark.id} className="relative flex items-center" title={mark.label}>
                 <MarkIcon mark={mark} iconClassName="h-5 w-5" ratingClassName="text-xl" />
                 {mark.count ? (
-                  <span className="ml-0.5 text-[11px] font-bold tabular-nums text-emerald-300" aria-hidden="true">×{mark.count}</span>
+                  <span className="ml-0.5 text-[11px] font-bold tabular-nums text-emerald-400" aria-hidden="true">×{mark.count}</span>
                 ) : null}
                 <span className="sr-only">{mark.label}</span>
               </li>
@@ -330,7 +329,7 @@ function PersonCard({ item, mediaType }) {
 
       {item.lists?.length ? (
         <p className="relative z-10 mt-3 flex items-center gap-1.5 truncate text-xs text-zinc-400">
-          <ListVideo aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-violet-300" />
+          <ListVideo aria-hidden="true" strokeWidth={2.5} className="h-3.5 w-3.5 shrink-0 text-violet-400" />
           <span className="truncate">{item.lists.map((list) => `«${list.name}»`).join(", ")}</span>
         </p>
       ) : null}
@@ -345,12 +344,6 @@ export function FollowingActivitySection({ data, mediaType }) {
   const visible = showAll ? data.items : data.items.slice(0, 6);
   return (
     <>
-      <p className="-mt-5 mb-6 text-sm text-zinc-400">
-        {summarySentence(data)}.
-        {data.summary?.averageRating != null ? (
-          <> Nota media de tu círculo: <strong className="font-black tabular-nums text-amber-300">{formatScore(data.summary.averageRating)}</strong>.</>
-        ) : null}
-      </p>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {visible.map((item) => (
           <PersonCard key={item.user.username} item={item} mediaType={mediaType} />

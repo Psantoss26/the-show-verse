@@ -828,12 +828,12 @@ function ActivityReview({ item, actor, compact = false, posterList = false }) {
 
 function ActivityRow({ item, actor, compact = false, posterList = false }) {
   const definitions = {
-    watched: { icon: Eye, tone: "text-emerald-300", text: "ha visto" },
-    watchlist: { icon: BookmarkPlus, tone: "text-sky-300", text: "ha añadido a Pendientes" },
-    favorite: { icon: Heart, tone: "text-red-300", text: "ha añadido a Favoritos" },
-    rating: { tone: "text-amber-300", text: "ha puntuado" },
-    list: { icon: ListPlus, tone: "text-violet-300", text: "ha creado la lista" },
-    list_item: { icon: ListPlus, tone: "text-violet-300", text: "ha añadido a una lista" },
+    watched: { icon: Eye, tone: "text-emerald-400", text: "ha visto" },
+    watchlist: { icon: BookmarkPlus, tone: "text-sky-400", text: "ha añadido a Pendientes" },
+    favorite: { icon: Heart, tone: "text-red-500", text: "ha añadido a Favoritos" },
+    rating: { tone: "text-amber-400", text: "ha puntuado" },
+    list: { icon: ListPlus, tone: "text-violet-400", text: "ha creado la lista" },
+    list_item: { icon: ListPlus, tone: "text-violet-400", text: "ha añadido a una lista" },
   };
   const definition = definitions[item.type] || definitions.watched;
   const Icon = definition.icon;
@@ -855,12 +855,12 @@ function ActivityRow({ item, actor, compact = false, posterList = false }) {
         <ActivityAvatar actor={actor} />
       )}
       {item.type === "rating" ? (
-        <span className={`flex h-8 w-8 shrink-0 items-center justify-center text-xl font-black leading-none tabular-nums ${definition.tone}`} aria-hidden="true">
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center text-xl font-black leading-none tabular-nums [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.65))] ${definition.tone}`} aria-hidden="true">
           {item.rating}
         </span>
       ) : (
-        <span className={`flex h-8 w-8 shrink-0 items-center justify-center ${definition.tone}`} aria-hidden="true">
-          <Icon className={`h-5 w-5 ${item.type === "favorite" || item.type === "watchlist" ? "fill-current" : ""}`} />
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.65))] ${definition.tone}`} aria-hidden="true">
+          <Icon strokeWidth={2.5} className={`h-5 w-5 ${item.type === "favorite" ? "fill-current" : ""}`} />
         </span>
       )}
       <p className="min-w-0 flex-1 text-sm leading-5 text-zinc-400">
