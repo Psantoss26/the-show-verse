@@ -22,6 +22,7 @@ import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import LevelBadge from "@/components/level/LevelBadge";
 import LevelProgress from "@/components/level/LevelProgress";
 import LevelPanel from "@/components/level/LevelPanel";
+import { formatXp } from "@/lib/level/tiers.mjs";
 import RecapPromoBanner from "@/components/recap/RecapPromoBanner";
 import RecapPreviewCard from "@/components/recap/RecapPreviewCard";
 import ProfileSection from "./ProfileSection";
@@ -1527,19 +1528,33 @@ function ProfileLevelSidebar({ level, username, routeBase, onNavigate }) {
         scroll={false}
         onClick={goToLevel}
         data-offline-local-nav="true"
-        className="block rounded-2xl bg-zinc-900/40 p-4 shadow-sm transition-colors hover:bg-zinc-900/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70"
+        className="block rounded-2xl bg-zinc-900/40 px-3.5 py-3 shadow-sm transition-colors hover:bg-zinc-900/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70"
         title={`Nivel ${level.level} · ${level.tier?.name || ""}`}
       >
-        <LevelBadge level={level.level} tier={level.tier} size="md" showTierName />
+        {/* Compacto: insignia y rango a la izquierda, la XP actual a la derecha
+            en la misma fila; debajo la barra y, al final, los logros. */}
+        <div className="flex items-center justify-between gap-3">
+          <LevelBadge level={level.level} tier={level.tier} size="md" showTierName />
+          <div className="min-w-0 text-right">
+            <p className="text-lg font-black leading-none tabular-nums tracking-tight text-white">
+              {formatXp(level.xp)} <span className="text-[11px] font-bold text-zinc-400">XP</span>
+            </p>
+            <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+              {level.isMax ? "Nivel máximo" : `${formatXp(level.xpToNextLevel)} para el ${Number(level.level) + 1}`}
+            </p>
+          </div>
+        </div>
         <LevelProgress
-          className="mt-4"
+          className="mt-2.5"
           level={level.level}
           tier={level.tier}
           progress={level}
           xp={level.xp}
+          showLabels={false}
+          barClassName="h-1.5"
         />
         {totalAchievements > 0 && (
-          <p className="mt-3 border-t border-white/[0.06] pt-3 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+          <p className="mt-2 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
             {level.achievementsUnlocked} de {totalAchievements} logros
             {streak > 0 && ` · racha de ${streak} d`}
           </p>
