@@ -65,6 +65,7 @@ import {
   ThumbsUp,
   Trophy,
   Users,
+  UsersRound,
 } from "lucide-react";
 
 import OptimizedImage from "@/components/OptimizedImage";
@@ -113,6 +114,10 @@ import {
   saveArtworkOverrides,
 } from "@/lib/artworkApi";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
+import {
+  FollowingActivitySection,
+  hasFollowingActivity,
+} from "@/components/details/FollowingActivity";
 
 // El menú se pega por debajo de los controles flotantes del panel (cerrar,
 // acoplar, ficha completa): están en `top-4` y miden 40px, así que 56px es
@@ -222,6 +227,9 @@ export default function PhoneDetailsSections({
   episodesWatched,
   imdbId,
   canLikeComments = false,
+  followingActivity,
+  canAccessFollowingActivity = false,
+  followingActivityPhoneLayout = false,
   onOpenSeason,
   onArtworkSelection,
   soundtrack,
@@ -936,6 +944,16 @@ export default function PhoneDetailsSections({
       items.push({ id: "seasons", label: "Temporadas", icon: Layers });
       items.push({ id: "episodes", label: "Episodios", icon: BarChart3 });
     }
+    if (canAccessFollowingActivity) {
+      items.push({
+        id: "following",
+        label: "Amigos",
+        icon: UsersRound,
+        count: hasFollowingActivity(followingActivity)
+          ? followingActivity.items.length
+          : undefined,
+      });
+    }
     items.push({
       id: "comments",
       label: "Comentarios",
@@ -963,6 +981,8 @@ export default function PhoneDetailsSections({
     images?.logos?.length,
     videos.length,
     type,
+    canAccessFollowingActivity,
+    followingActivity,
   ]);
 
   return (
@@ -1888,6 +1908,22 @@ export default function PhoneDetailsSections({
                     density="compact"
                   />
                 )}
+              </section>
+            </AnimatedSection>
+          </section>
+        )}
+
+        {canAccessFollowingActivity && (
+          <section className="sv-phone-section" id="phone-section-following" ref={registerSection("following")}>
+            <AnimatedSection delay={0.04} renderImmediately>
+              <section className="group/section">
+                <SectionTitle title="Tus amigos" icon={UsersRound} />
+                <FollowingActivitySection
+                  data={followingActivity}
+                  mediaType={type}
+                  loading={!followingActivity}
+                  phoneLayout={followingActivityPhoneLayout}
+                />
               </section>
             </AnimatedSection>
           </section>

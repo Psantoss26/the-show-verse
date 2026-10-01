@@ -7493,8 +7493,9 @@ export default function DetailsClient({
 
   // Actividad de las cuentas que sigues con este título ("Tus amigos"). Solo
   // con sesión; sin nadie que mostrar, ni franja ni sección.
+  const canAccessFollowingActivity = authenticated || hasBackendSession;
   const followingActivity = useFollowingActivity(type, id, {
-    enabled: authenticated,
+    enabled: canAccessFollowingActivity,
   });
   const showFollowingActivity = hasFollowingActivity(followingActivity);
 
@@ -7583,13 +7584,14 @@ export default function DetailsClient({
       });
     }
 
-    // Tus amigos: va justo antes de Comentarios y Listas, en el bloque social.
-    if (showFollowingActivity) {
+    // Tus amigos aparece junto con el resto del menú para una sesión activa;
+    // la sección resuelve después su estado de carga, actividad o vacío.
+    if (canAccessFollowingActivity) {
       items.push({
         id: "following",
         label: "Amigos",
         icon: UsersRound,
-        count: followingActivity.items.length,
+        count: showFollowingActivity ? followingActivity.items.length : undefined,
       });
     }
 
@@ -7629,6 +7631,7 @@ export default function DetailsClient({
     collectionLoading,
     awardItems,
     awardsLoading,
+    canAccessFollowingActivity,
     showFollowingActivity,
     followingActivity,
   ]);
@@ -7647,6 +7650,7 @@ export default function DetailsClient({
   const pendingSectionRef = useRef(null);
   const pendingSectionTimerRef = useRef(null);
   const pendingScrollEndCleanupRef = useRef(null);
+  const followingHashHandledRef = useRef(false);
 
   const [menuCompact, setMenuCompact] = useState(() => restoredValue(backSnapshot, "menuCompact", false));
   const [menuH, setMenuH] = useState(() => restoredValue(backSnapshot, "menuH", 0));
@@ -7815,6 +7819,21 @@ export default function DetailsClient({
     },
     [menuH, STICKY_TOP],
   );
+
+  useEffect(() => {
+    followingHashHandledRef.current = false;
+  }, [id]);
+
+  // Los accesos desde DetailModal llegan a la ficha completa con este hash.
+  // La actividad se pide en cliente y puede montar después del primer render;
+  // esperamos a que exista para aplicar el mismo scroll compensado del menú.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.location.hash !== "#section-following") return;
+    if (!showFollowingActivity || followingHashHandledRef.current) return;
+    followingHashHandledRef.current = true;
+    window.requestAnimationFrame(() => scrollToSection("following"));
+  }, [showFollowingActivity, scrollToSection]);
 
   // Scroll-spy (qué sección está “activa”)
   useEffect(() => {
@@ -12059,7 +12078,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   </section>
                 )}
 
-                {showFollowingActivity && (
+                {canAccessFollowingActivity && (
                   <section
                     id="section-following"
                     ref={registerSection("following")}
@@ -12073,6 +12092,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         <FollowingActivitySection
                           data={followingActivity}
                           mediaType={type}
+                          loading={!followingActivity}
                         />
                       </section>
                     </AnimatedSection>
