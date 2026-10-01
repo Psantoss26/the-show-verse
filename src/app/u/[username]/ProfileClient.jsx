@@ -762,7 +762,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
   // clic no remonte ni vuelva a animar cabecera, métricas y navegación.
   const [pendingTab, setPendingTab] = useState(null);
   const tab = pendingTab || routeTab;
-  const compactHeader = tab === "neural" && neuralHeaderCollapsed;
+  const compactHeader = tab === "neuronal" && neuralHeaderCollapsed;
   // Cualquier cambio de la cabecera (botón o cambio de pestaña) se anima con
   // recorte, para que no asome el contenido mientras crece o encoge.
   const previousCompactRef = useRef(compactHeader);
@@ -783,7 +783,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
   const viewerId = viewer?.id || null;
   useLayoutEffect(() => {
     const collapsed = readNeuralPreferences(viewerId).headerCollapsed;
-    if (!paintedRef.current) previousCompactRef.current = tab === "neural" && collapsed;
+    if (!paintedRef.current) previousCompactRef.current = tab === "neuronal" && collapsed;
     setNeuralHeaderCollapsed(collapsed);
     // Solo al cambiar de cuenta: la pestaña no debe volver a leerla.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1215,7 +1215,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
               </section>
             )}
           </div>
-        ) : tab === "neural" ? (
+        ) : tab === "neuronal" ? (
           <div className="sv-profile-entry sv-profile-entry--content mt-3 @[640px]/detail-page:mt-6">
             <NeuralGraphView
               username={user.username}
@@ -1316,11 +1316,11 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
             <section>
               <SectionHeader
                 label="Vista neuronal"
-                onClick={() => navigateToTab("neural")}
+                onClick={() => navigateToTab("neuronal")}
               />
               <NeuralPreviewCard
                 username={user.username}
-                onOpen={() => navigateToTab("neural")}
+                onOpen={() => navigateToTab("neuronal")}
                 onIntent={() => preloadNeuralView(user.username)}
               />
             </section>
@@ -1399,7 +1399,7 @@ function ProfileTabs({ tab, username, sections, onNavigate, routeBase, compact =
     { id: "profile", label: "Perfil" },
     { id: "level", label: "Nivel" },
     { id: "statistics", label: "Estadísticas" },
-    { id: "neural", label: "Neuronal" },
+    { id: "neuronal", label: "Neuronal" },
     { id: "activity", label: "Actividad", count: sections?.activity },
     { id: "watched", label: "Diario", count: sections?.watched },
     { id: "reviews", label: "Reseñas", count: sections?.reviews },
@@ -1459,7 +1459,7 @@ function ProfileTabs({ tab, username, sections, onNavigate, routeBase, compact =
             onClick={handleNavigate}
             // Vista neuronal: al mostrar intención de abrirla (ratón encima,
             // foco o dedo), se adelantan su código y sus datos.
-            {...(it.id === "neural"
+            {...(it.id === "neuronal"
               ? {
                   onPointerEnter: () => preloadNeuralView(username),
                   onFocus: () => preloadNeuralView(username),
