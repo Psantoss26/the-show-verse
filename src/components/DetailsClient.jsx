@@ -10086,6 +10086,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 }
               >
                 <DetailsScoreboardPanel
+                compactStatsTrailing={isBackdropPoster}
                 shareIconOnly={isBackdropPoster}
                 loading={tScoreboard.loading}
                 tmdb={{
@@ -10170,6 +10171,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 statsTrailing={
                   showFollowingActivity ? (
                     <FollowingActivityAvatars
+                      compact={isBackdropPoster}
                       data={followingActivity}
                       mediaType={type}
                       onOpen={() => scrollToSection("following")}

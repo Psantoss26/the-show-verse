@@ -302,6 +302,7 @@ export function DetailsStatsRow({
   // avatares de "Tus amigos" en la ficha). En teléfono no se pinta: la fila es
   // un carril que se desplaza y no tiene "derecha".
   trailing = null,
+  compactTrailing = false,
 }) {
   const customStatItems = Array.isArray(statItems)
     ? statItems.filter((item) => item?.label && item?.value != null)
@@ -314,7 +315,7 @@ export function DetailsStatsRow({
   const showTrailing = Boolean(trailing) && !phone;
   if (!hasCustomStats && !hasStats && !pending && !showTrailing) return null;
   const trailingNode = showTrailing ? (
-    <div className="ml-auto hidden shrink-0 items-center sm:flex">{trailing}</div>
+    <div className={`ml-auto hidden items-center sm:flex ${compactTrailing ? "min-w-[42px] max-w-[166px] flex-1" : "shrink-0"}`}>{trailing}</div>
   ) : null;
 
   // Teléfono: una sola fila que se desplaza, sin etiquetas. Los `sm:`/`md:`
@@ -325,8 +326,8 @@ export function DetailsStatsRow({
       ? ""
       : "sm:pl-[calc(1.5rem+env(safe-area-inset-left))] sm:pr-[calc(1.25rem+env(safe-area-inset-right))] md:overflow-x-visible"
   }`;
-  const statsTrackClass = `flex w-max min-w-0 flex-nowrap items-center justify-start gap-x-4 gap-y-1.5 ${
-    phone ? "" : "sm:w-full sm:flex-wrap"
+  const statsTrackClass = `${compactTrailing ? styles.compactStatsTrack : ""} flex w-max min-w-0 flex-nowrap items-center justify-start gap-x-4 gap-y-1.5 ${
+    phone ? "" : compactTrailing ? "sm:w-full sm:flex-nowrap sm:gap-x-2" : "sm:w-full sm:flex-wrap"
   }`;
 
   if (hasCustomStats) {
@@ -702,6 +703,7 @@ export default function DetailsScoreboardPanel({
   statsPending = false,
   // Contenido a la derecha de la fila de stats, solo en escritorio.
   statsTrailing = null,
+  compactStatsTrailing = false,
   externalLinks = null,
   streamingProviders = null,
   onMoreLinks,
@@ -847,6 +849,7 @@ export default function DetailsScoreboardPanel({
         pending={statsPending}
         phone={phoneLayout}
         trailing={statsTrailing}
+        compactTrailing={compactStatsTrailing}
       />
 
       {children}
