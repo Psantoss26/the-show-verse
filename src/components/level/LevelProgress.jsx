@@ -14,6 +14,10 @@ export default function LevelProgress({
   // de entrar el bloque que la contiene; por defecto, cero (la barra del panel
   // lateral del perfil no escalona con nada).
   barDelay = 0,
+  // Sin la fila de textos (XP y XP restante): para quien ya los pinta en otro
+  // sitio, como el lateral compacto del perfil.
+  showLabels = true,
+  barClassName = "h-2",
 }) {
   const visual = tierVisual(tier);
   const percent = Math.max(0, Math.min(100, Number(progress?.percent) || 0));
@@ -22,6 +26,7 @@ export default function LevelProgress({
 
   return (
     <div className={className} style={style}>
+      {showLabels ? (
       <div className="flex items-baseline justify-between gap-3">
         {/* La XP acumulada es el dato principal de la barra: va en blanco y sin
             versalitas, que a este tamaño son lo que más cuesta leer. */}
@@ -34,9 +39,10 @@ export default function LevelProgress({
             : `${formatXp(progress?.xpToNextLevel)} XP para el nivel ${Number(level) + 1}`}
         </span>
       </div>
+      ) : null}
 
       <div
-        className="mt-2 h-2 overflow-hidden rounded-full bg-white/[0.07]"
+        className={`${showLabels ? "mt-2" : ""} ${barClassName} overflow-hidden rounded-full bg-white/[0.07]`}
         role="progressbar"
         aria-valuenow={percent}
         aria-valuemin={0}
