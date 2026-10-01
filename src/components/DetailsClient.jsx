@@ -10181,6 +10181,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     que tus amigos van en una franja bajo el marcador. */}
                 <FollowingActivityStrip
                   data={followingActivity}
+                  compactWatchedSummary
                   onOpen={() => scrollToSection("following")}
                   className="mt-3 sm:hidden"
                 />
