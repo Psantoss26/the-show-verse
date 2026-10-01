@@ -50,7 +50,8 @@ function sanitize(body) {
     genre: text(body?.genre, 24),
     shows: titles(body?.shows),
     movies: titles(body?.movies),
-    backdropPath: imagePath(body?.backdropPath),
+    // Arte SIN idioma del título del año (póster textless o fondo textless).
+    backgroundPath: imagePath(body?.backgroundPath),
   };
 }
 
@@ -140,16 +141,16 @@ function Card(data) {
   const hours = Math.round(data.minutes / 60);
   return (
     <div style={{ width: W, height: H, display: "flex", flexDirection: "column", background: INK, color: "#fff", fontFamily: data.fonts ? BODY_FONT : "sans-serif" }}>
-      {/* Cabecera con el fondo del título del año. */}
+      {/* Cabecera con el arte sin idioma del título del año. */}
       <div style={{ position: "relative", display: "flex", flexDirection: "column", justifyContent: "flex-end", height: 760, padding: "0 72px 56px" }}>
-        {data.backdropPath ? (
+        {data.backgroundPath ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={`${TMDB}/w1280${data.backdropPath}`}
+            src={`${TMDB}/original${data.backgroundPath}`}
             width={W}
             height={760}
             alt=""
-            style={{ position: "absolute", top: 0, left: 0, width: W, height: 760, objectFit: "cover" }}
+            style={{ position: "absolute", top: 0, left: 0, width: W, height: 760, objectFit: "cover", objectPosition: "50% 22%" }}
           />
         ) : null}
         <div

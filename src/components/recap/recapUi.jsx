@@ -8,7 +8,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { Star } from "lucide-react";
 
-import { formatDecimal, formatNumber, tmdbImg } from "@/lib/recap/recapModel";
+import { backgroundArt, formatDecimal, formatNumber, tmdbImg } from "@/lib/recap/recapModel";
 import styles from "./recap.module.css";
 
 export const ANTON = { fontFamily: "var(--font-anton), var(--font-pt-sans), sans-serif" };
@@ -133,15 +133,19 @@ export function Poster({ path, title, className = "", size = "w342", rounded = "
   );
 }
 
-export function PersonPhoto({ path, name, className = "" }) {
-  const src = tmdbImg(path, "w185");
+/**
+ * Foto de persona en RETRATO 2:3 (el formato de las fotos de perfil de TMDb),
+ * con esquinas apenas redondeadas: se ve la foto completa, sin recorte circular.
+ */
+export function PersonPhoto({ path, name, className = "", size = "w185" }) {
+  const src = tmdbImg(path, size);
   const initials = String(name || "?")
     .split(/\s+/)
     .map((part) => part[0])
     .slice(0, 2)
     .join("");
   return (
-    <div className={`relative overflow-hidden rounded-full bg-white/15 ${className}`}>
+    <div className={`relative aspect-[2/3] overflow-hidden rounded-[8px] bg-white/15 shadow-[0_14px_30px_-12px_rgba(0,0,0,0.7)] ${className}`}>
       {src ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={src} alt={name ? `Foto de ${name}` : ""} loading="lazy" decoding="async" draggable={false} className="absolute inset-0 h-full w-full object-cover" />
@@ -152,14 +156,27 @@ export function PersonPhoto({ path, name, className = "" }) {
   );
 }
 
-/** Fondo de película/serie a sangre con Ken Burns y degradado de lectura. */
-export function BackdropFill({ path, fallbackPoster, tint = "#050505" }) {
-  const src = tmdbImg(path, "w1280") || tmdbImg(fallbackPoster, "w780");
-  if (!src) return null;
+/**
+ * Fondo de película/serie a sangre con Ken Burns y degradado de lectura.
+ * Siempre arte SIN idioma (backgroundArt): el póster textless llena el marco
+ * vertical; en pantallas grandes se pide el original para que no se vea borroso.
+ */
+export function BackdropFill({ card, tint = "#050505" }) {
+  const art = backgroundArt(card);
+  if (!art) return null;
+  const small = tmdbImg(art.path, art.kind === "poster" ? "w780" : "w1280");
+  const large = tmdbImg(art.path, "original");
   return (
     <div aria-hidden="true" className="absolute inset-0 overflow-hidden">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt="" className={`absolute inset-0 h-full w-full object-cover ${styles.kenBurns}`} draggable={false} />
+      <img
+        src={small}
+        srcSet={`${small} ${art.kind === "poster" ? 780 : 1280}w, ${large} 2000w`}
+        sizes="(min-width: 640px) 60vh, 100vw"
+        alt=""
+        className={`absolute inset-0 h-full w-full object-cover ${art.kind === "poster" ? "object-[50%_30%]" : ""} ${styles.kenBurns}`}
+        draggable={false}
+      />
       <div
         className="absolute inset-0"
         style={{

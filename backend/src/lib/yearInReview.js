@@ -34,7 +34,15 @@ import {
 import { cacheGet, cacheSet } from './redis.js';
 import { getMediaMetadataMap } from '../utils/mediaMetadata.js';
 import { ACHIEVEMENTS } from '../level/achievements.js';
-import { YEAR_IN_REVIEW_VERSION, buildYearInReview, localParts, watchLocalParts } from './yearInReviewCore.js';
+import {
+  YEAR_IN_REVIEW_VERSION,
+  attachBackgrounds,
+  backgroundTitleKeys,
+  buildYearInReview,
+  localParts,
+  pickTextlessImage,
+  watchLocalParts,
+} from './yearInReviewCore.js';
 
 const CACHE_TTL_SECONDS = 6 * 60 * 60;
 const PARTIAL_CACHE_TTL_SECONDS = 10 * 60;
@@ -43,6 +51,9 @@ const CREDITS_TTL_DAYS = 30;
 const FETCH_BATCH = 10;
 const META_FETCH_MAX = 120;
 const CREDITS_FETCH_MAX = 80;
+const IMAGES_TTL_DAYS = 30;
+const IMAGES_FETCH_MAX = 60;
+const IMAGES_BUDGET_MS = 4_000;
 const FETCH_BUDGET_MS = 5_000;
 const HISTORY_LIMIT = 60_000;
 
@@ -448,6 +459,104 @@ async function fetchMissingCredits(db, keys, credits, meta, deadline) {
   return Math.max(0, keys.length - pending.length);
 }
 
+// ─────────────────────────────────────────────
+// Arte de fondo sin idioma
+// ─────────────────────────────────────────────
+
+// Solo los campos que usa pickTextlessImage, para no guardar galerías enteras.
+function trimImages(list) {
+  return (Array.isArray(list) ? list : [])
+    .filter((img) => img?.file_path && !img.iso_639_1)
+    .map((img) => ({
+      file_path: img.file_path,
+      width: img.width,
+      height: img.height,
+      vote_count: img.vote_count,
+      vote_average: img.vote_average,
+      iso_639_1: null,
+    }));
+}
+
+function pickBackground(posters, backdrops) {
+  return {
+    poster: pickTextlessImage(posters, { minWidth: 600 }),
+    backdrop: pickTextlessImage(backdrops, { minWidth: 1280 }),
+  };
+}
+
+/**
+ * Galerías sin idioma ya guardadas: la ficha completa (`tmdb:`, pedida con
+ * include_image_language=es,en,null) o la copia propia `images-null:`. Un
+ * título está "resuelto" aunque no tenga arte sin idioma: así no se vuelve a
+ * pedir a TMDb en cada visita.
+ */
+async function loadCachedBackgrounds(db, keys) {
+  const backgrounds = new Map();
+  if (!keys.length) return backgrounds;
+  const rows = await db
+    .select({
+      cacheKey: tmdbCache.cacheKey,
+      hasGallery: sql`(${tmdbCache.data} ? 'posters') or (${tmdbCache.data}->'images' ? 'posters')`,
+      posters: sql`coalesce(
+        jsonb_path_query_array(${tmdbCache.data}->'images'->'posters', '$[*] ? (@.iso_639_1 == null)'),
+        jsonb_path_query_array(${tmdbCache.data}->'posters', '$[*] ? (@.iso_639_1 == null)')
+      )`,
+      backdrops: sql`coalesce(
+        jsonb_path_query_array(${tmdbCache.data}->'images'->'backdrops', '$[*] ? (@.iso_639_1 == null)'),
+        jsonb_path_query_array(${tmdbCache.data}->'backdrops', '$[*] ? (@.iso_639_1 == null)')
+      )`,
+    })
+    .from(tmdbCache)
+    .where(inArray(tmdbCache.cacheKey, keys.flatMap((key) => [`tmdb:${key}`, `images-null:${key}`])));
+  for (const row of rows) {
+    if (!row.hasGallery) continue;
+    const key = String(row.cacheKey).replace(/^(tmdb|images-null):/, '');
+    const picked = pickBackground(row.posters, row.backdrops);
+    const current = backgrounds.get(key);
+    // Entre las dos copias, la que aporte más.
+    if (!current || (!current.poster && picked.poster) || (!current.backdrop && picked.backdrop)) {
+      backgrounds.set(key, { poster: picked.poster || current?.poster || null, backdrop: picked.backdrop || current?.backdrop || null });
+    }
+  }
+  return backgrounds;
+}
+
+async function fetchBackground(db, key) {
+  const [type, id] = key.split(':');
+  const url = `https://api.themoviedb.org/3/${type === 'movie' ? 'movie' : 'tv'}/${id}/images?api_key=${process.env.TMDB_API_KEY}&include_image_language=null`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+  if (!res.ok) return null;
+  const json = await res.json();
+  const data = { posters: trimImages(json?.posters), backdrops: trimImages(json?.backdrops) };
+  const now = new Date();
+  await db
+    .insert(tmdbCache)
+    .values({ cacheKey: `images-null:${key}`, data, fetchedAt: now, expiresAt: new Date(now.getTime() + IMAGES_TTL_DAYS * 86_400_000) })
+    .onConflictDoUpdate({ target: tmdbCache.cacheKey, set: { data, fetchedAt: now } })
+    .catch(() => {});
+  return pickBackground(data.posters, data.backdrops);
+}
+
+/** Fondos sin idioma de `keys` (en orden de importancia). Devuelve [mapa, pendientes]. */
+async function loadBackgrounds(db, keys) {
+  const backgrounds = await loadCachedBackgrounds(db, keys);
+  const missing = keys.filter((key) => !backgrounds.has(key));
+  if (!missing.length || !process.env.TMDB_API_KEY) return [backgrounds, 0];
+  const deadline = Date.now() + IMAGES_BUDGET_MS;
+  const pending = missing.slice(0, IMAGES_FETCH_MAX);
+  let done = 0;
+  for (let i = 0; i < pending.length; i += FETCH_BATCH) {
+    if (Date.now() > deadline) break;
+    const batch = pending.slice(i, i + FETCH_BATCH);
+    const results = await Promise.all(batch.map((key) => fetchBackground(db, key).catch(() => null)));
+    batch.forEach((key, index) => {
+      if (results[index]) backgrounds.set(key, results[index]);
+    });
+    done += batch.length;
+  }
+  return [backgrounds, missing.length - done];
+}
+
 /**
  * Resumen del año de un usuario. `year` null → el año por defecto.
  */
@@ -532,9 +641,14 @@ export async function getYearInReview(db, userId, { year = null, refresh = false
     community,
   });
   result.availableYears = availableYears;
-  result.partial = pendingCredits > 0 || [...yearKeys].some((key) => !meta.has(key));
+
+  // Fondos: siempre arte sin idioma (los títulos importantes primero).
+  const [backgrounds, pendingImages] = await loadBackgrounds(db, backgroundTitleKeys(result));
+  attachBackgrounds(result, backgrounds);
+
+  result.partial = pendingCredits > 0 || pendingImages > 0 || [...yearKeys].some((key) => !meta.has(key));
 
   await cacheSet(cacheKey, result, result.partial ? PARTIAL_CACHE_TTL_SECONDS : CACHE_TTL_SECONDS);
-  if (result.partial) log?.info?.({ userId, year: targetYear, pendingCredits }, '[recap] resumen parcial');
+  if (result.partial) log?.info?.({ userId, year: targetYear, pendingCredits, pendingImages }, '[recap] resumen parcial');
   return result;
 }

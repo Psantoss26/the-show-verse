@@ -2,11 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  attachBackgrounds,
+  backgroundTitleKeys,
   buildYearInReview,
   computePersona,
   dayOfYear,
   localParts,
   normalizePlays,
+  pickTextlessImage,
   watchLocalParts,
 } from './yearInReviewCore.js';
 
@@ -300,4 +303,31 @@ test('banda sonora: con títulos de sobra, las pantallas no repiten canción', (
   // Sin notas, repartos ni series terminadas, esas pantallas vuelven al título del año.
   assert.equal(bySlide.ratings, bySlide.intro);
   assert.equal(bySlide.people, bySlide.intro);
+});
+
+test('fondos: solo arte sin idioma, el de más resolución y luego más votos', () => {
+  const gallery = [
+    { file_path: '/con-texto.jpg', iso_639_1: 'en', width: 2000, height: 3000, vote_count: 99 },
+    { file_path: '/pequeno.jpg', iso_639_1: null, width: 500, height: 750, vote_count: 50 },
+    { file_path: '/grande-pocos-votos.jpg', iso_639_1: null, width: 2000, height: 3000, vote_count: 2 },
+    { file_path: '/grande-mas-votos.jpg', iso_639_1: null, width: 2000, height: 3000, vote_count: 9 },
+  ];
+  assert.equal(pickTextlessImage(gallery), '/grande-mas-votos.jpg');
+  // Nunca cae a un arte con idioma.
+  assert.equal(pickTextlessImage([{ file_path: '/es.jpg', iso_639_1: 'es', width: 2000, height: 3000 }]), null);
+  assert.equal(pickTextlessImage([]), null);
+});
+
+test('fondos: se adjuntan a las tarjetas y el muro solo conserva pósters sin idioma', () => {
+  const r = buildYearInReview(sampleInput());
+  const keys = backgroundTitleKeys(r);
+  assert.ok(keys.includes(r.topTitle.key) && keys.includes(r.shows.top[0].key) && keys.includes(r.movies.top[0].key));
+  attachBackgrounds(r, new Map([
+    ['tv:1', { poster: '/sev-limpio.jpg', backdrop: '/sev-fondo-limpio.jpg' }],
+    ['movie:10', { poster: null, backdrop: '/par-fondo-limpio.jpg' }],
+  ]));
+  assert.equal(r.shows.top[0].textlessPosterPath, '/sev-limpio.jpg');
+  assert.equal(r.movies.top[0].textlessPosterPath, null);
+  assert.equal(r.movies.top[0].textlessBackdropPath, '/par-fondo-limpio.jpg');
+  assert.deepEqual(r.posterWall.map((p) => p.key), ['tv:1']);
 });

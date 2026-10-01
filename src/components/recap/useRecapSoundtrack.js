@@ -11,7 +11,18 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-const TARGET_VOLUME = 0.55;
+// Volumen de la banda sonora: 20 % en la vista de ordenador (el marco con
+// flechas a partir de 640 px, el `sm:` de RecapStory) y 55 % en móvil, donde
+// los altavoces suenan mucho más bajos. Se lee en cada fundido para seguir al
+// tamaño de la ventana si cambia a mitad del resumen.
+const DESKTOP_VOLUME = 0.2;
+const MOBILE_VOLUME = 0.55;
+const DESKTOP_QUERY = "(min-width: 640px)";
+
+function targetVolume() {
+  if (typeof window === "undefined" || !window.matchMedia) return MOBILE_VOLUME;
+  return window.matchMedia(DESKTOP_QUERY).matches ? DESKTOP_VOLUME : MOBILE_VOLUME;
+}
 const FADE_MS = 900;
 
 function yearOf(card) {
@@ -159,7 +170,7 @@ export default function useRecapSoundtrack({ subjects, activeKey, enabled, muted
       const active = players.current[current.current.index];
       if (active.paused) {
         active.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
-        fades.current.push(fade(active, TARGET_VOLUME, FADE_MS));
+        fades.current.push(fade(active, targetVolume(), FADE_MS));
       }
       return true;
     }
@@ -172,7 +183,7 @@ export default function useRecapSoundtrack({ subjects, activeKey, enabled, muted
     loadTrack(incoming, track.previewUrl)
       .then(() => {
         setPlaying(true);
-        fades.current.push(fade(incoming, TARGET_VOLUME, FADE_MS));
+        fades.current.push(fade(incoming, targetVolume(), FADE_MS));
       })
       .catch(() => setPlaying(false));
     current.current = { index: nextIndex, key };

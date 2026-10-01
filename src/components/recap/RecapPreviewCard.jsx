@@ -15,7 +15,7 @@ import { useEffect, useRef, useState } from "react";
 import { Play } from "lucide-react";
 
 import { fetchRecap, getCachedRecap } from "@/lib/recap/recapCache";
-import { formatNumber, tmdbImg } from "@/lib/recap/recapModel";
+import { backgroundArt, formatNumber, tmdbImg } from "@/lib/recap/recapModel";
 import { ANTON, recapStyles as styles } from "./recapUi";
 
 // Debe coincidir con la duración de .previewFill en recap.module.css.
@@ -38,7 +38,8 @@ function useInView(ref) {
 }
 
 function MinutesFrame({ recap }) {
-  const posters = (recap.posterWall || []).slice(0, 12);
+  // Solo pósters sin idioma (fondo decorativo).
+  const posters = (recap.posterWall || []).filter((poster) => poster.textlessPosterPath).slice(0, 12);
   const column = posters.length ? [...posters, ...posters] : [];
   return (
     <div className="absolute inset-0 bg-[#c6f432] text-[#0b0b0b]">
@@ -49,7 +50,7 @@ function MinutesFrame({ recap }) {
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 key={`${poster.key}-${index}`}
-                src={tmdbImg(poster.posterPath, "w154")}
+                src={tmdbImg(poster.textlessPosterPath, "w154")}
                 alt=""
                 loading="lazy"
                 draggable={false}
@@ -73,12 +74,15 @@ function TitleFrame({ recap }) {
   const movie = recap.movies?.top?.[0];
   const title = show || movie;
   if (!title) return <MinutesFrame recap={recap} />;
-  const src = tmdbImg(title.backdropPath, "w780") || tmdbImg(title.posterPath, "w500");
+  // Fondo siempre sin idioma: póster textless (encuadre alto) o, si no hay,
+  // el fondo apaisado textless.
+  const art = backgroundArt(title);
+  const src = art ? tmdbImg(art.path, art.kind === "poster" ? "w500" : "w780") : null;
   return (
     <div className="absolute inset-0 bg-[#050505] text-white">
       {src ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt="" draggable={false} className={`absolute inset-0 h-full w-full object-cover ${styles.kenBurns}`} />
+        <img src={src} alt="" draggable={false} className={`absolute inset-0 h-full w-full object-cover ${art?.kind === "poster" ? "object-[50%_22%]" : ""} ${styles.kenBurns}`} />
       ) : null}
       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/10" />
       <div className="absolute inset-x-0 bottom-0 p-4">
@@ -86,7 +90,7 @@ function TitleFrame({ recap }) {
           <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />
           {show ? "Tu serie del año" : "Tu película del año"}
         </p>
-        <p className={`${DISPLAY} mt-1 line-clamp-2 text-[30px]`} style={ANTON}>{title.title}</p>
+        <p className="mt-1 line-clamp-2 text-[30px] uppercase leading-[1.05]" style={ANTON}>{title.title}</p>
         {show ? (
           <p className="mt-0.5 text-xs font-bold text-white/75">
             {formatNumber(show.episodes)} episodios · {formatNumber(Math.round(show.minutes / 60))} h

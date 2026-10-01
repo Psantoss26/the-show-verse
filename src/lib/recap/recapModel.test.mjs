@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  backgroundArt,
+  backgroundUrl,
   buildRecapSlides,
   criticLine,
   flagEmoji,
@@ -94,4 +96,12 @@ test("cada pantalla usa la canción que reparte el backend", () => {
   assert.equal(slides.find((s) => s.id === "split").sound, "tv:1");
   const subjects = soundtrackSubjects(recap, slides).map((s) => s.key);
   assert.ok(subjects.includes("tv:9") && subjects.includes("movie:8"));
+});
+
+test("los fondos son siempre arte sin idioma: póster, si no fondo apaisado, si no nada", () => {
+  assert.deepEqual(backgroundArt({ textlessPosterPath: "/p.jpg", textlessBackdropPath: "/b.jpg", backdropPath: "/con-texto.jpg" }), { kind: "poster", path: "/p.jpg" });
+  assert.deepEqual(backgroundArt({ textlessBackdropPath: "/b.jpg", posterPath: "/con-texto.jpg" }), { kind: "backdrop", path: "/b.jpg" });
+  // Sin arte textless no se usa el póster ni el fondo normales (llevan texto).
+  assert.equal(backgroundArt({ posterPath: "/con-texto.jpg", backdropPath: "/con-texto-2.jpg" }), null);
+  assert.equal(backgroundUrl({ textlessPosterPath: "/p.jpg" }), "https://image.tmdb.org/t/p/w780/p.jpg");
 });
