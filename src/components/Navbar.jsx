@@ -52,6 +52,7 @@ import {
   Loader2,
   Sparkles,
   Menu,
+  PartyPopper,
 } from "lucide-react";
 import WatchNextAssistant from "@/components/WatchNextAssistant";
 import NetflixSyncListener from "@/components/NetflixSyncListener";
@@ -2933,6 +2934,22 @@ function NavbarContent() {
                               </div>
                             ))}
 
+                            {/* Resumen anual ("Tu año en The Show Verse"). */}
+                            <Link
+                              href="/recap"
+                              role="menuitem"
+                              onClick={() => setProfileMenuOpen(false)}
+                              aria-current={isActive("/recap") ? "page" : undefined}
+                              className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors ${
+                                isActive("/recap")
+                                  ? "bg-white/10 font-bold text-white"
+                                  : "text-zinc-300 hover:bg-white/5 hover:text-white"
+                              }`}
+                            >
+                              <PartyPopper className="h-4 w-4 shrink-0 text-lime-300" />
+                              <span className="truncate">Tu año</span>
+                            </Link>
+
                             <Link
                               href="/recommendations"
                               prefetch
@@ -3501,6 +3518,19 @@ function NavbarContent() {
                 <div className="my-2.5 h-px bg-white/5" />
 
                 <section>
+                  <Link
+                    href="/recap"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                      isActive("/recap")
+                        ? "bg-lime-500/20 text-lime-200 font-bold"
+                        : "text-neutral-300 hover:text-white hover:bg-white/5"
+                    }`}
+                  >
+                    <PartyPopper className="h-5 w-5 text-lime-300" />
+                    <span>Tu año</span>
+                  </Link>
+
                   <Link
                     href="/recommendations"
                     onClick={() => setMobileMenuOpen(false)}

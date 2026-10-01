@@ -22,6 +22,8 @@ import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import LevelBadge from "@/components/level/LevelBadge";
 import LevelProgress from "@/components/level/LevelProgress";
 import LevelPanel from "@/components/level/LevelPanel";
+import RecapPromoBanner from "@/components/recap/RecapPromoBanner";
+import RecapPreviewCard from "@/components/recap/RecapPreviewCard";
 import ProfileSection from "./ProfileSection";
 import { PROFILE_TAB_IDS, profileTabHref } from "./profileRoutes";
 import { translateGenreName } from "@/lib/dashboard/media";
@@ -1203,6 +1205,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
           </div>
         ) : tab === "statistics" ? (
           <div className="sv-profile-entry sv-profile-entry--content mt-8">
+            {isSelf ? <RecapPromoBanner className="mb-6" /> : null}
             {resolvedAnalytics ? (
               <ProfileAnalytics analytics={resolvedAnalytics} />
             ) : (
@@ -1305,6 +1308,16 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
               routeBase={routeBase}
               onNavigate={navigateToTab}
             />
+
+            {/* Vista previa del resumen anual: solo en el propio perfil (sus
+                datos son privados). Rota sola y abre /recap. */}
+            {isSelf ? (
+              <RecapPreviewCard
+                renderHeader={(year) => (
+                  <SectionHeader label={`Tu ${year}`} onClick={() => router.push("/recap")} />
+                )}
+              />
+            ) : null}
 
             <ActivitySidebarPreview
               username={user.username}

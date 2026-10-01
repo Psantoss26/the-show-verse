@@ -5,6 +5,13 @@ import { db } from '../db/client.js';
 import { watchHistory, favorites, watchlist, userRatings, tmdbCache } from '../db/schema.js';
 import { eq, and, gte, lte, count, sql, isNotNull, desc, inArray } from 'drizzle-orm';
 import { computeShowProgress } from '../lib/showProgress.js';
+import { z } from 'zod';
+import { getYearInReview } from '../lib/yearInReview.js';
+
+const yearInReviewQuery = z.object({
+  year: z.coerce.number().int().min(1990).max(2100).optional(),
+  refresh: z.enum(['0', '1', 'true', 'false']).optional(),
+});
 
 const emptyStats = {
   movies: { watched: 0, plays: 0, minutes: 0, comments: 0, collected: 0 },
@@ -575,6 +582,29 @@ export default async function statsRoutes(fastify) {
       watchedShows: topShowRows.map(normalizeTopShow),
       topActors: [],
       topDirectors: [],
+    });
+  });
+
+  // ──────────────────────────────────────────────
+  // GET /stats/year-in-review?year=&refresh= — "Tu año en The Show Verse"
+  // Sin `year`, el año actual si ya tiene actividad (si no, el último con datos).
+  // ──────────────────────────────────────────────
+  fastify.get('/year-in-review', async (req, reply) => {
+    const query = { ...req.query };
+    if (query.year === '') delete query.year;
+    const parsed = yearInReviewQuery.safeParse(query);
+    if (!parsed.success) return reply.status(400).send({ error: 'Invalid query' });
+    const year = parsed.data.year ?? null;
+    const refresh = parsed.data.refresh === '1' || parsed.data.refresh === 'true';
+    const recap = await getYearInReview(db, req.user.id, { year, refresh, log: req.log });
+    reply.header('Cache-Control', 'private, no-store');
+    return reply.send({
+      ...recap,
+      user: {
+        username: req.user.username,
+        name: req.user.displayName || req.user.username,
+        avatarUrl: req.user.avatarUrl || null,
+      },
     });
   });
 
