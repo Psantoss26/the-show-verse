@@ -70,16 +70,16 @@ const FEED_VACIO = { items: [], hasMore: false, offset: 0, loaded: false, error:
 
 // Icono y tono de cada acción: EXACTAMENTE los de la Actividad del perfil
 // (`ActivityRow` en ProfileSection), para que una acción se vea igual en los
-// dos sitios. Favoritos y Pendientes van rellenos; las puntuaciones no llevan
+// dos sitios. Favoritos van rellenos; las puntuaciones no llevan
 // icono en la fila, enseñan la nota.
 const ACCIONES = {
-  watched: { Icono: Eye, tono: "text-emerald-300" },
-  watchlist: { Icono: BookmarkPlus, tono: "text-sky-300", relleno: true },
-  favorite: { Icono: Heart, tono: "text-red-300", relleno: true },
-  rating: { Icono: Star, tono: "text-amber-300" },
-  review: { Icono: MessageSquare, tono: "text-orange-300" },
-  list: { Icono: ListPlus, tono: "text-violet-300" },
-  list_item: { Icono: ListPlus, tono: "text-violet-300" },
+  watched: { Icono: Eye, tono: "text-emerald-400" },
+  watchlist: { Icono: BookmarkPlus, tono: "text-sky-400" },
+  favorite: { Icono: Heart, tono: "text-red-500", relleno: true },
+  rating: { Icono: Star, tono: "text-amber-400" },
+  review: { Icono: MessageSquare, tono: "text-orange-400" },
+  list: { Icono: ListPlus, tono: "text-violet-400" },
+  list_item: { Icono: ListPlus, tono: "text-violet-400" },
 };
 
 // Conjugación: en "Siguiendo" habla el autor del evento ("Ana ha visto…"); en
@@ -265,14 +265,14 @@ function EventoFila({ evento, actor, mostrarAutor, conPoster }) {
       )}
       {evento.type === "rating" ? (
         <span
-          className={`flex h-8 w-8 shrink-0 items-center justify-center text-xl font-black leading-none tabular-nums ${tono}`}
+          className={`flex h-8 w-8 shrink-0 items-center justify-center text-xl font-black leading-none tabular-nums [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.65))] ${tono}`}
           aria-hidden="true"
         >
           {evento.rating}
         </span>
       ) : (
-        <span className={`flex h-8 w-8 shrink-0 items-center justify-center ${tono}`} aria-hidden="true">
-          <Icono className={`h-5 w-5 ${relleno ? "fill-current" : ""}`} />
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.65))] ${tono}`} aria-hidden="true">
+          <Icono strokeWidth={2.5} className={`h-5 w-5 ${relleno ? "fill-current" : ""}`} />
         </span>
       )}
       <p className="min-w-0 flex-1 text-sm leading-5 text-zinc-400">
