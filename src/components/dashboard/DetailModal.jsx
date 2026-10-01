@@ -105,6 +105,12 @@ import { dashboardDetailHref } from "@/lib/dashboard/detailHref";
 // Componentes reales de la ficha completa (standalone) para que las tarjetas,
 // badges, pestañas y acciones sean IDÉNTICAS a DetailsClient.
 import DetailsScoreboardPanel from "@/components/details/DetailsScoreboardPanel";
+import {
+  FollowingActivityAvatars,
+  FollowingActivityStrip,
+  hasFollowingActivity,
+  useFollowingActivity,
+} from "@/components/details/FollowingActivity";
 import useRatingLinks from "@/lib/details/useRatingLinks";
 import {
   buildTmdbHref,
@@ -799,6 +805,13 @@ export default function DetailModal({
   const mediaType = isEpisode
     ? "tv"
     : data.mediaType || getMediaTypeForItem(item);
+  // La misma actividad de seguidos que muestra DetailsClient. En el modal es
+  // un acceso a la sección completa: el drawer no duplica el feed entero.
+  const canAccessFollowingActivity = !!session && !!account?.id && !isEpisode;
+  const followingActivity = useFollowingActivity(mediaType, item?.id, {
+    enabled: canAccessFollowingActivity,
+  });
+  const showFollowingActivity = hasFollowingActivity(followingActivity);
   const detailKey = `${mediaType}:${item?.id ?? ""}`;
   const metadataLoading =
     !isEpisode &&
@@ -2569,6 +2582,12 @@ export default function DetailModal({
       `${mediaType}:${item?.id ?? ""}`,
     );
 
+  const goToFollowingActivity = () =>
+    goToDetailsRoute(
+      `${dashboardDetailHref(item, mediaType)}#section-following`,
+      `${mediaType}:${item?.id ?? ""}`,
+    );
+
   // Ficha de la TEMPORADA a la que pertenece el episodio. Solo existe en la
   // variante de episodio y cuando se conocen serie y temporada: en un episodio
   // suelto (sin `showId`) no hay a dónde ir, y es mejor no pintar el botón que
@@ -3972,8 +3991,23 @@ export default function DetailModal({
                       : undefined,
                 }}
                 stats={scoreStats}
+                statsTrailing={
+                  showFollowingActivity ? (
+                    <FollowingActivityAvatars
+                      data={followingActivity}
+                      mediaType={mediaType}
+                      onOpen={goToFollowingActivity}
+                    />
+                  ) : null
+                }
                 showFavoritedStat={!isEpisode}
                 className="max-sm:-mx-2 max-sm:w-[calc(100%+1rem)]"
+              />
+              <FollowingActivityStrip
+                data={followingActivity}
+                onOpen={goToFollowingActivity}
+                phoneLayout={mobileDetails}
+                className={mobileDetails ? "mt-3" : "mt-3 sm:hidden"}
               />
             </div>
 
@@ -4520,6 +4554,9 @@ export default function DetailModal({
                 episodesWatched={episodesWatched}
                 imdbId={data.imdbId}
                 canLikeComments={ratingActionConnected}
+                followingActivity={followingActivity}
+                canAccessFollowingActivity={canAccessFollowingActivity}
+                followingActivityPhoneLayout
                 onArtworkSelection={applyArtworkSelection}
                 soundtrack={{
                   query: soundtrackSearchQuery,

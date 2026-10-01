@@ -175,7 +175,7 @@ export function FollowingActivityAvatars({ data, mediaType, onOpen }) {
 }
 
 /** Franja compacta de la cabecera. `onOpen` lleva a la sección completa. */
-export function FollowingActivityStrip({ data, onOpen, className = "" }) {
+export function FollowingActivityStrip({ data, onOpen, className = "", phoneLayout = false }) {
   if (!hasFollowingActivity(data)) return null;
   const items = data.items;
   const shown = items.slice(0, 4);
@@ -213,7 +213,7 @@ export function FollowingActivityStrip({ data, onOpen, className = "" }) {
         ) : null}
       </span>
       <span className="relative z-10 flex shrink-0 items-center gap-1 text-xs font-bold text-zinc-300 transition-colors group-hover:text-white">
-        <span className="hidden sm:inline">Ver</span>
+        <span className={phoneLayout ? "hidden" : "hidden sm:inline"}>Ver</span>
         <ChevronDown aria-hidden="true" className="h-4 w-4 transition-transform group-hover:translate-y-0.5" />
       </span>
     </button>
@@ -338,13 +338,22 @@ function PersonCard({ item, mediaType }) {
 }
 
 /** Sección completa: una tarjeta por persona. */
-export function FollowingActivitySection({ data, mediaType }) {
+export function FollowingActivitySection({ data, mediaType, loading = false, phoneLayout = false }) {
   const [showAll, setShowAll] = useState(false);
-  if (!hasFollowingActivity(data)) return null;
+  if (!hasFollowingActivity(data)) {
+    if (loading) {
+      return (
+        <p className="text-sm text-zinc-400" role="status">
+          Cargando la actividad de tus amigos…
+        </p>
+      );
+    }
+    return <p className="text-sm text-zinc-400">Aún no hay actividad de tus amigos con este título.</p>;
+  }
   const visible = showAll ? data.items : data.items.slice(0, 6);
   return (
     <>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className={`grid grid-cols-1 gap-4 ${phoneLayout ? "" : "sm:grid-cols-2 xl:grid-cols-3"}`}>
         {visible.map((item) => (
           <PersonCard key={item.user.username} item={item} mediaType={mediaType} />
         ))}
