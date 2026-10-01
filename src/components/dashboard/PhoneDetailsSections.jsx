@@ -220,6 +220,8 @@ export default function PhoneDetailsSections({
   mediaType,
   title,
   scrollContainerRef,
+  requestedSection = null,
+  onSectionRequestHandled,
   onOpenTitle,
   // Progreso de visionado por temporada. Sale del MISMO hook que la ficha
   // completa (`useTraktEpisodesWatched`), que el modal ya tiene montado: no
@@ -883,6 +885,15 @@ export default function PhoneDetailsSections({
     },
     [scrollContainerRef, menuHeight],
   );
+
+  useEffect(() => {
+    if (!requestedSection) return;
+    const frame = window.requestAnimationFrame(() => {
+      scrollToSection(requestedSection);
+      onSectionRequestHandled?.(null);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [requestedSection, scrollToSection, onSectionRequestHandled]);
 
   const sentimentPros = Array.isArray(data?.sentiment?.pros)
     ? data.sentiment.pros

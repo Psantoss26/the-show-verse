@@ -216,6 +216,7 @@ export function FollowingActivityStrip({ data, onOpen, className = "", phoneLayo
           <span className="mt-0.5 flex flex-wrap gap-x-2.5 gap-y-0.5 text-xs text-zinc-300">
             {chips.map((chip) => (
               <span key={chip.id} className={chip.id === "rating" ? "font-black tabular-nums text-amber-400" : ""}>
+                {chip.prefix ? <span className="font-normal text-zinc-400">{chip.prefix} </span> : null}
                 {chip.label}
                 {chip.hint ? <span className="font-normal text-zinc-400"> {chip.hint}</span> : null}
               </span>

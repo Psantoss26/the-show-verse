@@ -957,6 +957,7 @@ export default function DetailModal({
   // plano) `onAnimationComplete` puede no llegar nunca, y las secciones no
   // pueden quedarse sin montar por eso.
   const [phoneSectionsReady, setPhoneSectionsReady] = useState(false);
+  const [requestedPhoneSection, setRequestedPhoneSection] = useState(null);
   useEffect(() => {
     if (!mobileDetails) {
       setPhoneSectionsReady(false);
@@ -2582,11 +2583,17 @@ export default function DetailModal({
       `${mediaType}:${item?.id ?? ""}`,
     );
 
-  const goToFollowingActivity = () =>
+  const goToFollowingActivity = () => {
+    if (mobileDetails) {
+      setPhoneSectionsReady(true);
+      setRequestedPhoneSection("following");
+      return;
+    }
     goToDetailsRoute(
       `${dashboardDetailHref(item, mediaType)}#section-following`,
       `${mediaType}:${item?.id ?? ""}`,
     );
+  };
 
   // Ficha de la TEMPORADA a la que pertenece el episodio. Solo existe en la
   // variante de episodio y cuando se conocen serie y temporada: en un episodio
@@ -4547,6 +4554,8 @@ export default function DetailModal({
                 mediaType={mediaType}
                 title={title}
                 scrollContainerRef={scrollContainerRef}
+                requestedSection={requestedPhoneSection}
+                onSectionRequestHandled={setRequestedPhoneSection}
                 onOpenTitle={(rec) => openDetailModal?.(rec)}
                 onOpenSeason={(seasonNumber) =>
                   goToDetailsRoute(`/details/tv/${item?.id}/season/${seasonNumber}`)

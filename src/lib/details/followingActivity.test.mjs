@@ -31,11 +31,27 @@ test("frase de la cabecera: visto antes que pendiente", () => {
   assert.equal(summarySentence({ items: [] }), "");
 });
 
-test("chips: media de notas, pendientes y reseñas", () => {
+test("la cabecera identifica favoritos y puntuaciones de una o varias personas", () => {
+  const favorite = person("Ana", { favorite: true });
+  const anotherFavorite = person("Luis", { favorite: true });
+  const rated = person("Eva", { rating: 0 });
+  const anotherRated = person("Leo", { rating: 8 });
+  const listed = person("Irene", { lists: [{}] });
+  assert.equal(summarySentence({ items: [favorite, listed] }), "Le gusta a Ana");
+  assert.equal(summarySentence({ items: [favorite, anotherFavorite] }), "Les gusta a Ana y Luis");
+  assert.equal(summarySentence({ items: [rated, listed] }), "Eva la ha puntuado");
+  assert.equal(summarySentence({ items: [rated, anotherRated] }), "Eva y Leo la han puntuado");
+});
+
+test("chips: media de notas sin repetir pendientes", () => {
   const items = [person("Ana", { watched: { plays: 1 }, watchlist: true }), person("Luis", { watchlist: true })];
   const chips = summaryChips({ summary: { averageRating: 8.25, rated: 2, watched: 1, watching: 0, watchlist: 2, reviews: 0 }, items });
-  // Ana ya la vio: solo cuenta Luis como pendiente.
-  assert.deepEqual(chips.map((c) => c.label), ["8,3", "1 la tiene pendiente"]);
+  assert.deepEqual(chips.map((c) => c.label), ["8,3"]);
+  const singleRating = summaryChips({ summary: { averageRating: 10, rated: 1 } });
+  assert.equal(singleRating[0].prefix, "Puntuación:");
+  assert.equal(singleRating[0].label, "10");
+  assert.equal(singleRating[0].hint, null);
+  assert.deepEqual(summaryChips({ summary: { watchlist: 1 }, items: [person("Luis", { watchlist: true })] }), []);
 });
 
 test("estados y episodios", () => {

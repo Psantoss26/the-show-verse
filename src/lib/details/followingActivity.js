@@ -24,7 +24,8 @@ export function joinNames(items, max = 2) {
 /**
  * Frase principal de la franja de la cabecera. Prioriza lo más útil para
  * decidir: quién la ha visto; si nadie, quién la está viendo; si no, quién la
- * tiene pendiente, y como último recurso cualquier interacción.
+ * tiene pendiente, quién la ha puntuado o a quién le gusta; como último
+ * recurso, cualquier interacción.
  */
 export function summarySentence(data) {
   const items = data?.items || [];
@@ -41,6 +42,14 @@ export function summarySentence(data) {
   if (planned.length) {
     return `${joinNames(planned)} ${planned.length === 1 ? "la tiene pendiente" : "la tienen pendiente"}`;
   }
+  const rated = items.filter((item) => item.rating != null);
+  if (rated.length) {
+    return `${joinNames(rated)} ${rated.length === 1 ? "la ha puntuado" : "la han puntuado"}`;
+  }
+  const favorites = items.filter((item) => item.favorite);
+  if (favorites.length) {
+    return `Le${favorites.length === 1 ? "" : "s"} gusta a ${joinNames(favorites)}`;
+  }
   return `${joinNames(items)} ${items.length === 1 ? "se ha fijado en ella" : "se han fijado en ella"}`;
 }
 
@@ -49,13 +58,9 @@ export function summaryChips(data) {
   const s = data?.summary;
   if (!s) return [];
   const chips = [];
-  // "Pendiente" solo para quien aún no la ha empezado: tener en la lista algo
-  // que ya estás viendo no aporta nada a la frase.
-  const planned = (data.items || []).filter((item) => item.watchlist && !item.watched).length;
   // La nota va como número, sin estrella (mismo lenguaje que la actividad).
-  if (s.averageRating != null) chips.push({ id: "rating", label: formatScore(s.averageRating), hint: s.rated === 1 ? "su nota" : `media de ${s.rated}` });
+  if (s.averageRating != null) chips.push({ id: "rating", label: formatScore(s.averageRating), prefix: s.rated === 1 ? "Puntuación:" : null, hint: s.rated === 1 ? null : `media de ${s.rated}` });
   if (s.watching && s.watching < s.watched) chips.push({ id: "watching", label: `${s.watching} viéndola` });
-  if (planned) chips.push({ id: "watchlist", label: `${planned} la tiene${planned === 1 ? "" : "n"} pendiente` });
   if (s.reviews) chips.push({ id: "reviews", label: `${s.reviews} reseña${s.reviews === 1 ? "" : "s"}` });
   return chips;
 }
