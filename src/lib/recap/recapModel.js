@@ -10,6 +10,26 @@ export function tmdbImg(path, size = "w342") {
   return `${TMDB_IMG}/${size}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
+/**
+ * Arte de FONDO de un título: siempre sin idioma (sin texto). Primero el
+ * póster textless, que encaja en el marco vertical; si no hay, el fondo
+ * apaisado textless; si tampoco, ninguno (nunca un arte con texto). Los
+ * calcula el backend (attachBackgrounds en yearInReviewCore.js).
+ */
+export function backgroundArt(card) {
+  if (card?.textlessPosterPath) return { kind: "poster", path: card.textlessPosterPath };
+  if (card?.textlessBackdropPath) return { kind: "backdrop", path: card.textlessBackdropPath };
+  return null;
+}
+
+/** URL de un fondo a la talla adecuada (póster vertical o fondo apaisado). */
+export function backgroundUrl(card, { large = false } = {}) {
+  const art = backgroundArt(card);
+  if (!art) return null;
+  if (art.kind === "poster") return tmdbImg(art.path, large ? "original" : "w780");
+  return tmdbImg(art.path, large ? "original" : "w1280");
+}
+
 const numberFormatter = new Intl.NumberFormat("es-ES");
 
 export function formatNumber(value) {

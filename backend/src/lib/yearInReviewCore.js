@@ -13,7 +13,7 @@
 //     vieron de verdad: se excluyen de horas, días de la semana y maratones.
 //   - Duración: la de la fila, si no la de TMDb, y si no un valor por defecto.
 
-export const YEAR_IN_REVIEW_VERSION = 6;
+export const YEAR_IN_REVIEW_VERSION = 7;
 
 const DEFAULT_MOVIE_MINS = 100;
 const DEFAULT_EPISODE_MINS = 45;
@@ -753,6 +753,71 @@ function buildNetworks(shows) {
     networks.set(network.id, current);
   }
   return [...networks.values()].sort((a, b) => b.minutes - a.minutes).slice(0, 5);
+}
+
+// ─────────────────────────────────────────────
+// Fondos: siempre arte SIN idioma
+// ─────────────────────────────────────────────
+
+/**
+ * Mejor imagen SIN idioma (sin texto) de una galería de TMDb. Es la misma
+ * política que `pickBestNeutralPosterByResVotes` del frontend (héroe móvil de
+ * la ficha): solo entradas con `iso_639_1` nulo; mínimo de ancho si lo hay;
+ * entre las de máxima resolución (ventana del 98 %), la de más votos. A
+ * diferencia de aquel, NO cae nunca a arte con idioma: sin textless, null.
+ */
+export function pickTextlessImage(list, { minWidth = 600, resolutionWindow = 0.98 } = {}) {
+  const neutral = (Array.isArray(list) ? list : []).filter((img) => img?.file_path && !img.iso_639_1);
+  if (!neutral.length) return null;
+  const area = (img) => (Number(img.width) || 0) * (Number(img.height) || 0);
+  const wide = neutral.filter((img) => (Number(img.width) || 0) >= minWidth);
+  const pool = wide.length ? wide : neutral;
+  const threshold = Math.max(...pool.map(area)) * resolutionWindow;
+  return [...pool]
+    .filter((img) => area(img) >= threshold)
+    .sort((a, b) =>
+      area(b) - area(a) ||
+      (Number(b.width) || 0) - (Number(a.width) || 0) ||
+      (Number(b.vote_count) || 0) - (Number(a.vote_count) || 0) ||
+      (Number(b.vote_average) || 0) - (Number(a.vote_average) || 0),
+    )[0]?.file_path || null;
+}
+
+/** Claves de los títulos cuyo arte se usa como FONDO en el resumen. */
+export function backgroundTitleKeys(recap) {
+  if (!recap || recap.empty) return [];
+  return [
+    ...new Set([
+      recap.topTitle?.key,
+      recap.shows?.top?.[0]?.key,
+      recap.movies?.top?.[0]?.key,
+      ...(recap.posterWall || []).map((poster) => poster.key),
+    ].filter(Boolean)),
+  ];
+}
+
+/**
+ * Añade a las tarjetas del resumen su arte de fondo sin idioma:
+ * `textlessPosterPath` (preferido: encaja en el marco vertical) y
+ * `textlessBackdropPath` (respaldo). El muro de pósters se queda solo con los
+ * títulos que tienen póster sin idioma.
+ */
+export function attachBackgrounds(recap, backgrounds) {
+  if (!recap || recap.empty || !(backgrounds instanceof Map)) return recap;
+  const patch = (card) => {
+    if (!card?.key) return card;
+    const art = backgrounds.get(card.key);
+    card.textlessPosterPath = art?.poster || null;
+    card.textlessBackdropPath = art?.backdrop || null;
+    return card;
+  };
+  patch(recap.topTitle);
+  (recap.shows?.top || []).forEach(patch);
+  (recap.movies?.top || []).forEach(patch);
+  recap.posterWall = (recap.posterWall || [])
+    .map(patch)
+    .filter((poster) => poster.textlessPosterPath);
+  return recap;
 }
 
 // ─────────────────────────────────────────────

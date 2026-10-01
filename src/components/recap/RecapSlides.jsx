@@ -91,8 +91,9 @@ function Pill({ children, theme, inverted = false, className = "" }) {
 // 1. Portada
 // ─────────────────────────────────────────────
 
+// Fondo de la portada: solo pósters SIN idioma (el backend ya filtra el muro).
 function PosterWall({ posters }) {
-  const list = posters?.length ? posters : [];
+  const list = (posters || []).filter((poster) => poster.textlessPosterPath);
   if (list.length < 6) return null;
   const columns = [0, 1, 2, 3].map((column) => list.filter((_, index) => index % 4 === column));
   return (
@@ -107,7 +108,7 @@ function PosterWall({ posters }) {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     key={`${poster.key}-${i}`}
-                    src={tmdbImg(poster.posterPath, "w185")}
+                    src={tmdbImg(poster.textlessPosterPath, "w185")}
                     alt=""
                     draggable={false}
                     loading={i < 6 ? "eager" : "lazy"}
@@ -328,7 +329,7 @@ export function BookendsSlide({ recap, theme }) {
           <Reveal delay={0.45} y={30} className="flex items-center gap-4">
             <Poster path={first.posterPath} title={first.title} className="w-[30cqw] rotate-[-4deg]" priority />
             <div className="min-w-0">
-              <p className={`${DISPLAY} line-clamp-3 text-[7.5cqw]`} style={ANTON}>{first.title}</p>
+              <p className="line-clamp-3 text-[7.5cqw] uppercase leading-[1.08]" style={ANTON}>{first.title}</p>
               <p className={`mt-1 font-bold ${SMALL}`} style={{ color: theme.accent }}>{formatDay(first.date)}</p>
               {episodeLabel(first) ? <p className={SMALL} style={{ color: theme.muted }}>{episodeLabel(first)}</p> : null}
             </div>
@@ -337,7 +338,7 @@ export function BookendsSlide({ recap, theme }) {
           <Reveal delay={2} y={30} className="mt-[2.5cqh] flex flex-row-reverse items-center gap-4 text-right">
             <Poster path={last.posterPath} title={last.title} className="w-[30cqw] rotate-[4deg]" />
             <div className="min-w-0">
-              <p className={`${DISPLAY} line-clamp-3 text-[7.5cqw]`} style={ANTON}>{last.title}</p>
+              <p className="line-clamp-3 text-[7.5cqw] uppercase leading-[1.08]" style={ANTON}>{last.title}</p>
               <p className={`mt-1 font-bold ${SMALL}`} style={{ color: theme.accent }}>{formatDay(last.date)}</p>
               {episodeLabel(last) ? <p className={SMALL} style={{ color: theme.muted }}>{episodeLabel(last)}</p> : null}
             </div>
@@ -449,7 +450,7 @@ export function TopShowSlide({ recap, theme }) {
   const share = recap.totals.minutes ? Math.round((show.minutes / recap.totals.minutes) * 100) : 0;
   return (
     <>
-      <BackdropFill path={show.backdropPath} fallbackPoster={show.posterPath} tint="#050505" />
+      <BackdropFill card={show} tint="#050505" />
       <Teaser text="Hubo una serie que no pudiste soltar…" theme={theme} />
       <SlideBody className="justify-end">
         <Reveal delay={2} className="mb-[3cqh] flex items-end gap-4">
@@ -494,7 +495,7 @@ export function TopMovieSlide({ recap, theme }) {
       : "La que más te marcó";
   return (
     <>
-      <BackdropFill path={movie.backdropPath} fallbackPoster={movie.posterPath} tint="#050505" />
+      <BackdropFill card={movie} tint="#050505" />
       <Teaser text="Y una película que se quedó contigo…" theme={theme} />
       <SlideBody className="justify-end">
         <Reveal delay={2} className="mb-[3cqh] flex items-end gap-4">
@@ -530,13 +531,13 @@ export function TopMovieSlide({ recap, theme }) {
 
 function RankList({ items, theme, detail }) {
   return (
-    <ol className="mt-[2.5cqh] flex min-h-0 flex-1 flex-col justify-center gap-[1.4cqh]">
+    <ol className="mt-[2.5cqh] flex min-h-0 flex-1 flex-col justify-center gap-[1.1cqh]">
       {items.map((item, index) => (
         <Reveal key={item.key} as="li" delay={0.35 + index * 0.16} y={22} className="flex items-center gap-[4cqw]">
           <span className={`w-[10cqw] shrink-0 text-center ${DISPLAY} text-[11cqw] ${index ? styles.outline : ""}`} style={{ ...ANTON, color: index ? theme.fg : theme.accent }}>
             {index + 1}
           </span>
-          <Poster path={item.posterPath} title={item.title} className="w-[12.5cqw] shrink-0" rounded="rounded-[6px]" priority={index < 2} />
+          <Poster path={item.posterPath} title={item.title} className="w-[11.5cqw] shrink-0" rounded="rounded-[6px]" priority={index < 2} />
           <div className="min-w-0">
             <p className={`truncate font-bold ${index === 0 ? "text-[clamp(16px,5cqw,22px)]" : BODY}`}>{item.title}</p>
             <p className={SMALL} style={{ color: theme.muted }}>{detail(item)}</p>
@@ -559,7 +560,7 @@ export function TopShowsSlide({ recap, theme }) {
           theme={theme}
           detail={(show) => `${formatNumber(show.episodes)} ep. · ${formatHours(show.minutes)} h${show.rating ? ` · ★ ${formatDecimal(show.rating, show.rating % 1 ? 1 : 0)}` : ""}`}
         />
-        <Reveal delay={1.3} className={SMALL} style={{ color: theme.muted }}>
+        <Reveal delay={1.3} className={`mt-[3cqh] shrink-0 ${SMALL}`} style={{ color: theme.muted }}>
           {formatNumber(recap.shows.total)} series vistas este año.
         </Reveal>
       </SlideBody>
@@ -588,7 +589,7 @@ export function TopMoviesSlide({ recap, theme }) {
           }
         />
         {recap.movies.longest ? (
-          <Reveal delay={1.3} className={SMALL} style={{ color: theme.muted }}>
+          <Reveal delay={1.3} className={`mt-[3cqh] shrink-0 ${SMALL}`} style={{ color: theme.muted }}>
             La más larga: {recap.movies.longest.title} ({recap.movies.longest.runtime} min).
           </Reveal>
         ) : null}
@@ -1019,8 +1020,8 @@ export function PeopleSlide({ recap, theme }) {
           <>
             <Reveal delay={0.2} y={30} className="mt-[4cqh] flex items-center gap-[5cqw]">
               <div className="relative shrink-0">
-                <PersonPhoto path={star.profilePath} name={star.name} className="h-[34cqw] w-[34cqw] ring-4" />
-                <span aria-hidden="true" className="absolute -right-1 -top-1 flex h-[10cqw] w-[10cqw] items-center justify-center rounded-full text-[5cqw] font-bold" style={{ background: theme.accent, color: "#0b0b0b" }}>1</span>
+                <PersonPhoto path={star.profilePath} name={star.name} size="w342" className="w-[30cqw] !rounded-[12px]" />
+                <span aria-hidden="true" className="absolute -right-[2.5cqw] -top-[2.5cqw] flex h-[10cqw] w-[10cqw] items-center justify-center rounded-full text-[5cqw] font-bold shadow-lg" style={{ background: theme.accent, color: "#0b0b0b" }}>1</span>
               </div>
               <div className="min-w-0">
                 <p className={`text-[clamp(10px,3cqw,13px)] font-bold uppercase tracking-[0.18em]`} style={{ color: theme.muted }}>Tu cara más vista</p>
@@ -1032,7 +1033,7 @@ export function PeopleSlide({ recap, theme }) {
               <ul className="mt-[4cqh] grid grid-cols-5 gap-2">
                 {actors.slice(1, 6).map((person, index) => (
                   <Reveal key={person.id} as="li" delay={0.7 + index * 0.1} y={16} className="flex flex-col items-center text-center">
-                    <PersonPhoto path={person.profilePath} name={person.name} className="aspect-square w-full" />
+                    <PersonPhoto path={person.profilePath} name={person.name} className="w-full" />
                     <span className="mt-1 line-clamp-2 text-[clamp(10px,2.8cqw,12px)] font-bold leading-tight">{person.name}</span>
                     <span className="text-[clamp(9px,2.6cqw,11px)]" style={{ color: theme.muted }}>{person.titles} tít.</span>
                   </Reveal>
@@ -1046,12 +1047,15 @@ export function PeopleSlide({ recap, theme }) {
             <Reveal delay={1.3} className={`mb-2 font-bold uppercase tracking-[0.18em] text-[clamp(10px,3cqw,13px)]`} style={{ color: theme.muted }}>
               Detrás de la cámara
             </Reveal>
-            <ul className="space-y-2">
+            {/* Una fila de tres: con retratos 2:3, una lista vertical no cabe en el marco. */}
+            <ul className="grid grid-cols-3 gap-[2.5cqw]">
               {directors.slice(0, 3).map((person, index) => (
-                <Reveal key={person.id} as="li" delay={1.4 + index * 0.12} y={12} className="flex items-center gap-3">
-                  <PersonPhoto path={person.profilePath} name={person.name} className="h-[11cqw] w-[11cqw] shrink-0" />
-                  <span className={`min-w-0 flex-1 truncate font-bold ${BODY}`}>{person.name}</span>
-                  <span className={`shrink-0 ${SMALL}`} style={{ color: theme.muted }}>{person.titles} títulos</span>
+                <Reveal key={person.id} as="li" delay={1.4 + index * 0.12} y={12} className="flex min-w-0 items-center gap-[2cqw]">
+                  <PersonPhoto path={person.profilePath} name={person.name} className="w-[9cqw] shrink-0 !rounded-[6px]" />
+                  <span className="min-w-0">
+                    <span className="line-clamp-2 text-[clamp(11px,3.1cqw,14px)] font-bold leading-tight">{person.name}</span>
+                    <span className="block text-[clamp(9px,2.6cqw,12px)]" style={{ color: theme.muted }}>{person.titles} títulos</span>
+                  </span>
                 </Reveal>
               ))}
             </ul>
@@ -1242,7 +1246,7 @@ export function SummarySlide({ recap, theme, user, onReplay, onShare, shareState
           ))}
         </div>
 
-        <div className="mt-auto grid grid-cols-3 gap-2 border-t border-black/20 pt-[3cqw]">
+        <div className="mt-auto grid grid-cols-3 gap-[3cqw] border-t border-black/20 pt-[3cqw]">
           {[
             [formatNumber(recap.totals.minutes), "minutos"],
             [formatNumber(recap.totals.titles), "títulos"],
@@ -1250,8 +1254,13 @@ export function SummarySlide({ recap, theme, user, onReplay, onShare, shareState
           ].map(([value, label]) => (
             <div key={label} className="min-w-0">
               <p
-                className={`${DISPLAY} ${label === "género top" ? "line-clamp-2 break-words text-[6.5cqw]" : "truncate text-[9cqw]"}`}
-                style={ANTON}
+                // Anton es muy alta: con el interlineado apretado de DISPLAY, el
+                // recorte de truncate/line-clamp cortaba la parte de arriba y de
+                // abajo de las cifras. Aquí el interlineado deja sitio al glifo.
+                className={`uppercase tracking-[-0.005em] ${label === "género top" ? "line-clamp-2 break-words leading-[1.15]" : "whitespace-nowrap leading-[1.2]"}`}
+                // Cada cifra a su tamaño para que entre COMPLETA en su columna
+                // (≈25cqw): "7.284" a 9cqw, "26.823" más pequeña.
+                style={{ ...ANTON, fontSize: label === "género top" ? "6.5cqw" : `${Math.min(9, 42 / Math.max(String(value).length, 1))}cqw` }}
               >
                 {value}
               </p>

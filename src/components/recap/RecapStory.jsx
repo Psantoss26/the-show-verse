@@ -18,6 +18,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import useBodyScrollLock from "@/hooks/useBodyScrollLock";
 import {
   RECAP_THEMES,
+  backgroundArt,
+  backgroundUrl,
   buildRecapSlides,
   soundtrackSubjects,
   tmdbImg,
@@ -67,7 +69,8 @@ function cardPayload(recap, user) {
     genre: recap.genres?.top?.[0]?.name || "",
     shows: recap.shows.top.slice(0, 5).map(pick),
     movies: recap.movies.top.slice(0, 5).map(pick),
-    backdropPath: recap.topTitle?.backdropPath || null,
+    // Fondo de la cabecera: arte sin idioma del título del año.
+    backgroundPath: backgroundArt(recap.topTitle)?.path || null,
   };
 }
 
@@ -120,8 +123,8 @@ export default function RecapStory({ recap, user, onClose }) {
   // Precarga de lo que más pesa: fondos y pósters de los tops.
   useEffect(() => {
     preload([
-      tmdbImg(recap.shows?.top?.[0]?.backdropPath, "w1280"),
-      tmdbImg(recap.movies?.top?.[0]?.backdropPath, "w1280"),
+      backgroundUrl(recap.shows?.top?.[0]),
+      backgroundUrl(recap.movies?.top?.[0]),
       ...(recap.shows?.top || []).map((s) => tmdbImg(s.posterPath, "w342")),
       ...(recap.movies?.top || []).map((m) => tmdbImg(m.posterPath, "w342")),
     ]);
@@ -351,8 +354,11 @@ export default function RecapStory({ recap, user, onClose }) {
           <ChevronRight aria-hidden="true" className="h-6 w-6" />
         </button>
 
+        {/* Escritorio: el marco 9:16 ocupa el alto de la ventana (40 px de
+            margen arriba y abajo) y, si la ventana es estrecha, el ancho que dejan libres las
+            flechas laterales (100 px a cada lado). */}
         <div
-          className={`${styles.frame} relative h-[100svh] w-screen touch-manipulation select-none overflow-hidden sm:h-[min(calc(100svh-48px),920px)] sm:w-[min(calc((100svh-48px)*9/16),517px)] sm:rounded-[28px] sm:shadow-[0_40px_120px_-20px_rgba(0,0,0,0.8)]`}
+          className={`${styles.frame} relative h-[100svh] w-screen touch-manipulation select-none overflow-hidden sm:h-[min(calc(100svh-80px),calc((100vw-200px)*16/9))] sm:w-[min(calc((100svh-80px)*9/16),calc(100vw-200px))] sm:rounded-[28px] sm:shadow-[0_40px_120px_-20px_rgba(0,0,0,0.8)]`}
           onPointerDown={onPointerDown}
           onPointerUp={(event) => endPress(event)}
           onPointerCancel={(event) => endPress(event, true)}
