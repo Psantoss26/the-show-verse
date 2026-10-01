@@ -148,7 +148,9 @@ export function FollowingActivityAvatars({ data, mediaType, onOpen, compact = fa
         className={compact ? "ml-auto grid w-full min-w-0 items-center" : "flex items-center gap-2.5"}
         style={compact ? {
           gridTemplateColumns: avatarCount > 1 ? `repeat(${avatarCount - 1}, minmax(0, 1fr)) 38px` : "38px",
-          maxWidth: `${38 + (avatarCount - 1) * 40}px`,
+          // Cada foto añade solo 18px: el solapamiento se mantiene también
+          // cuando sobra ancho y aumenta si el hueco disponible se estrecha.
+          maxWidth: `${38 + (avatarCount - 1) * 18}px`,
         } : undefined}
         aria-hidden="true"
       >
