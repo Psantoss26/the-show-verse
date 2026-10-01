@@ -175,12 +175,13 @@ export function FollowingActivityAvatars({ data, mediaType, onOpen }) {
 }
 
 /** Franja compacta de la cabecera. `onOpen` lleva a la sección completa. */
-export function FollowingActivityStrip({ data, onOpen, className = "", phoneLayout = false }) {
+export function FollowingActivityStrip({ data, onOpen, className = "", phoneLayout = false, compactWatchedSummary = false }) {
   if (!hasFollowingActivity(data)) return null;
   const items = data.items;
   const shown = items.slice(0, 4);
   const extra = items.length - shown.length;
-  const chips = summaryChips(data);
+  const multipleWatched = items.filter((item) => item.watched).length > 1;
+  const chips = compactWatchedSummary && multipleWatched ? [] : summaryChips(data);
   return (
     <button
       type="button"
