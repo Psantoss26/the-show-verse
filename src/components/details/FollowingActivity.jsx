@@ -145,10 +145,10 @@ export function FollowingActivityAvatars({ data, mediaType, onOpen, compact = fa
       className={`group flex items-center rounded-full p-0.5 transition-colors hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400/70 ${compact ? "w-full min-w-0" : "gap-2.5"}`}
     >
       <span
-        className={compact ? "grid w-full min-w-0 items-center" : "flex items-center gap-2.5"}
+        className={compact ? "ml-auto grid w-full min-w-0 items-center" : "flex items-center gap-2.5"}
         style={compact ? {
           gridTemplateColumns: avatarCount > 1 ? `repeat(${avatarCount - 1}, minmax(0, 1fr)) 38px` : "38px",
-          maxWidth: `${38 + (avatarCount - 1) * 24}px`,
+          maxWidth: `${38 + (avatarCount - 1) * 40}px`,
         } : undefined}
         aria-hidden="true"
       >
@@ -161,8 +161,8 @@ export function FollowingActivityAvatars({ data, mediaType, onOpen, compact = fa
             // 32.5px de cada lado; con una caja de 16px eso es -2.5px desde
             // la esquina. Queda montado sobre el canto de la foto.
             <span key={item.user.username} className="relative block h-[38px] w-[38px] shrink-0" title={describe(item)}>
-              <PersonAvatar user={item.user} className={`h-full w-full ${compact ? "ring-2 ring-zinc-900" : ""}`} />
-              {mark ? (
+              <PersonAvatar user={item.user} className="h-full w-full" />
+              {mark && !compact ? (
                 // Solo el icono, sin pastilla ni borde: una sombra apretada lo
                 // separa de la foto para que se lea sobre cualquier avatar.
                 <span className="absolute -bottom-[2.5px] -right-[2.5px] flex h-4 w-4 items-center justify-center [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.95))_drop-shadow(0_0_3px_rgba(0,0,0,0.85))]">
@@ -200,10 +200,10 @@ export function FollowingActivityStrip({ data, onOpen, className = "", phoneLayo
       <LiquidGlassOpticalLayers />
       <span className="relative z-10 flex shrink-0 -space-x-2" aria-hidden="true">
         {shown.map((item) => (
-          <PersonAvatar key={item.user.username} user={item.user} className="h-8 w-8 ring-2 ring-black/70" />
+          <PersonAvatar key={item.user.username} user={item.user} className="h-8 w-8" />
         ))}
         {extra > 0 ? (
-          <span className="relative inline-flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800 text-[11px] font-bold text-white ring-2 ring-black/70">
+          <span className="relative inline-flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800 text-[11px] font-bold text-white">
             +{extra}
           </span>
         ) : null}
