@@ -2947,7 +2947,7 @@ function NavbarContent() {
                               }`}
                             >
                               <PartyPopper className="h-4 w-4 shrink-0 text-lime-300" />
-                              <span className="truncate">Tu año</span>
+                              <span className="truncate">Recap</span>
                             </Link>
 
                             <Link
@@ -3528,7 +3528,7 @@ function NavbarContent() {
                     }`}
                   >
                     <PartyPopper className="h-5 w-5 text-lime-300" />
-                    <span>Tu año</span>
+                    <span>Recap</span>
                   </Link>
 
                   <Link
