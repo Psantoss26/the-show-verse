@@ -17,6 +17,13 @@ import AwardCard, {
   sortAwardItemsForDisplay,
 } from "@/components/details/AwardCard";
 import SectionTitle from "@/components/details/SectionTitle";
+import {
+  FollowingActivityAvatars,
+  FollowingActivitySection,
+  FollowingActivityStrip,
+  hasFollowingActivity,
+  useFollowingActivity,
+} from "@/components/details/FollowingActivity";
 import Avatar from "@/components/ui/Avatar";
 // -- Hooks de React --
 import {
@@ -99,6 +106,7 @@ import {
   TrendingUp,
   Layers,
   Users,
+  UsersRound,
   Building2,
   MapPin,
   Languages,
@@ -7483,6 +7491,13 @@ export default function DetailsClient({
 
   const castSectionLoading = creativeCreditsLoading || tmdbCastLoading;
 
+  // Actividad de las cuentas que sigues con este título ("Tus amigos"). Solo
+  // con sesión; sin nadie que mostrar, ni franja ni sección.
+  const followingActivity = useFollowingActivity(type, id, {
+    enabled: authenticated,
+  });
+  const showFollowingActivity = hasFollowingActivity(followingActivity);
+
   const sectionItems = useMemo(() => {
     const items = [];
 
@@ -7568,6 +7583,16 @@ export default function DetailsClient({
       });
     }
 
+    // Tus amigos: va justo antes de Comentarios y Listas, en el bloque social.
+    if (showFollowingActivity) {
+      items.push({
+        id: "following",
+        label: "Amigos",
+        icon: UsersRound,
+        count: followingActivity.items.length,
+      });
+    }
+
     // Comentarios comunitarios, almacenados en nuestra BBDD.
     const commentsCount = Number(tComments?.total || 0) || 0;
 
@@ -7604,6 +7629,8 @@ export default function DetailsClient({
     collectionLoading,
     awardItems,
     awardsLoading,
+    showFollowingActivity,
+    followingActivity,
   ]);
 
   // Menú global (scroll + sticky + spy). Los dos valores salen de
@@ -7734,11 +7761,55 @@ export default function DetailsClient({
         }
       };
 
-      window.addEventListener("scrollend", releasePending, { once: true });
-      pendingScrollEndCleanupRef.current = () => {
-        window.removeEventListener("scrollend", releasePending);
+      // Las secciones de ENCIMA pueden terminar de pintarse mientras la página
+      // baja (rejillas, imágenes, bloques diferidos) y empujar el destino: con
+      // un solo scrollTo el usuario se quedaba a cientos de píxeles de la
+      // sección. Al acabar cada desplazamiento se vuelve a medir y, si se ha
+      // movido, se corrige (como mucho dos veces; en el final de la página no
+      // se puede subir más y no se insiste).
+      const settle = (attempt) => {
+        if (pendingScrollEndCleanupRef.current) {
+          pendingScrollEndCleanupRef.current();
+          pendingScrollEndCleanupRef.current = null;
+        }
+        if (pendingSectionTimerRef.current) {
+          window.clearTimeout(pendingSectionTimerRef.current);
+          pendingSectionTimerRef.current = null;
+        }
+        if (pendingSectionRef.current !== sid) return;
+        const drift = el.getBoundingClientRect().top - offset;
+        const atBottom =
+          window.scrollY + window.innerHeight >=
+          document.documentElement.scrollHeight - 2;
+        if (attempt < 2 && Math.abs(drift) > 24 && !(drift > 0 && atBottom)) {
+          arm(attempt + 1);
+          window.scrollTo({
+            top: Math.max(0, window.scrollY + drift),
+            behavior: "smooth",
+          });
+          return;
+        }
+        releasePending();
       };
-      pendingSectionTimerRef.current = window.setTimeout(releasePending, 1800);
+
+      const arm = (attempt) => {
+        const onEnd = () => settle(attempt);
+        // Si el usuario toma el control (rueda, toque, teclado), se acabó
+        // corregir: no se pelea con su scroll.
+        const onUser = () => releasePending();
+        const userEvents = ["wheel", "touchstart", "keydown"];
+        window.addEventListener("scrollend", onEnd, { once: true });
+        userEvents.forEach((type) =>
+          window.addEventListener(type, onUser, { once: true, passive: true }),
+        );
+        pendingScrollEndCleanupRef.current = () => {
+          window.removeEventListener("scrollend", onEnd);
+          userEvents.forEach((type) => window.removeEventListener(type, onUser));
+        };
+        pendingSectionTimerRef.current = window.setTimeout(onEnd, 1800);
+      };
+
+      arm(0);
 
       window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
     },
@@ -10075,6 +10146,24 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   text: `Echa un vistazo a ${title} en The Show Verse`,
                 }}
                 stats={tScoreboard?.stats}
+                // Escritorio: tus amigos a la derecha de la fila de stats, solo
+                // avatar + su marca (nota, viéndola, pendiente…).
+                statsTrailing={
+                  showFollowingActivity ? (
+                    <FollowingActivityAvatars
+                      data={followingActivity}
+                      mediaType={type}
+                      onOpen={() => scrollToSection("following")}
+                    />
+                  ) : null
+                }
+                />
+                {/* Teléfono: la fila de stats es un carril sin "derecha", así
+                    que tus amigos van en una franja bajo el marcador. */}
+                <FollowingActivityStrip
+                  data={followingActivity}
+                  onOpen={() => scrollToSection("following")}
+                  className="mt-3 sm:hidden"
                 />
               </div>
             </div>
@@ -11966,6 +12055,26 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           Esta sección solo aplica a series.
                         </div>
                       )}
+                    </AnimatedSection>
+                  </section>
+                )}
+
+                {showFollowingActivity && (
+                  <section
+                    id="section-following"
+                    ref={registerSection("following")}
+                  >
+                    <AnimatedSection delay={0.04} renderImmediately>
+                      <section className="mb-10 group/section">
+                        <SectionTitle
+                          title="Tus amigos"
+                          icon={UsersRound}
+                        />
+                        <FollowingActivitySection
+                          data={followingActivity}
+                          mediaType={type}
+                        />
+                      </section>
                     </AnimatedSection>
                   </section>
                 )}

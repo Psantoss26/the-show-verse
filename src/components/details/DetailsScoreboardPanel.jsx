@@ -298,6 +298,10 @@ export function DetailsStatsRow({
   pending = false,
   // Disposición de teléfono forzada (ver `phoneLayout` del panel).
   phone = false,
+  // Contenido anclado a la DERECHA de la fila, solo en escritorio (p. ej. los
+  // avatares de "Tus amigos" en la ficha). En teléfono no se pinta: la fila es
+  // un carril que se desplaza y no tiene "derecha".
+  trailing = null,
 }) {
   const customStatItems = Array.isArray(statItems)
     ? statItems.filter((item) => item?.label && item?.value != null)
@@ -307,7 +311,11 @@ export function DetailsStatsRow({
   const hasStats = Object.values(stats || {}).some(
     (v) => typeof v === "number",
   );
-  if (!hasCustomStats && !hasStats && !pending) return null;
+  const showTrailing = Boolean(trailing) && !phone;
+  if (!hasCustomStats && !hasStats && !pending && !showTrailing) return null;
+  const trailingNode = showTrailing ? (
+    <div className="ml-auto hidden shrink-0 items-center sm:flex">{trailing}</div>
+  ) : null;
 
   // Teléfono: una sola fila que se desplaza, sin etiquetas. Los `sm:`/`md:`
   // miran el viewport, así que en la ficha de teléfono del drawer (tablet)
@@ -340,6 +348,7 @@ export function DetailsStatsRow({
                 phone={phone}
               />
             ))}
+            {trailingNode}
           </div>
         </div>
       </div>
@@ -351,6 +360,17 @@ export function DetailsStatsRow({
   // sería "no hay dato"; durante la carga no se sabe ninguna de las dos cosas.
   const statValue = (value) =>
     hasStats ? formatShortNumber(value ?? 0)?.toUpperCase() || "0" : null;
+
+  // Sin stats (ni pendientes) pero con contenido a la derecha: solo eso.
+  if (!hasStats && !pending) {
+    return (
+      <div className="relative z-10 hidden rounded-b-2xl border-t border-white/5 bg-black/[0.04] sm:block">
+        <div className={statsScrollerClass}>
+          <div className={statsTrackClass}>{trailingNode}</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative z-10 border-t border-white/5 bg-black/[0.04] rounded-b-2xl">
@@ -397,6 +417,7 @@ export function DetailsStatsRow({
               tooltip="Favoritos"
             />
           )}
+          {trailingNode}
         </div>
       </div>
     </div>
@@ -679,6 +700,8 @@ export default function DetailsScoreboardPanel({
   // empujar hacia abajo lo que tenga debajo. Es opcional: quien no la pase
   // conserva el comportamiento anterior.
   statsPending = false,
+  // Contenido a la derecha de la fila de stats, solo en escritorio.
+  statsTrailing = null,
   externalLinks = null,
   streamingProviders = null,
   onMoreLinks,
@@ -737,7 +760,7 @@ export default function DetailsScoreboardPanel({
   // `statsPending` cuenta como contenido: si no, el panel entero no se montaría
   // hasta que llegasen las stats y aparecería de golpe, que es justo el salto
   // que se quiere evitar.
-  if (!hasToolbar && !hasStats && !hasCustomStats && !statsPending && !children) return null;
+  if (!hasToolbar && !hasStats && !hasCustomStats && !statsPending && !statsTrailing && !children) return null;
 
   return (
     <div
@@ -823,6 +846,7 @@ export default function DetailsScoreboardPanel({
         showFavoritedStat={showFavoritedStat}
         pending={statsPending}
         phone={phoneLayout}
+        trailing={statsTrailing}
       />
 
       {children}

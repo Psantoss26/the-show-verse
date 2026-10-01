@@ -9,6 +9,7 @@ import {
 } from '../community/store.js';
 import { db } from '../db/client.js';
 import { invalidateLevelState } from '../level/store.js';
+import { getFollowingTitleActivity } from '../lib/followingTitleActivity.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -128,6 +129,15 @@ export default async function communityRoutes(fastify) {
 
   fastify.delete('/lists/:id/like', { preHandler: fastify.requireAuth }, (req, reply) =>
     toggleListLike(req, reply, unlikeCommunityList));
+
+  // GET /:type/:tmdbId/following — "Tus amigos": qué han hecho con este título
+  // las cuentas que sigue el usuario. Solo con sesión; nunca se cachea en el borde.
+  fastify.get('/:type/:tmdbId/following', { preHandler: fastify.requireAuth }, async (req, reply) => {
+    const t = parseTarget(req, reply); if (!t) return;
+    const activity = await getFollowingTitleActivity(db, req.user.id, { mediaType: t.type, tmdbId: t.tmdbId });
+    reply.header('Cache-Control', 'private, no-store');
+    return activity;
+  });
 
   // Combined summary for SSR (one round-trip).
   fastify.get('/:type/:tmdbId/summary', async (req, reply) => {
