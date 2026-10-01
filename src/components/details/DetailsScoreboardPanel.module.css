@@ -39,6 +39,18 @@
   container: detail-scoreboard / inline-size;
 }
 
+/* En backdrop, las fotos comparten una sola línea con las estadísticas.
+   En paneles estrechos cedemos las etiquetas antes de perder esa línea. */
+@container detail-scoreboard (width < 32rem) {
+  .compactStatsTrack > div > div > span:last-child {
+    display: none;
+  }
+
+  .compactStatsTrack > div {
+    padding-inline: 0;
+  }
+}
+
 /* 40rem = las cinco insignias con los botones ya compactados. Por debajo, la
    fila empezaría a apretarse: antes de eso se van estas dos. */
 @container detail-scoreboard (width < 40rem) {

@@ -128,10 +128,11 @@ function PersonAvatar({ user, className = "h-8 w-8" }) {
  * marcador, cada uno con su marca (la nota; si no, "viéndola" en series; si no,
  * pendiente…). Sin texto: el detalle está en la sección, a un clic.
  */
-export function FollowingActivityAvatars({ data, mediaType, onOpen }) {
+export function FollowingActivityAvatars({ data, mediaType, onOpen, compact = false }) {
   if (!hasFollowingActivity(data)) return null;
   const shown = data.items.slice(0, 5);
   const extra = data.items.length - shown.length;
+  const avatarCount = shown.length + (extra > 0 ? 1 : 0);
   const describe = (item) => {
     const mark = primaryMark(item, mediaType);
     return `${item.user.displayName}${mark ? `, ${mark.label.toLowerCase()}` : ""}`;
@@ -141,9 +142,16 @@ export function FollowingActivityAvatars({ data, mediaType, onOpen }) {
       type="button"
       onClick={onOpen}
       aria-label={`Tus amigos. ${shown.map(describe).join(". ")}${extra > 0 ? `. Y ${extra} más` : ""}. Ver su actividad`}
-      className="group flex items-center gap-2.5 rounded-full p-0.5 transition-colors hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400/70"
+      className={`group flex items-center rounded-full p-0.5 transition-colors hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400/70 ${compact ? "w-full min-w-0" : "gap-2.5"}`}
     >
-      <span className="flex items-center gap-2.5" aria-hidden="true">
+      <span
+        className={compact ? "grid w-full min-w-0 items-center" : "flex items-center gap-2.5"}
+        style={compact ? {
+          gridTemplateColumns: avatarCount > 1 ? `repeat(${avatarCount - 1}, minmax(0, 1fr)) 38px` : "38px",
+          maxWidth: `${38 + (avatarCount - 1) * 24}px`,
+        } : undefined}
+        aria-hidden="true"
+      >
         {shown.map((item) => {
           const mark = primaryMark(item, mediaType);
           return (
@@ -153,7 +161,7 @@ export function FollowingActivityAvatars({ data, mediaType, onOpen }) {
             // 32.5px de cada lado; con una caja de 16px eso es -2.5px desde
             // la esquina. Queda montado sobre el canto de la foto.
             <span key={item.user.username} className="relative block h-[38px] w-[38px] shrink-0" title={describe(item)}>
-              <PersonAvatar user={item.user} className="h-full w-full" />
+              <PersonAvatar user={item.user} className={`h-full w-full ${compact ? "ring-2 ring-zinc-900" : ""}`} />
               {mark ? (
                 // Solo el icono, sin pastilla ni borde: una sombra apretada lo
                 // separa de la foto para que se lea sobre cualquier avatar.
