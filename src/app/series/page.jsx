@@ -194,7 +194,10 @@ async function getCriticalDashboardData() {
         recognizedTV,
         awarded: curatedAwarded,
       },
-      { size: FEATURED_HERO_SIZE },
+      // Igual que Inicio, CON su reserva: el hero de Inicio puede acabar
+      // mostrando cualquiera de esos candidatos (ver featuredPersonalize.js),
+      // así que se excluyen todos para no repetir títulos entre dashboards.
+      { size: FEATURED_HERO_SIZE, reserve: FEATURED_HERO_RESERVE },
     );
     const { mediaKeys, titleKeys } = getFeaturedExclusionKeys(mainFeatured);
     const featured = buildFeatured(

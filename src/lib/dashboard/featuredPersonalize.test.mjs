@@ -57,3 +57,12 @@ test("buildFeatured: la reserva va detrás de la selección y no la repite", () 
   assert.deepEqual(ids(withReserve.slice(0, FEATURED_HERO_SIZE)), ids(plain));
   assert.equal(new Set(ids(withReserve)).size, withReserve.length);
 });
+
+test("hero: los títulos del hero de Inicio solo entran como último recurso", () => {
+  const items = Array.from({ length: 6 }, (_, i) => movie(i + 1));
+  const seen = new Set(["movie:2"]);
+  const avoid = new Set(["movie:1", "movie:3"]);
+  assert.deepEqual(ids(pickFreshFeatured(items, seen, 4, avoid)), [4, 5, 6, 2]);
+  assert.deepEqual(ids(pickFreshFeatured(items, seen, 6, avoid)), [4, 5, 6, 2, 1, 3]);
+  assert.deepEqual(ids(pickFreshFeatured(items, new Set(), 3, avoid)), [2, 4, 5]);
+});

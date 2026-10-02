@@ -28,6 +28,9 @@ const COMPLETED_CACHE_KEY = "showverse:showverse:completed:v4";
 const LIBRARY_SEEN_CACHE_KEY = "showverse:featured:library-seen:v1";
 const LIBRARY_SEEN_CACHE_LIMIT = 400;
 const STATES_BATCH_SIZE = 100;
+// Títulos que acaba de mostrar el hero de cada dashboard (`home`, …). Películas
+// y Series evitan los de Inicio para no repetir hero entre dashboards.
+const SHOWN_CACHE_PREFIX = "showverse:featured:shown:";
 
 function readJson(key) {
   try {
@@ -151,33 +154,78 @@ async function fetchKnownKeys(items, signal) {
   return known;
 }
 
-// ELIGE el hero: primero los títulos que el usuario no conoce (en el orden en
-// que llegan: la selección normal y después la reserva) y, solo si no hay
-// bastantes, completa con los ya vistos de la selección normal. Siempre
-// devuelve `size` títulos si los candidatos alcanzan.
-export function pickFreshFeatured(items, seenKeys, size = FEATURED_HERO_SIZE) {
+// Claves que mostró por última vez el hero de otro dashboard.
+function readShownKeys(scopes) {
+  const keys = new Set();
+  for (const scope of scopes) {
+    const stored = readJson(`${SHOWN_CACHE_PREFIX}${scope}`);
+    if (!Array.isArray(stored)) continue;
+    for (const key of stored) if (typeof key === "string") keys.add(key);
+  }
+  return keys;
+}
+
+function storeShownKeys(scope, items) {
+  try {
+    const keys = items
+      .map((item) => getMediaKey(item, item?.media_type || "movie"))
+      .filter(Boolean);
+    window.localStorage.setItem(`${SHOWN_CACHE_PREFIX}${scope}`, JSON.stringify(keys));
+  } catch {
+    // Almacenamiento no disponible: queda la exclusión del servidor.
+  }
+}
+
+// ELIGE el hero, en este orden de preferencia:
+//   1. títulos que el usuario no conoce (en el orden en que llegan: la
+//      selección normal y después la reserva);
+//   2. si no hay bastantes, los ya vistos;
+//   3. y solo como último recurso, los que ya muestra el hero de otro
+//      dashboard (`avoidKeys`): no repetir pesa más que no haberlo visto.
+// Siempre devuelve `size` títulos si los candidatos alcanzan.
+export function pickFreshFeatured(
+  items,
+  seenKeys,
+  size = FEATURED_HERO_SIZE,
+  avoidKeys = null,
+) {
   if (!Array.isArray(items) || items.length === 0) return items || [];
-  if (!seenKeys || seenKeys.size === 0) return items.slice(0, size);
+  const hasSeen = seenKeys && seenKeys.size > 0;
+  const hasAvoid = avoidKeys && avoidKeys.size > 0;
+  if (!hasSeen && !hasAvoid) return items.slice(0, size);
 
   const fresh = [];
   const seen = [];
+  const avoided = [];
   for (const item of items) {
     const key = getMediaKey(item, item?.media_type || "movie");
-    if (key && seenKeys.has(key)) seen.push(item);
+    if (key && hasAvoid && avoidKeys.has(key)) avoided.push(item);
+    else if (key && hasSeen && seenKeys.has(key)) seen.push(item);
     else fresh.push(item);
   }
-  return [...fresh, ...seen].slice(0, size);
+  return [...fresh, ...seen, ...avoided].slice(0, size);
 }
 
 // Hook para los dashboards: devuelve la lista del hero ya personalizada. En SSR y
 // en el PRIMER render del cliente devuelve la selección normal (evita desajustes
 // de hidratación); tras montar, filtra con las cachés y, después, con la
 // biblioteca real.
-export function usePersonalizedFeatured(rawItems, size = FEATURED_HERO_SIZE) {
+//
+// `publishAs` guarda lo que acaba mostrando este hero (Inicio) y `avoid` lista
+// los dashboards cuyo hero no hay que repetir (Películas y Series evitan el de
+// Inicio). El servidor ya excluye todos los candidatos de Inicio; esto cubre
+// las regeneraciones de páginas estáticas con datos de TMDB algo distintos.
+export function usePersonalizedFeatured(
+  rawItems,
+  { size = FEATURED_HERO_SIZE, publishAs = null, avoid = null } = {},
+) {
   const [seenKeys, setSeenKeys] = useState(null);
+  const [avoidKeys, setAvoidKeys] = useState(null);
+  const avoidScopes = Array.isArray(avoid) ? avoid.join(",") : "";
 
   useEffect(() => {
     setSeenKeys(readSeenAndFavoriteKeys());
+    setAvoidKeys(avoidScopes ? readShownKeys(avoidScopes.split(",")) : null);
     if (!Array.isArray(rawItems) || rawItems.length === 0) return undefined;
 
     const controller = new AbortController();
@@ -192,10 +240,17 @@ export function usePersonalizedFeatured(rawItems, size = FEATURED_HERO_SIZE) {
         // Sin red o abortado: el hero se queda con el filtrado local.
       });
     return () => controller.abort();
-  }, [rawItems]);
+  }, [rawItems, avoidScopes]);
 
-  return useMemo(() => {
+  const picked = useMemo(() => {
     if (!seenKeys) return Array.isArray(rawItems) ? rawItems.slice(0, size) : rawItems;
-    return pickFreshFeatured(rawItems, seenKeys, size);
-  }, [rawItems, seenKeys, size]);
+    return pickFreshFeatured(rawItems, seenKeys, size, avoidKeys);
+  }, [rawItems, seenKeys, avoidKeys, size]);
+
+  useEffect(() => {
+    if (!publishAs || !seenKeys || !Array.isArray(picked) || !picked.length) return;
+    storeShownKeys(publishAs, picked);
+  }, [publishAs, seenKeys, picked]);
+
+  return picked;
 }
