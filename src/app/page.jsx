@@ -9,7 +9,6 @@ import {
   fetchPopularMovies,
   fetchPopularTV,
   discoverMovies,
-  discoverTV,
   fetchMediaByGenre,
 } from "@/lib/api/tmdb";
 import { balanceSoftLimitedDashboardContent } from "@/lib/dashboard/contentBalance";
@@ -19,6 +18,7 @@ import {
   FEATURED_HERO_RESERVE,
   FEATURED_HERO_SIZE,
 } from "@/lib/dashboard/featured";
+import { fetchFeaturedSources } from "@/lib/dashboard/featuredSources";
 import { combineTopRatedItems } from "@/lib/dashboard/topRated";
 
 export const dynamic = "force-static";
@@ -88,8 +88,7 @@ async function getDashboardData() {
       trendingTV,
       popularMovies,
       popularTV,
-      recognizedMovies,
-      recognizedTV,
+      featuredSources,
     ] = await Promise.all([
       fetchTopRatedMovies(5000),
       fetchTopRatedTV(5000),
@@ -109,18 +108,9 @@ async function getDashboardData() {
       fetchTrendingTV(),
       fetchPopularMovies(),
       fetchPopularTV(),
-      discoverMovies({
-        "vote_average.gte": 6.7,
-        "vote_count.gte": 2500,
-        sort_by: "vote_count.desc",
-        page: 1,
-      }),
-      discoverTV({
-        "vote_average.gte": 6.7,
-        "vote_count.gte": 1200,
-        sort_by: "vote_count.desc",
-        page: 1,
-      }),
+      // Fuentes del hero, compartidas con Películas y Series (que las usan
+      // para no repetir los títulos de este hero).
+      fetchFeaturedSources(),
     ]);
 
     // Top 20 películas y Top 20 series — se usan los backdrop_path del endpoint de lista.
@@ -152,18 +142,10 @@ async function getDashboardData() {
 
     return {
       topRated: topRatedSSR,
-      featured: buildFeatured(
-        {
-          trendingMovies,
-          trendingTV,
-          popularMovies,
-          popularTV,
-          recognizedMovies,
-          recognizedTV,
-          awarded: awardedSSR,
-        },
-        { size: FEATURED_HERO_SIZE, reserve: FEATURED_HERO_RESERVE },
-      ),
+      featured: buildFeatured(featuredSources, {
+        size: FEATURED_HERO_SIZE,
+        reserve: FEATURED_HERO_RESERVE,
+      }),
       awarded: awardedSSR,
       dramaTV: curateList(dramaTV, {
         minVotes: 1000,
