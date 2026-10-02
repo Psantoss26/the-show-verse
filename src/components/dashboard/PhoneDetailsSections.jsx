@@ -239,6 +239,10 @@ export default function PhoneDetailsSections({
   const { cacheArtworkOverrides } = useAuth();
   const id = item?.id ?? null;
   const type = mediaType === "tv" ? "tv" : "movie";
+  // "Amigos" solo existe si hay sesión y alguno de tus seguidos ha tocado el
+  // título: sin actividad no se pinta ni la entrada del menú ni la sección.
+  const showFollowingActivity =
+    canAccessFollowingActivity && hasFollowingActivity(followingActivity);
 
   /* ----------------------------- PREMIOS ----------------------------- */
   // Misma consulta que la ficha completa: la sección de premios es
@@ -955,14 +959,12 @@ export default function PhoneDetailsSections({
       items.push({ id: "seasons", label: "Temporadas", icon: Layers });
       items.push({ id: "episodes", label: "Episodios", icon: BarChart3 });
     }
-    if (canAccessFollowingActivity) {
+    if (showFollowingActivity) {
       items.push({
         id: "following",
         label: "Amigos",
         icon: UsersRound,
-        count: hasFollowingActivity(followingActivity)
-          ? followingActivity.items.length
-          : undefined,
+        count: followingActivity.items.length,
       });
     }
     items.push({
@@ -992,7 +994,7 @@ export default function PhoneDetailsSections({
     images?.logos?.length,
     videos.length,
     type,
-    canAccessFollowingActivity,
+    showFollowingActivity,
     followingActivity,
   ]);
 
@@ -1924,7 +1926,7 @@ export default function PhoneDetailsSections({
           </section>
         )}
 
-        {canAccessFollowingActivity && (
+        {showFollowingActivity && (
           <section className="sv-phone-section" id="phone-section-following" ref={registerSection("following")}>
             <AnimatedSection delay={0.04} renderImmediately>
               <section className="group/section">
@@ -1932,7 +1934,6 @@ export default function PhoneDetailsSections({
                 <FollowingActivitySection
                   data={followingActivity}
                   mediaType={type}
-                  loading={!followingActivity}
                   phoneLayout={followingActivityPhoneLayout}
                 />
               </section>
