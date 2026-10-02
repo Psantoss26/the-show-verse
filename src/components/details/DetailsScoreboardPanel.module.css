@@ -54,7 +54,17 @@
 /* 40rem = las cinco insignias con los botones ya compactados. Por debajo, la
    fila empezaría a apretarse: antes de eso se van estas dos. */
 @container detail-scoreboard (width < 40rem) {
-  .optionalScore {
+  .panel:not(.fitAllScores) .optionalScore {
+    display: none;
+  }
+}
+
+/* PORTADA BACKDROP (DetailsClient): los botones de la barra son solo iconos
+   (enlaces y compartir), así que las cinco insignias, el separador y los dos
+   botones redondos piden ~36rem. El panel de ~37,5rem las muestra todas y RT y
+   Metacritic solo se retiran si de verdad no caben. */
+@container detail-scoreboard (width < 36.5rem) {
+  .fitAllScores .optionalScore {
     display: none;
   }
 }
