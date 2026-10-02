@@ -7584,14 +7584,14 @@ export default function DetailsClient({
       });
     }
 
-    // Tus amigos aparece junto con el resto del menú para una sesión activa;
-    // la sección resuelve después su estado de carga, actividad o vacío.
-    if (canAccessFollowingActivity) {
+    // Tus amigos solo aparece cuando alguno de tus seguidos ha tocado el
+    // título: sin actividad no hay entrada de menú ni sección vacía.
+    if (showFollowingActivity) {
       items.push({
         id: "following",
         label: "Amigos",
         icon: UsersRound,
-        count: showFollowingActivity ? followingActivity.items.length : undefined,
+        count: followingActivity.items.length,
       });
     }
 
@@ -7631,7 +7631,6 @@ export default function DetailsClient({
     collectionLoading,
     awardItems,
     awardsLoading,
-    canAccessFollowingActivity,
     showFollowingActivity,
     followingActivity,
   ]);
@@ -12081,7 +12080,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   </section>
                 )}
 
-                {canAccessFollowingActivity && (
+                {showFollowingActivity && (
                   <section
                     id="section-following"
                     ref={registerSection("following")}
@@ -12095,7 +12094,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         <FollowingActivitySection
                           data={followingActivity}
                           mediaType={type}
-                          loading={!followingActivity}
                         />
                       </section>
                     </AnimatedSection>
