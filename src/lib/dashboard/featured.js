@@ -10,6 +10,11 @@ const FEATURED_SOURCE_WEIGHTS = {
   awarded: 0.34,
 };
 
+// Títulos que muestra el hero y candidatos de reserva que viajan con ellos para
+// sustituir en el cliente a los que el usuario ya ha visto o puntuado.
+export const FEATURED_HERO_SIZE = 10;
+export const FEATURED_HERO_RESERVE = 30;
+
 const FEATURED_ROTATION_WINDOW_MS = 30 * 60 * 1000;
 const FEATURED_ROTATION_POOL_MULTIPLIER = 3;
 const FEATURED_ROTATION_JITTER = 0.32;
@@ -135,6 +140,11 @@ export function buildFeatured(
   } = {},
   {
     size = 10,
+    // Candidatos de RESERVA tras la selección: el cliente los usa para cubrir
+    // los huecos de los títulos que el usuario ya ha visto o puntuado (ver
+    // featuredPersonalize.js). El resultado mide `size + reserve`; los
+    // `size` primeros son la selección normal, sin cambios.
+    reserve = 0,
     mediaTypes = ["movie", "tv"],
     excludeMediaKeys = new Set(),
     excludeTitleKeys = new Set(),
@@ -310,7 +320,30 @@ export function buildFeatured(
     ...selected.slice(0, startIndex),
   ];
 
-  return rotatedSelection.map((item) => {
+  // Reserva: los siguientes del ranking, con el mismo tope de estrenos
+  // recientes que la selección para que un hero personalizado no se llene de
+  // novedades. Si no alcanza, se completa sin el tope.
+  const reserveItems = [];
+  if (reserve > 0) {
+    const taken = new Set(selected.map((item) => item.__featuredKey));
+    for (const item of ranked) {
+      if (reserveItems.length >= reserve) break;
+      if (taken.has(item.__featuredKey)) continue;
+      const recent = isRecentRelease(item);
+      if (recent && recentCount >= maxRecent) continue;
+      reserveItems.push(item);
+      taken.add(item.__featuredKey);
+      if (recent) recentCount += 1;
+    }
+    for (const item of ranked) {
+      if (reserveItems.length >= reserve) break;
+      if (taken.has(item.__featuredKey)) continue;
+      reserveItems.push(item);
+      taken.add(item.__featuredKey);
+    }
+  }
+
+  return [...rotatedSelection, ...reserveItems].map((item) => {
     const cleanItem = { ...item };
     delete cleanItem.__featuredKey;
     delete cleanItem.__featuredSources;

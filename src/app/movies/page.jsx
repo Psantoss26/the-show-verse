@@ -18,6 +18,8 @@ import {
 } from "@/lib/api/tmdb";
 import {
   buildFeatured,
+  FEATURED_HERO_RESERVE,
+  FEATURED_HERO_SIZE,
   getFeaturedExclusionKeys,
 } from "@/lib/dashboard/featured";
 import { balanceSoftLimitedDashboardContent } from "@/lib/dashboard/contentBalance";
@@ -197,7 +199,7 @@ async function getCriticalDashboardData() {
         recognizedTV,
         awarded: curatedAwarded,
       },
-      { size: 10 },
+      { size: FEATURED_HERO_SIZE },
     );
     const { mediaKeys, titleKeys } = getFeaturedExclusionKeys(mainFeatured);
     const featured = buildFeatured(
@@ -208,7 +210,8 @@ async function getCriticalDashboardData() {
         awarded: curatedAwarded,
       },
       {
-        size: 10,
+        size: FEATURED_HERO_SIZE,
+        reserve: FEATURED_HERO_RESERVE,
         mediaTypes: ["movie"],
         excludeMediaKeys: mediaKeys,
         excludeTitleKeys: titleKeys,

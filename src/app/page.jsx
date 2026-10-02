@@ -14,7 +14,11 @@ import {
 } from "@/lib/api/tmdb";
 import { balanceSoftLimitedDashboardContent } from "@/lib/dashboard/contentBalance";
 import { fetchAnonymousDashboardRows } from "@/lib/dashboard/engineRows";
-import { buildFeatured } from "@/lib/dashboard/featured";
+import {
+  buildFeatured,
+  FEATURED_HERO_RESERVE,
+  FEATURED_HERO_SIZE,
+} from "@/lib/dashboard/featured";
 import { combineTopRatedItems } from "@/lib/dashboard/topRated";
 
 export const dynamic = "force-static";
@@ -158,7 +162,7 @@ async function getDashboardData() {
           recognizedTV,
           awarded: awardedSSR,
         },
-        { size: 10 },
+        { size: FEATURED_HERO_SIZE, reserve: FEATURED_HERO_RESERVE },
       ),
       awarded: awardedSSR,
       dramaTV: curateList(dramaTV, {
