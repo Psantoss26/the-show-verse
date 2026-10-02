@@ -13,6 +13,7 @@ aliases: [Architecture MOC, Diseño técnico]
 | [[MODULOS_FUNCIONALES_PROFUNDO]] | Módulos funcionales en profundidad. |
 | [[MODULOS_FUNCIONALES_PROFUNDO_PARTE2]] | Continuación (parte 2). |
 | [[RESUMEN_TECNICO]] | Resumen técnico de la arquitectura. |
+| [[RESUMEN_TECNICO_ENTREVISTA]] | Chuleta técnica para entrevistas: stack, arquitectura, decisiones y preguntas típicas. |
 | [[dashboards-implementation]] | Implementación de los dashboards. |
 
 ## Relacionado

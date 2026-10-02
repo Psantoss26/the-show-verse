@@ -36,6 +36,7 @@ navegador + app companion de Android).
 
 - [[ARRANQUE-LOCAL|Arranque local (guía exacta)]] — levantar todo el proyecto.
 - [[RESUMEN_TECNICO|Resumen técnico]] — visión de alto nivel de la arquitectura.
+- [[RESUMEN_TECNICO_ENTREVISTA|Resumen técnico para entrevistas]] — repaso rápido de tecnologías, decisiones y preguntas típicas.
 - [[backend_api_reference|Referencia de la API del backend]].
 - [[2026-07-03-universal-streaming-sync-design|Diseño del Universal Streaming Sync]].
 
