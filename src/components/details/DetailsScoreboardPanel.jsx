@@ -715,6 +715,10 @@ export default function DetailsScoreboardPanel({
   // Modo de portada backdrop: el marcador comparte fila con las puntuaciones y
   // las estadísticas, así que "Compartir" va sin texto para no comerse el ancho.
   shareIconOnly = false,
+  // Modo de portada backdrop: con los botones ya en icono, Rotten Tomatoes y
+  // Metacritic se quedan junto a las otras puntuaciones mientras quepan, en
+  // lugar de retirarse al bajar de 40rem (ver `.fitAllScores` en el módulo CSS).
+  fitAllScores = false,
   // BARRA ESTRECHA (ficha de teléfono del drawer). Las insignias van en un
   // carril que se DESPLAZA en vez de empujar: por defecto el bloque es
   // `shrink-0`, igual que los botones de la derecha, así que en un panel
@@ -766,7 +770,7 @@ export default function DetailsScoreboardPanel({
 
   return (
     <div
-      className={`w-full rounded-2xl ${LIQUID_GLASS_SURFACE} ${styles.panel} ${className}`}
+      className={`w-full rounded-2xl ${LIQUID_GLASS_SURFACE} ${styles.panel} ${fitAllScores ? styles.fitAllScores : ""} ${className}`}
     >
       {/* Refracción, reflejo especular y luz difusa compartidos con InfoTabs. */}
       <LiquidGlassOpticalLayers />

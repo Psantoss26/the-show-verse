@@ -10087,6 +10087,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 <DetailsScoreboardPanel
                 compactStatsTrailing={isBackdropPoster}
                 shareIconOnly={isBackdropPoster}
+                fitAllScores={isBackdropPoster}
                 loading={tScoreboard.loading}
                 tmdb={{
                   value:
