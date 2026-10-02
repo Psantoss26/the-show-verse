@@ -42,7 +42,6 @@ test("acciones: listas, comunidad, ajustes y conexiones", () => {
   assert.equal(post("/api/lists/abc/items/5/tv", null, "DELETE").text, "Quitada de la lista");
   assert.equal(post("/api/community/tv/1399/comments", { comment: "x" }).text, "Reseña publicada");
   assert.equal(post("/api/users/ana/follow", null).text, "Ahora sigues a @ana");
-  assert.equal(post("/api/user/preferences", { x: 1 }, "PATCH").text, "Preferencias guardadas");
   assert.equal(post("/api/netflix/disconnect", null).text, "Netflix desconectado");
 });
 
@@ -52,6 +51,7 @@ test("acciones: lo que no es una acción no avisa", () => {
   assert.equal(describeAction({ method: "GET", url: "/api/tmdb/account/favorite", origin }), null);
   assert.equal(describeAction({ method: "POST", url: "https://evil.test/api/lists", origin }), null);
   assert.equal(post("/api/netflix/extension-progress", {}), null);
+  assert.equal(post("/api/user/preferences", { x: 1 }, "PATCH"), null);
 });
 
 test("acciones: misma clave para la misma acción sobre el mismo título", () => {
