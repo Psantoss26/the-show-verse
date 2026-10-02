@@ -187,7 +187,9 @@ const RULES = [
   // ── Perfil y ajustes ────────────────────────────────────────────────────
   ["PUT", /^\/api\/users\/me\/profile-favorites$/, () => ({ icon: "profile", label: "Perfil", text: "Destacados del perfil guardados" })],
   ["PATCH", /^\/api\/auth\/me$/, () => ({ icon: "profile", label: "Perfil", text: "Perfil actualizado" })],
-  ["PATCH", /^\/api\/user\/preferences$/, () => ({ icon: "settings", label: "Ajustes", text: "Preferencias guardadas" })],
+  // Guardar preferencias (/api/user/preferences) no avisa nunca: la regla
+  // vacía corta la búsqueda para que ninguna otra la convierta en popup.
+  ["PATCH", /^\/api\/user\/preferences$/, () => null],
   ["PUT", /^\/api\/auth\/account\/password$/, () => ({ icon: "security", label: "Cuenta", text: "Contraseña actualizada" })],
   ["POST", /^\/api\/auth\/account\/email\/change-request$/, () => ({ icon: "security", label: "Cuenta", text: "Te hemos enviado un correo para confirmar el cambio" })],
   ["POST", /^\/api\/auth\/account\/email\/confirm$/, () => ({ icon: "security", label: "Cuenta", text: "Correo actualizado" })],
