@@ -4443,6 +4443,7 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
   // Reduce en el hero los títulos ya vistos / en favoritos (criterio cliente).
   const featuredItems = usePersonalizedFeatured(
     dashboardData.featured || EMPTY_ARRAY,
+    { publishAs: "home" },
   );
 
   if (!dashboardData || Object.keys(dashboardData).length === 0) {

@@ -26,6 +26,9 @@ import {
   DASHBOARD_PREVIEW_REDUCED_TRANSITION,
 } from "@/lib/dashboard/previewTiming";
 import { usePersonalizedFeatured } from "@/lib/dashboard/featuredPersonalize";
+
+// El hero de este dashboard no repite los títulos del hero de Inicio.
+const FEATURED_AVOID_HOME = { avoid: ["home"] };
 import "swiper/swiper-bundle.css";
 import Link from "next/link";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
@@ -2012,6 +2015,7 @@ export default function SeriesPageClient({
   // Reduce en el hero los títulos ya vistos / en favoritos (criterio cliente).
   const featuredItems = usePersonalizedFeatured(
     dashboardData.featured || EMPTY_ARRAY,
+    FEATURED_AVOID_HOME,
   );
   const hasFeaturedHero = featuredItems.length > 0;
 
