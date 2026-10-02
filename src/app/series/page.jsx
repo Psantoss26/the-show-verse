@@ -7,11 +7,6 @@ import {
   fetchTVSections,
   fetchRomanceSeriesWithGoodReviews,
   discoverTV,
-  discoverMovies,
-  fetchTrendingMovies,
-  fetchTrendingTV,
-  fetchPopularMovies,
-  fetchPopularTV,
   fetchTrendingTVDay,
 } from "@/lib/api/tmdb";
 import {
@@ -20,6 +15,7 @@ import {
   FEATURED_HERO_SIZE,
   getFeaturedExclusionKeys,
 } from "@/lib/dashboard/featured";
+import { fetchFeaturedSources } from "@/lib/dashboard/featuredSources";
 import { balanceSoftLimitedDashboardContent } from "@/lib/dashboard/contentBalance";
 import { fetchAnonymousDashboardRows } from "@/lib/dashboard/engineRows";
 
@@ -133,41 +129,12 @@ async function getCriticalDashboardData() {
   const lang = "es-ES";
 
   try {
-    const [
-      popular,
-      topES,
-      trendingMovies,
-      trendingTV,
-      popularMovies,
-      popularTV,
-      recognizedMovies,
-      recognizedTV,
-      awarded,
-    ] = await Promise.all([
+    const [popular, topES, featuredSources] = await Promise.all([
       fetchPopularMedia({ type: "tv", language: lang }),
       fetchTrendingTVDay(),
-      fetchTrendingMovies(),
-      fetchTrendingTV(),
-      fetchPopularMovies(),
-      fetchPopularTV(),
-      discoverMovies({
-        "vote_average.gte": 6.7,
-        "vote_count.gte": 2500,
-        sort_by: "vote_count.desc",
-        page: 1,
-      }),
-      discoverTV({
-        "vote_average.gte": 6.7,
-        "vote_count.gte": 1200,
-        sort_by: "vote_count.desc",
-        page: 1,
-      }),
-      discoverMovies({
-        "vote_average.gte": 7.5,
-        "vote_count.gte": 2000,
-        sort_by: "vote_average.desc",
-        page: 1,
-      }),
+      // Las MISMAS fuentes que el hero de Inicio (películas y series): hacen
+      // falta para reconstruir sus candidatos y no repetirlos aquí.
+      fetchFeaturedSources(),
     ]);
 
     const curatedPopular = curateList(popular, {
@@ -178,42 +145,20 @@ async function getCriticalDashboardData() {
     });
 
     const curatedTopES = (topES || []).slice(0, 10);
-    const curatedAwarded = curateList(awarded, {
-      minVotes: 1200,
-      minRating: 6.8,
-      minSize: 20,
-      maxSize: 72,
+    // Candidatos del hero de Inicio (selección + reserva): este hero no repite
+    // ninguno de ellos, porque Inicio puede acabar mostrando cualquiera.
+    const mainFeatured = buildFeatured(featuredSources, {
+      size: FEATURED_HERO_SIZE,
+      reserve: FEATURED_HERO_RESERVE,
     });
-    const mainFeatured = buildFeatured(
-      {
-        trendingMovies,
-        trendingTV,
-        popularMovies,
-        popularTV,
-        recognizedMovies,
-        recognizedTV,
-        awarded: curatedAwarded,
-      },
-      // Igual que Inicio, CON su reserva: el hero de Inicio puede acabar
-      // mostrando cualquiera de esos candidatos (ver featuredPersonalize.js),
-      // así que se excluyen todos para no repetir títulos entre dashboards.
-      { size: FEATURED_HERO_SIZE, reserve: FEATURED_HERO_RESERVE },
-    );
     const { mediaKeys, titleKeys } = getFeaturedExclusionKeys(mainFeatured);
-    const featured = buildFeatured(
-      {
-        trendingTV,
-        popularTV,
-        recognizedTV,
-      },
-      {
-        size: FEATURED_HERO_SIZE,
-        reserve: FEATURED_HERO_RESERVE,
-        mediaTypes: ["tv"],
-        excludeMediaKeys: mediaKeys,
-        excludeTitleKeys: titleKeys,
-      },
-    );
+    const featured = buildFeatured(featuredSources, {
+      size: FEATURED_HERO_SIZE,
+      reserve: FEATURED_HERO_RESERVE,
+      mediaTypes: ["tv"],
+      excludeMediaKeys: mediaKeys,
+      excludeTitleKeys: titleKeys,
+    });
 
     return {
       featured,
