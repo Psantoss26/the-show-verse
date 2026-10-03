@@ -81,6 +81,15 @@ test("la captura global replica el gesto de Perfil, también en fichas de usuari
   );
   assert.match(detailsClient, /ref=\{mobileSecondaryTriggerRef\}\s+data-details-mobile-secondary-trigger/);
 
+  // Las filas horizontales y las pestañas del Perfil ceden también el gesto
+  // entre páginas, no solo el de secciones del propio Perfil.
+  const profileClient = await readFile(
+    new URL("../../app/u/[username]/ProfileClient.jsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(profileClient, /data-mobile-page-swipe-ignore=\{prioritizeHorizontalScroll \|\| undefined\}/);
+  assert.match(profileClient, /data-profile-swipe-exempt\s+data-mobile-page-swipe-ignore\s+aria-label="Secciones del perfil"/);
+
   const routes = await readFile(new URL("./mobileUserPageSwipe.js", import.meta.url), "utf8");
   assert.match(routes, /"\[data-mobile-page-swipe-ignore\]"/);
   assert.doesNotMatch(routes, /"a"|"button"|"input"/);

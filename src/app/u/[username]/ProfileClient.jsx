@@ -234,6 +234,9 @@ function ProfilePosterGrid({
       data-profile-horizontal-scroll
       data-user-details-sequence
       data-profile-swipe-exempt={prioritizeHorizontalScroll || undefined}
+      // El Perfil vive dentro de MobileUserPageSwipeNavigation: sin esta marca,
+      // arrastrar la fila hacia la derecha también saltaba a Pendientes.
+      data-mobile-page-swipe-ignore={prioritizeHorizontalScroll || undefined}
       role="region"
       aria-label={label}
       className="flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden @[640px]/detail-page:grid @[640px]/detail-page:grid-cols-5 @[640px]/detail-page:overflow-visible @[640px]/detail-page:pb-0"
@@ -1439,6 +1442,7 @@ function ProfileTabs({ tab, username, sections, onNavigate, routeBase, compact =
       ref={navRef}
       data-profile-horizontal-scroll
       data-profile-swipe-exempt
+      data-mobile-page-swipe-ignore
       aria-label="Secciones del perfil"
       // Con la cabecera compacta, el margen superior se iguala al hueco de
       // encima para que la fila compacta quede centrada entre la barra de
