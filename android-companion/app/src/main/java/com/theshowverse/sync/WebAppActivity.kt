@@ -111,6 +111,11 @@ class WebAppActivity : AppCompatActivity() {
         setContentView(binding.root)
         prefs = Prefs(this)
 
+        // Antes que nada se pinte: la frecuencia de refresco más alta de la
+        // pantalla, como la que tiene la PWA dentro de Chrome. Ver
+        // FrecuenciaPantalla.
+        FrecuenciaPantalla.pedirMaxima(this)
+
         configurarWebView()
         configurarRefresco()
         configurarBotonAtras()
@@ -613,6 +618,9 @@ class WebAppActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         binding.webView.onResume()
+        // La pantalla puede haber cambiado mientras la app estaba detrás (un
+        // plegable que se abre, otra pantalla): se vuelve a pedir su máximo.
+        FrecuenciaPantalla.pedirMaxima(this)
         aLaVista = this
         // Estando delante, la vigilancia del login sobra: la web reclama la
         // sesión al recuperar el foco.
