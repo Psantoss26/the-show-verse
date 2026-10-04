@@ -1683,6 +1683,70 @@ html {
   transition: margin-right 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* COMPACTADO DE LA BARRA SUPERIOR (móvil y tablet) SOLO CON `transform`.
+   ===================================================================
+
+   Igual que la barra inferior: nada de animar el alto. La barra mantiene sus
+   64px en el flujo y, al compactarse con el scroll, SUBE entera (los 16px de
+   arriba quedan fuera de la pantalla, así el cristal termina a 48px) mientras
+   su fila de controles BAJA la mitad para seguir centrada en lo que se ve. Los
+   controles ya encogían con `scale`. Todo es composición: ni se recoloca la
+   página ni salta el contenido 16px al cruzar el umbral.
+
+   El aviso de servidor caído cuelga del borde inferior del <nav> (`top-full`),
+   así que sube con la barra y sigue pegado a ella.
+
+   Solo fuera de escritorio (ver el bloque `desktop` de abajo). */
+.sv-topbar {
+  transition:
+    background-color 300ms,
+    backdrop-filter 300ms,
+    box-shadow 300ms,
+    transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sv-topbar-row {
+  transition:
+    margin-right 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sv-topbar[data-compact] {
+  transform: translate3d(0, -16px, 0);
+}
+
+.sv-topbar[data-compact] .sv-topbar-row {
+  transform: translate3d(0, 8px, 0);
+}
+
+/* Tablet: compacta a 56px (antes `md:h-14`). */
+@media (min-width: 48rem) {
+  .sv-topbar[data-compact] {
+    transform: translate3d(0, -8px, 0);
+  }
+
+  .sv-topbar[data-compact] .sv-topbar-row {
+    transform: translate3d(0, 4px, 0);
+  }
+}
+
+/* Escritorio: la barra no se compacta (la fila móvil ni se muestra). Mismo
+   criterio que la variante `desktop:`. Se anula aquí en vez de envolver lo de
+   arriba en un `@media not …`: el compilador de CSS descartaba ese bloque
+   entero sin avisar. */
+@media (min-width: 64rem) and (hover: hover) and (pointer: fine) {
+  .sv-topbar[data-compact] {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-topbar,
+  .sv-topbar-row {
+    transition: none;
+  }
+}
+
 :root[data-sv-drawer-resizing] .sv-navbar-touch-shift {
   transition: none;
 }
