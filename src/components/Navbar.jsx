@@ -2546,7 +2546,6 @@ function NavbarContent() {
     };
   }, [profileMenuOpen]);
 
-  const mobileTopIsCompact = isScrolled || isImmersiveRoute;
   // El encogido al compactar está calibrado para un móvil de 390px, donde la
   // barra se queda en 48px y los controles necesitan ceder sitio. En tablet la
   // barra compactada mide 56px y aplicar ese mismo 0,82 dejaba el selector en
@@ -2595,7 +2594,10 @@ function NavbarContent() {
           sobre el hero, con un velo oscuro mínimo para que los botones se vean;
           al hacer scroll aparece el fondo glass difuminado. */}
       <nav
-        className={`sticky top-0 z-40 w-full transition-[background-color,backdrop-filter,box-shadow] duration-300 ${
+        // Compactado por scroll en móvil/tablet: solo con `transform`, igual que
+        // la barra inferior. Ver `.sv-topbar` en globals.css.
+        data-compact={isScrolled && !isImmersiveRoute ? "" : undefined}
+        className={`sv-topbar sticky top-0 z-40 w-full transition-[background-color,backdrop-filter,box-shadow] duration-300 ${
           heroNavMode
             ? "bg-gradient-to-b from-black/60 via-black/25 to-transparent"
             : desktopDetailsNavMode
@@ -3001,10 +3003,18 @@ function NavbarContent() {
           // de perfil, porque va con `justify-between` y encoger el contenedor
           // recoloca los tres grupos de una vez (menú, logo y perfil) en vez de
           // dejar el logo descentrado respecto a lo que se ve.
-          className={`sv-navbar-touch-shift desktop:hidden relative flex items-center justify-between px-2 md:px-3 transition-[height] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
-            // Tablet: la barra gana alto para que los controles no queden
-            // flotando en una franja pensada para 390px de ancho.
-            mobileTopIsCompact ? "h-12 md:h-14" : "h-16"
+          className={`sv-navbar-touch-shift desktop:hidden sv-topbar-row relative flex items-center justify-between px-2 md:px-3 ${
+            // EL ALTO YA NO SE ANIMA. Pasar de h-16 a h-12 con `transition-
+            // [height]` volvía a maquetar la barra y, por ser `sticky`, la página
+            // entera en cada fotograma, y además subía el contenido 16px de golpe
+            // al dejar de ocupar ese hueco. Al hacer scroll la barra conserva su
+            // alto y se compacta con `transform` (ver `.sv-topbar` en
+            // globals.css), igual que la inferior.
+            //
+            // Ficha / recomendaciones nacen ya compactas y no cambian con el
+            // scroll: ahí se queda el alto final. En tablet gana alto para que
+            // los controles no floten en una franja pensada para 390px.
+            isImmersiveRoute ? "h-12 md:h-14" : "h-16"
           }`}
         >
           {/* Izquierda: el menú lateral concentra la navegación principal en
