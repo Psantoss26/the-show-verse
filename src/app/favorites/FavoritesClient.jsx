@@ -5,6 +5,7 @@ import LogoutConfirmModal from "@/components/auth/LogoutConfirmModal";
 import { pickBestFavoriteEnglishPoster } from "@/lib/details/tmdbImages";
 
 import OptimizedImage from "@/components/OptimizedImage";
+import useImageLoadReady from "@/lib/hooks/useImageLoadReady";
 import {
   useEffect,
   useLayoutEffect,
@@ -944,7 +945,13 @@ function getCachedSmartPosterUrl(item, mode = "poster") {
       ? backdropChoiceCache.get(key)
       : null;
     const storedBackdrop = getStoredImageChoice("backdrop", key);
-    const path = cachedBackdrop || storedBackdrop || null;
+    // Selector ya resuelto en esta sesión sin backdrop en inglés (null): el
+    // efecto acabaría usando el del propio item, así que se usa ya y la
+    // tarjeta no pasa por placeholder + fundido cada vez que se vuelve.
+    const resolvedFallback = backdropChoiceCache.has(key)
+      ? item.backdrop_path || item.poster_path || null
+      : null;
+    const path = cachedBackdrop || storedBackdrop || resolvedFallback;
     return path ? buildImg(path, "w1280") : null;
   }
 
@@ -952,7 +959,11 @@ function getCachedSmartPosterUrl(item, mode = "poster") {
     ? posterChoiceCache.get(key)
     : null;
   const storedPoster = getStoredImageChoice("poster", key);
-  const path = cachedPoster || storedPoster || null;
+  // Igual que arriba: elección ya resuelta a null → póster del propio item.
+  const resolvedFallback = posterChoiceCache.has(key)
+    ? item.poster_path || item.backdrop_path || null
+    : null;
+  const path = cachedPoster || storedPoster || resolvedFallback;
   return path ? buildImg(path, POSTER_CARD_SIZE) : null;
 }
 
@@ -974,7 +985,7 @@ function SmartPoster({ item, title, mode = "poster" }) {
   const initialSrc = getCachedSmartPosterUrl(item, mode);
 
   const [src, setSrc] = useState(initialSrc);
-  const [ready, setReady] = useState(Boolean(initialSrc));
+  const { imgRef, onLoad, ready, instant } = useImageLoadReady(src);
 
   useEffect(() => {
     let abort = false;
@@ -982,13 +993,11 @@ function SmartPoster({ item, title, mode = "poster" }) {
     const cachedUrl = getCachedSmartPosterUrl(item, mode);
     if (cachedUrl) {
       setSrc(cachedUrl);
-      setReady(true);
       return () => {
         abort = true;
       };
     } else {
       setSrc(null);
-      setReady(false);
     }
 
     const load = async () => {
@@ -1003,7 +1012,6 @@ function SmartPoster({ item, title, mode = "poster" }) {
           // fallo puntual dejaba la tarjeta sin idioma durante 7 días.
           writeImageChoice("backdrop", imageKey, bestBackdrop);
           setSrc(url);
-          setReady(!!url);
         }
         return;
       }
@@ -1015,7 +1023,6 @@ function SmartPoster({ item, title, mode = "poster" }) {
       if (!abort) {
         writeImageChoice("poster", imageKey, best);
         setSrc(url);
-        setReady(!!url);
       }
     };
 
@@ -1028,22 +1035,26 @@ function SmartPoster({ item, title, mode = "poster" }) {
   return (
     <div className="relative w-full h-full">
       <div
-        className={`absolute inset-0 flex flex-col items-center justify-center bg-neutral-900 transition-opacity duration-300 ${
-          ready && src ? "opacity-0" : "opacity-100"
-        }`}
+        className={`absolute inset-0 flex flex-col items-center justify-center bg-neutral-900 ${
+          instant ? "" : "transition-opacity duration-300"
+        } ${ready ? "opacity-0" : "opacity-100"}`}
       >
-        <Film className="w-8 h-8 text-neutral-700" />
+        {/* El icono entra con retraso (`starting:`): si la portada sale de
+            caché en unos ms no llega a asomar y no se ve parpadear. */}
+        <Film className="w-8 h-8 text-neutral-700 transition-opacity duration-200 delay-200 starting:opacity-0" />
       </div>
 
       {src ? (
         <OptimizedImage
+          ref={imgRef}
           src={src}
           alt={title}
           loading="lazy"
           decoding="async"
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
-            ready ? "opacity-100" : "opacity-0"
-          }`}
+          onLoad={onLoad}
+          className={`absolute inset-0 w-full h-full object-cover ${
+            instant ? "" : "transition-opacity duration-300"
+          } ${ready ? "opacity-100" : "opacity-0"}`}
         />
       ) : null}
     </div>
