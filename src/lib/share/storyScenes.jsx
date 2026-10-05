@@ -19,10 +19,8 @@ import {
   GLASS_TINT,
   H,
   Icon,
-  SCORE_LOGOS,
   SHADE,
   SIDE_MARGIN,
-  ScoreBadge,
   W,
   px,
   rgba,
@@ -40,7 +38,6 @@ const WHITE = (alpha) => `rgba(255, 255, 255, ${alpha})`;
 const YELLOW_300 = rgba(COLORS.yellow.secondary, 1);
 const GREEN_300 = rgba(COLORS.green.secondary, 1);
 // Halo de las cifras grandes: el `glow` de los botones activos (LiquidButton).
-const YELLOW_GLOW = rgba(COLORS.yellow.rgb, 0.45);
 const GREEN_GLOW = rgba(COLORS.green.rgb, 0.45);
 
 // Capa transparente a tamaño completo.
@@ -460,10 +457,16 @@ export function EpisodesScene({ episodes, assets, fonts }) {
 
   return (
     <SceneBody fonts={fonts}>
-      <Eyebrow icon="tv" label="Episodios vistos" color={GREEN_300} />
-      <Glass style={{ width: PANEL_W, padding: "30px 48px 34px" }}>
-        {/* Cabecera de las dos columnas de notas. */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", paddingBottom: 14 }}>
+      <Glass style={{ width: PANEL_W, padding: "40px 48px 34px" }}>
+        {/* MISMO TÍTULO QUE EL MODAL DE EPISODIOS VISTOS: «Episodios vistos»
+            en negrita y sin versalitas, en la cabecera de la lista (no en la
+            píldora de las otras secciones, que lo escribía en mayúsculas y se
+            leía como otro título). A su derecha, las columnas de notas. */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingBottom: 18 }}>
+          <div style={{ display: "flex", fontSize: 50, fontWeight: 700, color: "#ffffff", letterSpacing: -0.5 }}>
+            Episodios vistos
+          </div>
+          <div style={{ display: "flex", alignItems: "center" }}>
           <div style={{ display: "flex", width: 130, justifyContent: "center" }}>
             {assets?.imdb ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -477,6 +480,7 @@ export function EpisodesScene({ episodes, assets, fonts }) {
               <Icon name="star" size={34} color={YELLOW_300} filled />
             </div>
           ) : null}
+          </div>
         </div>
         {items.map((item, index) => (
           <div
@@ -522,55 +526,6 @@ export function EpisodesScene({ episodes, assets, fonts }) {
           </div>
         ) : null}
       </Glass>
-    </SceneBody>
-  );
-}
-
-/** Puntuación: la nota propia en grande y, debajo, las de la comunidad. */
-export function RatingScene({ card, assets, fonts }) {
-  const rating = card.actions.rating;
-  const scores = ["tmdb", "trakt", "imdb"].filter((key) => card.scores[key]);
-  const filled = rating != null ? Math.round(rating) : 0;
-
-  return (
-    <SceneBody fonts={fonts}>
-      <Eyebrow icon="star" label={rating != null ? "Mi puntuación" : "Puntuaciones"} color={YELLOW_300} />
-      {rating != null ? (
-        // Columna explícita: Satori no apila los hijos de un fragmento.
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-          <BigFigure value={formatUserRating(rating)} suffix="/10" color={YELLOW_300} glow={YELLOW_GLOW} />
-          <div style={{ display: "flex", marginTop: 40 }}>
-            {Array.from({ length: 10 }, (_, index) => (
-              <Icon
-                key={index}
-                name="star"
-                size={66}
-                color={index < filled ? YELLOW_300 : WHITE(0.22)}
-                filled={index < filled}
-                style={{ marginLeft: index ? 10 : 0 }}
-              />
-            ))}
-          </div>
-        </div>
-      ) : null}
-      {scores.length ? (
-        <Glass
-          style={{
-            width: PANEL_W,
-            marginTop: rating != null ? 84 : 0,
-            padding: rating != null ? `${px(12)}px ${px(14)}px` : "56px 80px",
-            flexDirection: rating != null ? "row" : "column",
-            alignItems: rating != null ? "center" : "flex-start",
-            justifyContent: "space-around",
-          }}
-        >
-          {scores.map((key, index) => (
-            <div key={key} style={{ display: "flex", marginTop: rating == null && index ? 52 : 0 }}>
-              <ScoreBadge logo={assets[key]} size={SCORE_LOGOS[key]} score={card.scores[key]} />
-            </div>
-          ))}
-        </Glass>
-      ) : null}
     </SceneBody>
   );
 }
