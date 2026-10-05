@@ -38,6 +38,7 @@ import {
 } from "@/lib/android/appBridge";
 import { shareCardFileName } from "@/lib/details/shareCard";
 import { buildShareStoryPayload, sanitizeShareStory, storySceneIds } from "@/lib/details/shareStory";
+import { getLocalInProgress } from "@/lib/api/progressClient";
 import { createStoryVideo, detectStoryVideoFormat } from "@/lib/share/storyVideo";
 import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER } from "@/lib/ui/liquidGlass";
 import styles from "./DetailsShareSheet.module.css";
@@ -253,6 +254,60 @@ export default function DetailsShareSheet({ open, onClose, card, story, title, t
   useModalGuard({ open, onClose });
   useEffect(() => setPortalReady(true), []);
 
+  // DATOS DEL VÍDEO QUE LA FICHA NO TIENE CARGADOS. Se piden al abrir la hoja
+  // (no al cargar la ficha, que no los necesita): el progreso de «Continuar
+  // viendo» del título y, en las series, las notas que el usuario ha dado a sus
+  // episodios. El vídeo espera a tenerlos para no generarse dos veces.
+  const extrasKey = story?.tmdbId ? `${story.type}:${story.tmdbId}` : "";
+  const [storyExtras, setStoryExtras] = useState(null);
+  useEffect(() => {
+    if (!open) {
+      setStoryExtras(null);
+      return undefined;
+    }
+    if (!extrasKey) return undefined;
+    let cancelled = false;
+    const tmdbId = Number(story.tmdbId);
+    (async () => {
+      const [rows, ratings] = await Promise.all([
+        getLocalInProgress().catch(() => []),
+        story.type === "tv"
+          ? fetch(`/api/trakt/ratings?type=episode&tmdbId=${tmdbId}`, { cache: "no-store" })
+              .then((res) => (res.ok ? res.json() : null))
+              .catch(() => null)
+          : null,
+      ]);
+      if (cancelled) return;
+      // El progreso más reciente del título (en una serie, su episodio).
+      const current = (Array.isArray(rows) ? rows : [])
+        .filter((row) => Number(row?.tmdbId) === tmdbId && row?.mediaType === story.type)
+        .sort((a, b) => String(b?.updatedAt || "").localeCompare(String(a?.updatedAt || "")))[0];
+      const episodeUserRatings = {};
+      for (const row of Array.isArray(ratings?.results) ? ratings.results : []) {
+        const season = Number(row?.season);
+        const episode = Number(row?.episode);
+        const rating = Number(row?.rating);
+        if (Number.isInteger(season) && Number.isInteger(episode) && Number.isFinite(rating)) {
+          episodeUserRatings[`S${season}E${episode}`] = rating;
+        }
+      }
+      setStoryExtras({
+        key: extrasKey,
+        continueWatching:
+          current && typeof current.percent === "number"
+            ? { percent: current.percent * 100, season: current.season ?? null, episode: current.episode ?? null }
+            : null,
+        episodeUserRatings,
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // `story` se lee al pedir; su identidad (tipo + id) va en `extrasKey`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, extrasKey]);
+  const extrasReady = !extrasKey || storyExtras?.key === extrasKey;
+
   const cardKey = card ? JSON.stringify(card) : "";
   const imageReady = status === "ready" && image?.key === cardKey;
 
@@ -260,7 +315,14 @@ export default function DetailsShareSheet({ open, onClose, card, story, title, t
   const reviewAvailable = !!(story?.review?.comment || story?.review?.text);
   const reviewSpoiler = !!story?.review?.spoiler;
   const storyPayload = story
-    ? sanitizeShareStory(buildShareStoryPayload({ ...story, includeReview: includeReview && !reviewSpoiler }))
+    ? sanitizeShareStory(
+        buildShareStoryPayload({
+          ...story,
+          continueWatching: extrasReady ? storyExtras?.continueWatching : null,
+          episodeUserRatings: extrasReady ? storyExtras?.episodeUserRatings : null,
+          includeReview: includeReview && !reviewSpoiler,
+        }),
+      )
     : null;
   const sceneIds = storyPayload ? storySceneIds(card, storyPayload) : [];
   const videoKey = storyPayload ? `${cardKey}|${JSON.stringify(storyPayload)}` : "";
@@ -316,7 +378,7 @@ export default function DetailsShareSheet({ open, onClose, card, story, title, t
   // Generar (o reutilizar) el vídeo al elegirlo. Parte de la imagen de portada,
   // así que espera a que esté. Cerrar o cambiar de modo cancela la generación.
   useEffect(() => {
-    if (!open || mode !== "video" || !videoFormat || !imageReady || !storyPayload) return undefined;
+    if (!open || mode !== "video" || !videoFormat || !imageReady || !storyPayload || !extrasReady) return undefined;
     if (video?.key === videoKey) {
       setVideoStatus("ready");
       return undefined;
@@ -352,7 +414,7 @@ export default function DetailsShareSheet({ open, onClose, card, story, title, t
     // Igual que la imagen: `video`, `card`, `storyPayload` y `sceneIds` van
     // dentro de `videoKey`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, mode, videoFormat, imageReady, videoKey, videoAttempt]);
+  }, [open, mode, videoFormat, imageReady, videoKey, videoAttempt, extrasReady]);
 
   // Liberar las URL de las vistas previas al cambiarlas o al desmontar.
   const objectUrl = image?.objectUrl;

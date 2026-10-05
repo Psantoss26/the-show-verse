@@ -9060,6 +9060,12 @@ export default function DetailsClient({
   const shareStory = useMemo(
     () => ({
       type,
+      // Con el id, la hoja de compartir pide al abrirse lo que la ficha no
+      // tiene cargado (progreso de «Continuar viendo», notas de episodios).
+      tmdbId: id,
+      // Series: episodios vistos con su nota de IMDb (SeriesGraph).
+      watchedBySeason: type === "tv" ? watchedBySeason : null,
+      episodeImdbRatings: type === "tv" ? ratings : null,
       watched: watchedActionValue,
       plays: watchedActionPlays,
       history: trakt.history,
@@ -9089,6 +9095,9 @@ export default function DetailsClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       type,
+      id,
+      watchedBySeason,
+      ratings,
       watchedActionValue,
       watchedActionPlays,
       trakt.history,

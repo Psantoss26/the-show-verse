@@ -13,7 +13,11 @@
 // Toda la coreografía vive aquí, sin DOM, para poder probarla.
 
 export const STORY_FPS = 30;
-export const STORY_SCENES = ["plays", "rating", "review", "details"];
+export const STORY_SCENES = ["plays", "episodes", "rating", "review", "details"];
+
+// Episodios vistos de una serie que caben en una sección del vídeo. Con más, se
+// enseñan los ÚLTIMOS (los más avanzados de la serie) y un «+N más».
+export const STORY_MAX_EPISODES = 14;
 
 const ISO_RE = /^\d{4}-\d{2}-\d{2}(?:T[\d:.]+(?:Z|[+-]\d{2}:?\d{2})?)?$/;
 
@@ -47,6 +51,63 @@ export function truncateText(value, max) {
 
 // ------------------------------------------------------------------ cliente
 
+// Progreso de «Continuar viendo» (1-99%) del título, con su episodio si es una
+// serie.
+function resumeData(value) {
+  const percent = finite(value?.percent, 0, 100);
+  if (percent == null) return null;
+  const rounded = Math.round(percent);
+  if (rounded < 1 || rounded > 99) return null;
+  // `null` no es 0: con `Number(null)` una película acababa en «T0·E1».
+  const season = value?.season == null ? null : finite(value.season, 0, 500);
+  const episode = value?.episode == null ? null : finite(value.episode, 1, 5000);
+  return {
+    percent: rounded,
+    season: season != null && episode != null ? Math.round(season) : null,
+    episode: season != null && episode != null ? Math.round(episode) : null,
+  };
+}
+
+function ratingValue(value, min = 0) {
+  const number = finite(value, 0, 10);
+  return number != null && number > min ? Math.round(number * 10) / 10 : null;
+}
+
+// Episodios vistos ({ temporada: [episodios] }), en orden, con la nota de IMDb
+// de cada uno (SeriesGraph) y la del usuario. Solo los VISTOS.
+function watchedEpisodes(watchedBySeason, imdbRatings, userRatings) {
+  const imdb = new Map();
+  for (const season of Array.isArray(imdbRatings?.seasons) ? imdbRatings.seasons : []) {
+    const sn = Number(season?.season_number ?? season?.seasonNumber);
+    for (const episode of Array.isArray(season?.episodes) ? season.episodes : []) {
+      const en = Number(episode?.episode_number ?? episode?.episodeNumber);
+      if (!Number.isInteger(sn) || !Number.isInteger(en)) continue;
+      imdb.set(`S${sn}E${en}`, {
+        rating: episode?.vote_average ?? episode?.rating ?? null,
+        name: episode?.name || "",
+      });
+    }
+  }
+  const rows = [];
+  for (const [seasonKey, episodes] of Object.entries(watchedBySeason || {})) {
+    const season = Number(seasonKey);
+    if (!Number.isInteger(season) || season < 1 || !Array.isArray(episodes)) continue;
+    for (const value of new Set(episodes.map(Number))) {
+      if (!Number.isInteger(value) || value < 1) continue;
+      const key = `S${season}E${value}`;
+      rows.push({
+        season,
+        episode: value,
+        name: text(imdb.get(key)?.name, 60),
+        imdb: ratingValue(imdb.get(key)?.rating),
+        mine: ratingValue(userRatings?.[key], 0),
+      });
+    }
+  }
+  rows.sort((a, b) => a.season - b.season || a.episode - b.episode);
+  return rows;
+}
+
 function historyDates(history) {
   const dates = (Array.isArray(history) ? history : [])
     .map((entry) => isoDate(entry?.watched_at ?? entry?.watchedAt ?? entry?.watchedAtIso ?? null))
@@ -67,6 +128,10 @@ export function buildShareStoryPayload({
   history,
   lastWatchedAt,
   tvProgress,
+  continueWatching,
+  watchedBySeason,
+  episodeImdbRatings,
+  episodeUserRatings,
   review,
   includeReview = false,
   details,
@@ -75,6 +140,9 @@ export function buildShareStoryPayload({
   const dates = historyDates(history);
   const last = isoDate(lastWatchedAt) || dates[0] || null;
 
+  // En «Continuar viendo» la sección de visionados lo enseña también: una
+  // película a medias sale aunque aún no cuente como vista.
+  const resume = resumeData(continueWatching);
   let playsData = null;
   if (isTv && tvProgress?.percent > 0) {
     playsData = {
@@ -82,14 +150,21 @@ export function buildShareStoryPayload({
       watched: tvProgress.watched,
       total: tvProgress.total,
       last,
+      resume,
     };
   } else if (!isTv && watched) {
     playsData = {
       count: Math.max(Number(plays) || 0, dates.length, 1),
       dates: dates.slice(0, 4),
       last,
+      resume,
     };
+  } else if (resume) {
+    playsData = { count: 0, dates: [], last: null, resume };
   }
+
+  const episodeRows = isTv ? watchedEpisodes(watchedBySeason, episodeImdbRatings, episodeUserRatings) : [];
+  const shown = episodeRows.slice(-STORY_MAX_EPISODES);
 
   const reviewText = text(review?.comment ?? review?.text, 2000);
   const reviewData =
@@ -99,6 +174,9 @@ export function buildShareStoryPayload({
 
   return {
     plays: playsData,
+    episodes: shown.length
+      ? { items: shown, more: episodeRows.length - shown.length }
+      : null,
     review: reviewData,
     details: details
       ? {
@@ -122,26 +200,47 @@ export function sanitizeShareStory(body) {
   const plays = body?.plays && typeof body.plays === "object" ? body.plays : null;
   const review = body?.review && typeof body.review === "object" ? body.review : null;
   const details = body?.details && typeof body.details === "object" ? body.details : null;
+  const episodeList = body?.episodes && typeof body.episodes === "object" ? body.episodes : null;
 
   let playsData = null;
   if (plays) {
     const percent = finite(plays.percent, 0, 100);
     const count = finite(plays.count, 0, 9999);
+    const resume = resumeData(plays.resume);
     if (percent != null && percent > 0) {
       playsData = {
         percent: Math.round(percent),
         watched: Math.round(finite(plays.watched, 0, 100_000) ?? 0),
         total: Math.round(finite(plays.total, 0, 100_000) ?? 0),
         last: isoDate(plays.last),
+        resume,
       };
-    } else if (count != null && count > 0) {
+    } else if ((count != null && count > 0) || resume) {
       playsData = {
-        count: Math.round(count),
+        count: Math.round(count ?? 0),
         dates: (Array.isArray(plays.dates) ? plays.dates : []).map(isoDate).filter(Boolean).slice(0, 4),
         last: isoDate(plays.last),
+        resume,
       };
     }
   }
+
+  const episodeItems = (Array.isArray(episodeList?.items) ? episodeList.items : [])
+    .slice(0, STORY_MAX_EPISODES)
+    .map((item) => {
+      if (item?.season == null || item?.episode == null) return null;
+      const season = finite(item.season, 1, 500);
+      const episode = finite(item.episode, 1, 5000);
+      if (season == null || episode == null) return null;
+      return {
+        season: Math.round(season),
+        episode: Math.round(episode),
+        name: text(item?.name, 60),
+        imdb: ratingValue(item?.imdb),
+        mine: ratingValue(item?.mine, 0),
+      };
+    })
+    .filter(Boolean);
 
   const reviewText = review ? truncateText(review.text, 340) : "";
   const year = finite(details?.year, 1870, 2200);
@@ -151,6 +250,9 @@ export function sanitizeShareStory(body) {
 
   return {
     plays: playsData,
+    episodes: episodeItems.length
+      ? { items: episodeItems, more: Math.round(finite(episodeList?.more, 0, 100_000) ?? 0) }
+      : null,
     review: reviewText ? { text: reviewText, date: isoDate(review.date) } : null,
     details: details
       ? {
@@ -192,6 +294,7 @@ export function storySceneIds(card, story) {
     );
   return STORY_SCENES.filter((id) => {
     if (id === "plays") return !!story?.plays;
+    if (id === "episodes") return !!story?.episodes?.items?.length;
     if (id === "rating") return card?.actions?.rating != null || hasScores;
     if (id === "review") return !!story?.review;
     return hasDetails;

@@ -13,6 +13,7 @@ import {
 } from "@/lib/share/ogKit";
 import {
   DetailsScene,
+  EpisodesScene,
   PlaysScene,
   RatingScene,
   ReviewScene,
@@ -30,13 +31,14 @@ export const dynamic = "force-dynamic";
 // paralelo:
 //   - "backdrop": el fondo opaco de las secciones (la portada difuminada);
 //   - "header":   la cabecera fija (marca + logo del título), transparente;
-//   - "plays" | "rating" | "review" | "details": una sección, transparente.
+//   - "plays" | "episodes" | "rating" | "review" | "details": una sección,
+//     transparente.
 // La portada inicial es la imagen de /api/share/details-card.
 //
 // Igual que la imagen de portada, recibe los datos ya resueltos por el cliente
 // (no la sesión) y lo valida todo: `sanitizeShareCard` y `sanitizeShareStory`.
 
-const SCENES = new Set(["backdrop", "header", "plays", "rating", "review", "details"]);
+const SCENES = new Set(["backdrop", "header", "plays", "episodes", "rating", "review", "details"]);
 
 async function renderLayer(scene, card, story) {
   if (scene === "backdrop") {
@@ -62,6 +64,10 @@ async function renderLayer(scene, card, story) {
       };
     case "plays":
       return story.plays ? { element: <PlaysScene plays={story.plays} fonts={hasFonts} />, fonts } : null;
+    case "episodes":
+      return story.episodes
+        ? { element: <EpisodesScene episodes={story.episodes} assets={assets} fonts={hasFonts} />, fonts }
+        : null;
     case "rating":
       return { element: <RatingScene card={card} assets={assets} fonts={hasFonts} />, fonts };
     case "review":
