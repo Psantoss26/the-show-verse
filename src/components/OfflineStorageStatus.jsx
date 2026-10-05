@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, CloudOff, Loader2, RotateCcw } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useServerOnline } from "@/context/ServerStatusContext";
-import { PREPARATION_EVENT } from "@/lib/offline/client";
+import { PREPARATION_EVENT, runKey } from "@/lib/offline/client";
 
 // `long` para pantallas anchas, `short` para que la fila de móvil no se corte.
 const STATUS_TEXT = {
@@ -15,6 +15,10 @@ const STATUS_TEXT = {
   preparing: { long: "Preparando la copia de tus páginas…", short: "Preparando…" },
   "storage-full": { long: "No hay espacio suficiente en el dispositivo", short: "Sin espacio" },
   partial: { long: "Copia parcial: algunos datos no estaban disponibles", short: "Copia parcial" },
+  interrupted: {
+    long: "Copia interrumpida: se reanudará donde iba al volver la conexión",
+    short: "Interrumpida",
+  },
   "no-session": {
     long: "Tu sesión ha caducado en este dispositivo: vuelve a iniciarla para actualizar la copia",
     short: "Sesión caducada",
@@ -25,7 +29,23 @@ const STATUS_TEXT = {
   },
   error: { long: "No se pudo actualizar la copia. Inténtalo de nuevo", short: "Error al actualizar" },
 };
-const WARNING_PHASES = new Set(["partial", "storage-full", "no-session", "no-worker", "error"]);
+const WARNING_PHASES = new Set(["partial", "storage-full", "interrupted", "no-session", "no-worker", "error"]);
+
+const GB = 1024 ** 3;
+const MB = 1024 ** 2;
+const size = (bytes) => bytes >= GB
+  ? `${(bytes / GB).toLocaleString("es-ES", { maximumFractionDigits: 1 })} GB`
+  : `${Math.round(bytes / MB)} MB`;
+
+/** Qué falta y cuánto ocupa, para que «parcial» o «sin espacio» se entiendan. */
+function warningDetail(state) {
+  const parts = [];
+  if (state?.pagesFailed > 0) {
+    parts.push(state.pagesFailed === 1 ? "1 página sin guardar" : `${state.pagesFailed} páginas sin guardar`);
+  }
+  if (state?.storage?.quota > 0) parts.push(`${size(state.storage.usage)} de ${size(state.storage.quota)} usados`);
+  return parts.length ? { long: parts.join(" · "), short: parts[0] } : null;
+}
 
 // Fila de Ajustes con el mismo lenguaje que SettingActionRow (panel de cristal,
 // icono, título, descripción y acción a la derecha). `panelClassName` recibe la
@@ -37,7 +57,10 @@ export default function OfflineStorageStatus({ panelClassName = "" }) {
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(`showverse:offline:prepared:${user?.id}`) || "null");
-      if (saved) setState({ ...saved, phase: saved.failures?.length ? "partial" : "ready" });
+      // Una copia empezada y sin terminar manda sobre el resultado anterior.
+      const running = user?.id && localStorage.getItem(runKey(user.id));
+      if (running) setState({ ...saved, phase: "interrupted" });
+      else if (saved) setState({ ...saved, phase: saved.failures?.length ? "partial" : "ready" });
     } catch { /* storage unavailable */ }
     const update = (event) => setState(event.detail);
     window.addEventListener(PREPARATION_EVENT, update);
@@ -55,7 +78,9 @@ export default function OfflineStorageStatus({ panelClassName = "" }) {
     ? { long: `${state.completed} pasos completados`, short: `${state.completed}` }
     : updatedAt
       ? { long: `última el ${updatedAt}`, short: updatedAt }
-      : null;
+      : ["partial", "storage-full"].includes(phase)
+        ? warningDetail(state)
+        : null;
   const Icon = preparing ? Loader2 : warning ? AlertTriangle : CloudOff;
 
   return (

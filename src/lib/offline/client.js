@@ -1,6 +1,9 @@
 // Browser-side bridge. No tokens or credentials are written into snapshots.
 export const CONNECTION_EVENT = "showverse:offline-connection";
 export const PREPARATION_EVENT = "showverse:offline-preparation";
+// Copia sin conexión en marcha de un usuario (ver prepare.js): si existe al
+// arrancar, la anterior se cortó y la siguiente la reanuda.
+export const runKey = (userId) => `showverse:offline:run:${userId}`;
 let online = true;
 
 export function isServerReachable() { return online; }
@@ -23,8 +26,10 @@ export async function workerMessage(message, timeout = 30000) {
     worker.postMessage(message, [channel.port2]);
   });
 }
-export async function saveOfflineRoute(path) {
-  return workerMessage({ type: "OFFLINE_SAVE_ROUTE", path });
+// `freshSince`: al reanudar una copia interrumpida, lo guardado después de ese
+// instante no se vuelve a descargar.
+export async function saveOfflineRoute(path, { freshSince } = {}) {
+  return workerMessage({ type: "OFFLINE_SAVE_ROUTE", path, freshSince });
 }
 export async function clearOfflineAccount() {
   return workerMessage({ type: "OFFLINE_CLEAR" });
