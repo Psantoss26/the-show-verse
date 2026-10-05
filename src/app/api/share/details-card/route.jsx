@@ -51,25 +51,32 @@ const LOGO_MAX_W = Math.round(W * 0.85);
 const LOGO_MAX_H = 210;
 const LOGO_BOTTOM = BUTTONS_TOP - 44;
 const PANEL_TOP = BUTTONS_TOP + BUTTON + 48;
-// Fondo ambiental con un 12% de escala (como `.hero-bg-base` en móvil).
-const AMBIENT = {
-  width: Math.round(W * 1.12),
-  height: Math.round(H * 1.12),
-  left: -Math.round(W * 0.06),
-  top: -Math.round(H * 0.06),
-};
-
-// Logotipo con nombre: el contenido visible ocupa ~(95..810, 95..300) del PNG.
-const BRAND_SCALE = 0.36;
+// Fondo ambiental: la portada desenfocada.
+//
+// OJO CON LOS FILTROS EN SATORI (medido): el resultado de un `filter` se recorta
+// a la caja de su <img> y, además, el desenfoque se corta en el borde del
+// LIENZO, donde mezcla con transparencia. Da igual cuánto sobresalga la imagen:
+// un `blur` siempre oscurece los bordes de la tarjeta (54 de luminancia en el
+// borde frente a 144 en el centro). Por eso debajo va una BASE opaca sin
+// desenfoque —la portada de 92px ampliada, que ya es borrosa por sí sola— y el
+// desenfoque encima: donde este pierde opacidad asoma la base, no el negro.
+const AMBIENT_BLUR = 32;
+const AMBIENT_FILTER = "brightness(0.62) saturate(1.15)";
+const AMBIENT = { width: W, height: H, left: 0, top: 0 };
+// Marca: el ISOTIPO sin nombre (logo-TSV-sinFondo.png, 351×351). El dibujo
+// visible ocupa (107..246, 115..235) del PNG; el resto es margen transparente,
+// que se recorta con la caja para poder centrarlo con precisión.
+const BRAND_SOURCE = { size: 351, x: 107, y: 115, width: 139, height: 120 };
+const BRAND_HEIGHT = 72;
+const BRAND_SCALE = BRAND_HEIGHT / BRAND_SOURCE.height;
 const BRAND = {
-  imageWidth: Math.round(896 * BRAND_SCALE),
-  imageHeight: Math.round(448 * BRAND_SCALE),
-  offsetX: Math.round(90 * BRAND_SCALE),
-  offsetY: Math.round(88 * BRAND_SCALE),
-  width: Math.round(725 * BRAND_SCALE),
-  height: Math.round(218 * BRAND_SCALE),
+  imageSize: Math.round(BRAND_SOURCE.size * BRAND_SCALE),
+  offsetX: Math.round(BRAND_SOURCE.x * BRAND_SCALE),
+  offsetY: Math.round(BRAND_SOURCE.y * BRAND_SCALE),
+  width: Math.round(BRAND_SOURCE.width * BRAND_SCALE),
+  height: BRAND_HEIGHT,
+  top: 32,
 };
-
 // Colores de LiquidButton (rgb primario + secundario).
 const COLORS = {
   green: { rgb: [34, 197, 94], secondary: [134, 239, 172] },
@@ -230,9 +237,14 @@ async function loadPoster(posterPath) {
   );
 }
 
-// El fondo ambiental va desenfocado: basta una versión pequeña.
+// El fondo ambiental va desenfocado: basta una versión pequeña. La base (ver
+// AMBIENT_BLUR) usa la mínima, cuya ampliación ya es un desenfoque.
 function loadAmbient(posterPath) {
   return posterPath ? fetchImage(`${TMDB}/w342${posterPath}`, 4000) : null;
+}
+
+function loadAmbientBase(posterPath) {
+  return posterPath ? fetchImage(`${TMDB}/w92${posterPath}`, 4000) : null;
 }
 
 // TMDb sirve los logos SVG también como PNG cambiando la extensión; Satori
@@ -251,7 +263,7 @@ const LOCAL_ASSETS = {
   tmdb: { file: "logo-TMDb.png", mime: "image/png" },
   trakt: { file: "logo-Trakt.png", mime: "image/png" },
   imdb: { file: "logo-IMDb.svg", mime: "image/svg+xml" },
-  brand: { file: "logo-final-titulo-sinFondo.png", mime: "image/png" },
+  brand: { file: "logo-TSV-sinFondo.png", mime: "image/png" },
 };
 let localAssetsPromise = null;
 
@@ -427,8 +439,11 @@ function TitleArt({ card, logo }) {
           src={logo.src}
           width={box.width}
           height={box.height}
+          // Sin `drop-shadow`: Satori lo recorta a la caja del logo y sobre
+          // portadas claras se veía un rectángulo oscuro con una línea
+          // horizontal en su borde. El contraste lo da el fondo, que se
+          // oscurece hacia abajo (ver los sombreados de Card).
           alt=""
-          style={{ filter: "drop-shadow(0 6px 26px rgba(0,0,0,0.85))" }}
         />
       ) : (
         <div
@@ -450,7 +465,7 @@ function TitleArt({ card, logo }) {
   );
 }
 
-function Card({ card, poster, ambient, logo, assets, fonts }) {
+function Card({ card, poster, ambient, ambientBase, logo, assets, fonts }) {
   const buttons = shareCardActionButtons(card);
   const scores = ["tmdb", "trakt", "imdb"].filter((key) => card.scores[key]);
   const rowWidth = buttons.length * BUTTON + (buttons.length - 1) * BUTTON_GAP;
@@ -470,7 +485,18 @@ function Card({ card, poster, ambient, logo, assets, fonts }) {
       {/* Fondo ambiental: la misma portada difuminada y atenuada que la ficha
           pinta detrás de todo (`.hero-bg-base`, con su escala para que el
           desenfoque no deje halo en los bordes). Es lo que el cristal de los
-          botones y del marcador tiene detrás. */}
+          botones y del marcador tiene detrás. Base opaca + desenfoque: ver
+          AMBIENT_BLUR. */}
+      {ambientBase ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={ambientBase.src}
+          width={W}
+          height={H}
+          alt=""
+          style={{ position: "absolute", top: 0, left: 0, width: W, height: H, objectFit: "cover", filter: AMBIENT_FILTER }}
+        />
+      ) : null}
       {ambient ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -485,24 +511,10 @@ function Card({ card, poster, ambient, logo, assets, fonts }) {
             width: AMBIENT.width,
             height: AMBIENT.height,
             objectFit: "cover",
-            filter: "blur(44px) brightness(0.62) saturate(1.15)",
+            filter: `blur(${AMBIENT_BLUR}px) ${AMBIENT_FILTER}`,
           }}
         />
       ) : null}
-
-      {/* Sombreados de legibilidad del fondo (los de la ficha): se oscurece
-          hacia abajo, donde van los botones y el marcador. */}
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: W,
-          height: H,
-          display: "flex",
-          backgroundImage: `linear-gradient(0deg, ${rgba(SHADE, 0.72)} 0%, ${rgba(SHADE, 0.36)} 45%, rgba(0,0,0,0.12) 100%)`,
-        }}
-      />
 
       {/* Portada a sangre, fundida con el fondo por máscara (la de la ficha
           móvil): no se oscurece hacia negro, se vuelve transparente y deja ver
@@ -528,6 +540,24 @@ function Card({ card, poster, ambient, logo, assets, fonts }) {
         />
       ) : null}
 
+      {/* Sombreados de legibilidad del fondo (los de la ficha): se oscurece
+          hacia abajo, donde van el logo, los botones y el marcador. Es un
+          degradado MONÓTONO (solo crece hacia abajo): una franja que se
+          aclarase otra vez por debajo se leería como una mancha suspendida.
+          Va ENCIMA de la portada, como el fundido a oscuro de la ficha: sobre
+          una portada clara, el logo blanco necesita ese fondo oscuro debajo. */}
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: W,
+          height: H,
+          display: "flex",
+          backgroundImage: `linear-gradient(0deg, ${rgba(SHADE, 0.86)} 0%, ${rgba(SHADE, 0.7)} 22%, ${rgba(SHADE, 0.45)} 36%, ${rgba(SHADE, 0.2)} 55%, rgba(0,0,0,0) 100%)`,
+        }}
+      />
+
       {/* Velo suave arriba para que la marca se lea sobre pósters claros. */}
       <div
         style={{
@@ -541,14 +571,14 @@ function Card({ card, poster, ambient, logo, assets, fonts }) {
         }}
       />
 
-      {/* Marca, en el sitio de los controles superiores de la ficha. El PNG
-          (896×448) trae mucho margen transparente: se recorta con la caja. */}
+      {/* Marca: el isotipo, centrado arriba. El PNG trae mucho margen
+          transparente: se recorta con la caja (ver BRAND). */}
       {assets.brand ? (
         <div
           style={{
             position: "absolute",
-            top: 58,
-            left: 50,
+            top: BRAND.top,
+            left: Math.round((W - BRAND.width) / 2),
             width: BRAND.width,
             height: BRAND.height,
             display: "flex",
@@ -558,8 +588,8 @@ function Card({ card, poster, ambient, logo, assets, fonts }) {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={assets.brand}
-            width={BRAND.imageWidth}
-            height={BRAND.imageHeight}
+            width={BRAND.imageSize}
+            height={BRAND.imageSize}
             alt=""
             style={{ position: "absolute", left: -BRAND.offsetX, top: -BRAND.offsetY }}
           />
@@ -635,7 +665,7 @@ export async function POST(request) {
   }
 
   const card = sanitizeShareCard(body);
-  const [fonts, assets, poster, ambient, logo] = await Promise.all([
+  const [fonts, assets, poster, ambient, ambientBase, logo] = await Promise.all([
     loadGoogleFonts([
       { name: FONT, query: "PT+Sans:wght@400", weight: 400 },
       { name: FONT, query: "PT+Sans:wght@700", weight: 700 },
@@ -643,11 +673,12 @@ export async function POST(request) {
     loadLocalAssets(),
     loadPoster(card.posterPath),
     loadAmbient(card.posterPath),
+    loadAmbientBase(card.posterPath),
     loadLogo(card.logoPath),
   ]);
 
   return new ImageResponse(
-    <Card card={card} poster={poster} ambient={ambient} logo={logo} assets={assets} fonts={Boolean(fonts)} />,
+    <Card card={card} poster={poster} ambient={ambient} ambientBase={ambientBase} logo={logo} assets={assets} fonts={Boolean(fonts)} />,
     {
       width: W,
       height: H,
