@@ -2652,17 +2652,15 @@ function NavbarContent() {
               aria-hidden
               className="desktop:hidden pointer-events-none absolute inset-0 bg-gradient-to-b from-black/45 via-black/10 to-transparent"
             />
-            {/* Fondo GLASS que aparece GRADUALMENTE con el scroll
-                (--sv-hero-scroll: 0→1) sin afectar a los iconos. */}
+            {/* Fondo GLASS que aparece GRADUALMENTE con el scroll, al mismo
+                paso que la portada se convierte en fondo, sin afectar a los
+                iconos. La opacidad la decide `.sv-details-nav-glass` en
+                globals.css: en TELÉFONO sigue solo al progreso del scroll; en
+                TABLET (sin ese progreso) aparece al empezar a desplazarse. */}
             <div
               aria-hidden
-              className={`desktop:hidden pointer-events-none absolute inset-0 ${LIQUID_GLASS_BAR} transition-opacity duration-300 motion-reduce:transition-none ${
-                // `sv-hero-scroll-in`: el mismo progreso, animado por el
-                // compositor donde hay soporte (ver globals.css).
-                isScrolled
-                  ? "opacity-100"
-                  : "sv-hero-scroll-in [opacity:var(--sv-hero-scroll,0)]"
-              }`}
+              data-scrolled={isScrolled ? "" : undefined}
+              className={`sv-details-nav-glass desktop:hidden pointer-events-none absolute inset-0 ${LIQUID_GLASS_BAR}`}
             >
               {/* Dentro de esta capa para que aparezcan y desaparezcan con ella
                   según el progreso del scroll, no por separado. */}
