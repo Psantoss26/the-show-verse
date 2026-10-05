@@ -138,6 +138,14 @@
             android:textSize="11sp" />
 
         <Button
+            android:id="@+id/perfButton"
+            style="?android:attr/borderlessButtonStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/perf_open" />
+
+        <Button
             android:id="@+id/unpairButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

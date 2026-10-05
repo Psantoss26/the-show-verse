@@ -115,6 +115,21 @@ class Prefs(context: Context) {
         get() = prefs.getString(KEY_PUSH_TOKEN, null)
         set(value) = prefs.edit().putString(KEY_PUSH_TOKEN, value).apply()
 
+    // Diagnóstico de rendimiento (ver RendimientoActivity). Por defecto, la app
+    // tal cual: medidor apagado, frecuencia máxima y desenfoques de la web.
+
+    var perfFrameMeter: Boolean
+        get() = prefs.getBoolean(KEY_PERF_METER, false)
+        set(value) = prefs.edit().putBoolean(KEY_PERF_METER, value).apply()
+
+    var perfMaxRefresh: Boolean
+        get() = prefs.getBoolean(KEY_PERF_MAX_REFRESH, true)
+        set(value) = prefs.edit().putBoolean(KEY_PERF_MAX_REFRESH, value).apply()
+
+    var perfNoBlur: Boolean
+        get() = prefs.getBoolean(KEY_PERF_NO_BLUR, false)
+        set(value) = prefs.edit().putBoolean(KEY_PERF_NO_BLUR, value).apply()
+
     fun isPaired(): Boolean = !token.isNullOrBlank() && !origin.isNullOrBlank()
 
     /** Apps activadas para sincronizar. Por defecto, las de streaming conocidas. */
@@ -201,6 +216,9 @@ class Prefs(context: Context) {
         private const val KEY_NO_NATIVE_GOOGLE = "no_native_google"
         private const val KEY_GOOGLE_RESULT = "google_result"
         private const val KEY_PUSH_TOKEN = "push_token"
+        private const val KEY_PERF_METER = "perf_frame_meter"
+        private const val KEY_PERF_MAX_REFRESH = "perf_max_refresh"
+        private const val KEY_PERF_NO_BLUR = "perf_no_blur"
         private const val KEY_NOT_A_TITLE = "not_a_title_rules"
         private const val KEY_NOT_A_TITLE_AT = "not_a_title_fetched_at"
     }

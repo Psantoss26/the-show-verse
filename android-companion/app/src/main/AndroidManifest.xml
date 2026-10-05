@@ -86,6 +86,14 @@
             android:label="@string/server_title"
             android:parentActivityName=".WebAppActivity" />
 
+        <!-- Diagnóstico de fluidez de la web (medidor y ajustes de prueba).
+             Se abre desde el panel de sincronización. -->
+        <activity
+            android:name=".RendimientoActivity"
+            android:exported="false"
+            android:label="@string/perf_title"
+            android:parentActivityName=".WebAppActivity" />
+
         <!-- Recibe el deep link de emparejamiento: theshowverse://pair?token=&origin= -->
         <activity
             android:name=".PairingActivity"

@@ -56,4 +56,17 @@
     <string name="server_save">Guardar y recargar</string>
     <string name="server_reset">Restablecer el servidor oficial</string>
     <string name="server_invalid">Dirección no válida. Usa algo como https://theshowverse.com</string>
+
+    <!-- Diagnóstico de rendimiento (RendimientoActivity, MedidorFotogramas) -->
+    <string name="perf_open">Rendimiento (diagnóstico)</string>
+    <string name="perf_title">Rendimiento</string>
+    <string name="perf_intro">Para averiguar por qué la ficha va menos fluida aquí que en la PWA. Cambia un ajuste cada vez, vuelve a la app, abre la misma ficha y haz el mismo scroll. Compara lo que marca el medidor.</string>
+    <string name="perf_meter">Medidor de fotogramas</string>
+    <string name="perf_meter_hint">Arriba de la pantalla: frecuencia, fluidez del último segundo, el fotograma más lento y el total de la página (100 % = ningún fotograma perdido).</string>
+    <string name="perf_meter_waiting">Medidor: mueve algo…</string>
+    <string name="perf_max_refresh">Frecuencia de refresco máxima</string>
+    <string name="perf_max_refresh_hint">Apagado, la pantalla vuelve a la frecuencia que elija el sistema.</string>
+    <string name="perf_no_blur">Quitar desenfoques (prueba)</string>
+    <string name="perf_no_blur_hint">Quita el cristal y el desenfoque de toda la web. Se verá peor: es solo para saber si son ellos los que frenan.</string>
+    <string name="perf_a11y_hint">Prueba también a desactivar el servicio de accesibilidad de The Show Verse: con un servicio de accesibilidad activo, el WebView puede tener que hacer más trabajo con cada cambio de la página. El medidor marca «a11y ON» mientras haya alguno activo.</string>
 </resources>

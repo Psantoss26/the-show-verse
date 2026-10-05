@@ -79,6 +79,9 @@ class WebAppActivity : AppCompatActivity() {
     private var customView: View? = null
     private var customViewCallback: WebChromeClient.CustomViewCallback? = null
 
+    /** Medidor de fotogramas de diagnóstico; null mientras está apagado. */
+    private var medidor: MedidorFotogramas? = null
+
     private val fileChooserLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             val callback = fileChooserCallback ?: return@registerForActivityResult
@@ -114,7 +117,7 @@ class WebAppActivity : AppCompatActivity() {
         // Antes que nada se pinte: la frecuencia de refresco más alta de la
         // pantalla, como la que tiene la PWA dentro de Chrome. Ver
         // FrecuenciaPantalla.
-        FrecuenciaPantalla.pedirMaxima(this)
+        aplicarFrecuencia()
 
         configurarWebView()
         configurarRefresco()
@@ -266,6 +269,7 @@ class WebAppActivity : AppCompatActivity() {
 
         override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
             currentUrl = url.orEmpty()
+            medidor?.nuevaPagina()
             // Una página nueva no hereda el panel abierto de la anterior: si la
             // web se fue con el bloqueo puesto, aquí se libera.
             recargaBloqueada = false
@@ -275,6 +279,7 @@ class WebAppActivity : AppCompatActivity() {
             currentUrl = url.orEmpty()
             binding.refresh.isRefreshing = false
             listoParaPintar = true
+            aplicarSinDesenfoques()
             // Guardar la última ruta permite volver donde estabas si el sistema
             // mata la app en segundo plano.
             if (WebOrigin.isInternal(url, origin)) prefs.lastUrl = url
@@ -283,6 +288,7 @@ class WebAppActivity : AppCompatActivity() {
         /** El enrutado de Next no recarga la página: sin esto, la app no se
          *  enteraría de en qué sección está el usuario. */
         override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {
+            if (url != currentUrl) medidor?.nuevaPagina()
             currentUrl = url.orEmpty()
             if (WebOrigin.isInternal(url, origin)) prefs.lastUrl = url
         }
@@ -464,7 +470,10 @@ class WebAppActivity : AppCompatActivity() {
                         WindowInsetsCompat.Type.displayCutout(),
                 )
                 view.setPadding(barras.left, barras.top, barras.right, barras.bottom)
-                if (view === binding.refresh) bajarIndicadorDeRecarga(barras.top)
+                if (view === binding.refresh) {
+                    bajarIndicadorDeRecarga(barras.top)
+                    binding.frameMeter.translationY = barras.top.toFloat()
+                }
                 insets
             }
         }
@@ -613,6 +622,59 @@ class WebAppActivity : AppCompatActivity() {
         }
     }
 
+    // ------------------------------------------------- diagnóstico (Rendimiento)
+
+    private fun aplicarFrecuencia() {
+        if (prefs.perfMaxRefresh) {
+            FrecuenciaPantalla.pedirMaxima(this)
+        } else {
+            FrecuenciaPantalla.soltar(this)
+        }
+    }
+
+    private fun aplicarMedidor() {
+        if (prefs.perfFrameMeter) {
+            if (medidor == null) {
+                medidor = MedidorFotogramas(this, binding.frameMeter).also { it.arrancar() }
+            }
+            binding.frameMeter.visibility = View.VISIBLE
+        } else {
+            medidor?.parar()
+            medidor = null
+            binding.frameMeter.visibility = View.GONE
+        }
+    }
+
+    /**
+     * Prueba "sin desenfoques": una hoja de estilo inyectada que apaga
+     * `backdrop-filter` y `filter` en toda la web. Es lo más caro de pintar de la
+     * ficha; si con esto va fluida, el problema es el coste de GPU de esos efectos
+     * en el WebView. Va desde aquí para no tener que desplegar la web.
+     * La navegación interna de Next no recarga el documento, así que basta con
+     * aplicarla al terminar cada carga completa y al volver de los ajustes.
+     */
+    private fun aplicarSinDesenfoques() {
+        val activo = prefs.perfNoBlur
+        binding.webView.evaluateJavascript(
+            """
+            (function () {
+              var id = 'tsv-perf-no-blur';
+              var s = document.getElementById(id);
+              if ($activo) {
+                if (s) return;
+                s = document.createElement('style');
+                s.id = id;
+                s.textContent = '*,*::before,*::after{-webkit-backdrop-filter:none!important;backdrop-filter:none!important;filter:none!important}';
+                (document.head || document.documentElement).appendChild(s);
+              } else if (s) {
+                s.remove();
+              }
+            })();
+            """.trimIndent(),
+            null,
+        )
+    }
+
     // ------------------------------------------------------------ ciclo de vida
 
     override fun onResume() {
@@ -620,7 +682,10 @@ class WebAppActivity : AppCompatActivity() {
         binding.webView.onResume()
         // La pantalla puede haber cambiado mientras la app estaba detrás (un
         // plegable que se abre, otra pantalla): se vuelve a pedir su máximo.
-        FrecuenciaPantalla.pedirMaxima(this)
+        aplicarFrecuencia()
+        // Los ajustes de diagnóstico se cambian en otra pantalla: al volver.
+        aplicarMedidor()
+        aplicarSinDesenfoques()
         aLaVista = this
         // Estando delante, la vigilancia del login sobra: la web reclama la
         // sesión al recuperar el foco.
@@ -640,6 +705,8 @@ class WebAppActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        medidor?.parar()
+        medidor = null
         binding.webView.apply {
             (parent as? ViewGroup)?.removeView(this)
             stopLoading()
