@@ -31,7 +31,9 @@ export const dynamic = "force-dynamic";
 
 const TMDB = "https://image.tmdb.org/t/p";
 const FONT = "PT Sans";
-const BG = "#000000";
+// Fondo de la ficha (`bg-[#0a0a0a]`) y color de sus sombreados (`#101010`).
+const BG = "#0a0a0a";
+const SHADE = [16, 16, 16];
 
 // --- Geometría (px de la imagen). Proporciones medidas sobre la ficha móvil.
 const POSTER_H = 1620;
@@ -42,6 +44,13 @@ const LOGO_MAX_W = Math.round(W * 0.85);
 const LOGO_MAX_H = 210;
 const LOGO_BOTTOM = BUTTONS_TOP - 44;
 const PANEL_TOP = BUTTONS_TOP + BUTTON + 52;
+// Fondo ambiental con un 12% de escala (como `.hero-bg-base` en móvil).
+const AMBIENT = {
+  width: Math.round(W * 1.12),
+  height: Math.round(H * 1.12),
+  left: -Math.round(W * 0.06),
+  top: -Math.round(H * 0.06),
+};
 
 // Logotipo con nombre: el contenido visible ocupa ~(95..810, 95..300) del PNG.
 const BRAND_SCALE = 0.36;
@@ -65,6 +74,30 @@ const COLORS = {
 };
 const EMERALD_300 = "rgb(110, 231, 183)";
 const rgba = (rgb, alpha) => `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`;
+
+// px de la ficha móvil -> px de la imagen (los botones miden 38px en un
+// teléfono de 393px y aquí BUTTON).
+const S = BUTTON / 38;
+const px = (value) => Math.round(value * S);
+
+// CRISTAL LÍQUIDO de la app (lib/ui/liquidGlass + LiquidGlassOpticalLayers),
+// traducido a lo que Satori sabe pintar. Sin `backdrop-filter`: el desenfoque lo
+// pone el fondo ambiental, que ya es la portada difuminada, igual que lo que el
+// cristal de la ficha tiene detrás. Encima van las mismas capas y en el mismo
+// orden que en la página, SIN borde: el canto lo dan la luz y el halo.
+const GLASS_TINT = "rgba(0, 0, 0, 0.15)"; // bg-black/15
+const GLASS_LAYERS = [
+  // Luz superior (volumen).
+  "radial-gradient(130% 100% at 50% 0%, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 68%)",
+  // Especular de las esquinas.
+  "linear-gradient(125deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 16%, rgba(255,255,255,0) 40%, rgba(255,255,255,0) 60%, rgba(255,255,255,0.02) 86%, rgba(255,255,255,0.04) 100%)",
+  // Refracción del canto: una franja estrecha que se aclara hacia el borde.
+  "radial-gradient(115% 135% at 50% 50%, rgba(255,255,255,0) 66%, rgba(255,255,255,0.04) 100%)",
+  // bg-gradient-to-b from-white/[0.14] via-white/[0.03] to-black/15
+  "linear-gradient(180deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.03) 50%, rgba(0,0,0,0.15) 100%)",
+].join(", ");
+// LIQUID_GLASS_ELEVATION: sombra amplia hacia abajo + halo blanco tenue.
+const GLASS_ELEVATION = `0 ${px(16)}px ${px(40)}px -${px(8)}px rgba(0,0,0,0.75), 0 0 ${px(32)}px rgba(255,255,255,0.06)`;
 
 // Iconos de lucide-react (mismos trazados, viewBox 24).
 const ICONS = {
@@ -190,6 +223,11 @@ async function loadPoster(posterPath) {
   );
 }
 
+// El fondo ambiental va desenfocado: basta una versión pequeña.
+function loadAmbient(posterPath) {
+  return posterPath ? fetchImage(`${TMDB}/w342${posterPath}`, 4000) : null;
+}
+
 // TMDb sirve los logos SVG también como PNG cambiando la extensión; Satori
 // necesita un raster con tamaño conocido para encajarlo.
 async function loadLogo(logoPath) {
@@ -242,23 +280,22 @@ function ActionButton({ button }) {
         ? "rgba(255, 255, 255, 0.3)"
         : "#e4e4e7";
 
-  const background = isSolid
-    ? "#ffffff"
+  // Igual que LiquidButton: el cristal siempre; activo, su color al 30% como
+  // fondo, el brillo diagonal y el aro de color; `!bg-white` en los de
+  // reproducción. El halo sustituye a la elevación cuando hay estado.
+  const backgroundColor = isSolid ? "#ffffff" : isActive ? rgba(color.rgb, 0.3) : GLASS_TINT;
+  const backgroundImage = isSolid
+    ? undefined
     : isActive
-      ? `linear-gradient(135deg, ${rgba(color.secondary, 0.22)} 0%, ${rgba(color.rgb, 0.3)} 45%, ${rgba(color.rgb, 0.36)} 100%)`
-      : "linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.06) 50%, rgba(255, 255, 255, 0.03) 100%)";
-
-  const border = isSolid
-    ? "2px solid rgba(255, 255, 255, 1)"
+      ? `linear-gradient(135deg, ${rgba(color.secondary, 0.2)} 0%, rgba(0,0,0,0) 40%, ${rgba(color.rgb, 0.1)} 60%, rgba(0,0,0,0) 100%), ${GLASS_LAYERS}`
+      : GLASS_LAYERS;
+  const boxShadow = isSolid
+    ? `0 0 ${px(20)}px rgba(234, 179, 8, 0.5)`
     : isActive
-      ? `2px solid ${rgba(color.rgb, 0.55)}`
-      : "2px solid rgba(255, 255, 255, 0.12)";
-
-  const glow = isSolid
-    ? "0 0 36px rgba(234, 179, 8, 0.35)"
-    : isActive
-      ? `0 0 40px ${rgba(color.rgb, 0.5)}`
-      : "0 18px 40px -16px rgba(0, 0, 0, 0.6)";
+      ? `0 0 ${px(20)}px ${rgba(color.rgb, 0.5)}, inset 0 0 0 ${px(1.5)}px ${rgba(color.rgb, 0.45)}`
+      : isDisabled
+        ? undefined
+        : GLASS_ELEVATION;
 
   const fill = isActive && Number.isFinite(button.fill) && button.fill > 0 ? Math.min(100, button.fill) : 0;
   const iconSize = Math.round(BUTTON * 0.46);
@@ -273,10 +310,10 @@ function ActionButton({ button }) {
         width: BUTTON,
         height: BUTTON,
         borderRadius: BUTTON,
-        backgroundColor: isSolid ? "#ffffff" : "rgba(18, 18, 20, 0.72)",
-        backgroundImage: background,
-        border,
-        boxShadow: glow,
+        backgroundColor,
+        // Satori no admite propiedades a `undefined`: solo se pasan si existen.
+        ...(backgroundImage ? { backgroundImage } : {}),
+        ...(boxShadow ? { boxShadow } : {}),
         overflow: "hidden",
       }}
     >
@@ -405,7 +442,7 @@ function TitleArt({ card, logo }) {
   );
 }
 
-function Card({ card, poster, logo, assets, fonts }) {
+function Card({ card, poster, ambient, logo, assets, fonts }) {
   const buttons = shareCardActionButtons(card);
   const scores = ["tmdb", "trakt", "imdb"].filter((key) => card.scores[key]);
   const rowWidth = buttons.length * BUTTON + (buttons.length - 1) * BUTTON_GAP;
@@ -422,7 +459,46 @@ function Card({ card, poster, logo, assets, fonts }) {
         fontFamily: fonts ? FONT : "sans-serif",
       }}
     >
-      {/* Portada a sangre. */}
+      {/* Fondo ambiental: la misma portada difuminada y atenuada que la ficha
+          pinta detrás de todo (`.hero-bg-base`, con su escala para que el
+          desenfoque no deje halo en los bordes). Es lo que el cristal de los
+          botones y del marcador tiene detrás. */}
+      {ambient ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={ambient.src}
+          width={AMBIENT.width}
+          height={AMBIENT.height}
+          alt=""
+          style={{
+            position: "absolute",
+            top: AMBIENT.top,
+            left: AMBIENT.left,
+            width: AMBIENT.width,
+            height: AMBIENT.height,
+            objectFit: "cover",
+            filter: "blur(44px) brightness(0.62) saturate(1.15)",
+          }}
+        />
+      ) : null}
+
+      {/* Sombreados de legibilidad del fondo (los de la ficha): se oscurece
+          hacia abajo, donde van los botones y el marcador. */}
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: W,
+          height: H,
+          display: "flex",
+          backgroundImage: `linear-gradient(0deg, ${rgba(SHADE, 0.72)} 0%, ${rgba(SHADE, 0.36)} 45%, rgba(0,0,0,0.12) 100%)`,
+        }}
+      />
+
+      {/* Portada a sangre, fundida con el fondo por máscara (la de la ficha
+          móvil): no se oscurece hacia negro, se vuelve transparente y deja ver
+          el fondo ambiental, así no hay corte entre portada y botones. */}
       {poster ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -430,22 +506,30 @@ function Card({ card, poster, logo, assets, fonts }) {
           width={W}
           height={POSTER_H}
           alt=""
-          style={{ position: "absolute", top: 0, left: 0, width: W, height: POSTER_H, objectFit: "cover", objectPosition: "50% 0%" }}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: W,
+            height: POSTER_H,
+            objectFit: "cover",
+            objectPosition: "50% 0%",
+            maskImage:
+              "linear-gradient(180deg, #000 0%, #000 58%, rgba(0,0,0,0.75) 72%, rgba(0,0,0,0.3) 86%, rgba(0,0,0,0) 98%)",
+          }}
         />
       ) : null}
 
-      {/* Fundido de la portada con el fondo (la máscara inferior de la ficha)
-          y un velo suave arriba para que la marca se lea sobre pósters claros. */}
+      {/* Velo suave arriba para que la marca se lea sobre pósters claros. */}
       <div
         style={{
           position: "absolute",
           top: 0,
           left: 0,
           width: W,
-          height: POSTER_H + 2,
+          height: 300,
           display: "flex",
-          backgroundImage:
-            "linear-gradient(180deg, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0) 13%, rgba(0,0,0,0) 56%, rgba(0,0,0,0.38) 68%, rgba(0,0,0,0.82) 82%, rgba(0,0,0,1) 96%)",
+          backgroundImage: "linear-gradient(180deg, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0) 100%)",
         }}
       />
 
@@ -493,31 +577,33 @@ function Card({ card, poster, logo, assets, fonts }) {
         ))}
       </div>
 
-      {/* Marcador compacto: solo las puntuaciones. */}
+      {/* Marcador compacto: solo las puntuaciones. Mismo ancho que la fila de
+          acciones y alineado con ella: deja aire a los lados de la imagen en
+          vez de ir casi de borde a borde. */}
       {scores.length ? (
         <div
           style={{
             position: "absolute",
             top: PANEL_TOP,
-            left: 44,
-            width: W - 88,
+            left: Math.round((W - rowWidth) / 2),
+            width: rowWidth,
             display: "flex",
             justifyContent: "center",
           }}
         >
+          {/* Mismo cristal que el marcador de la ficha (LIQUID_GLASS_SURFACE,
+              `rounded-2xl`): tinte, luz, capas ópticas y elevación; sin borde. */}
           <div
             style={{
               display: "flex",
               alignItems: "center",
               justifyContent: "space-around",
               width: "100%",
-              padding: "30px 40px",
-              borderRadius: 44,
-              backgroundColor: "rgba(28, 28, 30, 0.78)",
-              backgroundImage:
-                "linear-gradient(135deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.03) 45%, rgba(255,255,255,0.05) 100%)",
-              border: "2px solid rgba(255, 255, 255, 0.10)",
-              boxShadow: "0 24px 60px -20px rgba(0, 0, 0, 0.8), inset 0 2px 0 rgba(255, 255, 255, 0.10)",
+              padding: `${px(12)}px ${px(14)}px`,
+              borderRadius: px(16),
+              backgroundColor: GLASS_TINT,
+              backgroundImage: GLASS_LAYERS,
+              boxShadow: GLASS_ELEVATION,
             }}
           >
             {scores.map((key) => (
@@ -541,18 +627,19 @@ export async function POST(request) {
   }
 
   const card = sanitizeShareCard(body);
-  const [fonts, assets, poster, logo] = await Promise.all([
+  const [fonts, assets, poster, ambient, logo] = await Promise.all([
     loadGoogleFonts([
       { name: FONT, query: "PT+Sans:wght@400", weight: 400 },
       { name: FONT, query: "PT+Sans:wght@700", weight: 700 },
     ]),
     loadLocalAssets(),
     loadPoster(card.posterPath),
+    loadAmbient(card.posterPath),
     loadLogo(card.logoPath),
   ]);
 
   return new ImageResponse(
-    <Card card={card} poster={poster} logo={logo} assets={assets} fonts={Boolean(fonts)} />,
+    <Card card={card} poster={poster} ambient={ambient} logo={logo} assets={assets} fonts={Boolean(fonts)} />,
     {
       width: W,
       height: H,
