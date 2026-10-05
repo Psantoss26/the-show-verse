@@ -2657,7 +2657,11 @@ function NavbarContent() {
             <div
               aria-hidden
               className={`desktop:hidden pointer-events-none absolute inset-0 ${LIQUID_GLASS_BAR} transition-opacity duration-300 motion-reduce:transition-none ${
-                isScrolled ? "opacity-100" : "[opacity:var(--sv-hero-scroll,0)]"
+                // `sv-hero-scroll-in`: el mismo progreso, animado por el
+                // compositor donde hay soporte (ver globals.css).
+                isScrolled
+                  ? "opacity-100"
+                  : "sv-hero-scroll-in [opacity:var(--sv-hero-scroll,0)]"
               }`}
             >
               {/* Dentro de esta capa para que aparezcan y desaparezcan con ella

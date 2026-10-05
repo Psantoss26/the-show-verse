@@ -379,6 +379,12 @@ const MOBILE_SCOREBOARD_REVEAL_ANIMATION =
 // centinela contra el borde superior de la navegación inferior.
 const MOBILE_REVEAL_SHOW_AT_PX = 16;
 
+// Misma condición que el `@supports` de `.sv-hero-scroll-in` en globals.css:
+// con soporte, el progreso de scroll del hero lo anima el compositor y no hace
+// falta el listener que escribe `--sv-hero-scroll`.
+const HERO_SCROLL_TIMELINE_QUERY =
+  "(animation-timeline: scroll()) and (animation-range: 0% 100%)";
+
 // El título del hero mantiene su jerarquía normal cuando cabe en una fila. Si
 // no cabe, se compacta un paso medido para compensar la segunda línea sin
 // convertirlo en un estilo distinto. La medición se hace con una copia invisible
@@ -1502,9 +1508,14 @@ export default function DetailsClient({
   // póster de portada a fondo (difuminado + escala + máscara, en globals.css). Se
   // escribe en el <html> con un listener pasivo + rAF (sin re-render de React). La
   // distancia (~55% de la ventana) es AJUSTABLE. En desktop se limpia y no se usa.
+  //
+  // SOLO RESPALDO: donde hay animaciones ligadas al scroll, `.sv-hero-scroll-in`
+  // y `.sv-hero-scroll-shade` hacen esto en el compositor. Escribir la variable
+  // en la raíz recalculaba el estilo de toda la ficha en cada fotograma y era
+  // lo que hacía avanzar a tirones el logo y los botones al arrastrar.
   useEffect(() => {
     const root = document.documentElement;
-    if (!isMobileViewport) {
+    if (!isMobileViewport || CSS.supports?.(HERO_SCROLL_TIMELINE_QUERY)) {
       root.style.removeProperty("--sv-hero-scroll");
       return undefined;
     }
@@ -9066,7 +9077,7 @@ export default function DetailsClient({
                 Se elimina también `opacity: isTransitioning ? 1 : 1`, que era un
                 ternario muerto (siempre 1). */}
             <div
-              className="hero-bg-base absolute inset-0 bg-cover bg-center max-sm:[opacity:var(--sv-hero-scroll,0)] sm:opacity-100 sm:transition-opacity sm:duration-500"
+              className="hero-bg-base sv-hero-scroll-in absolute inset-0 bg-cover bg-center max-sm:[opacity:var(--sv-hero-scroll,0)] sm:opacity-100 sm:transition-opacity sm:duration-500"
               style={{
                 backgroundImage: `url(https://image.tmdb.org/t/p/${heroBackgroundSize}${heroBackgroundPath})`,
                 // MÓVIL: desenfoque + un punto de escala.
@@ -9142,7 +9153,7 @@ export default function DetailsClient({
             (`--sv-hero-scroll`): en p=0 el póster está nítido SIN oscurecer (entrada
             intacta); al hacer scroll aparecen para dar legibilidad sobre el fondo.
             Escritorio (>=sm): siempre visibles. */}
-        <div className="absolute inset-0 pointer-events-none sm:opacity-100 max-sm:[opacity:calc(var(--sv-hero-scroll,0)*0.6)]">
+        <div className="sv-hero-scroll-shade absolute inset-0 pointer-events-none sm:opacity-100 max-sm:[opacity:calc(var(--sv-hero-scroll,0)*0.6)]">
           {/* Sombreado superior + laterales (sin "marcos") */}
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-r from-[#101010]/60 via-transparent to-transparent" />
