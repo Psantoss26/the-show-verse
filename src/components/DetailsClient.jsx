@@ -10029,14 +10029,17 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 (ver `--details-mobile-poster-height` más arriba): al insertarse
                 aquí, empuja la fila de acciones hacia abajo en flujo normal,
                 hasta quedar detrás del navbar inferior flotante, que la cubre.
-                Sin margen inferior: con `mb-6` quedaban 44px entre la barra y
-                los botones, demasiado aire entre dos piezas que van juntas. El ajuste visual se hace en
+                `mb-1.5` deja entre la barra y los botones el MISMO hueco que
+                entre los botones y el marcador (26px en un móvil de 390px). El ajuste visual se hace en
                 el propio bloque para igualar la distancia al navbar que tiene
                 la fila de acciones sin progreso, sin variar el alto del póster
                 ni desplazar el logo. */}
             {inProgressPct != null && (
-              <div className="pointer-events-none relative -top-2 mb-0 w-full px-4 sm:hidden">
-                <div className="px-3 pt-4">
+              <div className="pointer-events-none relative -top-2 mb-1.5 w-full px-4 sm:hidden">
+                {/* MISMO ANCHO QUE EL NAVBAR INFERIOR: su misma fórmula
+                    (`min(100vw - 3rem, 21.5rem)`, centrada), para que la barra
+                    y el navbar queden alineados en cualquier móvil. */}
+                <div className="mx-auto w-[min(calc(100vw_-_3rem),21.5rem)] pt-4">
                   <div className="mb-1.5 flex items-end justify-between gap-2">
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-black shadow-[0_2px_10px_rgba(16,185,129,0.55)]">
                       <Play className="h-2.5 w-2.5 fill-current" /> Viendo
