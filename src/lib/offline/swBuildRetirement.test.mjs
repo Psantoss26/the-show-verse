@@ -142,6 +142,44 @@ test('una ruta que ya no existe (404) se olvida en vez de contar como fallo para
   assert.equal(b.stores.has('showverse-shell-build-a'), false);
 });
 
+test('una ruta que ahora redirige se sustituye por su destino en vez de fallar siempre', async () => {
+  const a = worker('build-a'); await mismaCuenta(a);
+  a.network(() => html('vista neuronal (ruta antigua)'));
+  await a.save('/profile/neural');
+
+  const b = worker('build-b', a.stores); await mismaCuenta(b);
+  b.network((request) => {
+    const response = html('vista neuronal');
+    if (new URL(request.url).pathname === '/profile/neural') {
+      // Así llega una redirección seguida por fetch (Next responde 308).
+      Object.defineProperty(response, 'redirected', { value: true });
+      Object.defineProperty(response, 'url', { value: 'https://app.test/profile/neuronal' });
+    }
+    return response;
+  });
+  const result = await b.save('/profile/neural');
+  assert.equal(result.gone, true, 'una redirección cuenta como fallo en cada copia para siempre');
+  assert.equal(result.movedTo, '/profile/neuronal');
+  assert.equal(await b.has('/profile/neural'), false);
+  assert.equal(await b.has('/profile/neuronal'), true);
+});
+
+test('una redirección al login no borra la copia guardada', async () => {
+  const a = worker('build-a'); await mismaCuenta(a);
+  a.network(() => html('favoritos'));
+  await a.save('/favorites');
+  a.network(() => {
+    const response = html('login');
+    Object.defineProperty(response, 'redirected', { value: true });
+    Object.defineProperty(response, 'url', { value: 'https://app.test/login?next=/favorites' });
+    return response;
+  });
+  const result = await a.save('/favorites');
+  assert.equal(result.ok, false);
+  assert.notEqual(result.gone, true);
+  assert.equal(await a.has('/favorites'), true);
+});
+
 test('al reanudar una copia interrumpida no se vuelve a descargar lo ya guardado', async () => {
   const a = worker('build-a'); await mismaCuenta(a);
   let descargas = 0;

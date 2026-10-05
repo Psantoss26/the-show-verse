@@ -2257,7 +2257,7 @@ function ProfileSettingsClient() {
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-bold text-white">Detecciones del navegador</span>
                         <span className="block text-xs leading-relaxed text-zinc-400">
-                          Revisa los títulos que detectó la extensión y corrige los que no eran correctos. Las del móvil están en la app.
+                          Revisa los títulos que detectó la extensión y corrige los que no eran correctos.
                         </span>
                       </span>
                       <ChevronRight className="h-4 w-4 shrink-0 text-zinc-400" aria-hidden="true" />

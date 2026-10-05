@@ -492,11 +492,22 @@ self.addEventListener("message", (event) => {
         result = { ok: true, reused: true };
       } else {
         const response = await navigation(new Request(url, { headers: { Accept: "text/html" }, credentials: "include" }));
+        const target = response.redirected ? new URL(response.url) : null;
+        const moved = target && target.origin === self.location.origin && !target.pathname.startsWith("/api/")
+          && !/^\/(?:login|register|auth)(?:\/|$)/.test(target.pathname) && target.pathname !== url.pathname;
         if ([404, 410].includes(response.status)) {
           // La página ya no existe (una lista borrada, un título retirado): se
           // olvida. Si no, contaría como fallo en cada copia para siempre.
           await retireDocument(key, { exceptCurrent: false });
           result = { ok: false, gone: true };
+        } else if (moved && response.ok) {
+          // La ruta se ha MUDADO (p. ej. /profile/neural → /profile/neuronal):
+          // se olvida la vieja y se guarda la nueva, que ya viene en la
+          // respuesta. Una redirección al login NO entra aquí: sería la sesión,
+          // no la página, y se conserva la copia.
+          await retireDocument(key, { exceptCurrent: false });
+          await saveDocument(new Request(target.href, { headers: { Accept: "text/html" } }), response);
+          result = { ok: false, gone: true, movedTo: target.pathname + target.search };
         } else {
           // Only a copy in THIS build's shell counts: an older build's document
           // would still run that build's code offline.
