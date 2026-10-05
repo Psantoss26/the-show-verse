@@ -4,19 +4,24 @@
 // sigues. Tres piezas que comparten la misma petición:
 //   - FollowingActivityAvatars (escritorio): avatares con su marca (nota,
 //     viéndola, pendiente…) a la derecha de la fila de stats del marcador.
-//   - FollowingActivityStrip (teléfono): franja compacta bajo el marcador
-//     (avatares + "Ana y Luis la han visto" + chips).
+//   - FollowingActivityStrip (modal del dashboard en teléfono): franja
+//     compacta bajo el marcador (avatares + "Ana y Luis la han visto" + chips).
+//   - FollowingActivityPill (ficha en teléfono): píldora con sus avatares entre
+//     Plataformas y Compartir, bajo el marcador; abre FollowingActivityModal,
+//     con el mismo diseño que el modal de plataformas.
 //   - FollowingActivitySection: la sección completa, con una tarjeta por
 //     persona (progreso, nota, favorito, pendiente, reseña y listas).
 // Si no hay sesión o nadie de los que sigues ha tocado el título, no se pinta
-// nada: ninguna de las dos deja hueco vacío.
+// nada: ninguna deja hueco vacío.
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   BookmarkPlus,
   CheckCircle2,
   ChevronDown,
+  ChevronRight,
   Eye,
   EyeOff,
   Heart,
@@ -24,11 +29,14 @@ import {
   ListVideo,
   MessageSquareQuote,
   Play,
+  X,
 } from "lucide-react";
 
+import { SCOREBOARD_PILL_CLASS } from "@/components/details/DetailHeaderBits";
 import Avatar from "@/components/ui/Avatar";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
-import { LIQUID_GLASS_SURFACE_CARD } from "@/lib/ui/liquidGlass";
+import useModalGuard from "@/hooks/useModalGuard";
+import { LIQUID_GLASS_MODAL_HEADER, LIQUID_GLASS_PANEL, LIQUID_GLASS_SURFACE_CARD } from "@/lib/ui/liquidGlass";
 import {
   activityMarks,
   episodeLabel,
@@ -176,6 +184,41 @@ export function FollowingActivityAvatars({ data, mediaType, onOpen, compact = fa
         })}
         {extra > 0 ? (
           <span className="inline-flex h-[38px] min-w-[38px] items-center justify-center rounded-full bg-white/10 px-1.5 text-xs font-bold text-white">
+            +{extra}
+          </span>
+        ) : null}
+      </span>
+    </button>
+  );
+}
+
+/**
+ * Teléfono: píldora entre Plataformas y Compartir con los avatares de tus
+ * seguidos (hasta tres; con más, dos y "+N"). Solo ocupa lo que miden las
+ * fotos: las otras dos se reparten el resto de la fila.
+ */
+export function FollowingActivityPill({ data, onOpen, className = "", ref, ...props }) {
+  if (!hasFollowingActivity(data)) return null;
+  const items = data.items;
+  const shown = items.length > 3 ? items.slice(0, 2) : items;
+  const extra = items.length - shown.length;
+  return (
+    <button
+      ref={ref}
+      type="button"
+      onClick={onOpen}
+      aria-haspopup="dialog"
+      aria-label={`${summarySentence(data)}. Ver la actividad de tus amigos`}
+      className={`${SCOREBOARD_PILL_CLASS} !w-auto !px-2.5 ${className}`}
+      {...props}
+    >
+      <LiquidGlassOpticalLayers />
+      <span className="relative z-10 flex shrink-0 -space-x-3" aria-hidden="true">
+        {shown.map((item) => (
+          <PersonAvatar key={item.user.username} user={item.user} className="h-7 w-7 ring-2 ring-black/50" />
+        ))}
+        {extra > 0 ? (
+          <span className="relative inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-zinc-800 px-1 text-[11px] font-bold tabular-nums text-white ring-2 ring-black/50">
             +{extra}
           </span>
         ) : null}
@@ -382,5 +425,147 @@ export function FollowingActivitySection({ data, mediaType, loading = false, pho
         </div>
       ) : null}
     </>
+  );
+}
+
+// Una persona en el modal: misma fila que una plataforma (foto, nombre y
+// flecha a su perfil) y, debajo, lo que ha hecho con el título.
+function PersonRow({ item, mediaType, onNavigate }) {
+  const when = item.lastActivityApprox ? null : relativeTime(item.lastActivityAt);
+  const w = item.watched;
+  const marks = activityMarks(item, mediaType);
+  return (
+    <li className="rounded-2xl bg-white/[0.03] p-4 transition-colors duration-300 hover:bg-white/[0.05]">
+      <Link
+        href={`/u/${encodeURIComponent(item.user.username)}`}
+        onClick={onNavigate}
+        aria-label={`Ver el perfil de ${item.user.displayName}`}
+        className="group/link flex w-full items-center gap-3.5 rounded-xl text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400"
+      >
+        <PersonAvatar user={item.user} className="h-11 w-11 transition duration-300 group-hover/link:scale-105" />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-black leading-tight text-white">{item.user.displayName}</span>
+          <span className="mt-1 block truncate text-xs font-semibold text-zinc-400 transition-colors group-hover/link:text-zinc-300">
+            @{item.user.username}
+            {when ? ` · ${when}` : ""}
+          </span>
+        </span>
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/5 text-zinc-400 transition duration-300 group-hover/link:bg-white/10 group-hover/link:text-white">
+          <ChevronRight aria-hidden="true" className="h-4 w-4" />
+        </span>
+      </Link>
+
+      {marks.length ? (
+        <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Su actividad con este título">
+          {marks.map((mark) => (
+            <li
+              key={mark.id}
+              className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] px-2.5 py-1 text-xs font-bold text-zinc-200"
+            >
+              <MarkIcon mark={mark} iconClassName="h-3.5 w-3.5" ratingClassName="text-sm" />
+              <span>{mark.id === "rating" ? "Su nota" : mark.label}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {mediaType === "tv" && w?.episodes ? (
+        <div className="mt-3">
+          <div className="flex items-baseline justify-between gap-2 text-xs">
+            <span className="font-bold text-zinc-200">
+              {w.aired ? `${w.episodes} de ${w.aired} episodios` : `${w.episodes} episodios`}
+            </span>
+            <span className="text-zinc-400">
+              {episodeLabel(w.lastEpisode) ? `Último: ${episodeLabel(w.lastEpisode)}` : null}
+            </span>
+          </div>
+          {w.progressPct != null ? (
+            <div
+              className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10"
+              role="progressbar"
+              aria-valuenow={w.progressPct}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`Progreso de ${item.user.displayName}: ${w.progressPct}%`}
+            >
+              <div
+                className={`h-full rounded-full ${w.completed ? "bg-emerald-400" : "bg-sky-400"}`}
+                style={{ width: `${Math.max(3, w.progressPct)}%` }}
+              />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {item.review ? <ReviewQuote review={item.review} /> : null}
+
+      {item.lists?.length ? (
+        <p className="mt-3 flex items-center gap-1.5 truncate text-xs text-zinc-400">
+          <ListVideo aria-hidden="true" strokeWidth={2.5} className="h-3.5 w-3.5 shrink-0 text-violet-400" />
+          <span className="truncate">{item.lists.map((list) => `«${list.name}»`).join(", ")}</span>
+        </p>
+      ) : null}
+    </li>
+  );
+}
+
+/**
+ * Teléfono: la actividad de tus amigos en un modal con el diseño del de
+ * plataformas (ExternalLinksModal): mismo velo, cristal, cabecera y filas.
+ */
+export function FollowingActivityModal({ open, onClose, data, mediaType }) {
+  const [portalReady, setPortalReady] = useState(false);
+  useModalGuard({ open, onClose });
+  useEffect(() => setPortalReady(true), []);
+  if (!open || !portalReady || !hasFollowingActivity(data)) return null;
+
+  return createPortal(
+    <div
+      data-detail-modal-layer=""
+      className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+      aria-modal="true"
+      role="dialog"
+      aria-labelledby="following-activity-title"
+    >
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-lg animate-in fade-in duration-300"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div
+        className={`relative flex max-h-[85dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
+      >
+        <div className={`flex w-full shrink-0 items-center justify-between ${LIQUID_GLASS_MODAL_HEADER} p-6 sm:px-8 sm:pb-6 sm:pt-8`}>
+          <div className="min-w-0">
+            <h2
+              id="following-activity-title"
+              className="bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-xl font-black text-transparent"
+            >
+              Actividad de amigos
+            </h2>
+            <p className="mt-1 text-xs font-medium uppercase tracking-wide text-zinc-500">
+              {summarySentence(data)}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400"
+            aria-label="Cerrar"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 pb-8 sm:px-8">
+          <ul className="space-y-2">
+            {data.items.map((item) => (
+              <PersonRow key={item.user.username} item={item} mediaType={mediaType} onNavigate={onClose} />
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
