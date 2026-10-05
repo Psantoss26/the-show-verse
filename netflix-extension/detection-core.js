@@ -399,8 +399,43 @@
     return out;
   }
 
+  // Misma normalización que el servidor (src/lib/netflix/resolve.js →
+  // normalizeText): los textos que "no son un título" llegan ya normalizados y
+  // hay que comparar con la misma regla.
+  function normalizeTitleKey(value) {
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .toLowerCase()
+      .replace(/[×✕⨯╳]/g, "x")
+      .replace(/[^\p{L}\p{N}]+/gu, " ")
+      .trim();
+  }
+
+  // ¿El usuario (o el consenso) dijo que este texto no es un título en esta
+  // plataforma? `learned` = { platforms: { netflix: ["top 10 en espana", …] } }.
+  // Mismo id canónico que usa el servidor en la huella (detectionFingerprint.js).
+  const PLATFORM_ALIASES = {
+    prime: "primevideo", amazon: "primevideo", amazonprimevideo: "primevideo",
+    hbomax: "max", hbo: "max", disneyplus: "disney", movistarplus: "movistar",
+    appletvplus: "appletv",
+  };
+  function canonicalPlatformId(platform) {
+    const id = String(platform || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+    return PLATFORM_ALIASES[id] || id;
+  }
+
+  function isLearnedNotATitle(learned, platformId, text) {
+    const list = learned && learned.platforms && learned.platforms[canonicalPlatformId(platformId)];
+    if (!Array.isArray(list) || !list.length) return false;
+    const key = normalizeTitleKey(text);
+    return Boolean(key) && list.includes(key);
+  }
+
   return {
     clean,
+    normalizeTitleKey,
+    isLearnedNotATitle,
     parseSeasonEpisode,
     stripPlatformPrefix,
     isBarePlatformName,

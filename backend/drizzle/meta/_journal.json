@@ -127,6 +127,13 @@
       "when": 1790583942665,
       "tag": "0017_push_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791189153592,
+      "tag": "0018_streaming_detections",
+      "breakpoints": true
     }
   ]
 }

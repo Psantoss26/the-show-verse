@@ -52,6 +52,23 @@ object RecentDetail {
     }
 
     /**
+     * El usuario corrigió una detección. La ficha recordada pudo ser justo la
+     * equivocada, y prestarla como serie a la próxima reproducción repetiría el
+     * error; se olvida todo lo recordado (la ficha y el episodio confirmado). Lo
+     * correcto se volverá a aprender de lo siguiente que se vea.
+     */
+    @Synchronized
+    fun forgetAfterCorrection() {
+        pkg = null
+        synced = null
+        atMs = 0L
+        confirmedPkg = null
+        confirmedEpisode = null
+        confirmedTitle = null
+        confirmedAtMs = 0L
+    }
+
+    /**
      * El servidor dio por buena la serie [synced] para el episodio [episodeKey]
      * (ver [HintFreshness.episodeKey]). Si ese mismo episodio se reanuda después
      * de una pausa larga, se vuelve a usar esa serie.

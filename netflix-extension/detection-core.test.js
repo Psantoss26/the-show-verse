@@ -227,3 +227,14 @@ test("pickProgressPoint funciona sin reproductor y descarta lo inservible", () =
   assert.equal(D.pickProgressPoint({ positionSec: 100, durationSec: 0 }, null), null);
   assert.equal(D.pickProgressPoint({ positionSec: NaN, durationSec: NaN }, null), null);
 });
+
+test("isLearnedNotATitle compara con la normalización del servidor", () => {
+  const learned = { platforms: { netflix: ["top 10 en espana"] } };
+  assert.equal(D.normalizeTitleKey("Top 10 en España!"), "top 10 en espana");
+  assert.equal(D.isLearnedNotATitle(learned, "netflix", "TOP 10 en España"), true);
+  assert.equal(D.isLearnedNotATitle(learned, "netflix", "Dark"), false);
+  assert.equal(D.isLearnedNotATitle(learned, "primevideo", "Top 10 en España"), false);
+  assert.equal(D.isLearnedNotATitle(null, "netflix", "Top 10 en España"), false);
+  // La extensión llama «prime» a Prime Video; el servidor, «primevideo».
+  assert.equal(D.isLearnedNotATitle({ platforms: { primevideo: ["destacados"] } }, "prime", "Destacados"), true);
+});

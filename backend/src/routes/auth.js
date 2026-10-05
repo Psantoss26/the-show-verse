@@ -26,6 +26,7 @@ import {
 import { sendEmailChangeVerification } from '../lib/email.js';
 import { REFRESH_ROTATION_GRACE_MS } from '../lib/refreshRotation.js';
 import { syncDedupKey } from './netflixSyncDedup.js';
+import { applyDetectionRedirect } from './streamingDetections.js';
 import {
   shouldRecordCompletion,
   REWATCH_COMPLETION_COOLDOWN_MS,
@@ -120,6 +121,8 @@ const netflixSyncSchema = z.object({
   netflixTitle: z.string().max(300).optional(),
   platform: z.string().max(40).optional(),
   confidence: z.enum(['high', 'medium', 'low']).optional(),
+  // Detección que produjo este visionado (ver routes/streamingDetections.js).
+  detectionId: z.string().uuid().optional(),
   // La posición no la publica el reproductor: está DEDUCIDA por reloj desde que
   // se empezó a mirar (algunas apps de Android). Sirve para que el título salga
   // en "Continuar viendo", pero no para dar nada por visto.
@@ -152,6 +155,10 @@ const netflixProgressSchema = z.object({
   // `parsed.data.estimated` llegaba siempre `undefined` y las dos protecciones
   // quedaban muertas. Declararlo es lo que las reactiva.
   estimated: z.boolean().optional(),
+  // Detección que resolvió este contenido: enlaza lo guardado para poder
+  // deshacerlo o moverlo si el usuario la corrige, y redirige los pings que
+  // lleguen después de corregirla.
+  detectionId: z.string().uuid().optional(),
 });
 
 const netflixSyncBatchSchema = z.object({
@@ -1249,6 +1256,11 @@ export default async function authRoutes(fastify) {
       return reply.status(401).send({ error: 'Netflix sync token is invalid or revoked' });
     }
 
+    const redirect = await applyDetectionRedirect(account.userId, parsed.data.detectionId, parsed.data);
+    if (redirect.skip) {
+      // El usuario corrigió esa detección: no había ningún título.
+      return reply.send({ success: true, duplicate: false, ignored: 'detection_dismissed', item: null });
+    }
     const {
       tmdbId,
       mediaType,
@@ -1259,7 +1271,7 @@ export default async function authRoutes(fastify) {
       title,
       posterPath,
       confidence,
-    } = parsed.data;
+    } = redirect.item;
     // Nota: un tv sin temporada/episodio es válido → fallback a nivel serie
     // (episode = null, confidence 'low'). No se rechaza.
 
@@ -1318,6 +1330,7 @@ export default async function authRoutes(fastify) {
           title: title || null,
           posterPath: posterPath || null,
           confidence: confidence || 'high',
+          detectionId: redirect.detectionId,
         })
         .returning();
     }
@@ -1373,10 +1386,16 @@ export default async function authRoutes(fastify) {
       return reply.status(401).send({ error: 'Netflix sync token is invalid or revoked' });
     }
 
+    const redirect = await applyDetectionRedirect(account.userId, parsed.data.detectionId, parsed.data);
+    if (redirect.skip) {
+      // El usuario corrigió esa detección: no había ningún título que guardar.
+      return reply.send({ ok: true, completed: false, ignored: 'detection_dismissed' });
+    }
+    const detectionId = redirect.detectionId;
     const {
       tmdbId, mediaType, positionSeconds, runtimeSeconds, platform, title, posterPath,
       confidence, estimated,
-    } = parsed.data;
+    } = redirect.item;
     if (Boolean(parsed.data.eventId) !== Boolean(parsed.data.observedAt)) {
       return reply.status(400).send({ error: 'eventId and observedAt must be provided together' });
     }
@@ -1386,8 +1405,8 @@ export default async function authRoutes(fastify) {
     }
     const isTv = mediaType === 'tv';
     // Clave del índice único: 0 para película o episodio desconocido.
-    const season = isTv ? (parsed.data.season ?? 0) : 0;
-    const episode = isTv ? (parsed.data.episode ?? 0) : 0;
+    const season = isTv ? (redirect.item.season ?? 0) : 0;
+    const episode = isTv ? (redirect.item.episode ?? 0) : 0;
 
     // Duración efectiva: la que reporta el cliente o, si no la trae (Plex y algunos
     // episodios de Netflix no exponen duración en la MediaSession), la de TMDb. Sin
@@ -1495,6 +1514,7 @@ export default async function authRoutes(fastify) {
                 posterPath: posterPath || null,
                 // La que traiga el cliente; 'high' solo si no la manda (clientes viejos).
                 confidence: confidence || 'high',
+                detectionId,
               })
               .returning();
           }
@@ -1517,6 +1537,7 @@ export default async function authRoutes(fastify) {
             platform: platform || null,
             title: title || null,
             posterPath: posterPath || null,
+            detectionId,
             updatedAt: observedAt,
           })
           .onConflictDoUpdate({
@@ -1542,6 +1563,8 @@ export default async function authRoutes(fastify) {
               platform: platform || null,
               title: title || null,
               posterPath: posterPath || null,
+              // Un ping sin detección (cliente antiguo) no borra el enlace.
+              ...(detectionId ? { detectionId } : {}),
               updatedAt: observedAt,
             },
           });

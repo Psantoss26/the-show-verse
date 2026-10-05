@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "The Show Verse - Streaming Sync",
-  "version": "3.0",
+  "version": "3.1",
   "description": "Sincroniza la reproducción de servicios compatibles con The Show Verse. Incluye recuperación de envíos y seguimiento de progreso.",
   "permissions": [
     "cookies",

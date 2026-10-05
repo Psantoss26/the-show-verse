@@ -76,6 +76,15 @@ export function setAccessibilityDetection(enabled) {
   return call("setAccessibility", false, !!enabled) === true;
 }
 
+/**
+ * Avisa a la app de que el usuario corrigió una detección: olvida la ficha
+ * equivocada que recordaba como pista de serie y refresca los textos que no son
+ * títulos. Fuera de la app (o en versiones que no lo tienen) no hace nada.
+ */
+export function notifyDetectionCorrected(detectionId) {
+  return call("detectionCorrected", false, String(detectionId || "")) === true;
+}
+
 export function openSyncPanel() {
   call("openSyncPanel", undefined);
 }

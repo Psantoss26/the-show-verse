@@ -39,7 +39,8 @@ class Prefs(context: Context) {
         get() = prefs.getString(KEY_TOKEN, null)
         set(value) {
             val edit = prefs.edit().putString(KEY_TOKEN, value)
-            if (value != token) edit.remove(KEY_PENDING_PROGRESS)
+            // Otra vinculación es otro usuario: sus pendientes y lo que aprendió no valen.
+            if (value != token) edit.remove(KEY_PENDING_PROGRESS).remove(KEY_NOT_A_TITLE).remove(KEY_NOT_A_TITLE_AT)
             edit.apply()
         }
 
@@ -169,6 +170,18 @@ class Prefs(context: Context) {
     fun clearLogs() = prefs.edit().remove(KEY_LOGS).apply()
 
     val pendingProgress: String? get() = prefs.getString(KEY_PENDING_PROGRESS, null)
+
+    /** Textos que no son títulos (JSON del servidor, ver [NotATitleList]). */
+    var notATitleJson: String?
+        get() = prefs.getString(KEY_NOT_A_TITLE, null)
+        set(value) {
+            prefs.edit()
+                .putString(KEY_NOT_A_TITLE, value)
+                .putLong(KEY_NOT_A_TITLE_AT, if (value == null) 0L else System.currentTimeMillis())
+                .apply()
+        }
+
+    val notATitleFetchedAt: Long get() = prefs.getLong(KEY_NOT_A_TITLE_AT, 0L)
     fun savePendingProgress(value: String): Boolean = prefs.edit().putString(KEY_PENDING_PROGRESS, value).commit()
 
     companion object {
@@ -188,5 +201,7 @@ class Prefs(context: Context) {
         private const val KEY_NO_NATIVE_GOOGLE = "no_native_google"
         private const val KEY_GOOGLE_RESULT = "google_result"
         private const val KEY_PUSH_TOKEN = "push_token"
+        private const val KEY_NOT_A_TITLE = "not_a_title_rules"
+        private const val KEY_NOT_A_TITLE_AT = "not_a_title_fetched_at"
     }
 }

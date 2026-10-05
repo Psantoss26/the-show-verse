@@ -114,9 +114,13 @@ export const watchHistory = pgTable('watch_history', {
   // Agrupa los episodios insertados por una única acción de serie completada.
   // El historial sigue siendo detallado; el feed público los representa juntos.
   activityGroup: text('activity_group'),
+  // Detección de streaming que creó este visionado (ver streaming_detections).
+  // Permite deshacer o mover lo guardado si el usuario corrige la detección.
+  detectionId: uuid('detection_id').references(() => streamingDetections.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => ({
   userIdIdx: index('idx_watch_history_user_id').on(t.userId),
+  detectionIdx: index('idx_watch_history_detection').on(t.detectionId),
   tmdbIdx: index('idx_watch_history_tmdb').on(t.userId, t.tmdbId, t.mediaType),
   watchedAtIdx: index('idx_watch_history_watched_at').on(t.userId, t.watchedAt),
   activityGroupIdx: index('idx_watch_history_activity_group').on(t.userId, t.activityGroup),
@@ -142,10 +146,13 @@ export const watchProgress = pgTable('watch_progress', {
   platform: text('platform'),
   title: text('title'),
   posterPath: text('poster_path'),
+  // Última detección de streaming que escribió esta fila (ver watch_history).
+  detectionId: uuid('detection_id').references(() => streamingDetections.id, { onDelete: 'set null' }),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (t) => ({
   itemUnique: uniqueIndex('idx_watch_progress_item').on(t.userId, t.tmdbId, t.mediaType, t.season, t.episode),
+  detectionIdx: index('idx_watch_progress_detection').on(t.detectionId),
   userUpdatedIdx: index('idx_watch_progress_user_updated').on(t.userId, t.updatedAt),
   mediaTypeCheck: check('chk_watch_progress_media_type', sql`media_type IN ('movie', 'tv')`),
 }));
@@ -557,6 +564,107 @@ export const streamingEvents = pgTable('streaming_events', {
 }, (t) => ({
   eventUnique: uniqueIndex('idx_streaming_event_unique').on(t.userId, t.eventId),
   entityTime: index('idx_streaming_event_entity_time').on(t.userId, t.entityKey, t.observedAt),
+}));
+
+// ─────────────────────────────────────────────
+// DETECCIONES DE STREAMING Y SU APRENDIZAJE
+// ─────────────────────────────────────────────
+// Cada título que la extensión o la app Android notifican (ficha navegando o
+// reproducción). El usuario puede marcarlo como incorrecto; esa corrección
+// deshace o mueve lo guardado con este `id` y genera reglas (detection_rules).
+// `fingerprint`: plataforma + texto de identidad normalizado (ver
+// lib/detectionRules.js). Se purgan pasados 30 días; las reglas permanecen.
+export const streamingDetections = pgTable('streaming_detections', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  platform: text('platform').notNull(),
+  kind: text('kind').notNull(),                           // 'detail' | 'playback'
+  fingerprint: text('fingerprint').notNull(),
+  triggerText: text('trigger_text').notNull(),             // texto que la disparó, sin normalizar
+  signal: jsonb('signal').notNull(),                       // señal original del cliente
+  tmdbId: integer('tmdb_id').notNull(),
+  mediaType: text('media_type').notNull(),
+  season: integer('season'),
+  episode: integer('episode'),
+  title: text('title'),
+  posterPath: text('poster_path'),
+  confidence: text('confidence'),
+  source: text('source').default('search').notNull(),     // 'search' | 'user_rule' | 'global_rule'
+  status: text('status').default('active').notNull(),     // 'active' | 'corrected' | 'dismissed'
+  // Destino tras corregir (null si no había título): los pings que sigan
+  // llegando con este id se aplican aquí.
+  correctedTmdbId: integer('corrected_tmdb_id'),
+  correctedMediaType: text('corrected_media_type'),
+  correctedSeason: integer('corrected_season'),
+  correctedEpisode: integer('corrected_episode'),
+  correctedTitle: text('corrected_title'),
+  correctedPosterPath: text('corrected_poster_path'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  userCreated: index('idx_streaming_detections_user_created').on(t.userId, t.createdAt),
+  kindCheck: check('chk_streaming_detections_kind', sql`kind IN ('detail', 'playback')`),
+  statusCheck: check('chk_streaming_detections_status', sql`status IN ('active', 'corrected', 'dismissed')`),
+  mediaTypeCheck: check('chk_streaming_detections_media_type', sql`media_type IN ('movie', 'tv')`),
+}));
+
+// Lo que dijo cada usuario de una detección. Es el registro de verdad del que
+// salen las reglas; se conserva aunque la detección se purgue.
+export const detectionCorrections = pgTable('detection_corrections', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  detectionId: uuid('detection_id').references(() => streamingDetections.id, { onDelete: 'set null' }),
+  platform: text('platform').notNull(),
+  fingerprint: text('fingerprint').notNull(),
+  triggerText: text('trigger_text').notNull(),
+  verdict: text('verdict').notNull(),                      // 'not_a_title' | 'wrong_title'
+  rejectedTmdbId: integer('rejected_tmdb_id').notNull(),
+  rejectedMediaType: text('rejected_media_type').notNull(),
+  tmdbId: integer('tmdb_id'),
+  mediaType: text('media_type'),
+  season: integer('season'),
+  episode: integer('episode'),
+  title: text('title'),
+  posterPath: text('poster_path'),
+  signal: jsonb('signal'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  // Una corrección por usuario y detección (corregir otra vez la sustituye).
+  detectionUnique: uniqueIndex('idx_detection_corrections_detection').on(t.userId, t.detectionId),
+  fingerprintIdx: index('idx_detection_corrections_fingerprint').on(t.platform, t.fingerprint),
+  verdictCheck: check('chk_detection_corrections_verdict', sql`verdict IN ('not_a_title', 'wrong_title')`),
+}));
+
+// Lo aprendido. `owner` = id del usuario (regla personal) o 'global'.
+//   - override:    esta huella es SIEMPRE este título.
+//   - not_a_title: esta huella no identifica ningún título (no notificar).
+//   - reject:      este título NO es el de esta huella (puede haber varios).
+// override/not_a_title son excluyentes por dueño y huella (la última decide);
+// reject se acumula por título. Las globales se derivan de las correcciones
+// cuando las respaldan suficientes usuarios distintos (`supporters`).
+export const detectionRules = pgTable('detection_rules', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  owner: text('owner').notNull(),
+  platform: text('platform').notNull(),
+  fingerprint: text('fingerprint').notNull(),
+  rule: text('rule').notNull(),
+  tmdbId: integer('tmdb_id'),
+  mediaType: text('media_type'),
+  title: text('title'),
+  posterPath: text('poster_path'),
+  triggerText: text('trigger_text').notNull(),
+  supporters: integer('supporters').default(1).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  decisionUnique: uniqueIndex('idx_detection_rules_decision')
+    .on(t.owner, t.platform, t.fingerprint)
+    .where(sql`rule IN ('override', 'not_a_title')`),
+  rejectUnique: uniqueIndex('idx_detection_rules_reject')
+    .on(t.owner, t.platform, t.fingerprint, t.tmdbId, t.mediaType)
+    .where(sql`rule = 'reject'`),
+  lookupIdx: index('idx_detection_rules_lookup').on(t.platform, t.fingerprint),
+  ownerPlatformIdx: index('idx_detection_rules_owner_platform').on(t.owner, t.platform, t.rule),
+  ruleCheck: check('chk_detection_rules_rule', sql`rule IN ('override', 'not_a_title', 'reject')`),
 }));
 
 // ─────────────────────────────────────────────

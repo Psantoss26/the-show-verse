@@ -29,7 +29,11 @@ object SyncClient {
         .callTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    fun signalJson(signal: PlaybackSignal, resolveOnly: Boolean = false): JSONObject = JSONObject().apply {
+    fun signalJson(
+        signal: PlaybackSignal,
+        resolveOnly: Boolean = false,
+        detectionKind: String? = null,
+    ): JSONObject = JSONObject().apply {
             put("platform", signal.platformId)
             put("platformName", signal.platformName)
             put("mainTitle", signal.mainTitle ?: return@apply)
@@ -56,6 +60,8 @@ object SyncClient {
                 put("screenTitles", org.json.JSONArray(signal.screenTitles))
             }
             if (resolveOnly) put("resolveOnly", true)
+            // "detail" (ficha navegando) | "playback": lo guarda la detección corregible.
+            putOpt("detectionKind", detectionKind)
         }
 
     /**
@@ -72,9 +78,10 @@ object SyncClient {
         token: String,
         signal: PlaybackSignal,
         resolveOnly: Boolean = false,
+        detectionKind: String? = null,
         onResult: (Boolean, String?, SyncedInfo?, Int) -> Unit,
     ) {
-        val json = signalJson(signal, resolveOnly)
+        val json = signalJson(signal, resolveOnly, detectionKind)
 
         val url = origin.trimEnd('/') + "/api/netflix/extension-sync"
         val request = Request.Builder()
@@ -145,6 +152,9 @@ object SyncClient {
             putOpt("title", synced.title)
             putOpt("posterPath", synced.posterPath)
             putOpt("confidence", synced.confidence)
+            // Enlaza el progreso con su detección: si el usuario la corrige, el
+            // servidor mueve o borra lo guardado y redirige los pings siguientes.
+            putOpt("detectionId", synced.detectionId)
             // Posición deducida por reloj (la app no la publica): el servidor la
             // usa solo para Continuar viendo, nunca para marcar como visto.
             if (estimated) put("estimated", true)
@@ -175,6 +185,30 @@ object SyncClient {
         }
     }
 
+    /**
+     * Textos que el usuario (o el consenso de usuarios) marcó como «no había
+     * ninguna ficha», por plataforma: `{"platforms":{"netflix":["top 10 en espana"]}}`.
+     * Bloqueante: solo desde un hilo de fondo. Null si no se pudo obtener.
+     */
+    fun fetchNotATitle(origin: String, token: String): String? {
+        val request = Request.Builder()
+            .url(origin.trimEnd('/') + "/api/netflix/detection-rules")
+            .header("Authorization", "Bearer $token")
+            .header("Accept", "application/json")
+            .get()
+            .build()
+        return try {
+            client.newCall(request).execute().use {
+                if (!it.isSuccessful) return null
+                val body = it.body?.string() ?: return null
+                if (JSONObject(body).optJSONObject("platforms") == null) null else body
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "No-title rules unavailable: ${e.message}")
+            null
+        }
+    }
+
     /** Extrae el objeto `synced` de la respuesta del endpoint (o null). */
     private fun parseSynced(body: String?): SyncedInfo? {
         if (body.isNullOrBlank()) return null
@@ -190,6 +224,7 @@ object SyncClient {
                 title = synced.optString("title").ifBlank { null },
                 posterPath = synced.optString("posterPath").ifBlank { null },
                 confidence = synced.optString("confidence").ifBlank { null },
+                detectionId = synced.optString("detectionId").ifBlank { null },
             )
         } catch (e: Exception) {
             null

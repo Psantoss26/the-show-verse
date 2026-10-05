@@ -36,6 +36,7 @@ class AccessibilityStreamingService : AccessibilityService() {
     override fun onServiceConnected() {
         prefs = Prefs(this)
         prefs?.addLog("Accesibilidad conectada (detección de ficha)")
+        prefs?.let { NotATitleList.refreshIfStale(it) }
     }
 
     override fun onInterrupt() { /* noop */ }
@@ -135,7 +136,21 @@ class AccessibilityStreamingService : AccessibilityService() {
             return
         }
 
-        val primary = analysis.candidates.first()
+        // Textos que el usuario corrigió como «no había ninguna ficha»: fuera, para
+        // que el siguiente candidato (el título de verdad, si lo hay) sea el
+        // principal. La lista se refresca sola cuando caduca.
+        NotATitleList.refreshIfStale(p)
+        val candidates = NotATitleList.filter(p, Platforms.idFor(pkg), analysis.candidates)
+        if (candidates.isEmpty()) {
+            val top = analysis.candidates.first()
+            if (!top.equals(lastDiagText, ignoreCase = true)) {
+                lastDiagText = top
+                p.addLog("Ficha ignorada (${Platforms.nameFor(pkg)}): «$top» no es un título (corregido)")
+            }
+            return
+        }
+
+        val primary = candidates.first()
         val now = SystemClock.elapsedRealtime()
         if (primary.equals(lastText, ignoreCase = true) && now - lastAt < DEDUP_MS) return
         lastText = primary
@@ -155,12 +170,12 @@ class AccessibilityStreamingService : AccessibilityService() {
             platformId = Platforms.idFor(pkg),
             platformName = Platforms.nameFor(pkg),
             movieTitle = primary,
-            notifTitle = analysis.candidates.getOrNull(1),
-            notifText = analysis.candidates.getOrNull(2),
-            notifSubText = analysis.candidates.getOrNull(3),
+            notifTitle = candidates.getOrNull(1),
+            notifText = candidates.getOrNull(2),
+            notifSubText = candidates.getOrNull(3),
         )
-        val textosDePantalla = analysis.candidates
-        SyncClient.send(origin, token, signal, resolveOnly = true) { ok, _, synced, _ ->
+        val textosDePantalla = candidates
+        SyncClient.send(origin, token, signal, resolveOnly = true, detectionKind = "detail") { ok, _, synced, _ ->
             handler.post {
                 if (p.paused || p.token != token || p.origin != origin || pendingPkg != pkg || lastText != primary) return@post
                 if (!ok || synced == null) return@post

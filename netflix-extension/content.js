@@ -84,6 +84,8 @@
   let indicatorDismissedUrl = null; // URL ocultada por el usuario (no re-mostrar)
   let indicatorCurrentUrl = null; // URL visible ahora (evita reconstruir en bucle)
   let lastBrowseKey = null; // dedup del indicador de FICHA (resolveOnly)
+  // Textos marcados como «no había ninguna ficha» (ver background.js).
+  let learnedNotATitle = null;
 
   // Páginas genéricas del catálogo (no son la ficha de un título): no resolver.
   const GENERIC_TITLES = new Set(
@@ -272,6 +274,8 @@
     const sig = detectBrowsingSignal();
     if (!sig || !sig.mainTitle) return;
     const title = sig.mainTitle;
+    // El usuario ya corrigió esto como «no había ninguna ficha»: ni se consulta.
+    if (D.isLearnedNotATitle(learnedNotATitle, platformId, sig.showName || title)) return;
     const key = `${platformId}:browse:${sig.showName || title}:${sig.season ?? ""}:${sig.episode ?? ""}`;
     if (key === lastBrowseKey) return; // ya resuelto para esta ficha
     lastBrowseKey = key;
@@ -289,6 +293,7 @@
           subTitle: "",
           tabTitle: document.title,
           resolveOnly: true,
+          detectionKind: "detail",
         },
         (response) => {
           if (!extensionAlive()) return;
@@ -309,6 +314,7 @@
                 url,
                 title: response.synced.title || title,
                 posterPath: response.synced.posterPath,
+                correctUrl: correctionUrl(response.origin, response.synced.detectionId),
               });
             }
           }
@@ -352,7 +358,14 @@
     return box;
   }
 
-  function showIndicator({ url, title, posterPath }) {
+  // Página de The Show Verse para corregir una detección (si el servidor la
+  // registró: los servidores antiguos no devuelven `detectionId`).
+  function correctionUrl(origin, detectionId) {
+    if (!origin || !detectionId) return null;
+    return `${String(origin).replace(/\/+$/, "")}/detections/${encodeURIComponent(detectionId)}`;
+  }
+
+  function showIndicator({ url, title, posterPath, correctUrl }) {
     if (!indicatorEnabled || !url) return;
     if (url === indicatorDismissedUrl) return; // el usuario lo ocultó para este título
     if (url === indicatorCurrentUrl && document.getElementById(INDICATOR_HOST_ID)) return;
@@ -477,6 +490,32 @@
         background-color: rgba(234, 179, 8, 0.15);
         border-color: rgba(234, 179, 8, 0.3);
       }
+      .tsv-fix {
+        display: block;
+        width: 100%;
+        margin-top: 8px;
+        padding: 7px 10px;
+        font: inherit;
+        font-size: 11px;
+        font-weight: 700;
+        color: rgba(255, 255, 255, 0.82);
+        background: rgba(10, 10, 15, 0.65);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 14px;
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        cursor: pointer;
+        transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+      }
+      .tsv-fix:hover {
+        color: #fff;
+        background: rgba(239, 68, 68, 0.18);
+        border-color: rgba(239, 68, 68, 0.4);
+      }
+      .tsv-fix:focus-visible {
+        outline: 2px solid #eab308;
+        outline-offset: 2px;
+      }
       @media (max-width: 480px) {
         .tsv-card {
           width: 140px;
@@ -543,6 +582,31 @@
       if (e.key === "Enter") open();
     };
 
+    // «¿No es correcto?»: abre la corrección de ESTA detección en The Show Verse
+    // («no había ficha» o «el título es otro»). Va fuera de la tarjeta, que
+    // entera abre la ficha.
+    if (correctUrl) {
+      const fix = document.createElement("button");
+      fix.type = "button";
+      fix.className = "tsv-fix";
+      fix.textContent = "¿No es correcto?";
+      fix.title = "Corregir esta detección en The Show Verse";
+      fix.onclick = (e) => {
+        e.stopPropagation();
+        try {
+          window.open(correctUrl, "_blank", "noopener,noreferrer");
+        } catch (err) {
+          /* noop */
+        }
+        clearDismissTimer();
+        wrap.classList.remove("show");
+        // No se vuelve a mostrar este título en esta página: ya se está corrigiendo.
+        indicatorDismissedUrl = url;
+        hideIndicator();
+      };
+      wrap.appendChild(fix);
+    }
+
     // Temporizador de auto-cierre con pausa al hacer hover (5 segundos)
     let autoDismissTimer = null;
     const startDismissTimer = () => {
@@ -560,13 +624,16 @@
       }
     };
 
-    cardNode.onmouseenter = () => {
+    // La pausa cubre la tarjeta y el botón de corregir: si no, el indicador se
+    // iba mientras el ratón bajaba hacia el botón.
+    wrap.onmouseenter = () => {
       clearDismissTimer();
     };
 
-    cardNode.onmouseleave = () => {
+    wrap.onmouseleave = () => {
       startDismissTimer();
     };
+    wrap.addEventListener("focusin", clearDismissTimer);
 
     const imgNode = wrap.querySelector(".tsv-poster");
     if (imgNode) {
@@ -820,6 +887,9 @@
           positionSeconds: Math.round(pos),
           runtimeSeconds: Math.round(dur),
           confidence: synced.confidence,
+          // Enlaza el progreso con su detección: si el usuario la corrige, el
+          // servidor mueve o borra lo guardado y redirige los pings siguientes.
+          detectionId: synced.detectionId,
         },
         (resp) => {
           if (!extensionAlive() || currentSynced !== synced) return;
@@ -1007,6 +1077,7 @@
           // y el indicador). El "visto" ya no se marca al detectar, sino al 90%
           // mediante los pings de progreso.
           resolveOnly: true,
+          detectionKind: "playback",
         },
         (response) => {
           if (!extensionAlive() || syncPaused || requestGeneration !== generation || key !== lastKey) return;
@@ -1033,6 +1104,7 @@
                     url,
                     title: synced.title || mainTitle,
                     posterPath: synced.posterPath,
+                    correctUrl: correctionUrl(response.origin, synced.detectionId),
                   });
                 }
               }
@@ -1137,9 +1209,10 @@
 
   try {
     chrome.storage.local.get(
-      ["streamingSyncPaused", "indicatorEnabled"],
+      ["streamingSyncPaused", "indicatorEnabled", "tsvNotATitle"],
       (result) => {
         indicatorEnabled = result.indicatorEnabled !== false; // por defecto true
+        learnedNotATitle = result.tsvNotATitle || null;
         applyPausedState(result.streamingSyncPaused);
       },
     );
@@ -1159,6 +1232,11 @@
       if (changes.indicatorEnabled) {
         indicatorEnabled = changes.indicatorEnabled.newValue !== false;
         if (!indicatorEnabled) hideIndicator();
+      }
+      if (changes.tsvNotATitle) {
+        learnedNotATitle = changes.tsvNotATitle.newValue || null;
+        // Una ficha ya resuelta puede haber pasado a «no es un título».
+        lastBrowseKey = null;
       }
     });
   } catch (e) {

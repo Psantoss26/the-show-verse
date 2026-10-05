@@ -16,6 +16,7 @@ import * as resolver from "./streamingResolve.js";
 import * as resolve from "./resolve.js";
 import * as variants from "./queryVariants.js";
 import * as cache from "./requestCache.js";
+import * as fingerprint from "./detectionFingerprint.js";
 
 const { normalizeText } = resolve;
 
@@ -168,7 +169,9 @@ function showById(id) {
 }
 
 // ── Doble de fetch: TMDb directo + backend ────────────────────────────────────
-function installFakeNetwork(sent) {
+// `detections`: backend de detecciones simulado. `rules` es lo que devuelve la
+// consulta de reglas; sin él, ese backend no responde (como si estuviera caído).
+function installFakeNetwork(sent, detections = null) {
   const original = globalThis.fetch;
   globalThis.fetch = async (input, init) => {
     const url = String(input);
@@ -203,6 +206,14 @@ function installFakeNetwork(sent) {
     if (detail) {
       const show = showById(detail[1]);
       return show ? json({ seasons: show.seasons }) : json({ status_code: 34 }, 404);
+    }
+    if (detections && url.includes("/v1/streaming/detections/lookup")) {
+      detections.lookups.push(JSON.parse(init.body));
+      return json(detections.rules || { decision: null, rejects: [] });
+    }
+    if (detections && url.endsWith("/v1/streaming/detections")) {
+      detections.recorded.push(JSON.parse(init.body));
+      return json({ detectionId: "9b1f4b0e-9d1f-4a2b-8a1a-2f3c4d5e6f99" }, 201);
     }
     if (url.includes("/v1/auth/netflix/progress")) {
       sent.push({ url, body: JSON.parse(init.body) });
@@ -244,6 +255,7 @@ function handler() {
     "@/lib/netflix/resolve": resolve,
     "@/lib/netflix/queryVariants": variants,
     "@/lib/netflix/requestCache": cache,
+    "@/lib/netflix/detectionFingerprint": fingerprint,
   };
   const cjs = { exports: {} };
   new Function("require", "module", "exports", compiled)(
@@ -263,13 +275,13 @@ const request = (payload, auth = "Bearer sync-token") => ({
 });
 
 // Ejecuta el endpoint con TMDb simulado y devuelve {body, status, sent}.
-async function sync(payload) {
+async function sync(payload, detections = null) {
   process.env.TMDB_API_KEY = "test-key";
   const sent = [];
-  const restore = installFakeNetwork(sent);
+  const restore = installFakeNetwork(sent, detections);
   try {
     const result = await handler()(request({ resolveOnly: true, ...payload }));
-    return { ...result, sent };
+    return { ...result, sent, detections };
   } finally {
     restore();
   }
@@ -622,4 +634,59 @@ test("El progreso de una película llega sin temporada ni episodio", async () =>
   assert.equal(result.sent[0].body.mediaType, "movie");
   assert.equal(result.sent[0].body.season, 0);
   assert.equal(result.sent[0].body.episode, 0);
+});
+
+// ── Aprendizaje de las correcciones ──────────────────────────────────────────
+const learned = (rules = null) => ({ rules, lookups: [], recorded: [] });
+
+test("Una regla del usuario resuelve el título sin buscar y conserva el episodio", async () => {
+  const result = await sync({
+    platform: "netflix",
+    mainTitle: "Stranger Things",
+    showName: "Stranger Things",
+    episodeName: "Capítulo cinco: La Nina",
+    season: 4,
+    episode: 5,
+  }, learned({
+    decision: { rule: "override", scope: "user", tmdbId: 1396, mediaType: "tv", title: "Breaking Bad", posterPath: "/bb.jpg" },
+    rejects: [],
+  }));
+  assert.equal(synced(result).tmdbId, 1396);
+  assert.equal(synced(result).season, 4);
+  assert.equal(synced(result).episode, 5);
+  assert.equal(synced(result).detectionId, "9b1f4b0e-9d1f-4a2b-8a1a-2f3c4d5e6f99");
+  assert.equal(result.detections.lookups[0].fingerprint, "netflix|stranger things");
+  assert.equal(result.detections.recorded[0].source, "user_rule");
+});
+
+test("Un texto marcado como «no es un título» no se resuelve", async () => {
+  const result = await sync({ platform: "netflix", mainTitle: "Top 10 en España", movieTitle: "Top 10 en España" },
+    learned({ decision: { rule: "not_a_title", scope: "global" }, rejects: [] }));
+  assert.equal(result.status, 422);
+  assert.equal(result.body.reason, "not_a_title");
+  assert.equal(result.detections.recorded.length, 0);
+});
+
+test("Un título vetado no vuelve a proponerse", async () => {
+  const result = await sync({ platform: "netflix", mainTitle: "John Wick", movieTitle: "John Wick", durationSec: 6000 },
+    learned({ decision: null, rejects: [{ tmdbId: 245891, mediaType: "movie" }] }));
+  assert.notEqual(synced(result).tmdbId, 245891);
+});
+
+test("La detección se registra con su tipo, su huella y la señal del reproductor", async () => {
+  const result = await sync({
+    platform: "netflix", mainTitle: "El Irlandés", movieTitle: "El Irlandés", detectionKind: "detail",
+  }, learned());
+  const recorded = result.detections.recorded[0];
+  assert.equal(recorded.kind, "detail");
+  assert.equal(recorded.fingerprint, "netflix|el irlandes");
+  assert.equal(recorded.triggerText, "El Irlandés");
+  assert.equal(recorded.tmdbId, 398978);
+  assert.equal(recorded.signal.movieTitle, "El Irlandés");
+});
+
+test("Sin backend de detecciones se sincroniza igual que antes", async () => {
+  const result = await sync({ platform: "netflix", mainTitle: "El Irlandés", movieTitle: "El Irlandés" });
+  assert.equal(synced(result).tmdbId, 398978);
+  assert.equal("detectionId" in synced(result), false);
 });

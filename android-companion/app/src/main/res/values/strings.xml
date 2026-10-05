@@ -25,6 +25,7 @@
     <string name="notif_watched">Añadido a tu historial: %1$s</string>
     <string name="notif_browsing">En The Show Verse: %1$s</string>
     <string name="notif_open_details">Ver en The Show Verse</string>
+    <string name="notif_not_correct">No es correcto</string>
     <string name="notif_channel_name">Acceso rápido a la ficha</string>
     <string name="notif_channel_desc">Notificación con enlace a la página de detalles del título que estás viendo.</string>
     <string name="push_channel_name">Avisos</string>

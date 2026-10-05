@@ -46,4 +46,15 @@ class DetailsUrlTest {
             DetailsUrl.build("https://theshowverse.com/", SyncedInfo(tmdbId = 1, mediaType = "movie")),
         )
     }
+
+    @Test
+    fun correctionUrlOnlyForValidDetectionIds() {
+        assertEquals(
+            "https://theshowverse.com/detections/9b1f4b0e-9d1f-4a2b-8a1a-2f3c4d5e6f99",
+            DetailsUrl.correction("https://theshowverse.com/", "9b1f4b0e-9d1f-4a2b-8a1a-2f3c4d5e6f99"),
+        )
+        assertNull(DetailsUrl.correction("https://theshowverse.com", "../../login"))
+        assertNull(DetailsUrl.correction("https://theshowverse.com", null))
+        assertNull(DetailsUrl.correction(null, "9b1f4b0e-9d1f-4a2b-8a1a-2f3c4d5e6f99"))
+    }
 }
