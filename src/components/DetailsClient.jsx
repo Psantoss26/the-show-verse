@@ -2754,9 +2754,35 @@ export default function DetailsClient({
     });
   }, [artworkSelection.ordered]);
 
+  // IDENTIDAD de la fila: qué imágenes hay (pestaña, tamaño y el CONJUNTO de
+  // rutas), sin su orden. Elegir una imagen solo la REORDENA —pasa a la
+  // primera posición con la animación FLIP de arriba—, así que la identidad no
+  // cambia y la precarga de abajo no vuelve a ocultar el carrusel.
+  const artworkRowIdentity = useMemo(
+    () =>
+      [
+        activeImagesTab,
+        artworkSelection.size,
+        ...(artworkSelection.ordered || [])
+          .map((img) => img?.file_path)
+          .filter(Boolean)
+          .sort(),
+      ].join("|"),
+    [activeImagesTab, artworkSelection.size, artworkSelection.ordered],
+  );
+
   // Precarga las primeras N imagenes de la fila actual.
   // No muestra el carrusel hasta que todas las imagenes visibles esten cargadas
   // para evitar que aparezcan una por una (efecto "pop-in").
+  //
+  // SOLO cuando cambia QUÉ imágenes hay (pestaña, filtros, galería), nunca al
+  // elegir una. Antes dependía de `artworkSelection` entero: al elegir la
+  // primera vez, la comprobación de caché de abajo pedía `w342`/`w780` mientras
+  // que las tarjetas cargan por `srcSet` (otra URL), daba "no cargada", y el
+  // carrusel se cambiaba por el esqueleto hasta descargarlas: se desmontaba
+  // (adiós animación) y volvía a aparecer, un parpadeo. La segunda vez ya
+  // estaban en caché y no pasaba. Al reordenar, todas esas tarjetas ya se están
+  // viendo: no hay nada que esperar.
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -2823,7 +2849,10 @@ export default function DetailsClient({
     return () => {
       cancelled = true;
     };
-  }, [imagesLoading, artworkSelection, artworkPreloadCount]);
+    // `artworkSelection` se lee de este render a propósito: lo que dispara la
+    // precarga es `artworkRowIdentity`, que lo resume sin el orden (ver arriba).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imagesLoading, artworkRowIdentity, artworkPreloadCount]);
 
   // Recalcula cuantas imagenes precargar al cambiar el tamano del viewport
   useEffect(() => {
