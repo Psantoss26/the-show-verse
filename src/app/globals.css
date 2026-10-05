@@ -2017,6 +2017,54 @@ html {
   }
 }
 
+/* FONDO GLASS DEL NAVBAR SUPERIOR EN LA FICHA (móvil y tablet).
+   ===================================================================
+
+   ANTES MEZCLABA DOS MECANISMOS. Seguía el progreso del scroll hasta que el
+   navbar se daba por desplazado (40px) y entonces cambiaba de golpe a
+   `opacity-100` con un fundido de 300ms; al volver, no regresaba al progreso
+   hasta los 24px. El fondo "saltaba" nada más empezar a desplazarse en vez de
+   aparecer con el dedo y a la vez que la portada se convierte en fondo.
+
+   Ahora, en TELÉFONO, la opacidad es SOLO el progreso del scroll: en el
+   compositor donde hay animaciones ligadas al scroll (la misma curva y el
+   mismo recorrido de 55vh que la portada) y, si no, con `--sv-hero-scroll`,
+   que DetailsClient escribe como respaldo. En TABLET no hay ese progreso (la
+   transición de la portada es solo de teléfono), así que aparece con un
+   fundido al empezar a desplazarse, como hasta ahora. */
+.sv-details-nav-glass {
+  opacity: 0;
+  transition: opacity 300ms;
+}
+
+.sv-details-nav-glass[data-scrolled] {
+  opacity: 1;
+}
+
+@media (width < 40rem) {
+  .sv-details-nav-glass,
+  .sv-details-nav-glass[data-scrolled] {
+    opacity: var(--sv-hero-scroll, 0);
+    transition: none;
+  }
+}
+
+@supports ((animation-timeline: scroll()) and (animation-range: 0% 100%)) {
+  @media (width < 40rem) {
+    .sv-details-nav-glass {
+      animation: sv-hero-scroll-in linear both;
+      animation-timeline: scroll(root block);
+      animation-range: 0px 55vh;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-details-nav-glass {
+    transition: none;
+  }
+}
+
 /* =============================================================================
    Recharts - Eliminar recuadro de enfoque blanco al hacer click o tap en gráficas
    ========================================================================== */
