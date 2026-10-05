@@ -68,3 +68,33 @@
     display: none;
   }
 }
+
+/* MÓVIL DE LA FICHA (`mobileScoresOnly`): puntuaciones y stats repartidas a todo
+   el ancho, con un tamaño que SE AJUSTA AL HUECO DEL PANEL.
+   ---------------------------------------------------------------
+   Nunca pueden salirse por los lados ni quedar pegadas: cada fila calcula una
+   escala `--sb-*` (en px, para poder multiplicarla: `calc(22 * var(--sb-u))`
+   da 22px a escala 1) a partir del ancho del panel (`100cqi`, el contenedor
+   `detail-scoreboard`):
+
+     escala = (ancho del panel − márgenes y huecos mínimos fijos) / ancho que
+              piden las insignias a escala 1
+
+   con techo en 1 (el tamaño de diseño) y un suelo de legibilidad. Los márgenes
+   laterales (relleno de la fila) y los huecos mínimos entre insignias (`gap`)
+   son FIJOS: el reparto `justify-evenly` puede agrandarlos, nunca reducirlos.
+
+   Puntuaciones: relleno 2×12px + 2 huecos de 12px = 48px fijos; las tres
+   insignias piden 243px a escala 1 (logo + hueco + cifra "8.5"/votos "969K",
+   en el peor caso: TMDb 81 + Trakt 72 + IMDb 90).
+   Stats: relleno 2×8px + 3 huecos de 10px = 46px fijos; las cuatro piden 272px
+   (icono 18 + 6 + cifras de cinco o seis caracteres —"323.2K", "58.2K"— a 14px). */
+@media (width < 40rem) {
+  .spreadScores {
+    --sb-u: clamp(0.6px, calc((100cqi - 48px) / 243), 1px);
+  }
+
+  .spreadStats {
+    --sb-su: clamp(0.7px, calc((100cqi - 46px) / 272), 1px);
+  }
+}
