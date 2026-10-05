@@ -9572,7 +9572,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         portada ya trae el título impreso y el logo lo duplicaba.
                         `mobilePosterHasBurnedTitle` comprueba el idioma real del
                         póster elegido y cubre ese caso. */}
+                    {/* `inProgressChecked`: el logo entra A LA VEZ que los
+                        botones, como en las series. En las películas los
+                        botones esperan a /api/progress (barra «Viendo») y el
+                        logo salía antes, por su cuenta. */}
                     {currentLowLoaded &&
+                      inProgressChecked &&
                       mobilePosterPath &&
                       !mobilePosterHasBurnedTitle &&
                       (displayHeroLogoPath || heroLogoResolved) && (
@@ -9908,7 +9913,14 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   : "max-sm:invisible"
               }`}
             >
-              <FadeIn delay={0.12} className="mb-4 px-1 w-full sm:mb-6">
+              {/* En MÓVIL este FadeIn no se mueve (los `!` ganan a su estilo
+                  en línea): la subida de la fila va ligada a su revelado
+                  (`sv-mobile-actions-rise`, abajo). Al montarse, en las
+                  películas ya había terminado cuando la fila aparecía —espera a
+                  /api/progress— y solo se veía la cascada; en las series se
+                  veía subir en bloque. Además su `opacity` apagaba el cristal
+                  de los botones mientras duraba. */}
+              <FadeIn delay={0.12} className="mb-4 px-1 w-full sm:mb-6 max-sm:![transform:none] max-sm:!opacity-100">
                 <div className="relative -top-2 sm:top-0">
                   <div
                     ref={mobileActionRowRef}
@@ -9921,7 +9933,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           // revelado que el marcador y las pestañas, en su sitio.
                           MOBILE_REVEAL_BASE
                         : detailsEntryReady && currentLowLoaded && inProgressChecked
-                          ? "sv-mobile-actions-reveal"
+                          ? "sv-mobile-actions-reveal sv-mobile-actions-rise"
                           : ""
                     }
                     {...(mobileActionsWaitForScroll
