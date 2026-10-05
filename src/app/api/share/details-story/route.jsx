@@ -16,6 +16,7 @@ import {
   DetailsScene,
   EpisodesScene,
   PlaysScene,
+  ProductionScene,
   ReviewScene,
   StoryBackdrop,
   StoryHeader,
@@ -31,14 +32,15 @@ export const dynamic = "force-dynamic";
 // paralelo:
 //   - "backdrop": el fondo opaco de las secciones (la portada difuminada);
 //   - "header":   la cabecera fija (marca + logo del título), transparente;
-//   - "plays" | "episodes" | "review" | "details": una sección, transparente.
+//   - "plays" | "episodes" | "review" | "details" | "production": una
+//     sección, transparente.
 // La portada inicial es la imagen de /api/share/details-card.
 //
 // Igual que la imagen de portada, recibe los datos ya resueltos por el cliente
 // (no la sesión) y lo valida todo: `sanitizeShareCard` y `sanitizeShareStory`.
 
 // Sin sección de puntuaciones: ya están en la portada (la primera pantalla).
-const SCENES = new Set(["backdrop", "header", "plays", "episodes", "review", "details"]);
+const SCENES = new Set(["backdrop", "header", "plays", "episodes", "review", "details", "production"]);
 
 async function renderLayer(scene, card, story) {
   if (scene === "backdrop") {
@@ -77,6 +79,10 @@ async function renderLayer(scene, card, story) {
     case "details":
       return story.details
         ? { element: <DetailsScene card={card} details={story.details} fonts={hasFonts} />, fonts }
+        : null;
+    case "production":
+      return story.details
+        ? { element: <ProductionScene card={card} details={story.details} fonts={hasFonts} />, fonts }
         : null;
     default:
       return null;
