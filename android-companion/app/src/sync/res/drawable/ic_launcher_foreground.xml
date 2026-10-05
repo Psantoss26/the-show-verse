@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Capa frontal del icono de THE SHOW VERSE SYNC: el mismo logotipo que la app
+  completa (ver src/main/res/drawable/ic_launcher_foreground.xml), al mismo
+  tamaño para que se reconozca, con la insignia de Sync encima. Sustituye al de
+  src/main solo en esta variante; los mipmap no cambian.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <bitmap
+            android:antialias="true"
+            android:filter="true"
+            android:gravity="fill"
+            android:src="@drawable/tsv_launcher_logo" />
+    </item>
+    <item android:drawable="@drawable/ic_sync_badge" />
+</layer-list>
