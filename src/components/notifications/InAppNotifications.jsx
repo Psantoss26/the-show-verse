@@ -165,20 +165,23 @@ function Toast({ toast, onClose, onOpen }) {
       <span className={`flex h-8 w-8 shrink-0 items-center justify-center ${tone.text}`} aria-hidden="true">
         <Icon className={`h-5 w-5 ${filled ? "fill-current" : ""}`} />
       </span>
-      {/* Con título largo, el título se queda como mucho con el 60% de la fila
-          y se recorta: la acción es lo que dice qué ha pasado y tiene que verse
-          siempre. Con título corto, la acción aprovecha el resto. */}
-      <span className="flex min-w-0 flex-1 items-baseline whitespace-nowrap text-[13px] leading-snug text-zinc-300 md:text-sm [text-shadow:0_1px_2px_rgba(0,0,0,0.6)]">
-        <span className="sr-only">{toast.label ? `${toast.label}: ` : ""}</span>
-        {toast.title ? (
-          <>
-            <span className="max-w-[60%] shrink-0 truncate font-bold text-white">{toast.title}</span>
-            <span aria-hidden="true" className="mx-1.5 shrink-0">·</span>
-            <span className="min-w-0 flex-1 truncate">{action}</span>
-          </>
-        ) : (
-          <span className="min-w-0 truncate font-semibold text-white">{action}</span>
-        )}
+      {/* Texto corrido, como en la campana (AlertsMenu): «Título · acción»
+          completo y, si no cabe, en dos líneas. Antes iba en una sola línea y
+          título y acción se recortaban con «…». El tope de tres líneas es solo
+          para casos extremos (título y nombre de lista muy largos a la vez). */}
+      <span className="min-w-0 flex-1 text-[13px] leading-snug text-zinc-300 md:text-sm [text-shadow:0_1px_2px_rgba(0,0,0,0.6)]">
+        <span className="line-clamp-3 break-words">
+          <span className="sr-only">{toast.label ? `${toast.label}: ` : ""}</span>
+          {toast.title ? (
+            <>
+              <span className="font-bold text-white">{toast.title}</span>
+              <span aria-hidden="true"> · </span>
+              {action}
+            </>
+          ) : (
+            <span className="font-semibold text-white">{action}</span>
+          )}
+        </span>
       </span>
     </>
   );
