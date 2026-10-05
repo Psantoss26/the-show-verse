@@ -3,11 +3,12 @@
 
 import { canonicalDetailsHref } from "@/lib/navigation/embeddedDetails";
 import OptimizedImage from "@/components/OptimizedImage";
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Star, Share2, Check } from "lucide-react";
 import { isAndroidApp, shareFromApp } from "@/lib/android/appBridge";
 import { useDetailsStaticMotion } from "@/components/details/AnimatedSection";
+import DetailsShareSheet from "@/components/details/DetailsShareSheet";
 
 export function CompactBadge({
   logo,
@@ -299,16 +300,42 @@ export function UnifiedRateButton({
 // estadísticas y "Compartir" escrito se llevaba un trozo de ancho que allí hace
 // falta. El texto no se pierde: pasa al tooltip y al `aria-label`, que ya
 // existían para la versión móvil.
-export function ActionShareButton({ title, text, url, iconOnly = false, animateEntrance = true }) {
+//
+// `card`: payload de la imagen compartible (ver lib/details/shareCard). Con él,
+// el botón abre la hoja de compartir —imagen de la ficha + enlace, estilo
+// Spotify— en vez de mandar directamente el enlace. Se toma una FOTO del
+// payload al pulsar: si una puntuación termina de cargar con la hoja abierta,
+// la imagen que se está viendo no se regenera por debajo.
+export function ActionShareButton({ title, text, url, card = null, iconOnly = false, animateEntrance = true }) {
   const [copied, setCopied] = useState(false);
+  const [sheetCard, setSheetCard] = useState(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const buttonRef = useRef(null);
   const prefersReducedMotion = useReducedMotion();
   const isStaticDetails = useDetailsStaticMotion();
 
-  const handleShare = async () => {
-    const finalUrl =
-      url || (typeof window !== "undefined"
+  const resolveUrl = useCallback(
+    () =>
+      url ||
+      (typeof window !== "undefined"
         ? canonicalDetailsHref(window.location.href, window.location.origin).href
-        : "");
+        : ""),
+    [url],
+  );
+
+  const closeSheet = useCallback(() => {
+    setSheetOpen(false);
+    buttonRef.current?.focus({ preventScroll: true });
+  }, []);
+
+  const handleShare = async () => {
+    if (card) {
+      setSheetCard(card);
+      setSheetOpen(true);
+      return;
+    }
+
+    const finalUrl = resolveUrl();
     if (!finalUrl) return;
 
     // Dentro de la app de Android no existe navigator.share: el WebView no
@@ -337,57 +364,71 @@ export function ActionShareButton({ title, text, url, iconOnly = false, animateE
   };
 
   return (
-    <motion.button
-      type="button"
-      onClick={handleShare}
-      // `w-auto` no se puede interpolar con CSS. Al alternar entre el modo
-      // compacto y el que muestra etiqueta, Framer mide ambos tamaños y anima
-      // la diferencia en los dos sentidos.
-      layout={prefersReducedMotion ? false : "size"}
-      initial={
-        animateEntrance && !isStaticDetails ? { opacity: 0, y: 8, scale: 0.98 } : false
-      }
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{
-        duration: 0.3,
-        ease: [0.22, 1, 0.36, 1],
-        layout: prefersReducedMotion
-          ? { duration: 0 }
-          : { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
-      }}
-      className={[
-        `group/share relative isolate inline-grid h-10 w-10 transform-gpu place-items-center overflow-hidden ${
-          iconOnly ? "rounded-full text-zinc-200" : "rounded-xl"
-        } bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 shadow-none backdrop-blur-[6px] transition-all duration-300 hover:bg-white/[0.08] hover:text-white hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/30`,
-        iconOnly
-          ? ""
-          : "sm:inline-flex sm:h-auto sm:w-auto sm:items-center sm:justify-center sm:gap-2 sm:px-3 sm:py-2",
-      ].join(" ")}
-      aria-label={copied ? "¡Enlace copiado!" : "Compartir"}
-    >
-      <div
-        className="absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02] pointer-events-none overflow-hidden"
-        style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
-      />
-      {copied ? (
-        <Check className="relative z-10 block h-4 w-4 shrink-0 transition-transform group-hover/share:scale-110" />
-      ) : (
-        <Share2 className="relative z-10 block h-4 w-4 shrink-0 transition-transform group-hover/share:scale-110" />
-      )}
-      {!iconOnly && (
-        <span className="relative z-10 hidden sm:block text-sm font-medium">
-          {copied ? "Copiado" : "Compartir"}
-        </span>
-      )}
-      {/* Con etiqueta visible el tooltip sobra a partir de `sm`; en la variante
-          de solo icono es lo único que nombra el botón, así que se queda. */}
-      <div
-        className={`pointer-events-none absolute top-full mt-2 left-1/2 z-[100] -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/share:scale-100 group-hover/share:opacity-100 group-hover/share:delay-[2000ms]${
-          iconOnly ? "" : " sm:hidden"
-        }`}
+    <>
+      <motion.button
+        ref={buttonRef}
+        type="button"
+        onClick={handleShare}
+        aria-haspopup={card ? "dialog" : undefined}
+        // `w-auto` no se puede interpolar con CSS. Al alternar entre el modo
+        // compacto y el que muestra etiqueta, Framer mide ambos tamaños y anima
+        // la diferencia en los dos sentidos.
+        layout={prefersReducedMotion ? false : "size"}
+        initial={
+          animateEntrance && !isStaticDetails ? { opacity: 0, y: 8, scale: 0.98 } : false
+        }
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{
+          duration: 0.3,
+          ease: [0.22, 1, 0.36, 1],
+          layout: prefersReducedMotion
+            ? { duration: 0 }
+            : { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
+        }}
+        className={[
+          `group/share relative isolate inline-grid h-10 w-10 transform-gpu place-items-center overflow-hidden ${
+            iconOnly ? "rounded-full text-zinc-200" : "rounded-xl"
+          } bg-black/[0.04] bg-gradient-to-br from-white/10 via-transparent to-black/10 shadow-none backdrop-blur-[6px] transition-all duration-300 hover:bg-white/[0.08] hover:text-white hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/30`,
+          iconOnly
+            ? ""
+            : "sm:inline-flex sm:h-auto sm:w-auto sm:items-center sm:justify-center sm:gap-2 sm:px-3 sm:py-2",
+        ].join(" ")}
+        aria-label={copied ? "¡Enlace copiado!" : "Compartir"}
       >
-        {copied ? "¡Enlace copiado!" : "Compartir"}
-      </div>
-    </motion.button>
+        <div
+          className="absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02] pointer-events-none overflow-hidden"
+          style={{ WebkitMaskImage: "-webkit-radial-gradient(white, black)" }}
+        />
+        {copied ? (
+          <Check className="relative z-10 block h-4 w-4 shrink-0 transition-transform group-hover/share:scale-110" />
+        ) : (
+          <Share2 className="relative z-10 block h-4 w-4 shrink-0 transition-transform group-hover/share:scale-110" />
+        )}
+        {!iconOnly && (
+          <span className="relative z-10 hidden sm:block text-sm font-medium">
+            {copied ? "Copiado" : "Compartir"}
+          </span>
+        )}
+        {/* Con etiqueta visible el tooltip sobra a partir de `sm`; en la variante
+            de solo icono es lo único que nombra el botón, así que se queda. */}
+        <div
+          className={`pointer-events-none absolute top-full mt-2 left-1/2 z-[100] -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/share:scale-100 group-hover/share:opacity-100 group-hover/share:delay-[2000ms]${
+            iconOnly ? "" : " sm:hidden"
+          }`}
+        >
+          {copied ? "¡Enlace copiado!" : "Compartir"}
+        </div>
+      </motion.button>
+      {sheetCard && (
+        <DetailsShareSheet
+          open={sheetOpen}
+          onClose={closeSheet}
+          card={sheetCard}
+          title={title}
+          text={text}
+          getUrl={resolveUrl}
+        />
+      )}
+    </>
   );
 }

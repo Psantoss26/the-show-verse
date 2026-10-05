@@ -282,6 +282,7 @@ import DetailsInfoTabs from "@/components/details/DetailsInfoTabs";
 import { UnifiedRateButton } from "@/components/details/DetailHeaderBits";
 import DetailsScoreboardPanel from "@/components/details/DetailsScoreboardPanel";
 import useRatingLinks from "@/lib/details/useRatingLinks";
+import { buildShareCardPayload } from "@/lib/details/shareCard";
 import {
   buildTmdbHref,
   buildTraktHref,
@@ -8866,6 +8867,111 @@ export default function DetailsClient({
   const favoriteActionLoading = actionStateLoading || favLoading;
   const watchlistActionLoading = actionStateLoading || wlLoading;
 
+  // Puntuaciones del marcador. Se definen aquí, y no en línea, porque la imagen
+  // compartible (abajo) enseña EXACTAMENTE las mismas.
+  const scoreboardTmdb = {
+    value:
+      typeof data?.vote_average === "number" && data.vote_average > 0
+        ? data.vote_average.toFixed(1)
+        : null,
+    sub: data?.vote_count ? formatCountShort(data.vote_count) : undefined,
+    href: buildTmdbHref({ href: tmdbDetailUrl, type, tmdbId: id }),
+  };
+  // Trakt mantiene enlace canónico/búsqueda; el badge se oculta mientras la
+  // nota está pendiente y muestra "-" solo al resolverse sin puntuación.
+  // Se unifica con el antiguo `traktPublic` (que iba sin enlace).
+  const scoreboardTrakt = {
+    value: traktDecimal ?? (tScoreboard.loading ? undefined : null),
+    sub: tScoreboard.votes ? formatCountShort(tScoreboard.votes) : undefined,
+    href: buildTraktHref({
+      href: tScoreboard?.traktUrl || trakt?.traktUrl,
+      title,
+    }),
+    pending: tScoreboard.loading && traktDecimal == null,
+  };
+  // IMDb SIEMPRE visible con enlace (directo por id, o búsqueda por título si
+  // aún no se resolvió el id de IMDb).
+  const scoreboardImdb = {
+    value:
+      extras.imdbRating != null
+        ? Number(extras.imdbRating).toFixed(1)
+        : externalScoresLoading
+          ? undefined
+          : null,
+    sub:
+      extras.imdbRating != null ? formatCountShort(extras.imdbVotes) : undefined,
+    href: buildImdbHref({ imdbId: resolvedImdbId, title }),
+    pending: externalScoresLoading && extras.imdbRating == null,
+  };
+
+  // IMAGEN COMPARTIBLE: la "captura" de la ficha móvil con los estados que se
+  // ven ahora mismo. Misma portada textless y mismo logo que el hero móvil (sin
+  // logo si la portada ya trae el título impreso), aunque se comparta desde
+  // escritorio, donde el hero usa el backdrop.
+  const shareCardPosterPath =
+    mobileNeutralPosterPath ||
+    (isBackdropPoster ? null : asTmdbPath(displayPosterPath)) ||
+    asTmdbPath(data?.poster_path) ||
+    null;
+  const shareCardHasBurnedTitle = mobileNeutralPosterPath
+    ? mobilePosterHasBurnedTitle
+    : !!shareCardPosterPath;
+  const shareCard = useMemo(
+    () =>
+      buildShareCardPayload({
+        type,
+        title,
+        posterPath: shareCardPosterPath,
+        logoPath: shareCardHasBurnedTitle ? null : displayHeroLogoPath,
+        showTitle: !shareCardHasBurnedTitle,
+        trailerAvailable: !!preferredVideo,
+        soundtrackAvailable: !!soundtrackSearchQuery,
+        trakt: {
+          watched: watchedActionValue,
+          plays: watchedActionPlays,
+          badge: watchedActionBadge,
+          loading: watchedActionLoading,
+        },
+        rating: ratingActionValue,
+        favorite: favoriteActionValue,
+        watchlist: watchlistActionValue,
+        listActive,
+        commentsActive: myComments.length > 0,
+        scores: {
+          tmdb: scoreboardTmdb,
+          trakt: scoreboardTrakt,
+          imdb: scoreboardImdb,
+        },
+      }),
+    // Los objetos de puntuación se recrean en cada render: se depende de sus
+    // valores visibles.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      type,
+      title,
+      shareCardPosterPath,
+      shareCardHasBurnedTitle,
+      displayHeroLogoPath,
+      preferredVideo,
+      soundtrackSearchQuery,
+      watchedActionValue,
+      watchedActionPlays,
+      watchedActionBadge,
+      watchedActionLoading,
+      ratingActionValue,
+      favoriteActionValue,
+      watchlistActionValue,
+      listActive,
+      myComments.length,
+      scoreboardTmdb.value,
+      scoreboardTmdb.sub,
+      scoreboardTrakt.value,
+      scoreboardTrakt.sub,
+      scoreboardImdb.value,
+      scoreboardImdb.sub,
+    ],
+  );
+
   const detailsModalLayer = (
     <>
       {/* Modal de reproducción de vídeos y tráilers */}
@@ -10112,51 +10218,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 shareIconOnly={isBackdropPoster}
                 fitAllScores={isBackdropPoster}
                 loading={tScoreboard.loading}
-                tmdb={{
-                  value:
-                    typeof data.vote_average === "number" &&
-                    data.vote_average > 0
-                      ? data.vote_average.toFixed(1)
-                      : null,
-                  sub: data.vote_count
-                    ? formatCountShort(data.vote_count)
-                    : undefined,
-                  href: buildTmdbHref({ href: tmdbDetailUrl, type, tmdbId: id }),
-                }}
-                // Trakt mantiene enlace canónico/búsqueda; el badge se oculta
-                // mientras la nota está pendiente y muestra "-" solo al resolverse
-                // sin puntuación.
-                // Se unifica con el antiguo `traktPublic` (que iba sin enlace).
-                trakt={{
-                  value:
-                    traktDecimal ??
-                    (tScoreboard.loading ? undefined : null),
-                  sub: tScoreboard.votes
-                    ? formatCountShort(tScoreboard.votes)
-                    : undefined,
-                  href: buildTraktHref({
-                    href: tScoreboard?.traktUrl || trakt?.traktUrl,
-                    title,
-                  }),
-                  pending: tScoreboard.loading && traktDecimal == null,
-                }}
+                tmdb={scoreboardTmdb}
+                trakt={scoreboardTrakt}
                 traktPublic={null}
-                // IMDb SIEMPRE visible con enlace (directo por id, o búsqueda por
-                // título si aún no se resolvió el id de IMDb).
-                imdb={{
-                  value:
-                    extras.imdbRating != null
-                      ? Number(extras.imdbRating).toFixed(1)
-                      : externalScoresLoading
-                        ? undefined
-                        : null,
-                  sub: extras.imdbRating != null
-                    ? formatCountShort(extras.imdbVotes)
-                    : undefined,
-                  href: buildImdbHref({ imdbId: resolvedImdbId, title }),
-                  pending:
-                    externalScoresLoading && extras.imdbRating == null,
-                }}
+                imdb={scoreboardImdb}
                 rt={
                   tScoreboard?.external?.rtAudience != null ||
                   extras.rtScore != null
@@ -10187,6 +10252,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 share={{
                   title,
                   text: `Echa un vistazo a ${title} en The Show Verse`,
+                  card: shareCard,
                 }}
                 stats={tScoreboard?.stats}
                 // Escritorio: tus amigos a la derecha de la fila de stats, solo

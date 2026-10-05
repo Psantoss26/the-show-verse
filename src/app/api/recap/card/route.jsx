@@ -1,5 +1,7 @@
 import { ImageResponse } from "next/og";
 
+import { loadGoogleFonts } from "@/lib/og/googleFonts";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -58,37 +60,16 @@ function sanitize(body) {
 const nf = new Intl.NumberFormat("es-ES");
 
 // Tipografías de la experiencia (Anton para los titulares, PT Sans para el
-// texto). El proyecto solo las tiene en woff2, que Satori no lee: se piden una
-// vez en TTF a Google Fonts y se guardan en memoria. Si falla, la imagen sale
-// con la fuente por defecto en vez de no salir.
+// texto). Ver `loadGoogleFonts`: si fallan, la imagen sale con la fuente por
+// defecto en vez de no salir.
 const DISPLAY_FONT = "Anton";
 const BODY_FONT = "PT Sans";
-let fontsPromise = null;
-
-async function fetchTtf(family) {
-  const css = await fetch(`https://fonts.googleapis.com/css2?family=${family}`, {
-    signal: AbortSignal.timeout(4000),
-  }).then((res) => (res.ok ? res.text() : ""));
-  const url = css.match(/url\((https:[^)]+\.ttf)\)/)?.[1];
-  if (!url) throw new Error(`no ttf for ${family}`);
-  const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
-  if (!res.ok) throw new Error(`font ${res.status}`);
-  return res.arrayBuffer();
-}
 
 function loadFonts() {
-  if (!fontsPromise) {
-    fontsPromise = Promise.all([fetchTtf("Anton"), fetchTtf("PT+Sans:wght@700")])
-      .then(([anton, ptSans]) => [
-        { name: DISPLAY_FONT, data: anton, weight: 400, style: "normal" },
-        { name: BODY_FONT, data: ptSans, weight: 700, style: "normal" },
-      ])
-      .catch(() => {
-        fontsPromise = null; // se reintenta en la siguiente imagen
-        return null;
-      });
-  }
-  return fontsPromise;
+  return loadGoogleFonts([
+    { name: DISPLAY_FONT, query: "Anton", weight: 400 },
+    { name: BODY_FONT, query: "PT+Sans:wght@700", weight: 700 },
+  ]);
 }
 
 function Column({ label, items }) {
