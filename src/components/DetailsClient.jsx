@@ -279,8 +279,8 @@ import {
 // Sección de pestañas (Detalles/Producción/Sinopsis/Premios) compartida con la
 // ficha rápida del dashboard (DetailModal) para que rendericen las MISMAS tarjetas.
 import DetailsInfoTabs from "@/components/details/DetailsInfoTabs";
-import { UnifiedRateButton } from "@/components/details/DetailHeaderBits";
-import DetailsScoreboardPanel from "@/components/details/DetailsScoreboardPanel";
+import { ActionShareButton, UnifiedRateButton } from "@/components/details/DetailHeaderBits";
+import DetailsScoreboardPanel, { ScoreboardPill } from "@/components/details/DetailsScoreboardPanel";
 import useRatingLinks from "@/lib/details/useRatingLinks";
 import { buildShareCardPayload } from "@/lib/details/shareCard";
 import {
@@ -10261,7 +10261,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 // las secciones de los dashboards; la animación va en él y no
                 // aquí para no dejar el cristal plano (ver globals.css). Una
                 // ficha restaurada al volver ya se pinta estática.
-                className={`${MOBILE_REVEAL_BASE} ${
+                //
+                // MÓVIL: rejilla de dos columnas. El marcador y la franja de
+                // amigos ocupan las dos; Plataformas y Compartir, una cada uno.
+                // Así cada píldora es hija DIRECTA de este envoltorio y recibe
+                // su propia animación de revelado (sobre el cristal, no sobre un
+                // contenedor común que lo dejaría plano). Desde `sm` es un bloque.
+                className={`${MOBILE_REVEAL_BASE} max-sm:grid max-sm:grid-cols-2 max-sm:gap-x-3 ${
                   detailsRestored ? "" : MOBILE_SCOREBOARD_REVEAL_ANIMATION
                 }`}
                 {...{
@@ -10275,6 +10281,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 }
               >
                 <DetailsScoreboardPanel
+                // Móvil: solo puntuaciones y stats, centradas y a todo el ancho
+                // como en la imagen compartible; las acciones van debajo.
+                mobileScoresOnly
+                className="col-span-2"
                 compactStatsTrailing={isBackdropPoster}
                 shareIconOnly={isBackdropPoster}
                 fitAllScores={isBackdropPoster}
@@ -10330,13 +10340,31 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   ) : null
                 }
                 />
+                {/* Teléfono: Plataformas y Compartir, que en escritorio viven en
+                    la barra del marcador, como dos píldoras a media línea. */}
+                <ScoreboardPill
+                  icon={MonitorPlay}
+                  label="Plataformas"
+                  onClick={() => setPlatformsOpen(true)}
+                  aria-haspopup="dialog"
+                  aria-label="Abrir plataformas disponibles"
+                  className="mt-3 sm:hidden"
+                />
+                <ActionShareButton
+                  variant="pill"
+                  className="mt-3 sm:hidden"
+                  title={title}
+                  text={`Echa un vistazo a ${title} en The Show Verse`}
+                  card={shareCard}
+                  story={shareStory}
+                />
                 {/* Teléfono: la fila de stats es un carril sin "derecha", así
                     que tus amigos van en una franja bajo el marcador. */}
                 <FollowingActivityStrip
                   data={followingActivity}
                   compactWatchedSummary
                   onOpen={() => scrollToSection("following")}
-                  className="mt-3 sm:hidden"
+                  className="col-span-2 mt-3 sm:hidden"
                 />
               </div>
             </div>

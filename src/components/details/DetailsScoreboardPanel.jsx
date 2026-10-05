@@ -36,6 +36,7 @@ import {
   CompactBadge,
   ExternalLinkButton,
   ActionShareButton,
+  SCOREBOARD_PILL_CLASS,
 } from "@/components/details/DetailHeaderBits";
 import { formatShortNumber } from "@/lib/details/formatters";
 import { LIQUID_GLASS_SURFACE } from "@/lib/ui/liquidGlass";
@@ -50,6 +51,8 @@ function TraktStatBadge({
   tooltip,
   pending = false,
   phone = false,
+  // Tamaño grande en móvil (ver `spread` de la fila de stats).
+  large = false,
 }) {
   return (
     <motion.div
@@ -57,14 +60,14 @@ function TraktStatBadge({
       // vacío mientras sus estadísticas hacen el fundido.
       initial={false}
       whileHover={{ y: -1 }}
-      className={`relative flex min-w-0 items-center justify-start select-none group/statbadge py-1 transition-colors duration-200 ${phone ? "shrink-0 px-1.5" : "px-0.5 sm:shrink-0 sm:px-1.5"}`}
+      className={`relative flex min-w-0 items-center justify-start select-none group/statbadge py-1 transition-colors duration-200 ${phone ? "shrink-0 px-1.5" : "px-0.5 sm:shrink-0 sm:px-1.5"} ${large ? "max-sm:shrink-0 max-sm:px-0" : ""}`}
       aria-label={tooltip || label}
     >
       {/* Teléfono del drawer: iconos y cifras del tamaño de escritorio, pero
           sin la etiqueta de texto, que es lo que no cabe en ese ancho. */}
-      <div className={`grid min-w-0 grid-rows-[auto_auto] items-center ${phone ? "grid-cols-[1.25rem_auto] gap-x-2" : "grid-cols-[1rem_auto] gap-x-1 sm:grid-cols-[1.25rem_auto] sm:gap-x-2"}`}>
-        <Icon className={`col-start-1 row-start-1 shrink-0 self-center text-zinc-400 transition-colors duration-200 group-hover/statbadge:text-zinc-200 ${phone ? "h-5 w-5" : "h-4 w-4 sm:h-5 sm:w-5"}`} />
-        <span className={`col-start-2 row-start-1 block self-center font-bold leading-none tracking-tight text-white/90 [font-variant-numeric:tabular-nums] [text-box:trim-both_cap_alphabetic] ${phone ? "text-sm" : "text-[11px] sm:text-sm"}`}>
+      <div className={`grid min-w-0 grid-rows-[auto_auto] items-center ${phone ? "grid-cols-[1.25rem_auto] gap-x-2" : "grid-cols-[1rem_auto] gap-x-1 sm:grid-cols-[1.25rem_auto] sm:gap-x-2"} ${large ? "max-sm:grid-cols-[calc(18*var(--sb-su,1px))_auto] max-sm:gap-x-[calc(6*var(--sb-su,1px))]" : ""}`}>
+        <Icon className={`col-start-1 row-start-1 shrink-0 self-center text-zinc-400 transition-colors duration-200 group-hover/statbadge:text-zinc-200 ${phone ? "h-5 w-5" : "h-4 w-4 sm:h-5 sm:w-5"} ${large ? "max-sm:h-[calc(18*var(--sb-su,1px))] max-sm:w-[calc(18*var(--sb-su,1px))]" : ""}`} />
+        <span className={`col-start-2 row-start-1 block self-center font-bold leading-none tracking-tight text-white/90 [font-variant-numeric:tabular-nums] [text-box:trim-both_cap_alphabetic] ${phone ? "text-sm" : "text-[11px] sm:text-sm"} ${large ? "max-sm:text-[length:calc(14*var(--sb-su,1px))]" : ""}`}>
           {/* CARGANDO ≠ SIN DATO. Mientras la consulta está en vuelo el hueco
               se reserva con un valor INVISIBLE: ocupa lo mismo, pero no afirma
               nada. El guion queda para cuando ya se sabe que no hay dato. */}
@@ -110,6 +113,10 @@ export function DetailsRatingsBadges({
   compact = false,
   // Disposición de teléfono forzada (ver `phoneLayout` del panel).
   phone = false,
+  // Móvil (< sm) de la ficha: las puntuaciones ocupan TODA la barra repartidas
+  // a partes iguales, como el marcador de la imagen compartible (ver
+  // `mobileScoresOnly` del panel).
+  spread = false,
 }) {
   const isPendingScore = (score) =>
     !!score && score.pending === true && score.value == null;
@@ -163,7 +170,7 @@ export function DetailsRatingsBadges({
           : phone
             ? ""
             : "sm:gap-5"
-      }`}
+      } ${spread ? `max-sm:w-full max-sm:justify-evenly ${styles.spreadScores}` : ""}`}
     >
       {/* Indicador de carga mientras se obtienen las puntuaciones de Trakt */}
       <div className="absolute opacity-0 pointer-events-none w-4 h-4">
@@ -177,8 +184,9 @@ export function DetailsRatingsBadges({
         <CompactBadge
           key={scoreStateKey("tmdb", score)}
           logo="/logo-TMDb.png"
-          logoClassName="h-5 sm:h-5"
+          logoClassName={`h-5 sm:h-5 ${spread ? "max-sm:h-[calc(24*var(--sb-u,1px))]" : ""}`}
           phone={phone}
+          large={spread}
           value={resolvedValue(score)}
           sub={score.sub}
           href={score.href}
@@ -199,6 +207,7 @@ export function DetailsRatingsBadges({
           onClick={undefined}
           tooltip={score.href ? "Ver en Trakt" : "Trakt"}
           phone={phone}
+          large={spread}
         />
       ))}
 
@@ -213,6 +222,7 @@ export function DetailsRatingsBadges({
           onClick={undefined}
           tooltip="Ver en Trakt"
           phone={phone}
+          large={spread}
         />
       ))}
 
@@ -225,9 +235,10 @@ export function DetailsRatingsBadges({
           logoClassName={
             phone
               ? "!h-5 !max-h-none !max-w-[34px]"
-              : "!h-5 sm:!h-[22px] !max-h-none !max-w-[34px]"
+              : `!h-5 sm:!h-[22px] !max-h-none !max-w-[34px] ${spread ? "max-sm:!h-[calc(24*var(--sb-u,1px))] max-sm:!max-w-[calc(42*var(--sb-u,1px))]" : ""}`
           }
           phone={phone}
+          large={spread}
           value={resolvedValue(score)}
           sub={score.sub}
           href={score.href}
@@ -303,6 +314,9 @@ export function DetailsStatsRow({
   // un carril que se desplaza y no tiene "derecha".
   trailing = null,
   compactTrailing = false,
+  // Móvil (< sm) de la ficha: las stats se reparten centradas a lo ancho en vez
+  // de ir en un carril alineado a la izquierda (ver `mobileScoresOnly`).
+  spread = false,
 }) {
   const customStatItems = Array.isArray(statItems)
     ? statItems.filter((item) => item?.label && item?.value != null)
@@ -321,14 +335,18 @@ export function DetailsStatsRow({
   // Teléfono: una sola fila que se desplaza, sin etiquetas. Los `sm:`/`md:`
   // miran el viewport, así que en la ficha de teléfono del drawer (tablet)
   // activaban la fila ancha con etiquetas y las stats se partían en dos filas.
-  const statsScrollerClass = `overflow-x-auto scrollbar-hide overscroll-x-contain [touch-action:pan-y] py-2.5 pl-[calc(1.25rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))] ${
+  const statsScrollerClass = `overflow-x-auto scrollbar-hide overscroll-x-contain [touch-action:pan-y] py-2.5 ${
+    spread
+      ? "max-sm:px-[calc(0.5rem+env(safe-area-inset-left))] sm:pl-[calc(1.25rem+env(safe-area-inset-left))] sm:pr-[calc(0.75rem+env(safe-area-inset-right))]"
+      : "pl-[calc(1.25rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))]"
+  } ${
     phone
       ? ""
       : "sm:pl-[calc(1.5rem+env(safe-area-inset-left))] sm:pr-[calc(1.25rem+env(safe-area-inset-right))] md:overflow-x-visible"
   }`;
   const statsTrackClass = `${compactTrailing ? styles.compactStatsTrack : ""} flex w-max min-w-0 flex-nowrap items-center justify-start gap-x-4 gap-y-1.5 ${
     phone ? "" : compactTrailing ? "sm:w-full sm:flex-nowrap sm:gap-x-2" : "sm:w-full sm:flex-wrap"
-  }`;
+  } ${spread ? `max-sm:w-full max-sm:justify-evenly max-sm:gap-x-2.5 ${styles.spreadStats}` : ""}`;
 
   if (hasCustomStats) {
     return (
@@ -347,6 +365,7 @@ export function DetailsStatsRow({
                 label={item.label}
                 tooltip={item.tooltip}
                 phone={phone}
+                large={spread}
               />
             ))}
             {trailingNode}
@@ -385,6 +404,7 @@ export function DetailsStatsRow({
             pending={!hasStats && pending}
             label="SEGUIDORES"
             phone={phone}
+                large={spread}
             tooltip="Seguidores"
           />
 
@@ -395,6 +415,7 @@ export function DetailsStatsRow({
             pending={!hasStats && pending}
             label="REPRODUCCIONES"
             phone={phone}
+                large={spread}
             tooltip="Reproducciones"
           />
 
@@ -405,6 +426,7 @@ export function DetailsStatsRow({
             pending={!hasStats && pending}
             label="LISTAS"
             phone={phone}
+                large={spread}
             tooltip="En listas"
           />
 
@@ -415,6 +437,7 @@ export function DetailsStatsRow({
             pending={!hasStats && pending}
               label="FAVORITOS"
               phone={phone}
+                large={spread}
               tooltip="Favoritos"
             />
           )}
@@ -683,6 +706,18 @@ function DetailsToolbarActions({
   );
 }
 
+// Píldora de acción bajo el marcador móvil (ver `mobileScoresOnly`): icono +
+// título, a media línea. Compartir usa la misma píldora desde ActionShareButton.
+export function ScoreboardPill({ icon: Icon, label, onClick, className = "", ...props }) {
+  return (
+    <button type="button" onClick={onClick} className={`${SCOREBOARD_PILL_CLASS} ${className}`} {...props}>
+      <LiquidGlassOpticalLayers />
+      <Icon aria-hidden="true" className="relative z-10 h-5 w-5 shrink-0" />
+      <span className="relative z-10 truncate">{label}</span>
+    </button>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Panel compuesto: contenedor + barra (ratings + enlaces/compartir) + stats +
 // `children`. Reproduce la tarjeta de DetailsClient; la usan tanto la ficha
@@ -735,6 +770,12 @@ export default function DetailsScoreboardPanel({
   // todos los `sm:`/`md:` de este bloque se activaban aunque el panel sea
   // estrecho, con lo que puntuaciones, stats y botones se partían en dos filas.
   phoneLayout = false,
+  // MÓVIL DE LA FICHA (< sm, DetailsClient): el marcador enseña SOLO las
+  // puntuaciones y las stats de Trakt, centradas y repartidas a lo ancho como en
+  // la imagen compartible. Plataformas y Compartir salen de la barra: la ficha
+  // los pinta debajo como dos píldoras (ScoreboardPill + ActionShareButton
+  // `variant="pill"`). Desde `sm` el marcador es el de siempre.
+  mobileScoresOnly = false,
   toolbarActions = null,
   className = "",
   children = null,
@@ -755,6 +796,10 @@ export default function DetailsScoreboardPanel({
   const hasCustomStats = Array.isArray(statItems) && statItems.some(
     (item) => item?.label && item?.value != null,
   );
+  // Con `mobileScoresOnly` la barra móvil solo lleva puntuaciones: se monta en
+  // cuanto hay alguna, aunque esté pendiente (reserva su hueco invisible, ver
+  // DetailsRatingsBadges), y sin ninguna no se pinta una franja vacía.
+  const hasMobileScores = [tmdb, trakt, traktPublic, imdb].some(Boolean);
   const hasExternalLinks =
     Array.isArray(externalLinks) && externalLinks.length > 0;
   const hasStreamingProviders =
@@ -782,7 +827,12 @@ export default function DetailsScoreboardPanel({
       {hasToolbar && (
         <div
           className={
-            phoneLayout
+            mobileScoresOnly
+              ? `relative z-10 py-3 flex items-center gap-2.5 overflow-x-clip overscroll-x-none [touch-action:pan-y]
+      px-[calc(0.75rem+env(safe-area-inset-left))]
+      sm:pl-[calc(1.5rem+env(safe-area-inset-left))] sm:pr-[calc(1.25rem+env(safe-area-inset-right))] sm:gap-4 sm:overflow-visible
+      ${hasMobileScores ? "" : "max-sm:hidden"}`
+              : phoneLayout
               ? "relative z-10 py-3 pl-[calc(1.25rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))] flex items-center gap-2.5 overflow-x-clip overscroll-x-none [touch-action:pan-y]"
               : `
       relative z-10
@@ -830,9 +880,13 @@ export default function DetailsScoreboardPanel({
               mc={mc}
               compact={compactToolbar}
               phone={phoneLayout}
+              spread={mobileScoresOnly}
             />
           </div>
 
+          {/* En `mobileScoresOnly` las acciones solo existen desde `sm`; en
+              móvil la ficha las pinta como píldoras bajo el marcador. */}
+          <div className={mobileScoresOnly ? "contents max-sm:hidden" : "contents"}>
           <DetailsToolbarActions
             externalLinks={externalLinks}
             streamingProviders={streamingProviders}
@@ -847,6 +901,7 @@ export default function DetailsScoreboardPanel({
             compactToolbar={compactToolbar}
             phone={phoneLayout}
           />
+          </div>
         </div>
       )}
 
@@ -858,6 +913,7 @@ export default function DetailsScoreboardPanel({
         phone={phoneLayout}
         trailing={statsTrailing}
         compactTrailing={compactStatsTrailing}
+        spread={mobileScoresOnly}
       />
 
       {children}

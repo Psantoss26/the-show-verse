@@ -9,6 +9,8 @@ import { Star, Share2, Check } from "lucide-react";
 import { isAndroidApp, shareFromApp } from "@/lib/android/appBridge";
 import { useDetailsStaticMotion } from "@/components/details/AnimatedSection";
 import DetailsShareSheet from "@/components/details/DetailsShareSheet";
+import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
+import { LIQUID_GLASS_SURFACE } from "@/lib/ui/liquidGlass";
 
 export function CompactBadge({
   logo,
@@ -28,6 +30,12 @@ export function CompactBadge({
   // Fuerza los tamaños de teléfono aunque la ventana sea ancha (ficha de
   // teléfono del drawer): los `sm:` de abajo miran el viewport, no el panel.
   phone = false,
+  // Tamaño GRANDE en móvil (< sm): el marcador de la ficha con las puntuaciones
+  // repartidas a todo el ancho (`mobileScoresOnly`). Logo, cifra y votos crecen
+  // para llenar la barra, escalados con `--sb-u`, que la fila calcula según el
+  // ancho del panel para que nunca se salgan (ver `.spreadScores` en el módulo
+  // CSS del marcador). Desde `sm` no cambia nada.
+  large = false,
 }) {
   const MotionComp = href ? motion.a : onClick ? motion.button : motion.div;
   const isInteractive = !!(href || onClick);
@@ -62,14 +70,14 @@ export function CompactBadge({
           : undefined
       }
       className={`
-        relative flex items-center gap-2.5 group group/badge select-none min-w-0
+        relative flex items-center gap-2.5 group group/badge select-none min-w-0 ${large ? "max-sm:gap-[calc(12*var(--sb-u,1px))]" : ""}
         ${isInteractive ? "cursor-pointer" : ""}
         ${className}
       `}
       aria-label={titleText}
     >
       <span
-        className={`grid h-6 shrink-0 place-items-center ${logoWrapClassName}`}
+        className={`grid h-6 shrink-0 place-items-center ${large ? "max-sm:h-[calc(28*var(--sb-u,1px))] max-sm:min-w-[calc(32*var(--sb-u,1px))]" : ""} ${logoWrapClassName}`}
       >
         <OptimizedImage
           src={logo}
@@ -77,6 +85,7 @@ export function CompactBadge({
           draggable="false"
           className={`
             max-h-5 max-w-6 w-auto object-contain drop-shadow-sm transition-transform duration-300 group-hover:scale-110
+            ${large ? "max-sm:max-h-[calc(24*var(--sb-u,1px))] max-sm:max-w-[calc(32*var(--sb-u,1px))]" : ""}
             ${logoClassName}
           `}
         />
@@ -84,7 +93,7 @@ export function CompactBadge({
 
       <div className="flex flex-col justify-center leading-none min-w-0">
         <div className="flex items-baseline gap-1 min-w-0">
-          <span className={`${phone ? "text-lg" : "text-lg sm:text-xl"} font-black text-white/85 group-hover:text-white tracking-tight drop-shadow-sm transition-colors`}>
+          <span className={`${phone ? "text-lg" : "text-lg sm:text-xl"} ${large ? "max-sm:text-[length:calc(22*var(--sb-u,1px))]" : ""} font-black text-white/85 group-hover:text-white tracking-tight drop-shadow-sm transition-colors`}>
             {value != null ? value : "-"}
           </span>
 
@@ -105,7 +114,7 @@ export function CompactBadge({
           {sub && (
             <span
               className={`
-                ${phone ? "text-[11px]" : "text-[11px] sm:text-xs"} font-bold text-white/65 group-hover:text-white/80 transition-colors tracking-wide
+                ${phone ? "text-[11px]" : "text-[11px] sm:text-xs"} ${large ? "max-sm:text-[length:calc(12*var(--sb-u,1px))]" : ""} font-bold text-white/65 group-hover:text-white/80 transition-colors tracking-wide
                 truncate
                 ${hideSubOnMobile ? (phone ? "hidden" : "hidden sm:inline") : ""}
               `}
@@ -308,7 +317,12 @@ export function UnifiedRateButton({
 // la imagen que se está viendo no se regenera por debajo.
 // `story`: datos del vídeo compartible (ver lib/details/shareStory); con él la
 // hoja ofrece también el vídeo. Se fotografía igual que `card`.
-export function ActionShareButton({ title, text, url, card = null, story = null, iconOnly = false, animateEntrance = true }) {
+//
+// `variant="pill"`: la píldora a media línea que la ficha móvil pinta bajo el
+// marcador (ver SCOREBOARD_PILL_CLASS). Es un <button> normal, sin Framer: su
+// entrada la pone el revelado del marcador sobre el propio botón, y una
+// transformación de Framer encima se pelearía con ella.
+export function ActionShareButton({ title, text, url, card = null, story = null, iconOnly = false, animateEntrance = true, variant = "default", className = "" }) {
   const [copied, setCopied] = useState(false);
   const [sheetCard, setSheetCard] = useState(null);
   const [sheetStory, setSheetStory] = useState(null);
@@ -367,6 +381,42 @@ export function ActionShareButton({ title, text, url, card = null, story = null,
     }
   };
 
+  const sheet = sheetCard ? (
+    <DetailsShareSheet
+      open={sheetOpen}
+      onClose={closeSheet}
+      card={sheetCard}
+      story={sheetStory}
+      title={title}
+      text={text}
+      getUrl={resolveUrl}
+    />
+  ) : null;
+
+  if (variant === "pill") {
+    return (
+      <>
+        <button
+          ref={buttonRef}
+          type="button"
+          onClick={handleShare}
+          aria-haspopup={card ? "dialog" : undefined}
+          aria-label={copied ? "¡Enlace copiado!" : "Compartir"}
+          className={`${SCOREBOARD_PILL_CLASS} ${className}`}
+        >
+          <LiquidGlassOpticalLayers />
+          {copied ? (
+            <Check aria-hidden="true" className="relative z-10 h-5 w-5 shrink-0" />
+          ) : (
+            <Share2 aria-hidden="true" className="relative z-10 h-5 w-5 shrink-0" />
+          )}
+          <span className="relative z-10">{copied ? "Copiado" : "Compartir"}</span>
+        </button>
+        {sheet}
+      </>
+    );
+  }
+
   return (
     <>
       <motion.button
@@ -423,17 +473,15 @@ export function ActionShareButton({ title, text, url, card = null, story = null,
           {copied ? "¡Enlace copiado!" : "Compartir"}
         </div>
       </motion.button>
-      {sheetCard && (
-        <DetailsShareSheet
-          open={sheetOpen}
-          onClose={closeSheet}
-          card={sheetCard}
-          story={sheetStory}
-          title={title}
-          text={text}
-          getUrl={resolveUrl}
-        />
-      )}
+      {sheet}
     </>
   );
 }
+
+// PÍLDORA "bocadillo" de la ficha móvil, bajo el marcador: media línea, icono +
+// título y el MISMO cristal que el marcador (LIQUID_GLASS_SURFACE, con las capas
+// ópticas como primer hijo), solo que en `rounded-full`. La comparten
+// Plataformas (ScoreboardPill) y Compartir (ActionShareButton variant="pill").
+// En pantallas muy estrechas (< 340px) aprietan relleno, hueco y texto para que
+// el título no se recorte.
+export const SCOREBOARD_PILL_CLASS = `${LIQUID_GLASS_SURFACE} flex h-12 w-full min-w-0 items-center justify-center gap-2.5 rounded-full px-4 text-sm font-bold max-[340px]:gap-1.5 max-[340px]:px-2.5 max-[340px]:text-[13px] text-white/90 [-webkit-tap-highlight-color:transparent] transition-[color,scale] duration-300 hover:text-white active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/40`;
