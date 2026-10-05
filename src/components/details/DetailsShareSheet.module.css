@@ -1,0 +1,55 @@
+/* Entrada de la hoja de compartir. Solo `transform`: una animación de opacidad
+   en el panel lo convertiría en raíz de backdrop y apagaría su cristal (ver la
+   nota de las entradas de la ficha). En teléfono sube desde abajo como una hoja;
+   desde `sm` es una tarjeta centrada que crece un poco. */
+@keyframes sheet-in-mobile {
+  from {
+    transform: translateY(40px);
+  }
+
+  to {
+    transform: none;
+  }
+}
+
+@keyframes sheet-in-desktop {
+  from {
+    transform: scale(0.96);
+  }
+
+  to {
+    transform: none;
+  }
+}
+
+.sheet {
+  animation: sheet-in-mobile 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (min-width: 40rem) {
+  .sheet {
+    animation-name: sheet-in-desktop;
+  }
+}
+
+/* Mientras se genera la imagen: un brillo que recorre el hueco del póster. */
+@keyframes preview-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.shimmer {
+  animation: preview-shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet,
+  .shimmer {
+    animation: none;
+  }
+}

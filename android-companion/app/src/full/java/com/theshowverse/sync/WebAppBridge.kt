@@ -1,11 +1,16 @@
 package com.theshowverse.sync
 
 import android.app.Activity
+import android.content.ClipData
 import android.content.Intent
 import android.provider.Settings
+import android.util.Base64
 import android.webkit.JavascriptInterface
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.FileProvider
 import org.json.JSONObject
+import java.io.File
+import java.io.IOException
 
 /**
  * Puente entre la web y el nativo: `window.TSVAndroidBridge` dentro del WebView.
@@ -315,6 +320,65 @@ class WebAppBridge(
     }
 
     /**
+     * Compartir una IMAGEN (la de la ficha) con el selector del sistema, con el
+     * texto y el enlace como pie. El WebView no implementa `navigator.share` con
+     * ficheros, así que la web manda la imagen en base64; aquí se guarda en la
+     * caché y se entrega por FileProvider con permiso de lectura temporal.
+     *
+     * Solo se conserva la última imagen: cada llamada vacía la carpeta antes de
+     * escribir, así la caché no crece con cada título compartido.
+     */
+    @JavascriptInterface
+    fun shareImage(
+        base64: String?,
+        mimeType: String?,
+        fileName: String?,
+        text: String?,
+        url: String?,
+    ): Boolean {
+        if (!propio()) return false
+        val bytes = try {
+            Base64.decode(base64.orEmpty(), Base64.DEFAULT)
+        } catch (_: IllegalArgumentException) {
+            return false
+        }
+        if (bytes.isEmpty() || bytes.size > MAX_IMAGEN_COMPARTIDA) return false
+
+        val jpeg = mimeType == "image/jpeg"
+        val nombre = fileName.orEmpty()
+            .substringBeforeLast('.')
+            .replace(Regex("[^A-Za-z0-9._-]"), "")
+            .take(80)
+            .ifBlank { "the-show-verse" }
+        val carpeta = File(activity.cacheDir, CARPETA_COMPARTIDAS)
+        val archivo = File(carpeta, "$nombre.${if (jpeg) "jpg" else "png"}")
+        try {
+            carpeta.mkdirs()
+            carpeta.listFiles()?.forEach { it.delete() }
+            archivo.writeBytes(bytes)
+        } catch (_: IOException) {
+            return false
+        }
+
+        val uri = FileProvider.getUriForFile(activity, "${activity.packageName}.shareimages", archivo)
+        val pie = listOfNotNull(text?.takeIf { it.isNotBlank() }, url?.takeIf { it.isNotBlank() })
+            .joinToString("\n")
+        activity.runOnUiThread {
+            val enviar = Intent(Intent.ACTION_SEND).apply {
+                type = if (jpeg) "image/jpeg" else "image/png"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                if (pie.isNotBlank()) putExtra(Intent.EXTRA_TEXT, pie)
+                // ClipData: sin él, algunas apps del selector no heredan el
+                // permiso de lectura y no ven la imagen (ni la vista previa).
+                clipData = ClipData.newRawUri(null, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            activity.startActivity(Intent.createChooser(enviar, null))
+        }
+        return true
+    }
+
+    /**
      * Bloquea (o libera) "deslizar para recargar" mientras la web tiene abierto
      * un panel con scroll propio (el desplegable de alertas).
      *
@@ -382,5 +446,11 @@ class WebAppBridge(
     companion object {
         /** Nombre del objeto en `window`. */
         const val NAME = "TSVAndroidBridge"
+
+        /** Subcarpeta de la caché servida por el FileProvider (res/xml/share_image_paths.xml). */
+        private const val CARPETA_COMPARTIDAS = "shared"
+
+        /** Tope de la imagen a compartir (la de la ficha ronda 0,5 MB en JPEG). */
+        private const val MAX_IMAGEN_COMPARTIDA = 15 * 1024 * 1024
     }
 }

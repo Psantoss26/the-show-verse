@@ -78,6 +78,19 @@
             android:label="@string/perf_title"
             android:parentActivityName=".WebAppActivity" />
 
+        <!-- Imágenes que la web comparte con el selector del sistema
+             (WebAppBridge.shareImage). Sin exportar: el acceso lo da el
+             permiso temporal del Intent. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.shareimages"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/share_image_paths" />
+        </provider>
+
         <!-- Notificaciones push (Firebase Cloud Messaging). Sin
              google-services.json en la build, Firebase no arranca y este
              servicio nunca recibe nada. -->

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lo único que la app expone por FileProvider: la imagen que la web pide
+     compartir (WebAppBridge.shareImage), en la caché. -->
+<paths>
+    <cache-path name="shared_images" path="shared/" />
+</paths>

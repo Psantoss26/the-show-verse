@@ -187,6 +187,25 @@ export function shareFromApp(text, url) {
   return false;
 }
 
+/**
+ * ¿La app sabe compartir una IMAGEN? Las versiones anteriores solo comparten
+ * texto: ahí la web ofrece únicamente el enlace.
+ */
+export function canShareImageFromApp() {
+  const api = bridge();
+  return !!api && typeof api.shareImage === "function";
+}
+
+/**
+ * Comparte una imagen con el selector del sistema. `base64` sin prefijo
+ * `data:`; el nativo la guarda en su caché y la entrega por FileProvider.
+ */
+export function shareImageFromApp({ base64, mimeType, fileName, text, url }) {
+  return (
+    call("shareImage", false, base64 || "", mimeType || "", fileName || "", text || "", url || "") === true
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Inicio de sesión con Google, nativo.
 //
