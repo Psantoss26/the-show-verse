@@ -321,12 +321,8 @@ class WebAppBridge(
 
     /**
      * Compartir una IMAGEN (la de la ficha) con el selector del sistema, con el
-     * texto y el enlace como pie. El WebView no implementa `navigator.share` con
-     * ficheros, así que la web manda la imagen en base64; aquí se guarda en la
-     * caché y se entrega por FileProvider con permiso de lectura temporal.
-     *
-     * Solo se conserva la última imagen: cada llamada vacía la carpeta antes de
-     * escribir, así la caché no crece con cada título compartido.
+     * texto y el enlace como pie. Se conserva para las webs que aún no conocen
+     * [shareFile]; acepta solo imágenes.
      */
     @JavascriptInterface
     fun shareImage(
@@ -336,22 +332,57 @@ class WebAppBridge(
         text: String?,
         url: String?,
     ): Boolean {
+        val tipo = if (mimeType == "image/jpeg") "image/jpeg" else "image/png"
+        return compartirArchivo(base64, tipo, fileName, text, url)
+    }
+
+    /**
+     * Compartir un FICHERO —la imagen o el vídeo de la ficha— con el selector del
+     * sistema, con el texto y el enlace como pie. El WebView no implementa
+     * `navigator.share` con ficheros, así que la web lo manda en base64; aquí se
+     * guarda en la caché y se entrega por FileProvider con permiso de lectura
+     * temporal. Solo tipos conocidos: lo demás se rechaza.
+     */
+    @JavascriptInterface
+    fun shareFile(
+        base64: String?,
+        mimeType: String?,
+        fileName: String?,
+        text: String?,
+        url: String?,
+    ): Boolean {
+        val tipo = mimeType?.substringBefore(';')?.trim()?.lowercase() ?: return false
+        if (tipo !in EXTENSIONES_COMPARTIBLES) return false
+        return compartirArchivo(base64, tipo, fileName, text, url)
+    }
+
+    /**
+     * Solo se conserva el último fichero: cada llamada vacía la carpeta antes de
+     * escribir, así la caché no crece con cada título compartido.
+     */
+    private fun compartirArchivo(
+        base64: String?,
+        tipo: String,
+        fileName: String?,
+        text: String?,
+        url: String?,
+    ): Boolean {
         if (!propio()) return false
+        val extension = EXTENSIONES_COMPARTIBLES[tipo] ?: return false
         val bytes = try {
             Base64.decode(base64.orEmpty(), Base64.DEFAULT)
         } catch (_: IllegalArgumentException) {
             return false
         }
-        if (bytes.isEmpty() || bytes.size > MAX_IMAGEN_COMPARTIDA) return false
+        if (bytes.isEmpty() || bytes.size > MAX_ARCHIVO_COMPARTIDO) return false
 
-        val jpeg = mimeType == "image/jpeg"
         val nombre = fileName.orEmpty()
             .substringBeforeLast('.')
             .replace(Regex("[^A-Za-z0-9._-]"), "")
             .take(80)
             .ifBlank { "the-show-verse" }
         val carpeta = File(activity.cacheDir, CARPETA_COMPARTIDAS)
-        val archivo = File(carpeta, "$nombre.${if (jpeg) "jpg" else "png"}")
+        val archivo = File(carpeta, "$nombre.$extension")
         try {
             carpeta.mkdirs()
             carpeta.listFiles()?.forEach { it.delete() }
@@ -365,11 +396,11 @@ class WebAppBridge(
             .joinToString("\n")
         activity.runOnUiThread {
             val enviar = Intent(Intent.ACTION_SEND).apply {
-                type = if (jpeg) "image/jpeg" else "image/png"
+                type = tipo
                 putExtra(Intent.EXTRA_STREAM, uri)
                 if (pie.isNotBlank()) putExtra(Intent.EXTRA_TEXT, pie)
                 // ClipData: sin él, algunas apps del selector no heredan el
-                // permiso de lectura y no ven la imagen (ni la vista previa).
+                // permiso de lectura y no ven el fichero (ni la vista previa).
                 clipData = ClipData.newRawUri(null, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
@@ -450,7 +481,18 @@ class WebAppBridge(
         /** Subcarpeta de la caché servida por el FileProvider (res/xml/share_image_paths.xml). */
         private const val CARPETA_COMPARTIDAS = "shared"
 
-        /** Tope de la imagen a compartir (la de la ficha ronda 0,5 MB en JPEG). */
-        private const val MAX_IMAGEN_COMPARTIDA = 15 * 1024 * 1024
+        /**
+         * Tope del fichero a compartir: la imagen de la ficha ronda 0,5 MB en
+         * JPEG y el vídeo (~15 s a 5 Mbps) unos 6-9 MB.
+         */
+        private const val MAX_ARCHIVO_COMPARTIDO = 40 * 1024 * 1024
+
+        /** Tipos que la web puede compartir, con la extensión del fichero. */
+        private val EXTENSIONES_COMPARTIBLES = mapOf(
+            "image/jpeg" to "jpg",
+            "image/png" to "png",
+            "video/mp4" to "mp4",
+            "video/webm" to "webm",
+        )
     }
 }

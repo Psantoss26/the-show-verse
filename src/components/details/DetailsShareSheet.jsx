@@ -1,18 +1,22 @@
 "use client";
 
-// Hoja de COMPARTIR de la ficha, al estilo de Spotify: arriba la imagen que se
-// va a compartir (la "captura" de la ficha que genera /api/share/details-card)
-// y debajo las formas de mandarla: la imagen por el selector del sistema,
-// guardarla o copiarla, y el enlace de siempre.
+// Hoja de COMPARTIR de la ficha, al estilo de Spotify: arriba lo que se va a
+// compartir y debajo las formas de mandarlo.
+//   - Imagen: la "captura" de la ficha (/api/share/details-card).
+//   - Vídeo: una historia corta que empieza con esa imagen y sigue con
+//     visionados, puntuación, la reseña (si el usuario la incluye) y detalles
+//     (ver lib/details/shareStory y lib/share/storyVideo). Solo se ofrece si el
+//     navegador sabe codificar vídeo.
 //
-// La imagen se pide al abrir y se guarda mientras el botón siga montado: volver
-// a abrir la hoja del mismo título con los mismos estados no la regenera.
+// Imagen y vídeo se generan al pedirlos y se guardan mientras el botón siga
+// montado: volver a abrir la hoja con los mismos estados no los regenera.
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   AlertCircle,
   Check,
+  Clapperboard,
   Copy,
   Download,
   Image as ImageIcon,
@@ -25,12 +29,16 @@ import {
 
 import useModalGuard from "@/hooks/useModalGuard";
 import {
+  canShareFileFromApp,
   canShareImageFromApp,
   isAndroidApp,
+  shareFileFromApp,
   shareFromApp,
   shareImageFromApp,
 } from "@/lib/android/appBridge";
 import { shareCardFileName } from "@/lib/details/shareCard";
+import { buildShareStoryPayload, sanitizeShareStory, storySceneIds } from "@/lib/details/shareStory";
+import { createStoryVideo, detectStoryVideoFormat } from "@/lib/share/storyVideo";
 import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER } from "@/lib/ui/liquidGlass";
 import styles from "./DetailsShareSheet.module.css";
 
@@ -66,15 +74,24 @@ function extensionOf(blob) {
   return blob.type === "image/jpeg" ? "jpg" : "png";
 }
 
-// Se sondea con un JPEG vacío: así se sabe antes de tener la imagen y la fila
-// de opciones no cambia al terminar de generarse.
-function canShareImageFiles() {
+// Se sondea con un fichero vacío del mismo tipo: así se sabe antes de tenerlo y
+// la fila de opciones no cambia al terminar de generarse.
+function canShareFiles(mimeType, extension) {
   try {
-    const probe = new File([new Uint8Array(1)], "probe.jpg", { type: "image/jpeg" });
+    const probe = new File([new Uint8Array(1)], `probe.${extension}`, { type: mimeType });
     return typeof navigator !== "undefined" && !!navigator.canShare?.({ files: [probe] });
   } catch {
     return false;
   }
+}
+
+function downloadBlob(href, fileName) {
+  const link = document.createElement("a");
+  link.href = href;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
 }
 
 function canCopyImage() {
@@ -141,7 +158,75 @@ const PREVIEW_FEATHER = {
   maskComposite: "intersect",
 };
 
-export default function DetailsShareSheet({ open, onClose, card, title, text, getUrl }) {
+// Selector Imagen / Vídeo: la misma píldora que las opciones principales.
+function ModeSwitch({ mode, onChange }) {
+  const options = [
+    { id: "image", label: "Imagen", icon: ImageIcon },
+    { id: "video", label: "Vídeo", icon: Clapperboard },
+  ];
+  return (
+    <div role="radiogroup" aria-label="Formato" className="mx-auto mb-5 grid w-full max-w-[16rem] grid-cols-2 gap-1 rounded-full bg-white/5 p-1 backdrop-blur-xl">
+      {options.map(({ id, label, icon: Icon }) => (
+        <button
+          key={id}
+          type="button"
+          role="radio"
+          aria-checked={mode === id}
+          onClick={() => onChange(id)}
+          className={`flex h-9 items-center justify-center gap-2 rounded-full text-[11px] font-extrabold uppercase tracking-wider transition duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 ${
+            mode === id
+              ? "bg-white/90 text-black shadow-[0_10px_30px_-10px_rgba(255,255,255,0.45)]"
+              : "text-white/60 hover:bg-white/10 hover:text-white"
+          }`}
+        >
+          <Icon className="h-4 w-4" aria-hidden="true" />
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Interruptor "Incluir mi reseña" (es texto del usuario que se va a publicar,
+// así que va apagado por defecto).
+function ReviewToggle({ checked, disabled, onChange }) {
+  return (
+    <label
+      className={`mx-auto mt-5 flex max-w-[24rem] items-center justify-between gap-4 rounded-2xl bg-white/5 px-4 py-3 backdrop-blur-xl ${
+        disabled ? "opacity-60" : "cursor-pointer"
+      }`}
+    >
+      <span className="min-w-0">
+        <span className="block text-sm font-bold text-white/85">Incluir mi reseña</span>
+        <span className="block text-[11px] font-semibold text-white/45">
+          {disabled ? "Tiene spoilers: no se incluye" : "Se mostrará en el vídeo"}
+        </span>
+      </span>
+      <input
+        type="checkbox"
+        role="switch"
+        className="peer sr-only"
+        checked={checked}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      <span
+        aria-hidden="true"
+        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors duration-300 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-yellow-400 ${
+          checked ? "bg-orange-400/80" : "bg-white/15"
+        }`}
+      >
+        <span
+          className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-transform duration-300 ${
+            checked ? "translate-x-6" : "translate-x-1"
+          }`}
+        />
+      </span>
+    </label>
+  );
+}
+
+export default function DetailsShareSheet({ open, onClose, card, story, title, text, getUrl }) {
   const titleId = useId();
   const closeRef = useRef(null);
   const [portalReady, setPortalReady] = useState(false);
@@ -154,11 +239,32 @@ export default function DetailsShareSheet({ open, onClose, card, title, text, ge
   const [message, setMessage] = useState("");
   const doneTimer = useRef(null);
 
+  // --- Vídeo.
+  const [mode, setMode] = useState("image");
+  // undefined: comprobando; null: este navegador no sabe codificar vídeo.
+  const [videoFormat, setVideoFormat] = useState(undefined);
+  const [includeReview, setIncludeReview] = useState(false);
+  // { key, file, objectUrl } del último vídeo generado.
+  const [video, setVideo] = useState(null);
+  const [videoStatus, setVideoStatus] = useState("idle");
+  const [videoProgress, setVideoProgress] = useState(0);
+  const [videoAttempt, setVideoAttempt] = useState(0);
+
   useModalGuard({ open, onClose });
   useEffect(() => setPortalReady(true), []);
 
   const cardKey = card ? JSON.stringify(card) : "";
   const imageReady = status === "ready" && image?.key === cardKey;
+
+  // La reseña solo se ofrece si existe; con spoilers, el interruptor se bloquea.
+  const reviewAvailable = !!(story?.review?.comment || story?.review?.text);
+  const reviewSpoiler = !!story?.review?.spoiler;
+  const storyPayload = story
+    ? sanitizeShareStory(buildShareStoryPayload({ ...story, includeReview: includeReview && !reviewSpoiler }))
+    : null;
+  const sceneIds = storyPayload ? storySceneIds(card, storyPayload) : [];
+  const videoKey = storyPayload ? `${cardKey}|${JSON.stringify(storyPayload)}` : "";
+  const videoReady = videoStatus === "ready" && video?.key === videoKey;
 
   // Generar (o reutilizar) la imagen al abrir.
   useEffect(() => {
@@ -195,9 +301,64 @@ export default function DetailsShareSheet({ open, onClose, card, title, text, ge
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, cardKey, attempt]);
 
-  // Liberar la URL de la vista previa al cambiarla o al desmontar.
+  // ¿Sabe este navegador codificar vídeo? Se pregunta una vez, al abrir.
+  useEffect(() => {
+    if (!open || !story || videoFormat !== undefined) return undefined;
+    let cancelled = false;
+    detectStoryVideoFormat().then((format) => {
+      if (!cancelled) setVideoFormat(format);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, story, videoFormat]);
+
+  // Generar (o reutilizar) el vídeo al elegirlo. Parte de la imagen de portada,
+  // así que espera a que esté. Cerrar o cambiar de modo cancela la generación.
+  useEffect(() => {
+    if (!open || mode !== "video" || !videoFormat || !imageReady || !storyPayload) return undefined;
+    if (video?.key === videoKey) {
+      setVideoStatus("ready");
+      return undefined;
+    }
+    const controller = new AbortController();
+    setVideoStatus("loading");
+    setVideoProgress(0);
+    (async () => {
+      try {
+        const blob = await createStoryVideo({
+          card,
+          story: storyPayload,
+          sceneIds,
+          cover: image.png,
+          format: videoFormat,
+          onProgress: setVideoProgress,
+          signal: controller.signal,
+        });
+        if (controller.signal.aborted) return;
+        const file = new File([blob], shareCardFileName(title, videoFormat.extension), {
+          type: videoFormat.mimeType,
+        });
+        setVideo({ key: videoKey, file, objectUrl: URL.createObjectURL(blob) });
+        setVideoStatus("ready");
+      } catch (error) {
+        if (error?.name !== "AbortError") {
+          console.error("No se pudo crear el vídeo", error);
+          setVideoStatus("error");
+        }
+      }
+    })();
+    return () => controller.abort();
+    // Igual que la imagen: `video`, `card`, `storyPayload` y `sceneIds` van
+    // dentro de `videoKey`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, mode, videoFormat, imageReady, videoKey, videoAttempt]);
+
+  // Liberar las URL de las vistas previas al cambiarlas o al desmontar.
   const objectUrl = image?.objectUrl;
   useEffect(() => () => objectUrl && URL.revokeObjectURL(objectUrl), [objectUrl]);
+  const videoUrl = video?.objectUrl;
+  useEffect(() => () => videoUrl && URL.revokeObjectURL(videoUrl), [videoUrl]);
   useEffect(() => () => clearTimeout(doneTimer.current), []);
 
   // Foco al botón de cerrar al abrir (en la primera apertura, cuando el portal
@@ -222,55 +383,55 @@ export default function DetailsShareSheet({ open, onClose, card, title, text, ge
   const url = useCallback(() => getUrl?.() || "", [getUrl]);
   const shareText = useCallback(() => [text, url()].filter(Boolean).join("\n"), [text, url]);
 
+  const isVideo = mode === "video" && !!videoFormat;
+  const media = isVideo
+    ? { ready: videoReady, file: video?.file, objectUrl: video?.objectUrl, noun: "vídeo" }
+    : { ready: imageReady, file: image?.file, objectUrl: image?.objectUrl, noun: "imagen" };
+  const mediaMime = isVideo ? videoFormat.mimeType : "image/jpeg";
+  const mediaExtension = isVideo ? videoFormat.extension : "jpg";
+
   const inApp = portalReady && isAndroidApp();
-  const appCanShareImage = inApp && canShareImageFromApp();
-  const webCanShareImage = portalReady && !inApp && canShareImageFiles();
-  const showShareImage = appCanShareImage || webCanShareImage;
-  const showCopyImage = !inApp && !webCanShareImage && portalReady && canCopyImage();
+  // En la app: `shareFile` (imagen o vídeo) y, en versiones anteriores, solo
+  // `shareImage` para la imagen.
+  const appCanShareMedia = inApp && (canShareFileFromApp() || (!isVideo && canShareImageFromApp()));
+  const webCanShareMedia = portalReady && !inApp && canShareFiles(mediaMime, mediaExtension);
+  const showShareMedia = appCanShareMedia || webCanShareMedia;
+  const showCopyImage = !isVideo && !inApp && !webCanShareMedia && portalReady && canCopyImage();
   const showSave = !inApp;
   const showShareLink =
     inApp || (portalReady && typeof navigator !== "undefined" && typeof navigator.share === "function");
 
   // --- Acciones. Cada una se lanza directamente desde el clic: la Web Share
-  // API exige la activación del usuario, por eso la imagen ya está preparada.
-  const onShareImage = async () => {
-    if (!imageReady) return;
+  // API exige la activación del usuario, por eso imagen y vídeo ya están hechos.
+  const onShareMedia = async () => {
+    if (!media.ready) return;
     setMessage("");
-    if (appCanShareImage) {
-      setBusy("image");
+    const failed = `No se pudo compartir ${isVideo ? "el vídeo" : "la imagen"}.`;
+    if (appCanShareMedia) {
+      setBusy("media");
       try {
-        const base64 = await blobToBase64(image.file);
-        const ok = shareImageFromApp({
-          base64,
-          mimeType: image.file.type,
-          fileName: image.file.name,
-          text,
-          url: url(),
-        });
-        if (!ok) setMessage("No se pudo compartir la imagen.");
+        const base64 = await blobToBase64(media.file);
+        const options = { base64, mimeType: media.file.type, fileName: media.file.name, text, url: url() };
+        const ok = canShareFileFromApp() ? shareFileFromApp(options) : shareImageFromApp(options);
+        if (!ok) setMessage(failed);
       } catch {
-        setMessage("No se pudo compartir la imagen.");
+        setMessage(failed);
       } finally {
         setBusy(null);
       }
       return;
     }
     try {
-      await navigator.share({ files: [image.file], title, text: shareText() });
+      await navigator.share({ files: [media.file], title, text: shareText() });
     } catch (error) {
-      if (error?.name !== "AbortError") setMessage("No se pudo compartir la imagen.");
+      if (error?.name !== "AbortError") setMessage(failed);
     }
   };
 
   const onSave = () => {
-    if (!imageReady) return;
-    const link = document.createElement("a");
-    link.href = image.objectUrl;
-    link.download = image.file.name;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    flashDone("save", "Imagen guardada.");
+    if (!media.ready) return;
+    downloadBlob(media.objectUrl, media.file.name);
+    flashDone("save", isVideo ? "Vídeo guardado." : "Imagen guardada.");
   };
 
   const onCopyImage = async () => {
@@ -308,10 +469,18 @@ export default function DetailsShareSheet({ open, onClose, card, title, text, ge
     }
   };
 
+  const changeMode = (next) => {
+    setMode(next);
+    setMessage("");
+    setDone(null);
+  };
+
   if (!open || !portalReady) return null;
 
-  // La principal es la primera forma de mandar la IMAGEN que haya disponible.
-  const primaryImageAction = showShareImage ? "share" : showCopyImage ? "copy" : showSave ? "save" : null;
+  // La principal es la primera forma de mandar la imagen o el vídeo que haya.
+  const primaryAction = showShareMedia ? "share" : showCopyImage ? "copy" : showSave ? "save" : null;
+  const showModeSwitch = !!videoFormat && !!storyPayload;
+  const progressPct = Math.round(videoProgress * 100);
 
   // Misma estructura y acabado que los modales de las acciones de la ficha
   // (puntuación, listas, enlaces): portal, velo `bg-black/60` difuminado,
@@ -357,10 +526,77 @@ export default function DetailsShareSheet({ open, onClose, card, title, text, ge
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-6 sm:px-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {/* Vista previa: la imagen tal cual se va a compartir, sin marco. */}
-          <div className="relative mx-auto aspect-[9/16] h-[min(calc(85dvh-18rem),34rem)] max-w-full">
-            {imageReady ? (
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-2 sm:px-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {showModeSwitch && <ModeSwitch mode={mode} onChange={changeMode} />}
+
+          {/* Vista previa: lo que se va a compartir, sin marco. */}
+          <div
+            className={`relative mx-auto aspect-[9/16] max-w-full ${
+              showModeSwitch ? "h-[min(calc(85dvh-21rem),32rem)]" : "h-[min(calc(85dvh-18rem),34rem)]"
+            }`}
+          >
+            {isVideo ? (
+              videoReady ? (
+                <video
+                  key={video.objectUrl}
+                  src={video.objectUrl}
+                  className="h-full w-full rounded-[1.5rem] object-cover"
+                  style={PREVIEW_FEATHER}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  aria-label={`Vídeo para compartir de ${title}`}
+                />
+              ) : videoStatus === "error" ? (
+                <div className="flex h-full flex-col items-center justify-center gap-4 rounded-[1.5rem] bg-white/[0.03] p-6 text-center">
+                  <AlertCircle className="h-7 w-7 text-white/40" aria-hidden="true" />
+                  <p className="text-sm font-bold text-white/70">No se pudo crear el vídeo.</p>
+                  <button
+                    type="button"
+                    onClick={() => setVideoAttempt((value) => value + 1)}
+                    className="inline-flex h-11 items-center gap-2 rounded-full bg-white/5 px-5 text-xs font-extrabold uppercase tracking-wide text-white/80 backdrop-blur-xl transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400"
+                  >
+                    <RotateCw className="h-4 w-4" aria-hidden="true" />
+                    Reintentar
+                  </button>
+                </div>
+              ) : (
+                <div
+                  className="relative flex h-full flex-col items-center justify-center gap-4 overflow-hidden rounded-[1.5rem] bg-white/[0.03] px-8"
+                  style={PREVIEW_FEATHER}
+                  role="status"
+                >
+                  {/* Mientras: la portada, que es el primer fotograma del vídeo. */}
+                  {imageReady && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={image.objectUrl}
+                      alt=""
+                      className="absolute inset-0 h-full w-full object-cover opacity-30"
+                      draggable="false"
+                    />
+                  )}
+                  <Clapperboard className="relative h-7 w-7 text-yellow-300" aria-hidden="true" />
+                  <p className="relative text-[10px] font-bold uppercase tracking-widest text-white/70">
+                    Creando vídeo… {progressPct}%
+                  </p>
+                  <div
+                    className="relative h-1.5 w-full max-w-[12rem] overflow-hidden rounded-full bg-black/35 backdrop-blur-md"
+                    role="progressbar"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={progressPct}
+                    aria-label="Progreso del vídeo"
+                  >
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-yellow-200/80 via-yellow-100 to-white shadow-[0_0_14px_rgba(250,204,21,0.45)] transition-[width] duration-200 ease-out"
+                      style={{ width: `${progressPct}%` }}
+                    />
+                  </div>
+                </div>
+              )
+            ) : imageReady ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={image.objectUrl}
@@ -397,18 +633,22 @@ export default function DetailsShareSheet({ open, onClose, card, title, text, ge
               </div>
             )}
           </div>
+
+          {isVideo && reviewAvailable && (
+            <ReviewToggle checked={includeReview && !reviewSpoiler} disabled={reviewSpoiler} onChange={setIncludeReview} />
+          )}
         </div>
 
         <div className="shrink-0 px-5 pb-6 pt-5 sm:px-8 sm:pb-7">
           <div className="grid auto-cols-fr grid-flow-col gap-2">
-            {showShareImage && (
+            {showShareMedia && (
               <ShareOption
-                icon={ImageIcon}
-                label="Compartir imagen"
-                onClick={onShareImage}
-                primary={primaryImageAction === "share"}
-                disabled={!imageReady}
-                busy={busy === "image"}
+                icon={isVideo ? Clapperboard : ImageIcon}
+                label={isVideo ? "Compartir vídeo" : "Compartir imagen"}
+                onClick={onShareMedia}
+                primary={primaryAction === "share"}
+                disabled={!media.ready}
+                busy={busy === "media"}
               />
             )}
             {showCopyImage && (
@@ -416,7 +656,7 @@ export default function DetailsShareSheet({ open, onClose, card, title, text, ge
                 icon={Copy}
                 label="Copiar imagen"
                 onClick={onCopyImage}
-                primary={primaryImageAction === "copy"}
+                primary={primaryAction === "copy"}
                 disabled={!imageReady}
                 done={done === "copyImage"}
               />
@@ -424,10 +664,10 @@ export default function DetailsShareSheet({ open, onClose, card, title, text, ge
             {showSave && (
               <ShareOption
                 icon={Download}
-                label="Guardar imagen"
+                label={isVideo ? "Guardar vídeo" : "Guardar imagen"}
                 onClick={onSave}
-                primary={primaryImageAction === "save"}
-                disabled={!imageReady}
+                primary={primaryAction === "save"}
+                disabled={!media.ready}
                 done={done === "save"}
               />
             )}

@@ -206,6 +206,22 @@ export function shareImageFromApp({ base64, mimeType, fileName, text, url }) {
   );
 }
 
+/**
+ * ¿La app sabe compartir cualquier fichero (imagen o VÍDEO)? `shareImage` solo
+ * acepta imágenes; las versiones con `shareFile` aceptan también MP4/WebM.
+ */
+export function canShareFileFromApp() {
+  const api = bridge();
+  return !!api && typeof api.shareFile === "function";
+}
+
+/** Comparte una imagen o un vídeo con el selector del sistema (ver shareImageFromApp). */
+export function shareFileFromApp({ base64, mimeType, fileName, text, url }) {
+  return (
+    call("shareFile", false, base64 || "", mimeType || "", fileName || "", text || "", url || "") === true
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Inicio de sesión con Google, nativo.
 //

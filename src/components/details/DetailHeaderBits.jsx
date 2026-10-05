@@ -306,9 +306,12 @@ export function UnifiedRateButton({
 // Spotify— en vez de mandar directamente el enlace. Se toma una FOTO del
 // payload al pulsar: si una puntuación termina de cargar con la hoja abierta,
 // la imagen que se está viendo no se regenera por debajo.
-export function ActionShareButton({ title, text, url, card = null, iconOnly = false, animateEntrance = true }) {
+// `story`: datos del vídeo compartible (ver lib/details/shareStory); con él la
+// hoja ofrece también el vídeo. Se fotografía igual que `card`.
+export function ActionShareButton({ title, text, url, card = null, story = null, iconOnly = false, animateEntrance = true }) {
   const [copied, setCopied] = useState(false);
   const [sheetCard, setSheetCard] = useState(null);
+  const [sheetStory, setSheetStory] = useState(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const buttonRef = useRef(null);
   const prefersReducedMotion = useReducedMotion();
@@ -331,6 +334,7 @@ export function ActionShareButton({ title, text, url, card = null, iconOnly = fa
   const handleShare = async () => {
     if (card) {
       setSheetCard(card);
+      setSheetStory(story);
       setSheetOpen(true);
       return;
     }
@@ -424,6 +428,7 @@ export function ActionShareButton({ title, text, url, card = null, iconOnly = fa
           open={sheetOpen}
           onClose={closeSheet}
           card={sheetCard}
+          story={sheetStory}
           title={title}
           text={text}
           getUrl={resolveUrl}

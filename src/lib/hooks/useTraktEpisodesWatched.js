@@ -1271,10 +1271,11 @@ export function useTraktEpisodesWatched({
     ],
   );
 
-  // Badge de progreso ("47%") para el botón "visto" en series. MISMA fórmula
-  // que DetailsClient: % de episodios vistos sobre el total de temporadas
-  // regulares. null si no procede (no conectado, sin cargar, 0% o película).
-  const tvProgressBadge = useMemo(() => {
+  // Progreso de la serie: episodios vistos sobre el total de temporadas
+  // regulares. MISMA fórmula que DetailsClient. null si no procede (no
+  // conectado, sin cargar, 0% o película). Lo usan el badge del botón "visto"
+  // y el vídeo compartible de la ficha, que enseña también los recuentos.
+  const tvProgress = useMemo(() => {
     if (type !== "tv") return null;
     if (!connected) return null;
     if (!watchedBySeasonLoaded) return null;
@@ -1300,14 +1301,18 @@ export function useTraktEpisodesWatched({
     const pct = Math.round((watchedEpisodes / totalEpisodes) * 100);
     const safePct = Math.min(100, Math.max(0, pct));
     if (safePct <= 0) return null;
-    return `${safePct}%`;
+    return { percent: safePct, watched: watchedEpisodes, total: totalEpisodes };
   }, [type, connected, watchedBySeasonLoaded, seasons, watchedBySeason]);
+
+  // Badge de progreso ("47%") para el botón "visto" en series.
+  const tvProgressBadge = tvProgress ? `${tvProgress.percent}%` : null;
 
   return {
     // estado
     watchedBySeason,
     watchedBySeasonLoaded,
     episodeBusyKey,
+    tvProgress,
     tvProgressBadge,
     showPlays,
     rewatchStartAt,

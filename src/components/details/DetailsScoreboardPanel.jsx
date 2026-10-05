@@ -439,9 +439,10 @@ export function DetailsStatsRow({
 //    - `platformsMenuOnly`: muestra plataformas en un botón etiquetado también
 //      en escritorio (variante de DetailModal).
 //    - `showExternalLinksLabel`: muestra la etiqueta del botón desde `sm`.
-//    - `share`: { title, text?, url?, card? } -> <ActionShareButton>. Se ancla
-//      a la derecha con ml-auto (siempre visible si se pasa). Con `card` abre
-//      la hoja de compartir con la imagen de la ficha.
+//    - `share`: { title, text?, url?, card?, story? } -> <ActionShareButton>.
+//      Se ancla a la derecha con ml-auto (siempre visible si se pasa). Con
+//      `card` abre la hoja de compartir con la imagen de la ficha; con `story`,
+//      también con el vídeo.
 // ---------------------------------------------------------------------------
 // Separador compartido de las regiones del marcador.
 export function ToolbarSeparator({ className = "" }) {
@@ -518,6 +519,7 @@ function DetailsToolbarActions({
         text={share.text}
         url={share.url}
         card={share.card}
+        story={share.story}
         iconOnly={shareIconOnly || phone}
         animateEntrance={!platformsMenuOnly}
       />
