@@ -150,6 +150,10 @@ function Toast({ toast, onClose, onOpen }) {
   // La acción en una frase corta. Sin texto (raro), el rótulo de la sección.
   const action = toast.text || toast.label || "Aviso";
   const hasRating = typeof toast.rating === "number" && toast.rating > 0;
+  // Puntuación con título: solo el título (y el episodio o la temporada); la
+  // nota ya está en el icono y «Título · Has puntuado» no se lee bien. Sin
+  // título todavía, el texto «Has puntuado» hasta que llegue.
+  const ratingOnlyTitle = hasRating && Boolean(toast.title);
 
   // UNA SOLA FILA, como las de la campana: cartel, icono de la acción y la
   // frase «Título · acción». El rótulo en mayúsculas y el texto aparte en
@@ -184,13 +188,16 @@ function Toast({ toast, onClose, onOpen }) {
           {toast.title ? (
             <>
               <span className="font-bold text-white">{toast.title}</span>
-              <span aria-hidden="true"> · </span>
-              {action}
+              {ratingOnlyTitle ? (
+                toast.ratingTarget ? <><span aria-hidden="true"> · </span>{toast.ratingTarget}</> : null
+              ) : (
+                <><span aria-hidden="true"> · </span>{action}</>
+              )}
             </>
           ) : (
             <span className="font-semibold text-white">{action}</span>
           )}
-          {hasRating ? <span className="sr-only"> · {toast.rating}/10</span> : null}
+          {hasRating ? <span className="sr-only"> · {ratingOnlyTitle ? "Has puntuado con un " : ""}{toast.rating}/10</span> : null}
         </span>
       </span>
     </>

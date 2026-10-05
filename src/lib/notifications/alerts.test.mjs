@@ -128,4 +128,10 @@ test("ventanas emergentes: la nota va como icono, no en el texto", () => {
   assert.equal(content.title, "Matrix");
   assert.equal(content.text, "Has puntuado");
   assert.equal(content.rating, 8);
+  assert.equal(content.ratingTarget, null);
+
+  const episode = describeAlertGroup([
+    { kind: "activity", item: { id: "b", type: "rating", rating: 9, tmdbId: 1, mediaType: "tv", season: 1, episode: 3, title: "Dark" } },
+  ]);
+  assert.equal(episode.ratingTarget, "S01E03");
 });
