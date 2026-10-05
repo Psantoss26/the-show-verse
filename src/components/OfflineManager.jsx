@@ -94,7 +94,14 @@ export default function OfflineManager() {
       if (startRef.current === start) startRef.current = null;
       cancelled = true;
       clearTimeout(timer);
-      active.current?.abort();
+      // Una copia a medias que se corta (se pierde el servidor, cambia la
+      // sesión) lo DICE: antes se cancelaba en silencio y en Ajustes quedaba la
+      // «Copia parcial» de la vez anterior. Al volver la conexión este mismo
+      // efecto la relanza y prepareOfflineAccount la reanuda donde iba.
+      if (active.current) {
+        active.current.abort();
+        report({ phase: "interrupted" });
+      }
       navigator.serviceWorker.removeEventListener("controllerchange", automatic);
       navigator.serviceWorker.removeEventListener("message", message);
     };

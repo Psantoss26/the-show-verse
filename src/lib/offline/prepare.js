@@ -1,5 +1,5 @@
 import { loadProfileCharts } from "@/lib/profile/loadProfileCharts";
-import { workerMessage, saveOfflineRoute, PREPARATION_EVENT } from "./client";
+import { workerMessage, saveOfflineRoute, PREPARATION_EVENT, runKey } from "./client";
 
 export const USER_ROUTES = [
   "/", "/favorites", "/watchlist", "/history", "/in-progress", "/completed",
@@ -19,10 +19,37 @@ const READS = [
   "/api/recommendations?type=all&limit=40", "/api/recommendations?type=movie&limit=40", "/api/recommendations?type=tv&limit=40",
 ];
 
+// Copia en marcha. Si se interrumpe (sin conexión a mitad, la app cerrada), la
+// siguiente la REANUDA: las páginas guardadas desde que empezó no se vuelven a
+// descargar. Se borra al terminar. Una cortada hace mucho se rehace entera,
+// para no dar por buenas fichas guardadas hace días.
+const RESUME_WINDOW_MS = 6 * 60 * 60 * 1000;
+
+function readRun(userId) {
+  try { return JSON.parse(localStorage.getItem(runKey(userId)) || "null"); } catch { return null; }
+}
+function writeRun(userId, value) {
+  try {
+    if (value) localStorage.setItem(runKey(userId), JSON.stringify(value));
+    else localStorage.removeItem(runKey(userId));
+  } catch { /* storage unavailable */ }
+}
+
+/** Uso y cuota del almacenamiento del navegador, para explicar un «sin espacio». */
+async function storageEstimate() {
+  try {
+    const { usage, quota } = (await navigator.storage?.estimate?.()) || {};
+    return Number.isFinite(usage) && Number.isFinite(quota) ? { usage, quota } : null;
+  } catch { return null; }
+}
+
 export async function prepareOfflineAccount(user, { signal, onProgress = () => {} } = {}) {
   const userPath = `/api/users/${encodeURIComponent(user.username)}`;
   const failures = [];
   let completed = 0;
+  const pending = readRun(user.id);
+  const resumable = pending?.startedAt > Date.now() - RESUME_WINDOW_MS;
+  const freshSince = resumable ? pending.startedAt : Date.now();
   const progress = (phase) => {
     const state = { phase, completed, failures: failures.length, updatedAt: Date.now() };
     onProgress(state);
@@ -50,6 +77,7 @@ export async function prepareOfflineAccount(user, { signal, onProgress = () => {
     return;
   }
   await workerMessage({ type: "OFFLINE_PREPARE_BEGIN" });
+  writeRun(user.id, { startedAt: freshSince });
   progress("preparing");
   // Documents first. They only need HTML plus static assets, and after a deploy
   // any route not yet refreshed keeps opening offline with the previous build's
@@ -57,13 +85,20 @@ export async function prepareOfflineAccount(user, { signal, onProgress = () => {
   // that window open for minutes.
   let documentsComplete = true;
   const savedRoutes = new Set();
+  const failedRoutes = new Set();
+  async function saveRoute(path) {
+    const result = await saveOfflineRoute(path, { freshSince });
+    // Una página que ya no existe se olvida (el worker borra su copia): no es
+    // un fallo de la copia.
+    if (result?.gone) return;
+    if (!result?.ok) throw new Error("Document unavailable");
+  }
   async function saveRoutes(paths) {
     for (const path of paths) {
       if (savedRoutes.has(path)) continue;
       savedRoutes.add(path);
       await attempt(path, async () => {
-        const result = await saveOfflineRoute(path);
-        if (!result?.ok) { documentsComplete = false; throw new Error("Document unavailable"); }
+        try { await saveRoute(path); } catch (error) { failedRoutes.add(path); throw error; }
       });
     }
   }
@@ -122,10 +157,45 @@ export async function prepareOfflineAccount(user, { signal, onProgress = () => {
   await saveRoutes([...listIds].map((id) => `/lists/${encodeURIComponent(id)}`));
   // Profile charts are lazy modules. Prepare them before the origin disappears.
   await attempt("profile-charts", loadProfileCharts);
+  // SEGUNDA OPORTUNIDAD para lo que falló: casi siempre es un microcorte, o
+  // espacio que faltó mientras convivían dos builds y ya se ha liberado (cada
+  // página guardada retira la del build anterior, y un build vacío se borra
+  // con su JavaScript). El aviso de «sin espacio» se pone a cero: solo cuenta
+  // si vuelve a faltar ahora.
+  const squeezed = (await workerMessage({ type: "OFFLINE_STATUS" }))?.storageFull;
+  if (failedRoutes.size || squeezed) {
+    await workerMessage({ type: "OFFLINE_PREPARE_BEGIN" });
+    const retry = async (path, fn) => {
+      signal?.throwIfAborted();
+      try {
+        await fn();
+        const index = failures.indexOf(path);
+        if (index >= 0) failures.splice(index, 1);
+        return true;
+      } catch { return false; }
+    };
+    for (const path of [...failedRoutes]) {
+      if (await retry(path, () => saveRoute(path))) failedRoutes.delete(path);
+    }
+    // Datos que pudieron no caber: se vuelven a leer (el worker los guarda).
+    if (squeezed) for (const path of READS) await retry(path, () => read(path));
+  }
+  documentsComplete = failedRoutes.size === 0;
   const storage = await workerMessage({ type: "OFFLINE_STATUS" });
   if (storage?.storageFull) failures.push("storage-full");
   // Keep previous build assets until every known document has its replacement.
   if (documentsComplete && !failures.length) await workerMessage({ type: "PRUNE_BUILDS" });
-  progress(failures.length ? "partial" : "ready");
-  return { completed, failures, updatedAt: Date.now() };
+  writeRun(user.id, null);
+  const result = {
+    completed,
+    failures,
+    pages: savedRoutes.size,
+    pagesFailed: failedRoutes.size,
+    storage: await storageEstimate(),
+    updatedAt: Date.now(),
+  };
+  const phase = storage?.storageFull ? "storage-full" : failures.length ? "partial" : "ready";
+  onProgress({ ...result, phase });
+  window.dispatchEvent(new CustomEvent(PREPARATION_EVENT, { detail: { ...result, phase } }));
+  return result;
 }

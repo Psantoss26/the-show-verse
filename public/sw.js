@@ -110,11 +110,20 @@ function offlineResponse(response) {
   headers.set("Cache-Control", "no-store");
   return new Response(response.body, { status: response.status, headers });
 }
-async function safePut(cache, key, response, generation = epoch) {
+// true = guardado; false = sin espacio; undefined = cambió la cuenta mientras tanto.
+async function tryPut(cache, key, response, generation = epoch) {
   const copy = await stamped(response);
-  if (generation !== epoch) return;
-  try { await cache.put(key, copy); return true; }
-  catch { storageFull = true; await broadcast({ type: "OFFLINE_STORAGE_FULL" }); return false; }
+  if (generation !== epoch) return undefined;
+  try { await cache.put(key, copy); return true; } catch { return false; }
+}
+async function reportStorageFull() {
+  storageFull = true;
+  await broadcast({ type: "OFFLINE_STORAGE_FULL" });
+}
+async function safePut(cache, key, response, generation = epoch) {
+  const saved = await tryPut(cache, key, response, generation);
+  if (saved === false) await reportStorageFull();
+  return saved;
 }
 async function network(request, timeout = 6000) {
   const controller = new AbortController();
@@ -276,6 +285,26 @@ async function savedDocument(request) {
   }
   return null;
 }
+// UNA SOLA COPIA DE CADA PÁGINA. Al guardar una ruta en este build se retira la
+// del build anterior, y un build que se queda sin páginas se borra con su
+// JavaScript. Antes solo se podaba (PRUNE_BUILDS) tras una preparación SIN
+// NINGÚN fallo: con uno solo, cada despliegue sumaba otra copia completa de
+// todas las fichas (~420 KB cada una), el espacio se agotaba y la copia se
+// cortaba siempre hacia el mismo número de páginas («Copia parcial»).
+// `exceptCurrent` = false también la quita de este build (la ruta ya no existe).
+async function retireDocument(key, { exceptCurrent = true } = {}) {
+  let retired = false;
+  for (const name of await caches.keys()) {
+    if (!name.startsWith("showverse-shell-") || (exceptCurrent && name === SHELL_CACHE)) continue;
+    const cache = await caches.open(name);
+    if (await cache.delete(key)) retired = true;
+    if (name !== SHELL_CACHE && !(await cache.keys()).length) {
+      await caches.delete(name);
+      await caches.delete(name.replace("showverse-shell-", "showverse-assets-"));
+    }
+  }
+  return retired;
+}
 async function saveDocument(request, response, generation = epoch) {
   const key = await documentKey(request);
   const copy = response.clone();
@@ -287,7 +316,14 @@ async function saveDocument(request, response, generation = epoch) {
   // client router, which otherwise only stores an RSC fragment, not a document.
   const loaded = await Promise.all([...assets].map((url) => immutable(new Request(url)).catch(() => null)));
   if (loaded.some((asset) => !asset?.ok)) return false;
-  return safePut(await caches.open(SHELL_CACHE), key, copy, generation);
+  const shell = await caches.open(SHELL_CACHE);
+  let saved = await tryPut(shell, key, copy.clone(), generation);
+  // Sin espacio: la copia vieja de ESTA ruta ocupa lo mismo que la nueva y va a
+  // sobrar en cuanto se guarde. Se retira antes y se reintenta una vez.
+  if (saved === false && await retireDocument(key)) saved = await tryPut(shell, key, copy, generation);
+  if (saved === false) await reportStorageFull();
+  if (saved) await retireDocument(key);
+  return saved;
 }
 // The saved document already embeds this route's complete Flight stream in its
 // `self.__next_f.push([1, "..."])` scripts: concatenated, it is byte-identical
@@ -447,11 +483,27 @@ self.addEventListener("message", (event) => {
     if (message?.type === "OFFLINE_SAVE_ROUTE") {
       const url = new URL(message.path, self.location.origin);
       if (url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
-      const response = await navigation(new Request(url, { headers: { Accept: "text/html" }, credentials: "include" }));
-      // Only a copy in THIS build's shell counts: an older build's document
-      // would still run that build's code offline.
-      const current = await (await caches.open(SHELL_CACHE)).match(await documentKey(url.href));
-      result = { ok: response.status === 200 && !response.redirected && response.headers.get("X-Showverse-Offline") !== "1" && Boolean(current) };
+      const key = await documentKey(url.href);
+      const shell = await caches.open(SHELL_CACHE);
+      // Reanudar una copia interrumpida: lo que ya se guardó en esta pasada (en
+      // este build y después de `freshSince`) no se vuelve a descargar.
+      const fresh = Number(message.freshSince) > 0 ? await shell.match(key) : null;
+      if (fresh && Number(fresh.headers.get("X-Showverse-Saved-At")) >= Number(message.freshSince)) {
+        result = { ok: true, reused: true };
+      } else {
+        const response = await navigation(new Request(url, { headers: { Accept: "text/html" }, credentials: "include" }));
+        if ([404, 410].includes(response.status)) {
+          // La página ya no existe (una lista borrada, un título retirado): se
+          // olvida. Si no, contaría como fallo en cada copia para siempre.
+          await retireDocument(key, { exceptCurrent: false });
+          result = { ok: false, gone: true };
+        } else {
+          // Only a copy in THIS build's shell counts: an older build's document
+          // would still run that build's code offline.
+          const current = await shell.match(key);
+          result = { ok: response.status === 200 && !response.redirected && response.headers.get("X-Showverse-Offline") !== "1" && Boolean(current) };
+        }
+      }
     }
     if (message?.type === "OFFLINE_ROUTES") {
       const owner = (await session()).owner || "anonymous";
