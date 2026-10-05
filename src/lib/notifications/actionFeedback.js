@@ -59,9 +59,10 @@ function titleRef(body, { tmdbId, mediaType, season = null, episode = null } = {
   };
 }
 
-function ratingText(rating) {
+// La nota (1-10, con un decimal como mucho) o null si se ha quitado.
+function ratingValue(rating) {
   const value = num(rating);
-  return value == null || value <= 0 ? null : `${Number.isInteger(value) ? value : value.toFixed(1)}/10`;
+  return value == null || value <= 0 ? null : Math.round(value * 10) / 10;
 }
 
 // Cada regla: [método, patrón de ruta, (match, body, search) => descriptor|null].
@@ -210,15 +211,17 @@ const RULES = [
   ["POST", /^\/api\/plex\/sync$/, () => ({ icon: "import", label: "Plex", text: "Plex sincronizado" })],
 ];
 
+// La nota va en `rating` y el aviso la pinta en el hueco del icono, como la
+// campana; el texto solo dice qué se ha hecho.
 function rating(body, ref) {
-  const value = ratingText(body.rating);
+  const value = ratingValue(body.rating);
   const target = episodeLabel(num(ref.season), num(ref.episode));
-  if (!value) {
+  if (value == null) {
     return { icon: "unrate", label: "Nota", text: target ? `Nota de ${target} quitada` : "Nota quitada", ...titleRef(body, ref) };
   }
   return {
-    icon: "rate", label: "Nota",
-    text: target ? `Has puntuado ${target} con un ${value}` : `Has puntuado con un ${value}`,
+    icon: "rate", label: "Nota", rating: value,
+    text: target ? `Has puntuado ${target}` : "Has puntuado",
     ...titleRef(body, ref),
   };
 }

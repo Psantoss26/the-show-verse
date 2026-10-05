@@ -117,4 +117,15 @@ test("ventanas emergentes: texto del grupo sin el título", () => {
   assert.equal(content.text, "Has terminado S01E03. Puntúa el episodio S01E03");
   assert.equal(content.posterPath, "/d.jpg");
   assert.equal(content.target.id, "r");
+  assert.equal(content.rating, null);
+});
+
+test("ventanas emergentes: la nota va como icono, no en el texto", () => {
+  const content = describeAlertGroup([
+    { kind: "activity", item: { id: "a", type: "rating", rating: 8, tmdbId: 603, mediaType: "movie", title: "Matrix" } },
+  ]);
+  assert.equal(content.icon, "rate");
+  assert.equal(content.title, "Matrix");
+  assert.equal(content.text, "Has puntuado");
+  assert.equal(content.rating, 8);
 });

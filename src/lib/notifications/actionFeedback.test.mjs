@@ -20,12 +20,18 @@ test("acciones: favoritas y pendientes, añadir y quitar", () => {
 });
 
 test("acciones: notas de película, serie, temporada y episodio", () => {
-  assert.equal(post("/api/trakt/item/rating", { type: "movie", tmdbId: 603, rating: 8 }).text, "Has puntuado con un 8/10");
-  assert.equal(post("/api/trakt/item/rating", { type: "show", tmdbId: 1, rating: null }).text, "Nota quitada");
+  // La nota va aparte (`rating`): el aviso la pinta como icono, no en el texto.
+  const movie = post("/api/trakt/item/rating", { type: "movie", tmdbId: 603, rating: 8 });
+  assert.equal(movie.text, "Has puntuado");
+  assert.equal(movie.rating, 8);
+  const removed = post("/api/trakt/item/rating", { type: "show", tmdbId: 1, rating: null });
+  assert.equal(removed.text, "Nota quitada");
+  assert.equal(removed.rating, undefined);
   const episode = post("/api/trakt/ratings", { type: "episode", showTmdbId: 1399, season: 1, episode: 3, rating: 9 });
-  assert.equal(episode.text, "Has puntuado S01E03 con un 9/10");
+  assert.equal(episode.text, "Has puntuado S01E03");
+  assert.equal(episode.rating, 9);
   assert.equal(episode.tmdbId, 1399);
-  assert.equal(post("/api/tmdb/movies/603/rating", { value: 7.5 }).text, "Has puntuado con un 7.5/10");
+  assert.equal(post("/api/tmdb/movies/603/rating", { value: 7.5 }).rating, 7.5);
 });
 
 test("acciones: vistos", () => {
