@@ -149,6 +149,7 @@ function Toast({ toast, onClose, onOpen }) {
   const src = posterSrc(toast);
   // La acción en una frase corta. Sin texto (raro), el rótulo de la sección.
   const action = toast.text || toast.label || "Aviso";
+  const hasRating = typeof toast.rating === "number" && toast.rating > 0;
 
   // UNA SOLA FILA, como las de la campana: cartel, icono de la acción y la
   // frase «Título · acción». El rótulo en mayúsculas y el texto aparte en
@@ -162,9 +163,17 @@ function Toast({ toast, onClose, onOpen }) {
           <OptimizedImage src={src} alt="" width={30} height={44} className="h-full w-full object-cover" />
         </span>
       ) : null}
-      <span className={`flex h-8 w-8 shrink-0 items-center justify-center ${tone.text}`} aria-hidden="true">
-        <Icon className={`h-5 w-5 ${filled ? "fill-current" : ""}`} />
-      </span>
+      {/* Una puntuación se ve como su nota en el hueco del icono, igual que en
+          la campana (AlertsMenu), y no repetida en el texto. */}
+      {hasRating ? (
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center text-xl font-black leading-none tabular-nums ${tone.text}`} aria-hidden="true">
+          {toast.rating}
+        </span>
+      ) : (
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center ${tone.text}`} aria-hidden="true">
+          <Icon className={`h-5 w-5 ${filled ? "fill-current" : ""}`} />
+        </span>
+      )}
       {/* Texto corrido, como en la campana (AlertsMenu): «Título · acción»
           completo y, si no cabe, en dos líneas. Antes iba en una sola línea y
           título y acción se recortaban con «…». El tope de tres líneas es solo
@@ -181,6 +190,7 @@ function Toast({ toast, onClose, onOpen }) {
           ) : (
             <span className="font-semibold text-white">{action}</span>
           )}
+          {hasRating ? <span className="sr-only"> · {toast.rating}/10</span> : null}
         </span>
       </span>
     </>

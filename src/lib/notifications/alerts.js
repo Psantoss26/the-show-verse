@@ -210,9 +210,9 @@ function alertSentence({ kind, item }) {
     }
     return null;
   }
-  if (item.type === "rating") {
-    return typeof item.rating === "number" ? `Has puntuado con un ${item.rating}/10` : "Has puntuado";
-  }
+  // La nota no va en el texto: el aviso la pinta como icono (ver `rating` en
+  // describeAlertGroup), igual que la campana.
+  if (item.type === "rating") return "Has puntuado";
   if (item.type === "watchlist") return "Añadida a Pendientes";
   if (item.type === "favorite") return "Añadida a Favoritas";
   if (item.completedShow) return "Has completado la serie";
@@ -240,7 +240,8 @@ export function alertLook(type) {
 
 /**
  * Contenido del aviso para un grupo de `freshAlertGroups`:
- * `{ icon, label, title, text, posterPath, target }` (`target`: la alerta a la
+ * `{ icon, label, title, text, posterPath, rating, target }` (`rating`: la
+ * nota, que el aviso pinta en lugar del icono; `target`: la alerta a la
  * que lleva tocarlo; el recordatorio si lo hay, para puntuar directamente).
  */
 export function describeAlertGroup(rows) {
@@ -255,6 +256,10 @@ export function describeAlertGroup(rows) {
     title: list.find((row) => row.item.title)?.item.title || null,
     text: list.map(alertSentence).filter(Boolean).join(". "),
     posterPath: list.find((row) => row.item.posterPath)?.item.posterPath || null,
+    rating:
+      primary.kind !== "reminder" && primary.item.type === "rating" && typeof primary.item.rating === "number"
+        ? primary.item.rating
+        : null,
     target: list.find((row) => row.kind === "reminder")?.item || list[list.length - 1].item,
   };
 }
