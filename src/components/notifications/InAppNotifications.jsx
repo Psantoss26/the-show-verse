@@ -147,29 +147,38 @@ function Toast({ toast, onClose, onOpen }) {
   const { Icon, tone: toneKey, filled } = ICONS[toast.icon] || ICONS.bell;
   const tone = TONES[toneKey] || TONES.zinc;
   const src = posterSrc(toast);
+  // La acción en una frase corta. Sin texto (raro), el rótulo de la sección.
+  const action = toast.text || toast.label || "Aviso";
 
+  // UNA SOLA FILA, como las de la campana: cartel, icono de la acción y la
+  // frase «Título · acción». El rótulo en mayúsculas y el texto aparte en
+  // otra línea hacían del aviso una tarjeta de tres pisos para decir lo mismo
+  // que la campana dice en una. Sin cartel (ajustes, conexiones, social…) el
+  // icono ocupa su hueco y no se repite.
   const body = (
     <>
-      <span className="relative flex h-10 w-7 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white/[0.04] md:h-[4.5rem] md:w-12 md:rounded-xl">
-        {src ? (
-          <OptimizedImage src={src} alt="" width={48} height={72} className="h-full w-full object-cover" />
-        ) : (
-          <Icon className={`h-5 w-5 md:h-6 md:w-6 ${tone.text} ${filled ? "fill-current" : ""}`} aria-hidden="true" />
-        )}
-      </span>
-      <span className="min-w-0 flex-1 [text-shadow:0_1px_2px_rgba(0,0,0,0.6)]">
-        <span className={`flex items-center gap-1 text-[10px] font-bold uppercase leading-none tracking-[0.12em] md:gap-1.5 md:text-[11px] md:leading-normal ${tone.text}`}>
-          <Icon className={`h-3 w-3 shrink-0 md:h-3.5 md:w-3.5 ${filled ? "fill-current" : ""}`} aria-hidden="true" />
-          <span className="truncate">{toast.label || "Aviso"}</span>
+      {src ? (
+        <span className="h-11 w-[30px] shrink-0 overflow-hidden rounded-md bg-white/[0.04]">
+          <OptimizedImage src={src} alt="" width={30} height={44} className="h-full w-full object-cover" />
         </span>
+      ) : null}
+      <span className={`flex h-8 w-8 shrink-0 items-center justify-center ${tone.text}`} aria-hidden="true">
+        <Icon className={`h-5 w-5 ${filled ? "fill-current" : ""}`} />
+      </span>
+      {/* Con título largo, el título se queda como mucho con el 60% de la fila
+          y se recorta: la acción es lo que dice qué ha pasado y tiene que verse
+          siempre. Con título corto, la acción aprovecha el resto. */}
+      <span className="flex min-w-0 flex-1 items-baseline whitespace-nowrap text-[13px] leading-snug text-zinc-300 md:text-sm [text-shadow:0_1px_2px_rgba(0,0,0,0.6)]">
+        <span className="sr-only">{toast.label ? `${toast.label}: ` : ""}</span>
         {toast.title ? (
-          <span className="mt-0.5 block truncate text-[13px] font-extrabold leading-tight text-white md:text-[15px]">
-            {toast.title}
-          </span>
-        ) : null}
-        {toast.text ? (
-          <span className="line-clamp-1 text-xs leading-snug text-zinc-300 md:mt-0.5 md:line-clamp-2 md:text-[13px]">{toast.text}</span>
-        ) : null}
+          <>
+            <span className="max-w-[60%] shrink-0 truncate font-bold text-white">{toast.title}</span>
+            <span aria-hidden="true" className="mx-1.5 shrink-0">·</span>
+            <span className="min-w-0 flex-1 truncate">{action}</span>
+          </>
+        ) : (
+          <span className="min-w-0 truncate font-semibold text-white">{action}</span>
+        )}
       </span>
     </>
   );
@@ -185,43 +194,43 @@ function Toast({ toast, onClose, onOpen }) {
       onPointerLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
-      // RADIOS CONCÉNTRICOS: el borde del cartel = radio del icono/póster +
-      // el relleno que los separa, para que ambas curvas vayan paralelas.
-      // Móvil: 6px (rounded-md) + 6px (p-1.5) = 12px. Escritorio: 12px
-      // (rounded-xl) + 10px (p-2.5) = 22px. Si cambia uno, cambian los tres.
-      className={`pointer-events-auto relative overflow-hidden rounded-[12px] text-white md:rounded-[22px] ${LIQUID_GLASS_PANEL}`}
+      // RADIOS CONCÉNTRICOS: 6px del cartel (rounded-md) + 8px de relleno
+      // (p-2) = 14px de borde, para que las dos curvas vayan paralelas.
+      className={`pointer-events-auto relative overflow-hidden rounded-[14px] text-white ${LIQUID_GLASS_PANEL}`}
     >
       {/* Reflejo del color de la acción detrás del cartel. */}
       <span
         aria-hidden="true"
-        className={`pointer-events-none absolute -left-10 -top-12 h-32 w-32 rounded-full opacity-25 blur-3xl ${tone.glow}`}
+        className={`pointer-events-none absolute -left-10 -top-12 h-32 w-32 rounded-full opacity-20 blur-3xl ${tone.glow}`}
       />
-      <div className="relative flex items-center gap-1 px-1.5 py-1.5 pr-1 md:p-2.5 md:pr-2">
+      <div className="relative flex items-center gap-1 p-2 pr-1.5 pb-1">
         {toast.url ? (
           <button
             type="button"
             onClick={() => onOpen(toast)}
-            className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md text-left md:gap-3 md:rounded-xl transition-colors hover:bg-white/[0.04] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+            className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md text-left transition-colors hover:bg-white/[0.04] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
           >
             {body}
           </button>
         ) : (
-          <div className="flex min-w-0 flex-1 items-center gap-2.5 md:gap-3">{body}</div>
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">{body}</div>
         )}
         <button
           type="button"
           onClick={() => onClose(toast.id)}
           aria-label="Cerrar aviso"
-          className="inline-flex h-7 w-7 shrink-0 items-center justify-center self-center rounded-full md:h-8 md:w-8 md:self-start text-zinc-400 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
         >
-          <XIcon className="h-3.5 w-3.5 md:h-4 md:w-4" aria-hidden="true" />
+          <XIcon className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
       </div>
-      {/* Tiempo restante: un hilo dentro del panel, sin carril ni tocar el
-          borde, para no dibujar un filo en la parte de abajo. */}
-      <span aria-hidden="true" className="pointer-events-none absolute inset-x-5 bottom-1 h-[2px] overflow-hidden rounded-full md:inset-x-6 md:bottom-1.5">
+      {/* TIEMPO RESTANTE en su PROPIO carril, debajo de la fila y alineado con
+          su relleno. Antes iba superpuesto (absoluto a 4-6px del borde): en
+          móvil caía encima del canto del cartel y bajo el texto. Así no toca
+          nada ni dibuja un filo en el borde del panel. */}
+      <span aria-hidden="true" className="relative mx-3 mb-1.5 mt-0.5 block h-[2px] overflow-hidden rounded-full bg-white/[0.06]">
         <span
-          className={`sv-toast-timer block h-full origin-left rounded-full opacity-60 ${tone.bar}`}
+          className={`sv-toast-timer block h-full origin-left rounded-full opacity-70 ${tone.bar}`}
           style={{ animationDuration: `${VISIBLE_MS}ms`, animationPlayState: paused ? "paused" : "running" }}
         />
       </span>
@@ -404,7 +413,7 @@ export default function InAppNotifications() {
       aria-label="Avisos"
       className="pointer-events-none fixed inset-auto left-3 right-3 top-[calc(env(safe-area-inset-top)+4.5rem)] z-[100000] m-0 w-auto max-w-none overflow-visible border-0 bg-transparent p-0 text-white md:left-auto md:right-4 md:w-[24rem]"
     >
-      <ol aria-live="polite" className="flex flex-col gap-1.5 md:gap-2.5">
+      <ol aria-live="polite" className="flex flex-col gap-1.5 md:gap-2">
         <AnimatePresence initial={false}>
           {toasts.map((toast) => (
             <Toast key={toast.id} toast={toast} onClose={close} onOpen={open} />
