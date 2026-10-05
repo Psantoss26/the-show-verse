@@ -87,6 +87,28 @@ servicio de accesibilidad (antes, una pantalla que cambia sin parar no llegaba a
 leerse nunca) valen para todas. Con el indicador desactivado, la accesibilidad sigue
 leyendo Prime Video y Crunchyroll porque alimenta la sincronización; no notifica nada.
 
+## Corrección de detecciones
+
+Cada título que se notifica (ficha o reproducción) queda registrado como una
+detección con su `detectionId`. Desde la notificación de Android («No es
+correcto»), desde el indicador de la extensión («¿No es correcto?») o desde
+**Detecciones recientes** (`/detections`, enlazada en Ajustes → Conexiones), el
+usuario puede indicar que no había ninguna ficha abierta o que el título era otro.
+En ese caso elige el correcto y, en series, el episodio, ya rellenado con lo que
+leyó el reproductor.
+
+La corrección mueve o borra lo que guardó esa detección (y solo eso), redirige los
+pings posteriores y crea reglas sobre la **huella** de lo que había en pantalla:
+
+- **Título fijo:** la huella se resuelve directamente al título elegido.
+- **Veto:** el título propuesto no vuelve a ofrecerse para esa huella.
+- **«No es un título»:** esa huella se ignora; los clientes además descartan el
+  texto antes de tratar la pantalla como ficha.
+
+Las reglas valen al momento para quien corrige y para todos cuando coinciden 3
+usuarios distintos (`DETECTION_GLOBAL_MIN_SUPPORTERS`). Diseño completo:
+`docs/superpowers/specs/2026-10-05-streaming-detection-corrections-design.md`.
+
 ## Flujo
 
 1. El reproductor aporta título, episodio y posición; el servidor resuelve TMDb.
@@ -117,7 +139,8 @@ La desconexión global de ajustes revoca todos los dispositivos.
    PostgreSQL y Redis; la comprobación sí pasó con servicios locales aislados.
    No se cambiaron las credenciales ni se migró producción.
 2. Aplicar `npm --prefix backend run db:migrate` en el entorno de destino. La
-   migración aditiva `0016_calm_hannibal_king.sql` crea `streaming_events`. El comando
+   migración aditiva `0016_calm_hannibal_king.sql` crea `streaming_events`, y
+   `0018_streaming_detections.sql`, las tablas de detecciones y su aprendizaje. El comando
    de arranque actual del backend también aplica las migraciones pendientes.
 3. Desplegar backend y frontend antes de actualizar los clientes.
 4. En Chrome, actualizar la extensión o descomprimir el ZIP y cargar la carpeta
@@ -160,12 +183,22 @@ Ese arnés transpila el endpoint a ESNext. Con el objetivo por omisión (ES5)
 TypeScript degrada los spreads de iteradores del endpoint y algunos devuelven
 listas vacías: las pruebas pasaban sin ejercitar el camino.
 
-La prueba de integración usa PostgreSQL real y requiere una base **desechable** con
-las migraciones aplicadas. No usar la base de producción:
+Las pruebas de integración usan PostgreSQL real y requieren una base
+**desechable** con las migraciones aplicadas. No usar la base de producción:
 
 ```sh
 STREAMING_TEST_DATABASE_URL=postgresql://USER:PASS@HOST/TEST_DB \
-  node --test backend/src/routes/streamingProgress.integration.test.js
+  node --test backend/src/routes/streamingProgress.integration.test.js \
+  backend/src/routes/streamingDetections.integration.test.js
+```
+
+Una base desechable en local, con las migraciones aplicadas:
+
+```sh
+docker run -d --rm --name tsv-test-pg -e POSTGRES_PASSWORD=test -e POSTGRES_DB=tsv_test \
+  -p 55432:5432 postgres:16-alpine
+U=postgresql://postgres:test@127.0.0.1:55432/tsv_test
+(cd backend && NODE_ENV=test DATABASE_URL=$U DATABASE_URL_UNPOOLED=$U node src/db/migrate.js)
 ```
 
 Android, con JDK 17, Gradle 8.7 y Android SDK instalado:
