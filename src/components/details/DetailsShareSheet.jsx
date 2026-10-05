@@ -4,7 +4,7 @@
 // compartir y debajo las formas de mandarlo.
 //   - Imagen: la "captura" de la ficha (/api/share/details-card).
 //   - Vídeo: una historia corta que empieza con esa imagen y sigue con
-//     visionados, puntuación, la reseña (si el usuario la incluye) y detalles
+//     visionados, puntuación, la reseña (siempre que la haya) y detalles
 //     (ver lib/details/shareStory y lib/share/storyVideo). Solo se ofrece si el
 //     navegador sabe codificar vídeo.
 //
@@ -188,45 +188,6 @@ function ModeSwitch({ mode, onChange }) {
   );
 }
 
-// Interruptor "Incluir mi reseña" (es texto del usuario que se va a publicar,
-// así que va apagado por defecto).
-function ReviewToggle({ checked, disabled, onChange }) {
-  return (
-    <label
-      className={`mx-auto mt-5 flex max-w-[24rem] items-center justify-between gap-4 rounded-2xl bg-white/5 px-4 py-3 backdrop-blur-xl ${
-        disabled ? "opacity-60" : "cursor-pointer"
-      }`}
-    >
-      <span className="min-w-0">
-        <span className="block text-sm font-bold text-white/85">Incluir mi reseña</span>
-        <span className="block text-[11px] font-semibold text-white/45">
-          {disabled ? "Tiene spoilers: no se incluye" : "Se mostrará en el vídeo"}
-        </span>
-      </span>
-      <input
-        type="checkbox"
-        role="switch"
-        className="peer sr-only"
-        checked={checked}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.checked)}
-      />
-      <span
-        aria-hidden="true"
-        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors duration-300 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-yellow-400 ${
-          checked ? "bg-orange-400/80" : "bg-white/15"
-        }`}
-      >
-        <span
-          className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-transform duration-300 ${
-            checked ? "translate-x-6" : "translate-x-1"
-          }`}
-        />
-      </span>
-    </label>
-  );
-}
-
 export default function DetailsShareSheet({ open, onClose, card, story, title, text, getUrl }) {
   const titleId = useId();
   const closeRef = useRef(null);
@@ -244,7 +205,6 @@ export default function DetailsShareSheet({ open, onClose, card, story, title, t
   const [mode, setMode] = useState("image");
   // undefined: comprobando; null: este navegador no sabe codificar vídeo.
   const [videoFormat, setVideoFormat] = useState(undefined);
-  const [includeReview, setIncludeReview] = useState(false);
   // { key, file, objectUrl } del último vídeo generado.
   const [video, setVideo] = useState(null);
   const [videoStatus, setVideoStatus] = useState("idle");
@@ -311,16 +271,12 @@ export default function DetailsShareSheet({ open, onClose, card, story, title, t
   const cardKey = card ? JSON.stringify(card) : "";
   const imageReady = status === "ready" && image?.key === cardKey;
 
-  // La reseña solo se ofrece si existe; con spoilers, el interruptor se bloquea.
-  const reviewAvailable = !!(story?.review?.comment || story?.review?.text);
-  const reviewSpoiler = !!story?.review?.spoiler;
   const storyPayload = story
     ? sanitizeShareStory(
         buildShareStoryPayload({
           ...story,
           continueWatching: extrasReady ? storyExtras?.continueWatching : null,
           episodeUserRatings: extrasReady ? storyExtras?.episodeUserRatings : null,
-          includeReview: includeReview && !reviewSpoiler,
         }),
       )
     : null;
@@ -696,9 +652,6 @@ export default function DetailsShareSheet({ open, onClose, card, story, title, t
             )}
           </div>
 
-          {isVideo && reviewAvailable && (
-            <ReviewToggle checked={includeReview && !reviewSpoiler} disabled={reviewSpoiler} onChange={setIncludeReview} />
-          )}
         </div>
 
         <div className="shrink-0 px-5 pb-6 pt-5 sm:px-8 sm:pb-7">

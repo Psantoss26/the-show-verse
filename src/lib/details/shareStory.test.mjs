@@ -65,15 +65,12 @@ test("series plays use the episode progress", () => {
   assert.deepEqual(story.plays, { percent: 45, watched: 27, total: 60, last: null, resume: null });
 });
 
-test("review is opt-in and never includes spoilers", () => {
+test("review is always included, never with spoilers", () => {
   const review = { comment: "Una adaptación preciosa.", created_at: "2024-01-05T10:00:00Z" };
-  const off = buildShareStoryPayload({ type: "movie", review, details });
-  assert.equal(off.review, null);
-
-  const on = sanitizeShareStory(buildShareStoryPayload({ type: "movie", review, includeReview: true, details }));
+  const on = sanitizeShareStory(buildShareStoryPayload({ type: "movie", review, details }));
   assert.equal(on.review.text, "Una adaptación preciosa.");
 
-  const spoiler = buildShareStoryPayload({ type: "movie", review: { ...review, spoiler: true }, includeReview: true, details });
+  const spoiler = buildShareStoryPayload({ type: "movie", review: { ...review, spoiler: true }, details });
   assert.equal(spoiler.review, null);
 });
 
@@ -84,7 +81,6 @@ test("scenes keep their order and skip what has no data", () => {
       watched: true,
       plays: 1,
       review: { comment: "Muy buena" },
-      includeReview: true,
       details,
     }),
   );
