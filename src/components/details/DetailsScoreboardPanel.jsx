@@ -60,14 +60,14 @@ function TraktStatBadge({
       // vacío mientras sus estadísticas hacen el fundido.
       initial={false}
       whileHover={{ y: -1 }}
-      className={`relative flex min-w-0 items-center justify-start select-none group/statbadge py-1 transition-colors duration-200 ${phone ? "shrink-0 px-1.5" : "px-0.5 sm:shrink-0 sm:px-1.5"} ${large ? "max-sm:shrink-0 max-sm:px-0" : ""}`}
+      className={`relative flex min-w-0 items-center justify-start select-none group/statbadge py-1 transition-colors duration-200 ${phone ? "shrink-0 px-1.5" : "px-0.5 sm:shrink-0 sm:px-1.5"} ${large ? "phone-sb:shrink-0 phone-sb:px-0" : ""}`}
       aria-label={tooltip || label}
     >
       {/* Teléfono del drawer: iconos y cifras del tamaño de escritorio, pero
           sin la etiqueta de texto, que es lo que no cabe en ese ancho. */}
-      <div className={`grid min-w-0 grid-rows-[auto_auto] items-center ${phone ? "grid-cols-[1.25rem_auto] gap-x-2" : "grid-cols-[1rem_auto] gap-x-1 sm:grid-cols-[1.25rem_auto] sm:gap-x-2"} ${large ? "max-sm:grid-cols-[calc(18*var(--sb-su,1px))_auto] max-sm:gap-x-[calc(6*var(--sb-su,1px))]" : ""}`}>
-        <Icon className={`col-start-1 row-start-1 shrink-0 self-center text-zinc-400 transition-colors duration-200 group-hover/statbadge:text-zinc-200 ${phone ? "h-5 w-5" : "h-4 w-4 sm:h-5 sm:w-5"} ${large ? "max-sm:h-[calc(18*var(--sb-su,1px))] max-sm:w-[calc(18*var(--sb-su,1px))]" : ""}`} />
-        <span className={`col-start-2 row-start-1 block self-center font-bold leading-none tracking-tight text-white/90 [font-variant-numeric:tabular-nums] [text-box:trim-both_cap_alphabetic] ${phone ? "text-sm" : "text-[11px] sm:text-sm"} ${large ? "max-sm:text-[length:calc(14*var(--sb-su,1px))]" : ""}`}>
+      <div className={`grid min-w-0 grid-rows-[auto_auto] items-center ${phone ? "grid-cols-[1.25rem_auto] gap-x-2" : "grid-cols-[1rem_auto] gap-x-1 sm:grid-cols-[1.25rem_auto] sm:gap-x-2"} ${large ? "phone-sb:grid-cols-[calc(18*var(--sb-su,1px))_auto] phone-sb:gap-x-[calc(6*var(--sb-su,1px))]" : ""}`}>
+        <Icon className={`col-start-1 row-start-1 shrink-0 self-center text-zinc-400 transition-colors duration-200 group-hover/statbadge:text-zinc-200 ${phone ? "h-5 w-5" : "h-4 w-4 sm:h-5 sm:w-5"} ${large ? "phone-sb:h-[calc(18*var(--sb-su,1px))] phone-sb:w-[calc(18*var(--sb-su,1px))]" : ""}`} />
+        <span className={`col-start-2 row-start-1 block self-center font-bold leading-none tracking-tight text-white/90 [font-variant-numeric:tabular-nums] [text-box:trim-both_cap_alphabetic] ${phone ? "text-sm" : "text-[11px] sm:text-sm"} ${large ? "phone-sb:text-[length:calc(14*var(--sb-su,1px))]" : ""}`}>
           {/* CARGANDO ≠ SIN DATO. Mientras la consulta está en vuelo el hueco
               se reserva con un valor INVISIBLE: ocupa lo mismo, pero no afirma
               nada. El guion queda para cuando ya se sabe que no hay dato. */}
@@ -170,7 +170,7 @@ export function DetailsRatingsBadges({
           : phone
             ? ""
             : "sm:gap-5"
-      } ${spread ? `max-sm:w-full max-sm:justify-evenly ${styles.spreadScores}` : ""}`}
+      } ${spread ? `phone-sb:w-full phone-sb:justify-evenly ${styles.spreadScores}` : ""}`}
     >
       {/* Indicador de carga mientras se obtienen las puntuaciones de Trakt */}
       <div className="absolute opacity-0 pointer-events-none w-4 h-4">
@@ -184,7 +184,7 @@ export function DetailsRatingsBadges({
         <CompactBadge
           key={scoreStateKey("tmdb", score)}
           logo="/logo-TMDb.png"
-          logoClassName={`h-5 sm:h-5 ${spread ? "max-sm:h-[calc(24*var(--sb-u,1px))]" : ""}`}
+          logoClassName={`h-5 sm:h-5 ${spread ? "phone-sb:h-[calc(24*var(--sb-u,1px))]" : ""}`}
           phone={phone}
           large={spread}
           value={resolvedValue(score)}
@@ -234,8 +234,8 @@ export function DetailsRatingsBadges({
           logoWrapClassName="min-w-[28px]"
           logoClassName={
             phone
-              ? "!h-5 !max-h-none !max-w-[34px]"
-              : `!h-5 sm:!h-[22px] !max-h-none !max-w-[34px] ${spread ? "max-sm:!h-[calc(24*var(--sb-u,1px))] max-sm:!max-w-[calc(42*var(--sb-u,1px))]" : ""}`
+              ? `!h-5 !max-h-none !max-w-[34px] ${spread ? "phone-sb:!h-[calc(24*var(--sb-u,1px))] phone-sb:!max-w-[calc(42*var(--sb-u,1px))]" : ""}`
+              : `!h-5 sm:!h-[22px] !max-h-none !max-w-[34px] ${spread ? "phone-sb:!h-[calc(24*var(--sb-u,1px))] phone-sb:!max-w-[calc(42*var(--sb-u,1px))]" : ""}`
           }
           phone={phone}
           large={spread}
@@ -337,7 +337,9 @@ export function DetailsStatsRow({
   // activaban la fila ancha con etiquetas y las stats se partían en dos filas.
   const statsScrollerClass = `overflow-x-auto scrollbar-hide overscroll-x-contain [touch-action:pan-y] py-2.5 ${
     spread
-      ? "max-sm:px-[calc(0.5rem+env(safe-area-inset-left))] sm:pl-[calc(1.25rem+env(safe-area-inset-left))] sm:pr-[calc(0.75rem+env(safe-area-inset-right))]"
+      ? phone
+        ? "px-[calc(0.5rem+env(safe-area-inset-left))]"
+        : "max-sm:px-[calc(0.5rem+env(safe-area-inset-left))] sm:pl-[calc(1.25rem+env(safe-area-inset-left))] sm:pr-[calc(0.75rem+env(safe-area-inset-right))]"
       : "pl-[calc(1.25rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))]"
   } ${
     phone
@@ -346,7 +348,7 @@ export function DetailsStatsRow({
   }`;
   const statsTrackClass = `${compactTrailing ? styles.compactStatsTrack : ""} flex w-max min-w-0 flex-nowrap items-center justify-start gap-x-4 gap-y-1.5 ${
     phone ? "" : compactTrailing ? "sm:w-full sm:flex-nowrap sm:gap-x-2" : "sm:w-full sm:flex-wrap"
-  } ${spread ? `max-sm:w-full max-sm:justify-evenly max-sm:gap-x-2.5 ${styles.spreadStats}` : ""}`;
+  } ${spread ? `phone-sb:w-full phone-sb:justify-evenly phone-sb:gap-x-2.5 ${styles.spreadStats}` : ""}`;
 
   if (hasCustomStats) {
     return (
@@ -774,7 +776,10 @@ export default function DetailsScoreboardPanel({
   // puntuaciones y las stats de Trakt, centradas y repartidas a lo ancho como en
   // la imagen compartible. Plataformas y Compartir salen de la barra: la ficha
   // los pinta debajo como dos píldoras (ScoreboardPill + ActionShareButton
-  // `variant="pill"`). Desde `sm` el marcador es el de siempre.
+  // `variant="pill"`). Desde `sm` el marcador es el de siempre. Con
+  // `phoneLayout` (ficha de teléfono del drawer) se aplica a cualquier ancho de
+  // ventana: el panel marca `data-phone-scoreboard` y la variante `phone-sb:`
+  // (globals.css) activa ahí lo mismo que `max-sm:` en un teléfono.
   mobileScoresOnly = false,
   toolbarActions = null,
   className = "",
@@ -820,6 +825,7 @@ export default function DetailsScoreboardPanel({
   return (
     <div
       className={`w-full rounded-2xl ${LIQUID_GLASS_SURFACE} ${styles.panel} ${fitAllScores ? styles.fitAllScores : ""} ${className}`}
+      data-phone-scoreboard={mobileScoresOnly && phoneLayout ? "" : undefined}
     >
       {/* Refracción, reflejo especular y luz difusa compartidos con InfoTabs. */}
       <LiquidGlassOpticalLayers />
@@ -830,8 +836,8 @@ export default function DetailsScoreboardPanel({
             mobileScoresOnly
               ? `relative z-10 py-3 flex items-center gap-2.5 overflow-x-clip overscroll-x-none [touch-action:pan-y]
       px-[calc(0.75rem+env(safe-area-inset-left))]
-      sm:pl-[calc(1.5rem+env(safe-area-inset-left))] sm:pr-[calc(1.25rem+env(safe-area-inset-right))] sm:gap-4 sm:overflow-visible
-      ${hasMobileScores ? "" : "max-sm:hidden"}`
+      ${phoneLayout ? "" : "sm:pl-[calc(1.5rem+env(safe-area-inset-left))] sm:pr-[calc(1.25rem+env(safe-area-inset-right))] sm:gap-4 sm:overflow-visible"}
+      ${hasMobileScores ? "" : "phone-sb:hidden"}`
               : phoneLayout
               ? "relative z-10 py-3 pl-[calc(1.25rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))] flex items-center gap-2.5 overflow-x-clip overscroll-x-none [touch-action:pan-y]"
               : `
@@ -886,7 +892,7 @@ export default function DetailsScoreboardPanel({
 
           {/* En `mobileScoresOnly` las acciones solo existen desde `sm`; en
               móvil la ficha las pinta como píldoras bajo el marcador. */}
-          <div className={mobileScoresOnly ? "contents max-sm:hidden" : "contents"}>
+          <div className={mobileScoresOnly ? "contents phone-sb:hidden" : "contents"}>
           <DetailsToolbarActions
             externalLinks={externalLinks}
             streamingProviders={streamingProviders}

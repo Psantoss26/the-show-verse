@@ -154,9 +154,12 @@ test("nada se recorta contra los bordes del panel", async () => {
   // `lg:flex-row`, y ese `lg:` mira el VIEWPORT: en el drawer casa siempre.
   assert.match(modal, /mobileLayout=\{mobileDetails\}/);
 
-  // MARCADOR: las insignias ceden el ancho y se recorren, para que los botones
-  // de la derecha queden siempre completos.
-  assert.match(modal, /compactToolbar=\{mobileDetails\}/);
+  // MARCADOR: el de teléfono de la ficha (`mobileScoresOnly`), sin botones en
+  // la barra (Plataformas y Compartir van debajo como píldoras) y con las
+  // puntuaciones escaladas al ancho del panel para que nunca se salgan. Con
+  // `phoneLayout` se aplica aunque la ventana sea de escritorio.
+  assert.match(modal, /mobileScoresOnly=\{mobileDetails\}/);
+  assert.match(modal, /phoneLayout=\{mobileDetails\}/);
 });
 
 test("el marcador del teléfono deja fuera Rotten Tomatoes y Metacritic", async () => {
