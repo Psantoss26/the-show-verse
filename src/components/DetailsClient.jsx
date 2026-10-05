@@ -371,6 +371,16 @@ const MOBILE_REVEAL_BASE =
   "transform-gpu max-sm:data-[mobile-reveal=hidden]:invisible max-sm:data-[mobile-reveal=hidden]:pointer-events-none max-sm:data-[mobile-reveal=hidden]:**:!transition-none";
 const MOBILE_REVEAL_ATTR = "data-mobile-reveal";
 
+// FILA DE ACCIONES CON BARRA DE PROGRESO («Viendo»). Espera al primer scroll,
+// pero con SU PROPIA señal: se revela en cuanto ELLA asoma por encima del
+// navbar inferior. Antes compartía la del marcador, cuyo centinela está más
+// abajo, y no aparecía hasta llevar ~130px de scroll aunque ya estuviera a la
+// vista desde los ~60. Al revelarse entra con la misma cascada que sin
+// progreso (`sv-mobile-actions-scroll-reveal` en globals.css), no de golpe.
+const MOBILE_ACTIONS_REVEAL_ATTR = "data-mobile-actions-reveal";
+const MOBILE_ACTIONS_REVEAL_BASE =
+  "sv-mobile-actions-scroll-reveal transform-gpu max-sm:data-[mobile-actions-reveal=hidden]:invisible max-sm:data-[mobile-actions-reveal=hidden]:pointer-events-none max-sm:data-[mobile-actions-reveal=hidden]:**:!transition-none";
+
 // Aparición animada del marcador al revelarse (solo el marcador; las pestañas y
 // la fila de acciones siguen con el revelado instantáneo). Se reproduce cada vez
 // que el atributo pasa a "shown", como las secciones de los dashboards.
@@ -1402,6 +1412,9 @@ export default function DetailsClient({
   const [isMobileViewport, setIsMobileViewport] = useState(() => restoredValue(backSnapshot, "isMobileViewport", false)); // Viewport <= 640px
   const [mobileSecondaryVisible, setMobileSecondaryVisible] =
     useState(() => restoredValue(backSnapshot, "mobileSecondaryVisible", false));
+  // La fila de acciones con barra de progreso lleva su propia señal (ver
+  // MOBILE_ACTIONS_REVEAL_ATTR).
+  const [mobileActionsVisible, setMobileActionsVisible] = useState(false);
   const pointerCardHoverEnabled = supportsHover && !isMobileViewport;
 
   // Con barra de progreso ("Viendo XX%") la fila de acciones NO entra junto a la
@@ -1563,17 +1576,43 @@ export default function DetailsClient({
   useEffect(() => {
     if (!isMobileViewport) {
       setMobileSecondaryVisible(false);
+      setMobileActionsVisible(false);
       return undefined;
     }
 
     setMobileSecondaryVisible(false);
+    setMobileActionsVisible(false);
     const trigger = mobileSecondaryTriggerRef.current;
     if (!trigger) return undefined;
 
     let applied = null;
+    let actionsApplied = null;
+    // Fila de acciones con barra de progreso: visible en cuanto asoma ella
+    // misma por encima del navbar inferior (y tras el primer scroll). Se busca
+    // en cada evento porque monta después, al resolverse /api/progress.
+    const syncActions = (revealLine) => {
+      const row = document.querySelector(`[${MOBILE_ACTIONS_REVEAL_ATTR}]`);
+      if (!row) {
+        actionsApplied = null;
+        return;
+      }
+      const nextVisible =
+        window.scrollY > MOBILE_REVEAL_SHOW_AT_PX &&
+        row.getBoundingClientRect().top <= revealLine;
+      if (nextVisible === actionsApplied) return;
+      actionsApplied = nextVisible;
+      row.setAttribute(MOBILE_ACTIONS_REVEAL_ATTR, nextVisible ? "shown" : "hidden");
+      row.inert = !nextVisible;
+      startTransition(() => {
+        setMobileActionsVisible((current) =>
+          current === nextVisible ? current : nextVisible,
+        );
+      });
+    };
     const syncVisibility = () => {
       const triggerTop = trigger.getBoundingClientRect().top;
       const revealLine = window.innerHeight - 88;
+      syncActions(revealLine);
       const nextVisible =
         window.scrollY > MOBILE_REVEAL_SHOW_AT_PX &&
         triggerTop <= revealLine;
@@ -9981,12 +10020,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 (ver `--details-mobile-poster-height` más arriba): al insertarse
                 aquí, empuja la fila de acciones hacia abajo en flujo normal,
                 hasta quedar detrás del navbar inferior flotante, que la cubre.
-                `mb-6` preserva el hueco de flujo. El ajuste visual se hace en
+                Sin margen inferior: con `mb-6` quedaban 44px entre la barra y
+                los botones, demasiado aire entre dos piezas que van juntas. El ajuste visual se hace en
                 el propio bloque para igualar la distancia al navbar que tiene
                 la fila de acciones sin progreso, sin variar el alto del póster
                 ni desplazar el logo. */}
             {inProgressPct != null && (
-              <div className="pointer-events-none relative -top-2 mb-6 w-full px-4 sm:hidden">
+              <div className="pointer-events-none relative -top-2 mb-0 w-full px-4 sm:hidden">
                 <div className="px-3 pt-4">
                   <div className="mb-1.5 flex items-end justify-between gap-2">
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-black shadow-[0_2px_10px_rgba(16,185,129,0.55)]">
@@ -10129,18 +10169,18 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     className={
                       mobileActionsWaitForScroll
                         ? // CON BARRA DE PROGRESO: la fila no entra con la
-                          // portada. Antes se escondía tirando de ella hacia
-                          // arriba hasta quedar TAPADA por el navbar inferior;
-                          // ahora espera al primer scroll y aparece con el MISMO
-                          // revelado que el marcador y las pestañas, en su sitio.
-                          MOBILE_REVEAL_BASE
+                          // portada; espera al primer scroll y se revela en
+                          // cuanto asoma sobre el navbar inferior, con la misma
+                          // cascada que sin progreso (ver
+                          // MOBILE_ACTIONS_REVEAL_ATTR).
+                          MOBILE_ACTIONS_REVEAL_BASE
                         : detailsEntryReady && currentLowLoaded && inProgressChecked
                           ? "sv-mobile-actions-reveal sv-mobile-actions-rise"
                           : ""
                     }
                     {...(mobileActionsWaitForScroll
                       ? {
-                          [MOBILE_REVEAL_ATTR]: mobileSecondaryVisible
+                          [MOBILE_ACTIONS_REVEAL_ATTR]: mobileActionsVisible
                             ? "shown"
                             : "hidden",
                         }
@@ -10148,7 +10188,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     inert={
                       isMobileViewport &&
                       mobileActionsWaitForScroll &&
-                      !mobileSecondaryVisible
+                      !mobileActionsVisible
                     }
                   >
                   <DetailActionsRow
