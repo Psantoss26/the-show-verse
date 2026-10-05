@@ -1,5 +1,5 @@
 "use client";
-import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER } from "@/lib/ui/liquidGlass";
 
 import { useMemo } from "react";
 import Link from "next/link";
@@ -102,7 +102,7 @@ export default function AddToListModal(props) {
       {/* Modal */}
       <div className={`relative w-full max-w-xl flex flex-col max-h-[85vh] overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}>
         {/* Header */}
-        <div className="flex w-full items-center justify-between p-6 sm:px-8 sm:pt-8 sm:pb-6 bg-white/[0.025] shrink-0">
+        <div className={`flex w-full items-center justify-between p-6 sm:px-8 sm:pt-8 sm:pb-6 ${LIQUID_GLASS_MODAL_HEADER} shrink-0`}>
           <div>
             <h3 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400">
               Añadir a una lista

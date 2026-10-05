@@ -1,6 +1,6 @@
 "use client";
 import { useServerOnline } from "@/context/ServerStatusContext";
-import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER } from "@/lib/ui/liquidGlass";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 
 import { useEffect, useMemo, useState } from "react";
@@ -374,7 +374,7 @@ export default function TraktWatchedModal({
         aria-label="Historial de visionados"
       >
         {/* Header Premium */}
-        <div className="flex items-start justify-between px-6 py-5 sm:px-7 bg-white/[0.025]">
+        <div className={`flex items-start justify-between px-6 py-5 sm:px-7 ${LIQUID_GLASS_MODAL_HEADER}`}>
           <div>
             <h3 className="text-xl font-black text-white drop-shadow-md">
               Historial de Visionado

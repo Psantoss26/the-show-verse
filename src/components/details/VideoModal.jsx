@@ -1,6 +1,6 @@
 // src/components/details/modals/VideoModal.jsx
 "use client";
-import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER, LIQUID_GLASS_MODAL_FOOTER } from "@/lib/ui/liquidGlass";
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import Image from "next/image";
@@ -158,7 +158,7 @@ export default function VideoModal({
         aria-modal="true"
       >
         {/* HEADER: Glass Header */}
-        <div className="flex w-full items-center justify-between p-6 sm:px-8 sm:pt-8 sm:pb-6 bg-white/[0.025]">
+        <div className={`flex w-full items-center justify-between p-6 sm:px-8 sm:pt-8 sm:pb-6 ${LIQUID_GLASS_MODAL_HEADER}`}>
           <div className="flex flex-col gap-0.5 min-w-0 pr-4">
             <h3 className="text-xl sm:text-2xl font-black text-white drop-shadow-md truncate">
               {video.name || "Tráiler Oficial"}
@@ -206,7 +206,7 @@ export default function VideoModal({
         </div>
 
         {/* FOOTER: Información y acciones */}
-        <div className="flex flex-wrap items-center justify-between gap-4 p-6 sm:px-8 bg-white/[0.025]">
+        <div className={`flex flex-wrap items-center justify-between gap-4 p-6 sm:px-8 ${LIQUID_GLASS_MODAL_FOOTER}`}>
           <div className="text-xs font-semibold text-white/50">
             {video.published_at && (
               <span>

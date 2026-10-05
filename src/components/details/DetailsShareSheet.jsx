@@ -31,7 +31,7 @@ import {
   shareImageFromApp,
 } from "@/lib/android/appBridge";
 import { shareCardFileName } from "@/lib/details/shareCard";
-import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER } from "@/lib/ui/liquidGlass";
 import styles from "./DetailsShareSheet.module.css";
 
 // La ruta devuelve PNG (~3 MB por el póster a sangre). Para compartir se pasa a
@@ -316,7 +316,7 @@ export default function DetailsShareSheet({ open, onClose, card, title, text, ge
   // Misma estructura y acabado que los modales de las acciones de la ficha
   // (puntuación, listas, enlaces): portal, velo `bg-black/60` difuminado,
   // tarjeta centrada `rounded-[2rem]` de LIQUID_GLASS_PANEL y cabecera
-  // `bg-white/[0.025]`.
+  // LIQUID_GLASS_MODAL_HEADER.
   return createPortal(
     <div
       data-detail-modal-layer=""
@@ -334,7 +334,7 @@ export default function DetailsShareSheet({ open, onClose, card, title, text, ge
       <div
         className={`relative flex max-h-[85dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
       >
-        <div className="flex w-full shrink-0 items-center justify-between gap-3 bg-white/[0.025] p-6 sm:px-8 sm:pb-6 sm:pt-8">
+        <div className={`flex w-full shrink-0 items-center justify-between gap-3 ${LIQUID_GLASS_MODAL_HEADER} p-6 sm:px-8 sm:pb-6 sm:pt-8`}>
           <div className="min-w-0">
             <h2
               id={titleId}

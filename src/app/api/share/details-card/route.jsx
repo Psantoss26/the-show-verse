@@ -37,13 +37,20 @@ const SHADE = [16, 16, 16];
 
 // --- Geometría (px de la imagen). Proporciones medidas sobre la ficha móvil.
 const POSTER_H = 1620;
-const BUTTON = 104;
+// La fila de acciones (8 botones) y el marcador ocupan todo el ancho salvo un
+// margen lateral: en una imagen que se ve en pequeño (historias, chats) a la
+// escala exacta del teléfono se quedaban diminutos.
+const SIDE_MARGIN = 40;
+const ACTION_COUNT = 8;
 const BUTTON_GAP = 14;
-const BUTTONS_TOP = 1536;
+const BUTTON = Math.floor((W - SIDE_MARGIN * 2 - (ACTION_COUNT - 1) * BUTTON_GAP) / ACTION_COUNT);
+// Escala del texto y los logos del marcador respecto al diseño original.
+const SCORE_SCALE = 1.2;
+const BUTTONS_TOP = 1509;
 const LOGO_MAX_W = Math.round(W * 0.85);
 const LOGO_MAX_H = 210;
 const LOGO_BOTTOM = BUTTONS_TOP - 44;
-const PANEL_TOP = BUTTONS_TOP + BUTTON + 52;
+const PANEL_TOP = BUTTONS_TOP + BUTTON + 48;
 // Fondo ambiental con un 12% de escala (como `.hero-bg-base` en móvil).
 const AMBIENT = {
   width: Math.round(W * 1.12),
@@ -334,7 +341,7 @@ function ActionButton({ button }) {
         <div style={{ display: "flex", alignItems: "baseline", color: foreground, lineHeight: 1 }}>
           <span
             style={{
-              fontSize: button.label.length > 1 ? 42 : 48,
+              fontSize: Math.round(BUTTON * (button.label.length > 1 ? 0.4 : 0.46)),
               fontWeight: 700,
               letterSpacing: button.label.length > 1 ? -2 : 0,
             }}
@@ -342,7 +349,7 @@ function ActionButton({ button }) {
             {button.label}
           </span>
           {button.labelSuffix ? (
-            <span style={{ fontSize: 21, fontWeight: 700, color: "#ffffff", marginLeft: 1 }}>
+            <span style={{ fontSize: Math.round(BUTTON * 0.2), fontWeight: 700, color: "#ffffff", marginLeft: 1 }}>
               {button.labelSuffix}
             </span>
           ) : null}
@@ -361,10 +368,11 @@ function ActionButton({ button }) {
   );
 }
 
+const scoreSize = (value) => Math.round(value * SCORE_SCALE);
 const SCORE_LOGOS = {
-  tmdb: { width: 72, height: 52 },
-  trakt: { width: 52, height: 52 },
-  imdb: { width: 100, height: 50 },
+  tmdb: { width: scoreSize(72), height: scoreSize(52) },
+  trakt: { width: scoreSize(52), height: scoreSize(52) },
+  imdb: { width: scoreSize(100), height: scoreSize(50) },
 };
 
 function ScoreBadge({ logo, size, score }) {
@@ -374,12 +382,12 @@ function ScoreBadge({ logo, size, score }) {
         // eslint-disable-next-line @next/next/no-img-element
         <img src={logo} width={size.width} height={size.height} alt="" style={{ objectFit: "contain" }} />
       ) : null}
-      <div style={{ display: "flex", flexDirection: "column", marginLeft: 22, lineHeight: 1 }}>
-        <div style={{ display: "flex", fontSize: 50, fontWeight: 700, color: "rgba(255, 255, 255, 0.9)", letterSpacing: -1 }}>
+      <div style={{ display: "flex", flexDirection: "column", marginLeft: scoreSize(22), lineHeight: 1 }}>
+        <div style={{ display: "flex", fontSize: scoreSize(50), fontWeight: 700, color: "rgba(255, 255, 255, 0.9)", letterSpacing: -1 }}>
           {score.value}
         </div>
         {score.votes ? (
-          <div style={{ display: "flex", fontSize: 29, fontWeight: 700, color: "rgba(255, 255, 255, 0.62)", marginTop: 6, letterSpacing: 1 }}>
+          <div style={{ display: "flex", fontSize: scoreSize(29), fontWeight: 700, color: "rgba(255, 255, 255, 0.62)", marginTop: scoreSize(6), letterSpacing: 1 }}>
             {score.votes}
           </div>
         ) : null}

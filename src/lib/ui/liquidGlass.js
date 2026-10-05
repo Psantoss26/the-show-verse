@@ -19,6 +19,19 @@
 export const LIQUID_GLASS_PANEL =
   "bg-black/[0.28] bg-gradient-to-br from-white/[0.08] via-transparent to-black/[0.12] backdrop-blur-[16px] saturate-[140%] shadow-[inset_0_1px_1.5px_rgba(255,255,255,0.08),0_12px_36px_-6px_rgba(0,0,0,0.6)]";
 
+// CABECERA (y pie) de los modales sobre LIQUID_GLASS_PANEL.
+//
+// Antes llevaban un velo plano (`bg-white/[0.025]`) que terminaba en seco donde
+// empieza el contenido: ese escalón de tono se leía como una línea horizontal
+// dividiendo el modal. Ahora es el mismo velo pero en degradado, con el tono de
+// siempre arriba y transparente justo en el borde: la cabecera conserva su luz
+// y el paso al contenido es continuo, sin salto ni línea.
+export const LIQUID_GLASS_MODAL_HEADER =
+  "bg-gradient-to-b from-white/[0.025] to-transparent";
+// El pie, igual pero mirando hacia arriba (se funde con el contenido de encima).
+export const LIQUID_GLASS_MODAL_FOOTER =
+  "bg-gradient-to-t from-white/[0.025] to-transparent";
+
 export const LIQUID_GLASS_TOOLTIP =
   "bg-zinc-950/85 backdrop-blur-2xl saturate-[140%] shadow-[0_12px_36px_-6px_rgba(0,0,0,0.9)]";
 
