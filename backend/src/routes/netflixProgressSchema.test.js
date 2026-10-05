@@ -32,7 +32,12 @@ function destructuredFields(routePath) {
   const routeStart = source.indexOf(`fastify.post('${routePath}'`);
   assert.notEqual(routeStart, -1, `no se encontró la ruta ${routePath}`);
   const openBrace = source.indexOf('const {', routeStart);
-  const closeBrace = source.indexOf('} = parsed.data;', openBrace);
+  // `redirect.item` es `parsed.data` con el destino de una detección corregida
+  // encima (applyDetectionRedirect): sus claves salen igualmente del esquema.
+  const ends = ['} = parsed.data;', '} = redirect.item;']
+    .map((end) => source.indexOf(end, openBrace))
+    .filter((index) => index !== -1);
+  const closeBrace = ends.length ? Math.min(...ends) : -1;
   assert.notEqual(closeBrace, -1, `no se encontró la desestructuración de ${routePath}`);
   const body = source.slice(openBrace + 'const {'.length, closeBrace);
   return body

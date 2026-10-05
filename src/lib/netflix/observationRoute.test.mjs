@@ -6,6 +6,7 @@ import * as resolver from './streamingResolve.js';
 import * as resolve from './resolve.js';
 import * as variants from './queryVariants.js';
 import * as cache from './requestCache.js';
+import * as fingerprint from './detectionFingerprint.js';
 
 const source = await readFile(new URL('../../app/api/netflix/extension-sync/route.js', import.meta.url), 'utf8');
 // Con el target por defecto (ES5) TypeScript degrada los spreads de iteradores del
@@ -24,6 +25,7 @@ function handler() {
     '@/lib/netflix/resolve': resolve,
     '@/lib/netflix/queryVariants': variants,
     '@/lib/netflix/requestCache': cache,
+    '@/lib/netflix/detectionFingerprint': fingerprint,
   };
   const cjsModule = { exports: {} };
   new Function('require', 'module', 'exports', compiled)(name => {
@@ -36,7 +38,16 @@ test('offline observations resolve into progress without changing event identity
   const post = handler();
   const originalFetch = globalThis.fetch;
   const sent = [];
+  const detections = [];
   globalThis.fetch = async (url, init) => {
+    // Registro de la detección y consulta de reglas: no son progreso ni historial.
+    if (String(url).includes('/v1/streaming/')) {
+      detections.push({ url, body: JSON.parse(init.body) });
+      const json = String(url).endsWith('/lookup')
+        ? { decision: null, rejects: [] }
+        : { detectionId: '5e1f4b0e-9d1f-4a2b-8a1a-2f3c4d5e6f70' };
+      return new Response(JSON.stringify(json), { status: 200 });
+    }
     sent.push({ url, body: JSON.parse(init.body) });
     return new Response(JSON.stringify({ ok: true, completed: true }), { status: 200 });
   };
@@ -51,6 +62,9 @@ test('offline observations resolve into progress without changing event identity
     assert.equal(sent[0].body.positionSeconds, 950);
     assert.equal(sent[0].body.estimated, true);
     assert.equal(sent[0].body.tmdbId, 550);
+    // La observación queda enlazada a su detección (corregible después).
+    assert.equal(sent[0].body.detectionId, '5e1f4b0e-9d1f-4a2b-8a1a-2f3c4d5e6f70');
+    assert.equal(detections.at(-1).body.kind, 'playback');
     sent.length = 0;
     await post(request({ mainTitle: 'Fight Club', resolveOnly: true }));
     assert.equal(sent.length, 0, 'browsing must never record playback');
