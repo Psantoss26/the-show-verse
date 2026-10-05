@@ -20,8 +20,9 @@ import SectionTitle from "@/components/details/SectionTitle";
 import { createValueStore } from "@/lib/details/valueStore";
 import {
   FollowingActivityAvatars,
+  FollowingActivityModal,
+  FollowingActivityPill,
   FollowingActivitySection,
-  FollowingActivityStrip,
   hasFollowingActivity,
   useFollowingActivity,
 } from "@/components/details/FollowingActivity";
@@ -370,6 +371,11 @@ const TTL = 1000 * 60 * 5; // Tiempo de vida del cache: 5 minutos
 const MOBILE_REVEAL_BASE =
   "transform-gpu max-sm:data-[mobile-reveal=hidden]:invisible max-sm:data-[mobile-reveal=hidden]:pointer-events-none max-sm:data-[mobile-reveal=hidden]:**:!transition-none";
 const MOBILE_REVEAL_ATTR = "data-mobile-reveal";
+
+// Plataformas y Compartir cuando comparten fila con la píldora de amigos: menos
+// relleno y, por debajo de 400px, sin icono, para que el texto quepa entero en
+// vez de recortarse («Plataf…»).
+const THREE_PILL_ROW_CLASS = "!gap-2 !px-3 max-[399px]:[&>svg]:hidden max-[340px]:!px-2";
 
 // FILA DE ACCIONES CON BARRA DE PROGRESO («Viendo»). Espera al primer scroll,
 // pero con SU PROPIA señal: se revela en cuanto ELLA asoma por encima del
@@ -6937,6 +6943,7 @@ export default function DetailsClient({
 
   const [externalLinksOpen, setExternalLinksOpen] = useState(false); // Modal de enlaces externos abierto
   const [platformsOpen, setPlatformsOpen] = useState(false); // Modal de plataformas disponible en móvil
+  const [followingOpen, setFollowingOpen] = useState(false); // Modal de actividad de amigos en móvil
 
   const isMovie = endpointType === "movie";
 
@@ -9205,6 +9212,14 @@ export default function DetailsClient({
         mode="platforms"
       />
 
+      {/* Actividad de amigos en móvil: mismo diseño que el de plataformas. */}
+      <FollowingActivityModal
+        open={followingOpen}
+        onClose={() => setFollowingOpen(false)}
+        data={followingActivity}
+        mediaType={type}
+      />
+
       {/* Modal de control de visto en Trakt - Para marcar películas como vistas */}
       <TraktWatchedModal
         open={traktWatchedOpen}
@@ -10380,12 +10395,18 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 // aquí para no dejar el cristal plano (ver globals.css). Una
                 // ficha restaurada al volver ya se pinta estática.
                 //
-                // MÓVIL: rejilla de dos columnas. El marcador y la franja de
-                // amigos ocupan las dos; Plataformas y Compartir, una cada uno.
+                // MÓVIL: rejilla. El marcador ocupa la fila entera; debajo,
+                // Plataformas y Compartir a media línea o, con actividad de
+                // amigos, la píldora de sus avatares entre las dos (solo lo que
+                // miden las fotos; las otras se reparten el resto).
                 // Así cada píldora es hija DIRECTA de este envoltorio y recibe
                 // su propia animación de revelado (sobre el cristal, no sobre un
                 // contenedor común que lo dejaría plano). Desde `sm` es un bloque.
-                className={`${MOBILE_REVEAL_BASE} max-sm:grid max-sm:grid-cols-2 max-sm:gap-x-3 ${
+                className={`${MOBILE_REVEAL_BASE} max-sm:grid ${
+                  showFollowingActivity
+                    ? "max-sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] max-sm:gap-x-2.5 max-[340px]:gap-x-2"
+                    : "max-sm:grid-cols-2 max-sm:gap-x-3"
+                } ${
                   detailsRestored ? "" : MOBILE_SCOREBOARD_REVEAL_ANIMATION
                 }`}
                 {...{
@@ -10402,7 +10423,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 // Móvil: solo puntuaciones y stats, centradas y a todo el ancho
                 // como en la imagen compartible; las acciones van debajo.
                 mobileScoresOnly
-                className="col-span-2"
+                className="col-span-full"
                 compactStatsTrailing={isBackdropPoster}
                 shareIconOnly={isBackdropPoster}
                 fitAllScores={isBackdropPoster}
@@ -10459,30 +10480,29 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 }
                 />
                 {/* Teléfono: Plataformas y Compartir, que en escritorio viven en
-                    la barra del marcador, como dos píldoras a media línea. */}
+                    la barra del marcador, como píldoras bajo él; con actividad
+                    de amigos, sus avatares en medio (la fila de stats es un
+                    carril sin "derecha" donde ponerlos, como en escritorio). */}
                 <ScoreboardPill
                   icon={MonitorPlay}
                   label="Plataformas"
                   onClick={() => setPlatformsOpen(true)}
                   aria-haspopup="dialog"
                   aria-label="Abrir plataformas disponibles"
+                  className={`mt-3 sm:hidden ${showFollowingActivity ? THREE_PILL_ROW_CLASS : ""}`}
+                />
+                <FollowingActivityPill
+                  data={followingActivity}
+                  onOpen={() => setFollowingOpen(true)}
                   className="mt-3 sm:hidden"
                 />
                 <ActionShareButton
                   variant="pill"
-                  className="mt-3 sm:hidden"
+                  className={`mt-3 sm:hidden ${showFollowingActivity ? THREE_PILL_ROW_CLASS : ""}`}
                   title={title}
                   text={`Echa un vistazo a ${title} en The Show Verse`}
                   card={shareCard}
                   story={shareStory}
-                />
-                {/* Teléfono: la fila de stats es un carril sin "derecha", así
-                    que tus amigos van en una franja bajo el marcador. */}
-                <FollowingActivityStrip
-                  data={followingActivity}
-                  compactWatchedSummary
-                  onOpen={() => scrollToSection("following")}
-                  className="col-span-2 mt-3 sm:hidden"
                 />
               </div>
             </div>
