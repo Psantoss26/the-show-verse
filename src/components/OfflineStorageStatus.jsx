@@ -113,6 +113,18 @@ export default function OfflineStorageStatus({ panelClassName = "" }) {
               {detail ? ` · ${detail.long}` : null}
             </span>
           </p>
+          {/* Qué páginas faltan: «1 página sin guardar» sin decir cuál no
+              permitía saber si era algo importante o una ruta antigua. */}
+          {warning && state?.failedPages?.length ? (
+            <details className="mt-1 text-xs text-zinc-500">
+              <summary className="cursor-pointer select-none text-zinc-400 hover:text-zinc-300">
+                {state.failedPages.length === 1 ? "Ver cuál" : "Ver cuáles"}
+              </summary>
+              <ul className="mt-1 space-y-0.5 break-all">
+                {state.failedPages.map((page) => <li key={page}>{page}</li>)}
+              </ul>
+            </details>
+          ) : null}
         </div>
       </div>
       <button

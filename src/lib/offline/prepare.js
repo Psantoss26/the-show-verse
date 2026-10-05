@@ -191,6 +191,8 @@ export async function prepareOfflineAccount(user, { signal, onProgress = () => {
     failures,
     pages: savedRoutes.size,
     pagesFailed: failedRoutes.size,
+    // Cuáles, para que Ajustes pueda decirlo en vez de dejar adivinar.
+    failedPages: [...failedRoutes],
     storage: await storageEstimate(),
     updatedAt: Date.now(),
   };
