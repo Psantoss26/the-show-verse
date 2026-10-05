@@ -568,78 +568,187 @@ export function ReviewScene({ card, review, fonts }) {
   );
 }
 
-function DetailRow({ icon, label, children, first = false }) {
+// Celda de una tarjeta de la ficha: icono, etiqueta y valor. Las anchas
+// (`wide`) ocupan la fila; el resto va de dos en dos, como en la ficha.
+function FactCell({ fact, size }) {
   return (
-    <div style={{ display: "flex", alignItems: "flex-start", marginTop: first ? 0 : 40 }}>
-      <div style={{ display: "flex", width: 64, paddingTop: 6 }}>
-        <Icon name={icon} size={42} color={WHITE(0.55)} />
+    <div
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        width: fact.wide ? "100%" : "50%",
+        paddingRight: fact.wide ? 0 : 28,
+        marginBottom: size.gap,
+      }}
+    >
+      <div style={{ display: "flex", width: size.icon + 22, paddingTop: 4, flexShrink: 0 }}>
+        <Icon name={fact.icon} size={size.icon} color={WHITE(0.55)} />
       </div>
-      <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-        <div style={{ display: "flex", fontSize: 26, fontWeight: 700, letterSpacing: 4, textTransform: "uppercase", color: WHITE(0.5) }}>
-          {label}
+      <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", fontSize: size.label, fontWeight: 700, letterSpacing: 4, textTransform: "uppercase", color: WHITE(0.5) }}>
+          {fact.label}
         </div>
-        <div style={{ display: "flex", flexWrap: "wrap", marginTop: 8, fontSize: 44, fontWeight: 700, color: WHITE(0.94) }}>
-          {children}
+        <div style={{ display: "flex", flexWrap: "wrap", marginTop: 6, fontSize: size.value, lineHeight: 1.22, fontWeight: 700, color: WHITE(0.94) }}>
+          {fact.value}
         </div>
       </div>
     </div>
   );
 }
 
-/** Detalles: año, duración o temporadas, dirección/creación, géneros y sinopsis. */
+// Tamaño de las celdas según cuántas filas haya que meter.
+function factSize(facts) {
+  let rows = 0;
+  let half = 0;
+  for (const fact of facts) {
+    if (fact.wide) {
+      rows += half ? 2 : 1;
+      half = 0;
+    } else if (half) {
+      rows += 1;
+      half = 0;
+    } else {
+      half = 1;
+    }
+  }
+  rows += half;
+  return rows > 4
+    ? { rows, icon: 36, label: 23, value: 38, gap: 34 }
+    : { rows, icon: 40, label: 25, value: 42, gap: 40 };
+}
+
+function FactGrid({ facts }) {
+  const size = factSize(facts);
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", width: "100%", marginBottom: -size.gap }}>
+      {facts.map((fact) => (
+        <FactCell key={fact.label} fact={fact} size={size} />
+      ))}
+    </div>
+  );
+}
+
+function GenreChips({ genres, style }) {
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", ...style }}>
+      {genres.map((genre) => (
+        <div
+          key={genre}
+          style={{
+            display: "flex",
+            padding: "12px 30px",
+            marginRight: 16,
+            marginBottom: 14,
+            borderRadius: 50,
+            fontSize: 32,
+            fontWeight: 700,
+            color: WHITE(0.9),
+            backgroundColor: WHITE(0.1),
+          }}
+        >
+          {genre}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Corta un texto largo en el último límite de palabra (la sinopsis ya llega
+// recortada; aquí se ajusta al hueco que dejan las celdas).
+function clip(value, max) {
+  if (!value || value.length <= max) return value;
+  const cut = value.slice(0, max - 1);
+  const space = cut.lastIndexOf(" ");
+  return `${(space > max * 0.5 ? cut.slice(0, space) : cut).replace(/[\s,.;:–-]+$/, "")}…`;
+}
+
+/**
+ * Celdas de la tarjeta «Detalles» de la ficha: título original, fechas,
+ * formato, duración y estado. Lo que no hay, no se pinta.
+ */
+export function detailsFacts(card, details) {
+  const facts = details.facts || {};
+  const tv = card.type === "tv";
+  const list = [];
+  const push = (value, fact) => {
+    if (value) list.push({ ...fact, value });
+  };
+  push(facts.originalTitle, { icon: tv ? "tv" : "film", label: "Título original", wide: true });
+  push(facts.release || (details.year ? String(details.year) : null), {
+    icon: "calendar",
+    label: facts.release ? (tv ? "Inicio" : "Estreno") : "Año",
+  });
+  if (tv) push(facts.end, { icon: "calendar", label: details.endLabel || "Última emisión" });
+  let format = facts.format;
+  if (!format && tv && details.seasons) {
+    format = `${details.seasons} Temp.${details.episodes ? ` · ${details.episodes} Eps.` : ""}`;
+  }
+  if (tv) push(format, { icon: "layers", label: "Formato" });
+  push(facts.duration || (!tv && details.runtime ? formatRuntime(details.runtime) : null), { icon: "clock", label: "Duración" });
+  push(facts.status, { icon: "badgeCheck", label: "Estado" });
+  return list;
+}
+
+/**
+ * Celdas de la tarjeta «Producción»: dirección o creadores, premios,
+ * presupuesto y recaudación (películas) o canal (series), y productoras.
+ */
+export function productionFacts(card, details) {
+  const facts = details.facts || {};
+  const tv = card.type === "tv";
+  const list = [];
+  const push = (value, fact) => {
+    if (value) list.push({ ...fact, value });
+  };
+  push(details.people?.length ? details.people.join(" · ") : null, {
+    icon: tv ? "users" : "clapperboard",
+    label: details.peopleLabel || (tv ? "Creadores" : "Director"),
+    wide: true,
+  });
+  if (tv) {
+    push(facts.network, { icon: "monitorPlay", label: "Canal", wide: true });
+  } else {
+    push(facts.budget, { icon: "dollar", label: "Presupuesto" });
+    push(facts.revenue, { icon: "trending", label: "Recaudación" });
+  }
+  push(facts.awards, { icon: "trophy", label: "Premios", wide: true });
+  push(facts.production, { icon: "building", label: "Producción", wide: true });
+  return list;
+}
+
+/** Detalles: la tarjeta «Detalles» de la ficha, con géneros y sinopsis. */
 export function DetailsScene({ card, details, fonts }) {
-  const rows = [];
-  if (details.year) rows.push({ icon: "calendar", label: "Año", value: String(details.year) });
-  if (card.type === "tv" && details.seasons) {
-    const seasons = `${details.seasons} ${details.seasons === 1 ? "temporada" : "temporadas"}`;
-    rows.push({
-      icon: "tv",
-      label: "Temporadas",
-      value: details.episodes ? `${seasons} · ${details.episodes} episodios` : seasons,
-    });
-  } else if (details.runtime) {
-    rows.push({ icon: "clock", label: "Duración", value: formatRuntime(details.runtime) });
-  }
-  if (details.people.length) {
-    rows.push({ icon: card.type === "tv" ? "users" : "clapperboard", label: details.peopleLabel || "Dirección", value: details.people.join(" · ") });
-  }
+  const facts = detailsFacts(card, details);
+  const { rows } = factSize(facts);
+  // Cuantas más filas, menos sinopsis: todo tiene que caber en la sección.
+  const overview = clip(details.overview, rows >= 4 ? 200 : 260);
 
   return (
     <SceneBody fonts={fonts}>
       <Eyebrow icon="info" label="Detalles" />
-      <Glass style={{ width: PANEL_W, padding: "60px 64px" }}>
-        {rows.map((row, index) => (
-          <DetailRow key={row.label} icon={row.icon} label={row.label} first={index === 0}>
-            {row.value}
-          </DetailRow>
-        ))}
+      <Glass style={{ width: PANEL_W, padding: "56px 60px" }}>
+        {facts.length ? <FactGrid facts={facts} /> : null}
         {details.genres.length ? (
-          <div style={{ display: "flex", flexWrap: "wrap", marginTop: rows.length ? 44 : 0 }}>
-            {details.genres.map((genre) => (
-              <div
-                key={genre}
-                style={{
-                  display: "flex",
-                  padding: "12px 30px",
-                  marginRight: 16,
-                  marginBottom: 14,
-                  borderRadius: 50,
-                  fontSize: 34,
-                  fontWeight: 700,
-                  color: WHITE(0.9),
-                  backgroundColor: WHITE(0.1),
-                }}
-              >
-                {genre}
-              </div>
-            ))}
+          <GenreChips genres={details.genres} style={{ marginTop: facts.length ? 44 : 0 }} />
+        ) : null}
+        {overview ? (
+          <div style={{ display: "flex", marginTop: facts.length || details.genres.length ? 28 : 0, fontSize: 36, lineHeight: 1.42, color: WHITE(0.74) }}>
+            {overview}
           </div>
         ) : null}
-        {details.overview ? (
-          <div style={{ display: "flex", marginTop: rows.length || details.genres.length ? 30 : 0, fontSize: 38, lineHeight: 1.42, color: WHITE(0.74) }}>
-            {details.overview}
-          </div>
-        ) : null}
+      </Glass>
+    </SceneBody>
+  );
+}
+
+/** Producción: la tarjeta «Producción» de la ficha. */
+export function ProductionScene({ card, details, fonts }) {
+  const facts = productionFacts(card, details);
+  return (
+    <SceneBody fonts={fonts}>
+      <Eyebrow icon="building" label="Producción" />
+      <Glass style={{ width: PANEL_W, padding: "56px 60px" }}>
+        <FactGrid facts={facts} />
       </Glass>
     </SceneBody>
   );

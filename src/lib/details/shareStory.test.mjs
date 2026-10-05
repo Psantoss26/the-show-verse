@@ -50,7 +50,7 @@ test("movie plays: count, newest dates first and duplicates removed", () => {
 test("unwatched movie has no plays section", () => {
   const story = sanitizeShareStory(buildShareStoryPayload({ type: "movie", watched: false, details }));
   assert.equal(story.plays, null);
-  assert.deepEqual(storySceneIds(card, story), ["details"]);
+  assert.deepEqual(storySceneIds(card, story), ["details", "production"]);
 });
 
 test("series plays use the episode progress", () => {
@@ -88,7 +88,7 @@ test("scenes keep their order and skip what has no data", () => {
       details,
     }),
   );
-  assert.deepEqual(storySceneIds(card, story), ["plays", "review", "details"]);
+  assert.deepEqual(storySceneIds(card, story), ["plays", "review", "details", "production"]);
   assert.deepEqual(
     storySceneIds({ actions: { rating: null }, scores: {} }, { ...story, details: { genres: [], people: [] } }),
     ["plays", "review"],
@@ -259,5 +259,49 @@ test("sin sección de puntuaciones: ya están en la portada", () => {
   // Con nota propia (9) y puntuaciones públicas no aparece ninguna sección para ellas.
   const ids = storySceneIds({ actions: { rating: 9 }, scores: { tmdb: { value: "8.4" } } }, story);
   assert.equal(ids.includes("rating"), false);
-  assert.deepEqual(ids, ["plays", "details"]);
+  assert.deepEqual(ids, ["plays", "details", "production"]);
+});
+
+test("detalles y producción: las tarjetas de la ficha, sin huecos", () => {
+  const story = sanitizeShareStory(
+    buildShareStoryPayload({
+      type: "movie",
+      details: {
+        ...details,
+        facts: {
+          originalTitle: "Pride & Prejudice",
+          release: "16 sept 2005",
+          duration: "2h 9m",
+          status: "Estrenada",
+          budget: "$28.0M",
+          revenue: "$121.1M",
+          awards: "x".repeat(400),
+          production: "Working Title Films",
+          network: { evil: true },
+          end: "—",
+          format: "  ",
+          bogus: "nope",
+        },
+        endLabel: "<script>",
+      },
+    }),
+  );
+  const facts = story.details.facts;
+  assert.equal(facts.originalTitle, "Pride & Prejudice");
+  assert.equal(facts.budget, "$28.0M");
+  assert.ok(facts.awards.length <= 140);
+  // Objetos, marcadores vacíos y claves desconocidas no pasan.
+  assert.equal("network" in facts, false);
+  assert.equal("end" in facts, false);
+  assert.equal("format" in facts, false);
+  assert.equal("bogus" in facts, false);
+  assert.equal(story.details.endLabel, "Última emisión");
+
+  // Solo producción: sin datos de la tarjeta «Detalles» no hay esa sección.
+  const onlyProduction = sanitizeShareStory({ details: { facts: { budget: "$1.0M" } } });
+  assert.deepEqual(storySceneIds({ type: "movie" }, onlyProduction), ["production"]);
+  // El canal es de series: en una película no abre «Producción».
+  const network = sanitizeShareStory({ details: { facts: { network: "HBO" } } });
+  assert.deepEqual(storySceneIds({ type: "movie" }, network), []);
+  assert.deepEqual(storySceneIds({ type: "tv" }, network), ["production"]);
 });

@@ -17,11 +17,31 @@ export const STORY_FPS = 30;
 // Sin sección de puntuaciones: la nota propia y las públicas ya salen en la
 // portada, que es la primera pantalla del vídeo, y repetirlas en una sección
 // aparte alargaba el vídeo para decir lo mismo.
-export const STORY_SCENES = ["plays", "episodes", "review", "details"];
+export const STORY_SCENES = ["plays", "episodes", "review", "details", "production"];
 
 // Episodios vistos de una serie que caben en una sección del vídeo. Con más, se
 // enseñan los ÚLTIMOS (los más avanzados de la serie) y un «+N más».
 export const STORY_MAX_EPISODES = 14;
+
+// Datos de las tarjetas «Detalles» y «Producción» de la ficha que pasan a la
+// secciones «Detalles» y «Producción» del vídeo, ya formateados como en la ficha, con su
+// longitud máxima.
+export const STORY_FACTS = {
+  originalTitle: 80,
+  release: 40,
+  end: 40,
+  format: 40,
+  duration: 30,
+  status: 30,
+  network: 60,
+  budget: 30,
+  revenue: 30,
+  awards: 140,
+  production: 120,
+};
+
+// Lo que la ficha enseña cuando no hay dato: no merece una celda.
+const EMPTY_FACT_RE = /^(?:[-–—·?]+|n\/?a|desconocid[oa]s?|sin datos|unknown|0)$/i;
 
 const ISO_RE = /^\d{4}-\d{2}-\d{2}(?:T[\d:.]+(?:Z|[+-]\d{2}:?\d{2})?)?$/;
 
@@ -51,6 +71,19 @@ export function truncateText(value, max) {
   const cut = clean.slice(0, max - 1);
   const space = cut.lastIndexOf(" ");
   return `${(space > max * 0.5 ? cut.slice(0, space) : cut).replace(/[\s,.;:–-]+$/, "")}…`;
+}
+
+function factsData(value) {
+  const facts = {};
+  if (!value || typeof value !== "object") return facts;
+  for (const [key, max] of Object.entries(STORY_FACTS)) {
+    const raw = value[key];
+    if (raw == null || typeof raw === "object") continue;
+    const clean = text(raw, 10_000);
+    if (!clean || EMPTY_FACT_RE.test(clean)) continue;
+    facts[key] = clean.length > max ? truncateText(clean, max) : clean;
+  }
+  return facts;
 }
 
 // ------------------------------------------------------------------ cliente
@@ -192,6 +225,8 @@ export function buildShareStoryPayload({
           peopleLabel: details.peopleLabel || null,
           people: (details.people || []).filter(Boolean),
           overview: details.overview || null,
+          facts: factsData(details.facts),
+          endLabel: details.endLabel || null,
         }
       : null,
   };
@@ -274,6 +309,8 @@ export function sanitizeShareStory(body) {
             .filter(Boolean)
             .slice(0, 3),
           overview: details.overview ? truncateText(details.overview, 260) : null,
+          facts: factsData(details.facts),
+          endLabel: details.endLabel === "Finalización" ? "Finalización" : "Última emisión",
         }
       : null,
   };
@@ -284,20 +321,38 @@ export function sanitizeShareStory(body) {
  * de pintarse vacías.
  */
 export function storySceneIds(card, story) {
+  const details = story?.details || null;
+  const facts = details?.facts || {};
+  const tv = card?.type === "tv";
+  // Las mismas tarjetas que la ficha: «Detalles» y «Producción».
   const hasDetails =
-    !!story?.details &&
+    !!details &&
     !!(
-      story.details.year ||
-      story.details.runtime ||
-      story.details.seasons ||
-      story.details.genres?.length ||
-      story.details.people?.length ||
-      story.details.overview
+      facts.originalTitle ||
+      facts.release ||
+      (tv && facts.end) ||
+      (tv && facts.format) ||
+      facts.duration ||
+      facts.status ||
+      details.year ||
+      details.runtime ||
+      details.seasons ||
+      details.genres?.length ||
+      details.overview
+    );
+  const hasProduction =
+    !!details &&
+    !!(
+      details.people?.length ||
+      facts.awards ||
+      facts.production ||
+      (tv ? facts.network : facts.budget || facts.revenue)
     );
   return STORY_SCENES.filter((id) => {
     if (id === "plays") return !!story?.plays;
     if (id === "episodes") return !!story?.episodes?.items?.length;
     if (id === "review") return !!story?.review;
+    if (id === "production") return hasProduction;
     return hasDetails;
   });
 }

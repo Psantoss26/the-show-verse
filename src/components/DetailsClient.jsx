@@ -9086,9 +9086,27 @@ export default function DetailsClient({
         seasons: type === "tv" ? data?.number_of_seasons || null : null,
         episodes: type === "tv" ? data?.number_of_episodes || null : null,
         genres: data?.genres || [],
-        peopleLabel: type === "movie" ? "Dirección" : "Creación",
+        peopleLabel: type === "movie" ? "Director" : "Creadores",
         people: shareStoryPeople,
         overview: data?.overview || null,
+        // Lo mismo que enseñan las tarjetas «Detalles» y «Producción», con el
+        // formato de la ficha; lo que falta no llega a pintarse.
+        facts: {
+          originalTitle:
+            type === "movie" ? data?.original_title : data?.original_name,
+          release: releaseDateValue,
+          end: lastAirDateValue,
+          format: type === "tv" ? seasonEpisodeValue : null,
+          duration:
+            type === "tv" ? episodeRuntimeFormatValue : displayRuntimeValue,
+          status: data?.status ? getStatusLabel(data.status) : null,
+          network,
+          budget: budgetValue,
+          revenue: revenueValue,
+          awards: headerAwardsValue,
+          production,
+        },
+        endLabel: data?.status === "Ended" ? "Finalización" : "Última emisión",
       },
     }),
     // `shareStoryPeople` se recrea en cada render: se depende de su contenido.
@@ -9112,6 +9130,19 @@ export default function DetailsClient({
       data?.number_of_episodes,
       data?.genres,
       data?.overview,
+      data?.original_title,
+      data?.original_name,
+      data?.status,
+      releaseDateValue,
+      lastAirDateValue,
+      seasonEpisodeValue,
+      episodeRuntimeFormatValue,
+      displayRuntimeValue,
+      network,
+      budgetValue,
+      revenueValue,
+      headerAwardsValue,
+      production,
       shareStoryPeopleKey,
     ],
   );
