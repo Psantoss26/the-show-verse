@@ -1843,6 +1843,30 @@ html {
      La acción de reseña puede ser por ello el décimo hijo: debe conservar el
      mismo escalonado en vez de entrar de inmediato. */
   .sv-mobile-actions-reveal > * > :nth-child(10) { animation-delay: 220ms; }
+
+  /* La fila entera sube desde abajo AL HACERSE VISIBLE, junto con la cascada
+     de sus botones. Antes esa subida la hacía el FadeIn del envoltorio AL
+     MONTARSE: en las series la fila se revelaba enseguida y se veía subir en
+     bloque, pero en las películas espera a /api/progress (por la barra
+     «Viendo») y cuando aparecía la subida ya había terminado: solo quedaba la
+     cascada, de izquierda a derecha. Ligada al revelado, es la misma en las
+     dos. Mismo recorrido y curva que el FadeIn (20px, 600ms).
+     SOLO `transform`: un `opacity` en el contenedor apagaría el cristal de los
+     botones mientras dura (ver .sv-details-entry), y `backwards` en vez de
+     `both` para no dejar la capa promovida al acabar. */
+  .sv-mobile-actions-rise {
+    animation: sv-mobile-actions-rise 600ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+}
+
+@keyframes sv-mobile-actions-rise {
+  from {
+    transform: translate3d(0, 20px, 0);
+  }
+
+  to {
+    transform: translate3d(0, 0, 0);
+  }
 }
 
 /* SIN `filter` ANIMADO. Era el mayor coste de la entrada en móvil: un
@@ -1898,7 +1922,8 @@ html {
   }
 
   .sv-mobile-poster-reveal,
-  .sv-mobile-actions-reveal > * > * {
+  .sv-mobile-actions-reveal > * > *,
+  .sv-mobile-actions-rise {
     animation: none;
   }
 }
@@ -1907,7 +1932,8 @@ html {
    pinta exactamente como se dejó, así que ninguna pieza repite su entrada. */
 [data-details-restored] .sv-details-entry,
 [data-details-restored] .sv-mobile-poster-reveal,
-[data-details-restored] .sv-mobile-actions-reveal > * > * {
+[data-details-restored] .sv-mobile-actions-reveal > * > *,
+[data-details-restored] .sv-mobile-actions-rise {
   animation: none;
 }
 
