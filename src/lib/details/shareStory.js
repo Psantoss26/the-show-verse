@@ -155,8 +155,8 @@ function historyDates(history) {
 /**
  * Payload desde el estado de la ficha.
  *
- * `review` solo se incluye si el usuario lo pide en la hoja de compartir (es un
- * texto suyo que se va a publicar) y nunca si está marcada como spoiler.
+ * La reseña propia va siempre que exista, salvo si está marcada como spoiler
+ * (el vídeo se publica y lo ve quien no ha visto el título).
  */
 export function buildShareStoryPayload({
   type,
@@ -170,7 +170,6 @@ export function buildShareStoryPayload({
   episodeImdbRatings,
   episodeUserRatings,
   review,
-  includeReview = false,
   details,
 }) {
   const isTv = type === "tv";
@@ -205,7 +204,7 @@ export function buildShareStoryPayload({
 
   const reviewText = text(review?.comment ?? review?.text, 2000);
   const reviewData =
-    includeReview && reviewText && !review?.spoiler
+    reviewText && !review?.spoiler
       ? { text: reviewText, date: isoDate(review?.created_at ?? review?.date ?? null) }
       : null;
 

@@ -9048,8 +9048,8 @@ export default function DetailsClient({
   );
 
   // VÍDEO COMPARTIBLE: lo que la imagen no cabe (visionados, la reseña propia y
-  // los detalles). Son los datos crudos: la hoja de compartir decide si incluye
-  // la reseña (apagado por defecto) y arma el payload con buildShareStoryPayload.
+  // los detalles). Son los datos crudos: la hoja de compartir arma el payload con
+  // buildShareStoryPayload (la reseña va siempre, salvo con spoilers).
   const shareStoryPeople = (
     type === "movie" ? movieDirectorsCrew : data?.created_by || []
   )
