@@ -70,14 +70,14 @@ export function CompactBadge({
           : undefined
       }
       className={`
-        relative flex items-center gap-2.5 group group/badge select-none min-w-0 ${large ? "max-sm:gap-[calc(12*var(--sb-u,1px))]" : ""}
+        relative flex items-center gap-2.5 group group/badge select-none min-w-0 ${large ? "phone-sb:gap-[calc(12*var(--sb-u,1px))]" : ""}
         ${isInteractive ? "cursor-pointer" : ""}
         ${className}
       `}
       aria-label={titleText}
     >
       <span
-        className={`grid h-6 shrink-0 place-items-center ${large ? "max-sm:h-[calc(28*var(--sb-u,1px))] max-sm:min-w-[calc(32*var(--sb-u,1px))]" : ""} ${logoWrapClassName}`}
+        className={`grid h-6 shrink-0 place-items-center ${large ? "phone-sb:h-[calc(28*var(--sb-u,1px))] phone-sb:min-w-[calc(32*var(--sb-u,1px))]" : ""} ${logoWrapClassName}`}
       >
         <OptimizedImage
           src={logo}
@@ -85,7 +85,7 @@ export function CompactBadge({
           draggable="false"
           className={`
             max-h-5 max-w-6 w-auto object-contain drop-shadow-sm transition-transform duration-300 group-hover:scale-110
-            ${large ? "max-sm:max-h-[calc(24*var(--sb-u,1px))] max-sm:max-w-[calc(32*var(--sb-u,1px))]" : ""}
+            ${large ? "phone-sb:max-h-[calc(24*var(--sb-u,1px))] phone-sb:max-w-[calc(32*var(--sb-u,1px))]" : ""}
             ${logoClassName}
           `}
         />
@@ -93,7 +93,7 @@ export function CompactBadge({
 
       <div className="flex flex-col justify-center leading-none min-w-0">
         <div className="flex items-baseline gap-1 min-w-0">
-          <span className={`${phone ? "text-lg" : "text-lg sm:text-xl"} ${large ? "max-sm:text-[length:calc(22*var(--sb-u,1px))]" : ""} font-black text-white/85 group-hover:text-white tracking-tight drop-shadow-sm transition-colors`}>
+          <span className={`${phone ? "text-lg" : "text-lg sm:text-xl"} ${large ? "phone-sb:text-[length:calc(22*var(--sb-u,1px))]" : ""} font-black text-white/85 group-hover:text-white tracking-tight drop-shadow-sm transition-colors`}>
             {value != null ? value : "-"}
           </span>
 
@@ -114,7 +114,7 @@ export function CompactBadge({
           {sub && (
             <span
               className={`
-                ${phone ? "text-[11px]" : "text-[11px] sm:text-xs"} ${large ? "max-sm:text-[length:calc(12*var(--sb-u,1px))]" : ""} font-bold text-white/65 group-hover:text-white/80 transition-colors tracking-wide
+                ${phone ? "text-[11px]" : "text-[11px] sm:text-xs"} ${large ? "phone-sb:text-[length:calc(12*var(--sb-u,1px))]" : ""} font-bold text-white/65 group-hover:text-white/80 transition-colors tracking-wide
                 truncate
                 ${hideSubOnMobile ? (phone ? "hidden" : "hidden sm:inline") : ""}
               `}

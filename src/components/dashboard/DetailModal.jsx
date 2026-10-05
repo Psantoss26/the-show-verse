@@ -104,7 +104,8 @@ import { dashboardDetailHref } from "@/lib/dashboard/detailHref";
 
 // Componentes reales de la ficha completa (standalone) para que las tarjetas,
 // badges, pestañas y acciones sean IDÉNTICAS a DetailsClient.
-import DetailsScoreboardPanel from "@/components/details/DetailsScoreboardPanel";
+import DetailsScoreboardPanel, { ScoreboardPill } from "@/components/details/DetailsScoreboardPanel";
+import { ActionShareButton } from "@/components/details/DetailHeaderBits";
 import {
   FollowingActivityAvatars,
   FollowingActivityStrip,
@@ -3904,8 +3905,15 @@ export default function DetailModal({
 
             {/* Panel de puntuaciones + plataformas: MISMO componente
                 presentacional que DetailsClient (badges CompactBadge + fila de
-                stats), con plataformas integradas en la barra superior. */}
-            <div style={mobileDetails ? PHONE_SCALED_BLOCK_STYLE : undefined}>
+                stats), con plataformas integradas en la barra superior.
+                FICHA DE TELÉFONO: el diseño móvil de DetailsClient. El marcador
+                solo lleva puntuaciones y stats repartidas a lo ancho
+                (`mobileScoresOnly`) y debajo van Plataformas y Compartir como
+                dos píldoras a media línea y la franja de amigos. */}
+            <div
+              style={mobileDetails ? PHONE_SCALED_BLOCK_STYLE : undefined}
+              className={mobileDetails ? "grid grid-cols-2 gap-x-3" : undefined}
+            >
               <DetailsScoreboardPanel
                 loading={loading}
                 // El pie de estadísticas de Trakt llega en su propia consulta
@@ -3972,7 +3980,7 @@ export default function DetailModal({
                 // hueco reservado mientras la respuesta de OMDb está en vuelo.
                 rt={optionalScoreBadge(data.rtScore, ratingLinks.rt)}
                 mc={optionalScoreBadge(data.mcScore, ratingLinks.mc)}
-                compactToolbar={mobileDetails}
+                mobileScoresOnly={mobileDetails}
                 // En tablet la ventana supera `sm` aunque el drawer sea
                 // estrecho: sin esto el marcador salía con la disposición
                 // ancha y puntuaciones y stats se partían en dos filas.
@@ -4008,13 +4016,40 @@ export default function DetailModal({
                   ) : null
                 }
                 showFavoritedStat={!isEpisode}
-                className="max-sm:-mx-2 max-sm:w-[calc(100%+1rem)]"
+                className={mobileDetails ? "col-span-2" : "max-sm:-mx-2 max-sm:w-[calc(100%+1rem)]"}
               />
+              {mobileDetails ? (
+                <>
+                  <ScoreboardPill
+                    icon={MonitorPlay}
+                    label="Plataformas"
+                    onClick={(event) => {
+                      stopNestedModalOpeningEvent(event);
+                      setPlatformsOpen(true);
+                    }}
+                    aria-haspopup="dialog"
+                    aria-label="Abrir plataformas disponibles"
+                    className="mt-3"
+                  />
+                  <ActionShareButton
+                    variant="pill"
+                    className="mt-3"
+                    title={title}
+                    text={`Echa un vistazo a ${title} en The Show Verse`}
+                    url={
+                      typeof window !== "undefined" && item?.id
+                        ? `${window.location.origin}/details/${mediaType}/${item.id}`
+                        : undefined
+                    }
+                  />
+                </>
+              ) : null}
               <FollowingActivityStrip
                 data={followingActivity}
                 onOpen={goToFollowingActivity}
                 phoneLayout={mobileDetails}
-                className={mobileDetails ? "mt-3" : "mt-3 sm:hidden"}
+                compactWatchedSummary={mobileDetails}
+                className={mobileDetails ? "col-span-2 mt-3" : "mt-3 sm:hidden"}
               />
             </div>
 

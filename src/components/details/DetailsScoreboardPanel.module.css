@@ -98,3 +98,14 @@
     --sb-su: clamp(0.7px, calc((100cqi - 46px) / 272), 1px);
   }
 }
+
+/* Ficha de teléfono del panel lateral: la ventana es de escritorio, pero el
+   marcador es el de teléfono (`data-phone-scoreboard`, ver la variante
+   `phone-sb` en globals.css). Misma escala. */
+[data-phone-scoreboard] .spreadScores {
+  --sb-u: clamp(0.6px, calc((100cqi - 48px) / 243), 1px);
+}
+
+[data-phone-scoreboard] .spreadStats {
+  --sb-su: clamp(0.7px, calc((100cqi - 46px) / 272), 1px);
+}

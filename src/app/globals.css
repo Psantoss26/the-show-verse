@@ -28,6 +28,19 @@
   }
 }
 
+/* MARCADOR DE TELÉFONO de la ficha (`mobileScoresOnly` de
+ * DetailsScoreboardPanel): lo mismo que `max-sm:` y, además, dentro de un
+ * marcador con `data-phone-scoreboard`, que es la ficha de teléfono del panel
+ * lateral. Ahí la ventana es de escritorio y `max-sm:` nunca se cumpliría. */
+@custom-variant phone-sb {
+  @media (width < 40rem) {
+    @slot;
+  }
+  &:where([data-phone-scoreboard], [data-phone-scoreboard] *) {
+    @slot;
+  }
+}
+
 /* Layout ANCHO del FeaturedHero (backdrop de fondo + información en la esquina
  * inferior izquierda). Lo que no es `hero-wide:` usa el layout móvil (póster +
  * información debajo): móviles y también tablets en VERTICAL, donde un
