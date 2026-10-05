@@ -60,6 +60,14 @@ export function pairDevice(token, origin) {
   return call("pair", false, token, origin) === true;
 }
 
+/**
+ * Dentro de la app completa con The Show Verse Sync instalada: el token es para
+ * Sync, que es quien sincroniza. La app abre su pantalla de emparejamiento.
+ */
+export function pairSyncApp(token, origin) {
+  return call("pairSyncApp", false, token, origin) === true;
+}
+
 export function unpairDevice() {
   return call("unpair", false) === true;
 }
@@ -99,6 +107,23 @@ export function openAccessibilitySettings() {
 
 export function openServerSettings() {
   call("openServerSettings", undefined);
+}
+
+/**
+ * Registro nativo de las detecciones de ESTE móvil (lista + corrección). La web
+ * ya no las enseña: son de la app. Devuelve false si la app es anterior y no
+ * tiene esa pantalla.
+ */
+export function openDeviceDetections() {
+  return call("openDetections", "missing") !== "missing";
+}
+
+/**
+ * Abre The Show Verse Sync. Con ella instalada la app completa le deja la
+ * sincronización y el registro (`syncStatus().delegatedToSyncApp`).
+ */
+export function openSyncApp() {
+  return call("openSyncApp", false) === true;
 }
 
 /**

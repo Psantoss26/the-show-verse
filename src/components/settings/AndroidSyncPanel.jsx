@@ -12,15 +12,60 @@
 // Este componente solo se monta si `useAndroidApp()` es cierto; fuera de la app
 // la tarjeta de Ajustes sigue funcionando exactamente igual que siempre.
 
-import { CheckCircle2, AlertTriangle, ExternalLink, Loader2 } from "lucide-react";
+import { CheckCircle2, AlertTriangle, ExternalLink, Loader2, Radar } from "lucide-react";
 
 import {
   openAccessibilitySettings,
+  openDeviceDetections,
   openNotificationAccessSettings,
+  openSyncApp,
   openSyncPanel,
   setAccessibilityDetection,
   setSyncPaused,
 } from "@/lib/android/appBridge";
+
+// Con The Show Verse Sync instalada, la app completa le deja la sincronización y
+// el registro de detecciones: aquí solo se explica y se lleva a ella.
+function DelegadoEnSync({ onPair, pairing, error }) {
+  return (
+    <div className="space-y-2 border-t border-white/5 pt-4">
+      <div className="flex items-start gap-2.5 rounded-2xl border border-white/5 bg-white/[0.03] p-3">
+        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" aria-hidden="true" />
+        <div className="min-w-0">
+          <p className="text-xs font-bold text-white">La sincronización la hace The Show Verse Sync</p>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-400">
+            Está instalada en este móvil, así que esta app deja de detectar para no duplicar nada. La
+            vinculación, los permisos y el registro de detecciones están en Sync.
+          </p>
+        </div>
+      </div>
+      {error ? (
+        <p className="rounded-xl border border-red-500/20 bg-red-500/5 p-2.5 text-xs text-red-400">
+          {error}
+        </p>
+      ) : null}
+      <div className="flex flex-wrap items-center gap-2 pt-1">
+        <button
+          type="button"
+          onClick={openSyncApp}
+          className="flex min-h-9 items-center gap-1.5 rounded-lg bg-white/5 px-3.5 text-xs font-bold text-zinc-300 transition hover:bg-white/10"
+        >
+          Abrir The Show Verse Sync
+          <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          onClick={onPair}
+          disabled={pairing}
+          className="flex min-h-9 items-center gap-1.5 rounded-lg bg-emerald-500/10 px-3.5 text-xs font-bold text-emerald-200 transition hover:bg-emerald-500/20 disabled:opacity-60"
+        >
+          {pairing ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : null}
+          Vincular Sync
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function Fila({ ok, titulo, detalle, accion, onAccion }) {
   return (
@@ -64,6 +109,10 @@ export default function AndroidSyncPanel({
   const a11yActiva = a11yConcedida && !!status?.accessibilityEnabled;
   const pausada = !!status?.paused;
   const pendientes = Number(status?.pendingSyncEvents) || 0;
+
+  if (status?.delegatedToSyncApp) {
+    return <DelegadoEnSync onPair={onPair} pairing={pairing} error={error} />;
+  }
 
   return (
     <div className="space-y-2 border-t border-white/5 pt-4">
@@ -131,6 +180,17 @@ export default function AndroidSyncPanel({
       ) : null}
 
       <div className="flex flex-wrap items-center gap-2 pt-1">
+        {/* Registro de detecciones del móvil: nativo, ya no está en la web. */}
+        {emparejado ? (
+          <button
+            type="button"
+            onClick={openDeviceDetections}
+            className="flex min-h-9 items-center gap-1.5 rounded-lg bg-emerald-500/10 px-3.5 text-xs font-bold text-emerald-200 transition hover:bg-emerald-500/20"
+          >
+            <Radar className="h-3.5 w-3.5" aria-hidden="true" />
+            Detecciones de este móvil
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={openSyncPanel}

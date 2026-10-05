@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Textos propios de The Show Verse Sync: sustituyen a los de src/main con el
+     mismo nombre. -->
+<resources>
+    <string name="app_name">The Show Verse Sync</string>
+    <string name="status_not_paired">No vinculado. Abre The Show Verse (la web o la app instalada desde el navegador), entra en Ajustes → Conexiones y pulsa «Vincular app Android».</string>
+    <string name="detections_not_paired">Este dispositivo no está vinculado. Abre The Show Verse → Ajustes → Conexiones y pulsa «Vincular app Android».</string>
+</resources>

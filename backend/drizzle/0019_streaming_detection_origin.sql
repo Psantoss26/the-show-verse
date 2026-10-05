@@ -1,0 +1,2 @@
+ALTER TABLE "streaming_detections" ADD COLUMN "origin" text;--> statement-breakpoint
+ALTER TABLE "streaming_detections" ADD CONSTRAINT "chk_streaming_detections_origin" CHECK (origin IS NULL OR origin IN ('android', 'browser'));

@@ -27,15 +27,23 @@ test('streaming detections: corrections fix stored data and teach the resolver',
   await app.register(authRoutes, { prefix: '/v1/auth' });
   await app.register(detectionRoutes, { prefix: '/v1/streaming' });
 
-  const makeUser = async () => {
+  // `uidPrefix` simula el emparejamiento real: 'mobile:' (app Android) o
+  // 'browser:' (extensión). Sin prefijo, la detección queda sin origen.
+  const makeUser = async (uidPrefix = '') => {
     const id = randomUUID();
     const token = `tsv_netflix_${randomUUID()}`;
     await db.insert(users).values({ id, username: `test-${id}`, email: `${id}@example.test` });
-    await db.insert(connectedAccounts).values({ userId: id, provider: 'netflix', providerUid: id, accessToken: hashToken(token) });
+    await db.insert(connectedAccounts).values({ userId: id, provider: 'netflix', providerUid: `${uidPrefix}${id}`, accessToken: hashToken(token) });
     return { id, token };
   };
   const created = [];
-  const user = async () => { const u = await makeUser(); created.push(u.id); return u; };
+  const user = async (uidPrefix) => { const u = await makeUser(uidPrefix); created.push(u.id); return u; };
+  // Mismo usuario con un segundo dispositivo vinculado (otro token).
+  const addDevice = async (u, uidPrefix) => {
+    const token = `tsv_netflix_${randomUUID()}`;
+    await db.insert(connectedAccounts).values({ userId: u.id, provider: 'netflix', providerUid: `${uidPrefix}${randomUUID()}`, accessToken: hashToken(token) });
+    return { id: u.id, token };
+  };
   t.after(async () => {
     await db.delete(users).where(inArray(users.id, created));
     await db.delete(detectionRules).where(eq(detectionRules.owner, 'global'));
@@ -168,5 +176,42 @@ test('streaming detections: corrections fix stored data and teach the resolver',
     const list = await call('GET', '/v1/streaming/detections', { userId: owner.id });
     assert.equal(list.json.results.length, 1);
     assert.equal(list.json.results[0].detectedSeason, 2);
+  });
+
+  await t.test('mobile detections live in the app: the web lists only the extension ones', async () => {
+    const phone = await user('mobile:');
+    const browser = await addDevice(phone, 'browser:');
+    const { json: { detectionId: fromPhone } } = await record(phone);
+    const { json: { detectionId: fromBrowser } } = await record(browser, { fingerprint: 'netflix|otra', triggerText: 'Otra' });
+
+    const web = await call('GET', '/v1/streaming/detections', { userId: phone.id });
+    assert.deepEqual(web.json.results.map((d) => d.id), [fromBrowser]);
+
+    const device = await call('GET', '/v1/streaming/device/detections', { token: phone.token });
+    assert.equal(device.status, 200);
+    assert.deepEqual(device.json.results.map((d) => d.id), [fromPhone]);
+
+    const one = await call('GET', `/v1/streaming/device/detections/${fromPhone}`, { token: phone.token });
+    assert.equal(one.json.detection.id, fromPhone);
+  });
+
+  await t.test('the app corrects with its token; the extension token cannot use the app endpoints', async () => {
+    const phone = await user('mobile:');
+    const browser = await addDevice(phone, 'browser:');
+    const { json: { detectionId } } = await record(phone);
+
+    assert.equal((await call('GET', '/v1/streaming/device/detections', {})).status, 401);
+    assert.equal((await call('GET', '/v1/streaming/device/detections', { token: browser.token })).status, 403);
+
+    const res = await call('POST', `/v1/streaming/device/detections/${detectionId}/correction`, {
+      token: phone.token, payload: { verdict: 'not_a_title' },
+    });
+    assert.equal(res.status, 200, JSON.stringify(res.json));
+    assert.equal(res.json.detection.status, 'corrected');
+
+    const stranger = await user('mobile:');
+    assert.equal((await call('POST', `/v1/streaming/device/detections/${detectionId}/correction`, {
+      token: stranger.token, payload: { verdict: 'not_a_title' },
+    })).status, 404);
   });
 });

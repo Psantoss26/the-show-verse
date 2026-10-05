@@ -591,6 +591,9 @@ export const streamingDetections = pgTable('streaming_detections', {
   confidence: text('confidence'),
   source: text('source').default('search').notNull(),     // 'search' | 'user_rule' | 'global_rule'
   status: text('status').default('active').notNull(),     // 'active' | 'corrected' | 'dismissed'
+  // Cliente que la envió: 'android' (app) | 'browser' (extensión) | null (filas
+  // anteriores al campo). Ver lib/detectionOrigin.js.
+  origin: text('origin'),
   // Destino tras corregir (null si no había título): los pings que sigan
   // llegando con este id se aplican aquí.
   correctedTmdbId: integer('corrected_tmdb_id'),
@@ -605,6 +608,7 @@ export const streamingDetections = pgTable('streaming_detections', {
   kindCheck: check('chk_streaming_detections_kind', sql`kind IN ('detail', 'playback')`),
   statusCheck: check('chk_streaming_detections_status', sql`status IN ('active', 'corrected', 'dismissed')`),
   mediaTypeCheck: check('chk_streaming_detections_media_type', sql`media_type IN ('movie', 'tv')`),
+  originCheck: check('chk_streaming_detections_origin', sql`origin IS NULL OR origin IN ('android', 'browser')`),
 }));
 
 // Lo que dijo cada usuario de una detección. Es el registro de verdad del que

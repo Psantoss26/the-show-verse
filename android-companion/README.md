@@ -1,18 +1,47 @@
-# The Show Verse — app oficial de Android
+# The Show Verse — apps de Android
 
-**Una sola app**: The Show Verse completo (lo mismo que la web, en móvil y
-tablet) más la sincronización automática de lo que ves en las apps de streaming.
-Antes eran dos cosas —la PWA por un lado y la APK "The Show Verse Sync" por
-otro—; ahora se instalan juntas en un único paquete, que es lo que se publica en
-Play Store.
+De este proyecto salen **dos apps** (sabores de Gradle):
 
-- **applicationId:** `com.theshowverse.app` (la APK anterior era
-  `com.theshowverse.sync`; son paquetes distintos y conviven).
+| App | Paquete | Qué es |
+|---|---|---|
+| **The Show Verse** (`full`) | `com.theshowverse.app` | La web completa en una carcasa nativa, más la sincronización de streaming. |
+| **The Show Verse Sync** (`sync`) | `com.theshowverse.sync` | Solo la sincronización y el **registro de detecciones**, para quien usa la PWA y no quiere la app completa. Sin WebView. |
+
+Se puede tener la PWA más Sync, solo la completa o las dos apps. Con las dos
+instaladas, **la completa le cede la sincronización a Sync** (`Delegacion`): deja
+de detectar y su panel solo explica que la sincronización es de Sync. Así nunca
+detectan las dos a la vez.
+
+- **Sync** usa el paquete de la antigua APK sideload (2.2, versionCode 13). Si
+  está firmada con la misma clave, la nueva (versionCode 20) se instala encima
+  como actualización. Si no, hay que desinstalar la vieja una vez.
 - **Mínimo:** Android 8.0 (API 26). **Objetivo:** API 35.
-- **Tablets:** soportadas; la interfaz es la web responsive, sin bloqueo de
-  orientación.
+- **Tablets:** soportadas; la interfaz de la completa es la web responsive.
 
 ## Cómo está montada
+
+```
+src/main   ── lo de las DOS apps
+  MediaListenerService, AccessibilityStreamingService  (detección)
+  QuickAccessNotifier   aviso de acceso rápido («Abrir ficha» / «No es correcto»)
+  MainActivity          panel de sincronización (inicio de Sync)
+  DeteccionesActivity   registro de detecciones del móvil (últimos 7 días)
+  CorreccionActivity    corrección: «no había ficha» / «era otro título»
+  PairingActivity       theshowverse://pair
+  Delegacion            la completa cede la sincronización si Sync está instalada
+
+src/full   ── solo la app completa (WebView, puente, Google, push, ajustes)
+src/sync   ── solo Sync (MainActivity como lanzador, textos propios)
+AppVariante (en full y en sync) ── dónde se abre la ficha: en el WebView
+                                   (completa) o en la PWA/navegador (Sync)
+```
+
+El registro de detecciones del móvil es **nativo**. Va con el token de
+vinculación contra `/api/streaming/device/*`, porque Sync no tiene sesión web.
+La web (`/detections`) solo enseña las de la extensión del navegador: el
+backend guarda el origen de cada detección (`android` / `browser`).
+
+### La app completa
 
 ```
 WebAppActivity  ── carcasa: WebView a pantalla completa con theshowverse.com
@@ -56,6 +85,9 @@ código puro y con tests: de ahí depende quién puede usar el puente.
 
 ## Notificaciones push
 
+Solo la app completa. Sync no tiene web a la que entregarlos: con la PWA, los
+avisos llegan por Web Push.
+
 La app recibe los avisos de The Show Verse (progreso sincronizado, vistos,
 recordatorios de puntuar) con **Firebase Cloud Messaging**: el WebView no admite
 Web Push. `PushMessagingService` los recibe; con la app delante se los pasa a la
@@ -72,10 +104,21 @@ Hace falta JDK 17 y el SDK de Android (o Android Studio Giraffe+).
 
 ```bash
 cd android-companion
-gradle wrapper            # una vez, si no existe ./gradlew
-./gradlew assembleDebug   # APK: app/build/outputs/apk/debug/app-debug.apk
-./gradlew test            # tests unitarios (WebOrigin, SignalBuilder, …)
+gradle wrapper                 # una vez, si no existe ./gradlew
+./gradlew assembleFullDebug    # app/build/outputs/apk/full/debug/app-full-debug.apk
+./gradlew assembleSyncDebug    # app/build/outputs/apk/sync/debug/app-sync-debug.apk
+./gradlew testFullDebugUnitTest testSyncDebugUnitTest
 ```
+
+Sin JDK local, con Docker:
+
+```bash
+docker run --rm --user root -v "$PWD":/project -w /project cimg/android:2025.01 \
+  bash -lc 'gradle testFullDebugUnitTest testSyncDebugUnitTest assembleFullDebug assembleSyncDebug --no-daemon'
+```
+
+Firebase (push) es solo de la completa: `app/google-services.json` lleva el
+cliente de `com.theshowverse.app` y la tarea de Google Services de Sync se salta.
 
 ### Probar contra tu propio servidor
 
@@ -113,10 +156,18 @@ en [`docs/android-play-store.md`](../docs/android-play-store.md#3bis-login-con-g
 
 ## Emparejamiento y permisos
 
-Dentro de la app: **Perfil → Ajustes → Conexiones → The Show Verse Sync**. Ahí se
-ve, en una sola pantalla, si el dispositivo está vinculado y qué permisos faltan,
-con su botón para concederlos. El deep link `theshowverse://pair` sigue
-funcionando para quien tenga instalada la APK antigua desde el navegador.
+- **Con la app completa:** Perfil → Ajustes → Conexiones → The Show Verse Sync.
+  Ahí se ve en una sola pantalla si el dispositivo está vinculado y qué
+  permisos faltan, con un botón para conceder cada uno.
+- **Con la PWA y Sync:** el mismo sitio en la PWA, botón «Vincular app
+  Android». Abre Sync con un enlace `intent://` dirigido a su paquete
+  (`src/lib/android/syncPairLink.js`), para que no conteste la completa si
+  también está instalada. El enlace que se copia es el de siempre,
+  `theshowverse://pair`. Sync sin vincular enseña un botón que abre esos
+  Ajustes.
+- **Con las dos apps:** la vinculación es de Sync. Desde la web de la
+  completa, «Vincular Sync» le pasa el token por el puente
+  (`pairSyncApp`).
 
 Para que la sincronización funcione hacen falta dos cosas:
 

@@ -3,6 +3,7 @@ package com.theshowverse.sync
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
@@ -23,12 +24,13 @@ import androidx.core.content.ContextCompat
 import com.theshowverse.sync.databinding.ActivityMainBinding
 
 /**
- * PANEL NATIVO DE SINCRONIZACIÓN (permisos, apps a sincronizar, registro).
+ * PANEL NATIVO DE SINCRONIZACIÓN (permisos, apps a sincronizar, registro de
+ * eventos y de detecciones).
  *
- * Ya NO es la pantalla de inicio: desde que la app incluye The Show Verse
- * completo, el punto de entrada es [WebAppActivity] y aquí se llega desde
- * Ajustes de la web (puente JS) o al emparejar por enlace. El nombre de la clase
- * se mantiene para no romper referencias antiguas.
+ * En The Show Verse Sync es la pantalla de inicio. En la app completa se llega
+ * desde Ajustes de la web (puente JS) o al emparejar por enlace, y si Sync está
+ * instalada solo explica que la sincronización es de ella (ver [Delegacion]).
+ * El nombre de la clase se mantiene para no romper referencias antiguas.
  */
 class MainActivity : AppCompatActivity() {
 
@@ -74,9 +76,15 @@ class MainActivity : AppCompatActivity() {
             render()
         }
         binding.testButton.setOnClickListener { sendTest() }
-        binding.perfButton.setOnClickListener {
-            startActivity(Intent(this, RendimientoActivity::class.java))
+        // Diagnóstico de fluidez de la web: solo existe en la app completa.
+        val rendimiento = AppVariante.rendimiento(this)
+        binding.perfButton.visibility = if (rendimiento != null) View.VISIBLE else View.GONE
+        binding.perfButton.setOnClickListener { rendimiento?.let { startActivity(it) } }
+        binding.detectionsButton.setOnClickListener {
+            startActivity(DeteccionesActivity.intentFor(this))
         }
+        binding.delegatedOpenButton.setOnClickListener { Delegacion.abrirSync(this) }
+        binding.openWebButton.setOnClickListener { abrirWeb() }
     }
 
     /** Android 13+ requiere permiso en runtime para publicar la notificación. */
@@ -130,7 +138,37 @@ class MainActivity : AppCompatActivity() {
     private fun hasNotificationAccess(): Boolean =
         NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName)
 
+    /** Ajustes de la web, donde se vincula (Sync no tiene web dentro). */
+    private fun abrirWeb() {
+        val origen = (prefs.origin ?: BuildConfig.DEFAULT_ORIGIN).trimEnd('/')
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("$origen/profile/settings")))
+        } catch (e: Exception) {
+            /* Sin navegador: no se puede hacer más. */
+        }
+    }
+
+    /** Con la sincronización cedida a Sync, solo se ve el título y el aviso. */
+    private fun renderCedida(cedida: Boolean) {
+        binding.delegatedPanel.visibility = if (cedida) View.VISIBLE else View.GONE
+        val contenido = binding.content
+        for (i in 0 until contenido.childCount) {
+            val hijo = contenido.getChildAt(i)
+            if (i == 0 || hijo === binding.delegatedPanel) continue
+            if (cedida) {
+                hijo.tag = hijo.tag ?: hijo.visibility
+                hijo.visibility = View.GONE
+            } else if (hijo.tag is Int) {
+                hijo.visibility = hijo.tag as Int
+                hijo.tag = null
+            }
+        }
+    }
+
     private fun render() {
+        val cedida = Delegacion.cedida(this)
+        renderCedida(cedida)
+        if (cedida) return
         val access = hasNotificationAccess()
         binding.pauseSwitch.isChecked = prefs.paused
         binding.indicatorSwitch.isChecked = prefs.indicatorEnabled
@@ -145,6 +183,10 @@ class MainActivity : AppCompatActivity() {
             binding.statusText.append("\n$pending envíos pendientes de sincronizar")
         }
         binding.grantButton.visibility = if (access) View.GONE else View.VISIBLE
+        binding.detectionsButton.visibility = if (prefs.isPaired()) View.VISIBLE else View.GONE
+        // En la app completa se vincula desde su propia web; en Sync, fuera.
+        binding.openWebButton.visibility =
+            if (!prefs.isPaired() && !BuildConfig.CEDE_A_SYNC) View.VISIBLE else View.GONE
 
         // Detección de ficha por accesibilidad: activa solo si el servicio está
         // concedido en Ajustes Y el toggle de la app está encendido.

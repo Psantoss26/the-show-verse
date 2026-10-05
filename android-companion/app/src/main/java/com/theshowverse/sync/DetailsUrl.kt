@@ -38,9 +38,7 @@ object DetailsUrl {
 
     private val UUID_RE = Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 
-    /** Página para corregir una detección, o null si no hay una válida. */
-    fun correction(origin: String?, detectionId: String?): String? {
-        if (origin.isNullOrBlank() || detectionId == null || !UUID_RE.matches(detectionId)) return null
-        return "${origin.trimEnd('/')}/detections/$detectionId"
-    }
+    /** ¿Es un id de detección válido (UUID)? Llega del servidor y acaba en una URL. */
+    fun isDetectionId(detectionId: String?): Boolean =
+        detectionId != null && UUID_RE.matches(detectionId)
 }

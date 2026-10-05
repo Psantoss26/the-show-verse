@@ -1,9 +1,9 @@
 "use client";
 
-// Detecciones recientes de la sincronización de streaming (últimos 7 días). Sirve
-// para corregir una detección cuya notificación ya no está: en Android cada
-// título nuevo sustituye al anterior y en el navegador el indicador desaparece
-// al cambiar de página.
+// Detecciones recientes de la EXTENSIÓN del navegador (últimos 7 días). Sirve
+// para corregir una detección cuyo indicador ya no está: desaparece al cambiar
+// de página. Las del móvil no salen aquí: tienen su registro en la app de
+// Android (The Show Verse Sync o la app completa), que el backend filtra.
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -135,7 +135,7 @@ export default function DetectionsClient() {
         <Radar className="mb-3 h-8 w-8 text-zinc-600" aria-hidden="true" />
         <p className="text-sm font-bold text-zinc-300">Sin detecciones en los últimos 7 días</p>
         <p className="mt-1 max-w-xs text-xs leading-relaxed text-zinc-500">
-          Aparecerán aquí los títulos que detecten la extensión del navegador y la app Android.
+          Aparecerán aquí los títulos que detecte la extensión del navegador. Los del móvil, en la app The Show Verse Sync.
         </p>
       </div>
     );
@@ -153,11 +153,12 @@ export default function DetectionsClient() {
     <main className="mx-auto w-full max-w-2xl px-4 pb-28 pt-6 sm:pt-10">
       <section className={`${LIQUID_GLASS_PANEL} rounded-[2rem] p-5 sm:p-7`} aria-labelledby="detections-title">
         <h1 id="detections-title" className="text-xl font-bold text-white">
-          Detecciones recientes
+          Detecciones del navegador
         </h1>
         <p className="mb-5 mt-1 text-sm leading-relaxed text-zinc-400">
-          Lo que han detectado la extensión y la app Android en los últimos 7 días. Si alguna no era
-          correcta, corrígela: se arregla lo guardado y la sincronización aprende de ello.
+          Lo que ha detectado la extensión del navegador en los últimos 7 días. Si alguna no era
+          correcta, corrígela: se arregla lo guardado y la sincronización aprende de ello. Las
+          detecciones del móvil se revisan en la app The Show Verse Sync.
         </p>
         {body}
       </section>

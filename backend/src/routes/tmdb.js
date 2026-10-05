@@ -6,6 +6,7 @@ import { and, eq, gt } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { tmdbCache } from '../db/schema.js';
 import { cacheGet, cacheSet } from '../lib/redis.js';
+import { normalizeTitleSearch } from '../lib/titleSearch.js';
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
 const TMDB_BASE = 'https://api.themoviedb.org/3';
@@ -136,6 +137,20 @@ async function withPersistentTmdbCache(cacheKey, ttlSeconds, fetchFn) {
   }
 
   return value;
+}
+
+/**
+ * Películas y series para un texto, con la misma caché que `/tmdb/search`.
+ * Lo usa el buscador de la corrección de detecciones de la app Android
+ * (routes/streamingDetections.js), que no pasa por la sesión web.
+ */
+export async function searchTmdbTitles(q) {
+  const endpoint = '/search/multi';
+  const cacheKey = `tmdb:search:${endpoint}:${q}:1`;
+  const data = await withPersistentTmdbCache(cacheKey, TTL.search, () =>
+    tmdbFetch(endpoint, { query: q, page: 1 })
+  );
+  return normalizeTitleSearch(data?.results);
 }
 
 export default async function tmdbRoutes(fastify) {

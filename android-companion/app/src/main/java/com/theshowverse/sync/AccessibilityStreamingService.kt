@@ -51,6 +51,8 @@ class AccessibilityStreamingService : AccessibilityService() {
         val pkg = e.packageName?.toString() ?: return
         if (!Platforms.KNOWN.containsKey(pkg)) return
         if (p.paused || !p.a11yEnabled || !p.isPaired()) return
+        // Con The Show Verse Sync instalada, detecta ella (ver Delegacion).
+        if (Delegacion.cedida(this)) return
         // En Prime Video y Crunchyroll la lectura de la pantalla también alimenta la
         // sincronización (serie, episodio y tiempo del reproductor), no solo el
         // acceso rápido: no depende del indicador, que QuickAccessNotifier ya
