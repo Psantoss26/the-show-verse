@@ -62,7 +62,7 @@ test("series plays use the episode progress", () => {
       details,
     }),
   );
-  assert.deepEqual(story.plays, { percent: 45, watched: 27, total: 60, last: null });
+  assert.deepEqual(story.plays, { percent: 45, watched: 27, total: 60, last: null, resume: null });
 });
 
 test("review is opt-in and never includes spoilers", () => {
@@ -168,4 +168,88 @@ test("scene enters from below and leaves upwards", () => {
   const leaving = storyFrame(timeline, scene.end - 0.1).scenes[0];
   assert.ok(entering.offsetY > 0 && entering.alpha < 1);
   assert.ok(leaving.offsetY < 0 && leaving.alpha < 1);
+});
+
+test("continuar viendo: la película a medias sale en visionados con su porcentaje", () => {
+  const card = { actions: { rating: null }, scores: {} };
+  const unwatched = sanitizeShareStory(
+    buildShareStoryPayload({ type: "movie", watched: false, continueWatching: { percent: 42 }, details }),
+  );
+  assert.deepEqual(unwatched.plays, { count: 0, dates: [], last: null, resume: { percent: 42, season: null, episode: null } });
+  assert.equal(storySceneIds(card, unwatched)[0], "plays");
+
+  // Ya vista y revisionándose: conserva las veces y añade el progreso.
+  const rewatch = sanitizeShareStory(
+    buildShareStoryPayload({ type: "movie", watched: true, plays: 2, continueWatching: { percent: 0.4 * 100 }, details }),
+  );
+  assert.equal(rewatch.plays.count, 2);
+  assert.equal(rewatch.plays.resume.percent, 40);
+
+  // Fuera de 1-99% no cuenta como en curso.
+  for (const percent of [0, 100, Number.NaN]) {
+    const story = sanitizeShareStory(buildShareStoryPayload({ type: "movie", watched: false, continueWatching: { percent }, details }));
+    assert.equal(story.plays, null);
+  }
+});
+
+test("continuar viendo en una serie: porcentaje con su episodio", () => {
+  const story = sanitizeShareStory(
+    buildShareStoryPayload({
+      type: "tv",
+      tvProgress: { percent: 45, watched: 27, total: 60 },
+      continueWatching: { percent: 63, season: 2, episode: 3 },
+      details,
+    }),
+  );
+  assert.deepEqual(story.plays.resume, { percent: 63, season: 2, episode: 3 });
+});
+
+test("series: episodios vistos con su nota de IMDb y la del usuario, solo los vistos", () => {
+  const story = sanitizeShareStory(
+    buildShareStoryPayload({
+      type: "tv",
+      tvProgress: { percent: 10, watched: 3, total: 30 },
+      watchedBySeason: { 2: [1], 1: [2, 1, 1] },
+      episodeImdbRatings: {
+        seasons: [
+          { season_number: 1, episodes: [{ episode_number: 1, name: "Piloto", vote_average: 8.24 }, { episode_number: 2, name: "Dos", vote_average: 7.9 }, { episode_number: 3, name: "No visto", vote_average: 9.9 }] },
+          { season_number: 2, episodes: [{ episode_number: 1, name: "Vuelta", vote_average: null }] },
+        ],
+      },
+      episodeUserRatings: { S1E2: 9, S1E3: 10 },
+      details,
+    }),
+  );
+  assert.deepEqual(story.episodes, {
+    more: 0,
+    items: [
+      { season: 1, episode: 1, name: "Piloto", imdb: 8.2, mine: null },
+      { season: 1, episode: 2, name: "Dos", imdb: 7.9, mine: 9 },
+      { season: 2, episode: 1, name: "Vuelta", imdb: null, mine: null },
+    ],
+  });
+  const card = { actions: { rating: null }, scores: {} };
+  assert.deepEqual(storySceneIds(card, story).slice(0, 2), ["plays", "episodes"]);
+});
+
+test("series con muchos episodios: los últimos y cuántos más", () => {
+  const watchedBySeason = { 1: Array.from({ length: 20 }, (_, i) => i + 1), 2: [1, 2, 3] };
+  const story = sanitizeShareStory(buildShareStoryPayload({ type: "tv", watchedBySeason, details }));
+  assert.equal(story.episodes.items.length, 14);
+  assert.equal(story.episodes.more, 9);
+  assert.deepEqual(story.episodes.items.at(-1), { season: 2, episode: 3, name: "", imdb: null, mine: null });
+  // Las películas no tienen lista de episodios.
+  assert.equal(sanitizeShareStory(buildShareStoryPayload({ type: "movie", watchedBySeason, details })).episodes, null);
+});
+
+test("el validador no deja pasar episodios mal formados ni de más", () => {
+  const items = [
+    ...Array.from({ length: 30 }, (_, i) => ({ season: 1, episode: i + 1, name: "x".repeat(200), imdb: 42, mine: -3 })),
+  ];
+  const story = sanitizeShareStory({ episodes: { items: [{ season: "a", episode: 1 }, { season: null, episode: 2 }, ...items], more: -5 } });
+  assert.equal(story.episodes.items.length, 12);
+  assert.equal(story.episodes.items[0].name.length, 60);
+  assert.equal(story.episodes.items[0].imdb, 10);
+  assert.equal(story.episodes.items[0].mine, null);
+  assert.equal(story.episodes.more, 0);
 });

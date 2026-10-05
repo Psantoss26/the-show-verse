@@ -240,8 +240,90 @@ export function StoryHeader({ card, logo, brand, fonts }) {
   );
 }
 
-/** Visionados: veces vista y fechas (películas) o progreso (series). */
+function episodeCode(season, episode) {
+  return `T${season} · E${String(episode).padStart(2, "0")}`;
+}
+
+function ResumeBar({ percent, height = 22, style }) {
+  return (
+    <div style={{ display: "flex", width: "100%", height, borderRadius: height, backgroundColor: WHITE(0.12), overflow: "hidden", ...style }}>
+      <div
+        style={{
+          display: "flex",
+          width: `${percent}%`,
+          height: "100%",
+          borderRadius: height,
+          backgroundImage: `linear-gradient(90deg, ${rgba(COLORS.green.rgb, 0.85)}, ${GREEN_300})`,
+          boxShadow: `0 0 22px ${rgba(COLORS.green.rgb, 0.6)}`,
+        }}
+      />
+    </div>
+  );
+}
+
+// «Continuar viendo»: lo que lleva visto del título (o del episodio en curso),
+// con la misma píldora «Viendo» y barra verde que la ficha.
+function ResumeBlock({ resume, style }) {
+  return (
+    <Glass style={{ width: PANEL_W, padding: "40px 56px 46px", ...style }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              padding: "8px 24px",
+              borderRadius: 40,
+              fontSize: 28,
+              fontWeight: 700,
+              letterSpacing: 3,
+              textTransform: "uppercase",
+              color: "#000000",
+              backgroundColor: rgba(COLORS.green.rgb, 1),
+            }}
+          >
+            <Icon name="play" size={26} color="#000000" filled />
+            <div style={{ display: "flex", marginLeft: 10 }}>Viendo</div>
+          </div>
+          {resume.season != null ? (
+            <div style={{ display: "flex", marginLeft: 22, fontSize: 38, fontWeight: 700, color: WHITE(0.86) }}>
+              {episodeCode(resume.season, resume.episode)}
+            </div>
+          ) : null}
+        </div>
+        <div style={{ display: "flex", alignItems: "baseline" }}>
+          <div style={{ display: "flex", fontSize: 64, fontWeight: 700, color: WHITE(0.95) }}>{resume.percent}</div>
+          <div style={{ display: "flex", marginLeft: 6, fontSize: 34, fontWeight: 700, color: GREEN_300 }}>%</div>
+        </div>
+      </div>
+      <ResumeBar percent={resume.percent} style={{ marginTop: 30 }} />
+    </Glass>
+  );
+}
+
+/**
+ * Visionados: veces vista y fechas (películas) o progreso (series), y lo que
+ * lleva visto si el título está en «Continuar viendo».
+ */
 export function PlaysScene({ plays, fonts }) {
+  const resume = plays.resume || null;
+
+  // Película a medias que aún no cuenta como vista: el porcentaje es lo único
+  // que hay que contar, y se cuenta en grande.
+  if (plays.percent == null && !plays.count && resume) {
+    return (
+      <SceneBody fonts={fonts}>
+        <Eyebrow icon="play" label="Viendo" color={GREEN_300} />
+        <BigFigure value={String(resume.percent)} suffix="%" color={GREEN_300} glow={GREEN_GLOW} />
+        <Caption>{resume.season != null ? `de ${episodeCode(resume.season, resume.episode)}` : "de la película vista"}</Caption>
+        {/* Solo la barra: repetir aquí la píldora y la cifra decía dos veces lo mismo. */}
+        <Glass style={{ width: PANEL_W, marginTop: 64, padding: "52px 60px" }}>
+          <ResumeBar percent={resume.percent} height={30} />
+        </Glass>
+      </SceneBody>
+    );
+  }
+
   if (plays.percent != null) {
     return (
       <SceneBody fonts={fonts}>
@@ -276,6 +358,7 @@ export function PlaysScene({ plays, fonts }) {
             </div>
           ) : null}
         </Glass>
+        {resume ? <ResumeBlock resume={resume} style={{ marginTop: 28 }} /> : null}
       </SceneBody>
     );
   }
@@ -287,7 +370,8 @@ export function PlaysScene({ plays, fonts }) {
       <Caption>{plays.count === 1 ? "vez vista" : "veces vista"}</Caption>
       {plays.dates.length ? (
         <Glass style={{ width: PANEL_W, marginTop: 64, padding: "28px 56px" }}>
-          {plays.dates.map((date, index) => (
+          {/* Con el bloque de «Viendo» debajo, una fecha menos para que quepa. */}
+          {plays.dates.slice(0, resume ? 3 : 4).map((date, index) => (
             <div key={date} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "22px 0" }}>
               <div style={{ display: "flex", alignItems: "center" }}>
                 <Icon name="calendar" size={40} color={index === 0 ? GREEN_300 : WHITE(0.5)} />
@@ -316,6 +400,91 @@ export function PlaysScene({ plays, fonts }) {
           ))}
         </Glass>
       ) : null}
+      {resume ? <ResumeBlock resume={resume} style={{ marginTop: plays.dates.length ? 28 : 64 }} /> : null}
+    </SceneBody>
+  );
+}
+
+/**
+ * Episodios vistos de una serie: código, nombre, nota de IMDb de cada uno y la
+ * del usuario (solo de los vistos). Con más de los que caben, los últimos y un
+ * «+N más».
+ */
+export function EpisodesScene({ episodes, assets, fonts }) {
+  const { items, more } = episodes;
+  const hasMine = items.some((item) => item.mine != null);
+  // Con muchas filas, más compactas para que la lista no toque el borde.
+  const rowSize = items.length > 10 ? 36 : 42;
+  const rowPad = items.length > 10 ? 12 : 20;
+  // IMDb siempre con un decimal («9.0»), como en su web; la nota propia, entera
+  // si lo es («10»).
+  const imdbScore = (value) => (value == null ? "–" : value.toFixed(1));
+  const myScore = (value) => (value == null ? "–" : value.toFixed(1).replace(/\.0$/, ""));
+
+  return (
+    <SceneBody fonts={fonts}>
+      <Eyebrow icon="tv" label="Episodios vistos" color={GREEN_300} />
+      <Glass style={{ width: PANEL_W, padding: "30px 48px 34px" }}>
+        {/* Cabecera de las dos columnas de notas. */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", paddingBottom: 14 }}>
+          <div style={{ display: "flex", width: 130, justifyContent: "center" }}>
+            {assets?.imdb ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={assets.imdb} width={74} height={37} alt="" style={{ objectFit: "contain" }} />
+            ) : (
+              <div style={{ display: "flex", fontSize: 26, fontWeight: 700, color: YELLOW_300 }}>IMDb</div>
+            )}
+          </div>
+          {hasMine ? (
+            <div style={{ display: "flex", width: 130, justifyContent: "center", alignItems: "center" }}>
+              <Icon name="star" size={34} color={YELLOW_300} filled />
+            </div>
+          ) : null}
+        </div>
+        {items.map((item, index) => (
+          <div
+            key={`${item.season}-${item.episode}`}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              padding: `${rowPad}px 0`,
+              borderTop: `1px solid ${WHITE(index ? 0.08 : 0.14)}`,
+            }}
+          >
+            <div style={{ display: "flex", width: 210, fontSize: rowSize - 6, fontWeight: 700, color: WHITE(0.55) }}>
+              {episodeCode(item.season, item.episode)}
+            </div>
+            <div
+              style={{
+                display: "block",
+                flex: 1,
+                minWidth: 0,
+                fontSize: rowSize,
+                fontWeight: 700,
+                color: WHITE(0.92),
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {item.name || `Episodio ${item.episode}`}
+            </div>
+            <div style={{ display: "flex", width: 130, justifyContent: "center", fontSize: rowSize, fontWeight: 700, color: item.imdb != null ? WHITE(0.9) : WHITE(0.35) }}>
+              {imdbScore(item.imdb)}
+            </div>
+            {hasMine ? (
+              <div style={{ display: "flex", width: 130, justifyContent: "center", fontSize: rowSize, fontWeight: 700, color: item.mine != null ? YELLOW_300 : WHITE(0.35) }}>
+                {myScore(item.mine)}
+              </div>
+            ) : null}
+          </div>
+        ))}
+        {more > 0 ? (
+          <div style={{ display: "flex", justifyContent: "center", marginTop: 18, fontSize: 32, fontWeight: 700, color: WHITE(0.6) }}>
+            {`+ ${more} ${more === 1 ? "episodio visto" : "episodios vistos"} más`}
+          </div>
+        ) : null}
+      </Glass>
     </SceneBody>
   );
 }
