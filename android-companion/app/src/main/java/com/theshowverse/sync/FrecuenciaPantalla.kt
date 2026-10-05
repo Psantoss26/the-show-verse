@@ -47,6 +47,14 @@ object FrecuenciaPantalla {
         activity.window.attributes = atributos
     }
 
+    /** Devuelve la frecuencia al criterio del sistema (diagnóstico de rendimiento). */
+    fun soltar(activity: Activity) {
+        val atributos = activity.window.attributes
+        if (atributos.preferredDisplayModeId == 0) return
+        atributos.preferredDisplayModeId = 0
+        activity.window.attributes = atributos
+    }
+
     private fun pantallaDe(activity: Activity): Display? =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             activity.display

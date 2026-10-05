@@ -29,6 +29,21 @@
             android:layout_height="match_parent" />
     </com.theshowverse.sync.HorizontalAwareSwipeRefresh>
 
+    <!-- DIAGNÓSTICO: medidor de fotogramas (MedidorFotogramas). Oculto salvo
+         que se active en Rendimiento. No es clicable: los toques pasan a la web. -->
+    <TextView
+        android:id="@+id/frameMeter"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:background="#CC000000"
+        android:fontFamily="monospace"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="4dp"
+        android:textColor="#FFFFFFFF"
+        android:textSize="11sp"
+        android:visibility="gone" />
+
     <!-- Vídeo a pantalla completa (lo rellena onShowCustomView). -->
     <FrameLayout
         android:id="@+id/videoContainer"

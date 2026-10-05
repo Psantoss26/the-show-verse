@@ -74,6 +74,9 @@ class MainActivity : AppCompatActivity() {
             render()
         }
         binding.testButton.setOnClickListener { sendTest() }
+        binding.perfButton.setOnClickListener {
+            startActivity(Intent(this, RendimientoActivity::class.java))
+        }
     }
 
     /** Android 13+ requiere permiso en runtime para publicar la notificación. */
