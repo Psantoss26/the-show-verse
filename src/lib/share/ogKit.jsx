@@ -270,6 +270,16 @@ export function loadAmbientBase(posterPath) {
   return posterPath ? fetchImage(`${TMDB}/w92${posterPath}`, 4000) : null;
 }
 
+// Fondo de las secciones del VÍDEO: la portada RECONOCIBLE (apenas difuminada),
+// así que hace falta más resolución que para el ambiental.
+export async function loadStoryPoster(posterPath) {
+  if (!posterPath) return null;
+  return (
+    (await fetchImage(`${TMDB}/w780${posterPath}`, 5000)) ||
+    fetchImage(`${TMDB}/w342${posterPath}`, 4000)
+  );
+}
+
 // TMDb sirve los logos SVG también como PNG cambiando la extensión; Satori
 // necesita un raster con tamaño conocido para encajarlo.
 export async function loadLogo(logoPath) {

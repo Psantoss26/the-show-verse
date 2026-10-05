@@ -7,6 +7,7 @@ import {
   W,
   loadAmbient,
   loadAmbientBase,
+  loadStoryPoster,
   loadLocalAssets,
   loadLogo,
   loadShareFonts,
@@ -42,11 +43,13 @@ const SCENES = new Set(["backdrop", "header", "plays", "episodes", "rating", "re
 
 async function renderLayer(scene, card, story) {
   if (scene === "backdrop") {
-    const [ambient, ambientBase] = await Promise.all([
-      loadAmbient(card.posterPath),
+    const [poster, ambientBase] = await Promise.all([
+      loadStoryPoster(card.posterPath),
       loadAmbientBase(card.posterPath),
     ]);
-    return { element: <StoryBackdrop ambient={ambient} ambientBase={ambientBase} />, fonts: null };
+    // El ambiental (w342) solo hace falta si la portada no ha llegado.
+    const ambient = poster ? null : await loadAmbient(card.posterPath);
+    return { element: <StoryBackdrop poster={poster} ambient={ambient} ambientBase={ambientBase} />, fonts: null };
   }
 
   const [fonts, assets, logo] = await Promise.all([
