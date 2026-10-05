@@ -24,7 +24,12 @@ const PUBLIC_API_ROUTES = new Set([
     '/api/netflix/extension-sync',
     '/api/netflix/extension-import',
     '/api/netflix/extension-progress',
+    '/api/netflix/detection-rules',
 ])
+// Registro de detecciones de la app Android (también The Show Verse Sync, que no
+// tiene WebView ni cookie de dispositivo): mismo caso que las rutas de arriba,
+// autenticado por el token del móvil. Lleva ids en la ruta, de ahí el prefijo.
+const PUBLIC_API_PREFIXES = ['/api/streaming/device/']
 const PUBLIC_FILE_RE = /\.(?:avif|gif|ico|jpg|jpeg|js|json|map|png|svg|txt|webmanifest|webp|woff|woff2)$/i
 
 async function sha256(value) {
@@ -88,6 +93,7 @@ function isPublicAsset(pathname) {
         pathname.startsWith('/images/') ||
         pathname.startsWith('/assets/') ||
         PUBLIC_API_ROUTES.has(pathname) ||
+        PUBLIC_API_PREFIXES.some((prefix) => pathname.startsWith(prefix)) ||
         pathname === '/favicon.ico' ||
         pathname === '/robots.txt' ||
         pathname === '/sitemap.xml' ||

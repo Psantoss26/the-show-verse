@@ -137,7 +137,9 @@ class MediaListenerService : NotificationListenerService() {
 
 
     private fun pollOnce() {
-        if (prefs.paused || !prefs.isPaired()) {
+        // Cedida: The Show Verse Sync está instalada y sincroniza ella (ver
+        // Delegacion). Se limpia igual que en pausa.
+        if (prefs.paused || !prefs.isPaired() || Delegacion.cedida(this)) {
             resolutions.clear()
             playingSince.clear()
             sessionStart.clear()

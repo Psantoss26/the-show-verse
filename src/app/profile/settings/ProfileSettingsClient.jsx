@@ -38,7 +38,8 @@ import { useAuth } from "@/context/AuthContext";
 import Avatar, { getInitial } from "@/components/ui/Avatar";
 import ProfileFavoritesEditor from "@/components/social/ProfileFavoritesEditor";
 import AndroidSyncPanel from "@/components/settings/AndroidSyncPanel";
-import { pairDevice, readSyncStatus, useSyncStatus } from "@/lib/android/appBridge";
+import { pairDevice, pairSyncApp, readSyncStatus, useSyncStatus } from "@/lib/android/appBridge";
+import { buildSyncPairLinks } from "@/lib/android/syncPairLink";
 import { useTranslation } from "@/lib/i18n";
 import {
   getPlexConnection,
@@ -1414,10 +1415,12 @@ function ProfileSettingsClient() {
   const [awaitingInstall, setAwaitingInstall] = useState(false);
   // Emparejamiento de la sincronización de streaming. Dos caminos:
   //  - Dentro de la app de Android: se pasa el token al nativo por el puente.
-  //  - En el navegador: deep link theshowverse://pair para la APK instalada.
+  //  - En el navegador o la PWA: enlace a The Show Verse Sync (ver
+  //    lib/android/syncPairLink). `link` abre la app; `copyLink` es el que se copia.
   const [androidPair, setAndroidPair] = useState({
     loading: false,
     link: "",
+    copyLink: "",
     error: "",
   });
   const {
@@ -1446,7 +1449,7 @@ function ProfileSettingsClient() {
   }, [activeTab, inAndroidApp]);
 
   const handlePairAndroid = useCallback(async () => {
-    setAndroidPair({ loading: true, link: "", error: "" });
+    setAndroidPair({ loading: true, link: "", copyLink: "", error: "" });
     try {
       const res = await fetch("/api/netflix/pair-mobile", {
         method: "POST",
@@ -1462,31 +1465,36 @@ function ProfileSettingsClient() {
         typeof window !== "undefined" ? window.location.origin : "";
 
       // Dentro de la app no hay deep link que valga: el token se guarda en el
-      // nativo directamente, sin salir de la pantalla.
+      // nativo directamente, sin salir de la pantalla. Si la app le cedió la
+      // sincronización a The Show Verse Sync, el token es para Sync.
       if (inAndroidApp) {
-        const ok = pairDevice(json.syncToken, origin);
+        const ok = androidSyncStatus?.delegatedToSyncApp
+          ? pairSyncApp(json.syncToken, origin)
+          : pairDevice(json.syncToken, origin);
         setAndroidPair({
           loading: false,
           link: "",
+          copyLink: "",
           error: ok ? "" : "No se pudo guardar el emparejamiento en la app.",
         });
         refreshAndroidSync();
         return;
       }
 
-      const link = `theshowverse://pair?token=${encodeURIComponent(json.syncToken)}&origin=${encodeURIComponent(origin)}`;
-      setAndroidPair({ loading: false, link, error: "" });
-      // Abre la app companion (mismo dispositivo). Si no está instalada, el enlace
-      // no hará nada y el usuario puede copiarlo tras instalar el APK.
-      if (typeof window !== "undefined") window.location.href = link;
+      const links = buildSyncPairLinks(json.syncToken, origin);
+      setAndroidPair({ loading: false, link: links.open, copyLink: links.copy, error: "" });
+      // Abre The Show Verse Sync (mismo dispositivo). Si no está instalada, el
+      // enlace no hará nada y el usuario puede copiarlo tras instalarla.
+      if (typeof window !== "undefined") window.location.href = links.open;
     } catch (err) {
       setAndroidPair({
         loading: false,
         link: "",
+        copyLink: "",
         error: err?.message || "Error al emparejar.",
       });
     }
-  }, [inAndroidApp, refreshAndroidSync]);
+  }, [inAndroidApp, androidSyncStatus?.delegatedToSyncApp, refreshAndroidSync]);
 
   const fetchConnections = useCallback(async () => {
     if (!authenticated) return;
@@ -2238,17 +2246,18 @@ function ProfileSettingsClient() {
                       className="pl-16"
                     />
 
-                    {/* Corrección de detecciones (navegador y app Android): para
-                        las que ya no tienen notificación a la vista. */}
+                    {/* Corrección de detecciones de la EXTENSIÓN: para las que ya
+                        no tienen notificación a la vista. Las del móvil tienen
+                        su registro en la app (The Show Verse Sync). */}
                     <Link
                       href="/detections"
                       className="flex items-center gap-3 rounded-2xl bg-white/[0.04] p-3 transition hover:bg-white/[0.08] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
                     >
                       <Radar className="h-5 w-5 shrink-0 text-emerald-400" aria-hidden="true" />
                       <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-bold text-white">Detecciones recientes</span>
+                        <span className="block text-sm font-bold text-white">Detecciones del navegador</span>
                         <span className="block text-xs leading-relaxed text-zinc-400">
-                          Revisa los títulos detectados y corrige los que no eran correctos.
+                          Revisa los títulos que detectó la extensión y corrige los que no eran correctos. Las del móvil están en la app.
                         </span>
                       </span>
                       <ChevronRight className="h-4 w-4 shrink-0 text-zinc-400" aria-hidden="true" />
@@ -2286,7 +2295,7 @@ function ProfileSettingsClient() {
                           <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
                             {inAndroidApp
                               ? "Sincroniza automáticamente lo que ves en las apps oficiales de streaming de este dispositivo. Ya viene incluido en la app: solo hay que vincularlo y conceder los permisos."
-                              : "Sincroniza automáticamente lo que ves en las apps oficiales de streaming del móvil. Instala la app companion y pulsa Vincular."}
+                              : "Sincroniza automáticamente lo que ves en las apps oficiales de streaming del móvil, y en ella revisas y corriges lo que detecta. Instala The Show Verse Sync y pulsa Vincular."}
                           </p>
                         </div>
                       </div>
@@ -2345,7 +2354,7 @@ function ProfileSettingsClient() {
                             type="button"
                             onClick={() => {
                               if (navigator?.clipboard) {
-                                navigator.clipboard.writeText(androidPair.link);
+                                navigator.clipboard.writeText(androidPair.copyLink || androidPair.link);
                               }
                             }}
                             className="min-h-9 px-3.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-bold text-zinc-300 transition"

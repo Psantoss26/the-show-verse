@@ -6,12 +6,9 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.concurrent.Executors
 
 /**
@@ -27,7 +24,6 @@ object QuickAccessNotifier {
     const val CHANNEL_ID = "tsv_quick_access_v2"
     private const val OLD_CHANNEL_ID = "tsv_quick_access"
     const val NOTIF_ID = 1001
-    private const val POSTER_BASE = "https://image.tmdb.org/t/p/w342"
 
     private val bg = Executors.newSingleThreadExecutor()
 
@@ -38,21 +34,22 @@ object QuickAccessNotifier {
      */
     fun show(ctx: Context, prefs: Prefs, synced: SyncedInfo?, contentTitleRes: Int) {
         if (!prefs.indicatorEnabled) return
+        if (Delegacion.cedida(ctx)) return
         val url = DetailsUrl.build(prefs.origin, synced) ?: return
         val title = synced?.title ?: return
         val app = ctx.applicationContext
         val contentTitle = app.getString(contentTitleRes, title)
         val posterUrl = synced.posterPath
             ?.takeIf { it.isNotBlank() }
-            ?.let { POSTER_BASE + it }
+            ?.let { Portadas.MEDIANA + it }
         // «No es correcto»: solo si el servidor registró la detección (los
         // servidores antiguos no devuelven su id).
-        val correctionUrl = DetailsUrl.correction(prefs.origin, synced.detectionId)
+        val detectionId = synced.detectionId?.takeIf { DetailsUrl.isDetectionId(it) }
 
         // Descarga la portada (si la hay) y luego muestra UNA sola vez con imagen.
         bg.execute {
-            val poster = posterUrl?.let { loadBitmap(it) }
-            notifyNow(app, contentTitle, url, poster, correctionUrl)
+            val poster = posterUrl?.let { Portadas.cargar(it) }
+            notifyNow(app, contentTitle, url, poster, detectionId)
         }
     }
 
@@ -69,13 +66,12 @@ object QuickAccessNotifier {
         contentTitle: String,
         url: String,
         poster: Bitmap?,
-        correctionUrl: String?,
+        detectionId: String?,
     ) {
         ensureChannel(app)
-        // Intent EXPLÍCITO a la propia app: antes era un ACTION_VIEW genérico que
-        // acababa en el navegador. Ahora la ficha se abre dentro de The Show
-        // Verse, que es de lo que va tener una app y no dos.
-        val intent = WebAppActivity.intentFor(app, url)
+        // La app completa abre la ficha en su WebView; Sync, en la PWA o el
+        // navegador (ver AppVariante).
+        val intent = AppVariante.abrirFicha(app, url)
         val pi = PendingIntent.getActivity(
             app,
             0,
@@ -92,14 +88,15 @@ object QuickAccessNotifier {
             .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .addAction(0, app.getString(R.string.notif_open_details), pi)
-        if (correctionUrl != null) {
-            // Abre en la propia app la corrección de ESTA detección («no había
-            // ninguna ficha» / «el título es otro»). Código de petición propio: con
-            // el mismo que `pi`, FLAG_UPDATE_CURRENT sustituiría uno por otro.
+        if (detectionId != null) {
+            // Abre la corrección NATIVA de esta detección («no había ninguna
+            // ficha» / «el título es otro»): el registro del móvil es de la app,
+            // no de la web. Código de petición propio: con el mismo que `pi`,
+            // FLAG_UPDATE_CURRENT sustituiría uno por otro.
             val fixIntent = PendingIntent.getActivity(
                 app,
                 1,
-                WebAppActivity.intentFor(app, correctionUrl),
+                CorreccionActivity.intentFor(app, detectionId),
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             )
             builder.addAction(0, app.getString(R.string.notif_not_correct), fixIntent)
@@ -117,19 +114,6 @@ object QuickAccessNotifier {
             NotificationManagerCompat.from(app).notify(NOTIF_ID, builder.build())
         } catch (e: SecurityException) {
             // Sin permiso POST_NOTIFICATIONS (Android 13+): se ignora.
-        }
-    }
-
-    private fun loadBitmap(urlStr: String): Bitmap? {
-        return try {
-            val conn = URL(urlStr).openConnection() as HttpURLConnection
-            conn.connectTimeout = 6000
-            conn.readTimeout = 6000
-            conn.instanceFollowRedirects = true
-            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Android) TSVSync")
-            conn.inputStream.use { BitmapFactory.decodeStream(it) }
-        } catch (e: Exception) {
-            null
         }
     }
 

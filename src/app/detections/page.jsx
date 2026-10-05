@@ -2,9 +2,9 @@
 import DetectionsClient from "./DetectionsClient";
 
 export const metadata = {
-  title: "Detecciones recientes",
+  title: "Detecciones del navegador",
   description:
-    "Títulos que la sincronización de streaming ha detectado en los últimos días, para corregir los que no eran correctos.",
+    "Títulos que la extensión del navegador ha detectado en los últimos días, para corregir los que no eran correctos.",
 };
 
 export default function DetectionsPage() {

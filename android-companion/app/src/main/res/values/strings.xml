@@ -69,4 +69,40 @@
     <string name="perf_no_blur">Quitar desenfoques (prueba)</string>
     <string name="perf_no_blur_hint">Quita el cristal y el desenfoque de toda la web. Se verá peor: es solo para saber si son ellos los que frenan.</string>
     <string name="perf_a11y_hint">Prueba también a desactivar el servicio de accesibilidad de The Show Verse: con un servicio de accesibilidad activo, el WebView puede tener que hacer más trabajo con cada cambio de la página. El medidor marca «a11y ON» mientras haya alguno activo.</string>
+
+    <!-- Registro de detecciones del móvil (DeteccionesActivity, CorreccionActivity) -->
+    <string name="detections_open">Detecciones recientes</string>
+    <string name="detections_title">Detecciones recientes</string>
+    <string name="detections_intro">Lo que ha detectado este móvil en los últimos 7 días. Toca una para corregirla: se arregla lo guardado y la sincronización aprende de ello.</string>
+    <string name="detections_loading">Cargando…</string>
+    <string name="detections_empty">Sin detecciones en los últimos 7 días.</string>
+    <string name="detections_not_paired">Este dispositivo no está vinculado. Vincúlalo desde The Show Verse → Ajustes → Conexiones.</string>
+    <string name="detections_untitled">Sin título</string>
+    <string name="detections_fix">Corregir</string>
+    <string name="detections_change">Cambiar</string>
+    <string name="detections_kind_detail">Ficha</string>
+    <string name="detections_kind_playback">Reproducción</string>
+    <string name="correction_title">Corregir detección</string>
+    <string name="correction_detected">Se detectó</string>
+    <string name="correction_read_text">Texto leído: «%1$s»</string>
+    <string name="correction_question">¿Qué pasó?</string>
+    <string name="correction_not_a_title">No había ninguna ficha (era un menú, un anuncio…)</string>
+    <string name="correction_wrong_title">Era otro título</string>
+    <string name="correction_unknown_title">No sé cuál era</string>
+    <string name="correction_search_hint">Busca el título correcto</string>
+    <string name="correction_no_results">Sin resultados.</string>
+    <string name="correction_chosen">Elegido: %1$s</string>
+    <string name="correction_type_movie">Película</string>
+    <string name="correction_type_tv">Serie</string>
+    <string name="correction_season">Temporada</string>
+    <string name="correction_episode">Episodio</string>
+    <string name="correction_unknown_episode">No sé el episodio</string>
+    <string name="correction_save">Guardar corrección</string>
+    <string name="correction_saved">Corrección guardada</string>
+
+    <!-- Con The Show Verse Sync instalada, la app completa le cede la sincronización. -->
+    <string name="delegated_title">La sincronización la hace The Show Verse Sync</string>
+    <string name="delegated_body">Está instalada en este móvil, así que esta app deja de detectar para no duplicar nada. La vinculación, los permisos y el registro de detecciones están en Sync.</string>
+    <string name="delegated_open">Abrir The Show Verse Sync</string>
+    <string name="open_web">Abrir The Show Verse</string>
 </resources>

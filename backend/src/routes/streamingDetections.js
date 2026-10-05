@@ -6,15 +6,23 @@
 //   POST /streaming/detections          → registra una detección notificada
 //   GET  /streaming/rules/not-a-title   → textos que no son títulos (por plataforma)
 //
-// Con SESIÓN (la web, también dentro de la app Android):
-//   GET  /streaming/detections              → detecciones recientes del usuario
+// Con el TOKEN del MÓVIL (registro de detecciones nativo de la app Android y de
+// The Show Verse Sync, que no tiene sesión web):
+//   GET  /streaming/device/detections                → detecciones del móvil
+//   GET  /streaming/device/detections/:id            → una detección
+//   POST /streaming/device/detections/:id/correction → misma corrección que la web
+//   GET  /streaming/device/titles?q=                 → buscar el título correcto
+//
+// Con SESIÓN (la web):
+//   GET  /streaming/detections              → detecciones recientes del usuario,
+//                                             salvo las del móvil (esas, en la app)
 //   GET  /streaming/detections/:id          → una detección
 //   POST /streaming/detections/:id/correction → «no había ficha» / «es otro título»
 //
 // Ver lib/detectionRules.js para cómo una corrección se convierte en reglas.
 
 import { z } from 'zod';
-import { and, desc, eq, gt, inArray, lt, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm';
 
 import { db } from '../db/client.js';
 import {
@@ -26,6 +34,8 @@ import {
   watchProgress,
 } from '../db/schema.js';
 import { hashToken } from '../lib/jwt.js';
+import { ANDROID, detectionOriginFromProviderUid } from '../lib/detectionOrigin.js';
+import { searchTmdbTitles } from './tmdb.js';
 import { invalidateLevelState } from '../level/store.js';
 import {
   GLOBAL_OWNER,
@@ -91,20 +101,28 @@ const listQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
 
-/** Usuario de un token de sincronización (extensión / app Android), o null. */
-async function userIdForSyncToken(req) {
+/**
+ * Cuenta de un token de sincronización (extensión / app Android): su usuario y
+ * de qué cliente es (ver lib/detectionOrigin.js), o null.
+ */
+async function syncAccountForToken(req) {
   const auth = req.headers.authorization || '';
   const token = auth.toLowerCase().startsWith('bearer ') ? auth.slice(7).trim() : '';
   if (!token) return null;
   const [account] = await db
-    .select({ userId: connectedAccounts.userId })
+    .select({ userId: connectedAccounts.userId, providerUid: connectedAccounts.providerUid })
     .from(connectedAccounts)
     .where(and(
       eq(connectedAccounts.provider, 'netflix'),
       eq(connectedAccounts.accessToken, hashToken(token)),
     ))
     .limit(1);
-  return account?.userId || null;
+  if (!account?.userId) return null;
+  return { userId: account.userId, origin: detectionOriginFromProviderUid(account.providerUid) };
+}
+
+async function userIdForSyncToken(req) {
+  return (await syncAccountForToken(req))?.userId || null;
 }
 
 function toDetectionResult(row) {
@@ -370,6 +388,138 @@ async function recomputeGlobalRules(tx, platform, fingerprint, triggerText) {
   if (rows.length) await tx.insert(detectionRules).values(rows);
 }
 
+// ── Lectura y corrección, compartidas por la web y el móvil ─────────────────
+
+/** Detecciones recientes de un usuario, filtradas por cliente. */
+async function listDetections(userId, { days, limit }, originFilter) {
+  const since = new Date(Date.now() - days * 86_400_000);
+  const rows = await db
+    .select()
+    .from(streamingDetections)
+    .where(and(eq(streamingDetections.userId, userId), gt(streamingDetections.createdAt, since), originFilter))
+    .orderBy(desc(streamingDetections.createdAt))
+    .limit(limit);
+  return { results: rows.map(toDetectionResult) };
+}
+
+// La web no enseña las del móvil: se ven y se corrigen en la app. Las filas sin
+// origen (anteriores al campo) se quedan en la web.
+const NOT_FROM_ANDROID = or(isNull(streamingDetections.origin), ne(streamingDetections.origin, ANDROID));
+const FROM_ANDROID = eq(streamingDetections.origin, ANDROID);
+
+async function findDetection(userId, rawId) {
+  const id = z.string().uuid().safeParse(rawId);
+  if (!id.success) return null;
+  const [row] = await db
+    .select()
+    .from(streamingDetections)
+    .where(and(eq(streamingDetections.id, id.data), eq(streamingDetections.userId, userId)))
+    .limit(1);
+  return row || null;
+}
+
+/**
+ * Aplica la corrección de un usuario a una detección suya: la marca, mueve o
+ * borra lo que guardó y aprende reglas. null si la detección no es suya.
+ */
+async function correctDetection(userId, detectionId, body) {
+  const result = await db.transaction(async (tx) => {
+    const [detection] = await tx
+      .select()
+      .from(streamingDetections)
+      .where(and(eq(streamingDetections.id, detectionId), eq(streamingDetections.userId, userId)))
+      .for('update')
+      .limit(1);
+    if (!detection) return null;
+
+    const target = body.verdict === 'wrong_title' && body.tmdbId
+      ? {
+          tmdbId: body.tmdbId,
+          mediaType: body.mediaType,
+          // Temporada sin episodio no identifica nada: queda a nivel serie.
+          season: body.mediaType === 'tv' && body.episode ? (body.season ?? null) : null,
+          episode: body.mediaType === 'tv' && body.season ? (body.episode ?? null) : null,
+          title: body.title || null,
+          posterPath: body.posterPath || null,
+        }
+      : null;
+    const sameAsDetected = target
+      && target.tmdbId === detection.tmdbId && target.mediaType === detection.mediaType;
+
+    const correction = {
+      userId,
+      detectionId: detection.id,
+      platform: detection.platform,
+      fingerprint: detection.fingerprint,
+      triggerText: detection.triggerText,
+      verdict: body.verdict,
+      rejectedTmdbId: detection.tmdbId,
+      rejectedMediaType: detection.mediaType,
+      tmdbId: target?.tmdbId ?? null,
+      mediaType: target?.mediaType ?? null,
+      season: target?.season ?? null,
+      episode: target?.episode ?? null,
+      title: target?.title ?? null,
+      posterPath: target?.posterPath ?? null,
+      signal: detection.signal,
+      createdAt: new Date(),
+    };
+    await tx.insert(detectionCorrections).values(correction).onConflictDoUpdate({
+      target: [detectionCorrections.userId, detectionCorrections.detectionId],
+      set: {
+        verdict: correction.verdict,
+        tmdbId: correction.tmdbId,
+        mediaType: correction.mediaType,
+        season: correction.season,
+        episode: correction.episode,
+        title: correction.title,
+        posterPath: correction.posterPath,
+        createdAt: correction.createdAt,
+      },
+    });
+
+    const [updated] = await tx.update(streamingDetections).set({
+      status: 'corrected',
+      correctedTmdbId: target?.tmdbId ?? null,
+      correctedMediaType: target?.mediaType ?? null,
+      correctedSeason: target?.season ?? null,
+      correctedEpisode: target?.episode ?? null,
+      correctedTitle: target?.title ?? null,
+      correctedPosterPath: target?.posterPath ?? null,
+    }).where(eq(streamingDetections.id, detection.id)).returning();
+
+    const data = await reassignDetectionData(tx, userId, detection.id, target);
+
+    // Solo se aprende de huellas útiles, y nunca de «era el mismo título» (solo
+    // se cambió el episodio: el título no estaba mal).
+    if (detection.fingerprint && !sameAsDetected) {
+      await applyUserRules(tx, userId, correction);
+      await recomputeGlobalRules(tx, detection.platform, detection.fingerprint, detection.triggerText);
+    }
+    return { detection: toDetectionResult(updated), data };
+  });
+
+  if (!result) return null;
+  // El historial ha podido cambiar: la caché de nivel se rehace ya.
+  await invalidateLevelState(db, userId).catch(() => {});
+  return result;
+}
+
+/** Respuesta común de la corrección (web y móvil). */
+async function handleCorrection(userId, req, reply) {
+  const id = z.string().uuid().safeParse(req.params.id);
+  if (!id.success) return reply.status(404).send({ error: 'Detection not found' });
+  const parsed = correctionSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
+  }
+  const result = await correctDetection(userId, id.data, parsed.data);
+  if (!result) return reply.status(404).send({ error: 'Detection not found' });
+  return { ok: true, ...result };
+}
+
+const titlesQuerySchema = z.object({ q: z.string().trim().min(2).max(100) });
+
 export default async function streamingDetectionsRoutes(fastify) {
   // ── Token de sincronización ──────────────────────────────────────────────
 
@@ -384,8 +534,9 @@ export default async function streamingDetectionsRoutes(fastify) {
   });
 
   fastify.post('/detections', async (req, reply) => {
-    const userId = await userIdForSyncToken(req);
-    if (!userId) return reply.status(401).send({ error: 'Sync token is invalid or missing' });
+    const account = await syncAccountForToken(req);
+    if (!account) return reply.status(401).send({ error: 'Sync token is invalid or missing' });
+    const { userId } = account;
     const parsed = recordSchema.safeParse(req.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
@@ -429,6 +580,7 @@ export default async function streamingDetectionsRoutes(fastify) {
       posterPath: d.posterPath ?? null,
       confidence: d.confidence ?? null,
       source: d.source,
+      origin: account.origin,
     }).returning({ id: streamingDetections.id });
 
     // Purga de lo antiguo de este usuario (barata: va por su índice).
@@ -476,6 +628,58 @@ export default async function streamingDetectionsRoutes(fastify) {
     };
   });
 
+  // ── Token del móvil: registro de detecciones de la app ───────────────────
+
+  /** Usuario del token, solo si es el de un móvil vinculado. */
+  async function androidUserId(req, reply) {
+    const account = await syncAccountForToken(req);
+    if (!account) {
+      reply.status(401).send({ error: 'Sync token is invalid or missing' });
+      return null;
+    }
+    // La extensión tiene su propio registro en la web; este es el del móvil.
+    // Un token sin origen es de un emparejamiento antiguo del móvil o de pruebas.
+    if (account.origin && account.origin !== ANDROID) {
+      reply.status(403).send({ error: 'This endpoint is for the Android app' });
+      return null;
+    }
+    return account.userId;
+  }
+
+  fastify.get('/device/detections', async (req, reply) => {
+    const userId = await androidUserId(req, reply);
+    if (!userId) return reply;
+    const parsed = listQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
+    }
+    return listDetections(userId, parsed.data, FROM_ANDROID);
+  });
+
+  fastify.get('/device/detections/:id', async (req, reply) => {
+    const userId = await androidUserId(req, reply);
+    if (!userId) return reply;
+    const row = await findDetection(userId, req.params.id);
+    if (!row) return reply.status(404).send({ error: 'Detection not found' });
+    return { detection: toDetectionResult(row) };
+  });
+
+  fastify.post('/device/detections/:id/correction', async (req, reply) => {
+    const userId = await androidUserId(req, reply);
+    if (!userId) return reply;
+    return handleCorrection(userId, req, reply);
+  });
+
+  // Buscador del título correcto en la corrección. La web usa el de TMDb con
+  // su sesión; la app no tiene sesión, así que va aquí con el token.
+  fastify.get('/device/titles', async (req, reply) => {
+    const userId = await androidUserId(req, reply);
+    if (!userId) return reply;
+    const parsed = titlesQuerySchema.safeParse(req.query);
+    if (!parsed.success) return { results: [] };
+    return { results: await searchTmdbTitles(parsed.data.q) };
+  });
+
   // ── Sesión web ───────────────────────────────────────────────────────────
 
   fastify.get('/detections', { preHandler: fastify.requireAuth }, async (req, reply) => {
@@ -483,117 +687,15 @@ export default async function streamingDetectionsRoutes(fastify) {
     if (!parsed.success) {
       return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
     }
-    const since = new Date(Date.now() - parsed.data.days * 86_400_000);
-    const rows = await db
-      .select()
-      .from(streamingDetections)
-      .where(and(eq(streamingDetections.userId, req.user.id), gt(streamingDetections.createdAt, since)))
-      .orderBy(desc(streamingDetections.createdAt))
-      .limit(parsed.data.limit);
-    return { results: rows.map(toDetectionResult) };
+    return listDetections(req.user.id, parsed.data, NOT_FROM_ANDROID);
   });
 
   fastify.get('/detections/:id', { preHandler: fastify.requireAuth }, async (req, reply) => {
-    const id = z.string().uuid().safeParse(req.params.id);
-    if (!id.success) return reply.status(404).send({ error: 'Detection not found' });
-    const [row] = await db
-      .select()
-      .from(streamingDetections)
-      .where(and(eq(streamingDetections.id, id.data), eq(streamingDetections.userId, req.user.id)))
-      .limit(1);
+    const row = await findDetection(req.user.id, req.params.id);
     if (!row) return reply.status(404).send({ error: 'Detection not found' });
     return { detection: toDetectionResult(row) };
   });
 
-  fastify.post('/detections/:id/correction', { preHandler: fastify.requireAuth }, async (req, reply) => {
-    const id = z.string().uuid().safeParse(req.params.id);
-    if (!id.success) return reply.status(404).send({ error: 'Detection not found' });
-    const parsed = correctionSchema.safeParse(req.body);
-    if (!parsed.success) {
-      return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
-    }
-    const body = parsed.data;
-    const userId = req.user.id;
-
-    const result = await db.transaction(async (tx) => {
-      const [detection] = await tx
-        .select()
-        .from(streamingDetections)
-        .where(and(eq(streamingDetections.id, id.data), eq(streamingDetections.userId, userId)))
-        .for('update')
-        .limit(1);
-      if (!detection) return null;
-
-      const target = body.verdict === 'wrong_title' && body.tmdbId
-        ? {
-            tmdbId: body.tmdbId,
-            mediaType: body.mediaType,
-            // Temporada sin episodio no identifica nada: queda a nivel serie.
-            season: body.mediaType === 'tv' && body.episode ? (body.season ?? null) : null,
-            episode: body.mediaType === 'tv' && body.season ? (body.episode ?? null) : null,
-            title: body.title || null,
-            posterPath: body.posterPath || null,
-          }
-        : null;
-      const sameAsDetected = target
-        && target.tmdbId === detection.tmdbId && target.mediaType === detection.mediaType;
-
-      const correction = {
-        userId,
-        detectionId: detection.id,
-        platform: detection.platform,
-        fingerprint: detection.fingerprint,
-        triggerText: detection.triggerText,
-        verdict: body.verdict,
-        rejectedTmdbId: detection.tmdbId,
-        rejectedMediaType: detection.mediaType,
-        tmdbId: target?.tmdbId ?? null,
-        mediaType: target?.mediaType ?? null,
-        season: target?.season ?? null,
-        episode: target?.episode ?? null,
-        title: target?.title ?? null,
-        posterPath: target?.posterPath ?? null,
-        signal: detection.signal,
-        createdAt: new Date(),
-      };
-      await tx.insert(detectionCorrections).values(correction).onConflictDoUpdate({
-        target: [detectionCorrections.userId, detectionCorrections.detectionId],
-        set: {
-          verdict: correction.verdict,
-          tmdbId: correction.tmdbId,
-          mediaType: correction.mediaType,
-          season: correction.season,
-          episode: correction.episode,
-          title: correction.title,
-          posterPath: correction.posterPath,
-          createdAt: correction.createdAt,
-        },
-      });
-
-      const [updated] = await tx.update(streamingDetections).set({
-        status: 'corrected',
-        correctedTmdbId: target?.tmdbId ?? null,
-        correctedMediaType: target?.mediaType ?? null,
-        correctedSeason: target?.season ?? null,
-        correctedEpisode: target?.episode ?? null,
-        correctedTitle: target?.title ?? null,
-        correctedPosterPath: target?.posterPath ?? null,
-      }).where(eq(streamingDetections.id, detection.id)).returning();
-
-      const data = await reassignDetectionData(tx, userId, detection.id, target);
-
-      // Solo se aprende de huellas útiles, y nunca de «era el mismo título» (solo
-      // se cambió el episodio: el título no estaba mal).
-      if (detection.fingerprint && !sameAsDetected) {
-        await applyUserRules(tx, userId, correction);
-        await recomputeGlobalRules(tx, detection.platform, detection.fingerprint, detection.triggerText);
-      }
-      return { detection: toDetectionResult(updated), data };
-    });
-
-    if (!result) return reply.status(404).send({ error: 'Detection not found' });
-    // El historial ha podido cambiar: la caché de nivel se rehace ya.
-    await invalidateLevelState(db, userId).catch(() => {});
-    return { ok: true, ...result };
-  });
+  fastify.post('/detections/:id/correction', { preHandler: fastify.requireAuth }, async (req, reply) =>
+    handleCorrection(req.user.id, req, reply));
 }

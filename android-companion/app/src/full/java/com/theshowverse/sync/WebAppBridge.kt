@@ -69,6 +69,9 @@ class WebAppBridge(
         json.put("pendingSyncEvents", ProgressOutbox.pendingCount(activity))
         json.put("indicator", prefs.indicatorEnabled)
         json.put("version", appVersion())
+        // The Show Verse Sync instalada: ella sincroniza y guarda el registro, y
+        // la web solo lo explica (ver Delegacion).
+        json.put("delegatedToSyncApp", Delegacion.cedida(activity))
         return json.toString()
     }
 
@@ -252,6 +255,38 @@ class WebAppBridge(
     fun openAccessibilitySettings() {
         if (!propio()) return
         abrirAjustes(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+    }
+
+    /** Registro de detecciones de este móvil (nativo; la web ya no las enseña). */
+    @JavascriptInterface
+    fun openDetections() {
+        if (!propio()) return
+        activity.runOnUiThread { activity.startActivity(DeteccionesActivity.intentFor(activity)) }
+    }
+
+    /** Abre The Show Verse Sync, que tiene la sincronización si está instalada. */
+    @JavascriptInterface
+    fun openSyncApp(): Boolean {
+        if (!propio()) return false
+        if (!Delegacion.syncInstalada(activity)) return false
+        activity.runOnUiThread { Delegacion.abrirSync(activity) }
+        return true
+    }
+
+    /**
+     * Vincula The Show Verse Sync con un token que acaba de generar la web. Con
+     * Sync instalada, el emparejamiento es suyo: guardarlo en esta app no
+     * serviría de nada porque le ha cedido la sincronización.
+     */
+    @JavascriptInterface
+    fun pairSyncApp(token: String?, origin: String?): Boolean {
+        if (!propio()) return false
+        val limpio = token?.trim().orEmpty()
+        val destino = WebOrigin.normalize(origin) ?: currentOrigin()
+        if (limpio.isEmpty() || destino.isBlank()) return false
+        if (!Delegacion.syncInstalada(activity)) return false
+        activity.runOnUiThread { Delegacion.vincularSync(activity, limpio, destino) }
+        return true
     }
 
     /** Ajustes de servidor propio y clave de acceso privado. */

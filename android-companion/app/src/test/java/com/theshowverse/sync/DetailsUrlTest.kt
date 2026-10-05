@@ -1,6 +1,8 @@
 package com.theshowverse.sync
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -48,13 +50,9 @@ class DetailsUrlTest {
     }
 
     @Test
-    fun correctionUrlOnlyForValidDetectionIds() {
-        assertEquals(
-            "https://theshowverse.com/detections/9b1f4b0e-9d1f-4a2b-8a1a-2f3c4d5e6f99",
-            DetailsUrl.correction("https://theshowverse.com/", "9b1f4b0e-9d1f-4a2b-8a1a-2f3c4d5e6f99"),
-        )
-        assertNull(DetailsUrl.correction("https://theshowverse.com", "../../login"))
-        assertNull(DetailsUrl.correction("https://theshowverse.com", null))
-        assertNull(DetailsUrl.correction(null, "9b1f4b0e-9d1f-4a2b-8a1a-2f3c4d5e6f99"))
+    fun onlyUuidsAreDetectionIds() {
+        assertTrue(DetailsUrl.isDetectionId("9b1f4b0e-9d1f-4a2b-8a1a-2f3c4d5e6f99"))
+        assertFalse(DetailsUrl.isDetectionId("../../login"))
+        assertFalse(DetailsUrl.isDetectionId(null))
     }
 }

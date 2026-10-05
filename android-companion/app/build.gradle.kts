@@ -26,9 +26,16 @@ fun signingSecret(property: String, environment: String): String? =
 val hasFirebaseConfig = file("google-services.json").exists()
 if (hasFirebaseConfig) {
     apply(plugin = "com.google.gms.google-services")
+    // Firebase es solo de la app completa: The Show Verse Sync no tiene cliente
+    // en ese fichero (otro paquete) y su tarea fallaría al no encontrarlo.
+    tasks.configureEach {
+        if (name.startsWith("processSync") && name.endsWith("GoogleServices")) enabled = false
+    }
 }
 
-val appVersionName = "1.4"
+// Dos apps salen de este proyecto (ver productFlavors): la completa y Sync.
+val appVersionName = "1.5"
+val syncVersionName = "3.0"
 
 // Cliente OAuth WEB de Google (el mismo que usa la web). Es el `serverClientId`
 // que se le pasa a Credential Manager, y es lo que hace que el `aud` del token
@@ -47,21 +54,46 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.theshowverse.app"
         minSdk = 26
         targetSdk = 35
-        // App oficial: numeración nueva. La APK sideload anterior era
-        // com.theshowverse.sync 2.2 (versionCode 13) y es otro paquete.
-        versionCode = 5
-        versionName = appVersionName
 
-        // Origen que carga el shell mientras el usuario no configure otro.
+        // Origen por defecto: el que carga la app completa y al que The Show
+        // Verse Sync manda a vincular mientras no se emparejen.
         buildConfigField("String", "DEFAULT_ORIGIN", "\"https://theshowverse.com\"")
-        // Sufijo de User-Agent: es cómo la web sabe que se está ejecutando
-        // dentro de la app (además del puente JS).
-        buildConfigField("String", "UA_SUFFIX", "\"TheShowVerseApp/$appVersionName\"")
-        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
-        buildConfigField("boolean", "PUSH_CONFIGURED", hasFirebaseConfig.toString())
+    }
+
+    // DOS APPS, UN CÓDIGO.
+    //  - full: The Show Verse completo (WebView) + sincronización. Lo propio en
+    //    src/full: carcasa web, puente JS, login con Google, push, ajustes.
+    //  - sync: The Show Verse Sync, solo sincronización y registro de detecciones,
+    //    para quien usa la PWA. Su pantalla de inicio es el panel nativo.
+    // Los servicios de detección, el emparejamiento y el registro son de las
+    // dos (src/main). Con Sync instalada, la completa le cede la sincronización
+    // (ver Delegacion), así que nunca detectan las dos a la vez.
+    flavorDimensions += "app"
+    productFlavors {
+        create("full") {
+            dimension = "app"
+            applicationId = "com.theshowverse.app"
+            versionCode = 6
+            versionName = appVersionName
+            // Sufijo de User-Agent: es cómo la web sabe que se está ejecutando
+            // dentro de la app (además del puente JS).
+            buildConfigField("String", "UA_SUFFIX", "\"TheShowVerseApp/$appVersionName\"")
+            buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
+            buildConfigField("boolean", "PUSH_CONFIGURED", hasFirebaseConfig.toString())
+            // Cede la sincronización a The Show Verse Sync si está instalada.
+            buildConfigField("boolean", "CEDE_A_SYNC", "true")
+        }
+        create("sync") {
+            dimension = "app"
+            // El paquete de la antigua APK sideload (2.2, versionCode 13): si
+            // está firmada con la misma clave, esta la actualiza.
+            applicationId = "com.theshowverse.sync"
+            versionCode = 20
+            versionName = syncVersionName
+            buildConfigField("boolean", "CEDE_A_SYNC", "false")
+        }
     }
 
     signingConfigs {
@@ -117,21 +149,24 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("androidx.work:work-runtime-ktx:2.9.1")
 
-    // Carcasa web
-    implementation("androidx.webkit:webkit:1.11.0")
-    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
-    implementation("androidx.browser:browser:1.8.0")
-    implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("androidx.activity:activity-ktx:1.9.3")
 
+    // Carcasa web: solo la app completa.
+    "fullImplementation"("androidx.webkit:webkit:1.11.0")
+    "fullImplementation"("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
+    "fullImplementation"("androidx.browser:browser:1.8.0")
+    "fullImplementation"("androidx.core:core-splashscreen:1.0.1")
+
     // Inicio de sesión con Google SIN navegador (selector de cuentas del sistema).
-    implementation("androidx.credentials:credentials:1.3.0")
-    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
-    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
+    "fullImplementation"("androidx.credentials:credentials:1.3.0")
+    "fullImplementation"("androidx.credentials:credentials-play-services-auth:1.3.0")
+    "fullImplementation"("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 
     // Notificaciones push (ver hasFirebaseConfig arriba).
-    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
-    implementation("com.google.firebase:firebase-messaging")
+    // Solo la completa: Sync no tiene web a la que entregar los avisos (la PWA
+    // recibe los suyos por Web Push).
+    "fullImplementation"(platform("com.google.firebase:firebase-bom:33.7.0"))
+    "fullImplementation"("com.google.firebase:firebase-messaging")
 
     testImplementation("junit:junit:4.13.2")
     // org.json de verdad en las pruebas JVM: la del android.jar es un stub que
