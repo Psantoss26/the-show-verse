@@ -174,11 +174,46 @@ function Caption({ children, style }) {
 
 // ------------------------------------------------------------------- capas
 
-/** Fondo de las secciones: la portada difuminada, más oscura que en la portada. */
-export function StoryBackdrop({ ambient, ambientBase }) {
+// Fondo de las secciones: la PORTADA del título, reconocible. Antes era la
+// misma portada difuminada a 32px y atenuada al 62%, con un velo encima: un
+// fondo oscuro casi liso en el que no se distinguía la imagen.
+const STORY_POSTER_FILTER = "blur(3px) brightness(0.72) saturate(1.1)";
+// Más oscuro arriba (marca y título) y abajo, y más claro en el centro, donde
+// los paneles de cristal ya dan contraste y la portada luce.
+const STORY_SCRIM = `linear-gradient(180deg, rgba(0,0,0,0.74) 0%, rgba(0,0,0,0.42) 20%, ${rgba(SHADE, 0.3)} 48%, ${rgba(SHADE, 0.42)} 76%, rgba(0,0,0,0.72) 100%)`;
+
+/** Fondo de las secciones: la portada del título con un velo para leer encima. */
+export function StoryBackdrop({ poster, ambient, ambientBase }) {
   return (
     <Layer style={{ background: "#0a0a0a" }}>
-      <AmbientBackground ambient={ambient} ambientBase={ambientBase} />
+      {poster ? (
+        <>
+          {/* Base opaca (la portada mínima, ya borrosa al ampliarse): donde el
+              desenfoque de encima pierde opacidad en el borde del lienzo asoma
+              ella y no el negro. Ver AMBIENT_BLUR. */}
+          {ambientBase ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={ambientBase.src}
+              width={W}
+              height={H}
+              alt=""
+              style={{ position: "absolute", top: 0, left: 0, width: W, height: H, objectFit: "cover", filter: "brightness(0.72) saturate(1.1)" }}
+            />
+          ) : null}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={poster.src}
+            width={W}
+            height={H}
+            alt=""
+            style={{ position: "absolute", top: 0, left: 0, width: W, height: H, objectFit: "cover", filter: STORY_POSTER_FILTER }}
+          />
+        </>
+      ) : (
+        // Sin portada a tiempo: el fondo ambiental de siempre.
+        <AmbientBackground ambient={ambient} ambientBase={ambientBase} />
+      )}
       <div
         style={{
           position: "absolute",
@@ -187,7 +222,9 @@ export function StoryBackdrop({ ambient, ambientBase }) {
           width: W,
           height: H,
           display: "flex",
-          backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.55) 0%, ${rgba(SHADE, 0.42)} 28%, ${rgba(SHADE, 0.5)} 100%)`,
+          backgroundImage: poster
+            ? STORY_SCRIM
+            : `linear-gradient(180deg, rgba(0,0,0,0.55) 0%, ${rgba(SHADE, 0.42)} 28%, ${rgba(SHADE, 0.5)} 100%)`,
         }}
       />
     </Layer>
