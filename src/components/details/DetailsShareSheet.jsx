@@ -85,35 +85,61 @@ function canCopyImage() {
   );
 }
 
-function ShareOption({ icon: Icon, label, onClick, disabled = false, busy = false, done = false }) {
+// Opción redonda con etiqueta debajo. Mismo lenguaje que los botones de los
+// modales de acciones (StarRating, listas): cristal `bg-white/5` para las
+// secundarias y la píldora blanca de "Guardar" para la principal.
+function ShareOption({
+  icon: Icon,
+  label,
+  onClick,
+  primary = false,
+  disabled = false,
+  busy = false,
+  done = false,
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled || busy}
-      className="group/opt flex min-w-0 flex-col items-center gap-2 rounded-2xl px-1 py-2 text-center transition disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400"
+      className="group/opt flex min-w-0 flex-col items-center gap-2.5 rounded-2xl px-1 py-1 text-center outline-none disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400"
     >
       <span
-        className={`grid h-14 w-14 place-items-center rounded-full transition duration-300 ${
+        className={`flex h-12 w-12 items-center justify-center rounded-full transition duration-300 group-active/opt:scale-95 ${
           done
-            ? "bg-emerald-500/25 text-emerald-300"
-            : "bg-white/[0.08] text-white group-hover/opt:-translate-y-0.5 group-hover/opt:bg-white/[0.14] group-disabled/opt:translate-y-0"
+            ? "bg-emerald-500/15 text-emerald-300 backdrop-blur-xl"
+            : primary
+              ? "bg-white/90 text-black shadow-[0_10px_30px_-10px_rgba(255,255,255,0.45)] group-hover/opt:bg-white"
+              : "bg-white/5 text-white/70 backdrop-blur-xl group-hover/opt:bg-white/10 group-hover/opt:text-white"
         }`}
       >
         {busy ? (
-          <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />
+          <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
         ) : done ? (
-          <Check className="h-6 w-6" aria-hidden="true" />
+          <Check className="h-5 w-5" aria-hidden="true" />
         ) : (
-          <Icon className="h-6 w-6" aria-hidden="true" />
+          <Icon className="h-5 w-5" aria-hidden="true" />
         )}
       </span>
-      <span className="text-xs font-bold leading-tight text-zinc-300 group-hover/opt:text-white">
+      <span className="text-balance text-[10px] font-bold uppercase leading-tight tracking-wider text-white/50 transition-colors group-hover/opt:text-white/80">
         {label}
       </span>
     </button>
   );
 }
+
+// Bordes de la vista previa FUNDIDOS con el cristal del modal: la imagen no se
+// recorta en seco con un rectángulo (ni lleva aro), se desvanece en un margen
+// estrecho por los cuatro lados, igual que la portada de la ficha se funde con
+// su fondo. Es la intersección de un degradado horizontal y uno vertical.
+const PREVIEW_FEATHER = {
+  WebkitMaskImage:
+    "linear-gradient(to right, transparent, #000 5%, #000 95%, transparent), linear-gradient(to bottom, transparent, #000 2.5%, #000 96%, transparent)",
+  WebkitMaskComposite: "source-in",
+  maskImage:
+    "linear-gradient(to right, transparent, #000 5%, #000 95%, transparent), linear-gradient(to bottom, transparent, #000 2.5%, #000 96%, transparent)",
+  maskComposite: "intersect",
+};
 
 export default function DetailsShareSheet({ open, onClose, card, title, text, getUrl }) {
   const titleId = useId();
@@ -284,25 +310,31 @@ export default function DetailsShareSheet({ open, onClose, card, title, text, ge
 
   if (!open || !portalReady) return null;
 
+  // La principal es la primera forma de mandar la IMAGEN que haya disponible.
+  const primaryImageAction = showShareImage ? "share" : showCopyImage ? "copy" : showSave ? "save" : null;
+
+  // Misma estructura y acabado que los modales de las acciones de la ficha
+  // (puntuación, listas, enlaces): portal, velo `bg-black/60` difuminado,
+  // tarjeta centrada `rounded-[2rem]` de LIQUID_GLASS_PANEL y cabecera
+  // `bg-white/[0.025]`.
   return createPortal(
     <div
       data-detail-modal-layer=""
-      className="fixed inset-0 z-[10000] flex items-end justify-center sm:items-center sm:p-4"
+      className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
     >
-      {/* Mismo velo que el resto de modales de la ficha. */}
       <div
-        className="sv-fade-in absolute inset-0 bg-black/60 backdrop-blur-lg"
+        className="absolute inset-0 bg-black/60 backdrop-blur-lg animate-in fade-in duration-300"
         onClick={onClose}
         aria-hidden="true"
       />
 
       <div
-        className={`${styles.sheet} relative flex max-h-[100dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-t-[2rem] sm:max-h-[92dvh] sm:rounded-[2rem] ${LIQUID_GLASS_PANEL}`}
+        className={`relative flex max-h-[85dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
       >
-        <div className="flex shrink-0 items-center justify-between gap-3 px-6 pb-3 pt-5">
+        <div className="flex w-full shrink-0 items-center justify-between gap-3 bg-white/[0.025] p-6 sm:px-8 sm:pb-6 sm:pt-8">
           <div className="min-w-0">
             <h2
               id={titleId}
@@ -310,7 +342,7 @@ export default function DetailsShareSheet({ open, onClose, card, title, text, ge
             >
               Compartir
             </h2>
-            <p className="mt-0.5 truncate text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <p className="mt-1 truncate text-xs font-medium uppercase tracking-wide text-zinc-500">
               {title}
             </p>
           </div>
@@ -321,54 +353,60 @@ export default function DetailsShareSheet({ open, onClose, card, title, text, ge
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400"
             aria-label="Cerrar"
           >
-            <X className="h-4 w-4" />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-6">
-          {/* Vista previa: la imagen tal cual se va a compartir. */}
-          <div className="mx-auto aspect-[9/16] h-[min(52dvh,560px)] max-w-full overflow-hidden rounded-2xl bg-zinc-900 shadow-[0_18px_50px_-12px_rgba(0,0,0,0.85)] ring-1 ring-white/10">
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-6 sm:px-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {/* Vista previa: la imagen tal cual se va a compartir, sin marco. */}
+          <div className="relative mx-auto aspect-[9/16] h-[min(calc(85dvh-18rem),34rem)] max-w-full">
             {imageReady ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={image.objectUrl}
                 alt={`Imagen para compartir de ${title}`}
-                className="h-full w-full object-cover"
+                className="h-full w-full rounded-[1.5rem] object-cover"
+                style={PREVIEW_FEATHER}
                 draggable="false"
               />
             ) : status === "error" ? (
-              <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-                <AlertCircle className="h-7 w-7 text-zinc-400" aria-hidden="true" />
-                <p className="text-sm font-bold text-zinc-300">No se pudo preparar la imagen.</p>
+              <div className="flex h-full flex-col items-center justify-center gap-4 rounded-[1.5rem] bg-white/[0.03] p-6 text-center">
+                <AlertCircle className="h-7 w-7 text-white/40" aria-hidden="true" />
+                <p className="text-sm font-bold text-white/70">No se pudo preparar la imagen.</p>
                 <button
                   type="button"
                   onClick={() => setAttempt((value) => value + 1)}
-                  className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-bold text-white transition hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400"
+                  className="inline-flex h-11 items-center gap-2 rounded-full bg-white/5 px-5 text-xs font-extrabold uppercase tracking-wide text-white/80 backdrop-blur-xl transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400"
                 >
                   <RotateCw className="h-4 w-4" aria-hidden="true" />
                   Reintentar
                 </button>
               </div>
             ) : (
-              <div className="relative flex h-full flex-col items-center justify-center gap-3 overflow-hidden" role="status">
+              <div
+                className="relative flex h-full flex-col items-center justify-center gap-3 overflow-hidden rounded-[1.5rem] bg-white/[0.03]"
+                style={PREVIEW_FEATHER}
+                role="status"
+              >
                 <div
                   className={`${styles.shimmer} pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.06] to-transparent`}
                   aria-hidden="true"
                 />
-                <Loader2 className="h-6 w-6 animate-spin text-zinc-400" aria-hidden="true" />
-                <p className="text-xs font-bold uppercase tracking-wide text-zinc-500">Preparando imagen…</p>
+                <Loader2 className="h-6 w-6 animate-spin text-yellow-300" aria-hidden="true" />
+                <p className="text-[10px] font-bold uppercase tracking-widest text-white/40">Preparando imagen…</p>
               </div>
             )}
           </div>
         </div>
 
-        <div className="shrink-0 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4">
-          <div className="grid auto-cols-fr grid-flow-col gap-1">
+        <div className="shrink-0 px-5 pb-6 pt-5 sm:px-8 sm:pb-7">
+          <div className="grid auto-cols-fr grid-flow-col gap-2">
             {showShareImage && (
               <ShareOption
                 icon={ImageIcon}
                 label="Compartir imagen"
                 onClick={onShareImage}
+                primary={primaryImageAction === "share"}
                 disabled={!imageReady}
                 busy={busy === "image"}
               />
@@ -378,6 +416,7 @@ export default function DetailsShareSheet({ open, onClose, card, title, text, ge
                 icon={Copy}
                 label="Copiar imagen"
                 onClick={onCopyImage}
+                primary={primaryImageAction === "copy"}
                 disabled={!imageReady}
                 done={done === "copyImage"}
               />
@@ -387,6 +426,7 @@ export default function DetailsShareSheet({ open, onClose, card, title, text, ge
                 icon={Download}
                 label="Guardar imagen"
                 onClick={onSave}
+                primary={primaryImageAction === "save"}
                 disabled={!imageReady}
                 done={done === "save"}
               />
@@ -401,7 +441,7 @@ export default function DetailsShareSheet({ open, onClose, card, title, text, ge
               <ShareOption icon={Share2} label="Enviar enlace" onClick={onShareLink} />
             )}
           </div>
-          <p className="mt-2 min-h-4 text-center text-xs font-bold text-zinc-400" aria-live="polite">
+          <p className="mt-3 min-h-4 text-center text-xs font-semibold text-white/50" aria-live="polite">
             {message}
           </p>
         </div>
