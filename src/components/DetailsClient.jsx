@@ -17,6 +17,7 @@ import AwardCard, {
   sortAwardItemsForDisplay,
 } from "@/components/details/AwardCard";
 import SectionTitle from "@/components/details/SectionTitle";
+import { createValueStore } from "@/lib/details/valueStore";
 import {
   FollowingActivityAvatars,
   FollowingActivitySection,
@@ -35,6 +36,7 @@ import {
   useCallback,
   useTransition,
   startTransition,
+  useSyncExternalStore,
 } from "react";
 import { createPortal } from "react-dom";
 
@@ -875,6 +877,14 @@ function ProgressiveHeroLogo({ path, title }) {
 // =====================================================================
 // COMPONENTE PRINCIPAL: DetailsClient
 // =====================================================================
+
+// Menú de secciones con la sección activa suscrita al almacén del scroll-spy:
+// al cambiar de sección se re-renderiza este menú y nada más (ver
+// `activeSectionStore` en DetailsClient).
+function StickySectionMenu({ store, items, onChange }) {
+  const activeId = useSyncExternalStore(store.subscribe, store.get, store.get);
+  return <DetailsSectionMenu items={items} activeId={activeId} onChange={onChange} />;
+}
 
 function RecommendationHoverIndicator({
   favorite = false,
@@ -7656,7 +7666,6 @@ export default function DetailsClient({
     ? DETAILS_STICKY_TOP_MOBILE
     : DETAILS_STICKY_TOP_DESKTOP;
 
-  const sentinelRef = useRef(null);
   const menuStickyRef = useRef(null);
   const sectionElsRef = useRef({});
   const pendingSectionRef = useRef(null);
@@ -7664,9 +7673,27 @@ export default function DetailsClient({
   const pendingScrollEndCleanupRef = useRef(null);
   const followingHashHandledRef = useRef(false);
 
-  const [menuCompact, setMenuCompact] = useState(() => restoredValue(backSnapshot, "menuCompact", false));
   const [menuH, setMenuH] = useState(() => restoredValue(backSnapshot, "menuH", 0));
-  const [activeSectionId, setActiveSectionId] = useState(() => restoredValue(backSnapshot, "activeSectionId", null));
+
+  // SECCIÓN ACTIVA del menú sticky, FUERA del estado de la ficha.
+  //
+  // La cambia el scroll-spy mientras el usuario arrastra. Como estado de este
+  // componente, cada cambio re-renderizaba la ficha ENTERA (miles de nodos) en
+  // mitad del gesto, y el desplazamiento iba a tirones al cruzar las pestañas y
+  // el arranque de las secciones. En un almacén externo solo se actualiza el
+  // menú (StickySectionMenu). La instantánea de "volver atrás" se anota aquí
+  // mismo, porque ya no pasa por un render de la ficha.
+  const activeSectionStore = useMemo(
+    () => createValueStore(restoredValue(backSnapshot, "activeSectionId", null)),
+    [backSnapshot],
+  );
+  const setActiveSectionId = useCallback(
+    (next) => {
+      activeSectionStore.set(next);
+      backSnapshot.live.activeSectionId = activeSectionStore.get();
+    },
+    [activeSectionStore, backSnapshot],
+  );
 
   const priorityCastResolved = !castSectionLoading;
   const priorityRecommendationsResolved = priorityCastResolved;
@@ -7721,25 +7748,6 @@ export default function DetailsClient({
     // entonces la ref está vacía y no hay nada que observar.
     canRenderLowerPrioritySections,
   ]);
-
-  useEffect(() => {
-    if (!sentinelRef.current) return;
-
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        // cuando el sentinel deja de verse => el menú ya está “pegado”
-        setMenuCompact(!entry.isIntersecting);
-      },
-      {
-        threshold: 0,
-        root: null,
-        rootMargin: `-${STICKY_TOP}px 0px 0px 0px`,
-      },
-    );
-
-    io.observe(sentinelRef.current);
-    return () => io.disconnect();
-  }, [STICKY_TOP]);
 
   const scrollToSection = useCallback(
     (sid) => {
@@ -7829,7 +7837,7 @@ export default function DetailsClient({
 
       window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
     },
-    [menuH, STICKY_TOP],
+    [menuH, STICKY_TOP, setActiveSectionId],
   );
 
   useEffect(() => {
@@ -7911,7 +7919,7 @@ export default function DetailsClient({
         pendingScrollEndCleanupRef.current = null;
       }
     };
-  }, [sectionItems, menuH, STICKY_TOP]);
+  }, [sectionItems, menuH, STICKY_TOP, setActiveSectionId]);
 
   useEffect(() => {
     if (!Array.isArray(sectionItems) || sectionItems.length === 0) return;
@@ -8027,9 +8035,7 @@ export default function DetailsClient({
     tmdbCast,
     tmdbCastLoading,
     tmdbCastError,
-    menuCompact,
     menuH,
-    activeSectionId,
     recAccountStates,
     recImdbRatings,
   });
@@ -10459,9 +10465,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
         {/* Sistema de navegación por secciones con detección de scroll */}
         {/* Incluye: Media, Actores, Recomendaciones, Comentarios, etc. */}
         <div className="mt-2 sm:mt-10">
-          {/* Elemento centinela para detectar cuándo el menú debe quedar sticky */}
-          <div ref={sentinelRef} className="h-px w-full" />
-
           {/* Menú de navegación sticky que se queda fijo debajo del navbar al hacer scroll */}
           <div
             ref={menuStickyRef}
@@ -10472,9 +10475,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               backfaceVisibility: "hidden",
             }}
           >
-            <DetailsSectionMenu
+            <StickySectionMenu
+              store={activeSectionStore}
               items={sectionItems}
-              activeId={activeSectionId}
               onChange={scrollToSection}
             />
           </div>
