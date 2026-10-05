@@ -2,7 +2,8 @@
 //
 // El vídeo empieza con la imagen compartible (la portada con botones y
 // puntuaciones) y después enseña, sección a sección, lo que la imagen no cabe:
-// visionados, puntuación, la reseña del usuario y los detalles del título.
+// visionados (y episodios vistos en las series), la reseña del usuario y los
+// detalles del título. Las puntuaciones no tienen sección: ya van en la portada.
 //
 // Reparto del trabajo:
 //   - el cliente arma el payload con `buildShareStoryPayload`;
@@ -13,7 +14,10 @@
 // Toda la coreografía vive aquí, sin DOM, para poder probarla.
 
 export const STORY_FPS = 30;
-export const STORY_SCENES = ["plays", "episodes", "rating", "review", "details"];
+// Sin sección de puntuaciones: la nota propia y las públicas ya salen en la
+// portada, que es la primera pantalla del vídeo, y repetirlas en una sección
+// aparte alargaba el vídeo para decir lo mismo.
+export const STORY_SCENES = ["plays", "episodes", "review", "details"];
 
 // Episodios vistos de una serie que caben en una sección del vídeo. Con más, se
 // enseñan los ÚLTIMOS (los más avanzados de la serie) y un «+N más».
@@ -276,12 +280,10 @@ export function sanitizeShareStory(body) {
 }
 
 /**
- * Secciones que tienen algo que enseñar, en orden. La puntuación sale con nota
- * propia o, si no la hay, con alguna puntuación pública; sin datos, se omite en
- * vez de pintarse vacía.
+ * Secciones que tienen algo que enseñar, en orden; sin datos, se omiten en vez
+ * de pintarse vacías.
  */
 export function storySceneIds(card, story) {
-  const hasScores = Object.values(card?.scores || {}).some(Boolean);
   const hasDetails =
     !!story?.details &&
     !!(
@@ -295,7 +297,6 @@ export function storySceneIds(card, story) {
   return STORY_SCENES.filter((id) => {
     if (id === "plays") return !!story?.plays;
     if (id === "episodes") return !!story?.episodes?.items?.length;
-    if (id === "rating") return card?.actions?.rating != null || hasScores;
     if (id === "review") return !!story?.review;
     return hasDetails;
   });

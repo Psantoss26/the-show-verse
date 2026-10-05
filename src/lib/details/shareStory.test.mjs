@@ -50,7 +50,7 @@ test("movie plays: count, newest dates first and duplicates removed", () => {
 test("unwatched movie has no plays section", () => {
   const story = sanitizeShareStory(buildShareStoryPayload({ type: "movie", watched: false, details }));
   assert.equal(story.plays, null);
-  assert.deepEqual(storySceneIds(card, story), ["rating", "details"]);
+  assert.deepEqual(storySceneIds(card, story), ["details"]);
 });
 
 test("series plays use the episode progress", () => {
@@ -88,7 +88,7 @@ test("scenes keep their order and skip what has no data", () => {
       details,
     }),
   );
-  assert.deepEqual(storySceneIds(card, story), ["plays", "rating", "review", "details"]);
+  assert.deepEqual(storySceneIds(card, story), ["plays", "review", "details"]);
   assert.deepEqual(
     storySceneIds({ actions: { rating: null }, scores: {} }, { ...story, details: { genres: [], people: [] } }),
     ["plays", "review"],
@@ -252,4 +252,12 @@ test("el validador no deja pasar episodios mal formados ni de más", () => {
   assert.equal(story.episodes.items[0].imdb, 10);
   assert.equal(story.episodes.items[0].mine, null);
   assert.equal(story.episodes.more, 0);
+});
+
+test("sin sección de puntuaciones: ya están en la portada", () => {
+  const story = sanitizeShareStory(buildShareStoryPayload({ type: "movie", watched: true, plays: 1, details }));
+  // Con nota propia (9) y puntuaciones públicas no aparece ninguna sección para ellas.
+  const ids = storySceneIds({ actions: { rating: 9 }, scores: { tmdb: { value: "8.4" } } }, story);
+  assert.equal(ids.includes("rating"), false);
+  assert.deepEqual(ids, ["plays", "details"]);
 });
