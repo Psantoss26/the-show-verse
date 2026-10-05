@@ -30,6 +30,8 @@ test("acciones: notas de película, serie, temporada y episodio", () => {
   const episode = post("/api/trakt/ratings", { type: "episode", showTmdbId: 1399, season: 1, episode: 3, rating: 9 });
   assert.equal(episode.text, "Has puntuado S01E03");
   assert.equal(episode.rating, 9);
+  assert.equal(episode.ratingTarget, "S01E03");
+  assert.equal(movie.ratingTarget, null);
   assert.equal(episode.tmdbId, 1399);
   assert.equal(post("/api/tmdb/movies/603/rating", { value: 7.5 }).rating, 7.5);
 });

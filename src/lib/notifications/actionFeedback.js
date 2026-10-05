@@ -212,7 +212,9 @@ const RULES = [
 ];
 
 // La nota va en `rating` y el aviso la pinta en el hueco del icono, como la
-// campana; el texto solo dice qué se ha hecho.
+// campana. Con título, el aviso enseña solo el título (y `ratingTarget`, el
+// episodio o la temporada); el texto es para cuando el título aún no ha
+// llegado (ver resolveTitleArt).
 function rating(body, ref) {
   const value = ratingValue(body.rating);
   const target = episodeLabel(num(ref.season), num(ref.episode));
@@ -220,7 +222,7 @@ function rating(body, ref) {
     return { icon: "unrate", label: "Nota", text: target ? `Nota de ${target} quitada` : "Nota quitada", ...titleRef(body, ref) };
   }
   return {
-    icon: "rate", label: "Nota", rating: value,
+    icon: "rate", label: "Nota", rating: value, ratingTarget: target || null,
     text: target ? `Has puntuado ${target}` : "Has puntuado",
     ...titleRef(body, ref),
   };

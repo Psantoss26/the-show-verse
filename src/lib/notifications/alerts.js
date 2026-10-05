@@ -256,10 +256,14 @@ export function describeAlertGroup(rows) {
     title: list.find((row) => row.item.title)?.item.title || null,
     text: list.map(alertSentence).filter(Boolean).join(". "),
     posterPath: list.find((row) => row.item.posterPath)?.item.posterPath || null,
-    rating:
-      primary.kind !== "reminder" && primary.item.type === "rating" && typeof primary.item.rating === "number"
-        ? primary.item.rating
-        : null,
+    // Una puntuación sola: el aviso enseña el título con la nota como icono
+    // y, si es de un episodio o una temporada, cuál (`ratingTarget`).
+    ...(list.length === 1 && primary.kind !== "reminder" && primary.item.type === "rating" && typeof primary.item.rating === "number"
+      ? {
+          rating: primary.item.rating,
+          ratingTarget: shortCode(primary.item) || (primary.item.season != null ? `Temporada ${primary.item.season}` : null),
+        }
+      : { rating: null }),
     target: list.find((row) => row.kind === "reminder")?.item || list[list.length - 1].item,
   };
 }
