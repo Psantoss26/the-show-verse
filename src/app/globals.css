@@ -1953,6 +1953,44 @@ html {
 
 }
 
+/* Progreso de scroll del hero MÓVIL de la ficha, en el COMPOSITOR.
+   Antes un listener escribía `--sv-hero-scroll` en <html> en cada fotograma.
+   Una propiedad personalizada en la raíz se hereda en TODO el documento, así
+   que cada escritura recalculaba el estilo de los ~2.500 nodos de la ficha
+   (medido: ~14 ms por fotograma en escritorio, varias veces más en un móvil).
+   Con el hilo principal saturado, el logo, los botones de cristal y el marcador
+   que van sobre la portada avanzaban a tirones mientras se arrastraba, aunque
+   su entrada (opacity/transform, compositor) fuera fluida.
+   Con una animación ligada al scroll del documento, la opacidad la resuelve el
+   compositor en el mismo fotograma que el desplazamiento, sin tocar estilos.
+   Donde no hay soporte, DetailsClient mantiene el listener como respaldo (el
+   JSX sigue leyendo la variable, y aquí las animaciones simplemente no se
+   aplican). El recorrido (55vh) es el mismo que usaba el listener. */
+@keyframes sv-hero-scroll-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes sv-hero-scroll-shade {
+  from { opacity: 0; }
+  to { opacity: 0.6; }
+}
+
+@supports ((animation-timeline: scroll()) and (animation-range: 0% 100%)) {
+  @media (width < 40rem) {
+    .sv-hero-scroll-in,
+    .sv-hero-scroll-shade {
+      animation: sv-hero-scroll-in linear both;
+      animation-timeline: scroll(root block);
+      animation-range: 0px 55vh;
+    }
+
+    .sv-hero-scroll-shade {
+      animation-name: sv-hero-scroll-shade;
+    }
+  }
+}
+
 /* =============================================================================
    Recharts - Eliminar recuadro de enfoque blanco al hacer click o tap en gráficas
    ========================================================================== */
