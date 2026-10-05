@@ -13,6 +13,10 @@ data class SyncedInfo(
     // por "high" cualquier cosa que llegara a completarse y una resolución dudosa
     // acababa en el Historial igual que una segura.
     val confidence: String? = null,
+    // Detección registrada en el servidor para este resultado. Permite corregirla
+    // desde la notificación y viaja en los pings de progreso para que el servidor
+    // sepa qué guardó cada detección (y lo mueva o borre si se corrige).
+    val detectionId: String? = null,
 )
 
 /**
@@ -30,5 +34,13 @@ object DetailsUrl {
         } else {
             "$base/details/$type/${s.tmdbId}"
         }
+    }
+
+    private val UUID_RE = Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+
+    /** Página para corregir una detección, o null si no hay una válida. */
+    fun correction(origin: String?, detectionId: String?): String? {
+        if (origin.isNullOrBlank() || detectionId == null || !UUID_RE.matches(detectionId)) return null
+        return "${origin.trimEnd('/')}/detections/$detectionId"
     }
 }

@@ -28,7 +28,7 @@ if (hasFirebaseConfig) {
     apply(plugin = "com.google.gms.google-services")
 }
 
-val appVersionName = "1.3"
+val appVersionName = "1.4"
 
 // Cliente OAuth WEB de Google (el mismo que usa la web). Es el `serverClientId`
 // que se le pasa a Credential Manager, y es lo que hace que el `aud` del token
@@ -52,7 +52,7 @@ android {
         targetSdk = 35
         // App oficial: numeración nueva. La APK sideload anterior era
         // com.theshowverse.sync 2.2 (versionCode 13) y es otro paquete.
-        versionCode = 4
+        versionCode = 5
         versionName = appVersionName
 
         // Origen que carga el shell mientras el usuario no configure otro.
@@ -134,4 +134,7 @@ dependencies {
     implementation("com.google.firebase:firebase-messaging")
 
     testImplementation("junit:junit:4.13.2")
+    // org.json de verdad en las pruebas JVM: la del android.jar es un stub que
+    // lanza "not mocked" (NotATitleListTest interpreta la respuesta del servidor).
+    testImplementation("org.json:json:20240303")
 }

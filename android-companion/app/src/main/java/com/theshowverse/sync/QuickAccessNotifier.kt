@@ -45,11 +45,14 @@ object QuickAccessNotifier {
         val posterUrl = synced.posterPath
             ?.takeIf { it.isNotBlank() }
             ?.let { POSTER_BASE + it }
+        // «No es correcto»: solo si el servidor registró la detección (los
+        // servidores antiguos no devuelven su id).
+        val correctionUrl = DetailsUrl.correction(prefs.origin, synced.detectionId)
 
         // Descarga la portada (si la hay) y luego muestra UNA sola vez con imagen.
         bg.execute {
             val poster = posterUrl?.let { loadBitmap(it) }
-            notifyNow(app, contentTitle, url, poster)
+            notifyNow(app, contentTitle, url, poster, correctionUrl)
         }
     }
 
@@ -61,7 +64,13 @@ object QuickAccessNotifier {
         }
     }
 
-    private fun notifyNow(app: Context, contentTitle: String, url: String, poster: Bitmap?) {
+    private fun notifyNow(
+        app: Context,
+        contentTitle: String,
+        url: String,
+        poster: Bitmap?,
+        correctionUrl: String?,
+    ) {
         ensureChannel(app)
         // Intent EXPLÍCITO a la propia app: antes era un ACTION_VIEW genérico que
         // acababa en el navegador. Ahora la ficha se abre dentro de The Show
@@ -83,6 +92,18 @@ object QuickAccessNotifier {
             .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .addAction(0, app.getString(R.string.notif_open_details), pi)
+        if (correctionUrl != null) {
+            // Abre en la propia app la corrección de ESTA detección («no había
+            // ninguna ficha» / «el título es otro»). Código de petición propio: con
+            // el mismo que `pi`, FLAG_UPDATE_CURRENT sustituiría uno por otro.
+            val fixIntent = PendingIntent.getActivity(
+                app,
+                1,
+                WebAppActivity.intentFor(app, correctionUrl),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            builder.addAction(0, app.getString(R.string.notif_not_correct), fixIntent)
+        }
         if (poster != null) {
             // Portada como icono grande (miniatura) y grande al expandir.
             builder.setLargeIcon(poster)

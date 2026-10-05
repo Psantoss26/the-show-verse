@@ -410,7 +410,7 @@ class MediaListenerService : NotificationListenerService() {
         prefs.addLog("Enviando: ${signal.mainTitle}${signal.episodeName?.let { " — $it" } ?: ""}")
         // resolveOnly: solo RESOLVEMOS el título (para "Continuar viendo" y el
         // indicador). El "visto" ya no se marca al detectar, sino al 90% vía pings.
-        SyncClient.send(origin, token, signal, resolveOnly = true) { ok, err, synced, status ->
+        SyncClient.send(origin, token, signal, resolveOnly = true, detectionKind = "playback") { ok, err, synced, status ->
             handler.post {
                 if (prefs.paused || prefs.token != token || prefs.origin != origin || lastKeyByPackage[pkg] != key) return@post
                 // 404/422 = el servidor entendió la petición y no supo identificar el

@@ -160,6 +160,20 @@ class WebAppBridge(
     private fun cadenaJs(valor: String): String = JSONObject.quote(valor)
 
     /** Deja una línea en el registro de la app desde la web. */
+    /**
+     * La web avisa de que el usuario corrigió una detección (ver
+     * src/app/detections/[id]). Se olvida la ficha recordada como pista de serie
+     * —pudo ser la equivocada— y se refresca la lista de textos que no son títulos.
+     */
+    @JavascriptInterface
+    fun detectionCorrected(detectionId: String?): Boolean {
+        if (!propio()) return false
+        RecentDetail.forgetAfterCorrection()
+        NotATitleList.refreshIfStale(prefs, force = true)
+        prefs.addLog("Detección corregida desde la web${detectionId?.let { " ($it)" } ?: ""}")
+        return true
+    }
+
     @JavascriptInterface
     fun log(mensaje: String?) {
         if (!propio()) return

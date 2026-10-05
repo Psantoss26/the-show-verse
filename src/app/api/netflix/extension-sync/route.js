@@ -15,6 +15,11 @@ import {
 import { normalizeText } from "@/lib/netflix/resolve";
 import { createRequestCache } from "@/lib/netflix/requestCache";
 import {
+  canonicalPlatformId,
+  detectionFingerprint,
+  detectionTriggerText,
+} from "@/lib/netflix/detectionFingerprint";
+import {
   buildRankedQueryVariants,
   cleanSearchTitle,
   isBarePlatformName,
@@ -245,6 +250,45 @@ async function findSeasonByEpisodeName(tmdbId, episodeName, episodeNumber = null
   return null;
 }
 
+// ── Detecciones y su aprendizaje (backend: routes/streamingDetections.js) ──
+// Las dos llamadas son de MEJOR ESFUERZO: si el backend no responde, se resuelve
+// y se sincroniza igual que antes, solo que sin reglas ni posibilidad de
+// corregir esa detección.
+async function detectionBackend(path, syncToken, payload, timeoutMs) {
+  const baseUrl = getBackendBaseUrl();
+  if (!baseUrl || !syncToken) return null;
+  try {
+    const res = await fetch(`${baseUrl}/v1/streaming${path}`, {
+      method: "POST",
+      cache: "no-store",
+      signal: AbortSignal.timeout(timeoutMs),
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${syncToken}` },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) return null;
+    return await res.json().catch(() => null);
+  } catch {
+    return null;
+  }
+}
+
+// Señal original que se guarda con la detección (auditoría y prerrelleno de la
+// corrección). Solo campos del reproductor, nunca credenciales.
+const DETECTION_SIGNAL_FIELDS = [
+  "platformName", "mainTitle", "subTitle", "showName", "episodeName", "movieTitle", "seasonEpisodeText",
+  "tabTitle", "queueTitle", "albumArtist", "notifTitle", "notifText", "notifSubText",
+  "season", "episode", "durationSec", "seriesFromHint", "screenTitles",
+];
+function detectionSignal(body) {
+  const signal = {};
+  for (const key of DETECTION_SIGNAL_FIELDS) {
+    const value = body?.[key];
+    if (value == null || value === "") continue;
+    signal[key] = typeof value === "string" ? value.slice(0, 300) : value;
+  }
+  return signal;
+}
+
 export async function POST(request) {
   let backendResult = null;
   const backendRequest = async (path, init) => {
@@ -261,6 +305,7 @@ export async function POST(request) {
   };
 
   try {
+    const payload = await request.json().catch(() => ({}));
     const {
       mainTitle,
       subTitle,
@@ -312,7 +357,10 @@ export async function POST(request) {
       estimated,
       eventId,
       observedAt,
-    } = await request.json().catch(() => ({}));
+      // 'detail' (ficha navegando) | 'playback'. Los clientes antiguos no lo
+      // mandan: entonces se deduce de si hay posición/duración de reproducción.
+      detectionKind,
+    } = payload;
     const durationSecNum = Number(durationSec);
     const safeDurationSec = Number.isFinite(durationSecNum) && durationSecNum > 0
       ? durationSecNum
@@ -438,6 +486,37 @@ export async function POST(request) {
       return respond({ error: "Empty title after cleanup" }, { status: 422 });
     }
 
+    // 2b. Lo aprendido de las correcciones del usuario (y las globales con
+    // consenso) para lo que identifica este contenido.
+    const detectionPlatform = canonicalPlatformId(platform) || "netflix";
+    const triggerText = detectionTriggerText({ showName, movieTitle, mainTitle });
+    const fingerprint = detectionFingerprint(detectionPlatform, triggerText);
+    const rules = fingerprint
+      ? await detectionBackend(
+          "/detections/lookup",
+          syncToken,
+          { platform: detectionPlatform, fingerprint },
+          3000,
+        )
+      : null;
+    if (rules?.decision?.rule === "not_a_title") {
+      console.log(`[Extension Sync] "${triggerText}" no es un título (${rules.decision.scope}).`);
+      return respond({ error: "Not a title", reason: "not_a_title" }, { status: 422 });
+    }
+    const rejected = new Set(
+      (Array.isArray(rules?.rejects) ? rules.rejects : []).map((r) => `${r.mediaType}:${r.tmdbId}`),
+    );
+    // Búsqueda sin los títulos que el usuario ya dijo que NO son este.
+    const searchCandidates = async (searchQuery, type) => {
+      const results = await searchTmdbCandidates(backendRequest, searchQuery, type);
+      if (!rejected.size) return results;
+      return results.filter((item) => !rejected.has(`${item?.media_type || type}:${item?.id}`));
+    };
+    const override = rules?.decision?.rule === "override" ? rules.decision : null;
+    const detectionSource = override
+      ? (override.scope === "global" ? "global_rule" : "user_rule")
+      : "search";
+
     let tmdbId = null;
     let mediaType = isTv ? "tv" : "movie";
     let resolvedTitle = "";
@@ -479,13 +558,29 @@ export async function POST(request) {
     const requireExactMatch = !showName && (isTv || hasEpisodeNumber);
     let resolution = null;
     let fallback = null;
-    for (const variant of rankedVariants) {
+    if (override) {
+      // El usuario ya dijo qué título es: no se busca. Un episodio con número va
+      // como resuelto; sin él, como serie (la temporada/episodio se intentan
+      // fijar por nombre más abajo, igual que en una búsqueda normal).
+      const overrideIsTv = override.mediaType === "tv";
+      const entity = overrideIsTv
+        ? { id: override.tmdbId, name: override.title || query, poster_path: override.posterPath || null }
+        : { id: override.tmdbId, title: override.title || query, poster_path: override.posterPath || null };
+      resolution = {
+        kind: overrideIsTv && episode == null ? "show_level" : "resolved",
+        entity,
+        mediaType: override.mediaType,
+        confidence: "high",
+        exact: true,
+      };
+    }
+    for (const variant of override ? [] : rankedVariants) {
       const candidate = await resolveStreamingEntity({
         query: variant.query,
         expectedMediaType: episode != null ? "tv" : null,
         preferTv: isTv,
         durationSec: safeDurationSec,
-        search: (type) => searchTmdbCandidates(backendRequest, variant.query, type),
+        search: (type) => searchCandidates(variant.query, type),
       });
       if (!candidate) continue;
       if (candidate.exact) {
@@ -523,7 +618,7 @@ export async function POST(request) {
           expectedMediaType: episode != null ? "tv" : null,
           preferTv: true,
           durationSec: safeDurationSec,
-          search: (type) => searchTmdbCandidates(backendRequest, screenQuery, type),
+          search: (type) => searchCandidates(screenQuery, type),
         });
         if (!candidate?.exact || candidate.mediaType !== "tv") continue;
         // (show_level también es "tv": su mediaType ya viene fijado a "tv".)
@@ -702,6 +797,30 @@ export async function POST(request) {
       if (belongs === true && confidence === "low") confidence = "medium";
     }
 
+    // Registro de la detección: es lo que el usuario puede corregir desde la
+    // notificación. Su id viaja al cliente y vuelve en los pings de progreso, para
+    // que el backend sepa qué guardó cada detección.
+    const kind = detectionKind === "detail" || detectionKind === "playback"
+      ? detectionKind
+      : (Number(positionSec) > 0 || safeDurationSec != null || recordProgress ? "playback" : "detail");
+    const recorded = await detectionBackend("/detections", syncToken, {
+      platform: detectionPlatform,
+      kind,
+      fingerprint,
+      triggerText: triggerText || resolvedTitle || query,
+      signal: detectionSignal(payload),
+      tmdbId,
+      mediaType,
+      season: isTv && season != null ? season : null,
+      episode: isTv && episode != null ? episode : null,
+      title: resolvedTitle || null,
+      posterPath: posterPath || null,
+      confidence,
+      source: detectionSource,
+    }, 3000);
+    // Solo si existe: los clientes antiguos y las pruebas comparan `synced` tal cual.
+    const detectionFields = recorded?.detectionId ? { detectionId: recorded.detectionId } : {};
+
     // Observación guardada sin conexión: resolver y aplicar el punto original,
     // usando la misma identidad de evento en cada reintento.
     if (recordProgress) {
@@ -717,6 +836,7 @@ export async function POST(request) {
           positionSeconds: Math.max(0, Math.round(Number(positionSec) || 0)),
           runtimeSeconds: Math.max(0, Math.round(safeDurationSec || 0)),
           estimated: estimated === true, eventId, observedAt,
+          ...detectionFields,
         }),
       });
       const progress = await response.json().catch(() => ({}));
@@ -741,6 +861,7 @@ export async function POST(request) {
           // devuelve en los pings de progreso y es la que se guarda si el
           // contenido llega a completarse.
           confidence,
+          ...detectionFields,
         },
       });
     }
@@ -786,6 +907,7 @@ export async function POST(request) {
           platform,
           netflixVideoId: resolvedVideoId || undefined,
           netflixTitle: mainTitle || showName || resolvedTitle,
+          ...detectionFields,
         }),
       });
       const json = await res.json().catch(() => ({}));
@@ -826,6 +948,7 @@ export async function POST(request) {
         posterPath,
         confidence,
         duplicate: Boolean(historyRes.json?.duplicate),
+        ...detectionFields,
       },
     });
   } catch (error) {

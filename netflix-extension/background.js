@@ -406,17 +406,45 @@ async function drainProgress() {
 function ensureProgressAlarm() {
   chrome.alarms.create(PROGRESS_ALARM, { periodInMinutes: 1 });
 }
+// Textos que el usuario (o el consenso) marcó como «no había ninguna ficha»: el
+// content-script los descarta antes de tratar la pantalla como una ficha. Se
+// guardan en storage y se refrescan cada pocas horas (la alarma de progreso
+// corre cada minuto y solo pide la lista cuando ha caducado).
+const NOT_A_TITLE_KEY = "tsvNotATitle";
+const NOT_A_TITLE_TTL_MS = 6 * 60 * 60 * 1000;
+async function refreshNotATitle({ force = false } = {}) {
+  const config = await getStored(["showVerseOrigin", "netflixSyncToken", NOT_A_TITLE_KEY]);
+  if (!config.showVerseOrigin || !config.netflixSyncToken) return;
+  const current = config[NOT_A_TITLE_KEY];
+  if (!force && current && Date.now() - (current.fetchedAt || 0) < NOT_A_TITLE_TTL_MS) return;
+  const res = await fetch(`${config.showVerseOrigin}/api/netflix/detection-rules`, {
+    credentials: "omit", signal: AbortSignal.timeout(15_000),
+    headers: { Authorization: `Bearer ${config.netflixSyncToken}` },
+  });
+  if (!res.ok) return;
+  const json = await res.json().catch(() => null);
+  if (!json || typeof json.platforms !== "object") return;
+  await setStored({ [NOT_A_TITLE_KEY]: { platforms: json.platforms, fetchedAt: Date.now() } });
+}
 chrome.runtime.onInstalled.addListener(ensureProgressAlarm);
 chrome.runtime.onStartup.addListener(() => { ensureProgressAlarm(); drainProgress().catch(() => {}); });
 chrome.alarms.onAlarm.addListener(alarm => {
-  if (alarm.name === PROGRESS_ALARM) drainProgress().catch(() => {});
+  if (alarm.name === PROGRESS_ALARM) {
+    drainProgress().catch(() => {});
+    refreshNotATitle().catch(() => {});
+  }
 });
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;
   if (changes.netflixSyncToken || changes.showVerseOrigin) {
     getStored(["showVerseOrigin", "netflixSyncToken"]).then(async config => {
-      if (!config.netflixSyncToken) await progressOutbox.clear();
-      else await progressOutbox.rebind(await syncOwner(config));
+      if (!config.netflixSyncToken) {
+        await progressOutbox.clear();
+        await chrome.storage.local.remove(NOT_A_TITLE_KEY);
+      } else {
+        await progressOutbox.rebind(await syncOwner(config));
+        await refreshNotATitle({ force: true });
+      }
     }).catch(() => {});
   }
   if (changes[SYNC_PAUSED_KEY]?.newValue === false) drainProgress().catch(() => {});
@@ -680,6 +708,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       durationSec,
       positionSec,
       resolveOnly,
+      detectionKind,
     } = message;
     if (!resolveOnly) {
       addLog(`Reproducción detectada en ${platformName || platform || "streaming"}: "${mainTitle}"`, "info");
@@ -724,6 +753,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           durationSec: durationSec || undefined,
           positionSec: positionSec || undefined,
           resolveOnly: resolveOnly || undefined,
+          // Ficha navegando o reproducción: lo guarda la detección corregible.
+          detectionKind: detectionKind || undefined,
+          platformName: platformName || undefined,
         }),
         credentials: "omit"
       })
@@ -756,7 +788,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const config = await getStored(["showVerseOrigin", "netflixSyncToken", SYNC_PAUSED_KEY]);
       if (config[SYNC_PAUSED_KEY]) return { success: false, paused: true };
       if (!config.netflixSyncToken || !config.showVerseOrigin) return { success: false, status: 401, error: "Vuelve a vincular la extensión." };
-      const fields = ["recordProgress", "mainTitle", "subTitle", "showName", "episodeName", "movieTitle", "seasonEpisodeText", "tabTitle", "durationSec", "positionSec", "seriesFromHint", "queueTitle", "albumArtist", "notifTitle", "notifText", "notifSubText", "tmdbId", "mediaType", "season", "episode", "title", "posterPath", "platform", "positionSeconds", "runtimeSeconds", "confidence", "estimated"];
+      const fields = ["recordProgress", "mainTitle", "subTitle", "showName", "episodeName", "movieTitle", "seasonEpisodeText", "tabTitle", "durationSec", "positionSec", "seriesFromHint", "queueTitle", "albumArtist", "notifTitle", "notifText", "notifSubText", "tmdbId", "mediaType", "season", "episode", "title", "posterPath", "platform", "positionSeconds", "runtimeSeconds", "confidence", "estimated", "detectionId"];
       const payload = Object.fromEntries(fields.filter(k => message[k] != null).map(k => [k, message[k]]));
       if (message.action === "queuePlayback") payload.recordProgress = true;
       payload.eventId = crypto.randomUUID();

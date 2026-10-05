@@ -21,6 +21,7 @@ import {
   Bell,
   Layers,
   ChevronRight,
+  Radar,
   Database,
   Link2,
   Chrome,
@@ -2236,6 +2237,22 @@ function ProfileSettingsClient() {
                       activeId={isNetflixConnected ? netflixAccountInfo?.metadata?.lastPlatform || null : null}
                       className="pl-16"
                     />
+
+                    {/* Corrección de detecciones (navegador y app Android): para
+                        las que ya no tienen notificación a la vista. */}
+                    <Link
+                      href="/detections"
+                      className="flex items-center gap-3 rounded-2xl bg-white/[0.04] p-3 transition hover:bg-white/[0.08] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+                    >
+                      <Radar className="h-5 w-5 shrink-0 text-emerald-400" aria-hidden="true" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-bold text-white">Detecciones recientes</span>
+                        <span className="block text-xs leading-relaxed text-zinc-400">
+                          Revisa los títulos detectados y corrige los que no eran correctos.
+                        </span>
+                      </span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-zinc-400" aria-hidden="true" />
+                    </Link>
                   </div>
 
                   {/* App companion de Android: Tarjeta independiente */}

@@ -36,6 +36,7 @@ import calendarRoutes from './routes/calendar.js';
 import communityRoutes from './routes/community.js';
 import pushRoutes from './routes/push.js';
 import levelRoutes from './routes/level.js';
+import streamingDetectionsRoutes from './routes/streamingDetections.js';
 import { refreshAllPools } from './dashboard/pools.js';
 
 import { closeRedis, getRedis } from './lib/redis.js';
@@ -253,6 +254,7 @@ const apiV1 = async (app) => {
   app.register(recommendationsRoutes, { prefix: '/recommendations' });
   app.register(communityRoutes, { prefix: '/community' });
   app.register(pushRoutes, { prefix: '/push' });
+  app.register(streamingDetectionsRoutes, { prefix: '/streaming' });
 };
 
 await fastify.register(apiV1, { prefix: '/v1' });
