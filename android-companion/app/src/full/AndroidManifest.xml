@@ -78,8 +78,8 @@
             android:label="@string/perf_title"
             android:parentActivityName=".WebAppActivity" />
 
-        <!-- Imágenes que la web comparte con el selector del sistema
-             (WebAppBridge.shareImage). Sin exportar: el acceso lo da el
+        <!-- Imágenes y vídeos que la web comparte con el selector del sistema
+             (WebAppBridge.shareFile / shareImage). Sin exportar: el acceso lo da el
              permiso temporal del Intent. -->
         <provider
             android:name="androidx.core.content.FileProvider"

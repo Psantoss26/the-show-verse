@@ -3907,6 +3907,7 @@ export default function DetailsClient({
     createRewatchRun,
     deleteRewatchRun,
     getWatchedEpisodeCountForSeason,
+    tvProgress,
     tvProgressBadge,
     reconcileAfterClose,
     hasAnyWatchedEpisode: hasAnyWatchedEpisodeInMap,
@@ -8972,6 +8973,66 @@ export default function DetailsClient({
     ],
   );
 
+  // VÍDEO COMPARTIBLE: lo que la imagen no cabe (visionados, la reseña propia y
+  // los detalles). Son los datos crudos: la hoja de compartir decide si incluye
+  // la reseña (apagado por defecto) y arma el payload con buildShareStoryPayload.
+  const shareStoryPeople = (
+    type === "movie" ? movieDirectorsCrew : data?.created_by || []
+  )
+    .map((person) => person?.name)
+    .filter(Boolean);
+  const shareStoryPeopleKey = shareStoryPeople.join("|");
+  const shareStoryReview = myComments[0] || null;
+  const shareStory = useMemo(
+    () => ({
+      type,
+      watched: watchedActionValue,
+      plays: watchedActionPlays,
+      history: trakt.history,
+      lastWatchedAt: trakt.lastWatchedAt,
+      tvProgress: actionStateLoading ? null : tvProgress,
+      review: shareStoryReview
+        ? {
+            comment: shareStoryReview.comment,
+            spoiler: !!shareStoryReview.spoiler,
+            created_at: shareStoryReview.created_at,
+          }
+        : null,
+      details: {
+        year:
+          Number(String(data?.release_date || data?.first_air_date || "").slice(0, 4)) ||
+          null,
+        runtime: type === "movie" ? data?.runtime || null : null,
+        seasons: type === "tv" ? data?.number_of_seasons || null : null,
+        episodes: type === "tv" ? data?.number_of_episodes || null : null,
+        genres: data?.genres || [],
+        peopleLabel: type === "movie" ? "Dirección" : "Creación",
+        people: shareStoryPeople,
+        overview: data?.overview || null,
+      },
+    }),
+    // `shareStoryPeople` se recrea en cada render: se depende de su contenido.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      type,
+      watchedActionValue,
+      watchedActionPlays,
+      trakt.history,
+      trakt.lastWatchedAt,
+      actionStateLoading,
+      tvProgress,
+      shareStoryReview,
+      data?.release_date,
+      data?.first_air_date,
+      data?.runtime,
+      data?.number_of_seasons,
+      data?.number_of_episodes,
+      data?.genres,
+      data?.overview,
+      shareStoryPeopleKey,
+    ],
+  );
+
   const detailsModalLayer = (
     <>
       {/* Modal de reproducción de vídeos y tráilers */}
@@ -10253,6 +10314,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   title,
                   text: `Echa un vistazo a ${title} en The Show Verse`,
                   card: shareCard,
+                  story: shareStory,
                 }}
                 stats={tScoreboard?.stats}
                 // Escritorio: tus amigos a la derecha de la fila de stats, solo
