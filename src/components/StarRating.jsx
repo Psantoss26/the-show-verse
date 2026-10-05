@@ -1,6 +1,6 @@
 "use client";
 import { useServerOnline } from "@/context/ServerStatusContext";
-import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER } from "@/lib/ui/liquidGlass";
 
 import { useEffect, useId, useRef, useState } from "react";
 import useModalGuard from "@/hooks/useModalGuard";
@@ -222,7 +222,7 @@ export default function StarRating({
               aria-modal="true"
               aria-labelledby={titleId}
             >
-              <div className="flex items-center justify-between bg-white/[0.025] px-6 py-5">
+              <div className={`flex items-center justify-between ${LIQUID_GLASS_MODAL_HEADER} px-6 py-5`}>
                 <h2
                   id={titleId}
                   className="truncate text-lg font-black leading-tight text-white drop-shadow-md sm:text-xl"

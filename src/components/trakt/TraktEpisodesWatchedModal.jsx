@@ -1,6 +1,6 @@
 "use client";
 import { useServerOnline } from "@/context/ServerStatusContext";
-import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER } from "@/lib/ui/liquidGlass";
 
 
 import OptimizedImage from "@/components/OptimizedImage";
@@ -1214,7 +1214,7 @@ export default function TraktEpisodesWatchedModal({
         aria-label="Episodios vistos"
       >
         {/* Header */}
-        <div className="z-30 flex shrink-0 items-center justify-between bg-white/[0.035] px-6 py-5 backdrop-blur-xl sm:px-8 sm:pt-8 sm:pb-6">
+        <div className={`z-30 flex shrink-0 items-center justify-between ${LIQUID_GLASS_MODAL_HEADER} px-6 py-5 sm:px-8 sm:pt-8 sm:pb-6`}>
           <div className="min-w-0 pr-4">
             <h2 className="truncate text-lg font-black leading-tight text-white drop-shadow-md sm:text-xl">
               Episodios vistos
@@ -1264,7 +1264,7 @@ export default function TraktEpisodesWatchedModal({
         </div>
 
         {/* Toolbar */}
-        <div className="z-20 shrink-0 space-y-2 bg-white/[0.025] px-4 py-3 backdrop-blur-xl">
+        <div className="z-20 shrink-0 space-y-2 px-4 py-3">
           {/* Móvil: búsqueda + toggle filtros */}
           <div className="flex items-center gap-2 lg:hidden">
             <div className="relative h-10 flex-1">
@@ -2241,7 +2241,7 @@ export default function TraktEpisodesWatchedModal({
                     : "Añadir visionado"
                 }
               >
-                <div className="flex items-start justify-between gap-4 bg-white/[0.025] p-5">
+                <div className={`flex items-start justify-between gap-4 ${LIQUID_GLASS_MODAL_HEADER} p-5`}>
                   <div>
                     <h3 className="text-lg font-black text-white">
                       {addPlayMode === "rewatch"
@@ -2444,7 +2444,7 @@ export default function TraktEpisodesWatchedModal({
                 aria-modal="true"
                 aria-label="Historial de visionados"
               >
-                <div className="p-5 bg-white/[0.025] flex items-start justify-between gap-4">
+                <div className={`p-5 ${LIQUID_GLASS_MODAL_HEADER} flex items-start justify-between gap-4`}>
                   <div>
                     <h3 className="text-lg font-black text-white">
                       Historial de visionados

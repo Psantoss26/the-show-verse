@@ -1,5 +1,5 @@
 "use client";
-import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER } from "@/lib/ui/liquidGlass";
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -154,7 +154,7 @@ export default function EpisodeRatingsModal({
           aria-hidden="true"
         />
 
-        <header className="flex shrink-0 items-center justify-between gap-4 bg-white/[0.025] px-6 py-5 sm:px-8 sm:pt-8 sm:pb-6">
+        <header className={`flex shrink-0 items-center justify-between gap-4 ${LIQUID_GLASS_MODAL_HEADER} px-6 py-5 sm:px-8 sm:pt-8 sm:pb-6`}>
           <div className="min-w-0">
             <p className="mb-0.5 text-[10px] font-black uppercase tracking-[0.22em] text-amber-300">
               Serie

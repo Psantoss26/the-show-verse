@@ -3,7 +3,7 @@
 
 import OptimizedImage from "@/components/OptimizedImage";
 import useModalGuard from "@/hooks/useModalGuard";
-import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER } from "@/lib/ui/liquidGlass";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { ExternalLink, MonitorPlay, X } from 'lucide-react'
@@ -68,7 +68,7 @@ export default function ExternalLinksModal({
             <div
                 className={`relative flex max-h-[85dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
             >
-                        <div className="flex w-full shrink-0 items-center justify-between bg-white/[0.025] p-6 sm:px-8 sm:pb-6 sm:pt-8">
+                        <div className={`flex w-full shrink-0 items-center justify-between ${LIQUID_GLASS_MODAL_HEADER} p-6 sm:px-8 sm:pb-6 sm:pt-8`}>
                             <div className="min-w-0">
                                 <h2
                                     id="external-links-title"

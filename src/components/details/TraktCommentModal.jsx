@@ -1,6 +1,6 @@
 "use client";
 import OnlineOnlyForm from "@/components/OnlineOnlyForm";
-import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER } from "@/lib/ui/liquidGlass";
 
 import { useEffect, useState, useRef } from "react";
 import { X, Loader2, Calendar, Pencil, Trash2, AlertTriangle } from "lucide-react";
@@ -135,7 +135,7 @@ export default function TraktCommentModal({
       {/* Modal Card */}
       <div className={`relative w-full max-w-xl flex flex-col max-h-[90dvh] sm:max-h-[90vh] overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}>
         {/* Header */}
-        <div className="flex w-full items-center justify-between px-5 py-4 sm:px-6 sm:py-6 bg-white/[0.025] shrink-0">
+        <div className={`flex w-full items-center justify-between px-5 py-4 sm:px-6 sm:py-6 ${LIQUID_GLASS_MODAL_HEADER} shrink-0`}>
           <div>
             <h3 className="text-lg sm:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400">
               {editingCommentId ? "Editar comentario" : "Escribir comentario"}

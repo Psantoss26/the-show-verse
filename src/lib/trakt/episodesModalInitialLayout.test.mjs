@@ -33,9 +33,16 @@ test("los modales de episodios conservan un margen proporcional", () => {
 test("la cabecera de episodios comparte el espaciado de los demás modales", () => {
   assert.match(
     modalSource,
-    /items-center justify-between bg-white\/\[0\.035\] px-6 py-5 backdrop-blur-xl sm:px-8 sm:pt-8 sm:pb-6/,
+    /items-center justify-between \$\{LIQUID_GLASS_MODAL_HEADER\} px-6 py-5 sm:px-8 sm:pt-8 sm:pb-6/,
     "el título debe respirar respecto a los bordes lateral y superior del modal",
   );
+});
+
+test("la cabecera de episodios no marca un salto de tono con el contenido", () => {
+  // Un velo plano (`bg-white/[0.035]`) terminaba en seco y dibujaba una línea
+  // horizontal entre título y contenido; el degradado compartido se funde.
+  assert.doesNotMatch(modalSource, /z-30 flex shrink-0[^"`]*bg-white\/\[0\.0\d+\]/);
+  assert.doesNotMatch(modalSource, /z-20 shrink-0 space-y-2[^"`]*bg-white\/\[0\.0\d+\]/);
 });
 
 test("el cierre y las tarjetas de episodios no muestran contornos visuales", () => {
