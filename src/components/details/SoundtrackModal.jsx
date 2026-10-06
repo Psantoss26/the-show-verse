@@ -51,6 +51,10 @@ export default function SoundtrackModal({
   error = "",
   initialTrackId = null,
   searchUrl = "",
+  // Modo soundtrack de la ficha (useAmbientSoundtrack): con `onAutoplayChange`
+  // el reproductor ofrece activar o desactivar que suene al abrir una ficha.
+  autoplay = true,
+  onAutoplayChange = null,
 }) {
   const audioRef = useRef(null);
 
@@ -194,7 +198,9 @@ export default function SoundtrackModal({
       />
 
       <div
-        className={`relative flex w-full max-w-[460px] flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
+        // En pantallas bajas el reproductor (con el interruptor de reproducción
+        // automática) no cabe: se desplaza por dentro en vez de salirse.
+        className={`relative flex max-h-[calc(100dvh-2rem)] w-full max-w-[460px] flex-col overflow-y-auto overscroll-contain rounded-[2rem] [scrollbar-width:none] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
         role="dialog"
         aria-modal="true"
         aria-label={`Soundtrack de ${title || "este título"}`}
@@ -422,6 +428,37 @@ export default function SoundtrackModal({
                   />
                 </div>
               </div>
+            )}
+
+            {/* --- REPRODUCCIÓN AUTOMÁTICA (modo soundtrack de la ficha) --- */}
+            {onAutoplayChange && (
+              <label className="mt-8 flex w-full cursor-pointer items-center justify-between gap-4 rounded-2xl bg-white/5 px-4 py-3 text-left">
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold text-white/85">Reproducción automática</span>
+                  <span className="block text-[11px] font-semibold text-white/45">
+                    {autoplay ? "Suena al abrir la ficha de un título" : "Desactivada en todos los títulos"}
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  role="switch"
+                  className="peer sr-only"
+                  checked={autoplay}
+                  onChange={(event) => onAutoplayChange(event.target.checked)}
+                />
+                <span
+                  aria-hidden="true"
+                  className={`relative h-7 w-12 shrink-0 rounded-full transition-colors duration-300 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-yellow-400 ${
+                    autoplay ? "bg-yellow-400/80" : "bg-white/15"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-transform duration-300 ${
+                      autoplay ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </span>
+              </label>
             )}
           </div>
         ) : (

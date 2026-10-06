@@ -4,8 +4,9 @@
 // (las previews de 30 s que ya trae /api/soundtrack), una pista detrás de otra
 // y en bucle, a volumen bajo. Un solo <audio> fuera del DOM.
 //
-//   - Silenciar se recuerda en este navegador: con el soundtrack silenciado no
-//     suena en ningún título hasta que se vuelva a activar.
+//   - La reproducción automática se activa o desactiva desde el reproductor
+//     del soundtrack (SoundtrackModal) y se recuerda en este navegador: sin
+//     ella no suena en ningún título hasta que se vuelva a activar.
 //   - Se pausa mientras haya algo que tenga su propio sonido (tráiler, el
 //     reproductor del soundtrack) y con la pestaña oculta, y sigue después.
 //   - Los navegadores pueden bloquear el sonido sin un gesto previo (al abrir
@@ -43,12 +44,12 @@ export function ambientPlaylist(tracks) {
  * @param tracks     pistas del soundtrack (las de /api/soundtrack).
  * @param suspended  hay otro sonido en la ficha: pausar sin silenciar.
  * @param resetKey   identidad del título: al cambiar, vuelve a la primera pista.
- * @returns {{ available, playing, muted, trackId, toggle }}
- *   available  hay pistas con preview;
- *   playing    está sonando (para animar el icono del altavoz);
- *   muted      el usuario lo ha silenciado;
- *   trackId    la pista que suena (el reproductor completo abre en ella);
- *   toggle     silenciar / activar (o empezar si el navegador lo bloqueó).
+ * @returns {{ available, playing, autoplay, trackId, setAutoplay }}
+ *   available    hay pistas con preview;
+ *   playing      está sonando (para animar el icono del altavoz);
+ *   autoplay     la reproducción automática está activada;
+ *   trackId      la pista que suena (el reproductor completo abre en ella);
+ *   setAutoplay  activar o desactivar la reproducción automática.
  */
 export default function useAmbientSoundtrack({ tracks, suspended = false, resetKey = "" }) {
   const playlist = useMemo(() => ambientPlaylist(tracks), [tracks]);
@@ -202,24 +203,11 @@ export default function useAmbientSoundtrack({ tracks, suspended = false, resetK
     [],
   );
 
-  const toggle = useCallback(() => {
-    if (muted) {
-      writeMuted(false);
-      setMuted(false);
-      // Dentro del gesto: así el navegador deja sonar aunque antes lo bloqueara.
-      if (!suspended) void start();
-      return;
-    }
-    const element = audioRef.current;
-    if (!element || element.paused) {
-      // Bloqueado por el navegador: este toque es el gesto que faltaba.
-      void start();
-      return;
-    }
-    writeMuted(true);
-    setMuted(true);
-  }, [muted, start, suspended]);
+  const setAutoplay = useCallback((enabled) => {
+    writeMuted(!enabled);
+    setMuted(!enabled);
+  }, []);
 
   const trackId = playlist.find((track) => track.previewUrl === trackUrl)?.id ?? null;
-  return { available: playlist.length > 0, playing: playing && !muted, muted, trackId, toggle };
+  return { available: playlist.length > 0, playing: playing && !muted, autoplay: !muted, trackId, setAutoplay };
 }
