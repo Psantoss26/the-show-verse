@@ -710,14 +710,30 @@ function DetailsToolbarActions({
 
 // Píldora de acción bajo el marcador móvil (ver `mobileScoresOnly`): icono +
 // título, a media línea. Compartir usa la misma píldora desde ActionShareButton.
-export function ScoreboardPill({ icon: Icon, label, onClick, className = "", ...props }) {
+// `iconOnly`: solo el icono (la fila de cuatro de la ficha de teléfono); la
+// etiqueta pasa al tooltip y, si no se da otro, al `aria-label`.
+export function ScoreboardPill({ icon: Icon, label, onClick, iconOnly = false, className = "", ...props }) {
   return (
-    <button type="button" onClick={onClick} className={`${SCOREBOARD_PILL_CLASS} ${className}`} {...props}>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`${SCOREBOARD_PILL_CLASS} ${iconOnly ? "!px-0" : ""} ${className}`}
+      {...(iconOnly ? { title: label, "aria-label": label } : {})}
+      {...props}
+    >
       <LiquidGlassOpticalLayers />
       <Icon aria-hidden="true" className="relative z-10 h-5 w-5 shrink-0" />
-      <span className="relative z-10 truncate">{label}</span>
+      {iconOnly ? null : <span className="relative z-10 truncate">{label}</span>}
     </button>
   );
+}
+
+/**
+ * Teléfono: la fila bajo el marcador, con sus botones a partes iguales
+ * (Plataformas · Actividad · Enlaces · Compartir, solo iconos).
+ */
+export function ScoreboardPillRow({ children, className = "" }) {
+  return <div className={`flex gap-3 [&>*]:flex-1 ${className}`}>{children}</div>;
 }
 
 // ---------------------------------------------------------------------------

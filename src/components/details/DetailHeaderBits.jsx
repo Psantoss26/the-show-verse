@@ -318,8 +318,9 @@ export function UnifiedRateButton({
 // `story`: datos del vídeo compartible (ver lib/details/shareStory); con él la
 // hoja ofrece también el vídeo. Se fotografía igual que `card`.
 //
-// `variant="pill"`: la píldora a media línea que la ficha móvil pinta bajo el
-// marcador (ver SCOREBOARD_PILL_CLASS). Es un <button> normal, sin Framer: su
+// `variant="pill"`: la píldora que la ficha móvil pinta bajo el marcador (ver
+// SCOREBOARD_PILL_CLASS); con `iconOnly`, solo el icono, como el resto de su
+// fila (ScoreboardPillRow). Es un <button> normal, sin Framer: su
 // entrada la pone el revelado del marcador sobre el propio botón, y una
 // transformación de Framer encima se pelearía con ella.
 export function ActionShareButton({ title, text, url, card = null, story = null, iconOnly = false, animateEntrance = true, variant = "default", className = "" }) {
@@ -402,7 +403,8 @@ export function ActionShareButton({ title, text, url, card = null, story = null,
           onClick={handleShare}
           aria-haspopup={card ? "dialog" : undefined}
           aria-label={copied ? "¡Enlace copiado!" : "Compartir"}
-          className={`${SCOREBOARD_PILL_CLASS} ${className}`}
+          title={iconOnly ? (copied ? "Copiado" : "Compartir") : undefined}
+          className={`${SCOREBOARD_PILL_CLASS} ${iconOnly ? "!px-0" : ""} ${className}`}
         >
           <LiquidGlassOpticalLayers />
           {copied ? (
@@ -410,7 +412,7 @@ export function ActionShareButton({ title, text, url, card = null, story = null,
           ) : (
             <Share2 aria-hidden="true" className="relative z-10 h-5 w-5 shrink-0" />
           )}
-          <span className="relative z-10">{copied ? "Copiado" : "Compartir"}</span>
+          {iconOnly ? null : <span className="relative z-10">{copied ? "Copiado" : "Compartir"}</span>}
         </button>
         {sheet}
       </>

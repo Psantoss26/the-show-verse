@@ -62,7 +62,7 @@ test('grafo compacto: géneros y sagas por índice; sagas solo con dos títulos'
   assert.deepEqual(series[5], []);
 });
 
-test('grafo compacto: meses de visionado, listas, presupuesto, recaudación y nota de TMDb', () => {
+test('grafo compacto: meses de visionado, listas, presupuesto, recaudación e id de IMDb', () => {
   const titles = mergeTitleRecords({
     history: [
       { tmdbId: 1, mediaType: 'movie', plays: 2, months: [202403, 202311, 202403, null] },
@@ -72,8 +72,8 @@ test('grafo compacto: meses de visionado, listas, presupuesto, recaudación y no
   });
   assert.deepEqual(titles.get('movie:1').months, [202311, 202403]);
   const meta = new Map([
-    ['movie:1', { name: 'A', genres: [], budget: 63000000, revenue: 101000000, vote: 8.44 }],
-    ['tv:2', { name: 'B', genres: [], budget: 5, revenue: 5, vote: 7 }],
+    ['movie:1', { name: 'A', genres: [], budget: 63000000, revenue: 101000000, imdbId: 'tt0000001' }],
+    ['tv:2', { name: 'B', genres: [], budget: 5, revenue: 5, imdbId: 'tt0000002' }],
   ]);
   const packed = packNeuralGraph(titles, meta, [
     { id: 'l1', name: 'Favoritas de siempre', kind: 'own', keys: new Set(['movie:1', 'tv:2', 'movie:999']) },
@@ -83,16 +83,17 @@ test('grafo compacto: meses de visionado, listas, presupuesto, recaudación y no
   // Solo las listas que reúnen algún título del usuario.
   assert.deepEqual(packed.lists, [['l1', 'Favoritas de siempre', 'own'], ['c1', 'Clásicos', 'community']]);
   const [movie, show, pending] = packed.titles;
-  assert.deepEqual(movie.slice(10), [[202311, 202403], [0], 63000000, 101000000, 8.4]);
+  assert.deepEqual(movie.slice(10), [[202311, 202403], [0], 63000000, 101000000, 'tt0000001']);
   // Las series no tienen presupuesto ni recaudación.
-  assert.deepEqual(show.slice(10), [[202501], [0, 1], 0, 0, 7]);
-  assert.deepEqual(pending.slice(10), [[], [], 0, 0, 0]);
+  assert.deepEqual(show.slice(10), [[202501], [0, 1], 0, 0, 'tt0000002']);
+  assert.deepEqual(pending.slice(10), [[], [], 0, 0, '']);
 });
 
-test('metadatos: presupuesto, recaudación y nota de TMDb (sin votos, sin nota)', () => {
+test('metadatos: presupuesto, recaudación e id de IMDb (película o serie)', () => {
   assert.deepEqual(
-    pickTitleMeta({ title: 'X', budget: 10, revenue: 20, vote_average: 7.5, vote_count: 3 }),
-    { name: 'X', posterPath: null, date: null, genres: [], collection: null, budget: 10, revenue: 20, vote: 7.5 },
+    pickTitleMeta({ title: 'X', budget: 10, revenue: 20, imdb_id: 'tt0111161' }),
+    { name: 'X', posterPath: null, date: null, genres: [], collection: null, budget: 10, revenue: 20, imdbId: 'tt0111161' },
   );
-  assert.equal(pickTitleMeta({ title: 'Y', vote_average: 9, vote_count: 0 }).vote, 0);
+  assert.equal(pickTitleMeta({ name: 'Y', external_ids: { imdb_id: 'TT4574334' } }).imdbId, 'tt4574334');
+  assert.equal(pickTitleMeta({ name: 'Z', imdb_id: '' }).imdbId, '');
 });

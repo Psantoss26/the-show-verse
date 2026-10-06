@@ -155,7 +155,8 @@ test("nada se recorta contra los bordes del panel", async () => {
   assert.match(modal, /mobileLayout=\{mobileDetails\}/);
 
   // MARCADOR: el de teléfono de la ficha (`mobileScoresOnly`), sin botones en
-  // la barra (Plataformas y Compartir van debajo como píldoras) y con las
+  // la barra (Plataformas, Actividad, Enlaces y Compartir van debajo, en una
+  // fila de iconos) y con las
   // puntuaciones escaladas al ancho del panel para que nunca se salgan. Con
   // `phoneLayout` se aplica aunque la ventana sea de escritorio.
   assert.match(modal, /mobileScoresOnly=\{mobileDetails\}/);
@@ -305,18 +306,26 @@ test("acoplado, la página se reorganiza en directo durante el arrastre", async 
   );
 });
 
-test("el teléfono lleva los enlaces a su pestaña y los quita de la barra", async () => {
-  const [modal, panel] = await Promise.all([
+test("el teléfono lleva los enlaces a su botón de la fila y los quita de la barra", async () => {
+  const [modal, details, panel] = await Promise.all([
     read("../../components/dashboard/DetailModal.jsx"),
+    read("../../components/DetailsClient.jsx"),
     read("../../components/details/DetailsScoreboardPanel.jsx"),
   ]);
 
-  // Detalles · Producción · Sinopsis · Enlaces, como la ficha móvil.
-  assert.match(modal, /showExternalLinksTab=\{mobileDetails\}/);
+  // Plataformas · Actividad · Enlaces · Compartir, solo iconos, en el modal y
+  // en la ficha móvil. Los enlaces ya no son pestaña y la franja de amigos
+  // deja paso al botón Actividad.
+  for (const source of [modal, details]) {
+    assert.match(source, /<ScoreboardPillRow[\s\S]*?label="Plataformas"[\s\S]*?label="Actividad"[\s\S]*?label="Enlaces"[\s\S]*?<ActionShareButton\s+variant="pill"\s+iconOnly[\s\S]*?<\/ScoreboardPillRow>/);
+    assert.doesNotMatch(source, /FollowingActivityStrip/);
+    assert.match(source, /<FollowingActivityModal/);
+  }
+  assert.doesNotMatch(modal, /showExternalLinksTab/);
 
-  // Y por tanto el botón "..." desaparece de la barra, que se queda con
-  // plataformas y compartir. En un teléfono ya iba oculto por `hidden sm:flex`,
-  // pero ese `sm:` mira el VIEWPORT y en el drawer casa siempre.
+  // Y el botón "..." no vuelve a la barra, que se queda sin acciones. En un
+  // teléfono ya iba oculto por `hidden sm:flex`, pero ese `sm:` mira el
+  // VIEWPORT y en el drawer casa siempre.
   assert.match(panel, /\{onMoreLinks && !compactToolbar && \(/);
 });
 

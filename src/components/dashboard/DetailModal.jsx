@@ -49,6 +49,8 @@ import {
   Sparkles,
   Building2,
   MonitorPlay,
+  Link2,
+  UsersRound,
   Globe,
   Languages,
   Film,
@@ -104,11 +106,11 @@ import { dashboardDetailHref } from "@/lib/dashboard/detailHref";
 
 // Componentes reales de la ficha completa (standalone) para que las tarjetas,
 // badges, pestañas y acciones sean IDÉNTICAS a DetailsClient.
-import DetailsScoreboardPanel, { ScoreboardPill } from "@/components/details/DetailsScoreboardPanel";
+import DetailsScoreboardPanel, { ScoreboardPill, ScoreboardPillRow } from "@/components/details/DetailsScoreboardPanel";
 import { ActionShareButton } from "@/components/details/DetailHeaderBits";
 import {
   FollowingActivityAvatars,
-  FollowingActivityStrip,
+  FollowingActivityModal,
   hasFollowingActivity,
   useFollowingActivity,
 } from "@/components/details/FollowingActivity";
@@ -124,6 +126,7 @@ import {
   slugifyForSeriesGraph,
 } from "@/lib/details/formatters";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
+import { buildShareCardPayload } from "@/lib/details/shareCard";
 import AddToListModal from "@/components/details/AddToListModal";
 import SoundtrackModal from "@/components/details/SoundtrackModal";
 import VideoModal from "@/components/details/VideoModal";
@@ -1358,6 +1361,8 @@ export default function DetailModal({
 
   const [externalLinksOpen, setExternalLinksOpen] = useState(false);
   const [platformsOpen, setPlatformsOpen] = useState(false);
+  // Teléfono: actividad de tus amigos, desde su botón de la fila de iconos.
+  const [followingOpen, setFollowingOpen] = useState(false);
   // Pestaña activa de la variante de episodio (Detalles / Sinopsis).
   const [episodeTab, setEpisodeTab] = useState("details");
   // Acciones de EPISODIO (visto Trakt + puntuación), como en EpisodeDetails.
@@ -2584,16 +2589,11 @@ export default function DetailModal({
       `${mediaType}:${item?.id ?? ""}`,
     );
 
-  const goToFollowingActivity = () => {
-    if (mobileDetails) {
-      setPhoneSectionsReady(true);
-      setRequestedPhoneSection("following");
-      return;
-    }
-    goToDetailsRoute(
-      `${dashboardDetailHref(item, mediaType)}#section-following`,
-      `${mediaType}:${item?.id ?? ""}`,
-    );
+  // La actividad de tus amigos vive solo en su modal (ya no hay sección
+  // "Tus amigos" ni en la ficha ni en el panel de teléfono).
+  const openFollowingActivity = (event) => {
+    stopNestedModalOpeningEvent(event);
+    setFollowingOpen(true);
   };
 
   // Ficha de la TEMPORADA a la que pertenece el episodio. Solo existe en la
@@ -2852,6 +2852,217 @@ export default function DetailModal({
   const ratingActionConnected =
     isLoggedIn || traktConnected || traktStatus.connected;
 
+  // Puntuaciones del marcador. Se sacan aquí porque la imagen compartible
+  // enseña las mismas que se ven.
+  const scoreboardTmdb = {
+    value:
+      data.tmdbRating != null
+        ? data.tmdbRating
+        : data.tmdbRatingResolved
+          ? null
+          : undefined,
+    sub: data.tmdbRating != null ? formatCountShort(data.tmdbVotes) : undefined,
+    href: buildTmdbHref({ type: mediaType, tmdbId: item?.id }),
+    pending: !data.tmdbRatingResolved && data.tmdbRating == null,
+  };
+  // Trakt conserva enlace (canónico o búsqueda por TMDb). El badge no aparece
+  // mientras la nota está pendiente; "-" queda solo para ausencia confirmada.
+  const scoreboardTrakt = {
+    value:
+      typeof scoreboard?.rating === "number"
+        ? Number(scoreboard.rating).toFixed(1)
+        : data.scoreboardResolved
+          ? null
+          : undefined,
+    sub: scoreboard?.votes ? formatCountShort(scoreboard.votes) : undefined,
+    href: buildTraktHref({
+      href: scoreboard?.traktUrl || traktStatus?.traktUrl,
+      title,
+    }),
+    pending: !data.scoreboardResolved && typeof scoreboard?.rating !== "number",
+  };
+  const scoreboardImdb = {
+    value:
+      typeof data.imdbRating === "number"
+        ? data.imdbRating.toFixed(1)
+        : data.imdbRatingResolved
+          ? null
+          : undefined,
+    sub:
+      typeof data.imdbRating === "number"
+        ? formatCountShort(data.imdbVotes)
+        : undefined,
+    href: buildImdbHref({ imdbId: data.imdbId, title }),
+    pending: !data.imdbRatingResolved && typeof data.imdbRating !== "number",
+  };
+
+  // COMPARTIR: la misma hoja que la ficha completa (imagen + vídeo), con los
+  // datos que tiene el modal. Mismos payloads que DetailsClient (shareCard y
+  // shareStory). Los episodios se quedan con el enlace: no tienen ficha
+  // compartible.
+  const tvWatched =
+    mediaType === "tv"
+      ? episodesWatched.hasAnyWatchedEpisode(episodesWatched.watchedBySeason)
+      : traktStatus.watched;
+  const watchedLoading =
+    mediaType === "tv"
+      ? traktStatusLoading ||
+        ((traktConnected || traktStatus.connected) &&
+          !episodesWatched.watchedBySeasonLoaded)
+      : traktStatusLoading;
+  const listActive = Object.values(membershipMap || {}).some(Boolean);
+  // Misma portada que el hero de teléfono (textless) y su logo, sin logo si la
+  // portada ya trae el título impreso.
+  const shareCardPosterPath = data.heroPosterPath || data.posterPath || null;
+  const shareCardHasBurnedTitle = data.heroPosterPath
+    ? !!data.heroPosterHasBurnedTitle
+    : !!shareCardPosterPath;
+  const shareCard = useMemo(
+    () =>
+      isEpisode
+        ? null
+        : buildShareCardPayload({
+            type: mediaType,
+            title,
+            posterPath: shareCardPosterPath,
+            logoPath: shareCardHasBurnedTitle ? null : data.logoPath,
+            showTitle: !shareCardHasBurnedTitle,
+            // El modal busca el tráiler al pulsar: el botón siempre está.
+            trailerAvailable: true,
+            soundtrackAvailable: !!soundtrackSearchQuery,
+            trakt: {
+              watched: tvWatched,
+              plays: mediaType === "tv" ? 0 : traktStatus.plays,
+              badge: mediaType === "tv" ? episodesWatched.tvProgressBadge : null,
+              loading: watchedLoading,
+            },
+            rating: ratingActionValue,
+            favorite,
+            watchlist,
+            listActive,
+            commentsActive: myComments.length > 0,
+            scores: {
+              tmdb: scoreboardTmdb,
+              trakt: scoreboardTrakt,
+              imdb: scoreboardImdb,
+            },
+          }),
+    // Los objetos de puntuación se recrean en cada render: se depende de sus
+    // valores visibles.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      isEpisode,
+      mediaType,
+      title,
+      shareCardPosterPath,
+      shareCardHasBurnedTitle,
+      data.logoPath,
+      soundtrackSearchQuery,
+      tvWatched,
+      traktStatus.plays,
+      episodesWatched.tvProgressBadge,
+      watchedLoading,
+      ratingActionValue,
+      favorite,
+      watchlist,
+      listActive,
+      myComments.length,
+      scoreboardTmdb.value,
+      scoreboardTmdb.sub,
+      scoreboardTrakt.value,
+      scoreboardTrakt.sub,
+      scoreboardImdb.value,
+      scoreboardImdb.sub,
+    ],
+  );
+  const shareStoryReview = myComments[0] || null;
+  const shareStory = useMemo(
+    () =>
+      isEpisode
+        ? null
+        : {
+            type: mediaType,
+            // Con el id, la hoja pide al abrirse lo que el modal no tiene
+            // (progreso de «Continuar viendo», notas de episodios).
+            tmdbId: item?.id,
+            watchedBySeason:
+              mediaType === "tv" ? episodesWatched.watchedBySeason : null,
+            // Las notas de IMDb por episodio solo las carga su propio modal.
+            episodeImdbRatings: null,
+            watched: tvWatched,
+            plays: mediaType === "tv" ? 0 : traktStatus.plays,
+            history: traktStatus.history,
+            lastWatchedAt: traktStatus.lastWatchedAt,
+            tvProgress: watchedLoading ? null : episodesWatched.tvProgress,
+            review: shareStoryReview
+              ? {
+                  comment: shareStoryReview.comment,
+                  spoiler: !!shareStoryReview.spoiler,
+                  created_at: shareStoryReview.created_at,
+                }
+              : null,
+            details: {
+              year: Number(String(data.year || "").slice(0, 4)) || null,
+              runtime: data.runtimeMinutes,
+              seasons: mediaType === "tv" ? data.numberOfSeasons : null,
+              episodes: mediaType === "tv" ? data.numberOfEpisodes : null,
+              genres: data.genreObjects || [],
+              peopleLabel: mediaType === "movie" ? "Director" : "Creadores",
+              people: data.creditNames || [],
+              overview: data.overview,
+              facts: {
+                originalTitle: data.originalTitle,
+                release: data.releaseDateValue,
+                end: data.lastAirDateValue,
+                format: mediaType === "tv" ? data.seasonEpisodeValue : null,
+                duration:
+                  mediaType === "tv" ? data.episodeRuntimeValue : data.runtime,
+                status: data.production?.status || null,
+                network: data.network,
+                budget: data.budgetValue,
+                revenue: data.revenueValue,
+                awards: data.awards ? formatDashboardAwards(data.awards) : null,
+                production: data.productionText,
+              },
+              endLabel:
+                data.status === "Ended" ? "Finalización" : "Última emisión",
+            },
+          },
+    [
+      isEpisode,
+      mediaType,
+      item?.id,
+      episodesWatched.watchedBySeason,
+      episodesWatched.tvProgress,
+      tvWatched,
+      traktStatus.plays,
+      traktStatus.history,
+      traktStatus.lastWatchedAt,
+      watchedLoading,
+      shareStoryReview,
+      data.year,
+      data.runtimeMinutes,
+      data.numberOfSeasons,
+      data.numberOfEpisodes,
+      data.genreObjects,
+      data.creditNames,
+      data.overview,
+      data.originalTitle,
+      data.releaseDateValue,
+      data.lastAirDateValue,
+      data.seasonEpisodeValue,
+      data.episodeRuntimeValue,
+      data.runtime,
+      data.production?.status,
+      data.network,
+      data.budgetValue,
+      data.revenueValue,
+      data.awards,
+      data.productionText,
+      data.status,
+    ],
+  );
+
   const sentiment = data.sentiment || { pros: [], cons: [] };
   const hasSentiment =
     (sentiment.pros?.length || 0) > 0 || (sentiment.cons?.length || 0) > 0;
@@ -2883,6 +3094,7 @@ export default function DetailModal({
     commentModalOpen ||
     externalLinksOpen ||
     platformsOpen ||
+    followingOpen ||
     traktWatchedOpen ||
     traktEpisodesOpen ||
     episodeRatingsOpen ||
@@ -3129,6 +3341,15 @@ export default function DetailModal({
         open={externalLinksOpen}
         onClose={() => setExternalLinksOpen(false)}
         links={externalLinks}
+      />
+
+      {/* Actividad de tus amigos, con el diseño del de plataformas: la abren el
+          botón Actividad (teléfono) y los avatares junto a las estadísticas. */}
+      <FollowingActivityModal
+        open={followingOpen}
+        onClose={() => setFollowingOpen(false)}
+        data={followingActivity}
+        mediaType={mediaType}
       />
 
       {/* Visto en Trakt — gestor de reproducciones (mismo modal que la ficha
@@ -3912,7 +4133,10 @@ export default function DetailModal({
                 dos píldoras a media línea y la franja de amigos. */}
             <div
               style={mobileDetails ? PHONE_SCALED_BLOCK_STYLE : undefined}
-              className={mobileDetails ? "grid grid-cols-2 gap-x-3" : undefined}
+              // Teléfono: hasta las pestañas, los mismos 12px que separan el
+              // marcador de su fila de botones (en vez de los 32px de la
+              // columna, que `mb-3` gana porque `space-y-8` no pesa).
+              className={mobileDetails ? "mb-3 grid grid-cols-2 gap-x-3" : undefined}
             >
               <DetailsScoreboardPanel
                 loading={loading}
@@ -3923,59 +4147,10 @@ export default function DetailModal({
                 // de esa consulta —incluida "este título no está en
                 // Trakt"—, así que el hueco siempre acaba liberándose.
                 statsPending={!data.scoreboardResolved}
-                tmdb={{
-                  value:
-                    data.tmdbRating != null
-                      ? data.tmdbRating
-                      : data.tmdbRatingResolved
-                        ? null
-                        : undefined,
-                  sub:
-                    data.tmdbRating != null
-                      ? formatCountShort(data.tmdbVotes)
-                      : undefined,
-                  href: buildTmdbHref({ type: mediaType, tmdbId: item?.id }),
-                  pending:
-                    !data.tmdbRatingResolved && data.tmdbRating == null,
-                }}
-                // Trakt conserva enlace (canónico o búsqueda por TMDb). El badge
-                // no aparece mientras la nota está pendiente; "-" queda solo
-                // para ausencia confirmada.
-                trakt={{
-                  value:
-                    typeof scoreboard?.rating === "number"
-                      ? Number(scoreboard.rating).toFixed(1)
-                      : data.scoreboardResolved
-                        ? null
-                        : undefined,
-                  sub: scoreboard?.votes
-                    ? formatCountShort(scoreboard.votes)
-                    : undefined,
-                  href: buildTraktHref({
-                    href: scoreboard?.traktUrl || traktStatus?.traktUrl,
-                    title,
-                  }),
-                  pending:
-                    !data.scoreboardResolved &&
-                    typeof scoreboard?.rating !== "number",
-                }}
+                tmdb={scoreboardTmdb}
+                trakt={scoreboardTrakt}
                 traktPublic={null}
-                imdb={{
-                  value:
-                    typeof data.imdbRating === "number"
-                      ? data.imdbRating.toFixed(1)
-                      : data.imdbRatingResolved
-                        ? null
-                        : undefined,
-                  sub:
-                    typeof data.imdbRating === "number"
-                      ? formatCountShort(data.imdbVotes)
-                      : undefined,
-                  href: buildImdbHref({ imdbId: data.imdbId, title }),
-                  pending:
-                    !data.imdbRatingResolved &&
-                    typeof data.imdbRating !== "number",
-                }}
+                imdb={scoreboardImdb}
                 // Ver `optionalScoreBadge`: fuera de la ficha de teléfono, y con
                 // hueco reservado mientras la respuesta de OMDb está en vuelo.
                 rt={optionalScoreBadge(data.rtScore, ratingLinks.rt)}
@@ -4004,6 +4179,8 @@ export default function DetailModal({
                     typeof window !== "undefined" && item?.id
                       ? `${window.location.origin}/details/${mediaType}/${item.id}`
                       : undefined,
+                  card: shareCard,
+                  story: shareStory,
                 }}
                 stats={scoreStats}
                 statsTrailing={
@@ -4011,16 +4188,20 @@ export default function DetailModal({
                     <FollowingActivityAvatars
                       data={followingActivity}
                       mediaType={mediaType}
-                      onOpen={goToFollowingActivity}
+                      onOpen={openFollowingActivity}
                     />
                   ) : null
                 }
                 showFavoritedStat={!isEpisode}
                 className={mobileDetails ? "col-span-2" : "max-sm:-mx-2 max-sm:w-[calc(100%+1rem)]"}
               />
+              {/* TELÉFONO: Plataformas, Actividad (si tus amigos han tocado
+                  el título), Enlaces y Compartir en una fila de iconos bajo
+                  el marcador, como en la ficha móvil. Cada uno abre su modal. */}
               {mobileDetails ? (
-                <>
+                <ScoreboardPillRow className="col-span-2 mt-3">
                   <ScoreboardPill
+                    iconOnly
                     icon={MonitorPlay}
                     label="Plataformas"
                     onClick={(event) => {
@@ -4029,11 +4210,31 @@ export default function DetailModal({
                     }}
                     aria-haspopup="dialog"
                     aria-label="Abrir plataformas disponibles"
-                    className="mt-3"
+                  />
+                  {showFollowingActivity ? (
+                    <ScoreboardPill
+                      iconOnly
+                      icon={UsersRound}
+                      label="Actividad"
+                      onClick={openFollowingActivity}
+                      aria-haspopup="dialog"
+                      aria-label="Ver la actividad de tus amigos"
+                    />
+                  ) : null}
+                  <ScoreboardPill
+                    iconOnly
+                    icon={Link2}
+                    label="Enlaces"
+                    onClick={(event) => {
+                      stopNestedModalOpeningEvent(event);
+                      setExternalLinksOpen(true);
+                    }}
+                    aria-haspopup="dialog"
+                    aria-label="Abrir enlaces externos"
                   />
                   <ActionShareButton
                     variant="pill"
-                    className="mt-3"
+                    iconOnly
                     title={title}
                     text={`Echa un vistazo a ${title} en The Show Verse`}
                     url={
@@ -4041,16 +4242,11 @@ export default function DetailModal({
                         ? `${window.location.origin}/details/${mediaType}/${item.id}`
                         : undefined
                     }
+                    card={shareCard}
+                    story={shareStory}
                   />
-                </>
+                </ScoreboardPillRow>
               ) : null}
-              <FollowingActivityStrip
-                data={followingActivity}
-                onOpen={goToFollowingActivity}
-                phoneLayout={mobileDetails}
-                compactWatchedSummary={mobileDetails}
-                className={mobileDetails ? "col-span-2 mt-3" : "mt-3 sm:hidden"}
-              />
             </div>
 
             {/* EPISODIO: pestañas Detalles/Sinopsis (mismos componentes que
@@ -4156,12 +4352,8 @@ export default function DetailModal({
                   // solo desplazando algo que no parece desplazable.
                   wrapCards
                   showPlatformsTab={false}
-                  // TELÉFONO: los enlaces externos son una PESTAÑA más, igual
-                  // que en la ficha móvil (Detalles · Producción · Sinopsis ·
-                  // Enlaces). Ahí es donde viven, y por eso la barra del
-                  // marcador se queda solo con plataformas y compartir.
-                  showExternalLinksTab={mobileDetails}
-                  externalLinks={externalLinks}
+                  // TELÉFONO: los enlaces externos no son pestaña: van en su
+                  // botón de la fila bajo el marcador, como en la ficha móvil.
                   mediaType={mediaType}
                   originalTitle={data.originalTitle}
                   // `formatValue` NO significa lo mismo en las dos
@@ -4598,9 +4790,6 @@ export default function DetailModal({
                 episodesWatched={episodesWatched}
                 imdbId={data.imdbId}
                 canLikeComments={ratingActionConnected}
-                followingActivity={followingActivity}
-                canAccessFollowingActivity={canAccessFollowingActivity}
-                followingActivityPhoneLayout
                 onArtworkSelection={applyArtworkSelection}
                 soundtrack={{
                   query: soundtrackSearchQuery,

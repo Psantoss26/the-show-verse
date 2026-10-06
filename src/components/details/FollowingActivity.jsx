@@ -1,22 +1,23 @@
 "use client";
 
-// "Tus amigos" en la ficha de un título: qué han hecho con él las cuentas que
-// sigues. Tres piezas que comparten la misma petición:
+// Actividad de tus amigos en la ficha de un título: qué han hecho con él las
+// cuentas que sigues. Dos piezas que comparten la misma petición:
 //   - FollowingActivityAvatars (escritorio): avatares con su marca (nota,
 //     viéndola, pendiente…) a la derecha de la fila de stats del marcador.
-//   - FollowingActivityStrip (teléfono): franja compacta bajo el marcador
-//     (avatares + "Ana y Luis la han visto" + chips).
-//   - FollowingActivitySection: la sección completa, con una tarjeta por
-//     persona (progreso, nota, favorito, pendiente, reseña y listas).
+//   - FollowingActivityModal: una fila por persona (progreso, nota, favorito,
+//     pendiente, reseña y listas), con el mismo diseño que el modal de
+//     plataformas. Lo abren los avatares (escritorio) y el botón Actividad de
+//     la fila Plataformas · Actividad · Enlaces · Compartir (teléfono).
 // Si no hay sesión o nadie de los que sigues ha tocado el título, no se pinta
-// nada: ninguna de las dos deja hueco vacío.
+// nada: ninguna deja hueco vacío.
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   BookmarkPlus,
   CheckCircle2,
-  ChevronDown,
+  ChevronRight,
   Eye,
   EyeOff,
   Heart,
@@ -24,17 +25,17 @@ import {
   ListVideo,
   MessageSquareQuote,
   Play,
+  X,
 } from "lucide-react";
 
 import Avatar from "@/components/ui/Avatar";
-import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
-import { LIQUID_GLASS_SURFACE_CARD } from "@/lib/ui/liquidGlass";
+import useModalGuard from "@/hooks/useModalGuard";
+import { LIQUID_GLASS_MODAL_HEADER, LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import {
   activityMarks,
   episodeLabel,
   primaryMark,
   relativeTime,
-  summaryChips,
   summarySentence,
 } from "@/lib/details/followingActivity";
 
@@ -184,54 +185,6 @@ export function FollowingActivityAvatars({ data, mediaType, onOpen, compact = fa
   );
 }
 
-/** Franja compacta de la cabecera. `onOpen` lleva a la sección completa. */
-export function FollowingActivityStrip({ data, onOpen, className = "", phoneLayout = false, compactWatchedSummary = false }) {
-  if (!hasFollowingActivity(data)) return null;
-  const items = data.items;
-  const shown = items.slice(0, 4);
-  const extra = items.length - shown.length;
-  const multipleWatched = items.filter((item) => item.watched).length > 1;
-  const chips = compactWatchedSummary && multipleWatched ? [] : summaryChips(data);
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className={`group ${LIQUID_GLASS_SURFACE_CARD} flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-[filter] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400/70 ${className}`}
-      aria-label={`${summarySentence(data)}. Ver la actividad de tus amigos`}
-    >
-      <LiquidGlassOpticalLayers />
-      <span className="relative z-10 flex shrink-0 -space-x-2" aria-hidden="true">
-        {shown.map((item) => (
-          <PersonAvatar key={item.user.username} user={item.user} className="h-8 w-8" />
-        ))}
-        {extra > 0 ? (
-          <span className="relative inline-flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800 text-[11px] font-bold text-white">
-            +{extra}
-          </span>
-        ) : null}
-      </span>
-      <span className="relative z-10 min-w-0 flex-1">
-        <span className="block truncate text-sm font-bold text-white">{summarySentence(data)}</span>
-        {chips.length ? (
-          <span className="mt-0.5 flex flex-wrap gap-x-2.5 gap-y-0.5 text-xs text-zinc-300">
-            {chips.map((chip) => (
-              <span key={chip.id} className={chip.id === "rating" ? "font-black tabular-nums text-amber-400" : ""}>
-                {chip.prefix ? <span className="font-normal text-zinc-400">{chip.prefix} </span> : null}
-                {chip.label}
-                {chip.hint ? <span className="font-normal text-zinc-400"> {chip.hint}</span> : null}
-              </span>
-            ))}
-          </span>
-        ) : null}
-      </span>
-      <span className="relative z-10 flex shrink-0 items-center gap-1 text-xs font-bold text-zinc-300 transition-colors group-hover:text-white">
-        <span className={phoneLayout ? "hidden" : "hidden sm:inline"}>Ver</span>
-        <ChevronDown aria-hidden="true" className="h-4 w-4 transition-transform group-hover:translate-y-0.5" />
-      </span>
-    </button>
-  );
-}
-
 function ReviewQuote({ review }) {
   const [revealed, setRevealed] = useState(!review.spoiler);
   return (
@@ -264,48 +217,49 @@ function ReviewQuote({ review }) {
   );
 }
 
-function PersonCard({ item, mediaType }) {
+// Una persona en el modal: misma fila que un registro de la actividad del
+// perfil (ProfileSection ActivityRow): foto, los iconos de lo que ha hecho con
+// el título (sin texto: lo dicen el tooltip y la etiqueta del enlace), nombre
+// y cuándo, y la flecha a su perfil.
+function PersonRow({ item, mediaType, onNavigate }) {
   const when = item.lastActivityApprox ? null : relativeTime(item.lastActivityAt);
   const w = item.watched;
-  const isTv = mediaType === "tv";
   const marks = activityMarks(item, mediaType);
+  const marksLabel = marks.map((mark) => mark.label).join(", ");
   return (
-    <article className={`${LIQUID_GLASS_SURFACE_CARD} flex flex-col rounded-3xl p-4`}>
-      <LiquidGlassOpticalLayers />
-      <div className="relative z-10 flex items-center gap-3">
-        <Link
-          href={`/u/${encodeURIComponent(item.user.username)}`}
-          className="flex min-w-0 flex-1 items-center gap-3 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400/70"
-        >
-          <PersonAvatar user={item.user} className="h-11 w-11" />
-          <span className="min-w-0">
-            <span className="block truncate font-bold text-white">{item.user.displayName}</span>
-            <span className="block truncate text-xs text-zinc-400">
-              @{item.user.username}
-              {when ? ` · ${when}` : ""}
-            </span>
-          </span>
-        </Link>
-        {/* Lo que ha hecho, en iconos (mismo lenguaje que la actividad del
-            perfil). Cada icono lleva su texto para lectores de pantalla y en el
-            tooltip. */}
+    <li className="rounded-2xl bg-white/[0.03] p-4 transition-colors duration-300 hover:bg-white/[0.05]">
+      <Link
+        href={`/u/${encodeURIComponent(item.user.username)}`}
+        onClick={onNavigate}
+        aria-label={`Ver el perfil de ${item.user.displayName}${marksLabel ? `. ${marksLabel}` : ""}`}
+        className="group/link flex w-full items-center gap-3 rounded-xl text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400"
+      >
+        <PersonAvatar user={item.user} className="h-11 w-11 transition duration-300 group-hover/link:scale-105" />
         {marks.length ? (
-          <ul className="flex shrink-0 items-center gap-2.5 [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.65))]" aria-label="Su actividad con este título">
+          <span className="flex shrink-0 items-center [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.65))]" aria-hidden="true">
             {marks.map((mark) => (
-              <li key={mark.id} className="relative flex items-center" title={mark.label}>
+              <span key={mark.id} title={mark.label} className="flex h-8 min-w-8 items-center justify-center">
                 <MarkIcon mark={mark} iconClassName="h-5 w-5" ratingClassName="text-xl" />
-                {mark.count ? (
-                  <span className="ml-0.5 text-[11px] font-bold tabular-nums text-emerald-400" aria-hidden="true">×{mark.count}</span>
-                ) : null}
-                <span className="sr-only">{mark.label}</span>
-              </li>
+              </span>
             ))}
-          </ul>
+          </span>
         ) : null}
-      </div>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-black leading-tight text-white">{item.user.displayName}</span>
+          {/* Una sola línea: si "· hace 2 meses" no cabe entero, pasa a la
+              segunda, que no se ve. Nunca sale cortado con puntos. */}
+          <span className="mt-1 flex h-4 flex-wrap overflow-hidden text-xs font-semibold leading-4 text-zinc-400 transition-colors group-hover/link:text-zinc-300">
+            <span className="min-w-0 max-w-full truncate">@{item.user.username}</span>
+            {when ? <span className="whitespace-nowrap">&nbsp;· {when}</span> : null}
+          </span>
+        </span>
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/5 text-zinc-400 transition duration-300 group-hover/link:bg-white/10 group-hover/link:text-white">
+          <ChevronRight aria-hidden="true" className="h-4 w-4" />
+        </span>
+      </Link>
 
-      {isTv && w?.episodes ? (
-        <div className="relative z-10 mt-3">
+      {mediaType === "tv" && w?.episodes ? (
+        <div className="mt-3">
           <div className="flex items-baseline justify-between gap-2 text-xs">
             <span className="font-bold text-zinc-200">
               {w.aired ? `${w.episodes} de ${w.aired} episodios` : `${w.episodes} episodios`}
@@ -329,58 +283,78 @@ function PersonCard({ item, mediaType }) {
               />
             </div>
           ) : null}
-          {item.episodeRatings ? (
-            <p className="mt-2 text-xs text-zinc-400">
-              {item.episodeRatings} episodio{item.episodeRatings === 1 ? "" : "s"} puntuado{item.episodeRatings === 1 ? "" : "s"}
-            </p>
-          ) : null}
         </div>
       ) : null}
 
       {item.review ? <ReviewQuote review={item.review} /> : null}
 
       {item.lists?.length ? (
-        <p className="relative z-10 mt-3 flex items-center gap-1.5 truncate text-xs text-zinc-400">
+        <p className="mt-3 flex items-center gap-1.5 truncate text-xs text-zinc-400">
           <ListVideo aria-hidden="true" strokeWidth={2.5} className="h-3.5 w-3.5 shrink-0 text-violet-400" />
           <span className="truncate">{item.lists.map((list) => `«${list.name}»`).join(", ")}</span>
         </p>
       ) : null}
-    </article>
+    </li>
   );
 }
 
-/** Sección completa: una tarjeta por persona. */
-export function FollowingActivitySection({ data, mediaType, loading = false, phoneLayout = false }) {
-  const [showAll, setShowAll] = useState(false);
-  if (!hasFollowingActivity(data)) {
-    if (loading) {
-      return (
-        <p className="text-sm text-zinc-400" role="status">
-          Cargando la actividad de tus amigos…
-        </p>
-      );
-    }
-    return <p className="text-sm text-zinc-400">Aún no hay actividad de tus amigos con este título.</p>;
-  }
-  const visible = showAll ? data.items : data.items.slice(0, 6);
-  return (
-    <>
-      <div className={`grid grid-cols-1 gap-4 ${phoneLayout ? "" : "sm:grid-cols-2 xl:grid-cols-3"}`}>
-        {visible.map((item) => (
-          <PersonCard key={item.user.username} item={item} mediaType={mediaType} />
-        ))}
-      </div>
-      {data.items.length > visible.length ? (
-        <div className="mt-5 flex justify-center">
+/**
+ * Teléfono: la actividad de tus amigos en un modal con el diseño del de
+ * plataformas (ExternalLinksModal): mismo velo, cristal, cabecera y filas.
+ */
+export function FollowingActivityModal({ open, onClose, data, mediaType }) {
+  const [portalReady, setPortalReady] = useState(false);
+  useModalGuard({ open, onClose });
+  useEffect(() => setPortalReady(true), []);
+  if (!open || !portalReady || !hasFollowingActivity(data)) return null;
+
+  return createPortal(
+    <div
+      data-detail-modal-layer=""
+      className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+      aria-modal="true"
+      role="dialog"
+      aria-labelledby="following-activity-title"
+    >
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-lg animate-in fade-in duration-300"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div
+        className={`relative flex max-h-[85dvh] w-full max-w-[440px] flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
+      >
+        <div className={`flex w-full shrink-0 items-center justify-between ${LIQUID_GLASS_MODAL_HEADER} p-6 sm:px-8 sm:pb-6 sm:pt-8`}>
+          <div className="min-w-0">
+            <h2
+              id="following-activity-title"
+              className="bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-xl font-black text-transparent"
+            >
+              Actividad de amigos
+            </h2>
+            <p className="mt-1 text-xs font-medium uppercase tracking-wide text-zinc-500">
+              {summarySentence(data)}
+            </p>
+          </div>
           <button
             type="button"
-            onClick={() => setShowAll(true)}
-            className="rounded-full bg-white/10 px-5 py-2 text-sm font-bold text-white transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400/70"
+            onClick={onClose}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400"
+            aria-label="Cerrar"
           >
-            Ver a los {data.items.length} amigos
+            <X className="h-4 w-4" />
           </button>
         </div>
-      ) : null}
-    </>
+
+        <div className="flex-1 overflow-y-auto p-6 pb-8 sm:px-8">
+          <ul className="space-y-2">
+            {data.items.map((item) => (
+              <PersonRow key={item.user.username} item={item} mediaType={mediaType} onNavigate={onClose} />
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }

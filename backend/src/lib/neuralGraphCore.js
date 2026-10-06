@@ -8,7 +8,7 @@
 // simulación de fuerzas; no hace falta clasificar nada a mano.
 
 // Versión del formato: cambiarla invalida las cachés (servidor y cliente).
-export const NEURAL_GRAPH_VERSION = 2;
+export const NEURAL_GRAPH_VERSION = 3;
 
 // Flags de cada título (bits): qué registros tiene el usuario sobre él.
 export const FLAG_WATCHED = 1;
@@ -128,7 +128,7 @@ export function mergeTitleRecords({ history = [], ratings = [], favorites = [], 
  * los títulos y no con sus conexiones.
  *
  * @param titles  resultado de mergeTitleRecords.
- * @param metaByKey Map<key, { name, posterPath, date, genres, collection, budget, revenue, vote }>.
+ * @param metaByKey Map<key, { name, posterPath, date, genres, collection, budget, revenue, imdbId }>.
  * @param lists   listas del usuario y de la comunidad que ha guardado:
  *   [{ id, name, kind: 'own'|'community', keys: Set<key> }].
  * @returns {{
@@ -136,7 +136,7 @@ export function mergeTitleRecords({ history = [], ratings = [], favorites = [], 
  *   sagas: Array<[id, name]>,
  *   lists: Array<[id, name, kind]>,
  *   titles: Array<[tmdbId, isTv(0|1), title, posterPath, year, genreIdx[], sagaIdx, plays, rating, flags,
- *                  months[] (AAAAMM), listIdx[], budget, revenue, vote]>,
+ *                  months[] (AAAAMM), listIdx[], budget, revenue, imdbId]>,
  *   missing: number,
  * }}
  */
@@ -215,7 +215,9 @@ export function packNeuralGraph(titles, metaByKey, lists = []) {
       // Presupuesto y recaudación solo existen en películas.
       title.mediaType === 'movie' ? money(meta?.budget) : 0,
       title.mediaType === 'movie' ? money(meta?.revenue) : 0,
-      Math.round((Number(meta?.vote) || 0) * 10) / 10,
+      // Id de IMDb (tt…): el cliente pide la nota al dataset de IMDb solo al
+      // agrupar por puntuaciones.
+      imdbIdOf(meta?.imdbId),
     ];
   });
 
@@ -233,6 +235,13 @@ export function pickTitleMeta(data) {
     collection: data.belongs_to_collection || null,
     budget: Number(data.budget) || 0,
     revenue: Number(data.revenue) || 0,
-    vote: Number(data.vote_count) > 0 ? Number(data.vote_average) || 0 : 0,
+    // Las películas lo traen en la ficha; las series, en external_ids.
+    imdbId: imdbIdOf(data.imdb_id || data.external_ids?.imdb_id),
   };
+}
+
+/** Id de IMDb normalizado (tt…), o '' si no lo es. */
+export function imdbIdOf(value) {
+  const id = String(value || '').trim().toLowerCase();
+  return /^tt\d+$/.test(id) ? id : '';
 }
