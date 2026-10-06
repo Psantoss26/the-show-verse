@@ -293,18 +293,24 @@ export function DetailsTabsMenu({
   // viewport: en tablet salía el menú de escritorio y "Enlaces" bajaba de fila.
   phone = false,
 }) {
-  // En la ficha principal móvil hay exactamente cuatro secciones. La cuadrícula
-  // les reserva cuatro columnas equivalentes: así se centran respecto al ancho
-  // disponible, no respecto a la longitud desigual de cada etiqueta.
+  // En móvil, con tres o cuatro secciones (Detalles · Producción · Sinopsis,
+  // más Enlaces en temporadas y episodios), la cuadrícula les reserva columnas
+  // equivalentes: así se centran respecto al ancho disponible, no respecto a la
+  // longitud desigual de cada etiqueta. Con cuatro, el texto se estrecha.
   const hasFourMobileTabs = tabs.length === 4;
+  const mobileGridCols = hasFourMobileTabs
+    ? "grid-cols-4"
+    : tabs.length === 3
+      ? "grid-cols-3"
+      : null;
 
   return (
     <div
       {...swipeHandlers}
       className={
         phone
-          ? `relative isolate mb-4 w-full touch-pan-y items-center gap-y-0 overflow-hidden rounded-2xl px-4 py-1 transform-gpu ${hasFourMobileTabs ? "grid grid-cols-4 gap-x-0" : "flex flex-wrap gap-x-6"} ${LIQUID_GLASS_BAR}`
-          : `relative isolate mb-4 flex w-full touch-pan-y flex-wrap items-center gap-x-6 gap-y-0 overflow-hidden rounded-2xl px-4 py-1 max-sm:transform-gpu md:gap-x-8 ${hasFourMobileTabs ? "max-sm:grid max-sm:grid-cols-4 max-sm:gap-x-0" : ""} ${LIQUID_GLASS_BAR} sm:touch-auto sm:rounded-none sm:border-b sm:border-white/10 sm:bg-transparent sm:bg-none sm:px-2 sm:py-0 sm:shadow-none sm:[backdrop-filter:none]`
+          ? `relative isolate mb-4 w-full touch-pan-y items-center gap-y-0 overflow-hidden rounded-2xl px-4 py-1 transform-gpu ${mobileGridCols === "grid-cols-4" ? "grid grid-cols-4 gap-x-0" : mobileGridCols === "grid-cols-3" ? "grid grid-cols-3 gap-x-0" : "flex flex-wrap gap-x-6"} ${LIQUID_GLASS_BAR}`
+          : `relative isolate mb-4 flex w-full touch-pan-y flex-wrap items-center gap-x-6 gap-y-0 overflow-hidden rounded-2xl px-4 py-1 max-sm:transform-gpu md:gap-x-8 ${mobileGridCols === "grid-cols-4" ? "max-sm:grid max-sm:grid-cols-4 max-sm:gap-x-0" : mobileGridCols === "grid-cols-3" ? "max-sm:grid max-sm:grid-cols-3 max-sm:gap-x-0" : ""} ${LIQUID_GLASS_BAR} sm:touch-auto sm:rounded-none sm:border-b sm:border-white/10 sm:bg-transparent sm:bg-none sm:px-2 sm:py-0 sm:shadow-none sm:[backdrop-filter:none]`
       }
     >
       {/* Capas ópticas del cristal, las mismas de DetailsSectionMenu. Solo móvil:
@@ -325,8 +331,10 @@ export function DetailsTabsMenu({
             phone
               ? hasFourMobileTabs
                 ? "justify-self-center text-[11px] tracking-[0.06em]"
-                : "text-xs tracking-wider"
-              : `text-xs tracking-wider sm:pt-0 md:text-sm ${hasFourMobileTabs ? "max-sm:justify-self-center max-sm:text-[11px] max-sm:tracking-[0.06em]" : ""}`
+                : mobileGridCols
+                  ? "justify-self-center text-xs tracking-wider"
+                  : "text-xs tracking-wider"
+              : `text-xs tracking-wider sm:pt-0 md:text-sm ${hasFourMobileTabs ? "max-sm:justify-self-center max-sm:text-[11px] max-sm:tracking-[0.06em]" : mobileGridCols ? "max-sm:justify-self-center" : ""}`
           } ${
             activeTab === tab.id
               ? "text-white font-extrabold"

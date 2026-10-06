@@ -10,6 +10,7 @@ import {
   fitCamera,
   hubTitleIndices,
   searchNodes,
+  titleFacts,
   titlePasses,
 } from "./neuralGraph.js";
 
@@ -84,15 +85,15 @@ test("encuadre: centra y ajusta el zoom a los puntos", () => {
   assert.equal(cam.y, 0);
 });
 
-// Carga con los campos nuevos: [..., meses, listas, presupuesto, recaudación, nota TMDb].
+// Carga con los campos nuevos: [..., meses, listas, presupuesto, recaudación, id de IMDb].
 const extended = {
   genres: [[878, "Ciencia ficción"]],
   sagas: [[87096, "Avatar"]],
   lists: [["l1", "Mi lista", "own"], ["c1", "Clásicos", "community"]],
   titles: [
-    [19995, 0, "Avatar", "", 2009, [0], 0, 3, 8.5, FLAG_WATCHED, [202312, 202403], [0, 1], 237e6, 2.9e9, 7.6],
-    [76600, 0, "Avatar 2", "", 2022, [0], 0, 1, 0, FLAG_WATCHED, [202403], [0], 460e6, 2.3e9, 7.7],
-    [66732, 1, "Stranger Things", "", 2016, [0], -1, 34, 9, FLAG_WATCHED, [202501], [], 0, 0, 8.6],
+    [19995, 0, "Avatar", "", 2009, [0], 0, 3, 8.5, FLAG_WATCHED, [202312, 202403], [0, 1], 237e6, 2.9e9, "tt0499549"],
+    [76600, 0, "Avatar 2", "", 2022, [0], 0, 1, 0, FLAG_WATCHED, [202403], [0], 460e6, 2.3e9, "tt1630029"],
+    [66732, 1, "Stranger Things", "", 2016, [0], -1, 34, 9, FLAG_WATCHED, [202501], [], 0, 0, "tt4574334"],
     [1, 0, "Pendiente", "", 0, [], -1, 0, 0, FLAG_WATCHLIST],
   ],
 };
@@ -130,23 +131,52 @@ test("agrupar por listas: propias, de la comunidad y colecciones, con enlace", (
   assert.equal(graph.nodes[2].degree, 2);
 });
 
-test("agrupar por dinero: rangos de presupuesto y recaudación, solo con títulos", () => {
+test("agrupar por dinero: rangos de presupuesto, recaudación y beneficio, solo con títulos", () => {
   const graph = buildNeuralGraph(extended, { groupBy: "money" });
   assert.deepEqual(hubs(graph, "budget").map((n) => n.label), ["Presupuesto > 200 M$"]);
   assert.deepEqual(hubs(graph, "revenue").map((n) => n.label), ["Recaudación > 1.000 M$"]);
+  assert.deepEqual(hubs(graph, "profit").map((n) => n.label), ["Beneficio > 1.000 M$"]);
+  // Pérdidas, y sin beneficio si falta una de las dos cifras.
+  const flop = buildNeuralGraph({
+    ...extended,
+    titles: [[5, 0, "Fracaso", "", 2020, [], -1, 1, 0, FLAG_WATCHED, [], [], 90e6, 30e6], [6, 0, "Sin cifras", "", 2020, [], -1, 1, 0, FLAG_WATCHED, [], [], 90e6, 0]],
+  }, { groupBy: "money" });
+  assert.deepEqual(hubs(flop, "profit").map((n) => n.label), ["Con pérdidas"]);
+  assert.equal(flop.neighbors[flop.nodes.findIndex((n) => n.id === "movie:6")].length, 1);
+  assert.deepEqual(titleFacts(flop, flop.nodes.findIndex((n) => n.id === "movie:5")), ["Presupuesto 90 M$", "Recaudación 30 M$"]);
   // La serie no tiene presupuesto: queda suelta.
   const series = graph.nodes.findIndex((n) => n.id === "tv:66732");
   assert.equal(graph.neighbors[series].length, 0);
 });
 
-test("agrupar por puntuaciones: tu nota entera y la de TMDb por tramos", () => {
-  const graph = buildNeuralGraph(extended, { groupBy: "ratings" });
+test("agrupar por puntuaciones: tu nota entera y la de IMDb por tramos", () => {
+  const imdb = { "movie:19995": 7.9, "movie:76600": 7.5, "tv:66732": 8.6 };
+  const graph = buildNeuralGraph(extended, { groupBy: "ratings", imdb });
   assert.deepEqual(hubs(graph, "rating").map((n) => n.label), ["Tu nota 9", "Tu nota 8"]);
-  assert.deepEqual(hubs(graph, "tmdb").map((n) => n.label), ["TMDb 8-9", "TMDb 7-8"]);
+  assert.deepEqual(hubs(graph, "imdb").map((n) => n.label), ["IMDb 8-9", "IMDb 7-8"]);
   const avatar2 = graph.nodes.findIndex((n) => n.id === "movie:76600");
-  // Sin nota propia: solo el tramo de TMDb, y su color.
+  // Sin nota propia: solo el tramo de IMDb, y su color.
   assert.equal(graph.neighbors[avatar2].length, 1);
-  assert.equal(graph.nodes[avatar2].color, hubs(graph, "tmdb")[1].color);
+  assert.equal(graph.nodes[avatar2].color, hubs(graph, "imdb")[1].color);
+  // Sin notas de IMDb (aún no llegan o no las hay), solo la tuya.
+  assert.equal(hubs(buildNeuralGraph(extended, { groupBy: "ratings" }), "imdb").length, 0);
+});
+
+test("ficha del título: los datos de la agrupación", () => {
+  const facts = (groupBy, id, options = {}) => {
+    const graph = buildNeuralGraph(extended, { groupBy, ...options });
+    return titleFacts(graph, graph.nodes.findIndex((n) => n.id === id));
+  };
+  assert.deepEqual(facts("genre-saga", "movie:19995"), ["Avatar", "Ciencia ficción"]);
+  assert.deepEqual(facts("genre", "movie:19995"), ["Ciencia ficción"]);
+  assert.deepEqual(facts("decade", "movie:19995"), ["Años 2000"]);
+  assert.deepEqual(facts("watched", "movie:19995"), ["Visto en mar 2024, dic 2023"]);
+  assert.deepEqual(facts("watched", "movie:1"), ["Sin visionados"]);
+  assert.deepEqual(facts("lists", "movie:19995"), ["Mi lista", "Clásicos", "Avatar"]);
+  assert.deepEqual(facts("money", "movie:19995"), ["Presupuesto 237 M$", "Recaudación 2.900 M$"]);
+  assert.deepEqual(facts("money", "tv:66732"), ["Sin presupuesto ni recaudación"]);
+  assert.deepEqual(facts("ratings", "movie:19995", { imdb: { "movie:19995": 7.9 } }), ["IMDb 7,9"]);
+  assert.deepEqual(facts("ratings", "movie:19995"), ["Sin nota de IMDb"]);
 });
 
 test("cargas antiguas (sin campos nuevos) no rompen las agrupaciones nuevas", () => {

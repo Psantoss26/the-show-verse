@@ -127,6 +127,109 @@ export function useNeuralPayload(username) {
   return state;
 }
 
+// ── Notas de IMDb ───────────────────────────────────────────────────────────
+// Solo para agrupar por puntuaciones, así que no viajan con el grafo (saldrían
+// del dataset de IMDb en cada carga). La carga trae el id de IMDb de cada
+// título; las series sin él las resuelve el endpoint con TMDb.
+
+const IMDB_PREFIX = "showverse:neural:imdb:v1:";
+// El endpoint admite hasta 250 títulos por petición.
+const IMDB_CHUNK = 250;
+const IMDB_PARALLEL = 3;
+const imdbCache = new Map();
+const imdbInflight = new Map();
+
+// Misma red (usuario y firma); `missing` cambia al completarse los metadatos.
+function imdbKey(username, payload) {
+  return payload?.v ? `${normalize(username)}:${payload.v}:${payload.missing || 0}` : null;
+}
+
+function getCachedImdb(key) {
+  if (!key) return null;
+  if (imdbCache.has(key)) return imdbCache.get(key);
+  if (typeof window === "undefined") return null;
+  const stored = readSession(`${IMDB_PREFIX}${key}`);
+  if (!stored || typeof stored !== "object") return null;
+  imdbCache.set(key, stored);
+  return stored;
+}
+
+async function postImdbChunk(items) {
+  const res = await fetch("/api/imdb/ratings", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ items }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  if (json?.error) throw new Error(json.error);
+  return json?.items && typeof json.items === "object" ? json.items : {};
+}
+
+/** `{ "movie:603": 8.7 }` de los títulos de la carga. Nunca falla: sin datos, `{}`. */
+function fetchNeuralImdbRatings(key, payload) {
+  if (imdbInflight.has(key)) return imdbInflight.get(key);
+  const items = (Array.isArray(payload?.titles) ? payload.titles : []).map((row) => ({
+    tmdbId: row[0],
+    mediaType: row[1] ? "tv" : "movie",
+    ...(typeof row[14] === "string" && row[14] ? { imdbId: row[14] } : {}),
+  }));
+  const chunks = [];
+  for (let i = 0; i < items.length; i += IMDB_CHUNK) chunks.push(items.slice(i, i + IMDB_CHUNK));
+
+  const request = (async () => {
+    const ratings = {};
+    let complete = true;
+    let next = 0;
+    const run = async () => {
+      while (next < chunks.length) {
+        const chunk = chunks[next];
+        next += 1;
+        try {
+          const found = await postImdbChunk(chunk);
+          for (const [itemKey, entry] of Object.entries(found)) {
+            const rating = Number(entry?.rating);
+            if (Number.isFinite(rating) && rating > 0) ratings[itemKey] = rating;
+          }
+        } catch {
+          complete = false;
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(IMDB_PARALLEL, chunks.length) }, run));
+    imdbCache.set(key, ratings);
+    // Una respuesta a medias sirve para esta visita, pero no se guarda: la
+    // próxima vez se vuelve a pedir.
+    if (complete) writeSession(`${IMDB_PREFIX}${key}`, ratings);
+    return ratings;
+  })().finally(() => imdbInflight.delete(key));
+  imdbInflight.set(key, request);
+  return request;
+}
+
+/**
+ * Notas de IMDb de la red cuando `enabled`: el objeto de
+ * fetchNeuralImdbRatings, o null mientras llegan (o si no se piden).
+ */
+export function useNeuralImdbRatings(username, payload, enabled) {
+  const key = enabled ? imdbKey(username, payload) : null;
+  const [loaded, setLoaded] = useState(null);
+
+  useEffect(() => {
+    if (!key || getCachedImdb(key)) return undefined;
+    let cancelled = false;
+    fetchNeuralImdbRatings(key, payload).then((ratings) => {
+      if (!cancelled) setLoaded({ key, ratings });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [key, payload]);
+
+  if (!key) return null;
+  return loaded?.key === key ? loaded.ratings : getCachedImdb(key);
+}
+
 // ── Disposición guardada ────────────────────────────────────────────────────
 
 function toBase64(floats) {

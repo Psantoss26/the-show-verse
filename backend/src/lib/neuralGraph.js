@@ -1,7 +1,7 @@
 // src/lib/neuralGraph.js
 // Datos de la vista neuronal del perfil: TODOS los títulos que el usuario ha
 // registrado (vistos, puntuados, favoritos y pendientes) con sus géneros,
-// sagas, meses de visionado, listas, presupuesto, recaudación y nota de TMDb,
+// sagas, meses de visionado, listas, presupuesto, recaudación e id de IMDb,
 // en una sola respuesta compacta. Reglas puras en neuralGraphCore.js.
 //
 // OPTIMIZACIÓN, de lo más barato a lo más caro:
@@ -34,6 +34,7 @@ import { cacheGet, cacheSet } from './redis.js';
 import { getMediaMetadataMap } from '../utils/mediaMetadata.js';
 import {
   NEURAL_GRAPH_VERSION,
+  imdbIdOf,
   mergeTitleRecords,
   packNeuralGraph,
   pickTitleMeta,
@@ -191,7 +192,7 @@ async function loadCachedMeta(db, keys) {
         collection: sql`${tmdbCache.data}->'belongs_to_collection'`,
         budget: sql`${tmdbCache.data}->>'budget'`,
         revenue: sql`${tmdbCache.data}->>'revenue'`,
-        vote: sql`case when coalesce((${tmdbCache.data}->>'vote_count')::numeric, 0) > 0 then ${tmdbCache.data}->>'vote_average' end`,
+        imdbId: sql`coalesce(${tmdbCache.data}->>'imdb_id', ${tmdbCache.data}->'external_ids'->>'imdb_id')`,
       })
       .from(tmdbCache)
       .where(inArray(tmdbCache.cacheKey, chunk));
@@ -208,7 +209,7 @@ async function loadCachedMeta(db, keys) {
           collection: row.collection && typeof row.collection === 'object' ? row.collection : null,
           budget: Number(row.budget) || 0,
           revenue: Number(row.revenue) || 0,
-          vote: Number(row.vote) || 0,
+          imdbId: imdbIdOf(row.imdbId),
         });
       }
     }

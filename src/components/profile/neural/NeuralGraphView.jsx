@@ -36,6 +36,7 @@ import {
   getNeuralLayout,
   neuralLayoutKey,
   saveNeuralLayout,
+  useNeuralImdbRatings,
   useNeuralPayload,
 } from "@/lib/profile/neuralGraphData";
 import { NEURAL_STAGE_CLASS, NeuralSkeletonArt, documentTop } from "./NeuralGraphSkeleton";
@@ -51,6 +52,7 @@ import {
   fitCamera,
   hubTitleIndices,
   searchNodes,
+  titleFacts,
 } from "@/lib/profile/neuralGraph";
 
 // Opciones del menú, con la misma forma que las del resto de secciones del
@@ -163,10 +165,12 @@ function SelectedCard({ node, graph, onClose, onFocusNode }) {
             </p>
             <h3 className="truncate text-lg font-black">{node.label}</h3>
             <p className="text-xs text-white/60">
-              {/* Una saga solo reúne películas: no se cuentan series. */}
-              {isSaga
-                ? `${titles.length} ${titles.length === 1 ? "película" : "películas"}`
-                : `${titles.length - series} películas · ${series} series`}
+              {/* Solo lo que hay: un grupo sin series (sagas, rangos de
+                  presupuesto) no dice "0 series". */}
+              {[
+                titles.length - series ? `${titles.length - series} ${titles.length - series === 1 ? "película" : "películas"}` : null,
+                series ? `${series} ${series === 1 ? "serie" : "series"}` : null,
+              ].filter(Boolean).join(" · ") || "0 títulos"}
             </p>
           </div>
           {/* La saga abre su colección: en móvil con la flecha (se cierra
@@ -219,6 +223,7 @@ function SelectedCard({ node, graph, onClose, onFocusNode }) {
   }
 
   const title = node.title;
+  const facts = titleFacts(graph, graph.nodes.indexOf(node));
   const href = detailsHref(title);
   const openPreview = previewClick(
     { tmdbId: title.tmdbId, mediaType: title.mediaType, title: title.title, posterPath: title.posterPath },
@@ -264,10 +269,12 @@ function SelectedCard({ node, graph, onClose, onFocusNode }) {
             </button>
           </div>
           <h3 className="truncate text-sm font-black leading-5 @[640px]/detail-page:line-clamp-2 @[640px]/detail-page:whitespace-normal @[640px]/detail-page:text-base @[640px]/detail-page:leading-snug">{title.title}</h3>
-          {title.genres.length || title.saga ? (
-            <p className="truncate text-xs leading-4 text-white/60">
-              {[title.saga, ...title.genres].filter(Boolean).join(" · ")}
-            </p>
+          {/* Lo que le une a sus grupos en la agrupación actual: géneros,
+              visionados, listas, presupuesto y recaudación o notas. */}
+          {facts.length ? (
+            // Hasta dos filas en la ficha amplia (los nombres de listas son
+            // largos); en móvil, una, como el título.
+            <p className="truncate text-xs leading-4 text-white/60 @[640px]/detail-page:line-clamp-2 @[640px]/detail-page:whitespace-normal">{facts.join(" · ")}</p>
           ) : null}
           {/* Mismos iconos y colores que los registros de Actividad del
               perfil: visto (ojo), nota (el número en ámbar), favorita
@@ -275,21 +282,21 @@ function SelectedCard({ node, graph, onClose, onFocusNode }) {
           <div className="flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold leading-5 text-white/75">
             {title.flags & FLAG_WATCHED ? (
               <span className="inline-flex items-center gap-1" title="Vista" aria-label="Vista">
-                <Eye className="h-4 w-4 text-emerald-300" aria-hidden="true" />
+                <Eye strokeWidth={2.5} className="h-4 w-4 text-emerald-400" aria-hidden="true" />
                 {/* Solo el icono; el número únicamente si aporta algo. */}
                 {title.mediaType === "tv" ? `${title.plays} ep.` : title.plays > 1 ? `${title.plays} veces` : null}
               </span>
             ) : null}
             {title.rating ? (
-              <span className="text-base font-black leading-none tabular-nums text-amber-300" title="Tu puntuación">
+              <span className="text-base font-black leading-none tabular-nums text-amber-400" title="Tu puntuación">
                 {title.rating}
               </span>
             ) : null}
             {title.flags & FLAG_FAVORITE ? (
-              <Heart className="h-4 w-4 fill-current text-red-300" aria-label="Favorita" />
+              <Heart strokeWidth={2.5} className="h-4 w-4 fill-current text-red-500" aria-label="Favorita" />
             ) : null}
             {title.flags & FLAG_WATCHLIST ? (
-              <BookmarkPlus className="h-4 w-4 fill-current text-sky-300" aria-label="Pendiente" />
+              <BookmarkPlus strokeWidth={2.5} className="h-4 w-4 text-sky-400" aria-label="Pendiente" />
             ) : null}
           </div>
         </div>
@@ -359,7 +366,14 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
   const { user: viewer } = useAuth();
   const viewerId = viewer?.id || null;
   const [groupBy, setGroupBy] = useState(() => readNeuralPreferences(viewerId).groupBy);
-  const graph = useMemo(() => (payload ? buildNeuralGraph(payload, { groupBy }) : null), [payload, groupBy]);
+  // Al agrupar por puntuaciones hacen falta las notas de IMDb: hasta que
+  // llegan sigue el esqueleto, para no montar la red dos veces.
+  const imdb = useNeuralImdbRatings(username, payload, groupBy === "ratings");
+  const imdbPending = groupBy === "ratings" && !imdb;
+  const graph = useMemo(
+    () => (payload && !imdbPending ? buildNeuralGraph(payload, { groupBy, imdb }) : null),
+    [payload, groupBy, imdb, imdbPending],
+  );
 
   const containerRef = useRef(null);
   const menuRef = useRef(null);
@@ -1544,23 +1558,26 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
           <>
             {/* Leyenda de los grupos (géneros o décadas). */}
             <div
-              className={`pointer-events-none absolute bottom-3 right-3 hidden w-48 flex-col justify-end @[1024px]/detail-page:flex ${
+              className={`pointer-events-none absolute bottom-3 right-3 hidden w-60 flex-col justify-end @[1024px]/detail-page:flex ${
                 // Con el menú oculto, arriba a la derecha están los controles.
                 menuShown ? "top-3" : "top-16"
               }`}
             >
               <ul className={`pointer-events-auto max-h-full overflow-y-auto overscroll-contain rounded-2xl p-2 [scrollbar-width:none] ${LIQUID_GLASS_PANEL}`}>
                 {legend.map(({ node, index, count }) => (
-                  <li key={node.id}>
+                  // El id solo es único dentro de su tipo: presupuesto y
+                  // recaudación (o tu nota y IMDb) comparten índices de rango.
+                  <li key={`${node.kind}:${node.id}`}>
                     <button
                       type="button"
                       onClick={() => focusNode(index)}
-                      className={`flex w-full items-center gap-2 rounded-xl px-2 py-1 text-left text-xs transition hover:bg-white/[0.07] ${
+                      className={`flex w-full items-start gap-2 rounded-xl px-2 py-1 text-left text-xs leading-4 transition hover:bg-white/[0.07] ${
                         selected === index ? "bg-white/10 text-white" : "text-white/75"
                       }`}
                     >
-                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: node.color }} aria-hidden="true" />
-                      <span className="min-w-0 flex-1 truncate font-semibold">{node.label}</span>
+                      <span className="mt-[3px] h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: node.color }} aria-hidden="true" />
+                      {/* Etiqueta entera: las largas (rangos, listas) pasan a otra línea. */}
+                      <span className="min-w-0 flex-1 font-semibold [overflow-wrap:anywhere]">{node.label}</span>
                       <span className="tabular-nums text-white/40">{count}</span>
                     </button>
                   </li>
@@ -1570,7 +1587,7 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
 
             {/* Pie: recuento, estado y ficha del nodo seleccionado. */}
             {/* En móvil, por encima de la barra inferior flotante. */}
-            <div className="pointer-events-none absolute inset-x-4 bottom-[calc(5.5rem_+_env(safe-area-inset-bottom))] flex flex-col items-center gap-2 text-center @[640px]/detail-page:items-start @[640px]/detail-page:text-left @[640px]/detail-page:inset-x-3 @[640px]/detail-page:bottom-3 @[1024px]/detail-page:right-56">
+            <div className="pointer-events-none absolute inset-x-4 bottom-[calc(5.5rem_+_env(safe-area-inset-bottom))] flex flex-col items-center gap-2 text-center @[640px]/detail-page:items-start @[640px]/detail-page:text-left @[640px]/detail-page:inset-x-3 @[640px]/detail-page:bottom-3 @[1024px]/detail-page:right-64">
               <SelectedCard
                 node={selectedNode}
                 graph={graph}

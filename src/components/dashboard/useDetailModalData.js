@@ -233,6 +233,10 @@ const EMPTY_DATA = {
   revenueValue: null,
   director: null,
   creators: null,
+  // Para el vídeo compartible (shareStory): minutos sin formatear y los
+  // nombres de dirección (películas) o creación (series) uno a uno.
+  runtimeMinutes: null,
+  creditNames: [],
   network: null,
   productionText: null,
   tagline: null,
@@ -945,6 +949,16 @@ export function useDetailModalData(item) {
           revenueValue,
           director,
           creators,
+          runtimeMinutes:
+            mediaType === "movie" && source?.runtime > 0 ? source.runtime : null,
+          creditNames: (mediaType === "movie"
+            ? movieDirectors
+            : Array.isArray(details?.created_by)
+              ? details.created_by
+              : []
+          )
+            .map((person) => person?.name)
+            .filter(Boolean),
           network,
           productionText,
           tagline,

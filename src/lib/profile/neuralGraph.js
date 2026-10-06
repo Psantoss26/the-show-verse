@@ -4,7 +4,9 @@
 //   genres: [[id, nombre]], sagas: [[id, nombre]], lists: [[id, nombre, tipo]],
 //   titles: [[tmdbId, esSerie, título, póster, año, [géneros], saga, vistas,
 //             nota, flags, [meses AAAAMM], [listas], presupuesto, recaudación,
-//             nota de TMDb]]
+//             id de IMDb]]
+// Las notas de IMDb no vienen en la carga: la vista las pide aparte (solo al
+// agrupar por puntuaciones) y llegan en la opción `imdb`.
 // Aquí se expande a nodos y enlaces. Los enlaces no viajan por la red: salen de
 // los índices de género y saga de cada título.
 
@@ -70,7 +72,8 @@ function seeded(seed) {
 //   genre-saga  géneros y sagas            genre    solo géneros
 //   decade      década de estreno          watched  año y mes de visionado
 //   lists       listas propias, de la comunidad guardadas y colecciones
-//   money       presupuesto y recaudación  ratings  tu nota y la de TMDb
+//   money       presupuesto, recaudación   ratings  tu nota y la de IMDb
+//               y beneficio
 // Los hubs `main` forman los racimos (y la leyenda); los `sub` (sagas, meses)
 // se quedan dentro del racimo de sus títulos, con enlaces cortos.
 export const GROUP_BY_VALUES = ["genre-saga", "genre", "decade", "watched", "lists", "money", "ratings"];
@@ -87,8 +90,9 @@ export const HUB_KIND_LABEL = {
   collection: "Colección",
   budget: "Presupuesto",
   revenue: "Recaudación",
+  profit: "Beneficio",
   rating: "Tu nota",
-  tmdb: "Nota de TMDb",
+  imdb: "Nota de IMDb",
 };
 
 /** Cómo se llaman los grupos de cada agrupación en el pie de la vista. */
@@ -108,7 +112,9 @@ const MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sept", 
 // supera la cifra.
 const BUDGET_RANGES = [[0, "< 1 M$"], [1e6, "1-10 M$"], [1e7, "10-50 M$"], [5e7, "50-100 M$"], [1e8, "100-200 M$"], [2e8, "> 200 M$"]];
 const REVENUE_RANGES = [[0, "< 10 M$"], [1e7, "10-100 M$"], [1e8, "100-500 M$"], [5e8, "500 M$-1.000 M$"], [1e9, "> 1.000 M$"]];
-const TMDB_RANGES = [[0, "< 5"], [5, "5-6"], [6, "6-7"], [7, "7-8"], [8, "8-9"], [9, "9-10"]];
+// Beneficio = recaudación - presupuesto; el primer tramo, las pérdidas.
+const PROFIT_RANGES = [[-Infinity, "Con pérdidas"], [0, "0-50 M$"], [5e7, "50-200 M$"], [2e8, "200-500 M$"], [5e8, "500 M$-1.000 M$"], [1e9, "> 1.000 M$"]];
+const IMDB_RANGES = [[0, "< 5"], [5, "5-6"], [6, "6-7"], [7, "7-8"], [8, "8-9"], [9, "9-10"]];
 
 function rangeIndex(ranges, value) {
   let index = 0;
@@ -142,12 +148,14 @@ const COMMUNITY_COLORS = ["#38bdf8", "#818cf8", "#22d3ee", "#93c5fd", "#67e8f9"]
  * }}
  * Los nodos van en orden: hubs (en el orden en que aparecen) y títulos.
  */
-export function buildNeuralGraph(payload, { groupBy = "genre-saga" } = {}) {
+export function buildNeuralGraph(payload, { groupBy = "genre-saga", imdb = null } = {}) {
   const genres = Array.isArray(payload?.genres) ? payload.genres : [];
   const sagas = Array.isArray(payload?.sagas) ? payload.sagas : [];
   const lists = Array.isArray(payload?.lists) ? payload.lists : [];
   const rows = Array.isArray(payload?.titles) ? payload.titles : [];
   const mode = GROUP_BY_VALUES.includes(groupBy) ? groupBy : "genre-saga";
+  // Nota de IMDb de un título, de `imdb` ({ "movie:603": 8.7 }).
+  const imdbScore = (row) => imdb?.[`${row[1] ? "tv" : "movie"}:${row[0]}`];
 
   const nodes = [];
   const links = [];
@@ -210,6 +218,13 @@ export function buildNeuralGraph(payload, { groupBy = "genre-saga" } = {}) {
         addHub("revenue", i, `Recaudación ${label}`, gradientColor(i, REVENUE_RANGES.length, { from: 50, to: 15, light: 58 }), { order: 100 + i });
       }
     });
+    // Pérdidas en rojo rosado; las ganancias, de azul a violeta.
+    PROFIT_RANGES.forEach(([, label], i) => {
+      if (rows.some((row) => profitRange(row) === i)) {
+        const color = i === 0 ? "hsl(350 72% 60%)" : gradientColor(i - 1, PROFIT_RANGES.length - 1, { from: 200, to: 285, light: 66 });
+        addHub("profit", i, i === 0 ? label : `Beneficio ${label}`, color, { order: 200 + i });
+      }
+    });
   }
   if (mode === "ratings") {
     for (let score = 10; score >= 1; score -= 1) {
@@ -217,10 +232,10 @@ export function buildNeuralGraph(payload, { groupBy = "genre-saga" } = {}) {
         addHub("rating", score, `Tu nota ${score}`, scoreColor(score), { order: 10 - score });
       }
     }
-    for (let i = TMDB_RANGES.length - 1; i >= 0; i -= 1) {
-      if (rows.some((row) => rangeOf(TMDB_RANGES, row[14]) === i)) {
-        const [from, label] = TMDB_RANGES[i];
-        addHub("tmdb", i, `TMDb ${label}`, scoreColor(from + 0.5), { order: 100 + (TMDB_RANGES.length - i) });
+    for (let i = IMDB_RANGES.length - 1; i >= 0; i -= 1) {
+      if (rows.some((row) => rangeOf(IMDB_RANGES, imdbScore(row)) === i)) {
+        const [from, label] = IMDB_RANGES[i];
+        addHub("imdb", i, `IMDb ${label}`, scoreColor(from + 0.5), { order: 100 + (IMDB_RANGES.length - i) });
       }
     }
   }
@@ -255,9 +270,10 @@ export function buildNeuralGraph(payload, { groupBy = "genre-saga" } = {}) {
     } else if (mode === "money") {
       push(hub("budget", rangeOf(BUDGET_RANGES, row[12])));
       push(hub("revenue", rangeOf(REVENUE_RANGES, row[13])));
+      push(hub("profit", profitRange(row)));
     } else if (mode === "ratings") {
       push(hub("rating", userScore(row)));
-      push(hub("tmdb", rangeOf(TMDB_RANGES, row[14])));
+      push(hub("imdb", rangeOf(IMDB_RANGES, imdbScore(row))));
     }
 
     const onlyPending = (flags & FLAG_WATCHLIST) && !(flags & (FLAG_WATCHED | FLAG_RATED | FLAG_FAVORITE));
@@ -289,6 +305,9 @@ export function buildNeuralGraph(payload, { groupBy = "genre-saga" } = {}) {
         plays: plays || 0,
         rating: rating || 0,
         flags: flags || 0,
+        budget: isTv ? 0 : Number(row[12]) || 0,
+        revenue: isTv ? 0 : Number(row[13]) || 0,
+        imdb: imdbScore(row) || 0,
       },
     });
     for (const target of targets) links.push([target, index]);
@@ -318,6 +337,57 @@ export function buildNeuralGraph(payload, { groupBy = "genre-saga" } = {}) {
   };
 }
 
+const scoreFormat = new Intl.NumberFormat("es-ES", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+// Cifras en dólares con el mismo estilo que los rangos: "850.000 $", "63 M$",
+// "2.900 M$".
+function formatMoney(value) {
+  if (value < 1e6) return `${new Intl.NumberFormat("es-ES", { useGrouping: "always" }).format(Math.round(value))} $`;
+  const millions = value / 1e6;
+  const digits = millions < 10 ? 1 : 0;
+  return `${new Intl.NumberFormat("es-ES", { maximumFractionDigits: digits, useGrouping: "always" }).format(millions)} M$`;
+}
+
+/**
+ * Línea de datos de la ficha de un título, según la agrupación: lo que le une
+ * a sus grupos (géneros, visionados, listas, cifras o notas).
+ */
+export function titleFacts(graph, index) {
+  const node = graph?.nodes?.[index];
+  if (!node || node.kind !== "title") return [];
+  const title = node.title;
+  const hubLabels = () => (graph.neighbors[index] || [])
+    .filter((n) => graph.nodes[n].kind !== "title")
+    .map((n) => graph.nodes[n].label);
+  switch (graph.groupBy) {
+    case "genre":
+      return title.genres;
+    case "decade":
+      return hubLabels();
+    case "watched": {
+      // Sus meses, del más reciente al más antiguo.
+      const months = hubLabels();
+      return months.length ? [`Visto en ${months.join(", ")}`] : ["Sin visionados"];
+    }
+    case "lists": {
+      const lists = hubLabels();
+      return lists.length ? lists : ["En ninguna lista"];
+    }
+    case "money": {
+      const facts = [
+        title.budget ? `Presupuesto ${formatMoney(title.budget)}` : null,
+        title.revenue ? `Recaudación ${formatMoney(title.revenue)}` : null,
+      ].filter(Boolean);
+      return facts.length ? facts : ["Sin presupuesto ni recaudación"];
+    }
+    case "ratings":
+      // Tu nota ya sale en ámbar entre los registros.
+      return [title.imdb ? `IMDb ${scoreFormat.format(title.imdb)}` : "Sin nota de IMDb"];
+    default:
+      return [title.saga, ...title.genres].filter(Boolean);
+  }
+}
+
 // Meses (AAAAMM) en que se vio un título; vacío en cargas antiguas.
 function watchMonths(row) {
   return Array.isArray(row?.[10]) ? row[10].filter((m) => Number.isInteger(m) && m > 180001) : [];
@@ -327,6 +397,15 @@ function watchMonths(row) {
 function rangeOf(ranges, value) {
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? rangeIndex(ranges, n) : undefined;
+}
+
+// Tramo de beneficio, solo con presupuesto Y recaudación (si falta una de
+// las dos cifras, el beneficio no se puede calcular).
+function profitRange(row) {
+  const budget = Number(row?.[12]);
+  const revenue = Number(row?.[13]);
+  if (!(budget > 0) || !(revenue > 0)) return undefined;
+  return rangeIndex(PROFIT_RANGES, revenue - budget);
 }
 
 // Tu nota en entero (8,5 → 8), o undefined si no lo has puntuado.

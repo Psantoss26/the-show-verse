@@ -65,7 +65,6 @@ import {
   ThumbsUp,
   Trophy,
   Users,
-  UsersRound,
 } from "lucide-react";
 
 import OptimizedImage from "@/components/OptimizedImage";
@@ -114,10 +113,6 @@ import {
   saveArtworkOverrides,
 } from "@/lib/artworkApi";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
-import {
-  FollowingActivitySection,
-  hasFollowingActivity,
-} from "@/components/details/FollowingActivity";
 
 // El menú se pega por debajo de los controles flotantes del panel (cerrar,
 // acoplar, ficha completa): están en `top-4` y miden 40px, así que 56px es
@@ -229,9 +224,6 @@ export default function PhoneDetailsSections({
   episodesWatched,
   imdbId,
   canLikeComments = false,
-  followingActivity,
-  canAccessFollowingActivity = false,
-  followingActivityPhoneLayout = false,
   onOpenSeason,
   onArtworkSelection,
   soundtrack,
@@ -239,10 +231,6 @@ export default function PhoneDetailsSections({
   const { cacheArtworkOverrides } = useAuth();
   const id = item?.id ?? null;
   const type = mediaType === "tv" ? "tv" : "movie";
-  // "Amigos" solo existe si hay sesión y alguno de tus seguidos ha tocado el
-  // título: sin actividad no se pinta ni la entrada del menú ni la sección.
-  const showFollowingActivity =
-    canAccessFollowingActivity && hasFollowingActivity(followingActivity);
 
   /* ----------------------------- PREMIOS ----------------------------- */
   // Misma consulta que la ficha completa: la sección de premios es
@@ -959,14 +947,6 @@ export default function PhoneDetailsSections({
       items.push({ id: "seasons", label: "Temporadas", icon: Layers });
       items.push({ id: "episodes", label: "Episodios", icon: BarChart3 });
     }
-    if (showFollowingActivity) {
-      items.push({
-        id: "following",
-        label: "Amigos",
-        icon: UsersRound,
-        count: followingActivity.items.length,
-      });
-    }
     items.push({
       id: "comments",
       label: "Comentarios",
@@ -994,8 +974,6 @@ export default function PhoneDetailsSections({
     images?.logos?.length,
     videos.length,
     type,
-    showFollowingActivity,
-    followingActivity,
   ]);
 
   return (
@@ -1921,21 +1899,6 @@ export default function PhoneDetailsSections({
                     density="compact"
                   />
                 )}
-              </section>
-            </AnimatedSection>
-          </section>
-        )}
-
-        {showFollowingActivity && (
-          <section className="sv-phone-section" id="phone-section-following" ref={registerSection("following")}>
-            <AnimatedSection delay={0.04} renderImmediately>
-              <section className="group/section">
-                <SectionTitle title="Tus amigos" icon={UsersRound} />
-                <FollowingActivitySection
-                  data={followingActivity}
-                  mediaType={type}
-                  phoneLayout={followingActivityPhoneLayout}
-                />
               </section>
             </AnimatedSection>
           </section>

@@ -20,8 +20,7 @@ import SectionTitle from "@/components/details/SectionTitle";
 import { createValueStore } from "@/lib/details/valueStore";
 import {
   FollowingActivityAvatars,
-  FollowingActivitySection,
-  FollowingActivityStrip,
+  FollowingActivityModal,
   hasFollowingActivity,
   useFollowingActivity,
 } from "@/components/details/FollowingActivity";
@@ -109,6 +108,7 @@ import {
   Layers,
   Users,
   UsersRound,
+  Link2,
   Building2,
   MapPin,
   Languages,
@@ -282,7 +282,7 @@ import {
 // ficha rápida del dashboard (DetailModal) para que rendericen las MISMAS tarjetas.
 import DetailsInfoTabs from "@/components/details/DetailsInfoTabs";
 import { ActionShareButton, UnifiedRateButton } from "@/components/details/DetailHeaderBits";
-import DetailsScoreboardPanel, { ScoreboardPill } from "@/components/details/DetailsScoreboardPanel";
+import DetailsScoreboardPanel, { ScoreboardPill, ScoreboardPillRow } from "@/components/details/DetailsScoreboardPanel";
 import useRatingLinks from "@/lib/details/useRatingLinks";
 import { buildShareCardPayload } from "@/lib/details/shareCard";
 import {
@@ -6937,6 +6937,7 @@ export default function DetailsClient({
 
   const [externalLinksOpen, setExternalLinksOpen] = useState(false); // Modal de enlaces externos abierto
   const [platformsOpen, setPlatformsOpen] = useState(false); // Modal de plataformas disponible en móvil
+  const [followingOpen, setFollowingOpen] = useState(false); // Modal de actividad de amigos en móvil
 
   const isMovie = endpointType === "movie";
 
@@ -7582,8 +7583,8 @@ export default function DetailsClient({
 
   const castSectionLoading = creativeCreditsLoading || tmdbCastLoading;
 
-  // Actividad de las cuentas que sigues con este título ("Tus amigos"). Solo
-  // con sesión; sin nadie que mostrar, ni franja ni sección.
+  // Actividad de las cuentas que sigues con este título, en su modal. Solo con
+  // sesión; sin nadie que mostrar, ni botón Actividad ni avatares.
   const canAccessFollowingActivity = authenticated || hasBackendSession;
   const followingActivity = useFollowingActivity(type, id, {
     enabled: canAccessFollowingActivity,
@@ -7675,17 +7676,6 @@ export default function DetailsClient({
       });
     }
 
-    // Tus amigos solo aparece cuando alguno de tus seguidos ha tocado el
-    // título: sin actividad no hay entrada de menú ni sección vacía.
-    if (showFollowingActivity) {
-      items.push({
-        id: "following",
-        label: "Amigos",
-        icon: UsersRound,
-        count: followingActivity.items.length,
-      });
-    }
-
     // Comentarios comunitarios, almacenados en nuestra BBDD.
     const commentsCount = Number(tComments?.total || 0) || 0;
 
@@ -7722,8 +7712,6 @@ export default function DetailsClient({
     collectionLoading,
     awardItems,
     awardsLoading,
-    showFollowingActivity,
-    followingActivity,
   ]);
 
   // Menú global (scroll + sticky + spy). Los dos valores salen de
@@ -7739,7 +7727,6 @@ export default function DetailsClient({
   const pendingSectionRef = useRef(null);
   const pendingSectionTimerRef = useRef(null);
   const pendingScrollEndCleanupRef = useRef(null);
-  const followingHashHandledRef = useRef(false);
 
   const [menuH, setMenuH] = useState(() => restoredValue(backSnapshot, "menuH", 0));
 
@@ -7907,21 +7894,6 @@ export default function DetailsClient({
     },
     [menuH, STICKY_TOP, setActiveSectionId],
   );
-
-  useEffect(() => {
-    followingHashHandledRef.current = false;
-  }, [id]);
-
-  // Los accesos desde DetailModal llegan a la ficha completa con este hash.
-  // La actividad se pide en cliente y puede montar después del primer render;
-  // esperamos a que exista para aplicar el mismo scroll compensado del menú.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (window.location.hash !== "#section-following") return;
-    if (!showFollowingActivity || followingHashHandledRef.current) return;
-    followingHashHandledRef.current = true;
-    window.requestAnimationFrame(() => scrollToSection("following"));
-  }, [showFollowingActivity, scrollToSection]);
 
   // Scroll-spy (qué sección está “activa”)
   useEffect(() => {
@@ -9205,6 +9177,16 @@ export default function DetailsClient({
         mode="platforms"
       />
 
+      {/* Actividad de tus amigos, con el diseño del de plataformas. La abren
+          el botón Actividad (teléfono) y sus avatares junto a las
+          estadísticas (escritorio). */}
+      <FollowingActivityModal
+        open={followingOpen}
+        onClose={() => setFollowingOpen(false)}
+        data={followingActivity}
+        mediaType={type}
+      />
+
       {/* Modal de control de visto en Trakt - Para marcar películas como vistas */}
       <TraktWatchedModal
         open={traktWatchedOpen}
@@ -10348,8 +10330,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 genres={data.genres}
                 platforms={platformItems}
                 showPlatformsTab={false}
-                externalLinks={externalLinks}
-                showExternalLinksTab
               />
               </div>
             </div>
@@ -10364,7 +10344,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   externos y compartir) + estadísticas. Componente presentacional
                   compartido con DetailModal para que se vean IDÉNTICOS. */}
             <div
-              className={`${detailsEntryReady ? "sv-details-entry" : ""} sv-details-entry--scoreboard order-2 sm:order-none ${isBackdropPoster ? "" : "mb-6"}`}
+              // Teléfono: 12px hasta el menú de pestañas, los mismos que hay
+              // entre el marcador y su fila de botones.
+              className={`${detailsEntryReady ? "sv-details-entry" : ""} sv-details-entry--scoreboard order-2 sm:order-none mb-3 ${isBackdropPoster ? "sm:mb-0" : "sm:mb-6"}`}
             >
               <span
                 ref={mobileSecondaryTriggerRef}
@@ -10453,37 +10435,50 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       compact={isBackdropPoster}
                       data={followingActivity}
                       mediaType={type}
-                      onOpen={() => scrollToSection("following")}
+                      onOpen={() => setFollowingOpen(true)}
                     />
                   ) : null
                 }
                 />
-                {/* Teléfono: Plataformas y Compartir, que en escritorio viven en
-                    la barra del marcador, como dos píldoras a media línea. */}
-                <ScoreboardPill
-                  icon={MonitorPlay}
-                  label="Plataformas"
-                  onClick={() => setPlatformsOpen(true)}
-                  aria-haspopup="dialog"
-                  aria-label="Abrir plataformas disponibles"
-                  className="mt-3 sm:hidden"
-                />
-                <ActionShareButton
-                  variant="pill"
-                  className="mt-3 sm:hidden"
-                  title={title}
-                  text={`Echa un vistazo a ${title} en The Show Verse`}
-                  card={shareCard}
-                  story={shareStory}
-                />
-                {/* Teléfono: la fila de stats es un carril sin "derecha", así
-                    que tus amigos van en una franja bajo el marcador. */}
-                <FollowingActivityStrip
-                  data={followingActivity}
-                  compactWatchedSummary
-                  onOpen={() => scrollToSection("following")}
-                  className="col-span-2 mt-3 sm:hidden"
-                />
+                {/* Teléfono: Plataformas, Actividad (si tus amigos han tocado
+                    el título), Enlaces y Compartir en una fila de iconos bajo
+                    el marcador. Cada uno abre su modal. */}
+                <ScoreboardPillRow className="col-span-2 mt-3 sm:hidden">
+                  <ScoreboardPill
+                    iconOnly
+                    icon={MonitorPlay}
+                    label="Plataformas"
+                    onClick={() => setPlatformsOpen(true)}
+                    aria-haspopup="dialog"
+                    aria-label="Abrir plataformas disponibles"
+                  />
+                  {showFollowingActivity ? (
+                    <ScoreboardPill
+                      iconOnly
+                      icon={UsersRound}
+                      label="Actividad"
+                      onClick={() => setFollowingOpen(true)}
+                      aria-haspopup="dialog"
+                      aria-label="Ver la actividad de tus amigos"
+                    />
+                  ) : null}
+                  <ScoreboardPill
+                    iconOnly
+                    icon={Link2}
+                    label="Enlaces"
+                    onClick={() => setExternalLinksOpen(true)}
+                    aria-haspopup="dialog"
+                    aria-label="Abrir enlaces externos"
+                  />
+                  <ActionShareButton
+                    variant="pill"
+                    iconOnly
+                    title={title}
+                    text={`Echa un vistazo a ${title} en The Show Verse`}
+                    card={shareCard}
+                    story={shareStory}
+                  />
+                </ScoreboardPillRow>
               </div>
             </div>
 
@@ -12371,26 +12366,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           Esta sección solo aplica a series.
                         </div>
                       )}
-                    </AnimatedSection>
-                  </section>
-                )}
-
-                {showFollowingActivity && (
-                  <section
-                    id="section-following"
-                    ref={registerSection("following")}
-                  >
-                    <AnimatedSection delay={0.04} renderImmediately>
-                      <section className="mb-10 group/section">
-                        <SectionTitle
-                          title="Tus amigos"
-                          icon={UsersRound}
-                        />
-                        <FollowingActivitySection
-                          data={followingActivity}
-                          mediaType={type}
-                        />
-                      </section>
                     </AnimatedSection>
                   </section>
                 )}
