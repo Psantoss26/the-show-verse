@@ -6,7 +6,8 @@
 // posiciones como Float32Array transferible (sin copia) en cada paso.
 //
 // Mensajes de entrada:
-//   { type: "init", nodes: [{ x, y, r, charge, saga }], links: [[a, b]], instant, resume }
+//   { type: "init", nodes: [{ x, y, r, charge, saga }], links: [[a, b]], instant, resume,
+//     aspect }                      aspect: alto/ancho buscado (móvil), 1 sin cambio
 //   { type: "drag", index, x, y }   fija un nodo mientras se arrastra
 //   { type: "release", index }      lo suelta
 //   { type: "stop" }
@@ -22,6 +23,7 @@ import {
   forceX,
   forceY,
 } from "d3-force";
+import { NEURAL_GRAVITY, forceAspect } from "@/lib/profile/neuralForces";
 
 let simulation = null;
 let nodes = [];
@@ -92,8 +94,11 @@ self.onmessage = ({ data }) => {
       )
       // Gravedad hacia el centro: sin ella, un grupo sin conexión con el resto
       // (Documental, por ejemplo) sale despedido por la repulsión de los hubs.
-      .force("x", forceX(0).strength(0.06))
-      .force("y", forceY(0).strength(0.06))
+      .force("x", forceX(0).strength(NEURAL_GRAVITY))
+      .force("y", forceY(0).strength(NEURAL_GRAVITY))
+      // En una pantalla vertical (móvil), la red se reparte a lo alto en vez
+      // de apelotonarse en un círculo con huecos arriba y abajo.
+      .force("aspect", forceAspect(Number(data.aspect) || 1))
       .force("collide", forceCollide((node) => node.r + 1.5).iterations(1))
       .alphaDecay(0.03)
       .velocityDecay(0.42)

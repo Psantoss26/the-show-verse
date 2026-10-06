@@ -10,7 +10,7 @@
 //     que usa la pestaña, así que al abrirla después ya están.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { buildNeuralGraph, fitCamera } from "@/lib/profile/neuralGraph";
+import { DEFAULT_GROUPS, buildNeuralGraph, fitCamera } from "@/lib/profile/neuralGraph";
 import {
   getCachedNeuralGraph,
   getNeuralLayout,
@@ -26,7 +26,7 @@ const TOP_LABELS = 5;
 // que calcula su mismo worker en modo instantáneo (fuera del hilo principal).
 // Se guarda, así que la pestaña se abre después con esta misma red.
 function useSettledLayout(username, payload, graph) {
-  const layoutKey = neuralLayoutKey(username, payload, "genre-saga");
+  const layoutKey = neuralLayoutKey(username, payload, DEFAULT_GROUPS);
   const [layout, setLayout] = useState(null);
 
   useEffect(() => {
