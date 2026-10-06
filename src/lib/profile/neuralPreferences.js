@@ -6,7 +6,8 @@
 //   menuVisible      menú de opciones desplegado       (por defecto: no)
 //   type             Tipo: all | movie | tv            (por defecto: all)
 //   record           Registro: all | watched | rated | favorite | pending
-//   groupBy          Agrupar: genre-saga | genre | decade
+//   groupBy          Agrupar: genre-saga | genre | decade | watched | lists |
+//                    money | ratings
 
 const STORAGE_PREFIX = "showverse:profile:neural:v1:";
 
@@ -21,7 +22,7 @@ export const NEURAL_DEFAULTS = Object.freeze({
 const ALLOWED = {
   type: ["all", "movie", "tv"],
   record: ["all", "watched", "rated", "favorite", "pending"],
-  groupBy: ["genre-saga", "genre", "decade"],
+  groupBy: ["genre-saga", "genre", "decade", "watched", "lists", "money", "ratings"],
 };
 
 // Copia en memoria: las dos piezas que la usan (cabecera y vista) leen lo

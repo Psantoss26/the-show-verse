@@ -8,7 +8,7 @@
 // simulación de fuerzas; no hace falta clasificar nada a mano.
 
 // Versión del formato: cambiarla invalida las cachés (servidor y cliente).
-export const NEURAL_GRAPH_VERSION = 1;
+export const NEURAL_GRAPH_VERSION = 2;
 
 // Flags de cada título (bits): qué registros tiene el usuario sobre él.
 export const FLAG_WATCHED = 1;
@@ -92,7 +92,7 @@ export function mergeTitleRecords({ history = [], ratings = [], favorites = [], 
     const key = titleKey(row.mediaType, tmdbId);
     let title = titles.get(key);
     if (!title) {
-      title = { tmdbId, mediaType: row.mediaType, title: null, posterPath: null, plays: 0, rating: 0, flags: 0, lastAt: null };
+      title = { tmdbId, mediaType: row.mediaType, title: null, posterPath: null, plays: 0, rating: 0, flags: 0, lastAt: null, months: [] };
       titles.set(key, title);
     }
     title.flags |= flag;
@@ -104,7 +104,14 @@ export function mergeTitleRecords({ history = [], ratings = [], favorites = [], 
 
   for (const row of history) {
     const title = touch(row, FLAG_WATCHED);
-    if (title) title.plays += Math.max(0, Number(row.plays) || 0);
+    if (!title) continue;
+    title.plays += Math.max(0, Number(row.plays) || 0);
+    // Meses de visionado (AAAAMM), para agrupar por año y mes.
+    for (const month of Array.isArray(row.months) ? row.months : []) {
+      const value = Number(month);
+      if (Number.isInteger(value) && value >= 190001 && value <= 299912 && !title.months.includes(value)) title.months.push(value);
+    }
+    title.months.sort((a, b) => a - b);
   }
   for (const row of ratings) {
     const title = touch(row, FLAG_RATED);
@@ -121,15 +128,19 @@ export function mergeTitleRecords({ history = [], ratings = [], favorites = [], 
  * los títulos y no con sus conexiones.
  *
  * @param titles  resultado de mergeTitleRecords.
- * @param metaByKey Map<key, { name, posterPath, date, genres, collection }>.
+ * @param metaByKey Map<key, { name, posterPath, date, genres, collection, budget, revenue, vote }>.
+ * @param lists   listas del usuario y de la comunidad que ha guardado:
+ *   [{ id, name, kind: 'own'|'community', keys: Set<key> }].
  * @returns {{
  *   genres: Array<[id, name]>,
  *   sagas: Array<[id, name]>,
- *   titles: Array<[tmdbId, isTv(0|1), title, posterPath, year, genreIdx[], sagaIdx, plays, rating, flags]>,
+ *   lists: Array<[id, name, kind]>,
+ *   titles: Array<[tmdbId, isTv(0|1), title, posterPath, year, genreIdx[], sagaIdx, plays, rating, flags,
+ *                  months[] (AAAAMM), listIdx[], budget, revenue, vote]>,
  *   missing: number,
  * }}
  */
-export function packNeuralGraph(titles, metaByKey) {
+export function packNeuralGraph(titles, metaByKey, lists = []) {
   const genreIndex = new Map();
   const genres = [];
   const sagaCounts = new Map();
@@ -160,6 +171,25 @@ export function packNeuralGraph(titles, metaByKey) {
     sagas.push([id, String(sagaNames.get(id) || 'Saga').replace(/\s*-\s*Colecci[oó]n$/i, '').replace(/\s+Collection$/i, '')]);
   }
 
+  // Listas: solo las que reúnen algún título del usuario.
+  const listRows = [];
+  const listsByKey = new Map();
+  for (const list of Array.isArray(lists) ? lists : []) {
+    const keys = [...(list?.keys || [])].filter((key) => titles.has(key));
+    if (!keys.length || !list.id) continue;
+    const index = listRows.length;
+    listRows.push([String(list.id), String(list.name || 'Lista').slice(0, 80), list.kind === 'community' ? 'community' : 'own']);
+    for (const key of keys) {
+      if (!listsByKey.has(key)) listsByKey.set(key, []);
+      listsByKey.get(key).push(index);
+    }
+  }
+
+  const money = (value) => {
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
+  };
+
   const packed = rows.map(({ title, meta, genreIds, sagaId }) => {
     const genreIdx = genreIds.map((id) => {
       if (!genreIndex.has(id)) {
@@ -180,10 +210,16 @@ export function packNeuralGraph(titles, metaByKey) {
       title.plays,
       Math.round((Number(title.rating) || 0) * 10) / 10,
       title.flags,
+      title.months || [],
+      listsByKey.get(titleKey(title.mediaType, title.tmdbId)) || [],
+      // Presupuesto y recaudación solo existen en películas.
+      title.mediaType === 'movie' ? money(meta?.budget) : 0,
+      title.mediaType === 'movie' ? money(meta?.revenue) : 0,
+      Math.round((Number(meta?.vote) || 0) * 10) / 10,
     ];
   });
 
-  return { genres, sagas, titles: packed, missing };
+  return { genres, sagas, lists: listRows, titles: packed, missing };
 }
 
 /** Datos de TMDb que usa el grafo, de la ficha completa en caché. */
@@ -195,5 +231,8 @@ export function pickTitleMeta(data) {
     date: data.release_date || data.first_air_date || null,
     genres: Array.isArray(data.genres) ? data.genres : [],
     collection: data.belongs_to_collection || null,
+    budget: Number(data.budget) || 0,
+    revenue: Number(data.revenue) || 0,
+    vote: Number(data.vote_count) > 0 ? Number(data.vote_average) || 0 : 0,
   };
 }

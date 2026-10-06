@@ -8,6 +8,7 @@ import {
   buildNeuralGraph,
   computeVisibility,
   fitCamera,
+  hubTitleIndices,
   searchNodes,
   titlePasses,
 } from "./neuralGraph.js";
@@ -81,4 +82,77 @@ test("encuadre: centra y ajusta el zoom a los puntos", () => {
   assert.equal(cam.k, 2);
   assert.equal(cam.x, 0);
   assert.equal(cam.y, 0);
+});
+
+// Carga con los campos nuevos: [..., meses, listas, presupuesto, recaudación, nota TMDb].
+const extended = {
+  genres: [[878, "Ciencia ficción"]],
+  sagas: [[87096, "Avatar"]],
+  lists: [["l1", "Mi lista", "own"], ["c1", "Clásicos", "community"]],
+  titles: [
+    [19995, 0, "Avatar", "", 2009, [0], 0, 3, 8.5, FLAG_WATCHED, [202312, 202403], [0, 1], 237e6, 2.9e9, 7.6],
+    [76600, 0, "Avatar 2", "", 2022, [0], 0, 1, 0, FLAG_WATCHED, [202403], [0], 460e6, 2.3e9, 7.7],
+    [66732, 1, "Stranger Things", "", 2016, [0], -1, 34, 9, FLAG_WATCHED, [202501], [], 0, 0, 8.6],
+    [1, 0, "Pendiente", "", 0, [], -1, 0, 0, FLAG_WATCHLIST],
+  ],
+};
+const hubs = (graph, kind) => graph.nodes.filter((n) => n.kind === kind);
+
+test("agrupar por visionado: años con sus meses; sin visionados no se une", () => {
+  const graph = buildNeuralGraph(extended, { groupBy: "watched" });
+  assert.deepEqual(hubs(graph, "year").map((n) => n.label), ["2023", "2024", "2025"]);
+  assert.deepEqual(hubs(graph, "month").map((n) => n.label), ["dic 2023", "mar 2024", "ene 2025"]);
+  assert.ok(hubs(graph, "month").every((n) => n.tier === "sub"));
+  const index = (id) => graph.nodes.findIndex((n) => n.id === id);
+  // Avatar: diciembre de 2023 y marzo de 2024; color del último año.
+  assert.equal(graph.neighbors[index("movie:19995")].length, 2);
+  assert.equal(graph.nodes[index("movie:19995")].color, hubs(graph, "year")[1].color);
+  assert.equal(graph.neighbors[index("movie:1")].length, 0);
+  // El año es visible por sus meses aunque no tenga títulos directos.
+  const visible = computeVisibility(graph, { type: "tv" });
+  const year2025 = graph.nodes.findIndex((n) => n.kind === "year" && n.id === 2025);
+  const year2023 = graph.nodes.findIndex((n) => n.kind === "year" && n.id === 2023);
+  assert.equal(visible[year2025], 1);
+  assert.equal(visible[year2023], 0);
+  // Los títulos de un año son los de sus meses, sin repetir.
+  const year2024 = graph.nodes.findIndex((n) => n.kind === "year" && n.id === 2024);
+  assert.equal(hubTitleIndices(graph, year2024).length, 2);
+});
+
+test("agrupar por listas: propias, de la comunidad y colecciones, con enlace", () => {
+  const graph = buildNeuralGraph(extended, { groupBy: "lists" });
+  assert.deepEqual(graph.nodes.slice(0, 3).map((n) => [n.kind, n.label, n.href]), [
+    ["list", "Mi lista", "/lists/l1"],
+    ["community", "Clásicos", "/lists/community/c1"],
+    ["collection", "Avatar", "/lists/collection/87096"],
+  ]);
+  assert.equal(graph.nodes[0].degree, 2);
+  assert.equal(graph.nodes[2].degree, 2);
+});
+
+test("agrupar por dinero: rangos de presupuesto y recaudación, solo con títulos", () => {
+  const graph = buildNeuralGraph(extended, { groupBy: "money" });
+  assert.deepEqual(hubs(graph, "budget").map((n) => n.label), ["Presupuesto > 200 M$"]);
+  assert.deepEqual(hubs(graph, "revenue").map((n) => n.label), ["Recaudación > 1.000 M$"]);
+  // La serie no tiene presupuesto: queda suelta.
+  const series = graph.nodes.findIndex((n) => n.id === "tv:66732");
+  assert.equal(graph.neighbors[series].length, 0);
+});
+
+test("agrupar por puntuaciones: tu nota entera y la de TMDb por tramos", () => {
+  const graph = buildNeuralGraph(extended, { groupBy: "ratings" });
+  assert.deepEqual(hubs(graph, "rating").map((n) => n.label), ["Tu nota 9", "Tu nota 8"]);
+  assert.deepEqual(hubs(graph, "tmdb").map((n) => n.label), ["TMDb 8-9", "TMDb 7-8"]);
+  const avatar2 = graph.nodes.findIndex((n) => n.id === "movie:76600");
+  // Sin nota propia: solo el tramo de TMDb, y su color.
+  assert.equal(graph.neighbors[avatar2].length, 1);
+  assert.equal(graph.nodes[avatar2].color, hubs(graph, "tmdb")[1].color);
+});
+
+test("cargas antiguas (sin campos nuevos) no rompen las agrupaciones nuevas", () => {
+  for (const groupBy of ["watched", "lists", "money", "ratings"]) {
+    const graph = buildNeuralGraph(payload, { groupBy });
+    assert.equal(graph.stats.titles, 4);
+    assert.ok(graph.nodes.every((n) => Number.isFinite(n.x) && Number.isFinite(n.y)));
+  }
 });

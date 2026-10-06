@@ -44,10 +44,12 @@ import {
   FLAG_FAVORITE,
   FLAG_WATCHED,
   FLAG_WATCHLIST,
+  GROUP_NOUN,
   HUB_KIND_LABEL,
   buildNeuralGraph,
   computeVisibility,
   fitCamera,
+  hubTitleIndices,
   searchNodes,
 } from "@/lib/profile/neuralGraph";
 
@@ -65,6 +67,10 @@ const GROUP_OPTIONS = [
   ["genre-saga", "Género y saga"],
   ["genre", "Solo género"],
   ["decade", "Década"],
+  ["watched", "Año y mes de visionado"],
+  ["lists", "Listas y colecciones"],
+  ["money", "Presupuesto y recaudación"],
+  ["ratings", "Puntuaciones"],
 ];
 const optionLabel = (options, value) => options.find(([v]) => v === value)?.[1] || options[0][1];
 
@@ -131,20 +137,21 @@ function SelectedCard({ node, graph, onClose, onFocusNode }) {
 
   if (node.kind !== "title") {
     const index = graph.nodes.indexOf(node);
-    const titles = graph.neighbors[index]
-      .map((i) => graph.nodes[i])
-      .filter((n) => n.kind === "title");
+    const titles = hubTitleIndices(graph, index).map((i) => graph.nodes[i]);
     const series = titles.filter((n) => n.title.mediaType === "tv").length;
     const top = [...titles].sort((a, b) => b.r - a.r).slice(0, 6);
-    const isSaga = node.kind === "saga";
-    const collectionHref = isSaga && node.id ? `/lists/collection/${node.id}` : null;
+    // Sagas y colecciones solo reúnen películas; listas y colecciones abren
+    // su página.
+    const isSaga = node.kind === "saga" || node.kind === "collection";
+    const collectionHref = node.href || null;
+    const linkLabel = isSaga ? "Ver colección" : "Ver lista";
     return (
       <div className={`pointer-events-auto relative w-full max-w-sm rounded-2xl p-4 text-left text-white ${LIQUID_GLASS_PANEL}`}>
         {/* Móvil: toda la ficha abre la colección (la flecha solo lo indica). */}
         {collectionHref ? (
           <Link
             href={collectionHref}
-            aria-label={`Ver colección ${node.label}`}
+            aria-label={`${linkLabel} ${node.label}`}
             className="absolute inset-0 rounded-2xl @[640px]/detail-page:hidden"
           />
         ) : null}
@@ -204,7 +211,7 @@ function SelectedCard({ node, graph, onClose, onFocusNode }) {
             href={collectionHref}
             className="mt-3 hidden h-9 items-center justify-center rounded-xl bg-white/10 text-xs font-bold text-white transition hover:bg-white/20 @[640px]/detail-page:flex"
           >
-            Ver colección
+            {linkLabel}
           </Link>
         ) : null}
       </div>
@@ -443,13 +450,14 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
     if (!graph) return [];
     return graph.nodes
       .map((node, index) => ({ node, index }))
-      .filter(({ node, index }) => (node.kind === "genre" || node.kind === "decade") && visibility?.[index])
+      .filter(({ node, index }) => node.kind !== "title" && node.tier === "main" && visibility?.[index])
       .map((entry) => ({
         ...entry,
         // Títulos del grupo que pasan los filtros, no el total.
-        count: graph.neighbors[entry.index].filter((n) => visibility[n] && graph.nodes[n].kind === "title").length,
+        count: hubTitleIndices(graph, entry.index).filter((n) => visibility[n]).length,
       }))
-      .sort((a, b) => (graph.groupBy === "decade" ? a.node.id - b.node.id : b.count - a.count));
+      // Años, décadas, rangos y notas en su orden; géneros y listas, por tamaño.
+      .sort((a, b) => (a.node.order != null && b.node.order != null ? a.node.order - b.node.order : b.count - a.count));
   }, [graph, visibility]);
 
   const pos = useCallback((index) => {
@@ -635,14 +643,15 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
       const node = nodes[i];
       const emphasized = i === selectedIndex || (highlight?.has(i) && highlight.size <= 60);
       let alpha;
-      const mainHub = node.kind === "genre" || node.kind === "decade";
+      const mainHub = node.kind !== "title" && node.tier === "main";
+      const subHub = node.kind !== "title" && node.tier === "sub";
       if (mainHub) alpha = highlight && !highlight.has(i) ? 0.3 : 1;
       else if (emphasized) alpha = 1;
       else if (highlight) alpha = 0;
-      else alpha = node.kind === "saga" ? sagaAlpha : titleAlpha;
+      else alpha = subHub ? sagaAlpha : titleAlpha;
       if (reveal) alpha *= reveal(i);
       if (alpha <= 0.02) continue;
-      const priority = (emphasized ? 1e6 : 0) + (mainHub ? 1e5 : node.kind === "saga" ? 1e4 : 0) + node.degree * 10 + node.r;
+      const priority = (emphasized ? 1e6 : 0) + (mainHub ? 1e5 : subHub ? 1e4 : 0) + node.degree * 10 + node.r;
       candidates.push({ i, alpha, priority });
     }
     candidates.sort((x, y) => y.priority - x.priority);
@@ -669,9 +678,10 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
     };
     for (const { i, alpha } of candidates) {
       const node = nodes[i];
-      const isGenre = node.kind === "genre" || node.kind === "decade";
-      const size = isGenre ? Math.min(17, 11 + Math.sqrt(node.degree) * 0.35) : node.kind === "saga" ? 12 : 11;
-      const font = `${isGenre ? 800 : node.kind === "saga" ? 700 : 600} ${size}px ui-sans-serif, system-ui, sans-serif`;
+      const isGenre = node.kind !== "title" && node.tier === "main";
+      const isSub = node.kind !== "title" && node.tier === "sub";
+      const size = isGenre ? Math.min(17, 11 + Math.sqrt(node.degree) * 0.35) : isSub ? 12 : 11;
+      const font = `${isGenre ? 800 : isSub ? 700 : 600} ${size}px ui-sans-serif, system-ui, sans-serif`;
       ctx.font = font;
       node._labelWidth ??= {};
       const width = node._labelWidth[font] ??= ctx.measureText(node.label).width;
@@ -906,8 +916,8 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
         x: P ? P[i * 2] : node.x,
         y: P ? P[i * 2 + 1] : node.y,
         r: node.r,
-        charge: node.kind === "genre" || node.kind === "decade" ? -320 : node.kind === "saga" ? -40 : -26,
-        saga: node.kind === "saga",
+        charge: node.kind === "title" ? -26 : node.tier === "sub" ? -40 : -320,
+        saga: node.kind !== "title" && node.tier === "sub",
       })),
       links: graph.links,
       resume: Boolean(saved),
@@ -1417,7 +1427,7 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
           role="img"
           aria-label={
             graph
-              ? `Red de ${graph.stats.titles} títulos agrupados en ${graph.stats.genres} géneros y ${graph.stats.sagas} sagas`
+              ? `Red de ${graph.stats.titles} títulos agrupados en ${legend.length} ${GROUP_NOUN[graph.groupBy] || "grupos"}`
               : "Cargando la red de títulos"
           }
           // En móvil la red se funde arriba y abajo en vez de cortarse en seco.
@@ -1571,7 +1581,7 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
                 {visibleTitles === graph.stats.titles
                   ? `${graph.stats.titles} títulos · ${graph.stats.movies} películas · ${graph.stats.series} series`
                   : `${visibleTitles} de ${graph.stats.titles} títulos`}
-                {` · ${legend.length} ${graph.groupBy === "decade" ? "décadas" : "géneros"}`}
+                {` · ${legend.length} ${GROUP_NOUN[graph.groupBy] || "grupos"}`}
                 {graph.groupBy === "genre-saga" ? ` · ${graph.stats.sagas} sagas` : ""}
                 {!settled ? " · organizando…" : ""}
                 {payload?.missing ? ` · clasificando ${payload.missing}…` : ""}
