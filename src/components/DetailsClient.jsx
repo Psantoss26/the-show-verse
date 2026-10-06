@@ -297,6 +297,7 @@ import DetailActionsRow from "@/components/details/DetailActionsRow";
 import AddToListModal from "@/components/details/AddToListModal";
 import VideoModal from "@/components/details/VideoModal";
 import SoundtrackModal from "@/components/details/SoundtrackModal";
+import useAmbientSoundtrack from "@/lib/details/useAmbientSoundtrack";
 import TraktCommentModal from "@/components/details/TraktCommentModal";
 import PosterStack from "@/components/details/PosterStack";
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
@@ -2181,6 +2182,15 @@ export default function DetailsClient({
     },
     [loadSoundtrack],
   );
+
+  // MODO SOUNDTRACK: la banda sonora suena de fondo al entrar en la ficha. Se
+  // pausa con el tráiler o el reproductor completo abiertos (tienen su propio
+  // sonido) y el botón de soundtrack la silencia.
+  const soundtrackAmbient = useAmbientSoundtrack({
+    tracks: soundtrackTracks,
+    suspended: soundtrackModalOpen || videoModalOpen,
+    resetKey: `${endpointType}:${id}`,
+  });
 
   // Abre el modal de video con el video seleccionado
   const openVideo = (v) => {
@@ -10211,8 +10221,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 mobileGapClass="gap-1.5"
                 onTrailer={() => openVideo(preferredVideo)}
                 trailerAvailable={!!preferredVideo}
-                onSoundtrack={() => openSoundtrack()}
+                // Pulsado largo con el soundtrack sonando: el reproductor
+                // completo, en la misma pista.
+                onSoundtrack={() => openSoundtrack(soundtrackAmbient.trackId)}
                 soundtrackAvailable={!!soundtrackSearchQuery}
+                soundtrackAmbient={soundtrackAmbient}
                 onEpisodeRatings={
                   type === "tv"
                     ? () => setEpisodeRatingsModalOpen(true)
