@@ -55,9 +55,44 @@ test('grafo compacto: géneros y sagas por índice; sagas solo con dos títulos'
   assert.deepEqual(graph.genres.map(([, name]) => name), ['Aventura', 'Fantasía', 'Acción']);
   assert.deepEqual(graph.sagas, [[555, 'El Señor de los Anillos']]);
   const [lotr1, lotr2, solo, series] = graph.titles;
-  assert.deepEqual(lotr1, [10, 0, 'LOTR 1', '', 2001, [0, 1], 0, 1, 0, FLAG_WATCHED]);
+  assert.deepEqual(lotr1.slice(0, 10), [10, 0, 'LOTR 1', '', 2001, [0, 1], 0, 1, 0, FLAG_WATCHED]);
   assert.equal(lotr2[6], 0);
   assert.equal(solo[6], -1); // saga de un solo título: sin hub
   assert.deepEqual(series.slice(0, 2), [20, 1]);
   assert.deepEqual(series[5], []);
+});
+
+test('grafo compacto: meses de visionado, listas, presupuesto, recaudación y nota de TMDb', () => {
+  const titles = mergeTitleRecords({
+    history: [
+      { tmdbId: 1, mediaType: 'movie', plays: 2, months: [202403, 202311, 202403, null] },
+      { tmdbId: 2, mediaType: 'tv', plays: 1, months: [202501] },
+    ],
+    watchlist: [{ tmdbId: 3, mediaType: 'movie' }],
+  });
+  assert.deepEqual(titles.get('movie:1').months, [202311, 202403]);
+  const meta = new Map([
+    ['movie:1', { name: 'A', genres: [], budget: 63000000, revenue: 101000000, vote: 8.44 }],
+    ['tv:2', { name: 'B', genres: [], budget: 5, revenue: 5, vote: 7 }],
+  ]);
+  const packed = packNeuralGraph(titles, meta, [
+    { id: 'l1', name: 'Favoritas de siempre', kind: 'own', keys: new Set(['movie:1', 'tv:2', 'movie:999']) },
+    { id: 'c1', name: 'Clásicos', kind: 'community', keys: new Set(['tv:2']) },
+    { id: 'empty', name: 'Sin títulos míos', kind: 'own', keys: new Set(['movie:999']) },
+  ]);
+  // Solo las listas que reúnen algún título del usuario.
+  assert.deepEqual(packed.lists, [['l1', 'Favoritas de siempre', 'own'], ['c1', 'Clásicos', 'community']]);
+  const [movie, show, pending] = packed.titles;
+  assert.deepEqual(movie.slice(10), [[202311, 202403], [0], 63000000, 101000000, 8.4]);
+  // Las series no tienen presupuesto ni recaudación.
+  assert.deepEqual(show.slice(10), [[202501], [0, 1], 0, 0, 7]);
+  assert.deepEqual(pending.slice(10), [[], [], 0, 0, 0]);
+});
+
+test('metadatos: presupuesto, recaudación y nota de TMDb (sin votos, sin nota)', () => {
+  assert.deepEqual(
+    pickTitleMeta({ title: 'X', budget: 10, revenue: 20, vote_average: 7.5, vote_count: 3 }),
+    { name: 'X', posterPath: null, date: null, genres: [], collection: null, budget: 10, revenue: 20, vote: 7.5 },
+  );
+  assert.equal(pickTitleMeta({ title: 'Y', vote_average: 9, vote_count: 0 }).vote, 0);
 });

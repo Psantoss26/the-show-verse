@@ -1,7 +1,8 @@
 // src/lib/neuralGraph.js
 // Datos de la vista neuronal del perfil: TODOS los títulos que el usuario ha
-// registrado (vistos, puntuados, favoritos y pendientes) con sus géneros y
-// sagas, en una sola respuesta compacta. Reglas puras en neuralGraphCore.js.
+// registrado (vistos, puntuados, favoritos y pendientes) con sus géneros,
+// sagas, meses de visionado, listas, presupuesto, recaudación y nota de TMDb,
+// en una sola respuesta compacta. Reglas puras en neuralGraphCore.js.
 //
 // OPTIMIZACIÓN, de lo más barato a lo más caro:
 //   1. FIRMA del estado del usuario (una consulta de recuentos y fechas). Si el
@@ -17,7 +18,18 @@
 import crypto from 'node:crypto';
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 
-import { favorites, tmdbCache, userRatings, watchHistory, watchlist } from '../db/schema.js';
+import {
+  communityListItems,
+  communityLists,
+  favorites,
+  listLikes,
+  tmdbCache,
+  userListItems,
+  userLists,
+  userRatings,
+  watchHistory,
+  watchlist,
+} from '../db/schema.js';
 import { cacheGet, cacheSet } from './redis.js';
 import { getMediaMetadataMap } from '../utils/mediaMetadata.js';
 import {
@@ -36,7 +48,7 @@ const FETCH_BUDGET_MS = 4_500;
 // Una sola tanda de relleno en segundo plano por usuario a la vez.
 const backgroundFills = new Set();
 
-async function graphStamp(db, userId) {
+async function graphStamp(db, userId, { includePrivateLists = false } = {}) {
   const result = await db.execute(sql`
     select
       (select count(*) || '.' || coalesce(extract(epoch from max(created_at))::bigint, 0)
@@ -46,10 +58,17 @@ async function graphStamp(db, userId) {
       (select count(*) || '.' || coalesce(extract(epoch from max(added_at))::bigint, 0)
          from ${favorites} where user_id = ${userId}) as f,
       (select count(*) || '.' || coalesce(extract(epoch from max(added_at))::bigint, 0)
-         from ${watchlist} where user_id = ${userId}) as w
+         from ${watchlist} where user_id = ${userId}) as w,
+      (select count(*) || '.' || coalesce(extract(epoch from max(${userListItems.addedAt}))::bigint, 0)
+              || '.' || coalesce((select extract(epoch from max(updated_at))::bigint
+                                    from ${userLists} where user_id = ${userId}), 0)
+         from ${userListItems} join ${userLists} on ${userLists.id} = ${userListItems.listId}
+        where ${userLists.userId} = ${userId}) as l,
+      (select count(*) || '.' || coalesce(extract(epoch from max(created_at))::bigint, 0)
+         from ${listLikes} where user_id = ${userId}) as c
   `);
   const [row] = [...result];
-  const raw = `${NEURAL_GRAPH_VERSION}|${row?.h}|${row?.r}|${row?.f}|${row?.w}`;
+  const raw = `${NEURAL_GRAPH_VERSION}|${row?.h}|${row?.r}|${row?.f}|${row?.w}|${row?.l}|${row?.c}|${includePrivateLists ? 1 : 0}`;
   return `${NEURAL_GRAPH_VERSION}-${crypto.createHash('sha1').update(raw).digest('base64url').slice(0, 16)}`;
 }
 
@@ -61,6 +80,8 @@ async function loadRecords(db, userId) {
         mediaType: watchHistory.mediaType,
         plays: sql`count(*)::int`,
         lastAt: sql`max(${watchHistory.watchedAt})`,
+        // Meses distintos en que lo vio (AAAAMM).
+        months: sql`array_agg(distinct (extract(year from ${watchHistory.watchedAt}) * 100 + extract(month from ${watchHistory.watchedAt}))::int)`,
         title: sql`max(${watchHistory.title})`,
         posterPath: sql`max(${watchHistory.posterPath})`,
       })
@@ -95,6 +116,63 @@ async function loadRecords(db, userId) {
   return mergeTitleRecords({ history, ratings, favorites: favs, watchlist: pending });
 }
 
+// Listas que agrupan títulos del usuario: las suyas (las privadas solo si las
+// ve él) y las de la comunidad que ha guardado con «me gusta». Las suyas
+// publicadas en la comunidad no se repiten.
+async function loadLists(db, userId, titles, { includePrivateLists = false } = {}) {
+  const own = await db
+    .select({ id: userLists.id, name: userLists.name })
+    .from(userLists)
+    .where(includePrivateLists
+      ? eq(userLists.userId, userId)
+      : and(eq(userLists.userId, userId), eq(userLists.isPublic, true)));
+  const liked = await db
+    .select({ id: communityLists.id, name: communityLists.name, userListId: communityLists.userListId })
+    .from(listLikes)
+    .innerJoin(communityLists, eq(communityLists.id, listLikes.listId))
+    .where(eq(listLikes.userId, userId));
+  const ownIds = new Set(own.map((list) => list.id));
+  const community = liked.filter((list) => !list.userListId || !ownIds.has(list.userListId));
+
+  const tmdbIds = [...new Set([...titles.values()].map((title) => title.tmdbId))];
+  const keysByList = new Map();
+  const collect = (listId, row) => {
+    if (!keysByList.has(listId)) keysByList.set(listId, new Set());
+    keysByList.get(listId).add(titleKey(row.mediaType, row.tmdbId));
+  };
+  // Las listas de usuario publicadas en la comunidad guardan sus títulos en
+  // user_list_items; las importadas, en community_list_items.
+  const userListIds = [...own.map((list) => list.id), ...community.map((list) => list.userListId).filter(Boolean)];
+  const communityIds = community.filter((list) => !list.userListId).map((list) => list.id);
+  for (let i = 0; i < tmdbIds.length && (userListIds.length || communityIds.length); i += 3000) {
+    const chunk = tmdbIds.slice(i, i + 3000);
+    if (userListIds.length) {
+      const rows = await db
+        .select({ listId: userListItems.listId, tmdbId: userListItems.tmdbId, mediaType: userListItems.mediaType })
+        .from(userListItems)
+        .where(and(inArray(userListItems.listId, userListIds), inArray(userListItems.tmdbId, chunk)));
+      rows.forEach((row) => collect(row.listId, row));
+    }
+    if (communityIds.length) {
+      const rows = await db
+        .select({ listId: communityListItems.listId, tmdbId: communityListItems.tmdbId, mediaType: communityListItems.mediaType })
+        .from(communityListItems)
+        .where(and(inArray(communityListItems.listId, communityIds), inArray(communityListItems.tmdbId, chunk)));
+      rows.forEach((row) => collect(row.listId, row));
+    }
+  }
+
+  return [
+    ...own.map((list) => ({ id: list.id, name: list.name, kind: 'own', keys: keysByList.get(list.id) || new Set() })),
+    ...community.map((list) => ({
+      id: list.id,
+      name: list.name,
+      kind: 'community',
+      keys: keysByList.get(list.userListId || list.id) || new Set(),
+    })),
+  ];
+}
+
 // Metadatos de la caché de TMDb, solo con los campos que usa el grafo. Las
 // claves de tmdb_cache existen en tres formas según quién la escribió.
 async function loadCachedMeta(db, keys) {
@@ -111,6 +189,9 @@ async function loadCachedMeta(db, keys) {
         date: sql`coalesce(${tmdbCache.data}->>'release_date', ${tmdbCache.data}->>'first_air_date')`,
         genres: sql`${tmdbCache.data}->'genres'`,
         collection: sql`${tmdbCache.data}->'belongs_to_collection'`,
+        budget: sql`${tmdbCache.data}->>'budget'`,
+        revenue: sql`${tmdbCache.data}->>'revenue'`,
+        vote: sql`case when coalesce((${tmdbCache.data}->>'vote_count')::numeric, 0) > 0 then ${tmdbCache.data}->>'vote_average' end`,
       })
       .from(tmdbCache)
       .where(inArray(tmdbCache.cacheKey, chunk));
@@ -125,6 +206,9 @@ async function loadCachedMeta(db, keys) {
           date: row.date || null,
           genres: Array.isArray(row.genres) ? row.genres : [],
           collection: row.collection && typeof row.collection === 'object' ? row.collection : null,
+          budget: Number(row.budget) || 0,
+          revenue: Number(row.revenue) || 0,
+          vote: Number(row.vote) || 0,
         });
       }
     }
@@ -161,8 +245,8 @@ function fillInBackground(userId, missing, log) {
  * Grafo neural del usuario. Con `since` igual a la firma actual devuelve solo
  * `{ v, unchanged: true }`.
  */
-export async function getUserNeuralGraph(db, userId, { since = null, log = null } = {}) {
-  const stamp = await graphStamp(db, userId);
+export async function getUserNeuralGraph(db, userId, { since = null, log = null, includePrivateLists = false } = {}) {
+  const stamp = await graphStamp(db, userId, { includePrivateLists });
   if (since && since === stamp) return { v: stamp, unchanged: true };
 
   const cacheKey = `neural:${userId}:${stamp}`;
@@ -184,7 +268,8 @@ export async function getUserNeuralGraph(db, userId, { since = null, log = null 
     fillInBackground(userId, missing.slice(fetched), log);
   }
 
-  const packed = packNeuralGraph(titles, meta);
+  const lists = await loadLists(db, userId, titles, { includePrivateLists });
+  const packed = packNeuralGraph(titles, meta, lists);
   const payload = { v: stamp, generatedAt: new Date().toISOString(), ...packed };
   // Solo se guarda completo: uno a medias se reconstruye en la próxima visita,
   // cuando el relleno en segundo plano ya haya terminado.

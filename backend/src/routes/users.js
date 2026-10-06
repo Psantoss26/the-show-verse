@@ -515,7 +515,12 @@ export default async function usersRoutes(fastify) {
     const target = await findUserByUsername(db, req.params.username);
     if (!target) return reply.status(404).send({ error: 'User not found' });
     const since = typeof req.query?.v === 'string' ? req.query.v.slice(0, 64) : null;
-    const graph = await getUserNeuralGraph(db, target.id, { since, log: req.log });
+    const graph = await getUserNeuralGraph(db, target.id, {
+      since,
+      log: req.log,
+      // Las listas privadas solo cuentan en la red de uno mismo.
+      includePrivateLists: target.id === req.user?.id,
+    });
     return reply.send(graph);
   });
 }
