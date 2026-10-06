@@ -1021,13 +1021,22 @@ html {
    Va en media query (no en clase `sm:` de Tailwind) para que sea consistente
    desde el primer frame y porque los valores arbitrarios multi-stop de Tailwind
    no generan de forma fiable. */
-/* NOTA: aquí hubo un `overscroll-behavior-y: none` en móvil para eliminar el
-   rebote de overscroll (el fondo del hero es `fixed` y no se mueve con el
-   rebote, mientras que el póster sí, y al desincronizarse se marcaba el borde
-   inferior del difuminado). Se RETIRÓ: desactivaba también el pull-to-refresh
-   nativo de Chrome en Android, y poder recargar deslizando hacia abajo importa
-   más que un artefacto visual transitorio durante un gesto intencionado.
-   No volver a añadirlo sin resolver antes esa contrapartida. */
+/* SIN REBOTE AL LLEGAR AL BORDE. Al tocar el principio o el final de la
+   página, el rebote (iOS) o el estirado (Android) movían toda la pantalla
+   fuera de su sitio y volvía después; la página debe quedarse siempre dentro
+   de la ventana. `overscroll-behavior-y: none` en la raíz lo corta en todos
+   los navegadores (Safari desde iOS 16).
+
+   CONTRAPARTIDA, ya valorada: en una PESTAÑA de Chrome Android también
+   desactiva su "deslizar hacia abajo para recargar". No afecta a la app de
+   Android (su recarga es nativa y solo mira si el WebView está arriba) ni a la
+   PWA instalada (en modo standalone Chrome no ofrece ese gesto).
+   Los contenedores con scroll propio (modales, carruseles) siguen con su
+   `overscroll-behavior` para no encadenar el desplazamiento a la página. */
+html,
+body {
+  overscroll-behavior-y: none;
+}
 
 /* Velo de la navbar sobre el póster full-bleed de las fichas, en MÓVIL.
 
