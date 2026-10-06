@@ -12,10 +12,12 @@ import { AnimatePresence, motion } from "framer-motion";
 import BaseLiquidButton from "@/components/LiquidButton";
 import StarRating from "@/components/StarRating";
 import TraktWatchedControl from "@/components/trakt/TraktWatchedControl";
+import SoundBars from "@/components/details/SoundBars";
 import {
   Play,
   X,
   Music2,
+  VolumeX,
   BarChart3,
   Loader2,
   Heart,
@@ -23,6 +25,48 @@ import {
   ListVideo,
   MessageSquare,
 } from "lucide-react";
+
+// MODO SOUNDTRACK (ver useAmbientSoundtrack): con el soundtrack sonando de
+// fondo, el botón de soundtrack enseña las barras animadas y un toque lo
+// silencia (o lo vuelve a activar). Mantenerlo pulsado —o el clic derecho en
+// ordenador— abre el reproductor completo, que antes abría el toque.
+const LONG_PRESS_MS = 550;
+
+function useSoundtrackPress({ onPress, onLongPress }) {
+  const timerRef = useRef(0);
+  const firedRef = useRef(false);
+  const clear = () => window.clearTimeout(timerRef.current);
+  const fire = () => {
+    if (firedRef.current) return;
+    firedRef.current = true;
+    onLongPress?.();
+  };
+  return {
+    onPointerDown: (event) => {
+      if (!onLongPress || (event.pointerType === "mouse" && event.button !== 0)) return;
+      firedRef.current = false;
+      clear();
+      timerRef.current = window.setTimeout(fire, LONG_PRESS_MS);
+    },
+    onPointerUp: clear,
+    onPointerLeave: clear,
+    onPointerCancel: clear,
+    onContextMenu: (event) => {
+      if (!onLongPress) return;
+      event.preventDefault();
+      clear();
+      fire();
+    },
+    onClick: (event) => {
+      // El toque que acaba un "mantener pulsado" no cuenta como toque.
+      if (firedRef.current) {
+        firedRef.current = false;
+        return;
+      }
+      onPress?.(event);
+    },
+  };
+}
 
 // Limita el nuevo acabado a las acciones de ficha. Así todas sus variantes
 // (DetailsClient, DetailModal, héroes y filas responsive) comparten el mismo
@@ -178,6 +222,8 @@ export default function DetailActionsRow({
 
   onSoundtrack,
   soundtrackAvailable = false,
+  // `{ available, playing, muted, toggle }` de useAmbientSoundtrack, o null.
+  soundtrackAmbient = null,
 
   onEpisodeRatings,
   episodeRatingsOpen = false,
@@ -205,6 +251,44 @@ export default function DetailActionsRow({
 }) {
   const serverOnline = useServerOnline();
   const [mediaExpanded, setMediaExpanded] = useState(false);
+
+  // Soundtrack de fondo: el botón lo silencia y, pulsado largo, abre el
+  // reproductor. Sin pistas que sonar, se comporta como siempre.
+  const ambient = soundtrackAmbient?.available ? soundtrackAmbient : null;
+  const soundtrackIcon = ambient?.playing ? (
+    <SoundBars playing />
+  ) : ambient?.muted ? (
+    <VolumeX />
+  ) : (
+    <Music2 />
+  );
+  const soundtrackTitle = !soundtrackAvailable
+    ? "Sin soundtrack"
+    : ambient
+      ? `${ambient.muted ? "Activar el soundtrack" : ambient.playing ? "Silenciar el soundtrack" : "Reproducir el soundtrack"} · Mantén pulsado para abrir el reproductor`
+      : "Reproducir soundtrack";
+  const soundtrackPress = useSoundtrackPress({
+    onPress: () => (ambient ? ambient.toggle() : onSoundtrack?.()),
+    onLongPress: ambient ? onSoundtrack : null,
+  });
+  const expandedSoundtrackPress = useSoundtrackPress({
+    onPress: (event) => {
+      event?.stopPropagation?.();
+      if (ambient) {
+        ambient.toggle();
+        return;
+      }
+      setMediaExpanded(false);
+      onSoundtrack?.();
+    },
+    onLongPress: ambient
+      ? () => {
+          setMediaExpanded(false);
+          onSoundtrack?.();
+        }
+      : null,
+  });
+  const pressClass = ambient ? "select-none [-webkit-touch-callout:none]" : "";
 
   // --- Píldora adaptable (ver `compactLabelWhenTight`).
   const hasLabelButton = Boolean(play || trailerLabel);
@@ -453,6 +537,10 @@ export default function DetailActionsRow({
                       <X />
                     ) : trailerPlaying ? (
                       <X />
+                    ) : ambient?.playing ? (
+                      // El soundtrack suena, pero su botón está escondido tras
+                      // este: las barras lo dicen aquí.
+                      <SoundBars playing />
                     ) : (
                       <Play className={trailerAvailable ? "ml-0.5" : ""} />
                     )}
@@ -505,25 +593,18 @@ export default function DetailActionsRow({
             expanded={mediaExpanded}
             expandedContent={
               <LiquidButton
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMediaExpanded(false);
-                  if (onSoundtrack) onSoundtrack();
-                }}
+                {...expandedSoundtrackPress}
                 disabled={!soundtrackAvailable}
                 active={!!soundtrackAvailable}
                 activeColor="yellow"
                 groupId="details-actions"
-                className={`!w-full !h-auto aspect-square ${
+                className={`!w-full !h-auto aspect-square ${pressClass} ${
                   soundtrackAvailable ? "!bg-white !text-black" : ""
                 }`}
-                title={
-                  soundtrackAvailable
-                    ? "Reproducir soundtrack"
-                    : "Sin soundtrack"
-                }
+                title={soundtrackTitle}
+                aria-label={soundtrackTitle}
               >
-                <Music2 />
+                {soundtrackIcon}
               </LiquidButton>
             }
             collapsedContent={traktControl}
@@ -682,17 +763,16 @@ export default function DetailActionsRow({
         {/* Botón de música/soundtrack */}
         {onSoundtrack && (
           <LiquidButton
-            onClick={onSoundtrack}
+            {...soundtrackPress}
             disabled={!soundtrackAvailable}
             active={!!soundtrackAvailable}
             activeColor="yellow"
             groupId="details-actions"
-            className={soundtrackAvailable ? "!bg-white !text-black" : ""}
-            title={
-              soundtrackAvailable ? "Reproducir soundtrack" : "Sin soundtrack"
-            }
+            className={`${pressClass} ${soundtrackAvailable ? "!bg-white !text-black" : ""}`}
+            title={soundtrackTitle}
+            aria-label={soundtrackTitle}
           >
-            <Music2 />
+            {soundtrackIcon}
           </LiquidButton>
         )}
 

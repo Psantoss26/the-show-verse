@@ -410,6 +410,39 @@ html:not([data-avatar-boot]) .alerts-boot {
    de fijar la final (medido: 0.99 → 0 → 1), y eso era el parpadeo del fondo
    negro al pulsar la papelera. Sin `fill-mode`: al acabar manda el estilo en
    línea (opacidad 1). La salida es `sv-fade-out`, con FadePresence. */
+/* Barras del icono de soundtrack sonando (SoundBars): cada una sube y baja
+   desde su base con su propio desfase. Sin sonar, o con movimiento reducido,
+   se quedan quietas a distintas alturas. */
+@keyframes sv-sound-bar {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.sv-sound-bar {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  transform: scaleY(0.55);
+}
+
+.sv-sound-bar:nth-child(2) {
+  transform: scaleY(0.85);
+}
+
+.sv-sound-bar:nth-child(3) {
+  transform: scaleY(0.4);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-playing] > .sv-sound-bar {
+    animation: sv-sound-bar 0.9s ease-in-out infinite;
+  }
+}
+
 @keyframes sv-fade-in {
   from {
     opacity: 0;
