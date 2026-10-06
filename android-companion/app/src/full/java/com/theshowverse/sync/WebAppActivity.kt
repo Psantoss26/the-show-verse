@@ -163,6 +163,12 @@ class WebAppActivity : AppCompatActivity() {
         // pinta la pantalla de arranque antes de que exista el WebView.
         window.setBackgroundDrawable(null)
 
+        // Sin estirado al llegar al principio o al final de la página: la web
+        // ya lo corta con `overscroll-behavior-y: none` y así tampoco lo dibuja
+        // el WebView. La recarga al deslizar es del SwipeRefreshLayout y no
+        // depende de esto.
+        web.overScrollMode = View.OVER_SCROLL_NEVER
+
         web.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
