@@ -53,7 +53,6 @@ import StreamingProviderLogo from "@/components/details/StreamingProviderLogo";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
 // -- Componentes internos del proyecto --
-import EpisodeRatingsGrid from "@/components/EpisodeRatingsGrid";
 import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
 import {
   fetchArtworkOverride,
@@ -130,7 +129,6 @@ import {
   LibraryBig,
   MessageSquare,
   SlidersHorizontal,
-  BarChart3,
   Trophy,
 } from "lucide-react";
 
@@ -7666,14 +7664,8 @@ export default function DetailsClient({
         icon: Layers,
         count: visibleTraktSeasons.length || undefined,
       });
-      // TV: Episodios
-      items.push({
-        id: "episodes",
-        label: "Episodios",
-        icon: BarChart3,
-        // si no tienes "ratings.length", puedes dejar count undefined
-        count: Array.isArray(ratings) ? ratings.length : undefined,
-      });
+      // La valoración de episodios no tiene sección: la abre el botón de
+      // acción de la ficha (EpisodeRatingsModal).
     }
 
     // Comentarios comunitarios, almacenados en nuestra BBDD.
@@ -7697,7 +7689,6 @@ export default function DetailsClient({
     return items;
   }, [
     type,
-    ratings,
     imagesState?.posters,
     imagesState?.backdrops,
     videos,
@@ -12319,53 +12310,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             })}
                         </div>
                       </section>
-                    </AnimatedSection>
-                  </section>
-                )}
-
-                {/* =================================================================
-                SECCIÓN: VALORACIÓN DE EPISODIOS (solo para series)
-               ================================================================= */}
-                {/* Gráfico de valoraciones por episodio mostrando la evolución de ratings */}
-                {type === "tv" && (
-                  <section
-                    id="section-episodes"
-                    ref={registerSection("episodes")}
-                  >
-                    <AnimatedSection delay={0.04}>
-                      {/* Subsección: Episodios y sus valoraciones */}
-                      {type === "tv" ? (
-                        <section className="mb-10 group/section">
-                          <SectionTitle
-                            title="Valoración de Episodios"
-                            icon={BarChart3}
-                          />
-                          <div className="p-0">
-                            {ratingsError && (
-                              <p className="text-sm text-red-400 mb-2">
-                                {ratingsError}
-                              </p>
-                            )}
-                            {!ratingsLoading && !ratingsError && !ratings && (
-                              <p className="text-sm text-zinc-400 mb-2">
-                                No hay datos de episodios disponibles.
-                              </p>
-                            )}
-                            {!!ratings && !ratingsError && (
-                              <EpisodeRatingsGrid
-                                ratings={ratings}
-                                showId={Number(id)}
-                                tmdbSeasons={data?.seasons || []}
-                                density="compact"
-                              />
-                            )}
-                          </div>
-                        </section>
-                      ) : (
-                        <div className="text-sm text-zinc-400">
-                          Esta sección solo aplica a series.
-                        </div>
-                      )}
                     </AnimatedSection>
                   </section>
                 )}
