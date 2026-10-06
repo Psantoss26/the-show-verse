@@ -12,7 +12,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import BaseLiquidButton from "@/components/LiquidButton";
 import StarRating from "@/components/StarRating";
 import TraktWatchedControl from "@/components/trakt/TraktWatchedControl";
-import SoundBars from "@/components/details/SoundBars";
+import SoundWaves from "@/components/details/SoundWaves";
 import {
   Play,
   X,
@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 
 // MODO SOUNDTRACK (ver useAmbientSoundtrack): con el soundtrack sonando de
-// fondo, el botón de soundtrack enseña las barras animadas y un toque lo
+// fondo, el botón de soundtrack enseña el altavoz animado y un toque lo
 // silencia (o lo vuelve a activar). Mantenerlo pulsado —o el clic derecho en
 // ordenador— abre el reproductor completo, que antes abría el toque.
 const LONG_PRESS_MS = 550;
@@ -256,7 +256,7 @@ export default function DetailActionsRow({
   // reproductor. Sin pistas que sonar, se comporta como siempre.
   const ambient = soundtrackAmbient?.available ? soundtrackAmbient : null;
   const soundtrackIcon = ambient?.playing ? (
-    <SoundBars playing />
+    <SoundWaves playing />
   ) : ambient?.muted ? (
     <VolumeX />
   ) : (
@@ -539,8 +539,8 @@ export default function DetailActionsRow({
                       <X />
                     ) : ambient?.playing ? (
                       // El soundtrack suena, pero su botón está escondido tras
-                      // este: las barras lo dicen aquí.
-                      <SoundBars playing />
+                      // este: el altavoz animado lo dice aquí.
+                      <SoundWaves playing />
                     ) : (
                       <Play className={trailerAvailable ? "ml-0.5" : ""} />
                     )}
