@@ -28,9 +28,11 @@ import {
 } from "lucide-react";
 import OptimizedImage from "@/components/OptimizedImage";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
+import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 import { ProfileMenuDropdown } from "@/app/u/[username]/ProfileSection";
 import { useAuth } from "@/context/AuthContext";
 import { setAppPullToRefreshLocked } from "@/lib/android/appBridge";
+import { neuralLayoutAspect } from "@/lib/profile/neuralForces";
 import { readNeuralPreferences, saveNeuralPreferences } from "@/lib/profile/neuralPreferences";
 import {
   getNeuralLayout,
@@ -45,12 +47,13 @@ import {
   FLAG_FAVORITE,
   FLAG_WATCHED,
   FLAG_WATCHLIST,
-  GROUP_NOUN,
   HUB_KIND_LABEL,
   buildNeuralGraph,
   computeVisibility,
   fitCamera,
+  groupSummary,
   hubTitleIndices,
+  normalizeGroups,
   searchNodes,
   titleFacts,
 } from "@/lib/profile/neuralGraph";
@@ -65,9 +68,10 @@ const RECORD_OPTIONS = [
   ["favorite", "Favoritos"],
   ["pending", "Pendientes"],
 ];
+// Agrupar admite varias a la vez (se mezclan en la misma red).
 const GROUP_OPTIONS = [
-  ["genre-saga", "Género y saga"],
-  ["genre", "Solo género"],
+  ["genre", "Género"],
+  ["saga", "Saga"],
   ["decade", "Década"],
   ["watched", "Año y mes de visionado"],
   ["lists", "Listas y colecciones"],
@@ -75,6 +79,7 @@ const GROUP_OPTIONS = [
   ["ratings", "Puntuaciones"],
 ];
 const optionLabel = (options, value) => options.find(([v]) => v === value)?.[1] || options[0][1];
+const GROUP_LABEL = Object.fromEntries(GROUP_OPTIONS);
 
 // Mismo acabado que las piezas del menú de las secciones del perfil.
 const MENU_SURFACE = "overflow-clip rounded-2xl bg-black/30 bg-gradient-to-br from-white/10 to-white/5 shadow-lg";
@@ -264,17 +269,27 @@ function SelectedCard({ node, graph, onClose, onFocusNode }) {
               {title.mediaType === "tv" ? "Serie" : "Película"}
               {title.year ? ` · ${title.year}` : ""}
             </p>
-            <button type="button" onClick={onClose} aria-label="Cerrar" className="-mr-1 -mt-1 hidden h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/5 text-white/70 transition hover:bg-white/10 hover:text-white @[640px]/detail-page:flex">
+            {/* El botón (28px) no estira la fila (16px): los márgenes negativos
+                lo dejan donde estaba sin separar el título de la línea de
+                arriba. */}
+            <button type="button" onClick={onClose} aria-label="Cerrar" className="-mb-2 -mr-1 -mt-1 hidden h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/5 text-white/70 transition hover:bg-white/10 hover:text-white @[640px]/detail-page:flex">
               <X className="h-3.5 w-3.5" />
             </button>
           </div>
           <h3 className="truncate text-sm font-black leading-5 @[640px]/detail-page:line-clamp-2 @[640px]/detail-page:whitespace-normal @[640px]/detail-page:text-base @[640px]/detail-page:leading-snug">{title.title}</h3>
-          {/* Lo que le une a sus grupos en la agrupación actual: géneros,
-              visionados, listas, presupuesto y recaudación o notas. */}
+          {/* Lo que le une a sus grupos en las agrupaciones marcadas, una
+              línea por tipo: saga, géneros, década, visionados, listas,
+              presupuesto y recaudación, notas. */}
           {facts.length ? (
-            // Hasta dos filas en la ficha amplia (los nombres de listas son
-            // largos); en móvil, una, como el título.
-            <p className="truncate text-xs leading-4 text-white/60 @[640px]/detail-page:line-clamp-2 @[640px]/detail-page:whitespace-normal">{facts.join(" · ")}</p>
+            <div className="text-xs leading-4 text-white/60">
+              {facts.map((fact) => (
+                // Hasta dos filas en la ficha amplia (los nombres de listas
+                // son largos); en móvil, una, como el título.
+                <p key={fact} title={fact} className="truncate @[640px]/detail-page:line-clamp-2 @[640px]/detail-page:whitespace-normal">
+                  {fact}
+                </p>
+              ))}
+            </div>
           ) : null}
           {/* Mismos iconos y colores que los registros de Actividad del
               perfil: visto (ojo), nota (el número en ámbar), favorita
@@ -365,14 +380,36 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
   // vista nace ya como se dejó: sin pintar antes los valores por defecto.
   const { user: viewer } = useAuth();
   const viewerId = viewer?.id || null;
-  const [groupBy, setGroupBy] = useState(() => readNeuralPreferences(viewerId).groupBy);
+  const [groups, setGroups] = useState(() => readNeuralPreferences(viewerId).groups);
+  // Marca o desmarca una agrupación; siempre queda al menos una.
+  const toggleGroup = useCallback((group) => {
+    setGroups((current) => {
+      if (!current.includes(group)) return normalizeGroups([...current, group]);
+      return current.length > 1 ? current.filter((g) => g !== group) : current;
+    });
+  }, []);
   // Al agrupar por puntuaciones hacen falta las notas de IMDb: hasta que
   // llegan sigue el esqueleto, para no montar la red dos veces.
-  const imdb = useNeuralImdbRatings(username, payload, groupBy === "ratings");
-  const imdbPending = groupBy === "ratings" && !imdb;
+  const byRatings = groups.includes("ratings");
+  const imdb = useNeuralImdbRatings(username, payload, byRatings);
+  const imdbPending = byRatings && !imdb;
+  // Forma de la red: en una pantalla vertical (móvil) se reparte a lo alto
+  // para aprovechar el espacio; en horizontal, como siempre (1). Se mide una
+  // vez y solo cambia al girar la pantalla: cada forma es otra disposición, y
+  // no debe recolocarse porque la barra del navegador aparezca o se oculte.
+  const [layoutAspect, setLayoutAspect] = useState(() =>
+    typeof window === "undefined" ? 1 : neuralLayoutAspect(window.innerWidth, window.innerHeight),
+  );
+  useEffect(() => {
+    const query = window.matchMedia?.("(orientation: portrait)");
+    if (!query) return undefined;
+    const onChange = () => setLayoutAspect(neuralLayoutAspect(window.innerWidth, window.innerHeight));
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
   const graph = useMemo(
-    () => (payload && !imdbPending ? buildNeuralGraph(payload, { groupBy, imdb }) : null),
-    [payload, groupBy, imdb, imdbPending],
+    () => (payload && !imdbPending ? buildNeuralGraph(payload, { groups, imdb, aspect: layoutAspect }) : null),
+    [payload, groups, imdb, imdbPending, layoutAspect],
   );
 
   const containerRef = useRef(null);
@@ -422,14 +459,14 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
     if (loadedViewerRef.current === viewerId) return;
     loadedViewerRef.current = viewerId;
     const prefs = readNeuralPreferences(viewerId);
-    setGroupBy(prefs.groupBy);
+    setGroups(prefs.groups);
     setFilters({ type: prefs.type, record: prefs.record });
     setMenuVisible(prefs.menuVisible);
   }, [viewerId]);
   useEffect(() => {
     if (loadedViewerRef.current !== viewerId) return;
-    saveNeuralPreferences(viewerId, { groupBy, type: filters.type, record: filters.record, menuVisible });
-  }, [filters, groupBy, menuVisible, viewerId]);
+    saveNeuralPreferences(viewerId, { groups, type: filters.type, record: filters.record, menuVisible });
+  }, [filters, groups, menuVisible, viewerId]);
 
   // Buscador dentro del lienzo (con el menú oculto).
   const [searchOpen, setSearchOpen] = useState(false);
@@ -470,9 +507,15 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
         // Títulos del grupo que pasan los filtros, no el total.
         count: hubTitleIndices(graph, entry.index).filter((n) => visibility[n]).length,
       }))
-      // Años, décadas, rangos y notas en su orden; géneros y listas, por tamaño.
-      .sort((a, b) => (a.node.order != null && b.node.order != null ? a.node.order - b.node.order : b.count - a.count));
+      // Por agrupaciones (en el orden del menú); dentro, años, décadas, rangos
+      // y notas en su orden, y géneros, sagas y listas por tamaño.
+      .sort((a, b) =>
+        graph.groups.indexOf(a.node.group) - graph.groups.indexOf(b.node.group) ||
+        (a.node.order != null && b.node.order != null ? a.node.order - b.node.order : b.count - a.count));
   }, [graph, visibility]);
+  // Con varias agrupaciones en la leyenda, cada una lleva su encabezado.
+  const legendHeadings = new Set(legend.map(({ node }) => node.group)).size > 1;
+  const summary = useMemo(() => (graph ? groupSummary(graph, visibility) : []), [graph, visibility]);
 
   const pos = useCallback((index) => {
     const positions = positionsRef.current;
@@ -785,7 +828,15 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
     });
     const follow = animate === "follow";
     const capped = follow || animate === "start";
-    const target = fitCamera(points, w, h, { padding: 40, minK: MIN_K, maxK: capped ? LABEL_K - 0.1 : 1.6 });
+    // En móvil la red llena el ancho: poco margen lateral, y arriba y abajo
+    // no cuentan los nodos más sueltos (años, géneros pequeños), que en una
+    // red alta obligaban a alejarla y dejaban franjas vacías a los lados. Se
+    // puede cortar algún nodo o texto de arriba o de abajo.
+    const target = fitCamera(points, w, h, {
+      ...(narrow ? { padX: 12, padY: 24, trimY: 0.015 } : { padding: 40 }),
+      minK: MIN_K,
+      maxK: capped ? LABEL_K - 0.1 : 1.6,
+    });
     if (animate === "start") {
       cameraRef.current = target;
       requestDraw();
@@ -803,7 +854,7 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
       cameraRef.current = target;
       requestDraw();
     }
-  }, [animateCamera, graph, pos, requestDraw, visibility]);
+  }, [animateCamera, graph, narrow, pos, requestDraw, visibility]);
 
   const fitViewRef = useRef(fitView);
   useEffect(() => {
@@ -840,7 +891,7 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
   //   - si no, con las posiciones de partida (ya agrupadas por hub), y la
   //     simulación la va asentando desde ahí.
   // Al asentarse se guarda la disposición; al salir, también la cámara.
-  const layoutKey = neuralLayoutKey(username, payload, groupBy);
+  const layoutKey = neuralLayoutKey(username, payload, groups, layoutAspect);
 
   // Arranca la entrada animada con las posiciones de ese momento (guardadas o
   // de partida) y la pinta fotograma a fotograma hasta terminar.
@@ -934,6 +985,7 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
         saga: node.kind !== "title" && node.tier === "sub",
       })),
       links: graph.links,
+      aspect: graph.aspect,
       resume: Boolean(saved),
       instant: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches || false,
     });
@@ -998,15 +1050,19 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
   // Solo entonces: al montarse el lienzo se coloca en pasos provisionales, y
   // compensarlos desplazaba la red al volver a la pestaña.
   const anchorUntilRef = useRef(0);
-  const layoutTogglesRef = useRef({ headerCollapsed, menuShown });
+  const layoutTogglesRef = useRef({ headerCollapsed, menuShown, menuOpen });
   useEffect(() => {
     // Solo si de verdad han cambiado (no por montarse ni por el doble montaje
     // de desarrollo de React).
     const previous = layoutTogglesRef.current;
-    if (previous.headerCollapsed !== headerCollapsed || previous.menuShown !== menuShown) {
+    if (
+      previous.headerCollapsed !== headerCollapsed ||
+      previous.menuShown !== menuShown ||
+      previous.menuOpen !== menuOpen
+    ) {
       anchorUntilRef.current = performance.now() + 700;
     }
-    layoutTogglesRef.current = { headerCollapsed, menuShown };
+    layoutTogglesRef.current = { headerCollapsed, menuShown, menuOpen };
     let frame = 0;
     const until = performance.now() + 600;
     const loop = () => {
@@ -1015,10 +1071,11 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
     };
     frame = window.requestAnimationFrame(loop);
     return () => window.cancelAnimationFrame(frame);
-    // Cabecera y menú animan su altura durante 300 ms: se mide en CADA
-    // fotograma de la animación (en requestAnimationFrame ya se ve su estado
-    // de ese fotograma), para que el lienzo encaje sin desfase de un cuadro.
-  }, [headerCollapsed, menuShown]);
+    // Cabecera y menú (también el desplegable de opciones del móvil) animan su
+    // altura durante ~300 ms: se mide en CADA fotograma de la animación (en
+    // requestAnimationFrame ya se ve su estado de ese fotograma), para que el
+    // lienzo encaje sin desfase de un cuadro.
+  }, [headerCollapsed, menuShown, menuOpen]);
 
   // ── Tamaño del lienzo ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -1306,11 +1363,12 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
       />
       <ProfileMenuDropdown
         label="Agrupar"
-        valueLabel={optionLabel(GROUP_OPTIONS, groupBy)}
+        valueLabel={groups.map((group) => GROUP_LABEL[group]).join(", ")}
         icon={Layers3}
         options={GROUP_OPTIONS}
-        value={groupBy}
-        onChange={setGroupBy}
+        value={groups}
+        onChange={toggleGroup}
+        multiple
       />
       <div className={`flex h-11 w-full items-center gap-1 p-1 ${MENU_SURFACE}`}>
         {onToggleHeader && !fullscreen ? (
@@ -1414,9 +1472,16 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
           {searchField("", "Buscar título, género o saga...", "text-sm")}
           {menuControls}
         </div>
-        <div id="profile-menu-neural" className={`${menuOpen ? "grid" : "hidden"} grid-cols-2 gap-2 @[1024px]/detail-page:hidden`}>
+        {/* Mismo despliegue que los menús móviles del resto de páginas. */}
+        <MobileFiltersPanel
+          open={menuOpen}
+          id="profile-menu-neural"
+          className="@[1024px]/detail-page:hidden"
+          gapClassName=""
+          contentClassName="grid grid-cols-2 gap-2"
+        >
           {menuControls}
-        </div>
+        </MobileFiltersPanel>
       </section>
         </div>
       </div>
@@ -1441,7 +1506,7 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
           role="img"
           aria-label={
             graph
-              ? `Red de ${graph.stats.titles} títulos agrupados en ${legend.length} ${GROUP_NOUN[graph.groupBy] || "grupos"}`
+              ? `Red de ${graph.stats.titles} títulos agrupados en ${summary.join(", ")}`
               : "Cargando la red de títulos"
           }
           // En móvil la red se funde arriba y abajo en vez de cortarse en seco.
@@ -1564,10 +1629,15 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
               }`}
             >
               <ul className={`pointer-events-auto max-h-full overflow-y-auto overscroll-contain rounded-2xl p-2 [scrollbar-width:none] ${LIQUID_GLASS_PANEL}`}>
-                {legend.map(({ node, index, count }) => (
+                {legend.map(({ node, index, count }, i) => (
                   // El id solo es único dentro de su tipo: presupuesto y
                   // recaudación (o tu nota y IMDb) comparten índices de rango.
                   <li key={`${node.kind}:${node.id}`}>
+                    {legendHeadings && node.group !== legend[i - 1]?.node.group ? (
+                      <p className={`px-2 pb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 ${i ? "pt-3" : "pt-1"}`}>
+                        {GROUP_LABEL[node.group]}
+                      </p>
+                    ) : null}
                     <button
                       type="button"
                       onClick={() => focusNode(index)}
@@ -1598,8 +1668,7 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
                 {visibleTitles === graph.stats.titles
                   ? `${graph.stats.titles} títulos · ${graph.stats.movies} películas · ${graph.stats.series} series`
                   : `${visibleTitles} de ${graph.stats.titles} títulos`}
-                {` · ${legend.length} ${GROUP_NOUN[graph.groupBy] || "grupos"}`}
-                {graph.groupBy === "genre-saga" ? ` · ${graph.stats.sagas} sagas` : ""}
+                {summary.map((part) => ` · ${part}`).join("")}
                 {!settled ? " · organizando…" : ""}
                 {payload?.missing ? ` · clasificando ${payload.missing}…` : ""}
               </p>

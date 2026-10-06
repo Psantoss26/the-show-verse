@@ -15,7 +15,15 @@ test("preferencias neurales: solo valores conocidos", () => {
     menuVisible: "sí",
     type: "tv",
     record: "otro",
-    groupBy: "decade",
+    groups: ["ratings", "decade", "otra"],
   });
-  assert.deepEqual(prefs, { headerCollapsed: false, menuVisible: false, type: "tv", record: "all", groupBy: "decade" });
+  assert.deepEqual(prefs, { headerCollapsed: false, menuVisible: false, type: "tv", record: "all", groups: ["decade", "ratings"] });
+});
+
+test("preferencias neurales: varias agrupaciones, y el antiguo groupBy se migra", () => {
+  assert.deepEqual(NEURAL_DEFAULTS.groups, ["genre", "saga"]);
+  assert.deepEqual(sanitizeNeuralPreferences({ groupBy: "genre-saga" }).groups, ["genre", "saga"]);
+  assert.deepEqual(sanitizeNeuralPreferences({ groupBy: "money" }).groups, ["money"]);
+  assert.equal("groupBy" in sanitizeNeuralPreferences({ groupBy: "money" }), false);
+  assert.deepEqual(sanitizeNeuralPreferences({ groups: [] }).groups, ["genre", "saga"]);
 });

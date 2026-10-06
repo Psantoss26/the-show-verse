@@ -6,8 +6,12 @@
 //   menuVisible      menú de opciones desplegado       (por defecto: no)
 //   type             Tipo: all | movie | tv            (por defecto: all)
 //   record           Registro: all | watched | rated | favorite | pending
-//   groupBy          Agrupar: genre-saga | genre | decade | watched | lists |
-//                    money | ratings
+//   groups           Agrupar, una o varias a la vez: genre | saga | decade |
+//                    watched | lists | money | ratings  (por defecto: género
+//                    y saga). Se lee también el antiguo `groupBy`, de una
+//                    sola ("genre-saga" pasa a género + saga).
+
+import { DEFAULT_GROUPS, normalizeGroups } from "./neuralGraph.js";
 
 const STORAGE_PREFIX = "showverse:profile:neural:v1:";
 
@@ -16,13 +20,12 @@ export const NEURAL_DEFAULTS = Object.freeze({
   menuVisible: false,
   type: "all",
   record: "all",
-  groupBy: "genre-saga",
+  groups: DEFAULT_GROUPS,
 });
 
 const ALLOWED = {
   type: ["all", "movie", "tv"],
   record: ["all", "watched", "rated", "favorite", "pending"],
-  groupBy: ["genre-saga", "genre", "decade", "watched", "lists", "money", "ratings"],
 };
 
 // Copia en memoria: las dos piezas que la usan (cabecera y vista) leen lo
@@ -42,6 +45,8 @@ export function sanitizeNeuralPreferences(value) {
   for (const key of Object.keys(ALLOWED)) {
     if (ALLOWED[key].includes(value[key])) out[key] = value[key];
   }
+  const groups = value.groups ?? value.groupBy;
+  if (groups != null) out.groups = normalizeGroups(groups);
   return out;
 }
 

@@ -5,8 +5,8 @@
 //   titles: [[tmdbId, esSerie, título, póster, año, [géneros], saga, vistas,
 //             nota, flags, [meses AAAAMM], [listas], presupuesto, recaudación,
 //             id de IMDb]]
-// Las notas de IMDb no vienen en la carga: la vista las pide aparte (solo al
-// agrupar por puntuaciones) y llegan en la opción `imdb`.
+// Las notas de IMDb no vienen en la carga: la vista las pide aparte (solo si
+// se agrupa por puntuaciones) y llegan en la opción `imdb`.
 // Aquí se expande a nodos y enlaces. Los enlaces no viajan por la red: salen de
 // los índices de género y saga de cada título.
 
@@ -68,15 +68,30 @@ function seeded(seed) {
   };
 }
 
-// Agrupaciones de la red. Cada una decide a qué HUBS se une cada título:
-//   genre-saga  géneros y sagas            genre    solo géneros
-//   decade      década de estreno          watched  año y mes de visionado
-//   lists       listas propias, de la comunidad guardadas y colecciones
-//   money       presupuesto, recaudación   ratings  tu nota y la de IMDb
-//               y beneficio
-// Los hubs `main` forman los racimos (y la leyenda); los `sub` (sagas, meses)
-// se quedan dentro del racimo de sus títulos, con enlaces cortos.
-export const GROUP_BY_VALUES = ["genre-saga", "genre", "decade", "watched", "lists", "money", "ratings"];
+// Agrupaciones de la red. Cada una aporta sus HUBS y une a ellos cada título,
+// y se pueden MEZCLAR (el menú permite marcar varias):
+//   genre    géneros                    saga     sagas (colecciones de TMDb)
+//   decade   década de estreno          watched  año y mes de visionado
+//   lists    listas propias, de la comunidad guardadas y colecciones
+//   money    presupuesto, recaudación   ratings  tu nota y la de IMDb
+//            y beneficio
+// Los hubs `main` forman los racimos (y la leyenda); los `sub` (meses y, junto
+// a otra agrupación, sagas) se quedan dentro del racimo de sus títulos, con
+// enlaces cortos. El color de un título lo da la primera agrupación marcada en
+// este orden que lo une a algún hub (la saga, solo si va sola).
+export const GROUP_BY_VALUES = ["genre", "saga", "decade", "watched", "lists", "money", "ratings"];
+export const DEFAULT_GROUPS = Object.freeze(["genre", "saga"]);
+
+/**
+ * Agrupaciones válidas, sin repetir y en el orden de GROUP_BY_VALUES (así una
+ * misma mezcla tiene siempre la misma clave). Acepta también el valor antiguo,
+ * de una sola agrupación ("genre-saga", "decade"…). Nunca queda vacía.
+ */
+export function normalizeGroups(value) {
+  const list = value === "genre-saga" ? DEFAULT_GROUPS : Array.isArray(value) ? value : [value];
+  const groups = GROUP_BY_VALUES.filter((group) => list.includes(group));
+  return groups.length ? groups : [...DEFAULT_GROUPS];
+}
 
 /** Nombre de cada tipo de hub, para la ficha y la leyenda. */
 export const HUB_KIND_LABEL = {
@@ -95,15 +110,15 @@ export const HUB_KIND_LABEL = {
   imdb: "Nota de IMDb",
 };
 
-/** Cómo se llaman los grupos de cada agrupación en el pie de la vista. */
-export const GROUP_NOUN = {
-  "genre-saga": "géneros",
-  genre: "géneros",
-  decade: "décadas",
-  watched: "años",
-  lists: "listas y colecciones",
-  money: "rangos",
-  ratings: "notas",
+/** Cómo se llaman los grupos de cada agrupación (singular, plural) en el pie. */
+const GROUP_NOUN = {
+  genre: ["género", "géneros"],
+  saga: ["saga", "sagas"],
+  decade: ["década", "décadas"],
+  watched: ["año", "años"],
+  lists: ["lista", "listas"],
+  money: ["rango", "rangos"],
+  ratings: ["nota", "notas"],
 };
 
 const MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sept", "oct", "nov", "dic"];
@@ -148,12 +163,17 @@ const COMMUNITY_COLORS = ["#38bdf8", "#818cf8", "#22d3ee", "#93c5fd", "#67e8f9"]
  * }}
  * Los nodos van en orden: hubs (en el orden en que aparecen) y títulos.
  */
-export function buildNeuralGraph(payload, { groupBy = "genre-saga", imdb = null } = {}) {
+export function buildNeuralGraph(payload, { groups: requested = DEFAULT_GROUPS, imdb = null, aspect = 1 } = {}) {
   const genres = Array.isArray(payload?.genres) ? payload.genres : [];
   const sagas = Array.isArray(payload?.sagas) ? payload.sagas : [];
   const lists = Array.isArray(payload?.lists) ? payload.lists : [];
   const rows = Array.isArray(payload?.titles) ? payload.titles : [];
-  const mode = GROUP_BY_VALUES.includes(groupBy) ? groupBy : "genre-saga";
+  const groups = normalizeGroups(requested);
+  const has = (group) => groups.includes(group);
+  // Sola, la saga forma sus racimos; junto a otra se queda dentro de ellos.
+  const sagaTier = groups.length > 1 ? "sub" : "main";
+  // Las colecciones de "Listas" son las sagas: con las dos marcadas, un hub.
+  const listCollections = !has("saga");
   // Nota de IMDb de un título, de `imdb` ({ "movie:603": 8.7 }).
   const imdbScore = (row) => imdb?.[`${row[1] ? "tv" : "movie"}:${row[0]}`];
 
@@ -161,28 +181,34 @@ export function buildNeuralGraph(payload, { groupBy = "genre-saga", imdb = null 
   const links = [];
   const hubIndex = new Map();
   const hub = (kind, id) => hubIndex.get(`${kind}:${id}`);
+  // `group`: la agrupación que lo crea (leyenda y pie, por agrupación).
+  let group = null;
   const addHub = (kind, id, label, color, { tier = "main", order, href } = {}) => {
     const key = `${kind}:${id}`;
     if (hubIndex.has(key)) return hubIndex.get(key);
     hubIndex.set(key, nodes.length);
-    nodes.push({ kind, tier, id, label, color, degree: 0, ...(order != null ? { order } : {}), ...(href ? { href } : {}) });
+    nodes.push({ kind, tier, group, id, label, color, degree: 0, ...(order != null ? { order } : {}), ...(href ? { href } : {}) });
     return nodes.length - 1;
   };
   const hubLinks = [];
 
   // ── Hubs de la agrupación, antes que los títulos ──────────────────────────
-  if (mode === "genre-saga" || mode === "genre") {
+  group = "genre";
+  if (has("genre")) {
     for (const [id, name] of genres) addHub("genre", id, name, GENRE_COLORS[id] || UNKNOWN_COLOR);
   }
-  if (mode === "genre-saga") {
-    for (const [id, name] of sagas) addHub("saga", id, name, SAGA_COLOR, { tier: "sub", href: `/lists/collection/${id}` });
+  group = "saga";
+  if (has("saga")) {
+    for (const [id, name] of sagas) addHub("saga", id, name, SAGA_COLOR, { tier: sagaTier, href: `/lists/collection/${id}` });
   }
-  if (mode === "decade") {
+  group = "decade";
+  if (has("decade")) {
     // De la más antigua a la más reciente, de color frío a cálido.
     const decades = [...new Set(rows.map((row) => decadeOf(row[4])).filter((d) => d != null))].sort((x, y) => x - y);
     decades.forEach((decade, i) => addHub("decade", decade, decadeLabel(decade), decadeColor(i, decades.length), { order: decade }));
   }
-  if (mode === "watched") {
+  group = "watched";
+  if (has("watched")) {
     // Un hub por año con visionados y, dentro, uno por mes.
     const months = [...new Set(rows.flatMap((row) => watchMonths(row)))].sort((x, y) => x - y);
     const years = [...new Set(months.map((m) => Math.floor(m / 100)))];
@@ -193,7 +219,8 @@ export function buildNeuralGraph(payload, { groupBy = "genre-saga", imdb = null 
       hubLinks.push([hub("year", year), index]);
     }
   }
-  if (mode === "lists") {
+  group = "lists";
+  if (has("lists")) {
     let own = 0;
     let community = 0;
     for (const [id, name, kind] of lists) {
@@ -205,9 +232,12 @@ export function buildNeuralGraph(payload, { groupBy = "genre-saga", imdb = null 
         own += 1;
       }
     }
-    for (const [id, name] of sagas) addHub("collection", id, name, SAGA_COLOR, { href: `/lists/collection/${id}` });
+    if (listCollections) {
+      for (const [id, name] of sagas) addHub("collection", id, name, SAGA_COLOR, { href: `/lists/collection/${id}` });
+    }
   }
-  if (mode === "money") {
+  group = "money";
+  if (has("money")) {
     BUDGET_RANGES.forEach(([, label], i) => {
       if (rows.some((row) => rangeOf(BUDGET_RANGES, row[12]) === i)) {
         addHub("budget", i, `Presupuesto ${label}`, gradientColor(i, BUDGET_RANGES.length, { from: 170, to: 95, light: 55 }), { order: i });
@@ -226,7 +256,8 @@ export function buildNeuralGraph(payload, { groupBy = "genre-saga", imdb = null 
       }
     });
   }
-  if (mode === "ratings") {
+  group = "ratings";
+  if (has("ratings")) {
     for (let score = 10; score >= 1; score -= 1) {
       if (rows.some((row) => userScore(row) === score)) {
         addHub("rating", score, `Tu nota ${score}`, scoreColor(score), { order: 10 - score });
@@ -250,28 +281,32 @@ export function buildNeuralGraph(payload, { groupBy = "genre-saga", imdb = null 
     if (isTv) series += 1;
     else movies += 1;
 
-    // Hubs de este título, el primero da el color.
+    // Hubs de este título, en el orden de las agrupaciones.
     const targets = [];
     const push = (target) => {
       if (target != null && !targets.includes(target)) targets.push(target);
     };
-    if (mode === "genre-saga" || mode === "genre") {
+    const inSaga = sagaIdx >= 0 && sagaIdx < sagas.length;
+    if (has("genre")) {
       for (const g of genreIdx || []) if (g >= 0 && g < genres.length) push(hub("genre", genres[g][0]));
-      if (mode === "genre-saga" && sagaIdx >= 0 && sagaIdx < sagas.length) push(hub("saga", sagas[sagaIdx][0]));
-    } else if (mode === "decade") {
-      push(hub("decade", decadeOf(year)));
-    } else if (mode === "watched") {
+    }
+    if (has("saga") && inSaga) push(hub("saga", sagas[sagaIdx][0]));
+    if (has("decade")) push(hub("decade", decadeOf(year)));
+    if (has("watched")) {
       // Del más reciente al más antiguo (como mucho doce): el color es el del
       // último año en que lo vio.
       for (const month of watchMonths(row).slice(-12).reverse()) push(hub("month", month));
-    } else if (mode === "lists") {
+    }
+    if (has("lists")) {
       for (const l of Array.isArray(row[11]) ? row[11] : []) if (l >= 0 && l < lists.length) push(hub(lists[l][2] === "community" ? "community" : "list", lists[l][0]));
-      if (sagaIdx >= 0 && sagaIdx < sagas.length) push(hub("collection", sagas[sagaIdx][0]));
-    } else if (mode === "money") {
+      if (listCollections && inSaga) push(hub("collection", sagas[sagaIdx][0]));
+    }
+    if (has("money")) {
       push(hub("budget", rangeOf(BUDGET_RANGES, row[12])));
       push(hub("revenue", rangeOf(REVENUE_RANGES, row[13])));
       push(hub("profit", profitRange(row)));
-    } else if (mode === "ratings") {
+    }
+    if (has("ratings")) {
       push(hub("rating", userScore(row)));
       push(hub("imdb", rangeOf(IMDB_RANGES, imdbScore(row))));
     }
@@ -280,11 +315,13 @@ export function buildNeuralGraph(payload, { groupBy = "genre-saga", imdb = null 
     const r = onlyPending
       ? 2.6
       : Math.min(9, 3 + 1.1 * Math.log2(1 + Math.max(0, plays)) + (flags & FLAG_FAVORITE ? 0.8 : 0));
-    // En géneros, el color es el del género principal aunque no tenga hub.
+    // Con géneros, el color es el del género principal aunque no tenga hub.
+    // Si no, el del primer hub; la saga (gris neutro), solo si va sola.
     const primary = Array.isArray(genreIdx) && genreIdx.length ? genres[genreIdx[0]]?.[0] : null;
-    const color = mode === "genre-saga" || mode === "genre"
+    const colorTarget = targets.find((t) => nodes[t].kind !== "saga" || sagaTier === "main");
+    const color = has("genre")
       ? primary ? GENRE_COLORS[primary] || UNKNOWN_COLOR : UNKNOWN_COLOR
-      : targets.length ? nodes[targets[0]].color : UNKNOWN_COLOR;
+      : colorTarget != null ? nodes[colorTarget].color : UNKNOWN_COLOR;
     nodes.push({
       kind: "title",
       id: `${mediaType}:${tmdbId}`,
@@ -327,12 +364,13 @@ export function buildNeuralGraph(payload, { groupBy = "genre-saga", imdb = null 
     node.search = normalizeSearch(node.label);
   }
 
-  seedPositions(nodes, neighbors);
+  seedPositions(nodes, neighbors, aspect);
   return {
     nodes,
     links,
     neighbors,
-    groupBy: mode,
+    groups,
+    aspect,
     stats: { titles: rows.length, movies, series, genres: genres.length, sagas: sagas.length },
   };
 }
@@ -348,44 +386,74 @@ function formatMoney(value) {
   return `${new Intl.NumberFormat("es-ES", { maximumFractionDigits: digits, useGrouping: "always" }).format(millions)} M$`;
 }
 
+// Orden de los datos en la ficha: la saga delante de los géneros, lo más
+// concreto primero.
+const FACT_ORDER = ["saga", "genre", "decade", "watched", "lists", "money", "ratings"];
+const LIST_KINDS = ["list", "community", "collection"];
+
 /**
- * Línea de datos de la ficha de un título, según la agrupación: lo que le une
- * a sus grupos (géneros, visionados, listas, cifras o notas).
+ * Datos de la ficha de un título, según las agrupaciones: lo que le une a sus
+ * grupos. UNA LÍNEA POR TIPO de dato (saga, géneros, década, visionados,
+ * listas, cifras, notas); lo que no tiene, no sale.
  */
 export function titleFacts(graph, index) {
   const node = graph?.nodes?.[index];
   if (!node || node.kind !== "title") return [];
   const title = node.title;
-  const hubLabels = () => (graph.neighbors[index] || [])
-    .filter((n) => graph.nodes[n].kind !== "title")
+  const groups = graph.groups || DEFAULT_GROUPS;
+  const hubLabels = (kinds) => (graph.neighbors[index] || [])
+    .filter((n) => kinds.includes(graph.nodes[n].kind))
     .map((n) => graph.nodes[n].label);
-  switch (graph.groupBy) {
-    case "genre":
-      return title.genres;
-    case "decade":
-      return hubLabels();
-    case "watched": {
-      // Sus meses, del más reciente al más antiguo.
-      const months = hubLabels();
-      return months.length ? [`Visto en ${months.join(", ")}`] : ["Sin visionados"];
+  const line = (parts) => parts.filter(Boolean).join(" · ") || null;
+  const lineOf = (group) => {
+    switch (group) {
+      case "genre":
+        return line(title.genres);
+      case "saga":
+        return title.saga || null;
+      case "decade":
+        return line(hubLabels(["decade"]));
+      case "watched": {
+        // Sus meses, del más reciente al más antiguo.
+        const months = hubLabels(["month"]);
+        return months.length ? `Visto en ${months.join(", ")}` : "Sin visionados";
+      }
+      case "lists":
+        // En ninguna lista: no se dice nada.
+        return line(hubLabels(LIST_KINDS));
+      case "money":
+        // Las series no tienen cifras: sin ellas no se dice nada.
+        return line([
+          title.budget ? `Presupuesto ${formatMoney(title.budget)}` : null,
+          title.revenue ? `Recaudación ${formatMoney(title.revenue)}` : null,
+        ]);
+      case "ratings":
+        // Tu nota ya sale en ámbar entre los registros.
+        return title.imdb ? `IMDb ${scoreFormat.format(title.imdb)}` : "Sin nota de IMDb";
+      default:
+        return null;
     }
-    case "lists": {
-      const lists = hubLabels();
-      return lists.length ? lists : ["En ninguna lista"];
-    }
-    case "money": {
-      const facts = [
-        title.budget ? `Presupuesto ${formatMoney(title.budget)}` : null,
-        title.revenue ? `Recaudación ${formatMoney(title.revenue)}` : null,
-      ].filter(Boolean);
-      return facts.length ? facts : ["Sin presupuesto ni recaudación"];
-    }
-    case "ratings":
-      // Tu nota ya sale en ámbar entre los registros.
-      return [title.imdb ? `IMDb ${scoreFormat.format(title.imdb)}` : "Sin nota de IMDb"];
-    default:
-      return [title.saga, ...title.genres].filter(Boolean);
-  }
+  };
+  return FACT_ORDER.filter((group) => groups.includes(group)).map(lineOf).filter(Boolean);
+}
+
+/**
+ * Recuento de grupos visibles por agrupación, para el pie de la vista:
+ * ["12 géneros", "3 sagas"]. Cuentan los hubs principales (los años, no sus
+ * meses) y las sagas aunque vayan dentro de otros racimos.
+ */
+export function groupSummary(graph, visibility) {
+  const counts = new Map();
+  graph.nodes.forEach((node, index) => {
+    if (node.kind === "title" || !node.group || !visibility?.[index]) return;
+    if (node.tier !== "main" && node.kind !== "saga") return;
+    counts.set(node.group, (counts.get(node.group) || 0) + 1);
+  });
+  return (graph.groups || DEFAULT_GROUPS).map((group) => {
+    const count = counts.get(group) || 0;
+    const [one, many] = GROUP_NOUN[group];
+    return `${count} ${count === 1 ? one : many}`;
+  });
 }
 
 // Meses (AAAAMM) en que se vio un título; vacío en cargas antiguas.
@@ -431,7 +499,12 @@ function decadeColor(index, total) {
 // Posiciones de partida: los géneros en círculo (los más grandes, repartidos),
 // cada saga y cada título junto al centro de sus hubs. La simulación parte así
 // casi ordenada y converge en muchos menos pasos que desde puntos al azar.
-function seedPositions(nodes, neighbors) {
+// `aspect` (alto/ancho de la pantalla, 1 en horizontal): el círculo se estira
+// en una elipse vertical, sin cambiar su área, para que en el móvil la red
+// nazca ya con la forma de la pantalla.
+function seedPositions(nodes, neighbors, aspect = 1) {
+  const sx = 1 / Math.sqrt(aspect);
+  const sy = Math.sqrt(aspect);
   const random = seeded(nodes.length * 2654435761);
   const isMainHub = (node) => node.kind !== "title" && node.tier !== "sub";
   const hubCount = nodes.filter(isMainHub).length;
@@ -443,8 +516,8 @@ function seedPositions(nodes, neighbors) {
   order.forEach(({ node }, i) => {
     const angle = (i / Math.max(1, order.length)) * Math.PI * 2 + (i % 2) * 0.35;
     const dist = radius * (i % 2 ? 0.62 : 1);
-    node.x = Math.cos(angle) * dist;
-    node.y = Math.sin(angle) * dist;
+    node.x = Math.cos(angle) * dist * sx;
+    node.y = Math.sin(angle) * dist * sy;
   });
   // Primero los hubs secundarios (junto a su hub principal) y después los
   // títulos, junto a todos sus hubs ya colocados.
@@ -454,7 +527,7 @@ function seedPositions(nodes, neighbors) {
   });
   const around = (index) => {
     const hubs = neighbors[index].filter((n) => placed[n] && nodes[n].kind !== "title");
-    if (!hubs.length) return { x: (random() - 0.5) * radius * 2.4, y: (random() - 0.5) * radius * 2.4 };
+    if (!hubs.length) return { x: (random() - 0.5) * radius * 2.4 * sx, y: (random() - 0.5) * radius * 2.4 * sy };
     const x = hubs.reduce((sum, n) => sum + nodes[n].x, 0) / hubs.length;
     const y = hubs.reduce((sum, n) => sum + nodes[n].y, 0) / hubs.length;
     return { x, y };
@@ -540,22 +613,26 @@ export function searchNodes(nodes, query, limit = 200) {
   return out;
 }
 
-/** Encuadre (centro y zoom) que contiene los puntos dados. */
-export function fitCamera(points, width, height, { padding = 60, minK = 0.08, maxK = 2.5 } = {}) {
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  for (const { x, y, r = 0 } of points) {
-    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-    minX = Math.min(minX, x - r);
-    minY = Math.min(minY, y - r);
-    maxX = Math.max(maxX, x + r);
-    maxY = Math.max(maxY, y + r);
-  }
-  if (!Number.isFinite(minX)) return { x: 0, y: 0, k: 1 };
+/**
+ * Encuadre (centro y zoom) que contiene los puntos dados.
+ * `padX`/`padY`: margen de cada eje (por defecto, `padding`). `trimX`/`trimY`:
+ * parte de los puntos más extremos de cada lado que puede quedar fuera en ese
+ * eje (0,02 = el 2 %), para que unos pocos nodos sueltos no obliguen a alejar
+ * toda la red.
+ */
+export function fitCamera(points, width, height, { padding = 60, padX = padding, padY = padding, trimX = 0, trimY = 0, minK = 0.08, maxK = 2.5 } = {}) {
+  const valid = points.filter(({ x, y }) => Number.isFinite(x) && Number.isFinite(y));
+  if (!valid.length) return { x: 0, y: 0, k: 1 };
+  // Bordes de cada eje: el extremo o, recortando, el del percentil `trim`.
+  const edges = (lows, highs, trim) => {
+    if (!(trim > 0) || valid.length < 20) return [Math.min(...lows), Math.max(...highs)];
+    const cut = Math.floor(valid.length * trim);
+    return [lows.sort((a, b) => a - b)[cut], highs.sort((a, b) => b - a)[cut]];
+  };
+  const [minX, maxX] = edges(valid.map(({ x, r = 0 }) => x - r), valid.map(({ x, r = 0 }) => x + r), trimX);
+  const [minY, maxY] = edges(valid.map(({ y, r = 0 }) => y - r), valid.map(({ y, r = 0 }) => y + r), trimY);
   const w = Math.max(1, maxX - minX);
   const h = Math.max(1, maxY - minY);
-  const k = Math.min(maxK, Math.max(minK, Math.min((width - padding * 2) / w, (height - padding * 2) / h)));
+  const k = Math.min(maxK, Math.max(minK, Math.min((width - padX * 2) / w, (height - padY * 2) / h)));
   return { x: 0 - ((minX + maxX) / 2) * k, y: 0 - ((minY + maxY) / 2) * k, k };
 }

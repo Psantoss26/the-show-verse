@@ -248,9 +248,13 @@ function fromBase64(value) {
   return new Float32Array(bytes.buffer);
 }
 
-/** Clave de una disposición: la misma red (versión y agrupación) de un usuario. */
-export function neuralLayoutKey(username, payload, groupBy) {
-  return payload?.v ? `${normalize(username)}:${payload.v}:${groupBy}` : null;
+/**
+ * Clave de una disposición: la misma red (versión y agrupaciones) de un
+ * usuario y con la misma forma (`aspect`, la de una pantalla vertical).
+ */
+export function neuralLayoutKey(username, payload, groups, aspect = 1) {
+  if (!payload?.v) return null;
+  return `${normalize(username)}:${payload.v}:${groups.join("+")}${aspect !== 1 ? `:a${aspect}` : ""}`;
 }
 
 /** `{ positions: Float32Array, camera }` guardado, o null si no encaja. */

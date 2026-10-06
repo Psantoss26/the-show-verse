@@ -493,7 +493,9 @@ function relativeActivityTime(value) {
 }
 
 // Exportado: la vista neuronal reutiliza el mismo menú que las demás secciones.
-export function ProfileMenuDropdown({ label, valueLabel, icon: Icon, options, value, onChange }) {
+// `multiple`: `value` es una lista y cada opción se marca o desmarca sin cerrar
+// el desplegable (`onChange` recibe la opción pulsada).
+export function ProfileMenuDropdown({ label, valueLabel, icon: Icon, options, value, onChange, multiple = false }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const buttonRef = useRef(null);
@@ -573,14 +575,15 @@ export function ProfileMenuDropdown({ label, valueLabel, icon: Icon, options, va
               style={{ ...menuStyle, scrollbarWidth: "thin", scrollbarGutter: "stable", overscrollBehavior: "contain" }}
             >
               {options.map(([optionValue, optionLabel]) => {
-                const active = value === optionValue;
+                const active = multiple ? value.includes(optionValue) : value === optionValue;
                 return (
                   <button
                     key={optionValue}
                     type="button"
+                    aria-pressed={multiple ? active : undefined}
                     onClick={() => {
                       onChange(optionValue);
-                      setOpen(false);
+                      if (!multiple) setOpen(false);
                     }}
                     className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition ${
                       active ? "bg-white/10 font-bold text-white" : "text-zinc-300 hover:bg-white/5 hover:text-white"

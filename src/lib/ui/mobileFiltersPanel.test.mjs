@@ -22,6 +22,7 @@ const PAGES = [
   "components/ActorDetails.jsx",
   "components/DetailsClient.jsx",
   "components/dashboard/PhoneDetailsSections.jsx",
+  "components/profile/neural/NeuralGraphView.jsx",
   "components/lists/ListDetailsTools.jsx",
   "components/trakt/TraktEpisodesWatchedModal.jsx",
 ];
