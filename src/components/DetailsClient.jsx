@@ -2189,6 +2189,8 @@ export default function DetailsClient({
   // automática.
   const soundtrackAmbient = useAmbientSoundtrack({
     tracks: soundtrackTracks,
+    // Ajustes > Reproducción automática del soundtrack.
+    enabled: preferences?.uiSettings?.soundtrackAutoplay !== false,
     suspended: soundtrackModalOpen || videoModalOpen,
     resetKey: `${endpointType}:${id}`,
   });
@@ -9141,8 +9143,10 @@ export default function DetailsClient({
         error={soundtrackError}
         initialTrackId={activeSoundtrackId}
         searchUrl={soundtrackSpotifySearchUrl}
+        // Con el modo soundtrack desactivado en Ajustes, el altavoz del
+        // reproductor solo silencia el reproductor.
         autoplay={soundtrackAmbient.autoplay}
-        onAutoplayChange={soundtrackAmbient.setAutoplay}
+        onAutoplayChange={soundtrackAmbient.enabled ? soundtrackAmbient.setAutoplay : null}
       />
 
       {type === "tv" && (

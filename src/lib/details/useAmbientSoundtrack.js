@@ -4,9 +4,11 @@
 // (las previews de 30 s que ya trae /api/soundtrack), una pista detrás de otra
 // y en bucle, a volumen bajo. Un solo <audio> fuera del DOM.
 //
-//   - La reproducción automática se activa o desactiva desde el reproductor
-//     del soundtrack (SoundtrackModal) y se recuerda en este navegador: sin
-//     ella no suena en ningún título hasta que se vuelva a activar.
+//   - Ajustes puede desactivar el modo entero (`enabled`, preferencia de la
+//     cuenta): entonces no suena nada al abrir una ficha.
+//   - Con el modo activo, el altavoz del reproductor del soundtrack
+//     (SoundtrackModal) lo silencia o lo vuelve a activar, y se recuerda en este
+//     navegador: silenciado no suena en ningún título hasta reactivarlo.
 //   - Se pausa mientras haya algo que tenga su propio sonido (tráiler, el
 //     reproductor del soundtrack) y con la pestaña oculta, y sigue después.
 //   - Los navegadores pueden bloquear el sonido sin un gesto previo (al abrir
@@ -42,16 +44,18 @@ export function ambientPlaylist(tracks) {
 
 /**
  * @param tracks     pistas del soundtrack (las de /api/soundtrack).
+ * @param enabled    el modo soundtrack está activado en Ajustes.
  * @param suspended  hay otro sonido en la ficha: pausar sin silenciar.
  * @param resetKey   identidad del título: al cambiar, vuelve a la primera pista.
- * @returns {{ available, playing, autoplay, trackId, setAutoplay }}
- *   available    hay pistas con preview;
+ * @returns {{ available, enabled, playing, autoplay, trackId, setAutoplay }}
+ *   available    modo activo y hay pistas con preview;
+ *   enabled      el modo soundtrack está activado en Ajustes;
  *   playing      está sonando (para animar el icono del altavoz);
  *   autoplay     la reproducción automática está activada;
  *   trackId      la pista que suena (el reproductor completo abre en ella);
  *   setAutoplay  activar o desactivar la reproducción automática.
  */
-export default function useAmbientSoundtrack({ tracks, suspended = false, resetKey = "" }) {
+export default function useAmbientSoundtrack({ tracks, enabled = true, suspended = false, resetKey = "" }) {
   const playlist = useMemo(() => ambientPlaylist(tracks), [tracks]);
   const playlistKey = playlist.map((track) => track.previewUrl).join("|");
   const [muted, setMuted] = useState(false);
@@ -154,7 +158,7 @@ export default function useAmbientSoundtrack({ tracks, suspended = false, resetK
 
   // Sonar o no según el estado; si el navegador lo bloquea, al primer gesto.
   useEffect(() => {
-    const want = !muted && !suspended && playlist.length > 0;
+    const want = enabled && !muted && !suspended && playlist.length > 0;
     wantRef.current = want;
     if (!want) {
       stop();
@@ -186,7 +190,7 @@ export default function useAmbientSoundtrack({ tracks, suspended = false, resetK
     };
     // `playlist` se sigue por su clave: la misma lista puede llegar en otro array.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [muted, suspended, playlistKey, resetKey, start, stop]);
+  }, [enabled, muted, suspended, playlistKey, resetKey, start, stop]);
 
   // Al salir de la ficha, silencio.
   useEffect(
@@ -209,5 +213,12 @@ export default function useAmbientSoundtrack({ tracks, suspended = false, resetK
   }, []);
 
   const trackId = playlist.find((track) => track.previewUrl === trackUrl)?.id ?? null;
-  return { available: playlist.length > 0, playing: playing && !muted, autoplay: !muted, trackId, setAutoplay };
+  return {
+    available: enabled && playlist.length > 0,
+    enabled,
+    playing: enabled && playing && !muted,
+    autoplay: enabled && !muted,
+    trackId,
+    setAutoplay,
+  };
 }
