@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import OptimizedImage from "@/components/OptimizedImage";
 import { Search, Trash2, Plus, Loader2, ImageOff, Check, Film, Tv } from "lucide-react";
 import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
@@ -212,7 +213,9 @@ function FavoriteRow({ type, items, loaded, onRemove, onReorder, onAddRequest })
           );
         })}
       </div>
-      {dragPreview ? (
+      {/* En un portal: dentro del recuadro (con desenfoque de fondo y
+          overflow-hidden) un `fixed` se posiciona respecto a él y se recorta. */}
+      {dragPreview && typeof document !== "undefined" ? createPortal(
         <div
           ref={dragPreviewRef}
           aria-hidden="true"
@@ -236,7 +239,8 @@ function FavoriteRow({ type, items, loaded, onRemove, onReorder, onAddRequest })
             </div>
           )}
           <div className="absolute inset-0 rounded-[inherit] shadow-[inset_0_0_0_2.5px_rgba(239,68,68,0.95)]" />
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </section>
   );
@@ -392,9 +396,12 @@ export default function ProfileFavoritesEditor({ panelClassName = "" }) {
   // El título y el subtítulo van en el mismo panel que los demás grupos de
   // Preferencias (SegmentedField: "Vista por defecto"…). El buscador y las dos
   // filas quedan fuera, con todo el ancho de la columna para los pósters.
+  // Todo dentro del MISMO recuadro: cabecera, buscador y las filas de películas
+  // y series. Antes el recuadro solo envolvía la cabecera y las filas quedaban
+  // sueltas debajo.
   return (
-    <section aria-labelledby="profile-favorites-title" className="space-y-5">
-      <div className={`${panelClassName} rounded-2xl p-4 sm:p-5`}>
+    <section aria-labelledby="profile-favorites-title" className={`${panelClassName} space-y-5 rounded-2xl p-4 sm:p-5`}>
+      <div>
         <div className="flex items-center justify-between gap-3">
           <h3 id="profile-favorites-title" className="block text-xs font-black uppercase tracking-widest text-emerald-400/80">
             Favoritos del perfil
@@ -424,8 +431,10 @@ export default function ProfileFavoritesEditor({ panelClassName = "" }) {
           />
           {searching && <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-emerald-400" />}
 
+          {/* En el flujo, no flotando: el recuadro recorta lo que se sale
+              (overflow-hidden), así que los resultados empujan las filas. */}
           {results.length > 0 && (
-            <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-2xl bg-[#141414] shadow-2xl shadow-black/60">
+            <div className="mt-2 max-h-80 w-full overflow-y-auto overscroll-contain rounded-2xl bg-black/40 [scrollbar-width:thin]">
               {results.map((result) => {
                 const typeItems = itemsByType[result.mediaType] || [];
                 const alreadyAdded = typeItems.some((item) => keyOf(item) === keyOf(result));
