@@ -91,6 +91,9 @@ export default function SoundtrackModal({
     setSelectedId(initialTrack?.id || null);
     setIsPlaying(Boolean(initialTrack?.previewUrl));
     setProgress(0);
+    // Sin silencio compartido, silenciar vale solo para esa vez: al volver a
+    // abrir, suena.
+    setMutedState(false);
   }, [initialTrackId, open, trackQueue]);
 
   useModalGuard({ open, onClose });
