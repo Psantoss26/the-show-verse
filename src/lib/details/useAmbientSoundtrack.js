@@ -45,7 +45,7 @@ export function ambientPlaylist(tracks) {
  * @param resetKey   identidad del título: al cambiar, vuelve a la primera pista.
  * @returns {{ available, playing, muted, trackId, toggle }}
  *   available  hay pistas con preview;
- *   playing    está sonando (para animar las barras);
+ *   playing    está sonando (para animar el icono del altavoz);
  *   muted      el usuario lo ha silenciado;
  *   trackId    la pista que suena (el reproductor completo abre en ella);
  *   toggle     silenciar / activar (o empezar si el navegador lo bloqueó).
