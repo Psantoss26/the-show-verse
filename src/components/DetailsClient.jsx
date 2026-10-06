@@ -2185,7 +2185,8 @@ export default function DetailsClient({
 
   // MODO SOUNDTRACK: la banda sonora suena de fondo al entrar en la ficha. Se
   // pausa con el tráiler o el reproductor completo abiertos (tienen su propio
-  // sonido) y el botón de soundtrack la silencia.
+  // sonido); en el reproductor se activa o desactiva la reproducción
+  // automática.
   const soundtrackAmbient = useAmbientSoundtrack({
     tracks: soundtrackTracks,
     suspended: soundtrackModalOpen || videoModalOpen,
@@ -9140,6 +9141,8 @@ export default function DetailsClient({
         error={soundtrackError}
         initialTrackId={activeSoundtrackId}
         searchUrl={soundtrackSpotifySearchUrl}
+        autoplay={soundtrackAmbient.autoplay}
+        onAutoplayChange={soundtrackAmbient.setAutoplay}
       />
 
       {type === "tv" && (
@@ -10221,8 +10224,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 mobileGapClass="gap-1.5"
                 onTrailer={() => openVideo(preferredVideo)}
                 trailerAvailable={!!preferredVideo}
-                // Pulsado largo con el soundtrack sonando: el reproductor
-                // completo, en la misma pista.
+                // Con el soundtrack sonando, el reproductor abre en la misma
+                // pista.
                 onSoundtrack={() => openSoundtrack(soundtrackAmbient.trackId)}
                 soundtrackAvailable={!!soundtrackSearchQuery}
                 soundtrackAmbient={soundtrackAmbient}

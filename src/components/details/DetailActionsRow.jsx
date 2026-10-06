@@ -17,7 +17,6 @@ import {
   Play,
   X,
   Music2,
-  VolumeX,
   BarChart3,
   Loader2,
   Heart,
@@ -25,48 +24,6 @@ import {
   ListVideo,
   MessageSquare,
 } from "lucide-react";
-
-// MODO SOUNDTRACK (ver useAmbientSoundtrack): con el soundtrack sonando de
-// fondo, el botón de soundtrack enseña el altavoz animado y un toque lo
-// silencia (o lo vuelve a activar). Mantenerlo pulsado —o el clic derecho en
-// ordenador— abre el reproductor completo, que antes abría el toque.
-const LONG_PRESS_MS = 550;
-
-function useSoundtrackPress({ onPress, onLongPress }) {
-  const timerRef = useRef(0);
-  const firedRef = useRef(false);
-  const clear = () => window.clearTimeout(timerRef.current);
-  const fire = () => {
-    if (firedRef.current) return;
-    firedRef.current = true;
-    onLongPress?.();
-  };
-  return {
-    onPointerDown: (event) => {
-      if (!onLongPress || (event.pointerType === "mouse" && event.button !== 0)) return;
-      firedRef.current = false;
-      clear();
-      timerRef.current = window.setTimeout(fire, LONG_PRESS_MS);
-    },
-    onPointerUp: clear,
-    onPointerLeave: clear,
-    onPointerCancel: clear,
-    onContextMenu: (event) => {
-      if (!onLongPress) return;
-      event.preventDefault();
-      clear();
-      fire();
-    },
-    onClick: (event) => {
-      // El toque que acaba un "mantener pulsado" no cuenta como toque.
-      if (firedRef.current) {
-        firedRef.current = false;
-        return;
-      }
-      onPress?.(event);
-    },
-  };
-}
 
 // Limita el nuevo acabado a las acciones de ficha. Así todas sus variantes
 // (DetailsClient, DetailModal, héroes y filas responsive) comparten el mismo
@@ -222,7 +179,7 @@ export default function DetailActionsRow({
 
   onSoundtrack,
   soundtrackAvailable = false,
-  // `{ available, playing, muted, toggle }` de useAmbientSoundtrack, o null.
+  // `{ available, playing }` de useAmbientSoundtrack, o null: anima el icono.
   soundtrackAmbient = null,
 
   onEpisodeRatings,
@@ -252,43 +209,16 @@ export default function DetailActionsRow({
   const serverOnline = useServerOnline();
   const [mediaExpanded, setMediaExpanded] = useState(false);
 
-  // Soundtrack de fondo: el botón lo silencia y, pulsado largo, abre el
-  // reproductor. Sin pistas que sonar, se comporta como siempre.
+  // MODO SOUNDTRACK (ver useAmbientSoundtrack): mientras suena de fondo, el
+  // botón de soundtrack enseña el altavoz animado. Pulsarlo abre el
+  // reproductor, donde se activa o desactiva la reproducción automática.
   const ambient = soundtrackAmbient?.available ? soundtrackAmbient : null;
-  const soundtrackIcon = ambient?.playing ? (
-    <SoundWaves playing />
-  ) : ambient?.muted ? (
-    <VolumeX />
-  ) : (
-    <Music2 />
-  );
+  const soundtrackIcon = ambient?.playing ? <SoundWaves playing /> : <Music2 />;
   const soundtrackTitle = !soundtrackAvailable
     ? "Sin soundtrack"
-    : ambient
-      ? `${ambient.muted ? "Activar el soundtrack" : ambient.playing ? "Silenciar el soundtrack" : "Reproducir el soundtrack"} · Mantén pulsado para abrir el reproductor`
+    : ambient?.playing
+      ? "Soundtrack sonando · Abrir el reproductor"
       : "Reproducir soundtrack";
-  const soundtrackPress = useSoundtrackPress({
-    onPress: () => (ambient ? ambient.toggle() : onSoundtrack?.()),
-    onLongPress: ambient ? onSoundtrack : null,
-  });
-  const expandedSoundtrackPress = useSoundtrackPress({
-    onPress: (event) => {
-      event?.stopPropagation?.();
-      if (ambient) {
-        ambient.toggle();
-        return;
-      }
-      setMediaExpanded(false);
-      onSoundtrack?.();
-    },
-    onLongPress: ambient
-      ? () => {
-          setMediaExpanded(false);
-          onSoundtrack?.();
-        }
-      : null,
-  });
-  const pressClass = ambient ? "select-none [-webkit-touch-callout:none]" : "";
 
   // --- Píldora adaptable (ver `compactLabelWhenTight`).
   const hasLabelButton = Boolean(play || trailerLabel);
@@ -593,12 +523,16 @@ export default function DetailActionsRow({
             expanded={mediaExpanded}
             expandedContent={
               <LiquidButton
-                {...expandedSoundtrackPress}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMediaExpanded(false);
+                  if (onSoundtrack) onSoundtrack();
+                }}
                 disabled={!soundtrackAvailable}
                 active={!!soundtrackAvailable}
                 activeColor="yellow"
                 groupId="details-actions"
-                className={`!w-full !h-auto aspect-square ${pressClass} ${
+                className={`!w-full !h-auto aspect-square ${
                   soundtrackAvailable ? "!bg-white !text-black" : ""
                 }`}
                 title={soundtrackTitle}
@@ -763,12 +697,12 @@ export default function DetailActionsRow({
         {/* Botón de música/soundtrack */}
         {onSoundtrack && (
           <LiquidButton
-            {...soundtrackPress}
+            onClick={onSoundtrack}
             disabled={!soundtrackAvailable}
             active={!!soundtrackAvailable}
             activeColor="yellow"
             groupId="details-actions"
-            className={`${pressClass} ${soundtrackAvailable ? "!bg-white !text-black" : ""}`}
+            className={soundtrackAvailable ? "!bg-white !text-black" : ""}
             title={soundtrackTitle}
             aria-label={soundtrackTitle}
           >
