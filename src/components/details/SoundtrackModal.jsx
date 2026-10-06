@@ -51,8 +51,9 @@ export default function SoundtrackModal({
   error = "",
   initialTrackId = null,
   searchUrl = "",
-  // Modo soundtrack de la ficha (useAmbientSoundtrack): con `onAutoplayChange`
-  // el reproductor ofrece activar o desactivar que suene al abrir una ficha.
+  // Modo soundtrack de la ficha (useAmbientSoundtrack). Con `onAutoplayChange`
+  // el SILENCIO es uno solo: el altavoz junto al volumen silencia el
+  // reproductor y desactiva que suene al abrir una ficha, y al revés.
   autoplay = true,
   onAutoplayChange = null,
 }) {
@@ -72,7 +73,16 @@ export default function SoundtrackModal({
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.3);
-  const [isMuted, setIsMuted] = useState(false);
+  const [mutedState, setMutedState] = useState(false);
+  const sharedMute = typeof onAutoplayChange === "function";
+  const isMuted = sharedMute ? !autoplay : mutedState;
+  const setIsMuted = (next) => {
+    if (sharedMute) {
+      if (next !== isMuted) onAutoplayChange(!next);
+    } else {
+      setMutedState(next);
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -403,6 +413,23 @@ export default function SoundtrackModal({
                   type="button"
                   onClick={toggleMute}
                   className="text-white/60 hover:text-white transition"
+                  aria-pressed={isMuted}
+                  aria-label={
+                    sharedMute
+                      ? isMuted
+                        ? "Activar el sonido y la reproducción automática"
+                        : "Silenciar y desactivar la reproducción automática"
+                      : isMuted
+                        ? "Activar el sonido"
+                        : "Silenciar"
+                  }
+                  title={
+                    sharedMute
+                      ? isMuted
+                        ? "Activar el sonido (también al abrir una ficha)"
+                        : "Silenciar (tampoco sonará al abrir una ficha)"
+                      : undefined
+                  }
                 >
                   {isMuted || volume === 0 ? (
                     <VolumeX className="w-5 h-5" />
@@ -430,36 +457,6 @@ export default function SoundtrackModal({
               </div>
             )}
 
-            {/* --- REPRODUCCIÓN AUTOMÁTICA (modo soundtrack de la ficha) --- */}
-            {onAutoplayChange && (
-              <label className="mt-8 flex w-full cursor-pointer items-center justify-between gap-4 rounded-2xl bg-white/5 px-4 py-3 text-left">
-                <span className="min-w-0">
-                  <span className="block text-sm font-bold text-white/85">Reproducción automática</span>
-                  <span className="block text-[11px] font-semibold text-white/45">
-                    {autoplay ? "Suena al abrir la ficha de un título" : "Desactivada en todos los títulos"}
-                  </span>
-                </span>
-                <input
-                  type="checkbox"
-                  role="switch"
-                  className="peer sr-only"
-                  checked={autoplay}
-                  onChange={(event) => onAutoplayChange(event.target.checked)}
-                />
-                <span
-                  aria-hidden="true"
-                  className={`relative h-7 w-12 shrink-0 rounded-full transition-colors duration-300 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-yellow-400 ${
-                    autoplay ? "bg-yellow-400/80" : "bg-white/15"
-                  }`}
-                >
-                  <span
-                    className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-transform duration-300 ${
-                      autoplay ? "translate-x-6" : "translate-x-1"
-                    }`}
-                  />
-                </span>
-              </label>
-            )}
           </div>
         ) : (
           <div className="flex h-[340px] flex-col items-center justify-center gap-3 text-center text-zinc-400 p-6">
