@@ -15,8 +15,15 @@ import {
   Volume2,
   VolumeX,
   ExternalLink,
+  CirclePlay,
+  ThumbsUp,
+  ThumbsDown,
+  EyeOff,
+  RotateCcw,
+  Undo2,
 } from "lucide-react";
 import useModalGuard from "@/hooks/useModalGuard";
+import { useServerOnline } from "@/context/ServerStatusContext";
 
 function sourceIconPath(source) {
   const key = String(source || "").toLowerCase();
@@ -42,6 +49,61 @@ function SourceLinkIcon({ source, className = "" }) {
   return <ExternalLink className={className} />;
 }
 
+// Botón de icono de la fila de controles (sin texto: el nombre va en
+// `aria-label` para lectores de pantalla).
+function ControlIconButton({ icon: Icon, label, onClick, pressed, disabled = false, busy = false, activeClassName = "" }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      aria-pressed={pressed}
+      className={`flex h-10 w-10 items-center justify-center rounded-full transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70 disabled:cursor-not-allowed disabled:opacity-40 ${
+        pressed && activeClassName
+          ? activeClassName
+          : "bg-white/5 text-white/65 hover:bg-white/10 hover:text-white"
+      }`}
+    >
+      {busy ? (
+        <Loader2 className="h-[18px] w-[18px] animate-spin" aria-hidden="true" />
+      ) : (
+        <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
+      )}
+    </button>
+  );
+}
+
+// Interruptor de reproducción automática: el de Ajustes (ToggleRow) en pequeño,
+// con un icono en lugar de texto.
+function AutoplaySwitch({ checked, disabled, onChange }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <CirclePlay className="h-5 w-5 text-white/60" aria-hidden="true" />
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label="Reproducción automática al abrir la ficha"
+        disabled={disabled}
+        onClick={() => onChange(!checked)}
+        className={`relative h-7 w-12 shrink-0 rounded-full transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:cursor-not-allowed disabled:opacity-60 ${
+          checked
+            ? "bg-emerald-500/80 shadow-[0_0_12px_rgba(16,185,129,0.3)]"
+            : "bg-white/10"
+        }`}
+      >
+        <span
+          aria-hidden="true"
+          className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow-md transition-all duration-300 ${
+            checked ? "left-6" : "left-1"
+          }`}
+        />
+      </button>
+    </div>
+  );
+}
+
 export default function SoundtrackModal({
   open,
   onClose,
@@ -51,12 +113,29 @@ export default function SoundtrackModal({
   error = "",
   initialTrackId = null,
   searchUrl = "",
-  // Modo soundtrack de la ficha (useAmbientSoundtrack). Con `onAutoplayChange`
-  // el SILENCIO es uno solo: el altavoz junto al volumen silencia el
-  // reproductor y desactiva que suene al abrir una ficha, y al revés.
+  // Modo soundtrack de la ficha (useAmbientSoundtrack): si la banda sonora
+  // suena sola al abrir una ficha. Con `onAutoplayChange` aparece un
+  // interruptor bajo el volumen (es la misma preferencia que Ajustes); sin él
+  // (p. ej. desde DetailModal) no se pinta. El altavoz NO la toca: solo
+  // silencia este reproductor.
   autoplay = true,
   onAutoplayChange = null,
+  // Valoración del soundtrack de este título (src/lib/soundtrack/
+  // soundtrackFeedback.js). Con `onFeedback` aparecen 👍 / 👎 / revertir /
+  // ocultar:
+  //   "confirm"  lo da por bueno (otra vez: lo deja sin valorar);
+  //   "dislike"  descarta este resultado y busca otra alternativa;
+  //   "undo"     revertir el último 👎: vuelve al soundtrack anterior (solo
+  //              con `rejectionCount` > 0);
+  //   "hide"     no mostrar el soundtrack de este título;
+  //   "reset"    olvidar todos los descartes (cuando ya no quedan alternativas).
+  // `pendingAction`: la de esas acciones cuya búsqueda está en curso.
+  feedbackStatus = null,
+  rejectionCount = 0,
+  onFeedback = null,
+  pendingAction = null,
 }) {
+  const online = useServerOnline();
   const audioRef = useRef(null);
 
   const trackQueue = useMemo(
@@ -73,16 +152,11 @@ export default function SoundtrackModal({
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.3);
-  const [mutedState, setMutedState] = useState(false);
-  const sharedMute = typeof onAutoplayChange === "function";
-  const isMuted = sharedMute ? !autoplay : mutedState;
-  const setIsMuted = (next) => {
-    if (sharedMute) {
-      if (next !== isMuted) onAutoplayChange(!next);
-    } else {
-      setMutedState(next);
-    }
-  };
+  const [isMuted, setIsMuted] = useState(false);
+  const showAutoplaySwitch = typeof onAutoplayChange === "function";
+  const showFeedback = typeof onFeedback === "function";
+  const canUndo = showFeedback && rejectionCount > 0;
+  const busy = Boolean(pendingAction);
 
   useEffect(() => {
     if (!open) return;
@@ -91,9 +165,8 @@ export default function SoundtrackModal({
     setSelectedId(initialTrack?.id || null);
     setIsPlaying(Boolean(initialTrack?.previewUrl));
     setProgress(0);
-    // Sin silencio compartido, silenciar vale solo para esa vez: al volver a
-    // abrir, suena.
-    setMutedState(false);
+    // Silenciar vale solo para esa vez: al volver a abrir, suena.
+    setIsMuted(false);
   }, [initialTrackId, open, trackQueue]);
 
   useModalGuard({ open, onClose });
@@ -221,7 +294,13 @@ export default function SoundtrackModal({
         {loading ? (
           <div className="flex h-96 flex-col items-center justify-center gap-3 text-zinc-400">
             <Loader2 className="h-10 w-10 animate-spin text-yellow-300" />
-            <p className="text-base font-medium">Buscando música...</p>
+            <p className="text-base font-medium">
+              {pendingAction === "dislike"
+                ? "Buscando otra alternativa..."
+                : pendingAction === "undo"
+                  ? "Recuperando el soundtrack anterior..."
+                  : "Buscando música..."}
+            </p>
           </div>
         ) : selectedTrack ? (
           <div className="flex flex-col p-8 items-center w-full">
@@ -417,22 +496,7 @@ export default function SoundtrackModal({
                   onClick={toggleMute}
                   className="text-white/60 hover:text-white transition"
                   aria-pressed={isMuted}
-                  aria-label={
-                    sharedMute
-                      ? isMuted
-                        ? "Activar el sonido y la reproducción automática"
-                        : "Silenciar y desactivar la reproducción automática"
-                      : isMuted
-                        ? "Activar el sonido"
-                        : "Silenciar"
-                  }
-                  title={
-                    sharedMute
-                      ? isMuted
-                        ? "Activar el sonido (también al abrir una ficha)"
-                        : "Silenciar (tampoco sonará al abrir una ficha)"
-                      : undefined
-                  }
+                  aria-label={isMuted ? "Activar el sonido" : "Silenciar"}
                 >
                   {isMuted || volume === 0 ? (
                     <VolumeX className="w-5 h-5" />
@@ -460,6 +524,64 @@ export default function SoundtrackModal({
               </div>
             )}
 
+            {/* --- REPRODUCCIÓN AUTOMÁTICA Y VALORACIÓN ---
+                Solo iconos. Reproducción automática: misma preferencia que
+                Ajustes > Reproducción automática del soundtrack. Valoración:
+                👍 es correcto · 👎 no lo es, buscar otro · ocultar en esta
+                ficha. Fuera del bloque de volumen: se pueden usar aunque la
+                pista elegida no tenga preview. Sin servidor no se pueden
+                guardar, así que se desactivan (como en Ajustes). */}
+            {(showAutoplaySwitch || showFeedback) && (
+              <div className={`${selectedHasPreview ? "mt-6" : ""} flex w-full items-center justify-center gap-4`}>
+                {showAutoplaySwitch && (
+                  <AutoplaySwitch
+                    checked={autoplay}
+                    disabled={!online}
+                    onChange={onAutoplayChange}
+                  />
+                )}
+                {showAutoplaySwitch && showFeedback && (
+                  <span aria-hidden="true" className="h-6 w-px bg-white/10" />
+                )}
+                {showFeedback && (
+                  <div className="flex items-center gap-2">
+                    <ControlIconButton
+                      icon={ThumbsUp}
+                      label="El soundtrack es correcto"
+                      pressed={feedbackStatus === "confirmed"}
+                      activeClassName="bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25"
+                      disabled={!online}
+                      onClick={() => onFeedback("confirm")}
+                    />
+                    <ControlIconButton
+                      icon={ThumbsDown}
+                      label="No es el soundtrack correcto: buscar otro"
+                      disabled={!online || busy}
+                      busy={pendingAction === "dislike"}
+                      onClick={() => onFeedback("dislike")}
+                    />
+                    {/* Solo tras un 👎: volver al soundtrack anterior si era
+                        mejor que el nuevo (o si la búsqueda falló). */}
+                    {canUndo && (
+                      <ControlIconButton
+                        icon={Undo2}
+                        label="Volver al soundtrack anterior"
+                        disabled={!online || busy}
+                        busy={pendingAction === "undo"}
+                        onClick={() => onFeedback("undo")}
+                      />
+                    )}
+                    <ControlIconButton
+                      icon={EyeOff}
+                      label="No mostrar el soundtrack de este título"
+                      disabled={!online}
+                      onClick={() => onFeedback("hide")}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
           </div>
         ) : (
           <div className="flex h-[340px] flex-col items-center justify-center gap-3 text-center text-zinc-400 p-6">
@@ -467,6 +589,31 @@ export default function SoundtrackModal({
             <p className="text-sm">
               {error || "No se encontraron canciones para este título."}
             </p>
+            {/* Tras un 👎 puede no quedar ninguna alternativa (o fallar la
+                búsqueda): volver al soundtrack anterior, empezar de cero
+                (olvida todos los descartes) u ocultarlo. */}
+            {canUndo && (
+              <div className="mt-2 flex items-center gap-2">
+                <ControlIconButton
+                  icon={Undo2}
+                  label="Volver al soundtrack anterior"
+                  disabled={!online || busy}
+                  onClick={() => onFeedback("undo")}
+                />
+                <ControlIconButton
+                  icon={RotateCcw}
+                  label="Volver a buscar desde el principio (olvida los descartados)"
+                  disabled={!online || busy}
+                  onClick={() => onFeedback("reset")}
+                />
+                <ControlIconButton
+                  icon={EyeOff}
+                  label="No mostrar el soundtrack de este título"
+                  disabled={!online}
+                  onClick={() => onFeedback("hide")}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>

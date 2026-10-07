@@ -2109,6 +2109,27 @@ function ProfileSettingsClient() {
                         })
                       }
                     />
+                    {/* Valoraciones del reproductor del soundtrack (👍 / 👎 /
+                        ocultar, por título). Un soundtrack oculto quita también
+                        su botón de la ficha, así que esta es la forma de
+                        recuperarlo. Solo aparece si hay alguna. */}
+                    {Object.keys(preferences.uiSettings.soundtrackFeedback || {}).length > 0 && (
+                      <SettingActionRow
+                        icon={RotateCcw}
+                        title={t("settings_soundtrack_feedback", "Soundtracks valorados")}
+                        description={t(
+                          "settings_soundtrack_feedback_desc",
+                          "{count} títulos con el soundtrack confirmado, descartado u oculto. Restablecer vuelve a mostrarlos y a buscar desde el principio.",
+                        ).replace("{count}", String(Object.keys(preferences.uiSettings.soundtrackFeedback || {}).length))}
+                        buttonLabel={t("settings_reset", "Restablecer")}
+                        disabled={saving}
+                        onClick={() =>
+                          updatePreference({
+                            uiSettings: { ...preferences.uiSettings, soundtrackFeedback: {} },
+                          })
+                        }
+                      />
+                    )}
                     <ToggleRow
                       icon={Shield}
                       title={t("settings_sync_trakt", "Sincronizar acciones con Trakt")}

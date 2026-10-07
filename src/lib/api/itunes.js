@@ -14,6 +14,7 @@ import {
   primarySearchTitle,
   scoreSoundtrackAlbumCandidate,
 } from "@/lib/api/soundtrack-utils";
+import { itunesCollectionKey } from "@/lib/soundtrack/soundtrackFeedback";
 
 const ITUNES_SEARCH_URL = "https://itunes.apple.com/search";
 const ITUNES_LOOKUP_URL = "https://itunes.apple.com/lookup";
@@ -262,7 +263,9 @@ export async function searchITunes(ctx, country = "US", options = {}) {
   const uniqueAlbums = allAlbums.filter(
     (album, index, arr) =>
       arr.findIndex((item) => item.collectionId === album.collectionId) ===
-      index,
+        index &&
+      // Álbumes que el usuario descartó (👎): la clasificación pasa al siguiente.
+      !ctx.excluded?.has(itunesCollectionKey(album.collectionId)),
   );
   const ranked = scoreAlbums(uniqueAlbums, ctx, options);
   const topAlbums = ranked.slice(0, MAX_ALBUMS);

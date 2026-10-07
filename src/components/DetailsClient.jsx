@@ -299,6 +299,12 @@ import AddToListModal from "@/components/details/AddToListModal";
 import VideoModal from "@/components/details/VideoModal";
 import SoundtrackModal from "@/components/details/SoundtrackModal";
 import useAmbientSoundtrack from "@/lib/details/useAmbientSoundtrack";
+import {
+  getSoundtrackFeedback,
+  SOUNDTRACK_EXCLUDE_PARAM,
+  trackCollectionKeys,
+  withSoundtrackFeedback,
+} from "@/lib/soundtrack/soundtrackFeedback";
 import TraktCommentModal from "@/components/details/TraktCommentModal";
 import PosterStack from "@/components/details/PosterStack";
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
@@ -345,6 +351,7 @@ function getSoundtrackSourceBadge(source) {
 // Clave de API de TMDb inyectada como variable de entorno publica
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const SOUNDTRACK_ALGORITHM_VERSION = "soundtrack-ranking-v47";
+const EMPTY_SOUNDTRACK_TRACKS = [];
 const DETAILS_ROUTE_TRANSITION_KEY = "showverse:details-route-transition";
 
 // Cache en memoria para el scoreboard publico (evita refetches durante la sesion)
@@ -1030,6 +1037,7 @@ export default function DetailsClient({
     preferences,
     preferencesCached = false,
     cacheArtworkOverrides,
+    updatePreference,
   } = useAuth();
   const isAdmin =
     account?.username === "psantos26" || account?.name === "psantos26";
@@ -2013,8 +2021,18 @@ export default function DetailsClient({
 
   // Selecciona automaticamente el mejor video (trailer oficial preferido)
   const preferredVideo = useMemo(() => pickPreferredVideo(videos), [videos]);
+  // Valoración del soundtrack de este título por el usuario (👍 / 👎 / ocultar
+  // en el reproductor). Los descartes viajan a /api/soundtrack para que busque
+  // otra alternativa; "oculto" apaga todo lo del soundtrack en la ficha.
+  const soundtrackFeedback = useMemo(
+    () => getSoundtrackFeedback(preferences?.uiSettings, endpointType, id),
+    [endpointType, id, preferences?.uiSettings],
+  );
+  const soundtrackHidden = soundtrackFeedback.status === "hidden";
+  const soundtrackExcludeKey = soundtrackFeedback.excluded.join(",");
   const soundtrackSearchQuery = useMemo(() => {
-    if (!title) return "";
+    // Oculto: sin consulta no hay botón, ni sección, ni carga.
+    if (!title || soundtrackHidden) return "";
     return [
       title,
       yearIso,
@@ -2022,7 +2040,7 @@ export default function DetailsClient({
     ]
       .filter(Boolean)
       .join(" ");
-  }, [endpointType, title, yearIso]);
+  }, [endpointType, soundtrackHidden, title, yearIso]);
   const soundtrackSpotifySearchUrl = useMemo(() => {
     if (!soundtrackSearchQuery) return "";
     return `https://open.spotify.com/search/${encodeURIComponent(soundtrackSearchQuery)}`;
@@ -2036,10 +2054,11 @@ export default function DetailsClient({
         title,
         originalTitle,
         yearIso,
+        soundtrackExcludeKey && `x:${soundtrackExcludeKey}`,
       ]
         .filter(Boolean)
         .join("|"),
-    [endpointType, id, originalTitle, title, yearIso],
+    [endpointType, id, originalTitle, soundtrackExcludeKey, title, yearIso],
   );
 
   const loadSoundtrack = useCallback(
@@ -2100,6 +2119,9 @@ export default function DetailsClient({
         }
         if (yearIso) params.set("year", yearIso);
         if (id) params.set("tmdbId", String(id));
+        if (soundtrackExcludeKey) {
+          params.set(SOUNDTRACK_EXCLUDE_PARAM, soundtrackExcludeKey);
+        }
 
         const response = await fetch(`/api/soundtrack?${params.toString()}`, {
           signal: controller.signal,
@@ -2131,7 +2153,9 @@ export default function DetailsClient({
           setSoundtrackError(
             normalized.length
               ? ""
-              : !spotifyConfigured
+              : soundtrackExcludeKey
+                ? "No quedan más alternativas para este soundtrack."
+                : !spotifyConfigured
                 ? "Spotify no está configurado en el servidor."
                 : spotifyRateLimited
                   ? retryAfterSecs > 3600
@@ -2167,6 +2191,7 @@ export default function DetailsClient({
       endpointType,
       id,
       originalTitle,
+      soundtrackExcludeKey,
       soundtrackRequestKey,
       soundtrackResolved,
       soundtrackSearchQuery,
@@ -2189,12 +2214,91 @@ export default function DetailsClient({
   // sonido); en el reproductor se activa o desactiva la reproducción
   // automática.
   const soundtrackAmbient = useAmbientSoundtrack({
-    tracks: soundtrackTracks,
+    // Oculto en esta ficha: tampoco suena de fondo.
+    tracks: soundtrackHidden ? EMPTY_SOUNDTRACK_TRACKS : soundtrackTracks,
     // Ajustes > Reproducción automática del soundtrack.
     enabled: preferences?.uiSettings?.soundtrackAutoplay !== false,
     suspended: soundtrackModalOpen || videoModalOpen,
     resetKey: `${endpointType}:${id}`,
   });
+
+  // Interruptor del reproductor del soundtrack: es la MISMA preferencia que
+  // Ajustes, así que los dos siempre dicen lo mismo. Al activarlo se borra
+  // además el silencio local que dejaba el altavoz cuando hacía de interruptor
+  // (versiones anteriores); si no, seguiría sin sonar sin forma de saber por qué.
+  const soundtrackAutoplayPref = preferences?.uiSettings?.soundtrackAutoplay !== false;
+  const { setAutoplay: setAmbientAutoplay } = soundtrackAmbient;
+  const handleSoundtrackAutoplayChange = useCallback(
+    (value) => {
+      if (value) setAmbientAutoplay(true);
+      if (value === soundtrackAutoplayPref) return;
+      updatePreference?.({
+        uiSettings: { ...preferences?.uiSettings, soundtrackAutoplay: value },
+      });
+    },
+    [preferences?.uiSettings, setAmbientAutoplay, soundtrackAutoplayPref, updatePreference],
+  );
+
+  // 👍 / 👎 / revertir / ocultar del reproductor. Se guarda en la cuenta, por
+  // título. `pending` es la acción cuya búsqueda está en curso (el reproductor
+  // lo dice en su espera y desactiva el botón mientras tanto).
+  const [soundtrackPendingAction, setSoundtrackPendingAction] = useState(null);
+  const handleSoundtrackFeedback = useCallback(
+    (action) => {
+      const current = soundtrackFeedback;
+      let next;
+      if (action === "confirm") {
+        // Pulsar otra vez deja el soundtrack sin valorar.
+        next = { ...current, status: current.status === "confirmed" ? null : "confirmed" };
+      } else if (action === "dislike") {
+        // Apila un rechazo con las colecciones de las que sale el resultado
+        // actual; al cambiar los descartes, el efecto de abajo pide otro.
+        const rejected = trackCollectionKeys(soundtrackTracks).filter(
+          (key) => !current.excluded.includes(key),
+        );
+        if (!rejected.length) return;
+        next = { rejections: [...current.rejections, rejected], status: null };
+      } else if (action === "undo") {
+        // Revertir: quita el último rechazo y vuelve EXACTAMENTE al soundtrack
+        // anterior (es la misma búsqueda de antes y suele estar en caché).
+        if (!current.rejections.length) return;
+        next = { rejections: current.rejections.slice(0, -1), status: null };
+      } else if (action === "reset") {
+        next = { rejections: [], status: null };
+      } else if (action === "hide") {
+        next = { ...current, status: "hidden" };
+        setSoundtrackModalOpen(false);
+      } else {
+        return;
+      }
+      if (action === "dislike" || action === "undo" || action === "reset") {
+        setSoundtrackPendingAction(action);
+        setActiveSoundtrackId(null);
+        setSoundtrackTracks([]);
+        setSoundtrackLoading(true);
+      }
+      updatePreference?.({
+        uiSettings: withSoundtrackFeedback(preferences?.uiSettings, endpointType, id, next),
+      });
+    },
+    [endpointType, id, preferences?.uiSettings, soundtrackFeedback, soundtrackTracks, updatePreference],
+  );
+
+  // Cambiaron los descartes (👎, revertir o volver a empezar): pedir el
+  // soundtrack con la lista nueva, en primer plano si el reproductor está
+  // abierto.
+  const lastSoundtrackExcludeKeyRef = useRef(soundtrackExcludeKey);
+  useEffect(() => {
+    if (lastSoundtrackExcludeKeyRef.current === soundtrackExcludeKey) return;
+    lastSoundtrackExcludeKeyRef.current = soundtrackExcludeKey;
+    if (!soundtrackSearchQuery) {
+      setSoundtrackPendingAction(null);
+      return;
+    }
+    void loadSoundtrack({ background: false, force: true }).finally(() =>
+      setSoundtrackPendingAction(null),
+    );
+  }, [loadSoundtrack, soundtrackExcludeKey, soundtrackSearchQuery]);
 
   // Abre el modal de video con el video seleccionado
   const openVideo = (v) => {
@@ -9144,10 +9248,14 @@ export default function DetailsClient({
         error={soundtrackError}
         initialTrackId={activeSoundtrackId}
         searchUrl={soundtrackSpotifySearchUrl}
-        // Con el modo soundtrack desactivado en Ajustes, el altavoz del
-        // reproductor solo silencia el reproductor.
+        // Fila de iconos bajo el volumen: reproducción automática y 👍 / 👎 /
+        // revertir / ocultar el soundtrack de este título.
         autoplay={soundtrackAmbient.autoplay}
-        onAutoplayChange={soundtrackAmbient.enabled ? soundtrackAmbient.setAutoplay : null}
+        onAutoplayChange={handleSoundtrackAutoplayChange}
+        feedbackStatus={soundtrackFeedback.status}
+        rejectionCount={soundtrackFeedback.rejections.length}
+        onFeedback={handleSoundtrackFeedback}
+        pendingAction={soundtrackPendingAction}
       />
 
       {type === "tv" && (

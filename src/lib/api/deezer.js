@@ -9,6 +9,7 @@ import {
   primarySearchTitle,
   scoreSoundtrackAlbumCandidate,
 } from "@/lib/api/soundtrack-utils";
+import { deezerCollectionKey } from "@/lib/soundtrack/soundtrackFeedback";
 
 const DEEZER_API = "https://api.deezer.com";
 const MAX_TRACKS = 40;
@@ -171,7 +172,9 @@ export async function searchDeezer(ctx) {
         primaryTitleSearchRank: primaryTitleSearch ? index + 1 : null,
       }))
       .map((a) => ({ ...a, _score: scoreAlbum(a, ctx) }))
-      .filter((a) => a._score >= ALBUM_MIN_SCORE)
+      // Álbumes que el usuario descartó (👎), ANTES del recorte a MAX_ALBUMS:
+      // así la clasificación deja sitio al siguiente candidato.
+      .filter((a) => a._score >= ALBUM_MIN_SCORE && !ctx.excluded?.has(deezerCollectionKey(a.id)))
       .sort((a, b) => b._score - a._score)
       .slice(0, MAX_ALBUMS);
 
