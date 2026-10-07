@@ -65,7 +65,7 @@ test("el cierre y las tarjetas de episodios no muestran contornos visuales", () 
 
 test("un rewatch conserva su icono y etiqueta completos", () => {
   assert.match(modalSource, /isRewatchView \? "w-max"/);
-  assert.match(modalSource, /isRewatchView \? "w-10 xl:w-11"/);
+  assert.match(modalSource, /isRewatchView \? "w-11"/);
   assert.match(modalSource, /isRewatchView \? \(\s*<History className="w-3\.5 h-3\.5"/);
   assert.match(modalSource, /!isRewatchView && \(/);
 });
@@ -122,11 +122,11 @@ test("el cuadro de fecha de rewatch no muestra borde", () => {
 test("el selector de lista o tabla comparte la altura de la barra", () => {
   assert.match(
     modalSource,
-    // Misma altura que la barra (h-10, xl:h-11); el fondo es el cristal
-    // compartido de los controles del modal.
-    /flex h-10 shrink-0 gap-1 rounded-xl \$\{GLASS_CONTROL\} p-1 xl:h-11/,
+    // Misma altura que la barra (h-11) y el acabado de las barras de las
+    // páginas de usuario; el botón interior es concéntrico (rounded-xl).
+    /flex h-11 shrink-0 gap-1 rounded-2xl \$\{PAGE_CONTROL\} p-1/,
   );
-  assert.match(modalSource, /h-full w-9 rounded-lg text-xs font-bold/);
+  assert.match(modalSource, /h-full w-9 rounded-xl text-xs font-bold/);
 });
 
 test("al cambiar de temporada no se tapa el contenido con un estado de carga", () => {
@@ -135,4 +135,12 @@ test("al cambiar de temporada no se tapa el contenido con un estado de carga", (
     /\bisSwitching\b/,
     "el cambio de temporada no debe renderizar una capa de carga sobre la lista",
   );
+});
+
+test("la barra y sus desplegables usan el acabado de las páginas de usuario", () => {
+  assert.match(modalSource, /const PAGE_CONTROL =\s*"bg-gradient-to-br from-white\/10 to-white\/5 backdrop-blur-lg shadow-lg"/);
+  assert.match(modalSource, /const PAGE_MENU =\s*"rounded-2xl bg-black\/40 bg-gradient-to-br from-white\/10 to-white\/5 backdrop-blur-2xl p-2 shadow-2xl"/);
+  assert.match(modalSource, /w-full rounded-xl px-3 py-2 text-left text-sm/);
+  const toolbar = modalSource.slice(modalSource.indexOf("{/* Toolbar */}"), modalSource.indexOf("{!!showError && ("));
+  assert.doesNotMatch(toolbar, /GLASS_CONTROL|GLASS_MENU|\bh-10\b/);
 });

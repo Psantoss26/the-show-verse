@@ -250,6 +250,7 @@ export default function CollectionDetailsClient({ collectionId }) {
             description={collection?.description || ''}
             sourceLabel="Colección TMDb"
             posterImage={collectionPoster ? `https://image.tmdb.org/t/p/w780${collectionPoster}` : null}
+            posterLowImage={collectionPoster ? `https://image.tmdb.org/t/p/w342${collectionPoster}` : null}
             heroBackground={{
                 desktop: backgroundBackdrop ? `https://image.tmdb.org/t/p/original${backgroundBackdrop}` : null,
                 mobile: backgroundPoster ? `https://image.tmdb.org/t/p/w780${backgroundPoster}` : null,

@@ -13,13 +13,20 @@ import {
 // panel, este sería un backdrop root: los controles de dentro, con su propio
 // cristal, solo verían el fondo oscuro del modal y se quedaban oscuros. Así ven
 // la página y son cristal de verdad.
-//   - GLASS_CONTROL: buscador, botones, selectores y temporadas. El mismo
-//     cristal que las tarjetas de información de la ficha.
-//   - GLASS_MENU: desplegables que se abren ENCIMA de la lista; algo más
-//     tintados y desenfocados para que se lean sobre los episodios.
+//   - GLASS_CONTROL: temporadas, episodios y controles del contenido. El
+//     mismo cristal que las tarjetas de información de la ficha.
+//   - PAGE_CONTROL / PAGE_MENU: la barra de herramientas y sus desplegables,
+//     con el acabado de las páginas de usuario (ver más abajo).
 const GLASS_CONTROL = LIQUID_GLASS_CARD;
-const GLASS_MENU =
-  "bg-black/45 bg-gradient-to-b from-white/[0.12] via-white/[0.03] to-black/20 backdrop-blur-2xl backdrop-saturate-[180%] shadow-2xl";
+// BARRA DE HERRAMIENTAS (buscador, vista, filtros, añadir, historial): el
+// mismo acabado que la barra de las páginas de usuario (Favoritos, Pendientes,
+// Listas…), que también va superpuesta sobre el contenido. Controles de 44px
+// con `rounded-2xl` y desplegables con su panel translúcido.
+const PAGE_CONTROL =
+  "bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg";
+const PAGE_CONTROL_HOVER = "hover:from-white/15 hover:to-white/10 hover:text-white";
+const PAGE_MENU =
+  "rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl";
 
 function PanelGlass() {
   return (
@@ -1287,7 +1294,7 @@ export default function TraktEpisodesWatchedModal({
         <div className="z-20 shrink-0 space-y-2 px-4 py-3">
           {/* Móvil: búsqueda + toggle filtros */}
           <div className="flex items-center gap-2 lg:hidden">
-            <div className="relative h-10 flex-1">
+            <div className="relative h-11 flex-1">
               <Search className="pointer-events-none absolute z-10 left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
               <input
                 value={query}
@@ -1297,16 +1304,16 @@ export default function TraktEpisodesWatchedModal({
                     ? "Buscar episodio..."
                     : "Buscar temporada..."
                 }
-                className={`h-10 w-full rounded-xl ${GLASS_CONTROL} py-2.5 pl-10 pr-4 text-sm text-white/85 transition placeholder:text-white/30 focus:ring-2 focus:ring-emerald-300/50 focus:outline-none`}
+                className={`h-11 w-full rounded-2xl ${PAGE_CONTROL} py-2.5 pl-10 pr-4 text-sm text-white transition placeholder:text-zinc-400 focus:ring-2 focus:ring-emerald-300/50 focus:outline-none`}
               />
             </div>
             <button
               type="button"
               onClick={() => setMobileFiltersOpen((v) => !v)}
-              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-xl ${GLASS_CONTROL} transition-all ${
+              className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl ${PAGE_CONTROL} transition-all ${
                 mobileFiltersOpen
                   ? "text-emerald-400"
-                  : "text-white/50 hover:text-white"
+                  : "text-zinc-200 hover:text-white"
               }`}
             >
               <SlidersHorizontal className="w-4 h-4" />
@@ -1328,10 +1335,10 @@ export default function TraktEpisodesWatchedModal({
                     onClick={() => setViewMenuOpen((v) => !v)}
                     disabled={!isConnected || !serverOnline}
                     aria-label="Cambiar vista (Global o Rewatch por visionado)"
-                    className={`h-10 w-full inline-flex items-center gap-2 rounded-xl px-3.5 text-sm font-semibold transition ${
+                    className={`h-11 w-full inline-flex items-center gap-2 rounded-2xl px-3.5 text-sm font-semibold transition ${
                       !isConnected
                         ? "opacity-50 cursor-not-allowed bg-black/25 text-white/30"
-                        : `${GLASS_CONTROL} text-white/80 hover:bg-white/10`
+                        : `${PAGE_CONTROL} text-zinc-200 ${PAGE_CONTROL_HOVER}`
                     }`}
                   >
                     <span
@@ -1364,9 +1371,9 @@ export default function TraktEpisodesWatchedModal({
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -6 }}
                         transition={{ duration: 0.16, ease: "easeOut" }}
-                        className={`absolute left-0 top-full z-40 mt-1 w-full overflow-hidden rounded-xl ${GLASS_MENU}`}
+                        className={`absolute left-0 top-full z-40 mt-1 w-full overflow-hidden ${PAGE_MENU}`}
                       >
-                        <div className="max-h-56 overflow-y-auto sv-scroll py-1">
+                        <div className="max-h-56 space-y-1 overflow-y-auto sv-scroll">
                           {viewMenuItems.map((item) => {
                             const active = item.id === effectiveViewId;
                             return (
@@ -1377,7 +1384,7 @@ export default function TraktEpisodesWatchedModal({
                                   changeView(item.id);
                                   setViewMenuOpen(false);
                                 }}
-                                className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2.5 transition ${
+                                className={`w-full rounded-xl px-3 py-2 text-left text-sm flex items-center gap-2.5 transition ${
                                   active
                                     ? item.kind === "rewatch"
                                       ? "bg-purple-500/12 text-purple-200"
@@ -1414,10 +1421,10 @@ export default function TraktEpisodesWatchedModal({
                                     setHistoryLimit(60);
                     setHistoryOpen(true);
                   }}
-                  className={`h-10 min-w-0 w-full inline-flex items-center justify-center gap-2 px-3 text-sm font-semibold rounded-xl transition whitespace-nowrap ${
+                  className={`h-11 min-w-0 w-full inline-flex items-center justify-center gap-2 px-3 text-sm font-semibold rounded-2xl transition whitespace-nowrap ${
                     !isConnected || rewatchItems.length === 0
                       ? "opacity-50 cursor-not-allowed bg-black/25 text-white/30"
-                      : `${GLASS_CONTROL} text-white/75 hover:bg-white/10`
+                      : `${PAGE_CONTROL} text-zinc-200 ${PAGE_CONTROL_HOVER}`
                   }`}
                 >
                   <History className="w-4 h-4 shrink-0 text-emerald-400" />
@@ -1437,10 +1444,10 @@ export default function TraktEpisodesWatchedModal({
                   disabled={!isConnected || !serverOnline}
                   onClick={() => openAddPlayDialog("play")}
                   aria-label="Añadir un play completo o crear un rewatch vacío"
-                  className={`min-w-0 w-full h-10 inline-flex items-center justify-center gap-1 px-2 rounded-xl text-[11px] font-semibold transition whitespace-nowrap ${
+                  className={`min-w-0 w-full h-11 inline-flex items-center justify-center gap-1 px-2 rounded-2xl text-[11px] font-semibold transition whitespace-nowrap ${
                     !isConnected
                       ? "opacity-50 cursor-not-allowed bg-black/25 text-white/30"
-                      : `${GLASS_CONTROL} text-white/75 hover:bg-white/10`
+                      : `${PAGE_CONTROL} text-zinc-200 ${PAGE_CONTROL_HOVER}`
                   }`}
                 >
                   <Plus className="w-4 h-4 shrink-0" />
@@ -1452,17 +1459,17 @@ export default function TraktEpisodesWatchedModal({
                   <div
                     role="group"
                     aria-label="Modo de vista"
-                    className={`col-span-2 flex h-10 overflow-hidden rounded-xl ${GLASS_CONTROL}`}
+                    className={`col-span-2 flex h-11 gap-1 rounded-2xl ${PAGE_CONTROL} p-1`}
                   >
                     <button
                       type="button"
                       onClick={() => setViewMode("list")}
                       aria-label="Vista lista"
                       aria-pressed={viewMode === "list"}
-                      className={`h-full min-w-0 flex-1 inline-flex items-center justify-center rounded-l-xl transition-all ${
+                      className={`h-full min-w-0 flex-1 inline-flex items-center justify-center rounded-xl transition-all ${
                         viewMode === "list"
-                          ? "bg-white/15 text-white shadow"
-                          : "text-white/45 hover:bg-white/10 hover:text-white"
+                          ? "bg-white/90 text-black shadow-lg"
+                          : "text-zinc-400 hover:bg-white/10 hover:text-white"
                       }`}
                     >
                       <List className="w-3.5 h-3.5" />
@@ -1472,10 +1479,10 @@ export default function TraktEpisodesWatchedModal({
                       onClick={() => setViewMode("table")}
                       aria-label="Vista tabla"
                       aria-pressed={viewMode === "table"}
-                      className={`h-full min-w-0 flex-1 inline-flex items-center justify-center rounded-r-xl transition-all ${
+                      className={`h-full min-w-0 flex-1 inline-flex items-center justify-center rounded-xl transition-all ${
                         viewMode === "table"
-                          ? "bg-white/15 text-white shadow"
-                          : "text-white/45 hover:bg-white/10 hover:text-white"
+                          ? "bg-white/90 text-black shadow-lg"
+                          : "text-zinc-400 hover:bg-white/10 hover:text-white"
                       }`}
                     >
                       <Table2 className="w-3.5 h-3.5" />
@@ -1486,10 +1493,10 @@ export default function TraktEpisodesWatchedModal({
                     type="button"
                     onClick={() => setOnlyUnwatched(!onlyUnwatched)}
                     aria-label={onlyUnwatched ? "Mostrar no vistos" : "Mostrar todos"}
-                    className={`h-10 w-full inline-flex items-center justify-center rounded-xl transition ${
+                    className={`h-11 w-full inline-flex items-center justify-center rounded-2xl transition ${
                       onlyUnwatched
                         ? "bg-emerald-500/10 text-emerald-400"
-                        : `${GLASS_CONTROL} text-white/50 hover:bg-white/10 hover:text-white`
+                        : `${PAGE_CONTROL} text-zinc-200 ${PAGE_CONTROL_HOVER}`
                     }`}
                   >
                     <Filter className="w-4 h-4" />
@@ -1512,7 +1519,7 @@ export default function TraktEpisodesWatchedModal({
                     }
                     // Marcar / Quitar serie: el estado lo dicen el tinte y el
                     // icono; no hace falta duplicarlo con texto en móvil.
-                    className={`h-10 w-full inline-flex items-center justify-center rounded-xl transition
+                    className={`h-11 w-full inline-flex items-center justify-center rounded-2xl transition
                       ${
                         showCompleted
                           ? "bg-red-500/10 text-red-300 hover:bg-red-500/20"
@@ -1545,7 +1552,7 @@ export default function TraktEpisodesWatchedModal({
                     ? "Buscar episodio..."
                     : "Buscar temporada..."
                 }
-                className={`h-11 w-full rounded-xl ${GLASS_CONTROL} py-2.5 pl-10 pr-4 text-sm text-white/85 transition placeholder:text-white/30 focus:ring-2 focus:ring-emerald-300/50 focus:outline-none`}
+                className={`h-11 w-full rounded-2xl ${PAGE_CONTROL} py-2.5 pl-10 pr-4 text-sm text-white transition placeholder:text-zinc-400 focus:ring-2 focus:ring-emerald-300/50 focus:outline-none`}
               />
             </div>
 
@@ -1564,10 +1571,10 @@ export default function TraktEpisodesWatchedModal({
                 onClick={() => setViewMenuOpen((v) => !v)}
                 disabled={!isConnected || !serverOnline}
                 aria-label="Cambiar vista (Global o Rewatch por visionado)"
-                className={`h-10 xl:h-11 w-full inline-flex items-center gap-2 rounded-xl px-2.5 xl:px-3 text-[11px] xl:text-sm font-semibold transition ${
+                className={`h-11 w-full inline-flex items-center gap-2 rounded-2xl px-2.5 xl:px-3 text-[11px] xl:text-sm font-semibold transition ${
                   !isConnected
                     ? "opacity-50 cursor-not-allowed bg-black/25 text-white/30"
-                    : `${GLASS_CONTROL} text-white/80 hover:bg-white/10`
+                    : `${PAGE_CONTROL} text-zinc-200 ${PAGE_CONTROL_HOVER}`
                 }`}
               >
                 <span
@@ -1600,9 +1607,9 @@ export default function TraktEpisodesWatchedModal({
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -6 }}
                     transition={{ duration: 0.16, ease: "easeOut" }}
-                    className={`absolute left-0 top-full z-40 mt-1 w-[230px] overflow-hidden rounded-xl ${GLASS_MENU}`}
+                    className={`absolute left-0 top-full z-40 mt-1 w-[230px] overflow-hidden ${PAGE_MENU}`}
                   >
-                    <div className="max-h-56 overflow-y-auto sv-scroll py-1">
+                    <div className="max-h-56 space-y-1 overflow-y-auto sv-scroll">
                       {viewMenuItems.map((item) => {
                         const active = item.id === effectiveViewId;
                         return (
@@ -1613,7 +1620,7 @@ export default function TraktEpisodesWatchedModal({
                               changeView(item.id);
                               setViewMenuOpen(false);
                             }}
-                            className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2.5 transition ${
+                            className={`w-full rounded-xl px-3 py-2 text-left text-sm flex items-center gap-2.5 transition ${
                               active
                                 ? item.kind === "rewatch"
                                   ? "bg-purple-500/12 text-purple-200"
@@ -1642,15 +1649,15 @@ export default function TraktEpisodesWatchedModal({
             </div>
 
             {/* Lista / Tabla */}
-            <div className={`flex h-10 shrink-0 gap-1 rounded-xl ${GLASS_CONTROL} p-1 xl:h-11`}>
+            <div className={`flex h-11 shrink-0 gap-1 rounded-2xl ${PAGE_CONTROL} p-1`}>
               <button
                 type="button"
                 onClick={() => setViewMode("list")}
                 aria-label="Vista lista"
-                className={`h-full w-9 rounded-lg text-xs font-bold inline-flex items-center justify-center transition-all ${
+                className={`h-full w-9 rounded-xl text-xs font-bold inline-flex items-center justify-center transition-all ${
                   viewMode === "list"
-                    ? "bg-white/15 text-white shadow"
-                    : "text-white/45 hover:bg-white/10 hover:text-white"
+                    ? "bg-white/90 text-black shadow-lg"
+                    : "text-zinc-400 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 <List className="w-3.5 h-3.5" />
@@ -1659,10 +1666,10 @@ export default function TraktEpisodesWatchedModal({
                 type="button"
                 onClick={() => setViewMode("table")}
                 aria-label="Vista tabla"
-                className={`h-full w-9 rounded-lg text-xs font-bold inline-flex items-center justify-center transition-all ${
+                className={`h-full w-9 rounded-xl text-xs font-bold inline-flex items-center justify-center transition-all ${
                   viewMode === "table"
-                    ? "bg-white/15 text-white shadow"
-                    : "text-white/45 hover:bg-white/10 hover:text-white"
+                    ? "bg-white/90 text-black shadow-lg"
+                    : "text-zinc-400 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 <Table2 className="w-3.5 h-3.5" />
@@ -1673,10 +1680,10 @@ export default function TraktEpisodesWatchedModal({
             <button
               type="button"
               onClick={() => setOnlyUnwatched(!onlyUnwatched)}
-              className={`h-10 xl:h-11 inline-flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-4 rounded-xl text-[11px] xl:text-sm font-semibold transition whitespace-nowrap shrink-0 ${
+              className={`h-11 inline-flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-4 rounded-2xl text-[11px] xl:text-sm font-semibold transition whitespace-nowrap shrink-0 ${
                 onlyUnwatched
                   ? "bg-emerald-500/10 text-emerald-400"
-                  : `${GLASS_CONTROL} text-white/50 hover:bg-white/10 hover:text-white`
+                  : `${PAGE_CONTROL} text-zinc-200 ${PAGE_CONTROL_HOVER}`
               }`}
               aria-label={onlyUnwatched ? "Mostrar no vistos" : "Mostrar todos"}
             >
@@ -1691,12 +1698,12 @@ export default function TraktEpisodesWatchedModal({
               type="button"
               disabled={!isConnected || !serverOnline}
               onClick={() => openAddPlayDialog("play")}
-              className={`h-10 xl:h-11 inline-flex items-center justify-center rounded-xl text-[11px] xl:text-sm font-semibold transition whitespace-nowrap shrink-0 ${
+              className={`h-11 inline-flex items-center justify-center rounded-2xl text-[11px] xl:text-sm font-semibold transition whitespace-nowrap shrink-0 ${
                 !isConnected
                   ? "opacity-50 cursor-not-allowed bg-black/25 text-white/30"
-                  : `${GLASS_CONTROL} text-white/75 hover:bg-white/10`
+                  : `${PAGE_CONTROL} text-zinc-200 ${PAGE_CONTROL_HOVER}`
               } ${
-                isRewatchView ? "w-10 xl:w-11" : "gap-1.5 xl:gap-2 px-2.5 xl:px-4"
+                isRewatchView ? "w-11" : "gap-1.5 xl:gap-2 px-2.5 xl:px-4"
               }`}
               aria-label={
                 !isConnected
@@ -1721,10 +1728,10 @@ export default function TraktEpisodesWatchedModal({
                             setHistoryLimit(60);
                 setHistoryOpen(true);
               }}
-              className={`h-10 xl:h-11 inline-flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-4 rounded-xl text-[11px] xl:text-sm font-semibold transition whitespace-nowrap shrink-0 ${
+              className={`h-11 inline-flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-4 rounded-2xl text-[11px] xl:text-sm font-semibold transition whitespace-nowrap shrink-0 ${
                 !isConnected || rewatchItems.length === 0
                   ? "opacity-50 cursor-not-allowed bg-black/25 text-white/30"
-                  : `${GLASS_CONTROL} text-white/75 hover:bg-white/10`
+                  : `${PAGE_CONTROL} text-zinc-200 ${PAGE_CONTROL_HOVER}`
               }`}
               aria-label={
                 !isConnected
@@ -1750,7 +1757,7 @@ export default function TraktEpisodesWatchedModal({
               onClick={onClickToggleShow}
               // Mismo botón que el de la fila móvil, sin aro por el mismo
               // motivo: el tinte y el icono ya dicen en qué estado está.
-              className={`h-10 w-10 xl:h-11 xl:w-11 inline-flex items-center justify-center rounded-xl transition shrink-0
+              className={`h-11 w-11 inline-flex items-center justify-center rounded-2xl transition shrink-0
                 ${
                   showCompleted
                     ? "bg-red-500/10 text-red-300 hover:bg-red-500/20"
@@ -1918,7 +1925,9 @@ export default function TraktEpisodesWatchedModal({
                   La fila no se superpone a nada (la lista se desplaza debajo),
                   así que solo quedan los botones sobre el fondo del modal. */}
               <div className="w-full shrink-0 overflow-x-auto no-scrollbar md:hidden">
-                <div className="flex min-w-max gap-2 px-3 pb-3 pt-0">
+                {/* Mismo margen lateral (16px) que la barra de herramientas y la
+                    lista de episodios: las tres zonas arrancan alineadas. */}
+                <div className="flex min-w-max gap-2 px-4 pb-3 pt-0">
                   {usableSeasons.map((s) => {
                     const sn = s.season_number;
                     const active = sn === activeSeason;
@@ -1950,7 +1959,7 @@ export default function TraktEpisodesWatchedModal({
                 onTouchCancel={() => {
                   seasonSwipeStartRef.current = null;
                 }}
-                className="relative flex-1 overflow-y-auto scroll-smooth p-3 pb-20 touch-pan-y no-scrollbar sm:p-4 sm:pb-4 md:touch-auto"
+                className="relative flex-1 overflow-y-auto scroll-smooth p-4 pb-20 touch-pan-y no-scrollbar sm:pb-4 md:touch-auto"
               >
                 <div className="space-y-3">
                   {filteredEpisodes.length === 0 && !loadingSeason ? (
