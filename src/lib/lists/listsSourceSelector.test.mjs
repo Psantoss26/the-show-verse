@@ -19,7 +19,7 @@ test("las tres fuentes se muestran en un selector segmentado con iconos", () => 
   );
 });
 
-test("el selector de fuente está junto al buscador y ya no existe el filtro FUENTE", () => {
+test("el selector de fuente está junto al buscador (en móvil, entre el buscador y el menú) y ya no existe el filtro FUENTE", () => {
   const mobileToolbar = listsPage.slice(
     listsPage.indexOf("{/* Mobile: search + toggle */}"),
     listsPage.indexOf("{/* Mobile: collapsible filters */}"),
@@ -31,9 +31,14 @@ test("el selector de fuente está junto al buscador y ya no existe el filtro FUE
 
   assert.match(mobileToolbar, /<ListsSourceSelector/);
   assert.match(desktopToolbar, /<ListsSourceSelector/);
+  // Móvil: buscador, secciones y, a la derecha, el botón del desplegable.
+  assert.ok(
+    mobileToolbar.indexOf("<Search") <
+      mobileToolbar.indexOf("<ListsSourceSelector"),
+  );
   assert.ok(
     mobileToolbar.indexOf("<ListsSourceSelector") <
-      mobileToolbar.indexOf("<Search"),
+      mobileToolbar.indexOf("<SlidersHorizontal"),
   );
   assert.ok(
     desktopToolbar.indexOf("<ListsSourceSelector") <

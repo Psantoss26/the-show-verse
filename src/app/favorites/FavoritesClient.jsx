@@ -3655,7 +3655,7 @@ export default function FavoritesClient() {
                 <div className="flex rounded-2xl p-1 h-11 items-center flex-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
                   <button
                     onClick={() => setViewMode("list")}
-                    className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                    className={`flex-1 h-full px-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center ${
                       viewMode === "list"
                         ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
                         : "text-zinc-400 hover:text-white hover:bg-white/10"
@@ -3665,7 +3665,7 @@ export default function FavoritesClient() {
                   </button>
                   <button
                     onClick={() => setViewMode("compact")}
-                    className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                    className={`flex-1 h-full px-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center ${
                       viewMode === "compact"
                         ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
                         : "text-zinc-400 hover:text-white hover:bg-white/10"
@@ -3675,7 +3675,7 @@ export default function FavoritesClient() {
                   </button>
                   <button
                     onClick={() => setViewMode("grid")}
-                    className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                    className={`flex-1 h-full px-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center ${
                       viewMode === "grid"
                         ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
                         : "text-zinc-400 hover:text-white hover:bg-white/10"
@@ -3895,7 +3895,7 @@ export default function FavoritesClient() {
             <div className="flex rounded-2xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
               <button
                 onClick={() => setViewMode("list")}
-                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
+                className={`px-3 h-full rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
                   viewMode === "list"
                     ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
                     : "text-zinc-400 hover:text-white hover:bg-white/10"
@@ -3905,7 +3905,7 @@ export default function FavoritesClient() {
               </button>
               <button
                 onClick={() => setViewMode("compact")}
-                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
+                className={`px-3 h-full rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
                   viewMode === "compact"
                     ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
                     : "text-zinc-400 hover:text-white hover:bg-white/10"
@@ -3915,7 +3915,7 @@ export default function FavoritesClient() {
               </button>
               <button
                 onClick={() => setViewMode("grid")}
-                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
+                className={`px-3 h-full rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
                   viewMode === "grid"
                     ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
                     : "text-zinc-400 hover:text-white hover:bg-white/10"
@@ -3928,7 +3928,7 @@ export default function FavoritesClient() {
             <div className="flex rounded-2xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
               <button
                 onClick={() => setImageMode("poster")}
-                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
+                className={`px-3 h-full rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
                   imageMode === "poster"
                     ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
                     : "text-zinc-400 hover:text-white hover:bg-white/10"
@@ -3938,7 +3938,7 @@ export default function FavoritesClient() {
               </button>
               <button
                 onClick={() => setImageMode("backdrop")}
-                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
+                className={`px-3 h-full rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
                   imageMode === "backdrop"
                     ? "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20"
                     : "text-zinc-400 hover:text-white hover:bg-white/10"

@@ -151,6 +151,11 @@ export default function MobileFiltersPanel({
         ...style,
         marginTop: leadingGap ? -leadingGap : style?.marginTop,
         gridTemplateRows: expanded ? "1fr" : "0fr",
+        // La única columna se ajusta al ancho disponible. Sin esto (columna
+        // `auto` y celda sin `min-w-0`) el panel tomaba el ancho mínimo de su
+        // contenido: en móviles estrechos se salía por la derecha y sus filas a
+        // mitades no cuadraban con la barra de arriba (Historial, 390 px).
+        gridTemplateColumns: "minmax(0, 1fr)",
         transition: `grid-template-rows ${transition}`,
       }}
       onTransitionEnd={(event) => {
@@ -159,7 +164,7 @@ export default function MobileFiltersPanel({
         }
       }}
     >
-      <div className={`min-h-0 ${settled ? "overflow-visible" : "overflow-hidden"}`}>
+      <div className={`min-h-0 min-w-0 ${settled ? "overflow-visible" : "overflow-hidden"}`}>
         <div
           className={`${gapClassName} motion-reduce:!transition-none`}
           style={{

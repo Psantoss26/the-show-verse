@@ -60,3 +60,8 @@ test("el panel absorbe la separación del contenedor para no dar un bache al mon
   // Como overlay (barra fijada) no hay nada que compensar.
   assert.match(panel, /own\.position === "absolute" \|\| own\.position === "fixed"\) return 0/);
 });
+
+test("el panel se ajusta al ancho de la pantalla, no al de su contenido", () => {
+  assert.match(panel, /gridTemplateColumns: "minmax\(0, 1fr\)"/);
+  assert.match(panel, /className={`min-h-0 min-w-0 /);
+});
