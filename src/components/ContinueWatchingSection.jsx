@@ -286,11 +286,17 @@ const loadedContinueWatchingBackdropSrcs = new Set();
 // cachean por episodio para no mezclar puntuaciones de serie y episodio.
 const continueWatchingExtrasCache = new Map();
 
-// La imagen se desvanece a transparente por abajo (como DetailModal) para fundir
-// portada e info sobre el fondo uniforme de la tarjeta, sin línea de corte.
+// La imagen (y el tráiler) se funde con el cristal de la tarjeta con la MISMA
+// curva que la portada de DetailModal (`--sv-hero-fade`, globals.css): solo el
+// 22% inferior y con pendiente y curvatura cero en los extremos, así que la
+// imagen se ve casi intacta hasta el borde y el corte no se nota. Antes era una
+// rampa lineal desde el 60%, que borraba el 40% de la imagen y marcaba una
+// línea donde arrancaba. El velo oscuro que va encima ocupa toda la imagen
+// y lleva la misma máscara: así se desvanece con ella y no deja
+// negro sobre el cristal en la costura.
 const cwBackdropFadeStyle = {
-  WebkitMaskImage: "linear-gradient(to bottom, black 60%, transparent 100%)",
-  maskImage: "linear-gradient(to bottom, black 60%, transparent 100%)",
+  WebkitMaskImage: "var(--sv-hero-fade)",
+  maskImage: "var(--sv-hero-fade)",
 };
 
 function normalizePreviewVideos(rawVideos) {
@@ -1642,7 +1648,7 @@ function ContinueWatchingPreviewCard({
               <div className="absolute inset-0 animate-pulse bg-neutral-900" />
             )}
             {trailerSrc && (
-              <div className="absolute inset-0 overflow-hidden">
+              <div className="absolute inset-0 overflow-hidden" style={cwBackdropFadeStyle}>
                 <iframe
                   key={trailer.key}
                   ref={trailerIframeRef}
@@ -1665,7 +1671,10 @@ function ContinueWatchingPreviewCard({
         )}
 
         {/* Estado de la tarjeta superpuesto al pie del backdrop */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-12 bg-gradient-to-b from-transparent via-black/45 to-transparent" />
+        <div
+          className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-b from-transparent from-60% to-black/50"
+          style={cwBackdropFadeStyle}
+        />
         {isCalendar ? (
           // La fecha/cuenta atrás NO se repite sobre la portada: ya se muestra
           // abajo en el panel (línea de episodio). Aquí solo se conserva el badge

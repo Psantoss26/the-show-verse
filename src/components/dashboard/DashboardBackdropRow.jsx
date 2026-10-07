@@ -159,11 +159,17 @@ const shimmer = {
   },
 };
 
-// La imagen se desvanece a transparente por abajo (como DetailModal) para fundir
-// portada e info sobre el fondo uniforme de la tarjeta, sin línea de corte.
+// La imagen (y el tráiler) se funde con el cristal de la tarjeta con la MISMA
+// curva que la portada de DetailModal (`--sv-hero-fade`, globals.css): solo el
+// 22% inferior y con pendiente y curvatura cero en los extremos, así que la
+// imagen se ve casi intacta hasta el borde y el corte no se nota. Antes era una
+// rampa lineal desde el 60%, que borraba el 40% de la imagen y marcaba una
+// línea donde arrancaba. El velo oscuro que va encima ocupa toda la imagen
+// y lleva la misma máscara: así se desvanece con ella y no deja
+// negro sobre el cristal en la costura.
 const dashboardPreviewBackdropFadeStyle = {
-  WebkitMaskImage: "linear-gradient(to bottom, black 60%, transparent 100%)",
-  maskImage: "linear-gradient(to bottom, black 60%, transparent 100%)",
+  WebkitMaskImage: "var(--sv-hero-fade)",
+  maskImage: "var(--sv-hero-fade)",
 };
 
 /* =================== HELPERS =================== */
@@ -1105,7 +1111,7 @@ export function BackdropPreviewCard({
               <div className="absolute inset-0 animate-pulse bg-neutral-900" />
             )}
             {trailerSrc && (
-              <div className="absolute inset-0 overflow-hidden">
+              <div className="absolute inset-0 overflow-hidden" style={dashboardPreviewBackdropFadeStyle}>
                 <iframe
                   key={trailer.key}
                   ref={trailerIframeRef}
@@ -1127,7 +1133,10 @@ export function BackdropPreviewCard({
           </>
         )}
 
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-16 bg-gradient-to-t from-transparent via-black/20 to-transparent" />
+        <div
+          className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-b from-transparent from-60% to-black/25"
+          style={dashboardPreviewBackdropFadeStyle}
+        />
       </div>
 
       {/* Panel de info: acciones · metadatos */}
