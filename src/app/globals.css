@@ -2310,7 +2310,9 @@ html:has([data-embedded-details])::-webkit-scrollbar {
 /* =========================================================================
    ANTERIOR / SIGUIENTE DE LA FICHA (<DetailsSequenceNav>)
 
-   Dos flechas a la ALTURA DEL MENÚ DE SECCIONES: el `nav` va dentro de su
+   Dos flechas con la CARCASA del menú de secciones (mismo cristal, 60px de
+   alto, `rounded-2xl`; el contenido es propio) y a su ALTURA: el `nav` va
+   dentro de su
    contenedor sticky (cubre su caja, sin capturar eventos), así que suben y se
    quedan pegadas con él. Cada flecha está FUERA de la columna central, a 1,5rem
    del menú, centrada en su alto. Fuera del flujo: no mueven nada.
@@ -2323,8 +2325,8 @@ html:has([data-embedded-details])::-webkit-scrollbar {
    Espacio: el hueco lateral es `(100vw − 80rem)/2` y hay que dejar 1,5rem al
    menú, 1,5rem al borde y la barra de desplazamiento (≈1rem repartida), así
    que el ancho útil es `(100vw − 80rem)/2 − 2,5rem`:
-   · <1456px  no cabe ni la flecha (3rem): se ocultan LAS DOS.
-   · ≥1456px  flechas (sin tooltip nativo: Pablo no lo quiere).
+   · <1480px  no cabe ni la flecha (bloque de 3.75rem): se ocultan LAS DOS.
+   · ≥1480px  flechas (sin tooltip nativo: Pablo no lo quiere).
    · ≥1720px  además se despliegan con el título (hueco ≥ 11rem); el nombre
               largo se recorta con un desvanecido, sin "…".
    En teléfono se cambia de título deslizando.
@@ -2341,15 +2343,18 @@ html:has([data-embedded-details])::-webkit-scrollbar {
 
 .sv-seq-bubble {
   position: absolute;
-  top: calc(50% - 1.5rem);
+  /* Mismo alto que la barra del menú (60px) y centrada en ella. */
+  top: calc(50% - 1.875rem);
   display: flex;
-  height: 3rem;
+  height: 3.75rem;
   /* `max-content` explícito: anclada FUERA de su contenedor (`right/left:
      calc(100% + 1.5rem)`), su ancho disponible sale negativo y, sin esto, el
      navegador la encoge al mínimo y no puede desplegarse. */
   width: max-content;
   max-width: min(20rem, calc((100vw - 80rem) / 2 - 2.5rem));
-  padding: 0.375rem;
+  /* = `py-2.5` de la barra del menú: la flecha queda igual de separada del
+     cristal que sus botones de sección. */
+  padding: 0.625rem;
   pointer-events: auto;
 }
 
@@ -2361,9 +2366,11 @@ html:has([data-embedded-details])::-webkit-scrollbar {
   left: calc(100% + 1.5rem);
 }
 
+/* Flecha en círculo, centrada en la carcasa de 60px con el mismo relleno
+   (10px) que separa los botones del menú de su cristal. */
 .sv-seq-icon {
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 2.5rem;
+  height: 2.5rem;
   font-size: 1.125rem;
 }
 
@@ -2389,13 +2396,13 @@ html:has([data-embedded-details])::-webkit-scrollbar {
 /* El texto se maqueta YA a su ancho final y el despliegue solo lo va
    destapando (lo recorta `.sv-seq-text`). Si siguiera el ancho de la pista, el
    título se truncaría en cada fotograma de la animación y asomarían los "…".
-   Ancho final = el de la píldora desplegada menos la flecha (3rem). */
+   Ancho final = el de la píldora desplegada menos la flecha plegada (3.75rem). */
 .sv-seq-text-pad {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
   width: max-content;
-  max-width: calc(min(20rem, calc((100vw - 80rem) / 2 - 2.5rem)) - 3rem);
+  max-width: calc(min(20rem, calc((100vw - 80rem) / 2 - 2.5rem)) - 3.75rem);
   padding-inline: 0.875rem 0.625rem;
 }
 
@@ -2416,7 +2423,7 @@ html:has([data-embedded-details])::-webkit-scrollbar {
   mask-image: linear-gradient(to right, #000 calc(100% - 1.75rem), transparent);
 }
 
-@media (min-width: 1456px) {
+@media (min-width: 1480px) {
   .sv-seq-nav {
     display: block;
   }

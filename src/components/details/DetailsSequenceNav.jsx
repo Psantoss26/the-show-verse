@@ -58,22 +58,29 @@ function SequenceBubble({ href, title, direction, onNavigate }) {
       onClick={(event) => onNavigate(event, href)}
       aria-label={title ? `${label}: ${title}` : `${label} título`}
       data-direction={direction}
-      // Solo la flecha; al pasar por encima (o con foco de teclado) la píldora
-      // crece HACIA FUERA, hacia el borde de la pantalla, y enseña el título.
+      // Del menú de secciones (DetailsSectionMenu, que tiene al lado) toma SOLO
+      // la carcasa: el mismo cristal (`rounded-2xl` + LIQUID_GLASS_SURFACE +
+      // capas ópticas) y el mismo alto (60px). El contenido es el suyo: flecha en
+      // círculo y, al pasar por encima (o con foco), crece HACIA FUERA —hacia el
+      // borde de la pantalla— y enseña "Anterior/Siguiente" y el título.
       // Posición, tamaños y despliegue: `.sv-seq-*` en globals.css.
       //
-      // Misma envoltura y capas ópticas que DetailsSectionMenu, que tiene al
-      // lado. Sin `opacity` ni `filter` en la píldora: los dos la convierten en
+      // El fondo NO cambia en hover, igual que la barra del menú: un velo claro
+      // encima del cristal la dejaba demasiado brillante al desplegarse. El
+      // círculo de la flecha tampoco se ve en reposo: aparece solo en hover/foco.
+      //
+      // Sin `opacity` ni `filter` en la carcasa: los dos la convierten en
       // Backdrop Root y apagan la refracción de sus capas ópticas.
-      className={`sv-seq-bubble group items-center rounded-full text-white outline-none transition-[background-color] duration-300 hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70 motion-reduce:transition-none ${LIQUID_GLASS_SURFACE} ${
+      className={`sv-seq-bubble group items-center rounded-2xl text-white outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${LIQUID_GLASS_SURFACE} ${
         // La flecha queda siempre junto al menú; el texto se abre al otro lado.
         isNext ? "text-left" : "flex-row-reverse text-right"
       }`}
+      style={{ contain: "layout style" }}
     >
       <LiquidGlassOpticalLayers />
       <span
         aria-hidden="true"
-        className="sv-seq-icon relative flex shrink-0 items-center justify-center rounded-full bg-white/10 transition-colors duration-300 group-hover:bg-white/20"
+        className="sv-seq-icon relative flex shrink-0 items-center justify-center rounded-full bg-transparent transition-colors duration-300 group-hover:bg-white/10 group-focus-visible:bg-white/10"
       >
         <Icon className="h-[1.15em] w-[1.15em]" strokeWidth={2.25} />
       </span>
