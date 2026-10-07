@@ -17,6 +17,7 @@ import {
 } from '@/lib/lists/posterCollage'
 import { pickBestFavoriteEnglishPoster } from '@/lib/details/tmdbImages'
 import { fetchTmdbImages } from '@/lib/tmdb/imageRequests'
+import useImageLoadReady from '@/lib/hooks/useImageLoadReady'
 
 const finalEnglishPosterCache = new Map()
 
@@ -168,6 +169,88 @@ function PosterCover({ src, alt = "", priority = false }) {
     )
 }
 
+const POSTER_FRAME_CLASS = 'relative overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/35 shadow-[0_24px_70px_rgba(0,0,0,0.35)] backdrop-blur-[28px] aspect-[2/3]'
+
+// Portada oficial (colecciones) con la carga de la portada de DetailsClient:
+// una versión ligera (`lowSrc`, w342) que llega antes y la grande (`src`)
+// encima con fundido cuando está decodificada.
+//
+// El marco NO se pinta hasta que hay imagen: antes se veía un recuadro negro
+// vacío mientras se descargaba. Entra con un fundido y un leve escalado; si
+// la imagen ya estaba en caché (volver atrás, segunda visita) aparece tal cual,
+// sin animación (useImageLoadReady). Si no se puede cargar, se muestra el
+// marco con el icono de respaldo en vez de quedarse invisible.
+function RevealPoster({ src, lowSrc, alt }) {
+    const firstSrc = lowSrc || src
+    const { imgRef: lowRef, onLoad: onLowLoad, ready: lowReady, instant } = useImageLoadReady(firstSrc)
+    const highRef = useRef(null)
+    const [highSrc, setHighSrc] = useState(null)
+    const [failedSrc, setFailedSrc] = useState(null)
+    const hasHigh = Boolean(src && src !== firstSrc)
+    const highReady = hasHigh && highSrc === src
+    const failed = failedSrc === firstSrc
+    const visible = lowReady || highReady || failed
+
+    useLayoutEffect(() => {
+        const img = highRef.current
+        if (img?.complete && img.naturalWidth > 0) setHighSrc(src)
+    }, [src])
+
+    const markHigh = (event) => {
+        const img = event.currentTarget
+        const done = () => setHighSrc(img.getAttribute('src'))
+        if (typeof img.decode === 'function') img.decode().then(done, done)
+        else done()
+    }
+
+    return (
+        <div
+            className={`${POSTER_FRAME_CLASS} ${
+                instant ? '' : 'transition-[opacity,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none'
+            } ${visible ? 'scale-100 opacity-100' : 'scale-[0.97] opacity-0'}`}
+        >
+            <div className="pointer-events-none absolute inset-0 z-20 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]" />
+            <div className="relative z-10 h-full w-full">
+                {failed ? (
+                    <div className="flex h-full w-full items-center justify-center bg-neutral-950 text-zinc-700">
+                        <ListVideo className="h-16 w-16" />
+                    </div>
+                ) : (
+                    <>
+                        {/* Portada decorativa de cabecera: <img> directo para
+                            controlar `load`/`decode` de cada capa. */}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                            ref={lowRef}
+                            src={firstSrc}
+                            alt={alt}
+                            onLoad={onLowLoad}
+                            onError={() => setFailedSrc(firstSrc)}
+                            fetchPriority="high"
+                            decoding="async"
+                            className="absolute inset-0 h-full w-full object-cover"
+                        />
+                        {hasHigh ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                                ref={highRef}
+                                src={src}
+                                alt=""
+                                aria-hidden="true"
+                                onLoad={markHigh}
+                                decoding="async"
+                                className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 motion-reduce:transition-none ${
+                                    highReady ? 'opacity-100' : 'opacity-0'
+                                }`}
+                            />
+                        ) : null}
+                    </>
+                )}
+            </div>
+        </div>
+    )
+}
+
 function PosterCollage({ images, pending }) {
     const tiles = buildPosterCollageTiles(images)
     const layout = getPosterCollageLayout(tiles.length)
@@ -211,6 +294,7 @@ function PosterCollage({ images, pending }) {
  * Props:
  * - title, description
  * - posterImage?: string (portada oficial; tiene prioridad sobre el mosaico)
+ * - posterLowImage?: string (versión ligera de la portada oficial, se pinta antes)
  * - posterItems?: Array (títulos TMDb para resolver el mosaico inglés final)
  * - heroBackground?: { desktop?: string, mobile?: string } (fondo estilo
  *   DetailsClient: backdrop en escritorio, póster en móvil; sustituye al
@@ -230,6 +314,7 @@ export default function UnifiedListDetailsLayout({
     description,
     posterItems = [],
     posterImage,
+    posterLowImage,
     backdropImage,
     heroBackground,
     sourceLabel = 'Lista',
@@ -322,19 +407,24 @@ export default function UnifiedListDetailsLayout({
                     className="mb-12 flex flex-col items-start gap-8 lg:flex-row lg:gap-12"
                 >
                     <div className="relative z-10 mx-auto flex w-full max-w-[280px] flex-shrink-0 flex-col gap-5 lg:mx-0 lg:max-w-[320px]">
-                        <div className="relative overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/35 shadow-[0_24px_70px_rgba(0,0,0,0.35)] backdrop-blur-[28px] aspect-[2/3]">
-                            <div className="pointer-events-none absolute inset-0 z-20 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]" />
-                            <div className="relative z-10 h-full w-full bg-neutral-950">
-                                {posterImage ? (
-                                    <PosterCover src={posterImage} alt={title || 'Colección'} priority />
-                                ) : (
+                        {posterImage ? (
+                            <RevealPoster
+                                key={posterLowImage || posterImage}
+                                src={posterImage}
+                                lowSrc={posterLowImage}
+                                alt={title || 'Colección'}
+                            />
+                        ) : (
+                            <div className={POSTER_FRAME_CLASS}>
+                                <div className="pointer-events-none absolute inset-0 z-20 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]" />
+                                <div className="relative z-10 h-full w-full bg-neutral-950">
                                     <PosterCollage
                                         images={finalPosterArtwork.images}
                                         pending={finalPosterArtwork.pending}
                                     />
-                                )}
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                     </div>
 

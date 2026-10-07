@@ -302,7 +302,10 @@ function ViewSwitcher({ viewMode, setViewMode, className = "", fill = false }) {
           type="button"
           onClick={() => setViewMode(id)}
           title={label}
-          className={`flex h-full min-w-10 items-center justify-center rounded-lg px-3 transition ${
+          // Radio concéntrico al del contenedor: rounded-2xl (16px) menos su
+          // relleno p-1 (4px) = 12px. Con rounded-lg el resaltado del modo
+          // activo quedaba más cuadrado que la zona que lo alberga.
+          className={`flex h-full min-w-10 items-center justify-center rounded-xl px-3 transition ${
             fill ? "flex-1" : ""
           } ${
             viewMode === id
