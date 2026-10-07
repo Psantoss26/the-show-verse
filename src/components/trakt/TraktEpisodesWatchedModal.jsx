@@ -217,7 +217,6 @@ export default function TraktEpisodesWatchedModal({
   );
 
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [historyQuery, setHistoryQuery] = useState("");
   const [historyLimit, setHistoryLimit] = useState(60);
   const [deleteRunBusyId, setDeleteRunBusyId] = useState("");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
@@ -383,15 +382,8 @@ export default function TraktEpisodesWatchedModal({
     [rewatchItems],
   );
 
-  const filteredHistory = useMemo(() => {
-    const q = (historyQuery || "").trim().toLowerCase();
-    if (!q) return rewatchItems;
-    return rewatchItems.filter((item) =>
-      `${item?.label || ""} ${formatDateTime(item?.startedAt)}`
-        .toLowerCase()
-        .includes(q),
-    );
-  }, [rewatchItems, historyQuery]);
+  // El historial enseña todos los visionados y rewatches, sin buscador.
+  const filteredHistory = rewatchItems;
 
   const visibleHistory = useMemo(
     () => filteredHistory.slice(0, historyLimit),
@@ -463,7 +455,6 @@ export default function TraktEpisodesWatchedModal({
     setAddPlayOpen(false);
     setAddPlayMode("play");
     setHistoryOpen(false);
-    setHistoryQuery("");
     setHistoryLimit(60);
     setViewMenuOpen(false);
     setRewatchMarkPreset("today");
@@ -1420,8 +1411,7 @@ export default function TraktEpisodesWatchedModal({
                   type="button"
                   disabled={!isConnected || rewatchItems.length === 0}
                   onClick={() => {
-                    setHistoryQuery("");
-                    setHistoryLimit(60);
+                                    setHistoryLimit(60);
                     setHistoryOpen(true);
                   }}
                   className={`h-10 min-w-0 w-full inline-flex items-center justify-center gap-2 px-3 text-sm font-semibold rounded-xl transition whitespace-nowrap ${
@@ -1728,8 +1718,7 @@ export default function TraktEpisodesWatchedModal({
               type="button"
               disabled={!isConnected || rewatchItems.length === 0}
               onClick={() => {
-                setHistoryQuery("");
-                setHistoryLimit(60);
+                            setHistoryLimit(60);
                 setHistoryOpen(true);
               }}
               className={`h-10 xl:h-11 inline-flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-4 rounded-xl text-[11px] xl:text-sm font-semibold transition whitespace-nowrap shrink-0 ${
@@ -2498,23 +2487,10 @@ export default function TraktEpisodesWatchedModal({
                 </div>
 
                 <div className="p-5 space-y-4">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                    <input
-                      value={historyQuery}
-                      onChange={(e) => {
-                        setHistoryQuery(e.target.value);
-                        setHistoryLimit(60);
-                      }}
-                      placeholder="Buscar por fecha/hora..."
-                      className="w-full rounded-xl bg-black/30 py-2 pl-9 pr-4 text-sm text-white/85 backdrop-blur-md transition focus:ring-2 focus:ring-emerald-300/50 focus:outline-none"
-                    />
-                  </div>
-
                   <div className="max-h-[55vh] overflow-y-auto sv-scroll space-y-2 pr-1">
                     {visibleHistory.length === 0 ? (
                       <div className="text-center py-10 text-zinc-500 text-sm">
-                        No hay resultados.
+                        Aún no hay visionados registrados.
                       </div>
                     ) : (
                       visibleHistory.map((item) => (
