@@ -122,7 +122,9 @@ test("el cuadro de fecha de rewatch no muestra borde", () => {
 test("el selector de lista o tabla comparte la altura de la barra", () => {
   assert.match(
     modalSource,
-    /flex h-10 shrink-0 gap-1 rounded-xl bg-black\/30 p-1 backdrop-blur-md xl:h-11/,
+    // Misma altura que la barra (h-10, xl:h-11); el fondo es el cristal
+    // compartido de los controles del modal.
+    /flex h-10 shrink-0 gap-1 rounded-xl \$\{GLASS_CONTROL\} p-1 xl:h-11/,
   );
   assert.match(modalSource, /h-full w-9 rounded-lg text-xs font-bold/);
 });
