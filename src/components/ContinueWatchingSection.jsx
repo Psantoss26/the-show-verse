@@ -3,6 +3,7 @@
 
 import { LIQUID_GLASS_DETAIL_SURFACE } from "@/lib/ui/liquidGlass";
 import DashboardPreviewGlass from "@/components/dashboard/DashboardPreviewGlass";
+import RowNavGlass, { ROW_NAV_FADE } from "@/components/dashboard/RowNavGlass";
 import { useHoverCapable } from "@/lib/hooks/useMediaQuery";
 import { useCallback, useRef, useEffect, useState, memo } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -285,13 +286,6 @@ const loadedContinueWatchingBackdropSrcs = new Set();
 // no vienen en el item de "Continuar viendo": se cargan al hacer hover. En TV se
 // cachean por episodio para no mezclar puntuaciones de serie y episodio.
 const continueWatchingExtrasCache = new Map();
-
-// La imagen se desvanece a transparente por abajo (como DetailModal) para fundir
-// portada e info sobre el fondo uniforme de la tarjeta, sin línea de corte.
-const cwBackdropFadeStyle = {
-  WebkitMaskImage: "linear-gradient(to bottom, black 60%, transparent 100%)",
-  maskImage: "linear-gradient(to bottom, black 60%, transparent 100%)",
-};
 
 function normalizePreviewVideos(rawVideos) {
   const source = Array.isArray(rawVideos) ? rawVideos : EMPTY_ARRAY;
@@ -1370,7 +1364,8 @@ function ContinueWatchingPreviewCard({
       if (!t?.key) {
         setTrailer(null);
         setShowTrailer(false);
-        setError("No hay trailer disponible para este título.");
+        // Sin aviso: en la vista previa el tráiler se pide solo al hacer hover,
+        // así que no tenerlo no es un error que haya que mostrar.
         return;
       }
       setTrailer(t);
@@ -1611,13 +1606,18 @@ function ContinueWatchingPreviewCard({
         )}
 
         {bgSrc && (
+          <div
+            className={`pointer-events-none absolute inset-0 sv-preview-fade ${
+              showTrailer ? "z-[5]" : ""
+            }`}
+          >
           <motion.div
             initial={{ scale: 1 }}
             animate={{ scale: 1.08 }}
             transition={{ duration: 4, ease: "easeOut" }}
-            className={`pointer-events-none absolute inset-0 h-full w-full transition-opacity duration-300 ${
-              showTrailer ? "z-[5]" : ""
-            } ${showTrailer && trailerPlaying ? "opacity-0" : "opacity-100"}`}
+            className={`absolute inset-0 h-full w-full transition-opacity duration-300 ${
+              showTrailer && trailerPlaying ? "opacity-0" : "opacity-100"
+            }`}
           >
             <NextImage
               key={bgSrc}
@@ -1629,11 +1629,15 @@ function ContinueWatchingPreviewCard({
               className={`object-cover transition-opacity duration-200 ${
                 ready ? "opacity-100" : "opacity-0"
               }`}
-              style={cwBackdropFadeStyle}
               loading="eager"
               fetchPriority="low"
             />
           </motion.div>
+          {/* Velo del estado superpuesto al pie del backdrop. Va DENTRO de la
+              máscara: oscurece la imagen y se funde con ella, sin dejar una
+              banda oscura sobre el cristal de la costura. */}
+          <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-b from-transparent via-black/45 to-transparent" />
+          </div>
         )}
 
         {showTrailer && (
@@ -1642,30 +1646,32 @@ function ContinueWatchingPreviewCard({
               <div className="absolute inset-0 animate-pulse bg-neutral-900" />
             )}
             {trailerSrc && (
-              <div className="absolute inset-0 overflow-hidden">
-                <iframe
-                  key={trailer.key}
-                  ref={trailerIframeRef}
-                  className="pointer-events-none absolute left-1/2 top-1/2 h-[180%] w-[140%] -translate-x-1/2 -translate-y-1/2"
-                  src={trailerSrc}
-                  title={`Trailer - ${show?.title || ""}`}
-                  allow="autoplay; encrypted-media; picture-in-picture"
-                  allowFullScreen={false}
-                  onLoad={syncTrailerAudio}
-                />
+              <>
+                <div className="absolute inset-0 overflow-hidden sv-preview-fade">
+                  <iframe
+                    key={trailer.key}
+                    ref={trailerIframeRef}
+                    className="pointer-events-none absolute left-1/2 top-1/2 h-[180%] w-[140%] -translate-x-1/2 -translate-y-1/2"
+                    src={trailerSrc}
+                    title={`Trailer - ${show?.title || ""}`}
+                    allow="autoplay; encrypted-media; picture-in-picture"
+                    allowFullScreen={false}
+                    onLoad={syncTrailerAudio}
+                  />
+                </div>
+                {/* Fuera del envoltorio enmascarado: el botón es de cristal y
+                    una máscara en un ancestro anularía su backdrop-filter. */}
                 {trailerPlaying && (
                   <PreviewTrailerAudioButton
                     muted={trailerMuted}
                     onToggle={handleToggleTrailerAudio}
                   />
                 )}
-              </div>
+              </>
             )}
           </>
         )}
 
-        {/* Estado de la tarjeta superpuesto al pie del backdrop */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-12 bg-gradient-to-b from-transparent via-black/45 to-transparent" />
         {isCalendar ? (
           // La fecha/cuenta atrás NO se repite sobre la portada: ya se muestra
           // abajo en el panel (línea de episodio). Aquí solo se conserva el badge
@@ -2602,9 +2608,9 @@ function ContinueWatchingSection({
         <AnimatePresence>
           {showPrev && !isMobile && (
             <motion.button
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial="hidden"
+              animate="visible"
+              exit="hidden"
               type="button"
               onClick={(e) => {
                 e.preventDefault();
@@ -2617,13 +2623,10 @@ function ContinueWatchingSection({
               // de la preview activa: flecha y panel ENCIMA de la vista previa.
               className="absolute -left-6 top-14 bottom-44 z-[110] hidden w-32 items-center justify-start sm:top-16 sm:bottom-56 sm:flex md:top-44 md:bottom-80 group/nav"
             >
-              {/* Panel difuminado que ocupa el alto completo y se integra de forma continua
-                  con el fondo de la pantalla y las tarjetas sin cortes ni bordes (rounded-none, left-0 right-0). */}
-              <span
-                aria-hidden
-                className="pointer-events-none absolute inset-y-0 left-0 right-0 rounded-none bg-gradient-to-r from-black/50 via-black/15 to-transparent backdrop-blur-[8px] sv-scroll-mask-l transition-colors duration-300 group-hover/nav:from-black/75"
-              />
+              {/* Cristal sin límites visibles: ver RowNavGlass. */}
+              <RowNavGlass side="left" />
               <motion.span
+                variants={ROW_NAV_FADE}
                 className="relative ml-12 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] transition-transform group-hover/nav:scale-110"
                 whileHover={{ x: -4 }}
               >
@@ -2636,9 +2639,9 @@ function ContinueWatchingSection({
         <AnimatePresence>
           {showNext && !isMobile && (
             <motion.button
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial="hidden"
+              animate="visible"
+              exit="hidden"
               type="button"
               onClick={(e) => {
                 e.preventDefault();
@@ -2650,13 +2653,10 @@ function ContinueWatchingSection({
               // de la preview activa: flecha y panel ENCIMA de la vista previa.
               className="absolute -right-6 top-14 bottom-44 z-[110] hidden w-32 items-center justify-end sm:top-16 sm:bottom-56 sm:flex md:top-44 md:bottom-80 group/nav"
             >
-              {/* Panel difuminado que ocupa el alto completo y se integra de forma continua
-                  con el fondo de la pantalla y las tarjetas sin cortes ni bordes (rounded-none, right-0 left-0). */}
-              <span
-                aria-hidden
-                className="pointer-events-none absolute inset-y-0 right-0 left-0 rounded-none bg-gradient-to-l from-black/50 via-black/15 to-transparent backdrop-blur-[8px] sv-scroll-mask-r transition-colors duration-300 group-hover/nav:from-black/75"
-              />
+              {/* Cristal sin límites visibles: ver RowNavGlass. */}
+              <RowNavGlass side="right" />
               <motion.span
+                variants={ROW_NAV_FADE}
                 className="relative mr-12 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] transition-transform group-hover/nav:scale-110"
                 whileHover={{ x: 4 }}
               >

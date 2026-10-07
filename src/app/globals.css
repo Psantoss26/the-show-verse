@@ -1137,41 +1137,35 @@ body {
       rgba(0, 0, 0, 0.058) 95.6%,
       rgba(0, 0, 0, 0.009) 97.8%,
       transparent 100%);
-
-  /* Máscaras para difuminar los extremos internos de los scroll buttons */
-  --sv-scroll-mask-left: linear-gradient(to right,
-      #000 0%,
-      #000 30%,
-      rgba(0, 0, 0, 0.991) 40%,
-      rgba(0, 0, 0, 0.942) 50%,
-      rgba(0, 0, 0, 0.837) 60%,
-      rgba(0, 0, 0, 0.683) 70%,
-      rgba(0, 0, 0, 0.5) 80%,
-      rgba(0, 0, 0, 0.317) 87%,
-      rgba(0, 0, 0, 0.163) 93%,
-      rgba(0, 0, 0, 0.058) 97%,
-      rgba(0, 0, 0, 0.009) 99%,
-      transparent 100%);
-
-  --sv-scroll-mask-right: linear-gradient(to left,
-      #000 0%,
-      #000 30%,
-      rgba(0, 0, 0, 0.991) 40%,
-      rgba(0, 0, 0, 0.942) 50%,
-      rgba(0, 0, 0, 0.837) 60%,
-      rgba(0, 0, 0, 0.683) 70%,
-      rgba(0, 0, 0, 0.5) 80%,
-      rgba(0, 0, 0, 0.317) 87%,
-      rgba(0, 0, 0, 0.163) 93%,
-      rgba(0, 0, 0, 0.058) 97%,
-      rgba(0, 0, 0, 0.009) 99%,
-      transparent 100%);
 }
 
 /* Hero de DetailModal. Sin media query: aplica en todos los tamaños. */
 .sv-hero-fade {
   -webkit-mask-image: var(--sv-hero-fade);
   mask-image: var(--sv-hero-fade);
+}
+
+/* Backdrop de las vistas previa (hover) de los dashboards: la MISMA costura que
+   el hero de DetailModal, porque debajo está el mismo cristal
+   (LIQUID_GLASS_DETAIL_SURFACE + DashboardPreviewGlass).
+
+   Antes era una rampa lineal 60%→100%: tapaba el 40% inferior de la imagen y su
+   arranque en seco (pendiente que cambia de golpe) se leía como un pliegue. La
+   smootherstep 78%→100% deja la imagen intacta hasta el ~82% y llega a
+   transparente sin canto.
+
+   Va en un envoltorio ESTÁTICO, nunca en la imagen: la imagen hace zoom
+   (1 → 1,08) y una máscara que escala con ella se sale por abajo, así que el
+   `overflow-hidden` recortaba la imagen todavía con ~10% de alfa (corte visible).
+   Tampoco en el contenedor del tráiler: su botón de audio es de cristal y una
+   máscara en un ancestro lo convierte en Backdrop Root. */
+.sv-preview-fade {
+  -webkit-mask-image: var(--sv-hero-fade);
+  mask-image: var(--sv-hero-fade);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
 }
 
 /* =========================================================================
@@ -1834,15 +1828,83 @@ body {
   }
 }
 
-/* Máscaras de desvanecido de scroll de carruseles */
-.sv-scroll-mask-l {
-  -webkit-mask-image: var(--sv-scroll-mask-left);
-  mask-image: var(--sv-scroll-mask-left);
+/* =========================================================================
+   CRISTAL DE LOS BOTONES LATERALES DE LAS FILAS (<RowNavGlass>)
+
+   Antes era UN rectángulo con `blur(8px)` y una máscara solo horizontal: los
+   cantos de arriba y abajo quedaban en seco y, sobre imágenes claras, se veía
+   la caja entera. Ahora:
+
+   · Máscara ELÍPTICA anclada en el centro del borde exterior: llega a alfa 0
+     en los cuatro cantos del botón, así que no hay ningún límite recto.
+   · Desenfoque PROGRESIVO (2 → 6 → 12px): cada capa más fuerte es más pequeña.
+     Un solo desenfoque fuerte a media opacidad deja ver a la vez la imagen
+     nítida y la borrosa (doble contorno) y eso es lo que marcaba la zona.
+   · Curva smootherstep en todas las máscaras, la misma que `--sv-hero-fade`,
+     para que el borde de la zona no se lea como una línea.
+   · El oscurecido es un velo de la misma forma, solo para que la flecha se lea.
+   ========================================================================= */
+.sv-nav-glass {
+  --sv-nav-at: 100% 50%;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 
-.sv-scroll-mask-r {
-  -webkit-mask-image: var(--sv-scroll-mask-right);
-  mask-image: var(--sv-scroll-mask-right);
+.sv-nav-glass[data-side="left"] {
+  --sv-nav-at: 0% 50%;
+}
+
+.sv-nav-glass > span {
+  position: absolute;
+  inset: 0;
+  --sv-nav-mask: radial-gradient(
+    ellipse var(--sv-nav-r) at var(--sv-nav-at),
+    #000 0%,
+    rgba(0, 0, 0, 0.991) 10%,
+    rgba(0, 0, 0, 0.942) 20%,
+    rgba(0, 0, 0, 0.837) 30%,
+    rgba(0, 0, 0, 0.683) 40%,
+    rgba(0, 0, 0, 0.5) 50%,
+    rgba(0, 0, 0, 0.317) 60%,
+    rgba(0, 0, 0, 0.163) 70%,
+    rgba(0, 0, 0, 0.058) 80%,
+    rgba(0, 0, 0, 0.009) 90%,
+    transparent 100%
+  );
+  -webkit-mask-image: var(--sv-nav-mask);
+  mask-image: var(--sv-nav-mask);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+.sv-nav-glass__b1 {
+  --sv-nav-r: 100% 50%;
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+
+.sv-nav-glass__b2 {
+  --sv-nav-r: 72% 40%;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.sv-nav-glass__b3 {
+  --sv-nav-r: 46% 30%;
+  -webkit-backdrop-filter: blur(12px) saturate(1.15);
+  backdrop-filter: blur(12px) saturate(1.15);
+}
+
+.sv-nav-glass__tint {
+  --sv-nav-r: 100% 50%;
+  background-color: rgb(0 0 0 / 0.45);
+  transition: background-color 300ms ease;
+}
+
+button:hover > .sv-nav-glass > .sv-nav-glass__tint,
+button:focus-visible > .sv-nav-glass > .sv-nav-glass__tint {
+  background-color: rgb(0 0 0 / 0.62);
 }
 
 @media (max-width: 639px) {
