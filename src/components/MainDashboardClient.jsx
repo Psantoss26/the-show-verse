@@ -367,11 +367,17 @@ const dashboardPreviewMediaClass =
 const dashboardPreviewInfoClass =
   "w-full bg-transparent px-4 py-3.5 sm:px-5 sm:py-4";
 
-// La imagen se desvanece a transparente por abajo (como DetailModal) para fundir
-// portada e info; el fondo de la tarjeta queda visible en la zona difuminada.
+// La imagen (y el tráiler) se funde con el cristal de la tarjeta con la MISMA
+// curva que la portada de DetailModal (`--sv-hero-fade`, globals.css): solo el
+// 22% inferior y con pendiente y curvatura cero en los extremos, así que la
+// imagen se ve casi intacta hasta el borde y el corte no se nota. Antes era una
+// rampa lineal desde el 60%, que borraba el 40% de la imagen y marcaba una
+// línea donde arrancaba. El velo oscuro que va encima ocupa toda la imagen
+// y lleva la misma máscara: así se desvanece con ella y no deja
+// negro sobre el cristal en la costura.
 const dashboardPreviewBackdropFadeStyle = {
-  WebkitMaskImage: "linear-gradient(to bottom, black 60%, transparent 100%)",
-  maskImage: "linear-gradient(to bottom, black 60%, transparent 100%)",
+  WebkitMaskImage: "var(--sv-hero-fade)",
+  maskImage: "var(--sv-hero-fade)",
 };
 
 const EXPANDABLE_SECTION_HREFS = {
@@ -1524,7 +1530,7 @@ function InlinePreviewCard({
             )}
 
             {trailerSrc && (
-              <div className="absolute inset-0 overflow-hidden">
+              <div className="absolute inset-0 overflow-hidden" style={isSpotlight ? undefined : dashboardPreviewBackdropFadeStyle}>
                 <iframe
                   key={trailer.key}
                   ref={trailerIframeRef}
@@ -1559,8 +1565,8 @@ function InlinePreviewCard({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
-            className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-24
-                        bg-gradient-to-b from-transparent via-black/25 to-transparent"
+            className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-b from-transparent from-55% to-black/30"
+            style={dashboardPreviewBackdropFadeStyle}
           />
         )}
       </div>
@@ -2394,7 +2400,7 @@ function InlinePreviewCardAnticipated({
               <div className="absolute inset-0 bg-neutral-900 animate-pulse" />
             )}
             {trailer?.key && (
-              <div className="absolute inset-0 overflow-hidden">
+              <div className="absolute inset-0 overflow-hidden" style={dashboardPreviewBackdropFadeStyle}>
                 <iframe
                   key={trailer.key}
                   ref={trailerIframeRef}
@@ -2420,7 +2426,9 @@ function InlinePreviewCardAnticipated({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
-          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-24 bg-gradient-to-b from-transparent via-black/40 to-transparent"
+          // Contraste para el logo, fundido con la imagen (misma máscara).
+          className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-b from-transparent from-45% to-black/55"
+          style={dashboardPreviewBackdropFadeStyle}
         />
 
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-4 pb-4">
