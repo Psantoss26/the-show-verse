@@ -15,6 +15,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import usePreviewImageHalf from "@/hooks/usePreviewImageHalf";
 import { useHoverCapable } from "@/lib/hooks/useMediaQuery";
+import { LIQUID_GLASS_DETAIL_SURFACE } from "@/lib/ui/liquidGlass";
+import DashboardPreviewGlass from "@/components/dashboard/DashboardPreviewGlass";
 import useTrailerAutoDismiss from "@/hooks/useTrailerAutoDismiss";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, FreeMode } from "swiper/modules";
@@ -1048,7 +1050,7 @@ export function BackdropPreviewCard({
           : DASHBOARD_PREVIEW_ENTER_TRANSITION
       }
       ref={previewRef}
-      className={`absolute top-1/2 ${alignmentClass} z-50 flex cursor-pointer flex-col overflow-hidden rounded-xl border border-white/10 bg-[#141414]/95 text-white shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl`}
+      className={`absolute top-1/2 ${alignmentClass} z-50 flex cursor-pointer flex-col overflow-hidden rounded-xl text-white ${LIQUID_GLASS_DETAIL_SURFACE}`}
       onClick={() => openDetailModal?.(item)}
       onMouseEnter={(event) => {
         onPreviewMouseEnter?.(event);
@@ -1057,10 +1059,11 @@ export function BackdropPreviewCard({
       style={{
         width: previewMaxWidth,
         marginTop: -previewImgHalf,
-        willChange: "transform, opacity",
+        willChange: "transform",
         transformOrigin,
       }}
     >
+      <DashboardPreviewGlass />
       {/* Backdrop ampliado 16:9 (+ trailer al pulsar ▶) */}
       <div className="relative aspect-video w-full overflow-hidden bg-transparent">
         {!showTrailer && !bgSrc && (

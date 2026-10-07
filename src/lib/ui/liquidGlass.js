@@ -153,3 +153,9 @@ export const LIQUID_GLASS_SURFACE = `relative isolate overflow-hidden transform-
 // cartel para parecer un panel oscuro con separadores (verificado en la columna
 // móvil de la ficha). Es el mismo motivo por el que existe LIQUID_GLASS_CARD.
 export const LIQUID_GLASS_SURFACE_CARD = `relative isolate overflow-hidden transform-gpu ${LIQUID_GLASS_CARD}`;
+
+// Acabado de DetailModal y previews con controles de cristal encima.
+// El blur va en una capa hermana del contenido, nunca en esta superficie:
+// así los filtros de los controles siguen viendo el fondo de la página.
+export const LIQUID_GLASS_DETAIL_SURFACE =
+  "bg-black/[0.47] bg-gradient-to-br from-white/[0.12] via-transparent to-white/[0.04] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)]";

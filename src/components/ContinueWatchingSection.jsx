@@ -1,6 +1,8 @@
 // /src/components/ContinueWatchingSection.jsx
 "use client";
 
+import { LIQUID_GLASS_DETAIL_SURFACE } from "@/lib/ui/liquidGlass";
+import DashboardPreviewGlass from "@/components/dashboard/DashboardPreviewGlass";
 import { useHoverCapable } from "@/lib/hooks/useMediaQuery";
 import { useCallback, useRef, useEffect, useState, memo } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -1579,7 +1581,7 @@ function ContinueWatchingPreviewCard({
       ref={previewRef}
       // El ancho se calcula según las tarjetas visibles del breakpoint activo:
       // menos tarjetas permiten una preview mayor; con 6 se contiene mejor.
-      className={`absolute top-1/2 ${alignmentClass} rounded-xl text-white cursor-pointer bg-[#141414]/95 backdrop-blur-xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] border border-white/10 z-50 flex flex-col overflow-hidden`}
+      className={`absolute top-1/2 ${alignmentClass} rounded-xl text-white cursor-pointer ${LIQUID_GLASS_DETAIL_SURFACE} z-50 flex flex-col overflow-hidden`}
       onClick={() => openDetailModal?.(show)}
       onMouseEnter={(event) => {
         onPreviewMouseEnter?.(event);
@@ -1590,10 +1592,11 @@ function ContinueWatchingPreviewCard({
       style={{
         width: previewMaxWidth,
         marginTop: -previewImgHalf,
-        willChange: "transform, opacity",
+        willChange: "transform",
         transformOrigin,
       }}
     >
+      <DashboardPreviewGlass />
       {/* Backdrop de 16:9 (+ tráiler al reproducir) */}
       <div className="relative w-full aspect-video overflow-hidden bg-transparent">
         {!showTrailer && !ready && (

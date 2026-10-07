@@ -1,6 +1,9 @@
 // /src/app/movies/MoviesPageClient.jsx
 "use client";
 
+import { LIQUID_GLASS_DETAIL_SURFACE } from "@/lib/ui/liquidGlass";
+import DashboardPreviewGlass from "@/components/dashboard/DashboardPreviewGlass";
+
 import OptimizedImage from "@/components/OptimizedImage";
 import FeaturedHero from "@/components/FeaturedHero";
 import { useRef, useEffect, useMemo, useState } from "react";
@@ -172,10 +175,10 @@ const getPreviewBackdropFallback = (movie) =>
 
 const dashboardPreviewCardClass = (heightClass, isSpotlight = false) =>
   [
-    "relative isolate overflow-hidden rounded-lg text-white cursor-pointer transform-gpu",
+    "relative overflow-hidden rounded-lg text-white cursor-pointer transform-gpu",
     isSpotlight
       ? "bg-neutral-950 ring-1 ring-inset ring-white/10 shadow-[0_24px_64px_-18px_rgba(0,0,0,0.95)]"
-      : "grid grid-rows-[76%_24%] bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/40 backdrop-blur-[50px] shadow-[0_15px_40px_-10px_rgba(0,0,0,0.8)]",
+      : `z-0 grid grid-rows-[76%_24%] ${LIQUID_GLASS_DETAIL_SURFACE}`,
     "transition-all duration-300",
     heightClass,
   ].join(" ");
@@ -184,7 +187,7 @@ const dashboardPreviewMediaClass =
   "relative h-full w-full overflow-hidden bg-transparent";
 
 const dashboardPreviewInfoClass =
-  "relative h-full w-full overflow-hidden bg-black/10 bg-gradient-to-br from-white/5 via-transparent to-black/20 backdrop-blur-[50px]";
+  "relative h-full w-full overflow-hidden bg-transparent";
 
 const dashboardPreviewBackdropFadeStyle = {
   WebkitMaskImage:
@@ -1085,6 +1088,7 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
       onFocus={prefetchHref}
       onTouchStart={prefetchHref}
     >
+      {!isSpotlight && <DashboardPreviewGlass />}
       <div
         className={
           isSpotlight
@@ -1773,7 +1777,7 @@ function Row({
                           : DASHBOARD_PREVIEW_ENTER_TRANSITION
                       }
                       className="w-full h-full hidden sm:block"
-                      style={{ willChange: "transform, opacity" }}
+                      style={{ willChange: "transform" }}
                     >
                       {isTop10 ? (
                         <BackdropPreviewCard
