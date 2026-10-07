@@ -10,6 +10,19 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // es que ya estén en caché; si no, la transición no se queda esperando a un
 // `original` de varios MB.
 const IMAGE_WAIT_MS = 900;
+// Margen para el Reparto Principal si la ficha nueva aún lo está resolviendo
+// (series: reparto agregado). En películas ya viene del servidor y no espera.
+const CAST_WAIT_MS = 500;
+// Salida del contenido saliente al pulsar (ver `navigateDetailsSequence`).
+const EXIT_MS = 280;
+const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
+
+async function waitForCast(root, isCancelled) {
+  const deadline = Date.now() + CAST_WAIT_MS;
+  while (!isCancelled() && root.isConnected && root.getAttribute("data-details-cast-ready") !== "true" && Date.now() < deadline) {
+    await nextFrame();
+  }
+}
 
 export function isDetailsSequenceTransitionActive() {
   return typeof document !== "undefined" && document.documentElement.hasAttribute(FLAG);
@@ -24,9 +37,38 @@ function setNames(root, enabled) {
   });
 }
 
+const SKIP = "data-details-sequence-skip";
+
+// Marca los bloques del menú y las secciones que quedan por DEBAJO de la
+// pantalla. La copia de la ficha entera son ~5.500 elementos con paneles de
+// cristal, y pintarla retrasaba ~200ms el primer fotograma tras el clic (y con
+// él la salida). Lo de abajo nunca se ve durante la transición y quitarlo no
+// mueve lo de arriba; lo que queda por encima sí se conserva, porque
+// sostiene la posición de lo visible.
+function markBelowViewport(root) {
+  const limit = innerHeight + 200;
+  const marked = [];
+  const visit = (element) => {
+    for (const child of element.children || []) {
+      const rect = child.getBoundingClientRect();
+      if (rect.top > limit) {
+        child.setAttribute(SKIP, "");
+        marked.push(child);
+      } else if (rect.bottom > limit) {
+        visit(child);
+      }
+    }
+  };
+  root.querySelectorAll(`[${PART}="content"]`).forEach(visit);
+  return marked;
+}
+
 function captureDetails(root) {
   const bounds = root.getBoundingClientRect();
+  const marked = markBelowViewport(root);
   const snapshot = root.cloneNode(true);
+  marked.forEach((node) => node.removeAttribute(SKIP));
+  snapshot.querySelectorAll(`[${SKIP}]`).forEach((node) => node.remove());
   snapshot.removeAttribute("data-details-root");
   snapshot.removeAttribute("data-details-href");
   snapshot.setAttribute("data-details-sequence-snapshot", "");
@@ -54,7 +96,10 @@ function captureDetails(root) {
 }
 
 async function waitForImages(root) {
-  const images = [...root.querySelectorAll(`[${PART}] img`)].filter((img) => {
+  // Solo bloquean el póster, la cabecera y el fondo. Las fotos del reparto (capa
+  // `content`) las precalienta detailsSequenceWarmup; esperar por ellas aquí
+  // agotaba el tope cuando no estaban en caché y retrasaba toda la transición.
+  const images = [...root.querySelectorAll(`[${PART}="artwork"] img, [${PART}="info"] img`)].filter((img) => {
     const rect = img.getBoundingClientRect();
     return rect.width > 0 && rect.height > 0 && rect.top < innerHeight && rect.bottom > 0;
   });
@@ -78,7 +123,11 @@ function focusTitle(root) {
   const heading = root?.querySelector("h1");
   if (!heading) return;
   heading.setAttribute("tabindex", "-1");
-  heading.focus({ preventScroll: true });
+  // El foco pasa al título nuevo para lectores de pantalla y teclado, pero sin
+  // anillo: el título no es un control y el recuadro blanco ensuciaba la
+  // cabecera al terminar la transición (`focusVisible` se ignora donde no
+  // existe y el comportamiento es el de siempre).
+  heading.focus({ preventScroll: true, focusVisible: false });
 }
 
 /** Bloquea clics repetidos, pero conserva los enlaces modificados en el caller. */
@@ -95,6 +144,40 @@ export async function navigateDetailsSequence({ href, direction, navigate }) {
   const { snapshot, overlay } = captureDetails(source);
   const html = document.documentElement;
   html.setAttribute(FLAG, direction === "previous" ? "previous" : "next");
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // SALIDA COMPLETA AL CLIC. Al pulsar, el contenido saliente (póster,
+  // cabecera, menú y secciones) se va del todo —deslizándose hacia fuera y
+  // desvaneciéndose— y solo queda el fondo. Así:
+  //   - el clic responde al instante;
+  //   - mientras carga la ficha nueva no hay un movimiento a medias parado (la
+  //     versión anterior solo atenuaba y desplazaba 8px y ahí se quedaba);
+  //   - la pausa en la que el navegador captura la View Transition no congela
+  //     contenido a la vista, y la entrada del título nuevo se ve entera.
+  // Si la ficha llega antes de acabar la salida, la View Transition la captura
+  // a medias y su salida sigue desde ahí. El fondo no se toca: es lo que da
+  // continuidad y se funde con el nuevo en la transición.
+  // La ficha original sigue pintada DEBAJO de la copia hasta que Next la
+  // sustituye: hay que ocultarla o se vería a través de la copia que se va.
+  // Con `opacity`, no con `visibility`: esta se hereda y obligaba a recalcular
+  // el estilo de miles de elementos (menú y secciones) en el fotograma del clic.
+  const hiddenParts = [];
+  if (!reduced) {
+    source
+      .querySelectorAll(`[${PART}="artwork"], [${PART}="info"], [${PART}="content"]`)
+      .forEach((node) => {
+        hiddenParts.push([node, node.style.opacity]);
+        node.style.opacity = "0";
+      });
+    const shift = direction === "previous" ? 24 : -24;
+    snapshot
+      .querySelectorAll(`[${PART}="artwork"], [${PART}="info"], [${PART}="content"]`)
+      .forEach((node) => node.animate?.(
+        [{ opacity: 1, transform: "translateX(0)" }, { opacity: 0, transform: `translateX(${shift}px)` }],
+        // Curva que arranca rápido: con una de aceleración (ease-in) los primeros
+        // 150ms apenas se movía y el clic parecía no responder.
+        { duration: EXIT_MS, easing: "cubic-bezier(.2,0,0,1)", fill: "forwards" },
+      ));
+  }
   const lockedRoots = new Map();
   const lockRoot = (root) => {
     if (!root || lockedRoots.has(root)) return;
@@ -113,6 +196,17 @@ export async function navigateDetailsSequence({ href, direction, navigate }) {
   window.addEventListener("wheel", preventScroll, { passive: false });
 
   try {
+    // La navegación pone a React a renderizar la ficha nueva en tareas largas.
+    // Si empieza en el mismo instante, el navegador no pinta el primer
+    // fotograma de la salida hasta que acaba ese trabajo: el contenido se
+    // quedaba quieto y luego desaparecía de golpe. Dos fotogramas bastan para
+    // que la salida llegue al compositor, que la sigue animando aunque el hilo
+    // principal esté ocupado.
+    if (!reduced) {
+      await nextFrame();
+      await nextFrame();
+    }
+    if (cancelled) return false;
     const opened = await navigate(href, { scroll: false });
     if (opened === false) return false;
     while (!cancelled) {
@@ -124,16 +218,17 @@ export async function navigateDetailsSequence({ href, direction, navigate }) {
       // Errores de ruta se muestran inmediatamente, sin ocultar su recuperación.
       if (route === href && document.querySelector("[data-details-error], .next-error-h1")) break;
       incoming = null;
-      await delay(50);
+      // Se comprueba en cada fotograma: con 50ms de sondeo la transición podía
+      // arrancar hasta 50ms después de estar lista la ficha.
+      await nextFrame();
     }
     if (!incoming || cancelled) return false;
     incoming.setAttribute("data-details-sequence-entered", "");
-    await waitForImages(incoming);
+    await Promise.all([waitForImages(incoming), waitForCast(incoming, () => cancelled)]);
     if (cancelled || !incoming.isConnected) return false;
     // El nuevo título arranca en su hero; la copia saliente conserva el scroll.
     window.scrollTo({ top: 0, behavior: "instant" });
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    await nextFrame();
     if (!reduced && typeof document.startViewTransition === "function") {
       setNames(snapshot, true);
       viewTransition = document.startViewTransition(() => {
@@ -144,7 +239,7 @@ export async function navigateDetailsSequence({ href, direction, navigate }) {
     } else if (!reduced && overlay.animate) {
       // Baseline 2024: fundido sobre la nueva ficha YA lista, sin fondo negro.
       const x = direction === "previous" ? -24 : 24;
-      const animations = [...incoming.querySelectorAll(`[${PART}="artwork"], [${PART}="info"]`)]
+      const animations = [...incoming.querySelectorAll(`[${PART}="artwork"], [${PART}="info"], [${PART}="content"]`)]
         .map((node) => node.animate(
           [{ transform: `translateX(${x}px)` }, { transform: "translateX(0)" }],
           { duration: 320, easing: "cubic-bezier(.22,1,.36,1)" },
@@ -159,6 +254,8 @@ export async function navigateDetailsSequence({ href, direction, navigate }) {
     viewTransition?.skipTransition();
     if (incoming) setNames(incoming, false);
     overlay.remove();
+    // Navegación cancelada o fallida: la ficha original vuelve a verse.
+    hiddenParts.forEach(([node, opacity]) => { node.style.opacity = opacity; });
     lockedRoots.forEach((inert, root) => { root.inert = inert; });
     html.removeAttribute(FLAG);
     window.removeEventListener("popstate", cancel);
