@@ -76,6 +76,17 @@ import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { compareImdbRatings } from "@/lib/userLists/imdbRatingSort";
 import HoverExpandCard from "@/components/ui/HoverExpandCard";
+import FlipReorder from "@/components/ui/FlipReorder";
+import useImdbScoreLoader from "@/hooks/useImdbScoreLoader";
+import useCardEntrance from "@/hooks/useCardEntrance";
+import {
+  fetchImdbScoresForItems,
+  getScoreItemKey,
+  readScoreCache,
+  readScoreCacheEntries,
+  shouldRefreshScore,
+  writeScoreCache,
+} from "@/lib/userLists/listScoreCache";
 import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 
@@ -201,12 +212,6 @@ const posterInFlight = new Map();
 const backdropChoiceCache = new Map();
 const backdropInFlight = new Map();
 
-// Persistent score cache: recent titles change faster, older titles can stay cached longer.
-const SCORE_CACHE_RECENT_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
-const SCORE_CACHE_ACTIVE_WINDOW_MS = 365 * 24 * 60 * 60 * 1000;
-const SCORE_CACHE_RECENT_TTL_MS = 12 * 60 * 60 * 1000;
-const SCORE_CACHE_ACTIVE_TTL_MS = 3 * 24 * 60 * 60 * 1000;
-const SCORE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const WATCHLIST_CACHE_KEY = "showverse:watchlist:items:v3";
 const WATCHLIST_CACHE_TTL_MS = 10 * 60 * 1000;
 const IMAGE_CHOICE_CACHE_KEY = "showverse:watchlist:image-choices:v6";
@@ -313,143 +318,6 @@ function writeProvidersCache(providersMap) {
   } catch (e) {
     console.warn("Failed to write provider cache:", e);
   }
-}
-
-function getItemReleaseTime(item) {
-  const date = item?.release_date || item?.first_air_date;
-  const time = date ? Date.parse(date) : NaN;
-  return Number.isNaN(time) ? null : time;
-}
-
-function getScoreCacheTtlForItem(item, now = Date.now()) {
-  const releaseTime = getItemReleaseTime(item);
-  if (!releaseTime) return SCORE_CACHE_TTL_MS;
-  const age = now - releaseTime;
-  if (age < SCORE_CACHE_RECENT_WINDOW_MS) return SCORE_CACHE_RECENT_TTL_MS;
-  if (age < SCORE_CACHE_ACTIVE_WINDOW_MS) return SCORE_CACHE_ACTIVE_TTL_MS;
-  return SCORE_CACHE_TTL_MS;
-}
-
-function getWatchlistItemType(item) {
-  return item?.media_type || (item?.title ? "movie" : "tv");
-}
-
-function getScoreItemKey(item) {
-  return item?.id == null ? "" : `${getWatchlistItemType(item)}:${item.id}`;
-}
-
-function readScoreCacheEntries(source) {
-  if (typeof window === "undefined") return new Map();
-  try {
-    const key = `showverse:scores:${source}:v2`;
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return new Map();
-
-    const parsed = JSON.parse(raw);
-    const now = Date.now();
-    const cache = new Map();
-
-    Object.entries(parsed).forEach(([id, entry]) => {
-      if (entry?.t && now - entry.t < SCORE_CACHE_TTL_MS) {
-        cache.set(id, { score: entry.score, t: entry.t });
-      }
-    });
-
-    return cache;
-  } catch {
-    return new Map();
-  }
-}
-
-// Cache management for scores
-function readScoreCache(source) {
-  const entries = readScoreCacheEntries(source);
-  const cache = new Map();
-  entries.forEach((entry, id) => {
-    cache.set(id, entry.score);
-  });
-  return cache;
-}
-
-function shouldRefreshScore(item, entry, now = Date.now()) {
-  if (!entry || typeof entry.score !== "number" || Number.isNaN(entry.score)) {
-    return true;
-  }
-  return now - Number(entry.t || 0) >= getScoreCacheTtlForItem(item, now);
-}
-
-function writeScoreCache(source, scoresMap, refreshedIds = null) {
-  if (typeof window === "undefined") return;
-  try {
-    const key = `showverse:scores:${source}:v2`;
-    const now = Date.now();
-    const raw = window.localStorage.getItem(key);
-    const previous = raw ? JSON.parse(raw) : {};
-    const data = {};
-
-    Object.entries(previous || {}).forEach(([id, entry]) => {
-      if (entry?.t && now - entry.t < SCORE_CACHE_TTL_MS) {
-        data[id] = entry;
-      }
-    });
-
-    if (refreshedIds instanceof Set) {
-      refreshedIds.forEach((id) => {
-        if (scoresMap.has(id)) data[id] = { score: scoresMap.get(id), t: now };
-      });
-    } else {
-      scoresMap.forEach((score, id) => {
-        data[id] = { score, t: now };
-      });
-    }
-
-    window.localStorage.setItem(key, JSON.stringify(data));
-  } catch (e) {
-    console.warn("Failed to write score cache:", e);
-  }
-}
-
-function updateScoreCache(source, id, score) {
-  if (typeof window === "undefined") return;
-  try {
-    const key = `showverse:scores:${source}:v2`;
-    const raw = window.localStorage.getItem(key);
-    const data = raw ? JSON.parse(raw) : {};
-
-    data[id] = { score, t: Date.now() };
-
-    window.localStorage.setItem(key, JSON.stringify(data));
-  } catch (e) {
-    console.warn("Failed to update score cache:", e);
-  }
-}
-
-async function fetchImdbScoresForItems(items) {
-  const payloadItems = (Array.isArray(items) ? items : [])
-    .map((item) => {
-      const key = getScoreItemKey(item);
-      if (!key) return null;
-      return {
-        key,
-        id: item.id,
-        mediaType: getWatchlistItemType(item),
-        imdbId: item.imdb_id || item.imdbId || null,
-      };
-    })
-    .filter(Boolean);
-
-  if (!payloadItems.length) return {};
-
-  const res = await fetch("/api/imdb/ratings", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ items: payloadItems }),
-    cache: "no-store",
-  });
-  if (!res.ok) return {};
-
-  const json = await res.json().catch(() => null);
-  return json?.items && typeof json.items === "object" ? json.items : {};
 }
 
 function buildImg(path, size = "w500") {
@@ -1809,13 +1677,17 @@ const WatchlistCard = memo(function WatchlistCard({
         } else {
           try {
             const batchScores = await fetchImdbScoresForItems([item]);
-            const imdbRating = batchScores[itemId]?.rating;
+            const imdbRating = batchScores?.items[itemId]?.rating;
 
             if (imdbRating) {
               const numRating = Number(imdbRating);
               if (Number.isFinite(numRating) && numRating > 0) {
                 setImdbScore(numRating);
-                updateScoreCache("imdb", itemId, numRating);
+                writeScoreCache(
+                  "imdb",
+                  new Map([[itemId, numRating]]),
+                  new Set([itemId]),
+                );
               }
             }
           } catch (err) {
@@ -1831,34 +1703,35 @@ const WatchlistCard = memo(function WatchlistCard({
   // En navegación de historial (atrás/adelante) NO se anima la entrada: la página
   // debe verse estática, tal cual estaba antes de salir.
   const isBackNav = useIsHistoryNavigation();
-  const animDelay =
-    totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
   // Se anima todo lo que cabe en pantalla en la vista actual (no un tope fijo).
-  const shouldAnimate = !isBackNav && index < Math.max(1, animateWithin);
+  //
+  // La entrada se decide UNA vez, al montar, con el índice de ese momento, y se
+  // juega UNA sola vez (ver `useCardEntrance`). Antes era la entrada de framer
+  // (`initial`/`animate`) y se repetía al reordenar: la tarjeta volvía a
+  // fundirse desde opacidad 0 mientras se desplazaba, semitransparente, y
+  // parecía aparecer en vez de moverse.
+  const [{ shouldAnimate, animDelay }] = useState(() => ({
+    shouldAnimate: !isBackNav && index < Math.max(1, animateWithin),
+    animDelay: totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03,
+  }));
+  const shellRef = useRef(null);
+  useCardEntrance(shellRef, {
+    enabled: shouldAnimate,
+    delayS: animDelay,
+    durationS: viewMode === "list" || viewMode === "compact" ? 0.25 : 0.2,
+    fromTransform:
+      viewMode === "list" || viewMode === "compact"
+        ? "translateY(10px) scale(0.95)"
+        : "scale(0.95)",
+  });
+  // La recolocación al cambiar el orden la anima <FlipReorder> por esta clave.
+  const flipKey = `${type}-${item.id}`;
   const shellClassName =
     "relative z-0 overflow-visible focus-within:z-[40] hover:z-[50]";
 
   if (viewMode === "list") {
     return (
-      <motion.div
-        initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -10, scale: 0.95 }}
-        transition={{
-          duration: 0.25,
-          delay: shouldAnimate ? animDelay : 0,
-          // La recolocación no hereda el retardo escalonado de la entrada.
-          layout: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
-          ease: [0.25, 0.1, 0.25, 1],
-        }}
-        layout={!isBackNav}
-        // Solo se recoloca al CAMBIAR su posición en la lista (ordenar,
-        // filtrar). Abrir o redimensionar el panel lateral cambia las
-        // columnas, no el orden: ahí la rejilla se reorganiza de una vez
-        // en vez de animar cada tarjeta por separado.
-        layoutDependency={index}
-        data-watchlist-card=""
-      >
+      <div ref={shellRef} data-flip-key={flipKey} data-watchlist-card="">
         <Link
           href={href}
           prefetch={false}
@@ -1885,30 +1758,16 @@ const WatchlistCard = memo(function WatchlistCard({
             </div>
           </div>
         </Link>
-      </motion.div>
+      </div>
     );
   }
 
   if (viewMode === "compact") {
     return (
-      <motion.div
+      <div
+        ref={shellRef}
         className={shellClassName}
-        initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -10, scale: 0.95 }}
-        transition={{
-          duration: 0.25,
-          delay: shouldAnimate ? animDelay : 0,
-          // La recolocación no hereda el retardo escalonado de la entrada.
-          layout: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
-          ease: [0.25, 0.1, 0.25, 1],
-        }}
-        layout={!isBackNav}
-        // Solo se recoloca al CAMBIAR su posición en la lista (ordenar,
-        // filtrar). Abrir o redimensionar el panel lateral cambia las
-        // columnas, no el orden: ahí la rejilla se reorganiza de una vez
-        // en vez de animar cada tarjeta por separado.
-        layoutDependency={index}
+        data-flip-key={flipKey}
         data-watchlist-card=""
       >
         <Link
@@ -1931,19 +1790,13 @@ const WatchlistCard = memo(function WatchlistCard({
             />
           </HoverExpandCard>
         </Link>
-      </motion.div>
+      </div>
     );
   }
 
   // Grid mode
   return (
-    <motion.div
-      initial={shouldAnimate ? { opacity: 0, scale: 0.95 } : false}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.2, delay: shouldAnimate ? animDelay : 0 }}
-      data-watchlist-card=""
-    >
+    <div ref={shellRef} data-flip-key={flipKey} data-watchlist-card="">
       <Link
         href={href}
         prefetch={false}
@@ -1962,9 +1815,22 @@ const WatchlistCard = memo(function WatchlistCard({
           />
         </div>
       </Link>
-    </motion.div>
+    </div>
   );
-});
+}, areWatchlistCardPropsEqual);
+
+// `index`, `totalItems` y `animateWithin` solo deciden la entrada, que se fija al
+// montar. Ignorarlos evita volver a renderizar CADA tarjeta al reordenar (todas
+// cambian de índice): con cientos de tarjetas ese render bloqueaba el hilo
+// principal justo cuando debía empezar la recolocación.
+function areWatchlistCardPropsEqual(prev, next) {
+  return (
+    prev.item === next.item &&
+    prev.viewMode === next.viewMode &&
+    prev.imageMode === next.imageMode &&
+    prev.imdbScore === next.imdbScore
+  );
+}
 
 // ================== MAIN COMPONENT ==================
 export default function WatchlistClient() {
@@ -2360,82 +2226,15 @@ export default function WatchlistClient() {
     return () => window.removeEventListener(LIST_CHANGED_EVENT, onChange);
   }, []);
 
-  // Prefetch IMDb scores in background (non-blocking)
-  useEffect(() => {
-    if (items.length === 0) return;
-    if (!needsImdbScores) return;
-    // Al volver (atrás) con el orden congelado: no refrescar puntuaciones para no
-    // reordenar. El orden permanece exactamente como lo dejó el usuario.
-    if (freezeOrder) return;
-
-    let cancelled = false;
-
-    const loadImdbScores = async () => {
-      const cachedEntries = readScoreCacheEntries("imdb");
-      const scores = new Map();
-      cachedEntries.forEach((entry, id) => {
-        scores.set(id, entry.score);
-      });
-
-      if (scores.size > 0) {
-        startTransition(() => setImdbScores(new Map(scores)));
-      }
-
-      const now = Date.now();
-      const itemsToFetch = items.filter((item) =>
-        shouldRefreshScore(item, cachedEntries.get(getScoreItemKey(item)), now),
-      );
-
-      if (itemsToFetch.length === 0) {
-        setLoadingImdb(false);
-        return;
-      }
-
-      setLoadingImdb(true);
-
-      try {
-        const refreshedIds = new Set();
-        const batchSize = 80;
-
-        for (let i = 0; i < itemsToFetch.length; i += batchSize) {
-          if (cancelled) break;
-
-          const batch = itemsToFetch.slice(i, i + batchSize);
-          const batchScores = await fetchImdbScoresForItems(batch);
-          let hasBatchUpdates = false;
-
-          batch.forEach((item) => {
-            const scoreKey = getScoreItemKey(item);
-            const rating = Number(batchScores[scoreKey]?.rating);
-            if (!Number.isFinite(rating) || rating <= 0) return;
-            scores.set(scoreKey, rating);
-            refreshedIds.add(scoreKey);
-            hasBatchUpdates = true;
-          });
-
-          if (hasBatchUpdates && !cancelled) {
-            startTransition(() => setImdbScores(new Map(scores)));
-            await new Promise((resolve) => setTimeout(resolve, 0));
-          }
-        }
-
-        if (!cancelled && refreshedIds.size > 0) {
-          writeScoreCache("imdb", scores, refreshedIds);
-        }
-      } catch (error) {
-        console.error("Error loading IMDb scores:", error);
-      } finally {
-        if (!cancelled) {
-          setLoadingImdb(false);
-        }
-      }
-    };
-
-    loadImdbScores();
-    return () => {
-      cancelled = true;
-    };
-  }, [items, needsImdbScores, freezeOrder]);
+  // Notas de IMDb (ordenar por valoración / agrupar por IMDb): ver el hook,
+  // compartido con Favoritos.
+  useImdbScoreLoader({
+    items,
+    enabled: needsImdbScores,
+    frozen: freezeOrder,
+    setImdbScores,
+    setLoading: setLoadingImdb,
+  });
 
   // Prefetch Trakt scores in background (non-blocking)
   useEffect(() => {
@@ -2763,6 +2562,22 @@ export default function WatchlistClient() {
     () => sorted.slice(0, renderLimit),
     [sorted, renderLimit],
   );
+  // Firma del ORDEN visible (incluido el grupo de cada título): cuando cambia,
+  // <FlipReorder> anima la recolocación de las tarjetas a la vista. No depende
+  // de `renderLimit`: completar la lista por tandas no recoloca nada.
+  const flipOrderKey = useMemo(() => {
+    const keysOf = (list) => list.map(getScoreItemKey).join(",");
+    if (!grouped) return keysOf(sorted);
+    return grouped
+      .map((group) =>
+        group.subgroups?.length
+          ? `${group.key}:${group.subgroups
+              .map((subgroup) => `${subgroup.key}=${keysOf(subgroup.items)}`)
+              .join(";")}`
+          : `${group.key}:${keysOf(group.items)}`,
+      )
+      .join("|");
+  }, [grouped, sorted]);
 
   // Un título puede pertenecer a varias plataformas (o géneros/subgrupos). El
   // límite incremental ha de contar cada tarjeta que se va a pintar, no solo
@@ -3651,7 +3466,12 @@ export default function WatchlistClient() {
           </motion.div>
         ) : grouped ? (
           // Grouped view
-          <div className="space-y-8">
+          <FlipReorder
+            className="space-y-8"
+            orderKey={flipOrderKey}
+            itemSelector="[data-watchlist-card]"
+            disabled={freezeOrder}
+          >
             {(() => {
               let globalCardIndex = 0;
               return grouped.map((group, groupIndex) => (
@@ -3745,11 +3565,14 @@ export default function WatchlistClient() {
                 </motion.div>
               ));
             })()}
-          </div>
+          </FlipReorder>
         ) : (
-          <div
+          <FlipReorder
             key={`flat-grid-${viewMode}-${imageMode}`}
             className={getItemsGridClass(false)}
+            orderKey={flipOrderKey}
+            itemSelector="[data-watchlist-card]"
+            disabled={freezeOrder}
           >
             {renderedSorted.map((item, idx) => (
               <WatchlistCard
@@ -3763,7 +3586,7 @@ export default function WatchlistClient() {
                 imdbScore={imdbScores.get(getScoreItemKey(item))}
               />
             ))}
-          </div>
+          </FlipReorder>
         )}
       </div>
     </div>
