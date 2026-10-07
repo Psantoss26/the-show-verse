@@ -13,6 +13,7 @@ import {
   Eye,
   LayoutGrid,
   Loader2,
+  Music2,
   RotateCcw,
   Settings,
   Shield,
@@ -2093,6 +2094,18 @@ function ProfileSettingsClient() {
                       onChange={(value) =>
                         updatePreference({
                           uiSettings: { ...preferences.uiSettings, compactProfileCards: value },
+                        })
+                      }
+                    />
+                    <ToggleRow
+                      icon={Music2}
+                      title={t("settings_soundtrack_autoplay", "Reproducción automática del soundtrack")}
+                      description={t("settings_soundtrack_autoplay_desc", "La banda sonora suena al abrir la ficha de una película o serie. Desactivada, solo suena al abrir el reproductor del soundtrack.")}
+                      checked={preferences.uiSettings.soundtrackAutoplay !== false}
+                      disabled={saving}
+                      onChange={(value) =>
+                        updatePreference({
+                          uiSettings: { ...preferences.uiSettings, soundtrackAutoplay: value },
                         })
                       }
                     />

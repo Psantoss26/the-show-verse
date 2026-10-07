@@ -53,7 +53,6 @@ import StreamingProviderLogo from "@/components/details/StreamingProviderLogo";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
 // -- Componentes internos del proyecto --
-import EpisodeRatingsGrid from "@/components/EpisodeRatingsGrid";
 import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
 import {
   fetchArtworkOverride,
@@ -130,7 +129,6 @@ import {
   LibraryBig,
   MessageSquare,
   SlidersHorizontal,
-  BarChart3,
   Trophy,
 } from "lucide-react";
 
@@ -299,6 +297,7 @@ import DetailActionsRow from "@/components/details/DetailActionsRow";
 import AddToListModal from "@/components/details/AddToListModal";
 import VideoModal from "@/components/details/VideoModal";
 import SoundtrackModal from "@/components/details/SoundtrackModal";
+import useAmbientSoundtrack from "@/lib/details/useAmbientSoundtrack";
 import TraktCommentModal from "@/components/details/TraktCommentModal";
 import PosterStack from "@/components/details/PosterStack";
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
@@ -2183,6 +2182,18 @@ export default function DetailsClient({
     },
     [loadSoundtrack],
   );
+
+  // MODO SOUNDTRACK: la banda sonora suena de fondo al entrar en la ficha. Se
+  // pausa con el tráiler o el reproductor completo abiertos (tienen su propio
+  // sonido); en el reproductor se activa o desactiva la reproducción
+  // automática.
+  const soundtrackAmbient = useAmbientSoundtrack({
+    tracks: soundtrackTracks,
+    // Ajustes > Reproducción automática del soundtrack.
+    enabled: preferences?.uiSettings?.soundtrackAutoplay !== false,
+    suspended: soundtrackModalOpen || videoModalOpen,
+    resetKey: `${endpointType}:${id}`,
+  });
 
   // Abre el modal de video con el video seleccionado
   const openVideo = (v) => {
@@ -7666,14 +7677,8 @@ export default function DetailsClient({
         icon: Layers,
         count: visibleTraktSeasons.length || undefined,
       });
-      // TV: Episodios
-      items.push({
-        id: "episodes",
-        label: "Episodios",
-        icon: BarChart3,
-        // si no tienes "ratings.length", puedes dejar count undefined
-        count: Array.isArray(ratings) ? ratings.length : undefined,
-      });
+      // La valoración de episodios no tiene sección: la abre el botón de
+      // acción de la ficha (EpisodeRatingsModal).
     }
 
     // Comentarios comunitarios, almacenados en nuestra BBDD.
@@ -7697,7 +7702,6 @@ export default function DetailsClient({
     return items;
   }, [
     type,
-    ratings,
     imagesState?.posters,
     imagesState?.backdrops,
     videos,
@@ -9139,6 +9143,10 @@ export default function DetailsClient({
         error={soundtrackError}
         initialTrackId={activeSoundtrackId}
         searchUrl={soundtrackSpotifySearchUrl}
+        // Con el modo soundtrack desactivado en Ajustes, el altavoz del
+        // reproductor solo silencia el reproductor.
+        autoplay={soundtrackAmbient.autoplay}
+        onAutoplayChange={soundtrackAmbient.enabled ? soundtrackAmbient.setAutoplay : null}
       />
 
       {type === "tv" && (
@@ -10220,8 +10228,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 mobileGapClass="gap-1.5"
                 onTrailer={() => openVideo(preferredVideo)}
                 trailerAvailable={!!preferredVideo}
-                onSoundtrack={() => openSoundtrack()}
+                // Con el soundtrack sonando, el reproductor abre en la misma
+                // pista.
+                onSoundtrack={() => openSoundtrack(soundtrackAmbient.trackId)}
                 soundtrackAvailable={!!soundtrackSearchQuery}
+                soundtrackAmbient={soundtrackAmbient}
                 onEpisodeRatings={
                   type === "tv"
                     ? () => setEpisodeRatingsModalOpen(true)
@@ -12319,53 +12330,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             })}
                         </div>
                       </section>
-                    </AnimatedSection>
-                  </section>
-                )}
-
-                {/* =================================================================
-                SECCIÓN: VALORACIÓN DE EPISODIOS (solo para series)
-               ================================================================= */}
-                {/* Gráfico de valoraciones por episodio mostrando la evolución de ratings */}
-                {type === "tv" && (
-                  <section
-                    id="section-episodes"
-                    ref={registerSection("episodes")}
-                  >
-                    <AnimatedSection delay={0.04}>
-                      {/* Subsección: Episodios y sus valoraciones */}
-                      {type === "tv" ? (
-                        <section className="mb-10 group/section">
-                          <SectionTitle
-                            title="Valoración de Episodios"
-                            icon={BarChart3}
-                          />
-                          <div className="p-0">
-                            {ratingsError && (
-                              <p className="text-sm text-red-400 mb-2">
-                                {ratingsError}
-                              </p>
-                            )}
-                            {!ratingsLoading && !ratingsError && !ratings && (
-                              <p className="text-sm text-zinc-400 mb-2">
-                                No hay datos de episodios disponibles.
-                              </p>
-                            )}
-                            {!!ratings && !ratingsError && (
-                              <EpisodeRatingsGrid
-                                ratings={ratings}
-                                showId={Number(id)}
-                                tmdbSeasons={data?.seasons || []}
-                                density="compact"
-                              />
-                            )}
-                          </div>
-                        </section>
-                      ) : (
-                        <div className="text-sm text-zinc-400">
-                          Esta sección solo aplica a series.
-                        </div>
-                      )}
                     </AnimatedSection>
                   </section>
                 )}

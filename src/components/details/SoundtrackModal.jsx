@@ -51,6 +51,11 @@ export default function SoundtrackModal({
   error = "",
   initialTrackId = null,
   searchUrl = "",
+  // Modo soundtrack de la ficha (useAmbientSoundtrack). Con `onAutoplayChange`
+  // el SILENCIO es uno solo: el altavoz junto al volumen silencia el
+  // reproductor y desactiva que suene al abrir una ficha, y al revés.
+  autoplay = true,
+  onAutoplayChange = null,
 }) {
   const audioRef = useRef(null);
 
@@ -68,7 +73,16 @@ export default function SoundtrackModal({
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.3);
-  const [isMuted, setIsMuted] = useState(false);
+  const [mutedState, setMutedState] = useState(false);
+  const sharedMute = typeof onAutoplayChange === "function";
+  const isMuted = sharedMute ? !autoplay : mutedState;
+  const setIsMuted = (next) => {
+    if (sharedMute) {
+      if (next !== isMuted) onAutoplayChange(!next);
+    } else {
+      setMutedState(next);
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -77,6 +91,9 @@ export default function SoundtrackModal({
     setSelectedId(initialTrack?.id || null);
     setIsPlaying(Boolean(initialTrack?.previewUrl));
     setProgress(0);
+    // Sin silencio compartido, silenciar vale solo para esa vez: al volver a
+    // abrir, suena.
+    setMutedState(false);
   }, [initialTrackId, open, trackQueue]);
 
   useModalGuard({ open, onClose });
@@ -194,7 +211,9 @@ export default function SoundtrackModal({
       />
 
       <div
-        className={`relative flex w-full max-w-[460px] flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
+        // En pantallas bajas el reproductor (con el interruptor de reproducción
+        // automática) no cabe: se desplaza por dentro en vez de salirse.
+        className={`relative flex max-h-[calc(100dvh-2rem)] w-full max-w-[460px] flex-col overflow-y-auto overscroll-contain rounded-[2rem] [scrollbar-width:none] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
         role="dialog"
         aria-modal="true"
         aria-label={`Soundtrack de ${title || "este título"}`}
@@ -397,6 +416,23 @@ export default function SoundtrackModal({
                   type="button"
                   onClick={toggleMute}
                   className="text-white/60 hover:text-white transition"
+                  aria-pressed={isMuted}
+                  aria-label={
+                    sharedMute
+                      ? isMuted
+                        ? "Activar el sonido y la reproducción automática"
+                        : "Silenciar y desactivar la reproducción automática"
+                      : isMuted
+                        ? "Activar el sonido"
+                        : "Silenciar"
+                  }
+                  title={
+                    sharedMute
+                      ? isMuted
+                        ? "Activar el sonido (también al abrir una ficha)"
+                        : "Silenciar (tampoco sonará al abrir una ficha)"
+                      : undefined
+                  }
                 >
                   {isMuted || volume === 0 ? (
                     <VolumeX className="w-5 h-5" />
@@ -423,6 +459,7 @@ export default function SoundtrackModal({
                 </div>
               </div>
             )}
+
           </div>
         ) : (
           <div className="flex h-[340px] flex-col items-center justify-center gap-3 text-center text-zinc-400 p-6">
