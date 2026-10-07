@@ -4384,10 +4384,10 @@ export default function HistoryClient() {
                     )}
                   </InlineDropdown>
 
-                  <div className="flex rounded-xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+                  <div className="flex rounded-2xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
                     <button
                       onClick={() => setViewMode("list")}
-                      className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
+                      className={`px-3 h-full rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
                         viewMode === "list"
                           ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                           : "text-zinc-400 hover:text-white hover:bg-white/10"
@@ -4397,7 +4397,7 @@ export default function HistoryClient() {
                     </button>
                     <button
                       onClick={() => setViewMode("compact")}
-                      className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
+                      className={`px-3 h-full rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
                         viewMode === "compact"
                           ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                           : "text-zinc-400 hover:text-white hover:bg-white/10"
@@ -4407,7 +4407,7 @@ export default function HistoryClient() {
                     </button>
                     <button
                       onClick={() => setViewMode("grid")}
-                      className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
+                      className={`px-3 h-full rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
                         viewMode === "grid"
                           ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                           : "text-zinc-400 hover:text-white hover:bg-white/10"
