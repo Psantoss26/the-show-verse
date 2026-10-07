@@ -9436,12 +9436,6 @@ export default function DetailsClient({
         </div>
       </div>
 
-      {/* Anterior / siguiente de la lista de origen, pegados a las esquinas
-          superiores de la pantalla. Hijo directo de la raíz (ancho completo)
-          para medir contra el borde real; fuera del flujo, no mueve nada. Solo
-          existe al venir de una página personal. */}
-      <DetailsSequenceNav />
-
       {/* --- CONTENIDO PRINCIPAL --- */}
       <div
         ref={contentTopRef}
@@ -10605,6 +10599,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               items={sectionItems}
               onChange={scrollToSection}
             />
+            {/* Anterior / siguiente de la lista de origen: flechas a los lados
+                del menú, fuera de la columna. Van dentro de este contenedor
+                sticky para acompañar al menú al hacer scroll. Fuera del flujo,
+                no mueven nada; solo existen al venir de una página personal. */}
+            <DetailsSequenceNav />
           </div>
 
           {/* =================================================================
