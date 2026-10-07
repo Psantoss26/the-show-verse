@@ -186,11 +186,17 @@ const dashboardPreviewMediaClass =
 const dashboardPreviewInfoClass =
   "relative h-full w-full overflow-hidden bg-transparent";
 
+// La imagen (y el tráiler) se funde con el cristal de la tarjeta con la MISMA
+// curva que la portada de DetailModal (`--sv-hero-fade`, globals.css): solo el
+// 22% inferior y con pendiente y curvatura cero en los extremos, así que la
+// imagen se ve casi intacta hasta el borde y el corte no se nota. Antes era una
+// rampa lineal desde el 60%, que borraba el 40% de la imagen y marcaba una
+// línea donde arrancaba. El velo oscuro que va encima ocupa toda la imagen
+// y lleva la misma máscara: así se desvanece con ella y no deja
+// negro sobre el cristal en la costura.
 const dashboardPreviewBackdropFadeStyle = {
-  WebkitMaskImage:
-    "radial-gradient(ellipse at center, black 76%, rgba(0,0,0,0.98) 90%, rgba(0,0,0,0.9) 100%)",
-  maskImage:
-    "radial-gradient(ellipse at center, black 76%, rgba(0,0,0,0.98) 90%, rgba(0,0,0,0.9) 100%)",
+  WebkitMaskImage: "var(--sv-hero-fade)",
+  maskImage: "var(--sv-hero-fade)",
 };
 
 const TV_GENRES = {
@@ -1142,7 +1148,7 @@ function InlinePreviewCard({ show, heightClass, isSpotlight = false }) {
             )}
 
             {trailerSrc && (
-              <div className="absolute inset-0 overflow-hidden">
+              <div className="absolute inset-0 overflow-hidden" style={isSpotlight ? undefined : dashboardPreviewBackdropFadeStyle}>
                 <iframe
                   key={trailer.key}
                   ref={trailerIframeRef}
@@ -1168,7 +1174,12 @@ function InlinePreviewCard({ show, heightClass, isSpotlight = false }) {
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
           </>
         ) : (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent via-black/35 to-black/80" />
+          // Velo fundido con la imagen (misma máscara): antes acababa en un 80%
+          // de negro justo en el borde y marcaba un escalón con el cristal.
+          <div
+            className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent from-50% to-black/45"
+            style={dashboardPreviewBackdropFadeStyle}
+          />
         )}
       </div>
 
