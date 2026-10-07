@@ -1893,8 +1893,13 @@ export default function TraktEpisodesWatchedModal({
                 </div>
               </div>
 
-              {/* Mobile Season Selector */}
-              <div className="w-full shrink-0 overflow-x-auto bg-white/[0.02] backdrop-blur-xl no-scrollbar md:hidden">
+              {/* Mobile Season Selector. SIN fondo ni desenfoque propios: el
+                  modal ya es de cristal, y un `backdrop-blur` anidado dentro de
+                  él no ve la página de detrás, solo el fondo oscuro del modal,
+                  así que pintaba una franja más oscura detrás de los botones.
+                  La fila no se superpone a nada (la lista se desplaza debajo),
+                  así que solo quedan los botones sobre el fondo del modal. */}
+              <div className="w-full shrink-0 overflow-x-auto no-scrollbar md:hidden">
                 <div className="flex min-w-max gap-2 px-3 pb-3 pt-0">
                   {usableSeasons.map((s) => {
                     const sn = s.season_number;
