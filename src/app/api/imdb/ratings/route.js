@@ -54,8 +54,17 @@ function getItemKey(item) {
   return `${mediaType}:${tmdbId}`;
 }
 
+const TMDB_RETRY_DELAYS_MS = [400, 1200];
+
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Devuelve el id de IMDb, `null` si TMDb CONFIRMA que no tiene, o lanza si no se
+// pudo saber (límite de peticiones, error de red o de TMDb). Distinguirlo
+// importa: el cliente guarda los «sin nota» confirmados como entrada negativa y
+// esos títulos se ordenan al final; un fallo pasajero tratado igual dejaba
+// títulos con nota clavados al final de su grupo durante un día.
 async function tmdbExternalIds(item) {
-  if (!TMDB_KEY) return null;
+  if (!TMDB_KEY) throw new Error("TMDb key missing");
 
   const mediaType = normalizeMediaType(item?.mediaType || item?.media_type);
   const tmdbId = item?.tmdbId ?? item?.tmdb_id ?? item?.id;
@@ -66,14 +75,34 @@ async function tmdbExternalIds(item) {
   );
   url.searchParams.set("api_key", TMDB_KEY);
 
-  const res = await fetch(url, {
-    cache: "force-cache",
-    next: { revalidate: 60 * 60 * 24 * 7 },
-  });
-  if (!res.ok) return null;
-
-  const json = await res.json().catch(() => null);
-  return json?.imdb_id ? String(json.imdb_id) : null;
+  for (let attempt = 0; ; attempt += 1) {
+    const res = await fetch(url, {
+      cache: "force-cache",
+      next: { revalidate: 60 * 60 * 24 * 7 },
+    });
+    if (res.ok) {
+      const json = await res.json().catch(() => null);
+      if (!json) throw new Error("TMDb external_ids unreadable");
+      return json.imdb_id ? String(json.imdb_id) : null;
+    }
+    // 404: el título no existe con ese tipo; no hay id que buscar.
+    if (res.status === 404) return null;
+    // 429 / 5xx: reintento breve. Las cargas de cientos de títulos llegan en
+    // lotes paralelos y TMDb limita las ráfagas.
+    if (
+      (res.status === 429 || res.status >= 500) &&
+      attempt < TMDB_RETRY_DELAYS_MS.length
+    ) {
+      const retryAfter = Number(res.headers.get("retry-after"));
+      await wait(
+        Number.isFinite(retryAfter) && retryAfter > 0
+          ? retryAfter * 1000
+          : TMDB_RETRY_DELAYS_MS[attempt],
+      );
+      continue;
+    }
+    throw new Error(`TMDb external_ids ${res.status}`);
+  }
 }
 
 async function mapWithConcurrency(items, worker, concurrency = 10) {
@@ -161,10 +190,21 @@ export async function POST(req) {
       );
     }
 
+    // Títulos cuyo id de IMDb no se pudo averiguar (fallo, no «no tiene»): se
+    // devuelven en `unresolved` para que el cliente no los dé por «sin nota».
+    const unresolved = [];
     const resolved = await mapWithConcurrency(
       items,
       async (item) => {
-        const imdbId = item.imdbId || item.imdb_id || (await tmdbExternalIds(item));
+        let imdbId = item.imdbId || item.imdb_id || null;
+        if (!imdbId) {
+          try {
+            imdbId = await tmdbExternalIds(item);
+          } catch {
+            unresolved.push(item.key);
+            return null;
+          }
+        }
         return imdbId ? { key: item.key, imdbId } : null;
       },
       12,
@@ -200,6 +240,7 @@ export async function POST(req) {
     return NextResponse.json(
       {
         items: byItemKey,
+        unresolved,
         meta: {
           ...getImdbRatingsDatasetStatus(),
           requested: items.length,
