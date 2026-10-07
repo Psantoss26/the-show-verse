@@ -44,7 +44,6 @@ import {
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  BarChart3,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -69,7 +68,6 @@ import {
 
 import OptimizedImage from "@/components/OptimizedImage";
 import Avatar from "@/components/ui/Avatar";
-import EpisodeRatingsGrid from "@/components/EpisodeRatingsGrid";
 import CommentLikeButton from "@/components/community/CommentLikeButton";
 import PosterStack from "@/components/details/PosterStack";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
@@ -517,19 +515,15 @@ export default function PhoneDetailsSections({
 
   /* ------------------- VALORACIÓN DE EPISODIOS (TV) ------------------- */
   const [episodeRatings, setEpisodeRatings] = useState(null);
-  const [episodeRatingsError, setEpisodeRatingsError] = useState(null);
-  const [episodeRatingsLoading, setEpisodeRatingsLoading] = useState(false);
 
   useEffect(() => {
     if (type !== "tv" || id == null) {
       setEpisodeRatings(null);
-      setEpisodeRatingsError(null);
-      setEpisodeRatingsLoading(false);
       return undefined;
     }
+    // Ya no hay sección que las pinte: se usan para casar las temporadas de
+    // SeriesGraph con las de TMDb (más abajo).
     let ignore = false;
-    setEpisodeRatingsError(null);
-    setEpisodeRatingsLoading(true);
     (async () => {
       try {
         const res = await fetch(
@@ -539,10 +533,8 @@ export default function PhoneDetailsSections({
         const json = await res.json();
         if (!res.ok) throw new Error(json?.error);
         if (!ignore) setEpisodeRatings(json);
-      } catch (error) {
-        if (!ignore) setEpisodeRatingsError(error?.message || "Error");
-      } finally {
-        if (!ignore) setEpisodeRatingsLoading(false);
+      } catch {
+        // Sin notas: las temporadas se pintan con los datos de TMDb.
       }
     })();
     return () => {
@@ -945,7 +937,8 @@ export default function PhoneDetailsSections({
     items.push({ id: "sentiment", label: "Sentimientos", icon: Sparkles });
     if (type === "tv") {
       items.push({ id: "seasons", label: "Temporadas", icon: Layers });
-      items.push({ id: "episodes", label: "Episodios", icon: BarChart3 });
+      // La valoración de episodios no tiene sección: la abre el botón de
+      // acción, como en la ficha completa.
     }
     items.push({
       id: "comments",
@@ -1868,37 +1861,6 @@ export default function PhoneDetailsSections({
                     );
                   })}
                 </div>
-              </section>
-            </AnimatedSection>
-          </section>
-        )}
-
-        {/* === VALORACIÓN DE EPISODIOS (solo series) === */}
-        {type === "tv" && (
-          <section className="sv-phone-section" id="phone-section-episodes" ref={registerSection("episodes")}>
-            <AnimatedSection delay={0.04}>
-              <section className="group/section">
-                <SectionTitle title="Valoración de Episodios" icon={BarChart3} />
-                {episodeRatingsError && (
-                  <p className="text-sm text-red-400 mb-2">
-                    {episodeRatingsError}
-                  </p>
-                )}
-                {!episodeRatingsLoading &&
-                  !episodeRatingsError &&
-                  !episodeRatings && (
-                    <p className="text-sm text-zinc-400 mb-2">
-                      No hay datos de episodios disponibles.
-                    </p>
-                  )}
-                {!!episodeRatings && !episodeRatingsError && (
-                  <EpisodeRatingsGrid
-                    ratings={episodeRatings}
-                    showId={Number(id)}
-                    tmdbSeasons={tmdbSeasons}
-                    density="compact"
-                  />
-                )}
               </section>
             </AnimatedSection>
           </section>

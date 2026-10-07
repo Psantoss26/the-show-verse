@@ -18,7 +18,6 @@ const SECTIONS = [
   "media",
   "sentiment",
   "seasons",
-  "episodes",
   "comments",
   "lists",
 ];

@@ -12,6 +12,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import BaseLiquidButton from "@/components/LiquidButton";
 import StarRating from "@/components/StarRating";
 import TraktWatchedControl from "@/components/trakt/TraktWatchedControl";
+import SoundWaves from "@/components/details/SoundWaves";
 import {
   Play,
   X,
@@ -178,6 +179,8 @@ export default function DetailActionsRow({
 
   onSoundtrack,
   soundtrackAvailable = false,
+  // `{ available, playing }` de useAmbientSoundtrack, o null: anima el icono.
+  soundtrackAmbient = null,
 
   onEpisodeRatings,
   episodeRatingsOpen = false,
@@ -205,6 +208,17 @@ export default function DetailActionsRow({
 }) {
   const serverOnline = useServerOnline();
   const [mediaExpanded, setMediaExpanded] = useState(false);
+
+  // MODO SOUNDTRACK (ver useAmbientSoundtrack): mientras suena de fondo, el
+  // botón de soundtrack enseña el altavoz animado. Pulsarlo abre el
+  // reproductor, donde se activa o desactiva la reproducción automática.
+  const ambient = soundtrackAmbient?.available ? soundtrackAmbient : null;
+  const soundtrackIcon = ambient?.playing ? <SoundWaves playing /> : <Music2 />;
+  const soundtrackTitle = !soundtrackAvailable
+    ? "Sin soundtrack"
+    : ambient?.playing
+      ? "Soundtrack sonando · Abrir el reproductor"
+      : "Reproducir soundtrack";
 
   // --- Píldora adaptable (ver `compactLabelWhenTight`).
   const hasLabelButton = Boolean(play || trailerLabel);
@@ -453,6 +467,10 @@ export default function DetailActionsRow({
                       <X />
                     ) : trailerPlaying ? (
                       <X />
+                    ) : ambient?.playing ? (
+                      // El soundtrack suena, pero su botón está escondido tras
+                      // este: el altavoz animado lo dice aquí.
+                      <SoundWaves playing />
                     ) : (
                       <Play className={trailerAvailable ? "ml-0.5" : ""} />
                     )}
@@ -517,13 +535,10 @@ export default function DetailActionsRow({
                 className={`!w-full !h-auto aspect-square ${
                   soundtrackAvailable ? "!bg-white !text-black" : ""
                 }`}
-                title={
-                  soundtrackAvailable
-                    ? "Reproducir soundtrack"
-                    : "Sin soundtrack"
-                }
+                title={soundtrackTitle}
+                aria-label={soundtrackTitle}
               >
-                <Music2 />
+                {soundtrackIcon}
               </LiquidButton>
             }
             collapsedContent={traktControl}
@@ -688,11 +703,10 @@ export default function DetailActionsRow({
             activeColor="yellow"
             groupId="details-actions"
             className={soundtrackAvailable ? "!bg-white !text-black" : ""}
-            title={
-              soundtrackAvailable ? "Reproducir soundtrack" : "Sin soundtrack"
-            }
+            title={soundtrackTitle}
+            aria-label={soundtrackTitle}
           >
-            <Music2 />
+            {soundtrackIcon}
           </LiquidButton>
         )}
 

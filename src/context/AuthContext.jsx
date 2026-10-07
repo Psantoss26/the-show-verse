@@ -37,6 +37,9 @@ const DEFAULT_PREFERENCES = {
     // Películas, Series) -- ver `src/lib/ui/mobileCardsPerRow.js`. NO afecta a
     // las páginas de usuario con grid (Favoritos/Pendientes/Historial/Biblioteca).
     mobileCardsPerRow: 3,
+    // Modo soundtrack: la banda sonora suena al abrir la ficha de un título
+    // (ver useAmbientSoundtrack). Se desactiva en Ajustes.
+    soundtrackAutoplay: true,
   },
 };
 
