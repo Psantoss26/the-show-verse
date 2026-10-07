@@ -1237,7 +1237,7 @@ export default function ContinueWatchingClient() {
                       title="Vista de tarjetas"
                       aria-label="Vista de tarjetas"
                       aria-pressed={viewMode === "cards"}
-                      className={`flex h-full items-center justify-center rounded-lg px-2.5 text-sm font-bold transition-all ${viewMode === "cards"
+                      className={`flex h-full items-center justify-center rounded-xl px-2.5 text-sm font-bold transition-all ${viewMode === "cards"
                         ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                         : "text-zinc-400 hover:text-white hover:bg-white/10"
                         }`}
@@ -1250,7 +1250,7 @@ export default function ContinueWatchingClient() {
                       title="Vista de portadas"
                       aria-label="Vista de portadas"
                       aria-pressed={viewMode === "poster"}
-                      className={`flex h-full items-center justify-center rounded-lg px-2.5 text-sm font-bold transition-all ${viewMode === "poster"
+                      className={`flex h-full items-center justify-center rounded-xl px-2.5 text-sm font-bold transition-all ${viewMode === "poster"
                         ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                         : "text-zinc-400 hover:text-white hover:bg-white/10"
                         }`}
@@ -1263,7 +1263,7 @@ export default function ContinueWatchingClient() {
                       title="Vista compacta"
                       aria-label="Vista compacta"
                       aria-pressed={viewMode === "compact"}
-                      className={`flex h-full items-center justify-center rounded-lg px-2.5 text-sm font-bold transition-all ${viewMode === "compact"
+                      className={`flex h-full items-center justify-center rounded-xl px-2.5 text-sm font-bold transition-all ${viewMode === "compact"
                         ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                         : "text-zinc-400 hover:text-white hover:bg-white/10"
                         }`}
@@ -1347,7 +1347,7 @@ export default function ContinueWatchingClient() {
             <div className="flex gap-1 rounded-2xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
               <button
                 onClick={() => setViewMode("cards")}
-                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === "cards"
+                className={`px-3 h-full rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${viewMode === "cards"
                   ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                   : "text-zinc-400 hover:text-white hover:bg-white/10"
                   }`}
@@ -1356,7 +1356,7 @@ export default function ContinueWatchingClient() {
               </button>
               <button
                 onClick={() => setViewMode("poster")}
-                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === "poster"
+                className={`px-3 h-full rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${viewMode === "poster"
                   ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                   : "text-zinc-400 hover:text-white hover:bg-white/10"
                   }`}
@@ -1365,7 +1365,7 @@ export default function ContinueWatchingClient() {
               </button>
               <button
                 onClick={() => setViewMode("compact")}
-                className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${viewMode === "compact"
+                className={`px-3 h-full rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${viewMode === "compact"
                   ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                   : "text-zinc-400 hover:text-white hover:bg-white/10"
                   }`}

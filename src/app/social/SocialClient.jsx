@@ -1318,7 +1318,7 @@ function SelectorVista({ vista, setVista, controlGlass, activo, fill = false }) 
           onClick={() => setVista(valor)}
           aria-label={`Vista ${etiqueta}`}
           title={etiqueta}
-          className={`flex h-full flex-1 items-center justify-center rounded-lg px-2.5 text-sm font-bold transition-all ${
+          className={`flex h-full flex-1 items-center justify-center rounded-xl px-2.5 text-sm font-bold transition-all ${
             vista === valor
               ? activo
               : "text-zinc-400 hover:bg-white/10 hover:text-white"

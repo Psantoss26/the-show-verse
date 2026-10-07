@@ -1446,7 +1446,7 @@ export default function CalendarPage() {
                           }
                         </InlineDropdown>
                       </div>
-                      <div className="flex rounded-xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+                      <div className="flex rounded-2xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
                         {CARD_VIEWS.map(({ id, label, Icon }) => (
                           <button
                             key={id}
@@ -1454,7 +1454,7 @@ export default function CalendarPage() {
                             onClick={() => setCardView(id)}
                             aria-label={label}
                             title={label}
-                            className={`px-3 h-full rounded-lg transition-all flex items-center ${
+                            className={`px-3 h-full rounded-xl transition-all flex items-center ${
                               cardView === id
                                 ? "bg-gradient-to-br from-yellow-400 to-yellow-500 text-black shadow-lg shadow-yellow-500/20"
                                 : "text-zinc-400 hover:text-white hover:bg-white/10"
@@ -1559,7 +1559,7 @@ export default function CalendarPage() {
                   }
                 </InlineDropdown>
 
-                <div className="flex rounded-xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+                <div className="flex rounded-2xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
                   {CARD_VIEWS.map(({ id, label, Icon }) => (
                     <button
                       key={id}
@@ -1567,7 +1567,7 @@ export default function CalendarPage() {
                       onClick={() => setCardView(id)}
                       aria-label={label}
                       title={label}
-                      className={`px-3 h-full rounded-lg transition-all flex items-center ${
+                      className={`px-3 h-full rounded-xl transition-all flex items-center ${
                         cardView === id
                           ? "bg-gradient-to-br from-yellow-400 to-yellow-500 text-black shadow-lg shadow-yellow-500/20"
                           : "text-zinc-400 hover:text-white hover:bg-white/10"
