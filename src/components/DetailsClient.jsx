@@ -7600,8 +7600,24 @@ export default function DetailsClient({
   // =====================================================
   // CAST: mantener orden TMDb + evitar cast incompleto
   // =====================================================
-  const [tmdbCast, setTmdbCast] = useState(() => restoredValue(backSnapshot, "tmdbCast", []));
-  const [tmdbCastLoading, setTmdbCastLoading] = useState(() => restoredValue(backSnapshot, "tmdbCastLoading", false));
+  // PELÍCULAS: el reparto de `/credits` ya viene en los datos del servidor
+  // (`credits` va en el append de la ruta). Se usa desde el primer render: antes
+  // se volvía a pedir a TMDb y la sección se ocultaba mientras tanto, así que el
+  // Reparto Principal aparecía después que el resto de la ficha (y en la
+  // transición Anterior/Siguiente entraba tarde). SERIES: el reparto agregado de
+  // todas las temporadas no viene en el servidor y sí hay que pedirlo; la
+  // sección arranca en carga para no enseñar el de la temporada actual y
+  // sustituirlo después.
+  const ssrMovieCast =
+    endpointType === "movie" && Array.isArray(data?.credits?.cast) && data.credits.cast.length
+      ? data.credits.cast
+      : null;
+  const [tmdbCast, setTmdbCast] = useState(() => restoredValue(backSnapshot, "tmdbCast", () =>
+    ssrMovieCast ? normalizeCastFromTmdb(ssrMovieCast, { isAggregate: false }) : [],
+  ));
+  const [tmdbCastLoading, setTmdbCastLoading] = useState(() => restoredValue(backSnapshot, "tmdbCastLoading", () =>
+    endpointType === "tv" && Boolean(TMDB_API_KEY && id),
+  ));
   const [tmdbCastError, setTmdbCastError] = useState(() => restoredValue(backSnapshot, "tmdbCastError", ""));
 
   useRestorableEffect(backSnapshot, "tmdbCast", () => {
@@ -7623,6 +7639,13 @@ export default function DetailsClient({
         (endpointType !== "tv" && endpointType !== "movie")
       ) {
         setTmdbCast([]);
+        setTmdbCastError("");
+        setTmdbCastLoading(false);
+        return;
+      }
+
+      if (ssrMovieCast) {
+        setTmdbCast(normalizeCastFromTmdb(ssrMovieCast, { isAggregate: false }));
         setTmdbCastError("");
         setTmdbCastLoading(false);
         return;
@@ -9393,6 +9416,9 @@ export default function DetailsClient({
       data-details-root
       data-details-href={`/details/${endpointType}/${id}`}
       data-details-sequence-ready={detailsEntryReady && (currentLowLoaded || currentImgError || (currentResolved && !currentImagePath))}
+      // Reparto resuelto (con o sin actores): la transición Anterior/Siguiente
+      // lo espera un instante para que entre junto al hero y no aparezca tarde.
+      data-details-cast-ready={!castSectionLoading}
       data-details-entry={detailsEntryReady ? "ready" : "loading"}
       // Vuelta atrás con la instantánea recuperada: sin entradas CSS (ver
       // globals.css) ni de Framer (DetailsStaticMotionProvider).
@@ -10697,7 +10723,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
            ================================================================= */}
         {/* Sistema de navegación por secciones con detección de scroll */}
         {/* Incluye: Media, Actores, Recomendaciones, Comentarios, etc. */}
-        <div className="mt-2 sm:mt-10">
+        {/* Capa propia en la transición Anterior/Siguiente. Sin nombre quedaba
+            en la capa de la página, que el navegador pinta DEBAJO del fondo
+            (capa con nombre y opaca): el menú de secciones y el Reparto
+            desaparecían durante la animación y aparecían de golpe al final. */}
+        <div data-details-transition-part="content" className="mt-2 sm:mt-10">
           {/* Menú de navegación sticky que se queda fijo debajo del navbar al hacer scroll */}
           <div
             ref={menuStickyRef}
