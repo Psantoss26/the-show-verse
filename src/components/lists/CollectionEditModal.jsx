@@ -40,6 +40,18 @@ const ROW_COLUMNS = {
 }
 const ROW_GAP_PX = 12
 
+// Idioma de cada imagen de TMDb (`iso_639_1`). Sin idioma llega como null y, en
+// algunas, como "xx" o cadena vacía: las tres son "imagen sin texto".
+const POSTER_LANGUAGES = new Set(['es', 'en'])
+const imageLanguage = (image) => {
+  const lang = String(image?.iso_639_1 || '').toLowerCase()
+  return lang === 'xx' ? '' : lang
+}
+// Póster: el de portada lleva el título, así que solo en español o inglés.
+const titledPosters = (images) => (images?.posters || []).filter((image) => POSTER_LANGUAGES.has(imageLanguage(image)))
+// Fondos (móvil y ordenador): sin texto encima, solo imágenes sin idioma.
+const textlessImages = (list) => (list || []).filter((image) => !imageLanguage(image))
+
 function ArtworkRow({ id, label, field, original, value, candidates, landscape = false, onSelect }) {
   const paths = [...new Set([original, value, ...(candidates || []).map((item) => item.file_path)].filter(Boolean))]
   const size = landscape ? 'w300' : 'w185'
@@ -250,14 +262,14 @@ export default function CollectionEditModal({ original, collection, onClose }) {
             <textarea rows={3} maxLength={5000} value={draft.description || ''} onChange={(event) => setDraft({ ...draft, description: event.target.value })} className={`${FIELD_CLASS} resize-y normal-case tracking-normal font-normal ${THIN_SCROLLBAR}`} />
           </label>
 
-          <ArtworkRow id="collection-edit-poster" label="Póster" field="poster_path" original={original.poster_path} value={draft.poster_path} candidates={images?.posters} onSelect={selectArtwork} />
+          <ArtworkRow id="collection-edit-poster" label="Póster" field="poster_path" original={original.poster_path} value={draft.poster_path} candidates={titledPosters(images)} onSelect={selectArtwork} />
           {/* El fondo se edita para la vista en la que se está: en móvil la
               colección usa un póster de fondo y en ordenador un backdrop, y
               cada uno se guarda por separado. */}
           {phone ? (
-            <ArtworkRow key="mobile" id="collection-edit-background" label="Fondo (vista móvil)" field="mobile_background_path" original={original.mobile_background_path} value={draft.mobile_background_path} candidates={images?.posters} onSelect={selectArtwork} />
+            <ArtworkRow key="mobile" id="collection-edit-background" label="Fondo (vista móvil)" field="mobile_background_path" original={original.mobile_background_path} value={draft.mobile_background_path} candidates={textlessImages(images?.posters)} onSelect={selectArtwork} />
           ) : (
-            <ArtworkRow key="desktop" id="collection-edit-background" label="Fondo (vista ordenador)" field="backdrop_path" original={original.backdrop_path} value={draft.backdrop_path} candidates={images?.backdrops} landscape onSelect={selectArtwork} />
+            <ArtworkRow key="desktop" id="collection-edit-background" label="Fondo (vista ordenador)" field="backdrop_path" original={original.backdrop_path} value={draft.backdrop_path} candidates={textlessImages(images?.backdrops)} landscape onSelect={selectArtwork} />
           )}
 
           {!images && !imageError && (
