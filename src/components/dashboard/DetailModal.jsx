@@ -68,7 +68,7 @@ import {
 import PanelCenter from "@/components/ui/icons/PanelCenter";
 
 import { useAuth } from "@/context/AuthContext";
-import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import { LIQUID_GLASS_PANEL, LIQUID_GLASS_DETAIL_SURFACE } from "@/lib/ui/liquidGlass";
 import {
   clampDrawerWidth,
   clampMobileDetailsWidth,
@@ -3562,7 +3562,7 @@ export default function DetailModal({
         // Fondo del cristal: 0.35 → 0.47. El liquid glass dejaba ver demasiado
         // fondo. Este es el ÚNICO sitio donde se fija, así que sube por igual en
         // el modal centrado y en el drawer y siguen siendo idénticos.
-        className={`sv-drawer-panel relative z-10 flex flex-col overflow-hidden bg-black/[0.47] bg-gradient-to-br from-white/[0.12] via-transparent to-white/[0.04] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)] ${
+        className={`sv-drawer-panel relative z-10 flex flex-col overflow-hidden ${LIQUID_GLASS_DETAIL_SURFACE} ${
           isRightPlacement
             ? mobileDetails
               // PEGADA AL BORDE DERECHO, igual que el panel ancho.

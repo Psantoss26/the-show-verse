@@ -2,6 +2,8 @@
 "use client";
 
 import { useRef, useEffect, useState, useMemo, useCallback, memo } from "react";
+import { LIQUID_GLASS_DETAIL_SURFACE } from "@/lib/ui/liquidGlass";
+import DashboardPreviewGlass from "@/components/dashboard/DashboardPreviewGlass";
 import useTrailerAutoDismiss from "@/hooks/useTrailerAutoDismiss";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Autoplay, FreeMode } from "swiper/modules";
@@ -348,10 +350,10 @@ const dashboardSegmentButtonClass = (active) =>
 
 const dashboardPreviewCardClass = (heightClass, isSpotlight = false) =>
   [
-    "relative isolate overflow-hidden text-white cursor-pointer transform-gpu",
+    "relative overflow-hidden text-white cursor-pointer transform-gpu",
     isSpotlight
       ? "rounded-2xl bg-neutral-950 ring-1 ring-inset ring-white/10 shadow-[0_24px_64px_-18px_rgba(0,0,0,0.95)]"
-      : "flex flex-col rounded-xl border border-white/10 bg-[#141414]/95 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] backdrop-blur-xl",
+      : `z-0 flex flex-col rounded-xl ${LIQUID_GLASS_DETAIL_SURFACE}`,
     "transition-all duration-300",
     isSpotlight ? heightClass : "",
   ].join(" ");
@@ -360,7 +362,7 @@ const dashboardPreviewMediaClass =
   "relative aspect-video w-full shrink-0 overflow-hidden bg-transparent";
 
 // El panel de info NO lleva fondo ni borde propios: se apoya sobre el fondo
-// uniforme de la tarjeta (bg-[#141414]/95) para que la imagen (enmascarada) se
+// de cristal de la tarjeta para que la imagen (enmascarada) se
 // funda con la sección de info SIN línea/escalón, igual que DetailModal.
 const dashboardPreviewInfoClass =
   "w-full bg-transparent px-4 py-3.5 sm:px-5 sm:py-4";
@@ -1449,6 +1451,7 @@ function InlinePreviewCard({
       className={dashboardPreviewCardClass(heightClass, isSpotlight)}
       onClick={openPreviewModal}
     >
+      {!isSpotlight && <DashboardPreviewGlass />}
       <div
         className={
           isSpotlight
@@ -2338,10 +2341,11 @@ function InlinePreviewCardAnticipated({
           ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
           : DASHBOARD_PREVIEW_ENTER_TRANSITION
       }
-      className={`absolute top-1/2 ${alignmentClass} w-[300px] sm:w-[350px] md:w-[410px] xl:w-[450px] ${previewAnchorClass} rounded-xl text-white cursor-pointer bg-[#141414]/95 backdrop-blur-xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] border border-white/10 z-50 hidden sm:flex flex-col overflow-hidden`}
+      className={`absolute top-1/2 ${alignmentClass} w-[300px] sm:w-[350px] md:w-[410px] xl:w-[450px] ${previewAnchorClass} rounded-xl text-white cursor-pointer ${LIQUID_GLASS_DETAIL_SURFACE} z-50 hidden sm:flex flex-col overflow-hidden`}
       onClick={openPreviewModal}
-      style={{ willChange: "transform, opacity" }}
+      style={{ willChange: "transform" }}
     >
+      <DashboardPreviewGlass />
       {/* Backdrop de 16:9 */}
       <div className="relative w-full aspect-video overflow-hidden bg-transparent">
         {!showTrailer && !backdropReady && (
@@ -3371,7 +3375,7 @@ export function Row({
                                   ? `absolute top-0 ${standardPreviewAlignmentClass} ${normalPreviewWidthClass} ${standardPreviewAnchorClass} z-[80] hidden sm:block`
                                   : "hidden sm:block h-full w-full"
                               }
-                              style={{ willChange: "transform, opacity" }}
+                              style={{ willChange: "transform" }}
                             >
                             <InlinePreviewCard
                               movie={m}
