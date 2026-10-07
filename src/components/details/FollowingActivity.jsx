@@ -155,26 +155,15 @@ export function FollowingActivityAvatars({ data, mediaType, onOpen, compact = fa
         } : undefined}
         aria-hidden="true"
       >
-        {shown.map((item) => {
-          const mark = primaryMark(item, mediaType);
-          return (
-            // La foto mide lo mismo que las insignias de la fila (38px). El
-            // icono es una insignia de avatar: su CENTRO cae sobre el borde
-            // del círculo a 45° (abajo a la derecha), en (r + r·cos45°) ≈
-            // 32.5px de cada lado; con una caja de 16px eso es -2.5px desde
-            // la esquina. Queda montado sobre el canto de la foto.
-            <span key={item.user.username} className="relative block h-[38px] w-[38px] shrink-0" title={describe(item)}>
-              <PersonAvatar user={item.user} className="h-full w-full" />
-              {mark && !compact ? (
-                // Solo el icono, sin pastilla ni borde: una sombra apretada lo
-                // separa de la foto para que se lea sobre cualquier avatar.
-                <span className="absolute -bottom-[2.5px] -right-[2.5px] flex h-4 w-4 items-center justify-center [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.95))_drop-shadow(0_0_3px_rgba(0,0,0,0.85))]">
-                  <MarkIcon mark={mark} iconClassName="h-4 w-4" ratingClassName="text-[15px] [line-height:1]" />
-                </span>
-              ) : null}
-            </span>
-          );
-        })}
+        {shown.map((item) => (
+          // Solo la foto (38px, lo mismo que las insignias de la fila), sin la
+          // marca de lo que hizo cada uno encima: el botón abre el modal con
+          // esa información detallada. La etiqueta del botón la sigue
+          // describiendo para lectores de pantalla.
+          <span key={item.user.username} className="relative block h-[38px] w-[38px] shrink-0" title={describe(item)}>
+            <PersonAvatar user={item.user} className="h-full w-full" />
+          </span>
+        ))}
         {extra > 0 ? (
           <span className="inline-flex h-[38px] min-w-[38px] items-center justify-center rounded-full bg-white/10 px-1.5 text-xs font-bold text-white">
             +{extra}
