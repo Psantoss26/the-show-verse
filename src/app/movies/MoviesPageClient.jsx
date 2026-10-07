@@ -3,6 +3,7 @@
 
 import { LIQUID_GLASS_DETAIL_SURFACE } from "@/lib/ui/liquidGlass";
 import DashboardPreviewGlass from "@/components/dashboard/DashboardPreviewGlass";
+import RowNavGlass from "@/components/dashboard/RowNavGlass";
 
 import OptimizedImage from "@/components/OptimizedImage";
 import FeaturedHero from "@/components/FeaturedHero";
@@ -1032,7 +1033,8 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
       if (!t?.key) {
         setTrailer(null);
         setShowTrailer(false);
-        setError("No hay trailer disponible para este título.");
+        // Sin aviso: en la vista previa el tráiler se pide solo al hacer hover,
+        // así que no tenerlo no es un error que haya que mostrar.
         return;
       }
 
@@ -1908,12 +1910,8 @@ function Row({
               hidden sm:flex items-center justify-start
               pointer-events-auto group/nav"
           >
-            {/* Panel difuminado que ocupa el alto completo y se integra de forma continua
-                con el fondo de la pantalla y las tarjetas sin cortes ni bordes (rounded-none, left-0 right-0). */}
-            <span
-              aria-hidden
-              className="pointer-events-none absolute inset-y-0 left-0 right-0 rounded-none bg-gradient-to-r from-black/50 via-black/15 to-transparent backdrop-blur-[8px] sv-scroll-mask-l transition-all duration-300 group-hover/nav:from-black/75"
-            />
+            {/* Cristal sin límites visibles: ver RowNavGlass. */}
+            <RowNavGlass side="left" />
             <span className="relative ml-4 text-3xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)] transition-transform group-hover/nav:scale-110">
               ‹
             </span>
@@ -1928,12 +1926,8 @@ function Row({
               hidden sm:flex items-center justify-end
               pointer-events-auto group/nav"
           >
-            {/* Panel difuminado que ocupa el alto completo y se integra de forma continua
-                con el fondo de la pantalla y las tarjetas sin cortes ni bordes (rounded-none, right-0 left-0). */}
-            <span
-              aria-hidden
-              className="pointer-events-none absolute inset-y-0 right-0 left-0 rounded-none bg-gradient-to-l from-black/50 via-black/15 to-transparent backdrop-blur-[8px] sv-scroll-mask-r transition-all duration-300 group-hover/nav:from-black/75"
-            />
+            {/* Cristal sin límites visibles: ver RowNavGlass. */}
+            <RowNavGlass side="right" />
             <span className="relative mr-4 text-3xl font-semibold text-white drop-shadow-[0_0_10px_rgba(0,0,0,0.9)] transition-transform group-hover/nav:scale-110">
               ›
             </span>

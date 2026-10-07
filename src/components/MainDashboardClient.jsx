@@ -4,6 +4,7 @@
 import { useRef, useEffect, useState, useMemo, useCallback, memo } from "react";
 import { LIQUID_GLASS_DETAIL_SURFACE } from "@/lib/ui/liquidGlass";
 import DashboardPreviewGlass from "@/components/dashboard/DashboardPreviewGlass";
+import RowNavGlass, { ROW_NAV_FADE } from "@/components/dashboard/RowNavGlass";
 import useTrailerAutoDismiss from "@/hooks/useTrailerAutoDismiss";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Autoplay, FreeMode } from "swiper/modules";
@@ -366,13 +367,6 @@ const dashboardPreviewMediaClass =
 // funda con la sección de info SIN línea/escalón, igual que DetailModal.
 const dashboardPreviewInfoClass =
   "w-full bg-transparent px-4 py-3.5 sm:px-5 sm:py-4";
-
-// La imagen se desvanece a transparente por abajo (como DetailModal) para fundir
-// portada e info; el fondo de la tarjeta queda visible en la zona difuminada.
-const dashboardPreviewBackdropFadeStyle = {
-  WebkitMaskImage: "linear-gradient(to bottom, black 60%, transparent 100%)",
-  maskImage: "linear-gradient(to bottom, black 60%, transparent 100%)",
-};
 
 const EXPANDABLE_SECTION_HREFS = {
   Tendencias: "/dashboard/tendencias",
@@ -1289,7 +1283,8 @@ function InlinePreviewCard({
       if (!t?.key) {
         setTrailer(null);
         setShowTrailer(false);
-        setError("No hay trailer disponible para este título.");
+        // Sin aviso: en la vista previa el tráiler se pide solo al hacer hover,
+        // así que no tenerlo no es un error que haya que mostrar.
         return;
       }
 
@@ -1471,50 +1466,53 @@ function InlinePreviewCard({
         )}
 
         {bgSrc && (
-          <NextImage
-            key={bgSrc}
-            src={bgSrc}
-            alt={movie.title || movie.name}
-            fill
-            sizes={
-              isSpotlight
-                ? "(min-width:1280px) 924px, (min-width:768px) 818px, (min-width:640px) 711px, 604px"
-                : "(min-width:1280px) 480px, (min-width:768px) 430px, 100vw"
-            }
-            className={`pointer-events-none object-cover transition-opacity duration-300 ${
-              isSpotlight ? "" : "scale-[1.015]"
-            } ${showTrailer ? "z-[5]" : ""} ${
-              showTrailer && trailerPlaying
-                ? "opacity-0"
-                : backdropReady
-                  ? "opacity-100"
-                  : "opacity-0"
-            }`}
-            style={
-              isSpotlight ? undefined : dashboardPreviewBackdropFadeStyle
-            }
-            loading="eager"
-            fetchPriority="high"
-            onLoad={() => setBackdropReady(true)}
-            onError={() => {
-              if (isSpotlight) {
-                spotlightBackdropCache.set(
-                  getBackdropCacheKey(movie, mediaType),
-                  null,
-                );
+          <div
+            className={`pointer-events-none absolute inset-0 ${
+              isSpotlight ? "" : "sv-preview-fade"
+            } ${showTrailer ? "z-[5]" : ""}`}
+          >
+            <NextImage
+              key={bgSrc}
+              src={bgSrc}
+              alt={movie.title || movie.name}
+              fill
+              sizes={
+                isSpotlight
+                  ? "(min-width:1280px) 924px, (min-width:768px) 818px, (min-width:640px) 711px, 604px"
+                  : "(min-width:1280px) 480px, (min-width:768px) 430px, 100vw"
+              }
+              className={`pointer-events-none object-cover transition-opacity duration-300 ${
+                isSpotlight ? "" : "scale-[1.015]"
+              } ${
+                showTrailer && trailerPlaying
+                  ? "opacity-0"
+                  : backdropReady
+                    ? "opacity-100"
+                    : "opacity-0"
+              }`}
+              loading="eager"
+              fetchPriority="high"
+              onLoad={() => setBackdropReady(true)}
+              onError={() => {
+                if (isSpotlight) {
+                  spotlightBackdropCache.set(
+                    getBackdropCacheKey(movie, mediaType),
+                    null,
+                  );
+                  setBackdropReady(false);
+                  return;
+                }
+                const fallback = getPreviewBackdropFallback(movie);
+                if (fallback && fallback !== backdropPath) {
+                  movieBackdropCache.set(getBackdropCacheKey(movie, mediaType), fallback);
+                  setBackdropPath(fallback);
+                  setBackdropReady(true);
+                  return;
+                }
                 setBackdropReady(false);
-                return;
-              }
-              const fallback = getPreviewBackdropFallback(movie);
-              if (fallback && fallback !== backdropPath) {
-                movieBackdropCache.set(getBackdropCacheKey(movie, mediaType), fallback);
-                setBackdropPath(fallback);
-                setBackdropReady(true);
-                return;
-              }
-              setBackdropReady(false);
-            }}
-          />
+              }}
+            />
+          </div>
         )}
 
         {showTrailer && (
@@ -1524,44 +1522,47 @@ function InlinePreviewCard({
             )}
 
             {trailerSrc && (
-              <div className="absolute inset-0 overflow-hidden">
-                <iframe
-                  key={trailer.key}
-                  ref={trailerIframeRef}
-                  className="absolute left-1/2 top-1/2
-                                    w-[140%] h-[180%]
-                                    -translate-x-1/2 -translate-y-1/2
-                                    pointer-events-none"
-                  src={trailerSrc}
-                  title={`Trailer - ${movie.title || movie.name}`}
-                  allow="autoplay; encrypted-media; picture-in-picture"
-                  allowFullScreen={false}
-                  onLoad={syncTrailerAudio}
-                />
+              <>
+                <div
+                  className={`absolute inset-0 overflow-hidden ${
+                    isSpotlight ? "" : "sv-preview-fade"
+                  }`}
+                >
+                  <iframe
+                    key={trailer.key}
+                    ref={trailerIframeRef}
+                    className="absolute left-1/2 top-1/2
+                                      w-[140%] h-[180%]
+                                      -translate-x-1/2 -translate-y-1/2
+                                      pointer-events-none"
+                    src={trailerSrc}
+                    title={`Trailer - ${movie.title || movie.name}`}
+                    allow="autoplay; encrypted-media; picture-in-picture"
+                    allowFullScreen={false}
+                    onLoad={syncTrailerAudio}
+                  />
+                </div>
+                {/* Fuera del envoltorio enmascarado: el botón es de cristal y
+                    una máscara en un ancestro anularía su backdrop-filter. */}
                 {trailerPlaying && (
                   <PreviewTrailerAudioButton
                     muted={trailerMuted}
                     onToggle={handleToggleTrailerAudio}
                   />
                 )}
-              </div>
+              </>
             )}
           </>
         )}
 
-        {isSpotlight ? (
+        {/* Sin velo inferior fuera del spotlight: no hay nada superpuesto que
+            proteger, y un degradado oscuro sobre la costura añadía una banda
+            que no existe en el cristal de debajo (mismo motivo que DetailModal). */}
+        {isSpotlight && (
           <>
             <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-r from-black/65 via-black/20 to-transparent" />
             <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
           </>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-24
-                        bg-gradient-to-b from-transparent via-black/25 to-transparent"
-          />
         )}
       </div>
 
@@ -2243,7 +2244,8 @@ function InlinePreviewCardAnticipated({
       if (!t?.key) {
         setTrailer(null);
         setShowTrailer(false);
-        setError("No hay trailer disponible para este título.");
+        // Sin aviso: en la vista previa el tráiler se pide solo al hacer hover,
+        // así que no tenerlo no es un error que haya que mostrar.
         return;
       }
       setTrailer(t);
@@ -2353,13 +2355,18 @@ function InlinePreviewCardAnticipated({
         )}
 
         {bgSrc && (
+          <div
+            className={`pointer-events-none absolute inset-0 sv-preview-fade ${
+              showTrailer ? "z-[5]" : ""
+            }`}
+          >
           <motion.div
             initial={{ scale: 1 }}
             animate={{ scale: 1.08 }}
             transition={{ duration: 4, ease: "easeOut" }}
-            className={`pointer-events-none absolute inset-0 h-full w-full transition-opacity duration-300 ${
-              showTrailer ? "z-[5]" : ""
-            } ${showTrailer && trailerPlaying ? "opacity-0" : "opacity-100"}`}
+            className={`absolute inset-0 h-full w-full transition-opacity duration-300 ${
+              showTrailer && trailerPlaying ? "opacity-0" : "opacity-100"
+            }`}
           >
             <NextImage
               key={bgSrc}
@@ -2370,7 +2377,6 @@ function InlinePreviewCardAnticipated({
               className={`scale-[1.015] object-cover transition-opacity duration-200 ${
                 backdropReady ? "opacity-100" : "opacity-0"
               }`}
-              style={dashboardPreviewBackdropFadeStyle}
               loading="eager"
               fetchPriority="high"
               onLoad={() => setBackdropReady(true)}
@@ -2386,6 +2392,15 @@ function InlinePreviewCardAnticipated({
               }}
             />
           </motion.div>
+          {/* Velo del logo: DENTRO de la máscara, para que se funda con la
+              imagen y no deje una banda oscura sobre el cristal de la costura. */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent via-black/40 to-transparent"
+          />
+          </div>
         )}
 
         {showTrailer && (
@@ -2394,34 +2409,31 @@ function InlinePreviewCardAnticipated({
               <div className="absolute inset-0 bg-neutral-900 animate-pulse" />
             )}
             {trailer?.key && (
-              <div className="absolute inset-0 overflow-hidden">
-                <iframe
-                  key={trailer.key}
-                  ref={trailerIframeRef}
-                  className="absolute left-1/2 top-1/2 w-[140%] h-[180%] -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-                  src={`https://www.youtube-nocookie.com/embed/${trailer.key}?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1&controls=0&iv_load_policy=3&disablekb=1&fs=0&enablejsapi=1`}
-                  title={`Trailer - ${movie.title || movie.name}`}
-                  allow="autoplay; encrypted-media; picture-in-picture"
-                  allowFullScreen={false}
-                  onLoad={syncTrailerAudio}
-                />
+              <>
+                <div className="absolute inset-0 overflow-hidden sv-preview-fade">
+                  <iframe
+                    key={trailer.key}
+                    ref={trailerIframeRef}
+                    className="absolute left-1/2 top-1/2 w-[140%] h-[180%] -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                    src={`https://www.youtube-nocookie.com/embed/${trailer.key}?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1&controls=0&iv_load_policy=3&disablekb=1&fs=0&enablejsapi=1`}
+                    title={`Trailer - ${movie.title || movie.name}`}
+                    allow="autoplay; encrypted-media; picture-in-picture"
+                    allowFullScreen={false}
+                    onLoad={syncTrailerAudio}
+                  />
+                </div>
+                {/* Fuera del envoltorio enmascarado: el botón es de cristal y
+                    una máscara en un ancestro anularía su backdrop-filter. */}
                 {trailerPlaying && (
                   <PreviewTrailerAudioButton
                     muted={trailerMuted}
                     onToggle={handleToggleTrailerAudio}
                   />
                 )}
-              </div>
+              </>
             )}
           </>
         )}
-
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-24 bg-gradient-to-b from-transparent via-black/40 to-transparent"
-        />
 
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-4 pb-4">
           {logoSrc ? (
@@ -3443,22 +3455,19 @@ export function Row({
         <AnimatePresence>
           {showPrev && !isMobile && (
             <motion.button
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial="hidden"
+              animate="visible"
+              exit="hidden"
               type="button"
               onClick={handlePrevClick}
               className="absolute inset-y-0 -left-6 w-32 z-30
                   hidden sm:flex items-center justify-start
                   transition-all duration-300 pointer-events-auto group/nav"
             >
-              {/* Panel difuminado que ocupa el alto completo y se integra de forma continua
-                  con el fondo de la pantalla y las tarjetas sin cortes ni bordes (rounded-none, left-0 right-0). */}
-              <span
-                aria-hidden
-                className="pointer-events-none absolute inset-y-0 left-0 right-0 rounded-none bg-gradient-to-r from-black/50 via-black/15 to-transparent backdrop-blur-[8px] sv-scroll-mask-l transition-colors duration-300 group-hover/nav:from-black/75"
-              />
+              {/* Cristal sin límites visibles: ver RowNavGlass. */}
+              <RowNavGlass side="left" />
               <motion.span
+                variants={ROW_NAV_FADE}
                 className="relative ml-12 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] group-hover/nav:scale-110 transition-transform"
                 whileHover={{ x: -4 }}
               >
@@ -3471,22 +3480,19 @@ export function Row({
         <AnimatePresence>
           {showNext && !isMobile && (
             <motion.button
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial="hidden"
+              animate="visible"
+              exit="hidden"
               type="button"
               onClick={handleNextClick}
               className="absolute inset-y-0 -right-6 w-32 z-30
                   hidden sm:flex items-center justify-end
                   transition-all duration-300 pointer-events-auto group/nav"
             >
-              {/* Panel difuminado que ocupa el alto completo y se integra de forma continua
-                  con el fondo de la pantalla y las tarjetas sin cortes ni bordes (rounded-none, right-0 left-0). */}
-              <span
-                aria-hidden
-                className="pointer-events-none absolute inset-y-0 right-0 left-0 rounded-none bg-gradient-to-l from-black/50 via-black/15 to-transparent backdrop-blur-[8px] sv-scroll-mask-r transition-colors duration-300 group-hover/nav:from-black/75"
-              />
+              {/* Cristal sin límites visibles: ver RowNavGlass. */}
+              <RowNavGlass side="right" />
               <motion.span
+                variants={ROW_NAV_FADE}
                 className="relative mr-12 text-4xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] group-hover/nav:scale-110 transition-transform"
                 whileHover={{ x: 4 }}
               >
@@ -4186,22 +4192,19 @@ function TopRatedHero({
           <AnimatePresence>
             {showPrev && !isMobile && (
               <motion.button
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+                initial="hidden"
+                animate="visible"
+                exit="hidden"
                 type="button"
                 onClick={handlePrevClick}
                 className="absolute inset-y-0 -left-6 w-32 z-20
                                 hidden sm:flex items-center justify-start
                                 transition-all duration-500 pointer-events-auto group/nav"
               >
-                {/* Panel difuminado que ocupa el alto completo y se integra de forma continua
-                    con el fondo de la pantalla y las tarjetas sin cortes ni bordes (rounded-none, left-0 right-0). */}
-                <span
-                  aria-hidden
-                  className="pointer-events-none absolute inset-y-0 left-0 right-0 rounded-none bg-gradient-to-r from-black/50 via-black/15 to-transparent backdrop-blur-[8px] sv-scroll-mask-l transition-colors duration-500 group-hover/nav:from-black/75"
-                />
+                {/* Cristal sin límites visibles: ver RowNavGlass. */}
+                <RowNavGlass side="left" />
                 <motion.span
+                  variants={ROW_NAV_FADE}
                   className="relative ml-11 text-5xl font-bold text-white drop-shadow-[0_0_20px_rgba(0,0,0,0.8)] group-hover/nav:scale-110 transition-transform"
                   whileHover={{ x: -5 }}
                 >
@@ -4214,22 +4217,19 @@ function TopRatedHero({
           <AnimatePresence>
             {showNext && !isMobile && (
               <motion.button
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+                initial="hidden"
+                animate="visible"
+                exit="hidden"
                 type="button"
                 onClick={handleNextClick}
                 className="absolute inset-y-0 -right-6 w-32 z-20
                                 hidden sm:flex items-center justify-end
                                 transition-all duration-500 pointer-events-auto group/nav"
               >
-                {/* Panel difuminado que ocupa el alto completo y se integra de forma continua
-                    con el fondo de la pantalla y las tarjetas sin cortes ni bordes (rounded-none, right-0 left-0). */}
-                <span
-                  aria-hidden
-                  className="pointer-events-none absolute inset-y-0 right-0 left-0 rounded-none bg-gradient-to-l from-black/50 via-black/15 to-transparent backdrop-blur-[8px] sv-scroll-mask-r transition-colors duration-500 group-hover/nav:from-black/75"
-                />
+                {/* Cristal sin límites visibles: ver RowNavGlass. */}
+                <RowNavGlass side="right" />
                 <motion.span
+                  variants={ROW_NAV_FADE}
                   className="relative mr-11 text-5xl font-bold text-white drop-shadow-[0_0_20px_rgba(0,0,0,0.8)] group-hover/nav:scale-110 transition-transform"
                   whileHover={{ x: 5 }}
                 >
