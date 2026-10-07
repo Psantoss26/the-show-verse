@@ -4,11 +4,12 @@
 // (las previews de 30 s que ya trae /api/soundtrack), una pista detrás de otra
 // y en bucle, a volumen bajo. Un solo <audio> fuera del DOM.
 //
-//   - Ajustes puede desactivar el modo entero (`enabled`, preferencia de la
-//     cuenta): entonces no suena nada al abrir una ficha.
-//   - Con el modo activo, el altavoz del reproductor del soundtrack
-//     (SoundtrackModal) lo silencia o lo vuelve a activar, y se recuerda en este
-//     navegador: silenciado no suena en ningún título hasta reactivarlo.
+//   - La preferencia de la cuenta (`enabled`) lo activa o desactiva: se cambia
+//     en Ajustes o con el interruptor "Reproducción automática" del reproductor
+//     del soundtrack (SoundtrackModal). Desactivado, no suena al abrir una ficha.
+//   - `muted` es el silencio que guardaba el altavoz de ese reproductor cuando
+//     hacía de interruptor (versiones anteriores). Se sigue respetando y el
+//     interruptor lo borra al activarse (`setAutoplay(true)`).
 //   - Se pausa mientras haya algo que tenga su propio sonido (tráiler, el
 //     reproductor del soundtrack) y con la pestaña oculta, y sigue después.
 //   - Los navegadores pueden bloquear el sonido sin un gesto previo (al abrir

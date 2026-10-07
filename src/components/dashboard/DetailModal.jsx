@@ -68,6 +68,10 @@ import {
 import PanelCenter from "@/components/ui/icons/PanelCenter";
 
 import { useAuth } from "@/context/AuthContext";
+import {
+  getSoundtrackFeedback,
+  SOUNDTRACK_EXCLUDE_PARAM,
+} from "@/lib/soundtrack/soundtrackFeedback";
 import { LIQUID_GLASS_PANEL, LIQUID_GLASS_DETAIL_SURFACE } from "@/lib/ui/liquidGlass";
 import {
   clampDrawerWidth,
@@ -724,7 +728,7 @@ export default function DetailModal({
   );
   const router = useRouter();
   const prefersReducedMotion = useReducedMotion();
-  const { session, account } = useAuth();
+  const { session, account, preferences } = useAuth();
   const { openDetailModal } = useDetailModal();
   const { loading, data, applyArtworkSelection } = useDetailModalData(item);
   useOfflineTitle(item?.media_type || item?.mediaType || (item?.first_air_date ? "tv" : "movie"), item?.id || item?.tmdbId, data);
@@ -2076,8 +2080,22 @@ export default function DetailModal({
   // Consulta de búsqueda igual que DetailsClient (título + año + "soundtrack").
   // En EPISODIO el soundtrack es el de la SERIE (no el del episodio concreto).
   const soundtrackTitle = isEpisode ? episodeMeta?.showName || title : title;
+  // Valoración del soundtrack que el usuario hizo en la ficha completa (👍 / 👎 /
+  // ocultar, src/lib/soundtrack/soundtrackFeedback.js). Aquí solo se respeta:
+  // los descartados no vuelven y "oculto" quita el soundtrack. Solo títulos: el
+  // de un episodio es otra búsqueda.
+  const soundtrackFeedback = useMemo(
+    () =>
+      isEpisode || !item?.id
+        ? { excluded: [], status: null }
+        : getSoundtrackFeedback(preferences?.uiSettings, mediaType, item.id),
+    [isEpisode, item?.id, mediaType, preferences?.uiSettings],
+  );
+  const soundtrackHidden = soundtrackFeedback.status === "hidden";
+  const soundtrackExcludeKey = soundtrackFeedback.excluded.join(",");
+
   const soundtrackSearchQuery = useMemo(() => {
-    if (!soundtrackTitle) return "";
+    if (!soundtrackTitle || soundtrackHidden) return "";
     return [
       soundtrackTitle,
       isEpisode ? null : data.year,
@@ -2085,7 +2103,7 @@ export default function DetailModal({
     ]
       .filter(Boolean)
       .join(" ");
-  }, [soundtrackTitle, data.year, mediaType, isEpisode]);
+  }, [soundtrackTitle, soundtrackHidden, data.year, mediaType, isEpisode]);
 
   const soundtrackSpotifyUrl = soundtrackSearchQuery
     ? `https://open.spotify.com/search/${encodeURIComponent(
@@ -2109,13 +2127,14 @@ export default function DetailModal({
   const soundtrackRequestRef = useRef({ key: null, promise: null });
 
   const loadSoundtrack = ({ force = false } = {}) => {
-    if (!soundtrackTitle) return Promise.resolve();
+    if (!soundtrackTitle || soundtrackHidden) return Promise.resolve();
 
     const requestKey = [
       soundtrackTitle,
       mediaType,
       isEpisode ? "episode" : "title",
       item?.id ?? "",
+      soundtrackExcludeKey,
     ].join("|");
     const pending = soundtrackRequestRef.current;
     if (!force && pending.key === requestKey && pending.promise) {
@@ -2145,6 +2164,9 @@ export default function DetailModal({
       }
       if (!isEpisode && data.year) params.set("year", String(data.year));
       if (item?.id) params.set("tmdbId", String(item.id));
+      if (soundtrackExcludeKey) {
+        params.set(SOUNDTRACK_EXCLUDE_PARAM, soundtrackExcludeKey);
+      }
 
       const res = await fetch(`/api/soundtrack?${params.toString()}`);
       const payload = await res.json();
@@ -2154,7 +2176,11 @@ export default function DetailModal({
       const tracks = Array.isArray(payload?.tracks) ? payload.tracks : [];
       setSoundtrackTracks(tracks);
       if (!tracks.length) {
-        setSoundtrackError("No se encontraron canciones para este título.");
+        setSoundtrackError(
+          soundtrackExcludeKey
+            ? "No quedan más alternativas para este soundtrack."
+            : "No se encontraron canciones para este título.",
+        );
       }
     } catch (e) {
       setSoundtrackTracks([]);

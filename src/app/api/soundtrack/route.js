@@ -15,6 +15,12 @@ import {
   GENERIC_WORDS,
 } from "@/lib/api/soundtrack-utils";
 import { searchFallback } from "@/lib/api/soundtrack-fallback";
+import {
+  parseExcludedCollections,
+  SOUNDTRACK_EXCLUDE_PARAM,
+  soundtrackCollectionKey,
+  spotifyCollectionKey,
+} from "@/lib/soundtrack/soundtrackFeedback";
 import { getUserSpotifyAccessToken } from "@/lib/spotify/server";
 
 export const runtime = "nodejs";
@@ -432,7 +438,19 @@ async function saveDiskCache() {
 }
 
 function getCacheKey(ctx, market) {
-  return `${CACHE_VERSION}|${norm(ctx.titles.join("|"))}|${ctx.mediaType}|${ctx.year ?? ""}|${market}`;
+  // Las colecciones descartadas por el usuario cambian el resultado: van en la
+  // clave. Sin descartes la clave es la de siempre (no invalida la caché).
+  const excluded = ctx.excludedKey ? `|x:${ctx.excludedKey}` : "";
+  return `${CACHE_VERSION}|${norm(ctx.titles.join("|"))}|${ctx.mediaType}|${ctx.year ?? ""}|${market}${excluded}`;
+}
+
+// ¿El usuario descartó esta colección (👎 en el reproductor)? Se filtra en la
+// entrada de cada fuente, así todas las etapas de selección la saltan y la
+// misma clasificación cae en la siguiente candidata.
+function isExcludedSpotifyItem(item, ctx) {
+  if (!ctx.excluded?.size) return false;
+  const kind = item?.type === "playlist" ? "playlist" : "album";
+  return ctx.excluded.has(spotifyCollectionKey(kind, item?.id));
 }
 
 async function getCached(key) {
@@ -1108,10 +1126,10 @@ async function searchSoundtrackSources(ctx, token, market) {
     if (i === 0) usedQuery = q;
 
     const newAl = Array.isArray(result?.albums?.items)
-      ? result.albums.items.filter(Boolean)
+      ? result.albums.items.filter((item) => item && !isExcludedSpotifyItem(item, ctx))
       : [];
     const newPl = Array.isArray(result?.playlists?.items)
-      ? result.playlists.items.filter(Boolean)
+      ? result.playlists.items.filter((item) => item && !isExcludedSpotifyItem(item, ctx))
       : [];
     const annotatedAlbums = newAl.map((album, index) =>
       annotateSearchItem(album, ctx, q, i, index + 1),
@@ -2059,7 +2077,17 @@ export async function GET(req) {
     }
   }
 
-  const ctx = { titles, originalTitle, year, mediaType };
+  // Colecciones que el usuario descartó para este título (👎 en el
+  // reproductor del soundtrack). Ver src/lib/soundtrack/soundtrackFeedback.js.
+  const excludedCollections = parseExcludedCollections(sp.get(SOUNDTRACK_EXCLUDE_PARAM));
+  const ctx = {
+    titles,
+    originalTitle,
+    year,
+    mediaType,
+    excluded: new Set(excludedCollections),
+    excludedKey: [...excludedCollections].sort().join(","),
+  };
   const configured = Boolean(credentials());
 
   // ---- Try to get Spotify auth ----
@@ -2162,6 +2190,13 @@ export async function GET(req) {
     }
   }
 
+  // Red de seguridad: ninguna pista de una colección descartada, venga de la
+  // fuente que venga (las fuentes ya las saltan al elegir).
+  if (ctx.excluded.size) {
+    tracks = tracks.filter(
+      (track) => !ctx.excluded.has(soundtrackCollectionKey(track.collectionUrl)),
+    );
+  }
   tracks = topRelevantTracks(tracks).map(toPublic);
 
   // ---- Build response payload ----
