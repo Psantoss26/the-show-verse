@@ -1,5 +1,6 @@
 // /src/app/api/tmdb/collection/route.js
 import { NextResponse } from 'next/server'
+import { buildCollectionCast, sumCollectionRevenue } from '@/lib/lists/collectionStats'
 
 const TMDB_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY
 const TMDB_API = 'https://api.themoviedb.org/3'
@@ -17,6 +18,23 @@ async function fetchJson(url, init) {
     const j = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(j?.status_message || 'TMDb request failed')
     return j
+}
+
+// `/collection/{id}` no trae recaudación ni créditos de sus películas. Se piden
+// en paralelo (una petición por película, con los créditos anexados) y se
+// cachean un día: la taquilla y el reparto de una saga apenas cambian. Si
+// alguna falla, la colección se sirve igual sin sus datos.
+const PART_DETAILS_REVALIDATE_SECONDS = 60 * 60 * 24
+
+async function fetchPartDetails(partId) {
+    try {
+        return await fetchJson(
+            buildTmdbUrl(`/movie/${partId}`, { append_to_response: 'credits' }),
+            { next: { revalidate: PART_DETAILS_REVALIDATE_SECONDS } },
+        )
+    } catch {
+        return null
+    }
 }
 
 export async function GET(req) {
@@ -38,6 +56,20 @@ export async function GET(req) {
             return da.localeCompare(db)
         })
 
+        const details = await Promise.all(parts.map((p) => (p?.id != null ? fetchPartDetails(p.id) : null)))
+        const enrichedParts = parts.map((p, index) => ({
+            ...p,
+            revenue: Number(details[index]?.revenue) || 0,
+        }))
+        const cast = buildCollectionCast(
+            parts.map((p, index) => ({
+                id: p?.id,
+                title: p?.title,
+                release_date: p?.release_date,
+                cast: details[index]?.credits?.cast || [],
+            })),
+        )
+
         return NextResponse.json({
             ok: true,
             collection: {
@@ -48,9 +80,11 @@ export async function GET(req) {
                 item_count: parts.length,
                 poster_path: c?.poster_path || null,
                 backdrop_path: c?.backdrop_path || null,
+                revenue: sumCollectionRevenue(enrichedParts),
+                cast,
                 tmdbUrl: c?.id ? `https://www.themoviedb.org/collection/${c.id}` : null,
             },
-            items: parts.map((p) => ({
+            items: enrichedParts.map((p) => ({
                 ...p,
                 media_type: 'movie',
                 title: p?.title,

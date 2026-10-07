@@ -39,7 +39,8 @@ import { getUserNeuralGraph } from '../lib/neuralGraph.js';
 
 const ARTWORK_KINDS = ['poster', 'mobilePoster', 'backdrop', 'background', 'logo'];
 const artworkChangeSchema = z.object({
-  type: z.enum(['movie', 'tv']),
+  // `collection`: póster y fondo elegidos para una colección de TMDb.
+  type: z.enum(['movie', 'tv', 'collection']),
   id: z.coerce.number().int().positive(),
   kind: z.enum(ARTWORK_KINDS),
   // Solo se guardan file_path relativos de TMDb; nunca URLs o data URI arbitrarias.

@@ -9,7 +9,7 @@ import { ArrowLeft, Film, ListVideo } from 'lucide-react'
 import { useIsHistoryNavigation } from '@/lib/hooks/useIsHistoryNavigation'
 import DetailsScoreboardPanel from '@/components/details/DetailsScoreboardPanel'
 import DetailsInfoTabs from '@/components/details/DetailsInfoTabs'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
     buildPosterCollageTargets,
     buildPosterCollageTiles,
@@ -90,6 +90,50 @@ function useFinalEnglishPosterImages(items) {
         : { key: targetKey, pending: targets.length > 0, images: [] }
 }
 
+const useClientLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
+
+// Fondo a pantalla completa con el mismo reparto que DetailsClient: backdrop
+// horizontal en escritorio y póster vertical en móvil. Con <picture> el
+// navegador descarga solo la imagen que corresponde al viewport (dos capas con
+// `background-image` y `hidden` dejarían a Safari bajar las dos).
+//
+// En móvil se desenfoca y escala el póster con los valores de `.hero-bg-base`
+// (la capa de fondo de la ficha) para que no compita con la portada nítida de
+// la cabecera; en escritorio el backdrop va nítido, como la capa de detalle de
+// DetailsClient. No se usa la clase: su brillo 0.75 también se aplica en
+// escritorio, donde la ficha lo tapa con otra capa.
+function HeroBackground({ desktop, mobile, animate }) {
+    const imgRef = useRef(null)
+    const [loaded, setLoaded] = useState(false)
+
+    // Si la imagen ya estaba en caché (vuelta atrás), `load` puede haberse
+    // disparado antes de montar: se da por cargada sin fundido.
+    useClientLayoutEffect(() => {
+        const img = imgRef.current
+        if (img?.complete && img.naturalWidth > 0) setLoaded(true)
+    }, [])
+
+    return (
+        <picture>
+            {desktop ? <source media="(min-width: 640px)" srcSet={desktop} /> : null}
+            {/* Fondo decorativo a pantalla completa: next/image no aporta nada y
+                su contenedor rompería el <picture>. */}
+            <img
+                ref={imgRef}
+                src={mobile || desktop}
+                alt=""
+                aria-hidden="true"
+                decoding="async"
+                fetchPriority="low"
+                onLoad={() => setLoaded(true)}
+                className={`absolute inset-0 max-sm:scale-[1.12] max-sm:blur-[4px] max-sm:brightness-90 max-sm:saturate-[1.03] h-full w-full object-cover object-center sm:object-top ${
+                    animate ? 'transition-opacity duration-500 motion-reduce:transition-none' : ''
+                } ${loaded ? 'opacity-100' : 'opacity-0'}`}
+            />
+        </picture>
+    )
+}
+
 function TabButton({ active, disabled, onClick, icon: Icon, children }) {
     return (
         <button
@@ -110,12 +154,12 @@ function TabButton({ active, disabled, onClick, icon: Icon, children }) {
     )
 }
 
-function PosterCover({ src, priority = false }) {
+function PosterCover({ src, alt = "", priority = false }) {
     return (
         <OptimizedImage
             src={src}
-            alt=""
-            aria-hidden="true"
+            alt={alt}
+            aria-hidden={alt ? undefined : true}
             priority={priority}
             fetchPriority={priority ? 'high' : 'low'}
             decoding="async"
@@ -166,7 +210,11 @@ function PosterCollage({ images, pending }) {
  *
  * Props:
  * - title, description
+ * - posterImage?: string (portada oficial; tiene prioridad sobre el mosaico)
  * - posterItems?: Array (títulos TMDb para resolver el mosaico inglés final)
+ * - heroBackground?: { desktop?: string, mobile?: string } (fondo estilo
+ *   DetailsClient: backdrop en escritorio, póster en móvil; sustituye al
+ *   `backdropImage` tenue)
  * - backHref?: string (si lo pasas, usa Link; si no, router.back())
  * - rightActions?: ReactNode (botones arriba a la derecha)
  * - showTopBar?: boolean (oculta la barra superior cuando la navegación vive en las acciones)
@@ -181,7 +229,9 @@ export default function UnifiedListDetailsLayout({
     title,
     description,
     posterItems = [],
+    posterImage,
     backdropImage,
+    heroBackground,
     sourceLabel = 'Lista',
     stats = [],
     scoreboardStats = [],
@@ -205,6 +255,25 @@ export default function UnifiedListDetailsLayout({
 
     return (
         <div className="min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-purple-500/30">
+            {heroBackground ? (
+                <div className="fixed inset-0 pointer-events-none overflow-hidden bg-[#0a0a0a]">
+                    {heroBackground.desktop || heroBackground.mobile ? <HeroBackground
+                        key={`${heroBackground.desktop || ''}|${heroBackground.mobile || ''}`}
+                        desktop={heroBackground.desktop}
+                        mobile={heroBackground.mobile}
+                        animate={!isBackNav}
+                    /> : null}
+                    {/* Sombreados de legibilidad de la ficha (DetailsClient), en
+                        móvil al 60% como en su estado con scroll. */}
+                    <div className="absolute inset-0 max-sm:opacity-60">
+                        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-transparent" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-[#101010]/60 via-transparent to-transparent" />
+                        <div className="absolute inset-0 bg-gradient-to-l from-[#101010]/60 via-transparent to-transparent" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#101010] via-[#101010]/60 to-black/20" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-[#101010] via-transparent to-transparent opacity-30" />
+                    </div>
+                </div>
+            ) : (
             <div className="fixed inset-0 pointer-events-none overflow-hidden">
                 {backdropImage ? (
                     <OptimizedImage
@@ -217,6 +286,7 @@ export default function UnifiedListDetailsLayout({
                 <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-[#101010]/90 to-[#101010]" />
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(168,85,247,0.16),transparent_35%),radial-gradient(circle_at_80%_15%,rgba(234,179,8,0.11),transparent_32%)]" />
             </div>
+            )}
 
             <div className="relative z-10 mx-auto max-w-7xl px-4 py-8 lg:py-12">
                 {/* --- TOP BAR --- */}
@@ -255,10 +325,14 @@ export default function UnifiedListDetailsLayout({
                         <div className="relative overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/35 shadow-[0_24px_70px_rgba(0,0,0,0.35)] backdrop-blur-[28px] aspect-[2/3]">
                             <div className="pointer-events-none absolute inset-0 z-20 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]" />
                             <div className="relative z-10 h-full w-full bg-neutral-950">
-                                <PosterCollage
-                                    images={finalPosterArtwork.images}
-                                    pending={finalPosterArtwork.pending}
-                                />
+                                {posterImage ? (
+                                    <PosterCover src={posterImage} alt={title || 'Colección'} priority />
+                                ) : (
+                                    <PosterCollage
+                                        images={finalPosterArtwork.images}
+                                        pending={finalPosterArtwork.pending}
+                                    />
+                                )}
                             </div>
                         </div>
 

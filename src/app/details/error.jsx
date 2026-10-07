@@ -24,6 +24,7 @@ export default function DetailsError({ error, reset }) {
   return (
     <div
       data-details-root
+      data-details-error
       className="relative min-h-screen bg-[#101010] text-gray-100"
     >
       <div className="fixed inset-0 z-0 bg-[#0a0a0a]" aria-hidden="true" />

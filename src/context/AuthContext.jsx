@@ -295,6 +295,23 @@ export const AuthProvider = ({ children }) => {
     savePreferences(next);
   }, [preferences, savePreferences]);
 
+  // Persiste un parche parcial y publica el resultado solo tras confirmarlo.
+  const saveUiSettings = useCallback(async (patch) => {
+    requireOnline();
+    const res = await fetch("/api/user/preferences", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uiSettings: patch }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json?.preferences) throw new Error("No se pudieron guardar los cambios. Inténtalo de nuevo.");
+    const merged = mergePreferences(json.preferences);
+    setPreferences(merged);
+    syncPreferenceCookies(merged);
+    writeAuthPreferencesCache(merged);
+    setPreferencesCached(true);
+  }, [syncPreferenceCookies]);
+
   // Actualiza solo la instantánea local de artwork. DetailsClient persiste los
   // cambios con su propia cola PATCH; esta función mantiene sincronizados el
   // estado del contexto y localStorage para que una navegación inmediata no
@@ -556,6 +573,7 @@ export const AuthProvider = ({ children }) => {
       preferencesReady,
       updatePreference,
       cacheArtworkOverrides,
+      saveUiSettings,
     }),
     [
       account,
@@ -574,6 +592,7 @@ export const AuthProvider = ({ children }) => {
       preferencesReady,
       updatePreference,
       cacheArtworkOverrides,
+      saveUiSettings,
     ],
   );
 
@@ -601,6 +620,7 @@ export const useAuth = () => {
       preferencesReady: true,
       updatePreference: () => {},
       cacheArtworkOverrides: () => {},
+      saveUiSettings: async () => { throw new Error("Inicia sesión para guardar los cambios."); },
     };
   }
   return ctx;

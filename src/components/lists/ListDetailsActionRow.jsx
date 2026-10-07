@@ -8,7 +8,7 @@ import {
 } from "@/components/details/DetailActionsRow";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 import { LIQUID_GLASS_ELEVATION, LIQUID_GLASS_SURFACE_CARD } from "@/lib/ui/liquidGlass";
-import { ArrowLeft, Eraser, ExternalLink, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Eraser, ExternalLink, Loader2, Pencil, Plus, Trash2, Users } from "lucide-react";
 
 const ROW_CLASS = `flex w-full flex-nowrap items-center justify-center gap-1 sm:justify-start sm:gap-3
   ${DETAIL_ACTION_ITEM_SIZING_CLASS}
@@ -57,6 +57,7 @@ export default function ListDetailsActionRow({
   onBack,
   onAdd,
   onEdit,
+  editLabel = "Editar lista",
   onClear,
   onDelete,
   clearDisabled = false,
@@ -65,6 +66,8 @@ export default function ListDetailsActionRow({
   favoriteAction = null,
   externalHref = null,
   externalLabel = "Ver en fuente externa",
+  onCast = null,
+  castLabel = "Reparto destacado",
 }) {
   return (
     <div className={ROW_CLASS}>
@@ -73,8 +76,9 @@ export default function ListDetailsActionRow({
       </ActionButton>
       {favoriteAction}
       <ActionLink href={externalHref} label={externalLabel} />
+      {onCast ? <ActionButton label={castLabel} onClick={onCast}><Users /></ActionButton> : null}
       {onAdd ? <ActionButton mutation label="Añadir títulos" onClick={onAdd} tone="purple"><Plus /></ActionButton> : null}
-      {onEdit ? <ActionButton mutation label="Editar lista" onClick={onEdit} tone="yellow"><Pencil /></ActionButton> : null}
+      {onEdit ? <ActionButton mutation label={editLabel} onClick={onEdit} tone="yellow"><Pencil /></ActionButton> : null}
       {onClear ? <ActionButton mutation label="Vaciar lista" onClick={onClear} disabled={clearDisabled || clearing} tone="yellow">{clearing ? <Loader2 className="animate-spin" /> : <Eraser />}</ActionButton> : null}
       {onDelete ? <ActionButton mutation label="Borrar lista" onClick={onDelete} disabled={deleting} tone="red">{deleting ? <Loader2 className="animate-spin" /> : <Trash2 />}</ActionButton> : null}
     </div>

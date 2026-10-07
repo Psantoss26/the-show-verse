@@ -43,6 +43,10 @@ export function saveUserDetailsSequenceFromLink(link, sequenceScope = null) {
   const hrefs = uniqueDetailsHrefs(scope.querySelectorAll('a[href^="/details/"]'));
   if (hrefs.length < 2 || !hrefs.includes(selectedHref)) return;
 
+  storeSequence(hrefs);
+}
+
+function storeSequence(hrefs) {
   try {
     window.sessionStorage.setItem(
       STORAGE_KEY,
@@ -51,6 +55,39 @@ export function saveUserDetailsSequenceFromLink(link, sequenceScope = null) {
   } catch {
     // Si el almacenamiento no está disponible, abrir la ficha sigue funcionando.
   }
+}
+
+/**
+ * Guarda una secuencia ya ordenada por quien la pinta. Las listas y colecciones
+ * montan sus tarjetas por lotes y por grupos, así que el DOM solo tiene una
+ * parte: aquí llega el orden completo (tras filtros, orden y agrupación).
+ * Devuelve false si la ficha abierta no forma parte de la secuencia.
+ */
+export function saveUserDetailsSequence(hrefList, selectedHrefValue) {
+  if (typeof window === "undefined" || !Array.isArray(hrefList)) return false;
+
+  const selectedHref = normalizeDetailsHref(selectedHrefValue);
+  if (!selectedHref) return false;
+
+  const seen = new Set();
+  const hrefs = [];
+  for (const value of hrefList) {
+    const href = normalizeDetailsHref(value);
+    if (!href || seen.has(href)) continue;
+    seen.add(href);
+    hrefs.push(href);
+  }
+
+  const index = hrefs.indexOf(selectedHref);
+  if (hrefs.length < 2 || index < 0) return false;
+
+  // En listas enormes se guarda una ventana centrada en el título abierto.
+  const start = Math.max(
+    0,
+    Math.min(index - Math.floor(MAX_ITEMS / 2), hrefs.length - MAX_ITEMS),
+  );
+  storeSequence(hrefs.slice(start, start + MAX_ITEMS));
+  return true;
 }
 
 export function getUserDetailsSequence(currentHref) {

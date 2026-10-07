@@ -2,7 +2,12 @@
 
 import { useEffect, useLayoutEffect, useState, useMemo } from 'react'
 import { useRouter } from "@/lib/offline/useOfflineRouter";
-import { Clock3, ExternalLink, Film } from 'lucide-react'
+import { Banknote, Clock3, ExternalLink, Film } from 'lucide-react'
+import { useAuth } from '@/context/AuthContext'
+import CollectionEditModal from '@/components/lists/CollectionEditModal'
+import CollectionCastModal from '@/components/lists/CollectionCastModal'
+import { formatCollectionRevenue } from '@/lib/lists/collectionStats'
+import { applyCollectionCustomization, collectionCustomizationKey, readCollectionArtworkOverride } from '@/lib/lists/collectionCustomization'
 import ListPosterCard from '@/components/lists/ListPosterCard'
 import FilterableListItems from '@/components/lists/ListDetailsTools'
 import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayout'
@@ -14,12 +19,14 @@ import {
 import { ratingSummaryBadge, summarizeListRatings } from '@/lib/lists/ratingSummary'
 import useListImdbRatings from '@/hooks/useListImdbRatings'
 import { useIsHistoryNavigation } from '@/lib/hooks/useIsHistoryNavigation'
+import { fetchTmdbImages } from '@/lib/tmdb/imageRequests'
+import { pickHeroBackdropPath, pickMobileHeroPosterPath } from '@/lib/details/tmdbImages'
 
 const COLLECTION_DETAILS_CACHE_TTL_MS = 30 * 60 * 1000
 const useClientLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
 
 function getCollectionDetailsCacheKey(collectionId) {
-    return collectionId ? `showverse:list-details:collection:${collectionId}:v1` : null
+    return collectionId ? `showverse:list-details:collection:${collectionId}:v2` : null
 }
 
 function readCollectionDetailsCache(collectionId) {
@@ -44,6 +51,38 @@ function writeCollectionDetailsCache(collectionId, data) {
     } catch {
         // ignore
     }
+}
+
+// Galería /images de cada colección ya resuelta en esta sesión: al volver a la
+// página el fondo sale en el primer render, sin esperar a la red ni fundirse.
+const collectionGalleryCache = new Map()
+
+// Galería de la colección para elegir el fondo con el criterio de la ficha.
+// `done` distingue "aún no se sabe" (no se pinta nada, para no enseñar la
+// portada principal y sustituirla después) de "no hay galería" (se usa la
+// principal).
+function useCollectionGallery(collectionId) {
+    const [state, setState] = useState(() => ({
+        id: collectionId,
+        done: collectionGalleryCache.has(collectionId),
+        images: collectionGalleryCache.get(collectionId) || null,
+    }))
+
+    useEffect(() => {
+        if (!collectionId || collectionGalleryCache.has(collectionId)) return undefined
+        let cancelled = false
+        fetchTmdbImages('collection', collectionId, { priority: 'high' }).then((images) => {
+            if (images) collectionGalleryCache.set(collectionId, images)
+            if (!cancelled) setState({ id: collectionId, done: true, images })
+        })
+        return () => {
+            cancelled = true
+        }
+    }, [collectionId])
+
+    if (state.id === collectionId) return state
+    const cached = collectionGalleryCache.get(collectionId)
+    return { id: collectionId, done: Boolean(cached), images: cached || null }
 }
 
 function MovieCard({ movie, idx, imdbRating, disableHover = false, posterLoading = false }) {
@@ -77,7 +116,11 @@ function MovieCard({ movie, idx, imdbRating, disableHover = false, posterLoading
 
 export default function CollectionDetailsClient({ collectionId }) {
     const router = useRouter()
+    const { preferences } = useAuth()
+    const [editing, setEditing] = useState(false)
+    const [castOpen, setCastOpen] = useState(false)
     const isBackNav = useIsHistoryNavigation()
+    const gallery = useCollectionGallery(collectionId)
     // Conserva el mismo primer árbol que el servidor. Al regresar, la caché se
     // incorpora antes del primer repintado para que el scroll siga teniendo la
     // altura completa de la colección.
@@ -89,9 +132,15 @@ export default function CollectionDetailsClient({ collectionId }) {
         if (cached) setState(resolveCollectionDetailsInitialState(cached))
     }, [isBackNav, collectionId])
 
+    const artworkOverride = readCollectionArtworkOverride(preferences, collectionId)
+    const collection = applyCollectionCustomization(
+        state.collection,
+        preferences?.uiSettings?.[collectionCustomizationKey(collectionId)],
+        artworkOverride,
+    )
     useEffect(() => {
-        document.title = formatPageTitle(state.collection?.name || 'Colección')
-    }, [state.collection?.name])
+        document.title = formatPageTitle(collection?.name || 'Colección')
+    }, [collection?.name])
 
     useEffect(() => {
         let cancelled = false
@@ -134,7 +183,7 @@ export default function CollectionDetailsClient({ collectionId }) {
         }
     }, [collectionId])
 
-    const { collection, parts } = state
+    const { parts } = state
     const tmdbUrl = useMemo(
         () => collectionId ? `https://www.themoviedb.org/collection/${collectionId}` : null,
         [collectionId]
@@ -174,19 +223,41 @@ export default function CollectionDetailsClient({ collectionId }) {
         )
     }
 
-    const collectionPoster = collection?.poster_path || parts.find((movie) => movie?.poster_path)?.poster_path || null
-    const collectionBackdrop = collection?.backdrop_path || parts.find((movie) => movie?.backdrop_path)?.backdrop_path || collectionPoster
+    const collectionPoster = collection?.poster_path || null
+    const revenueLabel = formatCollectionRevenue(collection?.revenue)
+    const castMembers = Array.isArray(collection?.cast) ? collection.cast : []
+    // Fondo como en DetailsClient: backdrop en escritorio y póster textless en
+    // móvil, sacados de la galería de la colección. Lo que el usuario eligió al
+    // editar la colección (fondo de escritorio y fondo móvil, por separado)
+    // manda sobre la elección automática.
+    const original = state.collection
+    const customBackdrop = artworkOverride.backdrop ? collection?.backdrop_path : null
+    const autoBackdrop = gallery.done
+        ? pickHeroBackdropPath({ backdropPath: original?.backdrop_path, backdrops: gallery.images?.backdrops }) ||
+            parts.find((movie) => movie?.backdrop_path)?.backdrop_path ||
+            null
+        : null
+    const autoMobileBackground = gallery.done
+        ? pickMobileHeroPosterPath({ posterPath: original?.poster_path, posters: gallery.images?.posters })
+        : null
+    const backgroundBackdrop = customBackdrop || autoBackdrop
+    const backgroundPoster = collection?.mobile_background_path || autoMobileBackground
 
     return (
+        <>
         <UnifiedListDetailsLayout
             title={collection?.name || 'Colección'}
             description={collection?.description || ''}
             sourceLabel="Colección TMDb"
-            posterItems={parts}
-            backdropImage={collectionBackdrop ? `https://image.tmdb.org/t/p/original${collectionBackdrop}` : null}
+            posterImage={collectionPoster ? `https://image.tmdb.org/t/p/w780${collectionPoster}` : null}
+            heroBackground={{
+                desktop: backgroundBackdrop ? `https://image.tmdb.org/t/p/original${backgroundBackdrop}` : null,
+                mobile: backgroundPoster ? `https://image.tmdb.org/t/p/w780${backgroundPoster}` : null,
+            }}
             scoreboardStats={[
                 { icon: Film, label: 'PELÍCULAS', value: parts.length, tooltip: 'Películas de la colección' },
                 ...(totalRuntime > 0 ? [{ icon: Clock3, label: 'DURACIÓN', value: `${Math.round(totalRuntime / 60)} h`, tooltip: 'Duración total aproximada' }] : []),
+                ...(revenueLabel ? [{ icon: Banknote, label: 'INGRESOS', value: revenueLabel, tooltip: 'Recaudación total en taquilla de las películas con dato en TMDb' }] : []),
                 { icon: ExternalLink, label: 'FUENTE', value: 'TMDb', tooltip: 'Datos de TMDb' },
             ]}
             scoreboardRatings={{
@@ -194,7 +265,7 @@ export default function CollectionDetailsClient({ collectionId }) {
                 imdb: ratingSummaryBadge(imdbSummary),
             }}
             showTopBar={false}
-            heroActions={<ListDetailsActionRow onBack={() => router.back()} externalHref={tmdbUrl} externalLabel="Ver colección en TMDb" />}
+            heroActions={<ListDetailsActionRow onBack={() => router.back()} onEdit={() => setEditing(true)} editLabel="Editar colección" externalHref={tmdbUrl} externalLabel="Ver colección en TMDb" onCast={castMembers.length ? () => setCastOpen(true) : null} />}
         >
             {parts.length > 0 ? (
                 <FilterableListItems
@@ -221,6 +292,26 @@ export default function CollectionDetailsClient({ collectionId }) {
                 </div>
             ) : null}
         </UnifiedListDetailsLayout>
+        <CollectionCastModal open={castOpen} onClose={() => setCastOpen(false)} cast={castMembers} collectionName={collection?.name} />
+        {editing && collection && (
+            <CollectionEditModal
+                key={collectionId}
+                // "Original" = lo que se ve sin selección propia: los fondos
+                // automáticos de la galería, no la portada principal de TMDb.
+                original={{
+                    ...original,
+                    backdrop_path: autoBackdrop || original?.backdrop_path || null,
+                    mobile_background_path: autoMobileBackground,
+                }}
+                collection={{
+                    ...collection,
+                    backdrop_path: backgroundBackdrop || null,
+                    mobile_background_path: backgroundPoster || null,
+                }}
+                onClose={() => setEditing(false)}
+            />
+        )}
+        </>
     )
 
 }

@@ -144,7 +144,7 @@ export function fetchTmdbImages(
   const key = process.env.NEXT_PUBLIC_TMDB_API_KEY || apiKey;
   if (!key || !type || id == null) return Promise.resolve(null);
 
-  const mediaType = type === "tv" ? "tv" : "movie";
+  const mediaType = type === "collection" ? "collection" : type === "tv" ? "tv" : "movie";
   // Las dos variantes devuelven conjuntos distintos, así que no pueden compartir
   // ni deduplicación ni entrada en vuelo.
   const cacheKey = `${mediaType}:${id}:${allLanguages ? "all" : "std"}`;

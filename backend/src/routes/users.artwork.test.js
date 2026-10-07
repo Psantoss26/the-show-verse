@@ -41,3 +41,18 @@ test('artwork reset removes every override and restores the default image source
     '550': {},
   });
 });
+
+test('collections keep their artwork apart from the movie with the same id', () => {
+  const settings = applyArtworkChanges({}, [
+    { type: 'movie', id: 10, kind: 'poster', filePath: '/movie.jpg' },
+    { type: 'collection', id: 10, kind: 'poster', filePath: '/collection.jpg' },
+    { type: 'collection', id: 10, kind: 'backdrop', filePath: '/collection-bg.jpg' },
+  ]);
+
+  assert.deepEqual(getArtworkOverrides(settings, { type: 'collection', ids: [10] }), {
+    '10': { poster: '/collection.jpg', backdrop: '/collection-bg.jpg' },
+  });
+  assert.deepEqual(getArtworkOverrides(settings, { type: 'movie', ids: [10] }), {
+    '10': { poster: '/movie.jpg' },
+  });
+});
