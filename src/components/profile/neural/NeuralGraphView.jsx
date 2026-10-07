@@ -138,6 +138,43 @@ function detailsHref(title) {
   return `/details/${title.mediaType === "tv" ? "tv" : "movie"}/${title.tmdbId}`;
 }
 
+// Registros del título con los mismos iconos y colores que la Actividad del
+// perfil: visto (ojo), nota (el número en ámbar), favorita (corazón) y
+// pendiente (marcador). `compact`: la fila de la ficha móvil.
+function TitleFlags({ title, compact = false, className = "" }) {
+  const icon = compact ? "h-3.5 w-3.5" : "h-4 w-4";
+  return (
+    <div
+      className={`items-center gap-y-1 font-semibold text-white/75 ${
+        // Compacta: una sola línea (sin partir «12 veces»), recortada si no cabe.
+        compact ? "gap-x-2 overflow-hidden whitespace-nowrap [&>*]:shrink-0" : "gap-x-3"
+      } ${className}`}
+    >
+      {title.flags & FLAG_WATCHED ? (
+        <span className="inline-flex items-center gap-1" title="Vista" aria-label="Vista">
+          <Eye strokeWidth={2.5} className={`${icon} text-emerald-400`} aria-hidden="true" />
+          {/* Solo el icono; el número únicamente si aporta algo. */}
+          {title.mediaType === "tv" ? `${title.plays} ep.` : title.plays > 1 ? `${title.plays} veces` : null}
+        </span>
+      ) : null}
+      {title.rating ? (
+        <span
+          className={`font-black leading-none tabular-nums text-amber-400 ${compact ? "text-sm" : "text-base"}`}
+          title="Tu puntuación"
+        >
+          {title.rating}
+        </span>
+      ) : null}
+      {title.flags & FLAG_FAVORITE ? (
+        <Heart strokeWidth={2.5} className={`${icon} fill-current text-red-500`} aria-label="Favorita" />
+      ) : null}
+      {title.flags & FLAG_WATCHLIST ? (
+        <BookmarkPlus strokeWidth={2.5} className={`${icon} text-sky-400`} aria-label="Pendiente" />
+      ) : null}
+    </div>
+  );
+}
+
 function SelectedCard({ node, graph, onClose, onFocusNode }) {
   const previewClick = usePreviewOpen();
   if (!node) return null;
@@ -234,12 +271,16 @@ function SelectedCard({ node, graph, onClose, onFocusNode }) {
     { tmdbId: title.tmdbId, mediaType: title.mediaType, title: title.title, posterPath: title.posterPath },
     { mediaType: title.mediaType },
   );
-  // MÓVIL: una sola fila compacta (cartel pequeño, datos y, a la derecha,
-  // cerrar y una flecha para abrir la ficha). Desde 640px, la ficha amplia
-  // con el botón "Ver ficha" debajo. Siempre alineada a la izquierda (el pie
-  // de la vista se centra en móvil).
+  // MÓVIL: ficha compacta junto a un cartel pequeño (tipo y año; título; los
+  // datos de sus grupos en UNA línea; y los registros) con una
+  // flecha para abrir la ficha, para tapar la menor parte posible de la red.
+  // Antes cada dato de agrupación ocupaba su propia línea y, con varias
+  // agrupaciones marcadas, la ficha crecía hasta cubrir media pantalla.
+  // Desde 640px, la ficha amplia con el botón "Ver ficha" debajo. Siempre
+  // alineada a la izquierda (el pie de la vista se centra en móvil).
+  const factsLine = facts.join(" · ");
   return (
-    <div className={`pointer-events-auto relative w-full max-w-sm rounded-2xl p-2 text-left text-white @[640px]/detail-page:p-3 ${LIQUID_GLASS_PANEL}`}>
+    <div className={`pointer-events-auto relative w-full max-w-sm rounded-2xl p-1.5 text-left text-white @[640px]/detail-page:p-3 ${LIQUID_GLASS_PANEL}`}>
       {/* Móvil: toda la ficha abre el título (la flecha solo lo indica). */}
       <Link
         href={href}
@@ -247,7 +288,7 @@ function SelectedCard({ node, graph, onClose, onFocusNode }) {
         aria-label={`Ver ficha de ${title.title}`}
         className="absolute inset-0 z-10 rounded-2xl @[640px]/detail-page:hidden"
       />
-      <div className="flex items-center gap-3 @[640px]/detail-page:items-start">
+      <div className="flex items-center gap-2.5 @[640px]/detail-page:items-start @[640px]/detail-page:gap-3">
         <div className="h-[4.25rem] w-[2.85rem] shrink-0 overflow-hidden rounded-lg bg-white/5 shadow-[0_16px_32px_-10px_rgba(0,0,0,0.9)] @[640px]/detail-page:h-[6.5rem] @[640px]/detail-page:w-[4.4rem] @[640px]/detail-page:rounded-xl">
           {title.posterPath ? (
             <OptimizedImage
@@ -263,7 +304,8 @@ function SelectedCard({ node, graph, onClose, onFocusNode }) {
             </span>
           )}
         </div>
-        <div className="flex min-w-0 flex-1 flex-col gap-1 @[640px]/detail-page:gap-1.5">
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5 @[640px]/detail-page:gap-1.5">
+          {/* Tipo y año encima del título (desde 640px, con el botón de cerrar). */}
           <div className="flex items-start gap-2">
             <p className="min-w-0 flex-1 truncate text-[10px] font-bold uppercase leading-4 tracking-[0.2em] text-white/45">
               {title.mediaType === "tv" ? "Serie" : "Película"}
@@ -277,49 +319,41 @@ function SelectedCard({ node, graph, onClose, onFocusNode }) {
             </button>
           </div>
           <h3 className="truncate text-sm font-black leading-5 @[640px]/detail-page:line-clamp-2 @[640px]/detail-page:whitespace-normal @[640px]/detail-page:text-base @[640px]/detail-page:leading-snug">{title.title}</h3>
-          {/* Lo que le une a sus grupos en las agrupaciones marcadas, una
-              línea por tipo: saga, géneros, década, visionados, listas,
-              presupuesto y recaudación, notas. */}
+          {/* Lo que le une a sus grupos en las agrupaciones marcadas: saga,
+              géneros, década, visionados, listas, presupuesto y recaudación,
+              notas. En móvil, todo en una línea; desde 640px, una línea por
+              tipo (hasta dos filas: los nombres de listas son largos). */}
           {facts.length ? (
-            <div className="text-xs leading-4 text-white/60">
-              {facts.map((fact) => (
-                // Hasta dos filas en la ficha amplia (los nombres de listas
-                // son largos); en móvil, una, como el título.
-                <p key={fact} title={fact} className="truncate @[640px]/detail-page:line-clamp-2 @[640px]/detail-page:whitespace-normal">
-                  {fact}
-                </p>
-              ))}
-            </div>
+            <>
+              <p title={factsLine} className="truncate text-[11px] leading-4 text-white/55 @[640px]/detail-page:hidden">
+                {factsLine}
+              </p>
+              <div className="hidden text-xs leading-4 text-white/60 @[640px]/detail-page:block">
+                {facts.map((fact) => (
+                  <p key={fact} title={fact} className="line-clamp-2">
+                    {fact}
+                  </p>
+                ))}
+              </div>
+            </>
           ) : null}
-          {/* Mismos iconos y colores que los registros de Actividad del
-              perfil: visto (ojo), nota (el número en ámbar), favorita
-              (corazón) y pendiente (marcador). */}
-          <div className="flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold leading-5 text-white/75">
-            {title.flags & FLAG_WATCHED ? (
-              <span className="inline-flex items-center gap-1" title="Vista" aria-label="Vista">
-                <Eye strokeWidth={2.5} className="h-4 w-4 text-emerald-400" aria-hidden="true" />
-                {/* Solo el icono; el número únicamente si aporta algo. */}
-                {title.mediaType === "tv" ? `${title.plays} ep.` : title.plays > 1 ? `${title.plays} veces` : null}
-              </span>
-            ) : null}
-            {title.rating ? (
-              <span className="text-base font-black leading-none tabular-nums text-amber-400" title="Tu puntuación">
-                {title.rating}
-              </span>
-            ) : null}
-            {title.flags & FLAG_FAVORITE ? (
-              <Heart strokeWidth={2.5} className="h-4 w-4 fill-current text-red-500" aria-label="Favorita" />
-            ) : null}
-            {title.flags & FLAG_WATCHLIST ? (
-              <BookmarkPlus strokeWidth={2.5} className="h-4 w-4 text-sky-400" aria-label="Pendiente" />
-            ) : null}
-          </div>
+          {/* Registros (visionado, puntuación y estado), siempre abajo: en
+              móvil, una fila compacta. */}
+          <TitleFlags
+            title={title}
+            compact
+            className="flex min-h-4 text-[11px] leading-4 @[640px]/detail-page:hidden"
+          />
+          <TitleFlags
+            title={title}
+            className="hidden min-h-5 flex-wrap text-xs leading-5 @[640px]/detail-page:flex"
+          />
         </div>
         {/* Móvil: la flecha indica que la ficha abre el título. Se cierra
             tocando fuera, en la red. */}
         <span
           aria-hidden="true"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-white @[640px]/detail-page:hidden"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-white @[640px]/detail-page:hidden"
         >
           <ChevronRight className="h-4 w-4" />
         </span>
@@ -1664,7 +1698,9 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
                 onClose={() => setSelected(-1)}
                 onFocusNode={(index) => focusNode(index)}
               />
-              <p className="rounded-full bg-black/40 px-3 py-1 text-[11px] font-semibold text-white/55 backdrop-blur-md">
+              {/* El recuento no se muestra en móvil: allí la pantalla es para
+                  la red y la ficha del título seleccionado. */}
+              <p className="hidden rounded-full bg-black/40 px-3 py-1 text-[11px] font-semibold text-white/55 backdrop-blur-md @[640px]/detail-page:block">
                 {visibleTitles === graph.stats.titles
                   ? `${graph.stats.titles} títulos · ${graph.stats.movies} películas · ${graph.stats.series} series`
                   : `${visibleTitles} de ${graph.stats.titles} títulos`}
