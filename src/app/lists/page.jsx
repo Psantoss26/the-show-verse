@@ -70,6 +70,7 @@ import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import { TmdbImg } from "@/components/lists/ListCoverBackdropCollage";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
+import useWidthVariable from "@/hooks/useWidthVariable";
 
 // ================== UTILS & CACHE ==================
 const OMDB_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -568,8 +569,10 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
         className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-2xl transition text-sm lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 focus:outline-none"
       >
         <div className="flex min-w-0 items-center gap-2">
-          {Icon && <Icon className="w-4 h-4 text-purple-500" />}
-          <span className="text-zinc-500 font-bold text-xs uppercase tracking-wider">
+          {/* `shrink-0`: en una columna estrecha (móvil) se recorta el valor,
+              no el icono ni el rótulo. */}
+          {Icon && <Icon className="w-4 h-4 shrink-0 text-purple-500" />}
+          <span className="shrink-0 text-zinc-500 font-bold text-xs uppercase tracking-wider">
             {label}:
           </span>
           <span className="min-w-0 truncate font-semibold text-white">
@@ -1557,6 +1560,13 @@ export default function ListsPage() {
   const deferredQuery = useDeferredValue(query);
   const [sortMode, setSortMode] = useState("items_desc");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  // Móvil: la fila del desplegable reparte sus columnas como la barra de
+  // arriba (buscador | secciones + botón del menú), aunque no sea a mitades:
+  // la columna derecha mide lo mismo que esos botones.
+  const mobileToolbarRightRef = useWidthVariable(
+    "--lists-mobile-right",
+    "[data-lists-mobile-toolbar]",
+  );
   const [mobileDeleteMode, setMobileDeleteMode] = useState(false);
   const filtersRef = useRef(null);
   const { isSticky: filtersSticky, isPinned: filtersPinned } =
@@ -2197,14 +2207,13 @@ export default function ListsPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
         >
+          {/* Móvil: barra y desplegable en el mismo envoltorio, como en
+              Historial: el desplegable queda a 8 px de la barra (antes se
+              sumaban el espaciado del contenedor, el del panel y uno propio)
+              y, fijada la barra, se superpone justo debajo de ella. */}
+          <div data-lists-mobile-toolbar="" className="relative z-10 lg:hidden">
           {/* Mobile: search + toggle */}
           <div className="relative z-10 flex gap-2 lg:hidden">
-            <ListsSourceSelector
-              source={source}
-              onChange={(nextSource) =>
-                startTransition(() => setSource(nextSource))
-              }
-            />
             <div className="relative min-w-0 flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-500 z-10 pointer-events-none" />
               <input
@@ -2228,6 +2237,15 @@ export default function ListsPage() {
                 </button>
               )}
             </div>
+            {/* Las secciones, entre el buscador y el botón del desplegable. Su
+                ancho marca la columna derecha del desplegable. */}
+            <div ref={mobileToolbarRightRef} className="flex shrink-0 gap-2">
+            <ListsSourceSelector
+              source={source}
+              onChange={(nextSource) =>
+                startTransition(() => setSource(nextSource))
+              }
+            />
             <button
               type="button"
               onClick={() => setMobileFiltersOpen((v) => !v)}
@@ -2244,6 +2262,7 @@ export default function ListsPage() {
             >
               <SlidersHorizontal className="w-4 h-4" />
             </button>
+            </div>
           </div>
 
           {/* Mobile: collapsible filters */}
@@ -2256,12 +2275,12 @@ export default function ListsPage() {
             gapClassName="pt-2"
             contentClassName="space-y-2"
           >
-            <div className="space-y-3 pt-1">
+            <div className="space-y-3">
               <div
                 data-lists-mobile-order-view="true"
                 className="flex gap-2"
               >
-                <div className="flex-1">
+                <div className="min-w-0 flex-1">
                   <InlineDropdown
                     label="Ordenar"
                     valueLabel={
@@ -2346,13 +2365,19 @@ export default function ListsPage() {
 
                 <div
                   data-lists-view-selector="true"
-                  className="flex h-11 flex-1 items-center rounded-2xl bg-gradient-to-br from-white/10 to-white/5 p-1 shadow-lg backdrop-blur-lg"
+                  className="flex h-11 min-w-0 items-center rounded-2xl bg-gradient-to-br from-white/10 to-white/5 p-1 shadow-lg backdrop-blur-lg"
+                  style={{
+                    flex: "0 0 var(--lists-mobile-right, calc(50% - 4px))",
+                  }}
                 >
+                  {/* Botones `rounded-xl` (12px) dentro de un contenedor
+                      `rounded-2xl` (16px) con 4px de relleno: esquinas
+                      concéntricas, como el selector de secciones. */}
                   <button
                     onClick={() =>
                       startTransition(() => setViewMode("grid"))
                     }
-                    className={`flex h-full flex-1 items-center justify-center rounded-lg px-2.5 text-sm font-bold transition-all focus:outline-none ${
+                    className={`flex h-full flex-1 items-center justify-center rounded-xl px-2.5 text-sm font-bold transition-all focus:outline-none ${
                       viewMode === "grid"
                         ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
                         : "text-zinc-400 hover:bg-white/10 hover:text-white"
@@ -2364,7 +2389,7 @@ export default function ListsPage() {
                     onClick={() =>
                       startTransition(() => setViewMode("rows"))
                     }
-                    className={`flex h-full flex-1 items-center justify-center rounded-lg px-2.5 text-sm font-bold transition-all focus:outline-none ${
+                    className={`flex h-full flex-1 items-center justify-center rounded-xl px-2.5 text-sm font-bold transition-all focus:outline-none ${
                       viewMode === "rows"
                         ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
                         : "text-zinc-400 hover:bg-white/10 hover:text-white"
@@ -2377,7 +2402,7 @@ export default function ListsPage() {
                     onClick={() =>
                       startTransition(() => setViewMode("list"))
                     }
-                    className={`flex h-full flex-1 items-center justify-center rounded-lg px-2.5 text-sm font-bold transition-all focus:outline-none ${
+                    className={`flex h-full flex-1 items-center justify-center rounded-xl px-2.5 text-sm font-bold transition-all focus:outline-none ${
                       viewMode === "list"
                         ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
                         : "text-zinc-400 hover:bg-white/10 hover:text-white"
@@ -2391,7 +2416,7 @@ export default function ListsPage() {
                       onClick={() => setCreateOpen(true)}
                       aria-label="Crear lista"
                       title="Crear lista"
-                      className="flex h-full flex-1 items-center justify-center rounded-lg px-2.5 text-purple-400 transition-all hover:bg-purple-500/15 hover:text-purple-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-purple-400"
+                      className="flex h-full flex-1 items-center justify-center rounded-xl px-2.5 text-purple-400 transition-all hover:bg-purple-500/15 hover:text-purple-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-purple-400"
                     >
                       <Plus className="h-4 w-4" />
                     </button>
@@ -2400,6 +2425,7 @@ export default function ListsPage() {
               </div>
             </div>
           </MobileFiltersPanel>
+          </div>
 
           {/* Desktop */}
           <div className="hidden lg:flex gap-3 relative z-10">
@@ -2513,7 +2539,7 @@ export default function ListsPage() {
             <div className="flex rounded-2xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
               <button
                 onClick={() => startTransition(() => setViewMode("grid"))}
-                className={`h-full px-3 rounded-lg text-sm font-bold transition-all flex items-center gap-2 focus:outline-none ${
+                className={`h-full px-3 rounded-xl text-sm font-bold transition-all flex items-center gap-2 focus:outline-none ${
                   viewMode === "grid"
                     ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
                     : "text-zinc-400 hover:text-white hover:bg-white/10"
@@ -2523,7 +2549,7 @@ export default function ListsPage() {
               </button>
               <button
                 onClick={() => startTransition(() => setViewMode("rows"))}
-                className={`h-full px-3 rounded-lg text-sm font-bold transition-all flex items-center gap-2 focus:outline-none ${
+                className={`h-full px-3 rounded-xl text-sm font-bold transition-all flex items-center gap-2 focus:outline-none ${
                   viewMode === "rows"
                     ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
                     : "text-zinc-400 hover:text-white hover:bg-white/10"
@@ -2533,7 +2559,7 @@ export default function ListsPage() {
               </button>
               <button
                 onClick={() => startTransition(() => setViewMode("list"))}
-                className={`h-full px-3 rounded-lg text-sm font-bold transition-all flex items-center gap-2 focus:outline-none ${
+                className={`h-full px-3 rounded-xl text-sm font-bold transition-all flex items-center gap-2 focus:outline-none ${
                   viewMode === "list"
                     ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
                     : "text-zinc-400 hover:text-white hover:bg-white/10"

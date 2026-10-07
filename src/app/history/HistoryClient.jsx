@@ -68,6 +68,7 @@ import {
 import HoverExpandCard from "@/components/ui/HoverExpandCard";
 import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
+import useWidthVariable from "@/hooks/useWidthVariable";
 
 // Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
 // el mismo escalón que `w1280` en los backdrops. Antes era `w500` y en
@@ -2885,6 +2886,12 @@ function MobileCalendarOverlay({
 // ----------------------------
 // MAIN PAGE
 // ----------------------------
+// Columna derecha de las filas del desplegable móvil: el ancho medido de la
+// parte derecha de la barra (ver `--history-mobile-right`); hasta medirla, la
+// mitad.
+const MOBILE_TOOLBAR_RIGHT_COLUMN =
+  "0 0 var(--history-mobile-right, calc(50% - 4px))";
+
 export default function HistoryClient() {
   // Buscador de la barra: con texto si cabe, o solo icono (ver el hook).
   const toolbarSearchFitRef = usePageToolbarSearchFit();
@@ -3032,6 +3039,14 @@ export default function HistoryClient() {
   const filtersRef = useRef(null);
   const { isSticky: filtersSticky, isPinned: filtersPinned } =
     useStickyToolbarState(filtersRef);
+  // Móvil: las filas del desplegable reparten sus columnas como la barra de
+  // arriba (buscador | secciones + calendario + filtros), no a mitades: la
+  // columna derecha mide lo mismo que esos botones. Se mide el grupo y se
+  // publica en una variable del contenedor (ver el hook).
+  const mobileToolbarRightRef = useWidthVariable(
+    "--history-mobile-right",
+    "[data-history-mobile-toolbar]",
+  );
   const [showCalendarView, setShowCalendarView] = useState(false);
   // Móvil: overlay del calendario de días marcados (se abre desde el menú móvil).
   const [mobileCalendarOpen, setMobileCalendarOpen] = useState(false);
@@ -3916,7 +3931,7 @@ export default function HistoryClient() {
                     Al alcanzar el sticky (filtersSticky) se convierte en overlay
                     absoluto para no desplazar nada. El wrapper `relative` es el
                     contexto de posicionamiento del overlay. */}
-                <div className="relative z-10 lg:hidden">
+                <div data-history-mobile-toolbar="" className="relative z-10 lg:hidden">
                   <div className="relative flex gap-2">
                   <div className="relative min-w-0 flex-1">
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500 z-10 pointer-events-none" />
@@ -3935,6 +3950,9 @@ export default function HistoryClient() {
                       </button>
                     )}
                   </div>
+                  {/* Parte derecha de la barra: su ancho marca la columna
+                      derecha de las filas del desplegable. */}
+                  <div ref={mobileToolbarRightRef} className="flex shrink-0 gap-2">
                   <HistorySectionNav className="h-11 shrink-0" />
                   <button
                     type="button"
@@ -3955,6 +3973,7 @@ export default function HistoryClient() {
                   >
                     <SlidersHorizontal className="w-4 h-4" />
                   </button>
+                  </div>
                 </div>
 
                 {/* Mobile: collapsible filters */}
@@ -4014,7 +4033,10 @@ export default function HistoryClient() {
                         </InlineDropdown>
                       </div>
 
-                      <div className="flex-1 min-w-0">
+                      <div
+                        className="min-w-0"
+                        style={{ flex: MOBILE_TOOLBAR_RIGHT_COLUMN }}
+                      >
                         <InlineDropdown
                           label="Agrupar"
                           valueLabel={
@@ -4120,11 +4142,14 @@ export default function HistoryClient() {
                         </InlineDropdown>
                       </div>
 
-                      <div className="flex-1 flex gap-2">
-                        <div className="flex flex-1 rounded-xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+                      <div
+                        className="flex min-w-0 gap-2"
+                        style={{ flex: MOBILE_TOOLBAR_RIGHT_COLUMN }}
+                      >
+                        <div className="flex min-w-0 flex-1 rounded-2xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
                           <button
                             onClick={() => setViewMode("list")}
-                            className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                            className={`flex-1 h-full px-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center ${
                               viewMode === "list"
                                 ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                                 : "text-zinc-400 hover:text-white hover:bg-white/10"
@@ -4134,7 +4159,7 @@ export default function HistoryClient() {
                           </button>
                           <button
                             onClick={() => setViewMode("compact")}
-                            className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                            className={`flex-1 h-full px-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center ${
                               viewMode === "compact"
                                 ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                                 : "text-zinc-400 hover:text-white hover:bg-white/10"
@@ -4144,7 +4169,7 @@ export default function HistoryClient() {
                           </button>
                           <button
                             onClick={() => setViewMode("grid")}
-                            className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
+                            className={`flex-1 h-full px-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center ${
                               viewMode === "grid"
                                 ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                                 : "text-zinc-400 hover:text-white hover:bg-white/10"
