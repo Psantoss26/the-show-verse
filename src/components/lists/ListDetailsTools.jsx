@@ -22,6 +22,10 @@ import ListPosterCard, {
 } from "@/components/lists/ListPosterCard";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
+import {
+  saveUserDetailsSequence,
+  saveUserDetailsSequenceFromLink,
+} from "@/lib/navigation/userDetailsSequence";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
 import {
@@ -447,6 +451,23 @@ export default function FilterableListItems({
     return () => observer.disconnect();
   }, [entries.length, hasMoreEntries]);
 
+  // Anterior/Siguiente en la ficha (gesto móvil y flechas de escritorio) recorre
+  // esta lista en el orden en que se ve. Se guarda el orden completo de los
+  // grupos, no solo las tarjetas montadas: el resto se pinta por lotes.
+  const captureDetailsSequence = (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const link = target.closest('a[href^="/details/"]');
+    if (!link) return;
+
+    const hrefs = groups.flatMap((group) =>
+      group.entries.map((entry) => entry.meta.href),
+    );
+    if (!saveUserDetailsSequence(hrefs, link.getAttribute("href"))) {
+      saveUserDetailsSequenceFromLink(link, event.currentTarget);
+    }
+  };
+
   const renderEntry = (entry) => {
     if (renderCard) return renderCard(entry.item, entry.meta, viewMode, editMode);
     return (
@@ -466,7 +487,7 @@ export default function FilterableListItems({
   };
 
   return (
-    <div className="space-y-7">
+    <div className="space-y-7" onClickCapture={captureDetailsSequence}>
       <motion.div
         ref={filtersRef}
         data-menu-pinned={filtersPinned}

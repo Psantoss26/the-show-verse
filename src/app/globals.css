@@ -2446,3 +2446,92 @@ html:has([data-embedded-details])::-webkit-scrollbar {
     transition: none;
   }
 }
+
+/* Recorrido de una lista en escritorio: conservar la ficha saliente durante
+   la carga, luego intercambiar sus superficies sin una cortina oscura. */
+.sv-sequence-snapshot {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  overflow: hidden;
+  pointer-events: none;
+}
+[data-details-sequence-snapshot] *,
+html[data-details-sequence-transition] [data-details-root] .sv-details-entry,
+[data-details-sequence-entered] .sv-details-entry {
+  animation: none !important;
+  transition: none !important;
+}
+html[data-details-sequence-transition] {
+  --sv-sequence-in: 36px;
+  --sv-sequence-out: -24px;
+  view-transition-name: none;
+}
+html[data-details-sequence-transition="previous"] {
+  --sv-sequence-in: -36px;
+  --sv-sequence-out: 24px;
+}
+html[data-details-sequence-transition] [data-details-root] {
+  z-index: 0;
+  pointer-events: none;
+}
+::view-transition-group(details-sequence-page),
+::view-transition-group(details-sequence-background),
+::view-transition-group(details-sequence-artwork),
+::view-transition-group(details-sequence-info) {
+  animation-duration: 400ms;
+  animation-timing-function: cubic-bezier(.22, 1, .36, 1);
+}
+::view-transition-old(details-sequence-page),
+::view-transition-old(details-sequence-background) {
+  animation: none;
+  opacity: 1;
+}
+::view-transition-new(details-sequence-page),
+::view-transition-new(details-sequence-background) {
+  animation: sv-sequence-reveal 400ms cubic-bezier(.22, 1, .36, 1) both;
+}
+::view-transition-old(details-sequence-artwork),
+::view-transition-old(details-sequence-info) {
+  animation: sv-sequence-leave 400ms cubic-bezier(.22, 1, .36, 1) both;
+}
+::view-transition-new(details-sequence-artwork),
+::view-transition-new(details-sequence-info) {
+  animation: sv-sequence-enter 400ms cubic-bezier(.22, 1, .36, 1) both;
+}
+::view-transition-old(details-sequence-page),
+::view-transition-new(details-sequence-page),
+::view-transition-old(details-sequence-background),
+::view-transition-new(details-sequence-background),
+::view-transition-old(details-sequence-artwork),
+::view-transition-new(details-sequence-artwork),
+::view-transition-old(details-sequence-info),
+::view-transition-new(details-sequence-info) {
+  mix-blend-mode: normal;
+}
+@keyframes sv-sequence-reveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes sv-sequence-enter {
+  from { opacity: 0; transform: translateX(var(--sv-sequence-in)); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes sv-sequence-leave {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(var(--sv-sequence-out)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(details-sequence-page),
+  ::view-transition-group(details-sequence-background),
+  ::view-transition-group(details-sequence-artwork),
+  ::view-transition-group(details-sequence-info) { animation: none; }
+}
+
+/* La navegación global permanece visible y quieta sobre ambas fichas. */
+html[data-details-sequence-transition] .sv-topbar {
+  view-transition-name: details-sequence-navbar;
+}
+::view-transition-old(details-sequence-navbar) { display: none; }
+::view-transition-new(details-sequence-navbar),
+::view-transition-group(details-sequence-navbar) { animation: none; }

@@ -65,6 +65,7 @@ import {
   writeArtworkPreference,
 } from "@/lib/artworkApi";
 import Link from "next/link";
+import { isDetailsSequenceTransitionActive } from "@/lib/navigation/detailsSequenceTransition";
 import DetailsSequenceNav from "@/components/details/DetailsSequenceNav";
 
 // Componentes de animacion reutilizables para secciones con entrada animada
@@ -1284,6 +1285,7 @@ export default function DetailsClient({
   // animaciones CSS podían agotarse mientras llegaban el HTML y los bundles,
   // antes de que la ficha fuese visible/interactiva. Esta fase conserva la
   // superficie de carga y activa la entrada cuando el cliente ya está listo.
+  const sequenceTransitionActive = isDetailsSequenceTransitionActive();
   const detailsEntryKey = `${endpointType}:${id}`;
   const [detailsEntry, setDetailsEntry] = useState(() => restoredValue(backSnapshot, "detailsEntry", () => ({
     key: detailsEntryKey,
@@ -9389,6 +9391,8 @@ export default function DetailsClient({
   return (
     <div
       data-details-root
+      data-details-href={`/details/${endpointType}/${id}`}
+      data-details-sequence-ready={detailsEntryReady && (currentLowLoaded || currentImgError || (currentResolved && !currentImagePath))}
       data-details-entry={detailsEntryReady ? "ready" : "loading"}
       // Vuelta atrás con la instantánea recuperada: sin entradas CSS (ver
       // globals.css) ni de Framer (DetailsStaticMotionProvider).
@@ -9396,7 +9400,7 @@ export default function DetailsClient({
       aria-busy={!detailsEntryReady}
       className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30"
     >
-      <DetailsStaticMotionProvider value={detailsRestored}>
+      <DetailsStaticMotionProvider value={detailsRestored || sequenceTransitionActive}>
       {/* Equivale a la superficie de `loading.jsx`, pero también cubre una
           recarga directa, donde el servidor puede entregar DetailsClient antes
           de que el navegador haya hidratado sus animaciones. */}
@@ -9409,7 +9413,7 @@ export default function DetailsClient({
         }`}
       />
       {/* --- BACKGROUND & OVERLAY --- */}
-      <div className="fixed inset-0 z-0 overflow-hidden bg-[#0a0a0a] pointer-events-none">
+      <div data-details-transition-part="background" className="fixed inset-0 z-0 overflow-hidden bg-[#0a0a0a] pointer-events-none">
         {useBackdrop && heroBackgroundPath ? (
           <>
             {/* Imagen anterior (fade out) */}
@@ -9564,6 +9568,7 @@ export default function DetailsClient({
         >
           {/* --- COLUMNA IZQUIERDA: POSTER + PROVIDERS + ENLACES (cuando es backdrop) --- */}
           <div
+            data-details-transition-part="artwork"
             className={`flex-shrink-0 flex flex-col gap-5 lg:gap-7 relative z-10 w-[calc(100%+2rem)] -mx-4 max-w-none sm:w-full sm:mx-auto lg:mx-0 ${
               isBackdropPoster
                 ? "sm:max-w-full lg:max-w-[600px]"
@@ -10236,6 +10241,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
           {/* --- COLUMNA DERECHA: INFO (sin tabs cuando es backdrop) --- */}
           <div
+            data-details-transition-part="info"
             className={`flex-1 flex flex-col min-w-0 w-full ${
               isBackdropPoster ? "" : ""
             }`}

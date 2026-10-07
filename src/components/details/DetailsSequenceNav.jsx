@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
+import { navigateDetailsSequence } from "@/lib/navigation/detailsSequenceTransition";
+import { warmDetailsSequenceTarget } from "@/lib/navigation/detailsSequenceWarmup";
 import { getDetails } from "@/lib/api/tmdb";
 import { getUserDetailsSequence } from "@/lib/navigation/userDetailsSequence";
 import { LIQUID_GLASS_SURFACE } from "@/lib/ui/liquidGlass";
@@ -31,7 +33,7 @@ async function resolveTitle(href) {
   return title;
 }
 
-function SequenceBubble({ href, title, direction, onNavigate }) {
+function SequenceBubble({ href, title, direction, onNavigate, onIntent }) {
   const isNext = direction === "next";
   const Icon = isNext ? ChevronRight : ChevronLeft;
   const label = isNext ? "Siguiente" : "Anterior";
@@ -55,7 +57,11 @@ function SequenceBubble({ href, title, direction, onNavigate }) {
     <Link
       href={href}
       prefetch
-      onClick={(event) => onNavigate(event, href)}
+      onClick={(event) => onNavigate(event, href, direction)}
+      // Intención de ir: se precalienta el título para que la transición no
+      // espere a sus imágenes tras el clic.
+      onPointerEnter={() => onIntent(href)}
+      onFocus={() => onIntent(href)}
       aria-label={title ? `${label}: ${title}` : `${label} título`}
       data-direction={direction}
       // Del menú de secciones (DetailsSectionMenu, que tiene al lado) toma SOLO
@@ -158,7 +164,12 @@ export default function DetailsSequenceNav() {
 
   if (!sequence) return null;
 
-  const handleNavigate = (event, href) => {
+  const handleIntent = (href) => {
+    router.prefetch?.(href);
+    warmDetailsSequenceTarget(href);
+  };
+
+  const handleNavigate = (event, href, direction) => {
     // Cmd/Ctrl/Mayús/clic central: comportamiento nativo del enlace.
     if (
       event.defaultPrevented ||
@@ -173,7 +184,7 @@ export default function DetailsSequenceNav() {
     event.preventDefault();
     // Mismo router que el gesto móvil: respeta la ficha embebida y el modo
     // sin conexión.
-    router.push(href);
+    void navigateDetailsSequence({ href, direction, navigate: router.push }).catch(() => {});
   };
 
   return (
@@ -185,6 +196,7 @@ export default function DetailsSequenceNav() {
           title={titles[sequence.previous]}
           direction="previous"
           onNavigate={handleNavigate}
+          onIntent={handleIntent}
         />
       )}
       {sequence.next && (
@@ -193,6 +205,7 @@ export default function DetailsSequenceNav() {
           title={titles[sequence.next]}
           direction="next"
           onNavigate={handleNavigate}
+          onIntent={handleIntent}
         />
       )}
     </nav>
