@@ -65,6 +65,7 @@ import {
   writeArtworkPreference,
 } from "@/lib/artworkApi";
 import Link from "next/link";
+import DetailsSequenceNav from "@/components/details/DetailsSequenceNav";
 
 // Componentes de animacion reutilizables para secciones con entrada animada
 import {
@@ -9434,6 +9435,12 @@ export default function DetailsClient({
           <div className="absolute inset-0 bg-gradient-to-r from-[#101010] via-transparent to-transparent opacity-30" />
         </div>
       </div>
+
+      {/* Anterior / siguiente de la lista de origen, pegados a las esquinas
+          superiores de la pantalla. Hijo directo de la raíz (ancho completo)
+          para medir contra el borde real; fuera del flujo, no mueve nada. Solo
+          existe al venir de una página personal. */}
+      <DetailsSequenceNav />
 
       {/* --- CONTENIDO PRINCIPAL --- */}
       <div
