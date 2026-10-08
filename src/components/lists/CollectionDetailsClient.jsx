@@ -21,6 +21,7 @@ import useListImdbRatings from '@/hooks/useListImdbRatings'
 import { useIsHistoryNavigation } from '@/lib/hooks/useIsHistoryNavigation'
 import { fetchTmdbImages } from '@/lib/tmdb/imageRequests'
 import { pickHeroBackdropPath, pickMobileHeroPosterPath } from '@/lib/details/tmdbImages'
+import { pickCollectionCoverBackdrop } from '@/lib/lists/coverBackdrop'
 import { buildListShareCard, buildListShareStory, listYearSpan, normalizeListShareItem } from '@/lib/lists/shareList'
 
 const COLLECTION_DETAILS_CACHE_TTL_MS = 30 * 60 * 1000
@@ -243,6 +244,9 @@ export default function CollectionDetailsClient({ collectionId }) {
         : null
     const backgroundBackdrop = customBackdrop || autoBackdrop
     const backgroundPoster = collection?.mobile_background_path || autoMobileBackground
+    // Modo de portada BACKDROP: una imagen CON IDIOMA (inglés → español) de la
+    // galería; sin ninguna, el modo no se ofrece.
+    const coverBackdropPath = gallery.done ? pickCollectionCoverBackdrop(gallery.images?.backdrops) : null
 
     // IMAGEN Y VÍDEO COMPARTIBLES: la portada es el póster oficial CON idioma
     // (el del marco de la página, incluida la elección de «Editar colección»),
@@ -289,6 +293,11 @@ export default function CollectionDetailsClient({ collectionId }) {
             sourceLabel="Colección TMDb"
             posterImage={collectionPoster ? `https://image.tmdb.org/t/p/w780${collectionPoster}` : null}
             posterLowImage={collectionPoster ? `https://image.tmdb.org/t/p/w342${collectionPoster}` : null}
+            coverBackdrop={coverBackdropPath ? {
+                src: `https://image.tmdb.org/t/p/w1280${coverBackdropPath}`,
+                lowSrc: `https://image.tmdb.org/t/p/w780${coverBackdropPath}`,
+            } : null}
+            coverBackdropPending={!gallery.done}
             heroBackground={{
                 desktop: backgroundBackdrop ? `https://image.tmdb.org/t/p/original${backgroundBackdrop}` : null,
                 mobile: backgroundPoster ? `https://image.tmdb.org/t/p/w780${backgroundPoster}` : null,
