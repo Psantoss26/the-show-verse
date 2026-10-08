@@ -5,7 +5,7 @@ import OptimizedImage from "@/components/OptimizedImage";
 import Link from 'next/link'
 import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, Film, ListVideo } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, Film, ListVideo } from 'lucide-react'
 import { useIsHistoryNavigation } from '@/lib/hooks/useIsHistoryNavigation'
 import DetailsScoreboardPanel from '@/components/details/DetailsScoreboardPanel'
 import DetailsInfoTabs from '@/components/details/DetailsInfoTabs'
@@ -18,6 +18,8 @@ import {
 import { pickBestFavoriteEnglishPoster } from '@/lib/details/tmdbImages'
 import { fetchTmdbImages } from '@/lib/tmdb/imageRequests'
 import useImageLoadReady from '@/lib/hooks/useImageLoadReady'
+import usePosterViewMode from '@/lib/hooks/usePosterViewMode'
+import { posterShelfLayout } from '@/lib/lists/coverBackdrop'
 
 const finalEnglishPosterCache = new Map()
 
@@ -169,7 +171,67 @@ function PosterCover({ src, alt = "", priority = false }) {
     )
 }
 
-const POSTER_FRAME_CLASS = 'relative overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/35 shadow-[0_24px_70px_rgba(0,0,0,0.35)] backdrop-blur-[28px] aspect-[2/3]'
+// Acabado del marco de la portada (cristal, esquinas y sombra). La FORMA la
+// pone CoverShape, que persiste entre modos para poder animar el cambio.
+const POSTER_FRAME_VISUAL = 'overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/35 shadow-[0_24px_70px_rgba(0,0,0,0.35)] backdrop-blur-[28px]'
+
+// Caja de la portada: póster 2:3 o backdrop 16:9, con el mismo morph de 500 ms
+// que la ficha (`.poster-aspect-box`: `padding-bottom` desde `--poster-pb`,
+// solo a partir de `sm`; en móvil el modo es siempre póster y manda
+// `aspect-[2/3]`). Los hijos van en `absolute inset-0`.
+function CoverShape({ backdrop, animate, children, ...props }) {
+    return (
+        <div
+            {...props}
+            className="group/cover relative w-full aspect-[2/3] sm:aspect-auto sm:h-0 poster-aspect-box"
+            style={{
+                '--poster-pb': backdrop ? '56.25%' : '150%',
+                // La preferencia guardada se aplica sin animar al abrir.
+                ...(animate ? {} : { transition: 'none' }),
+            }}
+        >
+            {children}
+        </div>
+    )
+}
+
+// Capa de un modo dentro de CoverShape: las dos conviven y se funden.
+function CoverLayer({ active, children }) {
+    return (
+        <div
+            aria-hidden={active ? undefined : true}
+            className={`absolute inset-0 transition-opacity duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] motion-reduce:transition-none ${
+                active ? 'opacity-100' : 'pointer-events-none opacity-0'
+            }`}
+        >
+            {children}
+        </div>
+    )
+}
+
+// Zona lateral para alternar póster ↔ backdrop, como en la ficha: un tercio
+// del marco con degradado y chevron, visible al pasar el ratón (o con el foco
+// del teclado). Póster: a la derecha, «Ver imagen de fondo»; backdrop: a la
+// izquierda, «Ver póster».
+function CoverModeToggle({ backdrop, onToggle }) {
+    const label = backdrop ? 'Ver póster' : 'Ver imagen de fondo'
+    const Icon = backdrop ? ChevronLeft : ChevronRight
+    return (
+        <button
+            type="button"
+            onClick={onToggle}
+            aria-label={label}
+            title={label}
+            className={`absolute inset-y-0 z-30 flex w-1/3 cursor-pointer items-center from-black/70 to-transparent opacity-0 transition-opacity duration-200 group-hover/cover:opacity-100 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-yellow-400 motion-reduce:transition-none ${
+                backdrop
+                    ? 'left-0 justify-start rounded-l-2xl bg-gradient-to-r pl-4'
+                    : 'right-0 justify-end rounded-r-2xl bg-gradient-to-l pr-4'
+            }`}
+        >
+            <Icon className="h-8 w-8 text-white drop-shadow-lg" aria-hidden="true" />
+        </button>
+    )
+}
 
 // Portada oficial (colecciones) con la carga de la portada de DetailsClient:
 // una versión ligera (`lowSrc`, w342) que llega antes y la grande (`src`)
@@ -205,12 +267,12 @@ function RevealPoster({ src, lowSrc, alt }) {
 
     return (
         <div
-            className={`${POSTER_FRAME_CLASS} ${
+            className={`absolute inset-0 ${POSTER_FRAME_VISUAL} ${
                 instant ? '' : 'transition-[opacity,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none'
             } ${visible ? 'scale-100 opacity-100' : 'scale-[0.97] opacity-0'}`}
         >
             <div className="pointer-events-none absolute inset-0 z-20 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]" />
-            <div className="relative z-10 h-full w-full">
+            <div className="absolute inset-0 z-10">
                 {failed ? (
                     <div className="flex h-full w-full items-center justify-center bg-neutral-950 text-zinc-700">
                         <ListVideo className="h-16 w-16" />
@@ -288,6 +350,47 @@ function PosterCollage({ images, pending }) {
     )
 }
 
+// Portada BACKDROP de una lista: no tiene imagen horizontal propia, así que la
+// caja 16:9 se llena con una «estantería» de los pósters de sus títulos, enteros
+// (2:3, sin recortar), en tantas filas como haga falta para que salgan lo más
+// grandes posible (lib/lists/coverBackdrop). Detrás, el primero difuminado.
+function PosterShelf({ images, pending, count }) {
+    const posters = images.slice(0, 20)
+    // Mientras se resuelven los pósters ingleses, huecos en su sitio: la caja
+    // ya está en 16:9 y no cambia de forma al llegar.
+    const { tiles } = posterShelfLayout(pending ? Math.min(20, count) : posters.length)
+    return (
+        <div className={`absolute inset-0 ${POSTER_FRAME_VISUAL}`} aria-hidden="true">
+            {posters[0] ? (
+                // Fondo decorativo: <img> directo con filtro, sin next/image.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                    src={posters[0]}
+                    alt=""
+                    decoding="async"
+                    className="absolute inset-0 h-full w-full scale-110 object-cover blur-2xl brightness-[0.45] saturate-[1.15]"
+                />
+            ) : null}
+            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.06] via-transparent to-black/40" />
+            {tiles.map((tile, index) => (
+                <div
+                    key={pending ? `pending-${index}` : posters[index]}
+                    className={`absolute overflow-hidden rounded-md bg-zinc-900 shadow-[0_12px_28px_-10px_rgba(0,0,0,0.85)] ${pending ? 'animate-pulse' : ''}`}
+                    style={{
+                        left: `${tile.left}%`,
+                        top: `${tile.top}%`,
+                        width: `${tile.width}%`,
+                        height: `${tile.height}%`,
+                    }}
+                >
+                    {pending ? null : <PosterCover src={posters[index]} />}
+                </div>
+            ))}
+            <div className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]" />
+        </div>
+    )
+}
+
 /**
  * Layout único para detalles de listas (Trakt / TMDb / Colecciones / Mis listas)
  *
@@ -295,6 +398,10 @@ function PosterCollage({ images, pending }) {
  * - title, description
  * - posterImage?: string (portada oficial; tiene prioridad sobre el mosaico)
  * - posterLowImage?: string (versión ligera de la portada oficial, se pinta antes)
+ * - coverBackdrop?: { src, lowSrc } (backdrop con idioma para el modo de portada
+ *   backdrop de una colección; sin él, con portada oficial, el modo no se ofrece.
+ *   Sin portada oficial —listas— el modo usa la estantería de pósters)
+ * - coverBackdropPending?: boolean (aún se está buscando ese backdrop)
  * - posterItems?: Array (títulos TMDb para resolver el mosaico inglés final)
  * - heroBackground?: { desktop?: string, mobile?: string } (fondo estilo
  *   DetailsClient: backdrop en escritorio, póster en móvil; sustituye al
@@ -315,6 +422,8 @@ export default function UnifiedListDetailsLayout({
     posterItems = [],
     posterImage,
     posterLowImage,
+    coverBackdrop = null,
+    coverBackdropPending = false,
     backdropImage,
     heroBackground,
     sourceLabel = 'Lista',
@@ -337,6 +446,47 @@ export default function UnifiedListDetailsLayout({
     const hasTabs = Array.isArray(tabs) && tabs.length > 0 && !!activeTab && typeof onTabChange === 'function'
     const hasInfoTabs = Boolean(description)
     const finalPosterArtwork = useFinalEnglishPosterImages(posterItems)
+
+    // MODO DE PORTADA póster ↔ backdrop, como en DetailsClient (misma
+    // preferencia global, solo escritorio). Disponible con un backdrop con
+    // idioma (colecciones) o, en listas, con pósters para la estantería.
+    const coverMode = usePosterViewMode()
+    const posterTargetCount = useMemo(() => buildPosterCollageTargets(posterItems).length, [posterItems])
+    // Listas: disponible en cuanto hay títulos (la estantería enseña huecos
+    // mientras llegan sus pósters). Colecciones: con su backdrop con idioma.
+    const backdropAvailable = posterImage ? Boolean(coverBackdrop?.src) : posterTargetCount > 0
+    // Mientras se busca el backdrop de la colección, si la preferencia es
+    // backdrop la caja ya sale en 16:9 (vacía) en vez de enseñar el póster y
+    // transformarse al llegar; si al final no hay, vuelve al póster.
+    const backdropPending = Boolean(posterImage) && coverBackdropPending
+    const canToggleCover = coverMode.enabled && backdropAvailable
+    const isBackdropCover =
+        coverMode.enabled && coverMode.mode === 'preview' && (backdropAvailable || backdropPending)
+    // El cambio de forma solo se anima cuando lo pide el usuario; los que
+    // llegan con la carga (preferencia guardada, backdrop encontrado) son
+    // instantáneos.
+    const [animateCover, setAnimateCover] = useState(false)
+    // La capa backdrop se monta al acercar el ratón (así ya está cargada al
+    // pulsar) o cuando el modo es backdrop.
+    const [backdropWanted, setBackdropWanted] = useState(false)
+    const mountBackdrop = backdropAvailable && (isBackdropCover || (canToggleCover && backdropWanted))
+    const toggleCover = () => {
+        setAnimateCover(true)
+        coverMode.setMode(isBackdropCover ? 'poster' : 'preview')
+    }
+    const infoTabs = hasInfoTabs ? (
+        <DetailsInfoTabs
+            key={title}
+            layoutId={`listDetailsTabs-${title || 'list'}`}
+            mediaType="movie"
+            overview={description}
+            showAwardsTab={false}
+            showDetailsTab={false}
+            showProductionTab={false}
+            showTabsMenu={false}
+            expandableSynopsis
+        />
+    ) : null
 
     return (
         <div className="min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-purple-500/30">
@@ -404,28 +554,65 @@ export default function UnifiedListDetailsLayout({
                     initial={isBackNav ? false : { opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-                    className="mb-12 flex flex-col items-start gap-8 lg:flex-row lg:gap-12"
+                    className={`${isBackdropCover && hasInfoTabs ? 'mb-8' : 'mb-12'} flex flex-col items-start gap-8 lg:flex-row lg:gap-12`}
                 >
-                    <div className="relative z-10 mx-auto flex w-full max-w-[280px] flex-shrink-0 flex-col gap-5 lg:mx-0 lg:max-w-[320px]">
-                        {posterImage ? (
-                            <RevealPoster
-                                key={posterLowImage || posterImage}
-                                src={posterImage}
-                                lowSrc={posterLowImage}
-                                alt={title || 'Colección'}
-                            />
-                        ) : (
-                            <div className={POSTER_FRAME_CLASS}>
-                                <div className="pointer-events-none absolute inset-0 z-20 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]" />
-                                <div className="relative z-10 h-full w-full bg-neutral-950">
-                                    <PosterCollage
-                                        images={finalPosterArtwork.images}
-                                        pending={finalPosterArtwork.pending}
+                    {/* Columna de la portada: 320 px en póster, 600 px en
+                        backdrop (los anchos de la ficha), con su transición. */}
+                    <div
+                        className={`relative z-10 mx-auto flex w-full max-w-[280px] flex-shrink-0 flex-col gap-5 lg:mx-0 ${
+                            isBackdropCover ? 'sm:max-w-full lg:max-w-[600px]' : 'lg:max-w-[320px]'
+                        }`}
+                        style={animateCover ? { transition: 'max-width 500ms cubic-bezier(0.25, 1, 0.5, 1)' } : undefined}
+                    >
+                        <CoverShape
+                            backdrop={isBackdropCover}
+                            animate={animateCover}
+                            onPointerEnter={canToggleCover ? () => setBackdropWanted(true) : undefined}
+                        >
+                            {posterImage ? (
+                                <CoverLayer active={!isBackdropCover}>
+                                    <RevealPoster
+                                        key={posterLowImage || posterImage}
+                                        src={posterImage}
+                                        lowSrc={posterLowImage}
+                                        alt={title || 'Colección'}
                                     />
-                                </div>
-                            </div>
-                        )}
-
+                                </CoverLayer>
+                            ) : (
+                                <CoverLayer active={!isBackdropCover}>
+                                    <div className={`absolute inset-0 ${POSTER_FRAME_VISUAL}`}>
+                                        <div className="pointer-events-none absolute inset-0 z-20 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]" />
+                                        <div className="absolute inset-0 z-10 bg-neutral-950">
+                                            <PosterCollage
+                                                images={finalPosterArtwork.images}
+                                                pending={finalPosterArtwork.pending}
+                                            />
+                                        </div>
+                                    </div>
+                                </CoverLayer>
+                            )}
+                            {mountBackdrop ? (
+                                <CoverLayer active={isBackdropCover}>
+                                    {posterImage ? (
+                                        <RevealPoster
+                                            key={coverBackdrop.src}
+                                            src={coverBackdrop.src}
+                                            lowSrc={coverBackdrop.lowSrc}
+                                            alt={title || 'Colección'}
+                                        />
+                                    ) : (
+                                        <PosterShelf
+                                            images={finalPosterArtwork.images}
+                                            pending={finalPosterArtwork.pending}
+                                            count={posterTargetCount}
+                                        />
+                                    )}
+                                </CoverLayer>
+                            ) : null}
+                            {canToggleCover ? (
+                                <CoverModeToggle backdrop={isBackdropCover} onToggle={toggleCover} />
+                            ) : null}
+                        </CoverShape>
                     </div>
 
                     <div className="flex min-w-0 flex-1 flex-col w-full">
@@ -451,19 +638,9 @@ export default function UnifiedListDetailsLayout({
                             className="mb-6"
                         />
 
-                        {hasInfoTabs ? (
-                            <DetailsInfoTabs
-                                key={title}
-                                layoutId={`listDetailsTabs-${title || 'list'}`}
-                                mediaType="movie"
-                                overview={description}
-                                showAwardsTab={false}
-                                showDetailsTab={false}
-                                showProductionTab={false}
-                                showTabsMenu={false}
-                                expandableSynopsis
-                            />
-                        ) : null}
+                        {/* En backdrop la descripción baja bajo la cabecera, a
+                            todo el ancho, como las pestañas de la ficha. */}
+                        {isBackdropCover ? null : infoTabs}
 
                         {(hasTabs || topControls) && (
                             <div className="flex w-full flex-col gap-4">
@@ -503,6 +680,8 @@ export default function UnifiedListDetailsLayout({
                         )}
                     </div>
                 </motion.div>
+
+                {isBackdropCover && infoTabs ? <div className="mb-12">{infoTabs}</div> : null}
 
                 {/* --- BODY --- */}
                 <div className="relative z-0">{children}</div>
