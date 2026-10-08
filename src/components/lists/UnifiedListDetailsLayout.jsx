@@ -20,6 +20,8 @@ import { fetchTmdbImages } from '@/lib/tmdb/imageRequests'
 import useImageLoadReady from '@/lib/hooks/useImageLoadReady'
 import usePosterViewMode from '@/lib/hooks/usePosterViewMode'
 import { posterShelfLayout } from '@/lib/lists/coverBackdrop'
+// Capa con fundido de cada modo: la misma que usa DetailsClient.
+import { CoverLayer } from '@/components/details/CoverCrossfade'
 
 const finalEnglishPosterCache = new Map()
 
@@ -189,20 +191,6 @@ function CoverShape({ backdrop, animate, children, ...props }) {
                 // La preferencia guardada se aplica sin animar al abrir.
                 ...(animate ? {} : { transition: 'none' }),
             }}
-        >
-            {children}
-        </div>
-    )
-}
-
-// Capa de un modo dentro de CoverShape: las dos conviven y se funden.
-function CoverLayer({ active, children }) {
-    return (
-        <div
-            aria-hidden={active ? undefined : true}
-            className={`absolute inset-0 transition-opacity duration-500 ease-[cubic-bezier(0.25,1,0.5,1)] motion-reduce:transition-none ${
-                active ? 'opacity-100' : 'pointer-events-none opacity-0'
-            }`}
         >
             {children}
         </div>

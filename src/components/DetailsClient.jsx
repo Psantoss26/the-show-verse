@@ -9,6 +9,7 @@
 "use client";
 
 import OptimizedImage from "@/components/OptimizedImage";
+import { CoverLayer, ProgressiveCover } from "@/components/details/CoverCrossfade";
 // Premios y encabezados de sección viven en `@/components/details`: la ficha de
 // TELÉFONO del DetailModal muestra las MISMAS secciones y no puede partir de
 // una copia, o se separarían al primer retoque.
@@ -8822,11 +8823,6 @@ export default function DetailsClient({
     setBackdropResolved(false);
   }, [previewBackdropPath]);
 
-  const posterAspectIsBackdrop =
-    posterTransitioning && prevPosterPath
-      ? isBackdropPath(prevPosterPath)
-      : isBackdropPoster;
-
   // URLs basadas en el modo de vista
   const posterLowUrl =
     posterViewMode === "preview" && previewBackdropPath
@@ -8939,6 +8935,13 @@ export default function DetailsClient({
   const POSTER_MAX = 12; // grados
   const POSTER_SCALE = 1.06; // escala al hover
   const POSTER_OVERSCAN = 1.02; // Minimo para no perder nitidez
+  // Capas de portada de ESCRITORIO (ver el render): mismo overscan que la
+  // cadena de imágenes, para que la inclinación 3D no enseñe bordes.
+  const desktopCoverLayers = posterModeHydrated && !isMobileViewport;
+  const desktopCoverImgStyle = useMemo(
+    () => ({ transform: `scale(${POSTER_OVERSCAN})` }),
+    [],
+  );
   const IDLE_DELAY = 220; // ms sin interacción => idle
 
   // Una entrada corta de opacidad + escala da presencia a la portada sin
@@ -9813,33 +9816,11 @@ export default function DetailsClient({
                         idéntico, pero sin capa que quitar y, por tanto, sin
                         parpadeo. */}
 
-                    {/* Imagen anterior (permanece visible hasta que la nueva carga) */}
-                    <AnimatePresence>
-                      {prevPosterPath &&
-                        posterTransitioning &&
-                        !currentLowLoaded && (
-                          <motion.div
-                            key="prev-poster"
-                            initial={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.45, ease: "easeInOut" }}
-                            className="absolute inset-0 z-0 poster-mobile-fade max-sm:hidden"
-                          >
-                            <OptimizedImage
-                              src={
-                                posterAspectIsBackdrop
-                                  ? `https://image.tmdb.org/t/p/w1280${prevPosterPath}`
-                                  : buildOriginalImageUrl(prevPosterPath)
-                              }
-                              alt={title}
-                              className="absolute inset-0 w-full h-full object-cover"
-                              style={{
-                                transform: `scale(${POSTER_OVERSCAN})`,
-                              }}
-                            />
-                          </motion.div>
-                        )}
-                    </AnimatePresence>
+                    {/* Aquí iba la «imagen anterior» que se quedaba encima
+                        hasta que cargaba la nueva al alternar póster/backdrop
+                        (solo escritorio). Ya no hace falta: en escritorio la
+                        portada son las dos capas fijas de más abajo, que se
+                        funden entre sí (ver CoverCrossfade). */}
 
                     {posterLowUrl && !currentImgError && (
                       // Las imágenes de dentro NO llevan `translateZ(0)`, solo
@@ -9853,7 +9834,11 @@ export default function DetailsClient({
                       // `scale()` es un transform 2D que NO promueve, así que la
                       // imagen rasteriza dentro de esta capa y la máscara siempre
                       // la cubre. No se pierde GPU: el wrapper ya es transform-gpu.
-                      <div className="absolute inset-0 transform-gpu will-change-[opacity,transform] z-10 poster-mobile-fade max-sm:opacity-0">
+                      // ESCRITORIO: `sm:invisible`. La cadena sigue montada y
+                      // cargando (sus estados gobiernan fallbacks, logo, fondo…)
+                      // con las MISMAS URL que las capas de escritorio de abajo,
+                      // así que no hay descargas de más; solo no se pinta.
+                      <div className="absolute inset-0 transform-gpu will-change-[opacity,transform] z-10 poster-mobile-fade max-sm:opacity-0 sm:invisible">
                         {/* LOW */}
                         <OptimizedImage
                           src={posterLowUrl}
@@ -9999,6 +9984,43 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             }}
                           />
                         )}
+                      </div>
+                    )}
+
+                    {/* ESCRITORIO: póster y backdrop como DOS CAPAS FIJAS que
+                        se funden al alternar, igual que en las páginas de listas
+                        y colecciones (CoverCrossfade). Antes había una sola
+                        imagen que cambiaba de `src`: la nueva entraba con su
+                        propio fundido de 700 ms + escalado (y pasando por baja
+                        y alta calidad) y la anterior salía con otro de 450 ms,
+                        a destiempo del morph de 500 ms de la caja. Ahora las
+                        dos están montadas y cargadas, y el cambio es solo
+                        opacidad con la misma duración y curva que el morph.
+                        Mismas URL que la cadena de arriba. No se montan en
+                        móvil ni antes de saber el viewport: un <img> oculto
+                        también se descarga. */}
+                    {desktopCoverLayers && (
+                      <div className="pointer-events-none absolute inset-0 z-10 hidden sm:block">
+                        {basePosterDisplayPath ? (
+                          <CoverLayer active={posterViewMode !== "preview"}>
+                            <ProgressiveCover
+                              lowSrc={`https://image.tmdb.org/t/p/w342${basePosterDisplayPath}`}
+                              src={buildOriginalImageUrl(basePosterDisplayPath)}
+                              alt={title}
+                              imgStyle={desktopCoverImgStyle}
+                            />
+                          </CoverLayer>
+                        ) : null}
+                        {previewBackdropPath ? (
+                          <CoverLayer active={posterViewMode === "preview"}>
+                            <ProgressiveCover
+                              lowSrc={`https://image.tmdb.org/t/p/w780${previewBackdropPath}`}
+                              src={`https://image.tmdb.org/t/p/w1280${previewBackdropPath}`}
+                              alt={title}
+                              imgStyle={desktopCoverImgStyle}
+                            />
+                          </CoverLayer>
+                        ) : null}
                       </div>
                     )}
 
