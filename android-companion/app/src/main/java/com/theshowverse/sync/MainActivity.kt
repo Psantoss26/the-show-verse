@@ -34,6 +34,10 @@ import com.theshowverse.sync.databinding.ActivityMainBinding
  */
 class MainActivity : AppCompatActivity() {
 
+    companion object {
+        const val EXTRA_PWA_UNAVAILABLE = "com.theshowverse.sync.PWA_UNAVAILABLE"
+    }
+
     private lateinit var binding: ActivityMainBinding
     private lateinit var prefs: Prefs
 
@@ -85,6 +89,23 @@ class MainActivity : AppCompatActivity() {
         }
         binding.delegatedOpenButton.setOnClickListener { Delegacion.abrirSync(this) }
         binding.openWebButton.setOnClickListener { abrirWeb() }
+        mostrarPwaNoDisponible()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        mostrarPwaNoDisponible()
+    }
+
+    private fun mostrarPwaNoDisponible() {
+        if (!intent.getBooleanExtra(EXTRA_PWA_UNAVAILABLE, false)) return
+        intent.removeExtra(EXTRA_PWA_UNAVAILABLE)
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(R.string.pwa_unavailable_title)
+            .setMessage(R.string.pwa_unavailable_message)
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
     }
 
     /** Android 13+ requiere permiso en runtime para publicar la notificación. */

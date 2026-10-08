@@ -69,8 +69,8 @@ object QuickAccessNotifier {
         detectionId: String?,
     ) {
         ensureChannel(app)
-        // La app completa abre la ficha en su WebView; Sync, en la PWA o el
-        // navegador (ver AppVariante).
+        // La app completa abre la ficha en su WebView; Sync apunta directamente
+        // a la PWA instalada, sin pasar por el navegador (ver AppVariante).
         val intent = AppVariante.abrirFicha(app, url)
         val pi = PendingIntent.getActivity(
             app,

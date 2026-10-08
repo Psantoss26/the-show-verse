@@ -105,4 +105,6 @@
     <string name="delegated_body">Está instalada en este móvil, así que esta app deja de detectar para no duplicar nada. La vinculación, los permisos y el registro de detecciones están en Sync.</string>
     <string name="delegated_open">Abrir The Show Verse Sync</string>
     <string name="open_web">Abrir The Show Verse</string>
+    <string name="pwa_unavailable_title">No se encuentra la app web</string>
+    <string name="pwa_unavailable_message">Instala The Show Verse desde Chrome con «Instalar aplicación» en este dispositivo y comprueba que usa la misma dirección que tienes vinculada en Sync. Después vuelve a detectar la ficha para generar un nuevo aviso.</string>
 </resources>
