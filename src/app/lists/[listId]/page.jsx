@@ -9,13 +9,14 @@ import { AnimatePresence, motion } from 'framer-motion'
 
 import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayout'
 import ListDetailsActionRow from '@/components/lists/ListDetailsActionRow'
-import ListPosterCard, { ListItemsSkeleton, listPosterGridClass } from '@/components/lists/ListPosterCard'
+import ListPosterCard, { listPosterGridClass } from '@/components/lists/ListPosterCard'
 import FilterableListItems from '@/components/lists/ListDetailsTools'
 import LiquidGlassOpticalLayers from '@/components/ui/LiquidGlassOpticalLayers'
 import { LIQUID_GLASS_CARD, LIQUID_GLASS_PANEL } from '@/lib/ui/liquidGlass'
 import { formatPageTitle } from '@/lib/pageTitle'
 import {
     findListInIndexCache,
+    getPersonalListDetailsCacheKey,
     personalListPreviewFromIndex,
     shouldRenderCachedListDuringAuthHydration,
 } from '@/lib/lists/detailsInitialState'
@@ -91,9 +92,7 @@ const CATS = [
 
 const TMDB_LIST_DETAILS_CACHE_TTL_MS = 20 * 60 * 1000
 
-function getTmdbListDetailsCacheKey(listId) {
-    return listId ? `showverse:list-details:tmdb:${listId}:v1` : null
-}
+const getTmdbListDetailsCacheKey = getPersonalListDetailsCacheKey
 
 function readTmdbListDetailsCache(listId) {
     const key = getTmdbListDetailsCacheKey(listId)
@@ -571,22 +570,13 @@ export default function ListDetailsPage() {
         }
     }
 
-    // Sin datos todavía: la página con huecos de carga, nunca una pantalla
-    // vacía.
-    const loadingShell = (
-        <UnifiedListDetailsLayout titlePending sourceLabel="Lista de usuario" showTopBar={false}>
-            <ListItemsSkeleton />
-        </UnifiedListDetailsLayout>
-    )
-
-    // Si no hay sesión, no renderizamos (como ya hacías). Mientras la sesión
-    // aún se está comprobando no se sabe: huecos en vez de nada.
+    // Si no hay sesión, no renderizamos (como ya hacías)
     if (!shouldRenderCachedListDuringAuthHydration({
         canUse,
         hydrated,
         hasCachedData: Boolean(data),
-    })) return hydrated ? null : loadingShell
-    if (loading && !data) return loadingShell
+    })) return null
+    if (loading && !data) return null
 
     const addCandidates = addMode === 'search' ? searchRes : catRes
     const coverItem = items.find((item) => item?.poster_path || item?.backdrop_path)
@@ -721,8 +711,6 @@ export default function ListDetailsPage() {
                     emptyTitle="Sin resultados"
                     emptyText="No hay títulos que coincidan con los filtros."
                 />
-            ) : loading ? (
-                <ListItemsSkeleton count={Math.min(Number(data?.item_count) || 12, 18)} />
             ) : null}
 
             <ListActionDialog open={actionDialog === 'add'} onClose={() => setActionDialog(null)} title="Añadir títulos">

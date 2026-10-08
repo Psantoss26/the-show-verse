@@ -8,7 +8,7 @@ import CollectionEditModal from '@/components/lists/CollectionEditModal'
 import CollectionCastModal from '@/components/lists/CollectionCastModal'
 import { formatCollectionRevenue } from '@/lib/lists/collectionStats'
 import { applyCollectionCustomization, readCollectionArtworkOverride } from '@/lib/lists/collectionCustomization'
-import ListPosterCard, { ListItemsSkeleton } from '@/components/lists/ListPosterCard'
+import ListPosterCard from '@/components/lists/ListPosterCard'
 import FilterableListItems from '@/components/lists/ListDetailsTools'
 import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayout'
 import ListDetailsActionRow from '@/components/lists/ListDetailsActionRow'
@@ -16,6 +16,7 @@ import { formatPageTitle } from '@/lib/pageTitle'
 import {
     collectionPreviewFromIndex,
     findListInIndexCache,
+    getCollectionDetailsCacheKey,
     resolveCollectionDetailsInitialState,
 } from '@/lib/lists/detailsInitialState'
 import { ratingSummaryBadge, summarizeListRatings } from '@/lib/lists/ratingSummary'
@@ -29,9 +30,6 @@ import { buildListShareCard, buildListShareStory, listYearSpan, normalizeListSha
 const COLLECTION_DETAILS_CACHE_TTL_MS = 30 * 60 * 1000
 const useClientLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
 
-function getCollectionDetailsCacheKey(collectionId) {
-    return collectionId ? `showverse:list-details:collection:${collectionId}:v2` : null
-}
 
 function readCollectionDetailsCache(collectionId) {
     const key = getCollectionDetailsCacheKey(collectionId)
@@ -228,14 +226,8 @@ export default function CollectionDetailsClient({ collectionId }) {
         [parts, imdbRatings]
     )
 
-    // Sin datos ni vista provisional (p. ej. un enlace directo): la página con
-    // huecos de carga, nunca una pantalla vacía.
     if (state.loading && !collection && parts.length === 0) {
-        return (
-            <UnifiedListDetailsLayout titlePending sourceLabel="Colección TMDb" showTopBar={false}>
-                <ListItemsSkeleton />
-            </UnifiedListDetailsLayout>
-        )
+        return null
     }
 
     if (state.error && !collection && parts.length === 0) {
@@ -358,16 +350,14 @@ export default function CollectionDetailsClient({ collectionId }) {
                     emptyTitle="Sin resultados"
                     emptyText="No hay películas que coincidan con los filtros."
                 />
-            ) : state.loading ? (
-                <ListItemsSkeleton count={Math.min(Number(collection?.item_count) || 12, 18)} />
-            ) : (
+            ) : !state.loading ? (
                 <div className="py-20 text-center text-zinc-500">
                     <div className="mb-4 inline-flex h-20 w-20 items-center justify-center rounded-full bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/30 shadow-lg backdrop-blur-[28px]">
                         <Film className="h-10 w-10 opacity-40" />
                     </div>
                     <p className="text-sm font-medium">No hay películas en esta colección</p>
                 </div>
-            )}
+            ) : null}
         </UnifiedListDetailsLayout>
         <CollectionCastModal open={castOpen} onClose={() => setCastOpen(false)} cast={castMembers} collectionName={collection?.name} />
         {editing && collection && (

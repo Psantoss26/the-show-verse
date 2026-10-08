@@ -390,8 +390,6 @@ function PosterShelf({ images, pending, count }) {
  *   backdrop de una colección; sin él, con portada oficial, el modo no se ofrece.
  *   Sin portada oficial —listas— el modo usa la estantería de pósters)
  * - coverBackdropPending?: boolean (aún se está buscando ese backdrop)
- * - titlePending?: boolean (aún no se sabe el nombre: hueco en su lugar, para
- *   pintar la página al instante en vez de dejarla vacía)
  * - posterItems?: Array (títulos TMDb para resolver el mosaico inglés final)
  * - heroBackground?: { desktop?: string, mobile?: string } (fondo estilo
  *   DetailsClient: backdrop en escritorio, póster en móvil; sustituye al
@@ -414,7 +412,6 @@ export default function UnifiedListDetailsLayout({
     posterLowImage,
     coverBackdrop = null,
     coverBackdropPending = false,
-    titlePending = false,
     backdropImage,
     heroBackground,
     sourceLabel = 'Lista',
@@ -578,7 +575,7 @@ export default function UnifiedListDetailsLayout({
                                         <div className="absolute inset-0 z-10 bg-neutral-950">
                                             <PosterCollage
                                                 images={finalPosterArtwork.images}
-                                                pending={finalPosterArtwork.pending || titlePending}
+                                                pending={finalPosterArtwork.pending}
                                             />
                                         </div>
                                     </div>
@@ -614,16 +611,9 @@ export default function UnifiedListDetailsLayout({
                                 <Film className="h-4 w-4" />
                                 {sourceLabel}
                             </div>
-                            {titlePending ? (
-                                <div
-                                    className="h-10 w-3/4 max-w-md animate-pulse rounded-xl bg-white/[0.08] md:h-12 lg:h-14"
-                                    aria-hidden="true"
-                                />
-                            ) : (
-                                <h1 className="text-center text-4xl font-black leading-[1] tracking-tight text-white drop-shadow-xl text-balance md:text-left md:text-5xl lg:text-6xl">
-                                    {title || 'Lista'}
-                                </h1>
-                            )}
+                            <h1 className="text-center text-4xl font-black leading-[1] tracking-tight text-white drop-shadow-xl text-balance md:text-left md:text-5xl lg:text-6xl">
+                                {title || 'Lista'}
+                            </h1>
                         </div>
 
                         {heroActions ? <div className="mb-6 px-1">{heroActions}</div> : null}

@@ -46,7 +46,9 @@ export async function GET(req) {
         if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
 
         const tmdbUrl = buildTmdbUrl(`/collection/${id}`)
-        const c = await fetchJson(tmdbUrl, { cache: 'no-store' })
+        // Una hora en la caché del servidor: una colección casi nunca cambia y
+        // así abrirla (o precargarla desde /lists) no espera a TMDb.
+        const c = await fetchJson(tmdbUrl, { next: { revalidate: 3600 } })
         const parts = Array.isArray(c?.parts) ? c.parts : []
 
         // orden natural por fecha si existe
@@ -56,7 +58,10 @@ export async function GET(req) {
             return da.localeCompare(db)
         })
 
-        const details = await Promise.all(parts.map((p) => (p?.id != null ? fetchPartDetails(p.id) : null)))
+        // `lite=1` (vistas previas del índice de /lists): sin los detalles de
+        // cada película (taquilla y créditos), que solo usa la ficha.
+        const lite = searchParams.get('lite') === '1'
+        const details = lite ? [] : await Promise.all(parts.map((p) => (p?.id != null ? fetchPartDetails(p.id) : null)))
         const enrichedParts = parts.map((p, index) => ({
             ...p,
             revenue: Number(details[index]?.revenue) || 0,

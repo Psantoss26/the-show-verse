@@ -38,6 +38,8 @@ import { LIQUID_GLASS_CARD, LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { resolveListItemIndicator } from "@/lib/lists/listItemHoverIndicator";
 import { enrichListPreviewArtwork } from "@/lib/lists/previewArtwork";
 import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
+import { requestListArtwork } from "@/lib/tmdb/artworkBatch";
+import { prefetchListDetails } from "@/lib/lists/detailsPrefetch";
 import { stripHtml } from "@/lib/details/formatters";
 
 import {
@@ -248,7 +250,9 @@ function writeSessionJsonCache(key, data) {
 // segundo plano y por el cambio de pestaña, para que pulsar "Colecciones"
 // mientras la precarga vuela no dispare una segunda petición, sino que espere
 // a la que ya está en curso. Una respuesta vacía o fallida no se memoriza.
-const FEATURED_COLLECTIONS_CACHE_KEY = "showverse:lists:featured-collections:v1";
+// v2: la selección de destacadas creció (y se corrigieron ids erróneos); la
+// versión nueva evita servir la anterior de la caché de la sesión.
+const FEATURED_COLLECTIONS_CACHE_KEY = "showverse:lists:featured-collections:v3";
 let featuredCollectionsRequest = null;
 
 function readCachedFeaturedCollections() {
@@ -266,7 +270,7 @@ function loadFeaturedCollections({ force = false } = {}) {
   }
   if (!force && featuredCollectionsRequest) return featuredCollectionsRequest;
 
-  const request = fetch("/api/tmdb/collections/featured", {
+  const request = fetch("/api/tmdb/collections/featured?v=3", {
     cache: force ? "no-cache" : "default",
   })
     .then((res) => res.json().catch(() => ({})))
@@ -1541,33 +1545,11 @@ const ListModeRow = memo(function ListModeRow({
   );
 });
 
-// Final del catálogo de colecciones: pide la página siguiente cuando queda a
-// ~1500 px de verse.
-function CatalogSentinel({ onReach }) {
-  const ref = useRef(null);
-  useEffect(() => {
-    const node = ref.current;
-    if (!node || typeof IntersectionObserver === "undefined") return undefined;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) onReach();
-      },
-      { rootMargin: "1500px 0px" },
-    );
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [onReach]);
-  return (
-    <div ref={ref} className="flex justify-center pt-10">
-      <button
-        type="button"
-        onClick={onReach}
-        className="rounded-xl bg-gradient-to-br from-white/10 to-white/5 px-6 py-3 text-sm font-bold text-zinc-200 shadow-lg backdrop-blur-lg transition hover:from-white/15 hover:to-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60"
-      >
-        Cargar más colecciones
-      </button>
-    </div>
-  );
+// Precarga la ficha de la tarjeta bajo el puntero/foco/dedo (ver
+// lib/lists/detailsPrefetch).
+function handleListPrefetch(event) {
+  const link = event.target?.closest?.('a[href^="/lists/"]');
+  if (link) prefetchListDetails(link.getAttribute("href"));
 }
 
 // ================== MAIN PAGE ==================
@@ -1886,99 +1868,9 @@ export default function ListsPage() {
     [fetchedActiveLists, cachedActiveLists],
   );
 
-  // CATÁLOGO DE COLECCIONES: el resto de colecciones de TMDb tras las
-  // destacadas, por páginas y ya ordenadas por el servidor con el mismo
-  // criterio del menú (/api/tmdb/collections/catalog). Cada página se guarda por
-  // orden en sessionStorage —con el prefijo de la caché del índice, así las
-  // fichas de esas colecciones también se pintan al instante— y se restaura
-  // antes de pintar al volver.
-  const catalogActive = source === "collections" && !deferredQuery.trim();
-  const catalogSort = sortMode;
-  const [catalog, setCatalog] = useState({ sort: null, page: 0, totalPages: 1, items: [] });
-  const catalogLoadingRef = useRef(false);
-  const catalogKey = `showverse:lists:index:collections:catalog-${catalogSort}:v1`;
-  const catalogMetaKey = `showverse:lists:collections-catalog-meta:${catalogSort}:v1`;
-
-  useClientLayoutEffect(() => {
-    if (!prefsHydrated || !catalogActive || catalog.sort === catalogSort) return;
-    const items = readSessionJsonCache(catalogKey, LISTS_SOURCE_CACHE_TTL_MS);
-    const meta = readSessionJsonCache(catalogMetaKey, LISTS_SOURCE_CACHE_TTL_MS);
-    setCatalog(
-      Array.isArray(items) && meta
-        ? { sort: catalogSort, page: meta.page, totalPages: meta.totalPages, items }
-        : { sort: catalogSort, page: 0, totalPages: 1, items: [] },
-    );
-  }, [prefsHydrated, catalogActive, catalogSort, catalog.sort, catalogKey, catalogMetaKey]);
-
-  const loadMoreCatalog = useCallback(async () => {
-    if (catalogLoadingRef.current || catalog.sort !== catalogSort) return;
-    if (catalog.page >= catalog.totalPages && catalog.page > 0) return;
-    catalogLoadingRef.current = true;
-    const sortAtRequest = catalogSort;
-    try {
-      const res = await fetch(
-        `/api/tmdb/collections/catalog?sort=${encodeURIComponent(sortAtRequest)}&page=${catalog.page + 1}`,
-      );
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || !Array.isArray(json?.collections)) return;
-      setCatalog((prev) => {
-        if (prev.sort !== sortAtRequest) return prev;
-        const seen = new Set(prev.items.map((item) => String(item.id)));
-        const items = [
-          ...prev.items,
-          ...json.collections.filter((item) => !seen.has(String(item.id))),
-        ];
-        const next = {
-          sort: sortAtRequest,
-          page: Number(json.page) || prev.page + 1,
-          totalPages: Number(json.totalPages) || prev.totalPages,
-          items,
-        };
-        writeSessionJsonCache(`showverse:lists:index:collections:catalog-${sortAtRequest}:v1`, items);
-        writeSessionJsonCache(`showverse:lists:collections-catalog-meta:${sortAtRequest}:v1`, {
-          page: next.page,
-          totalPages: next.totalPages,
-        });
-        return next;
-      });
-    } catch {
-      // Se reintenta al volver a acercarse al final.
-    } finally {
-      catalogLoadingRef.current = false;
-    }
-  }, [catalog.sort, catalog.page, catalog.totalPages, catalogSort]);
-
-  const catalogLists = useMemo(
-    () =>
-      catalogActive && catalog.sort === catalogSort
-        ? catalog.items.map((c) => ({
-            ...c,
-            source: "collections",
-            internalUrl: buildInternalUrl({ ...c, source: "collections" }),
-            externalUrl: buildExternalUrl({ ...c, source: "collections" }),
-          }))
-        : [],
-    [catalogActive, catalog.sort, catalog.items, catalogSort],
-  );
-  const catalogHasMore =
-    catalogActive && catalog.sort === catalogSort && (catalog.page === 0 || catalog.page < catalog.totalPages);
-
-  // La primera página, en cuanto están las destacadas (antes, el catálogo se
-  // pintaría arriba y las destacadas lo empujarían al llegar).
-  useEffect(() => {
-    if (!catalogActive || catalog.sort !== catalogSort || catalog.page !== 0) return;
-    if (featuredCollectionsCount === 0) return;
-    loadMoreCatalog();
-  }, [catalogActive, catalog.sort, catalog.page, catalogSort, featuredCollectionsCount, loadMoreCatalog]);
-
   const filtered = useMemo(() => {
     const q = deferredQuery.trim().toLowerCase();
 
-    // Colecciones sin búsqueda: las destacadas (ordenadas aquí) y detrás el
-    // catálogo, que ya llega ordenado y no se reordena al crecer.
-    if (source === "collections" && !q) {
-      return [...sortLists(activeLists, sortMode), ...catalogLists];
-    }
 
     // Para colecciones, si hay búsqueda ya viene filtrado del servidor
     if (source === "collections" && q) {
@@ -1990,13 +1882,13 @@ export default function ListsPage() {
       ? activeLists.filter((l) => (l?.name || "").toLowerCase().includes(q))
       : activeLists;
     return sortLists(base, sortMode);
-  }, [activeLists, catalogLists, deferredQuery, sortMode, source]);
+  }, [activeLists, deferredQuery, sortMode, source]);
 
   const visibleCount = filtered.length;
 
   const activeListsMap = useMemo(
-    () => new Map([...activeLists, ...catalogLists].map((list) => [getListCacheKey(list), list])),
-    [activeLists, catalogLists],
+    () => new Map(activeLists.map((list) => [getListCacheKey(list), list])),
+    [activeLists],
   );
 
   // Al cambiar de fuente abortamos solicitudes en vuelo, pero conservamos caché resuelta.
@@ -2065,7 +1957,11 @@ export default function ListsPage() {
 
       const resolveAndStorePreview = async (rawItems) => {
         const deduped = dedupePreviewItems(rawItems);
+        // Arte elegido en el servidor y en lote (/api/tmdb/artwork): con
+        // cientos de colecciones, pedir /images por título desde aquí hacía
+        // que TMDb respondiera 429.
         const items = await enrichListPreviewArtwork(deduped, {
+          resolvePicks: requestListArtwork,
           resolveImages: fetchTmdbImages,
           limit: 5,
         });
@@ -2113,7 +2009,9 @@ export default function ListsPage() {
 
         // collections
         const res = await fetch(
-          `/api/tmdb/collection?id=${encodeURIComponent(listId)}`,
+          // `lite`: solo sus películas; la vista previa no usa créditos ni
+          // taquilla, que son una petición más a TMDb por película.
+          `/api/tmdb/collection?id=${encodeURIComponent(listId)}&lite=1`,
           {
             signal: ctrl.signal,
             cache: "no-store",
@@ -2216,15 +2114,6 @@ export default function ListsPage() {
       setQuery("");
       setSearchedCollections([]);
       setFeaturedCollections([]);
-      // El catálogo también desde cero (todas sus cachés por orden).
-      try {
-        Object.keys(window.sessionStorage)
-          .filter((key) => key.includes(":collections:catalog-") || key.includes(":collections-catalog-meta:"))
-          .forEach((key) => window.sessionStorage.removeItem(key));
-      } catch {
-        // sin sessionStorage
-      }
-      setCatalog({ sort: null, page: 0, totalPages: 1, items: [] });
       setCollectionsLoading(true);
       loadFeaturedCollections({ force: true })
         .then((cols) => setFeaturedCollections(cols))
@@ -2815,6 +2704,12 @@ export default function ListsPage() {
             // carga NO es la seleccionada. Sirve de asidero para comprobar el
             // relevo, igual que `data-lists-view-selector` en la barra.
             data-lists-content={contentSource}
+            // PRECARGA de la ficha (datos y pósters de sus títulos) al pasar
+            // el ratón, enfocar o tocar una tarjeta: al abrirla está completa
+            // desde el primer fotograma. Un solo manejador para todas.
+            onPointerOver={handleListPrefetch}
+            onFocus={handleListPrefetch}
+            onTouchStart={handleListPrefetch}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{
@@ -2908,14 +2803,6 @@ export default function ListsPage() {
             )}
           </motion.div>
         </AnimatePresence>
-        ) : null}
-
-        {/* Más colecciones del catálogo al acercarse al final (y un botón por
-            si el detector no salta: teclado, lectores de pantalla). La clave
-            por página vuelve a observar tras cada carga, por si el final
-            sigue a la vista. */}
-        {prefsHydrated && contentSource === "collections" && catalogHasMore ? (
-          <CatalogSentinel key={catalog.page} onReach={loadMoreCatalog} />
         ) : null}
 
         {/* Carga adicional de listas propias si el backend la expone. */}

@@ -14,6 +14,22 @@ function buildTmdbUrl(path, params = {}) {
   return url.toString();
 }
 
+// Con más de cien destacadas, pedirlas todas a la vez rozaba el límite de
+// TMDb: como mucho estas a la vez.
+const MAX_CONCURRENT = 12;
+let active = 0;
+const waiting = [];
+async function limited(task) {
+  if (active >= MAX_CONCURRENT) await new Promise((resolve) => waiting.push(resolve));
+  active += 1;
+  try {
+    return await task();
+  } finally {
+    active -= 1;
+    waiting.shift()?.();
+  }
+}
+
 async function fetchJson(url, init) {
   const res = await fetch(url, init);
   const j = await res.json().catch(() => ({}));
@@ -36,10 +52,10 @@ export async function GET() {
       uniqueIds.map(async (id) => {
         try {
           const tmdbUrl = await buildTmdbUrl(`/collection/${id}`);
-          const c = await fetchJson(tmdbUrl, {
+          const c = await limited(() => fetchJson(tmdbUrl, {
             cache: "force-cache",
             next: { revalidate: 3600 }, // 1 hora
-          });
+          }));
           return toCollectionSummary(c);
         } catch (err) {
           console.warn(`❌ Error colección ${id}:`, err.message);

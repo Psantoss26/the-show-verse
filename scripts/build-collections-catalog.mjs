@@ -1,13 +1,16 @@
 #!/usr/bin/env node
-// Genera src/data/tmdbCollectionsCatalog.json: el catálogo de TODAS las
-// colecciones de TMDb que merece la pena enseñar en /lists → Colecciones.
+// Genera src/data/tmdbCollectionsCatalog.json: las colecciones de TMDb más
+// CONOCIDAS, ordenadas por votos. Es la referencia del filtro de sagas de
+// /lists → Colecciones (ver src/lib/tmdb/featuredCollections.js y su test) y la
+// lista de la que elegir al ampliar la selección.
 //
 // TMDb no tiene un endpoint que liste colecciones. Sí publica cada día un
 // volcado con todos sus ids (files.tmdb.org/p/exports), pero solo con id y
 // nombre: sin popularidad ni número de películas. Este script recorre ese
 // volcado, pide cada colección en español y se queda con las que:
 //   - tienen al menos 2 películas y póster;
-//   - no son solo para adultos.
+//   - no son solo para adultos;
+//   - suman al menos MIN_VOTES votos (las ~400 más conocidas).
 // Para cada una guarda [id, nombre, nº de películas, votos], ordenadas por
 // votos (suma de vote_count de sus películas, una medida estable de lo
 // conocida que es; la popularidad de TMDb fluctúa a diario).
@@ -23,6 +26,7 @@ const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..")
 const OUT = path.join(ROOT, "src/data/tmdbCollectionsCatalog.json");
 const CONCURRENCY = 24;
 const MIN_PARTS = 2;
+const MIN_VOTES = 5000;
 
 async function readKey() {
   if (process.env.NEXT_PUBLIC_TMDB_API_KEY) return process.env.NEXT_PUBLIC_TMDB_API_KEY;
@@ -95,6 +99,7 @@ async function main() {
       if (!c?.poster_path || parts.length < MIN_PARTS) continue;
       if (parts.every((part) => part?.adult)) continue;
       const votes = parts.reduce((sum, part) => sum + (Number(part?.vote_count) || 0), 0);
+      if (votes < MIN_VOTES) continue;
       catalog.push([c.id, cleanCollectionName(c.name) || `Colección ${c.id}`, parts.length, votes]);
     }
   };
@@ -106,6 +111,7 @@ async function main() {
     OUT,
     JSON.stringify({
       generatedAt: new Date().toISOString(),
+      minVotes: MIN_VOTES,
       // [id, nombre, nº de películas, votos], de más a menos votos.
       fields: ["id", "name", "items", "votes"],
       collections: catalog,

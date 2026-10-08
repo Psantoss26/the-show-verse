@@ -19,7 +19,6 @@ import {
     getCommunityListDetailsCacheKey,
     resolveCommunityListDetailsInitialState,
 } from '@/lib/lists/detailsInitialState'
-import { ListItemsSkeleton } from '@/components/lists/ListPosterCard'
 import { useIsHistoryNavigation } from '@/lib/hooks/useIsHistoryNavigation'
 import { buildListShareCard, buildListShareStory, listNoun, normalizeListShareItem } from '@/lib/lists/shareList'
 
@@ -310,14 +309,8 @@ export default function TraktListDetailsClient({ username, listId }) {
         }
     }, [imdbRatings])
 
-    // Sin datos ni vista provisional (p. ej. un enlace directo): la página con
-    // huecos de carga, nunca una pantalla vacía.
     if (state.loading && !list && items.length === 0) {
-        return (
-            <UnifiedListDetailsLayout titlePending sourceLabel="Lista de la comunidad" showTopBar={false}>
-                <ListItemsSkeleton />
-            </UnifiedListDetailsLayout>
-        )
+        return null
     }
 
     if (state.error && !list && items.length === 0) {
@@ -410,9 +403,7 @@ export default function TraktListDetailsClient({ username, listId }) {
                     emptyTitle="Lista vacía"
                     emptyText="No hay títulos disponibles en esta lista."
                 />
-            ) : (
-                <ListItemsSkeleton count={Math.min(listItemCount || 12, 18)} />
-            )}
+            ) : null}
 
             {state.hasMore && (
                 <div ref={loadMoreRef} className="mt-10 flex min-h-14 justify-center">

@@ -7,6 +7,7 @@ import {
   communityListPreviewFromIndex,
   findListInIndexCache,
   getCommunityListDetailsCacheKey,
+  listDetailsTargetFromHref,
   personalListPreviewFromIndex,
   resolveCollectionDetailsInitialState,
   resolveCommunityListDetailsInitialState,
@@ -142,4 +143,13 @@ test('vistas provisionales: colección con su sufijo, lista propia editable', ()
   assert.equal(personal.canEdit, true)
   assert.equal(personal.public, true)
   assert.deepEqual(personal.items, [])
+})
+
+test('listDetailsTargetFromHref reconoce las tres fichas de lista', () => {
+  assert.deepEqual(listDetailsTargetFromHref('/lists/collection/10'), { source: 'collections', id: '10' })
+  assert.deepEqual(listDetailsTargetFromHref('/lists/community/a%20b?x=1'), { source: 'trakt', id: 'a b' })
+  assert.deepEqual(listDetailsTargetFromHref('/lists/abc-123'), { source: 'personal', id: 'abc-123' })
+  assert.equal(listDetailsTargetFromHref('/lists'), null)
+  assert.equal(listDetailsTargetFromHref('/lists/collection'), null)
+  assert.equal(listDetailsTargetFromHref('/details/movie/1'), null)
 })
