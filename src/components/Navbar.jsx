@@ -1850,15 +1850,21 @@ function BottomNavActiveLens({ activeKey, circleClassName }) {
         shownRef.current = false;
         return;
       }
+      // Leer toda la geometría antes de escribir estilos evita forzar layout
+      // entre cada medida cuando cambia el ancho de la barra en tablet.
+      const width = link.offsetWidth;
+      const height = link.offsetHeight;
+      const left = link.offsetLeft;
+      const top = link.offsetTop;
       // La transición se fija ANTES de mover la cápsula: sin deslizamiento,
       // solo se anima la opacidad y el salto de posición no se ve.
       lens.style.transition =
         slide && !reduceMotion
-          ? "transform 380ms cubic-bezier(0.22, 1, 0.36, 1), width 380ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease-out"
+          ? "transform 300ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease-out"
           : "opacity 200ms ease-out";
-      lens.style.width = `${link.offsetWidth}px`;
-      lens.style.height = `${link.offsetHeight}px`;
-      lens.style.transform = `translate3d(${link.offsetLeft}px, ${link.offsetTop}px, 0)`;
+      lens.style.width = `${width}px`;
+      lens.style.height = `${height}px`;
+      lens.style.transform = `translate3d(${left}px, ${top}px, 0)`;
       lens.style.opacity = "1";
       shownRef.current = true;
     };

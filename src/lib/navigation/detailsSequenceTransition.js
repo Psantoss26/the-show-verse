@@ -9,6 +9,7 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // resolución se completan sobre la ficha visible, sin retener su cabecera.
 const IMAGE_WAIT_MS = 200;
 const EXIT_MS = 220;
+const NAVIGATION_WAIT_MS = 8000;
 const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
 
 export function isDetailsSequenceTransitionActive() {
@@ -124,7 +125,7 @@ function focusTitle(root) {
 export async function navigateDetailsSequence({ href, direction, navigate }) {
   if (activeTransition) return false;
   const source = document.querySelector("[data-details-root][data-details-href]");
-  if (!source || window.parent !== window || !matchMedia("(min-width: 1024px)").matches) {
+  if (!source || window.parent !== window) {
     return navigate(href);
   }
 
@@ -135,6 +136,10 @@ export async function navigateDetailsSequence({ href, direction, navigate }) {
   const html = document.documentElement;
   html.setAttribute(FLAG, direction === "previous" ? "previous" : "next");
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // En táctil conservamos la ficha completa hasta que llegue la siguiente.
+  // Capturar varias superficies glass y animarlas por separado provoca
+  // repintados caros y cambios de composición en las GPU de tablets.
+  const touch = !matchMedia("(hover: hover) and (pointer: fine)").matches;
   // SALIDA COMPLETA AL CLIC. Al pulsar, el contenido saliente (póster,
   // cabecera, menú y secciones) se va del todo —deslizándose hacia fuera y
   // desvaneciéndose— y solo queda el fondo. Así:
@@ -151,7 +156,7 @@ export async function navigateDetailsSequence({ href, direction, navigate }) {
   // Con `opacity`, no con `visibility`: esta se hereda y obligaba a recalcular
   // el estilo de miles de elementos (menú y secciones) en el fotograma del clic.
   const hiddenParts = [];
-  if (!reduced) {
+  if (!reduced && !touch) {
     source
       .querySelectorAll(`[${PART}="artwork"], [${PART}="info"], [${PART}="content"]`)
       .forEach((node) => {
@@ -199,14 +204,18 @@ export async function navigateDetailsSequence({ href, direction, navigate }) {
     if (cancelled) return false;
     const opened = await navigate(href, { scroll: false });
     if (opened === false) return false;
-    while (!cancelled) {
+    const deadline = Date.now() + NAVIGATION_WAIT_MS;
+    while (!cancelled && Date.now() < deadline) {
       const route = location.pathname;
       if (route !== from && route !== href) break;
       incoming = document.querySelector(`[data-details-href="${href}"]`);
       lockRoot(incoming);
       if (incoming?.getAttribute("data-details-sequence-ready") === "true") break;
       // Errores de ruta se muestran inmediatamente, sin ocultar su recuperación.
-      if (route === href && document.querySelector("[data-details-error], .next-error-h1")) break;
+      if (route === href && document.querySelector("[data-details-error], .next-error-h1")) {
+        incoming = null;
+        break;
+      }
       incoming = null;
       // Se comprueba en cada fotograma: con 50ms de sondeo la transición podía
       // arrancar hasta 50ms después de estar lista la ficha.
@@ -219,17 +228,18 @@ export async function navigateDetailsSequence({ href, direction, navigate }) {
     // El nuevo título arranca en su hero; la copia saliente conserva el scroll.
     window.scrollTo({ top: 0, behavior: "instant" });
     await nextFrame();
-    if (!reduced && typeof document.startViewTransition === "function") {
+    if (!reduced && !touch && typeof document.startViewTransition === "function") {
       setNames(snapshot, true);
       viewTransition = document.startViewTransition(() => {
         overlay.remove();
         setNames(incoming, true);
       });
+      void viewTransition.ready?.catch(() => {});
       await viewTransition.finished.catch(() => {});
     } else if (!reduced && overlay.animate) {
       // Baseline 2024: fundido sobre la nueva ficha YA lista, sin fondo negro.
       const x = direction === "previous" ? -24 : 24;
-      const animations = [...incoming.querySelectorAll(`[${PART}="artwork"], [${PART}="info"], [${PART}="content"]`)]
+      const animations = (touch ? [] : [...incoming.querySelectorAll(`[${PART}="artwork"], [${PART}="info"], [${PART}="content"]`)])
         .map((node) => node.animate(
           [{ transform: `translateX(${x}px)` }, { transform: "translateX(0)" }],
           { duration: 320, easing: "cubic-bezier(.22,1,.36,1)" },

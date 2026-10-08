@@ -1517,10 +1517,8 @@ body {
    Va `fixed left-1/2` con `translateX(-50%)`, es decir centrada en la VENTANA.
    Con el drawer abierto su mitad derecha queda debajo del panel.
 
-   Se recoloca moviendo `left`, no con otra `transform`: la que ya tiene le
-   sirve para centrarse Y para esconderse al hacer scroll, y una segunda la
-   pisaría. Es el mismo motivo por el que la barra superior táctil usa
-   `margin-right`.
+   Se recoloca con `translate`, independiente de `scale`, que compacta la
+   barra al hacer scroll. Ambas propiedades se animan sin recalcular layout.
 
    Y además se ESTRECHA cuando hace falta: en una tablet de 768px con el panel
    a la mitad, la barra (28rem = 448px) no cabe en los 384px que quedan por
@@ -1539,12 +1537,14 @@ body {
       calc(100vw - var(--sv-detail-drawer-inset, 0px))
     );
 
-    left: calc(var(--sv-bottom-space) / 2);
+    left: 50%;
+    translate: calc(-50% + (var(--sv-bottom-space) - 100vw) / 2) 0;
     width: min(calc(var(--sv-bottom-space) - 2rem), 28rem);
+    /* Tailwind 4 usa scale, no transform, para compactar. El ancho se ajusta
+       una sola vez: animarlo realimentaba el ResizeObserver de la lente. */
     transition:
-      left 320ms cubic-bezier(0.22, 1, 0.36, 1),
-      width 320ms cubic-bezier(0.22, 1, 0.36, 1),
-      transform 450ms cubic-bezier(0.22, 1, 0.36, 1);
+      translate 320ms cubic-bezier(0.22, 1, 0.36, 1),
+      scale 300ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   :root[data-sv-drawer-resizing] .sv-navbar-bottom-shift {
