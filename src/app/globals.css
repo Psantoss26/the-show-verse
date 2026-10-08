@@ -2480,7 +2480,7 @@ html[data-details-sequence-transition] [data-details-root] {
 ::view-transition-group(details-sequence-artwork),
 ::view-transition-group(details-sequence-info),
 ::view-transition-group(details-sequence-content) {
-  animation-duration: 400ms;
+  animation-duration: 300ms;
   animation-timing-function: cubic-bezier(.22, 1, .36, 1);
 }
 ::view-transition-old(details-sequence-page),
@@ -2490,17 +2490,17 @@ html[data-details-sequence-transition] [data-details-root] {
 }
 ::view-transition-new(details-sequence-page),
 ::view-transition-new(details-sequence-background) {
-  animation: sv-sequence-reveal 400ms cubic-bezier(.22, 1, .36, 1) both;
+  animation: sv-sequence-reveal 300ms cubic-bezier(.22, 1, .36, 1) both;
 }
 ::view-transition-old(details-sequence-artwork),
 ::view-transition-old(details-sequence-info),
 ::view-transition-old(details-sequence-content) {
-  animation: sv-sequence-leave 400ms cubic-bezier(.22, 1, .36, 1) both;
+  animation: sv-sequence-leave 300ms cubic-bezier(.22, 1, .36, 1) both;
 }
 ::view-transition-new(details-sequence-artwork),
 ::view-transition-new(details-sequence-info),
 ::view-transition-new(details-sequence-content) {
-  animation: sv-sequence-enter 400ms cubic-bezier(.22, 1, .36, 1) both;
+  animation: sv-sequence-enter 300ms cubic-bezier(.22, 1, .36, 1) both;
 }
 ::view-transition-old(details-sequence-page),
 ::view-transition-new(details-sequence-page),

@@ -1,11 +1,7 @@
 // Precalienta el título al que llevan las flechas Anterior/Siguiente.
 //
-// La transición (detailsSequenceTransition) no anima hasta que la ficha nueva
-// tiene su portada y su fondo descargados y decodificados. Esas imágenes son
-// las `original` de TMDb (varios MB), así que se descargaban DESPUÉS del clic y
-// eran casi todo el tiempo de espera. Al pasar por encima de la flecha (o
-// enfocarla) se piden ya, con los mismos criterios que usa DetailsClient para
-// elegirlas, y al hacer clic salen de la caché del navegador.
+// Descarga las variantes ligeras que se mostrarán primero. La mejora a
+// original pertenece a la ficha visible y no compite con la navegación.
 import { getDetails } from "@/lib/api/tmdb";
 import { readPersistedArtworkOverride } from "@/lib/artworkApi";
 import { pickBestEnglishPoster, pickHeroBackdropPath } from "@/lib/details/tmdbImages";
@@ -74,11 +70,9 @@ export function warmDetailsSequenceTarget(href) {
     .then((data) => {
       const override = readPersistedArtworkOverride(parsed) || {};
       const { posters, backdrop, profiles } = pickSequenceWarmupArtwork(data, override);
-      // La portada entra primero en w342 y luego se sustituye por la original;
-      // el fondo de escritorio usa siempre la original.
+      // Coincide con las primeras capas que pinta DetailsClient.
       posters.forEach((path) => preloadImage("w342", path));
-      preloadImage("original", posters[0]);
-      preloadImage("original", backdrop);
+      preloadImage("w1280", backdrop);
       // Fotos de las tarjetas del Reparto Principal (misma URL que la ficha).
       profiles.forEach((path) => preloadImage("w342", path));
     })
