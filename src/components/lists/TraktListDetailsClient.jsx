@@ -312,6 +312,7 @@ export default function TraktListDetailsClient({ username, listId }) {
     const movieCount = shareItems.filter((item) => item.mediaType === 'movie').length
     const tvCount = shareItems.length - movieCount
     const share = {
+        title: list?.name || 'Lista',
         card: buildListShareCard({
             title: list?.name || 'Lista',
             label: 'Lista de la comunidad',
@@ -346,7 +347,6 @@ export default function TraktListDetailsClient({ username, listId }) {
             title={list?.name || 'Lista'}
             description={list?.description || ''}
             sourceLabel="Lista de la comunidad"
-            share={share}
             posterItems={items}
             backdropImage={tmdbImg(firstBackdrop, 'original')}
             scoreboardStats={[
@@ -363,6 +363,7 @@ export default function TraktListDetailsClient({ username, listId }) {
             heroActions={
                 <ListDetailsActionRow
                     onBack={() => router.back()}
+                    share={share}
                     favoriteAction={list?.id ? (
                     <ListLikeButton
                         listId={list.id}

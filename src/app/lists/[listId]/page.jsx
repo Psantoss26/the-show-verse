@@ -573,6 +573,7 @@ export default function ListDetailsPage() {
     // valoradas y las mismas cifras que la fila de stats.
     const shareItems = items.map((item) => normalizeListShareItem(item, imdbRatings))
     const share = {
+        title: data?.name || 'Lista',
         card: buildListShareCard({
             title: data?.name || 'Lista',
             label: 'Lista de usuario',
@@ -599,7 +600,6 @@ export default function ListDetailsPage() {
             title={data?.name || 'Lista'}
             description={data?.description || ''}
             sourceLabel="Lista de usuario"
-            share={share}
             posterItems={items}
             backdropImage={backdropPath ? `https://image.tmdb.org/t/p/original${backdropPath}` : null}
             scoreboardStats={[
@@ -616,6 +616,7 @@ export default function ListDetailsPage() {
             heroActions={(
                 <ListDetailsActionRow
                     onBack={() => router.back()}
+                    share={share}
                     onAdd={canManage ? () => setActionDialog('add') : null}
                     onEdit={canManage ? () => setActionDialog('edit') : null}
                     onClear={canManage ? () => setActionDialog('clear') : null}

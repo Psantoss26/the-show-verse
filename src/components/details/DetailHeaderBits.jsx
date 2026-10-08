@@ -323,14 +323,23 @@ export function UnifiedRateButton({
 // fila (ScoreboardPillRow). Es un <button> normal, sin Framer: su
 // entrada la pone el revelado del marcador sobre el propio botón, y una
 // transformación de Framer encima se pelearía con ella.
-export function ActionShareButton({ title, text, url, card = null, story = null, kind = "details", iconOnly = false, animateEntrance = true, variant = "default", className = "" }) {
+/**
+ * Lógica de COMPARTIR sin el botón: con `card`, abre la hoja de compartir
+ * (imagen y vídeo); sin él, manda el enlace (selector del sistema o
+ * portapapeles). La usan ActionShareButton y el botón de acción de las listas
+ * (ListDetailsActionRow), que pinta su propio LiquidButton.
+ *
+ * Devuelve `{ handleShare, sheet, copied, buttonRef }`: `sheet` se monta junto
+ * al botón. Al cerrar la hoja el foco vuelve al botón (`buttonRef`) o, si no se
+ * enganchó, al elemento que tenía el foco al abrirla.
+ */
+export function useShareAction({ title, text, url, card = null, story = null, kind = "details" }) {
   const [copied, setCopied] = useState(false);
   const [sheetCard, setSheetCard] = useState(null);
   const [sheetStory, setSheetStory] = useState(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const buttonRef = useRef(null);
-  const prefersReducedMotion = useReducedMotion();
-  const isStaticDetails = useDetailsStaticMotion();
+  const openerRef = useRef(null);
 
   const resolveUrl = useCallback(
     () =>
@@ -343,11 +352,12 @@ export function ActionShareButton({ title, text, url, card = null, story = null,
 
   const closeSheet = useCallback(() => {
     setSheetOpen(false);
-    buttonRef.current?.focus({ preventScroll: true });
+    (buttonRef.current || openerRef.current)?.focus?.({ preventScroll: true });
   }, []);
 
   const handleShare = async () => {
     if (card) {
+      openerRef.current = typeof document !== "undefined" ? document.activeElement : null;
       setSheetCard(card);
       setSheetStory(story);
       setSheetOpen(true);
@@ -394,6 +404,14 @@ export function ActionShareButton({ title, text, url, card = null, story = null,
       getUrl={resolveUrl}
     />
   ) : null;
+
+  return { handleShare, sheet, copied, buttonRef };
+}
+
+export function ActionShareButton({ title, text, url, card = null, story = null, kind = "details", iconOnly = false, animateEntrance = true, variant = "default", className = "" }) {
+  const { handleShare, sheet, copied, buttonRef } = useShareAction({ title, text, url, card, story, kind });
+  const prefersReducedMotion = useReducedMotion();
+  const isStaticDetails = useDetailsStaticMotion();
 
   if (variant === "pill") {
     return (

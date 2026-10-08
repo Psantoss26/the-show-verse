@@ -251,6 +251,7 @@ export default function CollectionDetailsClient({ collectionId }) {
     const shareItems = parts.map((movie) => normalizeListShareItem(movie, imdbRatings))
     const yearSpan = listYearSpan(shareItems)
     const share = {
+        title: collection?.name || 'Colección',
         card: buildListShareCard({
             kind: 'collection',
             title: collection?.name || 'Colección',
@@ -303,8 +304,7 @@ export default function CollectionDetailsClient({ collectionId }) {
                 imdb: ratingSummaryBadge(imdbSummary),
             }}
             showTopBar={false}
-            share={share}
-            heroActions={<ListDetailsActionRow onBack={() => router.back()} onEdit={() => setEditing(true)} editLabel="Editar colección" externalHref={tmdbUrl} externalLabel="Ver colección en TMDb" onCast={castMembers.length ? () => setCastOpen(true) : null} />}
+            heroActions={<ListDetailsActionRow onBack={() => router.back()} onEdit={() => setEditing(true)} editLabel="Editar colección" externalHref={tmdbUrl} externalLabel="Ver colección en TMDb" onCast={castMembers.length ? () => setCastOpen(true) : null} share={share} />}
         >
             {parts.length > 0 ? (
                 <FilterableListItems
