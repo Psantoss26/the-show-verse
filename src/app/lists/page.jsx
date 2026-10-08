@@ -1313,14 +1313,14 @@ function ListEntrance({ index = 0, className = "", instant = false, children }) 
 // títulos que tenga.
 const ROW_POSTER_SLOTS = 5;
 
-function PosterRow({ posters, loading, alt }) {
+function PosterRow({ posters, loading, pulse, alt }) {
   if (loading) {
     return (
       <div className="flex justify-center gap-1.5">
         {Array.from({ length: ROW_POSTER_SLOTS }, (_, index) => (
           <div
             key={index}
-            className="aspect-[2/3] w-[calc((100%-4*0.375rem)/5)] animate-pulse rounded-lg bg-white/[0.06]"
+            className={`aspect-[2/3] w-[calc((100%-4*0.375rem)/5)] rounded-lg bg-white/[0.06] ${pulse ? "animate-pulse" : ""}`}
           />
         ))}
       </div>
@@ -1366,6 +1366,14 @@ const GridListCard = memo(function GridListCard({
   }, [inView, ensureListItems, cacheKey]);
 
   const isLoading = itemsState == null;
+  // El hueco solo late mientras la petición está EN CURSO (`null`), no mientras
+  // aún no se ha pedido (`undefined`, la tarjeta lejos de la pantalla; se pide
+  // 320px antes de entrar, así que a la vista ya late). Con todas latiendo, en
+  // Colecciones había ~1200 `animate-pulse` infinitos: en reposo los mueve el
+  // compositor, pero en cuanto el hilo principal anima algo (el desplegable del
+  // menú móvil, que anima la altura) cada fotograma recalculaba el estilo de
+  // todos ellos: 57-75 ms por fotograma con CPU x4, frente a 14-18 en Comunidad.
+  const isPending = itemsState === null;
   const items = Array.isArray(itemsState) ? itemsState : [];
   const previewPosters = getPosterStackUrls(items);
   const description = stripHtml(list?.description);
@@ -1400,13 +1408,15 @@ const GridListCard = memo(function GridListCard({
 
           {/* Móvil: fila compacta. */}
           <div className="relative z-10 w-full bg-gradient-to-b from-white/5 to-transparent px-3 pb-2 pt-3 sm:hidden">
-            <PosterRow posters={previewPosters} loading={isLoading} alt={list?.name || "Lista"} />
+            <PosterRow posters={previewPosters} loading={isLoading} pulse={isPending} alt={list?.name || "Lista"} />
           </div>
 
           <div className="relative z-10 hidden h-52 w-full overflow-visible bg-gradient-to-b from-white/5 to-transparent p-6 sm:block">
             {isLoading ? (
               <div className="flex h-full w-full items-center justify-center">
-                <div className="h-40 w-56 animate-pulse rounded-2xl bg-white/[0.06]" />
+                <div
+                  className={`h-40 w-56 rounded-2xl bg-white/[0.06] ${isPending ? "animate-pulse" : ""}`}
+                />
               </div>
             ) : previewPosters.length > 0 ? (
               <div className="flex h-full w-full items-center justify-center overflow-visible">
@@ -1539,6 +1549,8 @@ const ListModeRow = memo(function ListModeRow({
   }, [inView, ensureListItems, cacheKey]);
 
   const isLoading = itemsState == null;
+  // Solo late lo que se está cargando (ver GridListCard).
+  const isPending = itemsState === null;
   const items = Array.isArray(itemsState) ? itemsState : [];
 
   return (
@@ -1548,7 +1560,9 @@ const ListModeRow = memo(function ListModeRow({
         <div className="flex items-center gap-4 p-3 bg-zinc-900/30 border border-white/5 rounded-xl hover:bg-zinc-900/60 hover:border-white/10 transition-all">
           <div className="h-16 w-40 shrink-0 overflow-hidden rounded-lg border border-white/5 bg-zinc-950 sm:w-[13.5rem]">
             {isLoading ? (
-              <div className="w-full h-full animate-pulse bg-zinc-900/40" />
+              <div
+                className={`w-full h-full bg-zinc-900/40 ${isPending ? "animate-pulse" : ""}`}
+              />
             ) : (
               <ListPreviewPosterStrip items={items} alt={list.name} />
             )}
@@ -1595,6 +1609,142 @@ const STAT_TONES = {
   rose: "text-rose-400",
   emerald: "text-emerald-400",
 };
+
+// Tarjetas fuera de pantalla sin layout ni pintado (`content-visibility: auto`,
+// Baseline 2024). Con el menú móvil abierto arriba del todo, el desplegable
+// empuja hacia abajo TODO el contenido (en Colecciones, ~60.000 px) y cada
+// fotograma recorría el pintado de todas las tarjetas: 24-27 ms por fotograma
+// con CPU x4, 17-18 ms con esto. El alto de reserva solo cuenta antes del primer
+// pintado de cada tarjeta (`auto` recuerda luego el real). No afecta al cristal
+// (medido con la sonda invert(1)). NO en el modo «filas»: sus pósters crecen
+// por fuera de la sección al pasar el ratón y las flechas cuelgan a los lados,
+// y la contención de pintado los recortaría.
+const OFFSCREEN_SKIP_GRID =
+  "[content-visibility:auto] [contain-intrinsic-size:auto_240px] sm:[contain-intrinsic-size:auto_380px]";
+const OFFSCREEN_SKIP_LIST =
+  "[content-visibility:auto] [contain-intrinsic-size:auto_90px]";
+
+// CONTENIDO DE LA PÁGINA, memoizado. Abrir o cerrar el menú móvil (y cualquier
+// otro estado de la barra) re-renderizaba la página entera: con las ~245
+// colecciones eran ~100 ms de React en el primer fotograma del desplegable (dev,
+// CPU x4), que se veía como un tirón al abrir y al cerrar. Así solo se vuelve a
+// pintar cuando cambia algo que de verdad afecta a las tarjetas.
+const ListsContent = memo(function ListsContent({
+  contentSource,
+  contentLists,
+  sourceInitialized,
+  source,
+  viewMode,
+  itemsMap,
+  ensureListItems,
+  isMobile,
+  isBackNav,
+}) {
+  return (
+    <AnimatePresence mode="wait" initial={!isBackNav}>
+      <motion.div
+        key={contentSource}
+        // Marca la fuente que se está pintando de verdad, que durante la
+        // carga NO es la seleccionada. Sirve de asidero para comprobar el
+        // relevo, igual que `data-lists-view-selector` en la barra.
+        data-lists-content={contentSource}
+        // PRECARGA de la ficha (datos y pósters de sus títulos) al pasar
+        // el ratón, enfocar o tocar una tarjeta: al abrirla está completa
+        // desde el primer fotograma. Un solo manejador para todas.
+        onPointerOver={handleListPrefetch}
+        onFocus={handleListPrefetch}
+        onTouchStart={handleListPrefetch}
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{
+          opacity: 0,
+          y: -8,
+          // La transición de salida va DENTRO de `exit`: es la forma que
+          // Framer resuelve para el desmontaje (una clave `exit` dentro de
+          // `transition` no la aplicaría).
+          transition: { duration: 0.16, ease: "easeIn" },
+        }}
+        transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+      >
+        {contentLists.length === 0 ? (
+          // Sin resultados solo se anuncia cuando la fuente está resuelta:
+          // durante la carga inicial, un "no hay listas" que dura un instante
+          // es peor que no decir nada todavía.
+          sourceInitialized ? (
+            <div className="flex flex-col items-center justify-center py-32 text-center border border-dashed border-neutral-800 rounded-3xl bg-neutral-900/20">
+              <ListVideo className="w-16 h-16 text-neutral-700 mb-4" />
+              <h3 className="text-xl font-bold text-neutral-300">
+                {source === "collections"
+                  ? "No hay colecciones"
+                  : "No hay listas"}
+              </h3>
+              <p className="text-zinc-500 mt-2">
+                {source === "personal"
+                  ? "Crea una nueva lista arriba para empezar."
+                  : "Prueba cambiando el modo o el buscador."}
+              </p>
+            </div>
+          ) : null
+        ) : (
+          <>
+            {viewMode === "grid" && (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
+                {contentLists.map((l, index) => (
+                  <ListEntrance
+                    key={`${l.source}-${l.id}`}
+                    index={index}
+                    instant={isBackNav}
+                    className={`h-full ${OFFSCREEN_SKIP_GRID}`}
+                  >
+                    <GridListCard
+                      list={l}
+                      itemsState={itemsMap[getListCacheKey(l)]}
+                      ensureListItems={ensureListItems}
+                    />
+                  </ListEntrance>
+                ))}
+              </div>
+            )}
+
+            {viewMode === "rows" && (
+              <div className="space-y-12">
+                {contentLists.map((l, index) => (
+                  <ListEntrance key={`${l.source}-${l.id}`} index={index} instant={isBackNav}>
+                    <RowListSection
+                      list={l}
+                      itemsState={itemsMap[getListCacheKey(l)]}
+                      ensureListItems={ensureListItems}
+                      isMobile={isMobile}
+                    />
+                  </ListEntrance>
+                ))}
+              </div>
+            )}
+
+            {viewMode === "list" && (
+              <div className="flex flex-col gap-3">
+                {contentLists.map((l, index) => (
+                  <ListEntrance
+                    key={`${l.source}-${l.id}`}
+                    index={index}
+                    instant={isBackNav}
+                    className={OFFSCREEN_SKIP_LIST}
+                  >
+                    <ListModeRow
+                      list={l}
+                      itemsState={itemsMap[getListCacheKey(l)]}
+                      ensureListItems={ensureListItems}
+                    />
+                  </ListEntrance>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </motion.div>
+    </AnimatePresence>
+  );
+});
 
 // ================== MAIN PAGE ==================
 export default function ListsPage() {
@@ -2696,103 +2846,17 @@ export default function ListsPage() {
             relevo a la buena se veía como una página vacía. Al volver atrás,
             sin entrada (`initial={false}`). */}
         {prefsHydrated ? (
-        <AnimatePresence mode="wait" initial={!isBackNav}>
-          <motion.div
-            key={contentSource}
-            // Marca la fuente que se está pintando de verdad, que durante la
-            // carga NO es la seleccionada. Sirve de asidero para comprobar el
-            // relevo, igual que `data-lists-view-selector` en la barra.
-            data-lists-content={contentSource}
-            // PRECARGA de la ficha (datos y pósters de sus títulos) al pasar
-            // el ratón, enfocar o tocar una tarjeta: al abrirla está completa
-            // desde el primer fotograma. Un solo manejador para todas.
-            onPointerOver={handleListPrefetch}
-            onFocus={handleListPrefetch}
-            onTouchStart={handleListPrefetch}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{
-              opacity: 0,
-              y: -8,
-              // La transición de salida va DENTRO de `exit`: es la forma que
-              // Framer resuelve para el desmontaje (una clave `exit` dentro de
-              // `transition` no la aplicaría).
-              transition: { duration: 0.16, ease: "easeIn" },
-            }}
-            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-          >
-            {contentLists.length === 0 ? (
-              // Sin resultados solo se anuncia cuando la fuente está resuelta:
-              // durante la carga inicial, un "no hay listas" que dura un instante
-              // es peor que no decir nada todavía.
-              sourceInitialized ? (
-                <div className="flex flex-col items-center justify-center py-32 text-center border border-dashed border-neutral-800 rounded-3xl bg-neutral-900/20">
-                  <ListVideo className="w-16 h-16 text-neutral-700 mb-4" />
-                  <h3 className="text-xl font-bold text-neutral-300">
-                    {source === "collections"
-                      ? "No hay colecciones"
-                      : "No hay listas"}
-                  </h3>
-                  <p className="text-zinc-500 mt-2">
-                    {source === "personal"
-                      ? "Crea una nueva lista arriba para empezar."
-                      : "Prueba cambiando el modo o el buscador."}
-                  </p>
-                </div>
-              ) : null
-            ) : (
-              <>
-                {viewMode === "grid" && (
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
-                    {contentLists.map((l, index) => (
-                      <ListEntrance
-                        key={`${l.source}-${l.id}`}
-                        index={index}
-                        instant={isBackNav}
-                        className="h-full"
-                      >
-                        <GridListCard
-                          list={l}
-                          itemsState={itemsMap[getListCacheKey(l)]}
-                          ensureListItems={ensureListItems}
-                        />
-                      </ListEntrance>
-                    ))}
-                  </div>
-                )}
-
-                {viewMode === "rows" && (
-                  <div className="space-y-12">
-                    {contentLists.map((l, index) => (
-                      <ListEntrance key={`${l.source}-${l.id}`} index={index} instant={isBackNav}>
-                        <RowListSection
-                          list={l}
-                          itemsState={itemsMap[getListCacheKey(l)]}
-                          ensureListItems={ensureListItems}
-                          isMobile={isMobile}
-                        />
-                      </ListEntrance>
-                    ))}
-                  </div>
-                )}
-
-                {viewMode === "list" && (
-                  <div className="flex flex-col gap-3">
-                    {contentLists.map((l, index) => (
-                      <ListEntrance key={`${l.source}-${l.id}`} index={index} instant={isBackNav}>
-                        <ListModeRow
-                          list={l}
-                          itemsState={itemsMap[getListCacheKey(l)]}
-                          ensureListItems={ensureListItems}
-                        />
-                      </ListEntrance>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-          </motion.div>
-        </AnimatePresence>
+          <ListsContent
+            contentSource={contentSource}
+            contentLists={contentLists}
+            sourceInitialized={sourceInitialized}
+            source={source}
+            viewMode={viewMode}
+            itemsMap={itemsMap}
+            ensureListItems={ensureListItems}
+            isMobile={isMobile}
+            isBackNav={isBackNav}
+          />
         ) : null}
 
         {/* Carga adicional de listas propias si el backend la expone. */}
