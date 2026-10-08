@@ -7,6 +7,12 @@ import { userLists, userListItems } from '../db/schema.js';
 import { eq, and, asc, desc, sql } from 'drizzle-orm';
 import { getMediaMetadataMap, metadataFor } from '../utils/mediaMetadata.js';
 import { buildRatingSummary, hydrateListRatings, isMissingVoteAverageColumn } from '../utils/listRatings.js';
+import {
+  getUserListCommunityId,
+  publishUserList,
+  syncPublishedUserList,
+  unpublishUserList,
+} from '../community/userLists.js';
 
 const userListItemFields = {
   id: userListItems.id,
@@ -144,11 +150,17 @@ export default async function listsRoutes(fastify) {
 
     const ratedItems = await hydrateListRatings(items);
 
+    const canEdit = list.userId === req.user.id;
+    // Si está publicada en «Listas de la comunidad» (solo lo ve su dueño).
+    const communityListId = canEdit ? await getUserListCommunityId(list.id) : null;
+
     return reply.send({
       list,
       items: ratedItems,
       ratingSummary: buildRatingSummary(ratedItems),
-      canEdit: list.userId === req.user.id,
+      canEdit,
+      inCommunity: Boolean(communityListId),
+      communityListId,
     });
   });
 
@@ -166,7 +178,22 @@ export default async function listsRoutes(fastify) {
       .returning();
 
     if (!list) return reply.status(404).send({ error: 'List not found' });
-    return reply.send({ list });
+
+    // «Listas de la comunidad»: `inCommunity` (opcional) publica o retira la
+    // lista; sin él, si ya estaba publicada se resincroniza con lo editado (y se
+    // retira si ha pasado a privada). Solo las listas públicas se publican.
+    const inCommunity = req.body?.inCommunity;
+    let communityListId = null;
+    if (inCommunity === true) {
+      communityListId = await publishUserList(list.id);
+    } else if (inCommunity === false) {
+      await unpublishUserList(list.id);
+    } else {
+      await syncPublishedUserList(list.id, req.log);
+      communityListId = await getUserListCommunityId(list.id);
+    }
+
+    return reply.send({ list, inCommunity: Boolean(communityListId), communityListId });
   });
 
   // DELETE /lists/:id — Eliminar lista
@@ -218,6 +245,7 @@ export default async function listsRoutes(fastify) {
 
     // Actualizar updatedAt de la lista
     await db.update(userLists).set({ updatedAt: new Date() }).where(eq(userLists.id, list.id));
+    await syncPublishedUserList(list.id, req.log);
 
     return reply.status(201).send({ item });
   });
@@ -234,6 +262,7 @@ export default async function listsRoutes(fastify) {
 
     await db.delete(userListItems).where(eq(userListItems.listId, list.id));
     await db.update(userLists).set({ updatedAt: new Date() }).where(eq(userLists.id, list.id));
+    await syncPublishedUserList(list.id, req.log);
     return reply.send({ ok: true });
   });
 
@@ -262,6 +291,7 @@ export default async function listsRoutes(fastify) {
       );
 
     await db.update(userLists).set({ updatedAt: new Date() }).where(eq(userLists.id, list.id));
+    await syncPublishedUserList(list.id, req.log);
     return reply.send({ ok: true });
   });
 
@@ -290,6 +320,7 @@ export default async function listsRoutes(fastify) {
       )
     );
 
+    await syncPublishedUserList(list.id, req.log);
     return reply.send({ ok: true });
   });
 }
