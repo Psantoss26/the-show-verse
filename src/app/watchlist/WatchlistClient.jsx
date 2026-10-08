@@ -1438,15 +1438,17 @@ function InlineDropdown({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 8, scale: 0.98 }}
                 transition={{ duration: 0.16, ease: "easeOut" }}
-                className="overflow-y-auto overflow-x-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl [scrollbar-color:#3f3f46_transparent]"
+                className="flex flex-col overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl"
                 style={{
                   ...menuStyle,
-                  scrollbarWidth: "thin",
-                  scrollbarGutter: "stable",
-                  overscrollBehavior: "contain",
                 }}
               >
-                {children({ close: () => setOpen(false) })}
+                <div
+                  className="min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-color:#3f3f46_transparent]"
+                  style={{ scrollbarWidth: "thin", scrollbarGutter: "stable" }}
+                >
+                  {children({ close: () => setOpen(false) })}
+                </div>
               </motion.div>
             )}
           </AnimatePresence>,

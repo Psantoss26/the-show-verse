@@ -18,6 +18,7 @@ import {
     resolveCommunityListDetailsInitialState,
 } from '@/lib/lists/detailsInitialState'
 import { useIsHistoryNavigation } from '@/lib/hooks/useIsHistoryNavigation'
+import { buildListShareCard, buildListShareStory, listNoun, normalizeListShareItem } from '@/lib/lists/shareList'
 
 const PAGE_SIZE = 48
 const TRAKT_LIST_DETAILS_CACHE_TTL_MS = 20 * 60 * 1000
@@ -303,11 +304,49 @@ export default function TraktListDetailsClient({ username, listId }) {
         )
     }
 
+    // IMAGEN Y VÍDEO COMPARTIBLES con lo cargado (la primera página basta para
+    // la vista previa y las mejor valoradas); los recuentos, del total.
+    const shareItems = items.map((item) => normalizeListShareItem(item, imdbRatings))
+    const allLoaded = items.length >= listItemCount
+    const shareNoun = allLoaded ? listNoun(shareItems) : 'title'
+    const movieCount = shareItems.filter((item) => item.mediaType === 'movie').length
+    const tvCount = shareItems.length - movieCount
+    const share = {
+        card: buildListShareCard({
+            title: list?.name || 'Lista',
+            label: 'Lista de la comunidad',
+            items: shareItems,
+            count: listItemCount,
+            noun: shareNoun,
+            meta: [`@${creatorUsername}`],
+            tmdb: state.ratingSummary,
+            imdb: imdbSummary,
+        }),
+        story: buildListShareStory({
+            items: shareItems,
+            count: listItemCount,
+            noun: shareNoun,
+            description: list?.description || '',
+            facts: [
+                { icon: 'layers', label: 'Elementos', value: String(listItemCount) },
+                { icon: 'users', label: 'Creador', value: `@${creatorUsername}` },
+                { icon: 'heart', label: 'Me gusta', value: String(Number(list?.likes || 0)) },
+                ...(allLoaded && movieCount && tvCount
+                    ? [
+                        { icon: 'film', label: 'Películas', value: String(movieCount) },
+                        { icon: 'tv', label: 'Series', value: String(tvCount) },
+                    ]
+                    : []),
+            ],
+        }),
+    }
+
     return (
         <UnifiedListDetailsLayout
             title={list?.name || 'Lista'}
             description={list?.description || ''}
             sourceLabel="Lista de la comunidad"
+            share={share}
             posterItems={items}
             backdropImage={tmdbImg(firstBackdrop, 'original')}
             scoreboardStats={[

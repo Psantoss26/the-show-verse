@@ -1080,7 +1080,7 @@ export function BackdropPreviewCard({
           >
           <motion.div
             initial={{ scale: 1 }}
-            animate={{ scale: 1.08 }}
+            animate={{ scale: reduceMotion ? 1 : 1.08 }}
             transition={{ duration: 4, ease: "easeOut" }}
             className={`absolute inset-0 h-full w-full transition-opacity duration-300 ${
               showTrailer && trailerPlaying ? "opacity-0" : "opacity-100"
@@ -1101,7 +1101,7 @@ export function BackdropPreviewCard({
 
         {showTrailer && (
           <>
-            {(trailerLoading || !trailerSrc) && (
+            {(trailerLoading || !trailerSrc) && !bgSrc && (
               <div className="absolute inset-0 animate-pulse bg-neutral-900" />
             )}
             {trailerSrc && (
@@ -1205,8 +1205,8 @@ export function BackdropPreviewCard({
           genres={previewDetails.genreObjects}
         />
 
-        {extras?.awards && (
-          <div className="mt-1.5 mb-1.5 flex items-center gap-2 text-[11px] font-bold text-emerald-300 drop-shadow-md sm:text-xs">
+        <div className="min-h-4 mt-1.5 mb-1.5 flex items-center gap-2 text-[11px] font-bold text-emerald-300 drop-shadow-md sm:text-xs">
+          {extras?.awards && (
             <motion.span
               key={extras.awards}
               initial={{ opacity: 0 }}
@@ -1217,26 +1217,28 @@ export function BackdropPreviewCard({
               <Award className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span className="line-clamp-1">{extras.awards}</span>
             </motion.span>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Puntuaciones TMDb · IMDb con el MISMO componente compartido que usa
             DetailModal (mismo diseño). Orden espejo del modal: acciones →
             meta → premios → puntuaciones. */}
-        {extras?.ratingsReady && (
-          <DetailsRatingsBadges
-            tmdb={
-              hasTmdbRating
-                ? { value: tmdbRating, sub: formatCountShort(item.vote_count) }
-                : null
-            }
-            imdb={
-              typeof extras?.imdbRating === "number"
-                ? { value: extras.imdbRating.toFixed(1), sub: null }
-                : null
-            }
-          />
-        )}
+        <div className="min-h-7">
+          {extras?.ratingsReady && (
+            <DetailsRatingsBadges
+              tmdb={
+                hasTmdbRating
+                  ? { value: tmdbRating, sub: formatCountShort(item.vote_count) }
+                  : null
+              }
+              imdb={
+                typeof extras?.imdbRating === "number"
+                  ? { value: extras.imdbRating.toFixed(1), sub: null }
+                  : null
+              }
+            />
+          )}
+        </div>
 
         {error && (
           <p className="mt-1.5 line-clamp-1 text-[11px] text-red-400">{error}</p>

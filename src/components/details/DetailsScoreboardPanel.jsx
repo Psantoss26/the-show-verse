@@ -464,7 +464,7 @@ export function DetailsStatsRow({
 //    - `platformsMenuOnly`: muestra plataformas en un botón etiquetado también
 //      en escritorio (variante de DetailModal).
 //    - `showExternalLinksLabel`: muestra la etiqueta del botón desde `sm`.
-//    - `share`: { title, text?, url?, card?, story? } -> <ActionShareButton>.
+//    - `share`: { title, text?, url?, card?, story?, kind? } -> <ActionShareButton>.
 //      Se ancla a la derecha con ml-auto (siempre visible si se pasa). Con
 //      `card` abre la hoja de compartir con la imagen de la ficha; con `story`,
 //      también con el vídeo.
@@ -545,6 +545,7 @@ function DetailsToolbarActions({
         url={share.url}
         card={share.card}
         story={share.story}
+        kind={share.kind}
         iconOnly={shareIconOnly || phone}
         animateEntrance={!platformsMenuOnly}
       />

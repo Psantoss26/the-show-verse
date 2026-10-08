@@ -323,7 +323,7 @@ export function UnifiedRateButton({
 // fila (ScoreboardPillRow). Es un <button> normal, sin Framer: su
 // entrada la pone el revelado del marcador sobre el propio botón, y una
 // transformación de Framer encima se pelearía con ella.
-export function ActionShareButton({ title, text, url, card = null, story = null, iconOnly = false, animateEntrance = true, variant = "default", className = "" }) {
+export function ActionShareButton({ title, text, url, card = null, story = null, kind = "details", iconOnly = false, animateEntrance = true, variant = "default", className = "" }) {
   const [copied, setCopied] = useState(false);
   const [sheetCard, setSheetCard] = useState(null);
   const [sheetStory, setSheetStory] = useState(null);
@@ -388,6 +388,7 @@ export function ActionShareButton({ title, text, url, card = null, story = null,
       onClose={closeSheet}
       card={sheetCard}
       story={sheetStory}
+      kind={kind}
       title={title}
       text={text}
       getUrl={resolveUrl}

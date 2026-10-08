@@ -21,6 +21,7 @@ import useListImdbRatings from '@/hooks/useListImdbRatings'
 import { useIsHistoryNavigation } from '@/lib/hooks/useIsHistoryNavigation'
 import { fetchTmdbImages } from '@/lib/tmdb/imageRequests'
 import { pickHeroBackdropPath, pickMobileHeroPosterPath } from '@/lib/details/tmdbImages'
+import { buildListShareCard, buildListShareStory, listYearSpan, normalizeListShareItem } from '@/lib/lists/shareList'
 
 const COLLECTION_DETAILS_CACHE_TTL_MS = 30 * 60 * 1000
 const useClientLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
@@ -243,6 +244,42 @@ export default function CollectionDetailsClient({ collectionId }) {
     const backgroundBackdrop = customBackdrop || autoBackdrop
     const backgroundPoster = collection?.mobile_background_path || autoMobileBackground
 
+    // IMAGEN Y VÍDEO COMPARTIBLES: la portada es el póster oficial CON idioma
+    // (el del marco de la página, incluida la elección de «Editar colección»),
+    // entero y sin texto encima: ya lleva el título impreso. El fondo del vídeo
+    // es el fondo móvil sin texto. El reparto destacado tiene su propia sección.
+    const shareItems = parts.map((movie) => normalizeListShareItem(movie, imdbRatings))
+    const yearSpan = listYearSpan(shareItems)
+    const share = {
+        card: buildListShareCard({
+            kind: 'collection',
+            title: collection?.name || 'Colección',
+            label: 'Colección TMDb',
+            layout: 'poster',
+            coverPath: collectionPoster || backgroundPoster,
+            backdropPath: backgroundPoster || collectionPoster,
+            items: shareItems,
+            count: parts.length,
+            noun: 'movie',
+            meta: [yearSpan],
+            tmdb: averageRating,
+            imdb: imdbSummary,
+        }),
+        story: buildListShareStory({
+            items: shareItems,
+            count: parts.length,
+            noun: 'movie',
+            description: collection?.description || '',
+            cast: castMembers,
+            facts: [
+                { icon: 'film', label: 'Películas', value: String(parts.length) },
+                ...(yearSpan ? [{ icon: 'calendar', label: 'Años', value: yearSpan }] : []),
+                ...(totalRuntime > 0 ? [{ icon: 'clock', label: 'Duración', value: `${Math.round(totalRuntime / 60)} h` }] : []),
+                ...(revenueLabel ? [{ icon: 'trending', label: 'Ingresos', value: revenueLabel }] : []),
+            ],
+        }),
+    }
+
     return (
         <>
         <UnifiedListDetailsLayout
@@ -266,6 +303,7 @@ export default function CollectionDetailsClient({ collectionId }) {
                 imdb: ratingSummaryBadge(imdbSummary),
             }}
             showTopBar={false}
+            share={share}
             heroActions={<ListDetailsActionRow onBack={() => router.back()} onEdit={() => setEditing(true)} editLabel="Editar colección" externalHref={tmdbUrl} externalLabel="Ver colección en TMDb" onCast={castMembers.length ? () => setCastOpen(true) : null} />}
         >
             {parts.length > 0 ? (

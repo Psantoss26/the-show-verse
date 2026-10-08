@@ -30,9 +30,9 @@ import {
 const HEADER_TITLE_TOP = BRAND.top + BRAND.height + 44;
 const HEADER_TITLE_MAX_H = 180;
 const HEADER_TITLE_MAX_W = 760;
-const CONTENT_TOP = HEADER_TITLE_TOP + HEADER_TITLE_MAX_H + 70;
-const CONTENT_BOTTOM = H - 110;
-const PANEL_W = W - SIDE_MARGIN * 2;
+export const CONTENT_TOP = HEADER_TITLE_TOP + HEADER_TITLE_MAX_H + 70;
+export const CONTENT_BOTTOM = H - 110;
+export const PANEL_W = W - SIDE_MARGIN * 2;
 
 const WHITE = (alpha) => `rgba(255, 255, 255, ${alpha})`;
 const YELLOW_300 = rgba(COLORS.yellow.secondary, 1);
@@ -60,7 +60,7 @@ function Layer({ fonts, children, style }) {
 }
 
 // Contenido de una sección, centrado en su zona.
-function SceneBody({ fonts, children }) {
+export function SceneBody({ fonts, children }) {
   return (
     <Layer fonts={fonts}>
       <div
@@ -83,7 +83,7 @@ function SceneBody({ fonts, children }) {
 }
 
 // El mismo cristal que el marcador de la ficha (LIQUID_GLASS_SURFACE).
-function Glass({ children, style }) {
+export function Glass({ children, style }) {
   return (
     <div
       style={{
@@ -103,7 +103,7 @@ function Glass({ children, style }) {
 
 // Etiqueta de la sección: una píldora de cristal con icono, como los títulos de
 // sección de la ficha.
-function Eyebrow({ icon, label, color = WHITE(0.9) }) {
+export function Eyebrow({ icon, label, color = WHITE(0.9) }) {
   return (
     <div
       style={{
@@ -161,7 +161,7 @@ function BigFigure({ value, suffix, color, glow, size = 300 }) {
   );
 }
 
-function Caption({ children, style }) {
+export function Caption({ children, style }) {
   return (
     <div style={{ display: "flex", marginTop: 18, fontSize: 52, fontWeight: 700, color: WHITE(0.82), ...style }}>
       {children}
@@ -617,7 +617,7 @@ function factSize(facts) {
     : { rows, icon: 40, label: 25, value: 42, gap: 40 };
 }
 
-function FactGrid({ facts }) {
+export function FactGrid({ facts }) {
   const size = factSize(facts);
   return (
     <div style={{ display: "flex", flexWrap: "wrap", width: "100%", marginBottom: -size.gap }}>
@@ -655,7 +655,7 @@ function GenreChips({ genres, style }) {
 
 // Corta un texto largo en el último límite de palabra (la sinopsis ya llega
 // recortada; aquí se ajusta al hueco que dejan las celdas).
-function clip(value, max) {
+export function clip(value, max) {
   if (!value || value.length <= max) return value;
   const cut = value.slice(0, max - 1);
   const space = cut.lastIndexOf(" ");

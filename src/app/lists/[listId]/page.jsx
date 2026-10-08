@@ -18,6 +18,7 @@ import { shouldRenderCachedListDuringAuthHydration } from '@/lib/lists/detailsIn
 import { useIsHistoryNavigation } from '@/lib/hooks/useIsHistoryNavigation'
 import { ratingSummaryBadge, summarizeListRatings } from '@/lib/lists/ratingSummary'
 import useListImdbRatings from '@/hooks/useListImdbRatings'
+import { buildListShareCard, buildListShareStory, normalizeListShareItem } from '@/lib/lists/shareList'
 
 import {
     getListDetails,
@@ -567,11 +568,38 @@ export default function ListDetailsPage() {
     const visibility = data?.public ? 'Pública' : 'Privada'
     const averageRating = summarizeListRatings(items)
 
+    // IMAGEN Y VÍDEO COMPARTIBLES: mosaico con los pósters de la lista, vista
+    // previa de sus títulos y medias; en el vídeo, el contenido, las mejor
+    // valoradas y las mismas cifras que la fila de stats.
+    const shareItems = items.map((item) => normalizeListShareItem(item, imdbRatings))
+    const share = {
+        card: buildListShareCard({
+            title: data?.name || 'Lista',
+            label: 'Lista de usuario',
+            items: shareItems,
+            count: items.length,
+            tmdb: averageRating,
+            imdb: imdbSummary,
+        }),
+        story: buildListShareStory({
+            items: shareItems,
+            count: items.length,
+            description: data?.description || '',
+            facts: [
+                { icon: 'layers', label: 'Elementos', value: String(items.length) },
+                ...(movieCount ? [{ icon: 'film', label: 'Películas', value: String(movieCount) }] : []),
+                ...(tvCount ? [{ icon: 'tv', label: 'Series', value: String(tvCount) }] : []),
+                { icon: 'eye', label: 'Visibilidad', value: visibility },
+            ],
+        }),
+    }
+
     return (
         <UnifiedListDetailsLayout
             title={data?.name || 'Lista'}
             description={data?.description || ''}
             sourceLabel="Lista de usuario"
+            share={share}
             posterItems={items}
             backdropImage={backdropPath ? `https://image.tmdb.org/t/p/original${backdropPath}` : null}
             scoreboardStats={[

@@ -10,6 +10,10 @@
 //
 // Imagen y vídeo se generan al pedirlos y se guardan mientras el botón siga
 // montado: volver a abrir la hoja con los mismos estados no los regenera.
+//
+// La misma hoja comparte LISTAS y COLECCIONES (`kind="list"`): cambia de dónde
+// salen la imagen y las capas del vídeo (lib/lists/shareList) y la historia
+// llega ya armada por la página.
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -38,10 +42,30 @@ import {
 } from "@/lib/android/appBridge";
 import { shareCardFileName } from "@/lib/details/shareCard";
 import { buildShareStoryPayload, sanitizeShareStory, storySceneIds } from "@/lib/details/shareStory";
+import { listStorySceneIds, sanitizeListShareStory } from "@/lib/lists/shareList";
+import { prepareListShare } from "@/lib/lists/shareListPosters";
 import { getLocalInProgress } from "@/lib/api/progressClient";
 import { createStoryVideo, detectStoryVideoFormat } from "@/lib/share/storyVideo";
 import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER } from "@/lib/ui/liquidGlass";
 import styles from "./DetailsShareSheet.module.css";
+
+// De dónde sale cada cosa según lo que se comparte.
+const SHARE_KINDS = {
+  details: {
+    cardEndpoint: "/api/share/details-card",
+    storyEndpoint: "/api/share/details-story",
+    buildStory: (story, extras) => sanitizeShareStory(buildShareStoryPayload({ ...story, ...extras })),
+    sceneIds: storySceneIds,
+  },
+  list: {
+    cardEndpoint: "/api/share/list-card",
+    storyEndpoint: "/api/share/list-story",
+    buildStory: (story) => sanitizeListShareStory(story),
+    sceneIds: listStorySceneIds,
+    // Antes de pedir nada: los pósters de las tarjetas de la página.
+    prepare: prepareListShare,
+  },
+};
 
 // La ruta devuelve PNG (~3 MB por el póster a sangre). Para compartir se pasa a
 // JPEG, que con el fondo opaco queda igual a la vista y pesa una fracción: se
@@ -188,7 +212,43 @@ function ModeSwitch({ mode, onChange }) {
   );
 }
 
-export default function DetailsShareSheet({ open, onClose, card, story, title, text, getUrl }) {
+export default function DetailsShareSheet({
+  open,
+  onClose,
+  card: sourceCard,
+  story: sourceStory,
+  title,
+  text,
+  getUrl,
+  kind = "details",
+}) {
+  const config = SHARE_KINDS[kind] || SHARE_KINDS.details;
+
+  // PREPARACIÓN ASÍNCRONA (listas): el payload que llega de la página se
+  // completa al abrir la hoja (p. ej. con los pósters ingleses de sus
+  // tarjetas) y la imagen y el vídeo esperan a tenerlo. Se guarda mientras el
+  // botón siga montado, como la imagen: reabrir con lo mismo no repite nada.
+  const prepareKey = config.prepare && sourceCard ? JSON.stringify([sourceCard, sourceStory]) : "";
+  const [prepared, setPrepared] = useState(null);
+  useEffect(() => {
+    if (!open || !prepareKey || prepared?.key === prepareKey) return undefined;
+    let cancelled = false;
+    config
+      .prepare(sourceCard, sourceStory)
+      .catch(() => ({ card: sourceCard, story: sourceStory }))
+      .then((result) => {
+        if (!cancelled) setPrepared({ key: prepareKey, ...result });
+      });
+    return () => {
+      cancelled = true;
+    };
+    // `sourceCard` y `sourceStory` van dentro de `prepareKey`; `prepared` se
+    // lee solo para no repetir.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, prepareKey]);
+  const preparing = !!prepareKey && prepared?.key !== prepareKey;
+  const card = !prepareKey ? sourceCard : preparing ? null : prepared.card;
+  const story = !prepareKey ? sourceStory : preparing ? null : prepared.story;
   const titleId = useId();
   const closeRef = useRef(null);
   const [portalReady, setPortalReady] = useState(false);
@@ -218,7 +278,7 @@ export default function DetailsShareSheet({ open, onClose, card, story, title, t
   // (no al cargar la ficha, que no los necesita): el progreso de «Continuar
   // viendo» del título y, en las series, las notas que el usuario ha dado a sus
   // episodios. El vídeo espera a tenerlos para no generarse dos veces.
-  const extrasKey = story?.tmdbId ? `${story.type}:${story.tmdbId}` : "";
+  const extrasKey = kind === "details" && story?.tmdbId ? `${story.type}:${story.tmdbId}` : "";
   const [storyExtras, setStoryExtras] = useState(null);
   useEffect(() => {
     if (!open) {
@@ -272,15 +332,12 @@ export default function DetailsShareSheet({ open, onClose, card, story, title, t
   const imageReady = status === "ready" && image?.key === cardKey;
 
   const storyPayload = story
-    ? sanitizeShareStory(
-        buildShareStoryPayload({
-          ...story,
-          continueWatching: extrasReady ? storyExtras?.continueWatching : null,
-          episodeUserRatings: extrasReady ? storyExtras?.episodeUserRatings : null,
-        }),
-      )
+    ? config.buildStory(story, {
+        continueWatching: extrasReady ? storyExtras?.continueWatching : null,
+        episodeUserRatings: extrasReady ? storyExtras?.episodeUserRatings : null,
+      })
     : null;
-  const sceneIds = storyPayload ? storySceneIds(card, storyPayload) : [];
+  const sceneIds = storyPayload ? config.sceneIds(card, storyPayload) : [];
   const videoKey = storyPayload ? `${cardKey}|${JSON.stringify(storyPayload)}` : "";
   const videoReady = videoStatus === "ready" && video?.key === videoKey;
 
@@ -295,7 +352,7 @@ export default function DetailsShareSheet({ open, onClose, card, story, title, t
     setStatus("loading");
     (async () => {
       try {
-        const res = await fetch("/api/share/details-card", {
+        const res = await fetch(config.cardEndpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: cardKey,
@@ -321,7 +378,7 @@ export default function DetailsShareSheet({ open, onClose, card, story, title, t
 
   // ¿Sabe este navegador codificar vídeo? Se pregunta una vez, al abrir.
   useEffect(() => {
-    if (!open || !story || videoFormat !== undefined) return undefined;
+    if (!open || !sourceStory || videoFormat !== undefined) return undefined;
     let cancelled = false;
     detectStoryVideoFormat().then((format) => {
       if (!cancelled) setVideoFormat(format);
@@ -329,7 +386,7 @@ export default function DetailsShareSheet({ open, onClose, card, story, title, t
     return () => {
       cancelled = true;
     };
-  }, [open, story, videoFormat]);
+  }, [open, sourceStory, videoFormat]);
 
   // Generar (o reutilizar) el vídeo al elegirlo. Parte de la imagen de portada,
   // así que espera a que esté. Cerrar o cambiar de modo cancela la generación.
@@ -350,6 +407,7 @@ export default function DetailsShareSheet({ open, onClose, card, story, title, t
           sceneIds,
           cover: image.png,
           format: videoFormat,
+          endpoint: config.storyEndpoint,
           onProgress: setVideoProgress,
           signal: controller.signal,
         });
@@ -497,7 +555,9 @@ export default function DetailsShareSheet({ open, onClose, card, story, title, t
 
   // La principal es la primera forma de mandar la imagen o el vídeo que haya.
   const primaryAction = showShareMedia ? "share" : showCopyImage ? "copy" : showSave ? "save" : null;
-  const showModeSwitch = !!videoFormat && !!storyPayload;
+  // Con `sourceStory` y no con el payload: no aparece de golpe al terminar de
+  // preparar.
+  const showModeSwitch = !!videoFormat && !!sourceStory;
   const progressPct = Math.round(videoProgress * 100);
 
   // Misma estructura y acabado que los modales de las acciones de la ficha

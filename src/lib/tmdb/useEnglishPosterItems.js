@@ -1,22 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { pickBestFavoriteEnglishPoster } from "@/lib/details/tmdbImages";
-import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
+import {
+  englishPosterCache,
+  englishPosterKey as posterKey,
+  resolveEnglishPosterPath,
+} from "@/lib/tmdb/englishPosters";
 
 // Compartida por las superficies de Perfil: una misma ficha conserva el
 // criterio de portada de DetailsClient sin reescribir el póster persistido.
-const englishPosterCache = new Map();
-
-function posterKey(item) {
-  const id = item?.tmdbId ?? item?.tmdb_id ?? item?.id;
-  if (id == null) return null;
-  const rawType = item?.mediaType ?? item?.media_type;
-  const mediaType = rawType === "tv" || rawType === "show" || rawType === "episode"
-    ? "tv"
-    : "movie";
-  return `${mediaType}:${id}`;
-}
+// La caché y la elección viven en lib/tmdb/englishPosters, que también usa la
+// imagen compartible de una lista.
 
 /**
  * Sustituye solo en pantalla el póster de cada título por la elección inglesa
@@ -60,21 +54,7 @@ export function useEnglishPosterItems(
 
     let cancelled = false;
     void Promise.all(
-      missingItems.map(async ({ key, item }) => {
-        try {
-          const mediaType = key.startsWith("tv:") ? "tv" : "movie";
-          const tmdbId = item?.tmdbId ?? item?.tmdb_id ?? item?.id;
-          const images = await fetchTmdbImages(mediaType, tmdbId);
-          const posterPath = pickBestFavoriteEnglishPoster(images?.posters || [])?.file_path || null;
-          englishPosterCache.set(key, posterPath);
-          return [key, posterPath];
-        } catch {
-          // Una petición fallida tampoco debe exponer un póster localizado
-          // mientras se está mostrando una parrilla que exige arte inglés.
-          englishPosterCache.set(key, null);
-          return [key, null];
-        }
-      }),
+      missingItems.map(async ({ key, item }) => [key, await resolveEnglishPosterPath(item)]),
     ).then((entries) => {
       if (cancelled) return;
       setResolvedPosters((current) => {
