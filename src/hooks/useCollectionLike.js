@@ -6,6 +6,8 @@
 
 import { useCallback, useEffect, useState } from 'react'
 
+import { mergeCollectionLikes } from '@/lib/lists/collectionLikesCache'
+
 export default function useCollectionLike(collectionId) {
     const [state, setState] = useState({ ready: false, likes: 0, liked: false })
 
@@ -17,6 +19,9 @@ export default function useCollectionLike(collectionId) {
             .then((res) => (res.ok ? res.json() : null))
             .then((json) => {
                 const entry = json?.likes?.[id]
+                if (!entry) throw new Error('likes')
+                // El índice de /lists lo reutiliza al volver (orden por likes).
+                mergeCollectionLikes({ [id]: Number(entry.likes) || 0 })
                 setState({ ready: true, likes: Number(entry?.likes) || 0, liked: Boolean(entry?.liked) })
             })
             .catch((error) => {
@@ -27,8 +32,9 @@ export default function useCollectionLike(collectionId) {
 
     // Lo que confirma el botón tras dar o quitar el me gusta.
     const update = useCallback((next) => {
+        mergeCollectionLikes({ [Number(collectionId)]: Number(next?.likes) || 0 })
         setState({ ready: true, likes: Number(next?.likes) || 0, liked: Boolean(next?.liked) })
-    }, [])
+    }, [collectionId])
 
     return { ...state, update }
 }

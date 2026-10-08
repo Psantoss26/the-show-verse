@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { toCollectionSummary } from "@/lib/tmdb/featuredCollections";
 
 const TMDB_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const TMDB_API = "https://api.themoviedb.org/3";
@@ -50,22 +51,8 @@ export async function GET(request) {
             cache: "force-cache",
             next: { revalidate: 3600 },
           });
-          const parts = Array.isArray(c?.parts) ? c.parts : [];
-          const cleanName = (c?.name || "Colección")
-            .replace(/ Collection$/i, "")
-            .replace(/ - Colección$/i, "");
-          return {
-            source: "collection",
-            id: String(c?.id),
-            name: cleanName,
-            description: c?.overview || "",
-            item_count: parts.length,
-            poster_path: c?.poster_path || null,
-            backdrop_path: c?.backdrop_path || null,
-            tmdbUrl: c?.id
-              ? `https://www.themoviedb.org/collection/${c.id}`
-              : null,
-          };
+          // Mismo formato que las destacadas (incluida la popularidad).
+          return toCollectionSummary(c);
         } catch {
           return null;
         }

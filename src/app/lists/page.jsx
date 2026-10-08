@@ -26,6 +26,11 @@ import { getDetails, getExternalIds } from "@/lib/api/tmdb";
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { useAuth } from "@/context/AuthContext";
 import useCardEntrance from "@/hooks/useCardEntrance";
+import {
+  hasCollectionLikes,
+  mergeCollectionLikes,
+  readCollectionLikes,
+} from "@/lib/lists/collectionLikesCache";
 import { formatPageTitle } from "@/lib/pageTitle";
 import LiquidButton from "@/components/LiquidButton";
 import Avatar from "@/components/ui/Avatar";
@@ -92,6 +97,8 @@ const VALID_SORT_MODES = new Set([
   "items_asc",
   "likes_desc",
   "likes_asc",
+  "popularity_desc",
+  "popularity_asc",
   "name_asc",
   "name_desc",
 ]);
@@ -255,7 +262,7 @@ function writeSessionJsonCache(key, data) {
 // a la que ya está en curso. Una respuesta vacía o fallida no se memoriza.
 // v2: la selección de destacadas creció (y se corrigieron ids erróneos); la
 // versión nueva evita servir la anterior de la caché de la sesión.
-const FEATURED_COLLECTIONS_CACHE_KEY = "showverse:lists:featured-collections:v4";
+const FEATURED_COLLECTIONS_CACHE_KEY = "showverse:lists:featured-collections:v5";
 let featuredCollectionsRequest = null;
 
 function readCachedFeaturedCollections() {
@@ -273,7 +280,7 @@ function loadFeaturedCollections({ force = false } = {}) {
   }
   if (!force && featuredCollectionsRequest) return featuredCollectionsRequest;
 
-  const request = fetch("/api/tmdb/collections/featured?v=4", {
+  const request = fetch("/api/tmdb/collections/featured?v=5", {
     cache: force ? "no-cache" : "default",
   })
     .then((res) => res.json().catch(() => ({})))
@@ -945,6 +952,29 @@ const ListItemCard = memo(function ListItemCard({
   );
 });
 
+// Criterios de «Ordenar». La popularidad solo existe en las colecciones (media
+// de la popularidad de TMDb de sus películas, ver toCollectionSummary).
+const SORT_OPTIONS = [
+  { id: "items_desc", label: "Más items" },
+  { id: "items_asc", label: "Menos items" },
+  { id: "likes_desc", label: "Más likes" },
+  { id: "likes_asc", label: "Menos likes" },
+  { id: "popularity_desc", label: "Más populares", collectionsOnly: true },
+  { id: "popularity_asc", label: "Menos populares", collectionsOnly: true },
+  { id: "name_asc", label: "A-Z" },
+  { id: "name_desc", label: "Z-A" },
+];
+
+function sortOptionsFor(source) {
+  return SORT_OPTIONS.filter((option) => !option.collectionsOnly || source === "collections");
+}
+
+// El orden guardado puede ser de colecciones (popularidad): en las demás
+// pestañas no aplica y se ordena como por defecto, sin perder la preferencia.
+function effectiveSortMode(sortMode, source) {
+  return sortOptionsFor(source).some((option) => option.id === sortMode) ? sortMode : "items_desc";
+}
+
 function sortLists(lists, mode) {
   const arr = [...lists];
   switch (mode) {
@@ -960,6 +990,10 @@ function sortLists(lists, mode) {
       return arr.sort((a, b) => (b?.likes || 0) - (a?.likes || 0));
     case "likes_asc":
       return arr.sort((a, b) => (a?.likes || 0) - (b?.likes || 0));
+    case "popularity_desc":
+      return arr.sort((a, b) => (b?.popularity || 0) - (a?.popularity || 0));
+    case "popularity_asc":
+      return arr.sort((a, b) => (a?.popularity || 0) - (b?.popularity || 0));
     default:
       return arr;
   }
@@ -1578,8 +1612,9 @@ export default function ListsPage() {
   const [searchedCollections, setSearchedCollections] = useState([]);
   // Me gusta públicos de las colecciones: id -> número. Se piden en lote para
   // las colecciones de la pestaña (destacadas o buscadas) y permiten ordenar
-  // por likes.
-  const [collectionLikes, setCollectionLikes] = useState({});
+  // por likes. Se parte de los ya conocidos en la sesión (collectionLikesCache):
+  // las colecciones no se pintan sin sus likes, para que no cambien de sitio.
+  const [collectionLikes, setCollectionLikes] = useState(readCollectionLikes);
 
   // Map: `${source}:${id}` -> undefined (no pedido) | null (cargando) | Array(items)
   const [itemsMap, setItemsMap] = useState({});
@@ -1641,7 +1676,9 @@ export default function ListsPage() {
         : source === "collections"
           ? collectionsQueryKey || "featured"
           : "personal";
-    return `showverse:lists:index:${source}:${scope}:v1`;
+    // Colecciones en v2: sus entradas llevan ya la popularidad (para ordenar
+    // por ella sin recolocar las tarjetas al llegar las vivas).
+    return `showverse:lists:index:${source}:${scope}:${source === "collections" ? "v2" : "v1"}`;
   }, [source, collectionsQueryKey]);
 
   // Caché de la pestaña ACTIVA, leída en el mismo render que su clave. Antes era
@@ -1717,14 +1754,16 @@ export default function ListsPage() {
 
   // Me gusta de las colecciones visibles, en una petición. Se vuelven a pedir al
   // montar (p. ej. al volver de una ficha donde se ha dado me gusta).
-  const collectionIdsKey = useMemo(() => {
-    if (source !== "collections") return "";
+  const collectionIds = useMemo(() => {
+    if (source !== "collections") return [];
     const cols = deferredQuery.trim() ? searchedCollections : featuredCollections;
     return (Array.isArray(cols) ? cols : [])
       .map((c) => Number(c?.id))
-      .filter((id) => Number.isInteger(id) && id > 0)
-      .join(",");
+      .filter((id) => Number.isInteger(id) && id > 0);
   }, [source, deferredQuery, searchedCollections, featuredCollections]);
+  const collectionIdsKey = collectionIds.join(",");
+  // Las colecciones de la pestaña tienen ya sus likes (o no hay colecciones).
+  const collectionLikesReady = hasCollectionLikes(collectionLikes, collectionIds);
 
   useEffect(() => {
     if (!collectionIdsKey) return;
@@ -1736,14 +1775,22 @@ export default function ListsPage() {
       .then((res) => (res.ok ? res.json() : null))
       .then((json) => {
         const likes = json?.likes;
-        if (!likes || typeof likes !== "object") return;
+        if (!likes || typeof likes !== "object") throw new Error("likes");
+        const counts = {};
+        for (const [id, entry] of Object.entries(likes)) counts[id] = Number(entry?.likes) || 0;
+        mergeCollectionLikes(counts);
+        setCollectionLikes((prev) => ({ ...prev, ...counts }));
+      })
+      .catch((error) => {
+        if (error?.name === "AbortError") return;
+        // Sin servidor de likes no se bloquea la pestaña: las que falten, a 0
+        // (sin guardarlo en la sesión, para pedirlas de nuevo la próxima vez).
         setCollectionLikes((prev) => {
           const next = { ...prev };
-          for (const [id, entry] of Object.entries(likes)) next[id] = Number(entry?.likes) || 0;
+          for (const id of collectionIdsKey.split(",")) if (!Object.hasOwn(next, id)) next[id] = 0;
           return next;
         });
-      })
-      .catch(() => {});
+      });
     return () => controller.abort();
   }, [collectionIdsKey]);
 
@@ -1819,6 +1866,10 @@ export default function ListsPage() {
         ? featuredCollections
         : [];
 
+    // Sin sus likes no se pintan (ordenadas por likes saltarían al llegar):
+    // mientras, sigue la caché del índice o lo último que estuvo listo.
+    if (!collectionLikesReady) return [];
+
     return cols.map((c) => ({
       ...c,
       likes: collectionLikes[c?.id] ?? c?.likes ?? 0,
@@ -1833,6 +1884,7 @@ export default function ListsPage() {
     featuredCollections,
     searchedCollections,
     collectionLikes,
+    collectionLikesReady,
     deferredQuery,
   ]);
 
@@ -1843,15 +1895,26 @@ export default function ListsPage() {
     writeSessionJsonCache(activeListsCacheKey, fetchedActiveLists);
   }, [activeListsCacheKey, fetchedActiveLists]);
 
-  const activeLists = useMemo(
-    () =>
-      fetchedActiveLists.length > 0
-        ? fetchedActiveLists
-        : Array.isArray(cachedActiveLists)
-          ? cachedActiveLists
-          : [],
-    [fetchedActiveLists, cachedActiveLists],
-  );
+  const activeLists = useMemo(() => {
+    if (fetchedActiveLists.length > 0) return fetchedActiveLists;
+    const cached = Array.isArray(cachedActiveLists) ? cachedActiveLists : [];
+    // Colecciones de la caché del índice con los likes más recientes de la
+    // sesión (p. ej. el me gusta recién dado en su ficha): pintan ya el orden
+    // final y no se recolocan cuando llegan las vivas.
+    if (source !== "collections") return cached;
+    return cached.map((c) =>
+      Object.hasOwn(collectionLikes, String(c?.id))
+        ? { ...c, likes: collectionLikes[c.id] }
+        : c,
+    );
+  }, [fetchedActiveLists, cachedActiveLists, source, collectionLikes]);
+
+  // Criterios de la pestaña y el que se aplica de verdad (la popularidad solo
+  // en Colecciones).
+  const sortOptions = sortOptionsFor(source);
+  const activeSortMode = effectiveSortMode(sortMode, source);
+  const activeSortLabel =
+    sortOptions.find((option) => option.id === activeSortMode)?.label || "Más items";
 
   const filtered = useMemo(() => {
     const q = deferredQuery.trim().toLowerCase();
@@ -1859,15 +1922,15 @@ export default function ListsPage() {
 
     // Para colecciones, si hay búsqueda ya viene filtrado del servidor
     if (source === "collections" && q) {
-      return sortLists(activeLists, sortMode);
+      return sortLists(activeLists, activeSortMode);
     }
 
     // Para las listas propias y de comunidad, filtrar localmente.
     const base = q
       ? activeLists.filter((l) => (l?.name || "").toLowerCase().includes(q))
       : activeLists;
-    return sortLists(base, sortMode);
-  }, [activeLists, deferredQuery, sortMode, source]);
+    return sortLists(base, activeSortMode);
+  }, [activeLists, deferredQuery, activeSortMode, source]);
 
   const visibleCount = filtered.length;
 
@@ -2100,11 +2163,12 @@ export default function ListsPage() {
           ? !!personalInitialized
           : source === "trakt"
             ? !!trakt?.initialized
-            : collectionsResolvedKey === collectionsQueryKey ||
-              // Destacadas ya precargadas: listas en este mismo render, sin
-              // esperar al efecto que marca `collectionsResolvedKey`.
-              (collectionsQueryKey === "featured" &&
-                featuredCollectionsCount > 0);
+            : collectionLikesReady &&
+              (collectionsResolvedKey === collectionsQueryKey ||
+                // Destacadas ya precargadas: listas en este mismo render, sin
+                // esperar al efecto que marca `collectionsResolvedKey`.
+                (collectionsQueryKey === "featured" &&
+                  featuredCollectionsCount > 0));
 
   useEffect(() => {
     if (hasCompletedInitialLoad) return;
@@ -2362,81 +2426,23 @@ export default function ListsPage() {
                 <div className="min-w-0 flex-1">
                   <InlineDropdown
                     label="Ordenar"
-                    valueLabel={
-                      sortMode.includes("items")
-                        ? sortMode === "items_desc"
-                          ? "Más items"
-                          : "Menos items"
-                        : sortMode.includes("likes")
-                          ? sortMode === "likes_desc"
-                            ? "Más likes"
-                            : "Menos likes"
-                          : sortMode === "name_asc"
-                            ? "A-Z"
-                            : "Z-A"
-                    }
+                    valueLabel={activeSortLabel}
                     icon={ArrowUpDown}
                   >
                     {({ close }) => (
                       <>
-                        <DropdownItem
-                          active={sortMode === "items_desc"}
-                          onClick={() => {
-                            startTransition(() =>
-                              setSortMode("items_desc"),
-                            );
-                            close();
-                          }}
-                        >
-                          Más items
-                        </DropdownItem>
-                        <DropdownItem
-                          active={sortMode === "items_asc"}
-                          onClick={() => {
-                            startTransition(() => setSortMode("items_asc"));
-                            close();
-                          }}
-                        >
-                          Menos items
-                        </DropdownItem>
-                        <DropdownItem
-                          active={sortMode === "likes_desc"}
-                          onClick={() => {
-                            startTransition(() =>
-                              setSortMode("likes_desc"),
-                            );
-                            close();
-                          }}
-                        >
-                          Más likes
-                        </DropdownItem>
-                        <DropdownItem
-                          active={sortMode === "likes_asc"}
-                          onClick={() => {
-                            startTransition(() => setSortMode("likes_asc"));
-                            close();
-                          }}
-                        >
-                          Menos likes
-                        </DropdownItem>
-                        <DropdownItem
-                          active={sortMode === "name_asc"}
-                          onClick={() => {
-                            startTransition(() => setSortMode("name_asc"));
-                            close();
-                          }}
-                        >
-                          A-Z
-                        </DropdownItem>
-                        <DropdownItem
-                          active={sortMode === "name_desc"}
-                          onClick={() => {
-                            startTransition(() => setSortMode("name_desc"));
-                            close();
-                          }}
-                        >
-                          Z-A
-                        </DropdownItem>
+                        {sortOptions.map((option) => (
+                          <DropdownItem
+                            key={option.id}
+                            active={activeSortMode === option.id}
+                            onClick={() => {
+                              startTransition(() => setSortMode(option.id));
+                              close();
+                            }}
+                          >
+                            {option.label}
+                          </DropdownItem>
+                        ))}
                       </>
                     )}
                   </InlineDropdown>
@@ -2540,77 +2546,23 @@ export default function ListsPage() {
 
             <InlineDropdown
               label="Ordenar"
-              valueLabel={
-                sortMode.includes("items")
-                  ? sortMode === "items_desc"
-                    ? "Más items"
-                    : "Menos items"
-                  : sortMode.includes("likes")
-                    ? sortMode === "likes_desc"
-                      ? "Más likes"
-                      : "Menos likes"
-                    : sortMode === "name_asc"
-                      ? "A-Z"
-                      : "Z-A"
-              }
+              valueLabel={activeSortLabel}
               icon={ArrowUpDown}
             >
               {({ close }) => (
                 <>
-                  <DropdownItem
-                    active={sortMode === "items_desc"}
-                    onClick={() => {
-                      startTransition(() => setSortMode("items_desc"));
-                      close();
-                    }}
-                  >
-                    Más items
-                  </DropdownItem>
-                  <DropdownItem
-                    active={sortMode === "items_asc"}
-                    onClick={() => {
-                      startTransition(() => setSortMode("items_asc"));
-                      close();
-                    }}
-                  >
-                    Menos items
-                  </DropdownItem>
-                  <DropdownItem
-                    active={sortMode === "likes_desc"}
-                    onClick={() => {
-                      startTransition(() => setSortMode("likes_desc"));
-                      close();
-                    }}
-                  >
-                    Más likes
-                  </DropdownItem>
-                  <DropdownItem
-                    active={sortMode === "likes_asc"}
-                    onClick={() => {
-                      startTransition(() => setSortMode("likes_asc"));
-                      close();
-                    }}
-                  >
-                    Menos likes
-                  </DropdownItem>
-                  <DropdownItem
-                    active={sortMode === "name_asc"}
-                    onClick={() => {
-                      startTransition(() => setSortMode("name_asc"));
-                      close();
-                    }}
-                  >
-                    A-Z
-                  </DropdownItem>
-                  <DropdownItem
-                    active={sortMode === "name_desc"}
-                    onClick={() => {
-                      startTransition(() => setSortMode("name_desc"));
-                      close();
-                    }}
-                  >
-                    Z-A
-                  </DropdownItem>
+                  {sortOptions.map((option) => (
+                    <DropdownItem
+                      key={option.id}
+                      active={activeSortMode === option.id}
+                      onClick={() => {
+                        startTransition(() => setSortMode(option.id));
+                        close();
+                      }}
+                    >
+                      {option.label}
+                    </DropdownItem>
+                  ))}
                 </>
               )}
             </InlineDropdown>

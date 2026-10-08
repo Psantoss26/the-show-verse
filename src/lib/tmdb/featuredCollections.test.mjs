@@ -23,3 +23,17 @@ test("nombre del índice sin el sufijo de colección", () => {
   assert.equal(cleanCollectionName("Harry Potter - Colección"), "Harry Potter");
   assert.equal(cleanCollectionName("Star Wars Collection"), "Star Wars");
 });
+
+test("la popularidad de una colección es la media de la de sus películas", async () => {
+  const { collectionPopularity, toCollectionSummary } = await import("./featuredCollections.js");
+  assert.equal(collectionPopularity([{ popularity: 10 }, { popularity: 20 }, { popularity: 31 }]), 20.3);
+  // Sin dato no cuenta; sin películas, 0.
+  assert.equal(collectionPopularity([{ popularity: 12 }, {}, { popularity: null }]), 12);
+  assert.equal(collectionPopularity([]), 0);
+  assert.equal(collectionPopularity(undefined), 0);
+  // Una saga larga y poco vista hoy no supera a una corta y muy vista.
+  const bond = collectionPopularity(Array.from({ length: 27 }, () => ({ popularity: 14 })));
+  const avengers = collectionPopularity([{ popularity: 99 }, { popularity: 60 }, { popularity: 44 }]);
+  assert.ok(avengers > bond);
+  assert.equal(toCollectionSummary({ id: 1, name: "X", parts: [{ popularity: 5 }, { popularity: 7 }] }).popularity, 6);
+});

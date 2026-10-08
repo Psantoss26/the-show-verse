@@ -301,6 +301,17 @@ export function cleanCollectionName(name) {
 }
 
 /** Resumen de una colección (respuesta de /collection/{id}) para el índice. */
+// Popularidad de una colección: TMDb solo la da por película, así que es la
+// MEDIA de la de sus películas. La suma premiaría las sagas largas (James Bond,
+// 27 películas poco vistas hoy, quedaría por delante de Los Vengadores).
+export function collectionPopularity(parts) {
+  const values = (Array.isArray(parts) ? parts : [])
+    .map((part) => part?.popularity)
+    .filter((value) => typeof value === "number" && Number.isFinite(value) && value >= 0);
+  if (!values.length) return 0;
+  return Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10;
+}
+
 export function toCollectionSummary(c) {
   const parts = Array.isArray(c?.parts) ? c.parts : [];
   return {
@@ -309,6 +320,7 @@ export function toCollectionSummary(c) {
     name: cleanCollectionName(c?.name),
     description: c?.overview || "",
     item_count: parts.length,
+    popularity: collectionPopularity(parts),
     poster_path: c?.poster_path || null,
     backdrop_path: c?.backdrop_path || null,
     tmdbUrl: c?.id ? `https://www.themoviedb.org/collection/${c.id}` : null,
