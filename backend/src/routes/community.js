@@ -7,6 +7,9 @@ import {
   likeComment, unlikeComment, likeCommunityList, unlikeCommunityList,
   getCommentOwnerId, getCommunityListOwnerId,
 } from '../community/store.js';
+import {
+  getCollectionLikes, likeCollection, unlikeCollection, parseCollectionId, parseCollectionIds,
+} from '../community/collectionLikes.js';
 import { db } from '../db/client.js';
 import { invalidateLevelState } from '../level/store.js';
 import { getFollowingTitleActivity } from '../lib/followingTitleActivity.js';
@@ -129,6 +132,29 @@ export default async function communityRoutes(fastify) {
 
   fastify.delete('/lists/:id/like', { preHandler: fastify.requireAuth }, (req, reply) =>
     toggleListLike(req, reply, unlikeCommunityList));
+
+  // ── ME GUSTA en colecciones de TMDb ─────────
+  // Recuentos públicos de varias a la vez (el índice de /lists los pide todos
+  // en una petición para mostrarlos y ordenar por likes).
+  fastify.get('/collections/likes', async (req, reply) => {
+    const ids = parseCollectionIds(req.query?.ids);
+    const viewerId = req.user?.id || null;
+    const likes = await getCollectionLikes({ ids, viewerId });
+    setCommunityCache(reply, viewerId, 'public, s-maxage=60, stale-while-revalidate=600');
+    return { likes };
+  });
+
+  async function toggleCollectionLike(req, reply, action) {
+    const collectionId = parseCollectionId(req.params.id);
+    if (!collectionId) return reply.status(404).send({ error: 'Collection not found' });
+    return reply.send(await action({ collectionId, userId: req.user.id }));
+  }
+
+  fastify.post('/collections/:id/like', { preHandler: fastify.requireAuth }, (req, reply) =>
+    toggleCollectionLike(req, reply, likeCollection));
+
+  fastify.delete('/collections/:id/like', { preHandler: fastify.requireAuth }, (req, reply) =>
+    toggleCollectionLike(req, reply, unlikeCollection));
 
   // GET /:type/:tmdbId/following — "Tus amigos": qué han hecho con este título
   // las cuentas que sigue el usuario. Solo con sesión; nunca se cachea en el borde.

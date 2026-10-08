@@ -530,6 +530,20 @@ export const listLikes = pgTable('list_likes', {
   userIdx: index('idx_list_likes_user').on(t.userId, t.createdAt),
 }));
 
+// Me gusta en las COLECCIONES de TMDb (/lists → Colecciones). No viven en
+// nuestra base de datos (se piden a TMDb), así que se apuntan por su id de TMDb
+// y el recuento se calcula al vuelo: es público y ordena el índice por likes.
+export const collectionLikes = pgTable('collection_likes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  collectionId: integer('collection_id').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  uniqueLike: uniqueIndex('idx_collection_likes_unique').on(t.userId, t.collectionId),
+  collectionIdx: index('idx_collection_likes_collection').on(t.collectionId),
+  userIdx: index('idx_collection_likes_user').on(t.userId, t.createdAt),
+}));
+
 // ─────────────────────────────────────────────
 // RECOMMENDATION DISMISSALS (títulos descartados en la sección de
 // Recomendaciones, con su flujo de deslizar). Se guardan en la base de datos y

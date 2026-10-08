@@ -3,13 +3,15 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 
 // Modo de la portada (póster 2:3 ↔ backdrop 16:9) de las páginas de listas y
-// colecciones, con la MISMA preferencia global que DetailsClient
-// (`showverse:global:posterViewMode`, valores "poster" | "preview"): cambiarlo
-// en una ficha lo cambia aquí y al revés.
+// colecciones (valores "poster" | "preview", como en DetailsClient).
+//
+// Es una preferencia PROPIA de las listas y colecciones, independiente de la de
+// DetailsClient (`showverse:global:posterViewMode`): cambiar la portada de una
+// lista no cambia la de las fichas de títulos, ni al revés.
 //
 // Igual que en la ficha, solo en escritorio de verdad (ratón y viewport que no
 // sea de móvil, > 640 px): en táctil la portada se queda siempre en póster.
-export const GLOBAL_POSTER_VIEW_MODE_KEY = "showverse:global:posterViewMode";
+export const LISTS_POSTER_VIEW_MODE_KEY = "showverse:lists:posterViewMode";
 const DESKTOP_QUERY = "(hover: hover) and (min-width: 641px)";
 
 const useClientLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
@@ -24,7 +26,7 @@ export default function usePosterViewMode() {
     const sync = () => setEnabled(!!query?.matches);
     sync();
     try {
-      const saved = window.localStorage.getItem(GLOBAL_POSTER_VIEW_MODE_KEY);
+      const saved = window.localStorage.getItem(LISTS_POSTER_VIEW_MODE_KEY);
       if (saved === "poster" || saved === "preview") setModeState(saved);
     } catch {
       // localStorage no disponible: póster.
@@ -39,7 +41,7 @@ export default function usePosterViewMode() {
     const value = next === "preview" ? "preview" : "poster";
     setModeState(value);
     try {
-      window.localStorage.setItem(GLOBAL_POSTER_VIEW_MODE_KEY, value);
+      window.localStorage.setItem(LISTS_POSTER_VIEW_MODE_KEY, value);
     } catch {
       // Sin persistencia: el cambio vale para esta página.
     }

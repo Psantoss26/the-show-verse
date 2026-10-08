@@ -28,10 +28,10 @@ test("Comunidad: suma títulos y me gusta", () => {
   assert.deepEqual(values(stats), { Listas: "2", "Títulos": "1623", "Me gusta": "26,1k" });
 });
 
-test("Colecciones: sagas, películas y media por saga", () => {
-  const stats = listsHeaderStats("collections", [{ item_count: 9 }, { item_count: 8 }, { item_count: 3 }]);
-  assert.deepEqual(values(stats), { Sagas: "3", "Películas": "20", "Media por saga": "6,7" });
-  assert.equal(values(listsHeaderStats("collections", []))["Media por saga"], "0");
+test("Colecciones: sagas, películas y me gusta", () => {
+  const stats = listsHeaderStats("collections", [{ item_count: 9, likes: 4 }, { item_count: 8 }, { item_count: 3, likes: 1 }]);
+  assert.deepEqual(values(stats), { Sagas: "3", "Películas": "20", "Me gusta": "5" });
+  assert.equal(values(listsHeaderStats("collections", []))["Me gusta"], "0");
 });
 
 test("números que caben en la tarjeta", () => {

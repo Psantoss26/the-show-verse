@@ -7,7 +7,7 @@ const listsPage = readFileSync(
   "utf8",
 );
 
-test("las filas enlazan los detalles desde el título y solo muestran borrar en el modo móvil", () => {
+test("las filas enlazan los detalles desde el título y no muestran borrar", () => {
   const rowSection = listsPage.slice(
     listsPage.indexOf("const RowListSection"),
     listsPage.indexOf("const ListModeRow"),
@@ -18,9 +18,6 @@ test("las filas enlazan los detalles desde el título y solo muestran borrar en 
     /<ListNavWrapper[\s\S]*?<h3[\s\S]*?{list\.name}[\s\S]*?<\/h3>[\s\S]*?<\/ListNavWrapper>/,
   );
   assert.doesNotMatch(rowSection, /Ver todo/i);
-  assert.match(
-    rowSection,
-    /canUse && mobileDeleteMode[\s\S]*?title="Borrar lista"[\s\S]*?<Trash2/,
-  );
-  assert.match(rowSection, /lg:hidden/);
+  // Las listas solo se borran desde su ficha.
+  assert.doesNotMatch(rowSection, /Borrar lista|<Trash2/);
 });
