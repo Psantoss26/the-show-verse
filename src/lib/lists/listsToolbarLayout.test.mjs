@@ -40,24 +40,14 @@ test("en móvil Ordenar y los modos de vista comparten la fila por mitades", () 
     mobileFilters.indexOf("</div>", mobileFilters.indexOf('data-lists-view-selector="true"')),
   );
   assert.match(viewSelector, /aria-label="Crear lista"[\s\S]*?<Plus/);
-  assert.match(viewSelector, /"Borrar listas"[\s\S]*?<Trash2/);
-  assert.match(viewSelector, /aria-pressed={mobileDeleteMode}/);
+  // Las listas solo se borran desde su ficha: aquí no hay modo borrar.
+  assert.doesNotMatch(viewSelector, /Borrar listas|mobileDeleteMode/);
   assert.doesNotMatch(mobileFilters, />Crear<\/span>/);
 });
 
-test("las papeleras de las tarjetas se ocultan en móvil hasta activar el modo borrar", () => {
-  const gridCard = listsPage.slice(
-    listsPage.indexOf("const GridListCard"),
-    listsPage.indexOf("const RowListSection"),
-  );
-  const listRow = listsPage.slice(
-    listsPage.indexOf("const ListModeRow"),
-    listsPage.indexOf("// ================== MAIN PAGE"),
-  );
-
-  assert.match(gridCard, /mobileDeleteMode[\s\S]*?hidden lg:flex/);
-  assert.match(gridCard, /lg:group-hover\/card:opacity-100/);
-  assert.match(listRow, /mobileDeleteMode[\s\S]*?hidden lg:flex/);
+test("las tarjetas del índice no permiten borrar listas (solo desde su ficha)", () => {
+  assert.doesNotMatch(listsPage, /Borrar lista|mobileDeleteMode|onDelete|<Trash2/);
+  assert.doesNotMatch(listsPage, /\bdel\(/);
 });
 
 test("Comunidad no expone los modos Trending o Popular", () => {

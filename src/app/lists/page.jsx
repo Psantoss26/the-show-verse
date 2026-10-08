@@ -15,7 +15,7 @@ import {
   useTransition,
   memo,
 } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { FreeMode } from "swiper/modules";
 import "swiper/swiper-bundle.css";
@@ -25,6 +25,7 @@ import { getListDetails } from "@/lib/api/backendLists";
 import { getDetails, getExternalIds } from "@/lib/api/tmdb";
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { useAuth } from "@/context/AuthContext";
+import useCardEntrance from "@/hooks/useCardEntrance";
 import { formatPageTitle } from "@/lib/pageTitle";
 import LiquidButton from "@/components/LiquidButton";
 import Avatar from "@/components/ui/Avatar";
@@ -45,7 +46,6 @@ import { stripHtml } from "@/lib/details/formatters";
 import {
   Loader2,
   Plus,
-  Trash2,
   ListVideo,
   RefreshCcw,
   Search,
@@ -67,7 +67,6 @@ import {
   Eye,
   ThumbsUp,
   Globe,
-  Sigma,
 } from "lucide-react";
 import PageStatCard from "@/components/ui/PageStatCard";
 import { listsHeaderStats } from "@/lib/lists/headerStats";
@@ -1256,23 +1255,21 @@ const LIST_ENTRANCE_MAX_DELAY = 0.36;
 
 // `instant`: al volver atrás la página se pinta estática (ver
 // useIsHistoryNavigation), sin la entrada escalonada de las filas.
+// La entrada es de Web Animations y UNA sola vez por tarjeta (useCardEntrance):
+// con la de framer, una tarjeta que cambiaba de sitio durante su entrada (p. ej.
+// al llegar los me gusta con «Más likes») se quedaba invisible.
 function ListEntrance({ index = 0, className = "", instant = false, children }) {
-  const shouldReduceMotion = useReducedMotion();
-  if (shouldReduceMotion || instant) return <div className={className}>{children}</div>;
-
+  const ref = useRef(null);
+  useCardEntrance(ref, {
+    enabled: !instant,
+    delayS: Math.min(index * LIST_ENTRANCE_STEP, LIST_ENTRANCE_MAX_DELAY),
+    durationS: 0.34,
+    fromTransform: "translateY(14px)",
+  });
   return (
-    <motion.div
-      className={className}
-      initial={{ opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{
-        duration: 0.34,
-        delay: Math.min(index * LIST_ENTRANCE_STEP, LIST_ENTRANCE_MAX_DELAY),
-        ease: [0.22, 1, 0.36, 1],
-      }}
-    >
+    <div ref={ref} className={className}>
       {children}
-    </motion.div>
+    </div>
   );
 }
 
@@ -1280,9 +1277,6 @@ const GridListCard = memo(function GridListCard({
   list,
   itemsState,
   ensureListItems,
-  canUse,
-  mobileDeleteMode,
-  onDelete,
 }) {
   const cacheKey = `${list?.source || "unknown"}:${String(list?.id || "")}`;
   const [ref, inView] = useInView();
@@ -1374,7 +1368,7 @@ const GridListCard = memo(function GridListCard({
                 <span className="rounded bg-white/5 px-1.5 py-0.5 text-zinc-300">
                   {itemCount} items
                 </span>
-                {list?.source === "trakt" && (
+                {(list?.source === "trakt" || list?.source === "collections") && (
                   <span className="flex items-center gap-1 transition-colors group-hover:text-pink-500">
                     <ThumbsUp aria-hidden="true" className="h-3 w-3" />
                     {likes}
@@ -1385,22 +1379,6 @@ const GridListCard = memo(function GridListCard({
           </div>
         </article>
       </ListNavWrapper>
-
-      {canUse && (
-        <button data-online-only="true"
-          type="button"
-          onClick={(e) => onDelete(e, list.id)}
-          className={`absolute right-3 top-3 z-40 h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white/70 opacity-0 backdrop-blur-md transition-all hover:bg-red-600/80 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400 lg:group-hover/card:opacity-100 lg:focus-visible:opacity-100 ${
-            mobileDeleteMode
-              ? "flex max-lg:bg-red-600/80 max-lg:text-white max-lg:opacity-100"
-              : "hidden lg:flex"
-          }`}
-          title="Borrar lista"
-          aria-label={`Borrar ${list?.name || "lista"}`}
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
-      )}
     </div>
   );
 });
@@ -1410,9 +1388,6 @@ const RowListSection = memo(function RowListSection({
   itemsState,
   ensureListItems,
   isMobile,
-  canUse,
-  mobileDeleteMode,
-  onDelete,
 }) {
   const cacheKey = `${list?.source || "unknown"}:${String(list?.id || "")}`;
   const [ref, inView] = useInView();
@@ -1451,17 +1426,6 @@ const RowListSection = memo(function RowListSection({
             </p>
           )}
         </div>
-        {canUse && mobileDeleteMode ? (
-          <button data-online-only="true"
-            type="button"
-            onClick={(event) => onDelete(event, list.id)}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-600/80 text-white backdrop-blur-md transition-colors hover:bg-red-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400 lg:hidden"
-            title="Borrar lista"
-            aria-label={`Borrar ${list?.name || "lista"}`}
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        ) : null}
       </div>
 
       {isLoading ? (
@@ -1481,9 +1445,6 @@ const ListModeRow = memo(function ListModeRow({
   list,
   itemsState,
   ensureListItems,
-  canUse,
-  mobileDeleteMode,
-  onDelete,
 }) {
   const cacheKey = `${list?.source || "unknown"}:${String(list?.id || "")}`;
   const [ref, inView] = useInView();
@@ -1526,22 +1487,6 @@ const ListModeRow = memo(function ListModeRow({
                 {list.item_count}
               </span>
             </div>
-
-            {canUse && (
-              <button data-online-only="true"
-                type="button"
-                onClick={(e) => onDelete(e, list.id)}
-                className={`h-10 w-10 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-red-500/10 hover:text-red-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400 ${
-                  mobileDeleteMode
-                    ? "flex bg-red-500/15 text-red-400"
-                    : "hidden lg:flex"
-                }`}
-                title="Borrar lista"
-                aria-label={`Borrar ${list?.name || "lista"}`}
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            )}
           </div>
         </div>
       </ListNavWrapper>
@@ -1557,7 +1502,7 @@ function handleListPrefetch(event) {
 }
 
 // Iconos y colores de las tarjetas de la cabecera (lib/lists/headerStats).
-const STAT_ICONS = { layers: Layers, film: Film, average: Sigma, list: ListVideo, heart: Heart, globe: Globe };
+const STAT_ICONS = { layers: Layers, film: Film, list: ListVideo, heart: Heart, globe: Globe };
 const STAT_TONES = {
   purple: "text-purple-400",
   sky: "text-sky-400",
@@ -1592,7 +1537,6 @@ export default function ListsPage() {
     loadMore,
     hasMore,
     create,
-    del,
   } = useTmdbLists();
   const { session, account } = useAuth();
 
@@ -1615,7 +1559,6 @@ export default function ListsPage() {
     "--lists-mobile-right",
     "[data-lists-mobile-toolbar]",
   );
-  const [mobileDeleteMode, setMobileDeleteMode] = useState(false);
   const filtersRef = useRef(null);
   const { isSticky: filtersSticky, isPinned: filtersPinned } =
     useStickyToolbarState(filtersRef);
@@ -1627,22 +1570,16 @@ export default function ListsPage() {
   // Último contenido que SÍ estuvo listo (ver el relevo entre fuentes, más abajo).
   const [readyContent, setReadyContent] = useState({ source, lists: [] });
 
-  useEffect(() => {
-    if (!mobileFiltersOpen && mobileDeleteMode) {
-      setMobileDeleteMode(false);
-    }
-  }, [mobileFiltersOpen, mobileDeleteMode]);
-
-  useEffect(() => {
-    setMobileDeleteMode(false);
-  }, [source]);
-
   const trakt = useTraktLists({ mode: "popular" });
   const [featuredCollections, setFeaturedCollections] = useState([]);
   const featuredCollectionsCount = featuredCollections.length;
   const [collectionsLoading, setCollectionsLoading] = useState(false);
   const [collectionsResolvedKey, setCollectionsResolvedKey] = useState(null);
   const [searchedCollections, setSearchedCollections] = useState([]);
+  // Me gusta públicos de las colecciones: id -> número. Se piden en lote para
+  // las colecciones de la pestaña (destacadas o buscadas) y permiten ordenar
+  // por likes.
+  const [collectionLikes, setCollectionLikes] = useState({});
 
   // Map: `${source}:${id}` -> undefined (no pedido) | null (cargando) | Array(items)
   const [itemsMap, setItemsMap] = useState({});
@@ -1778,6 +1715,38 @@ export default function ListsPage() {
     };
   }, [source, deferredQuery, featuredCollectionsCount]);
 
+  // Me gusta de las colecciones visibles, en una petición. Se vuelven a pedir al
+  // montar (p. ej. al volver de una ficha donde se ha dado me gusta).
+  const collectionIdsKey = useMemo(() => {
+    if (source !== "collections") return "";
+    const cols = deferredQuery.trim() ? searchedCollections : featuredCollections;
+    return (Array.isArray(cols) ? cols : [])
+      .map((c) => Number(c?.id))
+      .filter((id) => Number.isInteger(id) && id > 0)
+      .join(",");
+  }, [source, deferredQuery, searchedCollections, featuredCollections]);
+
+  useEffect(() => {
+    if (!collectionIdsKey) return;
+    const controller = new AbortController();
+    fetch(`/api/community/collections/likes?ids=${collectionIdsKey}`, {
+      signal: controller.signal,
+      cache: "no-store",
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json) => {
+        const likes = json?.likes;
+        if (!likes || typeof likes !== "object") return;
+        setCollectionLikes((prev) => {
+          const next = { ...prev };
+          for (const [id, entry] of Object.entries(likes)) next[id] = Number(entry?.likes) || 0;
+          return next;
+        });
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [collectionIdsKey]);
+
   // ✅ búsqueda dinámica de colecciones
   useEffect(() => {
     if (source !== "collections" || !deferredQuery.trim()) {
@@ -1852,6 +1821,7 @@ export default function ListsPage() {
 
     return cols.map((c) => ({
       ...c,
+      likes: collectionLikes[c?.id] ?? c?.likes ?? 0,
       source: "collections",
       internalUrl: buildInternalUrl({ ...c, source: "collections" }), // null
       externalUrl: buildExternalUrl({ ...c, source: "collections" }),
@@ -1862,6 +1832,7 @@ export default function ListsPage() {
     trakt?.lists,
     featuredCollections,
     searchedCollections,
+    collectionLikes,
     deferredQuery,
   ]);
 
@@ -2090,28 +2061,6 @@ export default function ListsPage() {
     } finally {
       setCreating(false);
     }
-  };
-
-  const handleDelete = async (e, listId) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!canUse || source !== "personal") return;
-    const ok = window.confirm("¿Seguro que quieres borrar esta lista?");
-    if (!ok) return;
-
-    // abort preview si estaba cargando
-    const cacheKey = getListCacheKey("personal", listId);
-    const ctrl = controllersRef.current.get(cacheKey);
-    if (ctrl) ctrl.abort();
-
-    await del(listId);
-
-    // limpia preview cache
-    setItemsMap((prev) => {
-      const next = { ...prev };
-      delete next[cacheKey];
-      return next;
-    });
   };
 
   const handleRefresh = () => {
@@ -2468,7 +2417,7 @@ export default function ListsPage() {
                             close();
                           }}
                         >
-                          Más likes
+                          Menos likes
                         </DropdownItem>
                         <DropdownItem
                           active={sortMode === "name_asc"}
@@ -2803,9 +2752,6 @@ export default function ListsPage() {
                           list={l}
                           itemsState={itemsMap[getListCacheKey(l)]}
                           ensureListItems={ensureListItems}
-                          canUse={canEdit}
-                          mobileDeleteMode={mobileDeleteMode}
-                          onDelete={handleDelete}
                         />
                       </ListEntrance>
                     ))}
@@ -2821,9 +2767,6 @@ export default function ListsPage() {
                           itemsState={itemsMap[getListCacheKey(l)]}
                           ensureListItems={ensureListItems}
                           isMobile={isMobile}
-                          canUse={canEdit}
-                          mobileDeleteMode={mobileDeleteMode}
-                          onDelete={handleDelete}
                         />
                       </ListEntrance>
                     ))}
@@ -2838,9 +2781,6 @@ export default function ListsPage() {
                           list={l}
                           itemsState={itemsMap[getListCacheKey(l)]}
                           ensureListItems={ensureListItems}
-                          canUse={canEdit}
-                          mobileDeleteMode={mobileDeleteMode}
-                          onDelete={handleDelete}
                         />
                       </ListEntrance>
                     ))}

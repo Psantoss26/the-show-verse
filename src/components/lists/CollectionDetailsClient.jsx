@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useState, useMemo } from 'react'
 import { useRouter } from "@/lib/offline/useOfflineRouter";
-import { Banknote, Clock3, ExternalLink, Film } from 'lucide-react'
+import { Banknote, Clock3, ExternalLink, Film, Heart } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import CollectionEditModal from '@/components/lists/CollectionEditModal'
 import CollectionCastModal from '@/components/lists/CollectionCastModal'
@@ -12,6 +12,8 @@ import ListPosterCard from '@/components/lists/ListPosterCard'
 import FilterableListItems from '@/components/lists/ListDetailsTools'
 import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayout'
 import ListDetailsActionRow from '@/components/lists/ListDetailsActionRow'
+import ListLikeButton from '@/components/community/ListLikeButton'
+import useCollectionLike from '@/hooks/useCollectionLike'
 import { formatPageTitle } from '@/lib/pageTitle'
 import {
     collectionPreviewFromIndex,
@@ -118,7 +120,8 @@ function MovieCard({ movie, idx, imdbRating, disableHover = false, posterLoading
 
 export default function CollectionDetailsClient({ collectionId }) {
     const router = useRouter()
-    const { preferences } = useAuth()
+    const { preferences, authenticated = false } = useAuth()
+    const like = useCollectionLike(collectionId)
     const [editing, setEditing] = useState(false)
     const [castOpen, setCastOpen] = useState(false)
     const isBackNav = useIsHistoryNavigation()
@@ -325,6 +328,7 @@ export default function CollectionDetailsClient({ collectionId }) {
                 { icon: Film, label: 'PELÍCULAS', value: parts.length || Number(collection?.item_count) || 0, tooltip: 'Películas de la colección' },
                 ...(totalRuntime > 0 ? [{ icon: Clock3, label: 'DURACIÓN', value: `${Math.round(totalRuntime / 60)} h`, tooltip: 'Duración total aproximada' }] : []),
                 ...(revenueLabel ? [{ icon: Banknote, label: 'INGRESOS', value: revenueLabel, tooltip: 'Recaudación total en taquilla de las películas con dato en TMDb' }] : []),
+                { icon: Heart, label: 'LIKES', value: like.likes, tooltip: 'Me gusta de la comunidad' },
                 { icon: ExternalLink, label: 'FUENTE', value: 'TMDb', tooltip: 'Datos de TMDb', hideOnPhone: true },
             ]}
             scoreboardRatings={{
@@ -332,7 +336,18 @@ export default function CollectionDetailsClient({ collectionId }) {
                 imdb: ratingSummaryBadge(imdbSummary),
             }}
             showTopBar={false}
-            heroActions={<ListDetailsActionRow onBack={() => router.back()} onEdit={() => setEditing(true)} editLabel="Editar colección" externalHref={tmdbUrl} externalLabel="Ver colección en TMDb" onCast={castMembers.length ? () => setCastOpen(true) : null} share={share} />}
+            heroActions={<ListDetailsActionRow onBack={() => router.back()} onEdit={() => setEditing(true)} editLabel="Editar colección" externalHref={tmdbUrl} externalLabel="Ver colección en TMDb" favoriteAction={(
+                <ListLikeButton
+                    // Se monta de nuevo con el estado del servidor al llegar.
+                    key={like.ready ? 'ready' : 'pending'}
+                    endpoint={`/api/community/collections/${encodeURIComponent(collectionId)}/like`}
+                    likes={like.likes}
+                    liked={like.liked}
+                    canLike={authenticated && like.ready}
+                    onChange={like.update}
+                    liquidGlass
+                />
+            )} onCast={castMembers.length ? () => setCastOpen(true) : null} share={share} />}
         >
             {parts.length > 0 ? (
                 <FilterableListItems

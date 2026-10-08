@@ -3,7 +3,7 @@
 // están mostrando:
 //   - Mis listas:  Listas · Títulos · Públicas
 //   - Comunidad:   Listas · Títulos · Me gusta
-//   - Colecciones: Sagas · Películas · Media por saga
+//   - Colecciones: Sagas · Películas · Me gusta
 // Cada tarjeta: { key, label, value (texto ya formateado), icon, tone }.
 
 const grouped = new Intl.NumberFormat("es-ES");
@@ -28,13 +28,7 @@ export function listsHeaderStats(source, lists) {
     return [
       { key: "count", label: "Sagas", value: formatStatNumber(count), icon: "layers", tone: "purple" },
       { key: "items", label: "Películas", value: formatStatNumber(items), icon: "film", tone: "sky" },
-      {
-        key: "average",
-        label: "Media por saga",
-        value: count ? oneDecimal.format(items / count) : "0",
-        icon: "average",
-        tone: "amber",
-      },
+      { key: "likes", label: "Me gusta", value: formatStatNumber(sum(rows, "likes")), icon: "heart", tone: "rose" },
     ];
   }
   if (source === "trakt") {

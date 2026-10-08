@@ -1,7 +1,7 @@
 "use client";
 
 // src/components/community/ListLikeButton.jsx
-// Me gusta en una lista de la comunidad.
+// Me gusta en una lista de la comunidad (o, con `endpoint`, en una colección).
 //
 // Mismo trato que el de las reseñas: optimista, reversible y idempotente en el
 // servidor. Sin sesión enseña el recuento pero no invita a pulsar.
@@ -18,13 +18,18 @@ export default function ListLikeButton({
   canLike = false,
   className = "",
   liquidGlass = false,
+  // Ruta del me gusta: por defecto, la de la lista `listId`.
+  endpoint = null,
+  // Avisa del estado confirmado por el servidor ({ liked, likes }).
+  onChange = null,
 }) {
   const online = useServerOnline();
   const [state, setState] = useState({ liked: Boolean(liked), likes: Number(likes) || 0 });
   const [pending, setPending] = useState(false);
 
   const toggle = async () => {
-    if (!online || !canLike || pending || !listId) return;
+    const url = endpoint || (listId ? `/api/community/lists/${encodeURIComponent(listId)}/like` : null);
+    if (!online || !canLike || pending || !url) return;
     const next = !state.liked;
     const previous = state;
 
@@ -32,12 +37,12 @@ export default function ListLikeButton({
     setState({ liked: next, likes: Math.max(0, previous.likes + (next ? 1 : -1)) });
 
     try {
-      const res = await fetch(`/api/community/lists/${encodeURIComponent(listId)}/like`, {
-        method: next ? "POST" : "DELETE",
-      });
+      const res = await fetch(url, { method: next ? "POST" : "DELETE" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setState({ liked: Boolean(data.liked), likes: Number(data.likes) || 0 });
+      const confirmed = { liked: Boolean(data.liked), likes: Number(data.likes) || 0 };
+      setState(confirmed);
+      onChange?.(confirmed);
     } catch {
       setState(previous);
     } finally {
