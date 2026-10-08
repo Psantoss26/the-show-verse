@@ -6,8 +6,9 @@ import test from 'node:test';
 const source = (await readFile(new URL('./detailsSequenceTransition.js', import.meta.url), 'utf8'))
   .replaceAll('export ', '');
 
-function setup({ native = true, reduced = false, stalledBackground = false, castReady = true } = {}) {
+function setup({ native = true, reduced = false, stalledBackground = false, castReady = true, touch = false, width = 1280, timeout = false, routeError = false } = {}) {
   const nodes = [];
+  let clock = 0;
   function node() {
     const attributes = new Map();
     return {
@@ -39,6 +40,7 @@ function setup({ native = true, reduced = false, stalledBackground = false, cast
     documentElement: html, body: { append() {} },
     createElement() { const el = node(); nodes.push(el); return el; },
     querySelector(selector) {
+      if (selector === '[data-details-error], .next-error-h1' && routeError) return node();
       if (selector === '[data-details-root][data-details-href]') return outgoing;
       if (selector === '[data-details-href="/details/movie/2"]') return incoming;
       return null;
@@ -59,7 +61,8 @@ function setup({ native = true, reduced = false, stalledBackground = false, cast
   window.parent = window;
   const context = vm.createContext({
     document, window, location, innerHeight: 900,
-    matchMedia: (query) => ({ matches: query.includes('reduced') ? reduced : true }),
+    matchMedia: (query) => ({ matches: query.includes('reduced') ? reduced : query.includes('pointer') ? !touch : width >= 1024 }),
+    Date: { now: () => timeout ? (clock += 1000) : Date.now() },
     requestAnimationFrame: (fn) => setTimeout(fn, 0),
     setTimeout: (fn, ms) => { const timer = setTimeout(fn, ms); if (ms === 900) timer.unref(); return timer; },
     getComputedStyle: () => ({ backgroundImage: 'url(https://image.tmdb.org/t/p/w1280/background.jpg)' }),
@@ -68,6 +71,7 @@ function setup({ native = true, reduced = false, stalledBackground = false, cast
   vm.runInContext(source + '\nglobalThis.run = navigateDetailsSequence;', context);
   return {
     run: (navigate) => context.run({ href: '/details/movie/2', direction: 'next', navigate }),
+    arrive: () => { location.pathname = '/details/movie/2'; },
     ready: () => { ready = true; location.pathname = '/details/movie/2'; },
     cancel: () => listeners.get('popstate')?.(),
     state: () => ({ focused, transitions, active: html.hasAttribute('data-details-sequence-transition'),
@@ -138,4 +142,38 @@ test('una imagen lenta y el reparto pendiente no retienen la cabecera nueva', as
   assert.ok(Date.now() - started < 450, 'El fondo ligero tiene un presupuesto breve, sin esperar al reparto');
   assert.equal(app.state().focused, true);
   assert.equal(app.state().overlayRemoved, true);
+});
+
+
+test('tablet vertical y horizontal mantienen la ficha hasta estar lista sin capturas nativas múltiples', async () => {
+  for (const width of [820, 1480]) {
+    const app = setup({ touch: true, width });
+    const pending = app.run(() => {});
+    await tick();
+    assert.equal(app.state().overlayRemoved, false);
+    assert.equal(app.state().active, true);
+    app.ready();
+    assert.equal(await pending, true);
+    assert.equal(app.state().transitions, 0);
+    assert.equal(app.state().overlayRemoved, true);
+    assert.equal(app.state().focused, true);
+  }
+});
+
+test('una ruta que nunca está lista libera la pantalla y los controles al agotar el plazo', async () => {
+  const app = setup({ touch: true, timeout: true });
+  assert.equal(await app.run(() => {}), false);
+  assert.equal(app.state().active, false);
+  assert.equal(app.state().overlayRemoved, true);
+  assert.equal(app.state().outgoingInert, false);
+  assert.equal(app.state().incomingInert, false);
+  assert.equal(app.state().listenerCount, 0);
+});
+
+test('un error de ruta se descubre sin animar una ficha incompleta', async () => {
+  const app = setup({ routeError: true });
+  assert.equal(await app.run(() => app.arrive()), false);
+  assert.equal(app.state().transitions, 0);
+  assert.equal(app.state().overlayRemoved, true);
+  assert.equal(app.state().listenerCount, 0);
 });

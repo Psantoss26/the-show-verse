@@ -89,10 +89,13 @@ test("en tablet la barra INFERIOR también se aparta del drawer", async () => {
   const rule = css.slice(css.indexOf(".sv-navbar-bottom-shift {"))
   const body = rule.slice(0, rule.indexOf("}"))
 
-  // Se mueve con `left`, no con otra `transform`: la que ya tiene le sirve para
-  // centrarse Y para esconderse al hacer scroll, y una segunda la pisaría.
-  assert.match(body, /left: calc\(var\(--sv-bottom-space\) \/ 2\);/)
-  assert.doesNotMatch(body, /transform:/)
+  // Centrado y compactación se componen con propiedades independientes.
+  assert.match(body, /left: 50%;/)
+  assert.match(body, /translate: calc\(-50% \+ \(var\(--sv-bottom-space\) - 100vw\) \/ 2\) 0;/)
+  const transition = body.slice(body.indexOf("transition:"))
+  assert.match(transition, /translate 320ms/)
+  assert.match(transition, /scale 300ms/)
+  assert.doesNotMatch(transition, /(?:left|width) \d+ms/)
 
   // Y se estrecha: en una tablet de 768px con el panel a la mitad, la barra de
   // 28rem no cabe en los 384px que quedan por mucho que se desplace.
