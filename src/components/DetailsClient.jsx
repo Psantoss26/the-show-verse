@@ -891,6 +891,37 @@ function ProgressiveHeroLogo({ path, title }) {
   );
 }
 
+// Fondo de escritorio progresivo: mostrar w1280 y decodificar la mejora
+// original fuera del camino crítico de la navegación.
+function useDesktopBackgroundSize(path, enabled) {
+  const [previewReady, setPreviewReady] = useState(null);
+  const [originalReady, setOriginalReady] = useState(null);
+  const upgrade = useDeferredOriginalUpgrade({ path, previewLoaded: previewReady === path, enabled });
+  useEffect(() => {
+    if (!enabled || !path || !matchMedia("(min-width: 640px)").matches) return;
+    let cancelled = false;
+    const image = new Image();
+    image.fetchPriority = "high";
+    image.src = `https://image.tmdb.org/t/p/w1280${path}`;
+    image.decode().catch(() => {}).then(() => {
+      if (!cancelled) setPreviewReady(path);
+    });
+    return () => { cancelled = true; };
+  }, [path, enabled]);
+  useEffect(() => {
+    if (!enabled || !path || !upgrade) return;
+    let cancelled = false;
+    const image = new Image();
+    image.fetchPriority = "low";
+    image.src = `https://image.tmdb.org/t/p/original${path}`;
+    image.decode().then(() => {
+      if (!cancelled) setOriginalReady(path);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [path, enabled, upgrade]);
+  return originalReady === path ? "original" : "w1280";
+}
+
 // Componente de badge de estadística con diseño premium optimizado y ultra-compacto (sin tarjeta/fondo)
 // =====================================================================
 // COMPONENTE PRINCIPAL: DetailsClient
@@ -1298,6 +1329,12 @@ export default function DetailsClient({
     let firstFrame = 0;
     let secondFrame = 0;
 
+    // La instantánea saliente ya protege la carga entre títulos; no hace
+    // falta pintar otra cortina ni consumir dos frames antes de la entrada.
+    if (isDetailsSequenceTransitionActive()) {
+      setDetailsEntry({ key: detailsEntryKey, ready: true });
+      return undefined;
+    }
     setDetailsEntry({ key: detailsEntryKey, ready: false });
     firstFrame = window.requestAnimationFrame(() => {
       // Dos frames garantizan que la capa de carga se haya pintado antes de
@@ -3667,11 +3704,10 @@ export default function DetailsClient({
   // El fondo móvil comparte primero la URL w500 de la portada LCP. Solo cambia
   // a original cuando esa descarga diferida ya terminó en la capa HIGH; así el
   // CSS reutiliza la caché y nunca inicia por su cuenta una petición pesada.
-  const heroBackgroundSize =
-    isMobileViewport &&
-    !(mobilePosterOriginalRequestReady && posterHighLoaded)
-      ? "w500"
-      : "original";
+  const desktopBackgroundSize = useDesktopBackgroundSize(heroBackgroundPath, !isMobileViewport);
+  const heroBackgroundSize = isMobileViewport
+    ? (mobilePosterOriginalRequestReady && posterHighLoaded ? "original" : "w500")
+    : desktopBackgroundSize;
 
   // =====================================================================
   // ESTADOS DE CUENTA (TMDb)
@@ -9487,6 +9523,7 @@ export default function DetailsClient({
                 Se elimina también `opacity: isTransitioning ? 1 : 1`, que era un
                 ternario muerto (siempre 1). */}
             <div
+              data-details-background-preview
               className="hero-bg-base sv-hero-scroll-in absolute inset-0 bg-cover bg-center max-sm:[opacity:var(--sv-hero-scroll,0)] sm:opacity-100 sm:transition-opacity sm:duration-500"
               style={{
                 backgroundImage: `url(https://image.tmdb.org/t/p/${heroBackgroundSize}${heroBackgroundPath})`,
@@ -9523,7 +9560,7 @@ export default function DetailsClient({
                 currentLowLoaded ? "" : "max-sm:opacity-0"
               }`}
               style={{
-                backgroundImage: `url(https://image.tmdb.org/t/p/original${heroBackgroundPath})`,
+                backgroundImage: `url(https://image.tmdb.org/t/p/${heroBackgroundSize}${heroBackgroundPath})`,
                 backgroundPosition: "center top",
                 transform: "scale(1)",
                 transformOrigin: "center top",

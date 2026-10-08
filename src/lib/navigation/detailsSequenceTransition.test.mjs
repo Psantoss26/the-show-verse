@@ -6,7 +6,7 @@ import test from 'node:test';
 const source = (await readFile(new URL('./detailsSequenceTransition.js', import.meta.url), 'utf8'))
   .replaceAll('export ', '');
 
-function setup({ native = true, reduced = false } = {}) {
+function setup({ native = true, reduced = false, stalledBackground = false, castReady = true } = {}) {
   const nodes = [];
   function node() {
     const attributes = new Map();
@@ -29,7 +29,8 @@ function setup({ native = true, reduced = false } = {}) {
   const heading = { setAttribute() {}, focus() { focused = true; } };
   incoming.querySelector = (selector) => selector === 'h1' ? heading : null;
   let ready = false;
-  incoming.getAttribute = () => ready ? 'true' : 'false';
+  incoming.getAttribute = (key) => (key === 'data-details-cast-ready' ? castReady : ready) ? 'true' : 'false';
+  if (stalledBackground) incoming.querySelectorAll = (selector) => selector === '[data-details-background-preview]' ? [{}] : [];
   const html = node();
   const listeners = new Map();
   const location = { pathname: '/details/movie/1' };
@@ -61,7 +62,8 @@ function setup({ native = true, reduced = false } = {}) {
     matchMedia: (query) => ({ matches: query.includes('reduced') ? reduced : true }),
     requestAnimationFrame: (fn) => setTimeout(fn, 0),
     setTimeout: (fn, ms) => { const timer = setTimeout(fn, ms); if (ms === 900) timer.unref(); return timer; },
-    Image: class { decode() { return Promise.resolve(); } },
+    getComputedStyle: () => ({ backgroundImage: 'url(https://image.tmdb.org/t/p/w1280/background.jpg)' }),
+    Image: class { decode() { return stalledBackground ? new Promise(() => {}) : Promise.resolve(); } },
   });
   vm.runInContext(source + '\nglobalThis.run = navigateDetailsSequence;', context);
   return {
@@ -125,4 +127,15 @@ test('volver con el navegador cancela la espera y limpia la instantánea', async
   assert.equal(app.state().active, false);
   assert.equal(app.state().overlayRemoved, true);
   assert.equal(app.state().listenerCount, 0);
+});
+
+
+test('una imagen lenta y el reparto pendiente no retienen la cabecera nueva', async () => {
+  const app = setup({ stalledBackground: true, castReady: false });
+  const started = Date.now();
+  app.ready();
+  assert.equal(await app.run(() => {}), true);
+  assert.ok(Date.now() - started < 450, 'El fondo ligero tiene un presupuesto breve, sin esperar al reparto');
+  assert.equal(app.state().focused, true);
+  assert.equal(app.state().overlayRemoved, true);
 });

@@ -162,6 +162,21 @@ export default function DetailsSequenceNav() {
     };
   }, [sequence]);
 
+  useEffect(() => {
+    if (!sequence || !matchMedia("(min-width: 1024px)").matches) return;
+    const connection = navigator.connection;
+    if (connection?.saveData || /(^|-)2g$/.test(connection?.effectiveType || "")) return;
+    // Preparar ambos vecinos antes del hover; un clic rápido también aprovecha
+    // la ruta prefetched y las imágenes ligeras ya en curso.
+    const timer = setTimeout(() => {
+      [sequence.next, sequence.previous].filter(Boolean).forEach((href) => {
+        router.prefetch?.(href);
+        warmDetailsSequenceTarget(href);
+      });
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [sequence, router]);
+
   if (!sequence) return null;
 
   const handleIntent = (href) => {
@@ -182,6 +197,7 @@ export default function DetailsSequenceNav() {
       return;
     }
     event.preventDefault();
+    handleIntent(href);
     // Mismo router que el gesto móvil: respeta la ficha embebida y el modo
     // sin conexión.
     void navigateDetailsSequence({ href, direction, navigate: router.push }).catch(() => {});

@@ -5,24 +5,11 @@ let activeTransition = null;
 const FLAG = "data-details-sequence-transition";
 const PART = "data-details-transition-part";
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-// Tope de espera por imágenes de la ficha nueva. Las flechas precalientan el
-// título vecino al pasar por encima (detailsSequenceWarmup), así que lo normal
-// es que ya estén en caché; si no, la transición no se queda esperando a un
-// `original` de varios MB.
-const IMAGE_WAIT_MS = 900;
-// Margen para el Reparto Principal si la ficha nueva aún lo está resolviendo
-// (series: reparto agregado). En películas ya viene del servidor y no espera.
-const CAST_WAIT_MS = 500;
-// Salida del contenido saliente al pulsar (ver `navigateDetailsSequence`).
-const EXIT_MS = 280;
+// Solo damos un margen breve al fondo ligero. El reparto y las mejoras de
+// resolución se completan sobre la ficha visible, sin retener su cabecera.
+const IMAGE_WAIT_MS = 200;
+const EXIT_MS = 220;
 const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
-
-async function waitForCast(root, isCancelled) {
-  const deadline = Date.now() + CAST_WAIT_MS;
-  while (!isCancelled() && root.isConnected && root.getAttribute("data-details-cast-ready") !== "true" && Date.now() < deadline) {
-    await nextFrame();
-  }
-}
 
 export function isDetailsSequenceTransitionActive() {
   return typeof document !== "undefined" && document.documentElement.hasAttribute(FLAG);
@@ -95,28 +82,31 @@ function captureDetails(root) {
   return { snapshot, overlay };
 }
 
-async function waitForImages(root) {
-  // Solo bloquean el póster, la cabecera y el fondo. Las fotos del reparto (capa
-  // `content`) las precalienta detailsSequenceWarmup; esperar por ellas aquí
-  // agotaba el tope cuando no estaban en caché y retrasaba toda la transición.
-  const images = [...root.querySelectorAll(`[${PART}="artwork"] img, [${PART}="info"] img`)].filter((img) => {
-    const rect = img.getBoundingClientRect();
-    return rect.width > 0 && rect.height > 0 && rect.top < innerHeight && rect.bottom > 0;
-  });
-  const background = root.querySelector(`[${PART}="background"]`);
-  const backgrounds = background ? [...background.querySelectorAll("[style]")] : [];
+async function waitForImages(root, snapshot) {
+  // La portada ligera ya está lista cuando sequence-ready pasa a true.
+  // No esperar por logos ni por la capa original del póster/fondo.
+  const backgrounds = [...root.querySelectorAll('[data-details-background-preview]')];
   const urls = [...new Set(backgrounds.flatMap((node) => {
     const value = getComputedStyle(node).backgroundImage;
     return [...value.matchAll(/url\(["']?([^"')]+)["']?\)/g)].map((match) => match[1]);
   }))];
-  const tasks = images.map((img) => img.decode?.().catch(() => {}));
+  const tasks = [];
   urls.forEach((url) => {
     const image = new Image();
     image.src = url;
     tasks.push(image.decode().catch(() => {}));
   });
-  // Un recurso roto o una imagen original muy lenta no bloquea la navegación.
-  await Promise.race([Promise.allSettled(tasks), delay(IMAGE_WAIT_MS)]);
+  // Si la red supera el presupuesto, conservar una base ya pintada detrás
+  // del nuevo fondo. El texto puede entrar sin descubrir una superficie negra.
+  const previous = snapshot.querySelector('[data-details-background-preview]');
+  const background = root.querySelector(`[${PART}="background"]`);
+  const fallback = previous && background ? previous.cloneNode(true) : null;
+  if (fallback) {
+    fallback.removeAttribute('data-details-background-preview');
+    background.prepend(fallback);
+  }
+  const settled = Promise.allSettled(tasks).then(() => fallback?.remove());
+  await Promise.race([settled, delay(IMAGE_WAIT_MS)]);
 }
 
 function focusTitle(root) {
@@ -224,7 +214,7 @@ export async function navigateDetailsSequence({ href, direction, navigate }) {
     }
     if (!incoming || cancelled) return false;
     incoming.setAttribute("data-details-sequence-entered", "");
-    await Promise.all([waitForImages(incoming), waitForCast(incoming, () => cancelled)]);
+    await waitForImages(incoming, snapshot);
     if (cancelled || !incoming.isConnected) return false;
     // El nuevo título arranca en su hero; la copia saliente conserva el scroll.
     window.scrollTo({ top: 0, behavior: "instant" });
