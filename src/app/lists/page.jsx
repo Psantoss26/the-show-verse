@@ -1308,8 +1308,9 @@ function ListEntrance({ index = 0, className = "", instant = false, children }) 
 }
 
 // Pósters de la tarjeta en MÓVIL: en fila, todos del mismo tamaño y sin girar
-// (el abanico de PosterStack ocupa el doble de alto). Cinco huecos fijos, así
-// que la fila mide lo mismo tenga la lista los títulos que tenga.
+// (el abanico de PosterStack ocupa el doble de alto), sin marco alrededor de
+// cada póster. Cinco huecos fijos: la fila mide lo mismo tenga la lista los
+// títulos que tenga.
 const ROW_POSTER_SLOTS = 5;
 
 function PosterRow({ posters, loading, alt }) {
@@ -1337,13 +1338,14 @@ function PosterRow({ posters, loading, alt }) {
       {posters.slice(0, ROW_POSTER_SLOTS).map((src, index) => (
         <div
           key={`${src}-${index}`}
-          className="relative aspect-[2/3] w-[calc((100%-4*0.375rem)/5)] overflow-hidden rounded-lg bg-zinc-900 shadow-lg shadow-black/50 ring-1 ring-white/10"
+          className="relative aspect-[2/3] w-[calc((100%-4*0.375rem)/5)] overflow-hidden rounded-lg"
         >
+          {/* Solo la imagen: sin marco, fondo ni sombra que dibujen un borde. */}
           <OptimizedImage
             src={src}
             alt={`${alt}: título ${index + 1}`}
             loading="lazy"
-            className="h-full w-full object-cover"
+            className="block h-full w-full object-cover"
           />
         </div>
       ))}
