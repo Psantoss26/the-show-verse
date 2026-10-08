@@ -1307,6 +1307,50 @@ function ListEntrance({ index = 0, className = "", instant = false, children }) 
   );
 }
 
+// Pósters de la tarjeta en MÓVIL: en fila, todos del mismo tamaño y sin girar
+// (el abanico de PosterStack ocupa el doble de alto). Cinco huecos fijos, así
+// que la fila mide lo mismo tenga la lista los títulos que tenga.
+const ROW_POSTER_SLOTS = 5;
+
+function PosterRow({ posters, loading, alt }) {
+  if (loading) {
+    return (
+      <div className="flex justify-center gap-1.5">
+        {Array.from({ length: ROW_POSTER_SLOTS }, (_, index) => (
+          <div
+            key={index}
+            className="aspect-[2/3] w-[calc((100%-4*0.375rem)/5)] animate-pulse rounded-lg bg-white/[0.06]"
+          />
+        ))}
+      </div>
+    );
+  }
+  if (!posters.length) {
+    return (
+      <div className="flex aspect-[5/1.6] items-center justify-center opacity-10">
+        <ListVideo className="h-12 w-12" />
+      </div>
+    );
+  }
+  return (
+    <div className="flex justify-center gap-1.5">
+      {posters.slice(0, ROW_POSTER_SLOTS).map((src, index) => (
+        <div
+          key={`${src}-${index}`}
+          className="relative aspect-[2/3] w-[calc((100%-4*0.375rem)/5)] overflow-hidden rounded-lg bg-zinc-900 shadow-lg shadow-black/50 ring-1 ring-white/10"
+        >
+          <OptimizedImage
+            src={src}
+            alt={`${alt}: título ${index + 1}`}
+            loading="lazy"
+            className="h-full w-full object-cover"
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const GridListCard = memo(function GridListCard({
   list,
   itemsState,
@@ -1352,7 +1396,12 @@ const GridListCard = memo(function GridListCard({
         >
           <LiquidGlassOpticalLayers />
 
-          <div className="relative z-10 h-52 w-full overflow-visible bg-gradient-to-b from-white/5 to-transparent p-6">
+          {/* Móvil: fila compacta. */}
+          <div className="relative z-10 w-full bg-gradient-to-b from-white/5 to-transparent px-3 pb-2 pt-3 sm:hidden">
+            <PosterRow posters={previewPosters} loading={isLoading} alt={list?.name || "Lista"} />
+          </div>
+
+          <div className="relative z-10 hidden h-52 w-full overflow-visible bg-gradient-to-b from-white/5 to-transparent p-6 sm:block">
             {isLoading ? (
               <div className="flex h-full w-full items-center justify-center">
                 <div className="h-40 w-56 animate-pulse rounded-2xl bg-white/[0.06]" />
@@ -1372,19 +1421,19 @@ const GridListCard = memo(function GridListCard({
             )}
           </div>
 
-          <div className="relative z-10 flex flex-1 flex-col justify-between bg-black/25 p-5">
+          <div className="relative z-10 flex flex-1 flex-col justify-between bg-black/25 px-4 pb-3 pt-3 sm:p-5">
             <div>
-              <h3 className="line-clamp-1 text-lg font-bold leading-tight text-white transition-colors group-hover:text-indigo-400">
+              <h3 className="line-clamp-1 text-base font-bold leading-tight text-white transition-colors group-hover:text-indigo-400 sm:text-lg">
                 {list?.name || "Lista"}
               </h3>
               {description && (
-                <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-zinc-400">
+                <p className="mt-1 line-clamp-1 text-xs leading-relaxed text-zinc-400 sm:mt-2 sm:line-clamp-2">
                   {description}
                 </p>
               )}
             </div>
 
-            <footer className="mt-4 flex items-center justify-between gap-3 border-t border-white/5 pt-4">
+            <footer className="mt-3 flex items-center justify-between gap-3 border-t border-white/5 pt-3 sm:mt-4 sm:pt-4">
               <div className="flex min-w-0 items-center gap-2">
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10 text-[10px] font-black text-white ring-1 ring-white/20">
                   {list?.source === "trakt" ? (
@@ -2692,7 +2741,7 @@ export default function ListsPage() {
             ) : (
               <>
                 {viewMode === "grid" && (
-                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
                     {contentLists.map((l, index) => (
                       <ListEntrance
                         key={`${l.source}-${l.id}`}

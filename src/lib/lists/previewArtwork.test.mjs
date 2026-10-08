@@ -167,7 +167,7 @@ test("grid replica las tarjetas de DetailsClient y lista muestra cinco posters c
   assert.doesNotMatch(gridMode, /<ListCoverBackdropCollage/);
   assert.match(
     listsPage,
-    /grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4/,
+    /grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4/,
   );
   assert.match(profileSection, /<ListCoverBackdropCollage/);
 });
