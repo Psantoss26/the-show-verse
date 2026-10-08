@@ -44,3 +44,93 @@ export function shouldRenderCachedListDuringAuthHydration({
 }) {
   return Boolean(canUse || (!hydrated && hasCachedData));
 }
+
+// ------------------------------------------------------------------------
+// VISTA PROVISIONAL DESDE EL ÍNDICE DE LISTAS
+//
+// Las fichas de lista devolvían `null` hasta tener sus datos: al abrir una sin
+// caché propia la pantalla se quedaba vacía 2-3 s (más en las propias, que
+// esperan también a la sesión). Pero quien llega desde /lists ya tiene esa
+// lista en la caché del índice (`showverse:lists:index:<fuente>:<ámbito>:v1`,
+// ver app/lists/page.jsx) con su nombre, descripción, recuento y portada: con
+// eso se pinta la cabecera al instante y solo los títulos esperan.
+
+const LISTS_INDEX_CACHE_PREFIX = 'showverse:lists:index:'
+// Misma vigencia que la caché del índice (LISTS_SOURCE_CACHE_TTL_MS).
+const LISTS_INDEX_CACHE_TTL_MS = 20 * 60 * 1000
+
+/**
+ * Busca la lista `id` en las cachés del índice de la fuente (`personal`,
+ * `trakt` o `collections`, en cualquiera de sus ámbitos). `storage` es un
+ * Storage (sessionStorage) o equivalente; null si no está o ha caducado.
+ */
+export function findListInIndexCache(source, id, {
+  storage = typeof window !== 'undefined' ? window.sessionStorage : null,
+  now = Date.now(),
+  ttlMs = LISTS_INDEX_CACHE_TTL_MS,
+} = {}) {
+  if (!storage || id == null || id === '') return null
+  const prefix = `${LISTS_INDEX_CACHE_PREFIX}${source}:`
+  const wanted = String(id)
+  try {
+    for (let index = 0; index < storage.length; index += 1) {
+      const key = storage.key(index)
+      if (!key || !key.startsWith(prefix)) continue
+      const parsed = JSON.parse(storage.getItem(key) || 'null')
+      const t = Number(parsed?.t || 0)
+      if (!t || now - t > ttlMs || !Array.isArray(parsed?.data)) continue
+      const hit = parsed.data.find((list) => String(list?.id) === wanted)
+      if (hit) return hit
+    }
+  } catch {
+    // Storage no disponible o entrada corrupta: sin vista provisional.
+  }
+  return null
+}
+
+// El índice guarda el nombre de las colecciones SIN «- Colección» (lo limpia
+// /api/tmdb/collections/featured); la ficha usa el de TMDb, que lo lleva. Se
+// repone para que el título no cambie al llegar los datos.
+export function collectionPreviewFromIndex(entry) {
+  if (!entry?.id) return null
+  const name = String(entry.name || '').trim()
+  return {
+    id: String(entry.id),
+    name: name ? `${name} - Colección` : 'Colección',
+    description: entry.description || '',
+    item_count: Number(entry.item_count) || 0,
+    poster_path: entry.poster_path || null,
+    backdrop_path: entry.backdrop_path || null,
+    cast: [],
+    revenue: 0,
+  }
+}
+
+export function communityListPreviewFromIndex(entry) {
+  if (!entry?.id) return null
+  return {
+    id: String(entry.id),
+    name: entry.name || '',
+    description: entry.description || '',
+    item_count: Number(entry.item_count) || 0,
+    likes: Number(entry.likes) || 0,
+    user: entry.user || null,
+  }
+}
+
+// Las listas del índice «personal» son SIEMPRE del usuario: se pueden editar.
+export function personalListPreviewFromIndex(entry) {
+  if (!entry?.id) return null
+  return {
+    id: entry.id,
+    name: entry.name || '',
+    description: entry.description || '',
+    public: Boolean(entry.public),
+    canEdit: true,
+    item_count: Number(entry.item_count) || 0,
+    page: 1,
+    total_pages: 1,
+    items: [],
+    ratingSummary: null,
+  }
+}

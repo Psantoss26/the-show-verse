@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createPortal } from "react-dom";
 import {
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -65,6 +66,8 @@ import {
   ThumbsUp,
 } from "lucide-react";
 import useTraktLists from "@/lib/hooks/useTraktLists";
+import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import { useHydrationReady } from "@/lib/hooks/useHydrationReady";
 import ListPosterCard from "@/components/lists/ListPosterCard";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import { TmdbImg } from "@/components/lists/ListCoverBackdropCollage";
@@ -1235,12 +1238,19 @@ function ListNavWrapper({ list, className = "", children }) {
 // para que, en una rejilla de treinta y tantas colecciones, la última no entre
 // segundo y medio después de la primera: lo que se busca es que el bloque
 // "aterrice", no un desfile.
+// Efectos que deben aplicarse ANTES del primer pintado (preferencias, cachés):
+// en el servidor no hay layout effect, de ahí el respaldo.
+const useClientLayoutEffect =
+  typeof window === "undefined" ? useEffect : useLayoutEffect;
+
 const LIST_ENTRANCE_STEP = 0.035;
 const LIST_ENTRANCE_MAX_DELAY = 0.36;
 
-function ListEntrance({ index = 0, className = "", children }) {
+// `instant`: al volver atrás la página se pinta estática (ver
+// useIsHistoryNavigation), sin la entrada escalonada de las filas.
+function ListEntrance({ index = 0, className = "", instant = false, children }) {
   const shouldReduceMotion = useReducedMotion();
-  if (shouldReduceMotion) return <div className={className}>{children}</div>;
+  if (shouldReduceMotion || instant) return <div className={className}>{children}</div>;
 
   return (
     <motion.div
@@ -1534,6 +1544,17 @@ const ListModeRow = memo(function ListModeRow({
 // ================== MAIN PAGE ==================
 export default function ListsPage() {
   const isMobile = useIsMobileLayout(768);
+  // Al volver atrás/adelante la página se pinta ESTÁTICA, como el resto de
+  // páginas de contenido: sin entradas de cabecera, barra ni filas.
+  //
+  // Nunca en el render de HIDRATACIÓN de una carga completa: la marca de
+  // historial vive en sessionStorage (30 s), así que recargar justo después de
+  // un «atrás» la daba por buena y el cliente no coincidía con el HTML del
+  // servidor, que trae las entradas animadas. Se fija en el primer render: si
+  // cambiara después, `ListEntrance` remontaría las filas.
+  const historyNavigation = useIsHistoryNavigation();
+  const hydrationDone = useHydrationReady();
+  const [isBackNav] = useState(() => hydrationDone && historyNavigation);
   const [isPending, startTransition] = useTransition();
 
   const {
@@ -1578,6 +1599,8 @@ export default function ListsPage() {
   // ✅ NUEVO: selector de fuente
   const [source, setSource] = useState("trakt"); // 'personal' | 'trakt' | 'collections'
   const [prefsHydrated, setPrefsHydrated] = useState(false);
+  // Último contenido que SÍ estuvo listo (ver el relevo entre fuentes, más abajo).
+  const [readyContent, setReadyContent] = useState({ source, lists: [] });
 
   useEffect(() => {
     if (!mobileFiltersOpen && mobileDeleteMode) {
@@ -1595,11 +1618,12 @@ export default function ListsPage() {
   const [collectionsLoading, setCollectionsLoading] = useState(false);
   const [collectionsResolvedKey, setCollectionsResolvedKey] = useState(null);
   const [searchedCollections, setSearchedCollections] = useState([]);
-  const [cachedActiveLists, setCachedActiveLists] = useState([]);
 
   // Map: `${source}:${id}` -> undefined (no pedido) | null (cargando) | Array(items)
   const [itemsMap, setItemsMap] = useState({});
   const itemsMapRef = useRef(itemsMap);
+  // Claves sembradas desde caché antes del pintado y aún sin refrescar.
+  const seededPreviewsRef = useRef(new Set());
   const inFlight = useRef(new Set());
   const controllersRef = useRef(new Map()); // cacheKey -> AbortController
 
@@ -1607,13 +1631,19 @@ export default function ListsPage() {
     itemsMapRef.current = itemsMap;
   }, [itemsMap]);
 
-  useEffect(() => {
+  // ANTES DEL PRIMER PINTADO. Con un efecto normal el primer fotograma salía
+  // con la pestaña por defecto ("trakt") y el contenido vacío, y un instante
+  // después cambiaba a la pestaña guardada con su propio relevo animado: al
+  // volver atrás desde una lista se veía la página vacía (solo la cabecera y su
+  // trazo morado) unos 300 ms, más si la pestaña tenía que cargar.
+  useClientLayoutEffect(() => {
     const prefs = readListsMenuPrefs();
     if (prefs) {
       setQuery(prefs.query);
       setSortMode(prefs.sortMode);
       setViewMode(prefs.viewMode);
       setSource(prefs.source);
+      setReadyContent({ source: prefs.source, lists: [] });
     }
     setPrefsHydrated(true);
   }, []);
@@ -1652,13 +1682,20 @@ export default function ListsPage() {
     return `showverse:lists:index:${source}:${scope}:v1`;
   }, [source, collectionsQueryKey]);
 
-  useEffect(() => {
+  // Caché de la pestaña ACTIVA, leída en el mismo render que su clave. Antes era
+  // un estado que se actualizaba en un efecto: justo después de cambiar de
+  // pestaña aún contenía la caché de la ANTERIOR, la nueva parecía lista con
+  // datos ajenos y, al corregirse, el relevo podía quedarse vacío hasta que
+  // llegaban sus listas. Hasta tener las preferencias (primer render, igual que
+  // el HTML del servidor) no se lee nada.
+  const cachedActiveLists = useMemo(() => {
+    if (!prefsHydrated) return [];
     const cached = readSessionJsonCache(
       activeListsCacheKey,
       LISTS_SOURCE_CACHE_TTL_MS,
     );
-    setCachedActiveLists(Array.isArray(cached) ? cached : []);
-  }, [activeListsCacheKey]);
+    return Array.isArray(cached) ? cached : [];
+  }, [prefsHydrated, activeListsCacheKey]);
 
   // ✅ precarga las colecciones destacadas en segundo plano estando en otra
   // pestaña. Antes solo se pedían al pulsar "Colecciones", y la primera vez de
@@ -1807,7 +1844,6 @@ export default function ListsPage() {
     if (!Array.isArray(fetchedActiveLists) || fetchedActiveLists.length === 0) {
       return;
     }
-    setCachedActiveLists(fetchedActiveLists);
     writeSessionJsonCache(activeListsCacheKey, fetchedActiveLists);
   }, [activeListsCacheKey, fetchedActiveLists]);
 
@@ -1877,9 +1913,13 @@ export default function ListsPage() {
 
       if (!listId) return;
 
-      // ya cargado o cargando
-      if (itemsMapRef.current[cacheKey] !== undefined) return;
+      // ya cargado o cargando. Lo sembrado desde caché antes del pintado
+      // (ver más abajo) cuenta como pintado, no como cargado: se refresca igual
+      // que antes, manteniendo a la vista la vista previa cacheada.
+      const seeded = seededPreviewsRef.current.has(cacheKey);
+      if (itemsMapRef.current[cacheKey] !== undefined && !seeded) return;
       if (inFlight.current.has(cacheKey)) return;
+      seededPreviewsRef.current.delete(cacheKey);
 
       const src = listObj?.source || source;
       // v2 contiene el backdrop inglés/neutro y el póster inglés ya resueltos;
@@ -1979,6 +2019,30 @@ export default function ListsPage() {
     },
     [activeListsMap, source],
   );
+
+  // VISTAS PREVIAS CACHEADAS ANTES DEL PINTADO. `ensureListItems` las recupera
+  // en un efecto, así que al volver a la página las filas salían un instante
+  // vacías (esqueleto) aunque estuvieran en caché. Aquí se siembran todas las
+  // que haya, de una vez y antes de pintar; la petición de refresco sigue
+  // lanzándose como siempre (ver `seededPreviewsRef`).
+  useClientLayoutEffect(() => {
+    if (!prefsHydrated || filtered.length === 0) return;
+    const seeds = {};
+    for (const list of filtered) {
+      const cacheKey = getListCacheKey(list);
+      if (itemsMapRef.current[cacheKey] !== undefined) continue;
+      const cached = readSessionJsonCache(
+        `showverse:lists:preview:${cacheKey}:v2`,
+        LIST_PREVIEW_CACHE_TTL_MS,
+      );
+      if (!Array.isArray(cached)) continue;
+      seeds[cacheKey] = cached;
+      seededPreviewsRef.current.add(cacheKey);
+    }
+    if (Object.keys(seeds).length === 0) return;
+    itemsMapRef.current = { ...itemsMapRef.current, ...seeds };
+    setItemsMap((prev) => ({ ...seeds, ...prev }));
+  }, [prefsHydrated, filtered]);
 
   // ✅ precarga solo las primeras N listas visibles (el resto lo hace InView)
   useEffect(() => {
@@ -2082,7 +2146,6 @@ export default function ListsPage() {
   // ya con datos, animado por el <AnimatePresence> de más abajo. El usuario
   // tiene respuesta inmediata igualmente: la pestaña activa y el título cambian
   // al pulsar, y el botón de sincronizar gira mientras carga.
-  const [readyContent, setReadyContent] = useState({ source, lists: [] });
   useEffect(() => {
     if (!sourceInitialized) return;
     setReadyContent({ source, lists: filtered });
@@ -2144,7 +2207,7 @@ export default function ListsPage() {
         {/* Header */}
         <motion.header
           className="mb-10"
-          initial={{ opacity: 0, y: -20 }}
+          initial={isBackNav ? false : { opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
         >
@@ -2171,7 +2234,7 @@ export default function ListsPage() {
                 </h1>
 
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
+                  initial={isBackNav ? false : { opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.4, delay: 0.3 }}
                   className="shrink-0"
@@ -2205,7 +2268,7 @@ export default function ListsPage() {
           ref={filtersRef}
           data-menu-pinned={filtersPinned}
           className="relative sticky top-14 z-[60] space-y-3 mb-6 transition-all duration-300 sm:top-20"
-          initial={{ opacity: 0, y: 10 }}
+          initial={isBackNav ? false : { opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
         >
@@ -2611,7 +2674,12 @@ export default function ListsPage() {
             La clave es `contentSource`, no `source`: así el bloque no sale de
             escena en cuanto se pulsa la pestaña, sino cuando hay algo con lo que
             sustituirlo. */}
-        <AnimatePresence mode="wait">
+        {/* Sin montar hasta conocer la pestaña guardada (se lee antes del
+            pintado): si no, el primer fotograma era la pestaña por defecto y el
+            relevo a la buena se veía como una página vacía. Al volver atrás,
+            sin entrada (`initial={false}`). */}
+        {prefsHydrated ? (
+        <AnimatePresence mode="wait" initial={!isBackNav}>
           <motion.div
             key={contentSource}
             // Marca la fuente que se está pintando de verdad, que durante la
@@ -2657,6 +2725,7 @@ export default function ListsPage() {
                       <ListEntrance
                         key={`${l.source}-${l.id}`}
                         index={index}
+                        instant={isBackNav}
                         className="h-full"
                       >
                         <GridListCard
@@ -2675,7 +2744,7 @@ export default function ListsPage() {
                 {viewMode === "rows" && (
                   <div className="space-y-12">
                     {contentLists.map((l, index) => (
-                      <ListEntrance key={`${l.source}-${l.id}`} index={index}>
+                      <ListEntrance key={`${l.source}-${l.id}`} index={index} instant={isBackNav}>
                         <RowListSection
                           list={l}
                           itemsState={itemsMap[getListCacheKey(l)]}
@@ -2693,7 +2762,7 @@ export default function ListsPage() {
                 {viewMode === "list" && (
                   <div className="flex flex-col gap-3">
                     {contentLists.map((l, index) => (
-                      <ListEntrance key={`${l.source}-${l.id}`} index={index}>
+                      <ListEntrance key={`${l.source}-${l.id}`} index={index} instant={isBackNav}>
                         <ListModeRow
                           list={l}
                           itemsState={itemsMap[getListCacheKey(l)]}
@@ -2710,6 +2779,7 @@ export default function ListsPage() {
             )}
           </motion.div>
         </AnimatePresence>
+        ) : null}
 
         {/* Carga adicional de listas propias si el backend la expone. */}
         {source === "personal" && hasMore && !loadingUnified && (

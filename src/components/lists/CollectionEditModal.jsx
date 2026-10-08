@@ -11,12 +11,8 @@ import { LIQUID_GLASS_MODAL_HEADER, LIQUID_GLASS_PANEL } from '@/lib/ui/liquidGl
 import {
   COLLECTION_ARTWORK_TYPE,
   buildCollectionArtworkChanges,
-  buildCollectionCustomization,
-  collectionCustomizationKey,
 } from '@/lib/lists/collectionCustomization'
 
-// Controles de los modales de acciones de la ficha (AddToListModal).
-const FIELD_CLASS = 'mt-2 block w-full rounded-xl bg-black/40 px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none transition focus:bg-black/60 focus:ring-2 focus:ring-yellow-500/50'
 const LABEL_CLASS = 'block text-xs font-bold uppercase tracking-wider text-zinc-300'
 // Barra fina y translúcida sin raíl, la de EpisodeRatingsModal.
 const THIN_SCROLLBAR = '[scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin]'
@@ -47,8 +43,9 @@ const imageLanguage = (image) => {
   const lang = String(image?.iso_639_1 || '').toLowerCase()
   return lang === 'xx' ? '' : lang
 }
-// Póster: el de portada lleva el título, así que solo en español o inglés.
-const titledPosters = (images) => (images?.posters || []).filter((image) => POSTER_LANGUAGES.has(imageLanguage(image)))
+// Póster y backdrop de portada: llevan el título, así que solo en español o
+// inglés.
+const titledImages = (list) => (list || []).filter((image) => POSTER_LANGUAGES.has(imageLanguage(image)))
 // Fondos (móvil y ordenador): sin texto encima, solo imágenes sin idioma.
 const textlessImages = (list) => (list || []).filter((image) => !imageLanguage(image))
 
@@ -142,12 +139,13 @@ function ArtworkRow({ id, label, field, original, value, candidates, landscape =
 }
 
 /**
- * Edición por usuario de una colección con la estructura de los modales de
+ * Edición por usuario de las IMÁGENES de una colección (el nombre y la
+ * descripción son siempre los de TMDb), con la estructura de los modales de
  * acciones de DetailsClient: portal, velo difuminado, tarjeta de cristal con
  * cabecera fija y cuerpo con scroll propio.
  */
 export default function CollectionEditModal({ original, collection, onClose }) {
-  const { authenticated, saveUiSettings, cacheArtworkOverrides } = useAuth()
+  const { authenticated, cacheArtworkOverrides } = useAuth()
   const phone = usePhoneViewport()
   const panelRef = useRef(null)
   const [portalReady, setPortalReady] = useState(false)
@@ -186,13 +184,7 @@ export default function CollectionEditModal({ original, collection, onClose }) {
     setError('')
     setSaving(true)
     try {
-      const customization = buildCollectionCustomization(original, draft)
       const artworkChanges = buildCollectionArtworkChanges(original, collection, draft)
-      const textChanged = ['name', 'description'].some((field) => String(draft[field] || '').trim() !== String(collection[field] || '').trim())
-
-      // Primero el texto: su respuesta reemplaza las preferencias del contexto
-      // y, si fuese después, pisaría la instantánea local del artwork.
-      if (textChanged) await saveUiSettings({ [collectionCustomizationKey(original.id)]: customization })
 
       if (artworkChanges.length) {
         const target = { type: COLLECTION_ARTWORK_TYPE, id: original.id }
@@ -253,16 +245,13 @@ export default function CollectionEditModal({ original, collection, onClose }) {
             empujaba el pie fuera de la tarjeta. */}
         <div className={`min-h-0 flex-1 overflow-y-auto overscroll-contain ${THIN_SCROLLBAR}`}>
         <fieldset disabled={saving} className="min-w-0 space-y-6 p-6 sm:px-8">
-          <label className={LABEL_CLASS}>
-            Nombre
-            <input required maxLength={200} value={draft.name || ''} onChange={(event) => setDraft({ ...draft, name: event.target.value })} className={`${FIELD_CLASS} normal-case tracking-normal font-normal`} />
-          </label>
-          <label className={LABEL_CLASS}>
-            Descripción
-            <textarea rows={3} maxLength={5000} value={draft.description || ''} onChange={(event) => setDraft({ ...draft, description: event.target.value })} className={`${FIELD_CLASS} resize-y normal-case tracking-normal font-normal ${THIN_SCROLLBAR}`} />
-          </label>
-
-          <ArtworkRow id="collection-edit-poster" label="Póster" field="poster_path" original={original.poster_path} value={draft.poster_path} candidates={titledPosters(images)} onSelect={selectArtwork} />
+          <ArtworkRow id="collection-edit-poster" label="Póster" field="poster_path" original={original.poster_path} value={draft.poster_path} candidates={titledImages(images?.posters)} onSelect={selectArtwork} />
+          {/* La imagen de la portada en modo backdrop: con el título, en
+              español o inglés. Ese modo solo existe en ordenador, así que en
+              móvil no se ofrece (como el fondo de ordenador). */}
+          {phone ? null : (
+            <ArtworkRow id="collection-edit-cover-backdrop" label="Backdrop de portada" field="cover_backdrop_path" original={original.cover_backdrop_path} value={draft.cover_backdrop_path} candidates={titledImages(images?.backdrops)} landscape onSelect={selectArtwork} />
+          )}
           {/* El fondo se edita para la vista en la que se está: en móvil la
               colección usa un póster de fondo y en ordenador un backdrop, y
               cada uno se guarda por separado. */}

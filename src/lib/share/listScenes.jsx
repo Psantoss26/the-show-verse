@@ -351,6 +351,8 @@ const POSTER_FADE_TAIL = 34;
 // Lo máximo que se recorta arriba: un póster más alargado que 2:3 cede el resto
 // por abajo (bajo la vista previa) en vez de perder más cabeza.
 const POSTER_MAX_SHIFT = 140;
+// Hasta dónde se ve el reflejo del póster bajo la costura (ver PosterCard).
+const MIRROR_FADE_PX = 150;
 
 /** Medidas de la composición «póster» (px de la imagen). */
 export function posterLayout({ ratio = 1.5, tiles = LIST_PREVIEW_MAX, scores = true }) {
@@ -379,7 +381,16 @@ export function posterLayout({ ratio = 1.5, tiles = LIST_PREVIEW_MAX, scores = t
 }
 
 /** Imagen de una colección con su póster oficial (composición «póster»). */
-export function PosterCard({ card, cover, previews, ambient, ambientBase, assets, fonts }) {
+//
+// COSTURA SIN ESCALÓN. Debajo del póster no va otra imagen (el fondo
+// ambiental era el póster sin texto, de otro tono: el fundido dejaba un escalón
+// visible), sino la CONTINUACIÓN del propio póster: su versión diminuta (w92)
+// ampliada —borrosa por sí sola— detrás del póster nítido y, bajo la costura,
+// su REFLEJO vertical. En la costura las dos muestran la misma fila del póster,
+// así que no hay corte; el nítido se funde con una versión borrosa de SÍ MISMO.
+// Sin `filter: blur` a propósito: en Satori el desenfoque se recorta al borde
+// de cada imagen y lo oscurece, justo en la costura.
+export function PosterCard({ card, cover, coverBlur, previews, assets, fonts }) {
   const hasScores = !!(card.scores.tmdb || card.scores.imdb);
   const { posters, hasMore, more, tileCount } = previewSlots(card);
   const size = cover.size?.width && cover.size?.height ? cover.size : { width: 2, height: 3 };
@@ -387,6 +398,7 @@ export function PosterCard({ card, cover, previews, ambient, ambientBase, assets
   const rowWidth = tileCount * POSTER_TILE_W + Math.max(0, tileCount - 1) * POSTER_TILE_GAP;
   const fade = (layout.fadeStart / layout.height) * 100;
   const mid = fade + (100 - fade) * 0.45;
+  const posterBottom = layout.top + layout.height;
 
   return (
     <div
@@ -400,14 +412,56 @@ export function PosterCard({ card, cover, previews, ambient, ambientBase, assets
         fontFamily: fonts ? FONT : "sans-serif",
       }}
     >
-      {/* Fondo bajo el final del póster: el póster sin texto difuminado,
-          oscurecido hacia abajo, donde van la vista previa y el marcador. */}
-      <AmbientBackground ambient={ambient} ambientBase={ambientBase} />
-      <Fill
-        style={{
-          backgroundImage: `linear-gradient(180deg, ${rgba(SHADE, 0.35)} 0%, ${rgba(SHADE, 0.6)} 75%, ${rgba(SHADE, 0.88)} 100%)`,
-        }}
-      />
+      {/* La continuación del póster (ver arriba): borroso detrás y reflejado
+          debajo, oscureciéndose desde la costura hacia la vista previa y el
+          marcador. */}
+      {coverBlur ? (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={coverBlur.src}
+            width={W}
+            height={layout.height}
+            alt=""
+            style={{ position: "absolute", top: layout.top, left: 0, width: W, height: layout.height, objectFit: "cover" }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              top: posterBottom,
+              left: 0,
+              width: W,
+              height: Math.max(0, H - posterBottom),
+              display: "flex",
+              overflow: "hidden",
+            }}
+          >
+            {/* Volteado: la fila de arriba de esta caja es la última del póster. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={coverBlur.src}
+              width={W}
+              height={layout.height}
+              alt=""
+              style={{ position: "absolute", top: 0, left: 0, width: W, height: layout.height, objectFit: "cover", transform: "scaleY(-1)" }}
+            />
+          </div>
+          <div
+            style={{
+              position: "absolute",
+              top: posterBottom,
+              left: 0,
+              width: W,
+              height: Math.max(0, H - posterBottom),
+              display: "flex",
+              // El reflejo solo hace falta junto a la costura: más abajo se leería
+              // el texto del póster al revés. Transparente en la costura y casi
+              // opaco a ~150 px (`MIRROR_FADE_PX`).
+              backgroundImage: `linear-gradient(180deg, ${rgba(SHADE, 0)} 0px, ${rgba(SHADE, 0.6)} ${Math.round(MIRROR_FADE_PX * 0.45)}px, ${rgba(SHADE, 0.92)} ${MIRROR_FADE_PX}px, ${rgba(SHADE, 1)} ${Math.round(MIRROR_FADE_PX * 1.6)}px)`,
+            }}
+          />
+        </>
+      ) : null}
 
       {/* El póster a sangre, con su proporción (solo cede `cropTop` arriba),
           fundido por máscara: no se oscurece hacia negro, se vuelve
