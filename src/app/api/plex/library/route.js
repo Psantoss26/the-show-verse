@@ -1,3 +1,4 @@
+import { buildPlexWatchUrl } from "@/lib/streaming/plexLinks";
 import { NextResponse } from "next/server";
 import { getPlexAccessToken, getActivePlexServer } from "@/lib/plex/auth";
 
@@ -339,7 +340,7 @@ function buildPlexItemLinks({ item, machineIdentifier, baseUrl, itemType }) {
     play,
     playLegacy,
     playRaw,
-    universal: web,
+    universal: buildPlexWatchUrl(item?.slug, itemType),
     androidIntent,
     androidIntentPlay,
   };

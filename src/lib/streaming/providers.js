@@ -1,5 +1,5 @@
 import { buildImg } from "@/lib/dashboard/media";
-import { isAndroidApp } from "@/lib/android/appBridge";
+import { getPlexLink } from "./plexLinks.js";
 
 function normalizeProviderName(name = "") {
   return String(name)
@@ -98,55 +98,6 @@ function getProviderLogoSrc(provider) {
     return buildImg(logoPath, "original");
   }
   return logoPath;
-}
-
-// ¿Estamos en "un ordenador de verdad"? Se usa el MISMO criterio que la
-// variante `desktop:` de la web (ver globals.css): el ancho no distingue un
-// iPad de un monitor, el puntero sí. En SSR se asume escritorio porque el
-// destino web vale en cualquier parte; da igual, porque la tarjeta de Plex solo
-// existe tras la consulta a /api/plex, que ocurre ya en el cliente.
-function esEscritorio() {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-    return true;
-  }
-  return window.matchMedia(
-    "(min-width: 64rem) and (hover: hover) and (pointer: fine)",
-  ).matches;
-}
-
-// Enlace del icono de Plex (servidor personal). Va DIRECTO al título: antes
-// pasaba por una página intermedia (/api/plex/open) que anunciaba "Abriendo en
-// Plex…" y lanzaba el deep link por JS; ahora el href ya es el destino final.
-//
-// Además es más fiable: un click en un <a> es un gesto del usuario, y los
-// navegadores dejan pasar los esquemas propios (`plex://`) mucho mejor así que
-// desde un `location.href` automático.
-//
-// POLÍTICA EN MÓVIL Y TABLET: la app primero. Solo se cae a la web si este
-// contenido no tiene deep link nativo (sin slug no hay `plex://`).
-function getPlexLink(plexUrl) {
-  if (!plexUrl) return "#";
-  if (typeof plexUrl === "string") return plexUrl;
-
-  const web = plexUrl.web || "";
-  const universal = plexUrl.universal || "";   // https://watch.plex.tv/{type}/{slug}
-  const slug = plexUrl.slug || "";             // plex://{type}/{slug}
-  const androidIntent = plexUrl.androidSlugIntent || ""; // intent:// para Chrome
-
-  // Escritorio: Plex Web sobre el servidor personal es el destino natural.
-  if (esEscritorio()) return web || universal || "#";
-
-  // Dentro de la app de Android, el WebView resuelve los esquemas externos con
-  // `ACTION_VIEW`, que entiende `plex://` pero NO `intent://` (esa forma
-  // necesita `Intent.parseUri`). Así que allí se usa `plex://`.
-  const enChromeAndroid =
-    typeof navigator !== "undefined" &&
-    /Android/i.test(navigator.userAgent || "") &&
-    !isAndroidApp();
-
-  if (enChromeAndroid && androidIntent) return androidIntent;
-
-  return slug || universal || web || "#";
 }
 
 function getPlatformLink(provider, { justwatchUrl }) {
