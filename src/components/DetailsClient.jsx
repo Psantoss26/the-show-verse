@@ -10257,49 +10257,48 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               </div>
             )}
 
-            {/* Plataformas en escritorio. En móvil se colocan después de las
-                acciones, dentro de la columna de información, para mantener la
-                jerarquía compacta antes de los metadatos y los premios. */}
-            {platformItems.length > 0 ? (
-              <StaggerContainer
-                className="hidden w-full flex-row flex-wrap items-center justify-center gap-3 px-1 py-1 sm:flex"
-                staggerDelay={0.05}
-              >
-                {/* Providers - Solo si hay plataformas */}
-                <div className="flex flex-row flex-nowrap items-center gap-2">
-                  {platformItems.map((provider, index) => (
-                    <motion.a
-                      key={provider.key ?? `${provider.title}-${index}`}
-                      href={provider.href}
-                      initial={
-                        detailsRestored ? false : { opacity: 0, y: 10, scale: 0.96 }
-                      }
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      transition={{
-                        duration: 0.28,
-                        delay: 0.03 + index * 0.04,
-                        ease: [0.22, 1, 0.36, 1],
+            {/* Reserva estable desde SSR: logos de 44px + 8px de padding.
+                También sin plataformas, esta fila conserva su altura y el gap
+                de la columna para que el menú no se desplace al cargar.
+                En móvil las plataformas se consultan desde su botón de acción. */}
+            <StaggerContainer
+              className="hidden h-[3.25rem] w-full shrink-0 flex-row flex-nowrap items-center justify-center gap-3 px-1 py-1 sm:flex"
+              staggerDelay={0.05}
+            >
+              {/* Los enlaces aparecen dentro del espacio ya reservado. */}
+              <div className="flex flex-row flex-nowrap items-center gap-2">
+                {platformItems.map((provider, index) => (
+                  <motion.a
+                    key={provider.key ?? `${provider.title}-${index}`}
+                    href={provider.href}
+                    initial={
+                      detailsRestored ? false : { opacity: 0, y: 10, scale: 0.96 }
+                    }
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{
+                      duration: 0.28,
+                      delay: 0.03 + index * 0.04,
+                      ease: [0.22, 1, 0.36, 1],
+                    }}
+                    target={provider.target}
+                    rel={provider.rel}
+                    aria-label={provider.title}
+                    className="group/provider relative flex-shrink-0 cursor-pointer transform transition-transform hover:z-10 hover:scale-110 hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400"
+                  >
+                    <StreamingProviderLogo
+                      provider={provider}
+                      onError={(e) => {
+                        e.currentTarget.style.visibility = "hidden";
                       }}
-                      target={provider.target}
-                      rel={provider.rel}
-                      aria-label={provider.title}
-                      className="group/provider relative flex-shrink-0 cursor-pointer transform transition-transform hover:z-10 hover:scale-110 hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400"
-                    >
-                      <StreamingProviderLogo
-                        provider={provider}
-                        onError={(e) => {
-                          e.currentTarget.style.visibility = "hidden";
-                        }}
-                      />
-                      <div className="pointer-events-none absolute top-full mt-2 left-1/2 z-[100] -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/provider:scale-100 group-hover/provider:opacity-100 group-hover/provider:delay-[2000ms]">
-                        {provider.subtitle || provider.title}
-                      </div>
-                    </motion.a>
-                  ))}
-                </div>
+                    />
+                    <div className="pointer-events-none absolute top-full mt-2 left-1/2 z-[100] -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/provider:scale-100 group-hover/provider:opacity-100 group-hover/provider:delay-[2000ms]">
+                      {provider.subtitle || provider.title}
+                    </div>
+                  </motion.a>
+                ))}
+              </div>
 
-              </StaggerContainer>
-            ) : null}
+            </StaggerContainer>
           </div>
 
           {/* --- COLUMNA DERECHA: INFO (sin tabs cuando es backdrop) --- */}

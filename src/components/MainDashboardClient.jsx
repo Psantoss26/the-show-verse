@@ -355,7 +355,6 @@ const dashboardPreviewCardClass = (heightClass, isSpotlight = false) =>
     isSpotlight
       ? "rounded-2xl bg-neutral-950 ring-1 ring-inset ring-white/10 shadow-[0_24px_64px_-18px_rgba(0,0,0,0.95)]"
       : `z-0 flex flex-col rounded-xl ${LIQUID_GLASS_DETAIL_SURFACE}`,
-    "transition-all duration-300",
     isSpotlight ? heightClass : "",
   ].join(" ");
 
@@ -1438,10 +1437,9 @@ function InlinePreviewCard({
   return (
     <>
     <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      // El contenedor de la fila ya anima entrada/salida. Una segunda escala
+      // aquí multiplicaba el movimiento y rasterizaba de nuevo el cristal.
+      initial={false}
       ref={cardRef}
       className={dashboardPreviewCardClass(heightClass, isSpotlight)}
       onClick={openPreviewModal}
@@ -1517,7 +1515,7 @@ function InlinePreviewCard({
 
         {showTrailer && (
           <>
-            {(trailerLoading || !trailerSrc) && (
+            {(trailerLoading || !trailerSrc) && !bgSrc && (
               <div className="absolute inset-0 bg-neutral-900 animate-pulse" />
             )}
 
@@ -1648,23 +1646,25 @@ function InlinePreviewCard({
                 </div>
               )}
 
-              {extras?.ratingsReady && (
-                <DetailsRatingsBadges
-                  tmdb={
-                    hasTmdbRating
-                      ? {
-                          value: tmdbRating,
-                          sub: formatCountShort(movie.vote_count),
-                        }
-                      : null
-                  }
-                  imdb={
-                    typeof extras?.imdbRating === "number"
-                      ? { value: extras.imdbRating.toFixed(1), sub: null }
-                      : null
-                  }
-                />
-              )}
+              <div className="min-h-7">
+                {extras?.ratingsReady && (
+                  <DetailsRatingsBadges
+                    tmdb={
+                      hasTmdbRating
+                        ? {
+                            value: tmdbRating,
+                            sub: formatCountShort(movie.vote_count),
+                          }
+                        : null
+                    }
+                    imdb={
+                      typeof extras?.imdbRating === "number"
+                        ? { value: extras.imdbRating.toFixed(1), sub: null }
+                        : null
+                    }
+                  />
+                )}
+              </div>
 
               {error && (
                 <p className="mt-2 line-clamp-1 text-xs text-red-300">
@@ -1748,8 +1748,8 @@ function InlinePreviewCard({
               />
             </div>
 
-            {extras?.awards && (
-              <div className="mb-1.5 flex items-center gap-2 text-[11px] font-bold text-emerald-300 drop-shadow-md sm:text-xs">
+            <div className="min-h-4 mb-1.5 flex items-center gap-2 text-[11px] font-bold text-emerald-300 drop-shadow-md sm:text-xs">
+              {extras?.awards && (
                 <motion.span
                   key={extras.awards}
                   initial={{ opacity: 0 }}
@@ -1760,29 +1760,31 @@ function InlinePreviewCard({
                   <Award className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                   <span className="line-clamp-1">{extras.awards}</span>
                 </motion.span>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Puntuaciones TMDb · IMDb con el MISMO componente compartido que
                 usa DetailModal (mismo diseño). Orden espejo del modal:
                 acciones → meta → premios → puntuaciones. */}
-            {extras?.ratingsReady && (
-              <DetailsRatingsBadges
-                tmdb={
-                  hasTmdbRating
-                    ? {
-                        value: tmdbRating,
-                        sub: formatCountShort(movie.vote_count),
-                      }
-                    : null
-                }
-                imdb={
-                  typeof extras?.imdbRating === "number"
-                    ? { value: extras.imdbRating.toFixed(1), sub: null }
-                    : null
-                }
-              />
-            )}
+            <div className="min-h-7">
+              {extras?.ratingsReady && (
+                <DetailsRatingsBadges
+                  tmdb={
+                    hasTmdbRating
+                      ? {
+                          value: tmdbRating,
+                          sub: formatCountShort(movie.vote_count),
+                        }
+                      : null
+                  }
+                  imdb={
+                    typeof extras?.imdbRating === "number"
+                      ? { value: extras.imdbRating.toFixed(1), sub: null }
+                      : null
+                  }
+                />
+              )}
+            </div>
 
             {error && (
               <p className="mt-1.5 line-clamp-1 text-[11px] text-red-400">
@@ -2362,7 +2364,7 @@ function InlinePreviewCardAnticipated({
           >
           <motion.div
             initial={{ scale: 1 }}
-            animate={{ scale: 1.08 }}
+            animate={{ scale: reduceMotion ? 1 : 1.08 }}
             transition={{ duration: 4, ease: "easeOut" }}
             className={`absolute inset-0 h-full w-full transition-opacity duration-300 ${
               showTrailer && trailerPlaying ? "opacity-0" : "opacity-100"
@@ -2405,7 +2407,7 @@ function InlinePreviewCardAnticipated({
 
         {showTrailer && (
           <>
-            {trailerLoading && (
+            {trailerLoading && !bgSrc && (
               <div className="absolute inset-0 bg-neutral-900 animate-pulse" />
             )}
             {trailer?.key && (
@@ -3174,7 +3176,7 @@ export function Row({
               const isNearEnd = isLast || isSecondToLast || isThirdToLast;
 
               const base =
-                "relative flex-shrink-0 transition-all duration-[420ms] ease-[cubic-bezier(0.16,1,0.3,1)]";
+                `relative flex-shrink-0 ${isSpotlight ? "transition-[width,transform]" : "transition-transform"} duration-[420ms] ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none`;
 
               const isStandardPopoverPreview =
                 isActive && previewKind !== "anticipated" && !isSpotlight;

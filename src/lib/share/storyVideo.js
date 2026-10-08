@@ -57,8 +57,8 @@ export async function detectStoryVideoFormat() {
   return null;
 }
 
-async function postLayer(scene, payload, signal) {
-  const res = await fetch("/api/share/details-story", {
+async function postLayer(endpoint, scene, payload, signal) {
+  const res = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ...payload, scene }),
@@ -80,9 +80,19 @@ function drawLayer(ctx, bitmap, { alpha = 1, scale = 1, offsetY = 0 } = {}) {
 
 /**
  * Genera el vídeo. `cover` es el PNG de la portada (ya generado para la imagen).
+ * `endpoint` es la ruta que pinta las capas (la de la ficha o la de las listas).
  * `onProgress(fracción 0..1)` informa de capas y codificación.
  */
-export async function createStoryVideo({ card, story, sceneIds, cover, format, onProgress, signal }) {
+export async function createStoryVideo({
+  card,
+  story,
+  sceneIds,
+  cover,
+  format,
+  endpoint = "/api/share/details-story",
+  onProgress,
+  signal,
+}) {
   if (!format) throw new Error("No hay un formato de vídeo disponible");
   const report = (value) => onProgress?.(Math.max(0, Math.min(1, value)));
   report(0);
@@ -94,7 +104,7 @@ export async function createStoryVideo({ card, story, sceneIds, cover, format, o
   const [mediabunny, ...blobs] = await Promise.all([
     loadMediabunny(),
     ...scenes.map((scene) =>
-      postLayer(scene, payload, signal).then((blob) => {
+      postLayer(endpoint, scene, payload, signal).then((blob) => {
         ready += 1;
         report((ready / scenes.length) * 0.15);
         return blob;

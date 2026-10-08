@@ -1088,10 +1088,7 @@ function InlinePreviewCard({ show, heightClass, isSpotlight = false }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      initial={false}
       className={dashboardPreviewCardClass(heightClass, isSpotlight)}
       onClick={navigateToDetails}
       onMouseEnter={prefetchHref}
@@ -1143,7 +1140,7 @@ function InlinePreviewCard({ show, heightClass, isSpotlight = false }) {
 
         {showTrailer && (
           <>
-            {(trailerLoading || !trailerSrc) && (
+            {(trailerLoading || !trailerSrc) && !bgSrc && (
               <div className="absolute inset-0 bg-neutral-900" />
             )}
 

@@ -1613,7 +1613,7 @@ function ContinueWatchingPreviewCard({
           >
           <motion.div
             initial={{ scale: 1 }}
-            animate={{ scale: 1.08 }}
+            animate={{ scale: reduceMotion ? 1 : 1.08 }}
             transition={{ duration: 4, ease: "easeOut" }}
             className={`absolute inset-0 h-full w-full transition-opacity duration-300 ${
               showTrailer && trailerPlaying ? "opacity-0" : "opacity-100"
@@ -1642,7 +1642,7 @@ function ContinueWatchingPreviewCard({
 
         {showTrailer && (
           <>
-            {(trailerLoading || !trailerSrc) && (
+            {(trailerLoading || !trailerSrc) && !bgSrc && (
               <div className="absolute inset-0 animate-pulse bg-neutral-900" />
             )}
             {trailerSrc && (
@@ -1837,16 +1837,18 @@ function ContinueWatchingPreviewCard({
         )}
 
         {/* Puntuaciones TMDb · IMDb con el MISMO componente compartido. */}
-        {extras?.ratingsReady && (
-          <DetailsRatingsBadges
-            tmdb={tmdbRating ? { value: tmdbRating, sub: null } : null}
-            imdb={
-              typeof extras?.imdbRating === "number"
-                ? { value: extras.imdbRating.toFixed(1), sub: null }
-                : null
-            }
-          />
-        )}
+        <div className="min-h-7">
+          {extras?.ratingsReady && (
+            <DetailsRatingsBadges
+              tmdb={tmdbRating ? { value: tmdbRating, sub: null } : null}
+              imdb={
+                typeof extras?.imdbRating === "number"
+                  ? { value: extras.imdbRating.toFixed(1), sub: null }
+                  : null
+              }
+            />
+          )}
+        </div>
 
         {error && (
           <p className="mt-1.5 line-clamp-1 text-[11px] text-red-400">{error}</p>

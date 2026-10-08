@@ -17,10 +17,11 @@ import {
 } from "@/lib/dashboard/media";
 
 const DashboardHoverBackdropContext = createContext(null);
+const DashboardHoverBackdropImageContext = createContext(null);
 const hoverBackdropCache = new Map();
 const hoverBackdropPending = new Map();
 const hoverBackdropPreloaded = new Set();
-const HOVER_BACKDROP_SIZE = "original";
+const HOVER_BACKDROP_SIZE = "w1280";
 const HOVER_BACKDROP_PRELOAD_LIMIT = 8;
 
 function getHoverBackdropKey(item) {
@@ -68,18 +69,15 @@ export function DashboardHoverBackdropProvider({ children }) {
 
     const backdropPath = await resolveHoverBackdropPath(item);
 
-    if (
-      requestSeqRef.current !== requestSeq ||
-      activeKeyRef.current !== key
-    ) {
-      return;
-    }
-
-    if (backdropPath) {
-      preloadImage(buildImg(backdropPath, HOVER_BACKDROP_SIZE), {
-        fetchPriority: "high",
-      }).catch(() => {});
-    }
+    // No empezar el fundido hasta que el nuevo fondo esté decodificado.
+    // La comprobación se repite DESPUÉS de la descarga: un hover abandonado
+    // nunca debe sustituir al título que el usuario está mirando ahora.
+    if (requestSeqRef.current !== requestSeq || activeKeyRef.current !== key) return;
+    const ready = backdropPath && await preloadImage(buildImg(backdropPath, HOVER_BACKDROP_SIZE), {
+      fetchPriority: "low",
+    }).catch(() => false);
+    if (requestSeqRef.current !== requestSeq || activeKeyRef.current !== key) return;
+    if (backdropPath && !ready) return;
 
     setActiveBackdrop(
       backdropPath
@@ -115,13 +113,11 @@ export function DashboardHoverBackdropProvider({ children }) {
 
   const value = useMemo(
     () => ({
-      activeBackdrop,
       showHoverBackdrop,
       clearHoverBackdrop,
       prewarmHoverBackdrop,
     }),
     [
-      activeBackdrop,
       showHoverBackdrop,
       clearHoverBackdrop,
       prewarmHoverBackdrop,
@@ -130,7 +126,9 @@ export function DashboardHoverBackdropProvider({ children }) {
 
   return (
     <DashboardHoverBackdropContext.Provider value={value}>
-      {children}
+      <DashboardHoverBackdropImageContext.Provider value={activeBackdrop}>
+        {children}
+      </DashboardHoverBackdropImageContext.Provider>
     </DashboardHoverBackdropContext.Provider>
   );
 }
@@ -138,7 +136,6 @@ export function DashboardHoverBackdropProvider({ children }) {
 export function useDashboardHoverBackdrop() {
   return (
     useContext(DashboardHoverBackdropContext) || {
-      activeBackdrop: null,
       showHoverBackdrop: () => {},
       clearHoverBackdrop: () => {},
       prewarmHoverBackdrop: () => {},
@@ -147,7 +144,7 @@ export function useDashboardHoverBackdrop() {
 }
 
 export function DashboardHoverBackdropLayer() {
-  const { activeBackdrop } = useDashboardHoverBackdrop();
+  const activeBackdrop = useContext(DashboardHoverBackdropImageContext);
   const shouldReduceMotion = useReducedMotion();
   const imageUrl = activeBackdrop?.path
     ? buildImg(activeBackdrop.path, HOVER_BACKDROP_SIZE)

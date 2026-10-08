@@ -571,29 +571,34 @@ export function ProfileMenuDropdown({ label, valueLabel, icon: Icon, options, va
               exit={{ opacity: 0, y: 8, scale: 0.98 }}
               transition={{ duration: 0.16, ease: "easeOut" }}
               aria-label={label}
-              className="overflow-y-auto overflow-x-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 p-2 shadow-2xl backdrop-blur-2xl [scrollbar-color:#3f3f46_transparent]"
-              style={{ ...menuStyle, scrollbarWidth: "thin", scrollbarGutter: "stable", overscrollBehavior: "contain" }}
+              className="flex flex-col overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 p-2 shadow-2xl backdrop-blur-2xl"
+              style={{ ...menuStyle, }}
             >
-              {options.map(([optionValue, optionLabel]) => {
-                const active = multiple ? value.includes(optionValue) : value === optionValue;
-                return (
-                  <button
-                    key={optionValue}
-                    type="button"
-                    aria-pressed={multiple ? active : undefined}
-                    onClick={() => {
-                      onChange(optionValue);
-                      if (!multiple) setOpen(false);
-                    }}
-                    className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition ${
-                      active ? "bg-white/10 font-bold text-white" : "text-zinc-300 hover:bg-white/5 hover:text-white"
-                    }`}
-                  >
-                    <span className="font-medium">{optionLabel}</span>
-                    {active ? <Check className="h-4 w-4 text-emerald-400" aria-hidden="true" /> : null}
-                  </button>
-                );
-              })}
+              <div
+                className="min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-color:#3f3f46_transparent]"
+                style={{ scrollbarWidth: "thin", scrollbarGutter: "stable" }}
+              >
+                {options.map(([optionValue, optionLabel]) => {
+                  const active = multiple ? value.includes(optionValue) : value === optionValue;
+                  return (
+                    <button
+                      key={optionValue}
+                      type="button"
+                      aria-pressed={multiple ? active : undefined}
+                      onClick={() => {
+                        onChange(optionValue);
+                        if (!multiple) setOpen(false);
+                      }}
+                      className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition ${
+                        active ? "bg-white/10 font-bold text-white" : "text-zinc-300 hover:bg-white/5 hover:text-white"
+                      }`}
+                    >
+                      <span className="font-medium">{optionLabel}</span>
+                      {active ? <Check className="h-4 w-4 text-emerald-400" aria-hidden="true" /> : null}
+                    </button>
+                  );
+                })}
+              </div>
             </motion.div>
           ) : null}
         </AnimatePresence>,
