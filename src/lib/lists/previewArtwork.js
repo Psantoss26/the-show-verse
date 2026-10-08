@@ -17,14 +17,35 @@ function artworkKey(item) {
   return `${mediaTypeOf(item)}:${item.id}`;
 }
 
-async function resolveArtwork(item, resolveImages) {
+async function resolveArtwork(item, resolveImages, resolvePicks) {
   const key = artworkKey(item);
-  if (!key || typeof resolveImages !== "function") return null;
+  if (!key || (typeof resolveImages !== "function" && typeof resolvePicks !== "function")) return null;
 
   const cached = previewArtworkCache.get(key);
   if (cached) return cached;
 
   const mediaType = mediaTypeOf(item);
+
+  // Elecciones ya hechas en el servidor (/api/tmdb/artwork, en lote y
+  // cacheadas); si no llegan, /images como siempre.
+  if (typeof resolvePicks === "function") {
+    const request = Promise.resolve(resolvePicks(mediaType, item.id))
+      .catch(() => undefined)
+      .then((picks) => {
+        if (!picks) return typeof resolveImages === "function" ? resolveFromImages() : null;
+        const resolved = {
+          backdropPath: picks.previewBackdrop || item?.backdrop_path || null,
+          posterPath: picks.previewPoster || item?.poster_path || null,
+        };
+        previewArtworkCache.set(key, resolved);
+        return resolved;
+      });
+    previewArtworkCache.set(key, request);
+    return request;
+  }
+  return resolveFromImages();
+
+  function resolveFromImages() {
   const request = Promise.resolve(resolveImages(mediaType, item.id))
     .then((images) => {
       if (!images) {
@@ -59,6 +80,7 @@ async function resolveArtwork(item, resolveImages) {
 
   previewArtworkCache.set(key, request);
   return request;
+  }
 }
 
 /**
@@ -68,14 +90,14 @@ async function resolveArtwork(item, resolveImages) {
  */
 export async function enrichListPreviewArtwork(
   items,
-  { resolveImages, limit = 5 } = {},
+  { resolveImages, resolvePicks, limit = 5 } = {},
 ) {
   const source = Array.isArray(items) ? items : [];
   const previewCount = Math.min(Math.max(0, limit), source.length);
   const resolved = await Promise.all(
     source
       .slice(0, previewCount)
-      .map((item) => resolveArtwork(item, resolveImages)),
+      .map((item) => resolveArtwork(item, resolveImages, resolvePicks)),
   );
 
   return source.map((item, index) => {

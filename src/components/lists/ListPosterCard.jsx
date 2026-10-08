@@ -7,13 +7,19 @@ import { useState } from "react";
 import { Film, ImageOff, MonitorPlay } from "lucide-react";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
+import useImageLoadReady from "@/lib/hooks/useImageLoadReady";
 
 // Enlace a la ficha de un título: "/details/movie/123" o "/details/tv/456".
 const DETAILS_HREF_RE = /^\/details\/(movie|tv)\/(\d+)(?:[/?#]|$)/;
 
+// Carga real de la imagen (useImageLoadReady): si ya está en la caché del
+// navegador —p. ej. precargada desde el índice de /lists al pasar el ratón por
+// la lista— se pinta tal cual en el primer fotograma, sin pulso ni fundido; si
+// no, aparece con su fundido cuando está descargada y decodificada.
 function TmdbPoster({ posterPath, alt, loading = false }) {
   const [failed, setFailed] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  const src = posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : null;
+  const { imgRef, onLoad, ready: loaded, instant } = useImageLoadReady(loading ? null : src);
 
   if (loading) {
     return <div className="h-full w-full animate-pulse bg-zinc-900" aria-hidden="true" />;
@@ -31,12 +37,13 @@ function TmdbPoster({ posterPath, alt, loading = false }) {
     <>
       {!loaded && <div className="absolute inset-0 animate-pulse bg-zinc-900" />}
       <OptimizedImage
-        src={`https://image.tmdb.org/t/p/w500${posterPath}`}
+        ref={imgRef}
+        src={src}
         alt={alt}
-        className={`h-full w-full object-cover transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
+        className={`h-full w-full object-cover ${instant ? "" : "transition-opacity duration-300"} ${loaded ? "opacity-100" : "opacity-0"}`}
         loading="lazy"
         draggable={false}
-        onLoad={() => setLoaded(true)}
+        onLoad={onLoad}
         onError={() => setFailed(true)}
       />
     </>
@@ -152,15 +159,3 @@ export default function ListPosterCard({
   );
 }
 
-// Huecos de la rejilla de títulos mientras una ficha de lista carga sus
-// títulos: misma rejilla y proporción que ListPosterCard, para que al llegar
-// no cambie la maquetación.
-export function ListItemsSkeleton({ count = 12 }) {
-  return (
-    <div className={listPosterGridClass} aria-busy="true" aria-label="Cargando títulos">
-      {Array.from({ length: count }, (_, index) => (
-        <div key={index} className="aspect-[2/3] animate-pulse rounded-xl bg-white/[0.06]" />
-      ))}
-    </div>
-  );
-}

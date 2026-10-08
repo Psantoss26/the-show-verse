@@ -134,3 +134,38 @@ export function personalListPreviewFromIndex(entry) {
     ratingSummary: null,
   }
 }
+
+// Claves de la caché de cada ficha de lista (sessionStorage, {t, data}).
+// Las comparten las fichas y la precarga desde el índice
+// (lib/lists/detailsPrefetch), que escribe exactamente lo que ellas leen.
+export function getCollectionDetailsCacheKey(collectionId) {
+  return collectionId ? `showverse:list-details:collection:${collectionId}:v2` : null;
+}
+
+export function getPersonalListDetailsCacheKey(listId) {
+  return listId ? `showverse:list-details:tmdb:${listId}:v1` : null;
+}
+
+export const LIST_DETAILS_CACHE_TTL_MS = {
+  collection: 30 * 60 * 1000,
+  community: 20 * 60 * 1000,
+  personal: 20 * 60 * 1000,
+};
+
+/**
+ * Ruta interna de una ficha de lista → { source, id }, o null si no lo es:
+ *   /lists/collection/:id → collections · /lists/community/:id → trakt ·
+ *   /lists/:id → personal (las fuentes del índice de /lists).
+ */
+export function listDetailsTargetFromHref(href) {
+  const path = String(href || '').split(/[?#]/)[0]
+  let match = path.match(/^\/lists\/collection\/([^/]+)$/)
+  if (match) return { source: 'collections', id: decodeURIComponent(match[1]) }
+  match = path.match(/^\/lists\/community\/([^/]+)$/)
+  if (match) return { source: 'trakt', id: decodeURIComponent(match[1]) }
+  match = path.match(/^\/lists\/([^/]+)$/)
+  if (match && match[1] !== 'collection' && match[1] !== 'community') {
+    return { source: 'personal', id: decodeURIComponent(match[1]) }
+  }
+  return null
+}

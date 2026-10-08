@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   englishPosterCache,
   englishPosterKey as posterKey,
+  peekEnglishPosterPath,
   resolveEnglishPosterPath,
 } from "@/lib/tmdb/englishPosters";
 
@@ -46,7 +47,7 @@ export function useEnglishPosterItems(
     const seen = new Set();
     for (const item of items || []) {
       const key = posterKey(item);
-      if (!key || seen.has(key) || englishPosterCache.has(key)) continue;
+      if (!key || seen.has(key) || peekEnglishPosterPath(item).hit) continue;
       seen.add(key);
       missingItems.push({ key, item });
     }
@@ -78,6 +79,8 @@ export function useEnglishPosterItems(
   return useMemo(
     () => (items || []).map((item) => {
       const key = posterKey(item);
+      // Lo precargado (lote del servidor) entra en la caché ya en este render.
+      peekEnglishPosterPath(item);
       const posterPath = resolvedPosters.has(key)
         ? resolvedPosters.get(key)
         : englishPosterCache.get(key);
