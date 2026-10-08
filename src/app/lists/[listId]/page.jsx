@@ -11,8 +11,7 @@ import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayou
 import ListDetailsActionRow from '@/components/lists/ListDetailsActionRow'
 import ListPosterCard, { listPosterGridClass } from '@/components/lists/ListPosterCard'
 import FilterableListItems from '@/components/lists/ListDetailsTools'
-import LiquidGlassOpticalLayers from '@/components/ui/LiquidGlassOpticalLayers'
-import { LIQUID_GLASS_CARD, LIQUID_GLASS_PANEL } from '@/lib/ui/liquidGlass'
+import ListActionModal, { MODAL_FIELD_CLASS, MODAL_LABEL_CLASS, ModalButton, ModalToggleRow } from '@/components/lists/ListActionModal'
 import { formatPageTitle } from '@/lib/pageTitle'
 import {
     findListInIndexCache,
@@ -53,7 +52,7 @@ import {
     Globe2,
     LockKeyhole,
     MonitorPlay,
-    X
+    UsersRound,
 } from 'lucide-react'
 
 const useClientLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
@@ -189,76 +188,6 @@ function CatalogDropdown({ value, onChange }) {
     )
 }
 
-function ListActionDialog({ open, onClose, title, children }) {
-    const dialogRef = useRef(null)
-
-    useEffect(() => {
-        const dialog = dialogRef.current
-        if (!dialog) return
-
-        if (open && !dialog.open) dialog.showModal()
-        if (!open && dialog.open) dialog.close()
-    }, [open])
-
-    return (
-        <dialog
-            ref={dialogRef}
-            aria-label={title}
-            closedby="any"
-            onClose={onClose}
-            onCancel={onClose}
-            onClick={(event) => {
-                if (event.target === event.currentTarget) onClose()
-            }}
-            className="m-auto w-[calc(100%-2rem)] max-w-3xl overflow-visible border-0 bg-transparent p-0 text-zinc-100 shadow-none backdrop:bg-black/60 backdrop:backdrop-blur-lg"
-        >
-            <div className={`relative flex max-h-[85dvh] w-full flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}>
-                <LiquidGlassOpticalLayers />
-
-                <div className="relative z-10 flex w-full shrink-0 items-center justify-between gap-4 bg-white/[0.025] p-6 sm:px-8 sm:pb-6 sm:pt-8">
-                    <div className="min-w-0">
-                        <h2 className="bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-xl font-black text-transparent">
-                            {title}
-                        </h2>
-                    </div>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400"
-                        aria-label="Cerrar"
-                    >
-                        <X className="h-5 w-5" />
-                    </button>
-                </div>
-
-                <div className="relative z-10 min-h-0 flex-1 overflow-y-auto p-6 pb-8 sm:px-8">
-                    {children}
-                </div>
-            </div>
-        </dialog>
-    )
-}
-
-function DialogButton({ children, tone = 'neutral', ...props }) {
-    const toneClass = {
-        neutral: 'text-zinc-100 hover:brightness-110',
-        primary: 'text-violet-100 hover:text-white',
-        warning: 'text-amber-100 hover:text-amber-50',
-        danger: 'text-red-100 hover:text-white',
-    }[tone] || 'text-zinc-100'
-
-    return (
-        <button
-            type="button"
-            className={`relative isolate inline-flex min-h-11 items-center justify-center gap-2 overflow-hidden rounded-xl px-4 text-sm font-bold transition hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-purple-400/70 disabled:cursor-not-allowed disabled:opacity-50 ${LIQUID_GLASS_CARD} ${toneClass}`}
-            {...props}
-        >
-            <LiquidGlassOpticalLayers />
-            <span className="relative z-10 inline-flex items-center gap-2">{children}</span>
-        </button>
-    )
-}
-
 // --- PÁGINA PRINCIPAL ---
 
 export default function ListDetailsPage() {
@@ -287,6 +216,8 @@ export default function ListDetailsPage() {
     // Edit
     const [editName, setEditName] = useState('')
     const [editDesc, setEditDesc] = useState('')
+    const [editPublic, setEditPublic] = useState(true)
+    const [editInCommunity, setEditInCommunity] = useState(false)
     const [savingEdit, setSavingEdit] = useState(false)
 
     useClientLayoutEffect(() => {
@@ -538,6 +469,17 @@ export default function ListDetailsPage() {
         }
     }
 
+    // Al abrir «Editar» se parte de lo guardado (cerrar sin guardar descarta).
+    useEffect(() => {
+        if (actionDialog !== 'edit') return
+        setEditName(data?.name || '')
+        setEditDesc(data?.description || '')
+        setEditPublic(Boolean(data?.public))
+        setEditInCommunity(Boolean(data?.public && data?.inCommunity))
+        // Solo al abrir: `data` puede refrescarse en segundo plano mientras se edita.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [actionDialog])
+
     const handleSaveEdit = async () => {
         if (!canManage || !listId) return
         const n = editName.trim()
@@ -550,6 +492,9 @@ export default function ListDetailsPage() {
                 listId,
                 name: n,
                 description: editDesc,
+                isPublic: editPublic,
+                // Solo una lista pública puede estar en la comunidad.
+                inCommunity: editPublic && editInCommunity,
                 language: data?.iso_639_1 || 'es',
                 items
             })
@@ -624,7 +569,9 @@ export default function ListDetailsPage() {
                 { icon: ListVideo, label: 'ELEMENTOS', value: items.length || Number(data?.item_count) || 0, tooltip: 'Títulos de la lista' },
                 ...(movieCount ? [{ icon: Clapperboard, label: 'PELÍCULAS', value: movieCount, tooltip: 'Películas en la lista' }] : []),
                 ...(tvCount ? [{ icon: MonitorPlay, label: 'SERIES', value: tvCount, tooltip: 'Series en la lista' }] : []),
-                { icon: data?.public ? Globe2 : LockKeyhole, label: 'VISIBILIDAD', value: visibility, tooltip: `Lista ${visibility.toLowerCase()}` },
+                data?.inCommunity
+                    ? { icon: UsersRound, label: 'VISIBILIDAD', value: 'Comunidad', tooltip: 'Publicada en Listas de la comunidad' }
+                    : { icon: data?.public ? Globe2 : LockKeyhole, label: 'VISIBILIDAD', value: visibility, tooltip: `Lista ${visibility.toLowerCase()}` },
             ]}
             scoreboardRatings={{
                 tmdb: ratingSummaryBadge(averageRating),
@@ -713,8 +660,8 @@ export default function ListDetailsPage() {
                 />
             ) : null}
 
-            <ListActionDialog open={actionDialog === 'add'} onClose={() => setActionDialog(null)} title="Añadir títulos">
-                <div className="mt-5 space-y-4">
+            <ListActionModal open={actionDialog === 'add'} onClose={() => setActionDialog(null)} title="Añadir títulos" subtitle={data?.name} size="lg">
+                <div className="space-y-4">
                     <Segmented
                         value={addMode}
                         onChange={setAddMode}
@@ -772,38 +719,91 @@ export default function ListDetailsPage() {
                         ) : !searchLoading && !catLoading ? <p className="py-12 text-center text-sm text-zinc-500">{addMode === 'search' ? 'Busca un título para añadirlo a la lista.' : 'No hay títulos disponibles.'}</p> : null}
                     </div>
                 </div>
-            </ListActionDialog>
+            </ListActionModal>
 
-            <ListActionDialog open={actionDialog === 'edit'} onClose={() => setActionDialog(null)} title="Editar lista">
-                <form className="mt-5 space-y-4" onSubmit={(event) => { event.preventDefault(); handleSaveEdit() }}>
-                    <label className="block space-y-3 text-sm font-bold text-zinc-300">Nombre
-                        <input value={editName} onChange={(event) => setEditName(event.target.value)} maxLength={60} autoFocus className="h-11 w-full rounded-xl bg-white/10 px-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50" />
-                    </label>
-                    <label className="block space-y-3 text-sm font-bold text-zinc-300">Descripción
-                        <textarea value={editDesc} onChange={(event) => setEditDesc(event.target.value)} maxLength={200} className="h-28 w-full resize-none rounded-xl bg-white/10 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50" />
-                    </label>
-                    <div className="flex justify-end gap-3">
-                        <DialogButton onClick={() => setActionDialog(null)}>Cancelar</DialogButton>
-                        <DialogButton type="submit" tone="primary" disabled={savingEdit || !editName.trim()}>{savingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}Guardar cambios</DialogButton>
-                    </div>
+            <ListActionModal
+                open={actionDialog === 'edit'}
+                onClose={() => setActionDialog(null)}
+                title="Editar lista"
+                subtitle={data?.name}
+                busy={savingEdit}
+                footer={(
+                    <>
+                        <ModalButton onClick={() => setActionDialog(null)} disabled={savingEdit}>Cancelar</ModalButton>
+                        <ModalButton type="submit" form="list-edit-form" tone="primary" icon={Save} loading={savingEdit} disabled={savingEdit || !editName.trim()}>
+                            {savingEdit ? 'Guardando…' : 'Guardar cambios'}
+                        </ModalButton>
+                    </>
+                )}
+            >
+                <form id="list-edit-form" className="space-y-6" onSubmit={(event) => { event.preventDefault(); handleSaveEdit() }}>
+                    <fieldset disabled={savingEdit} className="min-w-0 space-y-6">
+                        <label className={MODAL_LABEL_CLASS}>
+                            Nombre
+                            <input required value={editName} onChange={(event) => setEditName(event.target.value)} maxLength={60} autoFocus className={MODAL_FIELD_CLASS} />
+                        </label>
+                        <label className={MODAL_LABEL_CLASS}>
+                            Descripción
+                            <textarea rows={3} value={editDesc} onChange={(event) => setEditDesc(event.target.value)} maxLength={200} className={`${MODAL_FIELD_CLASS} resize-none`} />
+                        </label>
+                        <ModalToggleRow
+                            icon={editPublic ? Globe2 : LockKeyhole}
+                            title="Lista pública"
+                            description={editPublic
+                                ? 'Otros usuarios pueden verla en tu perfil.'
+                                : 'Solo tú puedes verla.'}
+                            checked={editPublic}
+                            onChange={setEditPublic}
+                        />
+                        <ModalToggleRow
+                            icon={UsersRound}
+                            title="Publicar en Listas de la comunidad"
+                            description={!editPublic
+                                ? 'Hazla pública para poder compartirla con la comunidad.'
+                                : editInCommunity
+                                    ? 'Aparece en Listas → Comunidad para todos los usuarios, y se actualiza al cambiarla.'
+                                    : 'Añádela a Listas → Comunidad para que cualquiera pueda descubrirla.'}
+                            checked={editPublic && editInCommunity}
+                            onChange={setEditInCommunity}
+                            disabled={!editPublic}
+                        />
+                    </fieldset>
                 </form>
-            </ListActionDialog>
+            </ListActionModal>
 
-            <ListActionDialog open={actionDialog === 'clear'} onClose={() => setActionDialog(null)} title="¿Vaciar la lista?">
-                <p className="mt-3 text-sm leading-6 text-zinc-300">Se eliminarán los {items.length} títulos de esta lista. La lista y sus detalles se conservarán.</p>
-                <div className="mt-6 flex justify-end gap-3">
-                    <DialogButton onClick={() => setActionDialog(null)}>Cancelar</DialogButton>
-                    <DialogButton onClick={handleClear} tone="warning" disabled={clearing}>{clearing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eraser className="h-4 w-4" />}Vaciar lista</DialogButton>
-                </div>
-            </ListActionDialog>
+            <ListActionModal
+                open={actionDialog === 'clear'}
+                onClose={() => setActionDialog(null)}
+                title="¿Vaciar la lista?"
+                subtitle={data?.name}
+                size="sm"
+                busy={clearing}
+                footer={(
+                    <>
+                        <ModalButton onClick={() => setActionDialog(null)} disabled={clearing}>Cancelar</ModalButton>
+                        <ModalButton tone="warning" icon={Eraser} loading={clearing} onClick={handleClear} disabled={clearing}>Vaciar lista</ModalButton>
+                    </>
+                )}
+            >
+                <p className="text-sm leading-6 text-zinc-300">Se eliminarán los {items.length} títulos de esta lista. La lista y sus detalles se conservarán.</p>
+            </ListActionModal>
 
-            <ListActionDialog open={actionDialog === 'delete'} onClose={() => setActionDialog(null)} title="¿Borrar la lista?">
-                <p className="mt-3 text-sm leading-6 text-zinc-300">Esta acción elimina la lista y todos sus títulos de forma permanente. No se puede deshacer.</p>
-                <div className="mt-6 flex justify-end gap-3">
-                    <DialogButton onClick={() => setActionDialog(null)}>Cancelar</DialogButton>
-                    <DialogButton onClick={handleDeleteList} tone="danger" disabled={deleting}>{deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}Borrar definitivamente</DialogButton>
-                </div>
-            </ListActionDialog>
+            <ListActionModal
+                open={actionDialog === 'delete'}
+                onClose={() => setActionDialog(null)}
+                title="¿Borrar la lista?"
+                subtitle={data?.name}
+                size="sm"
+                busy={deleting}
+                footer={(
+                    <>
+                        <ModalButton onClick={() => setActionDialog(null)} disabled={deleting}>Cancelar</ModalButton>
+                        <ModalButton tone="danger" icon={Trash2} loading={deleting} onClick={handleDeleteList} disabled={deleting}>Borrar definitivamente</ModalButton>
+                    </>
+                )}
+            >
+                <p className="text-sm leading-6 text-zinc-300">Esta acción elimina la lista y todos sus títulos de forma permanente. No se puede deshacer.</p>
+            </ListActionModal>
         </UnifiedListDetailsLayout>
     )
 }

@@ -66,7 +66,11 @@ import {
   BookmarkPlus,
   Eye,
   ThumbsUp,
+  Globe,
+  Sigma,
 } from "lucide-react";
+import PageStatCard from "@/components/ui/PageStatCard";
+import { listsHeaderStats } from "@/lib/lists/headerStats";
 import useTraktLists from "@/lib/hooks/useTraktLists";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import { useHydrationReady } from "@/lib/hooks/useHydrationReady";
@@ -1552,6 +1556,16 @@ function handleListPrefetch(event) {
   if (link) prefetchListDetails(link.getAttribute("href"));
 }
 
+// Iconos y colores de las tarjetas de la cabecera (lib/lists/headerStats).
+const STAT_ICONS = { layers: Layers, film: Film, average: Sigma, list: ListVideo, heart: Heart, globe: Globe };
+const STAT_TONES = {
+  purple: "text-purple-400",
+  sky: "text-sky-400",
+  amber: "text-amber-400",
+  rose: "text-rose-400",
+  emerald: "text-emerald-400",
+};
+
 // ================== MAIN PAGE ==================
 export default function ListsPage() {
   const isMobile = useIsMobileLayout(768);
@@ -2174,6 +2188,11 @@ export default function ListsPage() {
   const contentSource = sourceInitialized ? source : readyContent.source;
   const contentLists = sourceInitialized ? filtered : readyContent.lists;
 
+  // Tarjetas de la cabecera: las de lo que se está pintando (durante el relevo
+  // entre pestañas, las de la anterior hasta que la nueva está lista).
+  const headerStats = listsHeaderStats(contentSource, contentLists);
+  const headerStatsLoading = !sourceInitialized && contentLists.length === 0;
+
   const errorUnified =
     source === "personal" ? error : source === "trakt" ? trakt?.error : "";
 
@@ -2278,6 +2297,34 @@ export default function ListsPage() {
                     : "Gestiona y organiza tus listas personales."}
               </p>
             </div>
+
+            {/* Tarjetas de información a la altura del título, como en
+                Historial o En progreso: tres por pestaña, con lo que se está
+                mostrando (lib/lists/headerStats). */}
+            <motion.div
+              className="grid grid-cols-3 gap-2 md:gap-4 w-full lg:w-auto lg:flex lg:justify-end"
+              initial={isBackNav ? false : { opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={isBackNav ? { duration: 0 } : { duration: 0.5, delay: 0.3 }}
+            >
+              {headerStats.map((stat, index) => (
+                <motion.div
+                  key={`${contentSource}-${stat.key}`}
+                  className="w-full min-w-0"
+                  initial={isBackNav ? false : { opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.5 + index * 0.1 }}
+                >
+                  <PageStatCard
+                    label={stat.label}
+                    value={stat.value}
+                    icon={STAT_ICONS[stat.icon] || ListVideo}
+                    colorClass={STAT_TONES[stat.tone] || "text-white"}
+                    loading={headerStatsLoading}
+                  />
+                </motion.div>
+              ))}
+            </motion.div>
           </div>
         </motion.header>
 

@@ -395,7 +395,11 @@ export async function discoverLists({ sort = 'items_desc', page = 1, limit = 30,
   const orderBy = Object.hasOwn(SORTS, sort) ? SORTS[sort] : SORTS.items_desc;
   const safeLimit = Math.min(Math.max(Number(limit) || 30, 1), 60);
   const offset = (Math.max(Number(page) || 1, 1) - 1) * safeLimit;
-  const rows = await db.select().from(communityLists).orderBy(...orderBy).limit(safeLimit).offset(offset);
+  // Las listas que publican los usuarios de la app van delante de las
+  // importadas de Trakt (cientos, y casi siempre más largas): si no, una lista
+  // recién publicada no llegaría nunca a la primera página.
+  const ownFirst = sql`case when ${communityLists.source} = 'user' then 0 else 1 end`;
+  const rows = await db.select().from(communityLists).orderBy(ownFirst, ...orderBy).limit(safeLimit).offset(offset);
   const liked = await likedListIds(viewerId, rows.map((row) => row.id));
   return rows.map((row) => listRowToApi({ ...row, likedByViewer: liked.has(row.id) }));
 }

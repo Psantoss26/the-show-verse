@@ -62,13 +62,21 @@ export async function deleteUserList({ listId } = {}) {
   return { ok: true };
 }
 
-export async function updateUserList({ listId, name, description } = {}) {
-  await api(`/${encodeURIComponent(listId)}`, {
+export async function updateUserList({ listId, name, description, isPublic, inCommunity } = {}) {
+  const json = await api(`/${encodeURIComponent(listId)}`, {
     method: 'PATCH',
-    body: JSON.stringify({ name, description: description ?? undefined }),
+    body: JSON.stringify({
+      name,
+      description: description ?? undefined,
+      // Solo si se pasa: editar el nombre no toca la visibilidad.
+      ...(typeof isPublic === 'boolean' ? { isPublic } : {}),
+      // Publicarla en «Listas de la comunidad» (o retirarla). Una lista privada
+      // no puede estar publicada: el backend la retira.
+      ...(typeof inCommunity === 'boolean' ? { inCommunity } : {}),
+    }),
   });
   // El backend no recrea la lista (id estable), a diferencia de TMDb v3.
-  return { recreated: false, listId };
+  return { recreated: false, listId, inCommunity: json?.inCommunity === true };
 }
 
 export async function getListDetails({ listId, signal } = {}) {
@@ -82,6 +90,8 @@ export async function getListDetails({ listId, signal } = {}) {
     description: list.description || '',
     public: !!list.isPublic,
     canEdit: json?.canEdit !== false,
+    // Publicada en «Listas de la comunidad» (solo lo sabe su dueño).
+    inCommunity: json?.inCommunity === true,
     item_count: items.length,
     page: 1,
     total_pages: 1,
