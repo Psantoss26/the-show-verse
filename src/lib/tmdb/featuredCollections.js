@@ -2,12 +2,15 @@
 // de sagas conocidas y el formato con el que se envía cada una al cliente (lo
 // usa /api/tmdb/collections/featured).
 
-// FILTRO: solo sagas CONOCIDAS. Cada una suma al menos
+// FILTRO: solo sagas CONOCIDAS, elegidas a mano y, además, con al menos
 // FEATURED_MIN_VOTES votos en TMDb entre todas sus películas (una medida estable
-// de lo conocida que es; la popularidad de TMDb fluctúa a diario). Lo comprueba
-// featuredCollections.test.mjs contra src/data/tmdbCollectionsCatalog.json,
-// así que una saga desconocida no puede colarse al ampliar la lista.
-export const FEATURED_MIN_VOTES = 10_000;
+// de lo conocida que es; la popularidad de TMDb fluctúa a diario). El umbral es
+// un suelo, no el criterio: por encima hay colecciones que no se incluyen
+// (películas sueltas con una secuela desconocida o sin estrenar, nichos). Lo
+// comprueba featuredCollections.test.mjs contra
+// src/data/tmdbCollectionsCatalog.json, así que una saga desconocida no puede
+// colarse al ampliar la lista.
+export const FEATURED_MIN_VOTES = 7_000;
 
 export const FEATURED_COLLECTION_IDS = [
   // Top Populares
@@ -33,6 +36,13 @@ export const FEATURED_COLLECTION_IDS = [
   85943, // Night at the Museum
   295130, // The Maze Runner
   283579, // Divergent
+  179919, // Percy Jackson
+  86780, // Clash of the Titans
+  52984, // National Treasure
+  2467, // Lara Croft: Tomb Raider
+  1216426, // Uncharted
+  1657, // The Mask of Zorro
+  17235, // Hellboy
 
   // Marvel
   556, // Spider-Man
@@ -53,6 +63,7 @@ export const FEATURED_COLLECTION_IDS = [
   453993, // Wolverine
   448150, // Deadpool
   558216, // Venom
+  90306, // Ghost Rider
 
   // DC
   263, // The Dark Knight
@@ -63,6 +74,8 @@ export const FEATURED_COLLECTION_IDS = [
   531242, // Suicide Squad
   573693, // Aquaman
   987044, // Joker
+  724848, // Shazam!
+  1025281, // Constantine
 
   // Acción
   87359, // Mission: Impossible
@@ -87,6 +100,24 @@ export const FEATURED_COLLECTION_IDS = [
   386534, // Olympus Has Fallen
   179892, // Kick-Ass
   8580, // The Karate Kid
+  9518, // The Transporter
+  403374, // Jack Reacher
+  135179, // Sin City
+  163902, // RED
+  85861, // Beverly Hills Cop
+  1129084, // Nobody
+  70068, // Ip Man
+  135468, // G.I. Joe
+  401562, // Teenage Mutant Ninja Turtles
+  742536, // The Meg
+  735127, // Extraction
+  870339, // The Accountant
+  43064, // Speed
+  192492, // Jack Ryan
+  10456, // Dirty Harry
+  64751, // Crank
+  737031, // Hitman
+  86029, // Charlie's Angels
 
   // Animación
   10194, // Toy Story
@@ -111,6 +142,28 @@ export const FEATURED_COLLECTION_IDS = [
   1241984, // Moana
   86027, // Aladdin
   720879, // Sonic
+  94602, // Puss in Boots
+  544670, // Sing
+  167613, // Alvin and the Chipmunks
+  427084, // The Secret Life of Pets
+  464577, // The Croods
+  325470, // The LEGO Movie
+  229932, // Rio
+  722961, // Space Jam
+  97461, // Lilo & Stitch
+  519457, // The Boss Baby
+  177467, // Cloudy with a Chance of Meatballs
+  762512, // The Lion King (2019)
+  87236, // Mulan
+  153010, // Beauty and the Beast
+  33085, // The Little Mermaid
+  55419, // Cinderella
+  1268789, // Tangled
+  275402, // SpongeBob
+  489724, // Trolls
+  100693, // 101 Dalmatians
+  97459, // The Jungle Book
+  488924, // Paddington
 
   // Terror
   313086, // The Conjuring
@@ -132,6 +185,25 @@ export const FEATURED_COLLECTION_IDS = [
   1565, // 28 Days Later
   537982, // Zombieland
   2366, // Jaws
+  12263, // The Exorcist
+  119674, // Psycho
+  1960, // Evil Dead
+  14563, // The Ring
+  111751, // The Texas Chainsaw Massacre
+  619537, // Train to Busan
+  748919, // Don't Breathe
+  526380, // Happy Death Day
+  74508, // [REC]
+  479888, // The Thing
+  89151, // Gremlins
+  968052, // The Nun
+  64750, // The Blair Witch Project
+  357173, // Sinister
+  8917, // Hellraiser
+  760193, // Orphan
+  64748, // Silent Hill
+  86578, // Hostel
+  10924, // From Dusk Till Dawn
 
   // Ciencia Ficción
   8091, // Alien
@@ -149,6 +221,15 @@ export const FEATURED_COLLECTION_IDS = [
   17255, // Resident Evil
   135416, // Prometheus
   304378, // Independence Day
+  535313, // Godzilla (Legendary)
+  2794, // The Chronicles of Riddick
+  4438, // 2001: A Space Odyssey
+  63043, // TRON
+  151, // Star Trek (The Original Series)
+  5547, // RoboCop
+  1709, // Planet of the Apes (1968)
+  10522, // Starship Troopers
+  115762, // Alien vs. Predator
 
   // Comedia
   86119, // The Hangover
@@ -162,6 +243,26 @@ export const FEATURED_COLLECTION_IDS = [
   212562, // 21 Jump Street
   124949, // Bruce Almighty
   306031, // Pitch Perfect
+  43072, // The Mask
+  8936, // Bridget Jones
+  37139, // The Naked Gun
+  180546, // Grown Ups
+  3167, // Ace Ventura
+  1006, // Austin Powers
+  99606, // Mean Girls
+  9338, // Police Academy
+  86117, // Johnny English
+  400700, // Neighbors
+  96665, // Dumb and Dumber
+  280588, // Horrible Bosses
+  2396, // Asterix & Obelix
+  945475, // Beetlejuice
+  747168, // Borat
+  352789, // Zoolander
+  93791, // Anchorman
+  11716, // The Addams Family
+  86860, // Scooby-Doo
+  17178, // Jackass
 
   // Drama y suspense
   230, // The Godfather
@@ -176,6 +277,20 @@ export const FEATURED_COLLECTION_IDS = [
   2883, // Kill Bill
   735384, // Hercule Poirot
   344830, // Fifty Shades
+  424202, // Trainspotting
+  496796, // Sicario
+  123800, // Before Trilogy
+  829314, // Enola Holmes
+
+  // Musicales
+  458558, // Mamma Mia!
+  87253, // High School Musical
+  86083, // Grease
+  527439, // Mary Poppins
+
+  // Anime
+  425164, // Dragon Ball Z (películas)
+  23616, // Naruto
 ];
 
 /** Nombre del índice: sin « - Colección» / « Collection» (la ficha lo lleva). */
