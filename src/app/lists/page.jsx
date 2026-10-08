@@ -2256,7 +2256,7 @@ export default function ListsPage() {
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         {/* Header */}
         <motion.header
-          className="mb-10"
+          className="mb-6 sm:mb-10"
           initial={isBackNav ? false : { opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
@@ -2315,7 +2315,7 @@ export default function ListsPage() {
                 Historial o En progreso: tres por pestaña, con lo que se está
                 mostrando (lib/lists/headerStats). */}
             <motion.div
-              className="grid grid-cols-3 gap-2 md:gap-4 w-full lg:w-auto lg:flex lg:justify-end"
+              className="flex gap-3 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
               initial={isBackNav ? false : { opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={isBackNav ? { duration: 0 } : { duration: 0.5, delay: 0.3 }}
@@ -2323,7 +2323,7 @@ export default function ListsPage() {
               {headerStats.map((stat, index) => (
                 <motion.div
                   key={`${contentSource}-${stat.key}`}
-                  className="w-full min-w-0"
+                  className="flex min-w-0 flex-1 lg:flex-none"
                   initial={isBackNav ? false : { opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.5 + index * 0.1 }}
