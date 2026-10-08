@@ -7,8 +7,9 @@ import {
   MOBILE_ACTION_BUTTON_CLASS,
 } from "@/components/details/DetailActionsRow";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
+import { useShareAction } from "@/components/details/DetailHeaderBits";
 import { LIQUID_GLASS_ELEVATION, LIQUID_GLASS_SURFACE_CARD } from "@/lib/ui/liquidGlass";
-import { ArrowLeft, Eraser, ExternalLink, Loader2, Pencil, Plus, Trash2, Users } from "lucide-react";
+import { ArrowLeft, Check, Eraser, ExternalLink, Loader2, Pencil, Plus, Share2, Trash2, Users } from "lucide-react";
 
 const ROW_CLASS = `flex w-full flex-nowrap items-center justify-center gap-1 sm:justify-start sm:gap-3
   ${DETAIL_ACTION_ITEM_SIZING_CLASS}
@@ -52,6 +53,41 @@ function ActionLink({ href, label }) {
   );
 }
 
+// Compartir como una acción más de la fila: abre la hoja de compartir con la
+// imagen y el vídeo de la lista (lib/lists/shareList) o, sin ellos, manda el
+// enlace. `share`: { title, text?, card?, story? }.
+function ShareActionButton({ share }) {
+  const title = share.title || "Lista";
+  const text = share.text || `Echa un vistazo a ${title} en The Show Verse`;
+  const { handleShare, sheet, copied } = useShareAction({
+    title,
+    text,
+    url: share.url,
+    card: share.card || null,
+    story: share.story || null,
+    kind: share.card ? "list" : "details",
+  });
+  const label = copied ? "¡Enlace copiado!" : "Compartir";
+  return (
+    <>
+      <LiquidButton
+        type="button"
+        liquidGlass
+        groupId="list-details-actions"
+        title={label}
+        aria-label={label}
+        aria-haspopup={share.card ? "dialog" : undefined}
+        activeColor="blue"
+        onClick={handleShare}
+        className="!w-full !h-auto aspect-square"
+      >
+        {copied ? <Check /> : <Share2 />}
+      </LiquidButton>
+      {sheet}
+    </>
+  );
+}
+
 /** Fila de gestión de una lista personal, visualmente alineada con DetailsClient. */
 export default function ListDetailsActionRow({
   onBack,
@@ -68,6 +104,7 @@ export default function ListDetailsActionRow({
   externalLabel = "Ver en fuente externa",
   onCast = null,
   castLabel = "Reparto destacado",
+  share = null,
 }) {
   return (
     <div className={ROW_CLASS}>
@@ -77,6 +114,7 @@ export default function ListDetailsActionRow({
       {favoriteAction}
       <ActionLink href={externalHref} label={externalLabel} />
       {onCast ? <ActionButton label={castLabel} onClick={onCast}><Users /></ActionButton> : null}
+      {share ? <ShareActionButton share={share} /> : null}
       {onAdd ? <ActionButton mutation label="Añadir títulos" onClick={onAdd} tone="purple"><Plus /></ActionButton> : null}
       {onEdit ? <ActionButton mutation label={editLabel} onClick={onEdit} tone="yellow"><Pencil /></ActionButton> : null}
       {onClear ? <ActionButton mutation label="Vaciar lista" onClick={onClear} disabled={clearDisabled || clearing} tone="yellow">{clearing ? <Loader2 className="animate-spin" /> : <Eraser />}</ActionButton> : null}

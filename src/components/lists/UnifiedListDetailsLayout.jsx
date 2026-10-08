@@ -307,8 +307,6 @@ function PosterCollage({ images, pending }) {
  * - activeTab?: string
  * - onTabChange?: (id) => void
  * - topControls?: ReactNode (bloque de controles bajo tabs, a la derecha)
- * - share?: { card, story } (imagen y vídeo compartibles de lib/lists/shareList;
- *   sin ellos, Compartir solo manda el enlace)
  * - children: contenido principal (grid, empty state, etc)
  */
 export default function UnifiedListDetailsLayout({
@@ -331,7 +329,6 @@ export default function UnifiedListDetailsLayout({
     activeTab,
     onTabChange,
     topControls,
-    share = null,
     children
 }) {
     const router = useRouter()
@@ -451,11 +448,6 @@ export default function UnifiedListDetailsLayout({
                                 label: stat.label,
                                 value: stat.value,
                             }))}
-                            share={{
-                                title: title || 'Lista',
-                                text: `Echa un vistazo a ${title || 'esta lista'} en The Show Verse`,
-                                ...(share?.card ? { kind: 'list', card: share.card, story: share.story || null } : {}),
-                            }}
                             className="mb-6"
                         />
 
