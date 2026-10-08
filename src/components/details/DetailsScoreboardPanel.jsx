@@ -53,6 +53,9 @@ function TraktStatBadge({
   phone = false,
   // Tamaño grande en móvil (ver `spread` de la fila de stats).
   large = false,
+  // Se retira en el marcador de teléfono (`phone-sb`): para stats que sobran
+  // ahí y harían que la fila no cupiera.
+  hideOnPhone = false,
 }) {
   return (
     <motion.div
@@ -60,7 +63,7 @@ function TraktStatBadge({
       // vacío mientras sus estadísticas hacen el fundido.
       initial={false}
       whileHover={{ y: -1 }}
-      className={`relative flex min-w-0 items-center justify-start select-none group/statbadge py-1 transition-colors duration-200 ${phone ? "shrink-0 px-1.5" : "px-0.5 sm:shrink-0 sm:px-1.5"} ${large ? "phone-sb:shrink-0 phone-sb:px-0" : ""}`}
+      className={`relative flex min-w-0 items-center justify-start select-none group/statbadge py-1 transition-colors duration-200 ${phone ? "shrink-0 px-1.5" : "px-0.5 sm:shrink-0 sm:px-1.5"} ${large ? "phone-sb:shrink-0 phone-sb:px-0" : ""} ${hideOnPhone ? "phone-sb:hidden" : ""}`}
       aria-label={tooltip || label}
     >
       {/* Teléfono del drawer: iconos y cifras del tamaño de escritorio, pero
@@ -84,7 +87,10 @@ function TraktStatBadge({
         </span>
       </div>
       {tooltip && (
-        <div className="pointer-events-none absolute bottom-full mb-2.5 left-1/2 z-[100] -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1.2 text-[10px] font-bold text-white opacity-0 shadow-2xl transition-all duration-200 ease-out group-hover/statbadge:scale-100 group-hover/statbadge:opacity-100 group-hover/statbadge:delay-[1500ms]">
+        // Marcador de teléfono (`large`, < sm): sin tooltip. No hay hover en un
+        // teléfono y, aun invisible, un tooltip largo junto al borde ensanchaba
+        // la fila y la volvía desplazable.
+        <div className={`pointer-events-none absolute bottom-full mb-2.5 left-1/2 z-[100] -translate-x-1/2 scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1.2 text-[10px] font-bold text-white opacity-0 shadow-2xl transition-all duration-200 ease-out group-hover/statbadge:scale-100 group-hover/statbadge:opacity-100 group-hover/statbadge:delay-[1500ms] ${large ? "max-sm:hidden" : ""}`}>
           {tooltip}
         </div>
       )}
@@ -297,7 +303,7 @@ export function DetailsStatsRow({
   // Variante para entidades que no proceden de Trakt (listas, colecciones,
   // perfiles…). Conserva exactamente la pieza visual del marcador, pero evita
   // inventar "seguidores" o "reproducciones" cuando esos datos no existen.
-  // Cada entrada: { icon, value, label, tooltip? }.
+  // Cada entrada: { icon, value, label, tooltip?, hideOnPhone? }.
   statItems = null,
   showFavoritedStat = true,
   // `pending`: las stats de Trakt todavía vienen de camino. La fila se monta
@@ -368,6 +374,7 @@ export function DetailsStatsRow({
                 tooltip={item.tooltip}
                 phone={phone}
                 large={spread}
+                hideOnPhone={spread && item.hideOnPhone === true}
               />
             ))}
             {trailingNode}

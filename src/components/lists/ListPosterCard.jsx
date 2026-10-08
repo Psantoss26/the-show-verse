@@ -151,3 +151,16 @@ export default function ListPosterCard({
     </Link>
   );
 }
+
+// Huecos de la rejilla de títulos mientras una ficha de lista carga sus
+// títulos: misma rejilla y proporción que ListPosterCard, para que al llegar
+// no cambie la maquetación.
+export function ListItemsSkeleton({ count = 12 }) {
+  return (
+    <div className={listPosterGridClass} aria-busy="true" aria-label="Cargando títulos">
+      {Array.from({ length: count }, (_, index) => (
+        <div key={index} className="aspect-[2/3] animate-pulse rounded-xl bg-white/[0.06]" />
+      ))}
+    </div>
+  );
+}

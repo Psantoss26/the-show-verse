@@ -14,9 +14,12 @@ import { formatPageTitle } from '@/lib/pageTitle'
 import { ratingSummaryBadge } from '@/lib/lists/ratingSummary'
 import useListImdbRatings from '@/hooks/useListImdbRatings'
 import {
+    communityListPreviewFromIndex,
+    findListInIndexCache,
     getCommunityListDetailsCacheKey,
     resolveCommunityListDetailsInitialState,
 } from '@/lib/lists/detailsInitialState'
+import { ListItemsSkeleton } from '@/components/lists/ListPosterCard'
 import { useIsHistoryNavigation } from '@/lib/hooks/useIsHistoryNavigation'
 import { buildListShareCard, buildListShareStory, listNoun, normalizeListShareItem } from '@/lib/lists/shareList'
 
@@ -117,6 +120,23 @@ export default function TraktListDetailsClient({ username, listId }) {
         if (cached) setState(resolveCommunityListDetailsInitialState(cached))
     }, [isBackNav, listId])
 
+    // Entrada normal, también antes de pintar: la caché propia de la lista o,
+    // si no la hay, su vista provisional desde el índice de /lists (nombre,
+    // descripción, recuento, likes, creador). Antes la página se quedaba vacía
+    // hasta que llegaban los datos (2-3 s sin caché).
+    useClientLayoutEffect(() => {
+        if (isBackNav) return
+        const cached = readDetailsCache(listId)
+        if (cached) {
+            setState(resolveCommunityListDetailsInitialState(cached))
+            return
+        }
+        const preview = communityListPreviewFromIndex(findListInIndexCache('trakt', listId))
+        setState(preview
+            ? { ...resolveCommunityListDetailsInitialState(null), list: preview }
+            : resolveCommunityListDetailsInitialState(null))
+    }, [isBackNav, listId])
+
     useEffect(() => {
         stateRef.current = state
     }, [state])
@@ -150,8 +170,9 @@ export default function TraktListDetailsClient({ username, listId }) {
     useEffect(() => {
         let cancelled = false
         if (!baseApiUrl) return
+        // Sin caché se conserva lo sembrado antes de pintar (vista provisional).
         const cached = readDetailsCache(listId)
-        setState(resolveCommunityListDetailsInitialState(cached))
+        if (cached) setState(resolveCommunityListDetailsInitialState(cached))
 
             ; (async () => {
                 try {
@@ -289,8 +310,14 @@ export default function TraktListDetailsClient({ username, listId }) {
         }
     }, [imdbRatings])
 
+    // Sin datos ni vista provisional (p. ej. un enlace directo): la página con
+    // huecos de carga, nunca una pantalla vacía.
     if (state.loading && !list && items.length === 0) {
-        return null
+        return (
+            <UnifiedListDetailsLayout titlePending sourceLabel="Lista de la comunidad" showTopBar={false}>
+                <ListItemsSkeleton />
+            </UnifiedListDetailsLayout>
+        )
     }
 
     if (state.error && !list && items.length === 0) {
@@ -353,7 +380,7 @@ export default function TraktListDetailsClient({ username, listId }) {
                 { icon: ListVideo, label: 'ELEMENTOS', value: listItemCount, tooltip: 'Títulos de la lista' },
                 { icon: UserRound, label: 'USUARIO', value: `@${creatorUsername}`, tooltip: 'Creador de la lista' },
                 { icon: Heart, label: 'LIKES', value: Number(list?.likes || 0), tooltip: 'Me gusta de la comunidad' },
-                { icon: ExternalLink, label: 'FUENTE', value: 'Comunidad', tooltip: 'Lista de la comunidad' },
+                { icon: ExternalLink, label: 'FUENTE', value: 'Comunidad', tooltip: 'Lista de la comunidad', hideOnPhone: true },
             ]}
             scoreboardRatings={{
                 tmdb: ratingSummaryBadge(state.ratingSummary),
@@ -383,7 +410,9 @@ export default function TraktListDetailsClient({ username, listId }) {
                     emptyTitle="Lista vacía"
                     emptyText="No hay títulos disponibles en esta lista."
                 />
-            ) : null}
+            ) : (
+                <ListItemsSkeleton count={Math.min(listItemCount || 12, 18)} />
+            )}
 
             {state.hasMore && (
                 <div ref={loadMoreRef} className="mt-10 flex min-h-14 justify-center">

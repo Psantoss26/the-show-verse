@@ -9,12 +9,16 @@ import { AnimatePresence, motion } from 'framer-motion'
 
 import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayout'
 import ListDetailsActionRow from '@/components/lists/ListDetailsActionRow'
-import ListPosterCard, { listPosterGridClass } from '@/components/lists/ListPosterCard'
+import ListPosterCard, { ListItemsSkeleton, listPosterGridClass } from '@/components/lists/ListPosterCard'
 import FilterableListItems from '@/components/lists/ListDetailsTools'
 import LiquidGlassOpticalLayers from '@/components/ui/LiquidGlassOpticalLayers'
 import { LIQUID_GLASS_CARD, LIQUID_GLASS_PANEL } from '@/lib/ui/liquidGlass'
 import { formatPageTitle } from '@/lib/pageTitle'
-import { shouldRenderCachedListDuringAuthHydration } from '@/lib/lists/detailsInitialState'
+import {
+    findListInIndexCache,
+    personalListPreviewFromIndex,
+    shouldRenderCachedListDuringAuthHydration,
+} from '@/lib/lists/detailsInitialState'
 import { useIsHistoryNavigation } from '@/lib/hooks/useIsHistoryNavigation'
 import { ratingSummaryBadge, summarizeListRatings } from '@/lib/lists/ratingSummary'
 import useListImdbRatings from '@/hooks/useListImdbRatings'
@@ -296,6 +300,21 @@ export default function ListDetailsPage() {
         setEditDesc(cached?.description || '')
     }, [isBackNav, listId])
 
+    // Entrada normal, también antes de pintar: la caché propia de la lista o,
+    // si no la hay, su vista provisional desde el índice de /lists (nombre,
+    // descripción, recuento, visibilidad). Antes la página se quedaba vacía
+    // hasta tener sesión y datos. `loading` sigue en true: solo los títulos
+    // esperan a la red.
+    useClientLayoutEffect(() => {
+        if (isBackNav) return
+        const cached = readTmdbListDetailsCache(listId)
+        const seed = cached || personalListPreviewFromIndex(findListInIndexCache('personal', listId))
+        if (!seed) return
+        setData(seed)
+        setEditName(seed?.name || '')
+        setEditDesc(seed?.description || '')
+    }, [isBackNav, listId])
+
     const items = Array.isArray(data?.items) ? data.items : []
     const { ratingsByKey: imdbRatings, summary: imdbSummary } = useListImdbRatings(items, { totalCount: items.length })
     // La edición solo se habilita cuando el backend confirma que esta lista
@@ -552,13 +571,22 @@ export default function ListDetailsPage() {
         }
     }
 
-    // Si no hay sesión, no renderizamos (como ya hacías)
+    // Sin datos todavía: la página con huecos de carga, nunca una pantalla
+    // vacía.
+    const loadingShell = (
+        <UnifiedListDetailsLayout titlePending sourceLabel="Lista de usuario" showTopBar={false}>
+            <ListItemsSkeleton />
+        </UnifiedListDetailsLayout>
+    )
+
+    // Si no hay sesión, no renderizamos (como ya hacías). Mientras la sesión
+    // aún se está comprobando no se sabe: huecos en vez de nada.
     if (!shouldRenderCachedListDuringAuthHydration({
         canUse,
         hydrated,
         hasCachedData: Boolean(data),
-    })) return null
-    if (loading && !data) return null
+    })) return hydrated ? null : loadingShell
+    if (loading && !data) return loadingShell
 
     const addCandidates = addMode === 'search' ? searchRes : catRes
     const coverItem = items.find((item) => item?.poster_path || item?.backdrop_path)
@@ -603,7 +631,7 @@ export default function ListDetailsPage() {
             posterItems={items}
             backdropImage={backdropPath ? `https://image.tmdb.org/t/p/original${backdropPath}` : null}
             scoreboardStats={[
-                { icon: ListVideo, label: 'ELEMENTOS', value: items.length, tooltip: 'Títulos de la lista' },
+                { icon: ListVideo, label: 'ELEMENTOS', value: items.length || Number(data?.item_count) || 0, tooltip: 'Títulos de la lista' },
                 ...(movieCount ? [{ icon: Clapperboard, label: 'PELÍCULAS', value: movieCount, tooltip: 'Películas en la lista' }] : []),
                 ...(tvCount ? [{ icon: MonitorPlay, label: 'SERIES', value: tvCount, tooltip: 'Series en la lista' }] : []),
                 { icon: data?.public ? Globe2 : LockKeyhole, label: 'VISIBILIDAD', value: visibility, tooltip: `Lista ${visibility.toLowerCase()}` },
@@ -693,6 +721,8 @@ export default function ListDetailsPage() {
                     emptyTitle="Sin resultados"
                     emptyText="No hay títulos que coincidan con los filtros."
                 />
+            ) : loading ? (
+                <ListItemsSkeleton count={Math.min(Number(data?.item_count) || 12, 18)} />
             ) : null}
 
             <ListActionDialog open={actionDialog === 'add'} onClose={() => setActionDialog(null)} title="Añadir títulos">

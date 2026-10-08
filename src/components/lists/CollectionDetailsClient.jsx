@@ -7,13 +7,15 @@ import { useAuth } from '@/context/AuthContext'
 import CollectionEditModal from '@/components/lists/CollectionEditModal'
 import CollectionCastModal from '@/components/lists/CollectionCastModal'
 import { formatCollectionRevenue } from '@/lib/lists/collectionStats'
-import { applyCollectionCustomization, collectionCustomizationKey, readCollectionArtworkOverride } from '@/lib/lists/collectionCustomization'
-import ListPosterCard from '@/components/lists/ListPosterCard'
+import { applyCollectionCustomization, readCollectionArtworkOverride } from '@/lib/lists/collectionCustomization'
+import ListPosterCard, { ListItemsSkeleton } from '@/components/lists/ListPosterCard'
 import FilterableListItems from '@/components/lists/ListDetailsTools'
 import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayout'
 import ListDetailsActionRow from '@/components/lists/ListDetailsActionRow'
 import { formatPageTitle } from '@/lib/pageTitle'
 import {
+    collectionPreviewFromIndex,
+    findListInIndexCache,
     resolveCollectionDetailsInitialState,
 } from '@/lib/lists/detailsInitialState'
 import { ratingSummaryBadge, summarizeListRatings } from '@/lib/lists/ratingSummary'
@@ -134,12 +136,26 @@ export default function CollectionDetailsClient({ collectionId }) {
         if (cached) setState(resolveCollectionDetailsInitialState(cached))
     }, [isBackNav, collectionId])
 
+    // Entrada normal, también antes de pintar: la caché propia de la colección
+    // o, si no la hay, su vista provisional desde el índice de /lists (nombre,
+    // póster, recuento). Antes la página se quedaba vacía hasta que llegaban
+    // los datos (2-3 s sin caché).
+    useClientLayoutEffect(() => {
+        if (isBackNav) return
+        const cached = readCollectionDetailsCache(collectionId)
+        if (cached) {
+            setState(resolveCollectionDetailsInitialState(cached))
+            return
+        }
+        const preview = collectionPreviewFromIndex(findListInIndexCache('collections', collectionId))
+        setState(preview
+            ? { loading: true, error: null, collection: preview, parts: [] }
+            : resolveCollectionDetailsInitialState(null))
+    }, [isBackNav, collectionId])
+
     const artworkOverride = readCollectionArtworkOverride(preferences, collectionId)
-    const collection = applyCollectionCustomization(
-        state.collection,
-        preferences?.uiSettings?.[collectionCustomizationKey(collectionId)],
-        artworkOverride,
-    )
+    // Solo las imágenes son personalizables; nombre y descripción, los de TMDb.
+    const collection = applyCollectionCustomization(state.collection, artworkOverride)
     useEffect(() => {
         document.title = formatPageTitle(collection?.name || 'Colección')
     }, [collection?.name])
@@ -147,8 +163,10 @@ export default function CollectionDetailsClient({ collectionId }) {
     useEffect(() => {
         let cancelled = false
         if (!collectionId) return
+        // Sin caché se conserva lo sembrado antes de pintar (vista provisional);
+        // volver a un estado vacío dejaba la pantalla en blanco hasta la red.
         const cached = readCollectionDetailsCache(collectionId)
-        setState(resolveCollectionDetailsInitialState(cached))
+        if (cached) setState(resolveCollectionDetailsInitialState(cached))
 
         ; (async () => {
             try {
@@ -210,8 +228,14 @@ export default function CollectionDetailsClient({ collectionId }) {
         [parts, imdbRatings]
     )
 
+    // Sin datos ni vista provisional (p. ej. un enlace directo): la página con
+    // huecos de carga, nunca una pantalla vacía.
     if (state.loading && !collection && parts.length === 0) {
-        return null
+        return (
+            <UnifiedListDetailsLayout titlePending sourceLabel="Colección TMDb" showTopBar={false}>
+                <ListItemsSkeleton />
+            </UnifiedListDetailsLayout>
+        )
     }
 
     if (state.error && !collection && parts.length === 0) {
@@ -244,9 +268,12 @@ export default function CollectionDetailsClient({ collectionId }) {
         : null
     const backgroundBackdrop = customBackdrop || autoBackdrop
     const backgroundPoster = collection?.mobile_background_path || autoMobileBackground
-    // Modo de portada BACKDROP: una imagen CON IDIOMA (inglés → español) de la
-    // galería; sin ninguna, el modo no se ofrece.
-    const coverBackdropPath = gallery.done ? pickCollectionCoverBackdrop(gallery.images?.backdrops) : null
+    // Modo de portada BACKDROP: la imagen elegida en «Editar colección» o, si
+    // no, una CON IDIOMA (inglés → español) de la galería; sin ninguna, el modo
+    // no se ofrece. Con una elegida no hace falta esperar a la galería.
+    const customCoverBackdrop = artworkOverride.background ? collection?.cover_backdrop_path : null
+    const autoCoverBackdrop = gallery.done ? pickCollectionCoverBackdrop(gallery.images?.backdrops) : null
+    const coverBackdropPath = customCoverBackdrop || autoCoverBackdrop
 
     // IMAGEN Y VÍDEO COMPARTIBLES: la portada es el póster oficial CON idioma
     // (el del marco de la página, incluida la elección de «Editar colección»),
@@ -297,16 +324,16 @@ export default function CollectionDetailsClient({ collectionId }) {
                 src: `https://image.tmdb.org/t/p/w1280${coverBackdropPath}`,
                 lowSrc: `https://image.tmdb.org/t/p/w780${coverBackdropPath}`,
             } : null}
-            coverBackdropPending={!gallery.done}
+            coverBackdropPending={!gallery.done && !customCoverBackdrop}
             heroBackground={{
                 desktop: backgroundBackdrop ? `https://image.tmdb.org/t/p/original${backgroundBackdrop}` : null,
                 mobile: backgroundPoster ? `https://image.tmdb.org/t/p/w780${backgroundPoster}` : null,
             }}
             scoreboardStats={[
-                { icon: Film, label: 'PELÍCULAS', value: parts.length, tooltip: 'Películas de la colección' },
+                { icon: Film, label: 'PELÍCULAS', value: parts.length || Number(collection?.item_count) || 0, tooltip: 'Películas de la colección' },
                 ...(totalRuntime > 0 ? [{ icon: Clock3, label: 'DURACIÓN', value: `${Math.round(totalRuntime / 60)} h`, tooltip: 'Duración total aproximada' }] : []),
                 ...(revenueLabel ? [{ icon: Banknote, label: 'INGRESOS', value: revenueLabel, tooltip: 'Recaudación total en taquilla de las películas con dato en TMDb' }] : []),
-                { icon: ExternalLink, label: 'FUENTE', value: 'TMDb', tooltip: 'Datos de TMDb' },
+                { icon: ExternalLink, label: 'FUENTE', value: 'TMDb', tooltip: 'Datos de TMDb', hideOnPhone: true },
             ]}
             scoreboardRatings={{
                 tmdb: ratingSummaryBadge(averageRating),
@@ -331,14 +358,16 @@ export default function CollectionDetailsClient({ collectionId }) {
                     emptyTitle="Sin resultados"
                     emptyText="No hay películas que coincidan con los filtros."
                 />
-            ) : !state.loading ? (
+            ) : state.loading ? (
+                <ListItemsSkeleton count={Math.min(Number(collection?.item_count) || 12, 18)} />
+            ) : (
                 <div className="py-20 text-center text-zinc-500">
                     <div className="mb-4 inline-flex h-20 w-20 items-center justify-center rounded-full bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/30 shadow-lg backdrop-blur-[28px]">
                         <Film className="h-10 w-10 opacity-40" />
                     </div>
                     <p className="text-sm font-medium">No hay películas en esta colección</p>
                 </div>
-            ) : null}
+            )}
         </UnifiedListDetailsLayout>
         <CollectionCastModal open={castOpen} onClose={() => setCastOpen(false)} cast={castMembers} collectionName={collection?.name} />
         {editing && collection && (
@@ -350,11 +379,13 @@ export default function CollectionDetailsClient({ collectionId }) {
                     ...original,
                     backdrop_path: autoBackdrop || original?.backdrop_path || null,
                     mobile_background_path: autoMobileBackground,
+                    cover_backdrop_path: autoCoverBackdrop,
                 }}
                 collection={{
                     ...collection,
                     backdrop_path: backgroundBackdrop || null,
                     mobile_background_path: backgroundPoster || null,
+                    cover_backdrop_path: coverBackdropPath || null,
                 }}
                 onClose={() => setEditing(false)}
             />

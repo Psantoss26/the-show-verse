@@ -38,34 +38,37 @@ export async function POST(request) {
   }
 
   const card = sanitizeListShareCard(body);
-  // Fondo ambiental: en la composición «póster», el póster SIN texto; con el
-  // oficial, su título blanco difuminado dejaba manchas claras alrededor.
-  const ambientPath =
-    (card.layout === "poster" ? card.backdropPath : null) ||
-    card.coverPath ||
-    card.collage[0] ||
-    card.preview.find((item) => item.posterPath)?.posterPath ||
-    null;
+  const posterLayout = card.layout === "poster";
   // El mosaico se ve grande (hasta media imagen por póster): w780.
   const collageSize = card.collage.length >= 6 ? "w500" : "w780";
-  const [fonts, assets, cover, collage, previews, ambient, ambientBase] = await Promise.all([
+  const [fonts, assets, cover, collage, previews, coverBlur] = await Promise.all([
     loadShareFonts(),
     loadLocalAssets(),
     loadPoster(card.coverPath),
     loadTmdbImages(card.collage, collageSize, 5000),
     loadTmdbImages(card.preview.slice(0, LIST_PREVIEW_MAX).map((item) => item.posterPath), "w342"),
-    loadAmbient(ambientPath),
-    loadAmbientBase(ambientPath),
+    // Composición «póster»: lo de debajo es la continuación del propio póster
+    // (su versión diminuta, ver PosterCard), no el fondo ambiental.
+    posterLayout ? loadAmbientBase(card.coverPath) : null,
   ]);
 
+  // Fondo ambiental: solo para la composición normal (o si el póster no ha
+  // llegado y se cae a ella).
+  const usePosterCard = posterLayout && cover;
+  const ambientPath = usePosterCard
+    ? null
+    : card.coverPath || card.collage[0] || card.preview.find((item) => item.posterPath)?.posterPath || null;
+  const [ambient, ambientBase] = usePosterCard
+    ? [null, null]
+    : await Promise.all([loadAmbient(ambientPath), loadAmbientBase(ambientPath)]);
+
   const element =
-    card.layout === "poster" && cover ? (
+    usePosterCard ? (
       <PosterCard
         card={card}
         cover={cover}
+        coverBlur={coverBlur}
         previews={previews}
-        ambient={ambient}
-        ambientBase={ambientBase}
         assets={assets}
         fonts={Boolean(fonts)}
       />
