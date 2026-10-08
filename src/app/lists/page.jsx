@@ -252,7 +252,7 @@ function writeSessionJsonCache(key, data) {
 // a la que ya está en curso. Una respuesta vacía o fallida no se memoriza.
 // v2: la selección de destacadas creció (y se corrigieron ids erróneos); la
 // versión nueva evita servir la anterior de la caché de la sesión.
-const FEATURED_COLLECTIONS_CACHE_KEY = "showverse:lists:featured-collections:v3";
+const FEATURED_COLLECTIONS_CACHE_KEY = "showverse:lists:featured-collections:v4";
 let featuredCollectionsRequest = null;
 
 function readCachedFeaturedCollections() {
@@ -270,7 +270,7 @@ function loadFeaturedCollections({ force = false } = {}) {
   }
   if (!force && featuredCollectionsRequest) return featuredCollectionsRequest;
 
-  const request = fetch("/api/tmdb/collections/featured?v=3", {
+  const request = fetch("/api/tmdb/collections/featured?v=4", {
     cache: force ? "no-cache" : "default",
   })
     .then((res) => res.json().catch(() => ({})))
