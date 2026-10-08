@@ -1,62 +1,8 @@
 import { NextResponse } from "next/server";
+import { FEATURED_COLLECTION_IDS, toCollectionSummary } from "@/lib/tmdb/featuredCollections";
 
 const TMDB_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const TMDB_API = "https://api.themoviedb.org/3";
-
-const FEATURED_COLLECTION_IDS = [
-  // Top Populares
-  10, // Star Wars
-  1241, // Harry Potter
-  119, // The Lord of the Rings
-  535313, // The Hobbit
-  86311, // The Avengers
-  9485, // Fast & Furious
-  645, // James Bond
-
-  // Marvel
-  556, // Spider-Man
-  131292, // Iron Man
-  131295, // Captain America
-  131296, // Thor
-  748, // X-Men
-
-  // DC
-  263, // The Dark Knight
-  8537, // Superman
-
-  // Acción
-  87359, // Mission: Impossible
-  2344, // The Matrix
-  328, // Jurassic Park
-  528, // Terminator
-  31562, // Bourne
-  1570, // Die Hard
-  304, // Ocean's
-
-  // Animación
-  10194, // Toy Story
-  86066, // Despicable Me
-  8354, // Ice Age
-  2150, // Shrek
-  14740, // Madagascar
-
-  // Terror
-  313086, // The Conjuring
-  91361, // Halloween
-  656, // Saw
-  2602, // Scream
-
-  // Ciencia Ficción
-  8091, // Alien
-  264, // Back to the Future
-  131635, // The Hunger Games
-  8945, // Mad Max
-
-  // Drama
-  230, // The Godfather
-  553, // Rocky
-  5039, // Rambo
-];
 
 function buildTmdbUrl(path, params = {}) {
   const url = new URL(`${TMDB_API}${path}`);
@@ -94,22 +40,7 @@ export async function GET() {
             cache: "force-cache",
             next: { revalidate: 3600 }, // 1 hora
           });
-          const parts = Array.isArray(c?.parts) ? c.parts : [];
-          const cleanName = (c?.name || "Colección")
-            .replace(/ Collection$/i, "")
-            .replace(/ - Colección$/i, "");
-          return {
-            source: "collection",
-            id: String(c?.id),
-            name: cleanName,
-            description: c?.overview || "",
-            item_count: parts.length,
-            poster_path: c?.poster_path || null,
-            backdrop_path: c?.backdrop_path || null,
-            tmdbUrl: c?.id
-              ? `https://www.themoviedb.org/collection/${c.id}`
-              : null,
-          };
+          return toCollectionSummary(c);
         } catch (err) {
           console.warn(`❌ Error colección ${id}:`, err.message);
           return null;
