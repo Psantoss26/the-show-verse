@@ -9,7 +9,6 @@
 import { LIST_PREVIEW_MAX, countLabel } from "@/lib/lists/shareList";
 import {
   AmbientBackground,
-  BRAND,
   Brand,
   COLORS,
   FONT,
@@ -45,7 +44,6 @@ const PREVIEW_TOP = PANEL_TOP - 52 - PREVIEW_H;
 const TITLE_GAP = 48;
 // Sin marcador, la vista previa y el título bajan para no dejar un hueco.
 const NO_SCORES_SHIFT = 120;
-const BRAND_BOTTOM = BRAND.top + BRAND.height;
 // Separación entre las piezas del mosaico (la `gap-px` sobre negro de la página).
 const COLLAGE_GAP = 4;
 
@@ -328,59 +326,67 @@ function ScorePanel({ card, assets, width, padY = px(12) }) {
 }
 
 // --- Composición «póster» (colecciones). El póster oficial lleva su título
-// impreso (normalmente abajo), así que va ENTERO: sin recorte, sin máscara y
-// sin nada encima. Debajo, la vista previa y el marcador al mismo ancho que el
-// póster; todo centrado en el alto que deja la marca.
-const POSTER_MAX_W = 900;
-const POSTER_TOP_MIN = BRAND_BOTTOM + 20;
-const POSTER_BOTTOM_MARGIN = 48;
-const POSTER_PREVIEW_GAP = 32;
+// impreso, así que va A SANGRE: pegado arriba y a los lados, a todo el ancho y
+// con su proporción. Debajo quedan ~300 px y la vista previa y el marcador,
+// compactos contra el borde inferior, ocupan ~390: algo hay que ceder.
+// Abajo suelen estar el título y los rótulos («COLECCIÓN» en Harry Potter
+// quedaba medio tapado); arriba, cielo o espacio. Así que el póster SUBE lo
+// justo para que su final caiga bajo el arranque de la vista previa (recorte
+// arriba de ~60 px, un 4%) y el fundido del borde inferior es corto y pasa
+// casi entero bajo los pósters de la vista previa. El marcador nunca lo pisa.
+const POSTER_ROW_W = 860;
+const POSTER_BOTTOM_MARGIN = 36;
 const POSTER_TILE_GAP = 18;
-const POSTER_PANEL_GAP = 26;
+const POSTER_PANEL_GAP = 18;
 // Marcador compacto: ScoreBadge solo con la cifra (el logo, 62 px, es lo más
 // alto) + relleno.
-const POSTER_PANEL_PAD = 24;
+const POSTER_PANEL_PAD = 20;
 const POSTER_PANEL_H = SCORE_LOGOS.tmdb.height + POSTER_PANEL_PAD * 2;
-const POSTER_RADIUS = 28;
+const POSTER_TILE_W = Math.floor((POSTER_ROW_W - (LIST_PREVIEW_MAX - 1) * POSTER_TILE_GAP) / LIST_PREVIEW_MAX);
+const POSTER_TILE_H = Math.round(POSTER_TILE_W * 1.5);
+// Fundido del borde inferior: empieza FADE_LEAD por encima de la vista previa
+// y acaba FADE_TAIL por debajo, que es donde termina el póster.
+const POSTER_FADE_LEAD = 40;
+const POSTER_FADE_TAIL = 34;
+// Lo máximo que se recorta arriba: un póster más alargado que 2:3 cede el resto
+// por abajo (bajo la vista previa) en vez de perder más cabeza.
+const POSTER_MAX_SHIFT = 140;
 
-/**
- * Medidas de la composición «póster». Despeja el ancho del póster de
- *   PW·ratio + gap + 1,5·(PW − 4·gapFila)/5 + gap + marcador ≤ alto útil
- * para que el póster sea lo más grande posible sin recortarse.
- */
+/** Medidas de la composición «póster» (px de la imagen). */
 export function posterLayout({ ratio = 1.5, tiles = LIST_PREVIEW_MAX, scores = true }) {
-  const available = H - POSTER_TOP_MIN - POSTER_BOTTOM_MARGIN;
-  const panel = scores ? POSTER_PANEL_GAP + POSTER_PANEL_H : 0;
-  // Fila de 5 huecos al ancho del póster (aunque haya menos, mismo tamaño).
-  const rowFactor = tiles ? 1.5 / LIST_PREVIEW_MAX : 0;
-  const rowFixed = tiles ? POSTER_PREVIEW_GAP - (1.5 * (LIST_PREVIEW_MAX - 1) * POSTER_TILE_GAP) / LIST_PREVIEW_MAX : 0;
-  const width = Math.floor(Math.min(POSTER_MAX_W, W - SIDE_MARGIN * 2, (available - panel - rowFixed) / (ratio + rowFactor)));
-  const height = Math.round(width * ratio);
-  const tileW = Math.floor((width - (LIST_PREVIEW_MAX - 1) * POSTER_TILE_GAP) / LIST_PREVIEW_MAX);
-  const tileH = Math.round(tileW * 1.5);
-  const stack = height + (tiles ? POSTER_PREVIEW_GAP + tileH : 0) + panel;
-  const top = POSTER_TOP_MIN + Math.max(0, Math.round((available - stack) / 2));
+  const height = Math.round(W * ratio);
+  const panelTop = H - POSTER_BOTTOM_MARGIN - (scores ? POSTER_PANEL_H : 0);
+  const previewTop = (scores ? panelTop - POSTER_PANEL_GAP : panelTop) - (tiles ? POSTER_TILE_H : 0);
+  const stackTop = tiles ? previewTop : panelTop;
+  // Dónde debería acabar el póster y cuánto hay que subirlo para ello (nada si
+  // ya cabe: un póster más bajo no se baja, se queda pegado arriba).
+  const end = stackTop + POSTER_FADE_TAIL;
+  const shift = Math.max(0, Math.min(POSTER_MAX_SHIFT, height - end));
+  const bottom = height - shift;
+  const fadeStart = Math.max(0, Math.min(bottom, stackTop) - POSTER_FADE_LEAD);
   return {
-    width,
     height,
-    left: Math.round((W - width) / 2),
-    top,
-    tileW,
-    tileH,
-    previewTop: top + height + POSTER_PREVIEW_GAP,
-    panelTop: top + height + (tiles ? POSTER_PREVIEW_GAP + tileH : 0) + POSTER_PANEL_GAP,
+    top: -shift,
+    previewTop,
+    panelTop,
+    // Recorte arriba y lo que la vista previa tapa del póster (px de imagen).
+    cropTop: shift,
+    covered: Math.max(0, bottom - stackTop),
+    // Fundido en px del PROPIO póster (la máscara va en la imagen).
+    fadeStart: fadeStart + shift,
+    fadeEnd: height,
   };
 }
 
-/** Imagen de una colección con su póster oficial (layout «póster»). */
+/** Imagen de una colección con su póster oficial (composición «póster»). */
 export function PosterCard({ card, cover, previews, ambient, ambientBase, assets, fonts }) {
   const hasScores = !!(card.scores.tmdb || card.scores.imdb);
   const { posters, hasMore, more, tileCount } = previewSlots(card);
   const size = cover.size?.width && cover.size?.height ? cover.size : { width: 2, height: 3 };
-  // Pósters con proporciones raras: entre 4:5 y 1:2, que siga cabiendo todo.
-  const ratio = Math.min(2, Math.max(1.25, size.height / size.width));
-  const layout = posterLayout({ ratio, tiles: tileCount, scores: hasScores });
-  const rowWidth = tileCount * layout.tileW + Math.max(0, tileCount - 1) * POSTER_TILE_GAP;
+  const layout = posterLayout({ ratio: size.height / size.width, tiles: tileCount, scores: hasScores });
+  const rowWidth = tileCount * POSTER_TILE_W + Math.max(0, tileCount - 1) * POSTER_TILE_GAP;
+  const fade = (layout.fadeStart / layout.height) * 100;
+  const mid = fade + (100 - fade) * 0.45;
 
   return (
     <div
@@ -394,62 +400,38 @@ export function PosterCard({ card, cover, previews, ambient, ambientBase, assets
         fontFamily: fonts ? FONT : "sans-serif",
       }}
     >
-      {/* Fondo: el mismo póster difuminado, un punto más oscuro para que el
-          póster nítido y los cristales destaquen. */}
+      {/* Fondo bajo el final del póster: el póster sin texto difuminado,
+          oscurecido hacia abajo, donde van la vista previa y el marcador. */}
       <AmbientBackground ambient={ambient} ambientBase={ambientBase} />
       <Fill
         style={{
-          backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.5) 0%, ${rgba(SHADE, 0.28)} 30%, ${rgba(SHADE, 0.4)} 70%, ${rgba(SHADE, 0.72)} 100%)`,
+          backgroundImage: `linear-gradient(180deg, ${rgba(SHADE, 0.35)} 0%, ${rgba(SHADE, 0.6)} 75%, ${rgba(SHADE, 0.88)} 100%)`,
         }}
       />
 
-      <Brand src={assets.brand} />
-
-      {/* El póster, entero: marco de la portada de la página (esquinas,
-          brillo diagonal y sombra amplia). */}
-      <div
+      {/* El póster a sangre, con su proporción (solo cede `cropTop` arriba),
+          fundido por máscara: no se oscurece hacia negro, se vuelve
+          transparente y deja ver el fondo. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={cover.src}
+        width={W}
+        height={layout.height}
+        alt=""
         style={{
           position: "absolute",
           top: layout.top,
-          left: layout.left,
-          width: layout.width,
+          left: 0,
+          width: W,
           height: layout.height,
-          display: "flex",
-          borderRadius: POSTER_RADIUS,
-          // Una sola sombra sin `spread`: con spread negativo y una segunda
-          // capa Satori pintaba un halo gris alrededor del póster.
-          boxShadow: "0 30px 70px rgba(0,0,0,0.6)",
+          objectFit: "cover",
+          maskImage: `linear-gradient(180deg, #000 0%, #000 ${fade}%, rgba(0,0,0,0.55) ${mid}%, rgba(0,0,0,0) 100%)`,
         }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={cover.src}
-          width={layout.width}
-          height={layout.height}
-          alt=""
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            width: layout.width,
-            height: layout.height,
-            objectFit: "cover",
-            borderRadius: POSTER_RADIUS,
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            width: layout.width,
-            height: layout.height,
-            display: "flex",
-            borderRadius: POSTER_RADIUS,
-            backgroundImage: POSTER_SHEEN,
-          }}
-        />
-      </div>
+      />
+
+      {/* Velo suave arriba para que la marca se lea sobre pósters claros. */}
+      <Fill style={{ height: 240, backgroundImage: "linear-gradient(180deg, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0) 100%)" }} />
+      <Brand src={assets.brand} />
 
       {tileCount ? (
         <div
@@ -458,23 +440,31 @@ export function PosterCard({ card, cover, previews, ambient, ambientBase, assets
             top: layout.previewTop,
             left: Math.round((W - rowWidth) / 2),
             width: rowWidth,
-            height: layout.tileH,
+            height: POSTER_TILE_H,
             display: "flex",
             justifyContent: "space-between",
           }}
         >
           {posters.map((item, index) => (
-            <PosterTile key={index} image={previews[index]} width={layout.tileW} height={layout.tileH} radius={16} />
+            <PosterTile key={index} image={previews[index]} width={POSTER_TILE_W} height={POSTER_TILE_H} radius={16} />
           ))}
           {hasMore ? (
-            <MoreTile image={previews[LIST_PREVIEW_MAX - 1]} more={more} width={layout.tileW} height={layout.tileH} />
+            <MoreTile image={previews[LIST_PREVIEW_MAX - 1]} more={more} width={POSTER_TILE_W} height={POSTER_TILE_H} />
           ) : null}
         </div>
       ) : null}
 
       {hasScores ? (
-        <div style={{ position: "absolute", top: layout.panelTop, left: layout.left, width: layout.width, display: "flex" }}>
-          <ScorePanel card={card} assets={assets} width={layout.width} padY={POSTER_PANEL_PAD} />
+        <div
+          style={{
+            position: "absolute",
+            top: layout.panelTop,
+            left: Math.round((W - POSTER_ROW_W) / 2),
+            width: POSTER_ROW_W,
+            display: "flex",
+          }}
+        >
+          <ScorePanel card={card} assets={assets} width={POSTER_ROW_W} padY={POSTER_PANEL_PAD} />
         </div>
       ) : null}
     </div>
