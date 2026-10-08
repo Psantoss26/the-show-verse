@@ -1,6 +1,7 @@
 "use client";
 
 
+import { getPlexLink } from "@/lib/streaming/plexLinks";
 import OptimizedImage from "@/components/OptimizedImage";
 import {
   useCallback,
@@ -52,7 +53,7 @@ import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 
 // ================== CONSTANTS ==================
 
-const CACHE_KEY_PREFIX = "showverse:plex-library:v6";
+const CACHE_KEY_PREFIX = "showverse:plex-library:v7";
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutos - coincide con revalidación del servidor
 const DEFAULT_FETCH_LIMIT = 2000;
 const EXPANDED_FETCH_LIMIT = 10000;
@@ -639,131 +640,14 @@ function GroupDivider({
 // ================== CARD COMPONENTS ==================
 
 function openPlexLink(item) {
-  const webUrl = item?.links?.web || null;
-  const mobileUrl = item?.links?.mobile || null;
-  const mobileAltUrl = item?.links?.mobileAlt || null;
-  const mobileRawUrl = item?.links?.mobileRaw || null;
-  const playUrl = item?.links?.play || null;
-  const playLegacyUrl = item?.links?.playLegacy || null;
-  const playRawUrl = item?.links?.playRaw || null;
-  const universalUrl = item?.links?.universal || null;
-  const androidIntentUrl = item?.links?.androidIntent || null;
-  const androidIntentPlayUrl = item?.links?.androidIntentPlay || null;
-
   if (typeof window === "undefined") return;
-
-  const ua = navigator.userAgent || "";
-  const isTouchDevice =
-    "ontouchstart" in window ||
-    navigator.maxTouchPoints > 0 ||
-    navigator.msMaxTouchPoints > 0;
-  const isAndroid = /Android/i.test(ua);
-  const isIOS =
-    /iPad|iPhone|iPod/i.test(ua) ||
-    (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
-  const isMobileOrTablet =
-    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Tablet/i.test(
-      ua,
-    ) || isIOS;
-
-  const uniqueCandidates = (urls) =>
-    Array.from(new Set(urls.filter((url) => typeof url === "string" && url)));
-
-  const openWithFallback = (urls) => {
-    const candidates = uniqueCandidates(urls);
-    if (!candidates.length) return;
-
-    let index = 0;
-    let timeoutId = null;
-
-    const cleanup = () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-        timeoutId = null;
-      }
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
-
-    const onVisibilityChange = () => {
-      if (document.hidden) cleanup();
-    };
-
-    const tryNext = () => {
-      if (index >= candidates.length) {
-        cleanup();
-        return;
-      }
-
-      const nextUrl = candidates[index];
-      index += 1;
-
-      if (/^(https?:)/i.test(nextUrl)) {
-        cleanup();
-        window.location.href = nextUrl;
-        return;
-      }
-
-      window.location.href = nextUrl;
-
-      if (index < candidates.length) {
-        timeoutId = window.setTimeout(() => {
-          if (!document.hidden) tryNext();
-        }, 900);
-      }
-    };
-
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    tryNext();
-  };
-
-  if (isTouchDevice || isMobileOrTablet) {
-    if (isAndroid) {
-      openWithFallback([
-        androidIntentPlayUrl,
-        androidIntentUrl,
-        playLegacyUrl,
-        playUrl,
-        playRawUrl,
-        mobileUrl,
-        mobileAltUrl,
-        mobileRawUrl,
-        universalUrl,
-        webUrl,
-      ]);
-      return;
-    }
-
-    if (isIOS) {
-      openWithFallback([
-        mobileUrl,
-        mobileAltUrl,
-        mobileRawUrl,
-        playLegacyUrl,
-        playUrl,
-        playRawUrl,
-        universalUrl,
-        webUrl,
-      ]);
-      return;
-    }
-
-    openWithFallback([
-      mobileUrl,
-      mobileAltUrl,
-      mobileRawUrl,
-      playLegacyUrl,
-      playUrl,
-      playRawUrl,
-      universalUrl,
-      webUrl,
-    ]);
-    return;
-  }
-
-  const desktopUrl =
-    webUrl || universalUrl || playUrl || mobileUrl || mobileAltUrl;
-  if (desktopUrl) {
-    window.open(desktopUrl, "_blank", "noopener,noreferrer");
+  const href = getPlexLink(item?.links);
+  if (href === "#") return;
+  // Keep the launch synchronous with the tap, including in standalone PWAs.
+  if (window.matchMedia?.("(min-width: 64rem) and (hover: hover) and (pointer: fine)").matches) {
+    window.open(href, "_blank", "noopener,noreferrer");
+  } else {
+    window.location.href = href;
   }
 }
 
