@@ -15,15 +15,18 @@ import {
     buildPosterCollageTiles,
     getPosterCollageLayout,
 } from '@/lib/lists/posterCollage'
-import { pickBestFavoriteEnglishPoster } from '@/lib/details/tmdbImages'
 import { fetchTmdbImages } from '@/lib/tmdb/imageRequests'
+import { requestListArtwork } from '@/lib/tmdb/artworkBatch'
+import { pickListArtwork } from '@/lib/tmdb/artworkPicks'
 import useImageLoadReady from '@/lib/hooks/useImageLoadReady'
 import usePosterViewMode from '@/lib/hooks/usePosterViewMode'
 import { posterShelfLayout } from '@/lib/lists/coverBackdrop'
 // Capa con fundido de cada modo: la misma que usa DetailsClient.
 import { CoverLayer } from '@/components/details/CoverCrossfade'
 
-const finalEnglishPosterCache = new Map()
+// Arte de cada título para la portada de la lista (`coverPoster`): id → ruta,
+// null (sin arte) o la promesa en vuelo.
+const coverArtCache = new Map()
 
 // ---- Cabecera MÓVIL (<640) con la composición de DetailsClient ----
 // Portada fija pegada arriba (como mucho 2:3 a todo el ancho), botones con la
@@ -63,22 +66,32 @@ function preloadPoster(src) {
     })
 }
 
-async function resolveEnglishPoster(target, priority) {
-    if (finalEnglishPosterCache.has(target.key)) {
-        return finalEnglishPosterCache.get(target.key)
+// PORTADA DE LA LISTA: arte SIN TEXTO de cada título (`coverPoster` de
+// lib/tmdb/artworkPicks: póster sin idioma → backdrop sin idioma → póster
+// inglés). El mosaico recorta cada imagen a su celda y con el póster inglés
+// cortaba los títulos impresos. Se pide en LOTE (/api/tmdb/artwork: una
+// petición para toda la lista, cacheada un día en el servidor) y, si el lote
+// falla, a /images del título con el mismo criterio.
+async function resolveCoverArt(target, priority) {
+    if (coverArtCache.has(target.key)) {
+        return coverArtCache.get(target.key)
     }
 
-    const request = fetchTmdbImages(target.mediaType, target.tmdbId, { priority })
-        .then((images) => pickBestFavoriteEnglishPoster(images?.posters || [])?.file_path || null)
+    const request = requestListArtwork(target.mediaType, target.tmdbId)
+        .then(async (picks) => {
+            if (picks) return picks.coverPoster || null
+            const images = await fetchTmdbImages(target.mediaType, target.tmdbId, { priority })
+            return pickListArtwork(images)?.coverPoster || null
+        })
         .catch(() => null)
 
-    finalEnglishPosterCache.set(target.key, request)
+    coverArtCache.set(target.key, request)
     const posterPath = await request
-    finalEnglishPosterCache.set(target.key, posterPath)
+    coverArtCache.set(target.key, posterPath)
     return posterPath
 }
 
-function useFinalEnglishPosterImages(items) {
+function useCoverArtImages(items) {
     const targets = useMemo(() => buildPosterCollageTargets(items), [items])
     const targetKey = targets.map((target) => target.key).join('|')
     const [state, setState] = useState({ key: '', pending: false, images: [] })
@@ -93,7 +106,7 @@ function useFinalEnglishPosterImages(items) {
 
         // Ya resueltos: el render los pinta desde la caché; se fija ese mismo
         // estado sin pasar por `pending` (haría parpadear la portada).
-        const resolved = targets.map((target) => finalEnglishPosterCache.get(target.key))
+        const resolved = targets.map((target) => coverArtCache.get(target.key))
         if (resolved.every((value) => value === null || typeof value === 'string')) {
             setState({ key: targetKey, pending: false, images: resolved.filter(Boolean).map(posterUrl) })
             return undefined
@@ -102,7 +115,7 @@ function useFinalEnglishPosterImages(items) {
         setState({ key: targetKey, pending: true, images: [] })
         void Promise.all(
             targets.map(async (target, index) => {
-                const posterPath = await resolveEnglishPoster(
+                const posterPath = await resolveCoverArt(
                     target,
                     index === 0 ? 'high' : 'normal',
                 )
@@ -125,7 +138,7 @@ function useFinalEnglishPosterImages(items) {
     if (state.key === targetKey) return state
     // Pósters ya resueltos en esta sesión (volver atrás): salen en el primer
     // render, sin un fotograma de huecos mientras el efecto los recupera.
-    const resolved = targets.map((target) => finalEnglishPosterCache.get(target.key))
+    const resolved = targets.map((target) => coverArtCache.get(target.key))
     if (targets.length && resolved.every((value) => value === null || typeof value === 'string')) {
         return { key: targetKey, pending: false, images: resolved.filter(Boolean).map(posterUrl) }
     }
@@ -502,6 +515,36 @@ function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, collage
     )
 }
 
+// UNIONES DEL MOSAICO: en vez de una línea entre celdas, cada imagen se
+// prolonga COLLAGE_FEATHER_PX por fuera de su celda y en esa prolongación se
+// desvanece. Las celdas posteriores se pintan encima de las anteriores, así
+// que en cada unión la imagen de un lado empieza opaca justo en el borde y se
+// funde sobre la del otro: un fundido sin línea y sin banda oscura (si las dos
+// se desvanecieran a la vez, asomaría el fondo en medio). En el borde exterior
+// del mosaico la prolongación cae fuera y se recorta: ahí no hay fundido.
+const COLLAGE_FEATHER_PX = 12
+// Rampa suave (smoothstep) de opaco a transparente sobre la prolongación.
+const featherRamp = (direction) => `linear-gradient(${direction},
+    transparent 0px,
+    rgba(0, 0, 0, 0.104) ${COLLAGE_FEATHER_PX * 0.2}px,
+    rgba(0, 0, 0, 0.352) ${COLLAGE_FEATHER_PX * 0.4}px,
+    rgba(0, 0, 0, 0.648) ${COLLAGE_FEATHER_PX * 0.6}px,
+    rgba(0, 0, 0, 0.896) ${COLLAGE_FEATHER_PX * 0.8}px,
+    #000 ${COLLAGE_FEATHER_PX}px,
+    #000 calc(100% - ${COLLAGE_FEATHER_PX}px),
+    rgba(0, 0, 0, 0.896) calc(100% - ${COLLAGE_FEATHER_PX * 0.8}px),
+    rgba(0, 0, 0, 0.648) calc(100% - ${COLLAGE_FEATHER_PX * 0.6}px),
+    rgba(0, 0, 0, 0.352) calc(100% - ${COLLAGE_FEATHER_PX * 0.4}px),
+    rgba(0, 0, 0, 0.104) calc(100% - ${COLLAGE_FEATHER_PX * 0.2}px),
+    transparent 100%)`
+const COLLAGE_TILE_STYLE = {
+    inset: -COLLAGE_FEATHER_PX,
+    WebkitMaskImage: `${featherRamp('to right')}, ${featherRamp('to bottom')}`,
+    maskImage: `${featherRamp('to right')}, ${featherRamp('to bottom')}`,
+    WebkitMaskComposite: 'source-in',
+    maskComposite: 'intersect',
+}
+
 function PosterCollage({ images, pending }) {
     const tiles = buildPosterCollageTiles(images)
     const layout = getPosterCollageLayout(tiles.length)
@@ -513,15 +556,17 @@ function PosterCollage({ images, pending }) {
     if (tiles.length > 1) {
         return (
             <div
-                className={`grid h-full w-full gap-px overflow-hidden bg-black/70 ${layout.gridClassName}`}
+                className={`grid h-full w-full overflow-hidden bg-neutral-950 ${layout.gridClassName}`}
                 aria-hidden="true"
             >
                 {tiles.map((src, index) => (
                     <div
                         key={src}
-                        className={`relative min-h-0 overflow-hidden bg-zinc-900 ${layout.tileClassNames[index]}`}
+                        className={`relative min-h-0 ${layout.tileClassNames[index]}`}
                     >
-                        <PosterCover src={src} priority={index === 0} />
+                        <div className="absolute" style={COLLAGE_TILE_STYLE}>
+                            <PosterCover src={src} priority={index === 0} />
+                        </div>
                     </div>
                 ))}
             </div>
@@ -591,7 +636,8 @@ function PosterShelf({ images, pending, count }) {
  *   backdrop de una colección; sin él, con portada oficial, el modo no se ofrece.
  *   Sin portada oficial —listas— el modo usa la estantería de pósters)
  * - coverBackdropPending?: boolean (aún se está buscando ese backdrop)
- * - posterItems?: Array (títulos TMDb para resolver el mosaico inglés final)
+ * - posterItems?: Array (títulos TMDb para el mosaico de portada, con su arte SIN
+ *   texto: ver `resolveCoverArt`)
  * - heroBackground?: { desktop?: string, mobile?: string } (fondo estilo
  *   DetailsClient: backdrop en escritorio, póster en móvil; sustituye al
  *   `backdropImage` tenue)
@@ -635,7 +681,7 @@ export default function UnifiedListDetailsLayout({
     const isBackNav = useIsHistoryNavigation()
     const hasTabs = Array.isArray(tabs) && tabs.length > 0 && !!activeTab && typeof onTabChange === 'function'
     const hasInfoTabs = Boolean(description)
-    const finalPosterArtwork = useFinalEnglishPosterImages(posterItems)
+    const finalPosterArtwork = useCoverArtImages(posterItems)
 
     // MODO DE PORTADA póster ↔ backdrop, como en DetailsClient (misma
     // preferencia global, solo escritorio). Disponible con un backdrop con
