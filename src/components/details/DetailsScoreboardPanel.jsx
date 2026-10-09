@@ -341,7 +341,9 @@ export function DetailsStatsRow({
   // Teléfono: una sola fila que se desplaza, sin etiquetas. Los `sm:`/`md:`
   // miran el viewport, así que en la ficha de teléfono del drawer (tablet)
   // activaban la fila ancha con etiquetas y las stats se partían en dos filas.
-  const statsScrollerClass = `overflow-x-auto scrollbar-hide overscroll-x-contain [touch-action:pan-y] py-2.5 ${
+  // Keep vertical padding inside the grid item: padding on the scroller
+  // sets a minimum height and makes the last pixels of collapse snap shut.
+  const statsScrollerClass = `overflow-x-auto scrollbar-hide overscroll-x-contain [touch-action:pan-y] ${
     spread
       ? phone
         ? "px-[calc(0.5rem+env(safe-area-inset-left))]"
@@ -352,7 +354,7 @@ export function DetailsStatsRow({
       ? ""
       : "sm:pl-[calc(1.5rem+env(safe-area-inset-left))] sm:pr-[calc(1.25rem+env(safe-area-inset-right))] md:overflow-x-visible"
   }`;
-  const statsTrackClass = `${compactTrailing ? styles.compactStatsTrack : ""} flex w-max min-w-0 flex-nowrap items-center justify-start gap-x-4 gap-y-1.5 ${
+  const statsTrackClass = `${compactTrailing ? styles.compactStatsTrack : ""} py-2.5 flex w-max min-w-0 flex-nowrap items-center justify-start gap-x-4 gap-y-1.5 ${
     phone ? "" : compactTrailing ? "sm:w-full sm:flex-nowrap sm:gap-x-2" : "sm:w-full sm:flex-wrap"
   } ${spread ? `phone-sb:w-full phone-sb:justify-evenly phone-sb:gap-x-2.5 ${styles.spreadStats}` : ""}`;
 
@@ -856,6 +858,7 @@ export default function DetailsScoreboardPanel({
 
       {hasToolbar && (
         <div
+          data-scoreboard-toolbar=""
           className={
             mobileScoresOnly
               ? `relative z-10 py-3 flex items-center gap-2.5 overflow-x-clip overscroll-x-none [touch-action:pan-y]

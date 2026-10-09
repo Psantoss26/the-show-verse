@@ -56,6 +56,10 @@ export const MOBILE_STATS_REVEAL_BASE = [
     'max-sm:[&_[data-scoreboard-stats]]:transition-[grid-template-rows,border-color]',
     'max-sm:[&_[data-scoreboard-stats]]:duration-[420ms] max-sm:[&_[data-scoreboard-stats]]:ease-[cubic-bezier(0.22,1,0.36,1)]',
     'max-sm:motion-reduce:[&_[data-scoreboard-stats]]:transition-none',
+    // Animate only the content, preserving the panel's glass backdrop.
+    'max-sm:[&_[data-scoreboard-stats]>*>*]:transition-[opacity,translate] max-sm:[&_[data-scoreboard-stats]>*>*]:duration-[420ms] max-sm:[&_[data-scoreboard-stats]>*>*]:ease-[cubic-bezier(0.22,1,0.36,1)]',
+    'max-sm:[&[data-mobile-reveal-stats=hidden]_[data-scoreboard-stats]>*>*]:opacity-0 max-sm:[&[data-mobile-reveal-stats=hidden]_[data-scoreboard-stats]>*>*]:-translate-y-1.5',
+    'max-sm:motion-reduce:[&_[data-scoreboard-stats]>*>*]:transition-none max-sm:motion-reduce:[&_[data-scoreboard-stats]>*>*]:translate-none',
     'max-sm:[&[data-mobile-reveal-stats=hidden]_[data-scoreboard-stats]]:grid-rows-[minmax(0,0fr)]',
     'max-sm:[&[data-mobile-reveal-stats=hidden]_[data-scoreboard-stats]]:border-transparent',
 ].join(' ')
@@ -346,7 +350,18 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
         }
         const observer = new ResizeObserver(update)
         observer.observe(row)
-        if (scoreboard) observer.observe(scoreboard)
+        // In fitCover mode only the ratings determine the cover height.
+        // Watching the expanding stats remeasures the whole hero every frame.
+        let observedScores = null
+        const observeScores = () => {
+            const scores = scoreboard?.querySelector('[data-scoreboard-toolbar]')
+            if (scores === observedScores) return
+            if (observedScores) observer.unobserve(observedScores)
+            observedScores = scores
+            if (scores) observer.observe(scores)
+        }
+        if (fitCover) observeScores()
+        else if (scoreboard) observer.observe(scoreboard)
         // Botones que aparecen o desaparecen no cambian el tamaño de la fila.
         const mutations = new MutationObserver(update)
         mutations.observe(row, { childList: true, subtree: true })
@@ -361,6 +376,7 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
             while (common && !common.contains(row)) common = common.parentElement
             if (common) {
                 fitMutations = new MutationObserver(() => {
+                    observeScores()
                     if (!raf) {
                         raf = window.requestAnimationFrame(() => {
                             raf = 0

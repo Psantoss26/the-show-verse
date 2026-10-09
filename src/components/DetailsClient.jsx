@@ -1178,6 +1178,14 @@ export default function DetailsClient({
   const [posterModeHydrated, setPosterModeHydrated] = useState(() => restoredValue(backSnapshot, "posterModeHydrated", false));
 
   const [isPosterHovered, setIsPosterHovered] = useState(false);
+  // Se ha alternado póster ↔ backdrop en esta ficha. Las pestañas de
+  // información cambian de sitio con el modo (junto al póster o bajo la
+  // cabecera) y se vuelven a montar: sin esto repetían la entrada de la página
+  // (120 ms de espera y 520 ms subiendo) en cada cambio, mientras que en listas
+  // y colecciones la descripción se recoloca sin animar. Guarda el título
+  // (`id`) para que el siguiente vuelva a entrar con su animación.
+  const [posterModeToggledId, setPosterModeToggledId] = useState(null);
+  const posterModeToggled = posterModeToggledId === id;
   // -- Imagen de fondo (background) con transicion suave --
   const [selectedBackgroundPath, setSelectedBackgroundPath] = useState(() => restoredValue(backSnapshot, "selectedBackgroundPath", null));
   const [prevBackgroundPath, setPrevBackgroundPath] = useState(null); // Fondo anterior (para crossfade)
@@ -1230,8 +1238,6 @@ export default function DetailsClient({
   // estabilizada la portada visible ya NO se sustituye por una "mejor".
   const posterSettledRef = useRef(false);
   const [posterImgError, setPosterImgError] = useState(false); // Error al cargar poster
-  const [posterTransitioning, setPosterTransitioning] = useState(false); // Transicion entre posters
-  const [prevPosterPath, setPrevPosterPath] = useState(null); // Poster anterior (para crossfade)
 
   // -- Progreso de reproduccion local ("Continuar viendo") de ESTE titulo --
   // Si hay una fila en watch_progress (mismo tmdbId y tipo), guardamos su % para
@@ -6923,6 +6929,7 @@ export default function DetailsClient({
     // retrasaban el arranque del morph y le metían un tirón por el medio.
     setPosterLayoutMode(nextMode);
     setPosterViewMode(nextMode);
+    setPosterModeToggledId(id);
   }, [
     selectedPosterPath,
     basePosterPath,
@@ -6930,6 +6937,7 @@ export default function DetailsClient({
     selectedPreviewBackdropPath,
     posterBackdropFallback,
     posterViewMode,
+    id,
   ]);
 
   // Persistir el modo de vista globalmente y sincronizar layoutMode
@@ -8606,10 +8614,11 @@ export default function DetailsClient({
 
     // Manejar cambio de imagen (incluyendo de null a valor)
     if (prev !== displayPosterPath) {
-      // Si hay imagen anterior, guardarla para crossfade
-      if (prev) {
-        setPrevPosterPath(prev);
-      }
+      // Aquí se guardaba la imagen anterior (`prevPosterPath` y
+      // `posterTransitioning`) para un fundido que ya no existe: la portada de
+      // escritorio son las dos capas fijas de CoverCrossfade. Solo provocaba
+      // dos renders más de la ficha por alternancia, uno justo al empezar el
+      // morph (lo retrasaba) y otro 800 ms después.
 
       // Verificar si la nueva imagen ya esta precargada.
       //
@@ -8620,6 +8629,14 @@ export default function DetailsClient({
       // renderiza nunca, el test fallaba siempre y se caía al `else`, que hace
       // `setPosterLowLoaded(false)` y BORRA el `true` que ya había puesto el
       // `onLoad` → la imagen se veía un instante y desaparecía en negro.
+      // Solo se escribe lo que cambia. Al alternar póster ↔ backdrop con las
+      // imágenes ya cargadas, todo seguía igual, pero cada `set` con el mismo
+      // valor hacía que React volviera a ejecutar la ficha entera para
+      // comprobarlo: un render más, en el mismo clic, antes de empezar el morph.
+      const setIfChanged = (current, set, next) => {
+        if (current !== next) set(next);
+      };
+
       if (displayPosterPath) {
         const checkIfLoaded = (url) => {
           if (!url) return false;
@@ -8633,14 +8650,14 @@ export default function DetailsClient({
           const isHighPreloaded = checkIfLoaded(posterHighUrl);
 
           if (isLowPreloaded) {
-            setBackdropLowLoaded(true);
-            setBackdropHighLoaded(isHighPreloaded);
-            setBackdropResolved(true);
+            setIfChanged(backdropLowLoaded, setBackdropLowLoaded, true);
+            setIfChanged(backdropHighLoaded, setBackdropHighLoaded, isHighPreloaded);
+            setIfChanged(backdropResolved, setBackdropResolved, true);
           } else {
-            setBackdropLowLoaded(false);
-            setBackdropHighLoaded(false);
+            setIfChanged(backdropLowLoaded, setBackdropLowLoaded, false);
+            setIfChanged(backdropHighLoaded, setBackdropHighLoaded, false);
           }
-          setBackdropImgError(false);
+          setIfChanged(backdropImgError, setBackdropImgError, false);
         } else {
           const isLowPreloaded = checkIfLoaded(posterLowUrl);
           // Asignar una URL a `new Image()` no es una consulta de caché pura:
@@ -8654,35 +8671,34 @@ export default function DetailsClient({
             : checkIfLoaded(posterHighUrl);
 
           if (isLowPreloaded) {
-            setPosterLowLoaded(true);
-            setPosterHighLoaded(isHighPreloaded);
-            setPosterResolved(true);
+            setIfChanged(posterLowLoaded, setPosterLowLoaded, true);
+            setIfChanged(posterHighLoaded, setPosterHighLoaded, isHighPreloaded);
+            setIfChanged(posterResolved, setPosterResolved, true);
             posterSettledRef.current = isHighPreloaded;
           } else {
-            setPosterLowLoaded(false);
-            setPosterHighLoaded(false);
+            setIfChanged(posterLowLoaded, setPosterLowLoaded, false);
+            setIfChanged(posterHighLoaded, setPosterHighLoaded, false);
             posterSettledRef.current = false;
           }
-          setPosterImgError(false);
+          setIfChanged(posterImgError, setPosterImgError, false);
         }
-
-        setPosterTransitioning(!!prev); // Solo transición si había imagen anterior
       } else {
         // Si displayPosterPath es null, resetear estados
         if (posterViewMode === "preview") {
-          setBackdropLowLoaded(false);
-          setBackdropHighLoaded(false);
-          setBackdropResolved(false);
+          setIfChanged(backdropLowLoaded, setBackdropLowLoaded, false);
+          setIfChanged(backdropHighLoaded, setBackdropHighLoaded, false);
+          setIfChanged(backdropResolved, setBackdropResolved, false);
         } else {
-          setPosterLowLoaded(false);
-          setPosterHighLoaded(false);
-          setPosterResolved(false);
+          setIfChanged(posterLowLoaded, setPosterLowLoaded, false);
+          setIfChanged(posterHighLoaded, setPosterHighLoaded, false);
+          setIfChanged(posterResolved, setPosterResolved, false);
           posterSettledRef.current = false;
         }
-        setPosterTransitioning(false);
-        setPrevPosterPath(null);
       }
     }
+    // Los estados de carga se leen solo para no reescribir el mismo valor;
+    // el efecto debe correr únicamente al cambiar la imagen o el modo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayPosterPath, posterViewMode]);
 
   // Resetear estados de carga del backdrop cuando cambia la vista o la imagen
@@ -8825,16 +8841,6 @@ export default function DetailsClient({
     if (currentLowLoaded) sendEmbeddedDetailsAction("hero-ready");
   }, [currentLowLoaded]);
 
-  // Limpiar transicion suavemente solo despues de cargar (evita destellos en internet lento)
-  useEffect(() => {
-    if (currentLowLoaded && prevPosterPath) {
-      const timer = setTimeout(() => {
-        setPrevPosterPath(null);
-        setPosterTransitioning(false);
-      }, 800); // Dar suficiente tiempo para que la animacion de fade termine
-      return () => clearTimeout(timer);
-    }
-  }, [currentLowLoaded, prevPosterPath]);
 
   // Icono NO IMAGE solo cuando el artwork ya se ha inicializado por completo y se
   // ha resuelto que NO hay imagen (o falló). Requerir `artworkInitialized` en
@@ -8851,14 +8857,14 @@ export default function DetailsClient({
     remoteArtworkChecked &&
     (!currentImagePath || currentImgError);
 
-  // Mientras se espera a `remoteArtworkChecked` (y no hay ya algo que mostrar:
-  // un póster anterior en transición), el marco del póster (fondo oscuro,
+  // Mientras se espera a `remoteArtworkChecked` (y no hay ya algo que
+  // mostrar), el marco del póster (fondo oscuro,
   // sombra, borde) se oculta también: sin esto, aunque ya no aparezca el
   // icono de "sin imagen" (ver `showNoPoster`), quedaba un recuadro vacío con
   // marco visible -- la misma sensación de "tarjeta vacía" que se quiere
   // evitar. En cuanto se sabe si hay imagen o no, el marco vuelve.
   const posterChromeReady =
-    remoteArtworkChecked || Boolean(posterLowUrl) || Boolean(prevPosterPath);
+    remoteArtworkChecked || Boolean(posterLowUrl);
 
   // ====== Poster 3D Tilt / Shine ======
   const posterWrapRef = useRef(null);
@@ -9986,7 +9992,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       </div>
                     )}
 
-                    {showNoPoster && !prevPosterPath && (
+                    {showNoPoster && (
                       <div className="absolute inset-0 flex items-center justify-center">
                         <ImageOff className="w-10 h-10 text-neutral-700" />
                       </div>
@@ -10662,7 +10668,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             {/* Sistema de tabs para mostrar información adicional: Detalles, Producción y Sinopsis */}
             {/* Solo visible cuando NO estamos en modo backdrop (en ese modo se muestra más abajo) */}
             {!isBackdropPoster && (
-              <div className={`${detailsEntryReady ? "sv-details-entry" : ""} sv-details-entry--tabs hidden sm:order-none sm:block`}>
+              <div className={`${detailsEntryReady && !posterModeToggled ? "sv-details-entry" : ""} sv-details-entry--tabs hidden sm:order-none sm:block`}>
                 <div>
                   {/* Sección de pestañas compartida con DetailModal (misma tarjetas).
                       variant="normal": Presupuesto/Recaudación/Canal con fallback "—"
@@ -10704,7 +10710,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
         {/* Tabs y contenido debajo de la tarjeta (solo cuando es backdrop) */}
         {isBackdropPoster && (
-          <div className={`${detailsEntryReady ? "sv-details-entry" : ""} sv-details-entry--tabs mt-8 hidden w-full sm:block lg:mt-6`}>
+          <div className={`${detailsEntryReady && !posterModeToggled ? "sv-details-entry" : ""} sv-details-entry--tabs mt-8 hidden w-full sm:block lg:mt-6`}>
             {/* Sección de pestañas compartida con DetailModal (mismas tarjetas).
                 variant="backdrop": Presupuesto/Recaudación/Canal solo si hay valor
                 y tagline con comillas rectas. */}
