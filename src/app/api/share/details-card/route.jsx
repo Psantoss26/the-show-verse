@@ -17,6 +17,10 @@ import {
   PANEL_TOP,
   POSTER_H,
   SCORE_LOGOS,
+  SCORE_PANEL_W,
+  SEASON_BUTTON,
+  SEASON_BUTTON_GAP,
+  SEASON_BUTTONS_TOP,
   SHADE,
   ScoreBadge,
   TitleArt,
@@ -47,11 +51,17 @@ export const dynamic = "force-dynamic";
 //
 // Las piezas (cristal, botones, fondo, marca…) viven en lib/share/ogKit, que
 // comparte con las capas del vídeo (/api/share/details-story).
+//
+// TEMPORADAS (`card.season`): la misma imagen con la fila de su página, cinco
+// botones más grandes (ver SEASON_BUTTON); el marcador no se mueve.
 
 function Card({ card, poster, ambient, ambientBase, logo, assets, fonts }) {
   const buttons = shareCardActionButtons(card);
   const scores = ["tmdb", "trakt", "imdb"].filter((key) => card.scores[key]);
-  const rowWidth = buttons.length * BUTTON + (buttons.length - 1) * BUTTON_GAP;
+  const buttonSize = card.season ? SEASON_BUTTON : BUTTON;
+  const buttonGap = card.season ? SEASON_BUTTON_GAP : BUTTON_GAP;
+  const buttonsTop = card.season ? SEASON_BUTTONS_TOP : BUTTONS_TOP;
+  const rowWidth = buttons.length * buttonSize + (buttons.length - 1) * buttonGap;
 
   return (
     <div
@@ -125,13 +135,13 @@ function Card({ card, poster, ambient, ambientBase, logo, assets, fonts }) {
       <Brand src={assets.brand} />
 
       {/* Logo del título (o el título en texto si no hay logo). */}
-      <TitleArt card={card} logo={logo} />
+      <TitleArt card={card} logo={logo} bottom={buttonsTop - 44} />
 
       {/* Fila de acciones con los estados de la ficha. */}
       <div
         style={{
           position: "absolute",
-          top: BUTTONS_TOP,
+          top: buttonsTop,
           left: Math.round((W - rowWidth) / 2),
           width: rowWidth,
           display: "flex",
@@ -139,7 +149,7 @@ function Card({ card, poster, ambient, ambientBase, logo, assets, fonts }) {
         }}
       >
         {buttons.map((button) => (
-          <ActionButton key={button.key} button={button} />
+          <ActionButton key={button.key} button={button} size={buttonSize} />
         ))}
       </div>
 
@@ -151,8 +161,8 @@ function Card({ card, poster, ambient, ambientBase, logo, assets, fonts }) {
           style={{
             position: "absolute",
             top: PANEL_TOP,
-            left: Math.round((W - rowWidth) / 2),
-            width: rowWidth,
+            left: Math.round((W - SCORE_PANEL_W) / 2),
+            width: SCORE_PANEL_W,
             display: "flex",
             justifyContent: "center",
           }}

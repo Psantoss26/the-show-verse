@@ -301,3 +301,26 @@ test("detalles y producción: las tarjetas de la ficha, sin huecos", () => {
   assert.deepEqual(storySceneIds({ type: "movie" }, network), []);
   assert.deepEqual(storySceneIds({ type: "tv" }, network), ["production"]);
 });
+
+test("temporada: el progreso es el de la temporada y «continuar viendo» solo si es de ella", () => {
+  const input = {
+    type: "tv",
+    season: 2,
+    tvProgress: { percent: 50, watched: 5, total: 10 },
+    watchedBySeason: { 2: [1, 2] },
+    details,
+  };
+  const other = sanitizeShareStory(
+    buildShareStoryPayload({ ...input, continueWatching: { percent: 40, season: 3, episode: 1 } }),
+  );
+  assert.deepEqual(other.plays, { percent: 50, watched: 5, total: 10, last: null, resume: null, season: true });
+
+  const same = sanitizeShareStory(
+    buildShareStoryPayload({ ...input, continueWatching: { percent: 40, season: 2, episode: 3 } }),
+  );
+  assert.deepEqual(same.plays.resume, { percent: 40, season: 2, episode: 3 });
+  assert.deepEqual(
+    same.episodes.items.map((item) => `${item.season}x${item.episode}`),
+    ["2x1", "2x2"],
+  );
+});

@@ -61,8 +61,11 @@ import {
 import { buildTvExternalLinks } from "@/lib/details/tvExternalLinks";
 import {
   fetchSeriesGraphRatingsCached,
+  getSeriesGraphEpisodeRating,
   getSeriesGraphSeasonAggregate,
 } from "@/lib/details/seriesGraphRatings";
+import { buildShareCardPayload } from "@/lib/details/shareCard";
+import { formatRuntime } from "@/lib/details/shareStory";
 import TraktEpisodesWatchedModal from "@/components/trakt/TraktEpisodesWatchedModal";
 import { useTraktEpisodesWatched } from "@/lib/hooks/useTraktEpisodesWatched";
 import SubrouteDetailsActionRow from "@/components/details/SubrouteDetailsActionRow";
@@ -124,6 +127,26 @@ function getSeasonWatchedEpisodes(watchedBySeason, seasonNumber) {
     watchedBySeason?.[Number(seasonNumber)] ??
     watchedBySeason?.[String(Number(seasonNumber))];
   return Array.isArray(value) ? value : [];
+}
+
+// Fin de la temporada para el vídeo compartible: la fecha del último episodio
+// ya emitido; «Finalización» si es el último de la temporada.
+function seasonEndFact(episodes) {
+  const today = new Date().toISOString().slice(0, 10);
+  const aired = episodes.filter((ep) => ep?.air_date && ep.air_date <= today);
+  const last = aired[aired.length - 1];
+  if (!last) return { end: null, endLabel: null };
+  return {
+    end: formatDateEs(last.air_date),
+    endLabel: last === episodes[episodes.length - 1] ? "Finalización" : "Última emisión",
+  };
+}
+
+// Duración media de los episodios («47 min»), como la ficha de la serie.
+function seasonEpisodeRuntime(episodes) {
+  const runtimes = episodes.map((ep) => Number(ep?.runtime)).filter((value) => value > 0);
+  if (!runtimes.length) return null;
+  return formatRuntime(Math.round(runtimes.reduce((sum, value) => sum + value, 0) / runtimes.length));
 }
 
 function scheduleAfterFirstPaint(task, delay = 0) {
@@ -315,7 +338,10 @@ export default function SeasonDetailsClient({
   const heroBgPath =
     show?.backdrop_path || season?.poster_path || show?.poster_path || null;
 
-  const episodes = Array.isArray(season?.episodes) ? season.episodes : [];
+  const episodes = useMemo(
+    () => (Array.isArray(season?.episodes) ? season.episodes : []),
+    [season?.episodes],
+  );
   const totalEp = episodes.length;
   const seasonModalSeasons = useMemo(
     () => [
@@ -1252,6 +1278,171 @@ export default function SeasonDetailsClient({
     [trakt?.connected, trakt.traktId, episodeBusyKey, showId, showName],
   );
 
+  // COMPARTIR (imagen y vídeo), como la ficha (DetailsClient) y las listas: la
+  // misma hoja y las mismas rutas (/api/share/details-card y -story) con la
+  // variante de temporada (`season`): la fila de acciones de esta página y, en
+  // el vídeo, solo lo de la temporada (su progreso, sus episodios vistos y sus
+  // datos). La portada es la de la cabecera móvil, sin texto encima.
+  const shareTitle = `${showName} · ${seasonName}`;
+  const shareCard = useMemo(
+    () =>
+      buildShareCardPayload({
+        type: "tv",
+        title: shareTitle,
+        posterPath,
+        logoPath: null,
+        // El póster de la temporada ya trae el título impreso.
+        showTitle: !posterPath,
+        trakt: {
+          watched: seasonButtonWatched,
+          badge: seasonProgressBadge,
+          loading: !watchedStateSettled || (trakt.loading && !watchedBySeasonLoaded),
+        },
+        rating: ratingLoading ? null : userRating,
+        scores: {
+          tmdb: {
+            value: seasonVote?.toFixed(1),
+            sub: tmdbVotesSeason ? formatCountShort(tmdbVotesSeason) : undefined,
+          },
+          trakt: {
+            value: traktDecimal || undefined,
+            sub: tScoreboard.votes ? formatCountShort(tScoreboard.votes) : undefined,
+          },
+          imdb: {
+            value: imdbData?.rating != null ? Number(imdbData.rating).toFixed(1) : undefined,
+            sub: imdbData?.votes ? formatCountShort(imdbData.votes) : undefined,
+          },
+        },
+        season: {
+          previous: !!adjacentSeasonHrefs.previousHref,
+          next: !!adjacentSeasonHrefs.nextHref,
+        },
+      }),
+    [
+      shareTitle,
+      posterPath,
+      seasonButtonWatched,
+      seasonProgressBadge,
+      watchedStateSettled,
+      trakt.loading,
+      watchedBySeasonLoaded,
+      ratingLoading,
+      userRating,
+      seasonVote,
+      tmdbVotesSeason,
+      traktDecimal,
+      tScoreboard.votes,
+      imdbData?.rating,
+      imdbData?.votes,
+      adjacentSeasonHrefs.previousHref,
+      adjacentSeasonHrefs.nextHref,
+    ],
+  );
+
+  // Notas de IMDb (SeriesGraph) de cada episodio, para la sección «Episodios
+  // vistos» del vídeo. Misma petición en caché que la nota de la temporada; se
+  // pide después de pintar y solo para compartir.
+  const [seriesGraphRatings, setSeriesGraphRatings] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    const controller = new AbortController();
+    const cancelSchedule = scheduleAfterFirstPaint(async () => {
+      try {
+        const ratings = await fetchSeriesGraphRatingsCached({
+          showId,
+          title: showName,
+          signal: controller.signal,
+        });
+        if (alive) setSeriesGraphRatings(ratings || null);
+      } catch {
+        // Sin notas: la columna de IMDb sale con «–».
+      }
+    }, 600);
+    return () => {
+      alive = false;
+      controller.abort();
+      cancelSchedule();
+    };
+  }, [showId, showName]);
+
+  const shareStory = useMemo(() => {
+    const number = Number(seasonNumber);
+    const { end, endLabel } = seasonEndFact(episodes);
+    return {
+      type: "tv",
+      // La hoja pide al abrirse el progreso de «Continuar viendo» y las notas
+      // propias de los episodios de la serie.
+      tmdbId: showId,
+      season: number,
+      watchedBySeason: { [number]: getSeasonWatchedEpisodes(watchedBySeason, number) },
+      episodeImdbRatings: {
+        seasons: [
+          {
+            season_number: number,
+            episodes: episodes.map((ep) => ({
+              episode_number: ep?.episode_number,
+              name: ep?.name || "",
+              rating: seriesGraphRatings
+                ? getSeriesGraphEpisodeRating({
+                    ratings: seriesGraphRatings,
+                    seasonNumber: number,
+                    episodeNumber: ep?.episode_number,
+                    tmdbSeasons: show?.seasons,
+                    showId,
+                    title: showName,
+                  })?.rating ?? null
+                : null,
+            })),
+          },
+        ],
+      },
+      watched: seasonButtonWatched,
+      tvProgress:
+        seasonProgressPct != null
+          ? { percent: seasonProgressPct, watched: seasonWatchedEpisodes, total: totalEp }
+          : null,
+      details: {
+        year: Number(String(season?.air_date || "").slice(0, 4)) || null,
+        episodes: totalEp || null,
+        genres: show?.genres || [],
+        peopleLabel: "Creadores",
+        people: (Array.isArray(show?.created_by) ? show.created_by : [])
+          .map((creator) => creator?.name)
+          .filter(Boolean),
+        overview: season?.overview || null,
+        facts: {
+          release: airDate,
+          end,
+          format: totalEp ? `${totalEp} ${totalEp === 1 ? "episodio" : "episodios"}` : null,
+          duration: seasonEpisodeRuntime(episodes),
+          network: showNetwork || null,
+          production: seasonProduction,
+        },
+        endLabel,
+      },
+    };
+  }, [
+    seasonNumber,
+    episodes,
+    showId,
+    watchedBySeason,
+    seriesGraphRatings,
+    show?.seasons,
+    show?.genres,
+    show?.created_by,
+    showName,
+    seasonButtonWatched,
+    seasonProgressPct,
+    seasonWatchedEpisodes,
+    totalEp,
+    season?.air_date,
+    season?.overview,
+    airDate,
+    showNetwork,
+    seasonProduction,
+  ]);
+  const shareText = `Echa un vistazo a ${seasonName} de ${showName} en The Show Verse`;
+
   const prefetchEpisodeDetails = useCallback(
     (epNum) => {
       const href = `/details/tv/${showId}/season/${seasonNumber}/episode/${epNum}`;
@@ -1567,8 +1758,10 @@ export default function SeasonDetailsClient({
               showFavoritedStat={false}
               onMorePlatforms={() => setPlatformsOpen(true)}
               share={{
-                title: seasonName,
-                text: `Echa un vistazo a ${seasonName} de ${showName} en The Show Verse`,
+                title: shareTitle,
+                text: shareText,
+                card: shareCard,
+                story: shareStory,
               }}
             />
             </div>
@@ -1603,8 +1796,10 @@ export default function SeasonDetailsClient({
                 <ActionShareButton
                   variant="pill"
                   iconOnly
-                  title={seasonName}
-                  text={`Echa un vistazo a ${seasonName} de ${showName} en The Show Verse`}
+                  title={shareTitle}
+                  text={shareText}
+                  card={shareCard}
+                  story={shareStory}
                 />
               </ScoreboardPillRow>
             </div>

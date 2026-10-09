@@ -38,10 +38,22 @@
 import { startTransition, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 // Modo 'compact': la barra de stats del marcador se oculta hasta el scroll
-// (con el mismo disparador que lo secundario).
+// (con el mismo disparador que lo secundario). No con `display: none`: se
+// pliega y despliega su alto (rejilla 1fr ↔ 0fr, como MobileFiltersPanel) para
+// que el marcador crezca con suavidad. Sin `opacity`: anularía el cristal
+// (backdrop root). La pista es `minmax(0, …fr)` para que plegada mida 0 aunque
+// el scroller de dentro tenga relleno: lo que sobresale lo recorta la propia
+// fila (`overflow-hidden`).
 const MOBILE_STATS_REVEAL_ATTR = 'data-mobile-reveal-stats'
-export const MOBILE_STATS_REVEAL_BASE =
-    'max-sm:[&[data-mobile-reveal-stats=hidden]_[data-scoreboard-stats]]:hidden'
+export const MOBILE_STATS_REVEAL_BASE = [
+    'max-sm:[&_[data-scoreboard-stats]]:grid max-sm:[&_[data-scoreboard-stats]]:grid-rows-[minmax(0,1fr)]',
+    'max-sm:[&_[data-scoreboard-stats]]:overflow-hidden max-sm:[&_[data-scoreboard-stats]>*]:min-h-0',
+    'max-sm:[&_[data-scoreboard-stats]]:transition-[grid-template-rows,border-color]',
+    'max-sm:[&_[data-scoreboard-stats]]:duration-[420ms] max-sm:[&_[data-scoreboard-stats]]:ease-[cubic-bezier(0.22,1,0.36,1)]',
+    'max-sm:motion-reduce:[&_[data-scoreboard-stats]]:transition-none',
+    'max-sm:[&[data-mobile-reveal-stats=hidden]_[data-scoreboard-stats]]:grid-rows-[minmax(0,0fr)]',
+    'max-sm:[&[data-mobile-reveal-stats=hidden]_[data-scoreboard-stats]]:border-transparent',
+].join(' ')
 export const MOBILE_REVEAL_BASE =
     'max-sm:transform-gpu max-sm:data-[mobile-reveal=hidden]:invisible max-sm:data-[mobile-reveal=hidden]:pointer-events-none max-sm:data-[mobile-reveal=hidden]:**:!transition-none'
 const MOBILE_REVEAL_ATTR = 'data-mobile-reveal'
@@ -140,7 +152,12 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
             const total = Math.ceil(scoreboard.getBoundingClientRect().height)
             const statsRow = scoreboard.querySelector('[data-scoreboard-stats]')
             const statsHeight = statsRow ? Math.ceil(statsRow.getBoundingClientRect().height) : 0
-            if (statsHeight) statsRowHeightRef.current = statsHeight
+            // Su alto completo solo se recuerda en modo 'full' (sin el
+            // atributo de revelado): en 'compact' la fila está plegada o a
+            // medio desplegar.
+            if (statsHeight && !scoreboard.hasAttribute(MOBILE_STATS_REVEAL_ATTR)) {
+                statsRowHeightRef.current = statsHeight
+            }
             const compactHeight = total - statsHeight
             const fullHeight = compactHeight + statsRowHeightRef.current
             const space =
@@ -223,11 +240,14 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
         }
     }, [enabled, isPhone])
 
-    // Lo secundario (sinopsis; el marcador si no cabe) no compite con la
-    // portada al entrar: se revela al cruzar el navbar inferior y se oculta al
-    // volver arriba, como en la ficha. El atributo se escribe en el DOM en el
-    // mismo evento de scroll y el estado de React se pone al día después
-    // (mismos valores).
+    // Lo secundario (sinopsis, píldoras y la barra de stats del modo compacto)
+    // no compite con la portada al entrar: se revela cuando el centinela cruza
+    // el navbar inferior y, desde entonces, se queda FIJO hasta volver a la
+    // posición inicial (arriba del todo). Volver a mirar el centinela para
+    // ocultarlo hacía parpadear el marcador: al desplegarse su barra de stats
+    // el centinela baja ese alto, vuelve a quedar bajo el navbar, se oculta,
+    // sube… El atributo se escribe en el DOM en el mismo evento de scroll y el
+    // estado de React se pone al día después (mismos valores).
     useEffect(() => {
         const trigger = secondaryTriggerRef.current
         const container = rootRef.current
@@ -240,7 +260,7 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
             const revealLine = window.innerHeight - MOBILE_BOTTOM_NAV_PX
             const nextVisible =
                 window.scrollY > MOBILE_REVEAL_SHOW_AT_PX &&
-                trigger.getBoundingClientRect().top <= revealLine
+                (applied === true || trigger.getBoundingClientRect().top <= revealLine)
             if (nextVisible === applied) return
             applied = nextVisible
             container.querySelectorAll(`[${MOBILE_REVEAL_ATTR}]`).forEach((el) => {
