@@ -576,12 +576,130 @@ const MOBILE_COVER_SHADE_SOFT = `linear-gradient(to bottom,
     rgba(10, 10, 10, 0.46) ${MOBILE_COVER_SHADE_LEAD_PX + 220}px,
     rgba(10, 10, 10, 0.52) 100%)`
 
-export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, collage, collageUnderlay, blurredUnderlay = false, ready, animate }) {
+// CONTRASTE ADAPTATIVO (`adaptiveContrast`, la ficha): el logo y los botones
+// son blancos sobre cristal, y con pósters claros (cielo, nieve, fondos
+// blancos) se perdían. Oscurecer siempre apagaba los pósters oscuros, que no
+// lo necesitan. Así que se MIDE cada portada: se lee una copia diminuta (w92,
+// ~5 KB; TMDb sirve CORS) y se calcula la luminancia relativa (WCAG) de la
+// franja del logo (el 30% inferior del póster) y de lo que queda bajo los
+// botones (la última franja, que se prolonga, y el centro, que va de fondo
+// difuminado al 70% de brillo). De la peor de las dos sale cuánto hay que
+// oscurecer para que el blanco tenga contraste ≥ ~5:1
+// (`MOBILE_COVER_TARGET_LUMINANCE`): 0 en pósters oscuros, más cuanto más
+// claro. Se usa el percentil 80 y no la media: lo que estorba son las zonas
+// claras que quedan detrás del texto.
+const MOBILE_COVER_TARGET_LUMINANCE = 0.16
+const MOBILE_COVER_MAX_SCRIM = 0.82
+// Si la medida falla (sin CORS, error de red): un oscurecido intermedio.
+const MOBILE_COVER_FALLBACK_SCRIM = 0.4
+// Brillo del fondo difuminado (`blurredUnderlay`) en luminancia lineal
+// (0.7 en sRGB ≈ 0.46 lineal).
+const MOBILE_COVER_UNDERLAY_LINEAR = 0.46
+const coverLuminanceCache = new Map()
+
+function srgbToLinear(value) {
+    const c = value / 255
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+}
+
+function regionLuminance(data, width, height, fromY, toY, fromX = 0, toX = 1) {
+    const values = []
+    const y0 = Math.floor(height * fromY)
+    const y1 = Math.max(y0 + 1, Math.ceil(height * toY))
+    const x0 = Math.floor(width * fromX)
+    const x1 = Math.max(x0 + 1, Math.ceil(width * toX))
+    for (let y = y0; y < y1; y += 1) {
+        for (let x = x0; x < x1; x += 1) {
+            const i = (y * width + x) * 4
+            values.push(
+                0.2126 * srgbToLinear(data[i]) + 0.7152 * srgbToLinear(data[i + 1]) + 0.0722 * srgbToLinear(data[i + 2]),
+            )
+        }
+    }
+    values.sort((a, b) => a - b)
+    return values[Math.min(values.length - 1, Math.floor(values.length * 0.8))] || 0
+}
+
+function readCoverLuminance(src) {
+    const key = src.replace(/\/t\/p\/[^/]+\//, '/t/p/w92/')
+    if (coverLuminanceCache.has(key)) return coverLuminanceCache.get(key)
+    const request = new Promise((resolve) => {
+        const image = new Image()
+        image.crossOrigin = 'anonymous'
+        image.decoding = 'async'
+        image.onload = () => {
+            try {
+                const width = image.naturalWidth
+                const height = image.naturalHeight
+                const canvas = document.createElement('canvas')
+                canvas.width = width
+                canvas.height = height
+                const context = canvas.getContext('2d', { willReadFrequently: true })
+                context.drawImage(image, 0, 0)
+                const { data } = context.getImageData(0, 0, width, height)
+                resolve({
+                    logo: regionLuminance(data, width, height, 0.7, 1),
+                    edge: regionLuminance(data, width, height, 0.92, 1),
+                    center: regionLuminance(data, width, height, 0.3, 0.7, 0.2, 0.8),
+                })
+            } catch {
+                resolve(null)
+            }
+        }
+        image.onerror = () => resolve(null)
+        image.src = key
+    })
+    coverLuminanceCache.set(key, request)
+    return request
+}
+
+function scrimForLuminance(luminance) {
+    if (luminance <= MOBILE_COVER_TARGET_LUMINANCE) return 0
+    return Math.min(MOBILE_COVER_MAX_SCRIM, 1 - MOBILE_COVER_TARGET_LUMINANCE / luminance)
+}
+
+// Cuánto oscurecer bajo el logo y los botones (0…MOBILE_COVER_MAX_SCRIM), o
+// null mientras se mide.
+function useCoverContrastScrim(src, enabled) {
+    const [state, setState] = useState({ src: null, scrim: null })
+    useEffect(() => {
+        if (!enabled || !src) return undefined
+        let cancelled = false
+        readCoverLuminance(src).then((luminance) => {
+            if (cancelled) return
+            const scrim = luminance
+                ? Math.max(
+                    scrimForLuminance(luminance.logo),
+                    scrimForLuminance(Math.max(luminance.edge, luminance.center * MOBILE_COVER_UNDERLAY_LINEAR)),
+                )
+                : MOBILE_COVER_FALLBACK_SCRIM
+            setState({ src, scrim: Math.round(scrim * 100) / 100 })
+        })
+        return () => {
+            cancelled = true
+        }
+    }, [src, enabled])
+    return enabled && state.src === src ? state.scrim : null
+}
+
+// La capa: transparente en la mitad superior del póster, crece hacia la franja
+// del logo y sigue plena bajo los botones hasta el pie de la pantalla. Su
+// opacidad es la medida (con fundido por si la medida llega con la portada ya
+// visible).
+const MOBILE_COVER_CONTRAST_SCRIM = `linear-gradient(to bottom,
+    rgba(10, 10, 10, 0) calc(var(--mobile-cover-h) * 0.5),
+    rgba(10, 10, 10, 0.22) calc(var(--mobile-cover-h) * 0.62),
+    rgba(10, 10, 10, 0.62) calc(var(--mobile-cover-h) * 0.74),
+    rgba(10, 10, 10, 0.9) calc(var(--mobile-cover-h) * 0.86),
+    rgb(10, 10, 10) calc(var(--mobile-cover-h) * 0.95))`
+
+export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, collage, collageUnderlay, blurredUnderlay = false, adaptiveContrast = false, ready, animate }) {
     const highRef = useRef(null)
     const [highSrc, setHighSrc] = useState(null)
     const firstSrc = lowSrc || src
     const hasImage = Boolean(firstSrc) && !failed
     const hasHigh = hasImage && Boolean(src && src !== firstSrc)
+    const contrastScrim = useCoverContrastScrim(hasImage ? firstSrc : null, adaptiveContrast)
     const highReady = hasHigh && highSrc === src
 
     useLayoutEffect(() => {
@@ -738,6 +856,16 @@ export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, 
                             ? `calc(100lvh + ${MOBILE_COVER_SHADE_LEAD_PX}px)`
                             : MOBILE_COVER_EXTEND_PX + MOBILE_COVER_SHADE_LEAD_PX,
                         backgroundImage: blurredUnderlay ? MOBILE_COVER_SHADE_SOFT : MOBILE_COVER_SHADE,
+                    }}
+                />
+            ) : null}
+            {hasImage && adaptiveContrast ? (
+                <div
+                    className="pointer-events-none absolute inset-x-0 top-0 transition-opacity duration-500 motion-reduce:transition-none"
+                    style={{
+                        height: 'calc(var(--mobile-cover-h) + 100lvh)',
+                        backgroundImage: MOBILE_COVER_CONTRAST_SCRIM,
+                        opacity: contrastScrim ?? 0,
                     }}
                 />
             ) : null}
