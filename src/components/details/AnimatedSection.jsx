@@ -23,10 +23,6 @@ function useSkipEntryMotion() {
   return shouldReduceMotion || isStatic;
 }
 
-// Referencia estable (no recrear en cada render) para forzar a Framer Motion
-// a animar por JS en vez de WAAPI acelerado -- ver comentario en FadeIn.
-function EMPTY_ON_UPDATE() {}
-
 function baseTransition(
   delay = 0,
   duration = 0.55,
@@ -92,40 +88,31 @@ export function FadeIn({
   const isInView = useInView(ref, { once: true, margin: "-50px" });
   const shouldReduceMotion = useSkipEntryMotion();
 
-  const directions = {
-    up: { y: 20 },
-    down: { y: -20 },
-    left: { x: 20 },
-    right: { x: -20 },
+  const offsets = {
+    up: 'translateY(20px)',
+    down: 'translateY(-20px)',
+    left: 'translateX(20px)',
+    right: 'translateX(-20px)',
   };
+  const visible = isInView || shouldReduceMotion;
 
-  const initial = shouldReduceMotion
-    ? { opacity: 1, x: 0, y: 0 }
-    : { opacity: 0, x: 0, y: 0, ...directions[direction] };
-
-  const animate =
-    isInView || shouldReduceMotion ? { opacity: 1, y: 0, x: 0 } : initial;
-
+  // CSS owns the final style too: no JS animation on every frame and no
+  // hand-off from WAAPI to inline styles at completion (which could flicker).
   return (
-    <motion.div
+    <div
       ref={ref}
-      initial={initial}
-      animate={animate}
-      transition={baseTransition(delay, duration, shouldReduceMotion)}
       className={className}
-      // Framer Motion anima opacity/transform vía WAAPI (nativo del navegador)
-      // cuando puede, para acelerarlo por hardware. El problema: al terminar
-      // esa animación nativa, el navegador la retira y el elemento "vuelve"
-      // un frame al estilo inline previo (opacity:0) hasta que Framer escribe
-      // el valor final por JS justo después -> parpadeo real y visible
-      // (opacity 1 -> 0 -> 1) justo al completarse. Pasar un `onUpdate`
-      // desactiva esa vía WAAPI (Framer no puede leer valores por frame desde
-      // WAAPI) y fuerza su animación por JS, que sí queda sincronizada con lo
-      // que se pinta. Confirmado en DetailsInfoTabs (móvil), que usa FadeIn.
-      onUpdate={EMPTY_ON_UPDATE}
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'none' : offsets[direction] || offsets.up,
+        transitionProperty: 'opacity, transform',
+        transitionDuration: shouldReduceMotion ? '0s' : `${duration}s`,
+        transitionDelay: shouldReduceMotion ? '0s' : `${delay}s`,
+        transitionTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)',
+      }}
     >
       {children}
-    </motion.div>
+    </div>
   );
 }
 

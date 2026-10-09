@@ -36,7 +36,7 @@
 // constantes locales que sus tests leen del propio fichero); si cambian allí,
 // hay que cambiarlas aquí.
 
-import { createContext, startTransition, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 // Modo 'compact': la barra de stats del marcador se oculta hasta el scroll
 // (con el mismo disparador que lo secundario). No con `display: none`: se
@@ -212,7 +212,6 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
     // Ancho de referencia para un marcador estrecho (`--mobile-actions-w`): el
     // mayor entre lo que ocupan los botones y el navbar inferior.
     const [actionsWidth, setActionsWidth] = useState(0)
-    const [statsVisible, setStatsVisible] = useState(false)
 
     useClientLayoutEffect(() => {
         lockRef.current = lock
@@ -399,11 +398,16 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
         const root = document.documentElement
         if (!enabled || !isPhone || CSS.supports?.(HERO_SCROLL_TIMELINE_QUERY)) return undefined
         let raf = 0
+        let lastProgress = null
         const apply = () => {
             raf = 0
             const dist = heroScrollEndRef.current || Math.max(1, window.innerHeight * 0.55)
             const p = Math.min(1, Math.max(0, window.scrollY / dist))
-            root.style.setProperty('--sv-hero-scroll', p.toFixed(4))
+            const progress = p.toFixed(4)
+            if (progress !== lastProgress) {
+                lastProgress = progress
+                root.style.setProperty('--sv-hero-scroll', progress)
+            }
         }
         const onScroll = () => {
             if (!raf) raf = window.requestAnimationFrame(apply)
@@ -432,37 +436,27 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
     //      empuja hacia abajo lo que va debajo, y un bloque revelado a la vez
     //      que él acababa otra vez detrás del navbar. Antes se esperaba a que
     //      terminara (~460ms) y la barra de búsqueda tardaba en salir.
-    // Los atributos se escriben en el DOM en el mismo evento de scroll. Los de
-    // los bloques los lleva solo el DOM (React los pinta ocultos y no vuelve a
-    // tocarlos: `revealProps` no cambia); el de la barra de stats también va en
-    // el estado de React, que se pone al día después (mismos valores).
+    // Los eventos se agrupan por fotograma; primero se mide y luego se escribe.
+    // El DOM gestiona tanto los bloques como las stats. React solo proporciona
+    // el atributo inicial: abrir el marcador no vuelve a renderizar la ficha.
     useEffect(() => {
         const trigger = secondaryTriggerRef.current
         const container = rootRef.current
         if (!enabled || !isPhone || !trigger || !container) {
-            setStatsVisible(false)
             return undefined
         }
         let statsApplied = null
         let raf = 0
         const sync = () => {
             const atTop = window.scrollY <= MOBILE_REVEAL_SHOW_AT_PX
+            const statsTargets = container.querySelectorAll(`[${MOBILE_STATS_REVEAL_ATTR}]`)
             const statsVisible =
                 !atTop &&
                 (statsApplied === true ||
                     trigger.getBoundingClientRect().top <= window.innerHeight - MOBILE_BOTTOM_NAV_PX)
-            const statsTargets = container.querySelectorAll(`[${MOBILE_STATS_REVEAL_ATTR}]`)
-            if (statsVisible !== statsApplied) {
-                statsApplied = statsVisible
-                // Solo se muestra/oculta: el marcador sigue siendo interactivo.
-                statsTargets.forEach((el) => {
-                    if (statsVisible) el.setAttribute(MOBILE_STATS_ANIMATED_ATTR, '')
-                    el.setAttribute(MOBILE_STATS_REVEAL_ATTR, statsVisible ? 'shown' : 'hidden')
-                })
-                startTransition(() => {
-                    setStatsVisible((current) => (current === statsVisible ? current : statsVisible))
-                })
-            }
+            // Read every position before changing attributes; otherwise each
+            // reveal can force layout again for the next block.
+            const updates = []
             let revealLine = null
             let statsPending = null
             container.querySelectorAll(`[${MOBILE_REVEAL_ATTR}]`).forEach((el) => {
@@ -489,6 +483,18 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
                     : (current === 'shown' || current === 'out') && el.hasAttribute(MOBILE_REVEAL_ANIMATED_ATTR)
                         ? 'out'
                         : 'hidden'
+                updates.push({ el, current, value, visible })
+            })
+            // Also initialize rows mounted after the first sync (async data).
+            statsTargets.forEach((el) => {
+                const value = statsVisible ? 'shown' : 'hidden'
+                if (statsVisible && !el.hasAttribute(MOBILE_STATS_ANIMATED_ATTR)) el.setAttribute(MOBILE_STATS_ANIMATED_ATTR, '')
+                if (el.getAttribute(MOBILE_STATS_REVEAL_ATTR) !== value) el.setAttribute(MOBILE_STATS_REVEAL_ATTR, value)
+                const row = el.querySelector('[data-scoreboard-stats]')
+                if (row && row.inert === statsVisible) row.inert = !statsVisible
+            })
+            statsApplied = statsVisible
+            updates.forEach(({ el, current, value, visible }) => {
                 if (current !== value) el.setAttribute(MOBILE_REVEAL_ATTR, value)
                 if (el.inert === visible) el.inert = !visible
             })
@@ -501,7 +507,7 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
                 })
             }
         }
-        const observer = new IntersectionObserver(sync, {
+        const observer = new IntersectionObserver(scheduleSync, {
             rootMargin: `0px 0px -${MOBILE_BOTTOM_NAV_PX}px 0px`,
             threshold: 0,
         })
@@ -511,14 +517,15 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
         const mutations = new MutationObserver(scheduleSync)
         mutations.observe(container, { childList: true, subtree: true })
         sync()
-        window.addEventListener('scroll', sync, { passive: true })
-        window.addEventListener('resize', sync, { passive: true })
+        window.addEventListener('scroll', scheduleSync, { passive: true })
+        window.addEventListener('resize', scheduleSync, { passive: true })
         return () => {
             observer.disconnect()
             mutations.disconnect()
             if (raf) window.cancelAnimationFrame(raf)
-            window.removeEventListener('scroll', sync)
-            window.removeEventListener('resize', sync)
+            window.removeEventListener('scroll', scheduleSync)
+            window.removeEventListener('resize', scheduleSync)
+            container.querySelectorAll('[data-scoreboard-stats]').forEach((row) => { row.inert = false })
         }
     }, [enabled, isPhone])
 
@@ -541,7 +548,7 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
         scoreboardMode,
         revealProps,
         statsRevealProps: enabled
-            ? { [MOBILE_STATS_REVEAL_ATTR]: statsVisible ? 'shown' : 'hidden' }
+            ? { [MOBILE_STATS_REVEAL_ATTR]: 'hidden' }
             : {},
         // La portada: el póster entero (2:3 a todo el ancho), siempre.
         rootStyle: enabled
