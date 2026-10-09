@@ -75,6 +75,7 @@ import {
 } from "lucide-react";
 import PageStatCard from "@/components/ui/PageStatCard";
 import { listsHeaderStats } from "@/lib/lists/headerStats";
+import { FEATURED_COLLECTION_IDS } from "@/lib/tmdb/featuredCollections";
 import useTraktLists from "@/lib/hooks/useTraktLists";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import { useHydrationReady } from "@/lib/hooks/useHydrationReady";
@@ -278,7 +279,7 @@ function loadFeaturedCollections({ force = false } = {}) {
     const cached = readCachedFeaturedCollections();
     if (cached) return Promise.resolve(cached);
   }
-  if (!force && featuredCollectionsRequest) return featuredCollectionsRequest;
+  if (featuredCollectionsRequest) return featuredCollectionsRequest;
 
   const request = fetch("/api/tmdb/collections/featured?v=5", {
     cache: force ? "no-cache" : "default",
@@ -288,10 +289,11 @@ function loadFeaturedCollections({ force = false } = {}) {
     .catch(() => [])
     .then((cols) => {
       if (cols.length > 0) writeSessionJsonCache(FEATURED_COLLECTIONS_CACHE_KEY, cols);
-      if (featuredCollectionsRequest === request && cols.length === 0) {
-        featuredCollectionsRequest = null;
-      }
       return cols;
+    })
+    .finally(() => {
+      // Only share in-flight work; completed promises must not bypass the TTL.
+      if (featuredCollectionsRequest === request) featuredCollectionsRequest = null;
     });
   featuredCollectionsRequest = request;
   return request;
@@ -1957,6 +1959,8 @@ export default function ListsPage() {
   // montar (p. ej. al volver de una ficha donde se ha dado me gusta).
   const collectionIds = useMemo(() => {
     if (source !== "collections") return [];
+    // The featured IDs are already known: fetch likes alongside the catalog.
+    if (!deferredQuery.trim() && !featuredCollections.length) return FEATURED_COLLECTION_IDS;
     const cols = deferredQuery.trim() ? searchedCollections : featuredCollections;
     return (Array.isArray(cols) ? cols : [])
       .map((c) => Number(c?.id))
@@ -1965,12 +1969,13 @@ export default function ListsPage() {
   const collectionIdsKey = collectionIds.join(",");
   // Las colecciones de la pestaña tienen ya sus likes (o no hay colecciones).
   const collectionLikesReady = hasCollectionLikes(collectionLikes, collectionIds);
+  const collectionsWaitForLikes = effectiveSortMode(sortMode, source).startsWith("likes_");
 
   useEffect(() => {
     if (!collectionIdsKey) return;
     const controller = new AbortController();
     fetch(`/api/community/collections/likes?ids=${collectionIdsKey}`, {
-      signal: controller.signal,
+      signal: AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]),
       cache: "no-store",
     })
       .then((res) => (res.ok ? res.json() : null))
@@ -2067,9 +2072,8 @@ export default function ListsPage() {
         ? featuredCollections
         : [];
 
-    // Sin sus likes no se pintan (ordenadas por likes saltarían al llegar):
-    // mientras, sigue la caché del índice o lo último que estuvo listo.
-    if (!collectionLikesReady) return [];
+    // Only sorting by likes needs these counts before displaying the catalog.
+    if (collectionsWaitForLikes && !collectionLikesReady) return [];
 
     return cols.map((c) => ({
       ...c,
@@ -2086,6 +2090,7 @@ export default function ListsPage() {
     searchedCollections,
     collectionLikes,
     collectionLikesReady,
+    collectionsWaitForLikes,
     deferredQuery,
   ]);
 
@@ -2364,7 +2369,7 @@ export default function ListsPage() {
           ? !!personalInitialized
           : source === "trakt"
             ? !!trakt?.initialized
-            : collectionLikesReady &&
+            : (!collectionsWaitForLikes || collectionLikesReady) &&
               (collectionsResolvedKey === collectionsQueryKey ||
                 // Destacadas ya precargadas: listas en este mismo render, sin
                 // esperar al efecto que marca `collectionsResolvedKey`.
@@ -2399,13 +2404,19 @@ export default function ListsPage() {
 
   // Con la fuente ya lista se pinta SIEMPRE lo vivo, para que buscar y ordenar
   // sigan siendo instantáneos dentro de la misma fuente.
-  const contentSource = sourceInitialized ? source : readyContent.source;
+  const contentSource = sourceInitialized || readyContent.lists.length === 0 ? source : readyContent.source;
   const contentLists = sourceInitialized ? filtered : readyContent.lists;
 
   // Tarjetas de la cabecera: las de lo que se está pintando (durante el relevo
   // entre pestañas, las de la anterior hasta que la nueva está lista).
-  const headerStats = listsHeaderStats(contentSource, contentLists);
-  const headerStatsLoading = !sourceInitialized && contentLists.length === 0;
+  const statsLists = contentSource === "collections" && source === "collections" && contentLists.length === 0
+    ? (deferredQuery.trim() ? searchedCollections : featuredCollections)
+    : contentLists;
+  const headerStats = useMemo(
+    () => listsHeaderStats(contentSource, statsLists),
+    [contentSource, statsLists],
+  );
+  const headerStatsLoading = !sourceInitialized && statsLists.length === 0;
 
   const errorUnified =
     source === "personal" ? error : source === "trakt" ? trakt?.error : "";
@@ -2458,7 +2469,7 @@ export default function ListsPage() {
         {/* Header */}
         <motion.header
           className="mb-6 sm:mb-10"
-          initial={isBackNav ? false : { opacity: 0, y: -20 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
         >
@@ -2516,25 +2527,28 @@ export default function ListsPage() {
                 Historial o En progreso: tres por pestaña, con lo que se está
                 mostrando (lib/lists/headerStats). */}
             <motion.div
+              data-lists-stats={contentSource}
               className="flex gap-3 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
-              initial={isBackNav ? false : { opacity: 0, y: 20 }}
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
               transition={isBackNav ? { duration: 0 } : { duration: 0.5, delay: 0.3 }}
             >
-              {headerStats.map((stat, index) => (
+              {headerStats.map((stat) => (
                 <motion.div
-                  key={`${contentSource}-${stat.key}`}
+                  key={stat.key}
+                  data-list-stat={stat.key}
+                  aria-busy={headerStatsLoading || (contentSource === "collections" && stat.key === "likes" && !collectionLikesReady)}
                   className="flex min-w-0 flex-1 lg:flex-none"
-                  initial={isBackNav ? false : { opacity: 0, scale: 0.9 }}
+                  initial={false}
                   animate={{ opacity: 1, scale: 1 }}
-                  transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.5 + index * 0.1 }}
+                  transition={{ duration: 0 }}
                 >
                   <PageStatCard
                     label={stat.label}
                     value={stat.value}
                     icon={STAT_ICONS[stat.icon] || ListVideo}
                     colorClass={STAT_TONES[stat.tone] || "text-white"}
-                    loading={headerStatsLoading}
+                    loading={headerStatsLoading || (contentSource === "collections" && stat.key === "likes" && !collectionLikesReady)}
                   />
                 </motion.div>
               ))}

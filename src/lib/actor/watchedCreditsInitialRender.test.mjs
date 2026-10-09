@@ -28,10 +28,11 @@ test("la sección Vistos recibe créditos ya resueltos en el render inicial", as
     "const defaultCreditFilters = getDefaultCreditFilters(actorDetails);",
   );
   const watchedRefreshEffectStart = actorDetails.indexOf(
-    "fetch(`/api/trakt/person/${encodeURIComponent(personId)}/watched`",
+    "  useEffect(() => {\n    if (!personId)",
+    resetEffectStart,
   );
   const resetEffect = actorDetails.slice(resetEffectStart, watchedRefreshEffectStart);
 
-  assert.match(resetEffect, /setWatchedCredits\(\[\]\);/);
-  assert.doesNotMatch(resetEffect, /initialWatchedCredits/);
+  assert.match(resetEffect, /setWatchedCredits\(normalizeWatchedCredits\(initialWatchedCredits\)\);/);
+  assert.doesNotMatch(resetEffect, /setWatchedCredits\(\[\]\);/);
 });

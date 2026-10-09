@@ -10,7 +10,7 @@
 // (premios) + IMDb (nota), y la comunidad de Trakt (sentimientos + scoreboard).
 // Se cancela con un flag al desmontar o cambiar de item.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   getDetails,
@@ -345,9 +345,17 @@ function normalizeProviders(list, max = 6) {
   return out;
 }
 
-export function useDetailModalData(item) {
+// `phoneView`: la ficha se muestra en la vista de TELÉFONO del drawer, que
+// pinta la portada y no el backdrop (ver la carga del backdrop del hero).
+export function useDetailModalData(item, { phoneView = false } = {}) {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(EMPTY_DATA);
+  // Se lee al cargar, sin relanzar la carga: cambiar de vista con la ficha
+  // abierta no debe volver a pedir nada.
+  const phoneViewRef = useRef(phoneView);
+  useEffect(() => {
+    phoneViewRef.current = phoneView;
+  }, [phoneView]);
 
   useEffect(() => {
     if (!item || item.id == null) {
@@ -1152,7 +1160,7 @@ export function useDetailModalData(item) {
     //
     // Se PRECARGA y se fija una sola vez (el hero móvil la usa en exclusiva,
     // sin parpadeo).
-    (async () => {
+    const heroPosterTask = (async () => {
       // `heroPosterResolved` tiene que acabar en `true` pase lo que pase: es la
       // señal con la que la ficha de teléfono deja de esperar. Si se quedara a
       // medias por un fallo, el hero se quedaría con el esqueleto para siempre.
@@ -1205,11 +1213,20 @@ export function useDetailModalData(item) {
         // caído, imagen retirada), el `<img>` la vuelve a pedir por su cuenta y
         // como mucho entra con su propio fundido. Antes, un rechazo aquí saltaba
         // al `catch` y dejaba el hero sin portada.
-        await preloadImage(buildImg(finalPoster, "w780")).catch(() => {});
+        // Se precarga la versión LIGERA (w342), no la w780: es la que pinta
+        // primero la ficha de teléfono (y la nítida entra encima al
+        // decodificarse, ver `phoneCoverSrc` en DetailModal). Esperar a la
+        // w780 entera dejaba el panel en blanco varios segundos con red lenta.
+        await preloadImage(buildImg(finalPoster, "w342")).catch(() => {});
         markResolved({
           heroPosterPath: finalPoster,
           heroPosterHasBurnedTitle: hasBurnedTitle,
         });
+        // En la vista de teléfono, la tarea acaba con la nítida ya descargada:
+        // el backdrop `original` la espera para no quitarle red.
+        if (phoneViewRef.current) {
+          await preloadImage(buildImg(finalPoster, "w780")).catch(() => {});
+        }
       } catch {
         // Sin portada: el hero cae al backdrop, pero solo ahora que se SABE que
         // no hay ninguna.
@@ -1246,6 +1263,13 @@ export function useDetailModalData(item) {
           detailsForArt?.backdrop_path ||
           null;
         if (cancelled || !finalBackdrop) return;
+        // VISTA DE TELÉFONO: primero la portada, que es todo su primer
+        // pantallazo. El backdrop va en tamaño `original` (la ficha ancha) y,
+        // pedido a la vez, se repartían la red: con una conexión lenta la
+        // portada tardaba lo que las dos juntas (medido: ~5 s en vez de ~1,5).
+        // Se sigue cargando después, por si se cambia a la vista ancha.
+        if (phoneViewRef.current) await heroPosterTask;
+        if (cancelled) return;
         await preloadImage(buildImg(finalBackdrop, HERO_BACKDROP_SIZE));
         if (cancelled) return;
         setData((prev) => ({ ...prev, heroBackdropPath: finalBackdrop }));

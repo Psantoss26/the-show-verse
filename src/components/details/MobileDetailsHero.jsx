@@ -63,6 +63,24 @@ export const MOBILE_STATS_REVEAL_BASE = [
     'max-sm:[&[data-mobile-reveal-stats=hidden]_[data-scoreboard-stats]]:grid-rows-[minmax(0,0fr)]',
     'max-sm:[&[data-mobile-reveal-stats=hidden]_[data-scoreboard-stats]]:border-transparent',
 ].join(' ')
+// La MISMA barra plegable, sin `max-sm:`, para la ficha de teléfono del drawer
+// (DetailModal en vista "mobile"): allí el viewport es el de un escritorio o
+// una tablet y las variantes de teléfono no aplican. Lo que va DETRÁS del
+// marcador en esa ficha (`data-panel-reveal`, la fila de píldoras) tampoco se
+// ve mientras la barra está plegada: en la ficha móvil lo tapa el navbar
+// inferior, y el drawer no tiene ninguno (ver `usePanelHeroFit`).
+export const PANEL_STATS_REVEAL_ATTR = 'data-mobile-reveal-stats'
+export const PANEL_STATS_REVEAL_BASE = [
+    '[&_[data-scoreboard-stats]]:grid [&_[data-scoreboard-stats]]:grid-rows-[minmax(0,1fr)]',
+    '[&_[data-scoreboard-stats]]:overflow-hidden [&_[data-scoreboard-stats]>*]:min-h-0',
+    '[&_[data-scoreboard-stats]>*]:overflow-y-hidden [&_[data-scoreboard-stats]>*]:[scrollbar-width:none]',
+    '[&_[data-scoreboard-stats]]:transition-[grid-template-rows,border-color]',
+    '[&_[data-scoreboard-stats]]:duration-[420ms] [&_[data-scoreboard-stats]]:ease-[cubic-bezier(0.22,1,0.36,1)]',
+    'motion-reduce:[&_[data-scoreboard-stats]]:transition-none',
+    '[&[data-mobile-reveal-stats=hidden]_[data-scoreboard-stats]]:grid-rows-[minmax(0,0fr)]',
+    '[&[data-mobile-reveal-stats=hidden]_[data-scoreboard-stats]]:border-transparent',
+    '[&[data-mobile-reveal-stats=hidden]_[data-panel-reveal]]:invisible',
+].join(' ')
 // Lo que aún le falta por crecer a la barra de stats del modo compacto
 // mientras se despliega (su contenido menos lo que ya enseña): lo que va
 // debajo bajará eso.
@@ -600,6 +618,92 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
     }
 }
 
+// FICHA DE TELÉFONO DEL DRAWER (DetailModal en vista "mobile", escritorio y
+// tablet): la cabecera de la ficha móvil con `fitCover`, dentro de un panel
+// con scroll PROPIO. Allí no aplica nada de lo de arriba: el viewport no es el
+// de un teléfono y lo que se desplaza es el panel, no la ventana.
+//
+// - Ajuste: desde el borde inferior del panel (no hay navbar inferior) hacia
+//   arriba, `gap`, el marcador SIEMPRE compacto, `gap`, la fila de botones y
+//   `actionsLead` hasta el pie de la portada; la portada ocupa el resto (como
+//   mínimo 3:4 del ancho). Se escribe en `--mobile-cover-h` del panel
+//   directamente: el drawer se redimensiona arrastrando y un estado de React
+//   volvería a renderizar la ficha en cada movimiento.
+// - Revelado: al empezar a desplazar se despliega la barra de stats del
+//   marcador y aparece lo que va detrás de él (`PANEL_STATS_REVEAL_BASE`), y
+//   se recoge al volver arriba del todo, como en la ficha móvil.
+//
+// `scoreboardRef` va en el envoltorio del marcador: su primer hijo es el
+// marcador (se mide sin la barra de stats) y en él se escribe el atributo de
+// revelado. `resetKey` vuelve a enganchar las medidas si cambia el contenido.
+export function usePanelHeroFit(enabled, { panelRef, scrollerRef, actionsRef, scoreboardRef, gap = 20, actionsLead = 12, resetKey }) {
+    useClientLayoutEffect(() => {
+        const panel = panelRef.current
+        const scroller = scrollerRef.current
+        if (!enabled || !panel || !scroller) return undefined
+        let applied = ''
+        const update = () => {
+            const height = scroller.clientHeight
+            const width = scroller.clientWidth
+            if (!height || !width) return
+            const actions = actionsRef.current
+            const board = scoreboardRef.current?.firstElementChild
+            const actionsHeight = actions ? actions.getBoundingClientRect().height : 0
+            const boardHeight = board
+                ? board.getBoundingClientRect().height - readInnerHeight(board.querySelector('[data-scoreboard-stats]'))
+                : 0
+            // Hacia abajo, como en la ficha: con `round` el último hueco salía 1px corto.
+            const cover = Math.floor(
+                Math.max(width * 0.75, height - gap - boardHeight - gap - actionsHeight - actionsLead),
+            )
+            const value = `${cover}px`
+            if (value === applied) return
+            applied = value
+            panel.style.setProperty('--mobile-cover-h', value)
+        }
+        update()
+        if (typeof ResizeObserver === 'undefined') return undefined
+        const observer = new ResizeObserver(update)
+        observer.observe(scroller)
+        if (actionsRef.current) observer.observe(actionsRef.current)
+        if (scoreboardRef.current) observer.observe(scoreboardRef.current)
+        return () => {
+            observer.disconnect()
+            panel.style.removeProperty('--mobile-cover-h')
+        }
+    }, [enabled, gap, actionsLead, resetKey])
+
+    useEffect(() => {
+        const scroller = scrollerRef.current
+        if (!enabled || !scroller) return undefined
+        let applied = null
+        let raf = 0
+        const sync = () => {
+            raf = 0
+            const atTop = scroller.scrollTop <= MOBILE_REVEAL_SHOW_AT_PX
+            if (atTop === applied) return
+            applied = atTop
+            const target = scoreboardRef.current
+            if (!target) return
+            target.setAttribute(PANEL_STATS_REVEAL_ATTR, atTop ? 'hidden' : 'shown')
+            const stats = target.querySelector('[data-scoreboard-stats]')
+            if (stats) stats.inert = atTop
+            target.querySelectorAll('[data-panel-reveal]').forEach((el) => {
+                el.inert = atTop
+            })
+        }
+        const onScroll = () => {
+            if (!raf) raf = window.requestAnimationFrame(sync)
+        }
+        sync()
+        scroller.addEventListener('scroll', onScroll, { passive: true })
+        return () => {
+            if (raf) window.cancelAnimationFrame(raf)
+            scroller.removeEventListener('scroll', onScroll)
+        }
+    }, [enabled, resetKey])
+}
+
 // MÓVIL: portada FIJA pegada arriba, como la de DetailsClient (mismo `cover`
 // con sobrebarrido), pero como mucho 2:3 a todo el ancho para no recortar los
 // lados (ver `--mobile-cover-h`). Va en el fondo fijo de la página; el contenido en flujo pasa por
@@ -796,7 +900,11 @@ const MOBILE_COVER_CONTRAST_SCRIM = `linear-gradient(to bottom,
     rgba(10, 10, 10, 0.9) calc(var(--mobile-cover-h) * 0.86),
     rgb(10, 10, 10) calc(var(--mobile-cover-h) * 0.95))`
 
-export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, collage, collageUnderlay, blurredUnderlay = false, adaptiveContrast = false, ready, animate }) {
+// `inPanel`: la portada de la ficha de teléfono del drawer (`usePanelHeroFit`).
+// Llena su contenedor (una capa fija del panel, detrás del contenido con
+// scroll) en vez de colgar de la ventana, y no lleva nada atado al viewport ni
+// al scroll del documento: el relevo con el fondo lo anima el panel.
+export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, collage, collageUnderlay, blurredUnderlay = false, adaptiveContrast = false, ready, animate, inPanel = false }) {
     const highRef = useRef(null)
     const [highSrc, setHighSrc] = useState(null)
     const firstSrc = lowSrc || src
@@ -829,12 +937,21 @@ export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, 
         // `--sv-hero-scroll` (respaldo del layout).
         <div
             aria-hidden="true"
-            className="sv-hero-scroll-out absolute inset-x-0 sm:hidden max-sm:[opacity:calc(1_-_var(--sv-hero-scroll,0))]"
-            style={{ top: 'var(--mobile-cover-top, 0px)' }}
+            className={
+                inPanel
+                    ? 'absolute inset-0'
+                    : 'sv-hero-scroll-out absolute inset-x-0 sm:hidden max-sm:[opacity:calc(1_-_var(--sv-hero-scroll,0))]'
+            }
+            style={inPanel ? undefined : { top: 'var(--mobile-cover-top, 0px)' }}
         >
         <div
-            className={`sv-mobile-poster-entry absolute inset-x-0 top-0 ${
-                ready ? (animate ? 'sv-mobile-poster-reveal' : '') : 'opacity-0'
+            className={`absolute inset-x-0 top-0 ${
+                inPanel
+                    // La entrada de la ficha móvil (`sv-mobile-poster-reveal`)
+                    // solo existe en la media query de teléfono: aquí, un
+                    // fundido (o nada si ya estaba en caché, `animate`).
+                    ? `${animate ? 'transition-opacity duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none' : ''} ${ready ? 'opacity-100' : 'opacity-0'}`
+                    : `sv-mobile-poster-entry ${ready ? (animate ? 'sv-mobile-poster-reveal' : '') : 'opacity-0'}`
             }`}
             // Sobrebarrido escalando DESDE ARRIBA: el borde superior se queda
             // en su sitio y no se pierde la franja de arriba del póster (en la

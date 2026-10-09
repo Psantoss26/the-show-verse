@@ -161,6 +161,13 @@ import DetailActionsRow from "@/components/details/DetailActionsRow";
 // ficha completa: renderiza EXACTAMENTE las mismas tarjetas que DetailsClient.
 import DetailsInfoTabs from "@/components/details/DetailsInfoTabs";
 import {
+  MobileHeroCover,
+  PANEL_STATS_REVEAL_ATTR,
+  PANEL_STATS_REVEAL_BASE,
+  usePanelHeroFit,
+} from "@/components/details/MobileDetailsHero";
+import useImageLoadReady from "@/lib/hooks/useImageLoadReady";
+import {
   createPlatformItem,
   dedupeStreamingProviders,
 } from "@/lib/streaming/providers";
@@ -730,7 +737,9 @@ export default function DetailModal({
   const prefersReducedMotion = useReducedMotion();
   const { session, account, preferences } = useAuth();
   const { openDetailModal } = useDetailModal();
-  const { loading, data, applyArtworkSelection } = useDetailModalData(item);
+  const { loading, data, applyArtworkSelection } = useDetailModalData(item, {
+    phoneView: mobileDetails,
+  });
   useOfflineTitle(item?.media_type || item?.mediaType || (item?.first_air_date ? "tv" : "movie"), item?.id || item?.tmdbId, data);
 
   const scrollContainerRef = useRef(null);
@@ -964,20 +973,27 @@ export default function DetailModal({
   // animación se interrumpe (cambio de título a medias, pestaña en segundo
   // plano) `onAnimationComplete` puede no llegar nunca, y las secciones no
   // pueden quedarse sin montar por eso.
+  //
+  // Y tampoco antes de que se vea la portada (`phoneCoverSeen`, ver abajo):
+  // sus imágenes son `lazy`, pero el navegador mide esa distancia contra la
+  // ventana y no contra el scroll del panel, así que se pedían A LA VEZ que la
+  // portada y le quitaban red. Una vez montadas, se quedan.
   const [phoneSectionsReady, setPhoneSectionsReady] = useState(false);
+  const [phoneCoverSeen, setPhoneCoverSeen] = useState(false);
   const [requestedPhoneSection, setRequestedPhoneSection] = useState(null);
   useEffect(() => {
     if (!mobileDetails) {
       setPhoneSectionsReady(false);
       return undefined;
     }
+    if (!phoneCoverSeen) return undefined;
     if (panelSettled) {
       setPhoneSectionsReady(true);
       return undefined;
     }
     const timer = window.setTimeout(() => setPhoneSectionsReady(true), 500);
     return () => window.clearTimeout(timer);
-  }, [mobileDetails, panelSettled]);
+  }, [mobileDetails, panelSettled, phoneCoverSeen]);
 
   // Ancho del drawer derecho (redimensionable arrastrando el borde izquierdo).
   // El ancho DEFINITIVO se calcula ya en el primer render —con la vista
@@ -1097,6 +1113,55 @@ export default function DetailModal({
     [logoFadeFrom, logoFadeTo],
     pinnedHeroRange(-20),
   );
+
+  // ---- FICHA DE TELÉFONO: cabecera de la ficha móvil (MobileDetailsHero) ----
+  // La portada es una capa FIJA del panel, detrás del contenido con scroll,
+  // ajustada para que logo, botones y marcador compacto se vean siempre a
+  // 20px entre sí y del borde inferior (`usePanelHeroFit`). Al desplazar se
+  // releva con el mismo póster difuminado de fondo, como en la ficha móvil.
+  const phoneActionsRef = useRef(null);
+  const phoneScoreboardRef = useRef(null);
+  usePanelHeroFit(mobileDetails, {
+    panelRef,
+    scrollerRef: scrollContainerRef,
+    actionsRef: phoneActionsRef,
+    scoreboardRef: phoneScoreboardRef,
+    resetKey: item?.id,
+  });
+  // La portada en dos pasos, como la ficha móvil (w500 → original): la ligera
+  // (w342, la que precarga useDetailModalData) aparece en cuanto llega y la
+  // w780 entra encima al decodificarse. Sin portada, el respaldo de siempre.
+  const phoneCoverLowSrc = data.heroPosterPath
+    ? buildImg(data.heroPosterPath, "w342")
+    : mobileHeroSrc;
+  const phoneCoverSrc = data.heroPosterPath ? heroPosterSrc : null;
+  const phoneCover = useImageLoadReady(mobileDetails ? phoneCoverLowSrc : null);
+  // Si la portada falla (CDN caído, imagen retirada) no puede quedarse el
+  // esqueleto para siempre: MobileHeroCover pinta su hueco vacío.
+  const [phoneCoverFailedSrc, setPhoneCoverFailedSrc] = useState(null);
+  const phoneCoverFailed =
+    Boolean(phoneCoverLowSrc) && phoneCoverFailedSrc === phoneCoverLowSrc;
+  // La portada ya se ve (o se sabe que no hay ninguna). Hasta entonces, el
+  // esqueleto; y el logo espera a ella, como en la ficha móvil: antes aparecía
+  // solo sobre el panel vacío y, con la red lenta, pintándose a trozos.
+  const phoneCoverShown = phoneCoverLowSrc
+    ? phoneCover.ready || phoneCoverFailed
+    : Boolean(data.heroPosterResolved);
+  // Las secciones de debajo esperan a que se vea la portada (ver
+  // `phoneSectionsReady`).
+  useEffect(() => {
+    if (phoneCoverShown) setPhoneCoverSeen(true);
+  }, [phoneCoverShown]);
+  const [phoneLogoLoaded, setPhoneLogoLoaded] = useState(null);
+  const phoneLogoShown =
+    phoneCoverShown &&
+    (data.logoPath ? phoneLogoLoaded === data.logoPath : Boolean(data.logoResolved));
+  // Recorrido del relevo: el de la ficha (55% del alto de la ventana), sobre el
+  // alto del panel.
+  const phoneRelayEnd = Math.max(1, Math.round(phonePanelHeight * 0.55));
+  const phoneCoverOpacity = useTransform(scrollY, [0, phoneRelayEnd], [1, 0]);
+  const phoneBackgroundOpacity = useTransform(scrollY, [0, phoneRelayEnd], [0, 1]);
+  const phoneShadeOpacity = useTransform(scrollY, [0, phoneRelayEnd], [0, 0.6]);
 
   const resizeCleanupRef = useRef(null);
 
@@ -3787,6 +3852,71 @@ export default function DetailModal({
             </button>
           </div>
 
+          {/* FICHA DE TELÉFONO: el fondo fijo de la ficha móvil, en el panel.
+              De abajo arriba, como en DetailsClient: el mismo póster
+              difuminado (aparece al desplazar), los sombreados de legibilidad
+              (hasta 0.6) y la portada nítida, que se desvanece a la vez. No se
+              desplaza: el contenido con scroll pasa por encima. */}
+          {mobileDetails && (
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+              {phoneCoverLowSrc ? (
+                <motion.div
+                  className="absolute inset-0 bg-cover bg-center"
+                  style={{
+                    opacity: phoneBackgroundOpacity,
+                    // Difuminado: la ligera basta (y ya está descargada).
+                    backgroundImage: `url(${phoneCoverLowSrc})`,
+                    // `.hero-bg-base` de la ficha móvil (va en su media query).
+                    transform: "scale(1.12)",
+                    filter: "brightness(0.9) saturate(1.03) blur(4px)",
+                  }}
+                />
+              ) : null}
+              <motion.div className="absolute inset-0" style={{ opacity: phoneShadeOpacity }}>
+                <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-r from-[#101010]/60 via-transparent to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-l from-[#101010]/60 via-transparent to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#101010] via-[#101010]/60 to-black/20" />
+                <div className="absolute inset-0 bg-gradient-to-r from-[#101010] via-transparent to-transparent opacity-30" />
+              </motion.div>
+              <motion.div className="absolute inset-0" style={{ opacity: phoneCoverOpacity }}>
+                {/* Esqueleto mientras llega la portada, con el mismo fundido
+                    inferior. Deja de latir en cuanto la portada se ve (queda
+                    debajo, transparente): un `animate-pulse` invisible sigue
+                    costando un recálculo por fotograma. */}
+                <div
+                  className={`absolute inset-x-0 top-0 transition-opacity duration-500 motion-reduce:transition-none ${
+                    phoneCoverShown ? "opacity-0" : "opacity-100"
+                  }`}
+                  style={{
+                    height: "var(--mobile-cover-h)",
+                    WebkitMaskImage: "var(--sv-poster-fade)",
+                    maskImage: "var(--sv-poster-fade)",
+                  }}
+                >
+                  <div
+                    className={`absolute inset-0 bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900 ${
+                      phoneCoverShown ? "" : "animate-pulse"
+                    }`}
+                  />
+                </div>
+                <MobileHeroCover
+                  inPanel
+                  lowSrc={phoneCoverLowSrc}
+                  src={phoneCoverSrc}
+                  imgRef={phoneCover.imgRef}
+                  onLoad={phoneCover.onLoad}
+                  onError={() => setPhoneCoverFailedSrc(phoneCoverLowSrc)}
+                  failed={phoneCoverFailed}
+                  ready={phoneCoverShown}
+                  animate={!phoneCover.instant && !prefersReducedMotion}
+                  collage={null}
+                  blurredUnderlay
+                  adaptiveContrast
+                />
+              </motion.div>
+            </div>
+          )}
           {/* Contenedor con scroll interno (barra oculta).
 
               SIN REBOTE DE OVERSCROLL (`overscroll-y-none`). Al llegar al tope, el
@@ -3804,22 +3934,20 @@ export default function DetailModal({
               debajo al llegar al tope. */}
           <div
             ref={scrollContainerRef}
-            className="min-h-0 flex-1 overflow-y-auto overscroll-y-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            className={`${mobileDetails ? "relative" : ""} min-h-0 flex-1 overflow-y-auto overscroll-y-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden`}
           >
-          {/* PRIMER PANTALLAZO DE LA FICHA DE TELÉFONO.
+          {/* PRIMER PANTALLAZO DE LA FICHA DE TELÉFONO, el de la ficha móvil.
 
-              En esa vista lo único que se ve sin hacer scroll es portada +
-              logo + botones, igual que en la ficha móvil real. Se consigue con
-              una columna de la ALTURA EXACTA del panel: la portada se queda con
-              el hueco sobrante (`flex-1`) y los botones ocupan el suyo, así que
-              el resto del contenido empieza justo por debajo del borde
-              inferior. No hay ninguna altura medida ni descontada a mano: si la
-              fila de botones cambia de alto, la portada se ajusta sola.
+              Sin hacer scroll se ven portada + logo + botones + marcador
+              compacto, a 20px entre sí y del borde inferior del panel. La
+              portada es la capa fija de detrás (MobileHeroCover); aquí solo
+              queda su hueco, de `--mobile-cover-h` (lo ajusta
+              `usePanelHeroFit`), con el logo al pie.
 
               `contents` deja la vista normal EXACTAMENTE como estaba: el
               envoltorio desaparece de la maquetación y hero y contenido siguen
               siendo hermanos directos de la columna con scroll. */}
-          <div className={mobileDetails ? "flex h-full flex-col" : "contents"}>
+          <div className={mobileDetails ? "flex flex-col" : "contents"}>
           {/* HERO: póster textless en móvil, backdrop panorámico en sm+.
               El fondo se desvanece a transparente por abajo (sin borde) para que la
               imagen (enmascarada) se funda con el panel translúcido de contenido y
@@ -3858,14 +3986,14 @@ export default function DetailModal({
           <div
             className={
               mobileDetails
-                // Teléfono: la portada se come todo el hueco que dejan los
-                // botones. Sin `aspect-*` y sin el degradado de fondo: aquí la
-                // imagen llega hasta abajo y se funde con el panel por su
-                // propia máscara (`sv-phone-fade`), que es mucho más larga que
-                // la del modal y es la que deja logo y botones sobre oscuro.
-                ? "relative min-h-0 w-full flex-1 overflow-hidden"
+                // Teléfono: solo el hueco de la portada, que es la capa fija
+                // del panel (con su prolongación difuminada y el velo bajo
+                // los botones de MobileHeroCover).
+                ? "relative w-full shrink-0"
                 : "relative aspect-[2/3] w-full overflow-hidden bg-gradient-to-b from-neutral-950 from-30% to-transparent to-78% sm:aspect-video"
             }
+            // Teléfono: el hueco de la portada fija (ver `usePanelHeroFit`).
+            style={mobileDetails ? { height: "var(--mobile-cover-h, 75%)" } : undefined}
           >
             {/* Wrapper ESTÁTICO y enmascarado: contiene SOLO la imagen.
                 - Estático (no lleva el parallax): la máscara queda fija
@@ -3874,7 +4002,10 @@ export default function DetailModal({
                 - Envuelve solo la imagen: el logo y las demás capas quedan
                   FUERA, así que no se difuminan. Antes la máscara estaba en
                   el contenedor y se comía el logo, que es su hermano. */}
-            <div className={`absolute inset-0 ${mobileDetails ? "sv-phone-fade" : "sv-hero-fade"}`}>
+            {/* Teléfono: nada de esto; la portada es la capa fija del panel. */}
+            {!mobileDetails && (
+            <>
+            <div className="absolute inset-0 sv-hero-fade">
             <motion.div
               style={{
                 y: yParallax,
@@ -3952,6 +4083,8 @@ export default function DetailModal({
               style={{ opacity: darkOverlayOpacity, willChange: "opacity" }}
               className="pointer-events-none absolute inset-0 bg-black/60 z-10"
             />
+            </>
+            )}
 
             {/* El arte de portada abre la ficha completa con la misma transición
                 que el control superior derecho. El botón queda bajo el logo y
@@ -3996,16 +4129,27 @@ export default function DetailModal({
               // recalcula en cada fotograma si la capa no está promocionada, y
               // ese recálculo es lo que hacía que el logo pareciera
               // distorsionarse al hacer scroll.
-              style={{
-                opacity: logoOpacity,
-                y: logoY,
-                willChange: "opacity, transform",
-              }}
-              className={`absolute inset-x-0 bottom-0 z-15 flex justify-center p-5 text-center ${
-                // Teléfono: el logo respira por debajo. Ese `pb` ES la
-                // separación con la fila de botones, que arranca justo donde
-                // acaba la portada.
-                mobileDetails ? "pb-8" : "sm:block sm:p-7 sm:text-left"
+              // Teléfono: sin fundido, como en la ficha móvil, donde el logo
+              // va en el flujo y sale con el contenido al desplazar.
+              style={
+                mobileDetails
+                  ? undefined
+                  : {
+                      opacity: logoOpacity,
+                      y: logoY,
+                      willChange: "opacity, transform",
+                    }
+              }
+              className={`absolute inset-x-0 bottom-0 z-15 flex justify-center text-center ${
+                // Teléfono: al pie de la portada con 8px de aire, que con los
+                // 12px de margen de la fila de botones dejan los 20px de la
+                // ficha móvil entre logo y botones. Entra con la portada y ya
+                // descargado entero (`phoneLogoShown`).
+                mobileDetails
+                  ? `px-4 pb-2 pt-4 transition-opacity duration-500 motion-reduce:transition-none ${
+                      phoneLogoShown ? "opacity-100" : "opacity-0"
+                    }`
+                  : "p-5 sm:block sm:p-7 sm:text-left"
               }`}
             >
               {data.logoPath ? (
@@ -4021,6 +4165,7 @@ export default function DetailModal({
                   }`}
                   loading="eager"
                   priority
+                  onLoad={() => setPhoneLogoLoaded(data.logoPath)}
                 />
               ) : data.logoResolved ? (
                 // El título de texto SOLO cuando la búsqueda del logo ha
@@ -4041,16 +4186,13 @@ export default function DetailModal({
             )}
           </div>
 
-          {/* TELÉFONO: la fila de botones cierra el primer pantallazo, igual que
-              en la ficha móvil, donde queda justo encima del navbar. `shrink-0`
-              la protege: la portada es quien cede espacio, nunca los botones.
-
-              Este `pb` sube a la vez los botones Y el logo: la portada es
-              `flex-1`, así que lo que se le quita por abajo la encoge, y el
-              logo va anclado a SU borde inferior. Por eso el aire del final se
-              ajusta aquí y no en los dos sitios por separado. */}
+          {/* TELÉFONO: la fila de botones, justo bajo la portada, y debajo
+              el marcador compacto, como en la ficha móvil. Si la fila cambia
+              de alto, la portada se reajusta (`usePanelHeroFit`). */}
           {mobileDetails && (
-            <div className="shrink-0 px-5 pb-10">
+            // 12px bajo la portada; hasta el marcador, los 20px del relleno
+            // superior del contenido (`p-5`). Se mide (`usePanelHeroFit`).
+            <div ref={phoneActionsRef} className="mt-3 shrink-0 px-5">
               {actionsNode}
             </div>
           )}
@@ -4158,11 +4300,15 @@ export default function DetailModal({
                 (`mobileScoresOnly`) y debajo van Plataformas y Compartir como
                 dos píldoras a media línea y la franja de amigos. */}
             <div
+              ref={mobileDetails ? phoneScoreboardRef : undefined}
               style={mobileDetails ? PHONE_SCALED_BLOCK_STYLE : undefined}
               // Teléfono: hasta las pestañas, los mismos 12px que separan el
               // marcador de su fila de botones (en vez de los 32px de la
               // columna, que `mb-3` gana porque `space-y-8` no pesa).
-              className={mobileDetails ? "mb-3 grid grid-cols-2 gap-x-3" : undefined}
+              // Marcador COMPACTO hasta que se desplaza: la barra de stats y
+              // las píldoras aparecen al empezar a bajar (`usePanelHeroFit`).
+              className={mobileDetails ? `mb-3 grid grid-cols-2 gap-x-3 ${PANEL_STATS_REVEAL_BASE}` : undefined}
+              {...(mobileDetails ? { [PANEL_STATS_REVEAL_ATTR]: "hidden" } : null)}
             >
               <DetailsScoreboardPanel
                 loading={loading}
@@ -4225,53 +4371,55 @@ export default function DetailModal({
                   el título), Enlaces y Compartir en una fila de iconos bajo
                   el marcador, como en la ficha móvil. Cada uno abre su modal. */}
               {mobileDetails ? (
-                <ScoreboardPillRow className="col-span-2 mt-3">
-                  <ScoreboardPill
-                    iconOnly
-                    icon={MonitorPlay}
-                    label="Plataformas"
-                    onClick={(event) => {
-                      stopNestedModalOpeningEvent(event);
-                      setPlatformsOpen(true);
-                    }}
-                    aria-haspopup="dialog"
-                    aria-label="Abrir plataformas disponibles"
-                  />
-                  {showFollowingActivity ? (
+                <div data-panel-reveal="" className="col-span-2 mt-3">
+                  <ScoreboardPillRow>
                     <ScoreboardPill
                       iconOnly
-                      icon={UsersRound}
-                      label="Actividad"
-                      onClick={openFollowingActivity}
+                      icon={MonitorPlay}
+                      label="Plataformas"
+                      onClick={(event) => {
+                        stopNestedModalOpeningEvent(event);
+                        setPlatformsOpen(true);
+                      }}
                       aria-haspopup="dialog"
-                      aria-label="Ver la actividad de tus amigos"
+                      aria-label="Abrir plataformas disponibles"
                     />
-                  ) : null}
-                  <ScoreboardPill
-                    iconOnly
-                    icon={Link2}
-                    label="Enlaces"
-                    onClick={(event) => {
-                      stopNestedModalOpeningEvent(event);
-                      setExternalLinksOpen(true);
-                    }}
-                    aria-haspopup="dialog"
-                    aria-label="Abrir enlaces externos"
-                  />
-                  <ActionShareButton
-                    variant="pill"
-                    iconOnly
-                    title={title}
-                    text={`Echa un vistazo a ${title} en The Show Verse`}
-                    url={
-                      typeof window !== "undefined" && item?.id
-                        ? `${window.location.origin}/details/${mediaType}/${item.id}`
-                        : undefined
-                    }
-                    card={shareCard}
-                    story={shareStory}
-                  />
-                </ScoreboardPillRow>
+                    {showFollowingActivity ? (
+                      <ScoreboardPill
+                        iconOnly
+                        icon={UsersRound}
+                        label="Actividad"
+                        onClick={openFollowingActivity}
+                        aria-haspopup="dialog"
+                        aria-label="Ver la actividad de tus amigos"
+                      />
+                    ) : null}
+                    <ScoreboardPill
+                      iconOnly
+                      icon={Link2}
+                      label="Enlaces"
+                      onClick={(event) => {
+                        stopNestedModalOpeningEvent(event);
+                        setExternalLinksOpen(true);
+                      }}
+                      aria-haspopup="dialog"
+                      aria-label="Abrir enlaces externos"
+                    />
+                    <ActionShareButton
+                      variant="pill"
+                      iconOnly
+                      title={title}
+                      text={`Echa un vistazo a ${title} en The Show Verse`}
+                      url={
+                        typeof window !== "undefined" && item?.id
+                          ? `${window.location.origin}/details/${mediaType}/${item.id}`
+                          : undefined
+                      }
+                      card={shareCard}
+                      story={shareStory}
+                    />
+                  </ScoreboardPillRow>
+                </div>
               ) : null}
             </div>
 
