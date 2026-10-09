@@ -37,6 +37,13 @@ const MOBILE_REVEAL_ATTR = 'data-mobile-reveal'
 const MOBILE_REVEAL_SHOW_AT_PX = 16
 // Alto de la navegación inferior flotante que tapa el borde de la pantalla.
 const MOBILE_BOTTOM_NAV_PX = 88
+// Hueco entre los botones y el marcador (16px) más el que queda entre el
+// marcador y el navbar inferior (8px).
+const MOBILE_SCOREBOARD_GAP_PX = 24
+// Aparición del marcador al revelarse con el scroll (pantallas muy bajas), la
+// de DetailsClient.
+const MOBILE_SCOREBOARD_REVEAL_ANIMATION =
+    'max-sm:motion-safe:data-[mobile-reveal=shown]:*:animate-sv-mobile-scoreboard-reveal'
 const HERO_SCROLL_TIMELINE_QUERY = '(animation-timeline: scroll()) and (animation-range: 0% 100%)'
 const PHONE_QUERY = '(width < 40rem)'
 // Mismo sobrebarrido que la portada móvil de la ficha.
@@ -331,30 +338,53 @@ function RevealPoster({ src, lowSrc, alt }) {
     )
 }
 
-// MÓVIL: portada FIJA a pantalla completa, como la de DetailsClient (mismo
-// alto, mismo `cover` centrado con sobrebarrido y fundido inferior por
-// máscara). Va en el fondo fijo de la página; el contenido en flujo pasa por
+// MÓVIL: portada FIJA pegada arriba, como la de DetailsClient (mismo `cover`
+// con sobrebarrido), pero como mucho 2:3 a todo el ancho para no recortar los
+// lados (ver `--list-mobile-cover-h`). Va en el fondo fijo de la página; el contenido en flujo pasa por
 // encima al hacer scroll y su opacidad sigue a `--sv-hero-scroll` (el mismo
 // relevo nítido → difuminado de la ficha). Con portada oficial (colecciones)
 // se pinta la ligera y la grande encima al decodificarse; sin ella (listas),
 // el mosaico de pósters de sus títulos.
 //
-// Fundido: el largo de la ficha (60% → 100%) con mosaico, porque encima va el
-// título como el logo de la ficha. Con portada oficial el título viene impreso
-// en la imagen, y muchas veces pegado al borde inferior («COLLECTION» bajo
-// AVENGERS): no hay logo superpuesto que lo sustituya, así que el fundido solo
-// esconde el canto, en el último 4% (smootherstep). Hasta con el corto del
-// hero de DetailModal (78% → 100%) esa línea salía apagada.
-const MOBILE_PRINTED_TITLE_FADE = `linear-gradient(to bottom,
-    #000 0%, #000 96%,
-    rgba(0, 0, 0, 0.942) 96.8%, rgba(0, 0, 0, 0.683) 97.6%, rgba(0, 0, 0, 0.317) 98.4%,
-    rgba(0, 0, 0, 0.058) 99.2%, transparent 100%)`
+// Borde inferior. Con mosaico (listas), el fundido largo de la ficha (60% →
+// 100%), porque encima va el título como el logo de la ficha. Con portada
+// oficial (colecciones) el título viene IMPRESO y un fundido sobre la imagen
+// lo apagaba; uno corto dejaba un escalón contra el fondo. Así que la imagen
+// se PROLONGA hacia abajo: una capa DIFUMINADA con el póster y, debajo, su
+// última fila de píxeles estirada, que se desvanece hasta el fondo.
+//
+// Esa capa no empieza en el borde: aparece poco a poco en los últimos
+// MOBILE_COVER_BLUR_BAND_PX del póster. Si empezara en seco, el paso de imagen
+// con detalle (tramas, texturas) a imagen lisa se leía como una línea aunque
+// el color fuera el mismo; así el póster se va desenfocando antes de llegar
+// al borde y no hay ningún punto donde cambie de golpe.
+const MOBILE_COVER_EXTEND_PX = 200
+const MOBILE_COVER_BLUR_BAND_PX = 64
+// Curva suave (smoothstep) para la entrada de la capa difuminada.
+const MOBILE_COVER_EXTEND_MASK = `linear-gradient(to bottom,
+    transparent calc(var(--list-mobile-cover-h) - ${MOBILE_COVER_BLUR_BAND_PX}px),
+    rgba(0, 0, 0, 0.104) calc(var(--list-mobile-cover-h) - ${MOBILE_COVER_BLUR_BAND_PX * 0.8}px),
+    rgba(0, 0, 0, 0.352) calc(var(--list-mobile-cover-h) - ${MOBILE_COVER_BLUR_BAND_PX * 0.6}px),
+    rgba(0, 0, 0, 0.648) calc(var(--list-mobile-cover-h) - ${MOBILE_COVER_BLUR_BAND_PX * 0.4}px),
+    rgba(0, 0, 0, 0.896) calc(var(--list-mobile-cover-h) - ${MOBILE_COVER_BLUR_BAND_PX * 0.2}px),
+    #000 var(--list-mobile-cover-h),
+    #000 calc(var(--list-mobile-cover-h) + 16px),
+    rgba(0, 0, 0, 0.784) calc(var(--list-mobile-cover-h) + ${MOBILE_COVER_EXTEND_PX * 0.35}px),
+    rgba(0, 0, 0, 0.5) calc(var(--list-mobile-cover-h) + ${MOBILE_COVER_EXTEND_PX * 0.55}px),
+    rgba(0, 0, 0, 0.216) calc(var(--list-mobile-cover-h) + ${MOBILE_COVER_EXTEND_PX * 0.75}px),
+    rgba(0, 0, 0, 0.058) calc(var(--list-mobile-cover-h) + ${MOBILE_COVER_EXTEND_PX * 0.9}px),
+    transparent calc(var(--list-mobile-cover-h) + ${MOBILE_COVER_EXTEND_PX}px))`
+// Estirado horizontal de la capa difuminada: lleva fuera de la pantalla los
+// laterales, donde el desenfoque mezcla con transparente y oscurecía los
+// bordes. Solo en horizontal, así las filas siguen alineadas con el póster.
+const MOBILE_COVER_EXTEND_SCALE_X = 1.12
 
 function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, collage, ready, animate }) {
     const highRef = useRef(null)
     const [highSrc, setHighSrc] = useState(null)
     const firstSrc = lowSrc || src
-    const hasHigh = Boolean(src && src !== firstSrc)
+    const hasImage = Boolean(firstSrc) && !failed
+    const hasHigh = hasImage && Boolean(src && src !== firstSrc)
     const highReady = hasHigh && highSrc === src
 
     useLayoutEffect(() => {
@@ -369,55 +399,96 @@ function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, collage
         else done()
     }
 
-    const mask = firstSrc ? MOBILE_PRINTED_TITLE_FADE : 'var(--sv-poster-fade)'
+    const mask = hasImage ? undefined : 'var(--sv-poster-fade)'
 
     return (
         <div
             aria-hidden="true"
-            className={`sv-mobile-poster-entry absolute inset-x-0 top-0 overflow-hidden sm:hidden ${
+            className={`sv-mobile-poster-entry absolute inset-x-0 top-0 sm:hidden ${
                 ready
                     ? `${animate ? 'sv-mobile-poster-reveal' : ''} [opacity:calc(1_-_var(--sv-hero-scroll,0))]`
                     : 'opacity-0'
             }`}
-            style={{
-                height: 'var(--list-mobile-cover-h)',
-                transform: `scale(${MOBILE_POSTER_OVERSCAN})`,
-                WebkitMaskImage: mask,
-                maskImage: mask,
-            }}
+            style={{ transform: `scale(${MOBILE_POSTER_OVERSCAN})` }}
         >
-            {firstSrc && !failed ? (
-                <>
-                    {/* Portada decorativa: <img> directo para controlar
-                        `load`/`decode` de cada capa, como RevealPoster. */}
+            <div
+                className="relative overflow-hidden"
+                style={{ height: 'var(--list-mobile-cover-h)', WebkitMaskImage: mask, maskImage: mask }}
+            >
+                {hasImage ? (
+                    <>
+                        {/* Portada decorativa: <img> directo para controlar
+                            `load`/`decode` de cada capa, como RevealPoster. En
+                            pantallas bajas el recorte es vertical y se saca de
+                            arriba (`object-bottom`), no del título. */}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                            ref={imgRef}
+                            src={firstSrc}
+                            alt=""
+                            onLoad={onLoad}
+                            onError={onError}
+                            fetchPriority="high"
+                            decoding="async"
+                            className="absolute inset-0 h-full w-full object-cover object-bottom"
+                        />
+                        {hasHigh ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                                ref={highRef}
+                                src={src}
+                                alt=""
+                                onLoad={markHigh}
+                                decoding="async"
+                                className={`absolute inset-0 h-full w-full object-cover object-bottom transition-opacity duration-500 motion-reduce:transition-none ${
+                                    highReady ? 'opacity-100' : 'opacity-0'
+                                }`}
+                            />
+                        ) : null}
+                    </>
+                ) : (
+                    <div className="absolute inset-0 bg-neutral-950">{collage}</div>
+                )}
+            </div>
+
+            {/* Prolongación del borde inferior (ver arriba): el póster y su
+                última fila estirada, en una sola capa difuminada para que el
+                desenfoque no deje costura entre los dos. La franja de 2 px
+                muestra la última fila con el mismo encaje que el `<img>`
+                (ancho completo, alineada abajo) y se estira en vertical. */}
+            {hasImage ? (
+                <div
+                    className="pointer-events-none absolute inset-x-0 top-0 blur-[12px]"
+                    style={{
+                        height: `calc(var(--list-mobile-cover-h) + ${MOBILE_COVER_EXTEND_PX}px)`,
+                        WebkitMaskImage: MOBILE_COVER_EXTEND_MASK,
+                        maskImage: MOBILE_COVER_EXTEND_MASK,
+                    }}
+                >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                        ref={imgRef}
                         src={firstSrc}
                         alt=""
-                        onLoad={onLoad}
-                        onError={onError}
-                        fetchPriority="high"
                         decoding="async"
-                        className="absolute inset-0 h-full w-full object-cover object-bottom"
+                        className="absolute inset-x-0 top-0 w-full object-cover object-bottom"
+                        style={{
+                            height: 'var(--list-mobile-cover-h)',
+                            transform: `scaleX(${MOBILE_COVER_EXTEND_SCALE_X})`,
+                        }}
                     />
-                    {hasHigh ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                            ref={highRef}
-                            src={src}
-                            alt=""
-                            onLoad={markHigh}
-                            decoding="async"
-                            className={`absolute inset-0 h-full w-full object-cover object-bottom transition-opacity duration-500 motion-reduce:transition-none ${
-                                highReady ? 'opacity-100' : 'opacity-0'
-                            }`}
-                        />
-                    ) : null}
-                </>
-            ) : (
-                <div className="absolute inset-0 bg-neutral-950">{collage}</div>
-            )}
+                    <div
+                        className="absolute inset-x-0 h-[2px] origin-top bg-no-repeat"
+                        style={{
+                            // 1px por encima del borde: sin hueco entre ambas.
+                            top: 'calc(var(--list-mobile-cover-h) - 1px)',
+                            backgroundImage: `url(${firstSrc})`,
+                            backgroundSize: '100% auto',
+                            backgroundPosition: 'center bottom',
+                            transform: `scale(${MOBILE_COVER_EXTEND_SCALE_X}, ${(MOBILE_COVER_EXTEND_PX + 1) / 2})`,
+                        }}
+                    />
+                </div>
+            ) : null}
         </div>
     )
 }
@@ -606,9 +677,15 @@ export default function UnifiedListDetailsLayout({
 
     const rootRef = useRef(null)
     const mobileActionRowRef = useRef(null)
+    const mobileScoreboardRef = useRef(null)
     const mobileSecondaryTriggerRef = useRef(null)
     const [isPhone, setIsPhone] = useState(false)
     const [mobileActionRowHeight, setMobileActionRowHeight] = useState(60)
+    const [mobileScoreboardHeight, setMobileScoreboardHeight] = useState(120)
+    // ¿Cabe el marcador sobre el navbar inferior sin hacer scroll? En pantallas
+    // muy bajas la portada no cede más (ver `--list-mobile-cover-h`) y el
+    // marcador se revela al hacer scroll, como en DetailsClient.
+    const [mobileScoreboardFits, setMobileScoreboardFits] = useState(true)
     const [mobileSecondaryVisible, setMobileSecondaryVisible] = useState(false)
 
     useClientLayoutEffect(() => {
@@ -622,18 +699,38 @@ export default function UnifiedListDetailsLayout({
     // Alto de la portada = pantalla menos la fila de acciones (MEDIDA) y la
     // navegación inferior, como en la ficha: en la primera vista solo se ven
     // portada (+ título) y botones, justo encima del navbar inferior.
+    // También se mide el marcador, que va visible debajo de los botones: la
+    // portada le deja su sitio para que no quede tapado por el navbar inferior.
     useClientLayoutEffect(() => {
         const row = mobileActionRowRef.current
+        const scoreboard = mobileScoreboardRef.current
         if (!mobileHero || !row) return undefined
+        // Se mide el PANEL, no su envoltorio, que incluye su margen inferior.
+        const panel = scoreboard?.firstElementChild || null
         const update = () => {
-            const next = Math.max(1, Math.ceil(row.getBoundingClientRect().height || 60))
-            setMobileActionRowHeight((current) => (current === next ? current : next))
+            const nextRow = Math.max(1, Math.ceil(row.getBoundingClientRect().height || 60))
+            setMobileActionRowHeight((current) => (current === nextRow ? current : nextRow))
+            if (!panel) return
+            const nextScoreboard = Math.ceil(panel.getBoundingClientRect().height)
+            setMobileScoreboardHeight((current) => (current === nextScoreboard ? current : nextScoreboard))
+            // Misma cuenta que `--list-mobile-cover-h`: cabe si, dejándole su
+            // sitio, a la portada aún le quedan los 125vw mínimos.
+            const available = window.innerHeight - 96 - nextRow
+            const fits = available - (nextScoreboard + MOBILE_SCOREBOARD_GAP_PX) >= window.innerWidth * 1.25
+            setMobileScoreboardFits((current) => (current === fits ? current : fits))
         }
         update()
-        if (typeof ResizeObserver === 'undefined') return undefined
+        window.addEventListener('resize', update, { passive: true })
+        if (typeof ResizeObserver === 'undefined') {
+            return () => window.removeEventListener('resize', update)
+        }
         const observer = new ResizeObserver(update)
         observer.observe(row)
-        return () => observer.disconnect()
+        if (panel) observer.observe(panel)
+        return () => {
+            window.removeEventListener('resize', update)
+            observer.disconnect()
+        }
     }, [mobileHero])
 
     // Respaldo de `--sv-hero-scroll` donde no hay animaciones ligadas al scroll
@@ -706,6 +803,10 @@ export default function UnifiedListDetailsLayout({
         }
     }, [mobileHero, isPhone])
 
+    // Alto que deja la pantalla a la portada con los botones justo encima del
+    // navbar inferior (la fórmula de DetailsClient).
+    const mobileAvailable = `(100svh - 6rem - ${mobileActionRowHeight}px - env(safe-area-inset-bottom))`
+
     // Solo se oculta en teléfono: en tablet/escritorio las variantes `max-sm:`
     // no aplican, pero `inert` sí bloquearía el foco.
     const mobileSecondaryHidden = mobileHero && isPhone && !mobileSecondaryVisible
@@ -734,11 +835,16 @@ export default function UnifiedListDetailsLayout({
             ref={rootRef}
             className="min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-purple-500/30"
             style={mobileHero ? {
-                // Como mucho 2:3 a todo el ancho (150vw): la portada entra
-                // entera de lado a lado, sin el recorte lateral de `cover` en
-                // una caja más alta que el póster, y los botones suben. Solo en
-                // pantallas bajas manda el alto disponible.
-                '--list-mobile-cover-h': `min(calc(100svh - 6rem - ${mobileActionRowHeight}px - env(safe-area-inset-bottom)), 150vw)`,
+                // Alto de la portada:
+                //  - Como mucho 2:3 a todo el ancho (150vw): entra entera de lado
+                //    a lado, sin el recorte lateral de `cover` en una caja más
+                //    alta que el póster.
+                //  - Deja sitio a botones Y marcador (con su separación) sobre
+                //    el navbar inferior; si no cabe, se recorta por arriba.
+                //  - Pero nunca menos de 125vw (pantallas muy bajas): ahí el
+                //    marcador queda bajo el pliegue, como en la ficha.
+                //  - Y nunca más del alto que deja a los botones visibles.
+                '--list-mobile-cover-h': `min(150vw, ${mobileAvailable}, max(calc(${mobileAvailable} - ${mobileScoreboardHeight + MOBILE_SCOREBOARD_GAP_PX}px), 125vw))`,
             } : undefined}
         >
             <div className={`fixed inset-0 pointer-events-none overflow-hidden ${heroBackground ? 'bg-[#0a0a0a]' : mobileHero ? 'max-sm:bg-[#0a0a0a]' : ''}`}>
@@ -982,24 +1088,31 @@ export default function UnifiedListDetailsLayout({
                             </div>
                         ) : null}
 
-                        {/* Móvil: el marcador de teléfono de la ficha. Con la
-                            cabecera inmersiva la portada ya no llena la
-                            pantalla, así que va VISIBLE bajo los botones, en
-                            su versión compacta (insignias a tamaño normal en
-                            vez de las grandes de `mobileScoresOnly`), y entra
-                            con la animación del marcador de la ficha justo
-                            después de los botones. */}
+                        {/* Móvil: el marcador de teléfono de la ficha
+                            (`mobileScoresOnly`, el mismo de DetailsClient):
+                            puntuaciones y stats repartidas a todo el ancho. Con
+                            la cabecera inmersiva va VISIBLE bajo los botones
+                            (la portada le deja sitio) y entra con la animación
+                            del marcador de la ficha justo después de ellos. Si
+                            no cabe (pantallas muy bajas), se revela al hacer
+                            scroll con la sinopsis (centinela de debajo). */}
                         <div
+                            ref={mobileScoreboardRef}
                             className={
-                                !mobileHero || !animateMobileEntry
+                                !mobileHero
                                     ? ''
-                                    : mobileCoverReady
-                                        ? 'max-sm:motion-safe:*:animate-sv-mobile-scoreboard-reveal max-sm:*:[animation-delay:140ms]'
-                                        : 'max-sm:invisible'
+                                    : !mobileScoreboardFits
+                                        ? `${MOBILE_REVEAL_BASE} ${isBackNav ? '' : MOBILE_SCOREBOARD_REVEAL_ANIMATION}`
+                                        : !animateMobileEntry
+                                            ? ''
+                                            : mobileCoverReady
+                                                ? 'max-sm:motion-safe:*:animate-sv-mobile-scoreboard-reveal max-sm:*:[animation-delay:140ms]'
+                                                : 'max-sm:invisible'
                             }
+                            {...(mobileHero && !mobileScoreboardFits ? mobileRevealProps : {})}
                         >
                             <DetailsScoreboardPanel
-                                mobileScoresOnly={!mobileHero}
+                                mobileScoresOnly
                                 {...scoreboardRatings}
                                 statItems={scoreboardStats.length ? scoreboardStats : stats.map((stat) => ({
                                     icon: stat.icon,
