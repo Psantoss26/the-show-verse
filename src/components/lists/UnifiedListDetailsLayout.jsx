@@ -9,7 +9,7 @@ import { ArrowLeft, ChevronLeft, ChevronRight, Film, ListVideo } from 'lucide-re
 import { useIsHistoryNavigation } from '@/lib/hooks/useIsHistoryNavigation'
 import DetailsScoreboardPanel from '@/components/details/DetailsScoreboardPanel'
 import DetailsInfoTabs from '@/components/details/DetailsInfoTabs'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { startTransition, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
     buildPosterCollageTargets,
     buildPosterCollageTiles,
@@ -24,6 +24,23 @@ import { posterShelfLayout } from '@/lib/lists/coverBackdrop'
 import { CoverLayer } from '@/components/details/CoverCrossfade'
 
 const finalEnglishPosterCache = new Map()
+
+// ---- Cabecera MÓVIL (<640) con la composición de DetailsClient ----
+// Portada fija pegada arriba (como mucho 2:3 a todo el ancho), botones con la
+// cascada de entrada de la ficha, marcador compacto debajo y sinopsis revelada
+// al hacer scroll. Las clases de
+// revelado son copia de las de DetailsClient (allí son constantes locales que
+// sus tests leen del propio fichero); si cambian allí, hay que cambiarlas aquí.
+const MOBILE_REVEAL_BASE =
+    'max-sm:transform-gpu max-sm:data-[mobile-reveal=hidden]:invisible max-sm:data-[mobile-reveal=hidden]:pointer-events-none max-sm:data-[mobile-reveal=hidden]:**:!transition-none'
+const MOBILE_REVEAL_ATTR = 'data-mobile-reveal'
+const MOBILE_REVEAL_SHOW_AT_PX = 16
+// Alto de la navegación inferior flotante que tapa el borde de la pantalla.
+const MOBILE_BOTTOM_NAV_PX = 88
+const HERO_SCROLL_TIMELINE_QUERY = '(animation-timeline: scroll()) and (animation-range: 0% 100%)'
+const PHONE_QUERY = '(width < 40rem)'
+// Mismo sobrebarrido que la portada móvil de la ficha.
+const MOBILE_POSTER_OVERSCAN = 1.02
 
 function posterUrl(filePath) {
     return filePath ? `https://image.tmdb.org/t/p/w342${filePath}` : null
@@ -67,6 +84,14 @@ function useFinalEnglishPosterImages(items) {
             return undefined
         }
 
+        // Ya resueltos: el render los pinta desde la caché; se fija ese mismo
+        // estado sin pasar por `pending` (haría parpadear la portada).
+        const resolved = targets.map((target) => finalEnglishPosterCache.get(target.key))
+        if (resolved.every((value) => value === null || typeof value === 'string')) {
+            setState({ key: targetKey, pending: false, images: resolved.filter(Boolean).map(posterUrl) })
+            return undefined
+        }
+
         setState({ key: targetKey, pending: true, images: [] })
         void Promise.all(
             targets.map(async (target, index) => {
@@ -90,9 +115,14 @@ function useFinalEnglishPosterImages(items) {
         }
     }, [targetKey])
 
-    return state.key === targetKey
-        ? state
-        : { key: targetKey, pending: targets.length > 0, images: [] }
+    if (state.key === targetKey) return state
+    // Pósters ya resueltos en esta sesión (volver atrás): salen en el primer
+    // render, sin un fotograma de huecos mientras el efecto los recupera.
+    const resolved = targets.map((target) => finalEnglishPosterCache.get(target.key))
+    if (targets.length && resolved.every((value) => value === null || typeof value === 'string')) {
+        return { key: targetKey, pending: false, images: resolved.filter(Boolean).map(posterUrl) }
+    }
+    return { key: targetKey, pending: targets.length > 0, images: [] }
 }
 
 const useClientLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
@@ -301,6 +331,97 @@ function RevealPoster({ src, lowSrc, alt }) {
     )
 }
 
+// MÓVIL: portada FIJA a pantalla completa, como la de DetailsClient (mismo
+// alto, mismo `cover` centrado con sobrebarrido y fundido inferior por
+// máscara). Va en el fondo fijo de la página; el contenido en flujo pasa por
+// encima al hacer scroll y su opacidad sigue a `--sv-hero-scroll` (el mismo
+// relevo nítido → difuminado de la ficha). Con portada oficial (colecciones)
+// se pinta la ligera y la grande encima al decodificarse; sin ella (listas),
+// el mosaico de pósters de sus títulos.
+//
+// Fundido: el largo de la ficha (60% → 100%) con mosaico, porque encima va el
+// título como el logo de la ficha. Con portada oficial el título viene impreso
+// en la imagen, y muchas veces pegado al borde inferior («COLLECTION» bajo
+// AVENGERS): no hay logo superpuesto que lo sustituya, así que el fundido solo
+// esconde el canto, en el último 4% (smootherstep). Hasta con el corto del
+// hero de DetailModal (78% → 100%) esa línea salía apagada.
+const MOBILE_PRINTED_TITLE_FADE = `linear-gradient(to bottom,
+    #000 0%, #000 96%,
+    rgba(0, 0, 0, 0.942) 96.8%, rgba(0, 0, 0, 0.683) 97.6%, rgba(0, 0, 0, 0.317) 98.4%,
+    rgba(0, 0, 0, 0.058) 99.2%, transparent 100%)`
+
+function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, collage, ready, animate }) {
+    const highRef = useRef(null)
+    const [highSrc, setHighSrc] = useState(null)
+    const firstSrc = lowSrc || src
+    const hasHigh = Boolean(src && src !== firstSrc)
+    const highReady = hasHigh && highSrc === src
+
+    useLayoutEffect(() => {
+        const img = highRef.current
+        if (img?.complete && img.naturalWidth > 0) setHighSrc(src)
+    }, [src])
+
+    const markHigh = (event) => {
+        const img = event.currentTarget
+        const done = () => setHighSrc(img.getAttribute('src'))
+        if (typeof img.decode === 'function') img.decode().then(done, done)
+        else done()
+    }
+
+    const mask = firstSrc ? MOBILE_PRINTED_TITLE_FADE : 'var(--sv-poster-fade)'
+
+    return (
+        <div
+            aria-hidden="true"
+            className={`sv-mobile-poster-entry absolute inset-x-0 top-0 overflow-hidden sm:hidden ${
+                ready
+                    ? `${animate ? 'sv-mobile-poster-reveal' : ''} [opacity:calc(1_-_var(--sv-hero-scroll,0))]`
+                    : 'opacity-0'
+            }`}
+            style={{
+                height: 'var(--list-mobile-cover-h)',
+                transform: `scale(${MOBILE_POSTER_OVERSCAN})`,
+                WebkitMaskImage: mask,
+                maskImage: mask,
+            }}
+        >
+            {firstSrc && !failed ? (
+                <>
+                    {/* Portada decorativa: <img> directo para controlar
+                        `load`/`decode` de cada capa, como RevealPoster. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                        ref={imgRef}
+                        src={firstSrc}
+                        alt=""
+                        onLoad={onLoad}
+                        onError={onError}
+                        fetchPriority="high"
+                        decoding="async"
+                        className="absolute inset-0 h-full w-full object-cover object-bottom"
+                    />
+                    {hasHigh ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                            ref={highRef}
+                            src={src}
+                            alt=""
+                            onLoad={markHigh}
+                            decoding="async"
+                            className={`absolute inset-0 h-full w-full object-cover object-bottom transition-opacity duration-500 motion-reduce:transition-none ${
+                                highReady ? 'opacity-100' : 'opacity-0'
+                            }`}
+                        />
+                    ) : null}
+                </>
+            ) : (
+                <div className="absolute inset-0 bg-neutral-950">{collage}</div>
+            )}
+        </div>
+    )
+}
+
 function PosterCollage({ images, pending }) {
     const tiles = buildPosterCollageTiles(images)
     const layout = getPosterCollageLayout(tiles.length)
@@ -412,6 +533,7 @@ export default function UnifiedListDetailsLayout({
     posterLowImage,
     coverBackdrop = null,
     coverBackdropPending = false,
+    posterPending = false,
     backdropImage,
     heroBackground,
     sourceLabel = 'Lista',
@@ -462,6 +584,137 @@ export default function UnifiedListDetailsLayout({
         setAnimateCover(true)
         coverMode.setMode(isBackdropCover ? 'poster' : 'preview')
     }
+
+    // ---- MÓVIL: cabecera inmersiva de DetailsClient ----
+    // Solo en las páginas de verdad (con su fila de acciones); los estados de
+    // error conservan la cabecera simple.
+    const mobileHero = Boolean(heroActions)
+    // Con portada oficial el título ya va impreso en la imagen (colecciones);
+    // con el mosaico (listas) se pinta encima, donde la ficha pone el logo.
+    // `posterPending`: la página aún elige la portada (colecciones: la inglesa
+    // de su galería); no se enseña otra para cambiarla después.
+    const showMobileTitle = !posterImage && !posterPending
+    const mobileCoverFirstSrc = posterLowImage || posterImage || null
+    const mobileCoverLoad = useImageLoadReady(mobileCoverFirstSrc)
+    const [mobileCoverFailedSrc, setMobileCoverFailedSrc] = useState(null)
+    const mobileCoverFailed = Boolean(mobileCoverFirstSrc) && mobileCoverFailedSrc === mobileCoverFirstSrc
+    const mobileCoverReady = mobileCoverFirstSrc
+        ? mobileCoverLoad.ready || mobileCoverFailed
+        : !posterPending && !finalPosterArtwork.pending
+    // Al volver atrás todo se pinta tal cual, sin entrada.
+    const animateMobileEntry = !isBackNav
+
+    const rootRef = useRef(null)
+    const mobileActionRowRef = useRef(null)
+    const mobileSecondaryTriggerRef = useRef(null)
+    const [isPhone, setIsPhone] = useState(false)
+    const [mobileActionRowHeight, setMobileActionRowHeight] = useState(60)
+    const [mobileSecondaryVisible, setMobileSecondaryVisible] = useState(false)
+
+    useClientLayoutEffect(() => {
+        const media = window.matchMedia(PHONE_QUERY)
+        const update = () => setIsPhone(media.matches)
+        update()
+        media.addEventListener('change', update)
+        return () => media.removeEventListener('change', update)
+    }, [])
+
+    // Alto de la portada = pantalla menos la fila de acciones (MEDIDA) y la
+    // navegación inferior, como en la ficha: en la primera vista solo se ven
+    // portada (+ título) y botones, justo encima del navbar inferior.
+    useClientLayoutEffect(() => {
+        const row = mobileActionRowRef.current
+        if (!mobileHero || !row) return undefined
+        const update = () => {
+            const next = Math.max(1, Math.ceil(row.getBoundingClientRect().height || 60))
+            setMobileActionRowHeight((current) => (current === next ? current : next))
+        }
+        update()
+        if (typeof ResizeObserver === 'undefined') return undefined
+        const observer = new ResizeObserver(update)
+        observer.observe(row)
+        return () => observer.disconnect()
+    }, [mobileHero])
+
+    // Respaldo de `--sv-hero-scroll` donde no hay animaciones ligadas al scroll
+    // (mismo recorrido que DetailsClient). Con soporte, `.sv-hero-scroll-in`
+    // y `.sv-hero-scroll-shade` lo resuelven en el compositor. El cristal del
+    // navbar en estas rutas también lee la variable.
+    useEffect(() => {
+        const root = document.documentElement
+        if (!mobileHero || !isPhone || CSS.supports?.(HERO_SCROLL_TIMELINE_QUERY)) return undefined
+        let raf = 0
+        const apply = () => {
+            raf = 0
+            const dist = Math.max(1, window.innerHeight * 0.55)
+            const p = Math.min(1, Math.max(0, window.scrollY / dist))
+            root.style.setProperty('--sv-hero-scroll', p.toFixed(4))
+        }
+        const onScroll = () => {
+            if (!raf) raf = window.requestAnimationFrame(apply)
+        }
+        apply()
+        window.addEventListener('scroll', onScroll, { passive: true })
+        window.addEventListener('resize', onScroll, { passive: true })
+        return () => {
+            if (raf) window.cancelAnimationFrame(raf)
+            window.removeEventListener('scroll', onScroll)
+            window.removeEventListener('resize', onScroll)
+            root.style.removeProperty('--sv-hero-scroll')
+        }
+    }, [mobileHero, isPhone])
+
+    // Marcador y sinopsis no compiten con la portada al entrar: se revelan al
+    // cruzar el navbar inferior y se ocultan al volver arriba, como en la
+    // ficha. El atributo se escribe en el DOM en el mismo evento de scroll y el
+    // estado de React se pone al día después (mismos valores).
+    useEffect(() => {
+        const trigger = mobileSecondaryTriggerRef.current
+        const container = rootRef.current
+        if (!mobileHero || !isPhone || !trigger || !container) {
+            setMobileSecondaryVisible(false)
+            return undefined
+        }
+        let applied = null
+        const sync = () => {
+            const revealLine = window.innerHeight - MOBILE_BOTTOM_NAV_PX
+            const nextVisible =
+                window.scrollY > MOBILE_REVEAL_SHOW_AT_PX &&
+                trigger.getBoundingClientRect().top <= revealLine
+            if (nextVisible === applied) return
+            applied = nextVisible
+            container.querySelectorAll(`[${MOBILE_REVEAL_ATTR}]`).forEach((el) => {
+                el.setAttribute(MOBILE_REVEAL_ATTR, nextVisible ? 'shown' : 'hidden')
+                el.inert = !nextVisible
+            })
+            startTransition(() => {
+                setMobileSecondaryVisible((current) => (current === nextVisible ? current : nextVisible))
+            })
+        }
+        const observer = new IntersectionObserver(sync, {
+            rootMargin: `0px 0px -${MOBILE_BOTTOM_NAV_PX}px 0px`,
+            threshold: 0,
+        })
+        observer.observe(trigger)
+        sync()
+        window.addEventListener('scroll', sync, { passive: true })
+        window.addEventListener('resize', sync, { passive: true })
+        return () => {
+            observer.disconnect()
+            window.removeEventListener('scroll', sync)
+            window.removeEventListener('resize', sync)
+        }
+    }, [mobileHero, isPhone])
+
+    // Solo se oculta en teléfono: en tablet/escritorio las variantes `max-sm:`
+    // no aplican, pero `inert` sí bloquearía el foco.
+    const mobileSecondaryHidden = mobileHero && isPhone && !mobileSecondaryVisible
+    const mobileRevealProps = mobileHero
+        ? {
+            [MOBILE_REVEAL_ATTR]: mobileSecondaryVisible ? 'shown' : 'hidden',
+            inert: mobileSecondaryHidden,
+        }
+        : {}
     const infoTabs = hasInfoTabs ? (
         <DetailsInfoTabs
             key={title}
@@ -477,39 +730,88 @@ export default function UnifiedListDetailsLayout({
     ) : null
 
     return (
-        <div className="min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-purple-500/30">
-            {heroBackground ? (
-                <div className="fixed inset-0 pointer-events-none overflow-hidden bg-[#0a0a0a]">
-                    {heroBackground.desktop || heroBackground.mobile ? <HeroBackground
-                        key={`${heroBackground.desktop || ''}|${heroBackground.mobile || ''}`}
-                        desktop={heroBackground.desktop}
-                        mobile={heroBackground.mobile}
-                        animate={!isBackNav}
-                    /> : null}
-                    {/* Sombreados de legibilidad de la ficha (DetailsClient), en
-                        móvil al 60% como en su estado con scroll. */}
-                    <div className="absolute inset-0 max-sm:opacity-60">
+        <div
+            ref={rootRef}
+            className="min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-purple-500/30"
+            style={mobileHero ? {
+                // Como mucho 2:3 a todo el ancho (150vw): la portada entra
+                // entera de lado a lado, sin el recorte lateral de `cover` en
+                // una caja más alta que el póster, y los botones suben. Solo en
+                // pantallas bajas manda el alto disponible.
+                '--list-mobile-cover-h': `min(calc(100svh - 6rem - ${mobileActionRowHeight}px - env(safe-area-inset-bottom)), 150vw)`,
+            } : undefined}
+        >
+            <div className={`fixed inset-0 pointer-events-none overflow-hidden ${heroBackground ? 'bg-[#0a0a0a]' : mobileHero ? 'max-sm:bg-[#0a0a0a]' : ''}`}>
+                {/* Fondo de la página. MÓVIL con cabecera inmersiva: aparece con
+                    el scroll (`--sv-hero-scroll`), detrás de la portada fija,
+                    como la capa base de la ficha. */}
+                <div
+                    className={`absolute inset-0 ${
+                        mobileHero ? 'sv-hero-scroll-in max-sm:[opacity:var(--sv-hero-scroll,0)] sm:opacity-100' : ''
+                    }`}
+                >
+                    {heroBackground ? (
+                        heroBackground.desktop || heroBackground.mobile ? <HeroBackground
+                            key={`${heroBackground.desktop || ''}|${heroBackground.mobile || ''}`}
+                            desktop={heroBackground.desktop}
+                            mobile={heroBackground.mobile}
+                            animate={!isBackNav}
+                        /> : null
+                    ) : (
+                        <>
+                            {backdropImage ? (
+                                <OptimizedImage
+                                    src={backdropImage}
+                                    alt=""
+                                    fetchPriority="low"
+                                    className="h-full w-full scale-105 object-cover opacity-25 blur-sm"
+                                />
+                            ) : null}
+                            <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-[#101010]/90 to-[#101010]" />
+                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(168,85,247,0.16),transparent_35%),radial-gradient(circle_at_80%_15%,rgba(234,179,8,0.11),transparent_32%)]" />
+                        </>
+                    )}
+                </div>
+
+                {mobileHero ? (
+                    <MobileHeroCover
+                        src={posterImage}
+                        lowSrc={posterLowImage}
+                        imgRef={mobileCoverLoad.imgRef}
+                        onLoad={mobileCoverLoad.onLoad}
+                        onError={() => setMobileCoverFailedSrc(mobileCoverFirstSrc)}
+                        failed={mobileCoverFailed}
+                        ready={mobileCoverReady}
+                        animate={animateMobileEntry}
+                        collage={(
+                            <PosterCollage
+                                images={finalPosterArtwork.images}
+                                pending={finalPosterArtwork.pending}
+                            />
+                        )}
+                    />
+                ) : null}
+
+                {/* Sombreados de legibilidad de la ficha (DetailsClient). En
+                    MÓVIL con cabecera inmersiva siguen al scroll hasta el 60%,
+                    como en la ficha: la portada entra limpia. Sin `heroBackground`
+                    (listas) solo existen en móvil, sobre su portada. */}
+                {heroBackground || mobileHero ? (
+                    <div
+                        className={`absolute inset-0 ${
+                            mobileHero
+                                ? 'sv-hero-scroll-shade max-sm:[opacity:calc(var(--sv-hero-scroll,0)*0.6)] sm:opacity-100'
+                                : 'max-sm:opacity-60'
+                        } ${heroBackground ? '' : 'sm:hidden'}`}
+                    >
                         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-transparent" />
                         <div className="absolute inset-0 bg-gradient-to-r from-[#101010]/60 via-transparent to-transparent" />
                         <div className="absolute inset-0 bg-gradient-to-l from-[#101010]/60 via-transparent to-transparent" />
                         <div className="absolute inset-0 bg-gradient-to-t from-[#101010] via-[#101010]/60 to-black/20" />
                         <div className="absolute inset-0 bg-gradient-to-r from-[#101010] via-transparent to-transparent opacity-30" />
                     </div>
-                </div>
-            ) : (
-            <div className="fixed inset-0 pointer-events-none overflow-hidden">
-                {backdropImage ? (
-                    <OptimizedImage
-                        src={backdropImage}
-                        alt=""
-                        fetchPriority="low"
-                        className="h-full w-full scale-105 object-cover opacity-25 blur-sm"
-                    />
                 ) : null}
-                <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-[#101010]/90 to-[#101010]" />
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(168,85,247,0.16),transparent_35%),radial-gradient(circle_at_80%_15%,rgba(234,179,8,0.11),transparent_32%)]" />
             </div>
-            )}
 
             <div className="relative z-10 mx-auto max-w-7xl px-4 py-8 lg:py-12">
                 {/* --- TOP BAR --- */}
@@ -544,12 +846,52 @@ export default function UnifiedListDetailsLayout({
                     transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
                     // Backdrop con sinopsis debajo: 24 px hasta ella, la misma
                     // separación que entre los botones y el marcador.
-                    className={`${isBackdropCover && hasInfoTabs ? 'mb-6' : 'mb-12'} flex flex-col items-start gap-8 lg:flex-row lg:gap-12`}
+                    // MÓVIL inmersivo: sube hasta el borde superior (los 2rem
+                    // del `py-8` + los 3rem del navbar) para que el espaciador
+                    // de la portada coincida con la portada fija; y sin la
+                    // entrada de Framer (su `opacity` apagaría el cristal de los
+                    // botones): allí entran portada y botones con las clases de
+                    // la ficha.
+                    className={`${isBackdropCover && hasInfoTabs ? 'mb-6' : 'mb-12'} flex flex-col items-start lg:flex-row lg:gap-12 ${
+                        mobileHero
+                            ? '-mt-[5rem] gap-5 sm:mt-0 sm:gap-8 max-sm:![transform:none] max-sm:!opacity-100'
+                            : 'gap-8'
+                    }`}
                 >
+                    {/* MÓVIL: hueco del alto de la portada fija (que va en el
+                        fondo de la página) y, en listas, el título encima, donde
+                        la ficha pone el logo y con su misma entrada. */}
+                    {mobileHero ? (
+                        <div
+                            className="relative -mx-4 w-[calc(100%+2rem)] max-w-none flex-shrink-0 sm:hidden"
+                            style={{ height: 'var(--list-mobile-cover-h)' }}
+                        >
+                            {showMobileTitle && mobileCoverReady ? (
+                                <motion.div
+                                    initial={animateMobileEntry ? { opacity: 0, y: 18, scale: 0.94 } : false}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    transition={{ duration: 0.48, delay: 0.14, ease: [0.16, 1, 0.3, 1] }}
+                                    className="pointer-events-none absolute inset-x-0 bottom-2 flex flex-col items-center p-4 text-center motion-reduce:!transform-none motion-reduce:!opacity-100"
+                                >
+                                    <div className="mb-2 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-yellow-300 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
+                                        <Film className="h-4 w-4" />
+                                        {sourceLabel}
+                                    </div>
+                                    <h1 className="max-w-[90%] text-4xl font-black leading-[1] tracking-tight text-white text-balance drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)]">
+                                        {title || 'Lista'}
+                                    </h1>
+                                </motion.div>
+                            ) : null}
+                        </div>
+                    ) : null}
+
                     {/* Columna de la portada: 320 px en póster, 600 px en
-                        backdrop (los anchos de la ficha), con su transición. */}
+                        backdrop (los anchos de la ficha), con su transición.
+                        En móvil inmersivo la portada es la fija del fondo. */}
                     <div
-                        className={`relative z-10 mx-auto flex w-full max-w-[280px] flex-shrink-0 flex-col gap-5 lg:mx-0 ${
+                        className={`relative z-10 mx-auto w-full max-w-[280px] flex-shrink-0 flex-col gap-5 lg:mx-0 ${
+                            mobileHero ? 'hidden sm:flex' : 'flex'
+                        } ${
                             isBackdropCover ? 'sm:max-w-full lg:max-w-[600px]' : 'lg:max-w-[320px]'
                         }`}
                         style={animateCover ? { transition: 'max-width 500ms cubic-bezier(0.25, 1, 0.5, 1)' } : undefined}
@@ -559,7 +901,7 @@ export default function UnifiedListDetailsLayout({
                             animate={animateCover}
                             onPointerEnter={canToggleCover ? () => setBackdropWanted(true) : undefined}
                         >
-                            {posterImage ? (
+                            {posterPending && !posterImage ? null : posterImage ? (
                                 <CoverLayer active={!isBackdropCover}>
                                     <RevealPoster
                                         key={posterLowImage || posterImage}
@@ -606,7 +948,9 @@ export default function UnifiedListDetailsLayout({
                     </div>
 
                     <div className="flex min-w-0 flex-1 flex-col w-full">
-                        <div className="mb-5 px-1 flex flex-col items-center md:items-start text-center md:text-left w-full">
+                        {/* MÓVIL inmersivo: el título va sobre la portada (o
+                            impreso en ella, en colecciones). */}
+                        <div className={`mb-5 px-1 flex-col items-center md:items-start text-center md:text-left w-full ${mobileHero ? 'hidden sm:flex' : 'flex'}`}>
                             <div className="mb-2 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-yellow-300">
                                 <Film className="h-4 w-4" />
                                 {sourceLabel}
@@ -616,28 +960,75 @@ export default function UnifiedListDetailsLayout({
                             </h1>
                         </div>
 
-                        {heroActions ? <div className="mb-6 px-1">{heroActions}</div> : null}
+                        {/* MÓVIL: fila de acciones como la de la ficha, pegada
+                            a la portada (`-top-2`) y con su entrada (la fila
+                            sube y los botones caen en cascada) cuando la
+                            portada está lista; hasta entonces, invisible pero
+                            ocupando su sitio. */}
+                        {heroActions ? (
+                            <div className={`relative mb-6 px-1 ${mobileHero ? 'max-sm:-top-2 max-sm:mb-4' : ''}`}>
+                                <div
+                                    ref={mobileActionRowRef}
+                                    className={
+                                        !mobileHero || !animateMobileEntry
+                                            ? ''
+                                            : mobileCoverReady
+                                                ? 'sv-mobile-actions-reveal sv-mobile-actions-rise'
+                                                : 'max-sm:invisible'
+                                    }
+                                >
+                                    {heroActions}
+                                </div>
+                            </div>
+                        ) : null}
 
-                        {/* Móvil: el marcador de teléfono de la ficha
-                            (`mobileScoresOnly`): puntuaciones y stats
-                            repartidas a todo el ancho y a tamaño grande. */}
-                        <DetailsScoreboardPanel
-                            mobileScoresOnly
-                            {...scoreboardRatings}
-                            statItems={scoreboardStats.length ? scoreboardStats : stats.map((stat) => ({
-                                icon: stat.icon,
-                                label: stat.label,
-                                value: stat.value,
-                            }))}
-                            // El margen es para la sinopsis que va debajo en la
-                            // columna; en backdrop baja bajo la cabecera y se
-                            // sumaba al de la cabecera (56 px en total).
-                            className={isBackdropCover && hasInfoTabs ? '' : 'mb-6'}
-                        />
+                        {/* Móvil: el marcador de teléfono de la ficha. Con la
+                            cabecera inmersiva la portada ya no llena la
+                            pantalla, así que va VISIBLE bajo los botones, en
+                            su versión compacta (insignias a tamaño normal en
+                            vez de las grandes de `mobileScoresOnly`), y entra
+                            con la animación del marcador de la ficha justo
+                            después de los botones. */}
+                        <div
+                            className={
+                                !mobileHero || !animateMobileEntry
+                                    ? ''
+                                    : mobileCoverReady
+                                        ? 'max-sm:motion-safe:*:animate-sv-mobile-scoreboard-reveal max-sm:*:[animation-delay:140ms]'
+                                        : 'max-sm:invisible'
+                            }
+                        >
+                            <DetailsScoreboardPanel
+                                mobileScoresOnly={!mobileHero}
+                                {...scoreboardRatings}
+                                statItems={scoreboardStats.length ? scoreboardStats : stats.map((stat) => ({
+                                    icon: stat.icon,
+                                    label: stat.label,
+                                    value: stat.value,
+                                }))}
+                                // El margen es para la sinopsis que va debajo en la
+                                // columna; en backdrop baja bajo la cabecera y se
+                                // sumaba al de la cabecera (56 px en total).
+                                className={isBackdropCover && hasInfoTabs ? '' : 'mb-6'}
+                            />
+                        </div>
+
+                        {mobileHero ? (
+                            <span
+                                ref={mobileSecondaryTriggerRef}
+                                aria-hidden="true"
+                                className="block h-px sm:hidden"
+                            />
+                        ) : null}
 
                         {/* En backdrop la descripción baja bajo la cabecera, a
-                            todo el ancho, como las pestañas de la ficha. */}
-                        {isBackdropCover ? null : infoTabs}
+                            todo el ancho, como las pestañas de la ficha. En
+                            móvil aparece al hacer scroll. */}
+                        {isBackdropCover || !infoTabs ? null : mobileHero ? (
+                            <div className={MOBILE_REVEAL_BASE} {...mobileRevealProps}>
+                                {infoTabs}
+                            </div>
+                        ) : infoTabs}
 
                         {(hasTabs || topControls) && (
                             <div className="flex w-full flex-col gap-4">
