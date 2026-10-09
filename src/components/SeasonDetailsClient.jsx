@@ -33,6 +33,7 @@ import { ActionShareButton } from "@/components/details/DetailHeaderBits";
 import {
   MOBILE_ACTIONS_ENTRY_ANIMATION,
   MOBILE_REVEAL_BASE,
+  MOBILE_STATS_REVEAL_BASE,
   MOBILE_SCOREBOARD_ENTRY_ANIMATION,
   MOBILE_SCOREBOARD_REVEAL_ANIMATION,
   MobileHeroCover,
@@ -546,6 +547,7 @@ export default function SeasonDetailsClient({
     isPhone,
     scoreboardMode: heroScoreboardMode,
     revealProps: heroRevealProps,
+    statsRevealProps: heroStatsRevealProps,
     rootStyle: heroRootStyle,
   } = useMobileDetailsHero(true, { lock: mobileCoverReady });
   // Qué cabe bajo los botones sin recortar la portada (solo teléfono).
@@ -1359,7 +1361,9 @@ export default function SeasonDetailsClient({
           <div
             ref={heroCoverSpacerRef}
             className="relative -mx-4 w-[calc(100%+2rem)] max-w-none flex-shrink-0 sm:hidden"
-            style={{ height: "var(--mobile-cover-h)" }}
+            // La portada más el sitio sobrante: el grupo botones + marcador
+            // queda pegado al navbar inferior.
+            style={{ height: "calc(var(--mobile-cover-h) + var(--mobile-hero-gap, 0px))" }}
           />
 
           {/* Left poster */}
@@ -1503,7 +1507,7 @@ export default function SeasonDetailsClient({
 
             {/* SCOREBOARD. MÓVIL: el de DetailsClient (`mobileScoresOnly`), bajo
                 los botones según el sitio que deja la portada, que NUNCA se
-                recorta: completo, solo puntuaciones ('compact') o, si no cabe
+                recorta: completo, solo puntuaciones con la barra de stats al hacer scroll ('compact') o, si no cabe
                 nada, revelado con el scroll. El margen va en el envoltorio: la
                 cabecera mide su alto. */}
             <div
@@ -1511,13 +1515,19 @@ export default function SeasonDetailsClient({
               className={`mb-6 ${
                 mobileScoreboardMode === "reveal"
                   ? `${MOBILE_REVEAL_BASE} ${isBackNav ? "" : MOBILE_SCOREBOARD_REVEAL_ANIMATION}`
-                  : !animateMobileEntry
-                    ? ""
-                    : mobileCoverReady
-                      ? MOBILE_SCOREBOARD_ENTRY_ANIMATION
-                      : "max-sm:invisible"
+                  : `${mobileScoreboardMode === "compact" ? MOBILE_STATS_REVEAL_BASE : ""} ${
+                      !animateMobileEntry
+                        ? ""
+                        : mobileCoverReady
+                          ? MOBILE_SCOREBOARD_ENTRY_ANIMATION
+                          : "max-sm:invisible"
+                    }`
               }`}
-              {...(mobileScoreboardMode === "reveal" ? heroRevealProps : {})}
+              {...(mobileScoreboardMode === "reveal"
+                ? heroRevealProps
+                : mobileScoreboardMode === "compact"
+                  ? heroStatsRevealProps
+                  : {})}
             >
             <DetailsScoreboardPanel
               mobileScoresOnly
@@ -1555,13 +1565,11 @@ export default function SeasonDetailsClient({
                   : undefined,
                 href: buildImdbHref({ href: imdbUrl, title: showName }),
               }}
-              // Compacto (teléfono sin sitio para todo): solo las puntuaciones.
-              stats={mobileScoreboardMode === "compact" ? null : tScoreboard?.stats}
+              stats={tScoreboard?.stats}
               // Reserva la fila de estadísticas mientras Trakt responde: el
               // marcador nace con su alto final y la decisión de qué cabe bajo
               // los botones se toma con él.
               statsPending={
-                mobileScoreboardMode !== "compact" &&
                 !initialScoreboardHasStats &&
                 traktScoreSettledKey !== scoreKey &&
                 !hasNumericScoreboardStats(tScoreboard?.stats)

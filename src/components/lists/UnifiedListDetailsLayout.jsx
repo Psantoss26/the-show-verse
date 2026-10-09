@@ -31,6 +31,7 @@ import {
     MOBILE_ACTIONS_ENTRY_ANIMATION,
     MOBILE_POSTER_OVERSCAN,
     MOBILE_REVEAL_BASE,
+    MOBILE_STATS_REVEAL_BASE,
     MOBILE_SCOREBOARD_ENTRY_ANIMATION,
     MOBILE_SCOREBOARD_REVEAL_ANIMATION,
     MobileHeroCover,
@@ -642,6 +643,7 @@ export default function UnifiedListDetailsLayout({
         isPhone,
         scoreboardMode: heroScoreboardMode,
         revealProps: heroRevealProps,
+        statsRevealProps: heroStatsRevealProps,
         rootStyle: heroRootStyle,
     } = useMobileDetailsHero(mobileHero, { lock: mobileCoverReady })
     // Qué cabe bajo los botones sin recortar la portada (solo teléfono).
@@ -820,7 +822,9 @@ export default function UnifiedListDetailsLayout({
                         <div
                             ref={heroCoverSpacerRef}
                             className="relative -mx-4 w-[calc(100%+2rem)] max-w-none flex-shrink-0 sm:hidden"
-                            style={{ height: 'var(--mobile-cover-h)' }}
+                            // La portada más el sitio sobrante: el grupo botones
+                            // + marcador queda pegado al navbar inferior.
+                            style={{ height: 'calc(var(--mobile-cover-h) + var(--mobile-hero-gap, 0px))' }}
                         >
                             {showMobileTitle && mobileCoverReady ? (
                                 <motion.div
@@ -959,19 +963,24 @@ export default function UnifiedListDetailsLayout({
                                     ? ''
                                     : mobileScoreboardMode === 'reveal'
                                         ? `${MOBILE_REVEAL_BASE} ${isBackNav ? '' : MOBILE_SCOREBOARD_REVEAL_ANIMATION}`
-                                        : !animateMobileEntry
-                                            ? ''
-                                            : mobileCoverReady
-                                                ? MOBILE_SCOREBOARD_ENTRY_ANIMATION
-                                                : 'max-sm:invisible'
+                                        : `${mobileScoreboardMode === 'compact' ? MOBILE_STATS_REVEAL_BASE : ''} ${
+                                            !animateMobileEntry
+                                                ? ''
+                                                : mobileCoverReady
+                                                    ? MOBILE_SCOREBOARD_ENTRY_ANIMATION
+                                                    : 'max-sm:invisible'
+                                        }`
                             }`}
-                            {...(mobileScoreboardMode === 'reveal' ? heroRevealProps : {})}
+                            {...(mobileScoreboardMode === 'reveal'
+                                ? heroRevealProps
+                                : mobileScoreboardMode === 'compact'
+                                    ? heroStatsRevealProps
+                                    : {})}
                         >
                             <DetailsScoreboardPanel
                                 mobileScoresOnly
                                 {...scoreboardRatings}
-                                // Compacto: solo las puntuaciones.
-                                statItems={mobileScoreboardMode === 'compact' ? [] : scoreboardStats.length ? scoreboardStats : stats.map((stat) => ({
+                                statItems={scoreboardStats.length ? scoreboardStats : stats.map((stat) => ({
                                     icon: stat.icon,
                                     label: stat.label,
                                     value: stat.value,

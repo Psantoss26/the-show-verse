@@ -8,8 +8,12 @@
 //     inferior prolongado y difuminado;
 //   - fila de acciones justo debajo, con la cascada de entrada de la ficha;
 //   - debajo, lo que quepa sobre el navbar inferior (`scoreboardMode`): el
-//     marcador completo ('full'), solo sus puntuaciones ('compact') o nada
-//     ('reveal': el marcador completo se revela con el scroll);
+//     marcador completo ('full'), solo sus puntuaciones con la barra de stats
+//     revelada al hacer scroll ('compact') o nada ('reveal': el marcador
+//     completo se revela con el scroll);
+//   - el grupo botones + marcador va PEGADO al navbar inferior: el sitio que
+//     sobre (`--mobile-hero-gap`) se deja entre la portada y los botones, donde
+//     está la prolongación difuminada del póster, no vacío bajo los botones;
 //   - relevo con el scroll: la portada se desvanece mientras aparece el fondo
 //     de la página (`.sv-hero-scroll-out` / `.sv-hero-scroll-in` en
 //     globals.css), con un recorrido que se acorta en páginas cortas.
@@ -23,8 +27,10 @@
 // acciones, `scoreboardRef` en el envoltorio del marcador (SIN márgenes
 // propios: se mide su alto) y `secondaryTriggerRef` en un centinela antes de
 // lo que se revela con el scroll, que lleva `revealProps` + MOBILE_REVEAL_BASE.
-// En modo 'compact' la página pinta el marcador sin su fila de estadísticas
-// (la marca `data-scoreboard-stats` de DetailsStatsRow, que aquí se mide).
+// En modo 'compact' el envoltorio del marcador lleva MOBILE_STATS_REVEAL_BASE +
+// `statsRevealProps`: su fila de estadísticas (la marca `data-scoreboard-stats`
+// de DetailsStatsRow, que aquí se mide) queda oculta hasta hacer scroll. El
+// hueco de la portada mide `calc(var(--mobile-cover-h) + var(--mobile-hero-gap))`.
 //
 // Las clases de revelado son copia de las de DetailsClient (allí son
 // constantes locales que sus tests leen del propio fichero); si cambian allí,
@@ -32,6 +38,11 @@
 
 import { startTransition, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
+// Modo 'compact': la barra de stats del marcador se oculta hasta el scroll
+// (con el mismo disparador que lo secundario).
+const MOBILE_STATS_REVEAL_ATTR = 'data-mobile-reveal-stats'
+export const MOBILE_STATS_REVEAL_BASE =
+    'max-sm:[&[data-mobile-reveal-stats=hidden]_[data-scoreboard-stats]]:hidden'
 export const MOBILE_REVEAL_BASE =
     'max-sm:transform-gpu max-sm:data-[mobile-reveal=hidden]:invisible max-sm:data-[mobile-reveal=hidden]:pointer-events-none max-sm:data-[mobile-reveal=hidden]:**:!transition-none'
 const MOBILE_REVEAL_ATTR = 'data-mobile-reveal'
@@ -97,6 +108,9 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
     // 'full' para pintar y medir el marcador completo; todo esto ocurre antes
     // de que se vean portada y marcador (esperan a que cargue la imagen).
     const [scoreboardMode, setScoreboardMode] = useState('full')
+    // Sitio sobrante bajo el grupo botones + marcador: se pasa ENCIMA de los
+    // botones para que el grupo quede pegado al navbar inferior.
+    const [heroGap, setHeroGap] = useState(0)
     const [secondaryVisible, setSecondaryVisible] = useState(false)
 
     useClientLayoutEffect(() => {
@@ -141,6 +155,12 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
                 - window.innerWidth * 1.5 - rowHeight - MOBILE_SCOREBOARD_GAP_PX
             const mode = space >= fullHeight ? 'full' : space >= compactHeight ? 'compact' : 'reveal'
             setScoreboardMode((current) => (current === mode ? current : mode))
+            // Lo que ocupa bajo los botones lo visible al cargar: el marcador
+            // completo o compacto (con su separación de 16px, ya en el hueco
+            // de MOBILE_SCOREBOARD_GAP_PX) o nada (se descuenta esa separación).
+            const used = mode === 'full' ? fullHeight : mode === 'compact' ? compactHeight : -16
+            const gap = Math.max(0, Math.floor(space - used))
+            setHeroGap((current) => (current === gap ? current : gap))
         }
         update()
         window.addEventListener('resize', update, { passive: true })
@@ -240,6 +260,11 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
                 el.setAttribute(MOBILE_REVEAL_ATTR, nextVisible ? 'shown' : 'hidden')
                 el.inert = !nextVisible
             })
+            // La barra de stats del modo compacto: solo se muestra/oculta, el
+            // marcador sigue siendo interactivo.
+            container.querySelectorAll(`[${MOBILE_STATS_REVEAL_ATTR}]`).forEach((el) => {
+                el.setAttribute(MOBILE_STATS_REVEAL_ATTR, nextVisible ? 'shown' : 'hidden')
+            })
             startTransition(() => {
                 setSecondaryVisible((current) => (current === nextVisible ? current : nextVisible))
             })
@@ -277,11 +302,15 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
                 inert: secondaryHidden,
             }
             : {},
+        statsRevealProps: enabled
+            ? { [MOBILE_STATS_REVEAL_ATTR]: secondaryVisible ? 'shown' : 'hidden' }
+            : {},
         // La portada: el póster entero (2:3 a todo el ancho), siempre.
         rootStyle: enabled
             ? {
                 '--mobile-cover-top': `${coverTop}px`,
                 '--mobile-cover-h': '150vw',
+                '--mobile-hero-gap': `${heroGap}px`,
             }
             : undefined,
     }
