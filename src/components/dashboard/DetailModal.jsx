@@ -1162,6 +1162,18 @@ export default function DetailModal({
   const phoneCoverOpacity = useTransform(scrollY, [0, phoneRelayEnd], [1, 0]);
   const phoneBackgroundOpacity = useTransform(scrollY, [0, phoneRelayEnd], [0, 1]);
   const phoneShadeOpacity = useTransform(scrollY, [0, phoneRelayEnd], [0, 0.6]);
+  // Con animaciones ligadas a una línea de tiempo con nombre, el relevo lo
+  // hace el compositor (`.sv-panel-relay-*` en globals.css) y framer no se
+  // engancha: desde JS iba un paso por detrás del scroll y a golpes con el
+  // hilo principal ocupado. Sin soporte (Firefox), framer como hasta ahora.
+  const [phoneRelayInCss, setPhoneRelayInCss] = useState(false);
+  useEffect(() => {
+    setPhoneRelayInCss(
+      typeof CSS !== "undefined" &&
+        CSS.supports?.("(animation-timeline: --a) and (timeline-scope: --a)") === true,
+    );
+  }, []);
+  const phoneRelayStyle = (opacity) => (phoneRelayInCss ? undefined : { opacity });
 
   const resizeCleanupRef = useRef(null);
 
@@ -3631,6 +3643,8 @@ export default function DetailModal({
                 "--sv-phone-scale": tabletViewport
                   ? 1
                   : phoneContentScale(panelWidth),
+                // Recorrido del relevo portada → fondo (`.sv-panel-relay-*`).
+                "--sv-panel-relay-end": `${phoneRelayEnd}px`,
               }
             : null),
           // La ficha "mobile" flota separada del borde: el hueco de la derecha
@@ -3653,7 +3667,7 @@ export default function DetailModal({
         // Fondo del cristal: 0.35 → 0.47. El liquid glass dejaba ver demasiado
         // fondo. Este es el ÚNICO sitio donde se fija, así que sube por igual en
         // el modal centrado y en el drawer y siguen siendo idénticos.
-        className={`sv-drawer-panel relative z-10 flex flex-col overflow-hidden ${LIQUID_GLASS_DETAIL_SURFACE} ${
+        className={`sv-drawer-panel relative z-10 flex flex-col overflow-hidden ${mobileDetails ? "sv-panel-scroll-scope" : ""} ${LIQUID_GLASS_DETAIL_SURFACE} ${
           isRightPlacement
             ? mobileDetails
               // PEGADA AL BORDE DERECHO, igual que el panel ancho.
@@ -3861,9 +3875,9 @@ export default function DetailModal({
             <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
               {phoneCoverLowSrc ? (
                 <motion.div
-                  className="absolute inset-0 bg-cover bg-center"
+                  className="sv-panel-relay-in absolute inset-0 bg-cover bg-center"
                   style={{
-                    opacity: phoneBackgroundOpacity,
+                    ...phoneRelayStyle(phoneBackgroundOpacity),
                     // Difuminado: la ligera basta (y ya está descargada).
                     backgroundImage: `url(${phoneCoverLowSrc})`,
                     // `.hero-bg-base` de la ficha móvil (va en su media query).
@@ -3872,14 +3886,14 @@ export default function DetailModal({
                   }}
                 />
               ) : null}
-              <motion.div className="absolute inset-0" style={{ opacity: phoneShadeOpacity }}>
+              <motion.div className="sv-panel-relay-shade absolute inset-0" style={phoneRelayStyle(phoneShadeOpacity)}>
                 <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-transparent" />
                 <div className="absolute inset-0 bg-gradient-to-r from-[#101010]/60 via-transparent to-transparent" />
                 <div className="absolute inset-0 bg-gradient-to-l from-[#101010]/60 via-transparent to-transparent" />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#101010] via-[#101010]/60 to-black/20" />
                 <div className="absolute inset-0 bg-gradient-to-r from-[#101010] via-transparent to-transparent opacity-30" />
               </motion.div>
-              <motion.div className="absolute inset-0" style={{ opacity: phoneCoverOpacity }}>
+              <motion.div className="sv-panel-relay-out absolute inset-0" style={phoneRelayStyle(phoneCoverOpacity)}>
                 {/* Esqueleto mientras llega la portada, con el mismo fundido
                     inferior. Deja de latir en cuanto la portada se ve (queda
                     debajo, transparente): un `animate-pulse` invisible sigue
@@ -3934,7 +3948,7 @@ export default function DetailModal({
               debajo al llegar al tope. */}
           <div
             ref={scrollContainerRef}
-            className={`${mobileDetails ? "relative" : ""} min-h-0 flex-1 overflow-y-auto overscroll-y-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden`}
+            className={`${mobileDetails ? "sv-panel-scroller relative" : ""} min-h-0 flex-1 overflow-y-auto overscroll-y-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden`}
           >
           {/* PRIMER PANTALLAZO DE LA FICHA DE TELÉFONO, el de la ficha móvil.
 

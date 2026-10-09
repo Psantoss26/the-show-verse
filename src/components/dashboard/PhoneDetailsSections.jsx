@@ -40,6 +40,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
@@ -206,6 +207,33 @@ const PHONE_WIDE_CAROUSEL = {
     480: { slidesPerView: 2, spaceBetween: 14 },
   },
 };
+
+// Sección activa del menú, FUERA del estado de las secciones. Cambia al cruzar
+// cada sección mientras se desplaza el panel, y como estado de
+// PhoneDetailsSections re-renderizaba todas (carruseles, cristal…) en pleno
+// gesto: el scroll iba a golpes justo en cada cruce. Así solo se re-renderiza
+// el menú, que es lo único que la usa.
+function createActiveSectionStore() {
+  let value = null;
+  const listeners = new Set();
+  return {
+    get: () => value,
+    set: (next) => {
+      if (next === value) return;
+      value = next;
+      listeners.forEach((listener) => listener());
+    },
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  };
+}
+
+function ActiveSectionMenu({ store, ...props }) {
+  const activeId = useSyncExternalStore(store.subscribe, store.get, store.get);
+  return <DetailsSectionMenu {...props} activeId={activeId} />;
+}
 
 export default function PhoneDetailsSections({
   item,
@@ -774,7 +802,7 @@ export default function PhoneDetailsSections({
   const sectionElsRef = useRef({});
   const menuStickyRef = useRef(null);
   const [menuHeight, setMenuHeight] = useState(0);
-  const [activeSectionId, setActiveSectionId] = useState(null);
+  const [activeSectionStore] = useState(createActiveSectionStore);
 
   const registerSection = useCallback(
     (sid) => (el) => {
@@ -825,7 +853,7 @@ export default function PhoneDetailsSections({
         if (!el) continue;
         if (el.getBoundingClientRect().top <= limit) current = sid;
       }
-      setActiveSectionId((prev) => (prev === current ? prev : current));
+      activeSectionStore.set(current);
     };
     const onScroll = () => {
       if (!frame) frame = window.requestAnimationFrame(measure);
@@ -837,7 +865,7 @@ export default function PhoneDetailsSections({
       scroller.removeEventListener("scroll", onScroll);
       if (frame) window.cancelAnimationFrame(frame);
     };
-  }, [scrollContainerRef, menuHeight]);
+  }, [scrollContainerRef, menuHeight, activeSectionStore]);
 
   const sectionsRef = useRef(null);
 
@@ -865,9 +893,9 @@ export default function PhoneDetailsSections({
       sections?.classList.remove("sv-phone-sections--measuring");
 
       scroller.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
-      setActiveSectionId(sid);
+      activeSectionStore.set(sid);
     },
-    [scrollContainerRef, menuHeight],
+    [scrollContainerRef, menuHeight, activeSectionStore],
   );
 
   useEffect(() => {
@@ -985,9 +1013,9 @@ export default function PhoneDetailsSections({
             envoltorio INTERIOR: con `zoom` en el propio elemento sticky, su
             `top` también se escalaría y dejaría de pegarse donde debe. */}
         <div style={{ zoom: "var(--sv-phone-scale, 1)" }}>
-          <DetailsSectionMenu
+          <ActiveSectionMenu
+            store={activeSectionStore}
             items={sectionItems}
-            activeId={activeSectionId}
             onChange={scrollToSection}
             // Diez secciones no caben rotuladas en el ancho de un teléfono: los
             // botones se encogían por debajo de su texto y lo cortaban a media
