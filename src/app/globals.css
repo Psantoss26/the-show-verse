@@ -699,7 +699,27 @@ html:not([data-avatar-boot]) .alerts-boot {
     }
   }
 
-  /* Salida inversa de la anterior, con la duración y la curva con las que se
+  /* Entrada de los bloques revelados con scroll que se animan
+     (`MOBILE_REVEAL_ANIMATED`, la barra de búsqueda de las listas): la del
+     marcador pero más corta (20px, 320ms). Con 40px y 600ms empezaba en
+     opacidad 0 justo cuando el bloque asoma sobre el navbar y tardaba en
+     verse al deslizar. */
+  --animate-sv-mobile-reveal-in: sv-mobile-reveal-in 320ms
+    cubic-bezier(0.22, 1, 0.36, 1) backwards;
+
+  @keyframes sv-mobile-reveal-in {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Salida inversa de la del marcador, con la duración y la curva con las que se
      pliega la barra de stats del marcador (420ms). Para los bloques revelados
      con scroll que se animan (`MOBILE_REVEAL_ANIMATED`, details/
      MobileDetailsHero): sus piezas de cristal bajan y se funden al volver

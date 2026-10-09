@@ -408,6 +408,34 @@ const COLLAGE_TILE_STYLE = {
 // desvanece sobre él (relevo `.sv-hero-scroll-out` / `-in`), y se lee como si el
 // mosaico creciera y se quedara de fondo. Va difuminado con los valores de
 // `.hero-bg-base` en móvil (sin su escala, que lo descuadraría de la portada).
+function MobileCollageGrid({ tiles, cols, rows }) {
+    return (
+        <div
+            className="grid bg-neutral-950"
+            style={{
+                gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+                gridAutoRows: `calc(var(--mobile-cover-h) / ${rows})`,
+            }}
+        >
+            {tiles.map((src, index) => (
+                <div key={`${index}-${src}`} className="relative min-h-0">
+                    <div className="absolute" style={COLLAGE_TILE_STYLE}>
+                        {/* Fondo decorativo difuminado: <img> directo. */}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                            src={src}
+                            alt=""
+                            decoding="async"
+                            fetchPriority="low"
+                            className="h-full w-full object-cover"
+                        />
+                    </div>
+                </div>
+            ))}
+        </div>
+    )
+}
+
 function MobileCollageBackground({ tiles, cols, rows }) {
     return (
         <div
@@ -421,28 +449,38 @@ function MobileCollageBackground({ tiles, cols, rows }) {
                 filter: 'brightness(0.9) saturate(1.03) blur(4px)',
             }}
         >
-            <div
-                className="grid bg-neutral-950"
-                style={{
-                    gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-                    gridAutoRows: `calc(var(--mobile-cover-h) / ${rows})`,
-                }}
-            >
-                {tiles.map((src, index) => (
-                    <div key={`${index}-${src}`} className="relative min-h-0">
-                        <div className="absolute" style={COLLAGE_TILE_STYLE}>
-                            {/* Fondo decorativo difuminado: <img> directo. */}
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                                src={src}
-                                alt=""
-                                decoding="async"
-                                fetchPriority="low"
-                                className="h-full w-full object-cover"
-                            />
-                        </div>
-                    </div>
-                ))}
+            <MobileCollageGrid tiles={tiles} cols={cols} rows={rows} />
+        </div>
+    )
+}
+
+// PROLONGACIÓN DEL MOSAICO bajo la portada de una lista, en la vista inicial:
+// la misma rejilla del fondo (sus primeras filas coinciden con la portada y
+// sigue con más títulos), MUY difuminada y oscurecida, detrás de la portada
+// nítida. Aparece donde la portada empieza a fundirse, así que esta no acaba
+// en negro: se deshace en el resto del mosaico, y bajo los botones y el
+// marcador queda una sugerencia de color en vez de un fondo plano. Va en la
+// capa de la portada (`MobileHeroCover`), así que con el scroll se desvanece
+// con ella mientras entra el fondo, menos difuminado: el relevo sigue igual.
+// Estirada en horizontal para que el desenfoque no oscurezca los laterales.
+const MOBILE_COLLAGE_EXTENSION_MASK = `linear-gradient(to bottom,
+    transparent calc(var(--mobile-cover-h) * 0.5),
+    rgba(0, 0, 0, 0.35) calc(var(--mobile-cover-h) * 0.62),
+    rgba(0, 0, 0, 0.8) calc(var(--mobile-cover-h) * 0.76),
+    #000 calc(var(--mobile-cover-h) * 0.9))`
+
+function MobileCollageExtension({ tiles, cols, rows }) {
+    return (
+        <div
+            className="pointer-events-none absolute inset-x-0 top-0 overflow-hidden"
+            style={{
+                height: 'calc(var(--mobile-cover-h) * 2)',
+                WebkitMaskImage: MOBILE_COLLAGE_EXTENSION_MASK,
+                maskImage: MOBILE_COLLAGE_EXTENSION_MASK,
+            }}
+        >
+            <div style={{ transform: 'scaleX(1.15)', filter: 'blur(24px) brightness(0.48) saturate(1.1)' }}>
+                <MobileCollageGrid tiles={tiles} cols={cols} rows={rows} />
             </div>
         </div>
     )
@@ -748,6 +786,13 @@ export default function UnifiedListDetailsLayout({
                                 pending={finalPosterArtwork.pending}
                             />
                         )}
+                        collageUnderlay={backgroundTiles.length ? (
+                            <MobileCollageExtension
+                                tiles={backgroundTiles}
+                                cols={collageGrid.cols}
+                                rows={collageGrid.rows}
+                            />
+                        ) : null}
                     />
                 ) : null}
 
