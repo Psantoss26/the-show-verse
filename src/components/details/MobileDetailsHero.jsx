@@ -59,9 +59,19 @@ export const MOBILE_STATS_REVEAL_BASE = [
     'max-sm:[&[data-mobile-reveal-stats=hidden]_[data-scoreboard-stats]]:grid-rows-[minmax(0,0fr)]',
     'max-sm:[&[data-mobile-reveal-stats=hidden]_[data-scoreboard-stats]]:border-transparent',
 ].join(' ')
-// Lo que tarda en desplegarse la barra de stats (420 ms) y un margen: hasta
-// entonces no se revela nada de lo que va debajo (ver el revelado del hook).
-const MOBILE_STATS_SETTLE_MS = 460
+// Lo que aún le falta por crecer a la barra de stats del modo compacto
+// mientras se despliega (su contenido menos lo que ya enseña): lo que va
+// debajo bajará eso.
+const MOBILE_STATS_PENDING_SLACK_PX = 2
+function readStatsPendingGrowth(target) {
+    let pending = 0
+    for (const row of target.querySelectorAll('[data-scoreboard-stats]')) {
+        for (const child of row.children) {
+            pending = Math.max(pending, child.scrollHeight - child.clientHeight)
+        }
+    }
+    return pending
+}
 // Envoltorio del marcador ESTRECHO (listas y colecciones, `--mobile-actions-w`)
 // en modo 'compact': al desplegarse la barra de stats crece también a los
 // lados hasta todo el ancho, a la vez y con la misma curva. La transición solo
@@ -81,8 +91,9 @@ const MOBILE_REVEAL_ATTR = 'data-mobile-reveal'
 // `data-mobile-reveal-animated` y la animación va en sus piezas de cristal
 // (`data-mobile-reveal-piece`), NUNCA en el bloque: la `opacity` en un
 // ancestro deja el cristal plano.
-//   - Al revelarse ('shown'): la entrada del marcador (sube 40px y se funde,
-//     600ms).
+//   - Al revelarse ('shown'): la entrada del marcador, más corta (sube 20px y
+//     se funde en 320ms, `sv-mobile-reveal-in`): con la del marcador (40px,
+//     600ms) la barra tardaba en verse al deslizar.
 //   - Al ocultarse tras haberse visto ('out', lo pone el revelado en vez de
 //     'hidden'): la inversa en 420ms, lo que tarda en plegarse la barra de
 //     stats, y el bloque pasa a `invisible` al acabar (visibilidad con
@@ -91,7 +102,7 @@ const MOBILE_REVEAL_ANIMATED_ATTR = 'data-mobile-reveal-animated'
 export const MOBILE_REVEAL_ANIMATED_PROPS = { [MOBILE_REVEAL_ANIMATED_ATTR]: '' }
 export const MOBILE_REVEAL_PIECE_PROPS = { 'data-mobile-reveal-piece': '' }
 export const MOBILE_REVEAL_ANIMATED = [
-    'max-sm:motion-safe:[&[data-mobile-reveal=shown]_[data-mobile-reveal-piece]]:animate-sv-mobile-scoreboard-reveal',
+    'max-sm:motion-safe:[&[data-mobile-reveal=shown]_[data-mobile-reveal-piece]]:animate-sv-mobile-reveal-in',
     'max-sm:motion-safe:[&[data-mobile-reveal=out]_[data-mobile-reveal-piece]]:animate-sv-mobile-reveal-out',
     'max-sm:data-[mobile-reveal=out]:invisible max-sm:data-[mobile-reveal=out]:pointer-events-none max-sm:data-[mobile-reveal=out]:**:!transition-none',
     'max-sm:motion-safe:data-[mobile-reveal=out]:![transition:visibility_0s_linear_420ms]',
@@ -358,10 +369,11 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
     //      baja ese alto, vuelve a quedar bajo el navbar, se oculta, sube…
     //   2. Cada bloque secundario (sinopsis, píldoras, barra de búsqueda de la
     //      lista…) por SEPARADO, cuando SU borde superior pasa el navbar
-    //      inferior: nunca se ve uno asomando detrás del navbar. Y no antes de
-    //      que el marcador haya terminado de abrirse: al desplegarse empuja
-    //      hacia abajo lo que va debajo, y un bloque revelado a la vez que él
-    //      acababa otra vez detrás del navbar.
+    //      inferior: nunca se ve uno asomando detrás del navbar. Mientras el
+    //      marcador se despliega, cuenta dónde QUEDARÁ el bloque: al abrirse
+    //      empuja hacia abajo lo que va debajo, y un bloque revelado a la vez
+    //      que él acababa otra vez detrás del navbar. Antes se esperaba a que
+    //      terminara (~460ms) y la barra de búsqueda tardaba en salir.
     // Los atributos se escriben en el DOM en el mismo evento de scroll. Los de
     // los bloques los lleva solo el DOM (React los pinta ocultos y no vuelve a
     // tocarlos: `revealProps` no cambia); el de la barra de stats también va en
@@ -374,8 +386,6 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
             return undefined
         }
         let statsApplied = null
-        let statsShownAt = 0
-        let settleTimer = 0
         let raf = 0
         const sync = () => {
             const atTop = window.scrollY <= MOBILE_REVEAL_SHOW_AT_PX
@@ -386,7 +396,6 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
             const statsTargets = container.querySelectorAll(`[${MOBILE_STATS_REVEAL_ATTR}]`)
             if (statsVisible !== statsApplied) {
                 statsApplied = statsVisible
-                statsShownAt = statsVisible ? performance.now() : 0
                 // Solo se muestra/oculta: el marcador sigue siendo interactivo.
                 statsTargets.forEach((el) => {
                     if (statsVisible) el.setAttribute(MOBILE_STATS_ANIMATED_ATTR, '')
@@ -396,24 +405,23 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
                     setStatsVisible((current) => (current === statsVisible ? current : statsVisible))
                 })
             }
-            // Mientras el marcador se despliega, los bloques esperan.
-            const settleLeft = statsTargets.length && statsVisible
-                ? MOBILE_STATS_SETTLE_MS - (performance.now() - statsShownAt)
-                : 0
-            if (settleLeft > 0 && !settleTimer) {
-                settleTimer = window.setTimeout(() => {
-                    settleTimer = 0
-                    sync()
-                }, settleLeft)
-            }
             let revealLine = null
+            let statsPending = null
             container.querySelectorAll(`[${MOBILE_REVEAL_ATTR}]`).forEach((el) => {
                 let visible = false
                 if (!atTop) {
                     if (el.getAttribute(MOBILE_REVEAL_ATTR) === 'shown') visible = true
-                    else if (settleLeft <= 0) {
+                    else {
                         revealLine ??= readBottomNavTop()
-                        visible = el.getBoundingClientRect().top <= revealLine
+                        // Lo que el marcador aún va a empujar hacia abajo (y
+                        // 2px de margen: los altos de la fila no son enteros).
+                        if (statsPending == null) {
+                            const growth = statsVisible
+                                ? Math.max(0, ...[...statsTargets].map(readStatsPendingGrowth))
+                                : 0
+                            statsPending = growth > 0 ? growth + MOBILE_STATS_PENDING_SLACK_PX : 0
+                        }
+                        visible = el.getBoundingClientRect().top + statsPending <= revealLine
                     }
                 }
                 const current = el.getAttribute(MOBILE_REVEAL_ATTR)
@@ -451,7 +459,6 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
             observer.disconnect()
             mutations.disconnect()
             if (raf) window.cancelAnimationFrame(raf)
-            if (settleTimer) window.clearTimeout(settleTimer)
             window.removeEventListener('scroll', sync)
             window.removeEventListener('resize', sync)
         }
@@ -544,7 +551,7 @@ const MOBILE_COVER_SHADE = `linear-gradient(to bottom,
     rgba(10, 10, 10, 0.72) ${MOBILE_COVER_SHADE_LEAD_PX + 130}px,
     rgba(10, 10, 10, 0.86) 100%)`
 
-export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, collage, ready, animate }) {
+export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, collage, collageUnderlay, ready, animate }) {
     const highRef = useRef(null)
     const [highSrc, setHighSrc] = useState(null)
     const firstSrc = lowSrc || src
@@ -588,6 +595,10 @@ export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, 
             // temporada, bajo el navbar, se cortaba el título).
             style={{ transform: `scale(${MOBILE_POSTER_OVERSCAN})`, transformOrigin: 'top center' }}
         >
+            {/* Con mosaico (listas): lo que va DETRÁS de la portada y asoma
+                por su fundido inferior (la prolongación difuminada del
+                mosaico, ver UnifiedListDetailsLayout). */}
+            {hasImage ? null : collageUnderlay}
             <div
                 className="relative overflow-hidden"
                 style={{ height: 'var(--mobile-cover-h)', WebkitMaskImage: mask, maskImage: mask }}
