@@ -407,6 +407,13 @@ const MOBILE_SCOREBOARD_REVEAL_ANIMATION =
 // centinela contra el borde superior de la navegación inferior.
 const MOBILE_REVEAL_SHOW_AT_PX = 16;
 
+// MÓVIL: margen entre el pie del logo y los botones, entre los botones y el
+// marcador compacto y entre este y el navbar inferior (ver `fitCover` en
+// details/MobileDetailsHero). El logo se coloca a este margen de los botones:
+// su capa va al pie de la portada con `pb-2` (8px) y la fila de botones empieza
+// 12px por debajo (el `gap-5` de la columna menos su `-top-2`).
+const MOBILE_HERO_FIT_GAP_PX = 20;
+
 // Misma condición que el `@supports` de `.sv-hero-scroll-in` en globals.css:
 // con soporte, el progreso de scroll del hero lo anima el compositor y no hace
 // falta el listener que escribe `--sv-hero-scroll`.
@@ -1468,11 +1475,13 @@ export default function DetailsClient({
   const [mobileActionsVisible, setMobileActionsVisible] = useState(false);
   const pointerCardHoverEnabled = supportsHover && !isMobileViewport;
 
-  // Con barra de progreso ("Viendo XX%") la fila de acciones NO entra junto a la
-  // portada: la barra ya ocupa esa zona y encadenar las dos cosas amontonaba
-  // información nada más abrir. Espera al primer scroll y aparece con el mismo
-  // revelado que el marcador y las pestañas.
-  const mobileActionsWaitForScroll = inProgressPct != null;
+  // Con barra de progreso ("Viendo XX%") la fila de acciones (y el marcador)
+  // esperaban al primer scroll: con el póster a pantalla completa la barra ya
+  // ocupaba esa zona. Desde que la portada se ajusta para dejar SIEMPRE a la
+  // vista logo, botones y marcador compacto (`fitCover`), la barra solo le
+  // quita alto a la portada y todo entra junto. Volver a `inProgressPct != null`
+  // recupera la espera (su revelado sigue montado: MOBILE_ACTIONS_REVEAL_ATTR).
+  const mobileActionsWaitForScroll = false;
 
   // Logo del título (arte, textless) para la cabecera MÓVIL (sobre la portada),
   // igual que DetailModal. Best-effort; si no hay logo, cae al título de texto.
@@ -8839,7 +8848,14 @@ export default function DetailsClient({
     revealProps: heroRevealProps,
     statsRevealProps: heroStatsRevealProps,
     rootStyle: heroRootStyle,
-  } = useMobileDetailsHero(true, { lock: mobileHeroCoverReady });
+  } = useMobileDetailsHero(true, {
+    lock: mobileHeroCoverReady,
+    // Logo, botones y marcador compacto a la misma distancia del navbar
+    // inferior en cualquier móvil; la portada ocupa el resto (se recorta por
+    // los lados en los altos). Mismo margen entre las tres piezas.
+    fitCover: true,
+    fitGap: MOBILE_HERO_FIT_GAP_PX,
+  });
   const mobileScoreboardMode = heroIsPhone ? heroScoreboardMode : "full";
   // La fila de acciones la miden la cabecera y el alto de fila de esta ficha.
   const setMobileActionRowNode = useCallback(
@@ -10067,7 +10083,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           delay: prefersReducedMotion ? 0 : 0.14,
                           ease: [0.16, 1, 0.3, 1],
                         }}
-                        className="pointer-events-none absolute inset-x-0 bottom-2 z-[16] flex items-end justify-center p-4 sm:bottom-0"
+                        // MÓVIL: al pie de la portada con 8px de aire: queda a
+                        // MOBILE_HERO_FIT_GAP_PX de los botones.
+                        className="pointer-events-none absolute inset-x-0 bottom-0 z-[16] flex items-end justify-center px-4 pt-4 pb-2 sm:p-4"
                       >
                         {/* Aquí había una sombra de 10rem para el logo. No era un
                             degradado anclado sino una FRANJA flotante: negro al
@@ -10244,17 +10262,16 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 (ver `--details-mobile-poster-height` más arriba): al insertarse
                 aquí, empuja la fila de acciones hacia abajo en flujo normal,
                 hasta quedar detrás del navbar inferior flotante, que la cubre.
-                `mb-1.5` deja entre la barra y los botones el MISMO hueco que
-                entre los botones y el marcador (26px en un móvil de 390px). El ajuste visual se hace en
-                el propio bloque para igualar la distancia al navbar que tiene
-                la fila de acciones sin progreso, sin variar el alto del póster
-                ni desplazar el logo. */}
+                Sin márgenes propios: con el `gap-5` de la columna y su
+                `-top-2` queda a MOBILE_HERO_FIT_GAP_PX (20px) del logo y de
+                los botones, el mismo hueco que hay entre botones, marcador y
+                navbar. La portada (`fitCover`) cede el alto que ocupa. */}
             {inProgressPct != null && (
-              <div className="pointer-events-none relative -top-2 mb-1.5 w-full px-4 sm:hidden">
+              <div className="pointer-events-none relative -top-2 w-full px-4 sm:hidden">
                 {/* MISMO ANCHO QUE EL NAVBAR INFERIOR: su misma fórmula
                     (`min(100vw - 3rem, 21.5rem)`, centrada), para que la barra
                     y el navbar queden alineados en cualquier móvil. */}
-                <div className="mx-auto w-[min(calc(100vw_-_3rem),21.5rem)] pt-4">
+                <div className="mx-auto w-[min(calc(100vw_-_3rem),21.5rem)]">
                   <div className="mb-1.5 flex items-end justify-between gap-2">
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-black shadow-[0_2px_10px_rgba(16,185,129,0.55)]">
                       <Play className="h-2.5 w-2.5 fill-current" /> Viendo
