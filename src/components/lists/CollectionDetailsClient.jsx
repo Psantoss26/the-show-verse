@@ -25,7 +25,7 @@ import { ratingSummaryBadge, summarizeListRatings } from '@/lib/lists/ratingSumm
 import useListImdbRatings from '@/hooks/useListImdbRatings'
 import { useIsHistoryNavigation } from '@/lib/hooks/useIsHistoryNavigation'
 import { fetchTmdbImages } from '@/lib/tmdb/imageRequests'
-import { pickBestFavoriteEnglishPoster, pickHeroBackdropPath, pickMobileHeroPosterPath } from '@/lib/details/tmdbImages'
+import { pickBestFavoriteEnglishPoster, pickBestNeutralPosterByResVotes, pickHeroBackdropPath } from '@/lib/details/tmdbImages'
 import { pickCollectionCoverBackdrop } from '@/lib/lists/coverBackdrop'
 import { buildListShareCard, buildListShareStory, listYearSpan, normalizeListShareItem } from '@/lib/lists/shareList'
 
@@ -87,6 +87,30 @@ function useCollectionGallery(collectionId) {
     if (state.id === collectionId) return state
     const cached = collectionGalleryCache.get(collectionId)
     return { id: collectionId, done: Boolean(cached), images: cached || null }
+}
+
+// Imagen SIN idioma de TMDb: `iso_639_1` nulo, vacío o "xx" (así marca TMDb
+// las imágenes sin texto en algunos casos).
+const isTextlessImage = (image) => {
+    const lang = String(image?.iso_639_1 || '').toLowerCase()
+    return !lang || lang === 'xx'
+}
+const textlessOnly = (list) =>
+    (Array.isArray(list) ? list : [])
+        .filter((image) => image?.file_path && isTextlessImage(image))
+        // El selector solo reconoce `null` como neutro.
+        .map((image) => ({ ...image, iso_639_1: null }))
+
+// Fondo MÓVIL automático: SIEMPRE sin idioma. El mejor póster sin texto de la
+// galería y, si la colección no tiene ninguno (Spider-Man (MCU): 34 pósters,
+// todos con título), un backdrop sin texto, que de fondo se recorta en
+// vertical sin problema. Antes se caía al póster con título.
+function pickTextlessMobileBackground(images) {
+    return (
+        pickBestNeutralPosterByResVotes(textlessOnly(images?.posters))?.file_path ||
+        pickBestNeutralPosterByResVotes(textlessOnly(images?.backdrops))?.file_path ||
+        null
+    )
 }
 
 function MovieCard({ movie, idx, imdbRating, disableHover = false, posterLoading = false }) {
@@ -267,9 +291,7 @@ export default function CollectionDetailsClient({ collectionId }) {
             parts.find((movie) => movie?.backdrop_path)?.backdrop_path ||
             null
         : null
-    const autoMobileBackground = gallery.done
-        ? pickMobileHeroPosterPath({ posterPath: original?.poster_path, posters: gallery.images?.posters })
-        : null
+    const autoMobileBackground = gallery.done ? pickTextlessMobileBackground(gallery.images) : null
     const backgroundBackdrop = customBackdrop || autoBackdrop
     const backgroundPoster = collection?.mobile_background_path || autoMobileBackground
     // Modo de portada BACKDROP: la imagen elegida en «Editar colección» o, si
