@@ -11,8 +11,12 @@ import DetailsScoreboardPanel from '@/components/details/DetailsScoreboardPanel'
 import DetailsInfoTabs from '@/components/details/DetailsInfoTabs'
 import { startTransition, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
+    MAX_BACKGROUND_TILE_COUNT,
+    buildBackgroundCollageTargets,
+    buildBackgroundCollageTiles,
     buildPosterCollageTargets,
     buildPosterCollageTiles,
+    getPosterCollageGrid,
     getPosterCollageLayout,
 } from '@/lib/lists/posterCollage'
 import { fetchTmdbImages } from '@/lib/tmdb/imageRequests'
@@ -143,6 +147,35 @@ function useCoverArtImages(items) {
         return { key: targetKey, pending: false, images: resolved.filter(Boolean).map(posterUrl) }
     }
     return { key: targetKey, pending: targets.length > 0, images: [] }
+}
+
+// Arte sin texto de los primeros títulos de la lista para el FONDO móvil (ver
+// MobileCollageBackground). Mismo lote y misma caché que la portada; sin
+// precarga: es un fondo difuminado que aparece con el scroll.
+function useBackgroundCoverArt(items, enabled) {
+    const targets = useMemo(
+        () => (enabled ? buildBackgroundCollageTargets(items, MAX_BACKGROUND_TILE_COUNT) : []),
+        [items, enabled],
+    )
+    const targetKey = targets.map((target) => target.key).join('|')
+    const [state, setState] = useState({ key: '', paths: [] })
+
+    useEffect(() => {
+        if (!targets.length) return undefined
+        let cancelled = false
+        void Promise.all(targets.map((target) => resolveCoverArt(target, 'normal'))).then((paths) => {
+            if (!cancelled) setState({ key: targetKey, paths: paths.filter(Boolean) })
+        })
+        return () => {
+            cancelled = true
+        }
+        // `targetKey` identifica la lista de títulos.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [targetKey])
+
+    if (state.key === targetKey) return state.paths
+    const cached = targets.map((target) => coverArtCache.get(target.key))
+    return cached.every((value) => value === null || typeof value === 'string') ? cached.filter(Boolean) : []
 }
 
 const useClientLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
@@ -545,6 +578,50 @@ const COLLAGE_TILE_STYLE = {
     maskComposite: 'intersect',
 }
 
+// FONDO MÓVIL DE UNA LISTA: el mosaico de la portada, AMPLIADO. Misma rejilla
+// (columnas y alto de fila, con el alto de la portada), mismo sobrebarrido y
+// mismas imágenes arriba, así que coincide celda a celda con la portada; debajo
+// sigue con más títulos hasta llenar la pantalla. Al hacer scroll la portada se
+// desvanece sobre él (relevo `.sv-hero-scroll-out` / `-in`), y se lee como si el
+// mosaico creciera y se quedara de fondo. Va difuminado con los valores de
+// `.hero-bg-base` en móvil (sin su escala, que lo descuadraría de la portada).
+function MobileCollageBackground({ tiles, cols, rows }) {
+    return (
+        <div
+            className="absolute inset-x-0 top-0 sm:hidden"
+            style={{
+                height: 'var(--list-mobile-cover-h)',
+                transform: `scale(${MOBILE_POSTER_OVERSCAN})`,
+                filter: 'brightness(0.9) saturate(1.03) blur(4px)',
+            }}
+        >
+            <div
+                className="grid bg-neutral-950"
+                style={{
+                    gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+                    gridAutoRows: `calc(var(--list-mobile-cover-h) / ${rows})`,
+                }}
+            >
+                {tiles.map((src, index) => (
+                    <div key={`${index}-${src}`} className="relative min-h-0">
+                        <div className="absolute" style={COLLAGE_TILE_STYLE}>
+                            {/* Fondo decorativo difuminado: <img> directo. */}
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                                src={src}
+                                alt=""
+                                decoding="async"
+                                fetchPriority="low"
+                                className="h-full w-full object-cover"
+                            />
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
+}
+
 function PosterCollage({ images, pending }) {
     const tiles = buildPosterCollageTiles(images)
     const layout = getPosterCollageLayout(tiles.length)
@@ -890,6 +967,23 @@ export default function UnifiedListDetailsLayout({
         }
     }, [mobileHero, isPhone])
 
+    // FONDO MÓVIL DE LAS LISTAS (sin portada oficial): el mosaico ampliado de
+    // la portada (MobileCollageBackground). Solo en teléfono y cuando hay
+    // mosaico de verdad; sus imágenes se piden cuando la portada ya está lista.
+    const coverTiles = useMemo(() => buildPosterCollageTiles(finalPosterArtwork.images), [finalPosterArtwork.images])
+    const collageBackground = mobileHero && isPhone && !posterImage && coverTiles.length > 1
+    const backgroundArt = useBackgroundCoverArt(posterItems, collageBackground && mobileCoverReady)
+    const collageGrid = getPosterCollageGrid(coverTiles.length)
+    // Dos portadas de alto llenan siempre la pantalla (la portada mide al
+    // menos 125vw y la pantalla, menos de dos veces eso).
+    const backgroundTiles = collageBackground
+        ? buildBackgroundCollageTiles(
+            coverTiles,
+            backgroundArt.map((path) => `https://image.tmdb.org/t/p/w185${path}`),
+            collageGrid.cols * collageGrid.rows * 2,
+        )
+        : []
+
     // Alto que deja la pantalla a la portada con los botones justo encima del
     // navbar inferior (la fórmula de DetailsClient).
     const mobileAvailable = `(100svh - 6rem - ${mobileActionRowHeight}px - env(safe-area-inset-bottom))`
@@ -952,16 +1046,28 @@ export default function UnifiedListDetailsLayout({
                         /> : null
                     ) : (
                         <>
-                            {backdropImage ? (
-                                <OptimizedImage
-                                    src={backdropImage}
-                                    alt=""
-                                    fetchPriority="low"
-                                    className="h-full w-full scale-105 object-cover opacity-25 blur-sm"
+                            {/* Con el mosaico ampliado de fondo (teléfono), el
+                                fondo tenue de escritorio sobra: se queda solo
+                                desde `sm`. */}
+                            <div className={`absolute inset-0 ${backgroundTiles.length ? 'max-sm:hidden' : ''}`}>
+                                {backdropImage ? (
+                                    <OptimizedImage
+                                        src={backdropImage}
+                                        alt=""
+                                        fetchPriority="low"
+                                        className="h-full w-full scale-105 object-cover opacity-25 blur-sm"
+                                    />
+                                ) : null}
+                                <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-[#101010]/90 to-[#101010]" />
+                                <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(168,85,247,0.16),transparent_35%),radial-gradient(circle_at_80%_15%,rgba(234,179,8,0.11),transparent_32%)]" />
+                            </div>
+                            {backgroundTiles.length ? (
+                                <MobileCollageBackground
+                                    tiles={backgroundTiles}
+                                    cols={collageGrid.cols}
+                                    rows={collageGrid.rows}
                                 />
                             ) : null}
-                            <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-[#101010]/90 to-[#101010]" />
-                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(168,85,247,0.16),transparent_35%),radial-gradient(circle_at_80%_15%,rgba(234,179,8,0.11),transparent_32%)]" />
                         </>
                     )}
                 </div>

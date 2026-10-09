@@ -3,6 +3,9 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 import {
+    buildBackgroundCollageTargets,
+    buildBackgroundCollageTiles,
+    getPosterCollageGrid,
     buildPosterCollageTargets,
     buildPosterCollageTiles,
     getCompletePosterCollageTileCount,
@@ -96,4 +99,35 @@ test('the list detail header waits for preloaded textless cover artwork instead 
     assert.match(source, /preloadPoster/)
     assert.match(source, /useCoverArtImages\(posterItems\)/)
     assert.doesNotMatch(source, /fallbackImage/)
+})
+
+test('el fondo móvil sigue la rejilla de la portada', () => {
+    assert.deepEqual(getPosterCollageGrid(20), { cols: 4, rows: 5 })
+    assert.deepEqual(getPosterCollageGrid(12), { cols: 4, rows: 3 })
+    assert.deepEqual(getPosterCollageGrid(2), { cols: 2, rows: 1 })
+})
+
+test('el fondo móvil toma los primeros títulos, en orden y sin repetir, hasta cuarenta', () => {
+    const items = [
+        { id: 1, media_type: 'movie' },
+        { id: 1, media_type: 'movie' },
+        { id: 2, media_type: 'tv' },
+        ...Array.from({ length: 60 }, (_, index) => ({ id: 100 + index, media_type: 'movie' })),
+    ]
+    const targets = buildBackgroundCollageTargets(items, 99)
+    assert.equal(targets.length, 40)
+    assert.deepEqual(targets.slice(0, 3).map((target) => target.key), ['movie:1', 'tv:2', 'movie:100'])
+})
+
+test('el fondo móvil empieza por la portada, sigue con el resto y repite si faltan', () => {
+    const cover = ['https://x/w342/a.jpg', 'https://x/w342/b.jpg']
+    const extra = ['https://x/w185/b.jpg', 'https://x/w185/c.jpg']
+    assert.deepEqual(buildBackgroundCollageTiles(cover, extra, 5), [
+        'https://x/w342/a.jpg',
+        'https://x/w342/b.jpg',
+        'https://x/w185/c.jpg',
+        'https://x/w342/a.jpg',
+        'https://x/w342/b.jpg',
+    ])
+    assert.deepEqual(buildBackgroundCollageTiles([], [], 4), [])
 })
