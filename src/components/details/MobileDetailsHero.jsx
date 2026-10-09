@@ -7,13 +7,12 @@
 //     (150vw). NUNCA se recorta para que quepa otra cosa; con su borde
 //     inferior prolongado y difuminado;
 //   - fila de acciones justo debajo, con la cascada de entrada de la ficha;
-//   - debajo, lo que quepa sobre el navbar inferior (`scoreboardMode`): el
-//     marcador completo ('full'), solo sus puntuaciones con la barra de stats
-//     revelada al hacer scroll ('compact') o nada ('reveal': el marcador
-//     completo se revela con el scroll);
-//   - el grupo botones + marcador va PEGADO al navbar inferior: el sitio que
-//     sobre (`--mobile-hero-gap`) se deja entre la portada y los botones, donde
-//     está la prolongación difuminada del póster, no vacío bajo los botones;
+//   - debajo, en el sitio que queda hasta el navbar inferior
+//     (`scoreboardMode`): el marcador completo ('full') si cabe y, si no, solo
+//     sus puntuaciones con la barra de stats revelada al hacer scroll
+//     ('compact'). Siempre hay marcador: nunca quedan los botones solos;
+//   - los botones van SIEMPRE justo debajo de la portada, sin hueco entre
+//     ambos: el sitio que sobre queda bajo el marcador;
 //   - relevo con el scroll: la portada se desvanece mientras aparece el fondo
 //     de la página (`.sv-hero-scroll-out` / `.sv-hero-scroll-in` en
 //     globals.css), con un recorrido que se acorta en páginas cortas.
@@ -30,7 +29,7 @@
 // En modo 'compact' el envoltorio del marcador lleva MOBILE_STATS_REVEAL_BASE +
 // `statsRevealProps`: su fila de estadísticas (la marca `data-scoreboard-stats`
 // de DetailsStatsRow, que aquí se mide) queda oculta hasta hacer scroll. El
-// hueco de la portada mide `calc(var(--mobile-cover-h) + var(--mobile-hero-gap))`.
+// hueco de la portada mide `var(--mobile-cover-h)`.
 //
 // Las clases de revelado son copia de las de DetailsClient (allí son
 // constantes locales que sus tests leen del propio fichero); si cambian allí,
@@ -53,10 +52,6 @@ const MOBILE_BOTTOM_NAV_PX = 88
 // marcador y el navbar inferior (20px: con las píldoras de la temporada bajo
 // el marcador, 8px las dejaban pegadas al navbar).
 const MOBILE_SCOREBOARD_GAP_PX = 36
-// Aparición del marcador al revelarse con el scroll (pantallas muy bajas), la
-// de DetailsClient.
-export const MOBILE_SCOREBOARD_REVEAL_ANIMATION =
-    'max-sm:motion-safe:data-[mobile-reveal=shown]:*:animate-sv-mobile-scoreboard-reveal'
 // Entrada del marcador visible al cargar: la misma animación, justo después
 // de los botones.
 export const MOBILE_SCOREBOARD_ENTRY_ANIMATION =
@@ -108,9 +103,6 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
     // 'full' para pintar y medir el marcador completo; todo esto ocurre antes
     // de que se vean portada y marcador (esperan a que cargue la imagen).
     const [scoreboardMode, setScoreboardMode] = useState('full')
-    // Sitio sobrante bajo el grupo botones + marcador: se pasa ENCIMA de los
-    // botones para que el grupo quede pegado al navbar inferior.
-    const [heroGap, setHeroGap] = useState(0)
     const [secondaryVisible, setSecondaryVisible] = useState(false)
 
     useClientLayoutEffect(() => {
@@ -127,7 +119,8 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
 
     // Qué cabe bajo los botones. La portada mide siempre 150vw (el póster
     // entero): lo que queda entre el pie de los botones y el navbar inferior
-    // decide si va el marcador completo, solo sus puntuaciones o nada.
+    // decide si va el marcador completo o solo sus puntuaciones (en pantallas
+    // muy bajas, aunque no quepa entero: queda a un scroll).
     useClientLayoutEffect(() => {
         const row = actionRowRef.current
         const scoreboard = scoreboardRef.current
@@ -153,14 +146,8 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
             const space =
                 window.innerHeight - readBottomNavReserve() - top
                 - window.innerWidth * 1.5 - rowHeight - MOBILE_SCOREBOARD_GAP_PX
-            const mode = space >= fullHeight ? 'full' : space >= compactHeight ? 'compact' : 'reveal'
+            const mode = space >= fullHeight ? 'full' : 'compact'
             setScoreboardMode((current) => (current === mode ? current : mode))
-            // Lo que ocupa bajo los botones lo visible al cargar: el marcador
-            // completo o compacto (con su separación de 16px, ya en el hueco
-            // de MOBILE_SCOREBOARD_GAP_PX) o nada (se descuenta esa separación).
-            const used = mode === 'full' ? fullHeight : mode === 'compact' ? compactHeight : -16
-            const gap = Math.max(0, Math.floor(space - used))
-            setHeroGap((current) => (current === gap ? current : gap))
         }
         update()
         window.addEventListener('resize', update, { passive: true })
@@ -310,7 +297,6 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
             ? {
                 '--mobile-cover-top': `${coverTop}px`,
                 '--mobile-cover-h': '150vw',
-                '--mobile-hero-gap': `${heroGap}px`,
             }
             : undefined,
     }
