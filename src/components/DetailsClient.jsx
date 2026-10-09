@@ -35,7 +35,6 @@ import {
   useMemo,
   useCallback,
   useTransition,
-  startTransition,
   useSyncExternalStore,
 } from "react";
 import { createPortal } from "react-dom";
@@ -400,7 +399,7 @@ const MOBILE_ACTIONS_REVEAL_BASE =
 // la fila de acciones siguen con el revelado instantáneo). Se reproduce cada vez
 // que el atributo pasa a "shown", como las secciones de los dashboards.
 const MOBILE_SCOREBOARD_REVEAL_ANIMATION =
-  "max-sm:motion-safe:data-[mobile-reveal=shown]:*:animate-sv-mobile-scoreboard-reveal";
+  "max-sm:motion-safe:data-[mobile-reveal=shown]:*:animate-sv-mobile-scoreboard-reveal max-sm:*:[animation-duration:280ms]";
 
 // Umbral mínimo que evita revelar el bloque antes de que el usuario haya
 // abandonado el inicio de la ficha. El cruce visual preciso lo calcula el
@@ -413,12 +412,6 @@ const MOBILE_REVEAL_SHOW_AT_PX = 16;
 // su capa va al pie de la portada con `pb-2` (8px) y la fila de botones empieza
 // 12px por debajo (el `gap-5` de la columna menos su `-top-2`).
 const MOBILE_HERO_FIT_GAP_PX = 20;
-
-// Misma condición que el `@supports` de `.sv-hero-scroll-in` en globals.css:
-// con soporte, el progreso de scroll del hero lo anima el compositor y no hace
-// falta el listener que escribe `--sv-hero-scroll`.
-const HERO_SCROLL_TIMELINE_QUERY =
-  "(animation-timeline: scroll()) and (animation-range: 0% 100%)";
 
 // El título del hero mantiene su jerarquía normal cuando cabe en una fila. Si
 // no cabe, se compacta un paso medido para compensar la segunda línea sin
@@ -1472,7 +1465,6 @@ export default function DetailsClient({
   const [isMobileViewport, setIsMobileViewport] = useState(() => restoredValue(backSnapshot, "isMobileViewport", false)); // Viewport <= 640px
   // La fila de acciones con barra de progreso lleva su propia señal (ver
   // MOBILE_ACTIONS_REVEAL_ATTR).
-  const [mobileActionsVisible, setMobileActionsVisible] = useState(false);
   const pointerCardHoverEnabled = supportsHover && !isMobileViewport;
 
   // Con barra de progreso ("Viendo XX%") la fila de acciones (y el marcador)
@@ -1588,41 +1580,7 @@ export default function DetailsClient({
     if (supportsHover) setMobileClearOpen(false);
   }, [supportsHover]);
 
-  // MÓVIL: progreso de scroll `--sv-hero-scroll` (0→1) que dirige la transición del
-  // póster de portada a fondo (difuminado + escala + máscara, en globals.css). Se
-  // escribe en el <html> con un listener pasivo + rAF (sin re-render de React). La
-  // distancia (~55% de la ventana) es AJUSTABLE. En desktop se limpia y no se usa.
-  //
-  // SOLO RESPALDO: donde hay animaciones ligadas al scroll, `.sv-hero-scroll-in`
-  // y `.sv-hero-scroll-shade` hacen esto en el compositor. Escribir la variable
-  // en la raíz recalculaba el estilo de toda la ficha en cada fotograma y era
-  // lo que hacía avanzar a tirones el logo y los botones al arrastrar.
-  useEffect(() => {
-    const root = document.documentElement;
-    if (!isMobileViewport || CSS.supports?.(HERO_SCROLL_TIMELINE_QUERY)) {
-      root.style.removeProperty("--sv-hero-scroll");
-      return undefined;
-    }
-    let raf = 0;
-    const apply = () => {
-      raf = 0;
-      const dist = Math.max(1, window.innerHeight * 0.55);
-      const p = Math.min(1, Math.max(0, window.scrollY / dist));
-      root.style.setProperty("--sv-hero-scroll", p.toFixed(4));
-    };
-    const onScroll = () => {
-      if (!raf) raf = window.requestAnimationFrame(apply);
-    };
-    apply();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll, { passive: true });
-    return () => {
-      if (raf) window.cancelAnimationFrame(raf);
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-      root.style.removeProperty("--sv-hero-scroll");
-    };
-  }, [isMobileViewport]);
+  // El progreso del fondo y su respaldo se gestionan en useMobileDetailsHero.
 
   // MÓVIL: la fila de acciones con barra de progreso («Viendo») espera al
   // primer scroll y se revela en cuanto ELLA asoma por encima del navbar
@@ -1630,17 +1588,15 @@ export default function DetailsClient({
   // compacto, píldoras y pestañas) lo lleva la cabecera compartida
   // (`useMobileDetailsHero`), como en listas, colecciones y temporadas.
   //
-  // El listener pasivo calcula el umbral en el MISMO evento de scroll, sin
-  // esperar a rAF, que en móviles saturados puede llegar varios fotogramas
-  // después del cruce.
+  // Agrupar eventos en un fotograma y escribir solo en el DOM evita volver
+  // a renderizar la ficha completa durante el gesto.
   useEffect(() => {
     if (!isMobileViewport) {
-      setMobileActionsVisible(false);
       return undefined;
     }
 
-    setMobileActionsVisible(false);
     let actionsApplied = null;
+    let frame = 0;
     // Se busca en cada evento porque monta después, al resolverse
     // /api/progress.
     const syncActions = () => {
@@ -1651,25 +1607,30 @@ export default function DetailsClient({
       }
       const nextVisible =
         window.scrollY > MOBILE_REVEAL_SHOW_AT_PX &&
-        row.getBoundingClientRect().top <= window.innerHeight - 88;
+        (actionsApplied === true || row.getBoundingClientRect().top <= window.innerHeight - 88);
       if (nextVisible === actionsApplied) return;
       actionsApplied = nextVisible;
       row.setAttribute(MOBILE_ACTIONS_REVEAL_ATTR, nextVisible ? "shown" : "hidden");
       row.inert = !nextVisible;
-      startTransition(() => {
-        setMobileActionsVisible((current) =>
-          current === nextVisible ? current : nextVisible,
-        );
-      });
     };
 
+    const scheduleActions = () => {
+      if (!frame) frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        syncActions();
+      });
+    };
+    const mutations = new MutationObserver(scheduleActions);
+    if (mobileActionRowRef.current) mutations.observe(mobileActionRowRef.current, { childList: true, subtree: true });
     syncActions();
-    window.addEventListener("scroll", syncActions, { passive: true });
-    window.addEventListener("resize", syncActions, { passive: true });
+    window.addEventListener("scroll", scheduleActions, { passive: true });
+    window.addEventListener("resize", scheduleActions, { passive: true });
 
     return () => {
-      window.removeEventListener("scroll", syncActions);
-      window.removeEventListener("resize", syncActions);
+      mutations.disconnect();
+      if (frame) window.cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", scheduleActions);
+      window.removeEventListener("resize", scheduleActions);
     };
   }, [id, isMobileViewport]);
 
@@ -9761,7 +9722,7 @@ export default function DetailsClient({
                 {/* Este es el recuadro completo que se inclina */}
                 <div
                   ref={posterTiltRef}
-                  className={`relative rounded-none sm:rounded-2xl overflow-hidden bg-transparent will-change-transform poster-tilt-corner-mask ${
+                  className={`relative rounded-none sm:rounded-2xl overflow-visible sm:overflow-hidden bg-transparent will-change-transform poster-tilt-corner-mask ${
                     posterChromeReady
                       ? "sm:shadow-2xl sm:shadow-black/80 sm:bg-black/40"
                       : ""
@@ -9787,6 +9748,10 @@ export default function DetailsClient({
                       el fondo): el póster entero a todo el ancho (2:3,
                       `--mobile-cover-h`), como en listas, colecciones y
                       temporadas. Aquí solo queda el logo, al pie del póster;
+                      su sombra debe poder salir por abajo. `overflow:hidden`
+                      o `contain:paint` la cortaban en seco y dibujaban una
+                      línea sobre el fondo (especialmente con logos anchos).
+                      El recorte del marco se conserva solo en escritorio;
                       los botones van justo debajo y el marcador, centrado
                       entre ellos y el navbar inferior. La cabecera compartida
                       mide dónde cae (`coverSpacerRef`). Con barra de
@@ -9795,11 +9760,10 @@ export default function DetailsClient({
                       aspecto 2:3 / 16:9. */}
                   <div
                     ref={heroCoverSpacerRef}
-                    className={`relative w-full h-[var(--details-mobile-poster-height)] overflow-hidden bg-transparent will-change-auto sm:h-0 poster-aspect-box ${
+                    className={`relative w-full h-[var(--details-mobile-poster-height)] overflow-visible [contain:layout] sm:overflow-hidden sm:[contain:layout_paint] bg-transparent will-change-auto sm:h-0 poster-aspect-box ${
                       posterChromeReady ? "sm:bg-neutral-950" : ""
                     }`}
                     style={{
-                      contain: "layout paint",
                       // MÓVIL: el hueco de la portada fija (el póster entero,
                       // 150vw); los botones van justo debajo.
                       "--details-mobile-poster-height": "var(--mobile-cover-h, 150vw)",
@@ -10424,15 +10388,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     }
                     {...(mobileActionsWaitForScroll
                       ? {
-                          [MOBILE_ACTIONS_REVEAL_ATTR]: mobileActionsVisible
-                            ? "shown"
-                            : "hidden",
+                          [MOBILE_ACTIONS_REVEAL_ATTR]: "hidden",
                         }
                       : {})}
                     inert={
                       isMobileViewport &&
-                      mobileActionsWaitForScroll &&
-                      !mobileActionsVisible
+                      mobileActionsWaitForScroll
                     }
                   >
                   <DetailActionsRow
@@ -10593,7 +10554,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       ? "max-sm:invisible"
                       : detailsRestored || sequenceTransitionActive
                         ? ""
-                        : MOBILE_SCOREBOARD_ENTRY_ANIMATION
+                        : `${MOBILE_SCOREBOARD_ENTRY_ANIMATION} max-sm:*:[animation-duration:280ms]`
                 }`}
                 {...(mobileScoreboardMode === "compact" ? heroStatsRevealProps : {})}
                 {...(mobileActionsWaitForScroll ? heroRevealProps : {})}
