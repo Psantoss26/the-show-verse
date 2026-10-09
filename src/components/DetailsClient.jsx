@@ -9582,9 +9582,12 @@ export default function DetailsClient({
               ready={mobileHeroCoverReady}
               animate={!detailsRestored && !sequenceTransitionActive}
               collage={null}
-              // Bajo el póster, su reflejo muy difuminado en vez del fondo
-              // casi negro de la página.
+              // Bajo el póster, su parte central muy difuminada en vez del
+              // fondo casi negro de la página.
               blurredUnderlay
+              // Logo y botones legibles sobre cualquier póster: se oscurece
+              // su zona según lo claro que sea (medido), nada en los oscuros.
+              adaptiveContrast
             />
           </>
         ) : (
