@@ -959,7 +959,9 @@ export default function UnifiedListDetailsLayout({
                             className={`${isBackdropCover && hasInfoTabs ? '' : 'mb-6'} ${
                                 !mobileHero
                                     ? ''
-                                    : `${mobileScoreboardMode === 'compact' ? MOBILE_STATS_REVEAL_BASE : ''} ${
+                                    // Centrado entre los botones y el navbar
+                                    // inferior (`--mobile-scoreboard-shift`).
+                                    : `max-sm:mt-[var(--mobile-scoreboard-shift,0px)] ${mobileScoreboardMode === 'compact' ? MOBILE_STATS_REVEAL_BASE : ''} ${
                                         !animateMobileEntry
                                             ? ''
                                             : mobileCoverReady

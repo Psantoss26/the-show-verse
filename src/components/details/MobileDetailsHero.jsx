@@ -48,6 +48,10 @@ const MOBILE_STATS_REVEAL_ATTR = 'data-mobile-reveal-stats'
 export const MOBILE_STATS_REVEAL_BASE = [
     'max-sm:[&_[data-scoreboard-stats]]:grid max-sm:[&_[data-scoreboard-stats]]:grid-rows-[minmax(0,1fr)]',
     'max-sm:[&_[data-scoreboard-stats]]:overflow-hidden max-sm:[&_[data-scoreboard-stats]>*]:min-h-0',
+    // El scroller es `overflow-x-auto`, que hace `auto` también el eje
+    // vertical: a medio plegar/desplegar es más bajo que su contenido y
+    // pintaba una barra de scroll vertical. Solo se desplaza en horizontal.
+    'max-sm:[&_[data-scoreboard-stats]>*]:overflow-y-hidden max-sm:[&_[data-scoreboard-stats]>*]:[scrollbar-width:none]',
     'max-sm:[&_[data-scoreboard-stats]]:transition-[grid-template-rows,border-color]',
     'max-sm:[&_[data-scoreboard-stats]]:duration-[420ms] max-sm:[&_[data-scoreboard-stats]]:ease-[cubic-bezier(0.22,1,0.36,1)]',
     'max-sm:motion-reduce:[&_[data-scoreboard-stats]]:transition-none',
@@ -60,10 +64,10 @@ const MOBILE_REVEAL_ATTR = 'data-mobile-reveal'
 const MOBILE_REVEAL_SHOW_AT_PX = 16
 // Alto de la navegación inferior flotante que tapa el borde de la pantalla.
 const MOBILE_BOTTOM_NAV_PX = 88
-// Hueco entre los botones y el marcador (16px) más el que queda entre el
-// marcador y el navbar inferior (20px: con las píldoras de la temporada bajo
-// el marcador, 8px las dejaban pegadas al navbar).
-const MOBILE_SCOREBOARD_GAP_PX = 36
+// Hueco mínimo encima y debajo del marcador (botones → marcador → navbar
+// inferior). Con más sitio, el sobrante se reparte A PARTES IGUALES entre los
+// dos huecos (`--mobile-scoreboard-shift`).
+const MOBILE_SCOREBOARD_MIN_GAP_PX = 16
 // Entrada del marcador visible al cargar: la misma animación, justo después
 // de los botones.
 export const MOBILE_SCOREBOARD_ENTRY_ANIMATION =
@@ -77,18 +81,17 @@ export const MOBILE_POSTER_OVERSCAN = 1.02
 
 const useClientLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
 
-// Lo que tapa la navegación inferior flotante, medido en pantalla (incluye su
-// margen y la zona segura de la barra de gestos) más un poco de aire. Sin ella
-// en el DOM, la reserva de la ficha (6rem).
+// Borde superior de la navegación inferior flotante, en la ventana (incluye su
+// margen y la zona segura de la barra de gestos). Sin ella en el DOM, la
+// reserva de la ficha (6rem).
 const MOBILE_BOTTOM_NAV_SELECTOR = '.sv-navbar-bottom-shift'
-const MOBILE_BOTTOM_NAV_AIR_PX = 12
-function readBottomNavReserve() {
+function readBottomNavTop() {
     const nav = document.querySelector(MOBILE_BOTTOM_NAV_SELECTOR)
     // `offsetTop` (fijo: respecto a la ventana) y no el rectángulo: el navbar
     // se esconde con un `transform` al hacer scroll y eso no debe contar.
     const top = nav?.offsetTop
-    if (!Number.isFinite(top) || top <= 0) return 96
-    return Math.max(0, window.innerHeight - top) + MOBILE_BOTTOM_NAV_AIR_PX
+    if (!Number.isFinite(top) || top <= 0) return window.innerHeight - 96
+    return top
 }
 
 /**
@@ -115,6 +118,9 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
     // 'full' para pintar y medir el marcador completo; todo esto ocurre antes
     // de que se vean portada y marcador (esperan a que cargue la imagen).
     const [scoreboardMode, setScoreboardMode] = useState('full')
+    // Margen extra encima del marcador para que quede centrado entre los
+    // botones y el navbar inferior (puede ser negativo: ver abajo).
+    const [scoreboardShift, setScoreboardShift] = useState(0)
     const [secondaryVisible, setSecondaryVisible] = useState(false)
 
     useClientLayoutEffect(() => {
@@ -132,7 +138,11 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
     // Qué cabe bajo los botones. La portada mide siempre 150vw (el póster
     // entero): lo que queda entre el pie de los botones y el navbar inferior
     // decide si va el marcador completo o solo sus puntuaciones (en pantallas
-    // muy bajas, aunque no quepa entero: queda a un scroll).
+    // muy bajas, aunque no quepa entero: queda a un scroll). El marcador se
+    // CENTRA en ese hueco: el mismo margen de los botones a él que de él al
+    // navbar. La página pone `margin-top: var(--mobile-scoreboard-shift)` en
+    // su envoltorio; lo que ya hay entre botones y marcador sin ese margen
+    // (su `mb-4` y el `-top-2` de la fila) se mide y se descuenta.
     useClientLayoutEffect(() => {
         const row = actionRowRef.current
         const scoreboard = scoreboardRef.current
@@ -148,10 +158,13 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
             const top = spacer ? Math.max(0, Math.round(spacer.getBoundingClientRect().top + window.scrollY)) : 0
             setCoverTop((current) => (current === top ? current : top))
             if (!scoreboard) return
-            const rowHeight = Math.ceil(row.getBoundingClientRect().height || 60)
-            const total = Math.ceil(scoreboard.getBoundingClientRect().height)
+            const rowRect = row.getBoundingClientRect()
+            const scoreboardRect = scoreboard.getBoundingClientRect()
+            // Sin redondear: con `ceil`/`floor` el hueco de arriba salía ~2px
+            // más corto que el de abajo.
+            const total = scoreboardRect.height
             const statsRow = scoreboard.querySelector('[data-scoreboard-stats]')
-            const statsHeight = statsRow ? Math.ceil(statsRow.getBoundingClientRect().height) : 0
+            const statsHeight = statsRow ? statsRow.getBoundingClientRect().height : 0
             // Su alto completo solo se recuerda en modo 'full' (sin el
             // atributo de revelado): en 'compact' la fila está plegada o a
             // medio desplegar.
@@ -160,11 +173,20 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
             }
             const compactHeight = total - statsHeight
             const fullHeight = compactHeight + statsRowHeightRef.current
-            const space =
-                window.innerHeight - readBottomNavReserve() - top
-                - window.innerWidth * 1.5 - rowHeight - MOBILE_SCOREBOARD_GAP_PX
-            const mode = space >= fullHeight ? 'full' : 'compact'
+            // Sitio entre el pie de los botones (con el desplazamiento
+            // `-top-2` de su fila) y el navbar, tal como se ve sin scroll.
+            const rowBottom = rowRect.bottom + window.scrollY
+            const space = readBottomNavTop() - rowBottom
+            const mode = space - fullHeight >= MOBILE_SCOREBOARD_MIN_GAP_PX * 2 ? 'full' : 'compact'
             setScoreboardMode((current) => (current === mode ? current : mode))
+            // Hueco igual arriba y abajo; si ni así cabe (pantallas muy
+            // bajas), el mínimo arriba y el marcador queda a un scroll.
+            const visibleHeight = mode === 'full' ? fullHeight : compactHeight
+            const gap = Math.max(MOBILE_SCOREBOARD_MIN_GAP_PX, (space - visibleHeight) / 2)
+            const appliedShift = Number.parseFloat(getComputedStyle(scoreboard).marginTop) || 0
+            const baseGap = scoreboardRect.top - rowRect.bottom - appliedShift
+            const shift = Math.round((gap - baseGap) * 2) / 2
+            setScoreboardShift((current) => (current === shift ? current : shift))
         }
         update()
         window.addEventListener('resize', update, { passive: true })
@@ -317,6 +339,7 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
             ? {
                 '--mobile-cover-top': `${coverTop}px`,
                 '--mobile-cover-h': '150vw',
+                '--mobile-scoreboard-shift': `${scoreboardShift}px`,
             }
             : undefined,
     }
