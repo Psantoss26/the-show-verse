@@ -961,7 +961,11 @@ export default function UnifiedListDetailsLayout({
                                     ? ''
                                     // Centrado entre los botones y el navbar
                                     // inferior (`--mobile-scoreboard-shift`).
-                                    : `max-sm:mt-[var(--mobile-scoreboard-shift,0px)] ${mobileScoreboardMode === 'compact' ? MOBILE_STATS_REVEAL_BASE : ''} ${
+                                    // Solo lleva dos puntuaciones (TMDb e
+                                    // IMDb): tan ancho como la fila de botones
+                                    // o el navbar (`--mobile-actions-w`), no
+                                    // de borde a borde con hueco a los lados.
+                                    : `max-sm:mt-[var(--mobile-scoreboard-shift,0px)] max-sm:mx-auto max-sm:w-[var(--mobile-actions-w,100%)] max-sm:max-w-full ${mobileScoreboardMode === 'compact' ? MOBILE_STATS_REVEAL_BASE : ''} ${
                                         !animateMobileEntry
                                             ? ''
                                             : mobileCoverReady
