@@ -2237,6 +2237,41 @@ button:focus-visible > .sv-nav-glass > .sv-nav-glass__tint {
   }
 }
 
+/* El MISMO relevo en la ficha de teléfono del drawer (DetailModal en vista
+   "mobile"). Allí lo que se desplaza es el contenedor del panel, no la
+   ventana, y la portada y el fondo son capas HERMANAS de ese contenedor (van
+   detrás, fijas). Una línea de tiempo con nombre en el contenedor, publicada en
+   el panel con `timeline-scope`, se la hace llegar. Antes lo animaba framer
+   desde JS en cada evento de scroll: con el hilo principal ocupado, la portada
+   iba por detrás del contenido y el desplazamiento se notaba a golpes. Sin
+   soporte, DetailModal sigue con framer. El recorrido (`--sv-panel-relay-end`)
+   lo fija el panel según su alto. */
+@supports ((animation-timeline: --a) and (timeline-scope: --a)) {
+  .sv-panel-scroll-scope {
+    timeline-scope: --sv-panel-scroll;
+  }
+
+  .sv-panel-scroller {
+    scroll-timeline: --sv-panel-scroll block;
+  }
+
+  .sv-panel-relay-in,
+  .sv-panel-relay-shade,
+  .sv-panel-relay-out {
+    animation: sv-hero-scroll-in linear both;
+    animation-timeline: --sv-panel-scroll;
+    animation-range: 0px var(--sv-panel-relay-end, 55vh);
+  }
+
+  .sv-panel-relay-shade {
+    animation-name: sv-hero-scroll-shade;
+  }
+
+  .sv-panel-relay-out {
+    animation-name: sv-hero-scroll-out;
+  }
+}
+
 /* FONDO GLASS DEL NAVBAR SUPERIOR EN LA FICHA (móvil y tablet).
    ===================================================================
 
