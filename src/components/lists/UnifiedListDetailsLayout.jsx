@@ -640,10 +640,12 @@ export default function UnifiedListDetailsLayout({
         scoreboardRef: heroScoreboardRef,
         secondaryTriggerRef: heroSecondaryTriggerRef,
         isPhone,
-        scoreboardFits: heroScoreboardFits,
+        scoreboardMode: heroScoreboardMode,
         revealProps: heroRevealProps,
         rootStyle: heroRootStyle,
-    } = useMobileDetailsHero(mobileHero)
+    } = useMobileDetailsHero(mobileHero, { lock: mobileCoverReady })
+    // Qué cabe bajo los botones sin recortar la portada (solo teléfono).
+    const mobileScoreboardMode = mobileHero && isPhone ? heroScoreboardMode : 'full'
 
     // FONDO MÓVIL DE LAS LISTAS (sin portada oficial): el mosaico ampliado de
     // la portada (MobileCollageBackground). Solo en teléfono y cuando hay
@@ -939,11 +941,12 @@ export default function UnifiedListDetailsLayout({
                         {/* Móvil: el marcador de teléfono de la ficha
                             (`mobileScoresOnly`, el mismo de DetailsClient):
                             puntuaciones y stats repartidas a todo el ancho. Con
-                            la cabecera inmersiva va VISIBLE bajo los botones
-                            (la portada le deja sitio) y entra con la animación
-                            del marcador de la ficha justo después de ellos. Si
-                            no cabe (pantallas muy bajas), se revela al hacer
-                            scroll con la sinopsis (centinela de debajo). */}
+                            la cabecera inmersiva va bajo los botones según el
+                            sitio que deja la portada, que NUNCA se recorta:
+                            completo, solo puntuaciones ('compact') o, si no cabe
+                            nada, revelado con el scroll junto a la sinopsis
+                            (centinela de debajo). Entra con la animación del
+                            marcador de la ficha justo después de los botones. */}
                         <div
                             ref={heroScoreboardRef}
                             // El margen va en este envoltorio y no en el panel:
@@ -954,7 +957,7 @@ export default function UnifiedListDetailsLayout({
                             className={`${isBackdropCover && hasInfoTabs ? '' : 'mb-6'} ${
                                 !mobileHero
                                     ? ''
-                                    : !heroScoreboardFits
+                                    : mobileScoreboardMode === 'reveal'
                                         ? `${MOBILE_REVEAL_BASE} ${isBackNav ? '' : MOBILE_SCOREBOARD_REVEAL_ANIMATION}`
                                         : !animateMobileEntry
                                             ? ''
@@ -962,12 +965,13 @@ export default function UnifiedListDetailsLayout({
                                                 ? MOBILE_SCOREBOARD_ENTRY_ANIMATION
                                                 : 'max-sm:invisible'
                             }`}
-                            {...(mobileHero && !heroScoreboardFits ? heroRevealProps : {})}
+                            {...(mobileScoreboardMode === 'reveal' ? heroRevealProps : {})}
                         >
                             <DetailsScoreboardPanel
                                 mobileScoresOnly
                                 {...scoreboardRatings}
-                                statItems={scoreboardStats.length ? scoreboardStats : stats.map((stat) => ({
+                                // Compacto: solo las puntuaciones.
+                                statItems={mobileScoreboardMode === 'compact' ? [] : scoreboardStats.length ? scoreboardStats : stats.map((stat) => ({
                                     icon: stat.icon,
                                     label: stat.label,
                                     value: stat.value,

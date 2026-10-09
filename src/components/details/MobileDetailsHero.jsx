@@ -3,11 +3,13 @@
 // CABECERA MÓVIL INMERSIVA (<640) compartida por las páginas de detalle que no
 // son la ficha principal: listas y colecciones (UnifiedListDetailsLayout) y
 // temporadas (SeasonDetailsClient). Reproduce la composición de DetailsClient:
-//   - portada FIJA pegada arriba, como mucho 2:3 a todo el ancho (sin recorte
-//     lateral), con su borde inferior prolongado y difuminado;
+//   - portada FIJA pegada arriba: el póster ENTERO, a todo el ancho y en 2:3
+//     (150vw). NUNCA se recorta para que quepa otra cosa; con su borde
+//     inferior prolongado y difuminado;
 //   - fila de acciones justo debajo, con la cascada de entrada de la ficha;
-//   - marcador visible bajo los botones si cabe sobre el navbar inferior (la
-//     portada le deja sitio); si no, se revela con el scroll;
+//   - debajo, lo que quepa sobre el navbar inferior (`scoreboardMode`): el
+//     marcador completo ('full'), solo sus puntuaciones ('compact') o nada
+//     ('reveal': el marcador completo se revela con el scroll);
 //   - relevo con el scroll: la portada se desvanece mientras aparece el fondo
 //     de la página (`.sv-hero-scroll-out` / `.sv-hero-scroll-in` en
 //     globals.css), con un recorrido que se acorta en páginas cortas.
@@ -21,6 +23,8 @@
 // acciones, `scoreboardRef` en el envoltorio del marcador (SIN márgenes
 // propios: se mide su alto) y `secondaryTriggerRef` en un centinela antes de
 // lo que se revela con el scroll, que lleva `revealProps` + MOBILE_REVEAL_BASE.
+// En modo 'compact' la página pinta el marcador sin su fila de estadísticas
+// (la marca `data-scoreboard-stats` de DetailsStatsRow, que aquí se mide).
 //
 // Las clases de revelado son copia de las de DetailsClient (allí son
 // constantes locales que sus tests leen del propio fichero); si cambian allí,
@@ -55,26 +59,49 @@ export const MOBILE_POSTER_OVERSCAN = 1.02
 
 const useClientLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
 
+// Lo que tapa la navegación inferior flotante, medido en pantalla (incluye su
+// margen y la zona segura de la barra de gestos) más un poco de aire. Sin ella
+// en el DOM, la reserva de la ficha (6rem).
+const MOBILE_BOTTOM_NAV_SELECTOR = '.sv-navbar-bottom-shift'
+const MOBILE_BOTTOM_NAV_AIR_PX = 12
+function readBottomNavReserve() {
+    const nav = document.querySelector(MOBILE_BOTTOM_NAV_SELECTOR)
+    // `offsetTop` (fijo: respecto a la ventana) y no el rectángulo: el navbar
+    // se esconde con un `transform` al hacer scroll y eso no debe contar.
+    const top = nav?.offsetTop
+    if (!Number.isFinite(top) || top <= 0) return 96
+    return Math.max(0, window.innerHeight - top) + MOBILE_BOTTOM_NAV_AIR_PX
+}
+
 /**
  * Estado y medidas de la cabecera inmersiva. `enabled`: la página la usa (en
- * teléfono; desde `sm` nada de esto aplica).
+ * teléfono; desde `sm` nada de esto aplica). `lock`: la portada ya se ve; desde
+ * entonces lo que hay bajo los botones queda FIJO y solo se recalcula si cambia
+ * el ancho de la ventana (no por datos que llegan, ni por la barra de
+ * direcciones, que cambia el alto al hacer scroll).
  */
-export function useMobileDetailsHero(enabled) {
+export function useMobileDetailsHero(enabled, { lock = false } = {}) {
     const rootRef = useRef(null)
     const coverSpacerRef = useRef(null)
     const actionRowRef = useRef(null)
     const scoreboardRef = useRef(null)
     const secondaryTriggerRef = useRef(null)
     const heroScrollEndRef = useRef(0)
+    const lockRef = useRef(lock)
+    // Alto de la fila de estadísticas del marcador, recordado de cuando se
+    // pintó completo (en modo 'compact' no está en el DOM).
+    const statsRowHeightRef = useRef(0)
     const [isPhone, setIsPhone] = useState(false)
-    const [actionRowHeight, setActionRowHeight] = useState(60)
     const [coverTop, setCoverTop] = useState(0)
-    const [scoreboardHeight, setScoreboardHeight] = useState(120)
-    // ¿Cabe el marcador sobre el navbar inferior sin hacer scroll? En pantallas
-    // muy bajas la portada no cede más y el marcador se revela con el scroll,
-    // como en DetailsClient.
-    const [scoreboardFits, setScoreboardFits] = useState(true)
+    // Qué cabe bajo los botones sin tocar la portada (ver arriba). Arranca en
+    // 'full' para pintar y medir el marcador completo; todo esto ocurre antes
+    // de que se vean portada y marcador (esperan a que cargue la imagen).
+    const [scoreboardMode, setScoreboardMode] = useState('full')
     const [secondaryVisible, setSecondaryVisible] = useState(false)
+
+    useClientLayoutEffect(() => {
+        lockRef.current = lock
+    }, [lock])
 
     useClientLayoutEffect(() => {
         const media = window.matchMedia(PHONE_QUERY)
@@ -84,31 +111,36 @@ export function useMobileDetailsHero(enabled) {
         return () => media.removeEventListener('change', update)
     }, [])
 
-    // Alto de la portada = pantalla menos la fila de acciones (MEDIDA) y la
-    // navegación inferior, como en la ficha: en la primera vista solo se ven
-    // portada y botones, justo encima del navbar inferior. También se mide el
-    // marcador, que va visible debajo de los botones: la portada le deja su
-    // sitio para que no quede tapado por el navbar inferior.
+    // Qué cabe bajo los botones. La portada mide siempre 150vw (el póster
+    // entero): lo que queda entre el pie de los botones y el navbar inferior
+    // decide si va el marcador completo, solo sus puntuaciones o nada.
     useClientLayoutEffect(() => {
         const row = actionRowRef.current
         const scoreboard = scoreboardRef.current
         if (!enabled || !row) return undefined
+        let lastWidth = window.innerWidth
         const update = () => {
-            const nextRow = Math.max(1, Math.ceil(row.getBoundingClientRect().height || 60))
-            setActionRowHeight((current) => (current === nextRow ? current : nextRow))
+            const widthChanged = window.innerWidth !== lastWidth
+            lastWidth = window.innerWidth
+            if (lockRef.current && !widthChanged) return
             // Posición del hueco en el documento (no en pantalla), así no
             // depende del scroll.
             const spacer = coverSpacerRef.current
-            const nextTop = spacer ? Math.max(0, Math.round(spacer.getBoundingClientRect().top + window.scrollY)) : 0
-            setCoverTop((current) => (current === nextTop ? current : nextTop))
+            const top = spacer ? Math.max(0, Math.round(spacer.getBoundingClientRect().top + window.scrollY)) : 0
+            setCoverTop((current) => (current === top ? current : top))
             if (!scoreboard) return
-            const nextScoreboard = Math.ceil(scoreboard.getBoundingClientRect().height)
-            setScoreboardHeight((current) => (current === nextScoreboard ? current : nextScoreboard))
-            // Misma cuenta que `--mobile-cover-h`: cabe si, dejándole su sitio,
-            // a la portada aún le quedan los 125vw mínimos.
-            const available = window.innerHeight - 96 - nextRow - nextTop
-            const fits = available - (nextScoreboard + MOBILE_SCOREBOARD_GAP_PX) >= window.innerWidth * 1.25
-            setScoreboardFits((current) => (current === fits ? current : fits))
+            const rowHeight = Math.ceil(row.getBoundingClientRect().height || 60)
+            const total = Math.ceil(scoreboard.getBoundingClientRect().height)
+            const statsRow = scoreboard.querySelector('[data-scoreboard-stats]')
+            const statsHeight = statsRow ? Math.ceil(statsRow.getBoundingClientRect().height) : 0
+            if (statsHeight) statsRowHeightRef.current = statsHeight
+            const compactHeight = total - statsHeight
+            const fullHeight = compactHeight + statsRowHeightRef.current
+            const space =
+                window.innerHeight - readBottomNavReserve() - top
+                - window.innerWidth * 1.5 - rowHeight - MOBILE_SCOREBOARD_GAP_PX
+            const mode = space >= fullHeight ? 'full' : space >= compactHeight ? 'compact' : 'reveal'
+            setScoreboardMode((current) => (current === mode ? current : mode))
         }
         update()
         window.addEventListener('resize', update, { passive: true })
@@ -227,9 +259,6 @@ export function useMobileDetailsHero(enabled) {
         }
     }, [enabled, isPhone])
 
-    // Alto que deja la pantalla a la portada con los botones justo encima del
-    // navbar inferior (la fórmula de DetailsClient).
-    const available = `(100svh - 6rem - ${actionRowHeight}px - ${coverTop}px - env(safe-area-inset-bottom))`
     // Solo se oculta en teléfono: en tablet/escritorio las variantes `max-sm:`
     // no aplican, pero `inert` sí bloquearía el foco.
     const secondaryHidden = enabled && isPhone && !secondaryVisible
@@ -241,29 +270,18 @@ export function useMobileDetailsHero(enabled) {
         scoreboardRef,
         secondaryTriggerRef,
         isPhone,
-        scoreboardFits,
+        scoreboardMode,
         revealProps: enabled
             ? {
                 [MOBILE_REVEAL_ATTR]: secondaryVisible ? 'shown' : 'hidden',
                 inert: secondaryHidden,
             }
             : {},
-        // Alto de la portada:
-        //  - Como mucho 2:3 a todo el ancho (150vw): entra entera de lado a
-        //    lado, sin el recorte lateral de `cover` en una caja más alta que
-        //    el póster.
-        //  - Deja sitio a botones Y marcador (con su separación) sobre el
-        //    navbar inferior; si no cabe, se recorta por arriba.
-        //  - Pero nunca menos de 125vw: si así no cabe, el marcador se revela
-        //    con el scroll, como en la ficha, y la portada recupera todo el
-        //    alto que deja a los botones visibles (sin pasar de 2:3).
-        //  - Y nunca más del alto que deja a los botones visibles.
+        // La portada: el póster entero (2:3 a todo el ancho), siempre.
         rootStyle: enabled
             ? {
                 '--mobile-cover-top': `${coverTop}px`,
-                '--mobile-cover-h': scoreboardFits
-                    ? `min(150vw, ${available}, max(calc(${available} - ${scoreboardHeight + MOBILE_SCOREBOARD_GAP_PX}px), 125vw))`
-                    : `min(150vw, ${available})`,
+                '--mobile-cover-h': '150vw',
             }
             : undefined,
     }
