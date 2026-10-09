@@ -32,9 +32,17 @@ test('mobile scoreboard starts compact, expands on scroll and collapses at the t
         }
         const revealed = holder.dataset.mobileRevealStats === 'shown' && !row.inert;
         window.scrollTo({ top: 0, behavior: 'instant' });
-        await new Promise((resolve) => setTimeout(resolve, 550));
+        const collapseSamples = [];
+        const started = performance.now();
+        while (performance.now() - started < 550) {
+          await new Promise(requestAnimationFrame);
+          collapseSamples.push({
+            height: row.getBoundingClientRect().height,
+            cover: getComputedStyle(holder).getPropertyValue('--mobile-cover-h').trim(),
+          });
+        }
         return {
-          samples, revealed, initialHidden,
+          samples, collapseSamples, revealed, initialHidden,
           collapsedHeight: row.getBoundingClientRect().height,
           reset: holder.dataset.mobileRevealStats === 'hidden' && row.inert,
           overflow: document.documentElement.scrollWidth > innerWidth,
@@ -47,7 +55,9 @@ test('mobile scoreboard starts compact, expands on scroll and collapses at the t
       assert.ok(result.collapsedHeight <= 2, 'returning to the top must restore the compact shape');
       if (reducedMotion === 'no-preference') {
         assert.ok(heights.some((height) => height > 2 && height < heights.at(-1) - 2), 'expansion must have intermediate animation frames');
+        assert.ok(result.collapseSamples.some(({ height }) => height > 2 && height < heights.at(-1) - 2), 'collapse must also have intermediate frames');
       }
+      assert.equal(new Set(result.collapseSamples.map(({ cover }) => cover)).size, 1, 'stats animation must not resize the poster');
       assert.ok(result.initialHidden, 'async stats must start outside the focus order');
       assert.ok(result.revealed, 'stats must reveal and become accessible');
       assert.ok(result.reset, 'hidden stats must leave the focus order');
