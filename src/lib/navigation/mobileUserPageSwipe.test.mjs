@@ -59,7 +59,7 @@ test("la captura global replica el gesto de Perfil, también en fichas de usuari
   assert.match(navigation, /getUserDetailsSequence\(pathname\)/);
   assert.match(navigation, /isDetailsInitialHeroVisible/);
   assert.match(navigation, /data-details-mobile-secondary-trigger/);
-  assert.match(navigation, /secondaryTrigger\.getBoundingClientRect\(\)\.top >= window\.innerHeight - 88/);
+  assert.match(navigation, /window\.scrollY <= 16 \|\|\s+secondaryTrigger\.getBoundingClientRect\(\)\.top > window\.innerHeight - 88/);
   assert.match(navigation, /saveUserDetailsSequenceFromLink\(/);
   assert.match(navigation, /target\.closest\('a\[href\^="\/details\/"\]'\)/);
   assert.match(navigation, /event\.currentTarget/);
@@ -79,7 +79,7 @@ test("la captura global replica el gesto de Perfil, también en fichas de usuari
     new URL("../../components/DetailsClient.jsx", import.meta.url),
     "utf8",
   );
-  assert.match(detailsClient, /ref=\{mobileSecondaryTriggerRef\}\s+data-details-mobile-secondary-trigger/);
+  assert.match(detailsClient, /ref=\{heroSecondaryTriggerRef\}\s+data-details-mobile-secondary-trigger/);
 
   // Las filas horizontales y las pestañas del Perfil ceden también el gesto
   // entre páginas, no solo el de secciones del propio Perfil.

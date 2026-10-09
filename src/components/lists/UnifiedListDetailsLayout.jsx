@@ -877,7 +877,10 @@ export default function UnifiedListDetailsLayout({
                                     initial={animateMobileEntry ? { opacity: 0, y: 18, scale: 0.94 } : false}
                                     animate={{ opacity: 1, y: 0, scale: 1 }}
                                     transition={{ duration: 0.48, delay: 0.14, ease: [0.16, 1, 0.3, 1] }}
-                                    className="pointer-events-none absolute inset-x-0 bottom-2 flex flex-col items-center p-4 text-center motion-reduce:!transform-none motion-reduce:!opacity-100"
+                                    // Al pie de la portada (4px de relleno abajo):
+                                    // con el `p-4` y `bottom-2` de antes quedaban
+                                    // 36px hasta los botones; así, ~16px.
+                                    className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center px-4 pb-1 pt-4 text-center motion-reduce:!transform-none motion-reduce:!opacity-100"
                                 >
                                     <div className="mb-2 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-yellow-300 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
                                         <Film className="h-4 w-4" />

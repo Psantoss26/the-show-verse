@@ -520,7 +520,7 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
 const MOBILE_COVER_EXTEND_PX = 200
 const MOBILE_COVER_BLUR_BAND_PX = 64
 // Curva suave (smoothstep) para la entrada de la capa difuminada.
-const MOBILE_COVER_EXTEND_MASK = `linear-gradient(to bottom,
+const buildCoverExtendMask = (extendPx) => `linear-gradient(to bottom,
     transparent calc(var(--mobile-cover-h) - ${MOBILE_COVER_BLUR_BAND_PX}px),
     rgba(0, 0, 0, 0.104) calc(var(--mobile-cover-h) - ${MOBILE_COVER_BLUR_BAND_PX * 0.8}px),
     rgba(0, 0, 0, 0.352) calc(var(--mobile-cover-h) - ${MOBILE_COVER_BLUR_BAND_PX * 0.6}px),
@@ -528,11 +528,17 @@ const MOBILE_COVER_EXTEND_MASK = `linear-gradient(to bottom,
     rgba(0, 0, 0, 0.896) calc(var(--mobile-cover-h) - ${MOBILE_COVER_BLUR_BAND_PX * 0.2}px),
     #000 var(--mobile-cover-h),
     #000 calc(var(--mobile-cover-h) + 16px),
-    rgba(0, 0, 0, 0.784) calc(var(--mobile-cover-h) + ${MOBILE_COVER_EXTEND_PX * 0.35}px),
-    rgba(0, 0, 0, 0.5) calc(var(--mobile-cover-h) + ${MOBILE_COVER_EXTEND_PX * 0.55}px),
-    rgba(0, 0, 0, 0.216) calc(var(--mobile-cover-h) + ${MOBILE_COVER_EXTEND_PX * 0.75}px),
-    rgba(0, 0, 0, 0.058) calc(var(--mobile-cover-h) + ${MOBILE_COVER_EXTEND_PX * 0.9}px),
-    transparent calc(var(--mobile-cover-h) + ${MOBILE_COVER_EXTEND_PX}px))`
+    rgba(0, 0, 0, 0.784) calc(var(--mobile-cover-h) + ${extendPx * 0.35}px),
+    rgba(0, 0, 0, 0.5) calc(var(--mobile-cover-h) + ${extendPx * 0.55}px),
+    rgba(0, 0, 0, 0.216) calc(var(--mobile-cover-h) + ${extendPx * 0.75}px),
+    rgba(0, 0, 0, 0.058) calc(var(--mobile-cover-h) + ${extendPx * 0.9}px),
+    transparent calc(var(--mobile-cover-h) + ${extendPx}px))`
+const MOBILE_COVER_EXTEND_MASK = buildCoverExtendMask(MOBILE_COVER_EXTEND_PX)
+// Con el fondo difuminado debajo (`blurredUnderlay`) la prolongación es más
+// corta: es la última fila del póster, casi siempre oscura, y en 200px tapaba
+// el color del fondo justo donde van los botones.
+const MOBILE_COVER_EXTEND_SHORT_PX = 100
+const MOBILE_COVER_EXTEND_SHORT_MASK = buildCoverExtendMask(MOBILE_COVER_EXTEND_SHORT_PX)
 // Estirado horizontal de la capa difuminada: lleva fuera de la pantalla los
 // laterales, donde el desenfoque mezcla con transparente y oscurecía los
 // bordes. Solo en horizontal, así las filas siguen alineadas con el póster.
@@ -551,7 +557,26 @@ const MOBILE_COVER_SHADE = `linear-gradient(to bottom,
     rgba(10, 10, 10, 0.72) ${MOBILE_COVER_SHADE_LEAD_PX + 130}px,
     rgba(10, 10, 10, 0.86) 100%)`
 
-export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, collage, collageUnderlay, ready, animate }) {
+// REFLEJO DIFUMINADO bajo la portada (`blurredUnderlay`, la ficha): sin él, lo
+// que queda bajo el póster (botones y marcador) es el fondo casi negro de la
+// página. Debajo de todo va el MISMO póster, su parte central (caras, cielo:
+// donde está el color; un reflejo del borde inferior repetía su franja
+// oscura), muy difuminado y algo oscurecido, hasta el pie de la pantalla. La
+// prolongación del borde, más corta, hace de transición entre los dos. El velo de los botones pasa a ser más suave y llega también hasta
+// abajo (`MOBILE_COVER_SHADE_SOFT`): con el de siempre, que acaba al 86% a
+// 200px del borde, el reflejo apenas se veía y quedaba un escalón donde acaba.
+const MOBILE_COVER_UNDERLAY_MASK = `linear-gradient(to bottom,
+    transparent calc(var(--mobile-cover-h) - 48px),
+    #000 calc(var(--mobile-cover-h) + 8px))`
+const MOBILE_COVER_SHADE_SOFT = `linear-gradient(to bottom,
+    rgba(10, 10, 10, 0) 0px,
+    rgba(10, 10, 10, 0.08) ${MOBILE_COVER_SHADE_LEAD_PX * 0.5}px,
+    rgba(10, 10, 10, 0.2) ${MOBILE_COVER_SHADE_LEAD_PX}px,
+    rgba(10, 10, 10, 0.36) ${MOBILE_COVER_SHADE_LEAD_PX + 90}px,
+    rgba(10, 10, 10, 0.46) ${MOBILE_COVER_SHADE_LEAD_PX + 220}px,
+    rgba(10, 10, 10, 0.52) 100%)`
+
+export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, collage, collageUnderlay, blurredUnderlay = false, ready, animate }) {
     const highRef = useRef(null)
     const [highSrc, setHighSrc] = useState(null)
     const firstSrc = lowSrc || src
@@ -599,6 +624,32 @@ export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, 
                 por su fundido inferior (la prolongación difuminada del
                 mosaico, ver UnifiedListDetailsLayout). */}
             {hasImage ? null : collageUnderlay}
+            {hasImage && blurredUnderlay ? (
+                <div
+                    className="pointer-events-none absolute inset-x-0 top-0 overflow-hidden"
+                    style={{
+                        height: 'calc(var(--mobile-cover-h) + 100lvh)',
+                        WebkitMaskImage: MOBILE_COVER_UNDERLAY_MASK,
+                        maskImage: MOBILE_COVER_UNDERLAY_MASK,
+                    }}
+                >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                        src={firstSrc}
+                        alt=""
+                        decoding="async"
+                        className="absolute inset-x-0 w-full object-cover object-center"
+                        style={{
+                            top: 'calc(var(--mobile-cover-h) - 48px)',
+                            height: 'calc(100lvh - var(--mobile-cover-h) + 96px)',
+                            // Estirado a lo ancho para que el desenfoque no
+                            // oscurezca los laterales.
+                            transform: `scaleX(${MOBILE_COVER_EXTEND_SCALE_X})`,
+                            filter: 'blur(32px) brightness(0.7) saturate(1.15)',
+                        }}
+                    />
+                </div>
+            ) : null}
             <div
                 className="relative overflow-hidden"
                 style={{ height: 'var(--mobile-cover-h)', WebkitMaskImage: mask, maskImage: mask }}
@@ -649,8 +700,8 @@ export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, 
                     className="pointer-events-none absolute inset-x-0 top-0 blur-[12px]"
                     style={{
                         height: `calc(var(--mobile-cover-h) + ${MOBILE_COVER_EXTEND_PX}px)`,
-                        WebkitMaskImage: MOBILE_COVER_EXTEND_MASK,
-                        maskImage: MOBILE_COVER_EXTEND_MASK,
+                        WebkitMaskImage: blurredUnderlay ? MOBILE_COVER_EXTEND_SHORT_MASK : MOBILE_COVER_EXTEND_MASK,
+                        maskImage: blurredUnderlay ? MOBILE_COVER_EXTEND_SHORT_MASK : MOBILE_COVER_EXTEND_MASK,
                     }}
                 >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -682,8 +733,11 @@ export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, 
                     className="pointer-events-none absolute inset-x-0"
                     style={{
                         top: `calc(var(--mobile-cover-h) - ${MOBILE_COVER_SHADE_LEAD_PX}px)`,
-                        height: MOBILE_COVER_EXTEND_PX + MOBILE_COVER_SHADE_LEAD_PX,
-                        backgroundImage: MOBILE_COVER_SHADE,
+                        // Con el reflejo, hasta el pie de la pantalla.
+                        height: blurredUnderlay
+                            ? `calc(100lvh + ${MOBILE_COVER_SHADE_LEAD_PX}px)`
+                            : MOBILE_COVER_EXTEND_PX + MOBILE_COVER_SHADE_LEAD_PX,
+                        backgroundImage: blurredUnderlay ? MOBILE_COVER_SHADE_SOFT : MOBILE_COVER_SHADE,
                     }}
                 />
             ) : null}
