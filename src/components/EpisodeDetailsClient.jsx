@@ -23,6 +23,7 @@ import {
   Users as UsersIcon,
   MonitorPlay,
   ImageOff,
+  Link2,
   Play as PlayIcon,
 } from "lucide-react";
 import { offlineMutationFetch } from "@/lib/offline/syncQueue";
@@ -31,7 +32,11 @@ import DetailsInfoTabs from "@/components/details/DetailsInfoTabs";
 import { AnimatedSection } from "@/components/details/AnimatedSection";
 import AnimatedPosterFrame from "@/components/details/AnimatedPosterFrame";
 import StreamingHoverOverlay from "@/components/details/StreamingHoverOverlay";
-import DetailsScoreboardPanel from "@/components/details/DetailsScoreboardPanel";
+import DetailsScoreboardPanel, {
+  ScoreboardPill,
+  ScoreboardPillRow,
+} from "@/components/details/DetailsScoreboardPanel";
+import { ActionShareButton } from "@/components/details/DetailHeaderBits";
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
 import {
   buildTraktHref,
@@ -290,6 +295,7 @@ export default function EpisodeDetailsClient({
 
   const showName = show?.name || "Serie";
   const epName = episode?.name || `Episodio ${episodeNumber}`;
+  const shareText = `Echa un vistazo a ${epName} de ${showName} en The Show Verse`;
   const traktShowWatchedStorageKey = `showverse:trakt:showWatched:${showId}`;
   const episodeExternalLinks = useMemo(
     () =>
@@ -795,6 +801,7 @@ export default function EpisodeDetailsClient({
   const [watchedBusy, setWatchedBusy] = useState(false);
   const [episodePlaysOpen, setEpisodePlaysOpen] = useState(false);
   const [platformsOpen, setPlatformsOpen] = useState(false);
+  const [externalLinksOpen, setExternalLinksOpen] = useState(false);
   const [episodePlaysLoading, setEpisodePlaysLoading] = useState(false);
   const [episodePlaysLoaded, setEpisodePlaysLoaded] = useState(false);
   const [episodePlays, setEpisodePlays] = useState({
@@ -1552,9 +1559,13 @@ export default function EpisodeDetailsClient({
               />
             </div>
 
-            {/* SCOREBOARD */}
+            {/* SCOREBOARD. MÓVIL: el de la ficha y las temporadas
+                (`mobileScoresOnly`): puntuaciones y stats repartidas a todo el
+                ancho; Plataformas, Enlaces y Compartir van debajo como
+                píldoras. Desde `sm`, el marcador de siempre con sus botones. */}
             <DetailsScoreboardPanel
-              className="mb-6"
+              mobileScoresOnly
+              className="mb-6 max-sm:mb-0"
               loading={tScoreboard.loading}
               tmdb={{
                 value: vote?.toFixed(1),
@@ -1588,13 +1599,48 @@ export default function EpisodeDetailsClient({
                 href: buildImdbHref({ href: imdbUrl, title: showName }),
               }}
               stats={tScoreboard?.stats}
+              // Reserva la fila de estadísticas mientras Trakt responde: el
+              // marcador nace con su alto final.
+              statsPending={
+                !initialScoreboardHasStats &&
+                traktScoreSettledKey !== scoreKey &&
+                !hasNumericScoreboardStats(tScoreboard?.stats)
+              }
               showFavoritedStat={false}
               onMorePlatforms={() => setPlatformsOpen(true)}
               share={{
                 title: epName,
-                text: `Echa un vistazo a ${epName} de ${showName} en The Show Verse`,
+                text: shareText,
               }}
             />
+
+            {/* Teléfono: Plataformas, Enlaces y Compartir en una fila de
+                iconos bajo el marcador, como en la ficha. Cada uno abre su
+                modal. */}
+            <ScoreboardPillRow className="mt-3 mb-6 sm:hidden">
+              <ScoreboardPill
+                iconOnly
+                icon={MonitorPlay}
+                label="Plataformas"
+                onClick={() => setPlatformsOpen(true)}
+                aria-haspopup="dialog"
+                aria-label="Abrir plataformas disponibles"
+              />
+              <ScoreboardPill
+                iconOnly
+                icon={Link2}
+                label="Enlaces"
+                onClick={() => setExternalLinksOpen(true)}
+                aria-haspopup="dialog"
+                aria-label="Abrir enlaces externos"
+              />
+              <ActionShareButton
+                variant="pill"
+                iconOnly
+                title={epName}
+                text={shareText}
+              />
+            </ScoreboardPillRow>
 
           </div>
         </motion.div>
@@ -1614,8 +1660,6 @@ export default function EpisodeDetailsClient({
             network={showNetwork}
             productionText={episodeProduction}
             showPlatformsTab={false}
-            externalLinks={episodeExternalLinks}
-            showExternalLinksTab
             showAwardsTab={false}
             showAwardsProductionCard={false}
             detailCards={episodeDetailCards}
@@ -1782,6 +1826,12 @@ export default function EpisodeDetailsClient({
           onClose={() => setPlatformsOpen(false)}
           links={episodePlatformItems}
           mode="platforms"
+        />
+
+        <ExternalLinksModal
+          open={externalLinksOpen}
+          onClose={() => setExternalLinksOpen(false)}
+          links={episodeExternalLinks}
         />
       </div>
     </div>

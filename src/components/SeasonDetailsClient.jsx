@@ -1701,7 +1701,9 @@ export default function SeasonDetailsClient({
                 cabecera mide su alto. */}
             <div
               ref={heroScoreboardRef}
-              className={`mb-6 ${mobileScoreboardMode === "compact" ? MOBILE_STATS_REVEAL_BASE : ""} ${
+              // Centrado entre los botones y el navbar inferior (ver
+              // `--mobile-scoreboard-shift` en details/MobileDetailsHero).
+              className={`mb-6 max-sm:mt-[var(--mobile-scoreboard-shift,0px)] ${mobileScoreboardMode === "compact" ? MOBILE_STATS_REVEAL_BASE : ""} ${
                 !animateMobileEntry
                   ? ""
                   : mobileCoverReady
