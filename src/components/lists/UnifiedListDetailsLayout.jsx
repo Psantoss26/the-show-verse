@@ -33,7 +33,6 @@ import {
     MOBILE_REVEAL_BASE,
     MOBILE_STATS_REVEAL_BASE,
     MOBILE_SCOREBOARD_ENTRY_ANIMATION,
-    MOBILE_SCOREBOARD_REVEAL_ANIMATION,
     MobileHeroCover,
     useMobileDetailsHero,
 } from '@/components/details/MobileDetailsHero'
@@ -822,9 +821,8 @@ export default function UnifiedListDetailsLayout({
                         <div
                             ref={heroCoverSpacerRef}
                             className="relative -mx-4 w-[calc(100%+2rem)] max-w-none flex-shrink-0 sm:hidden"
-                            // La portada más el sitio sobrante: el grupo botones
-                            // + marcador queda pegado al navbar inferior.
-                            style={{ height: 'calc(var(--mobile-cover-h) + var(--mobile-hero-gap, 0px))' }}
+                            // Solo la portada: los botones van justo debajo.
+                            style={{ height: 'var(--mobile-cover-h)' }}
                         >
                             {showMobileTitle && mobileCoverReady ? (
                                 <motion.div
@@ -947,10 +945,10 @@ export default function UnifiedListDetailsLayout({
                             puntuaciones y stats repartidas a todo el ancho. Con
                             la cabecera inmersiva va bajo los botones según el
                             sitio que deja la portada, que NUNCA se recorta:
-                            completo, solo puntuaciones ('compact') o, si no cabe
-                            nada, revelado con el scroll junto a la sinopsis
-                            (centinela de debajo). Entra con la animación del
-                            marcador de la ficha justo después de los botones. */}
+                            completo o solo puntuaciones ('compact', la barra de
+                            stats se revela con el scroll). Entra con la
+                            animación del marcador de la ficha justo después de
+                            los botones. */}
                         <div
                             ref={heroScoreboardRef}
                             // El margen va en este envoltorio y no en el panel:
@@ -961,21 +959,15 @@ export default function UnifiedListDetailsLayout({
                             className={`${isBackdropCover && hasInfoTabs ? '' : 'mb-6'} ${
                                 !mobileHero
                                     ? ''
-                                    : mobileScoreboardMode === 'reveal'
-                                        ? `${MOBILE_REVEAL_BASE} ${isBackNav ? '' : MOBILE_SCOREBOARD_REVEAL_ANIMATION}`
-                                        : `${mobileScoreboardMode === 'compact' ? MOBILE_STATS_REVEAL_BASE : ''} ${
-                                            !animateMobileEntry
-                                                ? ''
-                                                : mobileCoverReady
-                                                    ? MOBILE_SCOREBOARD_ENTRY_ANIMATION
-                                                    : 'max-sm:invisible'
-                                        }`
+                                    : `${mobileScoreboardMode === 'compact' ? MOBILE_STATS_REVEAL_BASE : ''} ${
+                                        !animateMobileEntry
+                                            ? ''
+                                            : mobileCoverReady
+                                                ? MOBILE_SCOREBOARD_ENTRY_ANIMATION
+                                                : 'max-sm:invisible'
+                                    }`
                             }`}
-                            {...(mobileScoreboardMode === 'reveal'
-                                ? heroRevealProps
-                                : mobileScoreboardMode === 'compact'
-                                    ? heroStatsRevealProps
-                                    : {})}
+                            {...(mobileScoreboardMode === 'compact' ? heroStatsRevealProps : {})}
                         >
                             <DetailsScoreboardPanel
                                 mobileScoresOnly

@@ -35,7 +35,6 @@ import {
   MOBILE_REVEAL_BASE,
   MOBILE_STATS_REVEAL_BASE,
   MOBILE_SCOREBOARD_ENTRY_ANIMATION,
-  MOBILE_SCOREBOARD_REVEAL_ANIMATION,
   MobileHeroCover,
   useMobileDetailsHero,
 } from "@/components/details/MobileDetailsHero";
@@ -1361,9 +1360,8 @@ export default function SeasonDetailsClient({
           <div
             ref={heroCoverSpacerRef}
             className="relative -mx-4 w-[calc(100%+2rem)] max-w-none flex-shrink-0 sm:hidden"
-            // La portada más el sitio sobrante: el grupo botones + marcador
-            // queda pegado al navbar inferior.
-            style={{ height: "calc(var(--mobile-cover-h) + var(--mobile-hero-gap, 0px))" }}
+            // Solo la portada: los botones van justo debajo.
+            style={{ height: "var(--mobile-cover-h)" }}
           />
 
           {/* Left poster */}
@@ -1507,27 +1505,19 @@ export default function SeasonDetailsClient({
 
             {/* SCOREBOARD. MÓVIL: el de DetailsClient (`mobileScoresOnly`), bajo
                 los botones según el sitio que deja la portada, que NUNCA se
-                recorta: completo, solo puntuaciones con la barra de stats al hacer scroll ('compact') o, si no cabe
-                nada, revelado con el scroll. El margen va en el envoltorio: la
+                recorta: completo o solo puntuaciones con la barra de stats al
+                hacer scroll ('compact'). El margen va en el envoltorio: la
                 cabecera mide su alto. */}
             <div
               ref={heroScoreboardRef}
-              className={`mb-6 ${
-                mobileScoreboardMode === "reveal"
-                  ? `${MOBILE_REVEAL_BASE} ${isBackNav ? "" : MOBILE_SCOREBOARD_REVEAL_ANIMATION}`
-                  : `${mobileScoreboardMode === "compact" ? MOBILE_STATS_REVEAL_BASE : ""} ${
-                      !animateMobileEntry
-                        ? ""
-                        : mobileCoverReady
-                          ? MOBILE_SCOREBOARD_ENTRY_ANIMATION
-                          : "max-sm:invisible"
-                    }`
+              className={`mb-6 ${mobileScoreboardMode === "compact" ? MOBILE_STATS_REVEAL_BASE : ""} ${
+                !animateMobileEntry
+                  ? ""
+                  : mobileCoverReady
+                    ? MOBILE_SCOREBOARD_ENTRY_ANIMATION
+                    : "max-sm:invisible"
               }`}
-              {...(mobileScoreboardMode === "reveal"
-                ? heroRevealProps
-                : mobileScoreboardMode === "compact"
-                  ? heroStatsRevealProps
-                  : {})}
+              {...(mobileScoreboardMode === "compact" ? heroStatsRevealProps : {})}
             >
             <DetailsScoreboardPanel
               mobileScoresOnly
