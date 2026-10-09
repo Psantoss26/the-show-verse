@@ -76,6 +76,27 @@ export const MOBILE_STATS_REVEAL_WIDEN =
 export const MOBILE_REVEAL_BASE =
     'max-sm:transform-gpu max-sm:data-[mobile-reveal=hidden]:invisible max-sm:data-[mobile-reveal=hidden]:pointer-events-none max-sm:data-[mobile-reveal=hidden]:**:!transition-none'
 const MOBILE_REVEAL_ATTR = 'data-mobile-reveal'
+// Bloques revelados que ENTRAN y SALEN animados como el marcador (la barra de
+// búsqueda de las listas), además de MOBILE_REVEAL_BASE. Llevan
+// `data-mobile-reveal-animated` y la animación va en sus piezas de cristal
+// (`data-mobile-reveal-piece`), NUNCA en el bloque: la `opacity` en un
+// ancestro deja el cristal plano.
+//   - Al revelarse ('shown'): la entrada del marcador (sube 40px y se funde,
+//     600ms).
+//   - Al ocultarse tras haberse visto ('out', lo pone el revelado en vez de
+//     'hidden'): la inversa en 420ms, lo que tarda en plegarse la barra de
+//     stats, y el bloque pasa a `invisible` al acabar (visibilidad con
+//     retardo). Mientras, sin `pointer-events` y sin transiciones dentro.
+const MOBILE_REVEAL_ANIMATED_ATTR = 'data-mobile-reveal-animated'
+export const MOBILE_REVEAL_ANIMATED_PROPS = { [MOBILE_REVEAL_ANIMATED_ATTR]: '' }
+export const MOBILE_REVEAL_PIECE_PROPS = { 'data-mobile-reveal-piece': '' }
+export const MOBILE_REVEAL_ANIMATED = [
+    'max-sm:motion-safe:[&[data-mobile-reveal=shown]_[data-mobile-reveal-piece]]:animate-sv-mobile-scoreboard-reveal',
+    'max-sm:motion-safe:[&[data-mobile-reveal=out]_[data-mobile-reveal-piece]]:animate-sv-mobile-reveal-out',
+    'max-sm:data-[mobile-reveal=out]:invisible max-sm:data-[mobile-reveal=out]:pointer-events-none max-sm:data-[mobile-reveal=out]:**:!transition-none',
+    'max-sm:motion-safe:data-[mobile-reveal=out]:![transition:visibility_0s_linear_420ms]',
+    'max-sm:motion-reduce:data-[mobile-reveal=out]:!transition-none',
+].join(' ')
 // `revealProps` de la cabecera para bloques que pinta un hijo de la página
 // (la barra de búsqueda de FilterableListItems); null fuera de ella.
 export const MobileHeroRevealContext = createContext(null)
@@ -395,8 +416,14 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
                         visible = el.getBoundingClientRect().top <= revealLine
                     }
                 }
-                const value = visible ? 'shown' : 'hidden'
-                if (el.getAttribute(MOBILE_REVEAL_ATTR) !== value) el.setAttribute(MOBILE_REVEAL_ATTR, value)
+                const current = el.getAttribute(MOBILE_REVEAL_ATTR)
+                // Los animados que ya se vieron salen con su animación ('out').
+                const value = visible
+                    ? 'shown'
+                    : (current === 'shown' || current === 'out') && el.hasAttribute(MOBILE_REVEAL_ANIMATED_ATTR)
+                        ? 'out'
+                        : 'hidden'
+                if (current !== value) el.setAttribute(MOBILE_REVEAL_ATTR, value)
                 if (el.inert === visible) el.inert = !visible
             })
         }

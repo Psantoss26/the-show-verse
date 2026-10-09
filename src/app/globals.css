@@ -698,6 +698,27 @@ html:not([data-avatar-boot]) .alerts-boot {
       transform: translateY(0);
     }
   }
+
+  /* Salida inversa de la anterior, con la duración y la curva con las que se
+     pliega la barra de stats del marcador (420ms). Para los bloques revelados
+     con scroll que se animan (`MOBILE_REVEAL_ANIMATED`, details/
+     MobileDetailsHero): sus piezas de cristal bajan y se funden al volver
+     arriba, y el bloque se oculta del todo al acabar. `forwards`: la pieza se
+     queda fundida hasta que el bloque deja de verse. */
+  --animate-sv-mobile-reveal-out: sv-mobile-reveal-out 420ms
+    cubic-bezier(0.22, 1, 0.36, 1) forwards;
+
+  @keyframes sv-mobile-reveal-out {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    to {
+      opacity: 0;
+      transform: translateY(40px);
+    }
+  }
 }
 
 /* Entrada del backdrop del hero de DetailModal.
