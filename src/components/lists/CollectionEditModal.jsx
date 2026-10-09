@@ -256,7 +256,10 @@ export default function CollectionEditModal({ original, collection, onClose }) {
               colección usa un póster de fondo y en ordenador un backdrop, y
               cada uno se guarda por separado. */}
           {phone ? (
-            <ArtworkRow key="mobile" id="collection-edit-background" label="Fondo (vista móvil)" field="mobile_background_path" original={original.mobile_background_path} value={draft.mobile_background_path} candidates={textlessImages(images?.posters)} onSelect={selectArtwork} />
+            // Siempre sin idioma: pósters sin texto y, si la colección no tiene
+            // ninguno, sus backdrops sin texto (de fondo se recortan en
+            // vertical), los mismos que usa el fondo automático.
+            <ArtworkRow key="mobile" id="collection-edit-background" label="Fondo (vista móvil)" field="mobile_background_path" original={original.mobile_background_path} value={draft.mobile_background_path} candidates={textlessImages(images?.posters).length ? textlessImages(images?.posters) : textlessImages(images?.backdrops)} onSelect={selectArtwork} />
           ) : (
             <ArtworkRow key="desktop" id="collection-edit-background" label="Fondo (vista ordenador)" field="backdrop_path" original={original.backdrop_path} value={draft.backdrop_path} candidates={textlessImages(images?.backdrops)} landscape onSelect={selectArtwork} />
           )}

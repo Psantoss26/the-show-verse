@@ -2121,10 +2121,21 @@ button:focus-visible > .sv-nav-glass > .sv-nav-glass__tint {
   to { opacity: 0.6; }
 }
 
+/* La inversa: la portada nítida que se desvanece mientras aparece el fondo
+   (detalles de listas y colecciones, UnifiedListDetailsLayout). Va en un
+   envoltorio propio: la portada lleva su animación de entrada
+   (`sv-mobile-poster-reveal`, relleno `both`) y las dos no pueden compartir
+   la propiedad `animation`. */
+@keyframes sv-hero-scroll-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
 @supports ((animation-timeline: scroll()) and (animation-range: 0% 100%)) {
   @media (width < 40rem) {
     .sv-hero-scroll-in,
-    .sv-hero-scroll-shade {
+    .sv-hero-scroll-shade,
+    .sv-hero-scroll-out {
       animation: sv-hero-scroll-in linear both;
       animation-timeline: scroll(root block);
       animation-range: 0px 55vh;
@@ -2132,6 +2143,10 @@ button:focus-visible > .sv-nav-glass > .sv-nav-glass__tint {
 
     .sv-hero-scroll-shade {
       animation-name: sv-hero-scroll-shade;
+    }
+
+    .sv-hero-scroll-out {
+      animation-name: sv-hero-scroll-out;
     }
   }
 }

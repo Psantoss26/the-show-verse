@@ -402,12 +402,20 @@ function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, collage
     const mask = hasImage ? undefined : 'var(--sv-poster-fade)'
 
     return (
+        // Relevo con el scroll: la portada se desvanece mientras aparece el
+        // fondo de la página (`.sv-hero-scroll-in`), con el mismo recorrido.
+        // En un envoltorio propio porque la entrada de dentro
+        // (`sv-mobile-poster-reveal`, relleno `both`) fija su opacidad a 1 al
+        // terminar y anulaba cualquier fundido puesto en la misma capa. Donde
+        // no hay animaciones ligadas al scroll, la opacidad sale de
+        // `--sv-hero-scroll` (respaldo del layout).
         <div
             aria-hidden="true"
-            className={`sv-mobile-poster-entry absolute inset-x-0 top-0 sm:hidden ${
-                ready
-                    ? `${animate ? 'sv-mobile-poster-reveal' : ''} [opacity:calc(1_-_var(--sv-hero-scroll,0))]`
-                    : 'opacity-0'
+            className="sv-hero-scroll-out absolute inset-x-0 top-0 sm:hidden max-sm:[opacity:calc(1_-_var(--sv-hero-scroll,0))]"
+        >
+        <div
+            className={`sv-mobile-poster-entry absolute inset-x-0 top-0 ${
+                ready ? (animate ? 'sv-mobile-poster-reveal' : '') : 'opacity-0'
             }`}
             style={{ transform: `scale(${MOBILE_POSTER_OVERSCAN})` }}
         >
@@ -489,6 +497,7 @@ function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, collage
                     />
                 </div>
             ) : null}
+        </div>
         </div>
     )
 }
