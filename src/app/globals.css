@@ -2126,6 +2126,11 @@ button:focus-visible > .sv-nav-glass > .sv-nav-glass__tint {
    envoltorio propio: la portada lleva su animación de entrada
    (`sv-mobile-poster-reveal`, relleno `both`) y las dos no pueden compartir
    la propiedad `animation`. */
+/* Recorrido del relevo: 55vh por defecto (la ficha). Los detalles de listas y
+   colecciones lo acortan con `--sv-hero-scroll-end` cuando la página es tan
+   corta que no se puede desplazar 55vh: si no, el relevo se quedaba a medias
+   al llegar abajo. La variable se escribe UNA vez por cambio de tamaño, no por
+   fotograma. */
 @keyframes sv-hero-scroll-out {
   from { opacity: 1; }
   to { opacity: 0; }
@@ -2138,7 +2143,7 @@ button:focus-visible > .sv-nav-glass > .sv-nav-glass__tint {
     .sv-hero-scroll-out {
       animation: sv-hero-scroll-in linear both;
       animation-timeline: scroll(root block);
-      animation-range: 0px 55vh;
+      animation-range: 0px var(--sv-hero-scroll-end, 55vh);
     }
 
     .sv-hero-scroll-shade {
@@ -2188,7 +2193,7 @@ button:focus-visible > .sv-nav-glass > .sv-nav-glass__tint {
     .sv-details-nav-glass {
       animation: sv-hero-scroll-in linear both;
       animation-timeline: scroll(root block);
-      animation-range: 0px 55vh;
+      animation-range: 0px var(--sv-hero-scroll-end, 55vh);
     }
   }
 }

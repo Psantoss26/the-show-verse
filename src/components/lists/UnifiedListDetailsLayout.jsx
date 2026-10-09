@@ -788,17 +788,49 @@ export default function UnifiedListDetailsLayout({
         }
     }, [mobileHero])
 
+    // Recorrido del relevo portada → fondo: 55vh, como en la ficha, salvo que
+    // la página no dé para tanto (colecciones de una sola fila de títulos):
+    // entonces el 85% de lo que se puede desplazar, para que el relevo termine
+    // ANTES de llegar al tope. Se publica en `--sv-hero-scroll-end` (lo leen
+    // las animaciones ligadas al scroll de globals.css, también el cristal del
+    // navbar) solo cuando cambia el alto de la página o de la ventana.
+    const heroScrollEndRef = useRef(0)
+    useEffect(() => {
+        const root = document.documentElement
+        if (!mobileHero || !isPhone) return undefined
+        let applied = ''
+        const update = () => {
+            const maxScroll = Math.max(0, root.scrollHeight - window.innerHeight)
+            const end = Math.max(1, Math.round(Math.min(window.innerHeight * 0.55, maxScroll * 0.85)))
+            heroScrollEndRef.current = end
+            const value = `${end}px`
+            if (value === applied) return
+            applied = value
+            root.style.setProperty('--sv-hero-scroll-end', value)
+        }
+        update()
+        window.addEventListener('resize', update, { passive: true })
+        const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update)
+        if (rootRef.current) observer?.observe(rootRef.current)
+        return () => {
+            window.removeEventListener('resize', update)
+            observer?.disconnect()
+            heroScrollEndRef.current = 0
+            root.style.removeProperty('--sv-hero-scroll-end')
+        }
+    }, [mobileHero, isPhone])
+
     // Respaldo de `--sv-hero-scroll` donde no hay animaciones ligadas al scroll
-    // (mismo recorrido que DetailsClient). Con soporte, `.sv-hero-scroll-in`
-    // y `.sv-hero-scroll-shade` lo resuelven en el compositor. El cristal del
-    // navbar en estas rutas también lee la variable.
+    // (mismo recorrido). Con soporte, `.sv-hero-scroll-in/-shade/-out` lo
+    // resuelven en el compositor. El cristal del navbar en estas rutas también
+    // lee la variable.
     useEffect(() => {
         const root = document.documentElement
         if (!mobileHero || !isPhone || CSS.supports?.(HERO_SCROLL_TIMELINE_QUERY)) return undefined
         let raf = 0
         const apply = () => {
             raf = 0
-            const dist = Math.max(1, window.innerHeight * 0.55)
+            const dist = heroScrollEndRef.current || Math.max(1, window.innerHeight * 0.55)
             const p = Math.min(1, Math.max(0, window.scrollY / dist))
             root.style.setProperty('--sv-hero-scroll', p.toFixed(4))
         }
