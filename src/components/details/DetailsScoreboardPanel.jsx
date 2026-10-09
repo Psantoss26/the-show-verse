@@ -358,7 +358,7 @@ export function DetailsStatsRow({
 
   if (hasCustomStats) {
     return (
-      <div className="relative z-10 border-t border-white/5 bg-black/[0.04] rounded-b-2xl">
+      <div data-scoreboard-stats="" className="relative z-10 border-t border-white/5 bg-black/[0.04] rounded-b-2xl">
         <div className={statsScrollerClass}>
           <div className={statsTrackClass}>
             {customStatItems.map((item, index) => (
@@ -393,7 +393,7 @@ export function DetailsStatsRow({
   // Sin stats (ni pendientes) pero con contenido a la derecha: solo eso.
   if (!hasStats && !pending) {
     return (
-      <div className="relative z-10 hidden rounded-b-2xl border-t border-white/5 bg-black/[0.04] sm:block">
+      <div data-scoreboard-stats="" className="relative z-10 hidden rounded-b-2xl border-t border-white/5 bg-black/[0.04] sm:block">
         <div className={statsScrollerClass}>
           <div className={statsTrackClass}>{trailingNode}</div>
         </div>
@@ -402,7 +402,7 @@ export function DetailsStatsRow({
   }
 
   return (
-    <div className="relative z-10 border-t border-white/5 bg-black/[0.04] rounded-b-2xl">
+    <div data-scoreboard-stats="" className="relative z-10 border-t border-white/5 bg-black/[0.04] rounded-b-2xl">
       {/* Scroller con padding + safe-area para que no se recorte en bordes */}
       <div className={statsScrollerClass}>
         <div className={statsTrackClass}>

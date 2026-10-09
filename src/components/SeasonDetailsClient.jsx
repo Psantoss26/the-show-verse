@@ -532,6 +532,11 @@ export default function SeasonDetailsClient({
   // portada da paso a un póster sin texto difuminado de fondo.
   const isBackNav = useIsHistoryNavigation();
   const animateMobileEntry = !isBackNav;
+  const mobileCoverLowSrc = posterPath ? `https://image.tmdb.org/t/p/w342${posterPath}` : null;
+  const mobileCoverLoad = useImageLoadReady(mobileCoverLowSrc);
+  const [mobileCoverFailedSrc, setMobileCoverFailedSrc] = useState(null);
+  const mobileCoverReady =
+    !mobileCoverLowSrc || mobileCoverLoad.ready || mobileCoverFailedSrc === mobileCoverLowSrc;
   const {
     rootRef: heroRootRef,
     coverSpacerRef: heroCoverSpacerRef,
@@ -539,15 +544,12 @@ export default function SeasonDetailsClient({
     scoreboardRef: heroScoreboardRef,
     secondaryTriggerRef: heroSecondaryTriggerRef,
     isPhone,
-    scoreboardFits: heroScoreboardFits,
+    scoreboardMode: heroScoreboardMode,
     revealProps: heroRevealProps,
     rootStyle: heroRootStyle,
-  } = useMobileDetailsHero(true);
-  const mobileCoverLowSrc = posterPath ? `https://image.tmdb.org/t/p/w342${posterPath}` : null;
-  const mobileCoverLoad = useImageLoadReady(mobileCoverLowSrc);
-  const [mobileCoverFailedSrc, setMobileCoverFailedSrc] = useState(null);
-  const mobileCoverReady =
-    !mobileCoverLowSrc || mobileCoverLoad.ready || mobileCoverFailedSrc === mobileCoverLowSrc;
+  } = useMobileDetailsHero(true, { lock: mobileCoverReady });
+  // Qué cabe bajo los botones sin recortar la portada (solo teléfono).
+  const mobileScoreboardMode = isPhone ? heroScoreboardMode : "full";
   const [mobileBackground, setMobileBackground] = useState({ key: "", path: null });
   const mobileBackgroundKey = `${showId}:${seasonNumber}`;
   useEffect(() => {
@@ -1499,15 +1501,15 @@ export default function SeasonDetailsClient({
               </div>
             </div>
 
-            {/* SCOREBOARD. MÓVIL: el de DetailsClient (`mobileScoresOnly`),
-                visible bajo los botones como en las colecciones (la portada le
-                deja sitio sobre el navbar inferior) y, si no cabe, revelado con
-                el scroll. El margen va en el envoltorio: la cabecera mide su
-                alto. */}
+            {/* SCOREBOARD. MÓVIL: el de DetailsClient (`mobileScoresOnly`), bajo
+                los botones según el sitio que deja la portada, que NUNCA se
+                recorta: completo, solo puntuaciones ('compact') o, si no cabe
+                nada, revelado con el scroll. El margen va en el envoltorio: la
+                cabecera mide su alto. */}
             <div
               ref={heroScoreboardRef}
               className={`mb-6 ${
-                !heroScoreboardFits
+                mobileScoreboardMode === "reveal"
                   ? `${MOBILE_REVEAL_BASE} ${isBackNav ? "" : MOBILE_SCOREBOARD_REVEAL_ANIMATION}`
                   : !animateMobileEntry
                     ? ""
@@ -1515,7 +1517,7 @@ export default function SeasonDetailsClient({
                       ? MOBILE_SCOREBOARD_ENTRY_ANIMATION
                       : "max-sm:invisible"
               }`}
-              {...(!heroScoreboardFits ? heroRevealProps : {})}
+              {...(mobileScoreboardMode === "reveal" ? heroRevealProps : {})}
             >
             <DetailsScoreboardPanel
               mobileScoresOnly
@@ -1553,7 +1555,17 @@ export default function SeasonDetailsClient({
                   : undefined,
                 href: buildImdbHref({ href: imdbUrl, title: showName }),
               }}
-              stats={tScoreboard?.stats}
+              // Compacto (teléfono sin sitio para todo): solo las puntuaciones.
+              stats={mobileScoreboardMode === "compact" ? null : tScoreboard?.stats}
+              // Reserva la fila de estadísticas mientras Trakt responde: el
+              // marcador nace con su alto final y la decisión de qué cabe bajo
+              // los botones se toma con él.
+              statsPending={
+                mobileScoreboardMode !== "compact" &&
+                !initialScoreboardHasStats &&
+                traktScoreSettledKey !== scoreKey &&
+                !hasNumericScoreboardStats(tScoreboard?.stats)
+              }
               showFavoritedStat={false}
               onMorePlatforms={() => setPlatformsOpen(true)}
               share={{
