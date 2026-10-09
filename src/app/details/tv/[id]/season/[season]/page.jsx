@@ -1,5 +1,6 @@
 import SeasonDetailsClient from "@/components/SeasonDetailsClient";
 import { getShareData, shareMetadata } from "@/lib/share/shareMeta";
+import { pickTmdbDefaultPoster } from "@/lib/details/tmdbImages";
 
 export const revalidate = 3600; // 1h
 
@@ -47,8 +48,24 @@ export default async function SeasonPage({ params }) {
 
   const showPromise = tmdbFetch(`/tv/${showId}?append_to_response=external_ids`);
   const seasonPromise = tmdbFetch(`/tv/${showId}/season/${seasonNumber}`);
+  // PÓSTER EN INGLÉS siempre que lo haya: el `poster_path` de la temporada es
+  // el que TMDb elige para español (`language=es-ES`); aquí se elige con el
+  // mismo criterio entre los de inglés. Sin ninguno, se queda el español. Se
+  // resuelve en el servidor para que la portada no cambie al cargar.
+  const englishPosterPromise = tmdbFetch(
+    `/tv/${showId}/season/${seasonNumber}/images?include_image_language=en`,
+  )
+    .then((json) => pickTmdbDefaultPoster(json?.posters, "en")?.file_path || null)
+    .catch(() => null);
 
-  const [show, season] = await Promise.all([showPromise, seasonPromise]);
+  const [show, seasonData, englishPosterPath] = await Promise.all([
+    showPromise,
+    seasonPromise,
+    englishPosterPromise,
+  ]);
+  const season = englishPosterPath
+    ? { ...seasonData, poster_path: englishPosterPath }
+    : seasonData;
 
   const showImdbId = show?.external_ids?.imdb_id || null;
 
