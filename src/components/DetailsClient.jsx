@@ -6770,7 +6770,6 @@ export default function DetailsClient({
   // Cada seleccion se persiste en localStorage y se guarda en la API.
   // =====================================================================
 
-  const [posterToggleBusy, setPosterToggleBusy] = useState(false); // Transicion de poster en curso
 
   // Selecciona un poster especifico y lo persiste
   const handleSelectPoster = (filePath) => {
@@ -6912,36 +6911,18 @@ export default function DetailsClient({
     const lowSize = nextMode === "preview" ? "w780" : "w342";
     const highSize = nextMode === "preview" ? "w1280" : "w780";
 
-    const seq = (posterToggleSeqRef.current += 1);
     posterRequestedModeRef.current = nextMode;
-    setPosterToggleBusy(true);
 
     void preloadTmdb(targetPath, lowSize);
     void preloadTmdb(targetPath, highSize);
 
-    const applyMode = () => {
-      if (
-        posterToggleSeqRef.current !== seq ||
-        posterRequestedModeRef.current !== nextMode
-      ) {
-        return;
-      }
-
-      setPosterLayoutMode(nextMode);
-      setPosterViewMode(nextMode);
-
-      window.setTimeout(() => {
-        if (posterToggleSeqRef.current === seq) {
-          setPosterToggleBusy(false);
-        }
-      }, 180);
-    };
-
-    if (typeof requestAnimationFrame === "function") {
-      requestAnimationFrame(applyMode);
-    } else {
-      applyMode();
-    }
+    // Caja y capas cambian en el MISMO render, dentro del propio clic. Antes
+    // se marcaba la transición como «ocupada» (un render), el modo se aplicaba
+    // en el siguiente fotograma (otro) y la marca se quitaba 180 ms después
+    // (un tercero, a mitad del morph). Cada uno re-renderiza la ficha entera:
+    // retrasaban el arranque del morph y le metían un tirón por el medio.
+    setPosterLayoutMode(nextMode);
+    setPosterViewMode(nextMode);
   }, [
     selectedPosterPath,
     basePosterPath,
@@ -6956,16 +6937,14 @@ export default function DetailsClient({
     if (typeof window === "undefined" || !posterModeHydrated) return;
     try {
       window.localStorage.setItem(globalViewModeStorageKey, posterViewMode);
-      // Sincronizar layoutMode cuando posterViewMode cambie (excepto durante transiciones)
-      // Esto asegura que ambos estados estén alineados después de navegaciones
-      if (!posterToggleBusy) {
-        setPosterLayoutMode(posterViewMode);
-      }
+      // Sincronizar layoutMode cuando posterViewMode cambie: asegura que ambos
+      // estados estén alineados después de navegaciones (al alternar ya
+      // cambian juntos y esto no hace nada).
+      setPosterLayoutMode(posterViewMode);
     } catch {}
   }, [
     posterViewMode,
     globalViewModeStorageKey,
-    posterToggleBusy,
     posterModeHydrated,
   ]);
 
@@ -8546,7 +8525,6 @@ export default function DetailsClient({
   // Refs para gestion de carga de poster (los estados estan definidos al inicio)
   const prevDisplayPosterRef = useRef(null);
   const posterLoadTokenRef = useRef(0);
-  const posterToggleSeqRef = useRef(0);
   const posterRequestedModeRef = useRef("poster");
 
   useEffect(() => {
@@ -9697,7 +9675,16 @@ export default function DetailsClient({
                   resetPosterTarget();
                   setIsPosterHovered(false);
                 }}
-                onPointerEnter={() => setIsPosterHovered(true)}
+                // Solo ratón en escritorio, el único sitio donde se pintan las
+                // flechas que dependen de este estado. En móvil el dedo que
+                // empieza a deslizar sobre la portada disparaba enter/leave y
+                // cada uno volvía a renderizar la ficha entera justo cuando se
+                // abre la barra de stats del marcador: la animación iba a saltos.
+                onPointerEnter={(e) => {
+                  if (pointerCardHoverEnabled && e.pointerType === "mouse") {
+                    setIsPosterHovered(true);
+                  }
+                }}
                 onPointerDown={(e) => {
                   // mejora tactil (evita pérdidas de tracking)
                   e.currentTarget.setPointerCapture?.(e.pointerId);

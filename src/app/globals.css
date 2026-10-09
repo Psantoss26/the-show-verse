@@ -1823,6 +1823,51 @@ body {
   }
 }
 
+/* AVISOS EMERGENTES (InAppNotifications) justo bajo la barra superior, a
+   0.375rem de su borde. Antes iban a 4.5rem fijos: con la barra compactada
+   (48px en móvil, 56px en tablet) o en la ficha, que nace compacta, quedaba
+   un hueco de hasta 24px. `--sv-topbar-bottom` es el borde inferior VISIBLE de
+   la barra en cada estado (mismos altos y desplazamientos que `.sv-topbar`
+   arriba) y el cambio sigue a la compactación con su misma curva. Se define
+   en el aviso y no en <html> para no recalcular el estilo de toda la página
+   al compactar. */
+.sv-toast-stack {
+  --sv-topbar-bottom: 4rem;
+  top: calc(env(safe-area-inset-top) + var(--sv-topbar-bottom) + 0.375rem);
+  transition: top 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:root:has(.sv-topbar[data-compact]) .sv-toast-stack,
+:root:has(.sv-topbar[data-immersive]) .sv-toast-stack {
+  --sv-topbar-bottom: 3rem;
+}
+
+@media (min-width: 48rem) {
+  :root:has(.sv-topbar[data-compact]) .sv-toast-stack,
+  :root:has(.sv-topbar[data-immersive]) .sv-toast-stack {
+    --sv-topbar-bottom: 3.5rem;
+  }
+}
+
+/* Escritorio: la barra no se compacta (ver arriba). */
+@media (min-width: 64rem) and (hover: hover) and (pointer: fine) {
+  :root:has(.sv-topbar[data-compact]) .sv-toast-stack,
+  :root:has(.sv-topbar[data-immersive]) .sv-toast-stack {
+    --sv-topbar-bottom: 4rem;
+  }
+}
+
+/* Páginas sin barra superior: arriba del todo. */
+:root:not(:has(.sv-topbar)) .sv-toast-stack {
+  --sv-topbar-bottom: 0px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-toast-stack {
+    transition: none;
+  }
+}
+
 :root[data-sv-drawer-resizing] .sv-navbar-touch-shift {
   transition: none;
 }

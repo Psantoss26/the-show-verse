@@ -140,11 +140,15 @@ const MOBILE_BOTTOM_NAV_SELECTOR = '.sv-navbar-bottom-shift'
 function readActionsSpan(row) {
     let flex = row
     while (flex && flex.children.length === 1) flex = flex.firstElementChild
-    const rects = [...(flex?.children || [])]
-        .map((child) => child.getBoundingClientRect())
-        .filter((rect) => rect.width > 0)
-    if (!rects.length) return 0
-    return Math.max(...rects.map((rect) => rect.right)) - Math.min(...rects.map((rect) => rect.left))
+    // Cajas de maquetación (`offset*`), no rectángulos: estos incluyen los
+    // `transform` de los botones (`active:scale-95`, hover, su entrada) y un
+    // dedo que pasaba por la fila al deslizar cambiaba el ancho 2px, con un
+    // render de la página entera a mitad de la apertura de la barra de stats.
+    const boxes = [...(flex?.children || [])]
+        .filter((child) => child.offsetWidth > 0)
+        .map((child) => ({ left: child.offsetLeft, right: child.offsetLeft + child.offsetWidth }))
+    if (!boxes.length) return 0
+    return Math.max(...boxes.map((box) => box.right)) - Math.min(...boxes.map((box) => box.left))
 }
 
 // Rectángulo vertical del elemento en su sitio, sin su propio `transform`: la
@@ -157,6 +161,14 @@ function readUntransformedRect(el) {
     if (!transform || transform === 'none' || typeof DOMMatrixReadOnly === 'undefined') return rect
     const dy = new DOMMatrixReadOnly(transform).m42
     return { top: rect.top - dy, bottom: rect.bottom - dy, height: rect.height }
+}
+
+// Alto interior (sin bordes) con decimales: `clientHeight` va redondeado.
+function readInnerHeight(el) {
+    if (!el) return 0
+    const style = getComputedStyle(el)
+    const borders = (Number.parseFloat(style.borderTopWidth) || 0) + (Number.parseFloat(style.borderBottomWidth) || 0)
+    return Math.max(0, el.getBoundingClientRect().height - borders)
 }
 
 function readBottomNavTop() {
@@ -233,10 +245,16 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
     // navbar. La página pone `margin-top: var(--mobile-scoreboard-shift)` en
     // su envoltorio; lo que ya hay entre botones y marcador sin ese margen
     // (su `mb-4` y el `-top-2` de la fila) se mide y se descuenta.
+    //
+    // SOLO TELÉFONO: lo que se mide aquí solo lo leen variantes `max-sm:` y
+    // capas `sm:hidden`. En escritorio el morph póster ↔ backdrop de la ficha
+    // cambia el ancho de la columna en cada fotograma; con el observador
+    // activo, cada uno movía `coverTop` y volvía a renderizar la ficha entera,
+    // y la transición avanzaba a tirones.
     useClientLayoutEffect(() => {
         const row = actionRowRef.current
         const scoreboard = scoreboardRef.current
-        if (!enabled || !row) return undefined
+        if (!enabled || !isPhone || !row) return undefined
         let lastWidth = window.innerWidth
         const update = () => {
             // El ancho no mueve nada en vertical: se mide siempre, también
@@ -290,9 +308,13 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
                 const spacerRect = readUntransformedRect(spacer)
                 const belowCover = rowRect.bottom - spacerRect.bottom
                 // Alto visible del marcador compacto: sin el interior de la
-                // barra de stats (`clientHeight`, sin bordes: su borde superior
-                // sigue ahí plegada y antes faltaba ese píxel abajo).
-                const visibleCompact = total - (statsRow ? statsRow.clientHeight : 0)
+                // barra de stats (sin bordes: su borde superior sigue ahí
+                // plegada y antes faltaba ese píxel abajo). Con decimales,
+                // como `total`: `clientHeight` va redondeado y, mientras la
+                // barra se despliega, la resta bailaba unas décimas y el alto
+                // de la portada saltaba 613 → 612 → 613 px, cada salto un
+                // render de la página entera a mitad de la animación.
+                const visibleCompact = total - readInnerHeight(statsRow)
                 const coverDocTop = spacerRect.top + window.scrollY
                 // Hacia abajo: con `round` el último hueco salía 1px corto.
                 const height = Math.floor(
@@ -356,7 +378,7 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
             fitMutations?.disconnect()
             if (raf) window.cancelAnimationFrame(raf)
         }
-    }, [enabled, fitCover, fitGap])
+    }, [enabled, isPhone, fitCover, fitGap])
 
     // Recorrido del relevo portada → fondo: 55vh, como en la ficha, salvo que
     // la página no dé para tanto (p. ej. colecciones de una sola fila de
