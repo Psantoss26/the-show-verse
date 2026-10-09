@@ -9,6 +9,7 @@ import { motion } from "framer-motion";
 
 import {
   Layers,
+  Link2,
   Calendar as CalendarIcon,
   Film as FilmIcon,
   MonitorPlay,
@@ -27,7 +28,20 @@ import {
 import AnimatedPosterFrame from "@/components/details/AnimatedPosterFrame";
 import StreamingHoverOverlay from "@/components/details/StreamingHoverOverlay";
 import StreamingProviderLogo from "@/components/details/StreamingProviderLogo";
-import DetailsScoreboardPanel from "@/components/details/DetailsScoreboardPanel";
+import DetailsScoreboardPanel, { ScoreboardPill, ScoreboardPillRow } from "@/components/details/DetailsScoreboardPanel";
+import { ActionShareButton } from "@/components/details/DetailHeaderBits";
+import {
+  MOBILE_ACTIONS_ENTRY_ANIMATION,
+  MOBILE_REVEAL_BASE,
+  MOBILE_SCOREBOARD_ENTRY_ANIMATION,
+  MOBILE_SCOREBOARD_REVEAL_ANIMATION,
+  MobileHeroCover,
+  useMobileDetailsHero,
+} from "@/components/details/MobileDetailsHero";
+import useImageLoadReady from "@/lib/hooks/useImageLoadReady";
+import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import { pickBestNeutralPosterByResVotes } from "@/lib/details/tmdbImages";
+import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 import { LIQUID_GLASS_BAR, LIQUID_GLASS_CARD } from "@/lib/ui/liquidGlass";
@@ -66,6 +80,38 @@ const seasonStatsCache = new Map();
 const seasonStatsInflight = new Map();
 const seasonImdbCache = new Map();
 const seasonImdbInflight = new Map();
+
+// Pósters SIN idioma (`iso_639_1` nulo, vacío o "xx"), normalizados a null
+// porque el selector neutro solo reconoce ese valor.
+function textlessPosters(list) {
+  return (Array.isArray(list) ? list : [])
+    .filter((image) => {
+      const lang = String(image?.iso_639_1 || "").toLowerCase();
+      return image?.file_path && (!lang || lang === "xx");
+    })
+    .map((image) => ({ ...image, iso_639_1: null }));
+}
+
+// Fondo MÓVIL de la temporada (tras el relevo con el scroll): un póster SIN
+// texto, como el de la ficha y las colecciones. El de la temporada y, si no
+// tiene, el de la serie. Sin ninguno, la página usa el backdrop de la serie.
+async function fetchTextlessSeasonBackground(showId, seasonNumber) {
+  const key = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+  if (key) {
+    try {
+      const res = await fetch(
+        `https://api.themoviedb.org/3/tv/${showId}/season/${seasonNumber}/images?api_key=${key}&include_image_language=null`,
+      );
+      const json = res.ok ? await res.json() : null;
+      const path = pickBestNeutralPosterByResVotes(textlessPosters(json?.posters))?.file_path;
+      if (path) return path;
+    } catch {
+      // Se prueba con la serie.
+    }
+  }
+  const showImages = await fetchTmdbImages("tv", showId).catch(() => null);
+  return pickBestNeutralPosterByResVotes(textlessPosters(showImages?.posters))?.file_path || null;
+}
 
 function normalizeWatchedBySeason(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -478,6 +524,47 @@ export default function SeasonDetailsClient({
   const [watchedBusy, setWatchedBusy] = useState(false);
   const [traktEpisodesOpen, setTraktEpisodesOpen] = useState(false);
   const [platformsOpen, setPlatformsOpen] = useState(false);
+  const [externalLinksOpen, setExternalLinksOpen] = useState(false);
+
+  // ---- MÓVIL: cabecera inmersiva (details/MobileDetailsHero) ----
+  // Póster de la temporada a pantalla completa (pegado arriba, sin recorte
+  // lateral), botones debajo y el marcador de DetailsClient; con el scroll la
+  // portada da paso a un póster sin texto difuminado de fondo.
+  const isBackNav = useIsHistoryNavigation();
+  const animateMobileEntry = !isBackNav;
+  const {
+    rootRef: heroRootRef,
+    coverSpacerRef: heroCoverSpacerRef,
+    actionRowRef: heroActionRowRef,
+    scoreboardRef: heroScoreboardRef,
+    secondaryTriggerRef: heroSecondaryTriggerRef,
+    isPhone,
+    scoreboardFits: heroScoreboardFits,
+    revealProps: heroRevealProps,
+    rootStyle: heroRootStyle,
+  } = useMobileDetailsHero(true);
+  const mobileCoverLowSrc = posterPath ? `https://image.tmdb.org/t/p/w342${posterPath}` : null;
+  const mobileCoverLoad = useImageLoadReady(mobileCoverLowSrc);
+  const [mobileCoverFailedSrc, setMobileCoverFailedSrc] = useState(null);
+  const mobileCoverReady =
+    !mobileCoverLowSrc || mobileCoverLoad.ready || mobileCoverFailedSrc === mobileCoverLowSrc;
+  const [mobileBackground, setMobileBackground] = useState({ key: "", path: null });
+  const mobileBackgroundKey = `${showId}:${seasonNumber}`;
+  useEffect(() => {
+    // Solo en teléfono: en escritorio el fondo es el backdrop de la serie.
+    if (!isPhone || mobileBackground.key === mobileBackgroundKey) return undefined;
+    let cancelled = false;
+    fetchTextlessSeasonBackground(showId, seasonNumber).then((path) => {
+      if (!cancelled) setMobileBackground({ key: mobileBackgroundKey, path });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isPhone, showId, seasonNumber, mobileBackgroundKey, mobileBackground.key]);
+  const mobileBackgroundPath =
+    mobileBackground.key === mobileBackgroundKey
+      ? mobileBackground.path || show?.backdrop_path || null
+      : null;
   const [episodeBusyKey, setEpisodeBusyKey] = useState("");
 
   // Ref para optimistic updates del modal
@@ -1174,9 +1261,18 @@ export default function SeasonDetailsClient({
   );
 
   return (
-    <div className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30">
+    <div
+      ref={heroRootRef}
+      className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30"
+      style={heroRootStyle}
+    >
       {/* Background */}
       <div className="fixed inset-0 z-0 overflow-hidden bg-[#0a0a0a] pointer-events-none">
+        {/* Fondo de la página. MÓVIL: aparece con el scroll, detrás de la
+            portada fija, y es un póster SIN texto difuminado (con los valores
+            de `.hero-bg-base` de la ficha) en vez del backdrop de escritorio. */}
+        <div className="sv-hero-scroll-in absolute inset-0 max-sm:[opacity:var(--sv-hero-scroll,0)] sm:opacity-100">
+        <div className="absolute inset-0 max-sm:hidden">
         {heroBackgroundStyle ? (
           <>
             {/* Capa base: siempre cubre (evita marcos laterales) */}
@@ -1202,12 +1298,42 @@ export default function SeasonDetailsClient({
         ) : (
           <div className="absolute inset-0 bg-[#0a0a0a]" />
         )}
+        </div>
+        {isPhone && mobileBackgroundPath ? (
+          // Fondo decorativo difuminado: <img> directo, solo en teléfono.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={`https://image.tmdb.org/t/p/w780${mobileBackgroundPath}`}
+            alt=""
+            aria-hidden="true"
+            decoding="async"
+            fetchPriority="low"
+            className="absolute inset-0 h-full w-full scale-[1.12] object-cover blur-[4px] brightness-90 saturate-[1.03] sm:hidden"
+          />
+        ) : null}
+        </div>
 
-        <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-black/60 via-transparent to-transparent" />
-        <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-[#101010]/60 via-transparent to-transparent" />
-        <div className="absolute inset-0 pointer-events-none bg-gradient-to-l from-[#101010]/60 via-transparent to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#101010] via-[#101010]/60 to-black/20" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#101010] via-transparent to-transparent opacity-30" />
+        <MobileHeroCover
+          src={posterPath ? `https://image.tmdb.org/t/p/w780${posterPath}` : null}
+          lowSrc={mobileCoverLowSrc}
+          imgRef={mobileCoverLoad.imgRef}
+          onLoad={mobileCoverLoad.onLoad}
+          onError={() => setMobileCoverFailedSrc(mobileCoverLowSrc)}
+          failed={mobileCoverFailedSrc === mobileCoverLowSrc}
+          ready={mobileCoverReady}
+          animate={animateMobileEntry}
+          collage={null}
+        />
+
+        {/* Sombreados de legibilidad. En MÓVIL siguen al scroll hasta el 60%,
+            como en la ficha: la portada entra limpia. */}
+        <div className="sv-hero-scroll-shade absolute inset-0 max-sm:[opacity:calc(var(--sv-hero-scroll,0)*0.6)] sm:opacity-100">
+          <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-black/60 via-transparent to-transparent" />
+          <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-[#101010]/60 via-transparent to-transparent" />
+          <div className="absolute inset-0 pointer-events-none bg-gradient-to-l from-[#101010]/60 via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#101010] via-[#101010]/60 to-black/20" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#101010] via-transparent to-transparent opacity-30" />
+        </div>
       </div>
 
       {/* Content */}
@@ -1220,14 +1346,26 @@ export default function SeasonDetailsClient({
           initial={false}
           animate={{ y: 0 }}
           transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-          className="flex flex-col lg:flex-row gap-8 lg:gap-12 mb-10 items-start transform-gpu"
+          // MÓVIL: sube hasta el borde superior (los 2rem del `py-8` + los
+          // 3rem del navbar compacto) para que el hueco de la portada coincida
+          // con la portada fija, pegada arriba y a los lados como la de las
+          // colecciones, con la navbar transparente encima.
+          className="-mt-[5rem] flex flex-col gap-5 sm:mt-0 sm:gap-8 lg:flex-row lg:gap-12 mb-10 items-start transform-gpu"
         >
+          {/* MÓVIL: hueco del alto de la portada fija, que va en el fondo de
+              la página y se coloca donde cae este hueco. */}
+          <div
+            ref={heroCoverSpacerRef}
+            className="relative -mx-4 w-[calc(100%+2rem)] max-w-none flex-shrink-0 sm:hidden"
+            style={{ height: "var(--mobile-cover-h)" }}
+          />
+
           {/* Left poster */}
           <motion.div
             initial={{ opacity: 0, x: -20, scale: 0.985 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
             transition={{ duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
-            className="w-full max-w-[280px] lg:max-w-[320px] mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-5 relative z-10"
+            className="w-full max-w-[280px] lg:max-w-[320px] mx-auto lg:mx-0 flex-shrink-0 hidden sm:flex flex-col gap-5 relative z-10"
           >
             <AnimatedPosterFrame
               src={
@@ -1304,7 +1442,8 @@ export default function SeasonDetailsClient({
             // cristal, igual que DetailsClient.
             className="flex-1 flex flex-col min-w-0 w-full"
           >
-            <div className="mb-4 px-1 flex flex-col items-center lg:items-start text-center lg:text-left w-full">
+            {/* MÓVIL: el nombre va al pie de la portada. */}
+            <div className="mb-4 px-1 hidden sm:flex flex-col items-center lg:items-start text-center lg:text-left w-full">
               <div className="mb-2 flex items-center justify-center lg:justify-start gap-2 text-xs font-bold uppercase tracking-widest text-zinc-400">
                 <Layers className="w-4 h-4" />
                 <span>Serie</span>
@@ -1315,7 +1454,16 @@ export default function SeasonDetailsClient({
               </h1>
             </div>
 
-            <div className="mb-6 px-1">
+            {/* MÓVIL: pegada a la portada (`-top-2`) y con la entrada de la
+                ficha (la fila sube y los botones caen en cascada) cuando la
+                portada está lista; hasta entonces, invisible en su sitio. */}
+            <div className="relative mb-6 px-1 max-sm:-top-2 max-sm:mb-4">
+              <div
+                ref={heroActionRowRef}
+                className={
+                  !animateMobileEntry ? "" : mobileCoverReady ? MOBILE_ACTIONS_ENTRY_ANIMATION : "max-sm:invisible"
+                }
+              >
               <SubrouteDetailsActionRow
                 seriesHref={`/details/tv/${showId}`}
                 previousHref={adjacentSeasonHrefs.previousHref}
@@ -1348,11 +1496,29 @@ export default function SeasonDetailsClient({
                   step: 1,
                 }}
               />
+              </div>
             </div>
 
-            {/* SCOREBOARD */}
+            {/* SCOREBOARD. MÓVIL: el de DetailsClient (`mobileScoresOnly`),
+                visible bajo los botones como en las colecciones (la portada le
+                deja sitio sobre el navbar inferior) y, si no cabe, revelado con
+                el scroll. El margen va en el envoltorio: la cabecera mide su
+                alto. */}
+            <div
+              ref={heroScoreboardRef}
+              className={`mb-6 ${
+                !heroScoreboardFits
+                  ? `${MOBILE_REVEAL_BASE} ${isBackNav ? "" : MOBILE_SCOREBOARD_REVEAL_ANIMATION}`
+                  : !animateMobileEntry
+                    ? ""
+                    : mobileCoverReady
+                      ? MOBILE_SCOREBOARD_ENTRY_ANIMATION
+                      : "max-sm:invisible"
+              }`}
+              {...(!heroScoreboardFits ? heroRevealProps : {})}
+            >
             <DetailsScoreboardPanel
-              className="mb-6"
+              mobileScoresOnly
               loading={tScoreboard.loading}
               tmdb={{
                 value: seasonVote?.toFixed(1),
@@ -1395,8 +1561,44 @@ export default function SeasonDetailsClient({
                 text: `Echa un vistazo a ${seasonName} de ${showName} en The Show Verse`,
               }}
             />
+            </div>
 
-            <div className="sm:hidden">
+            {/* MÓVIL: Plataformas, Enlaces y Compartir (las píldoras de la
+                ficha) y la sinopsis se revelan con el scroll (centinela antes).
+                Las píldoras no van con el marcador para que este quepa en la
+                primera vista, como en las colecciones. */}
+            <span
+              ref={heroSecondaryTriggerRef}
+              aria-hidden="true"
+              className="block h-px sm:hidden"
+            />
+            <div className={`mb-3 sm:hidden ${MOBILE_REVEAL_BASE}`} {...heroRevealProps}>
+              <ScoreboardPillRow>
+                <ScoreboardPill
+                  iconOnly
+                  icon={MonitorPlay}
+                  label="Plataformas"
+                  onClick={() => setPlatformsOpen(true)}
+                  aria-haspopup="dialog"
+                  aria-label="Abrir plataformas disponibles"
+                />
+                <ScoreboardPill
+                  iconOnly
+                  icon={Link2}
+                  label="Enlaces"
+                  onClick={() => setExternalLinksOpen(true)}
+                  aria-haspopup="dialog"
+                  aria-label="Abrir enlaces externos"
+                />
+                <ActionShareButton
+                  variant="pill"
+                  iconOnly
+                  title={seasonName}
+                  text={`Echa un vistazo a ${seasonName} de ${showName} en The Show Verse`}
+                />
+              </ScoreboardPillRow>
+            </div>
+            <div className={`sm:hidden ${MOBILE_REVEAL_BASE}`} {...heroRevealProps}>
               <DetailsInfoTabs
                 layoutId="seasonTabInlineMobile"
                 enableMobileTabSwipe
@@ -1406,8 +1608,6 @@ export default function SeasonDetailsClient({
                 network={showNetwork}
                 productionText={seasonProduction}
                 showPlatformsTab={false}
-                externalLinks={seasonExternalLinks}
-                showExternalLinksTab
                 showAwardsTab={false}
                 detailCards={seasonDetailCards}
               />
@@ -1711,6 +1911,12 @@ export default function SeasonDetailsClient({
         onClose={() => setPlatformsOpen(false)}
         links={seasonPlatformItems}
         mode="platforms"
+      />
+
+      <ExternalLinksModal
+        open={externalLinksOpen}
+        onClose={() => setExternalLinksOpen(false)}
+        links={seasonExternalLinks}
       />
     </div>
   );
