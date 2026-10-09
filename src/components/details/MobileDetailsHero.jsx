@@ -85,6 +85,18 @@ const useClientLayoutEffect = typeof window === 'undefined' ? useEffect : useLay
 // margen y la zona segura de la barra de gestos). Sin ella en el DOM, la
 // reserva de la ficha (6rem).
 const MOBILE_BOTTOM_NAV_SELECTOR = '.sv-navbar-bottom-shift'
+// Ancho de lo que se ve en la fila de acciones: de su primer botón al último
+// (la fila ocupa todo el ancho, pero los botones tienen un tope y se centran).
+function readActionsSpan(row) {
+    let flex = row
+    while (flex && flex.children.length === 1) flex = flex.firstElementChild
+    const rects = [...(flex?.children || [])]
+        .map((child) => child.getBoundingClientRect())
+        .filter((rect) => rect.width > 0)
+    if (!rects.length) return 0
+    return Math.max(...rects.map((rect) => rect.right)) - Math.min(...rects.map((rect) => rect.left))
+}
+
 function readBottomNavTop() {
     const nav = document.querySelector(MOBILE_BOTTOM_NAV_SELECTOR)
     // `offsetTop` (fijo: respecto a la ventana) y no el rectángulo: el navbar
@@ -121,6 +133,9 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
     // Margen extra encima del marcador para que quede centrado entre los
     // botones y el navbar inferior (puede ser negativo: ver abajo).
     const [scoreboardShift, setScoreboardShift] = useState(0)
+    // Ancho de referencia para un marcador estrecho (`--mobile-actions-w`): el
+    // mayor entre lo que ocupan los botones y el navbar inferior.
+    const [actionsWidth, setActionsWidth] = useState(0)
     const [secondaryVisible, setSecondaryVisible] = useState(false)
 
     useClientLayoutEffect(() => {
@@ -149,6 +164,11 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
         if (!enabled || !row) return undefined
         let lastWidth = window.innerWidth
         const update = () => {
+            // El ancho no mueve nada en vertical: se mide siempre, también
+            // con la portada ya visible (p. ej. si cambia el número de botones).
+            const nav = document.querySelector(MOBILE_BOTTOM_NAV_SELECTOR)
+            const span = Math.round(Math.max(readActionsSpan(row), nav?.offsetWidth || 0))
+            setActionsWidth((current) => (current === span ? current : span))
             const widthChanged = window.innerWidth !== lastWidth
             lastWidth = window.innerWidth
             if (lockRef.current && !widthChanged) return
@@ -196,9 +216,13 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
         const observer = new ResizeObserver(update)
         observer.observe(row)
         if (scoreboard) observer.observe(scoreboard)
+        // Botones que aparecen o desaparecen no cambian el tamaño de la fila.
+        const mutations = new MutationObserver(update)
+        mutations.observe(row, { childList: true, subtree: true })
         return () => {
             window.removeEventListener('resize', update)
             observer.disconnect()
+            mutations.disconnect()
         }
     }, [enabled])
 
@@ -340,6 +364,7 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
                 '--mobile-cover-top': `${coverTop}px`,
                 '--mobile-cover-h': '150vw',
                 '--mobile-scoreboard-shift': `${scoreboardShift}px`,
+                ...(actionsWidth ? { '--mobile-actions-w': `${actionsWidth}px` } : {}),
             }
             : undefined,
     }
