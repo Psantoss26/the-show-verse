@@ -112,6 +112,7 @@ export default function AnimatedPosterFrame({
 
   useEffect(() => {
     if (!enabled) {
+      stateRef.current = { rx: 0, ry: 0, s: 1 };
       const el = tiltRef.current;
       if (el) {
         el.style.transform =
@@ -124,6 +125,8 @@ export default function AnimatedPosterFrame({
     if (!el) return;
 
     let mounted = true;
+    let startedAt = null;
+    let previousTime = null;
     const loop = (time) => {
       if (!mounted) return;
 
@@ -132,15 +135,20 @@ export default function AnimatedPosterFrame({
       // ÚNICA animación: flotación 3D continua. No se inclina siguiendo al
       // puntero (eso dejaba la portada "clavada" en un ángulo fijo al parar el
       // ratón). Los clics los recibe la capa FIJA (`hitLayer`, fuera del marco).
-      const seconds = now / 1000;
+      startedAt ??= now;
+      const seconds = (now - startedAt) / 1000;
+      const delta = previousTime === null ? 0 : Math.min(now - previousTime, 50);
+      previousTime = now;
+      // Ease into the float without an arbitrary initial angle or a sudden zoom.
+      const progress = Math.min(seconds / 0.8, 1);
+      const strength = progress * progress * (3 - 2 * progress);
       const target = {
-        rx: Math.sin(seconds * 1.05) * 4.8,
-        ry: Math.cos(seconds * 0.9) * 7.2,
-        s: 1.025 + Math.sin(seconds * 1.6) * 0.008,
+        rx: Math.sin(seconds * 1.05) * 4.8 * strength,
+        ry: Math.sin(seconds * 0.9) * 7.2 * strength,
+        s: 1 + (1.025 - 1 + Math.sin(seconds * 1.6) * 0.008) * strength,
       };
-
       const current = stateRef.current;
-      const easing = 0.14;
+      const easing = 1 - Math.exp(-delta / 110);
       current.rx += (target.rx - current.rx) * easing;
       current.ry += (target.ry - current.ry) * easing;
       current.s += (target.s - current.s) * easing;

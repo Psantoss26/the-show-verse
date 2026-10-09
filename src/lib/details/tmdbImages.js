@@ -122,21 +122,17 @@ export function pickBestFavoriteEnglishPoster(list) {
     )[0] || null
 }
 
-// El póster que TMDb da por defecto para un idioma (el `poster_path` de una
-// petición con `language=xx`): el mejor valorado de ese idioma y, a igual nota,
-// el más votado. Sirve para pedir el de otro idioma con el MISMO criterio (p.
-// ej. las temporadas: el de inglés en vez del de español). Sin ninguno de ese
-// idioma, `null`: quien llama conserva el suyo.
-export function pickTmdbDefaultPoster(list, language) {
+// El PRIMER póster de un idioma tal como lo devuelve TMDb (`/images`), sin
+// reordenarlo. Las temporadas lo usan con inglés: el primero suele ser el
+// oficial de la temporada, con su número («Season N»), y no un póster de la
+// serie con solo el título. Sin ninguno de ese idioma, `null`: quien llama
+// conserva el suyo.
+export function pickFirstPosterByLanguage(list, language) {
     if (!Array.isArray(list) || !language) return null
     const target = String(language).toLowerCase().split('-')[0]
-    const candidates = list.filter(
+    return list.find(
         (img) => img?.file_path && String(img?.iso_639_1 || '').toLowerCase().split('-')[0] === target,
-    )
-    return [...candidates].sort((a, b) =>
-        (Number(b?.vote_average) || 0) - (Number(a?.vote_average) || 0)
-        || (Number(b?.vote_count) || 0) - (Number(a?.vote_count) || 0),
-    )[0] || null
+    ) || null
 }
 
 export function pickBestNeutralPosterByResVotes(list, opts = {}) {

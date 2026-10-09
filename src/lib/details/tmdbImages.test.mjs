@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {
   pickBestBackdropForPreview,
   pickBestFavoriteEnglishPoster,
-  pickTmdbDefaultPoster,
+  pickFirstPosterByLanguage,
 } from './tmdbImages.js'
 
 test('pickBestFavoriteEnglishPoster uses the Favorites ordering and ignores non-English posters', () => {
@@ -27,15 +27,14 @@ test('pickBestBackdropForPreview keeps an English backdrop when it is below the 
   assert.equal(selected, '/english-1000.jpg')
 })
 
-test('pickTmdbDefaultPoster elige como TMDb (nota, luego votos) solo entre los del idioma pedido', () => {
+test('pickFirstPosterByLanguage devuelve el primero del idioma en el orden de TMDb', () => {
   const posters = [
-    { file_path: '/es-top.jpg', iso_639_1: 'es', vote_average: 9, vote_count: 50 },
-    { file_path: '/en-low.jpg', iso_639_1: 'en', vote_average: 5.2, vote_count: 10 },
-    { file_path: '/en-top.jpg', iso_639_1: 'en', vote_average: 5.6, vote_count: 2 },
-    { file_path: '/en-tie.jpg', iso_639_1: 'en', vote_average: 5.6, vote_count: 1 },
-    { file_path: '/none.jpg', iso_639_1: null, vote_average: 10, vote_count: 99 },
+    { file_path: '/es.jpg', iso_639_1: 'es', vote_average: 9 },
+    { file_path: '/none.jpg', iso_639_1: null },
+    { file_path: '/en-first.jpg', iso_639_1: 'en', vote_average: 4 },
+    { file_path: '/en-better.jpg', iso_639_1: 'en', vote_average: 8 },
   ]
-  assert.equal(pickTmdbDefaultPoster(posters, 'en')?.file_path, '/en-top.jpg')
-  assert.equal(pickTmdbDefaultPoster(posters, 'fr'), null)
-  assert.equal(pickTmdbDefaultPoster(null, 'en'), null)
+  assert.equal(pickFirstPosterByLanguage(posters, 'en')?.file_path, '/en-first.jpg')
+  assert.equal(pickFirstPosterByLanguage(posters, 'fr'), null)
+  assert.equal(pickFirstPosterByLanguage(null, 'en'), null)
 })

@@ -1914,14 +1914,14 @@ button:focus-visible > .sv-nav-glass > .sv-nav-glass__tint {
   }
 
   /* Entrada de la ficha móvil: el póster no aparece como un corte seco sobre
-     negro; gana definición desde un desenfoque suave. La opacidad se mantiene
+     negro; entra con un zoom corto y continuo. La opacidad se mantiene
      separada porque también responde al progreso de scroll del hero. */
   .sv-mobile-poster-entry {
     transition: opacity 720ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .sv-mobile-poster-reveal {
-    animation: sv-mobile-detail-poster-reveal 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: sv-mobile-detail-poster-reveal 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
   /* Los botones entran después de que la portada esté lista. El escalonado
@@ -1997,12 +1997,7 @@ button:focus-visible > .sv-nav-glass > .sv-nav-glass__tint {
 @keyframes sv-mobile-detail-poster-reveal {
   from {
     opacity: 0;
-    transform: scale(1.065);
-  }
-
-  70% {
-    opacity: 1;
-    transform: scale(1.028);
+    transform: scale(1.045);
   }
 
   to {
