@@ -85,11 +85,15 @@ test('buildPosterCollageTargets keeps only unique TMDb identities for final artw
     )
 })
 
-test('the list detail header waits for preloaded English artwork instead of rendering stored posters', async () => {
+// La portada usa arte SIN texto (`coverPoster`, lib/tmdb/artworkPicks): el
+// mosaico recorta cada imagen a su celda y con el póster inglés cortaba los
+// títulos impresos.
+test('the list detail header waits for preloaded textless cover artwork instead of rendering stored posters', async () => {
     const source = await readFile(listDetailsLayoutUrl, 'utf8')
 
-    assert.match(source, /pickBestFavoriteEnglishPoster/)
+    assert.match(source, /coverPoster/)
+    assert.match(source, /requestListArtwork/)
     assert.match(source, /preloadPoster/)
-    assert.match(source, /useFinalEnglishPosterImages\(posterItems\)/)
+    assert.match(source, /useCoverArtImages\(posterItems\)/)
     assert.doesNotMatch(source, /fallbackImage/)
 })
