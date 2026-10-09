@@ -284,6 +284,12 @@ import {
 import DetailsInfoTabs from "@/components/details/DetailsInfoTabs";
 import { ActionShareButton, UnifiedRateButton } from "@/components/details/DetailHeaderBits";
 import DetailsScoreboardPanel, { ScoreboardPill, ScoreboardPillRow } from "@/components/details/DetailsScoreboardPanel";
+import {
+  MOBILE_SCOREBOARD_ENTRY_ANIMATION,
+  MOBILE_STATS_REVEAL_BASE,
+  MobileHeroCover,
+  useMobileDetailsHero,
+} from "@/components/details/MobileDetailsHero";
 import useRatingLinks from "@/lib/details/useRatingLinks";
 import { buildShareCardPayload } from "@/lib/details/shareCard";
 import {
@@ -366,8 +372,9 @@ const TTL = 1000 * 60 * 5; // Tiempo de vida del cache: 5 minutos
 // `visibility` evita pintar o interactuar con ellos antes del umbral, pero al
 // cruzarlo el contenido y su cristal aparecen en el mismo fotograma.
 //
-// El estado visual lo lleva el atributo `data-mobile-reveal`, que el listener
-// de scroll escribe DIRECTAMENTE en el DOM en el mismo evento; las variantes
+// El estado visual lo lleva el atributo `data-mobile-reveal`, que la cabecera
+// compartida (`useMobileDetailsHero`, details/MobileDetailsHero) escribe
+// DIRECTAMENTE en el DOM en el mismo evento de scroll; las variantes
 // `data-[mobile-reveal=hidden]` de MOBILE_REVEAL_BASE lo convierten en oculto.
 // (Van como utilidades y no como regla suelta en globals.css: allí el
 // compilador de CSS de Next la descartaba y el marcador salía siempre visible.) Antes dependía solo de un setState: cada cruce re-renderizaba
@@ -378,7 +385,6 @@ const TTL = 1000 * 60 * 5; // Tiempo de vida del cache: 5 minutos
 // seguían visibles 300 ms después que el panel.
 const MOBILE_REVEAL_BASE =
   "transform-gpu max-sm:data-[mobile-reveal=hidden]:invisible max-sm:data-[mobile-reveal=hidden]:pointer-events-none max-sm:data-[mobile-reveal=hidden]:**:!transition-none";
-const MOBILE_REVEAL_ATTR = "data-mobile-reveal";
 
 // FILA DE ACCIONES CON BARRA DE PROGRESO («Viendo»). Espera al primer scroll,
 // pero con SU PROPIA señal: se revela en cuanto ELLA asoma por encima del
@@ -1356,7 +1362,6 @@ export default function DetailsClient({
   // las acciones que tenga cada título. Se mide para que el hero termine justo
   // antes del navbar inferior, sin dejar metadatos entre ambos.
   const mobileActionRowRef = useRef(null);
-  const mobileSecondaryTriggerRef = useRef(null);
   const [mobileActionRowHeight, setMobileActionRowHeight] = useState(() => restoredValue(backSnapshot, "mobileActionRowHeight", 60));
   const [isHoveredImages, setIsHoveredImages] = useState(false);
   const [canPrevImages, setCanPrevImages] = useState(false); // Hay scroll a la izquierda
@@ -1458,8 +1463,6 @@ export default function DetailsClient({
   const [mobileClearOpen, setMobileClearOpen] = useState(false); // Boton de limpiar rating visible en movil
 
   const [isMobileViewport, setIsMobileViewport] = useState(() => restoredValue(backSnapshot, "isMobileViewport", false)); // Viewport <= 640px
-  const [mobileSecondaryVisible, setMobileSecondaryVisible] =
-    useState(() => restoredValue(backSnapshot, "mobileSecondaryVisible", false));
   // La fila de acciones con barra de progreso lleva su propia señal (ver
   // MOBILE_ACTIONS_REVEAL_ATTR).
   const [mobileActionsVisible, setMobileActionsVisible] = useState(false);
@@ -1612,33 +1615,26 @@ export default function DetailsClient({
     };
   }, [isMobileViewport]);
 
-  // MÓVIL: el bloque secundario (marcador de puntuaciones + pestañas de
-  // información) no compite con la portada al entrar. Se revela al cruzar por
-  // primera vez el navbar inferior y se oculta al volver al inicio de la ficha.
-  // Ambos comparten esta señal para aparecer y desaparecer como una sola pieza.
+  // MÓVIL: la fila de acciones con barra de progreso («Viendo») espera al
+  // primer scroll y se revela en cuanto ELLA asoma por encima del navbar
+  // inferior. El resto de lo revelado con scroll (barra de stats del marcador
+  // compacto, píldoras y pestañas) lo lleva la cabecera compartida
+  // (`useMobileDetailsHero`), como en listas, colecciones y temporadas.
   //
-  // IntersectionObserver conserva la sincronización ante cambios de layout,
-  // pero su callback se entrega de forma asíncrona. El listener pasivo calcula
-  // el umbral en el MISMO evento de scroll, sin esperar a rAF, que en móviles
-  // saturados puede llegar varios fotogramas después del cruce.
+  // El listener pasivo calcula el umbral en el MISMO evento de scroll, sin
+  // esperar a rAF, que en móviles saturados puede llegar varios fotogramas
+  // después del cruce.
   useEffect(() => {
     if (!isMobileViewport) {
-      setMobileSecondaryVisible(false);
       setMobileActionsVisible(false);
       return undefined;
     }
 
-    setMobileSecondaryVisible(false);
     setMobileActionsVisible(false);
-    const trigger = mobileSecondaryTriggerRef.current;
-    if (!trigger) return undefined;
-
-    let applied = null;
     let actionsApplied = null;
-    // Fila de acciones con barra de progreso: visible en cuanto asoma ella
-    // misma por encima del navbar inferior (y tras el primer scroll). Se busca
-    // en cada evento porque monta después, al resolverse /api/progress.
-    const syncActions = (revealLine) => {
+    // Se busca en cada evento porque monta después, al resolverse
+    // /api/progress.
+    const syncActions = () => {
       const row = document.querySelector(`[${MOBILE_ACTIONS_REVEAL_ATTR}]`);
       if (!row) {
         actionsApplied = null;
@@ -1646,7 +1642,7 @@ export default function DetailsClient({
       }
       const nextVisible =
         window.scrollY > MOBILE_REVEAL_SHOW_AT_PX &&
-        row.getBoundingClientRect().top <= revealLine;
+        row.getBoundingClientRect().top <= window.innerHeight - 88;
       if (nextVisible === actionsApplied) return;
       actionsApplied = nextVisible;
       row.setAttribute(MOBILE_ACTIONS_REVEAL_ATTR, nextVisible ? "shown" : "hidden");
@@ -1657,53 +1653,14 @@ export default function DetailsClient({
         );
       });
     };
-    const syncVisibility = () => {
-      const triggerTop = trigger.getBoundingClientRect().top;
-      const revealLine = window.innerHeight - 88;
-      syncActions(revealLine);
-      const nextVisible =
-        window.scrollY > MOBILE_REVEAL_SHOW_AT_PX &&
-        triggerTop <= revealLine;
 
-      if (nextVisible === applied) return;
-      applied = nextVisible;
-      // 1) Al DOM en este mismo evento: el marcador, las pestañas y la fila de
-      //    acciones aparecen/desaparecen en el siguiente fotograma, sin esperar
-      //    a que React re-renderice la ficha.
-      document.querySelectorAll(`[${MOBILE_REVEAL_ATTR}]`).forEach((el) => {
-        el.setAttribute(MOBILE_REVEAL_ATTR, nextVisible ? "shown" : "hidden");
-        el.inert = !nextVisible;
-        if (nextVisible) el.removeAttribute("aria-hidden");
-        else el.setAttribute("aria-hidden", "true");
-      });
-      // 2) El estado de React se pone al día sin prisa (mismos valores, así
-      //    que su commit no vuelve a tocar el DOM).
-      startTransition(() => {
-        setMobileSecondaryVisible((current) =>
-          current === nextVisible ? current : nextVisible,
-        );
-      });
-    };
-
-    const observer = new IntersectionObserver(
-      syncVisibility,
-      {
-        root: null,
-        // Reserva el espacio cubierto por la navegación inferior flotante.
-        rootMargin: "0px 0px -88px 0px",
-        threshold: 0,
-      },
-    );
-
-    observer.observe(trigger);
-    syncVisibility();
-    window.addEventListener("scroll", syncVisibility, { passive: true });
-    window.addEventListener("resize", syncVisibility, { passive: true });
+    syncActions();
+    window.addEventListener("scroll", syncActions, { passive: true });
+    window.addEventListener("resize", syncActions, { passive: true });
 
     return () => {
-      observer.disconnect();
-      window.removeEventListener("scroll", syncVisibility);
-      window.removeEventListener("resize", syncVisibility);
+      window.removeEventListener("scroll", syncActions);
+      window.removeEventListener("resize", syncActions);
     };
   }, [id, isMobileViewport]);
 
@@ -8193,7 +8150,6 @@ export default function DetailsClient({
     membershipMap,
     supportsHover,
     isMobileViewport,
-    mobileSecondaryVisible,
     heroLogoPath,
     selectedLogoPath,
     titleLogos,
@@ -8864,6 +8820,36 @@ export default function DetailsClient({
   const currentLoadTokenRef =
     posterViewMode === "preview" ? backdropLoadTokenRef : posterLoadTokenRef;
 
+  // ---- MÓVIL: cabecera inmersiva compartida (details/MobileDetailsHero) ----
+  // La misma de listas, colecciones y temporadas: el póster ENTERO (2:3 a todo
+  // el ancho, 150vw) fijo y pegado arriba, sin recortar los lados; los botones
+  // justo debajo; y el marcador centrado entre ellos y el navbar inferior,
+  // completo si cabe o compacto (la barra de stats se revela con el scroll).
+  // La portada está lista cuando lo está su versión ligera (o falló).
+  const mobileHeroCoverReady =
+    detailsEntryReady && (currentLowLoaded || currentImgError);
+  const {
+    rootRef: heroRootRef,
+    coverSpacerRef: heroCoverSpacerRef,
+    actionRowRef: heroActionRowRef,
+    scoreboardRef: heroScoreboardRef,
+    secondaryTriggerRef: heroSecondaryTriggerRef,
+    isPhone: heroIsPhone,
+    scoreboardMode: heroScoreboardMode,
+    revealProps: heroRevealProps,
+    statsRevealProps: heroStatsRevealProps,
+    rootStyle: heroRootStyle,
+  } = useMobileDetailsHero(true, { lock: mobileHeroCoverReady });
+  const mobileScoreboardMode = heroIsPhone ? heroScoreboardMode : "full";
+  // La fila de acciones la miden la cabecera y el alto de fila de esta ficha.
+  const setMobileActionRowNode = useCallback(
+    (node) => {
+      mobileActionRowRef.current = node;
+      heroActionRowRef.current = node;
+    },
+    [heroActionRowRef],
+  );
+
   // Aquí vivía `shouldRevealCurrentPosterImmediately`, que en la primera entrada
   // mostraba el póster ya visible para no romper la animación de entrada del
   // hero. Esa animación está desactivada (`initial={false}` en el poster card),
@@ -9467,6 +9453,8 @@ export default function DetailsClient({
       // globals.css) ni de Framer (DetailsStaticMotionProvider).
       data-details-restored={detailsRestored ? "" : undefined}
       aria-busy={!detailsEntryReady}
+      ref={heroRootRef}
+      style={heroRootStyle}
       className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30"
     >
       <DetailsStaticMotionProvider value={detailsRestored || sequenceTransitionActive}>
@@ -9575,28 +9563,28 @@ export default function DetailsClient({
               }}
             />
 
-            {/* MÓVIL: PÓSTER NÍTIDO como capa FIJA con el encuadre de la caja de
-                portada (mismo alto, mismo `cover` centrado y overscan, con fundido
-                inferior → botones sobre oscuro). Es la MISMA imagen que el fondo
-                desenfocado (capa base), y al ser también FIJA queda perfectamente
-                alineada con él: el crossfade por opacidad (nítida→difuminada,
-                dirigido por `--sv-hero-scroll`) se percibe como UNA sola imagen
-                que se difumina, sin la segunda imagen desalineada que causaba el
-                scroll de la portada en flujo. Gateada por `currentLowLoaded`
-                (evita destello). El logo y el contenido (en flujo, z-10) se
-                superponen. Solo móvil (`sm:hidden`). */}
-            <div
-              className={`sv-mobile-poster-entry sm:hidden absolute top-0 inset-x-0 bg-cover bg-center poster-mobile-fade ${
-                detailsEntryReady && currentLowLoaded
-                  ? "sv-mobile-poster-reveal [opacity:calc(1_-_var(--sv-hero-scroll,0))]"
-                  : "opacity-0"
-              }`}
-              style={{
-                height: `calc(100svh - 6rem - ${mobileActionRowHeight}px - env(safe-area-inset-bottom))`,
-                backgroundImage: `url(https://image.tmdb.org/t/p/${heroBackgroundSize}${heroBackgroundPath})`,
-                transform: `scale(${POSTER_OVERSCAN})`,
-                willChange: "opacity",
-              }}
+            {/* MÓVIL: PÓSTER NÍTIDO como capa FIJA, la portada de listas,
+                colecciones y temporadas (details/MobileHeroCover): el póster
+                ENTERO a todo el ancho (2:3, `--mobile-cover-h`), pegado arriba
+                y sin recortar los lados, con su borde inferior prolongado y
+                difuminado y un velo bajo los botones. Es la MISMA imagen que
+                el fondo desenfocado (capa base), con el que se releva al hacer
+                scroll. La ligera es la URL w500 que ya pide la caja de
+                portada; la original solo entra cuando ya está descargada
+                (`posterHighLoaded`), así que no hay peticiones de más. */}
+            <MobileHeroCover
+              lowSrc={`https://image.tmdb.org/t/p/w500${heroBackgroundPath}`}
+              src={
+                heroBackgroundSize === "original"
+                  ? `https://image.tmdb.org/t/p/original${heroBackgroundPath}`
+                  : null
+              }
+              ready={mobileHeroCoverReady}
+              animate={!detailsRestored && !sequenceTransitionActive}
+              collage={null}
+              // Bajo el póster, su reflejo muy difuminado en vez del fondo
+              // casi negro de la página.
+              blurredUnderlay
             />
           </>
         ) : (
@@ -9776,26 +9764,26 @@ export default function DetailsClient({
                     <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/15 z-30 hidden sm:block" />
                   )}
 
-                  {/* MÓVIL: el póster ocupa casi toda la pantalla para que en la
-                      primera vista SOLO se vean póster + logo + fila de botones,
-                      quedando los botones justo encima del navbar inferior y el
-                      resto (premios/info/scoreboard/tabs) por debajo (scroll).
-                      Su alto usa el viewport seguro, el área segura inferior y la
-                      altura MEDIDA de los botones. De este modo, logo y acciones
-                      acaban justo antes del navbar en cualquier ancho; el resto
-                      de la información queda después al hacer scroll.
-                      NO se descuenta la barra de "Continuar viendo": el póster
-                      (y el logo) deben quedar FIJOS la haya o no. Cuando existe,
-                      empuja la fila de acciones hacia abajo hasta quedar detrás
-                      del navbar inferior flotante (z-30 > z-10 del contenido),
-                      que la cubre por completo. ESCRITORIO: aspecto 2:3. */}
+                  {/* MÓVIL: el hueco de la portada FIJA (MobileHeroCover, en
+                      el fondo): el póster entero a todo el ancho (2:3,
+                      `--mobile-cover-h`), como en listas, colecciones y
+                      temporadas. Aquí solo queda el logo, al pie del póster;
+                      los botones van justo debajo y el marcador, centrado
+                      entre ellos y el navbar inferior. La cabecera compartida
+                      mide dónde cae (`coverSpacerRef`). Con barra de
+                      "Continuar viendo", esta empuja la fila de acciones hacia
+                      abajo sin tocar la portada ni el logo. ESCRITORIO:
+                      aspecto 2:3 / 16:9. */}
                   <div
+                    ref={heroCoverSpacerRef}
                     className={`relative w-full h-[var(--details-mobile-poster-height)] overflow-hidden bg-transparent will-change-auto sm:h-0 poster-aspect-box ${
                       posterChromeReady ? "sm:bg-neutral-950" : ""
                     }`}
                     style={{
                       contain: "layout paint",
-                      "--details-mobile-poster-height": `calc(100svh - 6rem - ${mobileActionRowHeight}px - env(safe-area-inset-bottom))`,
+                      // MÓVIL: el hueco de la portada fija (el póster entero,
+                      // 150vw); los botones van justo debajo.
+                      "--details-mobile-poster-height": "var(--mobile-cover-h, 150vw)",
                       // ESCRITORIO: la forma de la caja sigue al modo de portada
                       // (2:3 póster ↔ 16:9 backdrop) y el cambio se anima desde
                       // `.poster-aspect-box`. Antes esto era `sm:aspect-[2/3]`
@@ -10401,7 +10389,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               <FadeIn delay={0.12} className="mb-4 px-1 w-full sm:mb-6 max-sm:![transform:none] max-sm:!opacity-100">
                 <div className="relative -top-2 sm:top-0">
                   <div
-                    ref={mobileActionRowRef}
+                    ref={setMobileActionRowNode}
                     className={
                       mobileActionsWaitForScroll
                         ? // CON BARRA DE PROGRESO: la fila no entra con la
@@ -10501,14 +10489,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               <div
                 // Sin `will-change`: no hay transición pendiente y mantener una
                 // capa extra perjudica a los dispositivos de menor rendimiento.
+                // Aparece al pasar SU borde el navbar inferior (cabecera
+                // compartida, `revealProps`).
                 className={MOBILE_REVEAL_BASE}
-                {...{
-                  [MOBILE_REVEAL_ATTR]: mobileSecondaryVisible ? "shown" : "hidden",
-                }}
-                inert={isMobileViewport && !mobileSecondaryVisible}
-                aria-hidden={
-                  isMobileViewport && !mobileSecondaryVisible ? true : undefined
-                }
+                {...heroRevealProps}
               >
               <DetailsInfoTabs
                 key={`detailsTabMobile-${id}`}
@@ -10559,46 +10543,45 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   compartido con DetailModal para que se vean IDÉNTICOS. */}
             <div
               // Teléfono: 12px hasta el menú de pestañas, los mismos que hay
-              // entre el marcador y su fila de botones.
-              className={`${detailsEntryReady ? "sv-details-entry" : ""} sv-details-entry--scoreboard order-2 sm:order-none mb-3 ${isBackdropPoster ? "sm:mb-0" : "sm:mb-6"}`}
+              // entre el marcador y su fila de botones. En teléfono sin la
+              // entrada `sv-details-entry`: el marcador entra con los botones
+              // (abajo) y la cabecera lo mide, y un `transform` en un ancestro
+              // a medio animar falseaba esa medida.
+              className={`${detailsEntryReady ? "sv-details-entry" : ""} sv-details-entry--scoreboard max-sm:![animation:none] order-2 sm:order-none mb-3 ${isBackdropPoster ? "sm:mb-0" : "sm:mb-6"}`}
             >
-              <span
-                ref={mobileSecondaryTriggerRef}
-                data-details-mobile-secondary-trigger
-                aria-hidden="true"
-                className="block h-px sm:hidden"
-              />
               <div
-                // Sin `will-change`: no hay transición pendiente y mantener una
-                // capa extra perjudica a los dispositivos de menor rendimiento.
-                // Al revelarse, el panel (hijo directo, el cristal) entra como
-                // las secciones de los dashboards; la animación va en él y no
-                // aquí para no dejar el cristal plano (ver globals.css). Una
-                // ficha restaurada al volver ya se pinta estática.
+                ref={heroScoreboardRef}
+                // MÓVIL: el marcador de las listas, colecciones y temporadas.
+                // Centrado entre los botones y el navbar inferior
+                // (`--mobile-scoreboard-shift`, ver details/MobileDetailsHero):
+                // completo si cabe y, si no, solo las puntuaciones, con la
+                // barra de stats revelada al hacer scroll ('compact'). Entra
+                // justo después de los botones, cuando la portada está lista.
                 //
-                // MÓVIL: rejilla de dos columnas. El marcador y la franja de
-                // amigos ocupan las dos; Plataformas y Compartir, una cada uno.
-                // Así cada píldora es hija DIRECTA de este envoltorio y recibe
-                // su propia animación de revelado (sobre el cristal, no sobre un
-                // contenedor común que lo dejaría plano). Desde `sm` es un bloque.
-                className={`${MOBILE_REVEAL_BASE} max-sm:grid max-sm:grid-cols-2 max-sm:gap-x-3 ${
-                  detailsRestored ? "" : MOBILE_SCOREBOARD_REVEAL_ANIMATION
+                // Con barra de progreso («Viendo») los botones esperan al
+                // scroll y el marcador también: aparece al pasar el navbar
+                // inferior, con la animación del panel (el cristal) al
+                // revelarse.
+                //
+                // Sin márgenes propios salvo el del centrado: se mide su alto.
+                className={`max-sm:mt-[var(--mobile-scoreboard-shift,0px)] ${
+                  mobileScoreboardMode === "compact" ? MOBILE_STATS_REVEAL_BASE : ""
+                } ${
+                  mobileActionsWaitForScroll
+                    ? `${MOBILE_REVEAL_BASE} ${detailsRestored ? "" : MOBILE_SCOREBOARD_REVEAL_ANIMATION}`
+                    : !(mobileHeroCoverReady && inProgressChecked)
+                      ? "max-sm:invisible"
+                      : detailsRestored || sequenceTransitionActive
+                        ? ""
+                        : MOBILE_SCOREBOARD_ENTRY_ANIMATION
                 }`}
-                {...{
-                  [MOBILE_REVEAL_ATTR]: mobileSecondaryVisible ? "shown" : "hidden",
-                }}
-                inert={isMobileViewport && !mobileSecondaryVisible}
-                aria-hidden={
-                  isMobileViewport && !mobileSecondaryVisible
-                    ? true
-                    : undefined
-                }
+                {...(mobileScoreboardMode === "compact" ? heroStatsRevealProps : {})}
+                {...(mobileActionsWaitForScroll ? heroRevealProps : {})}
               >
                 <DetailsScoreboardPanel
                 // Móvil: solo puntuaciones y stats, centradas y a todo el ancho
                 // como en la imagen compartible; las acciones van debajo.
                 mobileScoresOnly
-                className="col-span-2"
                 compactStatsTrailing={isBackdropPoster}
                 shareIconOnly={isBackdropPoster}
                 fitAllScores={isBackdropPoster}
@@ -10654,10 +10637,19 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   ) : null
                 }
                 />
-                {/* Teléfono: Plataformas, Actividad (si tus amigos han tocado
-                    el título), Enlaces y Compartir en una fila de iconos bajo
-                    el marcador. Cada uno abre su modal. */}
-                <ScoreboardPillRow className="col-span-2 mt-3 sm:hidden">
+              </div>
+              <span
+                ref={heroSecondaryTriggerRef}
+                data-details-mobile-secondary-trigger
+                aria-hidden="true"
+                className="block h-px sm:hidden"
+              />
+              {/* Teléfono: Plataformas, Actividad (si tus amigos han tocado
+                  el título), Enlaces y Compartir en una fila de iconos bajo
+                  el marcador. Cada uno abre su modal. Se revela con el scroll
+                  al pasar el navbar inferior, como en las temporadas. */}
+              <div className={`mt-3 sm:hidden ${MOBILE_REVEAL_BASE}`} {...heroRevealProps}>
+                <ScoreboardPillRow>
                   <ScoreboardPill
                     iconOnly
                     icon={MonitorPlay}

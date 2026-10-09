@@ -42,10 +42,18 @@ function isDetailsInitialHeroVisible() {
   );
   if (!secondaryTrigger) return false;
 
-  // Es el mismo umbral que DetailsClient usa para revelar el marcador y las
-  // pestañas. Hasta entonces la portada sigue siendo la superficie principal;
-  // al cruzarlo, el gesto horizontal pertenece a las secciones de contenido.
-  return secondaryTrigger.getBoundingClientRect().top >= window.innerHeight - 88;
+  // Es el mismo umbral con el que la cabecera móvil de DetailsClient
+  // (details/MobileDetailsHero) abre la barra de stats del marcador y empieza
+  // a revelar lo secundario: tras los primeros 16px de scroll y con el
+  // centinela (bajo el marcador) por encima del navbar inferior. Hasta
+  // entonces la portada sigue siendo la superficie principal; al cruzarlo, el
+  // gesto horizontal pertenece a las secciones de contenido. Desde que el
+  // marcador se ve con la portada, el centinela ya nace por encima del navbar:
+  // sin mirar el scroll, el gesto no funcionaba nunca en la vista inicial.
+  return (
+    window.scrollY <= 16 ||
+    secondaryTrigger.getBoundingClientRect().top > window.innerHeight - 88
+  );
 }
 
 /**
