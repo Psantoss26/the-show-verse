@@ -25,7 +25,7 @@ import { ratingSummaryBadge, summarizeListRatings } from '@/lib/lists/ratingSumm
 import useListImdbRatings from '@/hooks/useListImdbRatings'
 import { useIsHistoryNavigation } from '@/lib/hooks/useIsHistoryNavigation'
 import { fetchTmdbImages } from '@/lib/tmdb/imageRequests'
-import { pickHeroBackdropPath, pickMobileHeroPosterPath } from '@/lib/details/tmdbImages'
+import { pickBestFavoriteEnglishPoster, pickHeroBackdropPath, pickMobileHeroPosterPath } from '@/lib/details/tmdbImages'
 import { pickCollectionCoverBackdrop } from '@/lib/lists/coverBackdrop'
 import { buildListShareCard, buildListShareStory, listYearSpan, normalizeListShareItem } from '@/lib/lists/shareList'
 
@@ -244,7 +244,16 @@ export default function CollectionDetailsClient({ collectionId }) {
         )
     }
 
-    const collectionPoster = collection?.poster_path || null
+    // Portada: la elegida en «Editar colección» o, por defecto, la mejor EN
+    // INGLÉS de la galería (TMDb sirve la principal en español, «VENGADORES
+    // COLECCIÓN»); sin ninguna en inglés, la principal. Hasta tener la galería
+    // la portada espera en vez de enseñar la española y cambiarla.
+    const customPoster = artworkOverride.poster ? collection?.poster_path || null : null
+    const autoPoster = gallery.done
+        ? pickBestFavoriteEnglishPoster(gallery.images?.posters)?.file_path || state.collection?.poster_path || null
+        : null
+    const collectionPoster = customPoster || autoPoster
+    const posterPending = !customPoster && !gallery.done
     const revenueLabel = formatCollectionRevenue(collection?.revenue)
     const castMembers = Array.isArray(collection?.cast) ? collection.cast : []
     // Fondo como en DetailsClient: backdrop en escritorio y póster textless en
@@ -315,6 +324,7 @@ export default function CollectionDetailsClient({ collectionId }) {
             sourceLabel="Colección TMDb"
             posterImage={collectionPoster ? `https://image.tmdb.org/t/p/w780${collectionPoster}` : null}
             posterLowImage={collectionPoster ? `https://image.tmdb.org/t/p/w342${collectionPoster}` : null}
+            posterPending={posterPending}
             coverBackdrop={coverBackdropPath ? {
                 src: `https://image.tmdb.org/t/p/w1280${coverBackdropPath}`,
                 lowSrc: `https://image.tmdb.org/t/p/w780${coverBackdropPath}`,
@@ -382,12 +392,14 @@ export default function CollectionDetailsClient({ collectionId }) {
                 // automáticos de la galería, no la portada principal de TMDb.
                 original={{
                     ...original,
+                    poster_path: autoPoster || original?.poster_path || null,
                     backdrop_path: autoBackdrop || original?.backdrop_path || null,
                     mobile_background_path: autoMobileBackground,
                     cover_backdrop_path: autoCoverBackdrop,
                 }}
                 collection={{
                     ...collection,
+                    poster_path: collectionPoster || collection?.poster_path || null,
                     backdrop_path: backgroundBackdrop || null,
                     mobile_background_path: backgroundPoster || null,
                     cover_backdrop_path: coverBackdropPath || null,
