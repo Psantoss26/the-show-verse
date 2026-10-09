@@ -140,3 +140,60 @@ export function getPosterCollageLayout(tileCount) {
     const count = Math.max(2, getCompletePosterCollageTileCount(tileCount))
     return COLLAGE_LAYOUTS[count]
 }
+
+// ---- Fondo móvil de una lista: el mosaico de la portada, AMPLIADO ----
+// Al hacer scroll, la portada da paso a un fondo con el mismo mosaico (mismas
+// columnas y alto de fila, mismas imágenes arriba) que sigue con más títulos
+// hasta llenar la pantalla. Ver UnifiedListDetailsLayout.
+
+export const MAX_BACKGROUND_TILE_COUNT = 40
+
+/**
+ * Títulos para el fondo: los primeros de la lista, en su orden y sin repetir,
+ * hasta `count` (sin el muestreo ni el tope de veinte de la portada).
+ */
+export function buildBackgroundCollageTargets(items, count = MAX_BACKGROUND_TILE_COUNT) {
+    const limit = Math.max(0, Math.min(Number(count) || 0, MAX_BACKGROUND_TILE_COUNT))
+    const targets = []
+    const seen = new Set()
+    for (const item of Array.isArray(items) ? items : []) {
+        if (targets.length >= limit) break
+        const target = posterTargetIdentity(item)
+        if (!target || seen.has(target.key)) continue
+        seen.add(target.key)
+        targets.push(target)
+    }
+    return targets
+}
+
+// Columnas y filas de la rejilla de la portada (de sus clases estáticas).
+export function getPosterCollageGrid(tileCount) {
+    const { gridClassName } = getPosterCollageLayout(tileCount)
+    return {
+        cols: Number(gridClassName.match(/grid-cols-(\d+)/)?.[1]) || 4,
+        rows: Number(gridClassName.match(/grid-rows-(\d+)/)?.[1]) || 1,
+    }
+}
+
+// Mismo póster aunque llegue en otro tamaño de TMDb (w342 / w185).
+const imageIdentity = (src) => String(src).split('/').pop()
+
+/**
+ * Celdas del fondo: primero las de la portada EN SU ORDEN (así las primeras
+ * filas coinciden con ella), después el resto de títulos sin repetir y, si la
+ * lista no da para llenar la pantalla, se vuelve a empezar.
+ */
+export function buildBackgroundCollageTiles(coverTiles, extraImages, count) {
+    const total = Math.max(0, Math.min(Number(count) || 0, MAX_BACKGROUND_TILE_COUNT))
+    const unique = []
+    const seen = new Set()
+    for (const src of [...(coverTiles || []), ...(extraImages || [])]) {
+        if (typeof src !== 'string' || !src.trim()) continue
+        const id = imageIdentity(src)
+        if (seen.has(id)) continue
+        seen.add(id)
+        unique.push(src)
+    }
+    if (!unique.length) return []
+    return Array.from({ length: total }, (_, index) => unique[index % unique.length])
+}
