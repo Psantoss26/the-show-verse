@@ -160,6 +160,7 @@ function historyDates(history) {
  */
 export function buildShareStoryPayload({
   type,
+  season = null,
   watched,
   plays,
   history,
@@ -177,8 +178,12 @@ export function buildShareStoryPayload({
   const last = isoDate(lastWatchedAt) || dates[0] || null;
 
   // En «Continuar viendo» la sección de visionados lo enseña también: una
-  // película a medias sale aunque aún no cuente como vista.
-  const resume = resumeData(continueWatching);
+  // película a medias sale aunque aún no cuente como vista. En una temporada,
+  // solo si el episodio a medias es de ella (`tvProgress` y `watchedBySeason`
+  // ya llegan de la temporada sola).
+  const resumeAny = resumeData(continueWatching);
+  const resume =
+    season == null || (resumeAny && resumeAny.season === Number(season)) ? resumeAny : null;
   let playsData = null;
   if (isTv && tvProgress?.percent > 0) {
     playsData = {
@@ -187,6 +192,8 @@ export function buildShareStoryPayload({
       total: tvProgress.total,
       last,
       resume,
+      // El progreso es de una temporada, no de la serie entera.
+      ...(season != null ? { season: true } : {}),
     };
   } else if (!isTv && watched) {
     playsData = {
@@ -252,6 +259,7 @@ export function sanitizeShareStory(body) {
         total: Math.round(finite(plays.total, 0, 100_000) ?? 0),
         last: isoDate(plays.last),
         resume,
+        ...(plays.season === true ? { season: true } : {}),
       };
     } else if ((count != null && count > 0) || resume) {
       playsData = {

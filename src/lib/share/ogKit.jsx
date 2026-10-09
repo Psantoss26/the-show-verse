@@ -38,6 +38,14 @@ export const LOGO_MAX_W = Math.round(W * 0.85);
 export const LOGO_MAX_H = 210;
 export const LOGO_BOTTOM = BUTTONS_TOP - 44;
 export const PANEL_TOP = BUTTONS_TOP + BUTTON + 48;
+// Fila de una TEMPORADA (5 acciones): como en su página, los botones crecen
+// hasta el tope de la ficha móvil (56px frente a los 38px de la fila de 8) con
+// 4px entre ellos. La fila sube lo que crecen, así el marcador no se mueve.
+export const SEASON_BUTTON = Math.round((BUTTON * 56) / 38);
+export const SEASON_BUTTON_GAP = Math.round((BUTTON * 4) / 38);
+export const SEASON_BUTTONS_TOP = BUTTONS_TOP - (SEASON_BUTTON - BUTTON);
+// Ancho del marcador: el de la fila de 8, aunque la fila tenga menos botones.
+export const SCORE_PANEL_W = ACTION_COUNT * BUTTON + (ACTION_COUNT - 1) * BUTTON_GAP;
 // Fondo ambiental: la portada desenfocada.
 //
 // OJO CON LOS FILTROS EN SATORI (medido): el resultado de un `filter` se recorta
@@ -223,6 +231,14 @@ export const ICONS = {
     ["path", { d: "M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" }],
     ["path", { d: "M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" }],
   ],
+  arrowLeft: [
+    ["path", { d: "m12 19-7-7 7-7" }],
+    ["path", { d: "M19 12H5" }],
+  ],
+  arrowRight: [
+    ["path", { d: "M5 12h14" }],
+    ["path", { d: "m12 5 7 7-7 7" }],
+  ],
   monitorPlay: [
     ["path", { d: "M10 7.75a.75.75 0 0 1 1.142-.638l3.664 2.249a.75.75 0 0 1 0 1.278l-3.664 2.25a.75.75 0 0 1-1.142-.64z" }],
     ["path", { d: "M12 17v4" }],
@@ -370,7 +386,7 @@ export function loadLocalAssets() {
 
 // ------------------------------------------------------------------- piezas
 
-export function ActionButton({ button }) {
+export function ActionButton({ button, size = BUTTON }) {
   const color = COLORS[button.color];
   const isSolid = button.variant === "solid";
   const isActive = button.variant === "active" && color;
@@ -402,7 +418,7 @@ export function ActionButton({ button }) {
         : GLASS_ELEVATION;
 
   const fill = isActive && Number.isFinite(button.fill) && button.fill > 0 ? Math.min(100, button.fill) : 0;
-  const iconSize = Math.round(BUTTON * 0.46);
+  const iconSize = Math.round(size * 0.46);
 
   return (
     <div
@@ -411,9 +427,9 @@ export function ActionButton({ button }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        width: BUTTON,
-        height: BUTTON,
-        borderRadius: BUTTON,
+        width: size,
+        height: size,
+        borderRadius: size,
         backgroundColor,
         // Satori no admite propiedades a `undefined`: solo se pasan si existen.
         ...(backgroundImage ? { backgroundImage } : {}),
@@ -438,7 +454,7 @@ export function ActionButton({ button }) {
         <div style={{ display: "flex", alignItems: "baseline", color: foreground, lineHeight: 1 }}>
           <span
             style={{
-              fontSize: Math.round(BUTTON * (button.label.length > 1 ? 0.4 : 0.46)),
+              fontSize: Math.round(size * (button.label.length > 1 ? 0.4 : 0.46)),
               fontWeight: 700,
               letterSpacing: button.label.length > 1 ? -2 : 0,
             }}
@@ -446,7 +462,7 @@ export function ActionButton({ button }) {
             {button.label}
           </span>
           {button.labelSuffix ? (
-            <span style={{ fontSize: Math.round(BUTTON * 0.2), fontWeight: 700, color: "#ffffff", marginLeft: 1 }}>
+            <span style={{ fontSize: Math.round(size * 0.2), fontWeight: 700, color: "#ffffff", marginLeft: 1 }}>
               {button.labelSuffix}
             </span>
           ) : null}
@@ -495,7 +511,7 @@ export function ScoreBadge({ logo, size, score }) {
 
 // Logo del título encajado en su caja máxima, apoyado sobre la fila de
 // acciones; sin logo, el título en texto (salvo que la portada ya lo traiga).
-export function TitleArt({ card, logo }) {
+export function TitleArt({ card, logo, bottom = LOGO_BOTTOM }) {
   let box = null;
   if (logo) {
     const ratio = logo.size.width / logo.size.height;
@@ -511,7 +527,7 @@ export function TitleArt({ card, logo }) {
         position: "absolute",
         left: 0,
         width: W,
-        top: LOGO_BOTTOM - height,
+        top: bottom - height,
         height,
         display: "flex",
         alignItems: "flex-end",

@@ -363,7 +363,7 @@ export function PlaysScene({ plays, fonts }) {
       <SceneBody fonts={fonts}>
         <Eyebrow icon="tv" label="Progreso" color={GREEN_300} />
         <BigFigure value={String(plays.percent)} suffix="%" color={GREEN_300} glow={GREEN_GLOW} />
-        <Caption>de la serie vista</Caption>
+        <Caption>{plays.season ? "de la temporada vista" : "de la serie vista"}</Caption>
         <Glass style={{ width: PANEL_W, marginTop: 64, padding: "52px 60px" }}>
           <div style={{ display: "flex", width: "100%", height: 30, borderRadius: 30, backgroundColor: WHITE(0.1), overflow: "hidden" }}>
             <div

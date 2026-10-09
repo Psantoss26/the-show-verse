@@ -162,3 +162,40 @@ test("file name is a readable ascii slug", () => {
   assert.equal(shareCardFileName("¿Qué pasó ayer?"), "que-paso-ayer-the-show-verse.png");
   assert.equal(shareCardFileName(""), "titulo-the-show-verse.png");
 });
+
+test("season card mirrors the season row: previous, series, watched, rating, next", () => {
+  const card = sanitizeShareCard(
+    buildShareCardPayload({
+      ...baseInput,
+      type: "tv",
+      title: "Breaking Bad · Temporada 1",
+      logoPath: null,
+      showTitle: false,
+      trakt: { watched: true, badge: "43%", loading: false },
+      rating: 8,
+      season: { previous: false, next: true },
+    }),
+  );
+  assert.deepEqual(card.season, { previous: false, next: true });
+
+  const buttons = shareCardActionButtons(card);
+  assert.deepEqual(buttons.map((b) => `${b.key}:${b.variant}`), [
+    "previous:disabled",
+    "series:glass",
+    "watched:active",
+    "rating:active",
+    "next:glass",
+  ]);
+  assert.deepEqual(buttons.map((b) => b.icon ?? null), ["arrowLeft", "monitorPlay", null, null, "arrowRight"]);
+  assert.equal(buttons[2].label, "43");
+  assert.equal(buttons[3].label, "8");
+});
+
+test("only tv cards can be season cards, and the flags are booleans", () => {
+  assert.equal(sanitizeShareCard({ type: "movie", season: { previous: true } }).season, null);
+  assert.deepEqual(sanitizeShareCard({ type: "tv", season: { previous: "yes", next: 1 } }).season, {
+    previous: false,
+    next: false,
+  });
+  assert.equal(sanitizeShareCard({ type: "tv" }).season, null);
+});

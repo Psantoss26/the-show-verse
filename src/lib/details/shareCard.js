@@ -2,6 +2,10 @@
 // móvil: portada, logo, fila de acciones con sus estados y un marcador con solo
 // TMDb, Trakt e IMDb).
 //
+// También la de una TEMPORADA (`season`): mismo dibujo, con la fila de acciones
+// de su página (SubrouteDetailsActionRow): anterior · serie · visto · nota ·
+// siguiente.
+//
 // Lo usan los dos extremos:
 //   - el cliente (DetailsClient) arma el payload con `buildShareCardPayload`;
 //   - la ruta /api/share/details-card lo valida con `sanitizeShareCard` y pinta
@@ -40,6 +44,11 @@ function percent(value) {
   return number >= 0 && number <= 100 ? `${number}%` : null;
 }
 
+function seasonData(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  return { previous: raw.previous === true, next: raw.next === true };
+}
+
 function score(raw) {
   if (!raw || typeof raw !== "object") return null;
   const value = text(raw.value, 6);
@@ -63,9 +72,10 @@ export function sanitizeShareCard(body) {
   const scores = body?.scores && typeof body.scores === "object" ? body.scores : {};
   const rating = finite(actions.rating, 0, 10);
   const plays = finite(actions.plays, 0, 9999);
+  const type = body?.type === "tv" ? "tv" : "movie";
 
   return {
-    type: body?.type === "tv" ? "tv" : "movie",
+    type,
     title: text(body?.title, 80),
     posterPath: tmdbImagePath(body?.posterPath),
     logoPath: tmdbImagePath(body?.logoPath),
@@ -84,6 +94,8 @@ export function sanitizeShareCard(body) {
       comments: actions.comments === true,
     },
     scores: Object.fromEntries(SCORE_KEYS.map((key) => [key, score(scores[key])])),
+    // Temporada: si hay temporada anterior / siguiente (sus flechas).
+    season: type === "tv" ? seasonData(body?.season) : null,
   };
 }
 
@@ -107,6 +119,7 @@ export function buildShareCardPayload({
   listActive,
   commentsActive,
   scores,
+  season = null,
 }) {
   // Misma lectura que TraktWatchedControl: en series el badge es el progreso
   // ("45%"); en películas, el número de visionados.
@@ -143,6 +156,7 @@ export function buildShareCardPayload({
         ];
       }),
     ),
+    season: season ? { previous: !!season.previous, next: !!season.next } : null,
   };
 }
 
@@ -150,6 +164,8 @@ export function buildShareCardPayload({
  * Los ocho botones de la fila móvil, en el orden de DetailActionsRow:
  *   - películas: tráiler · soundtrack · visto · nota · favorito · pendiente · lista · reseñas
  *   - series (fila combinada, replegada): multimedia · valoración de episodios · …
+ *   - temporadas: los cinco de SubrouteDetailsActionRow (ver arriba); sin
+ *     temporada anterior o siguiente, su flecha atenuada, como en la página.
  *
  * Cada botón: { key, icon, variant, color?, label?, labelSuffix?, fill?, filledIcon? }
  *   variant "solid"    -> blanco con icono negro (acciones de reproducción)
@@ -198,12 +214,25 @@ export function shareCardActionButtons(card) {
       ? { key, icon, variant: "active", color, filledIcon }
       : { key, icon, variant: "glass" };
 
+  const rating =
+    a.rating != null
+      ? { key: "rating", variant: "active", color: "yellow", label: formatUserRating(a.rating) }
+      : { key: "rating", icon: "star", variant: "glass" };
+
+  if (card.season) {
+    return [
+      { key: "previous", icon: "arrowLeft", variant: card.season.previous ? "glass" : "disabled" },
+      { key: "series", icon: "monitorPlay", variant: "glass" },
+      { key: "watched", ...watched },
+      rating,
+      { key: "next", icon: "arrowRight", variant: card.season.next ? "glass" : "disabled" },
+    ];
+  }
+
   return [
     ...media,
     { key: "watched", ...watched },
-    a.rating != null
-      ? { key: "rating", variant: "active", color: "yellow", label: formatUserRating(a.rating) }
-      : { key: "rating", icon: "star", variant: "glass" },
+    rating,
     toggle("favorite", "heart", a.favorite, "red", true),
     toggle("watchlist", "bookmark", a.watchlist, "blue", true),
     toggle("list", "list", a.list, "purple"),
