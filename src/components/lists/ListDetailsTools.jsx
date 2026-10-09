@@ -28,7 +28,10 @@ import {
 } from "@/lib/navigation/userDetailsSequence";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import {
+  MOBILE_REVEAL_ANIMATED,
+  MOBILE_REVEAL_ANIMATED_PROPS,
   MOBILE_REVEAL_BASE,
+  MOBILE_REVEAL_PIECE_PROPS,
   MobileHeroRevealContext,
 } from "@/components/details/MobileDetailsHero";
 import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
@@ -372,6 +375,7 @@ export default function FilterableListItems({
   // altura del documento sea correcta al instante y el scroll se restaure sin saltos.
   const isBackNav = useIsHistoryNavigation();
   const heroReveal = useContext(MobileHeroRevealContext);
+  const revealPiece = heroReveal ? MOBILE_REVEAL_PIECE_PROPS : undefined;
   const [visibleCount, setVisibleCount] = useState(
     isBackNav ? Number.MAX_SAFE_INTEGER : INITIAL_RENDER_COUNT,
   );
@@ -502,10 +506,11 @@ export default function FilterableListItems({
         ref={filtersRef}
         data-menu-pinned={filtersPinned}
         // Con la cabecera inmersiva móvil (UnifiedListDetailsLayout) aparece
-        // al pasar el navbar inferior, como la sinopsis.
-        {...(heroReveal || {})}
+        // al pasar el navbar inferior, como la sinopsis, y entra y sale
+        // animada como el marcador (en sus piezas de cristal: `revealPiece`).
+        {...(heroReveal ? { ...heroReveal, ...MOBILE_REVEAL_ANIMATED_PROPS } : {})}
         className={`relative sticky top-14 z-[70] mb-4 space-y-1 transition-all duration-300 sm:top-20 ${
-          heroReveal ? MOBILE_REVEAL_BASE : ""
+          heroReveal ? `${MOBILE_REVEAL_BASE} ${MOBILE_REVEAL_ANIMATED}` : ""
         }`}
         initial={isBackNav ? false : { opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -514,10 +519,12 @@ export default function FilterableListItems({
         <div className="flex gap-2 lg:hidden">
           <div className="relative flex-1">
             <Search
+              {...revealPiece}
               aria-hidden="true"
               className="pointer-events-none absolute left-3.5 top-1/2 z-10 h-4 w-4 shrink-0 -translate-y-1/2 text-purple-400"
             />
             <input
+              {...revealPiece}
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Buscar..."
@@ -525,6 +532,7 @@ export default function FilterableListItems({
             />
             {q ? (
               <button
+                {...revealPiece}
                 type="button"
                 onClick={() => setQ("")}
                 className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 transition-colors hover:bg-white/10"
@@ -534,6 +542,7 @@ export default function FilterableListItems({
             ) : null}
           </div>
           <button
+            {...revealPiece}
             type="button"
             onClick={() => setMobileFiltersOpen((v) => !v)}
             className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition-all ${
