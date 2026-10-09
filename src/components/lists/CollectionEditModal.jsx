@@ -45,11 +45,13 @@ const imageLanguage = (image) => {
 }
 // Póster y backdrop de portada: llevan el título, así que solo en español o
 // inglés.
-const titledImages = (list) => (list || []).filter((image) => POSTER_LANGUAGES.has(imageLanguage(image)))
+export const titledImages = (list) => (list || []).filter((image) => POSTER_LANGUAGES.has(imageLanguage(image)))
 // Fondos (móvil y ordenador): sin texto encima, solo imágenes sin idioma.
 const textlessImages = (list) => (list || []).filter((image) => !imageLanguage(image))
 
-function ArtworkRow({ id, label, field, original, value, candidates, landscape = false, onSelect }) {
+// Fila de imágenes a elegir. También la usa «Editar portada» de las temporadas
+// (details/SeasonCoverEditModal).
+export function ArtworkRow({ id, label, field, original, value, candidates, landscape = false, onSelect }) {
   const paths = [...new Set([original, value, ...(candidates || []).map((item) => item.file_path)].filter(Boolean))]
   const size = landscape ? 'w300' : 'w185'
   const rowRef = useRef(null)

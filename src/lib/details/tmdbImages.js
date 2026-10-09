@@ -122,17 +122,17 @@ export function pickBestFavoriteEnglishPoster(list) {
     )[0] || null
 }
 
-// El PRIMER póster de un idioma tal como lo devuelve TMDb (`/images`), sin
-// reordenarlo. Las temporadas lo usan con inglés: el primero suele ser el
-// oficial de la temporada, con su número («Season N»), y no un póster de la
-// serie con solo el título. Sin ninguno de ese idioma, `null`: quien llama
-// conserva el suyo.
-export function pickFirstPosterByLanguage(list, language) {
+// Póster de un idioma por su POSICIÓN en la lista de TMDb (`/images`), sin
+// reordenarla: `position` 0 es el primero, 1 el segundo… Si hay menos, el
+// último que haya. Sin ninguno de ese idioma, `null`: quien llama conserva el
+// suyo.
+export function pickPosterByLanguage(list, language, position = 0) {
     if (!Array.isArray(list) || !language) return null
     const target = String(language).toLowerCase().split('-')[0]
-    return list.find(
+    const candidates = list.filter(
         (img) => img?.file_path && String(img?.iso_639_1 || '').toLowerCase().split('-')[0] === target,
-    ) || null
+    )
+    return candidates[Math.min(Math.max(0, position), candidates.length - 1)] || null
 }
 
 export function pickBestNeutralPosterByResVotes(list, opts = {}) {

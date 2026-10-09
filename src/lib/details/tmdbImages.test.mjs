@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {
   pickBestBackdropForPreview,
   pickBestFavoriteEnglishPoster,
-  pickFirstPosterByLanguage,
+  pickPosterByLanguage,
 } from './tmdbImages.js'
 
 test('pickBestFavoriteEnglishPoster uses the Favorites ordering and ignores non-English posters', () => {
@@ -27,14 +27,17 @@ test('pickBestBackdropForPreview keeps an English backdrop when it is below the 
   assert.equal(selected, '/english-1000.jpg')
 })
 
-test('pickFirstPosterByLanguage devuelve el primero del idioma en el orden de TMDb', () => {
+test('pickPosterByLanguage elige por posición entre los del idioma, en el orden de TMDb', () => {
   const posters = [
     { file_path: '/es.jpg', iso_639_1: 'es', vote_average: 9 },
+    { file_path: '/en-1.jpg', iso_639_1: 'en', vote_average: 4 },
     { file_path: '/none.jpg', iso_639_1: null },
-    { file_path: '/en-first.jpg', iso_639_1: 'en', vote_average: 4 },
-    { file_path: '/en-better.jpg', iso_639_1: 'en', vote_average: 8 },
+    { file_path: '/en-2.jpg', iso_639_1: 'en', vote_average: 8 },
   ]
-  assert.equal(pickFirstPosterByLanguage(posters, 'en')?.file_path, '/en-first.jpg')
-  assert.equal(pickFirstPosterByLanguage(posters, 'fr'), null)
-  assert.equal(pickFirstPosterByLanguage(null, 'en'), null)
+  assert.equal(pickPosterByLanguage(posters, 'en')?.file_path, '/en-1.jpg')
+  assert.equal(pickPosterByLanguage(posters, 'en', 1)?.file_path, '/en-2.jpg')
+  // Con menos de los pedidos, el último que haya.
+  assert.equal(pickPosterByLanguage(posters.slice(0, 2), 'en', 1)?.file_path, '/en-1.jpg')
+  assert.equal(pickPosterByLanguage(posters, 'fr', 1), null)
+  assert.equal(pickPosterByLanguage(null, 'en'), null)
 })
