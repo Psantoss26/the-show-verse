@@ -175,8 +175,16 @@ function readBottomNavTop() {
  * cambia al hacer scroll) salvo que cambie también el ancho. Los cambios de
  * alto del marcador o de la fila de botones (datos que llegan) se recolocan
  * siempre.
+ *
+ * `fitCover` (la ficha): en vez de fijar la portada en 150vw y ver qué cabe
+ * debajo, se fija lo de debajo y la portada ocupa el resto. Desde el navbar
+ * inferior hacia arriba, con el MISMO margen (`fitGap`) entre cada pieza: el
+ * marcador SIEMPRE compacto, la fila de botones y el pie de la portada (donde
+ * la página pone el logo). Así esas piezas quedan en la misma posición en
+ * cualquier móvil: en los altos la portada crece y se recorta por los lados;
+ * en los bajos, se recorta por arriba (`object-bottom`).
  */
-export function useMobileDetailsHero(enabled, { lock = false } = {}) {
+export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, fitGap = 20 } = {}) {
     const rootRef = useRef(null)
     const coverSpacerRef = useRef(null)
     const actionRowRef = useRef(null)
@@ -195,7 +203,9 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
     // Qué cabe bajo los botones sin tocar la portada (ver arriba). Arranca en
     // 'full' para pintar y medir el marcador completo; todo esto ocurre antes
     // de que se vean portada y marcador (esperan a que cargue la imagen).
-    const [scoreboardMode, setScoreboardMode] = useState('full')
+    const [scoreboardMode, setScoreboardMode] = useState(fitCover ? 'compact' : 'full')
+    // Alto de la portada con `fitCover` (px); null hasta la primera medida.
+    const [fittedCoverHeight, setFittedCoverHeight] = useState(null)
     // Margen extra encima del marcador para que quede centrado entre los
     // botones y el navbar inferior (puede ser negativo: ver abajo).
     const [scoreboardShift, setScoreboardShift] = useState(0)
@@ -271,6 +281,33 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
             if (navTopRef.current == null || !lockRef.current || widthChanged) {
                 navTopRef.current = readBottomNavTop()
             }
+            const appliedShift = Number.parseFloat(getComputedStyle(scoreboard).marginTop) || 0
+            const baseGap = scoreboardRect.top - rowRect.bottom - appliedShift
+            if (fitCover && spacer) {
+                // Lo que hay del pie de la portada al pie de los botones (el
+                // hueco de la columna, su `-top-2` y la barra «Viendo» si la
+                // hay) no depende del alto de la portada: con él se despeja
+                // el alto que deja `fitGap` entre botones, marcador y navbar.
+                const spacerRect = readUntransformedRect(spacer)
+                const belowCover = rowRect.bottom - spacerRect.bottom
+                // Alto visible del marcador compacto: sin el interior de la
+                // barra de stats (`clientHeight`, sin bordes: su borde superior
+                // sigue ahí plegada y antes faltaba ese píxel abajo).
+                const visibleCompact = total - (statsRow ? statsRow.clientHeight : 0)
+                const coverDocTop = spacerRect.top + window.scrollY
+                // Hacia abajo: con `round` el último hueco salía 1px corto.
+                const height = Math.floor(
+                    Math.max(
+                        window.innerWidth * 0.75,
+                        navTopRef.current - fitGap * 2 - visibleCompact - belowCover - coverDocTop,
+                    ),
+                )
+                setFittedCoverHeight((current) => (current === height ? current : height))
+                setScoreboardMode((current) => (current === 'compact' ? current : 'compact'))
+                const fitShift = Math.round((fitGap - baseGap) * 2) / 2
+                setScoreboardShift((current) => (current === fitShift ? current : fitShift))
+                return
+            }
             const space = navTopRef.current - rowBottom
             const mode = space - fullHeight >= MOBILE_SCOREBOARD_MIN_GAP_PX * 2 ? 'full' : 'compact'
             setScoreboardMode((current) => (current === mode ? current : mode))
@@ -278,8 +315,6 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
             // bajas), el mínimo arriba y el marcador queda a un scroll.
             const visibleHeight = mode === 'full' ? fullHeight : compactHeight
             const gap = Math.max(MOBILE_SCOREBOARD_MIN_GAP_PX, (space - visibleHeight) / 2)
-            const appliedShift = Number.parseFloat(getComputedStyle(scoreboard).marginTop) || 0
-            const baseGap = scoreboardRect.top - rowRect.bottom - appliedShift
             const shift = Math.round((gap - baseGap) * 2) / 2
             setScoreboardShift((current) => (current === shift ? current : shift))
         }
@@ -294,12 +329,35 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
         // Botones que aparecen o desaparecen no cambian el tamaño de la fila.
         const mutations = new MutationObserver(update)
         mutations.observe(row, { childList: true, subtree: true })
+        // Con `fitCover`, lo que se monta entre la portada y los botones (la
+        // barra «Viendo», que llega con /api/progress) los mueve sin cambiar
+        // su tamaño: se vigila el contenedor común (un fotograma como mucho).
+        let raf = 0
+        let fitMutations = null
+        const spacer = coverSpacerRef.current
+        if (fitCover && spacer) {
+            let common = spacer.parentElement
+            while (common && !common.contains(row)) common = common.parentElement
+            if (common) {
+                fitMutations = new MutationObserver(() => {
+                    if (!raf) {
+                        raf = window.requestAnimationFrame(() => {
+                            raf = 0
+                            update()
+                        })
+                    }
+                })
+                fitMutations.observe(common, { childList: true, subtree: true })
+            }
+        }
         return () => {
             window.removeEventListener('resize', update)
             observer.disconnect()
             mutations.disconnect()
+            fitMutations?.disconnect()
+            if (raf) window.cancelAnimationFrame(raf)
         }
-    }, [enabled])
+    }, [enabled, fitCover, fitGap])
 
     // Recorrido del relevo portada → fondo: 55vh, como en la ficha, salvo que
     // la página no dé para tanto (p. ej. colecciones de una sola fila de
@@ -489,7 +547,7 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
         rootStyle: enabled
             ? {
                 '--mobile-cover-top': `${coverTop}px`,
-                '--mobile-cover-h': '150vw',
+                '--mobile-cover-h': fitCover && fittedCoverHeight ? `${fittedCoverHeight}px` : '150vw',
                 '--mobile-scoreboard-shift': `${scoreboardShift}px`,
                 ...(actionsWidth ? { '--mobile-actions-w': `${actionsWidth}px` } : {}),
             }
@@ -839,7 +897,10 @@ export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, 
                             // 1px por encima del borde: sin hueco entre ambas.
                             top: 'calc(var(--mobile-cover-h) - 1px)',
                             backgroundImage: `url(${firstSrc})`,
-                            backgroundSize: '100% auto',
+                            // El ancho con el que se pinta el póster: todo el
+                            // ancho o, si la portada es más alta que 2:3
+                            // (`fitCover`), el que da su alto.
+                            backgroundSize: 'max(100%, calc(var(--mobile-cover-h) * 2 / 3)) auto',
                             backgroundPosition: 'center bottom',
                             transform: `scale(${MOBILE_COVER_EXTEND_SCALE_X}, ${(MOBILE_COVER_EXTEND_PX + 1) / 2})`,
                         }}

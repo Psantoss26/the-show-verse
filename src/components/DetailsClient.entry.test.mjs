@@ -15,7 +15,7 @@ test("DetailsClient waits for client readiness before starting entry animations"
   // El revelado con scroll del teléfono es el de la cabecera compartida
   // (details/MobileDetailsHero): se escribe en el DOM en el mismo evento de
   // scroll, sin esperar a rAF ni a un render de React.
-  assert.match(source, /useMobileDetailsHero\(true, \{ lock: mobileHeroCoverReady \}\)/);
+  assert.match(source, /useMobileDetailsHero\(true, \{\s+lock: mobileHeroCoverReady,[\s\S]*?fitCover: true,/);
   assert.match(source, /\{\.\.\.heroRevealProps\}/);
   assert.match(source, /ref=\{heroScoreboardRef\}/);
   assert.match(source, /window\.addEventListener\("scroll", syncActions, \{ passive: true \}\)/);
