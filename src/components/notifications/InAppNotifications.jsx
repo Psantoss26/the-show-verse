@@ -412,7 +412,8 @@ export default function InAppNotifications() {
   // Capa superior (popover manual): por encima de modales y sin cerrarse al
   // pulsar fuera.
   //
-  // Siempre BAJO la barra superior, sin taparla. Desde 768px (tablet y
+  // Siempre JUSTO BAJO la barra superior, sin taparla, también cuando está
+  // compacta (`.sv-toast-stack` en globals.css). Desde 768px (tablet y
   // escritorio) a la derecha y con 24rem de ancho; en móvil, a todo el ancho
   // con margen lateral y en versión compacta (menos alto). Sin soporte de
   // popover queda como capa fija normal.
@@ -431,7 +432,7 @@ export default function InAppNotifications() {
       ref={containerRef}
       popover="manual"
       aria-label="Avisos"
-      className="pointer-events-none fixed inset-auto left-3 right-3 top-[calc(env(safe-area-inset-top)+4.5rem)] z-[100000] m-0 w-auto max-w-none overflow-visible border-0 bg-transparent p-0 text-white md:left-auto md:right-4 md:w-[24rem]"
+      className="sv-toast-stack pointer-events-none fixed inset-auto left-3 right-3 z-[100000] m-0 w-auto max-w-none overflow-visible border-0 bg-transparent p-0 text-white md:left-auto md:right-4 md:w-[24rem]"
     >
       <ol aria-live="polite" className="flex flex-col gap-1.5 md:gap-2">
         <AnimatePresence initial={false}>
