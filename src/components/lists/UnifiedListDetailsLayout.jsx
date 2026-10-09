@@ -32,8 +32,10 @@ import {
     MOBILE_POSTER_OVERSCAN,
     MOBILE_REVEAL_BASE,
     MOBILE_STATS_REVEAL_BASE,
+    MOBILE_STATS_REVEAL_WIDEN,
     MOBILE_SCOREBOARD_ENTRY_ANIMATION,
     MobileHeroCover,
+    MobileHeroRevealContext,
     useMobileDetailsHero,
 } from '@/components/details/MobileDetailsHero'
 
@@ -966,7 +968,9 @@ export default function UnifiedListDetailsLayout({
                                     // IMDb): tan ancho como la fila de botones
                                     // o el navbar (`--mobile-actions-w`), no
                                     // de borde a borde con hueco a los lados.
-                                    : `max-sm:mt-[var(--mobile-scoreboard-shift,0px)] max-sm:mx-auto max-sm:w-[var(--mobile-actions-w,100%)] max-sm:max-w-full ${mobileScoreboardMode === 'compact' ? MOBILE_STATS_REVEAL_BASE : ''} ${
+                                    // En 'compact', al desplegarse con el
+                                    // scroll, crece también a lo ancho.
+                                    : `max-sm:mt-[var(--mobile-scoreboard-shift,0px)] max-sm:mx-auto max-sm:w-[var(--mobile-actions-w,100%)] max-sm:max-w-full ${mobileScoreboardMode === 'compact' ? `${MOBILE_STATS_REVEAL_BASE} ${MOBILE_STATS_REVEAL_WIDEN}` : ''} ${
                                         !animateMobileEntry
                                             ? ''
                                             : mobileCoverReady
@@ -1045,8 +1049,13 @@ export default function UnifiedListDetailsLayout({
 
                 {isBackdropCover && infoTabs ? <div className="mb-12">{infoTabs}</div> : null}
 
-                {/* --- BODY --- */}
-                <div className="relative z-0">{children}</div>
+                {/* --- BODY --- La barra de búsqueda de la lista
+                    (FilterableListItems) se revela con el scroll como la
+                    sinopsis: sin sinopsis queda pegada al marcador y asomaba
+                    detrás del navbar inferior. */}
+                <MobileHeroRevealContext.Provider value={mobileHero ? heroRevealProps : null}>
+                    <div className="relative z-0">{children}</div>
+                </MobileHeroRevealContext.Provider>
             </div>
         </div>
     )

@@ -25,7 +25,8 @@
 // deja debajo, como las temporadas), `actionRowRef` en la fila de
 // acciones, `scoreboardRef` en el envoltorio del marcador (SIN márgenes
 // propios: se mide su alto) y `secondaryTriggerRef` en un centinela antes de
-// lo que se revela con el scroll, que lleva `revealProps` + MOBILE_REVEAL_BASE.
+// lo que se revela con el scroll, que lleva `revealProps` + MOBILE_REVEAL_BASE
+// (cada bloque aparece al pasar SU borde superior el navbar inferior).
 // En modo 'compact' el envoltorio del marcador lleva MOBILE_STATS_REVEAL_BASE +
 // `statsRevealProps`: su fila de estadísticas (la marca `data-scoreboard-stats`
 // de DetailsStatsRow, que aquí se mide) queda oculta hasta hacer scroll. El
@@ -35,7 +36,7 @@
 // constantes locales que sus tests leen del propio fichero); si cambian allí,
 // hay que cambiarlas aquí.
 
-import { startTransition, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createContext, startTransition, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 // Modo 'compact': la barra de stats del marcador se oculta hasta el scroll
 // (con el mismo disparador que lo secundario). No con `display: none`: se
@@ -58,9 +59,26 @@ export const MOBILE_STATS_REVEAL_BASE = [
     'max-sm:[&[data-mobile-reveal-stats=hidden]_[data-scoreboard-stats]]:grid-rows-[minmax(0,0fr)]',
     'max-sm:[&[data-mobile-reveal-stats=hidden]_[data-scoreboard-stats]]:border-transparent',
 ].join(' ')
+// Lo que tarda en desplegarse la barra de stats (420 ms) y un margen: hasta
+// entonces no se revela nada de lo que va debajo (ver el revelado del hook).
+const MOBILE_STATS_SETTLE_MS = 460
+// Envoltorio del marcador ESTRECHO (listas y colecciones, `--mobile-actions-w`)
+// en modo 'compact': al desplegarse la barra de stats crece también a los
+// lados hasta todo el ancho, a la vez y con la misma curva. La transición solo
+// existe desde la primera apertura (`data-mobile-stats-animated`, lo pone el
+// revelado): antes animaba también el ancho inicial al publicarse
+// `--mobile-actions-w` y el marcador entraba encogiendo. Duración y curva van
+// en la misma variante: un `transition-duration` suelto anima TODO
+// (`transition-property` vale `all` por defecto).
+const MOBILE_STATS_ANIMATED_ATTR = 'data-mobile-stats-animated'
+export const MOBILE_STATS_REVEAL_WIDEN =
+    'max-sm:data-[mobile-reveal-stats=shown]:w-full max-sm:motion-safe:data-[mobile-stats-animated]:transition-[width] max-sm:motion-safe:data-[mobile-stats-animated]:duration-[420ms] max-sm:motion-safe:data-[mobile-stats-animated]:ease-[cubic-bezier(0.22,1,0.36,1)]'
 export const MOBILE_REVEAL_BASE =
     'max-sm:transform-gpu max-sm:data-[mobile-reveal=hidden]:invisible max-sm:data-[mobile-reveal=hidden]:pointer-events-none max-sm:data-[mobile-reveal=hidden]:**:!transition-none'
 const MOBILE_REVEAL_ATTR = 'data-mobile-reveal'
+// `revealProps` de la cabecera para bloques que pinta un hijo de la página
+// (la barra de búsqueda de FilterableListItems); null fuera de ella.
+export const MobileHeroRevealContext = createContext(null)
 const MOBILE_REVEAL_SHOW_AT_PX = 16
 // Alto de la navegación inferior flotante que tapa el borde de la pantalla.
 const MOBILE_BOTTOM_NAV_PX = 88
@@ -97,6 +115,18 @@ function readActionsSpan(row) {
     return Math.max(...rects.map((rect) => rect.right)) - Math.min(...rects.map((rect) => rect.left))
 }
 
+// Rectángulo vertical del elemento en su sitio, sin su propio `transform`: la
+// fila de botones entra subiendo (`sv-mobile-actions-rise`, 20px → 0) y una
+// medida tomada a medio camino (llegan las puntuaciones o el botón de «me
+// gusta» durante la entrada) descentraba el marcador hasta el siguiente cambio.
+function readUntransformedRect(el) {
+    const rect = el.getBoundingClientRect()
+    const transform = getComputedStyle(el).transform
+    if (!transform || transform === 'none' || typeof DOMMatrixReadOnly === 'undefined') return rect
+    const dy = new DOMMatrixReadOnly(transform).m42
+    return { top: rect.top - dy, bottom: rect.bottom - dy, height: rect.height }
+}
+
 function readBottomNavTop() {
     const nav = document.querySelector(MOBILE_BOTTOM_NAV_SELECTOR)
     // `offsetTop` (fijo: respecto a la ventana) y no el rectángulo: el navbar
@@ -109,9 +139,10 @@ function readBottomNavTop() {
 /**
  * Estado y medidas de la cabecera inmersiva. `enabled`: la página la usa (en
  * teléfono; desde `sm` nada de esto aplica). `lock`: la portada ya se ve; desde
- * entonces lo que hay bajo los botones queda FIJO y solo se recalcula si cambia
- * el ancho de la ventana (no por datos que llegan, ni por la barra de
- * direcciones, que cambia el alto al hacer scroll).
+ * entonces el alto de la ventana deja de contar (la barra de direcciones lo
+ * cambia al hacer scroll) salvo que cambie también el ancho. Los cambios de
+ * alto del marcador o de la fila de botones (datos que llegan) se recolocan
+ * siempre.
  */
 export function useMobileDetailsHero(enabled, { lock = false } = {}) {
     const rootRef = useRef(null)
@@ -121,6 +152,9 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
     const secondaryTriggerRef = useRef(null)
     const heroScrollEndRef = useRef(0)
     const lockRef = useRef(lock)
+    // Borde superior del navbar inferior con el que se hizo la última medida
+    // (ver `lock`).
+    const navTopRef = useRef(null)
     // Alto de la fila de estadísticas del marcador, recordado de cuando se
     // pintó completo (en modo 'compact' no está en el DOM).
     const statsRowHeightRef = useRef(0)
@@ -136,7 +170,7 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
     // Ancho de referencia para un marcador estrecho (`--mobile-actions-w`): el
     // mayor entre lo que ocupan los botones y el navbar inferior.
     const [actionsWidth, setActionsWidth] = useState(0)
-    const [secondaryVisible, setSecondaryVisible] = useState(false)
+    const [statsVisible, setStatsVisible] = useState(false)
 
     useClientLayoutEffect(() => {
         lockRef.current = lock
@@ -171,15 +205,14 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
             setActionsWidth((current) => (current === span ? current : span))
             const widthChanged = window.innerWidth !== lastWidth
             lastWidth = window.innerWidth
-            if (lockRef.current && !widthChanged) return
             // Posición del hueco en el documento (no en pantalla), así no
             // depende del scroll.
             const spacer = coverSpacerRef.current
             const top = spacer ? Math.max(0, Math.round(spacer.getBoundingClientRect().top + window.scrollY)) : 0
             setCoverTop((current) => (current === top ? current : top))
             if (!scoreboard) return
-            const rowRect = row.getBoundingClientRect()
-            const scoreboardRect = scoreboard.getBoundingClientRect()
+            const rowRect = readUntransformedRect(row)
+            const scoreboardRect = readUntransformedRect(scoreboard)
             // Sin redondear: con `ceil`/`floor` el hueco de arriba salía ~2px
             // más corto que el de abajo.
             const total = scoreboardRect.height
@@ -196,7 +229,17 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
             // Sitio entre el pie de los botones (con el desplazamiento
             // `-top-2` de su fila) y el navbar, tal como se ve sin scroll.
             const rowBottom = rowRect.bottom + window.scrollY
-            const space = readBottomNavTop() - rowBottom
+            // Con la portada ya visible (`lock`), el navbar se toma de la
+            // medida anterior: la barra de direcciones cambia el alto de la
+            // ventana al hacer scroll y el marcador no debe moverse por eso.
+            // Lo demás (alto del marcador, botones) se mide SIEMPRE: con la
+            // portada en caché `lock` llega desde el primer render, antes que
+            // las puntuaciones, y congelar esa primera medida dejaba el
+            // marcador descentrado o en 'full' bajo el navbar inferior.
+            if (navTopRef.current == null || !lockRef.current || widthChanged) {
+                navTopRef.current = readBottomNavTop()
+            }
+            const space = navTopRef.current - rowBottom
             const mode = space - fullHeight >= MOBILE_SCOREBOARD_MIN_GAP_PX * 2 ? 'full' : 'compact'
             setScoreboardMode((current) => (current === mode ? current : mode))
             // Hueco igual arriba y abajo; si ni así cabe (pantallas muy
@@ -286,60 +329,115 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
         }
     }, [enabled, isPhone])
 
-    // Lo secundario (sinopsis, píldoras y la barra de stats del modo compacto)
-    // no compite con la portada al entrar: se revela cuando el centinela cruza
-    // el navbar inferior y, desde entonces, se queda FIJO hasta volver a la
-    // posición inicial (arriba del todo). Volver a mirar el centinela para
-    // ocultarlo hacía parpadear el marcador: al desplegarse su barra de stats
-    // el centinela baja ese alto, vuelve a quedar bajo el navbar, se oculta,
-    // sube… El atributo se escribe en el DOM en el mismo evento de scroll y el
-    // estado de React se pone al día después (mismos valores).
+    // Revelado con el scroll, en DOS PASOS, y todo FIJO una vez revelado hasta
+    // volver a la posición inicial (arriba del todo):
+    //   1. La barra de stats del modo compacto, cuando el centinela (bajo el
+    //      marcador) cruza el navbar inferior. Volver a mirar el centinela para
+    //      ocultarla hacía parpadear el marcador: al desplegarse, el centinela
+    //      baja ese alto, vuelve a quedar bajo el navbar, se oculta, sube…
+    //   2. Cada bloque secundario (sinopsis, píldoras, barra de búsqueda de la
+    //      lista…) por SEPARADO, cuando SU borde superior pasa el navbar
+    //      inferior: nunca se ve uno asomando detrás del navbar. Y no antes de
+    //      que el marcador haya terminado de abrirse: al desplegarse empuja
+    //      hacia abajo lo que va debajo, y un bloque revelado a la vez que él
+    //      acababa otra vez detrás del navbar.
+    // Los atributos se escriben en el DOM en el mismo evento de scroll. Los de
+    // los bloques los lleva solo el DOM (React los pinta ocultos y no vuelve a
+    // tocarlos: `revealProps` no cambia); el de la barra de stats también va en
+    // el estado de React, que se pone al día después (mismos valores).
     useEffect(() => {
         const trigger = secondaryTriggerRef.current
         const container = rootRef.current
         if (!enabled || !isPhone || !trigger || !container) {
-            setSecondaryVisible(false)
+            setStatsVisible(false)
             return undefined
         }
-        let applied = null
+        let statsApplied = null
+        let statsShownAt = 0
+        let settleTimer = 0
+        let raf = 0
         const sync = () => {
-            const revealLine = window.innerHeight - MOBILE_BOTTOM_NAV_PX
-            const nextVisible =
-                window.scrollY > MOBILE_REVEAL_SHOW_AT_PX &&
-                (applied === true || trigger.getBoundingClientRect().top <= revealLine)
-            if (nextVisible === applied) return
-            applied = nextVisible
+            const atTop = window.scrollY <= MOBILE_REVEAL_SHOW_AT_PX
+            const statsVisible =
+                !atTop &&
+                (statsApplied === true ||
+                    trigger.getBoundingClientRect().top <= window.innerHeight - MOBILE_BOTTOM_NAV_PX)
+            const statsTargets = container.querySelectorAll(`[${MOBILE_STATS_REVEAL_ATTR}]`)
+            if (statsVisible !== statsApplied) {
+                statsApplied = statsVisible
+                statsShownAt = statsVisible ? performance.now() : 0
+                // Solo se muestra/oculta: el marcador sigue siendo interactivo.
+                statsTargets.forEach((el) => {
+                    if (statsVisible) el.setAttribute(MOBILE_STATS_ANIMATED_ATTR, '')
+                    el.setAttribute(MOBILE_STATS_REVEAL_ATTR, statsVisible ? 'shown' : 'hidden')
+                })
+                startTransition(() => {
+                    setStatsVisible((current) => (current === statsVisible ? current : statsVisible))
+                })
+            }
+            // Mientras el marcador se despliega, los bloques esperan.
+            const settleLeft = statsTargets.length && statsVisible
+                ? MOBILE_STATS_SETTLE_MS - (performance.now() - statsShownAt)
+                : 0
+            if (settleLeft > 0 && !settleTimer) {
+                settleTimer = window.setTimeout(() => {
+                    settleTimer = 0
+                    sync()
+                }, settleLeft)
+            }
+            let revealLine = null
             container.querySelectorAll(`[${MOBILE_REVEAL_ATTR}]`).forEach((el) => {
-                el.setAttribute(MOBILE_REVEAL_ATTR, nextVisible ? 'shown' : 'hidden')
-                el.inert = !nextVisible
+                let visible = false
+                if (!atTop) {
+                    if (el.getAttribute(MOBILE_REVEAL_ATTR) === 'shown') visible = true
+                    else if (settleLeft <= 0) {
+                        revealLine ??= readBottomNavTop()
+                        visible = el.getBoundingClientRect().top <= revealLine
+                    }
+                }
+                const value = visible ? 'shown' : 'hidden'
+                if (el.getAttribute(MOBILE_REVEAL_ATTR) !== value) el.setAttribute(MOBILE_REVEAL_ATTR, value)
+                if (el.inert === visible) el.inert = !visible
             })
-            // La barra de stats del modo compacto: solo se muestra/oculta, el
-            // marcador sigue siendo interactivo.
-            container.querySelectorAll(`[${MOBILE_STATS_REVEAL_ATTR}]`).forEach((el) => {
-                el.setAttribute(MOBILE_STATS_REVEAL_ATTR, nextVisible ? 'shown' : 'hidden')
-            })
-            startTransition(() => {
-                setSecondaryVisible((current) => (current === nextVisible ? current : nextVisible))
-            })
+        }
+        const scheduleSync = () => {
+            if (!raf) {
+                raf = window.requestAnimationFrame(() => {
+                    raf = 0
+                    sync()
+                })
+            }
         }
         const observer = new IntersectionObserver(sync, {
             rootMargin: `0px 0px -${MOBILE_BOTTOM_NAV_PX}px 0px`,
             threshold: 0,
         })
         observer.observe(trigger)
+        // Bloques que se montan después (la barra de búsqueda llega con los
+        // títulos): nacen ocultos y se miran en el siguiente fotograma.
+        const mutations = new MutationObserver(scheduleSync)
+        mutations.observe(container, { childList: true, subtree: true })
         sync()
         window.addEventListener('scroll', sync, { passive: true })
         window.addEventListener('resize', sync, { passive: true })
         return () => {
             observer.disconnect()
+            mutations.disconnect()
+            if (raf) window.cancelAnimationFrame(raf)
+            if (settleTimer) window.clearTimeout(settleTimer)
             window.removeEventListener('scroll', sync)
             window.removeEventListener('resize', sync)
         }
     }, [enabled, isPhone])
 
-    // Solo se oculta en teléfono: en tablet/escritorio las variantes `max-sm:`
-    // no aplican, pero `inert` sí bloquearía el foco.
-    const secondaryHidden = enabled && isPhone && !secondaryVisible
+    // Los bloques nacen ocultos y desde ahí manda el DOM (ver arriba); el
+    // objeto no cambia para que React no reescriba lo que puso el scroll. Solo
+    // `inert` en teléfono: en tablet/escritorio las variantes `max-sm:` no
+    // aplican, pero `inert` sí bloquearía el foco.
+    const revealProps = useMemo(
+        () => (enabled ? { [MOBILE_REVEAL_ATTR]: 'hidden', inert: isPhone } : {}),
+        [enabled, isPhone],
+    )
 
     return {
         rootRef,
@@ -349,14 +447,9 @@ export function useMobileDetailsHero(enabled, { lock = false } = {}) {
         secondaryTriggerRef,
         isPhone,
         scoreboardMode,
-        revealProps: enabled
-            ? {
-                [MOBILE_REVEAL_ATTR]: secondaryVisible ? 'shown' : 'hidden',
-                inert: secondaryHidden,
-            }
-            : {},
+        revealProps,
         statsRevealProps: enabled
-            ? { [MOBILE_STATS_REVEAL_ATTR]: secondaryVisible ? 'shown' : 'hidden' }
+            ? { [MOBILE_STATS_REVEAL_ATTR]: statsVisible ? 'shown' : 'hidden' }
             : {},
         // La portada: el póster entero (2:3 a todo el ancho), siempre.
         rootStyle: enabled

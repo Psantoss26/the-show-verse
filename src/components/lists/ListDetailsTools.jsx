@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
@@ -27,6 +27,10 @@ import {
   saveUserDetailsSequenceFromLink,
 } from "@/lib/navigation/userDetailsSequence";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
+import {
+  MOBILE_REVEAL_BASE,
+  MobileHeroRevealContext,
+} from "@/components/details/MobileDetailsHero";
 import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
 import {
   normalizeSearchText,
@@ -367,6 +371,7 @@ export default function FilterableListItems({
   // Al VOLVER (atrás/adelante) se renderizan todos los items de golpe para que la
   // altura del documento sea correcta al instante y el scroll se restaure sin saltos.
   const isBackNav = useIsHistoryNavigation();
+  const heroReveal = useContext(MobileHeroRevealContext);
   const [visibleCount, setVisibleCount] = useState(
     isBackNav ? Number.MAX_SAFE_INTEGER : INITIAL_RENDER_COUNT,
   );
@@ -496,7 +501,12 @@ export default function FilterableListItems({
       <motion.div
         ref={filtersRef}
         data-menu-pinned={filtersPinned}
-        className="relative sticky top-14 z-[70] mb-4 space-y-1 transition-all duration-300 sm:top-20"
+        // Con la cabecera inmersiva móvil (UnifiedListDetailsLayout) aparece
+        // al pasar el navbar inferior, como la sinopsis.
+        {...(heroReveal || {})}
+        className={`relative sticky top-14 z-[70] mb-4 space-y-1 transition-all duration-300 sm:top-20 ${
+          heroReveal ? MOBILE_REVEAL_BASE : ""
+        }`}
         initial={isBackNav ? false : { opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35 }}
