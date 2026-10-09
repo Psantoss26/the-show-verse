@@ -2152,17 +2152,21 @@ function NavbarContent() {
   // glass, su velo cortaba en seco en ese borde y dejaba un escalón de brillo
   // contra la fila superior del póster. Arriba del todo usamos el mismo velo
   // degradado que el hero, que muere en transparente: así el borde no existe.
-  // SeasonDetails/EpisodeDetails son subrutas con layout propio y deben conservar
-  // la navbar glass visible desde el primer render.
+  // EpisodeDetails es una subruta con layout propio y debe conservar la navbar
+  // glass visible desde el primer render. Las TEMPORADAS no: su portada móvil es
+  // la de las colecciones (details/MobileDetailsHero), pegada arriba y a los
+  // lados, con la navbar transparente y compacta encima.
   //
   // Los detalles de lista, de lista de la comunidad y de colección pintan
   // también su imagen a pantalla completa detrás de la cabecera: llevan la
   // MISMA navbar transparente que la ficha, en escritorio y en móvil.
   const isListDetailsRoute = /^\/lists\/(?:collection\/|community\/)?[^/]+\/?$/.test(pathname || "");
+  const isSeasonDetailsRoute = /^\/details\/tv\/[^/]+\/season\/[^/]+\/?$/.test(pathname || "");
   const isDetailsRoute =
     /^\/details\/movie\/[^/]+\/?$/.test(pathname || "") ||
     /^\/details\/tv\/[^/]+\/?$/.test(pathname || "") ||
-    isListDetailsRoute;
+    isListDetailsRoute ||
+    isSeasonDetailsRoute;
   // La baraja de recomendaciones comparte la composición móvil de la ficha: la
   // portada ocupa desde el borde superior y el navbar va TRANSPARENTE encima.
   // Se distingue de la ficha porque allí hay además un velo oscuro de
