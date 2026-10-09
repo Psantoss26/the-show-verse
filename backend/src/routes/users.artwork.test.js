@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   applyArtworkChanges,
+  artworkChangeSchema,
   getArtworkOverrides,
 } from './users.js';
 
@@ -56,3 +57,21 @@ test('collections keep their artwork apart from the movie with the same id', () 
     '10': { poster: '/movie.jpg' },
   });
 });
+
+test('seasons accept a cover by their TMDb season id, apart from the show', () => {
+  const change = artworkChangeSchema.parse({ type: 'season', id: '3572', kind: 'poster', filePath: '/season.jpg' });
+  assert.equal(change.id, 3572);
+  assert.equal(artworkChangeSchema.safeParse({ type: 'episode', id: 1, kind: 'poster', filePath: '/x.jpg' }).success, false);
+
+  const settings = applyArtworkChanges({}, [
+    { type: 'tv', id: 3572, kind: 'poster', filePath: '/show.jpg' },
+    change,
+  ]);
+  assert.deepEqual(getArtworkOverrides(settings, { type: 'season', ids: [3572] }), {
+    '3572': { poster: '/season.jpg' },
+  });
+  assert.deepEqual(getArtworkOverrides(settings, { type: 'tv', ids: [3572] }), {
+    '3572': { poster: '/show.jpg' },
+  });
+});
+

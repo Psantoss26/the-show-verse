@@ -2,7 +2,7 @@
 
 
 import OptimizedImage from "@/components/OptimizedImage";
-import { useMemo, useEffect, useState, useCallback, useRef } from "react";
+import { useMemo, useEffect, useLayoutEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { motion } from "framer-motion";
@@ -43,6 +43,9 @@ import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import { pickBestNeutralPosterByResVotes } from "@/lib/details/tmdbImages";
 import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
+import SeasonCoverEditModal from "@/components/details/SeasonCoverEditModal";
+import { useAuth } from "@/context/AuthContext";
+import { readSeasonCustomPoster } from "@/lib/details/seasonArtwork";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 import { LIQUID_GLASS_BAR, LIQUID_GLASS_CARD } from "@/lib/ui/liquidGlass";
 import {
@@ -330,7 +333,20 @@ export default function SeasonDetailsClient({
     [showId, showName, show?.original_name, show?.homepage],
   );
 
-  const posterPath = season?.poster_path || show?.poster_path || null;
+  // PORTADA: la elegida en «Editar portada» (por usuario, ver
+  // lib/details/seasonArtwork) o la automática: el primer póster en inglés de
+  // la temporada, resuelto en el servidor (page.jsx); sin él, el de la serie.
+  // La elección vive en las preferencias del navegador: el servidor no la
+  // conoce y pinta la automática, y al hidratar React NO corrige el `src`
+  // distinto. Se aplica justo después de montar, en un efecto de layout (antes
+  // del primer pintado; la portada además espera a que cargue su imagen).
+  const { preferences } = useAuth();
+  const [coverEditing, setCoverEditing] = useState(false);
+  const [preferencesMounted, setPreferencesMounted] = useState(false);
+  useLayoutEffect(() => setPreferencesMounted(true), []);
+  const autoPosterPath = season?.poster_path || show?.poster_path || null;
+  const customPosterPath = preferencesMounted ? readSeasonCustomPoster(preferences, season?.id) : null;
+  const posterPath = customPosterPath || autoPosterPath;
   const adjacentSeasonHrefs = useMemo(
     () => getAdjacentSeasonHrefs(showId, seasonNumber, show?.seasons),
     [showId, seasonNumber, show?.seasons],
@@ -1690,6 +1706,7 @@ export default function SeasonDetailsClient({
                   max: 10,
                   step: 1,
                 }}
+                onEditCover={season?.id ? () => setCoverEditing(true) : null}
               />
               </div>
             </div>
@@ -2125,6 +2142,17 @@ export default function SeasonDetailsClient({
         onClose={() => setExternalLinksOpen(false)}
         links={seasonExternalLinks}
       />
+
+      {coverEditing && season?.id ? (
+        <SeasonCoverEditModal
+          seasonId={season.id}
+          showId={showId}
+          seasonNumber={seasonNumber}
+          originalPoster={autoPosterPath}
+          currentPoster={posterPath}
+          onClose={() => setCoverEditing(false)}
+        />
+      ) : null}
     </div>
   );
 }

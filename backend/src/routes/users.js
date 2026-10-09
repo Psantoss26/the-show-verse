@@ -38,9 +38,11 @@ import { getUserNotifications } from '../lib/notifications.js';
 import { getUserNeuralGraph } from '../lib/neuralGraph.js';
 
 const ARTWORK_KINDS = ['poster', 'mobilePoster', 'backdrop', 'background', 'logo'];
-const artworkChangeSchema = z.object({
+export const artworkChangeSchema = z.object({
   // `collection`: póster y fondo elegidos para una colección de TMDb.
-  type: z.enum(['movie', 'tv', 'collection']),
+  // `season`: portada elegida para una temporada (id = el de la temporada en
+  // TMDb, único entre todas las series).
+  type: z.enum(['movie', 'tv', 'collection', 'season']),
   id: z.coerce.number().int().positive(),
   kind: z.enum(ARTWORK_KINDS),
   // Solo se guardan file_path relativos de TMDb; nunca URLs o data URI arbitrarias.

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Layers, MonitorPlay } from "lucide-react";
+import { ArrowLeft, ArrowRight, Layers, MonitorPlay, Pencil } from "lucide-react";
 import StarRating from "@/components/StarRating";
 import TraktWatchedControl from "@/components/trakt/TraktWatchedControl";
 import {
@@ -45,8 +45,28 @@ function NavigationAction({ href, label, children }) {
   );
 }
 
+// Acción que abre algo en la página (p. ej. «Editar portada»): el mismo cristal
+// que la navegación, como botón.
+function ButtonAction({ label, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      aria-haspopup="dialog"
+      data-liquid-button="true"
+      className={`relative isolate flex !h-auto !w-full aspect-square items-center justify-center overflow-hidden rounded-full text-zinc-200 transition-[transform,color,background-color] duration-300 hover:scale-105 hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400 ${LIQUID_GLASS_SURFACE_CARD} ${LIQUID_GLASS_ELEVATION}`}
+    >
+      <LiquidGlassOpticalLayers />
+      <span className="relative z-10">{children}</span>
+    </button>
+  );
+}
+
 /**
- * Acciones de las fichas de temporada y episodio. Conserva los controles
+ * Acciones de las fichas de temporada y episodio. `onEditCover`: «Editar
+ * portada» (temporadas), como «Editar colección» en las colecciones. Conserva los controles
  * funcionales de Trakt/puntuación y suma la navegación en el mismo cristal
  * líquido que la fila principal de DetailsClient.
  */
@@ -57,6 +77,7 @@ export default function SubrouteDetailsActionRow({
   nextHref = null,
   trakt = null,
   rate = null,
+  onEditCover = null,
 }) {
   return (
     <div className={ROW_CLASS}>
@@ -101,6 +122,12 @@ export default function SubrouteDetailsActionRow({
           max={rate.max}
           step={rate.step}
         />
+      ) : null}
+
+      {onEditCover ? (
+        <ButtonAction label="Editar portada" onClick={onEditCover}>
+          <Pencil />
+        </ButtonAction>
       ) : null}
 
       <NavigationAction href={nextHref} label="Siguiente">
