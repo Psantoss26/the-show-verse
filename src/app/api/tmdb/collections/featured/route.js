@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { unstable_cache } from "next/cache";
 import { FEATURED_COLLECTION_IDS, toCollectionSummary } from "@/lib/tmdb/featuredCollections";
 
 const TMDB_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
@@ -37,24 +38,18 @@ async function fetchJson(url, init) {
   return j;
 }
 
-export async function GET() {
-  try {
-    if (!TMDB_KEY)
-      return NextResponse.json({ error: "Missing TMDb key" }, { status: 500 });
-
+const readFeaturedCollections = unstable_cache(async () => {
     // Primero, eliminar IDs duplicados del array original
     const uniqueIds = [...new Set(FEATURED_COLLECTION_IDS)];
-    console.log(
-      `📦 IDs: ${FEATURED_COLLECTION_IDS.length} → únicos: ${uniqueIds.length}`,
-    );
 
     const collections = await Promise.all(
       uniqueIds.map(async (id) => {
         try {
-          const tmdbUrl = await buildTmdbUrl(`/collection/${id}`);
+          const tmdbUrl = buildTmdbUrl(`/collection/${id}`);
           const c = await limited(() => fetchJson(tmdbUrl, {
             cache: "force-cache",
             next: { revalidate: 3600 }, // 1 hora
+            signal: AbortSignal.timeout(8000),
           }));
           return toCollectionSummary(c);
         } catch (err) {
@@ -72,9 +67,26 @@ export async function GET() {
       new Map(validCollections.map((c) => [c.id, c])).values(),
     );
 
-    console.log(
-      `📦 Resultado: ${validCollections.length} válidas → ${uniqueById.length} únicas`,
-    );
+    // Don't persist an incomplete catalog when an upstream request fails.
+    if (validCollections.length !== uniqueIds.length) {
+      throw Object.assign(new Error("Incomplete collections catalog"), { collections: uniqueById });
+    }
+    return uniqueById;
+}, ["featured-collections-summary-v1"], { revalidate: 3600 });
+
+let pendingCollections = null;
+function loadFeaturedCollections() {
+  if (!pendingCollections) {
+    pendingCollections = readFeaturedCollections().finally(() => { pendingCollections = null; });
+  }
+  return pendingCollections;
+}
+
+export async function GET() {
+  try {
+    if (!TMDB_KEY)
+      return NextResponse.json({ error: "Missing TMDb key" }, { status: 500 });
+    const uniqueById = await loadFeaturedCollections();
 
     // No deduplicar por nombre, ya que diferentes versiones pueden tener nombres similares
     return NextResponse.json(
@@ -87,6 +99,12 @@ export async function GET() {
       },
     );
   } catch (e) {
+    if (Array.isArray(e?.collections) && e.collections.length > 0) {
+      return NextResponse.json(
+        { ok: true, collections: e.collections },
+        { headers: { "Cache-Control": "no-store" } },
+      );
+    }
     return NextResponse.json(
       { error: e?.message || "Server error" },
       { status: 500 },

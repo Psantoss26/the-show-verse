@@ -1473,6 +1473,7 @@ export default function ActorDetails({
   const [sort, setSort] = useState("date_desc");
 
   const profileSrc = tmdbImg(actorDetails?.profile_path, "h632");
+  const [failedProfileSrc, setFailedProfileSrc] = useState(null);
   const tmdbUrl = personId
     ? `https://www.themoviedb.org/person/${personId}`
     : null;
@@ -1484,6 +1485,16 @@ export default function ActorDetails({
   const posterTargetRef = useRef({ rx: 0, ry: 0, s: 1 });
   const posterStateRef = useRef({ rx: 0, ry: 0, s: 1 });
   const posterIsInteractingRef = useRef(false);
+
+  useEffect(() => {
+    // A server-rendered image can fail before hydration attaches onError.
+    const image = posterTiltRef.current?.querySelector("img");
+    if (image?.complete && image.naturalWidth === 0) {
+      setFailedProfileSrc(profileSrc);
+    } else if (image?.complete) {
+      image.dataset.loaded = "true";
+    }
+  }, [profileSrc]);
 
   const prefersReducedMotion = useReducedMotion();
   const [poster3dEnabled, setPoster3dEnabled] = useState(false);
@@ -1532,7 +1543,7 @@ export default function ActorDetails({
         Math.abs(target.ry - cur.ry) < 0.02 &&
         Math.abs(target.s - cur.s) < 0.002;
 
-      if (posterIsInteractingRef.current || !isSettled) {
+      if (!isSettled) {
         posterAnimRafRef.current = window.requestAnimationFrame(loop);
       } else {
         posterAnimRafRef.current = 0;
@@ -1693,7 +1704,7 @@ export default function ActorDetails({
     setImages(actorDetails?.images || null);
     setTaggedImages(actorDetails?.tagged_images || null);
     setTranslations(actorDetails?.translations || null);
-    setWatchedCredits([]);
+    setWatchedCredits(normalizeWatchedCredits(initialWatchedCredits));
     setTmdbKnownFor(
       (initialKnownFor || [])
         .map(normalizeKnownForItem)
@@ -1724,6 +1735,7 @@ export default function ActorDetails({
     hasInitialExtra,
     initialExternalIds,
     initialKnownFor,
+    initialWatchedCredits,
     loadAll,
     loadAwardsForWikidata,
     personId,
@@ -1742,17 +1754,17 @@ export default function ActorDetails({
       credentials: "include",
       signal: controller.signal,
     })
-      .then((res) => (res.ok ? res.json() : null))
+      .then((res) => {
+        if (!res.ok) throw new Error("No se pudieron actualizar los títulos vistos");
+        return res.json();
+      })
       .then((payload) => {
         if (controller.signal.aborted) return;
         const items = Array.isArray(payload?.items) ? payload.items : [];
         setWatchedCredits(items.filter((item) => item?.poster_path));
       })
-      .catch((error) => {
-        if (error?.name !== "AbortError") {
-          setWatchedCredits([]);
-        }
-      });
+      // Keep the server snapshot if the background refresh fails.
+      .catch(() => {});
 
     return () => controller.abort();
   }, [personId]);
@@ -2074,8 +2086,11 @@ export default function ActorDetails({
   const esBio = translations?.translations?.find((t) => t.iso_639_1 === "es")
     ?.data?.biography;
   const bio = esBio || actorDetails?.biography || "";
-  const photos = (images?.profiles || []).sort(
-    (a, b) => (b.vote_count || 0) - (a.vote_count || 0),
+  const photos = useMemo(
+    () => [...(images?.profiles || [])].sort(
+      (a, b) => (b.vote_count || 0) - (a.vote_count || 0),
+    ),
+    [images],
   );
 
   const taggedCount = taggedImages?.results?.length || 0;
@@ -2294,7 +2309,7 @@ export default function ActorDetails({
         className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 lg:pt-12 pb-24"
       >
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
           className="flex flex-col lg:flex-row gap-8 lg:gap-12 mb-12 items-start transform-gpu"
@@ -2310,6 +2325,7 @@ export default function ActorDetails({
                 }
                 onPointerLeave={resetPosterTarget}
                 onPointerDown={(e) => {
+                  if (!poster3dEnabled) return;
                   e.currentTarget.setPointerCapture?.(e.pointerId);
                   setPosterTargetFromPointer(e.clientX, e.clientY);
                 }}
@@ -2322,30 +2338,37 @@ export default function ActorDetails({
               >
                 <div
                   ref={posterTiltRef}
-                  className="relative rounded-2xl overflow-hidden shadow-2xl shadow-black/80 border border-white/10 bg-black/40 aspect-[2/3] will-change-transform"
+                  data-actor-portrait=""
+                  className="relative rounded-2xl overflow-hidden shadow-2xl shadow-black/80 border border-white/10 bg-black/40 aspect-[2/3]"
                   style={{
                     transformStyle: "preserve-3d",
                     backfaceVisibility: "hidden",
                     WebkitBackfaceVisibility: "hidden",
                     outline: "1px solid transparent",
                     isolation: "isolate",
+                    willChange: poster3dEnabled ? "transform" : undefined,
                   }}
                 >
                   <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/10 z-20" />
-                  <div className="relative w-full h-full bg-neutral-950 z-10 overflow-hidden">
-                    {profileSrc ? (
+                  <div className="absolute inset-0 bg-neutral-950 z-10 overflow-hidden">
+                    {profileSrc && failedProfileSrc !== profileSrc ? (
                       <OptimizedImage
+                        key={profileSrc}
                         src={profileSrc}
                         alt={actorDetails?.name}
-                        className="w-full h-full object-cover"
-                        style={{
-                          transform: poster3dEnabled
-                            ? "scale(1.08)"
-                            : "scale(1)",
+                        width={421}
+                        height={632}
+                        priority
+                        fetchPriority="high"
+                        decoding="async"
+                        onLoad={(event) => {
+                          event.currentTarget.dataset.loaded = "true";
                         }}
+                        onError={() => setFailedProfileSrc(profileSrc)}
+                        className="actor-profile-image w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-zinc-600">
+                      <div role="img" aria-label={`Sin foto de ${actorDetails?.name || "esta persona"}`} className="w-full h-full flex items-center justify-center text-zinc-600">
                         <User className="w-16 h-16" />
                       </div>
                     )}
@@ -3001,6 +3024,26 @@ export default function ActorDetails({
       </div>
 
       <style jsx global>{`
+        @keyframes actor-profile-enter {
+          from {
+            opacity: 0;
+            scale: 1.045;
+          }
+          to {
+            opacity: 1;
+            scale: 1;
+          }
+        }
+        @media (prefers-reduced-motion: no-preference) {
+          .actor-profile-image[data-loaded="true"] {
+            animation: actor-profile-enter 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          }
+        }
+        @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+          .actor-profile-image {
+            transform: scale(1.08);
+          }
+        }
         .no-scrollbar::-webkit-scrollbar {
           display: none;
         }

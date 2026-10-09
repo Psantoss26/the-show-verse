@@ -1368,7 +1368,6 @@ export default function DetailsClient({
   // las acciones que tenga cada título. Se mide para que el hero termine justo
   // antes del navbar inferior, sin dejar metadatos entre ambos.
   const mobileActionRowRef = useRef(null);
-  const [mobileActionRowHeight, setMobileActionRowHeight] = useState(() => restoredValue(backSnapshot, "mobileActionRowHeight", 60));
   const [isHoveredImages, setIsHoveredImages] = useState(false);
   const [canPrevImages, setCanPrevImages] = useState(false); // Hay scroll a la izquierda
   const [canNextImages, setCanNextImages] = useState(false); // Hay scroll a la derecha
@@ -1503,40 +1502,6 @@ export default function DetailsClient({
     const l = lOrId;
     const id = l?.id ?? l?._id ?? l?.ids?.tmdb ?? l?.slug ?? l?.name;
     return id != null ? String(id) : null;
-  }, []);
-
-  // El alto de la fila puede ser 60px en pantallas anchas o menor cuando los
-  // botones se adaptan al ancho. ResizeObserver evita depender de una cifra
-  // estimada. OJO: esta medida NO debe incluir la barra de "Continuar viendo"
-  // -- el póster/logo tienen que quedar fijos siempre; si hay progreso, la
-  // fila de acciones simplemente se desplaza hacia abajo, quedando detrás del
-  // navbar inferior (ver el bloque `inProgressPct` en el render móvil).
-  useLayoutEffect(() => {
-    const updateHeroMobileGeometry = () => {
-      const nextActionHeight = Math.max(
-        1,
-        Math.ceil(mobileActionRowRef.current?.getBoundingClientRect().height || 60),
-      );
-
-      setMobileActionRowHeight((current) =>
-        current === nextActionHeight ? current : nextActionHeight,
-      );
-    };
-
-    updateHeroMobileGeometry();
-    window.addEventListener("resize", updateHeroMobileGeometry, { passive: true });
-
-    if (typeof ResizeObserver === "undefined") {
-      return () => window.removeEventListener("resize", updateHeroMobileGeometry);
-    }
-
-    const observer = new ResizeObserver(updateHeroMobileGeometry);
-    if (mobileActionRowRef.current) observer.observe(mobileActionRowRef.current);
-
-    return () => {
-      window.removeEventListener("resize", updateHeroMobileGeometry);
-      observer.disconnect();
-    };
   }, []);
 
   // Detecta las capacidades del dispositivo: hover (desktop) y viewport movil.
@@ -2431,6 +2396,12 @@ export default function DetailsClient({
 
   // Ref del wrapper de controles de artwork para detectar click fuera
   const artworkControlsWrapRef = useRef(null);
+  // ¿Hay algo que cerrar? (panel de filtros o menú de resolución; se actualiza
+  // en cada render, ver `resMenuOpen` abajo). El cierre al pulsar fuera escucha
+  // TODOS los `mousedown` de la página: cerrar lo ya cerrado volvía a ejecutar
+  // la ficha entera en cada clic (p. ej. al alternar póster ↔ backdrop, justo
+  // antes del morph).
+  const artworkMenusOpenRef = useRef(false);
 
   // Cierra el panel de filtros de artwork y el menu de resolucion con Escape
   // o al hacer click/touch fuera del wrapper
@@ -2443,6 +2414,7 @@ export default function DetailsClient({
     };
 
     const onDown = (e) => {
+      if (!artworkMenusOpenRef.current) return;
       const wrap = artworkControlsWrapRef.current;
       if (!wrap) return;
       if (!wrap.contains(e.target)) {
@@ -2464,6 +2436,7 @@ export default function DetailsClient({
 
   // -- Dropdown de resolucion --
   const [resMenuOpen, setResMenuOpen] = useState(false);
+  artworkMenusOpenRef.current = artworkControlsOpen || resMenuOpen;
   const resMenuRef = useRef(null);
 
   // Cierra el menu de resolucion al hacer click fuera
@@ -6946,10 +6919,15 @@ export default function DetailsClient({
     try {
       window.localStorage.setItem(globalViewModeStorageKey, posterViewMode);
       // Sincronizar layoutMode cuando posterViewMode cambie: asegura que ambos
-      // estados estén alineados después de navegaciones (al alternar ya
-      // cambian juntos y esto no hace nada).
-      setPosterLayoutMode(posterViewMode);
+      // estados estén alineados después de navegaciones. Solo si difieren: al
+      // alternar ya cambian juntos, y un `set` con el mismo valor desde un
+      // efecto vuelve a ejecutar la ficha entera para comprobarlo.
+      if (posterLayoutMode !== posterViewMode) {
+        setPosterLayoutMode(posterViewMode);
+      }
     } catch {}
+    // `posterLayoutMode` se lee solo para no reescribir el mismo valor.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     posterViewMode,
     globalViewModeStorageKey,
@@ -8103,7 +8081,6 @@ export default function DetailsClient({
     plexUrl,
     plexLoading,
     detailsEntry,
-    mobileActionRowHeight,
     membershipMap,
     supportsHover,
     isMobileViewport,
@@ -9832,6 +9809,12 @@ export default function DetailsClient({
                           // `complete` + `naturalWidth` detectan ese caso. El ref
                           // se ejecuta en la fase de commit, así que aquí sí se
                           // puede actualizar estado.
+                          // Solo si falta: este ref es una función nueva en
+                          // cada render, así que React lo vuelve a llamar en
+                          // cada commit. Con la imagen ya cargada, poner otra
+                          // vez `true` desde el commit forzaba un segundo render
+                          // síncrono de la ficha entera (al alternar póster ↔
+                          // backdrop retrasaba el arranque del morph).
                           ref={(el) => {
                             if (!el || !el.complete || !el.naturalWidth) return;
                             if (
@@ -9839,11 +9822,11 @@ export default function DetailsClient({
                             )
                               return;
                             if (posterViewMode === "preview") {
-                              setBackdropLowLoaded(true);
-                              setBackdropResolved(true);
+                              if (!backdropLowLoaded) setBackdropLowLoaded(true);
+                              if (!backdropResolved) setBackdropResolved(true);
                             } else {
-                              setPosterLowLoaded(true);
-                              setPosterResolved(true);
+                              if (!posterLowLoaded) setPosterLowLoaded(true);
+                              if (!posterResolved) setPosterResolved(true);
                             }
                           }}
                           onLoad={() => {
@@ -9851,13 +9834,16 @@ export default function DetailsClient({
                               currentLoadTokenRef.current !== currentLoadToken
                             )
                               return;
-                            // Usar el setState correcto segun el modo
+                            // Usar el setState correcto segun el modo. Solo si
+                            // falta: al alternar póster ↔ backdrop la imagen
+                            // nueva sale de caché y su `load` llegaba con todo
+                            // ya a `true`, con otro render de la ficha entera.
                             if (posterViewMode === "preview") {
-                              setBackdropLowLoaded(true);
-                              setBackdropResolved(true);
+                              if (!backdropLowLoaded) setBackdropLowLoaded(true);
+                              if (!backdropResolved) setBackdropResolved(true);
                             } else {
-                              setPosterLowLoaded(true);
-                              setPosterResolved(true);
+                              if (!posterLowLoaded) setPosterLowLoaded(true);
+                              if (!posterResolved) setPosterResolved(true);
                             }
                           }}
                           onError={() => {
@@ -9914,6 +9900,7 @@ ${currentLowLoaded ? "opacity-100" : "opacity-0"}`}
                             loading={deferPosterOriginal ? "lazy" : "eager"}
                             decoding="async"
                             fetchPriority={deferPosterOriginal ? "low" : "high"}
+                            // Solo si falta (ver el ref de LOW).
                             ref={(el) => {
                               if (!el || !el.complete || !el.naturalWidth)
                                 return;
@@ -9922,9 +9909,9 @@ ${currentLowLoaded ? "opacity-100" : "opacity-0"}`}
                               )
                                 return;
                               if (posterViewMode === "preview") {
-                                setBackdropHighLoaded(true);
+                                if (!backdropHighLoaded) setBackdropHighLoaded(true);
                               } else {
-                                setPosterHighLoaded(true);
+                                if (!posterHighLoaded) setPosterHighLoaded(true);
                                 posterSettledRef.current = true;
                               }
                             }}
@@ -9933,11 +9920,12 @@ ${currentLowLoaded ? "opacity-100" : "opacity-0"}`}
                                 currentLoadTokenRef.current !== currentLoadToken
                               )
                                 return;
-                              // Usar el setState correcto segun el modo
+                              // Usar el setState correcto segun el modo (solo si
+                              // falta, ver el `onLoad` de LOW).
                               if (posterViewMode === "preview") {
-                                setBackdropHighLoaded(true);
+                                if (!backdropHighLoaded) setBackdropHighLoaded(true);
                               } else {
-                                setPosterHighLoaded(true);
+                                if (!posterHighLoaded) setPosterHighLoaded(true);
                                 posterSettledRef.current = true;
                               }
                             }}

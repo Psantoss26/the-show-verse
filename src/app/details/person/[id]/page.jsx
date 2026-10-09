@@ -23,6 +23,7 @@ async function getInitialWatchedCredits(personId) {
       {
         headers: { cookie },
         cache: "no-store",
+        signal: AbortSignal.timeout(5000),
       },
     );
     if (!response.ok) return [];
@@ -44,13 +45,15 @@ export async function generateMetadata({ params }) {
 
 export default async function ActorDetailsPage({ params }) {
   const { id } = await params;
+  // Start the personalized request alongside TMDb rather than after it.
+  const watchedCreditsPromise = getInitialWatchedCredits(id);
   const actorDetails = await getActorDetailsFull(id);
 
   if (!actorDetails) notFound();
 
   const [knownFor, initialWatchedCredits] = await Promise.all([
-    getActorKnownFor(id, actorDetails.name),
-    getInitialWatchedCredits(id),
+    getActorKnownFor(id, actorDetails.name).catch(() => []),
+    watchedCreditsPromise,
   ]);
   const actorMovies = actorDetails?.combined_credits?.cast || [];
 
