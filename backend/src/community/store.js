@@ -17,6 +17,7 @@ import { getMediaMetadataMap, metadataFor } from '../utils/mediaMetadata.js';
 import { buildRatingSummary, hydrateListRatings, isMissingVoteAverageColumn } from '../utils/listRatings.js';
 import { mergeListItemRatings } from '../utils/listRatingMerge.js';
 import { selectCommunityImdbSummarySample } from './listImdbSummarySample.js';
+import { checkTmdbPosters, posterItemKey } from './posterlessItems.js';
 
 const communityListItemFields = {
   id: communityListItems.id,
@@ -59,8 +60,14 @@ async function readCommunityListItemsWithRatings({ listId, limit, offset }) {
 // posterPath es null (el sembrado solo hidrata 5 por lista). Usa el caché Postgres
 // (tmdb_cache) vía getMediaMetadataMap, así en visitas repetidas es barato; además
 // persiste lo hidratado en community_list_items para que la próxima lectura no toque
-// TMDb. Best-effort: si algo falla, devuelve los items tal cual.
-async function hydrateListItemPosters(items) {
+// TMDb.
+//
+// Lo que siga sin póster se comprueba en la galería de TMDb (posterlessItems.js):
+// si tiene póster en cualquier idioma, se usa y se guarda; si TMDb ya no tiene
+// el título o no tiene ningún póster, NO se devuelve (salía como un hueco que
+// no llevaba a ninguna parte) y, en las listas importadas (`allowDelete`), se
+// borra definitivamente. Ante un error pasajero de TMDb solo se oculta esta vez.
+async function hydrateListItemPosters(items, { allowDelete = false } = {}) {
   const pending = items.filter((it) => !it.posterPath && it.tmdbId);
   if (!pending.length) return items;
   const meta = await getMediaMetadataMap(pending, {
@@ -83,6 +90,21 @@ async function hydrateListItemPosters(items) {
       persist.push({ id: it.id, posterPath: it.posterPath, title: it.title });
     }
   }
+  const stillMissing = items.filter((it) => !it.posterPath);
+  const checks = stillMissing.length
+    ? await checkTmdbPosters(stillMissing).catch(() => new Map())
+    : new Map();
+  const removeIds = [];
+  for (const it of stillMissing) {
+    const check = checks.get(posterItemKey(it.mediaType, it.tmdbId));
+    if (check?.status === 'poster') {
+      it.posterPath = check.posterPath;
+      persist.push({ id: it.id, posterPath: it.posterPath, title: it.title });
+    } else if (check?.status === 'missing' && it.id) {
+      removeIds.push(it.id);
+    }
+  }
+
   // Persistencia en segundo plano (no bloquea la respuesta).
   if (persist.length) {
     Promise.all(persist.map((u) =>
@@ -92,7 +114,12 @@ async function hydrateListItemPosters(items) {
         .catch(() => {}),
     )).catch(() => {});
   }
-  return items;
+  if (allowDelete && removeIds.length) {
+    db.delete(communityListItems)
+      .where(inArray(communityListItems.id, removeIds))
+      .catch(() => {});
+  }
+  return items.filter((it) => it.posterPath);
 }
 
 export async function getCommentsPage({ tmdbId, mediaType, tab, page = 1, limit = 5, viewerId = null }) {
@@ -418,7 +445,9 @@ export async function getCommunityListWithItems({ id, page = 1, limit = 50, view
     limit: safeLimit,
     offset,
   });
-  const hydrated = await hydrateListItemPosters(items);
+  // Solo en las listas importadas de Trakt se borran de verdad los títulos sin
+  // póster: las de usuario reflejan su lista personal y ahí solo se ocultan.
+  const hydrated = await hydrateListItemPosters(items, { allowDelete: list.source === 'trakt' });
   const ratedItems = await hydrateListRatings(allRatingRows);
   const visibleItems = mergeListItemRatings(hydrated, ratedItems);
   const api = listRowToApi(list);
