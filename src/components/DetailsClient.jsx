@@ -8944,17 +8944,10 @@ export default function DetailsClient({
   );
   const IDLE_DELAY = 220; // ms sin interacción => idle
 
-  // Una entrada corta de opacidad + escala da presencia a la portada sin
-  // bloquear el render ni animar propiedades costosas. Queda desactivada para
-  // personas que han pedido reducir movimiento.
-  const posterLowEntranceScale =
-    prefersReducedMotion || currentLowLoaded
-      ? POSTER_OVERSCAN
-      : POSTER_OVERSCAN + 0.025;
-  const posterHighEntranceScale =
-    prefersReducedMotion || currentHighLoaded
-      ? POSTER_OVERSCAN
-      : POSTER_OVERSCAN + 0.025;
+  // LOW y HIGH comparten encuadre durante el fundido; el movimiento lo lleva
+  // el marco para no superponer dos zooms al llegar la imagen original.
+  const posterLowEntranceScale = POSTER_OVERSCAN;
+  const posterHighEntranceScale = POSTER_OVERSCAN;
 
   // Overscan
   const posterImgOverscan = poster3dEnabled ? 1.12 : 1;
@@ -9019,12 +9012,18 @@ export default function DetailsClient({
 
   // Animacion 3D continua: idle automático cuando no hay interacción
   useEffect(() => {
-    if (!poster3dEnabled) return;
+    if (!poster3dEnabled) {
+      posterStateRef.current = { rx: 0, ry: 0, s: 1 };
+      if (posterTiltRef.current) posterTiltRef.current.style.transform = "none";
+      return;
+    }
 
     const el = posterTiltRef.current;
     if (!el) return;
 
     let mounted = true;
+    let startedAt = null;
+    let previousTime = null;
 
     const loop = (t) => {
       if (!mounted) return;
@@ -9035,18 +9034,23 @@ export default function DetailsClient({
       // ÚNICA animación: flotación 3D continua. No se inclina siguiendo al
       // puntero (eso dejaba la portada "clavada" en un ángulo fijo al parar el
       // ratón). Los clics los recibe la capa FIJA (fuera del marco).
-      const dt = now / 1000;
+      startedAt ??= now;
+      const seconds = (now - startedAt) / 1000;
+      const delta = previousTime === null ? 0 : Math.min(now - previousTime, 50);
+      previousTime = now;
+      // Ease into the float without an arbitrary initial angle or a sudden zoom.
+      const progress = Math.min(seconds / 0.8, 1);
+      const strength = progress * progress * (3 - 2 * progress);
       const target = {
-        rx: Math.sin(dt * 1.05) * 5.5,
-        ry: Math.cos(dt * 0.9) * 8.5,
-        s: 1.03 + Math.sin(dt * 1.6) * 0.01,
+        rx: Math.sin(seconds * 1.05) * 5.5 * strength,
+        ry: Math.sin(seconds * 0.9) * 8.5 * strength,
+        s: 1 + (1.03 - 1 + Math.sin(seconds * 1.6) * 0.01) * strength,
       };
-
       const cur = posterStateRef.current;
-      const k = 0.14;
-      cur.rx += (target.rx - cur.rx) * k;
-      cur.ry += (target.ry - cur.ry) * k;
-      cur.s += (target.s - cur.s) * k;
+      const easing = 1 - Math.exp(-delta / 110);
+      cur.rx += (target.rx - cur.rx) * easing;
+      cur.ry += (target.ry - cur.ry) * easing;
+      cur.s += (target.s - cur.s) * easing;
 
       el.style.transform =
         `translateZ(0px) rotateX(${cur.rx.toFixed(3)}deg) rotateY(${cur.ry.toFixed(3)}deg) ` +

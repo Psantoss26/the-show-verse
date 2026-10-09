@@ -4,7 +4,7 @@
 import OptimizedImage from "@/components/OptimizedImage";
 import Link from 'next/link'
 import { useRouter } from "@/lib/offline/useOfflineRouter";
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { ArrowLeft, ChevronLeft, ChevronRight, Film, ListVideo } from 'lucide-react'
 import { useIsHistoryNavigation } from '@/lib/hooks/useIsHistoryNavigation'
 import DetailsScoreboardPanel from '@/components/details/DetailsScoreboardPanel'
@@ -294,7 +294,7 @@ function CoverModeToggle({ backdrop, onToggle }) {
 // encima con fundido cuando está decodificada.
 //
 // El marco NO se pinta hasta que hay imagen: antes se veía un recuadro negro
-// vacío mientras se descargaba. Entra con un fundido y un leve escalado; si
+// vacío mientras se descargaba. Entra con un fundido sin otro zoom sobre la entrada del hero; si
 // la imagen ya estaba en caché (volver atrás, segunda visita) aparece tal cual,
 // sin animación (useImageLoadReady). Si no se puede cargar, se muestra el
 // marco con el icono de respaldo en vez de quedarse invisible.
@@ -324,8 +324,8 @@ function RevealPoster({ src, lowSrc, alt }) {
     return (
         <div
             className={`absolute inset-0 ${POSTER_FRAME_VISUAL} ${
-                instant ? '' : 'transition-[opacity,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none'
-            } ${visible ? 'scale-100 opacity-100' : 'scale-[0.97] opacity-0'}`}
+                instant ? '' : 'transition-opacity duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none'
+            } ${visible ? 'opacity-100' : 'opacity-0'}`}
         >
             <div className="pointer-events-none absolute inset-0 z-20 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-white/[0.02]" />
             <div className="absolute inset-0 z-10">
@@ -588,6 +588,7 @@ export default function UnifiedListDetailsLayout({
     // preferencia global, solo escritorio). Disponible con un backdrop con
     // idioma (colecciones) o, en listas, con pósters para la estantería.
     const coverMode = usePosterViewMode()
+    const reduceMotion = useReducedMotion()
     const posterTargetCount = useMemo(() => buildPosterCollageTargets(posterItems).length, [posterItems])
     // Listas: disponible en cuanto hay títulos (la estantería enseña huecos
     // mientras llegan sus pósters). Colecciones: con su backdrop con idioma.
@@ -797,7 +798,7 @@ export default function UnifiedListDetailsLayout({
 
                 {/* --- HERO, misma base visual que ActorDetails --- */}
                 <motion.div
-                    initial={isBackNav ? false : { opacity: 0, y: 16 }}
+                    initial={isBackNav || reduceMotion ? false : { opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
                     // Backdrop con sinopsis debajo: 24 px hasta ella, la misma

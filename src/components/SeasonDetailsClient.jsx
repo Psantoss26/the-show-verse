@@ -1557,10 +1557,10 @@ export default function SeasonDetailsClient({
 
           {/* Left poster */}
           <motion.div
-            initial={{ opacity: 0, x: -20, scale: 0.985 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
-            className="w-full max-w-[280px] lg:max-w-[320px] mx-auto lg:mx-0 flex-shrink-0 hidden sm:flex flex-col gap-5 relative z-10"
+            className="w-full max-w-[280px] lg:max-w-[320px] mx-auto lg:mx-0 flex-shrink-0 hidden sm:flex flex-col gap-5 relative z-10 motion-reduce:!transform-none motion-reduce:!opacity-100"
           >
             <AnimatedPosterFrame
               src={
