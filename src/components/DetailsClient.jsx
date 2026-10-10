@@ -11387,9 +11387,15 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         </div>
 
                         {/* Panel movil desplegable en 2 filas maximo */}
+                        {/* Por ENCIMA de la galería que sigue: el contenido del panel lleva un
+                            `transform` (su animación) y eso encierra el z-index del
+                            desplegable de resolución en el panel; el Swiper de las
+                            imágenes (`.swiper`: relative, z-index 1) lo tapaba. Con
+                            z-[2] el panel gana a la galería y sigue por debajo de las
+                            barras fijas (z-30). */}
                         <MobileFiltersPanel
                           open={artworkControlsOpen}
-                          className="sm:hidden"
+                          className="sm:hidden relative z-[2]"
                           gapClassName=""
                           contentClassName="pb-4"
                         >
