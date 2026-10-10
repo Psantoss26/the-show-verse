@@ -1835,6 +1835,32 @@ body {
   );
 }
 
+/* MÓVIL Y TABLET: TRANSPARENTE ARRIBA, CRISTAL AL DESPLAZARSE (páginas que no
+   son dashboard ni ficha). Arriba del todo el cristal solo tenía detrás el
+   fondo de la página y, en las de usuario, lo teñía de su color. La opacidad va
+   en CADA capa (TopBarGlass las hace hermanas): en un contenedor apagaría su
+   `backdrop-filter` mientras dura el fundido. Escritorio, igual que antes. */
+.sv-topbar-glass-fade {
+  opacity: 0;
+  transition: opacity 300ms;
+}
+
+.sv-topbar-glass-fade[data-scrolled] {
+  opacity: 1;
+}
+
+@media (min-width: 64rem) and (hover: hover) and (pointer: fine) {
+  .sv-topbar-glass-fade {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-topbar-glass-fade {
+    transition: none;
+  }
+}
+
 .sv-topbar-row {
   transition:
     margin-right 320ms cubic-bezier(0.22, 1, 0.36, 1),
