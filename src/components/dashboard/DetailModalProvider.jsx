@@ -387,12 +387,15 @@ export default function DetailModalProvider({
   // reorganizaba dos veces seguidas.
   useLayoutEffect(() => {
     if (!contentRef.current) return;
+    // AnimatePresence keeps the outgoing panel mounted. Do not reflow the
+    // entire page underneath it while its native exit is still running.
+    if (activeItem == null) return;
     if (docked && drawerWidthRef.current == null) return;
     applyContentMargin(
       contentRef.current,
       docked ? `${drawerWidthRef.current}px` : "",
     );
-  }, [docked]);
+  }, [docked, activeItem]);
 
   // ¿La entrada actual es un CAMBIO (mismo nivel o profundizar) con la ficha ya
   // abierta? Dispara fundido cruzado (en vez de deslizar). Se pasa como `custom`
@@ -556,7 +559,14 @@ export default function DetailModalProvider({
         {children}
       </div>
 
-      <AnimatePresence custom={switching}>
+      <AnimatePresence
+        custom={switching}
+        onExitComplete={() => {
+          // A new title may have opened while the previous one was leaving.
+          // Only the final close releases the reserved page width.
+          if (stackRef.current.length === 0) applyContentMargin(contentRef.current, "");
+        }}
+      >
         {activeItem && (
           <DetailModal
             // La colocación forma parte de la identidad: al cambiar de centrado

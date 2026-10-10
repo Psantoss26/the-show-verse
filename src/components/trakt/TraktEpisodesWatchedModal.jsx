@@ -569,7 +569,10 @@ export default function TraktEpisodesWatchedModal({
   // La temporada inicial se escoge en un efecto al abrir el modal. Usamos la
   // primera disponible también durante ese primer render para que el contenido
   // se trate como pendiente de carga, en lugar de enseñar momentáneamente el
-  // estado vacío antes de que arranque la petición.
+  // estado vacío antes de que arranque la petición. Los selectores de
+  // temporada marcan la activa con `selectedSn` por lo mismo: con
+  // `activeSeason` (null en ese render) el botón se pintaba inactivo y saltaba
+  // al color de seleccionado con `transition-all`, un cambio de color visible.
   const selectedSn = selectedSeasonObj?.season_number ?? initialSeasonNumber;
   const displaySn = displaySeason ?? activeSeason ?? initialSeasonNumber;
 
@@ -1865,7 +1868,7 @@ export default function TraktEpisodesWatchedModal({
                       sn,
                       total,
                     );
-                    const active = sn === activeSeason;
+                    const active = sn === selectedSn;
 
                     return (
                       <button
@@ -1930,7 +1933,7 @@ export default function TraktEpisodesWatchedModal({
                 <div className="flex min-w-max gap-2 px-4 pb-3 pt-0">
                   {usableSeasons.map((s) => {
                     const sn = s.season_number;
-                    const active = sn === activeSeason;
+                    const active = sn === selectedSn;
                     return (
                       <button
                         key={sn}
