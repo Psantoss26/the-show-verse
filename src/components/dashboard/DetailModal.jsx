@@ -421,33 +421,39 @@ const DRAWER_EASE_IN = [0.16, 1, 0.3, 1];
 const DRAWER_EASE_OUT = [0.25, 0.8, 0.25, 1];
 const DRAWER_EXIT_DURATION = 0.28;
 
-const panelVariantsRight = {
-  hidden: (switching) =>
-    switching ? { opacity: 0 } : { opacity: 1, x: "100%" },
+// Animate the complete transform so Motion can use native WAAPI. Its `x`
+// shorthand runs on the main thread and stalls whenever the detail data renders.
+// Explicit identity transforms also keep title changes and interrupted exits
+// from inheriting a partially translated position.
+const drawerTransform = "translate3d(0, 0, 0)";
+const drawerHiddenTransform = "translate3d(100%, 0, 0)";
+const createPanelVariantsRight = (reduceMotion) => ({
+  hidden: (switching) => ({
+    opacity: switching && !reduceMotion ? 0 : 1,
+    transform: switching || reduceMotion ? drawerTransform : drawerHiddenTransform,
+  }),
   visible: (switching) => ({
     opacity: 1,
-    x: 0,
-    transition: switching
-      ? { duration: 0.2, ease: [0.22, 1, 0.36, 1] }
-      : { duration: 0.32, ease: DRAWER_EASE_IN },
+    transform: drawerTransform,
+    transition: {
+      duration: reduceMotion ? 0 : switching ? 0.2 : 0.32,
+      ease: switching ? [0.22, 1, 0.36, 1] : DRAWER_EASE_IN,
+    },
   }),
   navigate: {
-    // Igual que en el centrado: el panel real se oculta y el movimiento a la
-    // ficha completa lo hace el clon inerte.
     opacity: 0,
-    x: 0,
+    transform: drawerTransform,
     transition: { duration: 0 },
   },
-  exit: (switching) =>
-    switching
-      ? { opacity: 0, transition: { duration: 0.16, ease: [0.4, 0, 1, 1] } }
-      : {
-          // Sale deslizando sólido sin lag en la GPU: simétrico y fluido.
-          opacity: 1,
-          x: "100%",
-          transition: { duration: DRAWER_EXIT_DURATION, ease: DRAWER_EASE_OUT },
-        },
-};
+  exit: (switching) => ({
+    opacity: switching ? 0 : 1,
+    transform: switching || reduceMotion ? drawerTransform : drawerHiddenTransform,
+    transition: {
+      duration: reduceMotion ? 0 : switching ? 0.16 : DRAWER_EXIT_DURATION,
+      ease: switching ? [0.4, 0, 1, 1] : DRAWER_EASE_OUT,
+    },
+  }),
+});
 
 // ---- Redimensionado del drawer derecho -------------------------------------
 // El usuario puede arrastrar el borde izquierdo para agrandar/encoger el ancho.
@@ -735,6 +741,10 @@ export default function DetailModal({
   );
   const router = useRouter();
   const prefersReducedMotion = useReducedMotion();
+  const panelVariantsRight = useMemo(
+    () => createPanelVariantsRight(prefersReducedMotion),
+    [prefersReducedMotion],
+  );
   const { session, account, preferences } = useAuth();
   const { openDetailModal } = useDetailModal();
   const { loading, data, applyArtworkSelection } = useDetailModalData(item, {
@@ -3610,11 +3620,6 @@ export default function DetailModal({
         initial="hidden"
         animate={navigatingToFullDetails ? "navigate" : "visible"}
         exit="exit"
-        onAnimationStart={(definition) => {
-          if (definition === "exit" || definition === "hidden") {
-            setPanelSettled(false);
-          }
-        }}
         onAnimationComplete={(definition) => {
           if (definition === "visible") setPanelSettled(true);
         }}
