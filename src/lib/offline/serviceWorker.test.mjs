@@ -310,3 +310,18 @@ test('activation drops the old cache of opaque posters', async () => {
   await sw.activate();
   assert.equal(sw.stores.has('showverse-offline-images-v1'), false);
 });
+
+// Las lecturas de la copia sin conexión van en segundo plano y algunas son
+// pesadas (historial completo). Cortarlas a los 6 s no paraba al servidor, que
+// las seguía calculando, y como contaban como fallo se repetían en cada copia.
+test('offline-copy reads get a longer timeout than page reads', async () => {
+  const sw = harness(); await sw.login('alice');
+  const timeouts = [];
+  const realSetTimeout = sw.context.setTimeout;
+  sw.context.setTimeout = (fn, ms) => { timeouts.push(ms); return realSetTimeout(fn, 0 * ms + 1e9); };
+  sw.network(() => json({ items: [] }));
+  await sw.read('/api/favorites');
+  await sw.read('/api/trakt/history?limit=all', { headers: { 'X-Showverse-Prepare': '1' } });
+  assert.equal(timeouts[0], 6000);
+  assert(timeouts[1] >= 60000);
+});
