@@ -24,6 +24,7 @@ import {
   motion,
   AnimatePresence,
   useReducedMotion,
+  useIsPresent,
   useMotionValue,
   useScroll,
   useTransform,
@@ -741,6 +742,7 @@ export default function DetailModal({
   );
   const router = useRouter();
   const prefersReducedMotion = useReducedMotion();
+  const isPresent = useIsPresent();
   const panelVariantsRight = useMemo(
     () => createPanelVariantsRight(prefersReducedMotion),
     [prefersReducedMotion],
@@ -947,27 +949,40 @@ export default function DetailModal({
   const [loadingStates, setLoadingStates] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
-  // Modal CENTRADO: el backdrop-blur del panel solo se aplica una vez TERMINADA la
-  // animación de entrada; durante la entrada el panel se transforma (y/scale) y
-  // tener el backdrop-filter activo obligaría a recalcular el desenfoque en cada
-  // frame (lento, sobre todo en móvil). El fondo ya va difuminado por el dim.
-  // Drawer DERECHO: el blur va activo desde el primer frame, para que el cristal
-  // difumine EN DIRECTO lo que el panel va pisando durante el recorrido y no
-  // aparezca de golpe al terminar. Además, sin dim detrás, un panel sin blur se
-  // vería casi transparente (es bg-black/35).
-  //
-  // Que esto sea asumible depende de dos cosas, ambas resueltas más abajo:
-  //   1) NO animar `opacity` a la vez (ver panelVariantsRight). Animar opacidad
-  //      sobre un elemento con backdrop-filter es patológico: obliga a pintarlo
-  //      en un búfer aparte y recomponer el desenfoque con alfa cada frame.
-  //   2) NO declarar `will-change: opacity` en el drawer, que forzaba esa misma
-  //      capa con alfa aunque ya no animemos la opacidad.
-  //
-  // `panelSettled` solo limita `will-change` mientras se anima. El cristal del
-  // drawer se mantiene montado durante toda su vida: al cambiar de título el
-  // modal entrante arranca su fundido con este estado en false y, si el blur
-  // dependiera de él, se vería un flash transparente hasta que terminase.
+  // Moving backdrop filters must sample the dashboard again every frame,
+  // even with a native transform animation. Keep the glass mounted but use
+  // its opaque fallback while entering/exiting or scrolling (see globals.css).
   const [panelSettled, setPanelSettled] = useState(false);
+
+  useEffect(() => {
+    if (!isRightPlacement) return undefined;
+    const panel = panelRef.current;
+    const scroller = scrollContainerRef.current;
+    if (!panel || !scroller) return undefined;
+    let idleTimer;
+    let scrolling = false;
+    const settle = () => {
+      window.clearTimeout(idleTimer);
+      if (!scrolling) return;
+      scrolling = false;
+      panel.removeAttribute("data-drawer-scrolling");
+    };
+    const onScroll = () => {
+      // One local style invalidation per gesture, no React render per frame.
+      if (!scrolling) {
+        scrolling = true;
+        panel.setAttribute("data-drawer-scrolling", "");
+      }
+      window.clearTimeout(idleTimer);
+      // An idle gap also covers wheel bursts and browsers without scrollend.
+      idleTimer = window.setTimeout(settle, 160);
+    };
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      settle();
+      scroller.removeEventListener("scroll", onScroll);
+    };
+  }, [isRightPlacement]);
 
   // Las secciones de la ficha de TELÉFONO no se montan hasta que el panel ha
   // terminado de entrar.
@@ -3612,6 +3627,7 @@ export default function DetailModal({
           La transición a la ficha completa anima un clon inerte de este panel. */}
       <motion.div
         ref={panelRef}
+        data-drawer-moving={isRightPlacement && (!panelSettled || !isPresent) ? "" : undefined}
         // `custom` alimenta las variantes del panel ENTRANTE (hidden/visible).
         // Con `switching` true → fundido cruzado (opacity); false → deslizar.
         // El panel SALIENTE recibe su `custom` del AnimatePresence del provider.
@@ -3713,9 +3729,8 @@ export default function DetailModal({
             montar) el cristal se veía correcto.
 
             El drawer sí la necesita: no tiene overlay detrás, así que sin esto
-            no habría desenfoque ninguno. Se mantiene desde el primer frame y
-            también durante el fundido entre títulos; solo se retira al cerrar
-            el modal. */}
+            no habría desenfoque ninguno. La capa permanece montada; durante
+            el movimiento el CSS sustituye el filtro por un fondo estable. */}
         {isRightPlacement && (
           <div
             aria-hidden="true"

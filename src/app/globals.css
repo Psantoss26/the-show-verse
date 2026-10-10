@@ -1350,6 +1350,22 @@ body {
   animation-play-state: paused !important;
 }
 
+/* Native transform animation does not make backdrop sampling free. In a
+   populated dashboard it can re-rasterize the whole moving panel each frame.
+   Scope the temporary fallback to this drawer, including nested glass controls.
+   Keep the surface readable and restore its original glass only when settled.
+   Do not transition backdrop-filter: that would recreate the expensive frames. */
+.sv-drawer-panel:is([data-drawer-moving], [data-drawer-scrolling]) {
+  background-color: rgb(18 18 18 / 96%);
+}
+.sv-drawer-panel:is([data-drawer-moving], [data-drawer-scrolling]),
+.sv-drawer-panel:is([data-drawer-moving], [data-drawer-scrolling]) * {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  /* transition-all on glass buttons would otherwise animate blur to zero. */
+  transition: none !important;
+}
+
 /* LA PÁGINA DE DETRÁS SE REORGANIZA EN DIRECTO mientras se arrastra el
    tirador del drawer acoplado (su margen sigue al panel en cada fotograma, ver
    `updateDrawerWidth` en DetailModalProvider). Sus transiciones se apagan
