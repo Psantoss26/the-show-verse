@@ -1256,8 +1256,15 @@ export default function PhoneDetailsSections({
                 </div>
               </div>
 
+              {/* Por ENCIMA de la galería que sigue: el contenido del panel lleva un
+                  `transform` (su animación) y eso encierra el z-index del
+                  desplegable de resolución en el panel; el Swiper de las
+                  imágenes (`.swiper`: relative, z-index 1) lo tapaba. Con
+                  z-[2] el panel gana a la galería y sigue por debajo de las
+                  barras fijas (z-30). */}
               <MobileFiltersPanel
                 open={controlsOpen}
+                className="relative z-[2]"
                 gapClassName=""
                 contentClassName="pb-4"
               >
