@@ -163,7 +163,7 @@ test("file name is a readable ascii slug", () => {
   assert.equal(shareCardFileName(""), "titulo-the-show-verse.png");
 });
 
-test("season card mirrors the season row: previous, series, watched, rating, next", () => {
+test("season card keeps only the user-state actions: series, watched, rating (no arrows, no edit)", () => {
   const card = sanitizeShareCard(
     buildShareCardPayload({
       ...baseInput,
@@ -180,15 +180,13 @@ test("season card mirrors the season row: previous, series, watched, rating, nex
 
   const buttons = shareCardActionButtons(card);
   assert.deepEqual(buttons.map((b) => `${b.key}:${b.variant}`), [
-    "previous:disabled",
     "series:glass",
     "watched:active",
     "rating:active",
-    "next:glass",
   ]);
-  assert.deepEqual(buttons.map((b) => b.icon ?? null), ["arrowLeft", "monitorPlay", null, null, "arrowRight"]);
-  assert.equal(buttons[2].label, "43");
-  assert.equal(buttons[3].label, "8");
+  assert.ok(!buttons.some((b) => /arrow|pencil|edit/i.test(`${b.key} ${b.icon ?? ""}`)));
+  assert.equal(buttons[1].label, "43");
+  assert.equal(buttons[2].label, "8");
 });
 
 test("only tv cards can be season cards, and the flags are booleans", () => {

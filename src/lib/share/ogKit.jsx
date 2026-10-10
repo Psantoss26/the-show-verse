@@ -38,12 +38,6 @@ export const LOGO_MAX_W = Math.round(W * 0.85);
 export const LOGO_MAX_H = 210;
 export const LOGO_BOTTOM = BUTTONS_TOP - 44;
 export const PANEL_TOP = BUTTONS_TOP + BUTTON + 48;
-// Fila de una TEMPORADA (5 acciones): como en su página, los botones crecen
-// hasta el tope de la ficha móvil (56px frente a los 38px de la fila de 8) con
-// 4px entre ellos. La fila sube lo que crecen, así el marcador no se mueve.
-export const SEASON_BUTTON = Math.round((BUTTON * 56) / 38);
-export const SEASON_BUTTON_GAP = Math.round((BUTTON * 4) / 38);
-export const SEASON_BUTTONS_TOP = BUTTONS_TOP - (SEASON_BUTTON - BUTTON);
 // Ancho del marcador: el de la fila de 8, aunque la fila tenga menos botones.
 export const SCORE_PANEL_W = ACTION_COUNT * BUTTON + (ACTION_COUNT - 1) * BUTTON_GAP;
 // Fondo ambiental: la portada desenfocada.
@@ -636,6 +630,134 @@ export function Brand({ src }) {
         height={BRAND.imageSize}
         alt=""
         style={{ position: "absolute", left: -BRAND.offsetX, top: -BRAND.offsetY }}
+      />
+    </div>
+  );
+}
+
+// --- PÓSTER CON EL TÍTULO IMPRESO (colecciones, y temporadas o títulos cuyo
+// póster ya trae el texto). Va A SANGRE, a todo el ancho y con su proporción,
+// pero NO con el fundido largo ni el sombreado de la ficha: abajo suelen estar
+// el título y los rótulos («COLECCIÓN», «SEASON 1»…), y ese fundido los dejaba
+// a medio desvanecer. El póster SUBE lo justo para que su final caiga un poco
+// por debajo de lo primero que va encima (la vista previa de la colección, la
+// fila de acciones de la ficha) y el fundido del borde inferior es CORTO y pasa
+// casi entero bajo esa fila.
+
+// Fundido del borde inferior: empieza FADE_LEAD por encima de lo que va encima
+// (`stackTop`) y acaba FADE_TAIL por debajo, que es donde termina el póster.
+export const POSTER_FADE_LEAD = 40;
+export const POSTER_FADE_TAIL = 34;
+// Lo máximo que se recorta arriba: un póster más alargado que 2:3 cede el resto
+// por abajo (bajo la fila) en vez de perder más cabeza.
+export const POSTER_MAX_SHIFT = 140;
+// Hasta dónde se ve el reflejo del póster bajo la costura.
+export const MIRROR_FADE_PX = 150;
+
+/** Encaje del póster a sangre de proporción `ratio` (alto/ancho) sobre `stackTop`. */
+export function posterFit({ ratio = 1.5, stackTop }) {
+  const height = Math.round(W * ratio);
+  // Dónde debería acabar el póster y cuánto hay que subirlo para ello (nada si
+  // ya cabe: un póster más bajo no se baja, se queda pegado arriba).
+  const end = stackTop + POSTER_FADE_TAIL;
+  const shift = Math.max(0, Math.min(POSTER_MAX_SHIFT, height - end));
+  const bottom = height - shift;
+  const fadeStart = Math.max(0, Math.min(bottom, stackTop) - POSTER_FADE_LEAD);
+  return {
+    height,
+    top: -shift,
+    // Recorte arriba y lo que tapa la fila del póster (px de imagen).
+    cropTop: shift,
+    covered: Math.max(0, bottom - stackTop),
+    // Fundido en px del PROPIO póster (la máscara va en la imagen).
+    fadeStart: fadeStart + shift,
+    fadeEnd: height,
+  };
+}
+
+// COSTURA SIN ESCALÓN. Debajo del póster no va otra imagen (el fondo ambiental
+// es la portada sin texto, de otro tono: el fundido dejaba un escalón visible),
+// sino la CONTINUACIÓN del propio póster: su versión diminuta (w92, `coverBlur`)
+// ampliada —borrosa por sí sola— detrás del póster nítido y, bajo la costura,
+// su REFLEJO vertical. En la costura las dos muestran la misma fila del póster,
+// así que no hay corte; el nítido se funde con una versión borrosa de SÍ MISMO.
+// Sin `filter: blur` a propósito: en Satori el desenfoque se recorta al borde
+// de cada imagen y lo oscurece, justo en la costura.
+export function PosterWithContinuation({ cover, coverBlur, fit }) {
+  const fade = (fit.fadeStart / fit.height) * 100;
+  const mid = fade + (100 - fade) * 0.45;
+  const posterBottom = fit.top + fit.height;
+
+  return (
+    <div style={{ position: "absolute", top: 0, left: 0, width: W, height: H, display: "flex" }}>
+      {/* La continuación del póster: borroso detrás y reflejado debajo,
+          oscureciéndose desde la costura hacia lo que va encima. */}
+      {coverBlur ? (
+        <div style={{ position: "absolute", top: 0, left: 0, width: W, height: H, display: "flex" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={coverBlur.src}
+            width={W}
+            height={fit.height}
+            alt=""
+            style={{ position: "absolute", top: fit.top, left: 0, width: W, height: fit.height, objectFit: "cover" }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              top: posterBottom,
+              left: 0,
+              width: W,
+              height: Math.max(0, H - posterBottom),
+              display: "flex",
+              overflow: "hidden",
+            }}
+          >
+            {/* Volteado: la fila de arriba de esta caja es la última del póster. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={coverBlur.src}
+              width={W}
+              height={fit.height}
+              alt=""
+              style={{ position: "absolute", top: 0, left: 0, width: W, height: fit.height, objectFit: "cover", transform: "scaleY(-1)" }}
+            />
+          </div>
+          <div
+            style={{
+              position: "absolute",
+              top: posterBottom,
+              left: 0,
+              width: W,
+              height: Math.max(0, H - posterBottom),
+              display: "flex",
+              // El reflejo solo hace falta junto a la costura: más abajo se leería
+              // el texto del póster al revés. Transparente en la costura y casi
+              // opaco a ~150 px (`MIRROR_FADE_PX`).
+              backgroundImage: `linear-gradient(180deg, ${rgba(SHADE, 0)} 0px, ${rgba(SHADE, 0.6)} ${Math.round(MIRROR_FADE_PX * 0.45)}px, ${rgba(SHADE, 0.92)} ${MIRROR_FADE_PX}px, ${rgba(SHADE, 1)} ${Math.round(MIRROR_FADE_PX * 1.6)}px)`,
+            }}
+          />
+        </div>
+      ) : null}
+
+      {/* El póster a sangre, con su proporción (solo cede `cropTop` arriba),
+          fundido por máscara: no se oscurece hacia negro, se vuelve
+          transparente y deja ver su continuación. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={cover.src}
+        width={W}
+        height={fit.height}
+        alt=""
+        style={{
+          position: "absolute",
+          top: fit.top,
+          left: 0,
+          width: W,
+          height: fit.height,
+          objectFit: "cover",
+          maskImage: `linear-gradient(180deg, #000 0%, #000 ${fade}%, rgba(0,0,0,0.55) ${mid}%, rgba(0,0,0,0) 100%)`,
+        }}
       />
     </div>
   );

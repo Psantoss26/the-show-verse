@@ -90,8 +90,8 @@ async function getDashboardData() {
       popularTV,
       featuredSources,
     ] = await Promise.all([
-      fetchTopRatedMovies(5000),
-      fetchTopRatedTV(5000),
+      fetchTopRatedMovies(5001),
+      fetchTopRatedTV(5001),
       discoverMovies({
         "vote_average.gte": 7.5,
         "vote_count.gte": 2000,

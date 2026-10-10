@@ -16,11 +16,9 @@ import {
   H,
   PANEL_TOP,
   POSTER_H,
+  PosterWithContinuation,
   SCORE_LOGOS,
   SCORE_PANEL_W,
-  SEASON_BUTTON,
-  SEASON_BUTTON_GAP,
-  SEASON_BUTTONS_TOP,
   SHADE,
   ScoreBadge,
   TitleArt,
@@ -31,6 +29,7 @@ import {
   loadLogo,
   loadPoster,
   loadShareFonts,
+  posterFit,
   px,
   rgba,
 } from "@/lib/share/ogKit";
@@ -52,16 +51,27 @@ export const dynamic = "force-dynamic";
 // Las piezas (cristal, botones, fondo, marca…) viven en lib/share/ogKit, que
 // comparte con las capas del vídeo (/api/share/details-story).
 //
-// TEMPORADAS (`card.season`): la misma imagen con la fila de su página, cinco
-// botones más grandes (ver SEASON_BUTTON); el marcador no se mueve.
+// TEMPORADAS (`card.season`): el mismo dibujo que la ficha (botones del mismo
+// tamaño y en la misma posición, mismo marcador); solo cambia la fila, que lleva
+// las acciones con estado del usuario de la temporada (serie · visto · nota),
+// centradas. Sin flechas ni editar.
+//
+// PÓSTER CON EL TÍTULO IMPRESO (siempre en una temporada; en la ficha, cuando
+// no hay portada sin texto): sin logo encima, así que el texto es el del propio
+// póster, abajo. El fundido largo y el sombreado de la ficha lo dejaban a medio
+// desvanecer («SEASON 1» casi no se leía). Se encaja como el póster de las
+// colecciones (`posterFit` + `PosterWithContinuation`): sube lo justo para
+// terminar bajo la fila de acciones y se funde solo en su último tramo.
 
 function Card({ card, poster, ambient, ambientBase, logo, assets, fonts }) {
   const buttons = shareCardActionButtons(card);
   const scores = ["tmdb", "trakt", "imdb"].filter((key) => card.scores[key]);
-  const buttonSize = card.season ? SEASON_BUTTON : BUTTON;
-  const buttonGap = card.season ? SEASON_BUTTON_GAP : BUTTON_GAP;
-  const buttonsTop = card.season ? SEASON_BUTTONS_TOP : BUTTONS_TOP;
-  const rowWidth = buttons.length * buttonSize + (buttons.length - 1) * buttonGap;
+  const rowWidth = buttons.length * BUTTON + (buttons.length - 1) * BUTTON_GAP;
+  const burnedTitle = Boolean(poster && !logo && !card.showTitle);
+  const size = poster?.size?.width && poster?.size?.height ? poster.size : { width: 2, height: 3 };
+  const fit = burnedTitle
+    ? posterFit({ ratio: size.height / size.width, stackTop: BUTTONS_TOP })
+    : null;
 
   return (
     <div
@@ -75,49 +85,55 @@ function Card({ card, poster, ambient, ambientBase, logo, assets, fonts }) {
         fontFamily: fonts ? FONT : "sans-serif",
       }}
     >
-      <AmbientBackground ambient={ambient} ambientBase={ambientBase} />
+      {burnedTitle ? (
+        <PosterWithContinuation cover={poster} coverBlur={ambientBase} fit={fit} />
+      ) : (
+        <>
+        <AmbientBackground ambient={ambient} ambientBase={ambientBase} />
 
-      {/* Portada a sangre, fundida con el fondo por máscara (la de la ficha
-          móvil): no se oscurece hacia negro, se vuelve transparente y deja ver
-          el fondo ambiental, así no hay corte entre portada y botones. */}
-      {poster ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={poster.src}
-          width={W}
-          height={POSTER_H}
-          alt=""
+        {/* Portada a sangre, fundida con el fondo por máscara (la de la ficha
+            móvil): no se oscurece hacia negro, se vuelve transparente y deja ver
+            el fondo ambiental, así no hay corte entre portada y botones. */}
+        {poster ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={poster.src}
+            width={W}
+            height={POSTER_H}
+            alt=""
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: W,
+              height: POSTER_H,
+              objectFit: "cover",
+              objectPosition: "50% 0%",
+              maskImage:
+                "linear-gradient(180deg, #000 0%, #000 58%, rgba(0,0,0,0.75) 72%, rgba(0,0,0,0.3) 86%, rgba(0,0,0,0) 98%)",
+            }}
+          />
+        ) : null}
+
+        {/* Sombreados de legibilidad del fondo (los de la ficha): se oscurece
+            hacia abajo, donde van el logo, los botones y el marcador. Es un
+            degradado MONÓTONO (solo crece hacia abajo): una franja que se
+            aclarase otra vez por debajo se leería como una mancha suspendida.
+            Va ENCIMA de la portada, como el fundido a oscuro de la ficha: sobre
+            una portada clara, el logo blanco necesita ese fondo oscuro debajo. */}
+        <div
           style={{
             position: "absolute",
             top: 0,
             left: 0,
             width: W,
-            height: POSTER_H,
-            objectFit: "cover",
-            objectPosition: "50% 0%",
-            maskImage:
-              "linear-gradient(180deg, #000 0%, #000 58%, rgba(0,0,0,0.75) 72%, rgba(0,0,0,0.3) 86%, rgba(0,0,0,0) 98%)",
+            height: H,
+            display: "flex",
+            backgroundImage: `linear-gradient(0deg, ${rgba(SHADE, 0.86)} 0%, ${rgba(SHADE, 0.7)} 22%, ${rgba(SHADE, 0.45)} 36%, ${rgba(SHADE, 0.2)} 55%, rgba(0,0,0,0) 100%)`,
           }}
         />
-      ) : null}
-
-      {/* Sombreados de legibilidad del fondo (los de la ficha): se oscurece
-          hacia abajo, donde van el logo, los botones y el marcador. Es un
-          degradado MONÓTONO (solo crece hacia abajo): una franja que se
-          aclarase otra vez por debajo se leería como una mancha suspendida.
-          Va ENCIMA de la portada, como el fundido a oscuro de la ficha: sobre
-          una portada clara, el logo blanco necesita ese fondo oscuro debajo. */}
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: W,
-          height: H,
-          display: "flex",
-          backgroundImage: `linear-gradient(0deg, ${rgba(SHADE, 0.86)} 0%, ${rgba(SHADE, 0.7)} 22%, ${rgba(SHADE, 0.45)} 36%, ${rgba(SHADE, 0.2)} 55%, rgba(0,0,0,0) 100%)`,
-        }}
-      />
+        </>
+      )}
 
       {/* Velo suave arriba para que la marca se lea sobre pósters claros. */}
       <div
@@ -135,13 +151,13 @@ function Card({ card, poster, ambient, ambientBase, logo, assets, fonts }) {
       <Brand src={assets.brand} />
 
       {/* Logo del título (o el título en texto si no hay logo). */}
-      <TitleArt card={card} logo={logo} bottom={buttonsTop - 44} />
+      <TitleArt card={card} logo={logo} bottom={BUTTONS_TOP - 44} />
 
       {/* Fila de acciones con los estados de la ficha. */}
       <div
         style={{
           position: "absolute",
-          top: buttonsTop,
+          top: BUTTONS_TOP,
           left: Math.round((W - rowWidth) / 2),
           width: rowWidth,
           display: "flex",
@@ -149,7 +165,7 @@ function Card({ card, poster, ambient, ambientBase, logo, assets, fonts }) {
         }}
       >
         {buttons.map((button) => (
-          <ActionButton key={button.key} button={button} size={buttonSize} />
+          <ActionButton key={button.key} button={button} size={BUTTON} />
         ))}
       </div>
 
