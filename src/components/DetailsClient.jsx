@@ -7962,6 +7962,8 @@ export default function DetailsClient({
   useEffect(() => {
     if (typeof window === "undefined") return;
     let raf = 0;
+    let geometryDirty = true;
+    let positions = [];
 
     const getSectionElements = () =>
       (sectionItems || [])
@@ -7977,8 +7979,17 @@ export default function DetailsClient({
 
     const updateActiveSection = () => {
       raf = 0;
-      const sections = getSectionElements();
-      if (!sections.length) return;
+      // Cache document coordinates, never measure every section per scroll
+      // frame. ResizeObserver invalidates them when async content or the
+      // expanding scoreboard changes layout.
+      if (geometryDirty) {
+        geometryDirty = false;
+        const scrollY = window.scrollY;
+        positions = getSectionElements().map(({ id, el }) => ({
+          id, top: scrollY + el.getBoundingClientRect().top,
+        }));
+      }
+      if (!positions.length) return;
 
       const offset = STICKY_TOP + (menuH || 0) + 10;
       const pendingId = pendingSectionRef.current;
@@ -7989,10 +8000,9 @@ export default function DetailsClient({
       }
 
       const probeY = window.scrollY + offset + 16;
-      let next = sections[0].id;
+      let next = positions[0].id;
 
-      for (const { id, el } of sections) {
-        const top = window.scrollY + el.getBoundingClientRect().top;
+      for (const { id, top } of positions) {
         if (top <= probeY) next = id;
         else break;
       }
@@ -8005,14 +8015,29 @@ export default function DetailsClient({
       raf = window.requestAnimationFrame(updateActiveSection);
     };
 
-    requestUpdate();
+    const invalidateGeometry = () => {
+      geometryDirty = true;
+      requestUpdate();
+    };
+    const observer = new ResizeObserver(invalidateGeometry);
+    const container = contentTopRef.current;
+    if (container) observer.observe(container);
+    const observeSections = () => {
+      getSectionElements().forEach(({ el }) => observer.observe(el));
+      invalidateGeometry();
+    };
+    const mutations = new MutationObserver(observeSections);
+    if (container) mutations.observe(container, { childList: true, subtree: true });
+    observeSections();
     window.addEventListener("scroll", requestUpdate, { passive: true });
-    window.addEventListener("resize", requestUpdate);
+    window.addEventListener("resize", invalidateGeometry);
 
     return () => {
+      observer.disconnect();
+      mutations.disconnect();
       if (raf) window.cancelAnimationFrame(raf);
       window.removeEventListener("scroll", requestUpdate);
-      window.removeEventListener("resize", requestUpdate);
+      window.removeEventListener("resize", invalidateGeometry);
       if (pendingSectionTimerRef.current) {
         window.clearTimeout(pendingSectionTimerRef.current);
         pendingSectionTimerRef.current = null;

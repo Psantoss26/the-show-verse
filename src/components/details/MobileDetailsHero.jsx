@@ -425,9 +425,18 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
         const root = document.documentElement
         if (!enabled || !isPhone) return undefined
         let applied = ''
+        let viewportWidth = window.innerWidth
+        let viewportHeight = window.innerHeight
         const update = () => {
+            // Browser chrome changes height during a gesture. Keep the fade
+            // distance stable once the cover is visible; rotation still refits.
+            if (!lockRef.current || window.innerWidth !== viewportWidth) {
+                viewportWidth = window.innerWidth
+                viewportHeight = window.innerHeight
+            }
+            // Short pages must still finish the fade before the actual scroll limit.
             const maxScroll = Math.max(0, root.scrollHeight - window.innerHeight)
-            const end = Math.max(1, Math.round(Math.min(window.innerHeight * 0.55, maxScroll * 0.85)))
+            const end = Math.max(1, Math.round(Math.min(viewportHeight * 0.55, maxScroll * 0.85)))
             heroScrollEndRef.current = end
             const value = `${end}px`
             if (value === applied) return
@@ -446,36 +455,58 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
         }
     }, [enabled, isPhone])
 
-    // Respaldo de `--sv-hero-scroll` donde no hay animaciones ligadas al scroll
-    // (mismo recorrido). Con soporte, `.sv-hero-scroll-in/-shade/-out` lo
-    // resuelven en el compositor. El cristal del navbar en estas rutas también
-    // lee la variable.
+    // Baseline 2024 fallback: update only the opacity of the four visual
+    // layers. An inherited custom property on <html> invalidates styles for
+    // the entire details tree on every frame (notably Firefox/older Safari).
     useEffect(() => {
-        const root = document.documentElement
         if (!enabled || !isPhone || CSS.supports?.(HERO_SCROLL_TIMELINE_QUERY)) return undefined
         let raf = 0
-        let lastProgress = null
+        let targetsDirty = true
+        let targets = []
+        const originalOpacity = new Map()
         const apply = () => {
             raf = 0
+            if (targetsDirty) {
+                targetsDirty = false
+                targets = [...document.querySelectorAll(
+                    '.sv-hero-scroll-in, .sv-hero-scroll-out, .sv-hero-scroll-shade, .sv-details-nav-glass',
+                )]
+                targets.forEach((el) => {
+                    if (!originalOpacity.has(el)) originalOpacity.set(el, el.style.opacity)
+                })
+            }
             const dist = heroScrollEndRef.current || Math.max(1, window.innerHeight * 0.55)
             const p = Math.min(1, Math.max(0, window.scrollY / dist))
-            const progress = p.toFixed(4)
-            if (progress !== lastProgress) {
-                lastProgress = progress
-                root.style.setProperty('--sv-hero-scroll', progress)
-            }
+            targets.forEach((el) => {
+                const opacity = (el.classList.contains('sv-hero-scroll-out') ? 1 - p
+                    : el.classList.contains('sv-hero-scroll-shade') ? p * 0.6 : p).toFixed(4)
+                if (Number(el.style.opacity) !== Number(opacity) || el.style.opacity === '') {
+                    el.style.opacity = opacity
+                }
+            })
         }
         const onScroll = () => {
             if (!raf) raf = window.requestAnimationFrame(apply)
         }
+        // Artwork and navbar layers can arrive after hydration. Child changes
+        // refresh the small target list; scrolling never searches the DOM.
+        const mutations = new MutationObserver(() => {
+            targetsDirty = true
+            onScroll()
+        })
+        mutations.observe(document.body, { childList: true, subtree: true })
+        const resize = new ResizeObserver(onScroll)
+        if (rootRef.current) resize.observe(rootRef.current)
         apply()
         window.addEventListener('scroll', onScroll, { passive: true })
         window.addEventListener('resize', onScroll, { passive: true })
         return () => {
+            mutations.disconnect()
+            resize.disconnect()
             if (raf) window.cancelAnimationFrame(raf)
             window.removeEventListener('scroll', onScroll)
             window.removeEventListener('resize', onScroll)
-            root.style.removeProperty('--sv-hero-scroll')
+            originalOpacity.forEach((opacity, el) => { el.style.opacity = opacity })
         }
     }, [enabled, isPhone])
 
@@ -503,9 +534,20 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
         }
         let statsApplied = null
         let raf = 0
+        let targetsDirty = true
+        let statsTargets = []
+        let revealTargets = []
+        let settled = false
+        let wasAtTop = null
         const sync = () => {
             const atTop = window.scrollY <= MOBILE_REVEAL_SHOW_AT_PX
-            const statsTargets = container.querySelectorAll(`[${MOBILE_STATS_REVEAL_ATTR}]`)
+            if (!targetsDirty && settled && atTop === wasAtTop) return
+            if (targetsDirty) {
+                statsTargets = [...container.querySelectorAll(`[${MOBILE_STATS_REVEAL_ATTR}]`)]
+                revealTargets = [...container.querySelectorAll(`[${MOBILE_REVEAL_ATTR}]`)]
+                targetsDirty = false
+            }
+            wasAtTop = atTop
             const statsVisible =
                 !atTop &&
                 (statsApplied === true ||
@@ -515,7 +557,7 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
             const updates = []
             let revealLine = null
             let statsPending = null
-            container.querySelectorAll(`[${MOBILE_REVEAL_ATTR}]`).forEach((el) => {
+            revealTargets.forEach((el) => {
                 let visible = false
                 if (!atTop) {
                     if (el.getAttribute(MOBILE_REVEAL_ATTR) === 'shown') visible = true
@@ -550,6 +592,7 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
                 if (row && row.inert === statsVisible) row.inert = !statsVisible
             })
             statsApplied = statsVisible
+            settled = atTop || (statsVisible && updates.every(({ visible }) => visible))
             updates.forEach(({ el, current, value, visible }) => {
                 if (current !== value) el.setAttribute(MOBILE_REVEAL_ATTR, value)
                 if (el.inert === visible) el.inert = !visible
@@ -570,7 +613,10 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
         observer.observe(trigger)
         // Bloques que se montan después (la barra de búsqueda llega con los
         // títulos): nacen ocultos y se miran en el siguiente fotograma.
-        const mutations = new MutationObserver(scheduleSync)
+        const mutations = new MutationObserver(() => {
+            targetsDirty = true
+            scheduleSync()
+        })
         mutations.observe(container, { childList: true, subtree: true })
         sync()
         window.addEventListener('scroll', scheduleSync, { passive: true })
@@ -933,8 +979,8 @@ export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, 
         // En un envoltorio propio porque la entrada de dentro
         // (`sv-mobile-poster-reveal`, relleno `both`) fija su opacidad a 1 al
         // terminar y anulaba cualquier fundido puesto en la misma capa. Donde
-        // no hay animaciones ligadas al scroll, la opacidad sale de
-        // `--sv-hero-scroll` (respaldo del layout).
+        // no hay animaciones ligadas al scroll, el hook actualiza solo
+        // la opacidad de esta capa, sin invalidar estilos del documento.
         <div
             aria-hidden="true"
             className={
