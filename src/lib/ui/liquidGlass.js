@@ -159,3 +159,15 @@ export const LIQUID_GLASS_SURFACE_CARD = `relative isolate overflow-hidden trans
 // así los filtros de los controles siguen viendo el fondo de la página.
 export const LIQUID_GLASS_DETAIL_SURFACE =
   "bg-black/[0.47] bg-gradient-to-br from-white/[0.12] via-transparent to-white/[0.04] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)]";
+
+// El mismo acabado PARTIDO en dos capas, para las vistas previa de los
+// dashboards que se despliegan desde la tarjeta (ver `usePreviewMorph`). La
+// carcasa no puede llevar el tinte: la animación recorta la superficie con
+// `clip-path`, y un `clip-path` en un ANCESTRO apaga el `backdrop-filter` de sus
+// hijos (medido, igual que `opacity`). Así el recorte va en la propia capa de
+// cristal, que conserva el desenfoque en cada fotograma. La sombra exterior va
+// aparte porque `clip-path` la cortaría.
+export const LIQUID_GLASS_DETAIL_TINT =
+  "bg-black/[0.47] bg-gradient-to-br from-white/[0.12] via-transparent to-white/[0.04] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15)]";
+export const LIQUID_GLASS_DETAIL_SHADOW =
+  "shadow-[0_25px_50px_-12px_rgba(0,0,0,0.85)]";

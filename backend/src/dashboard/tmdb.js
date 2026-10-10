@@ -19,7 +19,7 @@ export const TV_GENRES = [
 ];
 
 export function toCard(raw, mediaType) {
-  if (!raw || !raw.id) return null;
+  if (!raw || !raw.id || raw.adult === true) return null;
   const posterPath = raw.poster_path || null;
   const backdropPath = raw.backdrop_path || null;
   if (!posterPath && !backdropPath) return null;
@@ -46,6 +46,28 @@ export function toCard(raw, mediaType) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// All pool and recommendation builds share this limit, not just each row.
+// Release the slot before retries/backoff so one failing request cannot starve
+// the catalog. Abort stalled requests instead of hanging a whole dashboard.
+let activeRequests = 0;
+const waitingRequests = [];
+async function limitedFetch(url) {
+  if (activeRequests >= 8) await new Promise((resolve) => waitingRequests.push(resolve));
+  else activeRequests++;
+  try {
+    const response = await fetch(url, {
+      headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(8000),
+    });
+    // Read the body while holding the slot too.
+    const body = response.ok ? await response.json() : null;
+    return { response, body };
+  } finally {
+    const next = waitingRequests.shift();
+    if (next) next();
+    else activeRequests--;
+  }
+}
+
 export async function tmdbGet(path, params = {}) {
   if (!TMDB_API_KEY) throw new Error('TMDB_API_KEY not configured');
   const url = new URL(`${TMDB_BASE}${path}`);
@@ -66,7 +88,9 @@ export async function tmdbGet(path, params = {}) {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     let res;
     try {
-      res = await fetch(url, { headers: { Accept: 'application/json' } });
+      const result = await limitedFetch(url);
+      res = result.response;
+      if (res.ok) return result.body;
     } catch (err) {
       lastErr = err;
       if (attempt < MAX_ATTEMPTS) {
@@ -75,7 +99,6 @@ export async function tmdbGet(path, params = {}) {
       }
       throw err;
     }
-    if (res.ok) return res.json();
     if ((res.status === 429 || res.status >= 500) && attempt < MAX_ATTEMPTS) {
       const retryAfter = Number(res.headers.get('retry-after'));
       const wait = Number.isFinite(retryAfter) && retryAfter > 0
@@ -123,6 +146,9 @@ export async function tmdbList({ path, mediaType, pages = 1 }) {
   const pageJsons = await Promise.all(
     Array.from({ length: pages }, (_, i) => tmdbGet(path, { page: i + 1 }).catch(() => null)),
   );
+  if (pageJsons.length && pageJsons.every((json) => json === null)) {
+    throw new Error(`TMDB ${path}: all pages unavailable`);
+  }
   const all = [];
   for (const json of pageJsons) {
     for (const r of json?.results || []) {

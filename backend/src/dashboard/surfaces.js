@@ -26,7 +26,7 @@ export const SURFACES = {
       },
       {
         key: 'popular',
-        title: 'Lo que más se está viendo',
+        title: 'Populares para descubrir',
         mediaType: 'mixed',
         source: { kind: 'pool', poolKey: 'popular' },
       },
@@ -59,7 +59,7 @@ export const SURFACES = {
       },
       {
         key: 'nostalgia_millennial',
-        title: 'Favoritos de los 90 y 2000',
+        title: 'Favoritos de 1995 a 2012',
         mediaType: 'mixed',
         source: { kind: 'pool', poolKey: 'curated:nostalgia_millennial' },
       },
@@ -95,19 +95,19 @@ export const SURFACES = {
       },
       {
         key: 'region_top',
-        title: 'Top de hoy en España',
+        title: 'Populares en streaming en España',
         mediaType: 'movie',
         source: { kind: 'pool', poolKey: 'region_top' },
       },
       {
         key: 'popular',
-        title: 'Películas que todo el mundo está viendo',
+        title: 'Películas populares',
         mediaType: 'movie',
         source: { kind: 'pool', poolKey: 'popular' },
       },
       {
         key: 'acclaimed',
-        title: 'Premiadas y aclamadas',
+        title: 'Películas con grandes valoraciones',
         mediaType: 'movie',
         source: { kind: 'pool', poolKey: 'acclaimed' },
       },
@@ -137,7 +137,7 @@ export const SURFACES = {
       },
       {
         key: 'new_releases',
-        title: 'Estrenos',
+        title: 'Estrenos y próximos lanzamientos',
         mediaType: 'movie',
         source: { kind: 'pool', poolKey: 'new_releases' },
       },
@@ -179,13 +179,13 @@ export const SURFACES = {
       },
       {
         key: 'region_top',
-        title: 'Top de hoy en España',
+        title: 'Populares en streaming en España',
         mediaType: 'tv',
         source: { kind: 'pool', poolKey: 'region_top' },
       },
       {
         key: 'popular',
-        title: 'Series que se están viendo ahora',
+        title: 'Series populares',
         mediaType: 'tv',
         source: { kind: 'pool', poolKey: 'popular' },
       },
@@ -221,7 +221,7 @@ export const SURFACES = {
       },
       {
         key: 'new_releases',
-        title: 'Estrenos',
+        title: 'Estrenos y próximos lanzamientos',
         mediaType: 'tv',
         source: { kind: 'pool', poolKey: 'new_releases' },
       },
@@ -254,14 +254,14 @@ export const SURFACES = {
 };
 
 // Proporción máxima de títulos ya vistos en filas personalizadas.
-const FOR_YOU_SEEN_LIMIT = 0.3;   // Recomendaciones generales: algunos vistos, sin dominar
-const BECAUSE_SEEN_LIMIT = 0.15;  // "Porque te gustó…": vistos solo como excepción
+const FOR_YOU_SEEN_LIMIT = 0.2;   // Recomendaciones generales: algunos vistos, sin dominar
+const BECAUSE_SEEN_LIMIT = 0.1;  // "Porque te gustó…": vistos solo como excepción
 
-// Tamaño de pool de cada fila personalizada. Es mayor que `perRow` (28) para que
+// Tamaño de pool de cada fila personalizada. Es mayor que `perRow` (32) para que
 // la rotación con semilla por superficie produzca subconjuntos distintos entre
 // Inicio/Películas/Series (variedad) sin salir de las mejores recomendaciones.
-const FOR_YOU_POOL = 64;
-const BECAUSE_POOL = 48;
+const FOR_YOU_POOL = 160;
+const BECAUSE_POOL = 96;
 
 // Intercala dos listas conservando el orden de cada una (para mezclar pelis y
 // series en Inicio sin que un tipo domine por puntuación).
@@ -317,34 +317,32 @@ export function personalizedRowDefs(recsByType, surface) {
     seenRatioLimit: FOR_YOU_SEEN_LIMIT,
   });
 
-  // 3. "Porque te gustó {seedTitle}" (máx 2). Las razones 'because' solo provienen
+  // 3. "Porque te gustó {seedTitle}" (máx 3). Las razones 'because' solo provienen
   //    de semillas que el usuario disfrutó (rating ≥ 8 o favorito; ver score.js),
   //    así que estas filas reflejan gustos reales, no visionados casuales.
-  const becauseGroups = new Map(); // seedTmdbId -> { seedTitle, items: recItem[] }
+  const becauseGroups = new Map();
   for (const item of all) {
-    const becauseReason = item.reasons?.find((r) => r.type === 'because');
-    if (!becauseReason) continue;
-    const { seedTmdbId, seedTitle } = becauseReason;
-    if (!seedTitle) continue;
-    if (!becauseGroups.has(seedTmdbId)) {
-      becauseGroups.set(seedTmdbId, { seedTitle, items: [] });
+    for (const reason of item.reasons || []) {
+      if (reason.type !== 'because' || !reason.seedTitle) continue;
+      const type = reason.seedMediaType || item.mediaType;
+      const key = `${type}_${reason.seedTmdbId}`;
+      if (!becauseGroups.has(key)) becauseGroups.set(key, { seedTitle: reason.seedTitle, items: [], strength: 0 });
+      const group = becauseGroups.get(key);
+      group.items.push({ ...item, score: reason.strength ?? item.score });
+      group.strength += reason.strength ?? item.score;
     }
-    becauseGroups.get(seedTmdbId).items.push(item);
   }
-
-  // Top 2 grupos con >= 15 candidatos (mínimo por fila)
   const topBecauseGroups = [...becauseGroups.entries()]
-    .filter(([, g]) => g.items.length >= 15)
-    .sort(([, a], [, b]) => b.items.length - a.items.length)
-    .slice(0, 2);
-
-  for (const [seedTmdbId, { seedTitle, items }] of topBecauseGroups) {
+    .filter(([, group]) => group.items.length >= 12)
+    .sort(([, a], [, b]) => b.strength - a.strength)
+    .slice(0, 3);
+  for (const [seedKey, { seedTitle, items }] of topBecauseGroups) {
     rows.push({
-      key: `because_${seedTmdbId}`,
+      key: `because_${seedKey}`,
       title: `Porque te gustó ${seedTitle}`,
       reason: 'Porque te gustó',
       mediaType: primaryMediaType,
-      items: items.slice(0, BECAUSE_POOL),
+      items: items.sort((a, b) => b.score - a.score).slice(0, BECAUSE_POOL),
       rotate: true,
       seenRatioLimit: BECAUSE_SEEN_LIMIT,
     });
@@ -358,7 +356,7 @@ export function personalizedRowDefs(recsByType, surface) {
   if (genreFillItems.length >= 15) {
     rows.push({
       key: 'genre_fill',
-      title: 'Creemos que te van a encantar',
+      title: 'Más de tus géneros favoritos',
       reason: undefined,
       mediaType: primaryMediaType,
       items: genreFillItems.slice(0, FOR_YOU_POOL),

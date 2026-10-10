@@ -41,6 +41,14 @@ const GENRE_LABELS = new Set([
 
 // Título exacto → etiqueta representativa.
 const EXACT_LABELS = {
+  "Populares para descubrir": "POPULARES",
+  "Películas populares": "POPULARES",
+  "Series populares": "POPULARES",
+  "Populares en streaming en España": "STREAMING",
+  "Películas con grandes valoraciones": "VALORADAS",
+  "Favoritos de 1995 a 2012": "NOSTALGIA",
+  "Estrenos y próximos lanzamientos": "ESTRENOS",
+  "Más de tus géneros favoritos": "PARA TI",
   // Tendencias / popularidad
   Tendencias: "TENDENCIAS",
   "Tendencias ahora mismo": "TENDENCIAS",

@@ -85,17 +85,6 @@ function refine(cards, mediaType, floor) {
   return balanceSoftLimitedContent(capAsian(cleaned));
 }
 
-function shouldRefineCachedPool(poolKey) {
-  // Estrenos incluye próximos lanzamientos sin votos: no se debe filtrar por
-  // señal pública hasta que estén estrenados. `calendar_episodes` guarda
-  // ENTRADAS DE EPISODIO (no "cards"): refine() las descartaría.
-  return (
-    poolKey !== 'new_releases' &&
-    poolKey !== 'anticipated' &&
-    poolKey !== 'calendar_episodes_v3'
-  );
-}
-
 // Ejecuta `mapper` sobre `items` con concurrencia acotada. Preserva el orden.
 export async function mapLimit(items, limit, mapper) {
   const out = new Array(items.length);
@@ -145,7 +134,7 @@ function addPool(poolKey, mediaType, ttlMs, build) {
 for (const mediaType of ['movie', 'tv']) {
   addPool('trending', mediaType, TTL_12H, async () =>
     refine(
-      await tmdbList({ path: `/trending/${mediaType}/week`, mediaType, pages: 5 }),
+      await tmdbList({ path: `/trending/${mediaType}/week`, mediaType, pages: 7 }),
       mediaType,
       TRENDING_VOTES[mediaType],
     )
@@ -158,7 +147,7 @@ for (const mediaType of ['movie', 'tv']) {
 for (const mediaType of ['movie', 'tv']) {
   addPool('popular', mediaType, TTL_24H, async () =>
     refine(
-      await tmdbList({ path: `/${mediaType}/popular`, mediaType, pages: 7 }),
+      await tmdbList({ path: `/${mediaType}/popular`, mediaType, pages: 10 }),
       mediaType,
       POPULAR_VOTES[mediaType],
     )
@@ -168,7 +157,7 @@ for (const mediaType of ['movie', 'tv']) {
 // top_rated (7d)
 for (const mediaType of ['movie', 'tv']) {
   addPool('top_rated', mediaType, TTL_7D, async () =>
-    refine(await tmdbList({ path: `/${mediaType}/top_rated`, mediaType, pages: 3 }), mediaType)
+    refine(await tmdbList({ path: `/${mediaType}/top_rated`, mediaType, pages: 6 }), mediaType)
   );
 }
 
@@ -179,7 +168,7 @@ for (const mediaType of ['movie', 'tv']) {
       sort_by: 'vote_average.desc',
       'vote_average.gte': 7.5,
       'vote_count.gte': ACCLAIMED_VOTES[mediaType],
-    }), 3), mediaType, ACCLAIMED_VOTES[mediaType])
+    }), 6), mediaType, ACCLAIMED_VOTES[mediaType])
   );
 }
 
@@ -189,7 +178,7 @@ for (const mediaType of ['movie', 'tv']) {
     refine(await discoverPages(mediaType, discoverParams(mediaType, {
       sort_by: 'popularity.desc',
       'vote_count.gte': BLOCKBUSTER_VOTES[mediaType],
-    }), 3), mediaType, BLOCKBUSTER_VOTES[mediaType])
+    }), 6), mediaType, BLOCKBUSTER_VOTES[mediaType])
   );
 }
 
@@ -201,7 +190,7 @@ for (const mediaType of ['movie', 'tv']) {
       'vote_average.gte': 7.5,
       'vote_count.gte': GEM_VOTES[mediaType].gte,
       'vote_count.lte': GEM_VOTES[mediaType].lte,
-    }), 3), mediaType, GEM_VOTES[mediaType].gte)
+    }), 6), mediaType, GEM_VOTES[mediaType].gte)
   );
 }
 
@@ -533,6 +522,7 @@ addPool('region_top', 'tv', TTL_24H, async () =>
     watch_region: 'ES',
     with_watch_monetization_types: 'flatrate|free|ads',
     sort_by: 'popularity.desc',
+    'first_air_date.lte': dateOffset(0),
     'first_air_date.gte': dateOffset(-1095),         // ~3 años
     'vote_count.gte': REGION_VOTES.tv,
   }), 4), 'tv', REGION_VOTES.tv)
@@ -575,20 +565,12 @@ addPool('curated:action_adventure', 'movie', TTL_7D, async () =>
   ]), 'movie', CURATED_VOTES.actionAdventure.movie)
 );
 addPool('curated:action_adventure', 'tv', TTL_7D, async () =>
-  refine(dedupeCards([
-    ...(await discoverPages('tv', discoverParams('tv', {
-      with_genres: 10759,
-      sort_by: 'popularity.desc',
-      'vote_average.gte': 6.7,
-      'vote_count.gte': CURATED_VOTES.actionAdventure.tv,
-    }), 3)),
-    ...(await discoverPages('tv', discoverParams('tv', {
-      with_genres: 10765,
-      sort_by: 'popularity.desc',
-      'vote_average.gte': 6.7,
-      'vote_count.gte': CURATED_VOTES.actionAdventure.tv,
-    }), 3)),
-  ]), 'tv', CURATED_VOTES.actionAdventure.tv)
+  refine(await discoverPages('tv', discoverParams('tv', {
+    with_genres: 10759,
+    sort_by: 'popularity.desc',
+    'vote_average.gte': 6.7,
+    'vote_count.gte': CURATED_VOTES.actionAdventure.tv,
+  }), 6), 'tv', CURATED_VOTES.actionAdventure.tv)
 );
 
 addPool('curated:nostalgia_millennial', 'movie', TTL_30D, async () =>
@@ -620,7 +602,7 @@ for (const { id } of MOVIE_GENRES) {
       with_genres: id,
       sort_by: 'popularity.desc',
       'vote_count.gte': GENRE_VOTES.movie,
-    }, 4), 'movie', GENRE_VOTES.movie)
+    }, 8), 'movie', GENRE_VOTES.movie)
   );
 }
 for (const { id } of TV_GENRES) {
@@ -630,7 +612,7 @@ for (const { id } of TV_GENRES) {
       with_genres: id,
       sort_by: 'popularity.desc',
       'vote_count.gte': GENRE_VOTES.tv,
-    }), 4), 'tv', GENRE_VOTES.tv)
+    }), 8), 'tv', GENRE_VOTES.tv)
   );
 }
 
@@ -650,7 +632,7 @@ for (const year of DECADES) {
       'primary_release_date.lte': dateLte,
       sort_by: 'popularity.desc',
       'vote_count.gte': DECADE_VOTES.movie,
-    }, 5), 'movie', DECADE_VOTES.movie)
+    }, 8), 'movie', DECADE_VOTES.movie)
   );
 
   addPool(poolKey, 'tv', TTL_30D, async () =>
@@ -659,7 +641,7 @@ for (const year of DECADES) {
       'first_air_date.lte': dateLte,
       sort_by: 'popularity.desc',
       'vote_count.gte': DECADE_VOTES.tv,
-    }), 5), 'tv', DECADE_VOTES.tv)
+    }), 8), 'tv', DECADE_VOTES.tv)
   );
 }
 
@@ -701,6 +683,7 @@ function poolMemSet(defKey, items, dbExpiresAt) {
 
 export async function getPool(poolKey, mediaType) {
   const defKey = `${poolKey}:${mediaType}`;
+  const storageKey = `${poolKey}:v2`;
   const def = POOL_DEFS.get(defKey);
   if (!def) return [];
 
@@ -712,14 +695,14 @@ export async function getPool(poolKey, mediaType) {
   const [row] = await db
     .select({ items: dashboardPools.items, expiresAt: dashboardPools.expiresAt })
     .from(dashboardPools)
-    .where(and(eq(dashboardPools.poolKey, poolKey), eq(dashboardPools.mediaType, mediaType)))
+    .where(and(eq(dashboardPools.poolKey, storageKey), eq(dashboardPools.mediaType, mediaType)))
     .limit(1);
 
   // Return cached if still fresh
   if (row && row.expiresAt > new Date()) {
-    const items = shouldRefineCachedPool(poolKey)
-      ? refine(row.items, mediaType)
-      : row.items;
+    // These cards already passed the section-specific rules at build time.
+    // Reapplying a generic vote floor here changed warm vs cold responses.
+    const items = row.items;
     poolMemSet(defKey, items, row.expiresAt);
     return items;
   }
@@ -731,12 +714,13 @@ export async function getPool(poolKey, mediaType) {
   const build = (async () => {
     try {
       const items = await def.build();
+      if (!items.length) throw new Error('Empty dashboard pool');
       const builtAt = new Date();
       const expiresAt = new Date(Date.now() + def.ttlMs);
 
       await db
         .insert(dashboardPools)
-        .values({ poolKey, mediaType, items, builtAt, expiresAt })
+        .values({ poolKey: storageKey, mediaType, items, builtAt, expiresAt })
         .onConflictDoUpdate({
           target: [dashboardPools.poolKey, dashboardPools.mediaType],
           set: { items, builtAt, expiresAt },
@@ -771,7 +755,7 @@ export async function refreshAllPools() {
     .from(dashboardPools);
   const rowMap = new Map();
   for (const row of rows) {
-    rowMap.set(`${row.poolKey}:${row.mediaType}`, row);
+    if (row.poolKey.endsWith(':v2')) rowMap.set(`${row.poolKey.slice(0, -3)}:${row.mediaType}`, row);
   }
 
   const now = new Date();

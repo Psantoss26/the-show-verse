@@ -5,7 +5,7 @@ import { db } from '../db/client.js';
 import { userRecommendations } from '../db/schema.js';
 import { and, eq } from 'drizzle-orm';
 
-import { loadLibrary, buildSeeds, libraryBasisHash } from './library.js';
+import { loadLibrary, buildSeeds, libraryBasisHash, dislikedIds } from './library.js';
 import { aggregateCandidates, excludeSeen, mergeGenreFill } from './score.js';
 import { tmdbList, tmdbDiscover } from './tmdb.js';
 import { excludeKidsReality, hasReliablePublicSignal, TV_WITHOUT_GENRES } from './filters.js';
@@ -69,7 +69,18 @@ function recMemSet(key, items, dbExpiresAt, basisHash) {
   });
 }
 
+const builds = new Map();
 export async function getUserRecommendations(userId, mediaType, preloaded = null) {
+  const lib = preloaded?.lib || await loadLibrary(userId);
+  const basisHash = preloaded?.basisHash || libraryBasisHash(lib);
+  const key = `${userId}:${mediaType}:${basisHash}`;
+  if (builds.has(key)) return builds.get(key);
+  const promise = buildUserRecommendations(userId, mediaType, { lib, basisHash });
+  builds.set(key, promise);
+  try { return await promise; } finally { builds.delete(key); }
+}
+
+async function buildUserRecommendations(userId, mediaType, preloaded = null) {
   // ── 1. Load library + compute hash ──────────────────────────────────────
   const lib = preloaded?.lib || await loadLibrary(userId);
   const basisHash = preloaded?.basisHash || libraryBasisHash(lib);
@@ -121,27 +132,30 @@ export async function getUserRecommendations(userId, mediaType, preloaded = null
     }
 
     // ── fetchSimilar: recommendations + similar from TMDB ─────────────────
+    let successfulSources = 0;
+    const track = (promise) => promise.then((items) => { successfulSources++; return items; }).catch(() => []);
     const fetchSimilar = async (seed) => {
       const type = seed.mediaType;
       const [recs, sim] = await Promise.all([
-        tmdbList({ path: `/${type}/${seed.tmdbId}/recommendations`, mediaType: type, pages: 1 }).catch(() => []),
-        tmdbList({ path: `/${type}/${seed.tmdbId}/similar`, mediaType: type, pages: 1 }).catch(() => []),
+        track(tmdbList({ path: `/${type}/${seed.tmdbId}/recommendations`, mediaType: type, pages: 1 })),
+        track(tmdbList({ path: `/${type}/${seed.tmdbId}/similar`, mediaType: type, pages: 1 })),
       ]);
       return { recommendations: recs, similar: sim };
     };
 
     // ── Aggregate candidates ───────────────────────────────────────────────
     let items = await aggregateCandidates({ seeds, fetchSimilar });
+    if (!successfulSources) throw new Error('Recommendation sources unavailable');
 
     // NO excluimos toda la biblioteca: los títulos ya vistos se permiten de
     // forma limitada por fila en el ensamblaje (seenRatioLimit). Solo evitamos
     // que una semilla se recomiende a sí misma (aggregateCandidates ya excluye
     // las semillas de `items`; lo reforzamos en el relleno por género más abajo).
-    const seedKeys = new Set(seeds.map((s) => `${s.mediaType}:${s.tmdbId}`));
+    const seedKeys = new Set([...dislikedIds(lib), ...seeds.map((s) => `${s.mediaType}:${s.tmdbId}`)]);
 
     // Regla de contenido: nunca recomendar infantil ni reality (aunque el
     // idioma/anime sí se respeta según el gusto del usuario).
-    items = excludeKidsReality(items);
+    items = excludeKidsReality(excludeSeen(items, dislikedIds(lib)));
 
     // Descartar candidatos con muy pocos votos (poco representativos).
     items = refineRecommendationItems(items, mediaType);
@@ -185,8 +199,10 @@ export async function getUserRecommendations(userId, mediaType, preloaded = null
       items = mergeGenreFill(items, filteredFill, 0.5);
     }
 
-    // ── Cap ────────────────────────────────────────────────────────────────
-    items = items.slice(0, 120);
+    // Reserve space for discovery as well as direct similarity candidates.
+    const direct = items.filter((item) => !item.reasons?.some((r) => r.type === 'based_on_genres'));
+    const fills = items.filter((item) => item.reasons?.some((r) => r.type === 'based_on_genres'));
+    items = [...direct.slice(0, 240), ...fills.slice(0, 80)];
 
     // ── Upsert ────────────────────────────────────────────────────────────
     await db
@@ -197,10 +213,11 @@ export async function getUserRecommendations(userId, mediaType, preloaded = null
         set: { items, basisHash, builtAt: new Date(), expiresAt },
       });
 
+    recMemSet(memKey, items, expiresAt, basisHash);
     return items;
   } catch (err) {
     // On any rebuild error return stale cache or empty array
     console.error('[recommendations] rebuild error:', err);
-    return row?.items || [];
+    return excludeSeen(refineRecommendationItems(row?.items || [], mediaType), dislikedIds(lib));
   }
 }

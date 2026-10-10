@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildSeeds, libraryBasisHash } from './library.js';
 
-test('buildSeeds weights watchlist above ratings/favorites/history', () => {
+test('buildSeeds prioritizes explicit enjoyment over pending and passive viewing', () => {
   const seeds = buildSeeds({
     favorites: [{ tmdbId: 10, mediaType: 'movie' }],
     ratings: [
@@ -16,19 +16,14 @@ test('buildSeeds weights watchlist above ratings/favorites/history', () => {
     watchlist: [{ tmdbId: 5, mediaType: 'movie' }],
   });
   const w = (id, mt = 'movie') => seeds.find((s) => s.tmdbId === id && s.mediaType === mt)?.weight;
-  assert.equal(w(5), 10);       // watchlist (SEÑAL PRINCIPAL)
-  assert.equal(w(1), 6);        // rating 9
-  assert.equal(w(2, 'tv'), 4);  // rating 8
-  assert.equal(w(10), 4);       // favorito
-  assert.equal(w(3), 2);        // rating 7
-  assert.equal(w(4), 1);        // historial
-  assert.equal(w(9), undefined); // rating 4 no genera semilla
-  // jerarquía: watchlist > rating9 > rating8 = favorito > rating7 > historial
-  assert.ok(w(5) > w(1) && w(1) > w(2, 'tv') && w(2, 'tv') === w(10) && w(10) > w(3) && w(3) > w(4));
-  assert.ok(seeds[0].weight >= seeds[seeds.length - 1].weight); // ordenado desc
-  // la watchlist es ahora la semilla de más peso → encabeza la lista
-  assert.equal(seeds[0].tmdbId, 5);
-  assert.ok(seeds.length <= 25);
+  assert.equal(w(1), 10);
+  assert.equal(w(2, 'tv'), 7);
+  assert.equal(w(10), 6);
+  assert.equal(w(3), 4);
+  assert.equal(w(5), 3);
+  assert.equal(w(4), 1);
+  assert.equal(w(9), undefined);
+  assert.equal(seeds[0].tmdbId, 1);
 });
 
 test('buildSeeds marks strongPositive only for rating>=8 or favorite', () => {
@@ -59,7 +54,7 @@ test('buildSeeds combines signals and flags strongPositive when any qualifies', 
     watchlist: [],
   });
   const s1 = seeds.find((s) => s.tmdbId === 1);
-  assert.equal(s1.weight, 5);          // rating8(4) + historial(1)
+  assert.equal(s1.weight, 8);          // rating8(7) + historial(1)
   assert.equal(s1.strongPositive, true);
 });
 
@@ -69,4 +64,19 @@ test('libraryBasisHash changes when library changes', () => {
   const h2 = libraryBasisHash({ ...base, favorites: [...base.favorites, { tmdbId: 2, mediaType: 'tv' }] });
   assert.notEqual(h1, h2);
   assert.equal(libraryBasisHash(base), h1);
+});
+
+test('dislike overrides favorite and pending signals; repeated history does not inflate weight', () => {
+  const seeds = buildSeeds({ favorites: [{ tmdbId: 1, mediaType: 'movie' }],
+    watchlist: [{ tmdbId: 1, mediaType: 'movie' }], ratings: [{ tmdbId: 1, mediaType: 'movie', rating: 3 }],
+    history: [{ tmdbId: 2, mediaType: 'tv' }, { tmdbId: 2, mediaType: 'tv' }] });
+  assert.deepEqual(seeds.map(s => [s.tmdbId, s.weight]), [[2, 1]]);
+});
+test('film-heavy library retains TV seeds and exact rating changes invalidate cache', () => {
+  const lib = { favorites: Array.from({ length: 50 }, (_, i) => ({ tmdbId: i + 1, mediaType: 'movie' })),
+    ratings: [{ tmdbId: 100, mediaType: 'tv', rating: 8 }], history: [], watchlist: [] };
+  assert.equal(buildSeeds(lib).filter(s => s.mediaType === 'movie').length, 25);
+  assert.equal(buildSeeds(lib).filter(s => s.mediaType === 'tv').length, 1);
+  assert.notEqual(libraryBasisHash(lib), libraryBasisHash({ ...lib, ratings: [{ ...lib.ratings[0], rating: 9 }] }));
+  assert.equal(libraryBasisHash(lib), libraryBasisHash({ ...lib, favorites: [...lib.favorites].reverse() }));
 });

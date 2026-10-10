@@ -154,3 +154,23 @@ test('rankAnticipatedMovies uses budget and franchise relevance to break close p
   const out = rankAnticipatedMovies([standalone, eventMovie], { now: NOW });
   assert.equal(out[0].tmdbId, 2);
 });
+
+test('same candidate in both sources contributes once per seed', async () => {
+  const seeds = [{ tmdbId: 1, mediaType: 'movie', weight: 10, strongPositive: true }];
+  const single = await aggregateCandidates({ seeds, fetchSimilar: async () => ({ recommendations: [card(10)] }) });
+  const duplicate = await aggregateCandidates({ seeds, fetchSimilar: async () => ({ recommendations: [card(10), card(10)], similar: [card(10)] }) });
+  assert.deepEqual(single, duplicate);
+  assert.equal(single[0].reasons[0].seedMediaType, 'movie');
+});
+test('source failures are isolated and seed requests have bounded concurrency', async () => {
+  let active = 0, peak = 0;
+  const seeds = Array.from({ length: 10 }, (_, i) => ({ tmdbId: i + 1, mediaType: 'movie', weight: 1 }));
+  const result = await aggregateCandidates({ seeds, fetchSimilar: async (seed) => {
+    active++; peak = Math.max(peak, active);
+    await new Promise(resolve => setTimeout(resolve, 2)); active--;
+    if (seed.tmdbId === 1) throw new Error('unavailable');
+    return { recommendations: [card(seed.tmdbId + 100)] };
+  } });
+  assert.equal(result.length, 9);
+  assert.ok(peak <= 4 && peak > 1);
+});

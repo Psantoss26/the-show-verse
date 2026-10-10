@@ -139,6 +139,7 @@ function mediaTypeOf(card) {
 }
 
 function numberOrNull(value) {
+  if (value == null || value === '') return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 }
@@ -240,5 +241,6 @@ export function capAsian(cards) {
     else rest.push(c);
   }
   const allowed = Math.max(ASIAN_MIN_KEEP, Math.round(rest.length * ASIAN_MAX_RATIO));
-  return [...rest, ...asian.slice(0, allowed)];
+  const permitted = new Set(asian.slice(0, allowed));
+  return (cards || []).filter((card) => card && (!DEMOTE_LANGS.has(card.originalLanguage) || permitted.has(card)));
 }

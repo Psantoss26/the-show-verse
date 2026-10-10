@@ -11,7 +11,7 @@ const ENGINE_ROWS_CACHE_TTL_MS = 5 * 60 * 1000; // "fresco" en memoria (dedup en
 // revalida siempre en segundo plano, así que servir algo viejo es stale-while-
 // revalidate correcto; si hay red, se reemplaza al instante.
 const ENGINE_ROWS_HARD_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
-const ENGINE_ROWS_CACHE_PREFIX = "showverse:dashboard:engine:v4:";
+const ENGINE_ROWS_CACHE_PREFIX = "showverse:dashboard:engine:v5:";
 const memoryCache = new Map();
 const inFlight = new Map();
 
@@ -33,6 +33,9 @@ export function toTmdbShape(card) {
     poster_path: card.posterPath || null,
     backdrop_path: card.backdropPath || null,
     vote_average: typeof card.voteAverage === "number" ? card.voteAverage : 0,
+    vote_count: Number(card.voteCount) || 0,
+    original_language: card.originalLanguage || null,
+    origin_country: Array.isArray(card.originCountry) ? card.originCountry : [],
     genre_ids: Array.isArray(card.genreIds) ? card.genreIds : [],
     popularity: card.popularity || 0,
     release_date: isTv ? undefined : card.releaseDate || dateStr,
@@ -178,10 +181,13 @@ async function fetchEngineRows(surface, key) {
       }
       return r.json();
     })
-    .then((json) => ({
-      rows: mapRows(json),
-      personalized: !!json?.personalized,
-    }))
+    .then((json) => {
+      const rows = mapRows(json);
+      // Empty catalog responses also indicate an unavailable upstream. Keep
+      // the previous useful result instead of persisting a blank dashboard.
+      if (!rows.length) throw new Error("dashboard catalog unavailable");
+      return { rows, personalized: !!json?.personalized };
+    })
     .finally(() => {
       inFlight.delete(key);
     });

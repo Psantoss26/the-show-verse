@@ -385,11 +385,16 @@ export default function DetailModalProvider({
   // `drawerWidthRef` trae el valor bueno y el margen se escribe UNA vez. Antes
   // se partía de un "50vw" provisional que luego se corregía, y la página se
   // reorganizaba dos veces seguidas.
+  //
+  // Al CERRAR (`activeItem` pasa a null, así que `docked` también) el margen se
+  // retira en este mismo commit, el del fotograma en que el panel empieza a
+  // salir: la página recupera su ancho A LA VEZ que el panel se desliza fuera,
+  // simétrico a la apertura. Antes se esperaba a `onExitComplete` y el
+  // contenido saltaba a su sitio justo después de que el panel desapareciera.
+  // La salida es una animación WAAPI de `transform` (ver `DetailModal`), así que
+  // la reorganización de la página no la frena.
   useLayoutEffect(() => {
     if (!contentRef.current) return;
-    // AnimatePresence keeps the outgoing panel mounted. Do not reflow the
-    // entire page underneath it while its native exit is still running.
-    if (activeItem == null) return;
     if (docked && drawerWidthRef.current == null) return;
     applyContentMargin(
       contentRef.current,
@@ -559,14 +564,7 @@ export default function DetailModalProvider({
         {children}
       </div>
 
-      <AnimatePresence
-        custom={switching}
-        onExitComplete={() => {
-          // A new title may have opened while the previous one was leaving.
-          // Only the final close releases the reserved page width.
-          if (stackRef.current.length === 0) applyContentMargin(contentRef.current, "");
-        }}
-      >
+      <AnimatePresence custom={switching}>
         {activeItem && (
           <DetailModal
             // La colocación forma parte de la identidad: al cambiar de centrado

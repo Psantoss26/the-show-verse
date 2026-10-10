@@ -19,93 +19,57 @@ function fnv1a(str) {
 // ─────────────────────────────────────────────
 // Weight helper: rating → weight contribution
 // ─────────────────────────────────────────────
-// PRIORIDAD A LA WATCHLIST (pendientes). Antes la watchlist era la señal más
-// DÉBIL (peso 1) y las valoraciones altas/favoritos dominaban, así que las
-// recomendaciones giraban en torno a lo ya visto/puntuado. Ahora la watchlist es
-// la señal PRINCIPAL: refleja lo que el usuario quiere ver a continuación, que es
-// lo más representativo de su intención actual. Lo visto/puntuado/favorito sigue
-// aportando, pero por debajo, para no dominar.
-// Por debajo de 7 una valoración no genera semilla (no gustó lo bastante).
+// Explicit enjoyment is stronger than intent or a casual viewing. A poor
+// rating overrides an old favorite/watchlist entry rather than becoming a seed.
 function ratingWeight(rating) {
-  if (rating >= 9) return 6; // muy positiva, pero por debajo de la watchlist
-  if (rating === 8) return 4; // positiva
-  if (rating === 7) return 2; // secundaria
+  if (rating >= 9) return 10;
+  if (rating >= 8) return 7;
+  if (rating >= 7) return 4;
   return 0;
 }
 
-const FAVORITE_WEIGHT = 4; // aporta, por debajo de la watchlist
-const HISTORY_WEIGHT = 1; // visionado sin valoración: señal muy débil
-const WATCHLIST_WEIGHT = 10; // pendiente: SEÑAL PRINCIPAL
-
-// ─────────────────────────────────────────────
-// buildSeeds — pure
-// ─────────────────────────────────────────────
-/**
- * Build a weighted seed list from the user's library.
- *
- * Weights (summed when a title appears in multiple sources):
- *   watchlist   → 10   (pendiente: SEÑAL PRINCIPAL — intención actual)
- *   rating ≥ 9  → 6    (muy positiva, por debajo de la watchlist)
- *   rating = 8  → 4    (positiva)
- *   favorite    → 4    (aporta, por debajo de la watchlist)
- *   rating = 7  → 2    (secundaria)
- *   history     → 1    (visionado sin valoración)
- *
- * `strongPositive` = el usuario realmente disfrutó el título (rating ≥ 8 o
- * favorito). Solo estas semillas habilitan filas "Porque viste…". La watchlist
- * NO es strongPositive (es aspiracional, no "disfrutado"), a propósito.
- *
- * @param {{ favorites: {tmdbId, mediaType, title?}[], ratings: {tmdbId, mediaType, rating, title?}[], history: {tmdbId, mediaType, title?}[], watchlist: {tmdbId, mediaType, title?}[] }} param0
- * @returns {{ tmdbId: number, mediaType: string, weight: number, title: string|null, strongPositive: boolean }[]}
- */
-export function buildSeeds({ favorites: favs = [], ratings = [], history = [], watchlist: wl = [] }) {
-  /** @type {Map<string, { tmdbId: number, mediaType: string, weight: number, title: string|null, maxRating: number, favorite: boolean }>} */
-  const map = new Map();
-
-  function ensure(tmdbId, mediaType, title) {
-    const key = `${mediaType}:${tmdbId}`;
-    if (!map.has(key)) {
-      map.set(key, { tmdbId, mediaType, weight: 0, title: title || null, maxRating: 0, favorite: false });
-    } else if (title && !map.get(key).title) {
-      map.get(key).title = title;
+export function buildSeeds({ favorites = [], ratings = [], history = [], watchlist = [] }) {
+  const entries = new Map();
+  const ensure = (item) => {
+    if (!['movie', 'tv'].includes(item?.mediaType) || !(Number(item.tmdbId) > 0)) return null;
+    const key = `${item.mediaType}:${item.tmdbId}`;
+    if (!entries.has(key)) entries.set(key, {
+      tmdbId: Number(item.tmdbId), mediaType: item.mediaType, title: item.title || null,
+      rating: null, favorite: false, watched: false, pending: false,
+    });
+    const entry = entries.get(key);
+    if (!entry.title && item.title) entry.title = item.title;
+    return entry;
+  };
+  for (const item of ratings) {
+    const entry = ensure(item);
+    const rating = Number(item.rating);
+    if (entry && Number.isFinite(rating) && rating >= 1 && rating <= 10) entry.rating = rating;
+  }
+  for (const [items, flag] of [[favorites, 'favorite'], [history, 'watched'], [watchlist, 'pending']]) {
+    for (const item of items) {
+      const entry = ensure(item);
+      if (entry) entry[flag] = true;
     }
-    return map.get(key);
   }
-
-  // ratings (≥9 → 10, =8 → 7, =7 → 4, <7 → 0)
-  for (const r of ratings) {
-    const entry = ensure(r.tmdbId, r.mediaType, r.title);
-    if (typeof r.rating === 'number' && r.rating > entry.maxRating) entry.maxRating = r.rating;
-    entry.weight += ratingWeight(r.rating);
-  }
-
-  // favorites → 6
-  for (const f of favs) {
-    const entry = ensure(f.tmdbId, f.mediaType, f.title);
-    entry.favorite = true;
-    entry.weight += FAVORITE_WEIGHT;
-  }
-
-  // history (each distinct tmdbId:mediaType) → 2
-  for (const h of history) {
-    ensure(h.tmdbId, h.mediaType, h.title).weight += HISTORY_WEIGHT;
-  }
-
-  // watchlist → 1
-  for (const w of wl) {
-    ensure(w.tmdbId, w.mediaType, w.title).weight += WATCHLIST_WEIGHT;
-  }
-
-  // Descartamos las entradas sin peso (p. ej. solo valoraciones < 7).
-  // Marcamos strongPositive y ordenamos por peso (valoración alta primero).
-  return Array.from(map.values())
-    .filter((s) => s.weight > 0)
-    .map(({ maxRating, favorite, ...s }) => ({
-      ...s,
-      strongPositive: maxRating >= 8 || favorite,
+  const counts = { movie: 0, tv: 0 };
+  return [...entries.values()]
+    .filter((entry) => entry.rating == null || entry.rating > 5)
+    .map(({ rating, favorite, watched, pending, ...entry }) => ({
+      ...entry,
+      weight: ratingWeight(rating) + (favorite ? 6 : 0) + (watched ? 1 : 0) + (pending ? 3 : 0),
+      strongPositive: rating >= 8 || favorite,
     }))
-    .sort((a, b) => b.weight - a.weight)
-    .slice(0, 25);
+    .filter((entry) => entry.weight > 0)
+    .sort((a, b) => b.weight - a.weight || a.tmdbId - b.tmdbId)
+    // Cap per type: a film-heavy library must not starve the Series dashboard.
+    .filter((entry) => ++counts[entry.mediaType] <= 25);
+}
+
+export function dislikedIds(lib) {
+  return new Set((lib?.ratings || [])
+    .filter((item) => Number(item.rating) >= 1 && Number(item.rating) <= 5)
+    .map((item) => `${item.mediaType}:${item.tmdbId}`));
 }
 
 // ─────────────────────────────────────────────
@@ -117,7 +81,7 @@ export function buildSeeds({ favorites: favs = [], ratings = [], history = [], w
  *
  * Token formats:
  *   favorites → `fav:${mediaType}:${tmdbId}`
- *   ratings   → `rating:${mediaType}:${tmdbId}:${ratingBucket}` where bucket = ≥8→'hi', 7→'mid', <7→'lo'
+ *   ratings   → `rating:${mediaType}:${tmdbId}:${rating}` (exact numeric value)
  *   history   → `hist:${mediaType}:${tmdbId}`
  *   watchlist → `wl:${mediaType}:${tmdbId}`
  *
@@ -127,8 +91,8 @@ export function buildSeeds({ favorites: favs = [], ratings = [], history = [], w
 // que un cambio de pesos (que no altera el contenido de la biblioteca) invalide
 // la caché de 24h de `user_recommendations` y se recalcule con el nuevo criterio.
 // SUBIR esta versión cada vez que se cambie buildSeeds/scoring. (v2: watchlist
-// pasó a señal principal.)
-const RECS_ALGO_VERSION = 'v2';
+// pasó a señal principal; v3: disfrute explícito, señales negativas y ranking.)
+const RECS_ALGO_VERSION = 'v3';
 
 export function libraryBasisHash({ favorites: favs = [], ratings = [], history = [], watchlist: wl = [] }) {
   const tokens = [`algo:${RECS_ALGO_VERSION}`];
@@ -138,7 +102,7 @@ export function libraryBasisHash({ favorites: favs = [], ratings = [], history =
   }
 
   for (const r of ratings) {
-    const bucket = r.rating >= 8 ? 'hi' : r.rating === 7 ? 'mid' : 'lo';
+    const bucket = Number(r.rating);
     tokens.push(`rating:${r.mediaType}:${r.tmdbId}:${bucket}`);
   }
 
@@ -150,8 +114,7 @@ export function libraryBasisHash({ favorites: favs = [], ratings = [], history =
     tokens.push(`wl:${w.mediaType}:${w.tmdbId}`);
   }
 
-  tokens.sort();
-  return fnv1a(tokens.join('|'));
+  return fnv1a([...new Set(tokens)].sort().join('|'));
 }
 
 // ─────────────────────────────────────────────
