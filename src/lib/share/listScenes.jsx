@@ -21,9 +21,11 @@ import {
   SHADE,
   SIDE_MARGIN,
   ScoreBadge,
+  PosterWithContinuation,
   TMDB,
   W,
   fetchImage,
+  posterFit,
   px,
   rgba,
 } from "@/lib/share/ogKit";
@@ -344,15 +346,9 @@ const POSTER_PANEL_PAD = 20;
 const POSTER_PANEL_H = SCORE_LOGOS.tmdb.height + POSTER_PANEL_PAD * 2;
 const POSTER_TILE_W = Math.floor((POSTER_ROW_W - (LIST_PREVIEW_MAX - 1) * POSTER_TILE_GAP) / LIST_PREVIEW_MAX);
 const POSTER_TILE_H = Math.round(POSTER_TILE_W * 1.5);
-// Fundido del borde inferior: empieza FADE_LEAD por encima de la vista previa
-// y acaba FADE_TAIL por debajo, que es donde termina el póster.
-const POSTER_FADE_LEAD = 40;
-const POSTER_FADE_TAIL = 34;
-// Lo máximo que se recorta arriba: un póster más alargado que 2:3 cede el resto
-// por abajo (bajo la vista previa) en vez de perder más cabeza.
-const POSTER_MAX_SHIFT = 140;
-// Hasta dónde se ve el reflejo del póster bajo la costura (ver PosterCard).
-const MIRROR_FADE_PX = 150;
+// El encaje del póster (subirlo lo justo, fundido corto) y su continuación
+// bajo la costura viven en ogKit (`posterFit`, `PosterWithContinuation`): los
+// usa también la imagen de la ficha cuando su póster trae el título impreso.
 
 /** Medidas de la composición «póster» (px de la imagen). */
 export function posterLayout({ ratio = 1.5, tiles = LIST_PREVIEW_MAX, scores = true }) {
@@ -360,24 +356,8 @@ export function posterLayout({ ratio = 1.5, tiles = LIST_PREVIEW_MAX, scores = t
   const panelTop = H - POSTER_BOTTOM_MARGIN - (scores ? POSTER_PANEL_H : 0);
   const previewTop = (scores ? panelTop - POSTER_PANEL_GAP : panelTop) - (tiles ? POSTER_TILE_H : 0);
   const stackTop = tiles ? previewTop : panelTop;
-  // Dónde debería acabar el póster y cuánto hay que subirlo para ello (nada si
-  // ya cabe: un póster más bajo no se baja, se queda pegado arriba).
-  const end = stackTop + POSTER_FADE_TAIL;
-  const shift = Math.max(0, Math.min(POSTER_MAX_SHIFT, height - end));
-  const bottom = height - shift;
-  const fadeStart = Math.max(0, Math.min(bottom, stackTop) - POSTER_FADE_LEAD);
-  return {
-    height,
-    top: -shift,
-    previewTop,
-    panelTop,
-    // Recorte arriba y lo que la vista previa tapa del póster (px de imagen).
-    cropTop: shift,
-    covered: Math.max(0, bottom - stackTop),
-    // Fundido en px del PROPIO póster (la máscara va en la imagen).
-    fadeStart: fadeStart + shift,
-    fadeEnd: height,
-  };
+  const fit = posterFit({ ratio, stackTop });
+  return { ...fit, height, previewTop, panelTop };
 }
 
 /** Imagen de una colección con su póster oficial (composición «póster»). */
@@ -396,9 +376,6 @@ export function PosterCard({ card, cover, coverBlur, previews, assets, fonts }) 
   const size = cover.size?.width && cover.size?.height ? cover.size : { width: 2, height: 3 };
   const layout = posterLayout({ ratio: size.height / size.width, tiles: tileCount, scores: hasScores });
   const rowWidth = tileCount * POSTER_TILE_W + Math.max(0, tileCount - 1) * POSTER_TILE_GAP;
-  const fade = (layout.fadeStart / layout.height) * 100;
-  const mid = fade + (100 - fade) * 0.45;
-  const posterBottom = layout.top + layout.height;
 
   return (
     <div
@@ -412,76 +389,7 @@ export function PosterCard({ card, cover, coverBlur, previews, assets, fonts }) 
         fontFamily: fonts ? FONT : "sans-serif",
       }}
     >
-      {/* La continuación del póster (ver arriba): borroso detrás y reflejado
-          debajo, oscureciéndose desde la costura hacia la vista previa y el
-          marcador. */}
-      {coverBlur ? (
-        <>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={coverBlur.src}
-            width={W}
-            height={layout.height}
-            alt=""
-            style={{ position: "absolute", top: layout.top, left: 0, width: W, height: layout.height, objectFit: "cover" }}
-          />
-          <div
-            style={{
-              position: "absolute",
-              top: posterBottom,
-              left: 0,
-              width: W,
-              height: Math.max(0, H - posterBottom),
-              display: "flex",
-              overflow: "hidden",
-            }}
-          >
-            {/* Volteado: la fila de arriba de esta caja es la última del póster. */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={coverBlur.src}
-              width={W}
-              height={layout.height}
-              alt=""
-              style={{ position: "absolute", top: 0, left: 0, width: W, height: layout.height, objectFit: "cover", transform: "scaleY(-1)" }}
-            />
-          </div>
-          <div
-            style={{
-              position: "absolute",
-              top: posterBottom,
-              left: 0,
-              width: W,
-              height: Math.max(0, H - posterBottom),
-              display: "flex",
-              // El reflejo solo hace falta junto a la costura: más abajo se leería
-              // el texto del póster al revés. Transparente en la costura y casi
-              // opaco a ~150 px (`MIRROR_FADE_PX`).
-              backgroundImage: `linear-gradient(180deg, ${rgba(SHADE, 0)} 0px, ${rgba(SHADE, 0.6)} ${Math.round(MIRROR_FADE_PX * 0.45)}px, ${rgba(SHADE, 0.92)} ${MIRROR_FADE_PX}px, ${rgba(SHADE, 1)} ${Math.round(MIRROR_FADE_PX * 1.6)}px)`,
-            }}
-          />
-        </>
-      ) : null}
-
-      {/* El póster a sangre, con su proporción (solo cede `cropTop` arriba),
-          fundido por máscara: no se oscurece hacia negro, se vuelve
-          transparente y deja ver el fondo. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={cover.src}
-        width={W}
-        height={layout.height}
-        alt=""
-        style={{
-          position: "absolute",
-          top: layout.top,
-          left: 0,
-          width: W,
-          height: layout.height,
-          objectFit: "cover",
-          maskImage: `linear-gradient(180deg, #000 0%, #000 ${fade}%, rgba(0,0,0,0.55) ${mid}%, rgba(0,0,0,0) 100%)`,
-        }}
-      />
+      <PosterWithContinuation cover={cover} coverBlur={coverBlur} fit={layout} />
 
       {/* Velo suave arriba para que la marca se lea sobre pósters claros. */}
       <Fill style={{ height: 240, backgroundImage: "linear-gradient(180deg, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0) 100%)" }} />

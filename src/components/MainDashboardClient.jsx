@@ -79,7 +79,6 @@ import { formatDashboardAwards } from "@/lib/details/awardsText";
 import DetailActionsRow from "@/components/details/DetailActionsRow";
 import DetailsMetaGenresRow from "@/components/details/DetailsMetaGenresRow";
 import { DetailsRatingsBadges } from "@/components/details/DetailsScoreboardPanel";
-import { formatCountShort } from "@/lib/details/formatters";
 import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
 import FeaturedHero from "@/components/FeaturedHero";
 import ContinueWatchingSection from "@/components/ContinueWatchingSection";
@@ -1673,14 +1672,8 @@ function InlinePreviewCard({
               <div className="min-h-7">
                 {extras?.ratingsReady && (
                   <DetailsRatingsBadges
-                    tmdb={
-                      hasTmdbRating
-                        ? {
-                            value: tmdbRating,
-                            sub: formatCountShort(movie.vote_count),
-                          }
-                        : null
-                    }
+                    // Solo la puntuación, igual que IMDb: sin el número de votos.
+                    tmdb={hasTmdbRating ? { value: tmdbRating, sub: null } : null}
                     imdb={
                       typeof extras?.imdbRating === "number"
                         ? { value: extras.imdbRating.toFixed(1), sub: null }
@@ -1793,14 +1786,8 @@ function InlinePreviewCard({
             <div className="min-h-7">
               {extras?.ratingsReady && (
                 <DetailsRatingsBadges
-                  tmdb={
-                    hasTmdbRating
-                      ? {
-                          value: tmdbRating,
-                          sub: formatCountShort(movie.vote_count),
-                        }
-                      : null
-                  }
+                  // Solo la puntuación, igual que IMDb: sin el número de votos.
+                  tmdb={hasTmdbRating ? { value: tmdbRating, sub: null } : null}
                   imdb={
                     typeof extras?.imdbRating === "number"
                       ? { value: extras.imdbRating.toFixed(1), sub: null }

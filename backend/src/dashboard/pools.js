@@ -47,6 +47,10 @@ const MIN_VOTES = { movie: 800, tv: 300 };
 const GENRE_VOTES = { movie: 500, tv: 150 };
 const DECADE_VOTES = { movie: 800, tv: 150 };
 const ACCLAIMED_VOTES = { movie: 3000, tv: 400 };
+// "Mejor valoradas": solo títulos con MÁS de 5000 votos (películas y series).
+// Con menos, la nota media de TMDB es demasiado volátil y la sección se
+// llenaba de títulos de nicho con notas infladas por pocas muestras.
+export const TOP_RATED_MIN_VOTES = 5001;
 const BLOCKBUSTER_VOTES = { movie: 5000, tv: 800 };
 const GEM_VOTES = {
   movie: { gte: 800, lte: 6000 },
@@ -124,8 +128,15 @@ async function discoverPages(mediaType, params, pages) {
 // Map keyed by `${poolKey}:${mediaType}`
 export const POOL_DEFS = new Map();
 
-function addPool(poolKey, mediaType, ttlMs, build) {
-  POOL_DEFS.set(`${poolKey}:${mediaType}`, { poolKey, mediaType, ttlMs, build });
+// `version`: cambia la clave de almacenamiento de ESE pool cuando cambia su
+// criterio, para que no se sigan sirviendo los items cacheados con el criterio
+// anterior hasta que caduque su TTL (hasta 30 días).
+function addPool(poolKey, mediaType, ttlMs, build, { version = null } = {}) {
+  POOL_DEFS.set(`${poolKey}:${mediaType}`, { poolKey, mediaType, ttlMs, build, version });
+}
+
+export function poolStorageKey(def) {
+  return def.version ? `${def.poolKey}:v2.${def.version}` : `${def.poolKey}:v2`;
 }
 
 // trending (12h) — pool profundo (5 págs): las tendencias de TV en TMDB traen
@@ -154,10 +165,19 @@ for (const mediaType of ['movie', 'tv']) {
   );
 }
 
-// top_rated (7d)
+// top_rated (7d) — "Mejor valoradas" (Inicio) y "Las más valoradas" (Películas
+// y Series). Discover por nota con el piso de votos EN LA PETICIÓN, en lugar de
+// filtrar /top_rated: de sus 6 páginas solo ~18 series superan los 5000 votos
+// (y menos tras las reglas de contenido), mientras que discover ofrece todas
+// las que lo cumplen. `refine` vuelve a aplicar el piso por si TMDB devolviera
+// alguno por debajo.
 for (const mediaType of ['movie', 'tv']) {
   addPool('top_rated', mediaType, TTL_7D, async () =>
-    refine(await tmdbList({ path: `/${mediaType}/top_rated`, mediaType, pages: 6 }), mediaType)
+    refine(await discoverPages(mediaType, discoverParams(mediaType, {
+      sort_by: 'vote_average.desc',
+      'vote_count.gte': TOP_RATED_MIN_VOTES,
+    }), 6), mediaType, TOP_RATED_MIN_VOTES),
+    { version: 'votes5000' },
   );
 }
 
@@ -683,9 +703,9 @@ function poolMemSet(defKey, items, dbExpiresAt) {
 
 export async function getPool(poolKey, mediaType) {
   const defKey = `${poolKey}:${mediaType}`;
-  const storageKey = `${poolKey}:v2`;
   const def = POOL_DEFS.get(defKey);
   if (!def) return [];
+  const storageKey = poolStorageKey(def);
 
   // 1) Caché en memoria (sin egress).
   const cached = poolMemGet(defKey);
@@ -754,14 +774,12 @@ export async function refreshAllPools() {
     })
     .from(dashboardPools);
   const rowMap = new Map();
-  for (const row of rows) {
-    if (row.poolKey.endsWith(':v2')) rowMap.set(`${row.poolKey.slice(0, -3)}:${row.mediaType}`, row);
-  }
+  for (const row of rows) rowMap.set(`${row.poolKey}|${row.mediaType}`, row);
 
   const now = new Date();
   const stale = [];
-  for (const [key, def] of POOL_DEFS) {
-    const row = rowMap.get(key);
+  for (const def of POOL_DEFS.values()) {
+    const row = rowMap.get(`${poolStorageKey(def)}|${def.mediaType}`);
     if (!row || row.expiresAt <= now) stale.push(def);
   }
 

@@ -2,9 +2,11 @@
 // móvil: portada, logo, fila de acciones con sus estados y un marcador con solo
 // TMDb, Trakt e IMDb).
 //
-// También la de una TEMPORADA (`season`): mismo dibujo, con la fila de acciones
-// de su página (SubrouteDetailsActionRow): anterior · serie · visto · nota ·
-// siguiente.
+// También la de una TEMPORADA (`season`): el MISMO dibujo que la ficha (póster
+// a sangre, botones del mismo tamaño y en la misma posición), con una fila de
+// solo las acciones con estado del usuario: serie · visto · nota. Las flechas
+// de temporada anterior/siguiente y el lápiz de editar son navegación/edición
+// de la página: en una imagen no significan nada.
 //
 // Lo usan los dos extremos:
 //   - el cliente (DetailsClient) arma el payload con `buildShareCardPayload`;
@@ -164,8 +166,7 @@ export function buildShareCardPayload({
  * Los ocho botones de la fila móvil, en el orden de DetailActionsRow:
  *   - películas: tráiler · soundtrack · visto · nota · favorito · pendiente · lista · reseñas
  *   - series (fila combinada, replegada): multimedia · valoración de episodios · …
- *   - temporadas: los cinco de SubrouteDetailsActionRow (ver arriba); sin
- *     temporada anterior o siguiente, su flecha atenuada, como en la página.
+ *   - temporadas: serie · visto · nota (ver arriba), sin flechas ni editar.
  *
  * Cada botón: { key, icon, variant, color?, label?, labelSuffix?, fill?, filledIcon? }
  *   variant "solid"    -> blanco con icono negro (acciones de reproducción)
@@ -221,11 +222,9 @@ export function shareCardActionButtons(card) {
 
   if (card.season) {
     return [
-      { key: "previous", icon: "arrowLeft", variant: card.season.previous ? "glass" : "disabled" },
       { key: "series", icon: "monitorPlay", variant: "glass" },
       { key: "watched", ...watched },
       rating,
-      { key: "next", icon: "arrowRight", variant: card.season.next ? "glass" : "disabled" },
     ];
   }
 
