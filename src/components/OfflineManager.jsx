@@ -4,10 +4,22 @@ import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useServerOnline } from "@/context/ServerStatusContext";
-import { isServerReachable, PREPARATION_EVENT, reportConnection, saveOfflineRoute, workerMessage } from "@/lib/offline/client";
+import { isServerReachable, PREPARATION_EVENT, reportConnection, runKey, saveOfflineRoute, workerMessage } from "@/lib/offline/client";
 import { prepareOfflineAccount } from "@/lib/offline/prepare";
+import { preparedKey, shouldPrepareAutomatically } from "@/lib/offline/schedule";
 import { openSavedRoute } from "@/lib/offline/navigation";
 import { hideBrokenImages } from "@/lib/offline/brokenImages";
+
+const BUILD = process.env.NEXT_PUBLIC_SW_BUILD || "dev";
+// La página a la que se llega ya la guarda el worker al servirla; volver a
+// pedirla en cada cambio de ruta duplicaba cada documento. Se espera a que la
+// vista asiente y no se repite si hay una copia reciente.
+const ROUTE_SAVE_DELAY_MS = 3000;
+const ROUTE_FRESH_MS = 30 * 60 * 1000;
+
+function readJson(key) {
+  try { return JSON.parse(localStorage.getItem(key) || "null"); } catch { return null; }
+}
 
 export default function OfflineManager() {
   const { user, hydrated } = useAuth();
@@ -28,10 +40,19 @@ export default function OfflineManager() {
 
   useEffect(() => {
     if (!online || !user?.id) return;
-    const save = () => { void saveOfflineRoute(window.location.pathname + window.location.search); };
+    let timer;
+    const save = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        void saveOfflineRoute(window.location.pathname + window.location.search, { freshSince: Date.now() - ROUTE_FRESH_MS });
+      }, ROUTE_SAVE_DELAY_MS);
+    };
     save();
     navigator.serviceWorker?.addEventListener("controllerchange", save);
-    return () => navigator.serviceWorker?.removeEventListener("controllerchange", save);
+    return () => {
+      clearTimeout(timer);
+      navigator.serviceWorker?.removeEventListener("controllerchange", save);
+    };
   }, [path, online, user?.id]);
 
   useEffect(() => {
@@ -44,7 +65,13 @@ export default function OfflineManager() {
     // esperan 5 s para agruparse. La MANUAL (botón «Actualizar») arranca ya y lo
     // dice desde el primer instante: con la espera y sus salidas silenciosas,
     // pulsarlo parecía no hacer nada.
-    const start = ({ manual = false } = {}) => {
+    const start = ({ manual = false, reason = "start" } = {}) => {
+      if (!manual && !shouldPrepareAutomatically({
+        last: readJson(preparedKey(user.id)),
+        build: BUILD,
+        pending: Boolean(readJson(runKey(user.id))),
+        reason,
+      })) return;
       clearTimeout(timer);
       if (manual && !active.current) report({ phase: "preparing", completed: 0 });
       timer = setTimeout(async () => {
@@ -67,7 +94,7 @@ export default function OfflineManager() {
         try {
           await navigator.storage?.persist?.();
           const result = await prepareOfflineAccount({ id: user.id, username: user.username }, { signal: controller.signal });
-          if (result) localStorage.setItem(`showverse:offline:prepared:${user.id}`, JSON.stringify(result));
+          if (result) localStorage.setItem(preparedKey(user.id), JSON.stringify({ ...result, build: BUILD }));
         } catch (error) {
           if (!controller.signal.aborted) {
             console.warn("No se completó la copia para consulta sin conexión", error);
@@ -81,7 +108,7 @@ export default function OfflineManager() {
     };
     startRef.current = start;
     const message = (event) => {
-      if (event.data?.type === "OFFLINE_DATA_CHANGED") start();
+      if (event.data?.type === "OFFLINE_DATA_CHANGED") start({ reason: "data" });
       if (event.data?.type === "OFFLINE_STORAGE_FULL") {
         window.dispatchEvent(new CustomEvent("showverse:offline-preparation", { detail: { phase: "storage-full" } }));
       }
