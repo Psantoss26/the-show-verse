@@ -21,3 +21,29 @@ test('toCard maps a TV result (name/first_air_date) and drops itemless entries',
   assert.equal(card.year, 2011);
   assert.equal(toCard({ id: 5, title: 'X' }, 'movie'), null); // no poster nor backdrop
 });
+
+test('adult results are not exposed as dashboard candidates', () => {
+  assert.equal(toCard({ id: 1, poster_path: '/p.jpg', adult: true }, 'movie'), null);
+});
+
+test('TMDb bounds parallel requests, retains partial lists and rejects total source failure', async (t) => {
+  const originalKey = process.env.TMDB_API_KEY;
+  process.env.TMDB_API_KEY = 'test-key';
+  t.after(() => { if (originalKey === undefined) delete process.env.TMDB_API_KEY; else process.env.TMDB_API_KEY = originalKey; });
+  const { tmdbList } = await import('./tmdb.js?network-test');
+  let active = 0, peak = 0;
+  t.mock.method(globalThis, 'fetch', async url => {
+    active++; peak = Math.max(peak, active);
+    const page = Number(url.searchParams.get('page'));
+    const failed = url.pathname.includes('unavailable') || page === 1;
+    if (failed) { active--; return { ok: false, status: 404 }; }
+    return { ok: true, json: async () => {
+      await new Promise(resolve => setTimeout(resolve, 2)); active--;
+      return { results: [{ id: page, poster_path: '/p.jpg', title: 'Candidate' }] };
+    } };
+  });
+  const items = await tmdbList({ path: '/movie/popular', mediaType: 'movie', pages: 24 });
+  assert.equal(items.length, 23);
+  assert.ok(peak <= 8 && peak > 1);
+  await assert.rejects(tmdbList({ path: '/movie/unavailable', mediaType: 'movie', pages: 2 }), /all pages unavailable/);
+});

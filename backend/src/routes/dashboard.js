@@ -4,7 +4,8 @@
 import { SURFACES, personalizedRowDefs } from '../dashboard/surfaces.js';
 import { getPool, dedupeCards } from '../dashboard/pools.js';
 import { getUserRecommendations } from '../dashboard/recommendations.js';
-import { loadLibrary, libraryBasisHash } from '../dashboard/library.js';
+import { loadLibrary, libraryBasisHash, dislikedIds } from '../dashboard/library.js';
+import { rankRowItems, MIXED_GENRES, cardKey, stableHash } from '../dashboard/ranking.js';
 import { assembleRows } from '../dashboard/assemble.js';
 import { dayNumber, pickRotating } from '../dashboard/rotation.js';
 import { MOVIE_GENRES, TV_GENRES } from '../dashboard/tmdb.js';
@@ -22,7 +23,7 @@ function interleave(a, b) {
 }
 
 // ─── resolvePoolItems ────────────────────────────────────────────────────────
-async function resolvePoolItems(poolKey, mediaType) {
+async function resolvePoolItems(poolKey, mediaType, getPool) {
   if (mediaType === 'mixed') {
     const [mv, tv] = await Promise.all([
       getPool(poolKey, 'movie').catch(() => []),
@@ -37,26 +38,39 @@ async function resolvePoolItems(poolKey, mediaType) {
 // día, pero con una fase distinta en Inicio/Películas/Series para que "Para ti"
 // (y las filas rotativas) no muestren exactamente el mismo set entre dashboards.
 const SURFACE_SEED_OFFSET = { home: 0, movies: 1009, series: 2017 };
-const DASHBOARD_ITEMS_PER_ROW = 28;
-const DASHBOARD_MIN_ITEMS_PER_ROW = 15;
+const DASHBOARD_ITEMS_PER_ROW = 32;
+const DASHBOARD_MIN_ITEMS_PER_ROW = 12;
 
 // Filas cuyo orden ES la información (no se barajan): "Estrenos" va ordenado por
 // hype/popularidad y "Top hoy en España" es un ranking. El resto rota a diario.
 const NON_ROTATING_POOLS = new Set([
+  'trending',
+  'popular',
+  'top_rated',
   'anticipated',
   'new_releases',
   'region_top',
 ]);
 
 // ─── Route plugin ─────────────────────────────────────────────────────────────
-export default async function dashboardRoutes(fastify) {
+export default async function dashboardRoutes(fastify, options = {}) {
+  const { getPool: pool = getPool, loadLibrary: library = loadLibrary, getUserRecommendations: recommend = getUserRecommendations } = options.sources || {};
   fastify.get('/:surface', async (req, reply) => {
     const surfaceKey = req.params.surface;
     const surface = SURFACES[surfaceKey];
     if (!surface) return reply.status(404).send({ error: 'Unknown surface' });
 
-    const seed = dayNumber() + (SURFACE_SEED_OFFSET[surfaceKey] || 0);
     const userId = req.user?.id || null;
+    const seed = dayNumber() + (SURFACE_SEED_OFFSET[surfaceKey] || 0) + stableHash(userId || 'anonymous');
+    // Public pools and private recommendations build concurrently.
+    const libraryPromise = userId ? library(userId).catch(() => null) : Promise.resolve(null);
+    const recommendationsPromise = libraryPromise.then(async (lib) => {
+      if (!lib) return {};
+      const basisHash = libraryBasisHash(lib);
+      return Object.fromEntries(await Promise.all(surface.mediaTypes.map(async (mt) =>
+        [mt, await recommend(userId, mt, { lib, basisHash }).catch(() => [])],
+      )));
+    });
 
     // ── Build generic specs ──────────────────────────────────────────────────
     // Todas las filas en paralelo (antes en serie): con los pools ya calientes,
@@ -68,7 +82,7 @@ export default async function dashboardRoutes(fastify) {
           const { kind } = def.source;
 
           if (kind === 'pool') {
-            const items = await resolvePoolItems(def.source.poolKey, def.mediaType);
+            const items = await resolvePoolItems(def.source.poolKey, def.mediaType, pool);
             return [{
               key: def.key,
               title: def.title,
@@ -80,19 +94,19 @@ export default async function dashboardRoutes(fastify) {
           }
 
           if (kind === 'genreRotating') {
-            const genres = def.mediaType === 'tv' ? TV_GENRES : MOVIE_GENRES;
+            const genres = def.mediaType === 'mixed' ? MIXED_GENRES : def.mediaType === 'tv' ? TV_GENRES : MOVIE_GENRES;
             const picked = pickRotating(genres, seed, def.source.count);
             const rows = await Promise.all(picked.map(async (g) => {
               try {
                 let items;
                 if (def.mediaType === 'mixed') {
                   const [mv, tv] = await Promise.all([
-                    getPool(`genre:${g.id}`, 'movie').catch(() => []),
-                    getPool(`genre:${g.id}`, 'tv').catch(() => []),
+                    Promise.all(g.movie.map((id) => pool(`genre:${id}`, 'movie').catch(() => []))).then((items) => items.flat()),
+                    Promise.all(g.tv.map((id) => pool(`genre:${id}`, 'tv').catch(() => []))).then((items) => items.flat()),
                   ]);
-                  items = dedupeCards([...mv, ...tv]);
+                  items = interleave(mv, tv);
                 } else {
-                  items = await getPool(`genre:${g.id}`, def.mediaType).catch(() => []);
+                  items = await pool(`genre:${g.id}`, def.mediaType).catch(() => []);
                 }
                 return { key: `genre_${g.id}`, title: g.label, reason: null, mediaType: def.mediaType, items, rotate: true };
               } catch {
@@ -113,12 +127,12 @@ export default async function dashboardRoutes(fastify) {
                 let items;
                 if (def.mediaType === 'mixed') {
                   const [mv, tv] = await Promise.all([
-                    getPool(`decade:${d}`, 'movie').catch(() => []),
-                    getPool(`decade:${d}`, 'tv').catch(() => []),
+                    pool(`decade:${d}`, 'movie').catch(() => []),
+                    pool(`decade:${d}`, 'tv').catch(() => []),
                   ]);
-                  items = dedupeCards([...mv, ...tv]);
+                  items = interleave(mv, tv);
                 } else {
-                  items = await getPool(`decade:${d}`, def.mediaType).catch(() => []);
+                  items = await pool(`decade:${d}`, def.mediaType).catch(() => []);
                 }
                 return { key: `decade_${d}`, title: `Lo mejor de ${d}`, reason: null, mediaType: def.mediaType, items, rotate: true };
               } catch {
@@ -144,17 +158,10 @@ export default async function dashboardRoutes(fastify) {
     // (seenRatioLimit). NO se excluyen por completo de ninguna fila.
     const seenIds = new Set();
 
-    if (userId) {
+    const lib = await libraryPromise;
+    const recsByType = await recommendationsPromise;
+    if (lib) {
       try {
-        const lib = await loadLibrary(userId);
-        const basisHash = libraryBasisHash(lib);
-        const recsByType = {};
-        // movie y tv en paralelo (en Inicio eran 2 builds en serie).
-        await Promise.all(
-          surface.mediaTypes.map(async (mt) => {
-            recsByType[mt] = await getUserRecommendations(userId, mt, { lib, basisHash });
-          }),
-        );
         personalSpecs = personalizedRowDefs(recsByType, surface);
         personalized = personalSpecs.length > 0;
         for (const r of [...lib.history, ...lib.favorites, ...lib.ratings]) {
@@ -165,14 +172,28 @@ export default async function dashboardRoutes(fastify) {
       }
     }
 
+    const affinity = new Map();
+    for (const items of Object.values(recsByType)) {
+      const max = Math.max(1, ...items.map((card) => card.score || 0));
+      for (const card of items) affinity.set(cardKey(card), Math.sqrt(Math.max(0, card.score || 0) / max));
+    }
+    // Rank before allocation; the assembler must not shuffle away relevance.
+    const specs = [...personalSpecs, ...genericSpecs].map((row) => ({
+      ...row, items: rankRowItems(row, { seed, recommendations: affinity, surface: surfaceKey, cohortSeed: dayNumber() + stableHash(userId || 'anonymous') }), rotate: false,
+    }));
     // ── Assemble final rows ───────────────────────────────────────────────────
     const rows = assembleRows({
-      rowSpecs: [...personalSpecs, ...genericSpecs],
+      rowSpecs: specs,
       rotationSeed: seed,
       perRow: DASHBOARD_ITEMS_PER_ROW,
       minItems: DASHBOARD_MIN_ITEMS_PER_ROW,
       seenIds,
+      excludeIds: dislikedIds(lib),
+      fairAllocation: true,
+      maxAppearances: 2,
+      repeatRatio: 0.125,
     });
+    personalized = rows.some((row) => personalSpecs.some((spec) => spec.key === row.key));
 
     reply.header('Cache-Control', 'private, max-age=300');
     return {

@@ -68,7 +68,7 @@ for (const width of [1280, 834]) {
             };
           });
           assert.ok(exiting.exists, 'panel must stay mounted for its exit');
-          assert.equal(exiting.margin, opened.margin, 'docked page must not reflow under the exiting panel');
+          assert.equal(exiting.margin, '', 'docked page must recover its width while the panel exits, not after');
           await panel.waitFor({ state: 'detached' });
           assert.ok(await page.evaluate(() => window.drawerAnimations.some(({ transform, duration }) =>
             duration > 0 && transform.at(-1).includes('100%'))), 'exit must also use a native transform');

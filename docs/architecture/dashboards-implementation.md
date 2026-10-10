@@ -7,6 +7,10 @@
 > momento**. Toda la obtención de datos del motor es contra **TMDB** + la
 > biblioteca del usuario en nuestra propia base de datos (Postgres/Neon).
 
+> **Criterios vigentes:** [Motor de recomendación v3](dashboard-recommendations-v3.md).
+> Ese documento sustituye los pesos, tamaños, rotación y deduplicación históricos
+> descritos debajo. La arquitectura y las fuentes siguen siendo las mismas.
+
 ---
 
 ## 1. Visión general

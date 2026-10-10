@@ -4,6 +4,7 @@
  */
 
 import { contentPriorityWeight } from './filters.js';
+import { publicQuality } from './ranking.js';
 
 /**
  * For each seed, fetch its similar/recommended candidates and accumulate
@@ -21,8 +22,18 @@ export async function aggregateCandidates({ seeds, fetchSimilar }) {
     seeds.map((s) => `${s.mediaType}:${s.tmdbId}`)
   );
 
-  for (const seed of seeds) {
-    const { recommendations = [], similar = [] } = await fetchSimilar(seed);
+  // Bounded concurrency, preserving seed order for deterministic results.
+  const fetched = new Array(seeds.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(4, seeds.length) }, async () => {
+    while (next < seeds.length) {
+      const index = next++;
+      fetched[index] = await fetchSimilar(seeds[index]).catch(() => ({}));
+    }
+  }));
+  for (const [seedIndex, seed] of seeds.entries()) {
+    const { recommendations = [], similar = [] } = fetched[seedIndex];
+    const contributed = new Set();
 
     const sources = [
       { list: recommendations, sourceWeight: 1.0 },
@@ -34,10 +45,12 @@ export async function aggregateCandidates({ seeds, fetchSimilar }) {
         const key = `${card.mediaType}:${card.tmdbId}`;
 
         // Skip the seed itself
-        if (seedKeys.has(key)) return;
+        if (seedKeys.has(key) || contributed.has(key) || card.mediaType !== seed.mediaType) return;
+        contributed.add(key);
 
         const positionDecay = 1 / (1 + index * 0.15);
-        const contribution = seed.weight * sourceWeight * positionDecay * contentPriorityWeight(card);
+        const contribution = seed.weight * sourceWeight * positionDecay *
+          (0.75 + publicQuality(card) / 20) * contentPriorityWeight(card);
 
         if (!candidateMap.has(key)) {
           candidateMap.set(key, { ...card, score: 0, reasons: [] });
@@ -51,12 +64,14 @@ export async function aggregateCandidates({ seeds, fetchSimilar }) {
         // casual o los pendientes puntúan, pero no crean esas filas.
         if (seed.strongPositive) {
           const alreadyHasReason = item.reasons.some(
-            (r) => r.seedTmdbId === seed.tmdbId
+            (r) => r.seedTmdbId === seed.tmdbId && r.seedMediaType === seed.mediaType
           );
           if (!alreadyHasReason) {
             item.reasons.push({
               type: 'because',
               seedTmdbId: seed.tmdbId,
+              seedMediaType: seed.mediaType,
+              strength: contribution,
               seedTitle: seed.title ?? null,
             });
           }
@@ -223,7 +238,12 @@ export function mergeGenreFill(recItems, fillCards, weight = 0.5) {
   );
 
   const fills = fillCards
-    .filter((card) => !existingKeys.has(`${card.mediaType}:${card.tmdbId}`))
+    .filter((card) => {
+      const key = `${card.mediaType}:${card.tmdbId}`;
+      if (existingKeys.has(key)) return false;
+      existingKeys.add(key);
+      return true;
+    })
     .map((card) => ({
       ...card,
       score: weight * contentPriorityWeight(card),

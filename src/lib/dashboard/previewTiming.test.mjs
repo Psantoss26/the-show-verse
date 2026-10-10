@@ -42,7 +42,21 @@ test("every expandable dashboard row uses the shared hover delay", async () => {
 
   sources.forEach((source) => {
     assert.match(source, /DASHBOARD_PREVIEW_OPEN_DELAY_MS/);
+    // Las filas cuya vista previa se despliega desde la tarjeta delegan la
+    // animación en `usePreviewMorph`, que usa las mismas transiciones.
+    if (/usePreviewMorph/.test(source)) return;
     assert.match(source, /DASHBOARD_PREVIEW_ENTER_TRANSITION/);
     assert.match(source, /DASHBOARD_PREVIEW_EXIT_TRANSITION/);
   });
+});
+
+test("the unfolding preview reuses the shared entry and exit transitions", async () => {
+  const source = await readFile(
+    new URL("./usePreviewMorph.js", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /DASHBOARD_PREVIEW_ENTER_TRANSITION\.duration/);
+  assert.match(source, /DASHBOARD_PREVIEW_EXIT_TRANSITION\.duration/);
+  assert.match(source, /DASHBOARD_PREVIEW_ENTER_TRANSITION\.ease/);
+  assert.match(source, /DASHBOARD_PREVIEW_EXIT_TRANSITION\.ease/);
 });

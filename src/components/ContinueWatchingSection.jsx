@@ -1,7 +1,6 @@
 // /src/components/ContinueWatchingSection.jsx
 "use client";
 
-import { LIQUID_GLASS_DETAIL_SURFACE } from "@/lib/ui/liquidGlass";
 import DashboardPreviewGlass from "@/components/dashboard/DashboardPreviewGlass";
 import RowNavGlass, { ROW_NAV_FADE } from "@/components/dashboard/RowNavGlass";
 import { useHoverCapable } from "@/lib/hooks/useMediaQuery";
@@ -46,7 +45,7 @@ import {
 import LiquidButton from "@/components/LiquidButton";
 import OptimizedImage from "@/components/OptimizedImage";
 import useTrailerAutoDismiss from "@/hooks/useTrailerAutoDismiss";
-import usePreviewImageHalf from "@/hooks/usePreviewImageHalf";
+import usePreviewMorph from "@/lib/dashboard/usePreviewMorph";
 import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
 import { useDashboardHoverBackdrop } from "@/components/dashboard/DashboardHoverBackdrop";
 import PreviewTrailerAudioButton, {
@@ -76,10 +75,7 @@ import {
 } from "@/lib/dashboard/media";
 import {
   DASHBOARD_PREVIEW_CLOSE_DELAY_MS,
-  DASHBOARD_PREVIEW_ENTER_TRANSITION,
-  DASHBOARD_PREVIEW_EXIT_TRANSITION,
   DASHBOARD_PREVIEW_OPEN_DELAY_MS,
-  DASHBOARD_PREVIEW_REDUCED_TRANSITION,
 } from "@/lib/dashboard/previewTiming";
 import { useScrollRevealProps } from "@/lib/hooks/useHasScrolled";
 
@@ -1514,22 +1510,16 @@ function ContinueWatchingPreviewCard({
   const isRightBoundary =
     index === activeIdx + visibleCount - 1 || index === totalCount - 1;
 
-  // Preview anclada por la IMAGEN (igual que las filas backdrop): el panel va con
-  // top:50% y marginTop=-½ alto de imagen, así el CENTRO del backdrop cae sobre el
-  // centro de la tarjeta base y la escala crece desde ese mismo centro.
-  const [previewRef, previewImgHalf] = usePreviewImageHalf(true);
-
   let alignmentClass = "left-1/2 -translate-x-1/2";
-  let originX = "center";
+  let alignment = "center";
 
   if (isLeftBoundary) {
     alignmentClass = "left-0";
-    originX = "left";
+    alignment = "left";
   } else if (isRightBoundary) {
     alignmentClass = "right-0";
-    originX = "right";
+    alignment = "right";
   }
-  const transformOrigin = `${originX} ${previewImgHalf}px`;
 
   // Vista previa ~1,6× la tarjeta base (como el spotlight): más ancha que antes
   // para que el backdrop se vea más grande y quepa el panel de info ampliado.
@@ -1541,9 +1531,17 @@ function ContinueWatchingPreviewCard({
         : visibleCount === 5
           ? 156
           : 154;
-  const previewScale = 1.04;
   const previewMaxWidth =
     visibleCount >= 6 ? "min(156%, 560px)" : `${previewWidthPercent}%`;
+  // Preview anclada por la IMAGEN (igual que las filas backdrop): el panel va
+  // con top:50% y el CENTRO de su imagen 16:9 cae sobre el centro de la tarjeta
+  // base. Un margen en % se resuelve contra el ANCHO del contenedor (la
+  // tarjeta), igual que el ancho de la preview: medio alto de imagen = ancho ·
+  // 9/32, correcto desde el primer render, que es cuando mide `usePreviewMorph`.
+  const previewMarginTop = `calc(${previewMaxWidth} * -9 / 32)`;
+
+  const previewRef = useRef(null);
+  usePreviewMorph(previewRef, { alignment, tileRadius: 8, reduceMotion });
   const previewImageSizes =
     visibleCount <= 3
       ? "(min-width:1280px) 620px, (min-width:768px) 540px, 440px"
@@ -1555,28 +1553,14 @@ function ContinueWatchingPreviewCard({
 
   return (
     <>
-    <motion.div
-      initial={
-        reduceMotion ? false : { opacity: 0, scale: 0.94, y: 8 }
-      }
-      animate={{ opacity: 1, scale: previewScale, y: -8 }}
-      exit={{
-        opacity: 0,
-        scale: 0.97,
-        y: 4,
-        transition: reduceMotion
-          ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
-          : DASHBOARD_PREVIEW_EXIT_TRANSITION,
-      }}
-      transition={
-        reduceMotion
-          ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
-          : DASHBOARD_PREVIEW_ENTER_TRANSITION
-      }
+    <div
       ref={previewRef}
       // El ancho se calcula según las tarjetas visibles del breakpoint activo:
       // menos tarjetas permiten una preview mayor; con 6 se contiene mejor.
-      className={`absolute top-1/2 ${alignmentClass} rounded-xl text-white cursor-pointer ${LIQUID_GLASS_DETAIL_SURFACE} z-50 flex flex-col overflow-hidden`}
+      // Sin `overflow-hidden` ni fondo en la carcasa: el tinte y el desenfoque
+      // van en la capa de cristal (que `usePreviewMorph` recorta) y la sombra en
+      // su hermana, que un recorte de la carcasa cortaría.
+      className={`absolute top-1/2 ${alignmentClass} rounded-xl text-white cursor-pointer z-50 flex flex-col`}
       onClick={() => openDetailModal?.(show)}
       onMouseEnter={(event) => {
         onPreviewMouseEnter?.(event);
@@ -1586,136 +1570,139 @@ function ContinueWatchingPreviewCard({
       onFocus={prefetchHref}
       style={{
         width: previewMaxWidth,
-        marginTop: -previewImgHalf,
-        willChange: "transform",
-        transformOrigin,
+        marginTop: previewMarginTop,
       }}
     >
-      <DashboardPreviewGlass />
+      <DashboardPreviewGlass surface />
       {/* Backdrop de 16:9 (+ tráiler al reproducir) */}
-      <div className="relative w-full aspect-video overflow-hidden bg-transparent">
-        {!showTrailer && !ready && (
-          <div className="absolute inset-0 overflow-hidden bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900">
-            <motion.div
-              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
-              variants={shimmer}
-              animate="animate"
-              style={{ backgroundSize: "200% 100%" }}
-            />
-          </div>
-        )}
-
-        {bgSrc && (
-          <div
-            className={`pointer-events-none absolute inset-0 sv-preview-fade ${
-              showTrailer ? "z-[5]" : ""
-            }`}
-          >
-          <motion.div
-            initial={{ scale: 1 }}
-            animate={{ scale: reduceMotion ? 1 : 1.08 }}
-            transition={{ duration: 4, ease: "easeOut" }}
-            className={`absolute inset-0 h-full w-full transition-opacity duration-300 ${
-              showTrailer && trailerPlaying ? "opacity-0" : "opacity-100"
-            }`}
-          >
-            <NextImage
-              key={bgSrc}
-              src={bgSrc}
-              alt={show?.title || ""}
-              fill
-              sizes={previewImageSizes}
-              quality={CONTINUE_WATCHING_IMAGE_QUALITY}
-              className={`object-cover transition-opacity duration-200 ${
-                ready ? "opacity-100" : "opacity-0"
-              }`}
-              loading="eager"
-              fetchPriority="low"
-            />
-          </motion.div>
-          {/* Velo del estado superpuesto al pie del backdrop. Va DENTRO de la
-              máscara: oscurece la imagen y se funde con ella, sin dejar una
-              banda oscura sobre el cristal de la costura. */}
-          <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-b from-transparent via-black/45 to-transparent" />
-          </div>
-        )}
-
-        {showTrailer && (
-          <>
-            {(trailerLoading || !trailerSrc) && !bgSrc && (
-              <div className="absolute inset-0 animate-pulse bg-neutral-900" />
-            )}
-            {trailerSrc && (
-              <>
-                <div className="absolute inset-0 overflow-hidden sv-preview-fade">
-                  <iframe
-                    key={trailer.key}
-                    ref={trailerIframeRef}
-                    className="pointer-events-none absolute left-1/2 top-1/2 h-[180%] w-[140%] -translate-x-1/2 -translate-y-1/2"
-                    src={trailerSrc}
-                    title={`Trailer - ${show?.title || ""}`}
-                    allow="autoplay; encrypted-media; picture-in-picture"
-                    allowFullScreen={false}
-                    onLoad={syncTrailerAudio}
-                  />
-                </div>
-                {/* Fuera del envoltorio enmascarado: el botón es de cristal y
-                    una máscara en un ancestro anularía su backdrop-filter. */}
-                {trailerPlaying && (
-                  <PreviewTrailerAudioButton
-                    muted={trailerMuted}
-                    onToggle={handleToggleTrailerAudio}
-                  />
-                )}
-              </>
-            )}
-          </>
-        )}
-
-        {isCalendar ? (
-          // La fecha/cuenta atrás NO se repite sobre la portada: ya se muestra
-          // abajo en el panel (línea de episodio). Aquí solo se conserva el badge
-          // "Estreno" para los estrenos (S1E1).
-          calendar?.isPremiere ? (
-            <div className="absolute inset-x-3 bottom-2 z-10">
-              <span className="rounded bg-white px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-black">
-                Estreno
-              </span>
-            </div>
-          ) : null
-        ) : (
-          // Barra de progreso de "Continuar viendo": se conserva sobre el pie del
-          // backdrop (aunque haya tráiler) para no perder la referencia visual.
-          // Es el ÚNICO sitio con el texto del progreso (episodio y tiempo
-          // restante): las tarjetas de la fila solo llevan la barra, debajo.
-          <div className="absolute inset-x-3 bottom-2 z-10">
-            {ep || show?.remainingLabel ? (
-              <div className="mb-1 flex items-center gap-1 truncate text-[11px] font-semibold text-white drop-shadow">
-                <Play className="h-3 w-3 shrink-0 fill-current text-white" aria-hidden="true" />
-                <span className="truncate">
-                  {ep ? `T${ep.season}·E${ep.number}` : ""}
-                  {ep && show?.remainingLabel ? " · " : ""}
-                  {show?.remainingLabel || ""}
-                </span>
-              </div>
-            ) : null}
-            <div className="h-1 w-full overflow-hidden rounded-full bg-white/20">
-              <div
-                className="h-full rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"
-                style={{ width: `${pct}%` }}
+      <div
+        data-preview-media=""
+        className="relative w-full aspect-video overflow-hidden rounded-t-[inherit] bg-transparent"
+      >
+        {/* Contenido de la ventana: `usePreviewMorph` lo escala a la inversa
+            para descubrir la imagen sin deformarla. */}
+        <div data-preview-media-inner="" className="absolute inset-0">
+          {!showTrailer && !ready && (
+            <div className="absolute inset-0 overflow-hidden bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900">
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
+                variants={shimmer}
+                animate="animate"
+                style={{ backgroundSize: "200% 100%" }}
               />
             </div>
-          </div>
-        )}
+          )}
+
+          {bgSrc && (
+            <div
+              className={`pointer-events-none absolute inset-0 sv-preview-fade ${
+                showTrailer ? "z-[5]" : ""
+              }`}
+            >
+            <motion.div
+              initial={{ scale: 1 }}
+              animate={{ scale: reduceMotion ? 1 : 1.08 }}
+              transition={{ duration: 4, ease: "easeOut" }}
+              className={`absolute inset-0 h-full w-full transition-opacity duration-300 ${
+                showTrailer && trailerPlaying ? "opacity-0" : "opacity-100"
+              }`}
+            >
+              <NextImage
+                key={bgSrc}
+                src={bgSrc}
+                alt={show?.title || ""}
+                fill
+                sizes={previewImageSizes}
+                quality={CONTINUE_WATCHING_IMAGE_QUALITY}
+                className={`object-cover transition-opacity duration-200 ${
+                  ready ? "opacity-100" : "opacity-0"
+                }`}
+                loading="eager"
+                fetchPriority="low"
+              />
+            </motion.div>
+            {/* Velo del estado superpuesto al pie del backdrop. Va DENTRO de la
+                máscara: oscurece la imagen y se funde con ella, sin dejar una
+                banda oscura sobre el cristal de la costura. */}
+            <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-b from-transparent via-black/45 to-transparent" />
+            </div>
+          )}
+
+          {showTrailer && (
+            <>
+              {(trailerLoading || !trailerSrc) && !bgSrc && (
+                <div className="absolute inset-0 animate-pulse bg-neutral-900" />
+              )}
+              {trailerSrc && (
+                <>
+                  <div className="absolute inset-0 overflow-hidden sv-preview-fade">
+                    <iframe
+                      key={trailer.key}
+                      ref={trailerIframeRef}
+                      className="pointer-events-none absolute left-1/2 top-1/2 h-[180%] w-[140%] -translate-x-1/2 -translate-y-1/2"
+                      src={trailerSrc}
+                      title={`Trailer - ${show?.title || ""}`}
+                      allow="autoplay; encrypted-media; picture-in-picture"
+                      allowFullScreen={false}
+                      onLoad={syncTrailerAudio}
+                    />
+                  </div>
+                  {/* Fuera del envoltorio enmascarado: el botón es de cristal y
+                      una máscara en un ancestro anularía su backdrop-filter. */}
+                  {trailerPlaying && (
+                    <PreviewTrailerAudioButton
+                      muted={trailerMuted}
+                      onToggle={handleToggleTrailerAudio}
+                    />
+                  )}
+                </>
+              )}
+            </>
+          )}
+
+          {isCalendar ? (
+            // La fecha/cuenta atrás NO se repite sobre la portada: ya se muestra
+            // abajo en el panel (línea de episodio). Aquí solo se conserva el badge
+            // "Estreno" para los estrenos (S1E1).
+            calendar?.isPremiere ? (
+              <div className="absolute inset-x-3 bottom-2 z-10">
+                <span className="rounded bg-white px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-black">
+                  Estreno
+                </span>
+              </div>
+            ) : null
+          ) : (
+            // Barra de progreso de "Continuar viendo": se conserva sobre el pie del
+            // backdrop (aunque haya tráiler) para no perder la referencia visual.
+            // Es el ÚNICO sitio con el texto del progreso (episodio y tiempo
+            // restante): las tarjetas de la fila solo llevan la barra, debajo.
+            <div className="absolute inset-x-3 bottom-2 z-10">
+              {ep || show?.remainingLabel ? (
+                <div className="mb-1 flex items-center gap-1 truncate text-[11px] font-semibold text-white drop-shadow">
+                  <Play className="h-3 w-3 shrink-0 fill-current text-white" aria-hidden="true" />
+                  <span className="truncate">
+                    {ep ? `T${ep.season}·E${ep.number}` : ""}
+                    {ep && show?.remainingLabel ? " · " : ""}
+                    {show?.remainingLabel || ""}
+                  </span>
+                </div>
+              ) : null}
+              <div className="h-1 w-full overflow-hidden rounded-full bg-white/20">
+                <div
+                  className="h-full rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Panel de info (mismo lenguaje visual que BackdropPreviewCard):
           [Continuar] reproducir episodio + progreso · acciones compartidas · meta/géneros · premios ·
           [Calendario] línea de episodio · meta/géneros · puntuaciones. */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.08, duration: 0.25, ease: "easeOut" }}
+      <div
+        data-preview-info=""
         className="w-full bg-transparent px-4 py-3.5 sm:px-5 sm:py-4"
       >
         {/* Fila de acciones COMPARTIDA con DetailsClient/DetailModal y las demás
@@ -1853,7 +1840,7 @@ function ContinueWatchingPreviewCard({
         {error && (
           <p className="mt-1.5 line-clamp-1 text-[11px] text-red-400">{error}</p>
         )}
-      </motion.div>
+      </div>
 
       {/* Overlay de soundtrack (mismo diseño que BackdropPreviewCard): se pinta
           dentro de la propia tarjeta y corta la propagación de clics. */}
@@ -1988,7 +1975,7 @@ function ContinueWatchingPreviewCard({
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </div>
 
     {/* Valoración de episodios (solo series) — mismo modal que la ficha completa
         y DetailModal. Fuera del área clicable de la card. */}
@@ -2426,7 +2413,7 @@ function ContinueWatchingSection({
       // spotlight de "Estrenos", que crea su propio contexto de apilado)— podían
       // tapar la preview al desbordar sobre ellas. Con un z muy alto la preview
       // queda siempre superpuesta a las demás filas.
-      className={`group relative ${hasActivePreview ? "z-[100]" : ""}`}
+      className={`group relative ${hasActivePreview || animatingOutId ? "z-[100]" : ""}`}
     >
       {Header}
 
@@ -2435,7 +2422,7 @@ function ContinueWatchingSection({
         // (que va en z-20 para ser clicable): así el hover NO queda tapado por el
         // título. Sin preview activa el carrusel vuelve a z-auto y el título es
         // clicable (su hueco vacío es pointer-events-none).
-        className={`relative ${hasActivePreview ? "z-30" : ""}`}
+        className={`relative ${hasActivePreview || animatingOutId ? "z-30" : ""}`}
         onMouseEnter={() => {
           setIsHoveredRow(true);
           prewarmVisibleTrailers();
@@ -2505,8 +2492,7 @@ function ContinueWatchingSection({
               const isActive = hydrated && !isMobile && hoveredId === itemKey;
               const isAnimatingOut = animatingOutId === itemKey;
 
-              const base =
-                "relative flex-shrink-0 transition-all duration-[420ms] ease-[cubic-bezier(0.16,1,0.3,1)]";
+              const base = "relative flex-shrink-0";
               // Escritorio: el ancho lo fija Swiper (según breakpoint) y el alto
               // sale del aspect-video. Móvil: 2 por fila (ancho lo fija Swiper)
               // con alto fijo; la barra de progreso queda fuera de la imagen.
@@ -2523,22 +2509,30 @@ function ContinueWatchingSection({
                   }`}
                 >
                   <div
-                    className={`${base} ${sizeClasses} ${
-                      isActive || isAnimatingOut ? "overflow-visible" : "overflow-hidden"
-                    }`}
+                    data-preview-tile=""
+                    className={`${base} ${sizeClasses} overflow-visible`}
                     onMouseEnter={() => handleMouseEnterItem(itemKey, show.id, i)}
                     onMouseLeave={() => {
                       if (!isActive) handleMouseLeaveItem(itemKey);
                     }}
                   >
+                    {/* La tarjeta NO se oculta mientras hay vista previa: esta
+                        crece desde ella y, al cerrarse, vuelve a encogerse
+                        hasta coincidir con ella (`usePreviewMorph`). */}
+                    <div
+                      data-preview-tile-art=""
+                      className="h-full w-full cursor-pointer"
+                      onClick={() => openDetailModal?.(show)}
+                    >
+                      <ContinueWatchingBaseCard show={show} mode={mode} />
+                    </div>
                     <AnimatePresence
                       initial={false}
-                      mode="popLayout"
                       onExitComplete={() => {
                         setAnimatingOutId((prev) => (prev === itemKey ? null : prev));
                       }}
                     >
-                      {isActive ? (
+                      {isActive && (
                         <div
                           key="preview"
                           className="hidden sm:block"
@@ -2558,31 +2552,6 @@ function ContinueWatchingSection({
                             }
                           />
                         </div>
-                      ) : (
-                        <motion.div
-                          key="base"
-                          initial={
-                            reduceMotion ? false : { opacity: 0, scale: 0.97 }
-                          }
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{
-                            opacity: 0,
-                            scale: 0.97,
-                            transition: reduceMotion
-                              ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
-                              : DASHBOARD_PREVIEW_EXIT_TRANSITION,
-                          }}
-                            transition={
-                              reduceMotion
-                                ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
-                                : DASHBOARD_PREVIEW_ENTER_TRANSITION
-                            }
-                            className="h-full w-full cursor-pointer"
-                            style={{ willChange: "transform, opacity" }}
-                            onClick={() => openDetailModal?.(show)}
-                          >
-                          <ContinueWatchingBaseCard show={show} mode={mode} />
-                        </motion.div>
                       )}
                     </AnimatePresence>
                   </div>
