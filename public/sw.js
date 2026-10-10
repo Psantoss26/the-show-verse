@@ -28,6 +28,16 @@ const IDENTITY_ASSETS = [
   "/favicon.ico",
 ];
 const isIdentityAsset = (url) => IDENTITY_ASSETS.includes(url.pathname);
+// LAS PORTADAS NO PASAN POR EL WORKER. Un <img> las pide en modo `no-cors` y el
+// worker las guardaba tal cual: respuestas OPACAS, que Chrome apunta como ~7 MB
+// de cuota cada una (relleno de seguridad), pese a pesar unos KB. Medido: 519
+// portadas del dashboard (~25 MB reales) ocupaban 3,9 GB; la cuota se agotaba,
+// la copia sin conexión dejaba de caber y se rehacía en cada apertura. Pedirlas
+// en modo CORS para guardarlas con su tamaño real hacía la carga 5 veces más
+// lenta (otra conexión, sin la prioridad del <img>). No hace falta: TMDb las
+// sirve con `max-age` de un año, así que la caché HTTP del navegador ya las da
+// sin red. Al activar se borra la caché vieja de portadas opacas.
+const OPAQUE_IMAGE_CACHES = ["showverse-offline-images-v1"];
 const DATA_PREFIX = "showverse-offline-data-v1-";
 const META_URL = new URL("/__offline/session", self.location.origin).href;
 const READ_POSTS = new Set(["/api/backend/items/states", "/api/imdb/ratings"]);
@@ -125,6 +135,20 @@ async function safePut(cache, key, response, generation = epoch) {
   if (saved === false) await reportStorageFull();
   return saved;
 }
+// GUARDAR NO RETIENE LA RESPUESTA. Leer el cuerpo entero, parsearlo y escribirlo
+// en Cache Storage se hace en segundo plano (event.waitUntil); la página recibe
+// la respuesta en cuanto llega. Antes CADA petición (API, documento, chunk,
+// imagen) esperaba a esa copia, y como el worker solo se registra en
+// producción, toda la app iba más lenta que en local sin motivo aparente. Sin
+// evento (mensajes, preparación de la copia) se sigue esperando: ahí el
+// resultado depende de que la copia exista.
+function keep(event, work) {
+  const done = Promise.resolve(work).catch(() => {});
+  if (!event?.waitUntil) return done;
+  try { event.waitUntil(done); } catch { /* el evento ya terminó: la copia sigue sola */ }
+  return undefined;
+}
+
 async function network(request, timeout = 6000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
@@ -200,7 +224,7 @@ async function cachedHistory(cache, request) {
   }, 200));
 }
 
-async function apiRead(request) {
+async function apiRead(request, event) {
   const url = new URL(request.url);
   let owner = (await session()).owner;
   let generation = epoch;
@@ -223,11 +247,14 @@ async function apiRead(request) {
       }
     }
     if (response.ok && (response.headers.get("Content-Type") || "").includes("application/json")) {
-      const payload = await response.clone().json().catch(() => null);
-      if (payload && !payload.degraded && !payload.offline && payload.connected !== false) {
-        await safePut(cache, key, response.clone(), generation);
-        if (url.pathname === "/api/backend/items/states") await storeStates(cache, payload, generation);
-      }
+      const copy = response.clone();
+      await keep(event, (async () => {
+        const payload = await copy.clone().json().catch(() => null);
+        if (payload && !payload.degraded && !payload.offline && payload.connected !== false) {
+          await safePut(cache, key, copy, generation);
+          if (url.pathname === "/api/backend/items/states") await storeStates(cache, payload, generation);
+        }
+      })());
     }
     // Never replace a genuine 401/403/404 with private cached data.
     return response;
@@ -248,7 +275,7 @@ async function apiRead(request) {
   }
 }
 
-async function immutable(request) {
+async function immutable(request, event) {
   // An offline document from a previous build must retain its matching chunks.
   const current = await caches.open(ASSET_CACHE);
   const currentSaved = await current.match(request);
@@ -257,11 +284,11 @@ async function immutable(request) {
   if (saved) {
     // Shared hashes may still live only in an older build. Retain a current
     // copy before PRUNE_BUILDS retires that build's cache.
-    await safePut(current, request, saved.clone());
+    await keep(event, safePut(current, request, saved.clone()));
     return saved;
   }
   const response = await network(request);
-  if (response.ok) await safePut(current, request, response.clone());
+  if (response.ok) await keep(event, safePut(current, request, response.clone()));
   return response;
 }
 async function documentKey(request) {
@@ -353,14 +380,14 @@ async function savedFlight(request) {
 }
 const isRscPrefetch = (request) => request.headers.has("Next-Router-Prefetch") || request.headers.has("Next-Router-Segment-Prefetch");
 
-async function navigation(request) {
+async function navigation(request, event) {
   const generation = epoch;
   try {
     if (Date.now() < offlineUntil) throw new Error("offline");
     const response = await network(request);
     if (unavailable(response)) throw new Error("origin unavailable");
     if (response.ok && !response.redirected && (response.headers.get("Content-Type") || "").includes("text/html")) {
-      await saveDocument(request, response.clone(), generation);
+      await keep(event, saveDocument(request, response.clone(), generation));
     }
     return response;
   } catch {
@@ -376,11 +403,26 @@ async function navigation(request) {
   }
 }
 
+// UNA FICHA YA PREPARADA NO SE VUELVE A PREPARAR EN UN TIEMPO. Cada apertura de
+// la ficha o del modal lateral repetía el documento entero, ~8 lecturas y TODAS
+// las temporadas, duplicando lo que la propia página acababa de pedir. Lo que la
+// página vuelve a pedir ya refresca su copia al pasar por apiRead.
+const TITLE_FRESH_MS = 6 * 60 * 60 * 1000;
+const titleMarker = (mediaType, id) => absolute(`/__offline/title/${mediaType}/${id}`);
+async function titleIsFresh(mediaType, id, owner) {
+  const saved = await (await caches.open(META_CACHE)).match(titleMarker(mediaType, id));
+  const mark = saved ? await saved.json().catch(() => null) : null;
+  return Boolean(mark && mark.owner === owner && mark.build === VERSION && Date.now() - mark.at < TITLE_FRESH_MS
+    && await savedDocument(`/details/${mediaType}/${id}`));
+}
+
 async function prepareTitle(message) {
   const { mediaType, id } = message;
   if (!["movie", "tv"].includes(mediaType) || !/^\d+$/.test(String(id))) return { ok: false };
-  const key = `${(await session()).owner}:${mediaType}:${id}`;
+  const owner = (await session()).owner;
+  const key = `${owner}:${mediaType}:${id}`;
   if (titlePreparations.has(key)) return titlePreparations.get(key);
+  if (await titleIsFresh(mediaType, id, owner)) return { ok: true, fresh: true };
   const work = (async () => {
     await apiRead(new Request(absolute("/api/auth/me"), { credentials: "include" }));
     const generation = epoch;
@@ -406,7 +448,14 @@ async function prepareTitle(message) {
         }
       })(),
     ]);
-    return { ok: generation === epoch && Boolean(await savedDocument(path)) };
+    const ok = generation === epoch && Boolean(await savedDocument(path));
+    if (ok) {
+      try {
+        await (await caches.open(META_CACHE)).put(titleMarker(mediaType, id),
+          jsonResponse({ owner: (await session()).owner, build: VERSION, at: Date.now() }, 200));
+      } catch { /* cuota: se prepara de nuevo la próxima vez */ }
+    }
+    return { ok };
   })().finally(() => titlePreparations.delete(key));
   titlePreparations.set(key, work);
   return work;
@@ -456,7 +505,10 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   // Do not erase private snapshots on deploy. Page preparation replaces saved
   // documents first; PRUNE_BUILDS then retires their old executable assets.
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(Promise.all([
+    self.clients.claim(),
+    ...OPAQUE_IMAGE_CACHES.map((name) => caches.delete(name)),
+  ]));
 });
 self.addEventListener("message", (event) => {
   const message = event.data;
@@ -599,23 +651,7 @@ self.addEventListener("notificationclick", (event) => {
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin) {
-    // The NAS can be down while the image CDN remains available. Cache image
-    // responses as well for the case where the device itself loses internet.
-    if (request.method === "GET" && ["image.tmdb.org", "images.unsplash.com"].includes(url.hostname)) {
-      event.respondWith((async () => {
-        const cache = await caches.open("showverse-offline-images-v1");
-        const saved = await cache.match(request);
-        if (saved) return saved;
-        const response = await fetch(request);
-        if (response.ok || response.type === "opaque") {
-          try { await cache.put(request, response.clone()); } catch { /* quota */ }
-        }
-        return response;
-      })());
-    }
-    return;
-  }
+  if (url.origin !== self.location.origin) return;
   if (url.pathname === "/api/health") { event.respondWith(health(request)); return; }
   if (url.pathname.startsWith("/api/")) {
     if (request.method !== "GET" && !READ_POSTS.has(url.pathname)) {
@@ -633,12 +669,12 @@ self.addEventListener("fetch", (event) => {
       })());
       return;
     }
-    if (!excludedApi(url.pathname)) event.respondWith(apiRead(request));
+    if (!excludedApi(url.pathname)) event.respondWith(apiRead(request, event));
     return;
   }
   if (request.method !== "GET") return;
   if (isIdentityAsset(url)) { event.respondWith(identity(request)); return; }
-  if (url.pathname.startsWith("/_next/static/")) { event.respondWith(immutable(request)); return; }
+  if (url.pathname.startsWith("/_next/static/")) { event.respondWith(immutable(request, event)); return; }
   if (isRscRequest(request, url)) {
     // Network flight responses are never cached: they depend on the router tree
     // sent by the client. Offline, a navigation (not a prefetch, whose segment
@@ -660,13 +696,13 @@ self.addEventListener("fetch", (event) => {
     })());
     return;
   }
-  if (isNavigation(request)) { event.respondWith(navigation(request)); return; }
+  if (isNavigation(request)) { event.respondWith(navigation(request, event)); return; }
   event.respondWith((async () => {
     const cache = await caches.open(ASSET_CACHE);
     try {
       const response = await network(request);
       if (unavailable(response)) throw new Error("offline");
-      if (response.ok) await safePut(cache, request, response.clone());
+      if (response.ok) keep(event, safePut(cache, request, response.clone()));
       return response;
     } catch { return (await caches.match(request)) || Response.error(); }
   })());

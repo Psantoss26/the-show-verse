@@ -28,6 +28,7 @@ function harness() {
     async delete(name) { return stores.delete(name); },
   };
   let handler = () => json({ ok: true });
+  const background = [];
   const context = vm.createContext({
     URL, URLSearchParams, Request, Response, Headers, TextEncoder, Uint8Array, Blob, atob,
     crypto: webcrypto, AbortController, setTimeout, clearTimeout, console, caches,
@@ -39,14 +40,17 @@ function harness() {
   });
   vm.runInContext(source, context);
   return {
-    context, caches, stores, messages,
+    context, caches, stores, messages, listeners,
     network(fn) { handler = fn; },
     async online() { await context.connectivity(true); },
     async login(id) { await context.changeOwner(id); },
     async read(path, init = {}) { return context.apiRead(new Request(`${origin}${path}`, init)); },
     async navigate(path) { return context.navigation(new Request(`${origin}${path}`, { headers: { Accept: 'text/html' } })); },
     async message(data) { let pending; let result; listeners.message({ data, ports: [{ postMessage: (value) => { result = value; } }], waitUntil: (promise) => { pending = promise; } }); await pending; return result; },
-    async fetch(path, init) { let response; listeners.fetch({ request: new Request(`${origin}${path}`, init), respondWith: (promise) => { response = promise; } }); return response; },
+    async activate() { let pending; listeners.activate({ waitUntil: (promise) => { pending = promise; } }); await pending; },
+    async fetch(path, init) { let response; listeners.fetch({ request: new Request(path.startsWith('http') ? path : `${origin}${path}`, init), respondWith: (promise) => { response = promise; }, waitUntil: (promise) => { background.push(promise); } }); return response; },
+    // Trabajo que el worker dejó en segundo plano (event.waitUntil).
+    async settle() { while (background.length) await background.shift(); },
   };
 }
 
@@ -224,4 +228,85 @@ test('worker-owned title preparation saves the document and supporting reads', a
   sw.network(() => { throw new Error('NAS off'); });
   assert.match(await (await sw.navigate('/details/tv/42?from=history')).text(), /Complete series/);
   assert.equal((await (await sw.read('/api/trakt/item/status?type=show&tmdbId=42')).json()).rating, 9);
+});
+
+// Guardar la copia sin conexión NO puede retener la respuesta: antes cada
+// petición de la página esperaba a que el worker leyera el cuerpo entero, lo
+// parseara y lo escribiera en Cache Storage, y en producción (único entorno con
+// worker) toda la app iba más lenta que en local.
+const never = () => new Promise(() => {});
+function stallWrites(sw) {
+  const open = sw.caches.open;
+  sw.caches.open = async (name) => ({ ...(await open(name)), put: never });
+}
+const within = (promise, ms = 200) => Promise.race([promise, new Promise((_, fail) => setTimeout(() => fail(new Error('response held by the cache write')), ms))]);
+
+test('a page API read is answered before its offline snapshot is written', async () => {
+  const sw = harness(); await sw.login('alice');
+  sw.network(() => json({ items: [1, 2, 3] }));
+  stallWrites(sw);
+  const response = await within(sw.fetch('/api/favorites'));
+  assert.deepEqual(await response.json(), { items: [1, 2, 3] });
+});
+
+test('the deferred snapshot is still saved for offline use', async () => {
+  const sw = harness(); await sw.login('alice');
+  sw.network(() => json({ items: [7] }));
+  await sw.fetch('/api/favorites');
+  await sw.settle();
+  sw.network(() => new Response('NAS down', { status: 502 }));
+  assert.deepEqual(await (await sw.read('/api/favorites')).json(), { items: [7] });
+});
+
+test('a page document is answered before its assets are copied', async () => {
+  const sw = harness(); await sw.login('alice');
+  sw.network((request) => new URL(request.url).pathname.startsWith('/_next/')
+    ? never()
+    : new Response('<html><script src="/_next/static/entry.js"></script>Home</html>', { headers: { 'Content-Type': 'text/html' } }));
+  const response = await within(sw.fetch('/favorites', { headers: { Accept: 'text/html' } }));
+  assert.match(await response.text(), /Home/);
+});
+
+test('static chunks and images are answered before being cached', async () => {
+  const sw = harness();
+  sw.network(() => new Response('chunk'));
+  stallWrites(sw);
+  assert.equal(await (await within(sw.fetch('/_next/static/chunk.js'))).text(), 'chunk');
+});
+
+test('a title saved recently in this build is not prepared again', async () => {
+  const sw = harness(); await sw.login('alice');
+  let reads = 0;
+  sw.network((request) => {
+    reads++;
+    const path = new URL(request.url).pathname;
+    if (path === '/api/auth/me') return json({ authenticated: true, user: { id: 'alice' } });
+    if (path.startsWith('/details/')) return new Response('<html>Movie</html>', { headers: { 'Content-Type': 'text/html' } });
+    return json({ ok: true });
+  });
+  assert.equal((await sw.message({ type: 'OFFLINE_PREPARE_TITLE', mediaType: 'movie', id: 42 })).ok, true);
+  const first = reads;
+  assert.equal((await sw.message({ type: 'OFFLINE_PREPARE_TITLE', mediaType: 'movie', id: 42 })).ok, true);
+  assert.equal(reads, first);
+});
+
+// Las portadas de TMDb llegan como peticiones `no-cors` de <img>. Guardadas por
+// el worker eran respuestas OPACAS, y Chrome apunta cada una como ~7 MB de cuota
+// por relleno de seguridad: 519 portadas del dashboard ocupaban 3,9 GB, la cuota
+// se agotaba y la copia sin conexión fallaba y se rehacía una y otra vez.
+const poster = 'https://image.tmdb.org/t/p/w342/poster.jpg';
+
+test('posters go straight to the network and the HTTP cache, not through the worker', async () => {
+  const sw = harness();
+  let answered = false;
+  const { listeners } = sw;
+  listeners.fetch({ request: new Request(poster, { mode: 'no-cors' }), respondWith: () => { answered = true; }, waitUntil: () => {} });
+  assert.equal(answered, false);
+});
+
+test('activation drops the old cache of opaque posters', async () => {
+  const sw = harness();
+  await (await sw.caches.open('showverse-offline-images-v1')).put(poster, new Response('opaque'));
+  await sw.activate();
+  assert.equal(sw.stores.has('showverse-offline-images-v1'), false);
 });
