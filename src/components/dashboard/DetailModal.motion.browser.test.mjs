@@ -107,3 +107,44 @@ test('drawer supports reduced motion and closing during entry', { skip: !enabled
     await browser.close();
   }
 });
+
+
+test('moving and scrolling drawers suspend backdrop sampling and restore glass at rest', { skip: !enabled }, async () => {
+  const browser = await launch();
+  try {
+    for (const route of ['/', '/favorites']) {
+      const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+      await page.addInitScript(() => {
+        localStorage.setItem('showverse:dashboard:detailModalPlacement', 'right');
+        localStorage.setItem('showverse:dashboard:detailModalContentView', 'modal');
+        localStorage.setItem('showverse:detailModalContentView', 'modal');
+        window.movingFilters = [];
+        const animate = Element.prototype.animate;
+        Element.prototype.animate = function (frames, options) {
+          if (this.classList.contains('sv-drawer-panel') && frames.transform) {
+            window.movingFilters.push([...this.querySelectorAll('*')].some(el =>
+              getComputedStyle(el).backdropFilter !== 'none'));
+          }
+          return animate.call(this, frames, options);
+        };
+      });
+      await page.goto(`${process.env.TEST_BASE_URL || 'http://localhost:3000'}${route}?preview=movie-550`, { waitUntil: 'domcontentloaded' });
+      const panel = page.locator('.sv-drawer-panel');
+      await panel.waitFor();
+      await page.waitForFunction(() => document.querySelector('.sv-drawer-panel')?.style.willChange === 'auto');
+      assert.equal(await page.evaluate(() => window.movingFilters[0]), false, 'entry must not sample live backdrop filters');
+      assert.ok(await panel.evaluate(el => [...el.querySelectorAll('*')].some(child => getComputedStyle(child).backdropFilter.includes('blur'))), 'settled drawer retains the original glass');
+      // Dispatch a scroll on the actual scroll container: this also exercises
+      // the idle fallback on browsers without scrollend, without network data.
+      await panel.evaluate(el => el.querySelector('.overflow-y-auto').dispatchEvent(new Event('scroll')));
+      assert.equal(await panel.getAttribute('data-drawer-scrolling'), '');
+      assert.equal(await panel.evaluate(el => [...el.querySelectorAll('*')].some(child => getComputedStyle(child).backdropFilter !== 'none')), false);
+      await page.waitForFunction(() => !document.querySelector('.sv-drawer-panel')?.hasAttribute('data-drawer-scrolling'));
+      await page.keyboard.press('Escape');
+      await panel.waitFor({ state: 'detached' });
+      assert.equal(await page.evaluate(() => window.movingFilters.at(-1)), false, 'exit must also suspend backdrop sampling');
+      assert.equal(await page.locator('[data-drawer-scrolling], [data-drawer-moving]').count(), 0);
+      await page.close();
+    }
+  } finally { await browser.close(); }
+});
