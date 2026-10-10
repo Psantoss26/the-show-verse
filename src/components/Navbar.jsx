@@ -1779,20 +1779,24 @@ function SearchBar({
 // que la luz entra por el borde de ARRIBA y el canto que refracta es el de
 // ABAJO, que es donde el cristal se encuentra con el contenido. En la píldora,
 // en cambio, la máscara es elíptica porque el canto la rodea entera.
-function TopBarGlassLayers({ className = "" }) {
+function TopBarGlassLayers({ className = "", dataScrolled }) {
   return (
     <>
       {/* Refracción del canto inferior: desenfoque distinto del centro, que es
           la única refracción que el navegador puede dar (los filtros SVG no se
-          aplican al backdrop; ver la nota en liquidGlass.js). */}
+          aplican al backdrop; ver la nota en liquidGlass.js). Su máximo queda
+          un poco POR ENCIMA del borde y se apaga en el propio borde: con el
+          máximo justo en el borde trazaba una línea clara que delataba dónde
+          acaba la barra. */}
       <span
         aria-hidden="true"
+        data-scrolled={dataScrolled ? "" : undefined}
         className={`pointer-events-none absolute inset-0 backdrop-blur-[2px] backdrop-brightness-[1.16] backdrop-saturate-[240%] ${className}`}
         style={{
           WebkitMaskImage:
-            "linear-gradient(to top, #000 0%, rgba(0,0,0,0.35) 45%, transparent 78%)",
+            "linear-gradient(to top, transparent 0%, #000 24%, rgba(0,0,0,0.35) 52%, transparent 80%)",
           maskImage:
-            "linear-gradient(to top, #000 0%, rgba(0,0,0,0.35) 45%, transparent 78%)",
+            "linear-gradient(to top, transparent 0%, #000 24%, rgba(0,0,0,0.35) 52%, transparent 80%)",
         }}
       />
       {/* Especular: el reflejo que recorre el borde superior y se apaga hacia
@@ -1803,8 +1807,32 @@ function TopBarGlassLayers({ className = "" }) {
           página, no como el canto de una pieza de vidrio. */}
       <span
         aria-hidden="true"
+        data-scrolled={dataScrolled ? "" : undefined}
         className={`pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(255,255,255,0.11)_0%,rgba(255,255,255,0.03)_16%,transparent_46%)] desktop:hidden ${className}`}
       />
+    </>
+  );
+}
+
+// CRISTAL DE LA BARRA SUPERIOR: el cristal plano, el relevo de desenfoque leve
+// que suaviza su borde inferior (ver `.sv-topbar-glass` en globals.css) y, en
+// móvil/tablet, el canto y el reflejo. Todas son HERMANAS, cada una con su
+// propia máscara y su propia opacidad: un contenedor con máscara u opacidad
+// apagaría el `backdrop-filter` de las de dentro. `className` se aplica a cada
+// capa (z-index, visibilidad por tamaño, la opacidad por scroll de la ficha).
+function TopBarGlass({ className = "", dataScrolled, layers = true }) {
+  const scrolled = dataScrolled ? "" : undefined;
+  return (
+    <>
+      <div
+        aria-hidden
+        data-scrolled={scrolled}
+        className={`sv-topbar-glass ${LIQUID_GLASS_BAR_FLAT} ${className}`}
+      />
+      <div aria-hidden data-scrolled={scrolled} className={`sv-topbar-glass-soft ${className}`} />
+      {layers ? (
+        <TopBarGlassLayers className={`desktop:hidden ${className}`} dataScrolled={dataScrolled} />
+      ) : null}
     </>
   );
 }
@@ -2632,13 +2660,18 @@ function NavbarContent() {
                 // los aportan la capa interna y la fila móvil, GRADUALMENTE con
                 // el scroll (--sv-hero-scroll); en recomendaciones no hay scroll,
                 // así que la barra se queda transparente.
-                "desktop:bg-black/15 desktop:shadow-[0_16px_40px_-8px_rgba(0,0,0,0.75)]"
+                // Sin tinte ni sombra en el <nav>: el cristal (con el tinte) va en
+                // sus capas, que funden el borde inferior. La sombra dibujaba una
+                // banda oscura bajo la barra.
+                ""
               : // RESTO DE PÁGINAS: el mismo cristal líquido en móvil y en
                 // escritorio, en su variante PLANA. El fondo se sigue viendo a
                 // través igual (mismo tinte, desenfoque y saturación); lo que se
                 // quita es el degradado de luz, que era lo que dibujaba la banda
                 // clara en lo alto. El cristal lo pone la capa de abajo.
-                "shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]"
+                // Sin sombra: dibujaba una banda oscura bajo la barra. El borde
+                // lo funde el propio cristal (ver TopBarGlass).
+                ""
         }`}
       >
         {/* EL CRISTAL DE LA BARRA VA EN UNA CAPA, NO EN EL <nav>. Un
@@ -2650,20 +2683,10 @@ function NavbarContent() {
             Las capas de canto y reflejo (solo móvil/tablet) van DENTRO de esta
             capa, así siguen muestreando lo mismo que cuando colgaban del <nav>.
             Nunca en los estados transparentes, donde añadirían un velo. */}
-        {!heroNavMode && !isImmersiveRoute && (
-          <div
-            aria-hidden
-            className={`pointer-events-none absolute inset-0 -z-10 ${LIQUID_GLASS_BAR_FLAT}`}
-          >
-            <TopBarGlassLayers className="desktop:hidden" />
-          </div>
-        )}
+        {!heroNavMode && !isImmersiveRoute && <TopBarGlass className="-z-10" />}
         {/* Ficha / recomendaciones en escritorio, tras el scroll. */}
         {isImmersiveRoute && !desktopDetailsNavMode && (
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 -z-10 hidden backdrop-blur-[7px] backdrop-saturate-[190%] backdrop-brightness-[1.06] desktop:block"
-          />
+          <TopBarGlass className="-z-10 hidden desktop:block" layers={false} />
         )}
 
         {isDetailsRoute && (
@@ -2680,15 +2703,10 @@ function NavbarContent() {
                 iconos. La opacidad la decide `.sv-details-nav-glass` en
                 globals.css: en TELÉFONO sigue solo al progreso del scroll; en
                 TABLET (sin ese progreso) aparece al empezar a desplazarse. */}
-            <div
-              aria-hidden
-              data-scrolled={isScrolled ? "" : undefined}
-              className={`sv-details-nav-glass desktop:hidden pointer-events-none absolute inset-0 ${LIQUID_GLASS_BAR}`}
-            >
-              {/* Dentro de esta capa para que aparezcan y desaparezcan con ella
-                  según el progreso del scroll, no por separado. */}
-              <TopBarGlassLayers />
-            </div>
+            {/* Cada capa lleva la clase de la opacidad por scroll: aparecen y
+                desaparecen juntas, sin un contenedor con opacidad que apagaría
+                su desenfoque mientras dura el fundido. */}
+            <TopBarGlass className="sv-details-nav-glass desktop:hidden" dataScrolled={isScrolled} />
           </>
         )}
         {/* ---------------- Desktop ---------------- */}
