@@ -149,6 +149,7 @@ function keep(event, work) {
   return undefined;
 }
 
+const PREPARE_TIMEOUT = 90000;
 async function network(request, timeout = 6000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
@@ -232,7 +233,10 @@ async function apiRead(request, event) {
   const key = await readKey(request);
   try {
     if (Date.now() < offlineUntil) throw new Error("origin offline");
-    const response = await network(request.clone());
+    // La copia sin conexión (prepare.js) marca sus lecturas: van en segundo
+    // plano y algunas son pesadas. Cortarlas a los 6 s no paraba al servidor,
+    // que seguía calculándolas, y como contaban como fallo se repetían.
+    const response = await network(request.clone(), request.headers.has("X-Showverse-Prepare") ? PREPARE_TIMEOUT : undefined);
     if (unavailable(response)) throw new Error("origin unavailable");
     if (response.ok && !(response.headers.get("Content-Type") || "").includes("application/json")) throw new Error("Invalid API response");
     if (url.pathname === "/api/auth/me" && response.ok) {

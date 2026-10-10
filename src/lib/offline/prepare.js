@@ -1,5 +1,6 @@
 import { loadProfileCharts } from "@/lib/profile/loadProfileCharts";
 import { workerMessage, saveOfflineRoute, PREPARATION_EVENT, runKey } from "./client";
+import { createRunLog } from "./schedule";
 
 export const USER_ROUTES = [
   "/", "/favorites", "/watchlist", "/history", "/in-progress", "/completed",
@@ -57,13 +58,23 @@ export async function prepareOfflineAccount(user, { signal, onProgress = () => {
   };
   async function read(path, init = {}) {
     signal?.throwIfAborted();
-    const response = await fetch(path, { ...init, cache: "no-store", priority: "low", signal });
+    const response = await fetch(path, {
+      ...init,
+      // Lectura de la copia: el worker le da más margen (ver apiRead en sw.js).
+      headers: { ...init.headers, "X-Showverse-Prepare": "1" },
+      cache: "no-store",
+      priority: "low",
+      signal,
+    });
     if (!response.ok || response.headers.get("X-Showverse-Offline") === "1") throw new Error(`Snapshot unavailable: ${path}`);
     return response.json();
   }
+  // Pasos que una copia interrumpida ya terminó: no se repiten (ver createRunLog).
+  let log = createRunLog(null, { resumable: false, save: () => {} });
   async function attempt(path, fn) {
     signal?.throwIfAborted();
-    try { await fn(); } catch (error) { if (signal?.aborted) throw error; failures.push(path); }
+    if (log.isDone(path)) { completed += 1; return; }
+    try { await fn(); log.markDone(path); } catch (error) { if (signal?.aborted) throw error; failures.push(path); }
     completed += 1;
     progress("preparing");
   }
@@ -77,7 +88,8 @@ export async function prepareOfflineAccount(user, { signal, onProgress = () => {
     return;
   }
   await workerMessage({ type: "OFFLINE_PREPARE_BEGIN" });
-  writeRun(user.id, { startedAt: freshSince });
+  log = createRunLog(resumable ? pending : { startedAt: freshSince }, { resumable, save: (run) => writeRun(user.id, run) });
+  if (!resumable) writeRun(user.id, { startedAt: freshSince, done: [] });
   progress("preparing");
   // Documents first. They only need HTML plus static assets, and after a deploy
   // any route not yet refreshed keeps opening offline with the previous build's

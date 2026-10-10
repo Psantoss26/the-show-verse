@@ -28,3 +28,34 @@ export function shouldPrepareAutomatically({ last, build, pending = false, reaso
   const age = now - last.updatedAt;
   return age >= (reason === "data" ? DATA_CHANGE_INTERVAL_MS : AUTO_PREPARE_INTERVAL_MS);
 }
+
+// UNA SOLA COPIA A LA VEZ ENTRE PESTAÑAS. En escritorio es normal tener varias
+// pestañas de la app: cada una lanzaba su copia completa en paralelo y, como la
+// copia en curso deja su marca de «en marcha», una pestaña nueva la tomaba por
+// interrumpida y arrancaba otra. El candado (Web Locks) lo tiene la pestaña que
+// copia; las demás no esperan, simplemente no copian. Se suelta solo al cerrar
+// esa pestaña, y entonces la siguiente reanuda.
+export const PREPARATION_LOCK = "showverse:offline-prepare";
+
+export async function withPreparationLock(run, locks = globalThis.navigator?.locks) {
+  if (!locks?.request) return { skipped: false, value: await run() };
+  return locks.request(PREPARATION_LOCK, { ifAvailable: true }, async (lock) =>
+    lock ? { skipped: false, value: await run() } : { skipped: true });
+}
+
+// REANUDAR SIN REPETIR. La copia guarda qué pasos terminó; al reanudarse (se
+// cerró o recargó la pestaña a mitad, lo habitual en escritorio) los salta. Antes
+// solo se saltaban las páginas: las lecturas pesadas (historial completo,
+// recomendaciones, secciones paginadas) se repetían enteras en cada carga y, si
+// la copia nunca llegaba a terminar, en cada carga cargaban al NAS de nuevo.
+export function createRunLog(run, { resumable, save }) {
+  const done = new Set(resumable && Array.isArray(run?.done) ? run.done : []);
+  const startedAt = run?.startedAt;
+  return {
+    isDone: (step) => done.has(step),
+    markDone(step) {
+      done.add(step);
+      save({ startedAt, done: [...done] });
+    },
+  };
+}

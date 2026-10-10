@@ -6,7 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useServerOnline } from "@/context/ServerStatusContext";
 import { isServerReachable, PREPARATION_EVENT, reportConnection, runKey, saveOfflineRoute, workerMessage } from "@/lib/offline/client";
 import { prepareOfflineAccount } from "@/lib/offline/prepare";
-import { preparedKey, shouldPrepareAutomatically } from "@/lib/offline/schedule";
+import { preparedKey, shouldPrepareAutomatically, withPreparationLock } from "@/lib/offline/schedule";
 import { openSavedRoute } from "@/lib/offline/navigation";
 import { hideBrokenImages } from "@/lib/offline/brokenImages";
 
@@ -65,13 +65,14 @@ export default function OfflineManager() {
     // esperan 5 s para agruparse. La MANUAL (botón «Actualizar») arranca ya y lo
     // dice desde el primer instante: con la espera y sus salidas silenciosas,
     // pulsarlo parecía no hacer nada.
+    const due = (reason) => shouldPrepareAutomatically({
+      last: readJson(preparedKey(user.id)),
+      build: BUILD,
+      pending: Boolean(readJson(runKey(user.id))),
+      reason,
+    });
     const start = ({ manual = false, reason = "start" } = {}) => {
-      if (!manual && !shouldPrepareAutomatically({
-        last: readJson(preparedKey(user.id)),
-        build: BUILD,
-        pending: Boolean(readJson(runKey(user.id))),
-        reason,
-      })) return;
+      if (!manual && !due(reason)) return;
       clearTimeout(timer);
       if (manual && !active.current) report({ phase: "preparing", completed: 0 });
       timer = setTimeout(async () => {
@@ -92,9 +93,16 @@ export default function OfflineManager() {
         const controller = new AbortController();
         active.current = controller;
         try {
-          await navigator.storage?.persist?.();
-          const result = await prepareOfflineAccount({ id: user.id, username: user.username }, { signal: controller.signal });
-          if (result) localStorage.setItem(preparedKey(user.id), JSON.stringify({ ...result, build: BUILD }));
+          // Otra pestaña puede estar copiando: entonces esta no hace nada. Con
+          // el candado ya en la mano se vuelve a mirar si toca, porque otra
+          // pestaña puede haber terminado la copia mientras esta esperaba.
+          const { skipped } = await withPreparationLock(async () => {
+            if (!manual && !due(reason)) return;
+            await navigator.storage?.persist?.();
+            const result = await prepareOfflineAccount({ id: user.id, username: user.username }, { signal: controller.signal });
+            if (result) localStorage.setItem(preparedKey(user.id), JSON.stringify({ ...result, build: BUILD }));
+          });
+          if (skipped && manual) report({ phase: "preparing" });
         } catch (error) {
           if (!controller.signal.aborted) {
             console.warn("No se completó la copia para consulta sin conexión", error);
