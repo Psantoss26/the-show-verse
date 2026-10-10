@@ -110,3 +110,78 @@ test('mobile hero logo shadow can fade beyond the poster frame', {
     await browser.close();
   }
 });
+
+test('mobile scroll avoids document-wide style invalidation and keeps the fade stable when browser chrome resizes', {
+  skip: !process.env.PLAYWRIGHT_MODULE,
+}, async () => {
+  const { chromium } = await import(process.env.PLAYWRIGHT_MODULE);
+  const browser = await chromium.launch({
+    headless: true,
+    ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}),
+    args: ['--no-sandbox'],
+  });
+  try {
+    for (const route of ['movie/550', 'tv/1399']) {
+      for (const fallback of [false, true]) {
+        const page = await browser.newPage({
+          viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true,
+        });
+        if (fallback) {
+          await page.addInitScript(() => {
+            const supports = CSS.supports.bind(CSS);
+            CSS.supports = (...args) => args[0].includes('animation-timeline') ? false : supports(...args);
+          });
+        }
+        await page.goto(`${process.env.TEST_BASE_URL || 'http://localhost:3000'}/details/${route}`, { waitUntil: 'domcontentloaded' });
+        await page.locator('[data-mobile-reveal-stats] [data-scoreboard-stats]').waitFor({ state: 'attached' });
+        if (fallback) {
+          // Emulate engines without CSS scroll timelines, including CSS itself.
+          await page.addStyleTag({ content: '.sv-hero-scroll-in,.sv-hero-scroll-out,.sv-hero-scroll-shade,.sv-details-nav-glass { animation: none !important; }' });
+        }
+        await page.waitForFunction(() => {
+          const cover = document.querySelector('.sv-mobile-poster-entry img');
+          return cover?.complete && cover.naturalWidth > 0;
+        });
+        await page.waitForTimeout(1500);
+        const range = await page.evaluate(() => document.documentElement.style.getPropertyValue('--sv-hero-scroll-end'));
+        assert.ok(parseFloat(range) > 0);
+        const result = await page.evaluate(async () => {
+          let rootWrites = 0;
+          const observer = new MutationObserver((records) => { rootWrites += records.length; });
+          observer.observe(document.documentElement, { attributes: true, attributeFilter: ['style'] });
+          for (let i = 0; i <= 40; i++) {
+            window.scrollTo({ top: i * 16, behavior: 'instant' });
+            await new Promise(requestAnimationFrame);
+          }
+          observer.disconnect();
+          return {
+            rootWrites,
+            coverOpacity: Number(getComputedStyle(document.querySelector('.sv-hero-scroll-out')).opacity),
+            backgroundOpacity: Number(getComputedStyle(document.querySelector('.sv-hero-scroll-in')).opacity),
+          };
+        });
+        assert.equal(result.rootWrites, 0, `${route}: scrolling must not invalidate inherited styles on html`);
+        assert.ok(result.coverOpacity < 0.01, 'cover fades out');
+        assert.ok(result.backgroundOpacity > 0.99, 'background fades in');
+        await page.setViewportSize({ width: 390, height: 920 });
+        await page.waitForTimeout(200);
+        assert.equal(await page.evaluate(() => document.documentElement.style.getPropertyValue('--sv-hero-scroll-end')), range,
+          'address bar height changes must not retime the fade during a gesture');
+        await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+        await page.waitForTimeout(550);
+        assert.ok(await page.locator('.sv-hero-scroll-out').evaluate((el) => Number(getComputedStyle(el).opacity) > 0.99));
+        await page.setViewportSize({ width: 550, height: 950 });
+        await page.waitForTimeout(300);
+        assert.notEqual(await page.evaluate(() => document.documentElement.style.getPropertyValue('--sv-hero-scroll-end')), range,
+          'width changes must recompute the fade range');
+        await page.setViewportSize({ width: 1280, height: 900 });
+        await page.waitForTimeout(200);
+        assert.equal(await page.locator('.sv-hero-scroll-in').first().evaluate((el) => el.style.opacity), '',
+          'fallback inline opacity must be cleaned up on desktop');
+        await page.close();
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+});
