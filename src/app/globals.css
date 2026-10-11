@@ -1362,7 +1362,13 @@ body {
 .sv-drawer-panel:is([data-drawer-moving], [data-drawer-scrolling]) * {
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
-  /* transition-all on glass buttons would otherwise animate blur to zero. */
+}
+/* transition-all on glass buttons would otherwise animate blur to zero. El
+   indicador del menú de secciones queda fuera: su desplazamiento es justo lo
+   que ocurre durante el scroll (cambia la sección activa) y es solo
+   `transform`/`width` de un elemento, sin cristal. */
+.sv-drawer-panel:is([data-drawer-moving], [data-drawer-scrolling]),
+.sv-drawer-panel:is([data-drawer-moving], [data-drawer-scrolling]) *:not(.sv-menu-indicator) {
   transition: none !important;
 }
 
@@ -1386,7 +1392,7 @@ body {
    hilo principal, recalculando estilos en CADA fotograma del scroll. Se
    excluyen las ligadas al propio scroll (relevo portada → fondo de la vista de
    teléfono), que son las que tienen que seguir al dedo. */
-.sv-drawer-panel[data-drawer-scrolling] *:not(.sv-panel-relay-in, .sv-panel-relay-shade, .sv-panel-relay-out) {
+.sv-drawer-panel[data-drawer-scrolling] *:not(.sv-panel-relay-in, .sv-panel-relay-shade, .sv-panel-relay-out, .sv-menu-icon) {
   animation-play-state: paused !important;
 }
 
@@ -2805,3 +2811,43 @@ html[data-details-sequence-transition] .sv-topbar {
 ::view-transition-old(details-sequence-navbar) { display: none; }
 ::view-transition-new(details-sequence-navbar),
 ::view-transition-group(details-sequence-navbar) { animation: none; }
+
+/* MENÚ DE SECCIONES (DetailsSectionMenu): indicador de la sección activa e
+   iconos, por CSS en vez de framer.
+   - El indicador (fondo + subrayado) es UN elemento que se desliza al botón
+     activo con una transición de `transform` (y de `width`, de un solo
+     elemento absoluto). La primera colocación no se anima (`data-placed`).
+   - El icono activo crece y hace un pequeño balanceo de una vez.
+   Con framer, cada cambio de sección medía el layout y escribía estilos en el
+   hilo principal durante ~0,5 s; al desplazar la ficha la sección activa
+   cambia a menudo y el menú iba siempre animándose en pleno scroll. */
+.sv-menu-indicator[data-placed] {
+  transition:
+    transform 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    width 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.sv-menu-icon {
+  transition: transform 200ms ease-out;
+}
+.sv-menu-icon[data-active] {
+  transform: scale(1.08);
+  animation: sv-menu-icon-in 200ms ease-out;
+}
+.sv-menu-indicator[data-static],
+.sv-menu-icon[data-static] {
+  transition: none;
+  animation: none;
+}
+@keyframes sv-menu-icon-in {
+  0% { transform: scale(1) rotate(0deg); }
+  40% { transform: scale(1.08) rotate(-3deg); }
+  70% { transform: scale(1.08) rotate(3deg); }
+  100% { transform: scale(1.08) rotate(0deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sv-menu-indicator,
+  .sv-menu-icon {
+    transition: none !important;
+    animation: none !important;
+  }
+}

@@ -31,6 +31,16 @@ export default function DetailsSectionMenu({
 
   const containerRef = useRef(null);
   const innerRef = useRef(null);
+  // Indicador de la sección activa (fondo + subrayado): UN solo elemento que se
+  // desliza por CSS hasta el botón activo. Antes era un `layoutId` de framer
+  // por botón: en cada cambio de sección framer medía el layout y escribía
+  // estilos en el hilo principal durante todo el muelle (~0,5 s). Como la
+  // sección activa cambia al cruzar cada una mientras se desplaza la ficha, el
+  // menú estaba animándose casi siempre en pleno scroll y lo dejaba a tirones
+  // (medido en la ficha de teléfono del drawer). Ahora se lee la posición del
+  // botón al cambiar y el resto lo hace una transición de `transform`.
+  const indicatorRef = useRef(null);
+  const buttonRefs = useRef(new Map());
   // La ficha recuperada al volver atrás se pinta estática (sin la entrada).
   const isStaticDetails = useDetailsStaticMotion();
   const shouldReduceMotion = useReducedMotion() || isStaticDetails;
@@ -113,6 +123,37 @@ export default function DetailsSectionMenu({
     };
   }, [safeItems.length]);
 
+  useLayoutEffect(() => {
+    const indicator = indicatorRef.current;
+    const button = activeId != null ? buttonRefs.current.get(activeId) : null;
+    if (!indicator) return undefined;
+    if (!button) {
+      indicator.style.visibility = "hidden";
+      return undefined;
+    }
+    // offsetLeft/Top son coordenadas de maquetación, sin el `scale` con el que
+    // se encoge la fila: el indicador vive dentro de la misma fila escalada.
+    const place = () => {
+      indicator.style.visibility = "visible";
+      indicator.style.transform = `translate(${button.offsetLeft}px, ${button.offsetTop}px)`;
+      indicator.style.width = `${button.offsetWidth}px`;
+      indicator.style.height = `${button.offsetHeight}px`;
+    };
+    place();
+    // La primera colocación es directa; a partir de ahí, se desliza.
+    let frame = 0;
+    if (!indicator.hasAttribute("data-placed")) {
+      frame = requestAnimationFrame(() => indicator.setAttribute("data-placed", ""));
+    }
+    const ro = new ResizeObserver(place);
+    ro.observe(button);
+    if (innerRef.current) ro.observe(innerRef.current);
+    return () => {
+      cancelAnimationFrame(frame);
+      ro.disconnect();
+    };
+  }, [activeId, safeItems, fits]);
+
   if (safeItems.length === 0) return null;
 
   return (
@@ -146,7 +187,7 @@ export default function DetailsSectionMenu({
                     <div
                       ref={innerRef}
                       className={[
-                        "flex flex-nowrap items-center whitespace-nowrap",
+                        "relative flex flex-nowrap items-center whitespace-nowrap",
                         fits
                           ? "w-full justify-between"
                           : "w-max justify-center",
@@ -159,26 +200,42 @@ export default function DetailsSectionMenu({
                         willChange: "transform",
                       }}
                     >
+                      <div
+                        ref={indicatorRef}
+                        aria-hidden="true"
+                        data-static={shouldReduceMotion ? "" : undefined}
+                        className="sv-menu-indicator pointer-events-none absolute left-0 top-0"
+                        style={{ visibility: "hidden" }}
+                      >
+                        <div
+                          className={`absolute inset-0 rounded-xl bg-gradient-to-br ${colors.activeBg}`}
+                        />
+                        <span
+                          className={`absolute bottom-0 left-2 right-2 h-[2.5px] rounded-full bg-gradient-to-r ${colors.indicator}`}
+                        />
+                      </div>
                       {safeItems.map((item, index) => {
                         const Icon = item.icon;
                         const active = item.id === activeId;
 
                         return (
-                          <motion.button
+                          <button
                             key={item.id}
+                            ref={(el) => {
+                              if (el) buttonRefs.current.set(item.id, el);
+                              else buttonRefs.current.delete(item.id);
+                            }}
                             onClick={() => onChange?.(item.id)}
                             type="button"
                             aria-current={active ? "page" : undefined}
-                            // Las secciones aparecen CON la barra, no después.
-                            // Entraban una a una desde opacity 0 con retardo
-                            // escalonado, así que durante ~0,3s se veía la barra
-                            // de cristal vacía. El movimiento de entrada lo hace
-                            // el contenedor, que sube con todo dentro.
-                            initial={false}
-                            whileHover={{ scale: 1.03 }}
-                            whileTap={{ scale: 0.97 }}
+                            // Las secciones aparecen CON la barra, no después: el
+                            // movimiento de entrada lo hace el contenedor. El
+                            // hover y la pulsación son CSS (antes gestos de
+                            // framer, que se disparaban al pasar las filas bajo
+                            // el puntero durante el scroll).
                             className={[
                               "group relative flex items-center justify-center overflow-hidden rounded-xl",
+                              "hover:scale-[1.03] active:scale-[0.97]",
                               "px-3 py-2 sm:px-3.5 sm:py-2.5",
                               "transition-all duration-300 ease-out",
                               "outline-none focus-visible:ring-2",
@@ -188,57 +245,12 @@ export default function DetailsSectionMenu({
                             ].join(" ")}
                             aria-label={item.label}
                           >
-                            {active && !shouldReduceMotion && (
-                              <>
-                                <motion.div
-                                  layoutId={`detailsMenuIndicatorBg-${colorScheme}`}
-                                  aria-hidden="true"
-                                  className={`absolute inset-0 rounded-xl bg-gradient-to-br ${colors.activeBg}`}
-                                  initial={false}
-                                  transition={{
-                                    type: "spring",
-                                    stiffness: 400,
-                                    damping: 30,
-                                    mass: 1,
-                                  }}
-                                />
-                                <motion.span
-                                  layoutId={`detailsMenuIndicatorLine-${colorScheme}`}
-                                  aria-hidden="true"
-                                  className={`absolute bottom-0 left-2 right-2 h-[2.5px] rounded-full bg-gradient-to-r ${colors.indicator}`}
-                                  initial={false}
-                                  transition={{
-                                    type: "spring",
-                                    stiffness: 400,
-                                    damping: 30,
-                                    mass: 1,
-                                  }}
-                                />
-                              </>
-                            )}
-                            {active && shouldReduceMotion && (
-                              <>
-                                <div
-                                  aria-hidden="true"
-                                  className={`absolute inset-0 rounded-xl bg-gradient-to-br backdrop-blur-lg ${colors.activeBg}`}
-                                />
-                                <span
-                                  aria-hidden="true"
-                                  className={`absolute bottom-0 left-2 right-2 h-[2.5px] rounded-full bg-gradient-to-r ${colors.indicator}`}
-                                />
-                              </>
-                            )}
                             <div className="relative z-10 flex items-center gap-2">
                               {Icon && (
-                                <motion.div
-                                  animate={{
-                                    scale: active ? 1.08 : 1,
-                                    rotate: active ? [0, -3, 3, 0] : 0,
-                                  }}
-                                  transition={{
-                                    duration: 0.2,
-                                    ease: "easeOut",
-                                  }}
+                                <div
+                                  className="sv-menu-icon"
+                                  data-active={active ? "" : undefined}
+                                  data-static={shouldReduceMotion ? "" : undefined}
                                 >
                                   <Icon
                                     className={[
@@ -254,14 +266,10 @@ export default function DetailsSectionMenu({
                                         : "text-zinc-300 group-hover:text-white",
                                     ].join(" ")}
                                   />
-                                </motion.div>
+                                </div>
                               )}
 
-                              <motion.span
-                                animate={{
-                                  scale: active ? 1.02 : 1,
-                                }}
-                                transition={{ duration: 0.3 }}
+                              <span
                                 className={[
                                   iconsOnly
                                     ? "hidden"
@@ -281,7 +289,7 @@ export default function DetailsSectionMenu({
                                 ].join(" ")}
                               >
                                 {item.label}
-                              </motion.span>
+                              </span>
 
                               {item.badge && (
                                 <motion.span
@@ -299,7 +307,7 @@ export default function DetailsSectionMenu({
                                 </motion.span>
                               )}
                             </div>
-                          </motion.button>
+                          </button>
                         );
                       })}
                     </div>

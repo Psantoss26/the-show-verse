@@ -17,7 +17,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/lib/i18n";
 import { getWatchProviders } from "@/lib/api/tmdb";
@@ -1848,6 +1848,8 @@ export default function WatchlistClient() {
   } = useAuth();
   const { t } = useTranslation();
   const isBackNav = useIsHistoryNavigation();
+  const reduceMotion = useReducedMotion();
+  const skipStatsAnimation = isBackNav || reduceMotion;
   // Read each persistent cache only once on mount. These JSON.parse and build
   // Maps from localStorage; calling them several times (watchlist x2,
   // providers x2) blocked the first render and added a perceptible delay to the
@@ -2914,40 +2916,59 @@ export default function WatchlistClient() {
               </p>
             </div>
 
-            {!loading && (
               <motion.div
                 className="flex gap-2 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
-                initial={isBackNav ? false : { opacity: 0, y: 20 }}
+                initial={skipStatsAnimation ? false : { opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={
-                  isBackNav ? { duration: 0 } : { duration: 0.5, delay: 0.3 }
+                  skipStatsAnimation ? { duration: 0 } : { duration: 0.5, delay: 0.3 }
                 }
               >
-                <PageStatCard
-                  className="flex-1 lg:flex-none lg:w-auto"
-                  label="Total"
-                  value={stats.total}
-                  icon={Bookmark}
-                  colorClass="text-blue-400"
-                  iconClassName="fill-blue-400"
-                />
-                <PageStatCard
-                  className="flex-1 lg:flex-none lg:w-auto"
-                  label="Películas"
-                  value={stats.movies}
-                  icon={Film}
-                  colorClass="text-sky-400"
-                />
-                <PageStatCard
-                  className="flex-1 lg:flex-none lg:w-auto"
-                  label="Series"
-                  value={stats.shows}
-                  icon={TvGlyph}
-                  colorClass="text-purple-400"
-                  iconClassName="text-purple-400"
-                />
+                <motion.div
+                  className="min-w-0 flex-1 lg:flex-none"
+                  initial={skipStatsAnimation ? false : { opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={skipStatsAnimation ? { duration: 0 } : { duration: 0.4, delay: 0.5 }}
+                >
+                  <PageStatCard
+                    loading={loading}
+                    label="Total"
+                    value={stats.total}
+                    icon={Bookmark}
+                    colorClass="text-blue-400"
+                    iconClassName="fill-blue-400"
+                  />
+                </motion.div>
+                <motion.div
+                  className="min-w-0 flex-1 lg:flex-none"
+                  initial={skipStatsAnimation ? false : { opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={skipStatsAnimation ? { duration: 0 } : { duration: 0.4, delay: 0.6 }}
+                >
+                  <PageStatCard
+                    loading={loading}
+                    label="Películas"
+                    value={stats.movies}
+                    icon={Film}
+                    colorClass="text-sky-400"
+                  />
+                </motion.div>
+                <motion.div
+                  className="min-w-0 flex-1 lg:flex-none"
+                  initial={skipStatsAnimation ? false : { opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={skipStatsAnimation ? { duration: 0 } : { duration: 0.4, delay: 0.7 }}
+                >
+                  <PageStatCard
+                    loading={loading}
+                    label="Series"
+                    value={stats.shows}
+                    icon={TvGlyph}
+                    colorClass="text-purple-400"
+                    iconClassName="text-purple-400"
+                  />
+                </motion.div>
               </motion.div>
-            )}
           </div>
         </motion.header>
 

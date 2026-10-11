@@ -50,9 +50,23 @@ export function AnimatedSection({
   const isInView = useInView(ref, { once: true, margin });
   const shouldReduceMotion = useSkipEntryMotion();
 
+  // `transform` completo y no `y`: framer pasa `transform` y `opacity` al
+  // compositor (WAAPI), mientras que `y` lo anima en el hilo principal
+  // escribiendo el estilo en cada fotograma. Las secciones entran justo
+  // mientras se desplaza la ficha, así que con `y` cada entrada competía con el
+  // scroll. Se acaba en `none` (no en `translateY(0px)`): un transform residual
+  // haría del envoltorio el bloque contenedor de cualquier `fixed` interior y
+  // un contexto de apilamiento.
   const hidden = shouldReduceMotion
-    ? { opacity: 1, y: 0 }
-    : { opacity: 0, y: 18 };
+    ? { opacity: 1, transform: "none" }
+    : { opacity: 0, transform: "translateY(18px)" };
+  // framer interpola hasta `translateY(0px)` y lo deja en línea: al acabar se
+  // sustituye por `none` (`transitionEnd`).
+  const shown = {
+    opacity: 1,
+    transform: "translateY(0px)",
+    transitionEnd: { transform: "none" },
+  };
 
   return (
     <motion.div
@@ -62,7 +76,7 @@ export function AnimatedSection({
         renderImmediately
           ? false
           : isInView || shouldReduceMotion
-            ? { opacity: 1, y: 0 }
+            ? shown
             : hidden
       }
       transition={

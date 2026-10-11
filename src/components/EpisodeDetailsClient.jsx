@@ -31,6 +31,17 @@ import { offlineMutationFetch } from "@/lib/offline/syncQueue";
 import DetailsInfoTabs from "@/components/details/DetailsInfoTabs";
 import { AnimatedSection } from "@/components/details/AnimatedSection";
 import AnimatedPosterFrame from "@/components/details/AnimatedPosterFrame";
+import EpisodeStillStack from "@/components/details/EpisodeStillStack";
+import {
+  MOBILE_ACTIONS_ENTRY_ANIMATION,
+  MOBILE_REVEAL_BASE,
+  MOBILE_STATS_REVEAL_BASE,
+  MOBILE_SCOREBOARD_ENTRY_ANIMATION,
+  MobileHeroCover,
+  useMobileDetailsHero,
+} from "@/components/details/MobileDetailsHero";
+import useImageLoadReady from "@/lib/hooks/useImageLoadReady";
+import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import StreamingHoverOverlay from "@/components/details/StreamingHoverOverlay";
 import DetailsScoreboardPanel, {
   ScoreboardPill,
@@ -290,6 +301,9 @@ export default function EpisodeDetailsClient({
   imdb,
   imdbId,
   imdbUrl,
+  // Portada móvil: imágenes del episodio a apilar (resueltas en el servidor,
+  // lib/details/episodeHeroStills).
+  heroStillPaths = [],
 }) {
   const traktRequestIdRef = useRef(0);
 
@@ -352,6 +366,42 @@ export default function EpisodeDetailsClient({
     const url = `https://image.tmdb.org/t/p/original${heroBgPath}`;
     return { backgroundImage: `url(${url})` };
   }, [heroBgPath]);
+
+  // ---- MÓVIL: cabecera inmersiva, la de las temporadas (details/MobileDetailsHero) ----
+  // El episodio no tiene póster: la portada vertical son sus imágenes
+  // horizontales apiladas (EpisodeStillStack), pegada arriba y a los lados.
+  // Debajo, el título, los botones y el marcador como en las temporadas; con el
+  // scroll la portada da paso a la primera imagen difuminada de fondo.
+  const mobileStillPaths = heroStillPaths?.length
+    ? heroStillPaths
+    : stillPath
+      ? [stillPath]
+      : [];
+  const isBackNav = useIsHistoryNavigation();
+  const animateMobileEntry = !isBackNav;
+  const mobileCoverFirstSrc = mobileStillPaths[0]
+    ? `https://image.tmdb.org/t/p/w780${mobileStillPaths[0]}`
+    : null;
+  const mobileCoverLoad = useImageLoadReady(mobileCoverFirstSrc);
+  const [mobileCoverFailedSrc, setMobileCoverFailedSrc] = useState(null);
+  const mobileCoverReady =
+    !mobileCoverFirstSrc ||
+    mobileCoverLoad.ready ||
+    mobileCoverFailedSrc === mobileCoverFirstSrc;
+  const {
+    rootRef: heroRootRef,
+    coverSpacerRef: heroCoverSpacerRef,
+    actionRowRef: heroActionRowRef,
+    scoreboardRef: heroScoreboardRef,
+    secondaryTriggerRef: heroSecondaryTriggerRef,
+    isPhone,
+    scoreboardMode: heroScoreboardMode,
+    revealProps: heroRevealProps,
+    statsRevealProps: heroStatsRevealProps,
+    rootStyle: heroRootStyle,
+  } = useMobileDetailsHero(true, { lock: mobileCoverReady });
+  // Qué cabe bajo los botones sin recortar la portada (solo teléfono).
+  const mobileScoreboardMode = isPhone ? heroScoreboardMode : "full";
 
   const [isMounted, setIsMounted] = useState(false);
   const [episodeStreamingProviders, setEpisodeStreamingProviders] = useState(
@@ -1355,9 +1405,18 @@ export default function EpisodeDetailsClient({
   ]);
 
   return (
-    <div className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30">
+    <div
+      ref={heroRootRef}
+      className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30"
+      style={heroRootStyle}
+    >
       {/* Background */}
       <div className="fixed inset-0 z-0 overflow-hidden bg-[#0a0a0a] pointer-events-none">
+        {/* Fondo de la página. MÓVIL: aparece con el scroll, detrás de la
+            portada fija, y es la primera imagen de la portada difuminada (como
+            el póster sin texto de las temporadas). */}
+        <div className="sv-hero-scroll-in absolute inset-0 max-sm:[opacity:var(--sv-hero-scroll,0)] sm:opacity-100">
+        <div className="absolute inset-0 max-sm:hidden">
         {heroBackgroundStyle ? (
           <>
             {/* Capa base: siempre cubre (evita marcos laterales) */}
@@ -1383,12 +1442,45 @@ export default function EpisodeDetailsClient({
         ) : (
           <div className="absolute inset-0 bg-[#0a0a0a]" />
         )}
+        </div>
+        {isPhone && mobileStillPaths[0] ? (
+          // Fondo decorativo difuminado: <img> directo, solo en teléfono.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={`https://image.tmdb.org/t/p/w780${mobileStillPaths[0]}`}
+            alt=""
+            aria-hidden="true"
+            decoding="async"
+            fetchPriority="low"
+            className="absolute inset-0 h-full w-full scale-[1.12] object-cover blur-[4px] brightness-90 saturate-[1.03] sm:hidden"
+          />
+        ) : null}
+        </div>
 
-        <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-black/60 via-transparent to-transparent" />
-        <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-[#101010]/60 via-transparent to-transparent" />
-        <div className="absolute inset-0 pointer-events-none bg-gradient-to-l from-[#101010]/60 via-transparent to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#101010] via-[#101010]/60 to-black/20" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#101010] via-transparent to-transparent opacity-30" />
+        <MobileHeroCover
+          src={null}
+          lowSrc={null}
+          ready={mobileCoverReady}
+          animate={animateMobileEntry}
+          collage={
+            <EpisodeStillStack
+              paths={mobileStillPaths}
+              imgRef={mobileCoverLoad.imgRef}
+              onLoad={mobileCoverLoad.onLoad}
+              onError={() => setMobileCoverFailedSrc(mobileCoverFirstSrc)}
+            />
+          }
+        />
+
+        {/* Sombreados de legibilidad. En MÓVIL siguen al scroll hasta el 60%,
+            como en las temporadas: la portada entra limpia. */}
+        <div className="sv-hero-scroll-shade absolute inset-0 max-sm:[opacity:calc(var(--sv-hero-scroll,0)*0.6)] sm:opacity-100">
+          <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-black/60 via-transparent to-transparent" />
+          <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-[#101010]/60 via-transparent to-transparent" />
+          <div className="absolute inset-0 pointer-events-none bg-gradient-to-l from-[#101010]/60 via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#101010] via-[#101010]/60 to-black/20" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#101010] via-transparent to-transparent opacity-30" />
+        </div>
       </div>
 
       {/* Content */}
@@ -1401,14 +1493,57 @@ export default function EpisodeDetailsClient({
           initial={false}
           animate={{ y: 0 }}
           transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-          className="flex flex-col items-start gap-8 lg:flex-row lg:gap-12 transform-gpu"
+          // MÓVIL: sube hasta el borde superior (los 2rem del `py-8` + los
+          // 3rem del navbar compacto) para que el hueco de la portada coincida
+          // con la portada fija, como en las temporadas.
+          className="-mt-[5rem] flex flex-col items-start gap-5 sm:mt-0 sm:gap-8 lg:flex-row lg:gap-12 transform-gpu"
         >
-          {/* Left still */}
+          {/* MÓVIL: hueco del alto de la portada fija (que va en el fondo de
+              la página) y, al pie, el título del episodio, donde las
+              temporadas tienen el de su póster. */}
+          <div
+            ref={heroCoverSpacerRef}
+            className="relative -mx-4 w-[calc(100%+2rem)] max-w-none flex-shrink-0 sm:hidden"
+            style={{ height: "var(--mobile-cover-h)" }}
+          >
+            {mobileCoverReady ? (
+              <motion.div
+                initial={animateMobileEntry ? { opacity: 0, y: 18, scale: 0.94 } : false}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.48, delay: 0.14, ease: [0.16, 1, 0.3, 1] }}
+                className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center px-4 pb-1 pt-4 text-center motion-reduce:!transform-none motion-reduce:!opacity-100"
+              >
+                <div className="mb-2 text-xs font-bold uppercase tracking-widest text-zinc-300 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
+                  Episodio {episodeNumber} · Temporada {seasonNumber}
+                </div>
+                <h1 className="max-w-[92%] text-4xl font-black leading-[1] tracking-tight text-white text-balance drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)]">
+                  {epName}
+                </h1>
+                {inProgressPct != null ? (
+                  // «Viendo»: el progreso que en escritorio va sobre la imagen.
+                  <div className="mt-3 flex w-full max-w-[16rem] items-center gap-2">
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-black shadow-[0_2px_10px_rgba(16,185,129,0.55)]">
+                      <PlayIcon className="h-2.5 w-2.5 fill-current" /> Viendo
+                    </span>
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/25">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500"
+                        style={{ width: `${inProgressPct}%` }}
+                      />
+                    </div>
+                    <span className="shrink-0 text-xs font-black text-white">{inProgressPct}%</span>
+                  </div>
+                ) : null}
+              </motion.div>
+            ) : null}
+          </div>
+
+          {/* Left still (desde `sm`; en el teléfono la portada es la fija) */}
           <motion.div
             initial={{ opacity: 0, x: -20, scale: 0.985 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
             transition={{ duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
-            className="mx-auto flex w-full max-w-[520px] flex-shrink-0 flex-col gap-5 lg:mx-0 lg:max-w-[560px]"
+            className="mx-auto hidden w-full max-w-[520px] flex-shrink-0 flex-col gap-5 sm:flex lg:mx-0 lg:max-w-[560px]"
           >
             <AnimatedPosterFrame
               src={
@@ -1511,7 +1646,8 @@ export default function EpisodeDetailsClient({
             // cristal, igual que DetailsClient.
             className="flex-1 flex flex-col min-w-0 w-full"
           >
-            <div className="mb-4 px-1 flex flex-col items-center lg:items-start text-center lg:text-left w-full">
+            {/* MÓVIL: el título va al pie de la portada. */}
+            <div className="mb-4 px-1 hidden sm:flex flex-col items-center lg:items-start text-center lg:text-left w-full">
               <div className="mb-2 text-xs font-bold uppercase tracking-widest text-zinc-400">
                 Episodio {episodeNumber} · Temporada {seasonNumber}
               </div>
@@ -1521,7 +1657,16 @@ export default function EpisodeDetailsClient({
               </h1>
             </div>
 
-            <div className="mb-6 px-1">
+            {/* MÓVIL: pegada a la portada (`-top-2`) y con la entrada de las
+                temporadas (la fila sube y los botones caen en cascada) cuando
+                la portada está lista; hasta entonces, invisible en su sitio. */}
+            <div className="relative mb-6 px-1 max-sm:-top-2 max-sm:mb-4">
+              <div
+                ref={heroActionRowRef}
+                className={
+                  !animateMobileEntry ? "" : mobileCoverReady ? MOBILE_ACTIONS_ENTRY_ANIMATION : "max-sm:invisible"
+                }
+              >
               <SubrouteDetailsActionRow
                 seriesHref={`/details/tv/${showId}`}
                 seasonHref={`/details/tv/${showId}/season/${seasonNumber}`}
@@ -1557,15 +1702,29 @@ export default function EpisodeDetailsClient({
                   onRate: handleRate,
                 }}
               />
+              </div>
             </div>
 
             {/* SCOREBOARD. MÓVIL: el de la ficha y las temporadas
                 (`mobileScoresOnly`): puntuaciones y stats repartidas a todo el
                 ancho; Plataformas, Enlaces y Compartir van debajo como
                 píldoras. Desde `sm`, el marcador de siempre con sus botones. */}
+            <div
+              ref={heroScoreboardRef}
+              // Centrado entre los botones y el navbar inferior (ver
+              // `--mobile-scoreboard-shift` en details/MobileDetailsHero); en
+              // 'compact' la barra de stats se revela con el scroll.
+              className={`mb-6 max-sm:mt-[var(--mobile-scoreboard-shift,0px)] ${mobileScoreboardMode === "compact" ? MOBILE_STATS_REVEAL_BASE : ""} ${
+                !animateMobileEntry
+                  ? ""
+                  : mobileCoverReady
+                    ? MOBILE_SCOREBOARD_ENTRY_ANIMATION
+                    : "max-sm:invisible"
+              }`}
+              {...(mobileScoreboardMode === "compact" ? heroStatsRevealProps : {})}
+            >
             <DetailsScoreboardPanel
               mobileScoresOnly
-              className="mb-6 max-sm:mb-0"
               loading={tScoreboard.loading}
               tmdb={{
                 value: vote?.toFixed(1),
@@ -1613,11 +1772,18 @@ export default function EpisodeDetailsClient({
                 text: shareText,
               }}
             />
+            </div>
 
-            {/* Teléfono: Plataformas, Enlaces y Compartir en una fila de
-                iconos bajo el marcador, como en la ficha. Cada uno abre su
-                modal. */}
-            <ScoreboardPillRow className="mt-3 mb-6 sm:hidden">
+            {/* MÓVIL: Plataformas, Enlaces y Compartir y las pestañas se
+                revelan con el scroll (centinela antes), como en las
+                temporadas: así el marcador cabe en la primera vista. */}
+            <span
+              ref={heroSecondaryTriggerRef}
+              aria-hidden="true"
+              className="block h-px sm:hidden"
+            />
+            <div className={`mb-3 sm:hidden ${MOBILE_REVEAL_BASE}`} {...heroRevealProps}>
+            <ScoreboardPillRow>
               <ScoreboardPill
                 iconOnly
                 icon={MonitorPlay}
@@ -1641,6 +1807,23 @@ export default function EpisodeDetailsClient({
                 text={shareText}
               />
             </ScoreboardPillRow>
+            </div>
+            <div className={`mb-10 sm:hidden ${MOBILE_REVEAL_BASE}`} {...heroRevealProps}>
+              <DetailsInfoTabs
+                layoutId="episodeTabBackdrop"
+                mobileLayout
+                enableMobileTabSwipe
+                mediaType="tv"
+                overview={episode?.overview}
+                creators={showCreators}
+                network={showNetwork}
+                productionText={episodeProduction}
+                showPlatformsTab={false}
+                showAwardsTab={false}
+                showAwardsProductionCard={false}
+                detailCards={episodeDetailCards}
+              />
+            </div>
 
           </div>
         </motion.div>
@@ -1649,23 +1832,6 @@ export default function EpisodeDetailsClient({
             backdrop. Por eso sus pestañas se colocan tras el hero: así no
             quedan limitadas a la columna de texto y usan todo el ancho de la
             ficha, como en DetailsClient. */}
-        <section className="mb-10 w-full sm:hidden">
-          <DetailsInfoTabs
-            layoutId="episodeTabBackdrop"
-            mobileLayout
-            enableMobileTabSwipe
-            mediaType="tv"
-            overview={episode?.overview}
-            creators={showCreators}
-            network={showNetwork}
-            productionText={episodeProduction}
-            showPlatformsTab={false}
-            showAwardsTab={false}
-            showAwardsProductionCard={false}
-            detailCards={episodeDetailCards}
-          />
-        </section>
-
         <section className="mt-8 mb-10 hidden w-full sm:block lg:mt-6">
           <DetailsInfoTabs
             layoutId="episodeTabBackdropDesktop"

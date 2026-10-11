@@ -318,6 +318,18 @@ export default function SeasonDetailsClient({
 
   const [episodesView, setEpisodesView] = useState("list"); // 'list' | 'grid'
 
+  // En el TELÉFONO la vista por defecto es la de rejilla: con una columna, cada
+  // episodio es una sola tarjeta con la imagen y sus datos encima (~220px)
+  // frente a la imagen + título + sinopsis de la lista (~375px). Se decide
+  // antes del primer pintado tras hidratar; el servidor no conoce el ancho, y
+  // la lista queda muy por debajo de la cabecera, así que el cambio no se ve.
+  // Después manda lo que elija el usuario con los botones.
+  useLayoutEffect(() => {
+    if (window.matchMedia("(max-width: 639px)").matches) {
+      setEpisodesView("grid");
+    }
+  }, []);
+
   const showName = show?.name || show?.title || "Serie";
   const seasonName =
     season?.name?.trim() ||
