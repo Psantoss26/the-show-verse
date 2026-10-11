@@ -70,7 +70,7 @@ Reestructurar el motor de dashboards en tres frentes: carga e interacción inmed
 
 ## Assumptions
 
-- El motor principal de dashboards debe seguir usando TMDB + biblioteca propia, no Trakt, tal como indica la documentación.
+- El motor principal de recomendaciones sigue usando TMDb + biblioteca propia. Excepción para «Más esperadas»: el pool público utiliza `list_count` de `/movies/anticipated` y `/shows/anticipated` de Trakt como señal de demanda, sin OAuth ni datos privados. Hidrata en TMDb candidatos ausentes en discover, ordena ambos formatos por demanda sin alternancia 50/50 y conserva un respaldo TMDb sin votos previos al estreno si Trakt falla. El pool se cachea durante 12 horas.
 - "Ya visto" se permitirá sobre todo en secciones genéricas; en recomendaciones personalizadas se permite solo con control de proporción.
 - "Porque viste..." debe interpretarse como "porque te gustó X", no solo porque aparece en historial.
 - La prioridad de implementación recomendada es: primero interacción/carga, luego scoring de recomendaciones, después variedad/dedupe entre dashboards.

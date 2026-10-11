@@ -2,7 +2,8 @@
 import { db } from '../db/client.js';
 import { dashboardPools } from '../db/schema.js';
 import { and, eq } from 'drizzle-orm';
-import { tmdbDiscover, tmdbList, tmdbDetails, tmdbSeason, MOVIE_GENRES, TV_GENRES } from './tmdb.js';
+import { tmdbDiscover, tmdbList, tmdbDetails, tmdbSeason, toCard, MOVIE_GENRES, TV_GENRES } from './tmdb.js';
+import { fetchAnticipated, mergeAnticipatedCandidates } from './anticipated.js';
 import { withinRange } from './calendarRange.js';
 import { rankAnticipatedTitles, rankNewReleaseMovies } from './score.js';
 import {
@@ -278,43 +279,33 @@ addPool('new_releases', 'tv', TTL_24H, async () =>
   }), 4))
 );
 
-// anticipated (24h) — próximos estrenos de cine Y series. Es la alternativa
-// propia a "anticipated" de Trakt: popularidad y votos miden interés público;
-// en cine los detalles aportan además escala y pertenencia a una saga. La
-// ventana amplia conserva eventos del próximo año, pero descarta anuncios sin
-// fecha fiable.
-addPool('anticipated', 'movie', TTL_24H, async () => {
-  const future = upcomingContentRules(
-    await discoverPages('movie', {
-      sort_by: 'popularity.desc',
-      'primary_release_date.gte': dateOffset(1),
-      'primary_release_date.lte': dateOffset(550),
-    }, 6),
-  );
-  const enriched = await enrichMoviesWithFinancials(future, 70);
-  return rankAnticipatedTitles(enriched)
-    .map((card) => ({
-      ...card,
-      anticipatedScore: card.anticipatedScore * localePriorityWeight(card),
-    }))
-    .sort((a, b) => b.anticipatedScore - a.anticipatedScore);
-}, { version: 'anticipated-multimedia-v3' });
-
-addPool('anticipated', 'tv', TTL_24H, async () => {
-  const future = upcomingContentRules(
-    await discoverPages('tv', discoverParams('tv', {
-      sort_by: 'popularity.desc',
-      'first_air_date.gte': dateOffset(1),
-      'first_air_date.lte': dateOffset(550),
-    }), 6),
-  );
-  return rankAnticipatedTitles(future)
-    .map((card) => ({
-      ...card,
-      anticipatedScore: card.anticipatedScore * localePriorityWeight(card),
-    }))
-    .sort((a, b) => b.anticipatedScore - a.anticipatedScore);
-}, { version: 'anticipated-multimedia-v3' });
+// Anticipation uses public list demand; TMDb provides metadata and a fallback.
+// Do not apply locale/animation penalties to an already measured demand rank.
+for (const mediaType of ['movie', 'tv']) {
+  addPool('anticipated', mediaType, TTL_12H, async () => {
+    const dateField = mediaType === 'movie' ? 'primary_release_date' : 'first_air_date';
+    const [discovered, signals] = await Promise.all([
+      discoverPages(mediaType, discoverParams(mediaType, {
+        sort_by: 'popularity.desc',
+        [dateField + '.gte']: dateOffset(1),
+        [dateField + '.lte']: dateOffset(550),
+      }), 6),
+      fetchAnticipated(mediaType),
+    ]);
+    const candidates = await mergeAnticipatedCandidates(discovered, signals, async (id) => {
+      const details = await tmdbDetails(mediaType, id);
+      if (!details) return null;
+      const card = toCard({ ...details, genre_ids: details.genres?.map((genre) => genre.id) }, mediaType);
+      return card ? { ...card, budget: details.budget || 0, isFranchise: !!details.belongs_to_collection } : null;
+    });
+    const cleaned = excludeKidsReality(dedupeCards(candidates));
+    // Financials are only a fallback signal; public list demand always wins.
+    const enriched = mediaType === 'movie' && !signals.length
+      ? await enrichMoviesWithFinancials(cleaned, 70)
+      : cleaned;
+    return rankAnticipatedTitles(enriched);
+  }, { version: 'anticipated-public-demand-v4' });
+}
 
 // ─── Calendario: próximos episodios de series ─────────────────────────────────
 // Ventana de emisión del calendario: desde hace 2 días (recién emitidos) hasta

@@ -37,9 +37,8 @@ export const SURFACES = {
         source: { kind: 'pool', poolKey: 'top_rated' },
       },
       {
-        // Próximas películas y series ordenadas por una aproximación propia a
-        // la anticipación (interés público + escala + cercanía), al estilo de
-        // la superficie multimedia de "anticipated" de Trakt.
+        // Próximas películas y series ordenadas por listas públicas de Trakt;
+        // popularidad TMDb como respaldo. Sin cuota fija entre los formatos.
         key: 'anticipated',
         title: 'Más esperadas',
         mediaType: 'mixed',

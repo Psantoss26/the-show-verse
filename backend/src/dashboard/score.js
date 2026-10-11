@@ -141,14 +141,11 @@ export function rankNewReleaseMovies(cards, { now, recencySigmaDays = 45 } = {})
 }
 
 /**
- * Aproxima el criterio de "anticipated" de Trakt sin consumir sus métricas
- * privadas de listas. TMDB no publica cuántas personas están esperando un
- * estreno, pero sí señales públicas comparables y disponibles tanto para cine
- * como para series:
- *   - popularidad actual (54%): interés/búsquedas que está despertando;
- *   - volumen de votos (20%): interés sostenido, no una subida aislada;
- *   - escala del evento (14%): presupuesto y saga cuando TMDB los conoce;
- *   - cercanía del estreno (12%): prima lo que ya se puede planificar.
+ * Prioriza el recuento público de listas de Trakt, disponible sin OAuth.
+ * Los candidatos con demanda medida se ordenan por ese recuento (score > 1).
+ * Los demás se añaden después con una aproximación TMDb (score <= 1):
+ * popularidad 80%, escala 15%, proximidad 5%. Los votos de un título sin
+ * estrenar NO miden intención de verlo y no deben influir en este ranking.
  *
  * La normalización es absoluta, no relativa al lote. Así las puntuaciones de
  * películas y series son comparables al juntarlas en Inicio; un catálogo con
@@ -187,18 +184,15 @@ export function rankAnticipatedTitles(
       // Curvas con techo: un pico de popularidad no debe ocultar por completo
       // un lanzamiento con una comunidad grande y sostenida.
       const popularity = 1 - Math.exp(-Math.max(0, numeric(card.popularity)) / 120);
-      const attention = Math.min(1, Math.log10(1 + Math.max(0, numeric(card.voteCount))) / 4);
       const budget = Math.min(1, Math.log10(1 + Math.max(0, numeric(card.budget))) / 8.5);
       const eventScale = Math.max(budget, card.isFranchise ? 1 : 0);
       const proximity = Math.exp(-daysAhead / 420);
 
       return {
         ...card,
-        anticipatedScore:
-          0.54 * popularity +
-          0.20 * attention +
-          0.14 * eventScale +
-          0.12 * proximity,
+        anticipatedScore: numeric(card.anticipatedListCount) > 0
+          ? 1 + Math.log1p(numeric(card.anticipatedListCount))
+          : 0.80 * popularity + 0.15 * eventScale + 0.05 * proximity,
       };
     })
     .sort((a, b) => b.anticipatedScore - a.anticipatedScore || a.tmdbId - b.tmdbId);

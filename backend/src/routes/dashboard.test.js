@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import Fastify from 'fastify';
 import dashboardRoutes from './dashboard.js';
 import { stableHash } from '../dashboard/ranking.js';
+import { rankAnticipatedTitles } from '../dashboard/score.js';
 
 const card = (id, mediaType, extra = {}) => ({ tmdbId: id, mediaType, title: `Title ${id}`, posterPath: '/poster.jpg',
   voteCount: 8000, voteAverage: 8, popularity: 100, genreIds: [18], ...extra });
@@ -68,4 +69,21 @@ test('empty profiles and failed pools retain useful generic rows', async t => {
   assert.ok(!body.rows.some(r => r.key === 'trending'));
   verifyRows(body, 'home');
   assert.equal((await app.inject('/dashboard/invalid')).statusCode, 404);
+});
+
+test('home delivers the demand ranking end to end, without alternating formats', async t => {
+  const app = Fastify();
+  t.after(() => app.close());
+  const candidates = Array.from({ length: 40 }, (_, i) => card(i + 1, i < 25 ? 'movie' : 'tv', {
+    releaseDate: '2027-03-01', anticipatedListCount: 50000 - i * 1000,
+  }));
+  const ranked = rankAnticipatedTitles(candidates, { now: '2026-10-11' });
+  await app.register(dashboardRoutes, { prefix: '/dashboard', sources: {
+    getPool: async (key, type) => key === 'anticipated' ? ranked.filter(c => c.mediaType === type) : [],
+  } });
+  const response = await app.inject('/dashboard/home');
+  assert.equal(response.statusCode, 200);
+  const row = response.json().rows.find(r => r.key === 'anticipated');
+  assert.deepEqual(row.items.map(c => c.tmdbId), ranked.slice(0, 32).map(c => c.tmdbId));
+  assert.equal(row.items.filter(c => c.mediaType === 'movie').length, 25);
 });

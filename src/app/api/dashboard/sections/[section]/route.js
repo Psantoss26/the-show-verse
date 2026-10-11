@@ -43,7 +43,7 @@ const SECTION_CONFIG = {
     title: "Más esperadas",
     eyebrow: "PRÓXIMAMENTE",
     description:
-      "Películas aún no estrenadas que más interés están generando.",
+      "Películas y series aún no estrenadas, ordenadas por el interés que despiertan.",
   },
 };
 

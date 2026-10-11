@@ -16,6 +16,9 @@ export function publicQuality(card) {
 
 export function rankRowItems(row, { seed = 0, recommendations = new Map(), surface, cohortSeed = seed } = {}) {
   const items = row.items || [];
+  // Already sorted by demand across both formats. Alternating movie/TV here
+  // used to replace half the leading movies with lower-demand shows.
+  if (row.key === 'anticipated') return [...items];
   const ranked = items.map((card, index) => {
     const quality = publicQuality(card) / 10;
     const popularity = Math.min(1, Math.log1p(Math.max(0, card.popularity || 0)) / 7);
