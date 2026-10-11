@@ -19,7 +19,8 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, MotionConfig, useReducedMotion } from "framer-motion";
+import useStickyGroup from "@/lib/hooks/useStickyGroup";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/lib/i18n";
 import { fetchRatedForUser, getWatchProviders } from "@/lib/api/tmdb";
@@ -1578,39 +1579,39 @@ function StatBox({
   horizontal = false,
 }) {
   return (
-    <div
-      className={`flex min-w-0 transition-all duration-300 ${horizontal ? "flex-row items-center gap-1.5 sm:gap-2" : "flex-col items-start"}`}
+    <motion.div layout
+      className={`flex min-w-0 transition-colors duration-200 ${horizontal ? "flex-row items-center gap-1.5 sm:gap-2" : "flex-col items-start"}`}
     >
-      <div
+      <motion.div layout
         className={`flex items-center gap-1.5 opacity-75 min-w-0 ${horizontal ? "" : "mb-1"}`}
       >
         {imgSrc ? (
           <OptimizedImage
             src={imgSrc}
             alt={label}
-            className={`w-auto object-contain opacity-85 shrink-0 transition-all duration-300 ${horizontal ? "h-3.5 sm:h-4" : "h-3 sm:h-3.5"}`}
+            className={`w-auto object-contain opacity-85 shrink-0 transition-colors duration-200 ${horizontal ? "h-3.5 sm:h-4" : "h-3 sm:h-3.5"}`}
           />
         ) : Icon ? (
           <Icon
-            className={`shrink-0 transition-all duration-300 ${colorClass} ${horizontal ? "w-3.5 h-3.5 sm:w-4 sm:h-4" : "w-3 h-3 sm:w-3.5 sm:h-3.5"}`}
+            className={`shrink-0 transition-colors duration-200 ${colorClass} ${horizontal ? "w-3.5 h-3.5 sm:w-4 sm:h-4" : "w-3 h-3 sm:w-3.5 sm:h-3.5"}`}
           />
         ) : null}
 
         {!horizontal && (
-          <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-zinc-400 truncate">
+          <motion.span layout className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-zinc-400 truncate">
             {label}
-          </span>
+          </motion.span>
         )}
-      </div>
+      </motion.div>
 
-      <div className="flex items-baseline gap-1.5 min-w-0">
-        <span
-          className={`font-black text-white tabular-nums tracking-tight leading-none truncate transition-all duration-300 ${horizontal ? "text-sm sm:text-base" : "text-lg sm:text-xl"}`}
+      <motion.div layout className="flex items-baseline gap-1.5 min-w-0">
+        <motion.span layout
+          className={`font-black text-white tabular-nums tracking-tight leading-none truncate transition-colors duration-200 ${horizontal ? "text-sm sm:text-base" : "text-lg sm:text-xl"}`}
         >
           {value}
-        </span>
-      </div>
-    </div>
+        </motion.span>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -1652,109 +1653,69 @@ function GroupDivider({
   // principal y no recibe `isBackNav` por props.
   const isBackNav = useIsHistoryNavigation();
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-  const [isSticky, setIsSticky] = useState(false);
-  const ref = useRef(null);
-  const [transitioningThreshold, setTransitioningThreshold] = useState(108);
-
-  useEffect(() => {
-    if (mobileFiltersOpen) {
-      setTransitioningThreshold(216);
-    } else {
-      const timer = setTimeout(() => {
-        setTransitioningThreshold(108);
-      }, 200);
-      return () => clearTimeout(timer);
-    }
-  }, [mobileFiltersOpen]);
-
-  // En una vuelta del historial el scroll ya se restaura antes del primer
-  // paint. Medir en un layout effect evita que el divisor se vea expandido
-  // antes de recuperar su estado sticky compacto.
-  useLayoutEffect(() => {
-    const handleScroll = () => {
-      if (!ref.current) return;
-      const top = ref.current.getBoundingClientRect().top;
-      const isLg = window.innerWidth >= 1024;
-      const threshold = isLg ? 136 : transitioningThreshold;
-      setIsSticky((prev) => {
-        const next = prev ? top <= threshold + 12 : top <= threshold + 1;
-        return prev === next ? prev : next;
-      });
-    };
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    window.addEventListener(
-      "showverse:scroll-restoration-complete",
-      handleScroll,
-    );
-    handleScroll();
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-      window.removeEventListener(
-        "showverse:scroll-restoration-complete",
-        handleScroll,
-      );
-    };
-  }, [transitioningThreshold]);
+  const reduceMotion = useReducedMotion();
+  const skipMotion = isBackNav || disableStickyAnimation || reduceMotion;
+  const { ref, isSticky } = useStickyGroup(mobileFiltersOpen, forceSticky);
 
   const renderSticky = isSticky || forceSticky;
   const stickyTransitionClass =
-    disableStickyAnimation || isBackNav
+    skipMotion
       ? "transition-none"
-      : "transition-all duration-300";
+      : "transition-colors duration-200";
 
   return (
+    <MotionConfig reducedMotion={skipMotion ? "always" : "user"} transition={{ layout: { duration: skipMotion ? 0 : 0.24, ease: [0.22, 1, 0.36, 1] } }}>
     <motion.div
       ref={ref}
+      layoutRoot
       data-group-divider
       // Fijada bajo el navbar: sus superficies pasan al cristal del
       // navbar (regla `[data-menu-pinned]` en globals.css).
       data-menu-pinned={renderSticky}
-      className={`sticky z-[60] ${hasPreviousGroup ? "my-4" : mobileFiltersOpen ? "mt-0 mb-4" : "mt-2 mb-4"} sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0 ${isBackNav ? "transition-none" : "transition-[top] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)]"} lg:top-[136px] ${
+      className={`sticky z-[60] ${hasPreviousGroup ? "my-4" : mobileFiltersOpen ? "mt-0 mb-4" : "mt-2 mb-4"} sm:my-6 -mx-2 px-2 sm:mx-0 sm:px-0 ${skipMotion ? "transition-none" : "transition-[top] duration-[180ms] ease-[cubic-bezier(0.16,1,0.3,1)]"} lg:top-[136px] ${
         mobileFiltersOpen ? "top-[216px]" : "top-[108px]"
       }`}
-      // `initial={false}` al retroceder. Es un elemento STICKY que entraba
-      // desde 20px abajo: al volver de una ficha se recolocaba tras cargar, y
-      // al ser sticky el movimiento se arrastra por toda la lista. Cualquier
-      // animación de entrada rompe el requisito de "estático al retroceder".
-      initial={isBackNav ? false : { opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
+      // Solo opacidad al entrar: trasladar este nodo alteraría la medición
+      // del punto de acople. Al retroceder no se anima.
+      initial={skipMotion ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
       transition={
-        isBackNav ? { duration: 0 } : { duration: 0.4, ease: "easeOut" }
+        skipMotion ? { duration: 0 } : { duration: 0.24, ease: "easeOut" }
       }
     >
-      <div className="flex min-w-0 items-center gap-3 lg:gap-4">
-        <div
+      <motion.div layout className="flex min-w-0 items-center gap-3 lg:gap-4">
+        <motion.div layout
           className={`relative min-w-0 flex-1 overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg ${stickyTransitionClass} ${renderSticky ? "shadow-md" : "shadow-xl"}`}
         >
-          <div
+          <motion.div layout
             className={`relative z-10 px-3 sm:px-6 flex items-center justify-between gap-3 sm:gap-6 ${stickyTransitionClass} ${renderSticky ? "py-2 sm:py-2.5" : "py-2.5 sm:py-5"}`}
           >
-            <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
-              <div
+            <motion.div layout className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+              <motion.div layout
                 className={`bg-gradient-to-b from-red-500 to-red-600 shadow-[0_0_15px_rgba(239,68,68,0.4)] shrink-0 ${stickyTransitionClass} ${renderSticky ? "w-2 h-2 rounded-full" : "w-1 sm:w-1.5 h-8 sm:h-12 rounded-full"}`}
               />
 
-              <div
+              <motion.div layout
                 className={`min-w-0 flex-1 ${stickyTransitionClass} ${renderSticky ? "flex flex-wrap items-center gap-x-3 gap-y-1" : ""}`}
               >
-                <h2
+                <motion.h2 layout
                   className={`font-black tracking-tight text-white leading-tight line-clamp-1 drop-shadow-md ${stickyTransitionClass} ${renderSticky ? "text-base sm:text-lg" : "text-base sm:text-2xl"}`}
                 >
                   {title}
-                </h2>
+                </motion.h2>
 
-                <div
+                <motion.div layout
                   className={`text-zinc-500 font-medium flex items-center gap-x-1.5 sm:gap-x-2 ${stickyTransitionClass} ${renderSticky ? "mt-0 text-[10px] sm:text-xs" : "mt-0.5 sm:mt-1 text-[10px] sm:text-sm"}`}
                 >
                   <span className="text-zinc-300 font-bold">{count}</span>
                   <span>items</span>
                   <span className="w-0.5 h-0.5 sm:w-1 sm:h-1 rounded-full bg-zinc-700" />
                   <span className="opacity-90">{pct}%</span>
-                </div>
-              </div>
-            </div>
+                </motion.div>
+              </motion.div>
+            </motion.div>
 
-            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+            <motion.div layout className="flex items-center gap-2 sm:gap-4 shrink-0">
               {stats?.imdb?.avg != null &&
                 typeof stats.imdb.avg === "number" &&
                 !Number.isNaN(stats.imdb.avg) &&
@@ -1793,7 +1754,7 @@ function GroupDivider({
                 typeof stats.my.avg === "number" &&
                 !Number.isNaN(stats.my.avg) &&
                 stats.my.avg > 0 && (
-                  <div
+                  <motion.div layout
                     className={`${stickyTransitionClass} border-white/10 ${renderSticky ? "sm:pl-3 sm:border-l" : "sm:pl-4 sm:border-l"}`}
                   >
                     <StatBox
@@ -1803,17 +1764,17 @@ function GroupDivider({
                       colorClass="text-amber-400 fill-amber-400"
                       horizontal={renderSticky}
                     />
-                  </div>
+                  </motion.div>
                 )}
-            </div>
-          </div>
-        </div>
-        <div
+            </motion.div>
+          </motion.div>
+        </motion.div>
+        <motion.div layout
           className={`hidden shrink-0 lg:flex overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 p-1 backdrop-blur-lg ${stickyTransitionClass} ${renderSticky ? "shadow-md" : "shadow-xl"} ${
             renderSticky ? "flex-row gap-1" : "flex-col gap-1"
           }`}
         >
-          <button
+          <motion.button layout
             type="button"
             onClick={onPreviousGroup}
             disabled={!hasPreviousGroup}
@@ -1821,8 +1782,8 @@ function GroupDivider({
             className="inline-flex h-9 w-9 items-center justify-center rounded-full text-zinc-200 transition-all duration-200 hover:bg-red-500/15 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400 disabled:pointer-events-none disabled:opacity-35"
           >
             <ChevronUp className="h-5 w-5" />
-          </button>
-          <button
+          </motion.button>
+          <motion.button layout
             type="button"
             onClick={onNextGroup}
             disabled={!hasNextGroup}
@@ -1830,10 +1791,11 @@ function GroupDivider({
             className="inline-flex h-9 w-9 items-center justify-center rounded-full text-zinc-200 transition-all duration-200 hover:bg-red-500/15 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400 disabled:pointer-events-none disabled:opacity-35"
           >
             <ChevronDown className="h-5 w-5" />
-          </button>
-        </div>
-      </div>
+          </motion.button>
+        </motion.div>
+      </motion.div>
     </motion.div>
+    </MotionConfig>
   );
 }
 
