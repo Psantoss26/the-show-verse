@@ -2688,6 +2688,14 @@ html:has([data-embedded-details])::-webkit-scrollbar {
   overflow: hidden;
   pointer-events: none;
 }
+/* En táctil la copia saliente se queda sin cristal: su contenido se va al
+   pulsar (opacity + transform), así que el desenfoque ya no se distingue, y
+   recomponerlo en cada fotograma de la salida es lo que más cuesta a la GPU de
+   una tablet. El prefijo va ANTES que la estándar (ver la nota del drawer). */
+html[data-details-sequence-touch] [data-details-sequence-snapshot] * {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
 [data-details-sequence-snapshot] *,
 html[data-details-sequence-transition] [data-details-root] .sv-details-entry,
 [data-details-sequence-entered] .sv-details-entry {

@@ -8,17 +8,31 @@ const source = (await readFile(new URL('./detailsSequenceTransition.js', import.
 
 function setup({ native = true, reduced = false, stalledBackground = false, castReady = true, touch = false, width = 1280, timeout = false, routeError = false } = {}) {
   const nodes = [];
+  const clones = [];
   let clock = 0;
+  // Póster, cabecera y secciones de una ficha: registran su estilo y las
+  // animaciones que reciben.
+  function part() {
+    return { style: {}, animations: [], animate(keyframes) { this.animations.push(keyframes); return { finished: Promise.resolve() }; } };
+  }
   function node() {
     const attributes = new Map();
+    const parts = [];
     return {
+      parts,
       attributes, style: {}, inert: false, isConnected: true, removed: false,
       setAttribute(key, value) { attributes.set(key, value); },
       getAttribute(key) { return attributes.get(key); },
       hasAttribute(key) { return attributes.has(key); },
       removeAttribute(key) { attributes.delete(key); },
       getBoundingClientRect: () => ({ top: -100, left: 0, width: 1280 }),
-      cloneNode: () => node(), querySelectorAll: () => [], querySelector: () => null,
+      cloneNode: () => { const clone = node(); clones.push(clone); return clone; },
+      querySelectorAll(selector) {
+        if (!selector.includes('="artwork"')) return [];
+        if (!parts.length) parts.push(part(), part(), part());
+        return parts;
+      },
+      querySelector: () => null,
       append(child) { this.child = child; },
       remove() { this.removed = true; },
       animate() { return { finished: Promise.resolve() }; },
@@ -31,7 +45,10 @@ function setup({ native = true, reduced = false, stalledBackground = false, cast
   incoming.querySelector = (selector) => selector === 'h1' ? heading : null;
   let ready = false;
   incoming.getAttribute = (key) => (key === 'data-details-cast-ready' ? castReady : ready) ? 'true' : 'false';
-  if (stalledBackground) incoming.querySelectorAll = (selector) => selector === '[data-details-background-preview]' ? [{}] : [];
+  if (stalledBackground) {
+    const partsOf = incoming.querySelectorAll.bind(incoming);
+    incoming.querySelectorAll = (selector) => selector === '[data-details-background-preview]' ? [{}] : partsOf(selector);
+  }
   const html = node();
   const listeners = new Map();
   const location = { pathname: '/details/movie/1' };
@@ -74,6 +91,7 @@ function setup({ native = true, reduced = false, stalledBackground = false, cast
     arrive: () => { location.pathname = '/details/movie/2'; },
     ready: () => { ready = true; location.pathname = '/details/movie/2'; },
     cancel: () => listeners.get('popstate')?.(),
+    parts: () => ({ outgoing: outgoing.parts, snapshot: clones[0]?.parts || [], incoming: incoming.parts }),
     state: () => ({ focused, transitions, active: html.hasAttribute('data-details-sequence-transition'),
       overlayRemoved: nodes[0]?.removed, outgoingInert: outgoing.inert, incomingInert: incoming.inert,
       listenerCount: listeners.size }),
@@ -176,4 +194,24 @@ test('un error de ruta se descubre sin animar una ficha incompleta', async () =>
   assert.equal(app.state().transitions, 0);
   assert.equal(app.state().overlayRemoved, true);
   assert.equal(app.state().listenerCount, 0);
+});
+
+test('en táctil la salida empieza al pulsar y la entrada no funde el cristal', async () => {
+  // Antes, en tablet la ficha se quedaba quieta hasta que llegaba la nueva y
+  // luego se fundían las dos fichas enteras una encima de la otra: doble
+  // imagen y el cristal de toda la copia aplanado durante el fundido.
+  const app = setup({ touch: true });
+  const pending = app.run(() => {});
+  await tick();
+  const exit = app.parts();
+  assert.ok(exit.outgoing.length && exit.outgoing.every((p) => p.style.opacity === '0'), 'La ficha original se oculta al pulsar');
+  assert.ok(exit.snapshot.length && exit.snapshot.every((p) => p.animations.length === 1), 'La copia sale animada al pulsar');
+  app.ready();
+  assert.equal(await pending, true);
+  const { incoming } = app.parts();
+  assert.ok(
+    incoming.length && incoming.every((p) => p.animations.length === 1 && p.animations[0].every((k) => !('opacity' in k))),
+    'La ficha nueva entra solo con transform: con opacity su cristal se ve plano hasta el final',
+  );
+  assert.equal(app.state().transitions, 0);
 });

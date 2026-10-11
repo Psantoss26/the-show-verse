@@ -156,12 +156,12 @@ test('rankAnticipatedMovies uses budget and franchise relevance to break close p
   assert.equal(out[0].tmdbId, 2);
 });
 
-test('rankAnticipatedTitles rewards sustained public interest, not just a short popularity spike', () => {
+test('rankAnticipatedTitles prioritizes public list demand over TMDb popularity and votes', () => {
   const spike = card(1, {
-    popularity: 105, voteCount: 30, releaseDate: '2026-09-01',
+    popularity: 900, voteCount: 9000, releaseDate: '2026-09-01', anticipatedListCount: 2000,
   });
   const sustained = card(2, {
-    popularity: 95, voteCount: 9_000, releaseDate: '2026-09-01',
+    popularity: 20, voteCount: 0, releaseDate: '2027-07-01', anticipatedListCount: 42000,
   });
   const out = rankAnticipatedTitles([spike, sustained], { now: NOW });
   assert.equal(out[0].tmdbId, 2);

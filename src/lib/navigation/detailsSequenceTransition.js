@@ -3,6 +3,7 @@
 // la View Transition empieza DESPUÉS de la carga, nunca dentro de ese await.
 let activeTransition = null;
 const FLAG = "data-details-sequence-transition";
+const TOUCH_FLAG = "data-details-sequence-touch";
 const PART = "data-details-transition-part";
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // Solo damos un margen breve al fondo ligero. El reparto y las mejoras de
@@ -136,10 +137,18 @@ export async function navigateDetailsSequence({ href, direction, navigate }) {
   const html = document.documentElement;
   html.setAttribute(FLAG, direction === "previous" ? "previous" : "next");
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  // En táctil conservamos la ficha completa hasta que llegue la siguiente.
-  // Capturar varias superficies glass y animarlas por separado provoca
-  // repintados caros y cambios de composición en las GPU de tablets.
+  // En táctil (tablet) NO hay View Transition: capturar varias superficies de
+  // cristal como imágenes y animarlas por separado sale caro en sus GPU. La
+  // salida al pulsar SÍ es la misma que en escritorio. Antes se omitía y la
+  // copia se quedaba entera encima hasta que llegaba la ficha nueva, y luego se
+  // fundía con ella: la pantalla no respondía al toque durante más de un
+  // segundo y después se veían dos fichas superpuestas (doble título, dos
+  // pósters), con el cristal de toda la copia aplanado durante el fundido.
+  // Ahora el contenido se va al pulsar y al final solo se funde el fondo.
   const touch = !matchMedia("(hover: hover) and (pointer: fine)").matches;
+  // Y en la copia saliente no queda cristal vivo (ver globals.css): su
+  // desenfoque no se ve mientras sale y es lo más caro de componer.
+  if (touch) html.setAttribute(TOUCH_FLAG, "");
   // SALIDA COMPLETA AL CLIC. Al pulsar, el contenido saliente (póster,
   // cabecera, menú y secciones) se va del todo —deslizándose hacia fuera y
   // desvaneciéndose— y solo queda el fondo. Así:
@@ -156,7 +165,7 @@ export async function navigateDetailsSequence({ href, direction, navigate }) {
   // Con `opacity`, no con `visibility`: esta se hereda y obligaba a recalcular
   // el estilo de miles de elementos (menú y secciones) en el fotograma del clic.
   const hiddenParts = [];
-  if (!reduced && !touch) {
+  if (!reduced) {
     source
       .querySelectorAll(`[${PART}="artwork"], [${PART}="info"], [${PART}="content"]`)
       .forEach((node) => {
@@ -237,9 +246,12 @@ export async function navigateDetailsSequence({ href, direction, navigate }) {
       void viewTransition.ready?.catch(() => {});
       await viewTransition.finished.catch(() => {});
     } else if (!reduced && overlay.animate) {
-      // Baseline 2024: fundido sobre la nueva ficha YA lista, sin fondo negro.
+      // Baseline 2024 y táctil: la ficha nueva YA lista entra deslizándose y
+      // la copia, que a estas alturas solo enseña el fondo, se funde encima.
+      // La entrada es SOLO transform: con opacity su cristal se vería plano
+      // hasta el último fotograma (Backdrop Root) y saltaría al acabar.
       const x = direction === "previous" ? -24 : 24;
-      const animations = (touch ? [] : [...incoming.querySelectorAll(`[${PART}="artwork"], [${PART}="info"], [${PART}="content"]`)])
+      const animations = [...incoming.querySelectorAll(`[${PART}="artwork"], [${PART}="info"], [${PART}="content"]`)]
         .map((node) => node.animate(
           [{ transform: `translateX(${x}px)` }, { transform: "translateX(0)" }],
           { duration: 320, easing: "cubic-bezier(.22,1,.36,1)" },
@@ -258,6 +270,7 @@ export async function navigateDetailsSequence({ href, direction, navigate }) {
     hiddenParts.forEach(([node, opacity]) => { node.style.opacity = opacity; });
     lockedRoots.forEach((inert, root) => { root.inert = inert; });
     html.removeAttribute(FLAG);
+    html.removeAttribute(TOUCH_FLAG);
     window.removeEventListener("popstate", cancel);
     window.removeEventListener("wheel", preventScroll);
     if (activeTransition === operation) activeTransition = null;

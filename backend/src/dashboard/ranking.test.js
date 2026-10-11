@@ -6,6 +6,10 @@ const card = (id, extra = {}) => ({ tmdbId: id, mediaType: 'movie', voteAverage:
 test('quality trusts a representative sample over a handful of perfect votes', () => {
   assert.ok(publicQuality(card(1)) > publicQuality(card(2, { voteAverage: 10, voteCount: 3 })));
 });
+test('anticipated preserves global demand order without imposing a movie/TV quota', () => {
+  const items = [card(1), card(2), card(3), card(4, { mediaType: 'tv' }), card(5)];
+  assert.deepEqual(rankRowItems({ key: 'anticipated', mediaType: 'mixed', rotate: false, items }), items);
+});
 test('editorial rankings preserve source order regardless of affinity or seed', () => {
   const row = { key: 'trending', mediaType: 'movie', rotate: false, items: [card(2), card(1)] };
   assert.deepEqual(rankRowItems(row, { recommendations: new Map([['movie:1', 1000]]) }), row.items);
