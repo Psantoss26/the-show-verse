@@ -22,7 +22,7 @@ import Link from "next/link";
 export default function PageStatCard({
   label,
   // Etiqueta de la mini tarjeta (móvil), que va SIEMPRE en una línea: para
-  // las que no caben enteras ("Progreso medio" → "P. medio").
+  // las que no caben enteras ("Progreso medio" → "Progreso").
   shortLabel,
   value,
   icon: Icon,

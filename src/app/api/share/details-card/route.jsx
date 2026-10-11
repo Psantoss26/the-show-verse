@@ -23,6 +23,7 @@ import {
   ScoreBadge,
   TitleArt,
   W,
+  actionButtonWidth,
   loadAmbient,
   loadAmbientBase,
   loadLocalAssets,
@@ -40,9 +41,11 @@ export const dynamic = "force-dynamic";
 // Imagen para compartir una ficha (formato story, 1080×1920).
 //
 // Es la "captura" de la ficha móvil con la misma estética: portada a sangre que
-// se funde con el fondo, logo del título encima, la fila de acciones con los
-// estados del usuario (visto, nota, favorito…) y, debajo, el marcador reducido a
-// las tres puntuaciones (TMDb, Trakt, IMDb) sin nada más.
+// se funde con el fondo, logo del título encima, los estados del usuario (visto,
+// nota, favorito, pendiente, lista, reseña: SOLO los que tiene, no la fila de
+// acciones entera; ver `shareCardActionButtons`) y, debajo, el marcador reducido
+// a las tres puntuaciones (TMDb, Trakt, IMDb) sin nada más. Sin ningún estado no
+// hay fila y el logo baja hasta el marcador para no dejar un hueco.
 //
 // Igual que la tarjeta del Recap, recibe los datos YA resueltos por el cliente
 // en vez de la sesión (renovar cookies aquí rompería la rotación de tokens: una
@@ -53,8 +56,8 @@ export const dynamic = "force-dynamic";
 //
 // TEMPORADAS (`card.season`): el mismo dibujo que la ficha (botones del mismo
 // tamaño y en la misma posición, mismo marcador); solo cambia la fila, que lleva
-// las acciones con estado del usuario de la temporada (serie · visto · nota),
-// centradas. Sin flechas ni editar.
+// los estados del usuario de la temporada (visto · nota), centrados. Sin flechas
+// ni editar.
 //
 // PÓSTER CON EL TÍTULO IMPRESO (siempre en una temporada; en la ficha, cuando
 // no hay portada sin texto): sin logo encima, así que el texto es el del propio
@@ -66,11 +69,17 @@ export const dynamic = "force-dynamic";
 function Card({ card, poster, ambient, ambientBase, logo, assets, fonts }) {
   const buttons = shareCardActionButtons(card);
   const scores = ["tmdb", "trakt", "imdb"].filter((key) => card.scores[key]);
-  const rowWidth = buttons.length * BUTTON + (buttons.length - 1) * BUTTON_GAP;
+  // El de visionado va ampliado (ocupa dos botones): se suma su ancho real.
+  const rowWidth =
+    buttons.reduce((total, button) => total + actionButtonWidth(button), 0) +
+    Math.max(0, buttons.length - 1) * BUTTON_GAP;
+  // Lo primero que va sobre la portada: la fila de estados o, si no hay
+  // ninguno, el propio marcador (el logo se apoya en él).
+  const stackTop = buttons.length ? BUTTONS_TOP : PANEL_TOP;
   const burnedTitle = Boolean(poster && !logo && !card.showTitle);
   const size = poster?.size?.width && poster?.size?.height ? poster.size : { width: 2, height: 3 };
   const fit = burnedTitle
-    ? posterFit({ ratio: size.height / size.width, stackTop: BUTTONS_TOP })
+    ? posterFit({ ratio: size.height / size.width, stackTop })
     : null;
 
   return (
@@ -151,23 +160,25 @@ function Card({ card, poster, ambient, ambientBase, logo, assets, fonts }) {
       <Brand src={assets.brand} />
 
       {/* Logo del título (o el título en texto si no hay logo). */}
-      <TitleArt card={card} logo={logo} bottom={BUTTONS_TOP - 44} />
+      <TitleArt card={card} logo={logo} bottom={stackTop - 44} />
 
-      {/* Fila de acciones con los estados de la ficha. */}
-      <div
-        style={{
-          position: "absolute",
-          top: BUTTONS_TOP,
-          left: Math.round((W - rowWidth) / 2),
-          width: rowWidth,
-          display: "flex",
-          justifyContent: "space-between",
-        }}
-      >
-        {buttons.map((button) => (
-          <ActionButton key={button.key} button={button} size={BUTTON} />
-        ))}
-      </div>
+      {/* Estados del usuario (solo los que tiene), centrados. */}
+      {buttons.length ? (
+        <div
+          style={{
+            position: "absolute",
+            top: BUTTONS_TOP,
+            left: Math.round((W - rowWidth) / 2),
+            width: rowWidth,
+            display: "flex",
+            justifyContent: "space-between",
+          }}
+        >
+          {buttons.map((button) => (
+            <ActionButton key={button.key} button={button} size={BUTTON} />
+          ))}
+        </div>
+      ) : null}
 
       {/* Marcador compacto: solo las puntuaciones. Mismo ancho que la fila de
           acciones y alineado con ella: deja aire a los lados de la imagen en

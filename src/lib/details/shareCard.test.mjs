@@ -29,27 +29,73 @@ const baseInput = {
 };
 
 const keysAndVariants = (buttons) => buttons.map((b) => `${b.key}:${b.variant}`);
+const byKey = (buttons, key) => buttons.find((b) => b.key === key);
 
-test("movie card mirrors the mobile action row states (screenshot case)", () => {
+test("movie card shows only the actions with a user state, the watched pill in the middle", () => {
   const card = sanitizeShareCard(buildShareCardPayload(baseInput));
   const buttons = shareCardActionButtons(card);
 
+  // Sin tráiler, banda sonora ni los botones apagados: solo lo que el usuario
+  // ha hecho con el título.
+  // El de visionado, ampliado, va en el centro.
   assert.deepEqual(keysAndVariants(buttons), [
-    "trailer:solid",
-    "soundtrack:solid",
+    "rating:active",
     "watched:active",
+    "favorite:active",
+  ]);
+  const watched = byKey(buttons, "watched");
+  assert.equal(watched.wide, true);
+  assert.equal(watched.icon, "eye");
+  assert.deepEqual([watched.label, watched.labelSuffix], ["2", " veces"]);
+  assert.equal(watched.color, "green");
+  assert.equal(byKey(buttons, "rating").label, "9");
+  assert.equal(byKey(buttons, "rating").color, "yellow");
+  assert.equal(byKey(buttons, "favorite").color, "red");
+  assert.equal(byKey(buttons, "favorite").filledIcon, true);
+});
+
+test("finished series with every state: watched, rating, favorite, list and review (Game of Thrones case)", () => {
+  const buttons = shareCardActionButtons(
+    sanitizeShareCard(
+      buildShareCardPayload({
+        ...baseInput,
+        type: "tv",
+        trakt: { watched: true, badge: "100%", loading: false },
+        rating: 10,
+        favorite: true,
+        watchlist: false,
+        listActive: true,
+        commentsActive: true,
+      }),
+    ),
+  );
+  assert.deepEqual(keysAndVariants(buttons), [
     "rating:active",
     "favorite:active",
-    "watchlist:glass",
-    "list:glass",
-    "comments:glass",
+    "watched:active",
+    "list:active",
+    "comments:active",
   ]);
-  assert.equal(buttons[2].label, "2");
-  assert.equal(buttons[2].color, "green");
-  assert.equal(buttons[3].label, "9");
-  assert.equal(buttons[3].color, "yellow");
-  assert.equal(buttons[4].color, "red");
-  assert.equal(buttons[4].filledIcon, true);
+  // También al 100%: el ojo (esmeralda) y el porcentaje, con la píldora llena.
+  const watched = byKey(buttons, "watched");
+  assert.equal(watched.wide, true);
+  assert.deepEqual([watched.icon, watched.iconColor], ["eye", "emerald"]);
+  assert.deepEqual([watched.label, watched.labelSuffix, watched.fill], ["100", "%", 100]);
+  assert.equal(byKey(buttons, "rating").label, "10");
+});
+
+test("a title without any user state has no action row", () => {
+  const buttons = shareCardActionButtons(
+    sanitizeShareCard(
+      buildShareCardPayload({
+        ...baseInput,
+        trakt: { watched: false },
+        rating: null,
+        favorite: false,
+      }),
+    ),
+  );
+  assert.deepEqual(buttons, []);
 });
 
 test("scores keep only TMDb, Trakt and IMDb values with their vote counts", () => {
@@ -71,7 +117,7 @@ test("pending or missing scores are dropped instead of drawn empty", () => {
   assert.deepEqual(card.scores, { tmdb: null, trakt: null, imdb: null });
 });
 
-test("tv card uses the collapsed combined row with series progress", () => {
+test("tv card keeps the series progress and drops the media buttons", () => {
   const card = sanitizeShareCard(
     buildShareCardPayload({
       ...baseInput,
@@ -80,21 +126,22 @@ test("tv card uses the collapsed combined row with series progress", () => {
       soundtrackAvailable: true,
       trakt: { watched: true, plays: 0, badge: "45%", loading: false },
       rating: 7.5,
+      favorite: false,
     }),
   );
   const buttons = shareCardActionButtons(card);
 
-  assert.deepEqual(buttons.slice(0, 2).map((b) => `${b.key}:${b.variant}:${b.icon}`), [
-    "media:solid:play",
-    "episodes:solid:chart",
-  ]);
-  assert.equal(buttons[2].label, "45");
-  assert.equal(buttons[2].labelSuffix, "%");
-  assert.equal(buttons[2].fill, 45);
-  assert.equal(buttons[3].label, "7.5");
+  assert.ok(!buttons.some((b) => b.key === "media" || b.key === "episodes"));
+  // Dos botones: el de visionado no puede ir en el centro, va a la izquierda.
+  assert.deepEqual(buttons.map((b) => b.key), ["watched", "rating"]);
+  assert.equal(buttons[0].label, "45");
+  assert.equal(buttons[0].labelSuffix, "%");
+  assert.equal(buttons[0].fill, 45);
+  assert.equal(buttons[0].icon, "eye");
+  assert.equal(buttons[1].label, "7.5");
 });
 
-test("finished series shows the emerald eye, unwatched shows eye-off", () => {
+test("finished series shows the emerald eye, unwatched is left out", () => {
   const done = shareCardActionButtons(
     sanitizeShareCard(
       buildShareCardPayload({
@@ -103,14 +150,15 @@ test("finished series shows the emerald eye, unwatched shows eye-off", () => {
         trakt: { watched: true, badge: "100%" },
       }),
     ),
-  )[2];
+  ).find((b) => b.key === "watched");
+  assert.equal(done.key, "watched");
   assert.equal(done.icon, "eye");
   assert.equal(done.iconColor, "emerald");
 
   const idle = shareCardActionButtons(
     sanitizeShareCard(buildShareCardPayload({ ...baseInput, trakt: { watched: false } })),
-  )[2];
-  assert.deepEqual([idle.icon, idle.variant], ["eyeOff", "glass"]);
+  );
+  assert.ok(!idle.some((b) => b.key === "watched"));
 });
 
 test("loading Trakt state is never shown as watched", () => {
@@ -121,13 +169,15 @@ test("loading Trakt state is never shown as watched", () => {
   assert.equal(card.actions.plays, 0);
 });
 
-test("unavailable trailer and soundtrack render as disabled", () => {
-  const buttons = shareCardActionButtons(
-    sanitizeShareCard(
-      buildShareCardPayload({ ...baseInput, trailerAvailable: false, soundtrackAvailable: false }),
-    ),
-  );
-  assert.deepEqual(keysAndVariants(buttons.slice(0, 2)), ["trailer:disabled", "soundtrack:disabled"]);
+test("trailer and soundtrack never appear, available or not", () => {
+  for (const available of [true, false]) {
+    const buttons = shareCardActionButtons(
+      sanitizeShareCard(
+        buildShareCardPayload({ ...baseInput, trailerAvailable: available, soundtrackAvailable: available }),
+      ),
+    );
+    assert.ok(!buttons.some((b) => b.key === "trailer" || b.key === "soundtrack"));
+  }
 });
 
 test("sanitizer rejects foreign image urls and clamps untrusted input", () => {
@@ -163,7 +213,7 @@ test("file name is a readable ascii slug", () => {
   assert.equal(shareCardFileName(""), "titulo-the-show-verse.png");
 });
 
-test("season card keeps only the user-state actions: series, watched, rating (no arrows, no edit)", () => {
+test("season card keeps only the user states: watched and rating (no series button, arrows or edit)", () => {
   const card = sanitizeShareCard(
     buildShareCardPayload({
       ...baseInput,
@@ -180,13 +230,13 @@ test("season card keeps only the user-state actions: series, watched, rating (no
 
   const buttons = shareCardActionButtons(card);
   assert.deepEqual(buttons.map((b) => `${b.key}:${b.variant}`), [
-    "series:glass",
     "watched:active",
     "rating:active",
   ]);
   assert.ok(!buttons.some((b) => /arrow|pencil|edit/i.test(`${b.key} ${b.icon ?? ""}`)));
-  assert.equal(buttons[1].label, "43");
-  assert.equal(buttons[2].label, "8");
+  assert.equal(buttons[0].label, "43");
+  assert.equal(buttons[0].wide, true);
+  assert.equal(buttons[1].label, "8");
 });
 
 test("only tv cards can be season cards, and the flags are booleans", () => {
@@ -196,4 +246,41 @@ test("only tv cards can be season cards, and the flags are booleans", () => {
     next: false,
   });
   assert.equal(sanitizeShareCard({ type: "tv" }).season, null);
+});
+
+test("the wide watched pill sits in the middle, or just left of it with an even count", () => {
+  const keysFor = (extra) =>
+    shareCardActionButtons(
+      sanitizeShareCard(
+        buildShareCardPayload({
+          ...baseInput,
+          trakt: { watched: true, plays: 1, loading: false },
+          rating: null,
+          favorite: false,
+          ...extra,
+        }),
+      ),
+    ).map((b) => b.key);
+
+  assert.deepEqual(keysFor({}), ["watched"]);
+  assert.deepEqual(keysFor({ favorite: true }), ["watched", "favorite"]);
+  assert.deepEqual(keysFor({ favorite: true, watchlist: true }), ["favorite", "watched", "watchlist"]);
+  assert.deepEqual(keysFor({ rating: 8, favorite: true, watchlist: true }), ["rating", "watched", "favorite", "watchlist"]);
+  assert.deepEqual(
+    keysFor({ rating: 8, favorite: true, watchlist: true, listActive: true, commentsActive: true }),
+    ["rating", "favorite", "watched", "watchlist", "list", "comments"],
+  );
+});
+
+test("a watched movie without a play count reads 'Vista'", () => {
+  const watched = shareCardActionButtons(
+    sanitizeShareCard(buildShareCardPayload({ ...baseInput, trakt: { watched: true, plays: 0, loading: false } })),
+  ).find((b) => b.key === "watched");
+  assert.deepEqual([watched.icon, watched.label, watched.labelSuffix ?? null], ["eye", "Vista", null]);
+  assert.equal(
+    shareCardActionButtons(
+      sanitizeShareCard(buildShareCardPayload({ ...baseInput, trakt: { watched: true, plays: 1, loading: false } })),
+    ).find((b) => b.key === "watched").labelSuffix,
+    " vez",
+  );
 });
