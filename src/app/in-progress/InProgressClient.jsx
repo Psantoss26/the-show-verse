@@ -2113,6 +2113,7 @@ export default function InProgressClient({
               >
                 <StatCard
                   label="Progreso Medio"
+                  shortLabel="P. medio"
                   value={`${displayStats?.avgProgress ?? 0}%`}
                   loading={!currentDataLoaded}
                   icon={TrendingUp}

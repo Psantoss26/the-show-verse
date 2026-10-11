@@ -6,9 +6,10 @@ import Link from "next/link";
 // vuelvan a separarse.
 //
 // DOS TAMAÑOS
-//  - Móvil (< md): MINI TARJETA de ~52px de alto. Icono pequeño y cifra en una
-//    línea, etiqueta debajo. Ocupa la mitad que la grande y deja ver el
-//    contenido nada más abrir la página; caben cuatro en 390px.
+//  - Móvil (< md): MINI TARJETA de ~50px de alto. Icono pequeño y cifra en una
+//    línea, etiqueta debajo en UNA sola línea (`shortLabel` si no cabe).
+//    Ocupa la mitad que la grande y deja ver el contenido nada más abrir la
+//    página; caben cuatro en 390px.
 //  - Desde md: la tarjeta de siempre (icono encima, cifra grande, etiqueta),
 //    con las mismas medidas que antes de existir el modo compacto.
 // El salto va por VIEWPORT y no por contenedor a propósito: así se comportan
@@ -20,6 +21,9 @@ import Link from "next/link";
 // enlace (Perfil y Social: seguidores, seguidos…).
 export default function PageStatCard({
   label,
+  // Etiqueta de la mini tarjeta (móvil), que va SIEMPRE en una línea: para
+  // las que no caben enteras ("Progreso medio" → "P. medio").
+  shortLabel,
   value,
   icon: Icon,
   colorClass = "text-white",
@@ -35,7 +39,7 @@ export default function PageStatCard({
   const interactive = href
     ? `transition duration-300 hover:-translate-y-0.5 hover:from-white/[0.16] hover:to-white/[0.07] focus-visible:outline-none focus-visible:ring-2 ${focusRingClass}`
     : "";
-  const classes = `relative overflow-hidden w-full h-full min-w-0 lg:min-w-[120px] rounded-2xl md:rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 ${glass ? "backdrop-blur-lg" : ""} shadow-lg px-2 py-2 md:px-5 md:py-4 flex flex-col items-center justify-center gap-0.5 md:gap-1 text-center ${interactive} ${className}`;
+  const classes = `relative overflow-hidden w-full h-full min-w-0 lg:min-w-[120px] rounded-2xl md:rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 ${glass ? "backdrop-blur-lg" : ""} shadow-lg px-2 py-2 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1.5 md:gap-1 text-center ${interactive} ${className}`;
 
   const body = (
     <>
@@ -56,8 +60,15 @@ export default function PageStatCard({
           )}
         </span>
       </div>
-      <span className="relative z-10 block max-w-full text-[9px] md:text-[10px] uppercase font-bold text-zinc-300 tracking-wider text-center leading-tight">
-        {label}
+      <span className="relative z-10 block max-w-full text-[9px] md:text-[10px] uppercase font-bold text-zinc-300 tracking-wider text-center leading-tight max-md:truncate">
+        {shortLabel ? (
+          <>
+            <span className="md:hidden">{shortLabel}</span>
+            <span className="max-md:hidden">{label}</span>
+          </>
+        ) : (
+          label
+        )}
       </span>
     </>
   );
