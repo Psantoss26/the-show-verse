@@ -418,7 +418,43 @@ const SORTS = {
   name_asc: [asc(communityLists.name)], name_desc: [desc(communityLists.name)],
 };
 
-export async function discoverLists({ sort = 'items_desc', page = 1, limit = 30, viewerId = null }) {
+export const MAX_DISCOVER_PREVIEW_ITEMS = 12;
+
+// Primeros títulos de VARIAS listas en una sola consulta (vistas previas del
+// índice de /lists). Antes el navegador pedía /lists/:id por cada tarjeta: doce
+// peticiones de 0,4-0,8 s en producción, cada una calculando además la media de
+// TODA la lista, que la vista previa no usa. Sin borrar nada: es un listado.
+async function readListPreviews(listIds, limit) {
+  const ids = [...new Set(listIds.filter(Boolean))];
+  const max = Math.min(Math.max(Number(limit) || 0, 0), MAX_DISCOVER_PREVIEW_ITEMS);
+  if (!ids.length || !max) return new Map();
+  const ranked = db
+    .select({
+      ...communityListItemFields,
+      rank: sql`row_number() over (partition by ${communityListItems.listId} order by ${communityListItems.position} asc)`.as('rank'),
+    })
+    .from(communityListItems)
+    .where(inArray(communityListItems.listId, ids))
+    .as('ranked');
+  const rows = await db
+    .select()
+    .from(ranked)
+    .where(sql`${ranked.rank} <= ${max}`)
+    .orderBy(asc(ranked.listId), asc(ranked.position));
+  const visible = await hydrateListItemPosters(rows, { allowDelete: false });
+  const byList = new Map(ids.map((id) => [id, []]));
+  for (const it of visible) {
+    byList.get(it.listId)?.push({
+      tmdbId: it.tmdbId,
+      mediaType: it.mediaType,
+      title: it.title || null,
+      posterPath: it.posterPath || null,
+    });
+  }
+  return byList;
+}
+
+export async function discoverLists({ sort = 'items_desc', page = 1, limit = 30, viewerId = null, previewItems = 0 }) {
   const orderBy = Object.hasOwn(SORTS, sort) ? SORTS[sort] : SORTS.items_desc;
   const safeLimit = Math.min(Math.max(Number(limit) || 30, 1), 60);
   const offset = (Math.max(Number(page) || 1, 1) - 1) * safeLimit;
@@ -427,8 +463,16 @@ export async function discoverLists({ sort = 'items_desc', page = 1, limit = 30,
   // recién publicada no llegaría nunca a la primera página.
   const ownFirst = sql`case when ${communityLists.source} = 'user' then 0 else 1 end`;
   const rows = await db.select().from(communityLists).orderBy(ownFirst, ...orderBy).limit(safeLimit).offset(offset);
-  const liked = await likedListIds(viewerId, rows.map((row) => row.id));
-  return rows.map((row) => listRowToApi({ ...row, likedByViewer: liked.has(row.id) }));
+  const listIds = rows.map((row) => row.id);
+  const [liked, previews] = await Promise.all([
+    likedListIds(viewerId, listIds),
+    // Una vista previa que falla no tumba el índice: el cliente la pide aparte.
+    readListPreviews(listIds, previewItems).catch(() => new Map()),
+  ]);
+  return rows.map((row) => {
+    const api = listRowToApi({ ...row, likedByViewer: liked.has(row.id) });
+    return previews.has(row.id) ? { ...api, previewItems: previews.get(row.id) } : api;
+  });
 }
 
 export async function getCommunityListWithItems({ id, page = 1, limit = 50, viewerId = null }) {

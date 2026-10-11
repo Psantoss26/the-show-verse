@@ -191,9 +191,11 @@ export default async function communityRoutes(fastify) {
 
   // Surface A: discover.
   fastify.get('/lists/discover', async (req, reply) => {
-    const { sort = 'items_desc', page = '1', limit = '30' } = req.query || {};
+    // `preview=N`: los N primeros títulos de cada lista, para pintar las
+    // vistas previas del índice sin una petición por lista.
+    const { sort = 'items_desc', page = '1', limit = '30', preview = '0' } = req.query || {};
     const viewerId = req.user?.id || null;
-    const results = await discoverLists({ sort, page, limit, viewerId });
+    const results = await discoverLists({ sort, page, limit, viewerId, previewItems: preview });
     setCommunityCache(reply, viewerId, 'public, s-maxage=300, stale-while-revalidate=86400');
     return { results };
   });
