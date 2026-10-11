@@ -60,9 +60,92 @@ const NON_ROTATING_POOLS = new Set([
   'region_top',
 ]);
 
+// Páginas dedicadas de sección (/dashboard/sections/:key): la lista COMPLETA
+// de una fila, no los 32 del dashboard.
+const SECTION_ITEMS_LIMIT = 200;
+const SECTION_KEYS = new Set(['anticipated', 'for_you', 'trending']);
+// En Inicio, las filas de esas secciones son los primeros títulos de la MISMA
+// lista que su página (mismo orden), más largas que el resto para poder seguir
+// recorriéndolas con el scroll horizontal.
+const SECTION_ROW_ITEMS = 60;
+
+const isValidCard = (card) =>
+  !!card && ['movie', 'tv'].includes(card.mediaType) && Number(card.tmdbId) > 0;
+
+/**
+ * Lista completa de una sección: la usan su página dedicada
+ * (`/sections/:key`) y su fila en Inicio, así que las dos enseñan los mismos
+ * títulos en el mismo orden.
+ *  - anticipated: ranking global de demanda pública (Trakt + TMDb), cine y
+ *    series en la misma escala (`anticipatedScore`).
+ *  - trending: tendencias de Trakt y, detrás, las de TMDb (pool
+ *    `trending_section`), cine y series intercalados.
+ *  - for_you: con biblioteca, TODAS las recomendaciones del usuario por
+ *    puntuación, cine y series alternos, SIN nada de su biblioteca (vistos,
+ *    favoritos, valorados): un título ya visto no es una recomendación. Sin
+ *    biblioteca (o sin recomendaciones), populares y mejor valoradas.
+ * `recsByType` permite reutilizar las recomendaciones ya calculadas.
+ */
+async function buildSectionList(key, { lib = null, recsByType = null, userId = null, pool, recommend }) {
+  const excluded = new Set(lib ? dislikedIds(lib) : []);
+  let items = [];
+  let personalized = false;
+
+  if (key === 'anticipated') {
+    items = await resolvePoolItems('anticipated', 'mixed', pool);
+  } else if (key === 'trending') {
+    items = await resolvePoolItems('trending_section', 'mixed', pool);
+  } else {
+    if (lib) {
+      let recs = recsByType;
+      if (!recs) {
+        const basisHash = libraryBasisHash(lib);
+        const [movie, tv] = await Promise.all(['movie', 'tv'].map((mt) =>
+          recommend(userId, mt, { lib, basisHash }).catch(() => [])));
+        recs = { movie, tv };
+      }
+      for (const entry of [...lib.history, ...lib.favorites, ...lib.ratings]) {
+        excluded.add(`${entry.mediaType}:${entry.tmdbId}`);
+      }
+      const byScore = (list) => (Array.isArray(list) ? list : [])
+        .filter((card) => isValidCard(card) && !excluded.has(cardKey(card)))
+        .sort((a, b) => (b.score || 0) - (a.score || 0));
+      items = interleave(byScore(recs.movie), byScore(recs.tv));
+      personalized = items.length > 0;
+    }
+    if (!items.length) {
+      const [popular, topRated] = await Promise.all([
+        resolvePoolItems('popular', 'mixed', pool),
+        resolvePoolItems('top_rated', 'mixed', pool),
+      ]);
+      items = interleave(popular, topRated);
+    }
+  }
+
+  items = dedupeCards(items.filter((card) => isValidCard(card) && !excluded.has(cardKey(card))))
+    .slice(0, SECTION_ITEMS_LIMIT);
+  return { items, personalized };
+}
+
 // ─── Route plugin ─────────────────────────────────────────────────────────────
 export default async function dashboardRoutes(fastify, options = {}) {
   const { getPool: pool = getPool, loadLibrary: library = loadLibrary, getUserRecommendations: recommend = getUserRecommendations } = options.sources || {};
+
+  // GET /dashboard/sections/:key — lista completa de una sección para su página
+  // dedicada ("Ver todos"): ver `buildSectionList`. Sin el recorte de las filas
+  // ni la rotación diaria: el orden ES la información.
+  fastify.get('/sections/:key', async (req, reply) => {
+    const { key } = req.params;
+    if (!SECTION_KEYS.has(key)) return reply.status(404).send({ error: 'Unknown section' });
+
+    const userId = req.user?.id || null;
+    const lib = userId ? await library(userId).catch(() => null) : null;
+    const { items, personalized } = await buildSectionList(key, { lib, userId, pool, recommend });
+
+    reply.header('Cache-Control', 'private, max-age=300');
+    return { key, personalized, generatedAt: new Date().toISOString(), items };
+  });
+
   fastify.get('/:surface', async (req, reply) => {
     const surfaceKey = req.params.surface;
     const surface = SURFACES[surfaceKey];
@@ -189,18 +272,44 @@ export default async function dashboardRoutes(fastify, options = {}) {
     const specs = [...personalSpecs, ...genericSpecs].map((row) => ({
       ...row, items: rankRowItems(row, { seed, recommendations: affinity, surface: surfaceKey, cohortSeed: dayNumber() + stableHash(userId || 'anonymous') }), rotate: false,
     }));
+    // ── Filas de sección (solo Inicio) ────────────────────────────────────────
+    // Recomendaciones, Más esperadas y Tendencias tienen página dedicada: su
+    // fila es el principio de la MISMA lista (`buildSectionList`), en el mismo
+    // orden y con SECTION_ROW_ITEMS títulos. No entran en el reparto equitativo
+    // (que recortaría y saltaría títulos); las demás filas se deduplican
+    // contra ellas para no repetir lo que ya enseñan.
+    const sectionRows = new Map();
+    if (surfaceKey === 'home') {
+      const lists = await Promise.all(specs.filter((spec) => SECTION_KEYS.has(spec.key)).map(async (spec) => {
+        const list = await buildSectionList(spec.key, { lib, recsByType, userId, pool, recommend })
+          .catch(() => ({ items: [], personalized: false }));
+        // "Para ti" solo si de verdad es personal: sin recomendaciones, la
+        // lista de la sección sería la genérica y no le corresponde esa fila.
+        if (spec.key === 'for_you' && !list.personalized) return null;
+        return [spec.key, list.items.slice(0, SECTION_ROW_ITEMS)];
+      }));
+      for (const entry of lists) {
+        if (entry && entry[1].length >= DASHBOARD_MIN_ITEMS_PER_ROW) sectionRows.set(entry[0], entry[1]);
+      }
+    }
+    const sectionIds = new Set([...sectionRows.values()].flat().map(cardKey));
+
     // ── Assemble final rows ───────────────────────────────────────────────────
-    const rows = assembleRows({
-      rowSpecs: specs,
+    const assembled = assembleRows({
+      rowSpecs: specs.filter((spec) => !sectionRows.has(spec.key)),
       rotationSeed: seed,
       perRow: DASHBOARD_ITEMS_PER_ROW,
       minItems: DASHBOARD_MIN_ITEMS_PER_ROW,
       seenIds,
-      excludeIds: dislikedIds(lib),
+      excludeIds: new Set([...dislikedIds(lib), ...sectionIds]),
       fairAllocation: true,
       maxAppearances: 2,
       repeatRatio: 0.125,
     });
+    // Orden de definición de las filas, con las de sección en su sitio.
+    const rows = specs.flatMap((spec) => (sectionRows.has(spec.key)
+      ? [{ key: spec.key, title: spec.title, reason: spec.reason, mediaType: spec.mediaType, items: sectionRows.get(spec.key) }]
+      : assembled.filter((row) => row.key === spec.key)));
     personalized = rows.some((row) => personalSpecs.some((spec) => spec.key === row.key));
 
     reply.header('Cache-Control', 'private, max-age=300');

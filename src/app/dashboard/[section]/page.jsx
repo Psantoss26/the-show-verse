@@ -1,4 +1,5 @@
 import DashboardSectionClient from "./DashboardSectionClient";
+import DetailModalProvider from "@/components/dashboard/DetailModalProvider";
 
 const SECTION_TITLES = {
   tendencias: "Tendencias",
@@ -16,5 +17,11 @@ export async function generateMetadata({ params }) {
 
 export default async function DashboardSectionPage({ params }) {
   const { section } = await params;
-  return <DashboardSectionClient section={section} />;
+  // Ficha rápida (DetailModal) como drawer desde la derecha al pulsar una
+  // tarjeta, igual que en Favoritos y el resto de páginas de usuario.
+  return (
+    <DetailModalProvider placement="right">
+      <DashboardSectionClient section={section} />
+    </DetailModalProvider>
+  );
 }

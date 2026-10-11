@@ -4,6 +4,7 @@ import { dashboardPools } from '../db/schema.js';
 import { and, eq } from 'drizzle-orm';
 import { tmdbDiscover, tmdbList, tmdbDetails, tmdbSeason, toCard, MOVIE_GENRES, TV_GENRES } from './tmdb.js';
 import { fetchAnticipated, mergeAnticipatedCandidates } from './anticipated.js';
+import { fetchTraktTrending, mergeTrendingCandidates } from './trending.js';
 import { withinRange } from './calendarRange.js';
 import { rankAnticipatedTitles, rankNewReleaseMovies } from './score.js';
 import {
@@ -151,6 +152,25 @@ for (const mediaType of ['movie', 'tv']) {
       TRENDING_VOTES[mediaType],
     )
   );
+}
+
+// trending_section (12h) — Tendencias para la página dedicada y su fila en
+// Inicio: Trakt (en su orden) + tendencias semanales de TMDb, sin mínimo de
+// votos (los estrenos recientes son lo que es tendencia). Es la receta que
+// usaba la página; el pool `trending` de arriba sigue alimentando las filas de
+// Películas y Series con su filtro de calidad.
+for (const mediaType of ['movie', 'tv']) {
+  addPool('trending_section', mediaType, TTL_12H, async () => {
+    const [traktIds, tmdbCards] = await Promise.all([
+      fetchTraktTrending(mediaType),
+      tmdbList({ path: `/trending/${mediaType}/week`, mediaType, pages: 5 }),
+    ]);
+    const merged = await mergeTrendingCandidates(traktIds, dedupeCards(tmdbCards), async (id) => {
+      const details = await tmdbDetails(mediaType, id);
+      return details ? toCard({ ...details, genre_ids: details.genres?.map((genre) => genre.id) }, mediaType) : null;
+    });
+    return excludeKidsReality(dedupeCards(merged));
+  }, { version: 'trending-section-v1' });
 }
 
 // popular (24h) — pool profundo: trending/region_top/popular se solapan mucho,

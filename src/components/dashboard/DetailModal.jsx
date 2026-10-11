@@ -960,17 +960,36 @@ export default function DetailModal({
     const scroller = scrollContainerRef.current;
     if (!panel || !scroller) return undefined;
     let idleTimer;
+    let settleFrame = 0;
     let scrolling = false;
+    const clearSettling = () => {
+      if (settleFrame) window.cancelAnimationFrame(settleFrame);
+      settleFrame = 0;
+      panel.removeAttribute("data-drawer-settling");
+    };
     const settle = () => {
       window.clearTimeout(idleTimer);
       if (!scrolling) return;
       scrolling = false;
+      // El cristal vuelve SIN transición (ver `data-drawer-settling` en
+      // globals.css): con ella, cada pieza animaba su desenfoque en el hilo
+      // principal tras cada parada del scroll. Dos fotogramas: el primero
+      // aplica el estilo sin `data-drawer-scrolling`, el segundo ya no cambia
+      // nada que pueda transicionar.
+      panel.setAttribute("data-drawer-settling", "");
       panel.removeAttribute("data-drawer-scrolling");
+      settleFrame = window.requestAnimationFrame(() => {
+        settleFrame = window.requestAnimationFrame(() => {
+          settleFrame = 0;
+          panel.removeAttribute("data-drawer-settling");
+        });
+      });
     };
     const onScroll = () => {
       // One local style invalidation per gesture, no React render per frame.
       if (!scrolling) {
         scrolling = true;
+        clearSettling();
         panel.setAttribute("data-drawer-scrolling", "");
       }
       window.clearTimeout(idleTimer);
@@ -980,6 +999,7 @@ export default function DetailModal({
     scroller.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       settle();
+      clearSettling();
       scroller.removeEventListener("scroll", onScroll);
     };
   }, [isRightPlacement]);
