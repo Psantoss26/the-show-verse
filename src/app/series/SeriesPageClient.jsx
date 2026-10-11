@@ -70,7 +70,8 @@ import DetailModalProvider from "@/components/dashboard/DetailModalProvider";
 import PreviewTrailerAudioButton, {
   usePreviewTrailerAudio,
 } from "@/components/dashboard/PreviewTrailerAudioControl";
-import { fetchBestBackdropNoLang, fetchBestLogo } from "@/lib/dashboard/media";
+import { fetchBestBackdropNoLang } from "@/lib/dashboard/media";
+import useSpotlightLogo from "@/lib/dashboard/useSpotlightLogo";
 import DashboardSpotlightPreview from "@/components/dashboard/DashboardSpotlightPreview";
 import DashboardRankNumber from "@/components/dashboard/DashboardRankNumber";
 
@@ -729,7 +730,8 @@ function InlinePreviewCard({ show, heightClass, isSpotlight = false }) {
   });
   const [backdropPath, setBackdropPath] = useState(null);
   const [backdropReady, setBackdropReady] = useState(false);
-  const [logoPath, setLogoPath] = useState(null);
+  // `undefined` mientras se resuelve: ni logo ni título (ver useSpotlightLogo).
+  const logoPath = useSpotlightLogo(show?.id, "tv", isSpotlight);
 
   const [loadingStates, setLoadingStates] = useState(false);
   const [favorite, setFavorite] = useState(false);
@@ -752,24 +754,6 @@ function InlinePreviewCard({ show, heightClass, isSpotlight = false }) {
     setTrailer(null);
     setTrailerLoading(false);
   }, [show?.id]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLogoPath(null);
-    if (!isSpotlight || !show?.id) return;
-
-    fetchBestLogo(show.id, "tv", ["en", "es", null])
-      .then((path) => {
-        if (!cancelled) setLogoPath(path || null);
-      })
-      .catch(() => {
-        if (!cancelled) setLogoPath(null);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isSpotlight, show?.id]);
 
   useEffect(() => {
     let cancel = false;
@@ -1186,6 +1170,7 @@ function InlinePreviewCard({ show, heightClass, isSpotlight = false }) {
           mediaType="tv"
           title={show.name || show.title}
           logoSrc={logoSrc}
+          logoPending={logoPath === undefined}
           backdropSrc={bgSrc}
           year={yearOf(show)}
           runtime={extras?.seasons}

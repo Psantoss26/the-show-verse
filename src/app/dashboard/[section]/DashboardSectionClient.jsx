@@ -16,9 +16,11 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft,
   ArrowUpDown,
+  Bookmark,
   Calendar,
   CheckCircle2,
   ChevronDown,
+  Eye,
   Film,
   Filter,
   Grid2X2,
@@ -31,6 +33,7 @@ import {
   X,
 } from "lucide-react";
 import { formatPageTitle } from "@/lib/pageTitle";
+import { deriveSectionLabel } from "@/lib/dashboard/sectionLabel";
 import {
   normalizeSearchText,
   titleMatchesQuery,
@@ -40,6 +43,19 @@ import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import HoverExpandCard from "@/components/ui/HoverExpandCard";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 import PageStatCard from "@/components/ui/PageStatCard";
+import usePreviewOpen from "@/components/preview/usePreviewOpen";
+import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import useUserTitleStates, {
+  userTitleKey,
+} from "@/lib/hooks/useUserTitleStates";
+import {
+  fetchImdbScoresForItems,
+  getScoreItemKey,
+  readScoreCache,
+  writeScoreCache,
+} from "@/lib/userLists/listScoreCache";
+
+const EMPTY_SCORES = new Map();
 
 const MOVIE_GENRES = {
   28: "Acción",
@@ -95,7 +111,6 @@ const SORT_OPTIONS = [
 const GROUP_OPTIONS = [
   { key: "none", label: "Sin agrupar" },
   { key: "media", label: "Tipo" },
-  { key: "source", label: "Fuente" },
   { key: "genre", label: "Género" },
   { key: "year", label: "Año" },
   { key: "decade", label: "Década" },
@@ -159,25 +174,12 @@ function getRatingGroup(item) {
 
 function getGroupMeta(item, groupBy) {
   const type = resolveType(item);
-  const sources = Array.isArray(item?.sources) && item.sources.length
-    ? item.sources
-    : [item?.source || "tmdb"];
   const year = getYear(item);
 
   if (groupBy === "media") {
     return {
       key: type,
       label: type === "movie" ? "Películas" : "Series",
-    };
-  }
-
-  if (groupBy === "source") {
-    if (sources.includes("trakt") && sources.includes("tmdb")) {
-      return { key: "both", label: "Trakt + TMDb" };
-    }
-    return {
-      key: sources[0],
-      label: sources[0] === "trakt" ? "Trakt" : "TMDb",
     };
   }
 
@@ -442,6 +444,103 @@ function DropdownItem({ active, onClick, children }) {
   );
 }
 
+// Píldora de cristal del hover: la de Favoritos y la de Pendientes EN UNA.
+//  - Siempre, el tipo (película / serie).
+//  - En FAVORITOS: lo que enseña Favoritos —visionados (veces en películas, ojo
+//    en series vistas) y la nota del usuario—.
+//  - Si no: lo que enseña Pendientes —nota de TMDb y de IMDb—.
+//  - En PENDIENTES, además, su marcador.
+// Sin sesión no hay favoritos ni pendientes: queda la versión de las notas.
+function SectionHoverIndicator({
+  type,
+  tmdbScore,
+  imdbScore,
+  favorite = false,
+  watchlisted = false,
+  watchCount = 0,
+  userRating,
+  compact = false,
+}) {
+  const tmdb = Number(tmdbScore);
+  const imdb = Number(imdbScore);
+  const hasTmdb = Number.isFinite(tmdb) && tmdb > 0;
+  const hasImdb = Number.isFinite(imdb) && imdb > 0;
+  const hasUserRating = userRating != null && Number(userRating) > 0;
+  const count = Number.isFinite(Number(watchCount)) ? Math.max(0, Number(watchCount)) : 0;
+  const itemClassName = compact ? "h-7 w-8" : "h-9 w-10";
+  const iconClassName = compact ? "h-4 w-4" : "h-5 w-5";
+  const valueClassName = compact ? "h-7 w-8 text-base" : "h-9 w-10 text-xl";
+
+  return (
+    <div
+      className={`pointer-events-none absolute ${compact ? "bottom-1.5 px-1" : "bottom-2 px-1.5"} left-1/2 z-20 hidden -translate-x-1/2 translate-y-3 scale-95 opacity-0 items-center overflow-hidden rounded-full ${LIQUID_GLASS_PANEL} text-white shadow-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none lg:flex lg:group-hover:translate-y-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 will-change-transform transform-gpu`}
+      aria-hidden="true"
+    >
+      <span
+        className={`flex ${itemClassName} shrink-0 items-center justify-center ${type === "movie" ? "text-sky-400" : "text-violet-400"}`}
+      >
+        {type === "movie" ? (
+          <Film className={iconClassName} />
+        ) : (
+          <MonitorPlay className={iconClassName} />
+        )}
+      </span>
+      {favorite ? (
+        <>
+          {type === "movie" ? (
+            <span
+              className={`flex ${valueClassName} shrink-0 items-center justify-center font-black leading-none tabular-nums text-emerald-400`}
+            >
+              {count}
+            </span>
+          ) : count > 0 ? (
+            <span
+              className={`flex ${itemClassName} shrink-0 items-center justify-center text-emerald-400`}
+            >
+              <Eye className={iconClassName} />
+            </span>
+          ) : null}
+          {hasUserRating ? (
+            <span
+              className={`flex ${valueClassName} shrink-0 items-center justify-center font-black leading-none text-amber-300`}
+            >
+              <span className="tabular-nums leading-none">{userRating}</span>
+            </span>
+          ) : null}
+        </>
+      ) : (
+        <>
+          {hasTmdb ? (
+            <span
+              className={`flex ${valueClassName} shrink-0 items-center justify-center font-black leading-none tabular-nums text-sky-400`}
+            >
+              {tmdb.toFixed(1)}
+            </span>
+          ) : null}
+          {hasImdb ? (
+            <span
+              className={`flex ${valueClassName} shrink-0 items-center justify-center font-black leading-none tabular-nums text-amber-300`}
+            >
+              {imdb.toFixed(1)}
+            </span>
+          ) : null}
+        </>
+      )}
+      {watchlisted ? (
+        <span
+          className={`flex ${itemClassName} shrink-0 items-center justify-center text-blue-400`}
+        >
+          <Bookmark className={`${iconClassName} fill-current`} />
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+// Tarjeta de las secciones del dashboard. Mismo diseño que las de Favoritos (y
+// el resto de páginas de usuario): en reposo solo la imagen; en hover, el aro
+// de color de la página (ámbar aquí, rojo en Favoritos) y la píldora de estado.
+// En lista, título y año. Al pulsar se abre la ficha rápida en el drawer.
 function SectionCard({
   item,
   index,
@@ -450,26 +549,67 @@ function SectionCard({
   imageMode = "poster",
   previewBackdropPath,
   backdropPending = false,
+  watchCount = 0,
+  userRating = null,
+  favorite = false,
+  watchlisted = false,
+  initialImdbScore,
 }) {
   const type = resolveType(item);
+  // Nota de IMDb: la de la caché compartida con Pendientes o, si no está, se
+  // pide al pasar el ratón por primera vez (igual que en Pendientes).
+  const [imdbScore, setImdbScore] = useState(initialImdbScore ?? null);
+  const imdbRequestedRef = useRef(false);
+  useEffect(() => {
+    if (initialImdbScore != null) setImdbScore(initialImdbScore);
+  }, [initialImdbScore]);
+  const loadImdbScore = useCallback(async () => {
+    if (imdbScore != null || imdbRequestedRef.current) return;
+    imdbRequestedRef.current = true;
+    const key = getScoreItemKey(item);
+    try {
+      const batch = await fetchImdbScoresForItems([item]);
+      const value = Number(batch?.items?.[key]?.rating);
+      if (Number.isFinite(value) && value > 0) {
+        setImdbScore(value);
+        writeScoreCache("imdb", new Map([[key, value]]), new Set([key]));
+      }
+    } catch {
+      // Sin nota de IMDb: la píldora se queda con la de TMDb.
+    }
+  }, [imdbScore, item]);
   const title = getTitle(item);
   const year = getYear(item);
-  const rating =
-    typeof item?.vote_average === "number" && item.vote_average > 0
-      ? item.vote_average.toFixed(1)
-      : null;
-  const genre = getGenreLabel(item);
   const href = `/details/${type === "tv" ? "tv" : "movie"}/${item.id}`;
+  const previewClick = usePreviewOpen();
+  const onPreviewClick = previewClick(item, { mediaType: type });
   const effectiveImageMode = viewMode === "list" ? "backdrop" : imageMode;
   const aspect =
     effectiveImageMode === "backdrop" ? "aspect-[16/9]" : "aspect-[2/3]";
   const animDelay =
     totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
   const shouldAnimate = index < 60;
+  // El hover gana al foco (ver Favoritos): la tarjeta señalada queda siempre
+  // encima, también de la que conserva el foco tras abrir su ficha rápida.
+  const shellClassName =
+    "relative z-0 overflow-visible focus-within:z-[40] hover:z-[50]";
+  const indicator = (compact) => (
+    <SectionHoverIndicator
+      type={type}
+      tmdbScore={item?.vote_average}
+      imdbScore={imdbScore}
+      favorite={favorite}
+      watchlisted={watchlisted}
+      watchCount={watchCount}
+      userRating={userRating}
+      compact={compact}
+    />
+  );
 
   if (viewMode === "list") {
     return (
       <motion.div
+        className={shellClassName}
         initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -10, scale: 0.95 }}
@@ -483,10 +623,11 @@ function SectionCard({
         <Link
           href={href}
           prefetch={false}
-          className="block bg-zinc-900/30 border border-white/5 rounded-xl hover:border-amber-500/30 hover:bg-zinc-900/60 transition-colors group overflow-hidden"
+          onClick={onPreviewClick}
+          className="relative block bg-zinc-900/30 rounded-xl hover:bg-zinc-900/60 transition-colors group overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(245,158,11,0.95)]"
         >
           <div className="relative flex items-center gap-2 sm:gap-6 p-1.5 sm:p-4">
-            <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md border border-white/5 bg-zinc-900 shrink-0">
+            <div className="w-[180px] sm:w-[280px] aspect-video rounded-lg overflow-hidden relative shadow-md bg-zinc-900 shrink-0">
               <PosterImage
                 item={item}
                 mode="backdrop"
@@ -495,29 +636,15 @@ function SectionCard({
                 backdropPending={backdropPending}
               />
             </div>
-            <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
-              <h3 className="text-white font-bold text-base leading-tight truncate">
-                {title}
-              </h3>
-              <div className="-ml-0.5 flex items-center gap-2 text-xs text-zinc-500">
-                {year && <span>{year}</span>}
-                {year && genre && <span>•</span>}
-                <span>{genre}</span>
-                {rating && (
-                  <>
-                    {(year || genre) && <span>•</span>}
-                    <span className="inline-flex items-center gap-1 text-amber-300">
-                      <Star className="h-3 w-3 fill-current text-amber-400" />
-                      {rating}
-                    </span>
-                  </>
-                )}
+            <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
+              <div className="flex items-center gap-2">
+                <h3 className="text-white font-bold text-base leading-tight truncate transition-colors group-hover:text-amber-300">
+                  {title}
+                </h3>
               </div>
-              {item?.overview && (
-                <p className="mt-3 line-clamp-2 text-sm text-zinc-500">
-                  {item.overview}
-                </p>
-              )}
+              <div className="flex flex-wrap items-center gap-1.5 text-xs font-medium leading-tight tracking-[0.08em] text-zinc-400 tabular-nums">
+                {year && <span>{year}</span>}
+              </div>
             </div>
           </div>
         </Link>
@@ -528,6 +655,7 @@ function SectionCard({
   if (viewMode === "compact") {
     return (
       <motion.div
+        className={shellClassName}
         initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -10, scale: 0.95 }}
@@ -541,12 +669,13 @@ function SectionCard({
         <Link
           href={href}
           prefetch={false}
-          className="block rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+          onClick={onPreviewClick}
+          className="block"
         >
           <HoverExpandCard
             cellClassName={aspect}
-            className="group rounded-lg overflow-hidden bg-zinc-900 shadow-md after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(245,158,11,0.95)]"
-            zIndex={50}
+            className="group overflow-hidden rounded-lg bg-zinc-900 shadow-md"
+            onMouseEnter={loadImdbScore}
           >
             <PosterImage
               item={item}
@@ -555,51 +684,7 @@ function SectionCard({
               previewBackdropPath={previewBackdropPath}
               backdropPending={backdropPending}
             />
-            <div
-              className={`hidden lg:flex items-center justify-center absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
-                type === "movie"
-                  ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
-                  : "bg-purple-500/15 border-purple-500/30 text-purple-300"
-              }`}
-            >
-              {type === "movie" ? (
-                <Film className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-              ) : (
-                <MonitorPlay className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-              )}
-            </div>
-            <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
-              <div className="p-3 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-                <div />
-                <div className="flex flex-col items-end gap-1 pointer-events-auto">
-                  {rating && (
-                    <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                      <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
-                        {rating}
-                      </span>
-                      <OptimizedImage
-                        src="/logo-TMDb.png"
-                        alt=""
-                        className="w-auto h-2.5 opacity-100"
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="p-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                <div className="flex items-end justify-between gap-3">
-                  <div className="min-w-0 text-left flex-1">
-                    <h3 className="text-white font-bold leading-tight line-clamp-2 drop-shadow-md text-xs">
-                      {title}
-                    </h3>
-                    <p className="text-yellow-500 text-[10px] font-bold mt-0.5 drop-shadow-md">
-                      {[year, genre].filter(Boolean).join(" • ")}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            {indicator(true)}
           </HoverExpandCard>
         </Link>
       </motion.div>
@@ -608,6 +693,7 @@ function SectionCard({
 
   return (
     <motion.div
+      className={shellClassName}
       initial={shouldAnimate ? { opacity: 0, scale: 0.95 } : false}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
@@ -616,12 +702,15 @@ function SectionCard({
       <Link
         href={href}
         prefetch={false}
-        className="block rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+        onClick={onPreviewClick}
+        className="block"
       >
         <div
-          className={`group relative ${aspect} overflow-hidden rounded-xl bg-zinc-900 shadow-md transition-all lg:hover:shadow-amber-900/20`}
+          className={`relative ${aspect} group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-amber-900/20 transition-shadow duration-300`}
+          onMouseEnter={loadImdbScore}
         >
-          <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] border border-white/5 group-hover:border-amber-500/40 transition-colors duration-300" />
+          {/* Aro del hover por encima de la imagen y de la píldora. */}
+          <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 group-hover:shadow-[inset_0_0_0_2.5px_rgba(245,158,11,0.95)]" />
           <PosterImage
             item={item}
             mode={effectiveImageMode}
@@ -629,53 +718,7 @@ function SectionCard({
             previewBackdropPath={previewBackdropPath}
             backdropPending={backdropPending}
           />
-
-          <div
-            className={`hidden lg:flex items-center justify-center absolute top-0 left-0 z-20 p-2 sm:p-2.5 rounded-br-2xl border-r border-b backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-top-left lg:scale-0 lg:opacity-0 lg:group-hover:scale-100 lg:group-hover:opacity-100 ${
-              type === "movie"
-                ? "bg-sky-500/15 border-sky-500/30 text-sky-300"
-                : "bg-purple-500/15 border-purple-500/30 text-purple-300"
-            }`}
-          >
-            {type === "movie" ? (
-              <Film className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
-            ) : (
-              <MonitorPlay className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
-            )}
-          </div>
-
-          <div className="absolute inset-0 z-10 hidden lg:flex flex-col justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
-            <div className="p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex justify-between items-start transform -translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-              <div />
-              <div className="flex flex-col items-end gap-1 pointer-events-auto">
-                {rating && (
-                  <div className="flex items-center gap-1.5 drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
-                    <span className="text-emerald-400 text-xs font-black font-mono tracking-tight">
-                      {rating}
-                    </span>
-                    <OptimizedImage
-                      src="/logo-TMDb.png"
-                      alt=""
-                      className="w-auto h-2.5 opacity-100"
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="p-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-              <div className="flex items-end justify-between gap-3">
-                <div className="min-w-0 text-left flex-1">
-                  <h3 className="text-white font-bold leading-tight line-clamp-2 drop-shadow-md text-sm">
-                    {title}
-                  </h3>
-                  <p className="text-yellow-500 text-xs font-bold mt-0.5 drop-shadow-md">
-                    {[year, genre].filter(Boolean).join(" • ")}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+          {indicator(false)}
         </div>
       </Link>
     </motion.div>
@@ -742,7 +785,6 @@ export default function DashboardSectionClient({ section }) {
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
   const [mediaFilter, setMediaFilter] = useState("all");
-  const [sourceFilter, setSourceFilter] = useState("all");
   const [sortBy, setSortBy] = useState("rank");
   const [groupBy, setGroupBy] = useState("none");
   const [viewMode, setViewMode] = useState("compact");
@@ -879,12 +921,6 @@ export default function DashboardSectionClient({ section }) {
     return rawItems.filter((item) => {
       const type = resolveType(item);
       if (mediaFilter !== "all" && type !== mediaFilter) return false;
-      const sources = Array.isArray(item?.sources) && item.sources.length
-        ? item.sources
-        : [item?.source || "tmdb"];
-      if (sourceFilter !== "all" && !sources.includes(sourceFilter)) {
-        return false;
-      }
       if (!q) return true;
       return (
         titleMatchesQuery(item, q) ||
@@ -892,7 +928,7 @@ export default function DashboardSectionClient({ section }) {
         normText(getYear(item)).includes(q)
       );
     });
-  }, [rawItems, deferredQuery, mediaFilter, sourceFilter]);
+  }, [rawItems, deferredQuery, mediaFilter]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -931,6 +967,28 @@ export default function DashboardSectionClient({ section }) {
     [getPreviewBackdropPath, imageMode, previewBackdropsReady, viewMode],
   );
 
+  // Visionados y nota del usuario para la píldora del hover (como Favoritos).
+  const { watchCounts, ratings, favorites, watchlist } = useUserTitleStates();
+  // Notas de IMDb ya conocidas (caché compartida con Favoritos y Pendientes).
+  // Se lee una vez, en cliente: localStorage no existe al renderizar en servidor.
+  const [imdbCache, setImdbCache] = useState(EMPTY_SCORES);
+  useEffect(() => {
+    setImdbCache(readScoreCache("imdb"));
+  }, []);
+  const userStateOf = useCallback(
+    (item) => {
+      const key = userTitleKey(resolveType(item), item.id);
+      return {
+        watchCount: watchCounts.get(key) || 0,
+        userRating: ratings.get(key) ?? null,
+        favorite: favorites.has(key),
+        watchlisted: watchlist.has(key),
+        initialImdbScore: imdbCache.get(getScoreItemKey(item)) ?? null,
+      };
+    },
+    [watchCounts, ratings, favorites, watchlist, imdbCache],
+  );
+
   const grouped = useMemo(() => {
     if (groupBy === "none") return null;
     const groups = new Map();
@@ -947,19 +1005,14 @@ export default function DashboardSectionClient({ section }) {
   const stats = useMemo(() => {
     let movies = 0;
     let shows = 0;
-    let trakt = 0;
-    let tmdb = 0;
     for (const item of rawItems) {
       if (resolveType(item) === "movie") movies += 1;
       else shows += 1;
-      const sources = Array.isArray(item?.sources) && item.sources.length
-        ? item.sources
-        : [item?.source || "tmdb"];
-      if (sources.includes("trakt")) trakt += 1;
-      if (sources.includes("tmdb")) tmdb += 1;
     }
-    return { movies, shows, trakt, tmdb };
+    return { movies, shows };
   }, [rawItems]);
+
+  const sectionLabel = data?.title ? deriveSectionLabel(data.title) : null;
 
   const sortLabel =
     SORT_OPTIONS.find((option) => option.key === sortBy)?.label || "Orden";
@@ -991,10 +1044,16 @@ export default function DashboardSectionClient({ section }) {
                 >
                   <ArrowLeft className="h-4 w-4" />
                 </Link>
-                <div className="h-px w-12 bg-amber-500" />
-                <span className="text-amber-400 font-bold uppercase tracking-widest text-xs">
-                  {data?.eyebrow || "Dashboard"}
-                </span>
+                {/* La misma etiqueta que lleva la sección en el dashboard
+                    (TENDENCIAS, POPULARES, PARA TI, ANTICIPADAS…). */}
+                {sectionLabel ? (
+                  <>
+                    <div className="h-px w-12 bg-amber-500" />
+                    <span className="text-amber-400 font-bold uppercase tracking-widest text-xs">
+                      {sectionLabel}
+                    </span>
+                  </>
+                ) : null}
               </div>
               <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
                 {data?.title || "Cargando"}
@@ -1119,43 +1178,6 @@ export default function DashboardSectionClient({ section }) {
               </div>
 
               <div className="min-w-0 flex-1">
-                <Dropdown
-                  label="Fuente"
-                  valueLabel={
-                    sourceFilter === "all"
-                      ? "Todas"
-                      : sourceFilter === "trakt"
-                        ? "Trakt"
-                        : "TMDb"
-                  }
-                  icon={SlidersHorizontal}
-                >
-                  {({ close }) => (
-                    <>
-                      {[
-                        ["all", "Todas"],
-                        ["trakt", "Trakt"],
-                        ["tmdb", "TMDb"],
-                      ].map(([key, label]) => (
-                        <DropdownItem
-                          key={key}
-                          active={sourceFilter === key}
-                          onClick={() => {
-                            setSourceFilter(key);
-                            close();
-                          }}
-                        >
-                          {label}
-                        </DropdownItem>
-                      ))}
-                    </>
-                  )}
-                </Dropdown>
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <div className="min-w-0 flex-1">
                 <Dropdown label="Orden" valueLabel={sortLabel} icon={ArrowUpDown}>
                   {({ close }) => (
                     <>
@@ -1175,7 +1197,9 @@ export default function DashboardSectionClient({ section }) {
                   )}
                 </Dropdown>
               </div>
+            </div>
 
+            <div className="flex gap-2">
               <div className="min-w-0 flex-1">
                 <Dropdown label="Agrupar" valueLabel={groupLabel} icon={Calendar}>
                   {({ close }) => (
@@ -1276,29 +1300,6 @@ export default function DashboardSectionClient({ section }) {
                         active={mediaFilter === key}
                         onClick={() => {
                           setMediaFilter(key);
-                          close();
-                        }}
-                      >
-                        {label}
-                      </DropdownItem>
-                    ))}
-                  </>
-                )}
-              </Dropdown>
-
-              <Dropdown label="Fuente" valueLabel={sourceFilter === "all" ? "Todas" : sourceFilter === "trakt" ? "Trakt" : "TMDb"} icon={SlidersHorizontal}>
-                {({ close }) => (
-                  <>
-                    {[
-                      ["all", "Todas"],
-                      ["trakt", "Trakt"],
-                      ["tmdb", "TMDb"],
-                    ].map(([key, label]) => (
-                      <DropdownItem
-                        key={key}
-                        active={sourceFilter === key}
-                        onClick={() => {
-                          setSourceFilter(key);
                           close();
                         }}
                       >
@@ -1441,6 +1442,7 @@ export default function DashboardSectionClient({ section }) {
                       imageMode={imageMode}
                       previewBackdropPath={getPreviewBackdropPath(item)}
                       backdropPending={isPreviewBackdropPending(item)}
+                      {...userStateOf(item)}
                     />
                   ))}
                 </div>
@@ -1462,6 +1464,7 @@ export default function DashboardSectionClient({ section }) {
                 imageMode={imageMode}
                 previewBackdropPath={getPreviewBackdropPath(item)}
                 backdropPending={isPreviewBackdropPending(item)}
+                {...userStateOf(item)}
               />
             ))}
           </div>

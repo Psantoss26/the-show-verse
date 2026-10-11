@@ -72,9 +72,9 @@ import PreviewTrailerAudioButton, {
 } from "@/components/dashboard/PreviewTrailerAudioControl";
 import {
   fetchBestBackdropNoLang,
-  fetchBestLogo,
   getArtworkPreference,
 } from "@/lib/dashboard/media";
+import useSpotlightLogo from "@/lib/dashboard/useSpotlightLogo";
 import DashboardSpotlightPreview from "@/components/dashboard/DashboardSpotlightPreview";
 import DashboardRankNumber from "@/components/dashboard/DashboardRankNumber";
 
@@ -741,7 +741,8 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
   });
   const [backdropPath, setBackdropPath] = useState(null);
   const [backdropReady, setBackdropReady] = useState(false);
-  const [logoPath, setLogoPath] = useState(null);
+  // `undefined` mientras se resuelve: ni logo ni título (ver useSpotlightLogo).
+  const logoPath = useSpotlightLogo(movie?.id, "movie", isSpotlight);
 
   const [loadingStates, setLoadingStates] = useState(false);
   const [favorite, setFavorite] = useState(false);
@@ -764,24 +765,6 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
     setTrailer(null);
     setTrailerLoading(false);
   }, [movie?.id]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLogoPath(null);
-    if (!isSpotlight || !movie?.id) return;
-
-    fetchBestLogo(movie.id, "movie", ["en", "es", null])
-      .then((path) => {
-        if (!cancelled) setLogoPath(path || null);
-      })
-      .catch(() => {
-        if (!cancelled) setLogoPath(null);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isSpotlight, movie?.id]);
 
   useEffect(() => {
     let cancel = false;
@@ -1184,6 +1167,7 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
           mediaType="movie"
           title={movie.title || movie.name}
           logoSrc={logoSrc}
+          logoPending={logoPath === undefined}
           backdropSrc={bgSrc}
           year={yearOf(movie)}
           runtime={formatRuntime(extras?.runtime)}

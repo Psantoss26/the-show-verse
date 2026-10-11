@@ -21,6 +21,7 @@ import {
   deriveSectionLabel,
   normalizeDashboardSectionTitle,
 } from "@/lib/dashboard/sectionLabel";
+import useSpotlightLogo from "@/lib/dashboard/useSpotlightLogo";
 import { shouldUseDashboardBackdropRow } from "@/lib/dashboard/rowLayout";
 import {
   DASHBOARD_PREVIEW_CLOSE_DELAY_MS,
@@ -706,7 +707,8 @@ function InlinePreviewCard({
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
 
-  const [logoPath, setLogoPath] = useState(null);
+  // `undefined` mientras se resuelve: ni logo ni título (ver useSpotlightLogo).
+  const logoPath = useSpotlightLogo(movie?.id, mediaType, isSpotlight);
   const [soundtrackTrack, setSoundtrackTrack] = useState(null);
   const [soundtrackLoading, setSoundtrackLoading] = useState(false);
   const [soundtrackPlaying, setSoundtrackPlaying] = useState(false);
@@ -812,24 +814,6 @@ function InlinePreviewCard({
       cancel = true;
     };
   }, [mediaType, movie, session, account]);
-
-  useEffect(() => {
-    let cancel = false;
-    setLogoPath(null);
-    if (!isSpotlight || !movie?.id) return;
-
-    fetchBestLogo(movie.id, mediaType, ["en", "es", null])
-      .then((path) => {
-        if (!cancel) setLogoPath(path || null);
-      })
-      .catch(() => {
-        if (!cancel) setLogoPath(null);
-      });
-
-    return () => {
-      cancel = true;
-    };
-  }, [isSpotlight, mediaType, movie?.id]);
 
   useEffect(() => {
     if (!soundtrackOpen) return;
@@ -1609,6 +1593,12 @@ function InlinePreviewCard({
                     loading="eager"
                   />
                 </div>
+              ) : logoPath === undefined ? (
+                // Logo aún por resolver: se reserva su hueco, sin título.
+                <div
+                  aria-hidden="true"
+                  className="mb-5 h-16 w-full max-w-[17rem] md:mb-6 md:h-20 md:max-w-[19rem] xl:h-24 xl:max-w-[21rem]"
+                />
               ) : (
                 <h3 className="mb-5 text-balance text-2xl font-black leading-none tracking-[-0.03em] text-white drop-shadow-lg sm:text-3xl md:mb-6">
                   {movie.title || movie.name}
@@ -4441,7 +4431,9 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
               Se omite "Mejor valoradas" porque ya se muestra arriba en TopRatedHero.
               El bloque "Calendario" + "Más esperadas" se saca de su posición natural
               y se coloca ARRIBA, justo tras la 1ª fila ("Recomendaciones de hoy para
-              ti"), para dar prioridad a los próximos episodios y estrenos. */}
+              ti"), para dar prioridad a los próximos episodios y estrenos.
+              "Tendencias ahora mismo" (key `trending`) va JUSTO DESPUÉS de "Más
+              esperadas", también fuera de su sitio natural. */}
           {(() => {
             // Fila destacada "Más esperadas" (key `anticipated`) buscada en TODAS las
             // filas (no solo las reveladas) para poder mostrarla siempre en el bloque.
@@ -4480,15 +4472,24 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
               );
             }
 
+            // "Tendencias ahora mismo", buscada también en TODAS las filas: va
+            // tras "Más esperadas" aunque su sitio natural no se haya revelado.
+            const trendingRow = renderableEngineRows.find(
+              (row) =>
+                row.key === "trending" &&
+                Array.isArray(row.items) &&
+                row.items.length > 0,
+            );
+
             const nodes = [];
             let blockInserted = false;
             // Escritorio conserva la alternancia backdrop/poster. En móvil las
             // filas genéricas son siempre poster, con tres tarjetas por defecto.
-            // "Mejor valoradas" usa su hero independiente.
+            // "Mejor valoradas" usa su hero independiente. "Tendencias" cuenta
+            // en la alternancia en su NUEVO sitio (tras el bloque), para que no
+            // queden dos filas del mismo tipo seguidas.
             let genericIndex = -1;
-            for (const row of visibleEngineRows) {
-              // "Más esperadas" se pinta en el bloque superior, no en su sitio.
-              if (row.key === "anticipated") continue;
+            const renderGenericRow = (row) => {
               genericIndex += 1;
               const isSpotlight =
                 !!spotlightRowTitle && row.title === spotlightRowTitle;
@@ -4497,40 +4498,51 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
                 rowIndex: genericIndex,
                 isSpotlight,
               });
-              nodes.push(
-                useBackdrop ? (
-                  <DashboardBackdropRow
-                    key={row.key}
-                    title={row.title}
-                    href={EXPANDABLE_SECTION_HREFS[row.title]}
-                    items={row.items}
-                    isMobile={isMobile}
-                    hydrated={hydrated}
-                    backdropOverrides={backdropOverrides}
-                  />
-                ) : (
-                  <Row
-                    key={row.key}
-                    title={row.title}
-                    items={row.items}
-                    isMobile={isMobile}
-                    hydrated={hydrated}
-                    posterCacheRef={posterCacheRef}
-                    posterOverrides={posterOverrides}
-                    backdropOverrides={backdropOverrides}
-                    overridesReady={overridesReady}
-                    spotlight={isSpotlight}
-                  />
-                ),
+              return useBackdrop ? (
+                <DashboardBackdropRow
+                  key={row.key}
+                  title={row.title}
+                  href={EXPANDABLE_SECTION_HREFS[row.title]}
+                  items={row.items}
+                  isMobile={isMobile}
+                  hydrated={hydrated}
+                  backdropOverrides={backdropOverrides}
+                />
+              ) : (
+                <Row
+                  key={row.key}
+                  title={row.title}
+                  items={row.items}
+                  isMobile={isMobile}
+                  hydrated={hydrated}
+                  posterCacheRef={posterCacheRef}
+                  posterOverrides={posterOverrides}
+                  backdropOverrides={backdropOverrides}
+                  overridesReady={overridesReady}
+                  spotlight={isSpotlight}
+                />
               );
-              // Justo tras la 1ª fila (Recomendaciones de hoy para ti) va el bloque.
+            };
+            for (const row of visibleEngineRows) {
+              // "Más esperadas" y "Tendencias" se pintan tras el bloque superior,
+              // no en su sitio.
+              if (row.key === "anticipated" || row.key === "trending") continue;
+              nodes.push(renderGenericRow(row));
+              // Justo tras la 1ª fila (Recomendaciones de hoy para ti) va el
+              // bloque, seguido de "Tendencias ahora mismo".
               if (!blockInserted) {
                 nodes.push(...calendarBlock);
+                if (trendingRow) nodes.push(renderGenericRow(trendingRow));
                 blockInserted = true;
               }
             }
-            // Sin filas todavía: el bloque abre la lista.
-            if (!blockInserted) nodes.unshift(...calendarBlock);
+            // Sin filas todavía: el bloque (y Tendencias) abren la lista.
+            if (!blockInserted) {
+              nodes.unshift(
+                ...calendarBlock,
+                ...(trendingRow ? [renderGenericRow(trendingRow)] : []),
+              );
+            }
             return nodes;
           })()}
               </motion.div>

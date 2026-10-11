@@ -22,6 +22,9 @@ export default function DashboardSpotlightPreview({
   mediaType,
   title,
   logoSrc,
+  // El logo aún se está resolviendo: no se pinta ni logo ni título (solo se
+  // reserva su hueco), para que el título no aparezca antes que el logo.
+  logoPending = false,
   backdropSrc,
   year,
   runtime,
@@ -203,6 +206,11 @@ export default function DashboardSpotlightPreview({
                 className="h-full w-full object-contain object-left drop-shadow-[0_3px_12px_rgba(0,0,0,0.95)]"
               />
             </div>
+          ) : logoPending ? (
+            <div
+              aria-hidden="true"
+              className="mb-5 h-16 w-full max-w-[17rem] md:mb-6 md:h-20 md:max-w-[19rem] xl:h-24 xl:max-w-[21rem]"
+            />
           ) : (
             <h3 className="mb-5 text-balance text-2xl font-black leading-none tracking-[-0.03em] text-white drop-shadow-lg sm:text-3xl md:mb-6">
               {title}

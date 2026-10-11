@@ -643,6 +643,17 @@ export async function fetchBestLogo(
   return best?.file_path || null;
 }
 
+/**
+ * El mejor logo YA en caché, sin pedir nada: `undefined` si aún no se sabe
+ * (hay que llamar a `fetchBestLogo`), `null` si el título no tiene logo y la
+ * ruta si lo tiene. Permite pintar el estado final desde el primer render.
+ */
+export function peekBestLogo(itemId, mediaType = "movie", preferLangs = ["es", "en", null]) {
+  const cacheKey = `${mediaType}:${itemId}`;
+  if (!movieLogosCache.has(cacheKey)) return undefined;
+  return pickBestLogoByLang(movieLogosCache.get(cacheKey), preferLangs)?.file_path || null;
+}
+
 /* =================== TRAILERS (TMDb videos) =================== */
 export const movieTrailerCache = new Map();
 export const movieTrailerInFlight = new Map();

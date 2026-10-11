@@ -10,6 +10,7 @@ import {
 import {
   getBackendBaseUrl,
   backendFetchJson,
+  backendFetchPublicJson,
   getCookieSecure,
   setBackendAuthCookies,
 } from "@/lib/backend/server";
@@ -26,22 +27,18 @@ const TMDB_BASE = "https://api.themoviedb.org/3";
 const SECTION_CONFIG = {
   tendencias: {
     title: "Tendencias",
-    eyebrow: "TRAKT / TMDB",
     description: "Los títulos que más se están moviendo ahora mismo.",
   },
   populares: {
     title: "Populares",
-    eyebrow: "TRAKT / TMDB",
     description: "Películas y series con mayor tracción entre la comunidad.",
   },
   recomendados: {
     title: "Recomendados",
-    eyebrow: "TRAKT",
     description: "Recomendaciones destacadas por Trakt para descubrir qué ver después.",
   },
   "mas-esperadas": {
     title: "Más esperadas",
-    eyebrow: "PRÓXIMAMENTE",
     description:
       "Películas y series aún no estrenadas, ordenadas por el interés que despiertan.",
   },
@@ -239,6 +236,24 @@ async function loadBackendRecommended(request, onBackendResult) {
   return mapEngineCards(pool?.items, "recomendados");
 }
 
+// Lista COMPLETA de una sección desde el motor (`/v1/dashboard/sections/:key`):
+// los mismos pools y criterio que su fila del dashboard, pero hasta 200 títulos
+// en vez de los 32 de la fila y sin la rotación diaria. Es pública: con sesión
+// se adjunta (Recomendados es personal y excluye lo que el usuario ya tiene en
+// su biblioteca) y sin ella el motor devuelve la versión genérica. Devuelve null si el motor no la sirve (p. ej. backend sin
+// desplegar aún): entonces se usa la fila del dashboard como antes.
+async function loadBackendSectionList(request, key, section, onBackendResult) {
+  const result = request
+    ? await backendFetchPublicJson(request, `/v1/dashboard/sections/${key}`, {
+        method: "GET",
+      }).catch(() => null)
+    : null;
+  if (result) onBackendResult?.(result);
+  const items = Array.isArray(result?.json?.items) ? result.json.items : null;
+  if (!result?.ok || !items?.length) return null;
+  return mapEngineCards(items, section);
+}
+
 async function loadTraktSection(section, { traktToken = null } = {}) {
   if (section === "tendencias") {
     const [mixed, movies, shows] = await Promise.all([
@@ -270,17 +285,39 @@ async function loadTraktSection(section, { traktToken = null } = {}) {
 
 async function loadSectionItems(section, options = {}) {
   if (section === "mas-esperadas") {
-    return loadBackendAnticipated();
+    return (
+      (await loadBackendSectionList(
+        options.request,
+        "anticipated",
+        section,
+        options.onBackendResult,
+      )) || loadBackendAnticipated()
+    );
   }
 
   if (section === "recomendados") {
-    return loadBackendRecommended(
-      options.request,
-      options.onBackendResult,
+    return (
+      (await loadBackendSectionList(
+        options.request,
+        "for_you",
+        section,
+        options.onBackendResult,
+      )) ||
+      loadBackendRecommended(options.request, options.onBackendResult)
     );
   }
 
   if (section === "tendencias") {
+    // La MISMA lista que la fila "Tendencias ahora mismo" de Inicio (motor):
+    // la fila enseña sus primeros títulos en el mismo orden. Si el motor no la
+    // sirve, la mezcla de Trakt + TMDb de antes.
+    const engine = await loadBackendSectionList(
+      options.request,
+      "trending",
+      section,
+      options.onBackendResult,
+    );
+    if (engine) return engine;
     const [trakt, tmdbItems] = await Promise.all([
       loadTraktSection(section, options),
       loadTmdbTrending(),

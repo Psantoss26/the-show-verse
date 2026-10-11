@@ -1366,6 +1366,30 @@ body {
   transition: none !important;
 }
 
+/* LA VUELTA DEL CRISTAL TAMPOCO SE ANIMA. Al soltar el scroll se quita
+   `data-drawer-scrolling` y, sin esto, cada pieza de cristal con
+   `transition-all` (títulos de sección, tarjetas, botones…) ANIMABA su
+   `backdrop-filter` de `none` al desenfoque durante 300-500 ms: medidas, 13
+   transiciones a la vez en el hilo principal tras cada parada. Con la rueda o
+   el trackpad el gesto se para y arranca cada poco, así que se repetían una y
+   otra vez y el scroll iba a tirones. DetailModal mantiene
+   `data-drawer-settling` dos fotogramas al devolver el cristal: vuelve de
+   golpe, sin transición. */
+.sv-drawer-panel[data-drawer-settling],
+.sv-drawer-panel[data-drawer-settling] * {
+  transition: none !important;
+}
+
+/* Mientras se desplaza el panel, las animaciones CSS decorativas de dentro
+   (el brillo y el pulso de los botones activos, `liquidShine`/`liquidPulse`)
+   se detienen: Chrome no las compone ("sin cambio visible") y las anima en el
+   hilo principal, recalculando estilos en CADA fotograma del scroll. Se
+   excluyen las ligadas al propio scroll (relevo portada → fondo de la vista de
+   teléfono), que son las que tienen que seguir al dedo. */
+.sv-drawer-panel[data-drawer-scrolling] *:not(.sv-panel-relay-in, .sv-panel-relay-shade, .sv-panel-relay-out) {
+  animation-play-state: paused !important;
+}
+
 /* LA PÁGINA DE DETRÁS SE REORGANIZA EN DIRECTO mientras se arrastra el
    tirador del drawer acoplado (su margen sigue al panel en cada fotograma, ver
    `updateDrawerWidth` en DetailModalProvider). Sus transiciones se apagan
