@@ -163,80 +163,71 @@ export function buildShareCardPayload({
 }
 
 /**
- * Los ocho botones de la fila móvil, en el orden de DetailActionsRow:
- *   - películas: tráiler · soundtrack · visto · nota · favorito · pendiente · lista · reseñas
- *   - series (fila combinada, replegada): multimedia · valoración de episodios · …
- *   - temporadas: serie · visto · nota (ver arriba), sin flechas ni editar.
+ * Los botones de la imagen para compartir: SOLO los que tienen un estado del
+ * usuario, en el orden de DetailActionsRow (visto · nota · favorito ·
+ * pendiente · lista · reseñas). Lo que no es un estado —tráiler, soundtrack,
+ * valoración de episodios, el botón de la serie en una temporada— y los
+ * botones apagados no se dibujan: la imagen cuenta qué ha hecho el usuario con
+ * el título, no reproduce la fila entera. Sin ningún estado, la lista va vacía
+ * y la imagen no lleva fila.
  *
- * Cada botón: { key, icon, variant, color?, label?, labelSuffix?, fill?, filledIcon? }
- *   variant "solid"    -> blanco con icono negro (acciones de reproducción)
- *   variant "active"   -> cristal teñido del color del estado, con halo
- *   variant "glass"    -> cristal neutro (estado apagado)
- *   variant "disabled" -> cristal con el icono atenuado
+ * El de VISIONADO va AMPLIADO (`wide`: píldora del ancho de dos botones) con el
+ * ojo y el estado escrito: el porcentaje en series y temporadas —también el
+ * 100%— y las veces vista en películas. Se coloca en el CENTRO de la fila; con
+ * un número par de botones, justo a la izquierda del centro (con dos, a la
+ * izquierda del todo).
+ *
+ * Temporadas: visto · nota (sin flechas ni editar).
+ *
+ * Cada botón: { key, icon, variant: "active", color, label?, labelSuffix?, fill?, filledIcon?, iconColor?, wide? }
  */
 export function shareCardActionButtons(card) {
   const a = card.actions;
-  const media =
-    card.type === "tv"
-      ? [
-          {
-            key: "media",
-            icon: "play",
-            variant: a.trailer || a.soundtrack ? "solid" : "disabled",
-          },
-          { key: "episodes", icon: "chart", variant: "solid" },
-        ]
-      : [
-          { key: "trailer", icon: "play", variant: a.trailer ? "solid" : "disabled" },
-          { key: "soundtrack", icon: "music", variant: a.soundtrack ? "solid" : "disabled" },
-        ];
 
-  let watched;
-  if (a.watched && a.progress === "100%") {
-    watched = { icon: "eye", variant: "active", color: "green", iconColor: "emerald", fill: 100 };
-  } else if (a.watched && a.progress) {
-    watched = {
-      variant: "active",
-      color: "green",
-      label: a.progress.replace("%", ""),
-      labelSuffix: "%",
-      fill: Number.parseInt(a.progress, 10),
-    };
-  } else if (a.watched && a.plays > 0) {
-    watched = { variant: "active", color: "green", label: String(a.plays) };
-  } else if (a.watched) {
-    watched = { icon: "eye", variant: "active", color: "green" };
-  } else {
-    watched = { icon: "eyeOff", variant: "glass" };
+  let watched = null;
+  if (a.watched) {
+    const base = { key: "watched", icon: "eye", variant: "active", color: "green", wide: true };
+    if (a.progress) {
+      const percent = Number.parseInt(a.progress, 10);
+      watched = {
+        ...base,
+        label: String(percent),
+        labelSuffix: "%",
+        fill: percent,
+        // Terminada: el ojo esmeralda de la ficha.
+        ...(percent >= 100 ? { iconColor: "emerald" } : {}),
+      };
+    } else if (a.plays > 0) {
+      watched = { ...base, label: String(a.plays), labelSuffix: a.plays === 1 ? " vez" : " veces" };
+    } else {
+      watched = { ...base, label: "Vista" };
+    }
   }
 
   const toggle = (key, icon, on, color, filledIcon = false) =>
-    on
-      ? { key, icon, variant: "active", color, filledIcon }
-      : { key, icon, variant: "glass" };
+    on ? { key, icon, variant: "active", color, filledIcon } : null;
 
   const rating =
     a.rating != null
       ? { key: "rating", variant: "active", color: "yellow", label: formatUserRating(a.rating) }
-      : { key: "rating", icon: "star", variant: "glass" };
+      : null;
 
-  if (card.season) {
-    return [
-      { key: "series", icon: "monitorPlay", variant: "glass" },
-      { key: "watched", ...watched },
-      rating,
-    ];
+  const others = [rating];
+  if (!card.season) {
+    others.push(
+      toggle("favorite", "heart", a.favorite, "red", true),
+      toggle("watchlist", "bookmark", a.watchlist, "blue", true),
+      toggle("list", "list", a.list, "purple"),
+      toggle("comments", "message", a.comments, "orange"),
+    );
   }
-
-  return [
-    ...media,
-    { key: "watched", ...watched },
-    rating,
-    toggle("favorite", "heart", a.favorite, "red", true),
-    toggle("watchlist", "bookmark", a.watchlist, "blue", true),
-    toggle("list", "list", a.list, "purple"),
-    toggle("comments", "message", a.comments, "orange"),
-  ];
+  const buttons = others.filter(Boolean);
+  if (!watched) return buttons;
+  // Centro de la fila completa (n = botones + el de visionado); con n par, el
+  // hueco de la izquierda del centro: n=2 → 0, n=4 → 1, n=6 → 2.
+  const middle = Math.ceil((buttons.length + 1) / 2) - 1;
+  buttons.splice(middle, 0, watched);
+  return buttons;
 }
 
 export function shareCardFileName(title, extension = "png") {

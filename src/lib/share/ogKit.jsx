@@ -380,6 +380,10 @@ export function loadLocalAssets() {
 
 // ------------------------------------------------------------------- piezas
 
+/** Ancho de un botón de la fila: el ampliado (`wide`) ocupa dos y su hueco. */
+export const actionButtonWidth = (button, size = BUTTON) =>
+  button?.wide ? size * 2 + BUTTON_GAP : size;
+
 export function ActionButton({ button, size = BUTTON }) {
   const color = COLORS[button.color];
   const isSolid = button.variant === "solid";
@@ -413,6 +417,8 @@ export function ActionButton({ button, size = BUTTON }) {
 
   const fill = isActive && Number.isFinite(button.fill) && button.fill > 0 ? Math.min(100, button.fill) : 0;
   const iconSize = Math.round(size * 0.46);
+  const width = actionButtonWidth(button, size);
+  const iconColor = button.iconColor === "emerald" ? EMERALD_300 : foreground;
 
   return (
     <div
@@ -421,7 +427,7 @@ export function ActionButton({ button, size = BUTTON }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        width: size,
+        width,
         height: size,
         borderRadius: size,
         backgroundColor,
@@ -444,7 +450,31 @@ export function ActionButton({ button, size = BUTTON }) {
           }}
         />
       ) : null}
-      {button.label ? (
+      {button.wide ? (
+        // PÍLDORA AMPLIADA (visionado): el ojo y el estado escrito al lado —
+        // "45%", "100%", "2 veces", "Vista"—, con el relleno de progreso detrás.
+        <div style={{ display: "flex", alignItems: "center", lineHeight: 1 }}>
+          {button.icon ? <Icon name={button.icon} size={iconSize} color={iconColor} /> : null}
+          {button.label ? (
+            <div style={{ display: "flex", alignItems: "baseline", marginLeft: Math.round(size * 0.14), color: foreground }}>
+              <span style={{ fontSize: Math.round(size * 0.4), fontWeight: 700, letterSpacing: -1 }}>{button.label}</span>
+              {button.labelSuffix ? (
+                <span
+                  style={{
+                    fontSize: Math.round(size * (button.labelSuffix.trim().length > 1 ? 0.24 : 0.2)),
+                    fontWeight: 700,
+                    color: "#ffffff",
+                    marginLeft: 1,
+                    whiteSpace: "pre",
+                  }}
+                >
+                  {button.labelSuffix}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : button.label ? (
         <div style={{ display: "flex", alignItems: "baseline", color: foreground, lineHeight: 1 }}>
           <span
             style={{
@@ -465,7 +495,7 @@ export function ActionButton({ button, size = BUTTON }) {
         <Icon
           name={button.icon}
           size={iconSize}
-          color={button.iconColor === "emerald" ? EMERALD_300 : foreground}
+          color={iconColor}
           filled={button.icon === "play" ? isSolid : !!button.filledIcon}
           // El triángulo de "play" se centra ópticamente, como `ml-0.5` en la ficha.
           style={button.icon === "play" ? { marginLeft: 5 } : undefined}
