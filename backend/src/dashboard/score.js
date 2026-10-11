@@ -141,20 +141,22 @@ export function rankNewReleaseMovies(cards, { now, recencySigmaDays = 45 } = {})
 }
 
 /**
- * Aproxima el criterio de "más esperadas" sin depender de Trakt. TMDB no expone
- * el número de personas que esperan un estreno, así que combinamos sus mejores
- * señales públicas equivalentes:
- *   - popularidad actual (68%): búsquedas/interés que ya está generando;
- *   - presupuesto (17%): escala e importancia industrial;
- *   - pertenencia a una saga (10%): audiencia previa reconocible;
- *   - cercanía del estreno (5%): desempata a favor de títulos accionables.
+ * Aproxima el criterio de "anticipated" de Trakt sin consumir sus métricas
+ * privadas de listas. TMDB no publica cuántas personas están esperando un
+ * estreno, pero sí señales públicas comparables y disponibles tanto para cine
+ * como para series:
+ *   - popularidad actual (54%): interés/búsquedas que está despertando;
+ *   - volumen de votos (20%): interés sostenido, no una subida aislada;
+ *   - escala del evento (14%): presupuesto y saga cuando TMDB los conoce;
+ *   - cercanía del estreno (12%): prima lo que ya se puede planificar.
  *
- * Solo admite fechas POSTERIORES a hoy y limita el horizonte para evitar títulos
- * anunciados sin una fecha suficientemente fiable. No usa votos/recaudación:
- * antes del estreno suelen ser cero y favorecerían injustamente a las ya
- * estrenadas.
+ * La normalización es absoluta, no relativa al lote. Así las puntuaciones de
+ * películas y series son comparables al juntarlas en Inicio; un catálogo con
+ * un único título muy popular no infla artificialmente el resto.
+ * Solo admite fechas POSTERIORES a hoy y limita el horizonte para evitar
+ * anuncios con una fecha demasiado incierta.
  */
-export function rankAnticipatedMovies(
+export function rankAnticipatedTitles(
   cards,
   { now, maxDaysAhead = 550 } = {},
 ) {
@@ -178,38 +180,33 @@ export function rankAnticipatedMovies(
   });
   if (future.length === 0) return [];
 
-  const maxPopularity = Math.max(
-    0,
-    ...future.map((card) => numeric(card.popularity)),
-  );
-  const maxLogBudget = Math.log10(
-    1 + Math.max(0, ...future.map((card) => numeric(card.budget))),
-  );
-
   return future
     .map((card) => {
       const releaseMs = new Date(`${card.releaseDate}T00:00:00Z`).getTime();
       const daysAhead = Math.max(1, (releaseMs - todayMs) / 86400000);
-      const popularity =
-        maxPopularity > 0 ? numeric(card.popularity) / maxPopularity : 0;
-      const budget =
-        maxLogBudget > 0
-          ? Math.log10(1 + Math.max(0, numeric(card.budget))) / maxLogBudget
-          : 0;
-      const franchise = card.isFranchise ? 1 : 0;
-      const proximity = Math.exp(-daysAhead / 365);
+      // Curvas con techo: un pico de popularidad no debe ocultar por completo
+      // un lanzamiento con una comunidad grande y sostenida.
+      const popularity = 1 - Math.exp(-Math.max(0, numeric(card.popularity)) / 120);
+      const attention = Math.min(1, Math.log10(1 + Math.max(0, numeric(card.voteCount))) / 4);
+      const budget = Math.min(1, Math.log10(1 + Math.max(0, numeric(card.budget))) / 8.5);
+      const eventScale = Math.max(budget, card.isFranchise ? 1 : 0);
+      const proximity = Math.exp(-daysAhead / 420);
 
       return {
         ...card,
         anticipatedScore:
-          0.68 * popularity +
-          0.17 * budget +
-          0.1 * franchise +
-          0.05 * proximity,
+          0.54 * popularity +
+          0.20 * attention +
+          0.14 * eventScale +
+          0.12 * proximity,
       };
     })
-    .sort((a, b) => b.anticipatedScore - a.anticipatedScore);
+    .sort((a, b) => b.anticipatedScore - a.anticipatedScore || a.tmdbId - b.tmdbId);
 }
+
+// Nombre conservado para los consumidores existentes. La política ya no es
+// exclusiva de películas: las series se ordenan con el mismo criterio.
+export const rankAnticipatedMovies = rankAnticipatedTitles;
 
 /**
  * Filter out items already in the user's library / seen set.

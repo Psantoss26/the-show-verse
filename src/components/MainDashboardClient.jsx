@@ -32,6 +32,7 @@ import {
 import { usePersonalizedFeatured } from "@/lib/dashboard/featuredPersonalize";
 import usePreviewMorph from "@/lib/dashboard/usePreviewMorph";
 import useNeighborPush from "@/lib/dashboard/useNeighborPush";
+import useSpotlightExpansion from "@/lib/dashboard/useSpotlightExpansion";
 import "swiper/swiper-bundle.css";
 import Link from "next/link";
 import NextImage from "next/image";
@@ -2934,6 +2935,11 @@ export function Row({
     enabled: hydrated && !isMobile && !isSpotlight && previewKind !== "anticipated",
     reduceMotion,
   });
+  useSpotlightExpansion(rowRef, {
+    index: hoveredIndex,
+    enabled: hydrated && isSpotlight,
+    reduceMotion,
+  });
   const heightClassDesktop = isSpotlight
     ? "h-[340px] sm:h-[400px] md:h-[460px] xl:h-[520px]"
     : "h-[220px] sm:h-[260px] md:h-[300px] xl:h-[340px]";
@@ -2941,8 +2947,6 @@ export function Row({
     "w-[200px] sm:w-[220px] md:w-[300px] xl:w-[340px]";
   const normalPosterWidthClass =
     "w-[140px] sm:w-[140px] md:w-[190px] xl:w-[210px]";
-  const spotlightPreviewWidthClass =
-    "w-[604px] sm:w-[711px] md:w-[818px] xl:w-[924px]";
   // Ancho del preview = alto de la tarjeta póster × 16/9, para que su imagen
   // backdrop (16:9) mida JUSTO el alto de las tarjetas (220/260/300/340).
   const normalPreviewWidthClass =
@@ -3133,7 +3137,19 @@ export function Row({
             slidesPerView={isSpotlight ? 2 : mobileCardsPerRow}
             spaceBetween={isSpotlight ? 14 : 12}
             onSwiper={handleSwiper}
-            onSlideChange={updateNav}
+            onSlideChange={(swiper) => {
+              updateNav(swiper);
+              if (!isSpotlight) return;
+              clearTimeout(hoverTimeoutRef.current);
+              clearTimeout(closeTimeoutRef.current);
+              hoverIntentRef.current += 1;
+              setHoveredId((prev) => {
+                if (prev) setAnimatingOutId(prev);
+                return null;
+              });
+              setHoveredIndex(null);
+              clearHoverBackdrop();
+            }}
             onResize={updateNav}
             onReachBeginning={updateNav}
             onReachEnd={updateNav}
@@ -3173,10 +3189,10 @@ export function Row({
               const isThirdToLast = i === normalizedItems.length - 3;
               const isNearEnd = isLast || isSecondToLast || isThirdToLast;
 
-              // Las filas póster normales se empujan con `useNeighborPush`
-              // (Web Animations); la destacada conserva su transición CSS.
+              // La destacada mantiene el tamaño del slot de Swiper y anima
+              // solo su superficie y el desplazamiento de las vecinas.
               const base = isSpotlight
-                ? "relative flex-shrink-0 transition-[width,transform] duration-[420ms] ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none"
+                ? "relative flex-shrink-0 translate-x-0"
                 : "relative flex-shrink-0";
 
               const isStandardPopoverPreview =
@@ -3185,7 +3201,7 @@ export function Row({
               const sizeClasses = isMobile
                 ? "w-full"
                 : (isActive && previewKind !== "anticipated")
-                  ? `${isSpotlight ? spotlightPreviewWidthClass : normalPosterWidthClass} z-20`
+                  ? `${isSpotlight ? spotlightPosterWidthClass : normalPosterWidthClass} z-20`
                   : `${isSpotlight ? spotlightPosterWidthClass : normalPosterWidthClass} z-10`;
               // Caja de la tarjeta: SIEMPRE altura fija (posterBoxClass), también
               // en la vista previa destacada. Si la activa usa una altura
@@ -3203,35 +3219,6 @@ export function Row({
                 : isActive || isAnimatingOut
                   ? "overflow-visible"
                   : "overflow-hidden";
-
-              // Empuje de vecinos de la fila DESTACADA (su tarjeta se ensancha).
-              // Las filas póster normales se empujan con `useNeighborPush`.
-              let transformClass = "";
-              if (
-                !isMobile &&
-                hoveredIndex !== null &&
-                hoveredIndex >= 0 &&
-                previewKind !== "anticipated"
-              ) {
-                if (isSpotlight) {
-                  // Spotlight: si el activo está en los últimos 3, desplaza el
-                  // activo (y los previos) a la izquierda para no salirse.
-                  const activeIndex = hoveredIndex;
-                  const totalItems = normalizedItems.length;
-                  if (activeIndex >= totalItems - 3 && i <= activeIndex) {
-                    if (activeIndex === totalItems - 1) {
-                      transformClass =
-                        "sm:-translate-x-[300px] md:-translate-x-[420px] xl:-translate-x-[470px]";
-                    } else if (activeIndex === totalItems - 2) {
-                      transformClass =
-                        "sm:-translate-x-[210px] md:-translate-x-[290px] xl:-translate-x-[320px]";
-                    } else if (activeIndex === totalItems - 3) {
-                      transformClass =
-                        "sm:-translate-x-[105px] md:-translate-x-[145px] xl:-translate-x-[160px]";
-                    }
-                  }
-                }
-              }
 
               const hasPosterOverride = Object.prototype.hasOwnProperty.call(
                 posterOverrides || {},
@@ -3306,71 +3293,48 @@ export function Row({
                 >
                   <div
                     data-preview-tile=""
-                    className={`${base} ${sizeClasses} ${itemBoxClass} ${transformClass} ${zOverflowClasses}`}
+                    className={`${base} ${sizeClasses} ${itemBoxClass} ${zOverflowClasses}`}
                     onMouseEnter={(e) => handleMouseEnterItem(e, itemKey, i, m, backdropOverride)}
                     onMouseLeave={handleMouseLeaveItem}
+                    onFocus={isSpotlight ? (e) => {
+                      if (!e.currentTarget.contains(e.relatedTarget)) handleMouseEnterItem(e, itemKey, i, m, backdropOverride);
+                    } : undefined}
+                    onBlur={isSpotlight ? (e) => {
+                      if (!e.currentTarget.contains(e.relatedTarget)) handleMouseLeaveItem();
+                    } : undefined}
                   >
                     {isSpotlight ? (
-                      // DESTACADA: la tarjeta se ensancha y la vista previa la
-                      // sustituye dentro de ella (no es un pop-out).
-                      <AnimatePresence initial={false} mode="popLayout">
-                        {isActive ? (
-                          <motion.div
-                            key="preview-normal"
-                            initial={
-                              reduceMotion ? false : { opacity: 0, scale: 0.96, y: 6 }
-                            }
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{
-                              opacity: 0,
-                              scale: 0.97,
-                              y: 5,
-                              transition: reduceMotion
-                                ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
-                                : DASHBOARD_PREVIEW_EXIT_TRANSITION,
-                            }}
-                            transition={
-                              reduceMotion
-                                ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
-                                : DASHBOARD_PREVIEW_ENTER_TRANSITION
-                            }
-                            className="hidden sm:block h-full w-full"
-                            style={{ willChange: "transform" }}
-                          >
-                            <InlinePreviewCard
-                              movie={m}
-                              heightClass="h-full"
-                              backdropOverride={backdropOverride}
-                              isSpotlight
-                              showContextBadge={showContextBadge}
-                            />
-                          </motion.div>
-                        ) : (
-                          <motion.div
-                            key="poster"
-                            initial={
-                              reduceMotion ? false : { opacity: 0, scale: 0.97 }
-                            }
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{
-                              opacity: 0,
-                              scale: 0.97,
-                              transition: reduceMotion
-                                ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
-                                : DASHBOARD_PREVIEW_EXIT_TRANSITION,
-                            }}
-                            transition={
-                              reduceMotion
-                                ? DASHBOARD_PREVIEW_REDUCED_TRANSITION
-                                : DASHBOARD_PREVIEW_ENTER_TRANSITION
-                            }
-                            className="w-full h-full"
-                            style={{ willChange: "transform, opacity" }}
-                          >
-                            {posterButton}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
+                      <div
+                        data-spotlight-shell=""
+                        className="absolute left-0 top-0 h-full w-full overflow-hidden rounded-2xl"
+                      >
+                        <div className={`absolute left-0 top-0 h-full ${spotlightPosterWidthClass}`}>
+                          {posterButton}
+                        </div>
+                        <AnimatePresence initial={false} onExitComplete={() => {
+                          setAnimatingOutId((prev) => prev === itemKey ? null : prev);
+                        }}>
+                          {isActive && (
+                            <motion.div
+                              key="spotlight-preview"
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              transition={{ duration: reduceMotion ? 0 : 0.42 }}
+                              className="absolute left-0 top-0 h-full"
+                              style={{ width: "var(--spotlight-preview-width)", pointerEvents: isActive ? "auto" : "none" }}
+                            >
+                              <InlinePreviewCard
+                                movie={m}
+                                heightClass="h-full"
+                                backdropOverride={backdropOverride}
+                                isSpotlight
+                                showContextBadge={showContextBadge}
+                              />
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
                     ) : (
                       <>
                         {/* El póster NO se oculta mientras hay vista previa:

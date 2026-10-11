@@ -2417,6 +2417,11 @@ export default function ListsPage() {
     [contentSource, statsLists],
   );
   const headerStatsLoading = !sourceInitialized && statsLists.length === 0;
+  // Al volver atrás, las tarjetas de la pestaña con la que se vuelve salen
+  // quietas, como el resto de la cabecera; las pestañas que se abran después
+  // sí entran.
+  const [staticStatsSource] = useState(() => (isBackNav ? contentSource : null));
+  const statsEntry = contentSource !== staticStatsSource;
 
   const errorUnified =
     source === "personal" ? error : source === "trakt" ? trakt?.error : "";
@@ -2525,23 +2530,31 @@ export default function ListsPage() {
 
             {/* Tarjetas de información a la altura del título, como en
                 Historial o En progreso: tres por pestaña, con lo que se está
-                mostrando (lib/lists/headerStats). */}
+                mostrando (lib/lists/headerStats).
+                Entran igual que en Historial (bloque que sube y tarjetas
+                escalonadas) al llegar a CADA pestaña: van con la clave de la
+                fuente pintada, como el contenido, así que se vuelven a montar
+                en el mismo relevo. Sin AnimatePresence a propósito: la anterior
+                se desmonta en el mismo render (con él convivían tres
+                fotogramas, seis tarjetas en fila) y la cabecera no cambia de
+                alto. */}
             <motion.div
+              key={contentSource}
               data-lists-stats={contentSource}
-              className="flex gap-3 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
-              initial={false}
+              className="flex gap-2 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
+              initial={statsEntry ? { opacity: 0, y: 20 } : false}
               animate={{ opacity: 1, y: 0 }}
-              transition={isBackNav ? { duration: 0 } : { duration: 0.5, delay: 0.3 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
             >
-              {headerStats.map((stat) => (
+              {headerStats.map((stat, index) => (
                 <motion.div
                   key={stat.key}
                   data-list-stat={stat.key}
                   aria-busy={headerStatsLoading || (contentSource === "collections" && stat.key === "likes" && !collectionLikesReady)}
                   className="flex min-w-0 flex-1 lg:flex-none"
-                  initial={false}
+                  initial={statsEntry ? { opacity: 0, scale: 0.9 } : false}
                   animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0 }}
+                  transition={{ duration: 0.4, delay: 0.5 + index * 0.1 }}
                 >
                   <PageStatCard
                     label={stat.label}

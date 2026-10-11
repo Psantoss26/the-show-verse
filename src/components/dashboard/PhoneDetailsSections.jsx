@@ -123,9 +123,19 @@ const PHONE_STICKY_TOP = 56;
 // por VIEWPORT y aquí el ancho lo pone el panel. Con `breakpointsBase="container"`
 // los mismos carruseles responden al panel, que es lo que hace que una rejilla
 // pensada para 1280px no acabe metiendo seis tarjetas en 400px.
+//
+// SIN `observeParents`: Swiper pone un MutationObserver en CADA ancestro y se
+// recalcula entero (ancho y estilo de cada tarjeta, con lecturas que fuerzan
+// el layout) ante cualquier cambio de atributo. Aquí los ancestros cambian
+// solos al desplazar: la entrada de `AnimatedSection` escribe su `transform`
+// en cada fotograma y el panel marca `data-drawer-scrolling` en cada gesto.
+// Era lo que atascaba el scroll justo al llegar a reparto, recomendaciones o
+// portadas (miles de escrituras de estilo en las tarjetas en unos segundos).
+// Los cambios de ancho los sigue cubriendo su ResizeObserver.
 const PHONE_CAROUSEL = {
   breakpointsBase: "container",
   showArrows: false,
+  observeParents: false,
 };
 
 // Los carruseles NO llevan `!overflow-visible` (que es lo que usan las secciones

@@ -64,6 +64,7 @@ import {
 } from "@/lib/profile/activityRatingTarget";
 import Stars from "@/components/social/Stars";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
+import PageStatCard from "@/components/ui/PageStatCard";
 
 const PAGE_SIZE = 30;
 const FEED_VACIO = { items: [], hasMore: false, offset: 0, loaded: false, error: "" };
@@ -365,38 +366,23 @@ function ListaEventos({ eventos, vista, mostrarAutor, yo }) {
   );
 }
 
-// Tarjeta de cifra de la cabecera. Es el mismo componente que las de Perfil
-// (allí `CountStat`): mismas proporciones, mismo cristal y mismo enlace a las
-// listas de seguidores/seguidos, para que las dos páginas no diverjan.
-function TarjetaCifra({ value, label, href, title, icon: Icon, iconClassName = "text-pink-400" }) {
-  const className =
-    "relative flex min-w-0 flex-1 flex-col items-center justify-center overflow-hidden rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 px-4 py-3 text-center shadow-lg backdrop-blur-lg transition duration-300 hover:-translate-y-0.5 hover:from-white/[0.16] hover:to-white/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/70 sm:min-w-[120px] sm:px-5 sm:py-4";
-  const cuerpo = (
-    <>
-      <span className={`relative z-10 mb-1 inline-flex h-7 w-7 items-center justify-center ${iconClassName}`}>
-        <Icon className="h-6 w-6" aria-hidden="true" />
-      </span>
-      <span className="relative z-10 block text-xl font-black tracking-tight text-white drop-shadow-md sm:text-2xl lg:text-3xl">
-        {/* Mientras no ha llegado el resumen se muestra un guion, no un 0:
-            un cero es una cifra real y sería mentira. */}
-        {typeof value === "number" ? value : "—"}
-      </span>
-      <span className="relative z-10 mt-0.5 block text-[9px] font-bold uppercase tracking-wider text-zinc-300 sm:text-[10px]">
-        {label}
-      </span>
-    </>
-  );
-  if (href) {
-    return (
-      <Link href={href} prefetch={false} className={className} title={title}>
-        {cuerpo}
-      </Link>
-    );
-  }
+// Tarjeta de cifra de la cabecera: la compartida de todas las cabeceras
+// (`PageStatCard`, mini tarjeta en móvil), como `CountStat` en Perfil, con el
+// mismo enlace a las listas de seguidores/seguidos.
+function TarjetaCifra({ value, label, href, title, icon, iconClassName = "text-pink-400" }) {
+  // Mientras no ha llegado el resumen se muestra un guion, no un 0: un cero
+  // es una cifra real y sería mentira.
   return (
-    <div className={className} title={title}>
-      {cuerpo}
-    </div>
+    <PageStatCard
+      value={typeof value === "number" ? value : "—"}
+      label={label}
+      href={href}
+      prefetch={false}
+      title={title}
+      icon={icon}
+      colorClass={iconClassName}
+      focusRingClass="focus-visible:ring-pink-400/70"
+    />
   );
 }
 

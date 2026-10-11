@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   aggregateCandidates,
   excludeSeen,
+  rankAnticipatedTitles,
   rankAnticipatedMovies,
   rankNewReleaseMovies,
 } from './score.js';
@@ -153,6 +154,29 @@ test('rankAnticipatedMovies uses budget and franchise relevance to break close p
   });
   const out = rankAnticipatedMovies([standalone, eventMovie], { now: NOW });
   assert.equal(out[0].tmdbId, 2);
+});
+
+test('rankAnticipatedTitles rewards sustained public interest, not just a short popularity spike', () => {
+  const spike = card(1, {
+    popularity: 105, voteCount: 30, releaseDate: '2026-09-01',
+  });
+  const sustained = card(2, {
+    popularity: 95, voteCount: 9_000, releaseDate: '2026-09-01',
+  });
+  const out = rankAnticipatedTitles([spike, sustained], { now: NOW });
+  assert.equal(out[0].tmdbId, 2);
+});
+
+test('rankAnticipatedTitles gives movies and series scores on the same scale', () => {
+  const movie = card(1, {
+    popularity: 180, voteCount: 1_500, releaseDate: '2026-10-01',
+  });
+  const show = card(2, {
+    mediaType: 'tv', popularity: 240, voteCount: 3_500, releaseDate: '2026-10-01',
+  });
+  const out = rankAnticipatedTitles([movie, show], { now: NOW });
+  assert.equal(out[0].mediaType, 'tv');
+  assert.ok(out.every((item) => Number.isFinite(item.anticipatedScore)));
 });
 
 test('same candidate in both sources contributes once per seed', async () => {

@@ -39,6 +39,7 @@ import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import HoverExpandCard from "@/components/ui/HoverExpandCard";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
+import PageStatCard from "@/components/ui/PageStatCard";
 
 const MOVIE_GENRES = {
   28: "Acción",
@@ -1006,7 +1007,7 @@ export default function DashboardSectionClient({ section }) {
 
             {!loading && (
               <motion.div
-                className="flex gap-3 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
+                className="flex gap-2 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.3 }}
@@ -1015,21 +1016,15 @@ export default function DashboardSectionClient({ section }) {
                   { label: "Total", value: rawItems.length, icon: Star, color: "text-amber-400" },
                   { label: "Películas", value: stats.movies, icon: Film, color: "text-sky-400" },
                   { label: "Series", value: stats.shows, icon: MonitorPlay, color: "text-purple-400" },
-                ].map(({ label, value, icon: Icon, color }) => (
-                  <div
+                ].map(({ label, value, icon, color }) => (
+                  <PageStatCard
                     key={label}
-                    className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1"
-                  >
-                    <div className={`relative z-10 mb-1 ${color}`}>
-                      <Icon className="w-6 h-6 md:w-7 md:h-7" />
-                    </div>
-                    <div className="relative z-10 text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight drop-shadow-md">
-                      {value}
-                    </div>
-                    <div className="relative z-10 text-[9px] md:text-[10px] uppercase font-bold text-zinc-300 tracking-wider text-center leading-tight">
-                      {label}
-                    </div>
-                  </div>
+                    className="flex-1 lg:flex-none lg:w-auto"
+                    label={label}
+                    value={value}
+                    icon={icon}
+                    colorClass={color}
+                  />
                 ))}
               </motion.div>
             )}

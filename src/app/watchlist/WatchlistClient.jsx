@@ -89,6 +89,7 @@ import {
 } from "@/lib/userLists/listScoreCache";
 import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
+import PageStatCard from "@/components/ui/PageStatCard";
 
 // Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
 // el mismo escalón que `w1280` en los backdrops. Antes era `w500` y en
@@ -2915,46 +2916,36 @@ export default function WatchlistClient() {
 
             {!loading && (
               <motion.div
-                className="flex gap-3 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
+                className="flex gap-2 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
                 initial={isBackNav ? false : { opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={
                   isBackNav ? { duration: 0 } : { duration: 0.5, delay: 0.3 }
                 }
               >
-                <div className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
-                  <div className="relative z-10 mb-1 text-blue-400">
-                    <Bookmark className="w-6 h-6 md:w-7 md:h-7 fill-blue-400" />
-                  </div>
-                  <div className="relative z-10 text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight drop-shadow-md">
-                    {stats.total}
-                  </div>
-                  <div className="relative z-10 text-[9px] md:text-[10px] uppercase font-bold text-zinc-300 tracking-wider text-center leading-tight">
-                    Total
-                  </div>
-                </div>
-                <div className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
-                  <div className="relative z-10 mb-1 text-sky-400">
-                    <Film className="w-6 h-6 md:w-7 md:h-7" />
-                  </div>
-                  <div className="relative z-10 text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight drop-shadow-md">
-                    {stats.movies}
-                  </div>
-                  <div className="relative z-10 text-[9px] md:text-[10px] uppercase font-bold text-zinc-300 tracking-wider text-center leading-tight">
-                    Películas
-                  </div>
-                </div>
-                <div className="relative overflow-hidden flex-1 lg:flex-none lg:min-w-[120px] rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg px-4 py-3 md:px-5 md:py-4 flex flex-col items-center justify-center gap-1">
-                  <div className="relative z-10 mb-1 text-purple-400">
-                    <TvGlyph className="w-6 h-6 md:w-7 md:h-7 text-purple-400" />
-                  </div>
-                  <div className="relative z-10 text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight drop-shadow-md">
-                    {stats.shows}
-                  </div>
-                  <div className="relative z-10 text-[9px] md:text-[10px] uppercase font-bold text-zinc-300 tracking-wider text-center leading-tight">
-                    Series
-                  </div>
-                </div>
+                <PageStatCard
+                  className="flex-1 lg:flex-none lg:w-auto"
+                  label="Total"
+                  value={stats.total}
+                  icon={Bookmark}
+                  colorClass="text-blue-400"
+                  iconClassName="fill-blue-400"
+                />
+                <PageStatCard
+                  className="flex-1 lg:flex-none lg:w-auto"
+                  label="Películas"
+                  value={stats.movies}
+                  icon={Film}
+                  colorClass="text-sky-400"
+                />
+                <PageStatCard
+                  className="flex-1 lg:flex-none lg:w-auto"
+                  label="Series"
+                  value={stats.shows}
+                  icon={TvGlyph}
+                  colorClass="text-purple-400"
+                  iconClassName="text-purple-400"
+                />
               </motion.div>
             )}
           </div>
