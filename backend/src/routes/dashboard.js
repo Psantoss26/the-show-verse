@@ -29,6 +29,14 @@ async function resolvePoolItems(poolKey, mediaType, getPool) {
       getPool(poolKey, 'movie').catch(() => []),
       getPool(poolKey, 'tv').catch(() => []),
     ]);
+    // "Más esperadas" es un ranking global (como Anticipated de Trakt), no
+    // dos rankings alternados. `anticipatedScore` se calcula con una escala
+    // común para cine y series, por lo que se puede comparar directamente.
+    if (poolKey === 'anticipated') {
+      return dedupeCards([...mv, ...tv]).sort(
+        (a, b) => (b.anticipatedScore || 0) - (a.anticipatedScore || 0),
+      );
+    }
     return interleave(mv, tv);
   }
   return getPool(poolKey, mediaType).catch(() => []);

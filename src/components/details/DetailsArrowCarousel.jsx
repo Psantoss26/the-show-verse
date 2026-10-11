@@ -147,8 +147,13 @@ export default function DetailsArrowCarousel({
   return (
     <div
       className="relative"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      // Sin flechas el hover no pinta nada, y cada cambio re-renderizaba el
+      // carrusel ENTERO (Swiper clona todas sus tarjetas en cada render). Con
+      // la rueda el puntero se queda quieto y son las filas las que pasan por
+      // debajo: un render al entrar y otro al salir de cada carrusel en pleno
+      // desplazamiento.
+      onMouseEnter={showArrows ? () => setIsHovered(true) : undefined}
+      onMouseLeave={showArrows ? () => setIsHovered(false) : undefined}
     >
       <div style={{ overflowX: "clip", overflowY: "visible" }}>
         <Swiper

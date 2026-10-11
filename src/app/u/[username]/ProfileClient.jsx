@@ -38,6 +38,7 @@ import {
 import { prefetchNeuralGraph } from "@/lib/profile/neuralGraphData";
 import NeuralGraphSkeleton from "@/components/profile/neural/NeuralGraphSkeleton";
 import NeuralPreviewCard from "@/components/profile/neural/NeuralPreviewCard";
+import PageStatCard from "@/components/ui/PageStatCard";
 import {
   Activity,
   Award,
@@ -172,27 +173,20 @@ function ProfileAvatar({ user, size = "h-22 w-22 @[640px]/detail-page:h-26 @[640
   );
 }
 
-function CountStat({ value, label, href, icon: Icon, iconClassName = "text-emerald-400" }) {
-  const className = "relative flex min-w-0 flex-1 flex-col items-center justify-center overflow-hidden rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 px-4 py-3 text-center shadow-lg transition duration-300 hover:-translate-y-0.5 hover:from-white/[0.16] hover:to-white/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 @[640px]/detail-page:min-w-[120px] @[640px]/detail-page:px-5 @[640px]/detail-page:py-4";
-  const body = (
-    <>
-      <span className={`relative z-10 mb-1 inline-flex h-7 w-7 items-center justify-center ${iconClassName}`}>
-        <Icon className="h-6 w-6" aria-hidden="true" />
-      </span>
-      <span className="relative z-10 block text-xl font-black tracking-tight text-white drop-shadow-md @[640px]/detail-page:text-2xl @[1024px]/detail-page:text-3xl">{value ?? 0}</span>
-      <span className="relative z-10 mt-0.5 block text-[9px] font-bold uppercase tracking-wider text-zinc-300 @[640px]/detail-page:text-[10px]">
-        {label}
-      </span>
-    </>
+function CountStat({ value, label, href, icon, iconClassName = "text-emerald-400" }) {
+  // La tarjeta compartida de las cabeceras (mini tarjeta en móvil). Sin
+  // cristal, como ha sido siempre en el Perfil.
+  return (
+    <PageStatCard
+      value={value ?? 0}
+      label={label}
+      href={href}
+      icon={icon}
+      colorClass={iconClassName}
+      glass={false}
+      focusRingClass="focus-visible:ring-emerald-400/70"
+    />
   );
-  if (href) {
-    return (
-      <Link href={href} className={className}>
-        {body}
-      </Link>
-    );
-  }
-  return <div className={className}>{body}</div>;
 }
 
 // Tarjeta de recuento en píldora, para la cabecera compacta de la vista neuronal.

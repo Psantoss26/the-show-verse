@@ -18,12 +18,12 @@ test('each surface defines media types and generic rows', () => {
   assert.deepEqual(SURFACES.series.mediaTypes, ['tv']);
 });
 
-test('home exposes a movie-only anticipated row backed by the own TMDB pool', () => {
+test('home exposes a multimedia anticipated row backed by the own TMDB pool', () => {
   const row = SURFACES.home.genericRows.find((candidate) => candidate.key === 'anticipated');
   assert.deepEqual(row, {
     key: 'anticipated',
     title: 'Más esperadas',
-    mediaType: 'movie',
+    mediaType: 'mixed',
     source: { kind: 'pool', poolKey: 'anticipated' },
   });
   assert.equal(

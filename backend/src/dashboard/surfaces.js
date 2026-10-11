@@ -37,12 +37,12 @@ export const SURFACES = {
         source: { kind: 'pool', poolKey: 'top_rated' },
       },
       {
-        // Solo películas aún no estrenadas, ordenadas por una aproximación
-        // propia a la anticipación (popularidad TMDB + escala + saga + cercanía).
-        // Las series tienen su hueco en la sección "Calendario" del home.
+        // Próximas películas y series ordenadas por una aproximación propia a
+        // la anticipación (interés público + escala + cercanía), al estilo de
+        // la superficie multimedia de "anticipated" de Trakt.
         key: 'anticipated',
         title: 'Más esperadas',
-        mediaType: 'movie',
+        mediaType: 'mixed',
         source: { kind: 'pool', poolKey: 'anticipated' },
       },
       {

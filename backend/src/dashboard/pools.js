@@ -4,7 +4,7 @@ import { dashboardPools } from '../db/schema.js';
 import { and, eq } from 'drizzle-orm';
 import { tmdbDiscover, tmdbList, tmdbDetails, tmdbSeason, MOVIE_GENRES, TV_GENRES } from './tmdb.js';
 import { withinRange } from './calendarRange.js';
-import { rankAnticipatedMovies, rankNewReleaseMovies } from './score.js';
+import { rankAnticipatedTitles, rankNewReleaseMovies } from './score.js';
 import {
   balanceSoftLimitedContent,
   excludeKidsReality,
@@ -278,11 +278,11 @@ addPool('new_releases', 'tv', TTL_24H, async () =>
   }), 4))
 );
 
-// anticipated (24h) — películas que TODAVÍA no se han estrenado. Es la
-// alternativa propia a "anticipated" de Trakt: TMDB popularity funciona como
-// señal de demanda, y los detalles aportan escala (presupuesto) y saga. La
-// ventana amplia incluye grandes títulos anunciados para el próximo año sin
-// mezclar ninguno ya estrenado.
+// anticipated (24h) — próximos estrenos de cine Y series. Es la alternativa
+// propia a "anticipated" de Trakt: popularidad y votos miden interés público;
+// en cine los detalles aportan además escala y pertenencia a una saga. La
+// ventana amplia conserva eventos del próximo año, pero descarta anuncios sin
+// fecha fiable.
 addPool('anticipated', 'movie', TTL_24H, async () => {
   const future = upcomingContentRules(
     await discoverPages('movie', {
@@ -292,13 +292,29 @@ addPool('anticipated', 'movie', TTL_24H, async () => {
     }, 6),
   );
   const enriched = await enrichMoviesWithFinancials(future, 70);
-  return rankAnticipatedMovies(enriched)
+  return rankAnticipatedTitles(enriched)
     .map((card) => ({
       ...card,
       anticipatedScore: card.anticipatedScore * localePriorityWeight(card),
     }))
     .sort((a, b) => b.anticipatedScore - a.anticipatedScore);
-});
+}, { version: 'anticipated-multimedia-v3' });
+
+addPool('anticipated', 'tv', TTL_24H, async () => {
+  const future = upcomingContentRules(
+    await discoverPages('tv', discoverParams('tv', {
+      sort_by: 'popularity.desc',
+      'first_air_date.gte': dateOffset(1),
+      'first_air_date.lte': dateOffset(550),
+    }), 6),
+  );
+  return rankAnticipatedTitles(future)
+    .map((card) => ({
+      ...card,
+      anticipatedScore: card.anticipatedScore * localePriorityWeight(card),
+    }))
+    .sort((a, b) => b.anticipatedScore - a.anticipatedScore);
+}, { version: 'anticipated-multimedia-v3' });
 
 // ─── Calendario: próximos episodios de series ─────────────────────────────────
 // Ventana de emisión del calendario: desde hace 2 días (recién emitidos) hasta
