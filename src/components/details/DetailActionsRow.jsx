@@ -633,12 +633,25 @@ export default function DetailActionsRow({
         )}
 
         {/* Botón de reproducción de tráiler */}
+        {/* VER TRÁILER ↔ OCULTAR SIN SALTOS. En la píldora con texto el botón
+            no cambia NI de contenido NI de tamaño al cambiar de estado:
+             - la carga no pasa por el `loading` de LiquidButton, que cambia
+               TODO el contenido por el spinner (el texto desaparecía y la
+               píldora, de ancho automático, encogía a la mitad un instante);
+               aquí solo el icono pasa a ser el spinner;
+             - las dos etiquetas ocupan la MISMA celda de una rejilla, así que
+               la píldora mide siempre lo que la más larga y solo cambia el
+               texto visible ("Ver trailer" 113px vs "Ocultar" 104px).
+            Mientras carga se ignoran los clics, como hacía `loading`. */}
         {onTrailer && (
           <LiquidButton
-            onClick={onTrailer}
+            onClick={(event) => {
+              if (trailerTextShown && trailerLoading) return;
+              onTrailer(event);
+            }}
             disabled={!trailerAvailable}
             active={!!trailerAvailable}
-            loading={trailerLoading}
+            loading={trailerTextShown ? false : trailerLoading}
             activeColor="yellow"
             groupId="details-actions"
             className={[
@@ -659,7 +672,11 @@ export default function DetailActionsRow({
                   : "Sin Tráiler"
             }
           >
-            {trailerPlaying ? (
+            {trailerTextShown && trailerLoading ? (
+              <Loader2
+                className={`animate-spin ${size === "lg" ? "mr-2 h-5 w-5" : "mr-2 h-4 w-4"}`}
+              />
+            ) : trailerPlaying ? (
               <X
                 className={
                   trailerTextShown
@@ -684,11 +701,22 @@ export default function DetailActionsRow({
             )}
             {trailerTextShown && (
               <span
-                className={`whitespace-nowrap font-bold ${
+                className={`grid justify-items-center whitespace-nowrap font-bold ${
                   size === "lg" ? "text-sm sm:text-base" : "text-[13px]"
                 }`}
               >
-                {trailerPlaying ? "Ocultar" : trailerLabel}
+                <span
+                  className={`[grid-area:1/1] ${trailerPlaying ? "invisible" : ""}`}
+                  aria-hidden={trailerPlaying || undefined}
+                >
+                  {trailerLabel}
+                </span>
+                <span
+                  className={`[grid-area:1/1] ${trailerPlaying ? "" : "invisible"}`}
+                  aria-hidden={!trailerPlaying || undefined}
+                >
+                  Ocultar
+                </span>
               </span>
             )}
           </LiquidButton>
