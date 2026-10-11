@@ -1,5 +1,6 @@
 import EpisodeDetailsClient from "@/components/EpisodeDetailsClient";
 import { getShareData, shareMetadata } from "@/lib/share/shareMeta";
+import { pickEpisodeHeroStills } from "@/lib/details/episodeHeroStills";
 
 export const revalidate = 3600; // 1h
 
@@ -65,12 +66,30 @@ export default async function EpisodePage({ params }) {
     `/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`,
   );
   const seasonPromise = tmdbFetch(`/tv/${showId}/season/${seasonNumber}`);
+  // Portada móvil: varias imágenes del episodio apiladas (ver
+  // lib/details/episodeHeroStills). Sin ellas, la página sigue funcionando con
+  // la imagen oficial, así que un fallo aquí no la tumba.
+  const imageLanguages = "include_image_language=null,xx,en,es";
+  const episodeImagesPromise = tmdbFetch(
+    `/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}/images?${imageLanguages}`,
+  ).catch(() => null);
+  const showImagesPromise = tmdbFetch(
+    `/tv/${showId}/images?include_image_language=null,xx`,
+  ).catch(() => null);
 
-  const [show, episode, season] = await Promise.all([
+  const [show, episode, season, episodeImages, showImages] = await Promise.all([
     showPromise,
     episodePromise,
     seasonPromise,
+    episodeImagesPromise,
+    showImagesPromise,
   ]);
+
+  const heroStillPaths = pickEpisodeHeroStills({
+    stillPath: episode?.still_path || null,
+    stills: episodeImages?.stills,
+    showBackdrops: showImages?.backdrops,
+  });
 
   const showImdbId = show?.external_ids?.imdb_id || null;
 
@@ -91,6 +110,7 @@ export default async function EpisodePage({ params }) {
       imdb={null}
       imdbId={showImdbId}
       imdbUrl={imdbUrl}
+      heroStillPaths={heroStillPaths}
     />
   );
 }

@@ -3,7 +3,7 @@
 
 import OptimizedImage from "@/components/OptimizedImage";
 import LogoutConfirmModal from "@/components/auth/LogoutConfirmModal";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, memo } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, memo } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
@@ -54,6 +54,7 @@ import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
+import { ImageModeSegmented, ImageModeToggleButton } from "@/components/ui/ImageModeSelector";
 import PageStatCard from "@/components/ui/PageStatCard";
 
 // Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
@@ -911,6 +912,7 @@ const InProgressCard = memo(function InProgressCard({
   item,
   index = 0,
   viewMode = "cards",
+  imageMode = "poster",
   activeTab = "inprogress",
 }) {
   const itemType =
@@ -1037,8 +1039,12 @@ const InProgressCard = memo(function InProgressCard({
         transition={{ duration: 0.35, delay: animDelay, ease: "easeOut" }}
       >
         <Link href={href} prefetch={false} onClick={onPreviewClick} className="block">
-          <div className="relative aspect-[2/3] group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-emerald-900/20 transition-all after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]">
-            <SmartPoster item={item} title={title} />
+          <div className={`relative ${imageMode === "backdrop" ? "aspect-video" : "aspect-[2/3]"} group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-emerald-900/20 transition-all after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]`}>
+            {imageMode === "backdrop" ? (
+              <SmartBackdrop item={item} title={title} />
+            ) : (
+              <SmartPoster item={item} title={title} />
+            )}
 
             {/* Tick verde para series completadas (mobile) */}
             {activeTab === "completed" && (
@@ -1300,6 +1306,13 @@ export default function InProgressClient({
       IN_PROGRESS_VIEW_MODES,
     ),
   );
+  const [posterImageMode, setPosterImageMode] = useState(() =>
+    readStoredInProgressValue(
+      "showverse:inprogress:posterImageMode",
+      "poster",
+      new Set(["poster", "backdrop"]),
+    ),
+  );
   const [sortBy, setSortBy] = useState(() =>
     readStoredInProgressValue("showverse:inprogress:sortBy", "recent"),
   );
@@ -1356,6 +1369,13 @@ export default function InProgressClient({
     if (!uiReady) return;
     window.localStorage.setItem("showverse:inprogress:viewMode", viewMode);
   }, [uiReady, viewMode]);
+  useEffect(() => {
+    if (!uiReady) return;
+    window.localStorage.setItem(
+      "showverse:inprogress:posterImageMode",
+      posterImageMode,
+    );
+  }, [posterImageMode, uiReady]);
   useEffect(() => {
     if (!uiReady) return;
     window.localStorage.setItem("showverse:inprogress:sortBy", sortBy);
@@ -2207,8 +2227,12 @@ export default function InProgressClient({
             gapClassName="pt-2"
           >
             <div className="space-y-2">
-              {/* Fila 1: ordenar. El selector de secciones permanece visible
-                  en la barra principal, entre la búsqueda y los filtros. */}
+              {/* Fila 1: ordenar (+ imagen de las tarjetas en la vista de
+                  pósters: el botón que alterna de Favoritos, aquí porque la
+                  fila de Agrupar y la vista no tiene sitio). El selector de
+                  secciones permanece visible en la barra principal. */}
+              <div className="flex gap-2">
+              <div className="min-w-0 flex-1">
               <InlineDropdown
                 label="Ordenar"
                 valueLabel={sortLabels[sortBy]}
@@ -2231,6 +2255,14 @@ export default function InProgressClient({
                   </>
                 )}
               </InlineDropdown>
+              </div>
+              {viewMode === "poster" && (
+                <ImageModeToggleButton
+                  value={posterImageMode}
+                  onChange={setPosterImageMode}
+                />
+              )}
+              </div>
 
               {/* Fila 2: Agrupar + botones de vista */}
               <div className="flex gap-2 items-center">
@@ -2366,6 +2398,7 @@ export default function InProgressClient({
               )}
             </InlineDropdown>
 
+
             {/* View mode */}
             <div className="flex gap-1 rounded-2xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
               <button
@@ -2399,6 +2432,14 @@ export default function InProgressClient({
                 <LayoutList className="w-4 h-4" />
               </button>
             </div>
+
+            {/* Imagen de las tarjetas, junto a la vista (como Favoritos). */}
+            {viewMode === "poster" && (
+              <ImageModeSegmented
+                value={posterImageMode}
+                onChange={setPosterImageMode}
+              />
+            )}
           </div>
         </motion.div>
 
@@ -2465,13 +2506,20 @@ export default function InProgressClient({
                         ))}
                       </div>
                     ) : viewMode === "poster" ? (
-                      <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 lg:gap-4">
+                      // `key` con el modo de imagen: las tarjetas se montan de
+                      // nuevo y repiten su entrada al cambiar póster ↔ backdrop
+                      // (como en Favoritos).
+                      <div
+                        key={`poster-group-${posterImageMode}`}
+                        className={`grid gap-3 lg:gap-4 ${posterImageMode === "backdrop" ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"}`}
+                      >
                         {group.items.map((item, idx) => (
                           <InProgressCard
                             key={item.tmdbId}
                             item={item}
                             index={idx}
                             viewMode="poster"
+                            imageMode={posterImageMode}
                             activeTab={activeTab}
                           />
                         ))}
@@ -2514,18 +2562,25 @@ export default function InProgressClient({
                 ) : viewMode === "poster" ? (
                   <motion.div
                     key="poster-grid"
-                    className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 lg:gap-4"
-                    layout
+                    className={`grid gap-3 lg:gap-4 ${posterImageMode === "backdrop" ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"}`}
+                    // Sin `layout`: al cambiar póster ↔ backdrop la rejilla
+                    // cambia mucho de alto y framer la deformaba mientras las
+                    // tarjetas cambiaban de forma. Ahora las tarjetas se montan
+                    // de nuevo (Fragment con `key`) y repiten su entrada, como
+                    // en Favoritos.
                   >
+                    <Fragment key={posterImageMode}>
                     {filtered.map((item, idx) => (
                       <InProgressCard
                         key={item.tmdbId}
                         item={item}
                         index={idx}
                         viewMode="poster"
+                        imageMode={posterImageMode}
                         activeTab={activeTab}
                       />
                     ))}
+                    </Fragment>
                   </motion.div>
                 ) : (
                   <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">

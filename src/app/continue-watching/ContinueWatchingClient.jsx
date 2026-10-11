@@ -1,7 +1,7 @@
 "use client";
 
 import OptimizedImage from "@/components/OptimizedImage";
-import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
@@ -60,6 +60,7 @@ import {
 } from "@/lib/dashboard/media";
 import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
+import { ImageModeSegmented, ImageModeToggleButton } from "@/components/ui/ImageModeSelector";
 import PageStatCard from "@/components/ui/PageStatCard";
 
 // Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
@@ -592,6 +593,7 @@ const ProgressCard = memo(function ProgressCard({
   item,
   index = 0,
   viewMode = "cards",
+  imageMode = "poster",
   editMode = false,
   busy = false,
   onRemove,
@@ -704,8 +706,8 @@ const ProgressCard = memo(function ProgressCard({
     return (
       <motion.div initial={isBackNav ? false : { opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.35, delay: isBackNav ? 0 : animDelay, ease: "easeOut" }}>
         <Link href={href} prefetch={false} onClick={onPreviewClick} draggable={false} className="block [-webkit-tap-highlight-color:transparent]">
-          <div className="relative aspect-[2/3] group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-emerald-900/20 transition-all after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]">
-            <SmartImage item={item} kind="poster" alt={title} />
+          <div className={`relative ${imageMode === "backdrop" ? "aspect-video" : "aspect-[2/3]"} group rounded-xl overflow-hidden bg-zinc-900 shadow-md lg:hover:shadow-emerald-900/20 transition-all after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]`}>
+            <SmartImage item={item} kind={imageMode} alt={title} />
 
             <ContinueWatchingPosterHoverIndicator
               platform={platform}
@@ -876,6 +878,8 @@ export default function ContinueWatchingClient() {
   const [sortBy, setSortBy] = useState("recent");
   const [typeFilter, setTypeFilter] = useState("all");
   const [viewMode, setViewMode] = useState("cards");
+  const [posterImageMode, setPosterImageMode] = useState("poster");
+  const [imageModeHydrated, setImageModeHydrated] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
   const { isSticky: filtersSticky, isPinned: filtersPinned } =
@@ -891,6 +895,9 @@ export default function ContinueWatchingClient() {
   useEffect(() => {
     const v = typeof window !== "undefined" && window.localStorage.getItem("showverse:cw:viewMode");
     if (v && VIEW_MODES.has(v)) setViewMode(v);
+    const imageMode = typeof window !== "undefined" && window.localStorage.getItem("showverse:cw:posterImageMode");
+    if (imageMode === "poster" || imageMode === "backdrop") setPosterImageMode(imageMode);
+    setImageModeHydrated(true);
     const cached = readCache();
     // Solo pintamos al instante si la caché es RECIENTE. Si es vieja, dejamos la
     // carga (skeleton) hasta que `load()` pinte la lista completa de una vez, sin
@@ -904,6 +911,10 @@ export default function ContinueWatchingClient() {
   useEffect(() => {
     if (typeof window !== "undefined") window.localStorage.setItem("showverse:cw:viewMode", viewMode);
   }, [viewMode]);
+  useEffect(() => {
+    if (!imageModeHydrated || typeof window === "undefined") return;
+    window.localStorage.setItem("showverse:cw:posterImageMode", posterImageMode);
+  }, [imageModeHydrated, posterImageMode]);
 
   const load = useCallback(async () => {
     try {
@@ -1223,6 +1234,15 @@ export default function ContinueWatchingClient() {
                     </InlineDropdown>
                   </div>
 
+                  {/* Imagen de las tarjetas: el botón que alterna de Favoritos
+                      (solo en la vista de pósters). */}
+                  {viewMode === "poster" && (
+                    <ImageModeToggleButton
+                      value={posterImageMode}
+                      onChange={setPosterImageMode}
+                    />
+                  )}
+
                   <div className="inline-flex h-11 shrink-0 items-center gap-1 rounded-2xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
                     <button
                       type="button"
@@ -1336,6 +1356,7 @@ export default function ContinueWatchingClient() {
               )}
             </InlineDropdown>
 
+
             {/* Modo de visualización */}
             <div className="flex gap-1 rounded-2xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
               <button
@@ -1366,6 +1387,14 @@ export default function ContinueWatchingClient() {
                 <LayoutList className="w-4 h-4" />
               </button>
             </div>
+
+            {/* Imagen de las tarjetas, junto a la vista (como Favoritos). */}
+            {viewMode === "poster" && (
+              <ImageModeSegmented
+                value={posterImageMode}
+                onChange={setPosterImageMode}
+              />
+            )}
 
             <button
               type="button"
@@ -1416,8 +1445,14 @@ export default function ContinueWatchingClient() {
                 {filtered.map((item, i) => <ProgressCard key={item.progressId || `${mediaTypeOf(item)}:${item.id}`} item={item} index={i} viewMode="cards" editMode={editMode} busy={busyId === item.progressId} onRemove={handleRemove} />)}
               </motion.div>
             ) : viewMode === "poster" ? (
-              <motion.div key="poster" layout className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 lg:gap-4">
-                {filtered.map((item, i) => <ProgressCard key={item.progressId || `${mediaTypeOf(item)}:${item.id}`} item={item} index={i} viewMode="poster" editMode={editMode} busy={busyId === item.progressId} onRemove={handleRemove} />)}
+              // Sin `layout` y con las tarjetas en un Fragment con `key`: al
+              // cambiar póster ↔ backdrop se montan de nuevo y repiten su
+              // entrada, como en Favoritos (antes framer estiraba la rejilla
+              // del alto viejo al nuevo con las tarjetas deformadas).
+              <motion.div key="poster" className={`grid gap-3 lg:gap-4 ${posterImageMode === "backdrop" ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"}`}>
+                <Fragment key={posterImageMode}>
+                  {filtered.map((item, i) => <ProgressCard key={item.progressId || `${mediaTypeOf(item)}:${item.id}`} item={item} index={i} viewMode="poster" imageMode={posterImageMode} editMode={editMode} busy={busyId === item.progressId} onRemove={handleRemove} />)}
+                </Fragment>
               </motion.div>
             ) : (
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">

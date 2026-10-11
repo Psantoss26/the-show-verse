@@ -143,7 +143,7 @@ export default function VideoModal({
   const ext = videoExternalUrl(video);
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6">
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center px-4 py-1 sm:p-6">
       {/* BACKDROP: Estilo cristal con desenfoque + Animación de fade */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-lg transition-opacity duration-300 animate-in fade-in"
@@ -153,12 +153,12 @@ export default function VideoModal({
 
       {/* MODAL CONTAINER: Liquid Glass */}
       <div
-        className={`relative w-full max-w-7xl flex flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
+        className={`relative w-full max-w-7xl max-h-[calc(100dvh-0.5rem)] flex flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
         role="dialog"
         aria-modal="true"
       >
         {/* HEADER: Glass Header */}
-        <div className={`flex w-full items-center justify-between p-6 sm:px-8 sm:pt-8 sm:pb-6 ${LIQUID_GLASS_MODAL_HEADER}`}>
+        <div className={`flex w-full items-center justify-between p-3 sm:px-8 sm:pt-8 sm:pb-6 ${LIQUID_GLASS_MODAL_HEADER}`}>
           <div className="flex flex-col gap-0.5 min-w-0 pr-4">
             <h3 className="text-xl sm:text-2xl font-black text-white drop-shadow-md truncate">
               {video.name || "Tráiler Oficial"}
@@ -184,7 +184,7 @@ export default function VideoModal({
         </div>
 
         {/* VIDEO AREA: Aspect Ratio cinematográfico */}
-        <div className="relative w-full aspect-[4/3] sm:aspect-video max-h-[50dvh] sm:max-h-none bg-black/40 group">
+        <div className="relative w-full aspect-square max-h-[calc(100dvh-11.5rem)] sm:aspect-video sm:max-h-none bg-black/40 group">
           {embed ? (
             <iframe
               ref={iframeRef}
@@ -206,7 +206,7 @@ export default function VideoModal({
         </div>
 
         {/* FOOTER: Información y acciones */}
-        <div className={`flex flex-wrap items-center justify-between gap-4 p-6 sm:px-8 ${LIQUID_GLASS_MODAL_FOOTER}`}>
+        <div className={`flex flex-wrap items-center justify-between gap-3 p-3 sm:p-6 sm:px-8 ${LIQUID_GLASS_MODAL_FOOTER}`}>
           <div className="text-xs font-semibold text-white/50">
             {video.published_at && (
               <span>

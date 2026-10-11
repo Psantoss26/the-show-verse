@@ -81,7 +81,7 @@ function useInViewOnce(rootMargin = "300px") {
 }
 
 // --- Tooltip flotante en portal ---
-function TooltipPortal({ activeData, anchorRect, enabled }) {
+function TooltipPortal({ activeData, anchorRect, enabled, zIndex }) {
   const tooltipRef = useRef(null);
   const [coords, setCoords] = useState({ top: 0, left: 0, placement: "top" });
 
@@ -118,8 +118,9 @@ function TooltipPortal({ activeData, anchorRect, enabled }) {
   return createPortal(
     <div
       ref={tooltipRef}
-      className="fixed z-[9999] pointer-events-none transition-opacity duration-150 ease-out"
+      className="fixed pointer-events-none transition-opacity duration-150 ease-out"
       style={{
+        zIndex,
         top: coords.top,
         left: coords.left,
         opacity: anchorRect && coords.top > 0 ? 1 : 0,
@@ -153,6 +154,7 @@ export default function EpisodeRatingsGrid({
   density = "compact",
   fillMissingWithTmdb = false,
   fallbackSource = "tmdb",
+  tooltipZIndex = 9999,
 }) {
   const router = useRouter();
   const isTouchLike = useIsTouchLike();
@@ -1423,6 +1425,7 @@ export default function EpisodeRatingsGrid({
         activeData={hoveredEp}
         anchorRect={anchorRect}
         enabled={tooltipEnabled}
+        zIndex={tooltipZIndex}
       />
     </>
   );

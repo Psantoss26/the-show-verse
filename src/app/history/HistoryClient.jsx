@@ -68,6 +68,7 @@ import {
 import HoverExpandCard from "@/components/ui/HoverExpandCard";
 import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
+import { ImageModeSegmented, ImageModeToggleButton } from "@/components/ui/ImageModeSelector";
 import useWidthVariable from "@/hooks/useWidthVariable";
 import PageStatCard from "@/components/ui/PageStatCard";
 
@@ -1765,6 +1766,58 @@ function Poster({ entry, className = "" }) {
   );
 }
 
+function Backdrop({ entry, className = "" }) {
+  const [backdropPath, setBackdropPath] = useState(null);
+  const { ref, hasBeenInView } = useInView({
+    threshold: 0.01,
+    rootMargin: "350px",
+  });
+  const type = getItemType(entry);
+  const id = getTmdbId(entry);
+
+  useEffect(() => {
+    let abort = false;
+    if (!hasBeenInView || !type || !id) return;
+    setBackdropPath(null);
+
+    const load = async () => {
+      const tmdbType = type === "show" ? "tv" : "movie";
+      const key = `${tmdbType}:${id}`;
+      const fallback = entry?.backdrop_path || entry?.poster_path || null;
+      const path = backdropCache.has(key)
+        ? backdropCache.get(key) || fallback
+        : (await getBestBackdropCached(tmdbType, id)) || fallback;
+      if (!abort) setBackdropPath(path);
+    };
+
+    load();
+    return () => {
+      abort = true;
+    };
+  }, [entry, hasBeenInView, id, type]);
+
+  const src = backdropPath
+    ? `https://image.tmdb.org/t/p/w1280${backdropPath}`
+    : null;
+
+  return (
+    <div ref={ref} className={`overflow-hidden bg-neutral-900 relative ${className}`}>
+      {src ? (
+        <OptimizedImage
+          src={src}
+          alt="backdrop"
+          className="w-full h-full object-cover"
+          loading="lazy"
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center text-zinc-600">
+          <Film className="w-6 h-6" />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Tarjeta modo LISTA
 const HistoryItemCard = memo(function HistoryItemCard({
   entry,
@@ -2064,6 +2117,7 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
   totalItems = 0,
   animateWithin = 24,
   editMode = false,
+  imageMode = "poster",
 }) {
   const type = getItemType(entry);
   const isGroup = entry?._group && entry._group.length > 1;
@@ -2117,12 +2171,16 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
 
   const CardInner = (
     <HoverExpandCard
-      cellClassName="aspect-[2/3]"
+      cellClassName={imageMode === "backdrop" ? "aspect-video" : "aspect-[2/3]"}
       className={`compact-card group overflow-hidden rounded-lg bg-zinc-900 shadow-md ${disabledCls}`}
     >
       <div className="absolute inset-0 rounded-[inherit] overflow-hidden">
-        {/* Poster Image */}
-        <Poster entry={entry} className="w-full h-full" />
+        {/* Póster o backdrop, según el modo de imagen (como en Favoritos). */}
+        {imageMode === "backdrop" ? (
+          <Backdrop entry={entry} className="w-full h-full" />
+        ) : (
+          <Poster entry={entry} className="w-full h-full" />
+        )}
 
         {isGroup && (
           <>
@@ -2241,6 +2299,7 @@ const HistoryGridCard = memo(function HistoryGridCard({
   animateWithin = 24,
   editMode = false,
   isMobile = false,
+  imageMode = "poster",
 }) {
   const type = getItemType(entry);
 
@@ -2337,7 +2396,7 @@ const HistoryGridCard = memo(function HistoryGridCard({
     <div
       className={[
         // IMPORTANTE: hover SOLO en desktop para evitar "hover pegajoso" en móvil
-        "relative aspect-[2/3] group overflow-hidden rounded-xl bg-zinc-900 shadow-md",
+        `relative ${imageMode === "backdrop" ? "aspect-video" : "aspect-[2/3]"} group overflow-hidden rounded-xl bg-zinc-900 shadow-md`,
         "lg:hover:shadow-emerald-900/20 transition-all",
         disabledCls,
       ].join(" ")}
@@ -2345,7 +2404,11 @@ const HistoryGridCard = memo(function HistoryGridCard({
       {/* Overlay de borde para que los indicadores queden por debajo */}
       <div className="absolute inset-0 z-50 pointer-events-none rounded-[inherit] transition-shadow duration-300 lg:group-hover:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]" />
       <div className="absolute inset-0 rounded-[inherit] overflow-hidden">
-        <Poster entry={entry} className="w-full h-full" />
+        {imageMode === "backdrop" ? (
+          <Backdrop entry={entry} className="w-full h-full" />
+        ) : (
+          <Poster entry={entry} className="w-full h-full" />
+        )}
 
         {isGroup && (
           <>
@@ -2961,6 +3024,7 @@ export default function HistoryClient() {
   const [viewMode, setViewModeState] = useState(
     () => backNavInit?.viewMode || "compact",
   );
+  const [gridImageMode, setGridImageMode] = useState("poster");
   // Marca si el usuario (o el localStorage propio) ya fijó una vista del Historial,
   // para que la preferencia global NUNCA la sobrescriba al recargar.
   const viewModeUserSetRef = useRef(!!backNavInit?.viewMode);
@@ -3018,7 +3082,6 @@ export default function HistoryClient() {
     }
   });
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-  const [desktopSearchFocused, setDesktopSearchFocused] = useState(false);
   const filtersRef = useRef(null);
   const { isSticky: filtersSticky, isPinned: filtersPinned } =
     useStickyToolbarState(filtersRef);
@@ -3136,6 +3199,13 @@ export default function HistoryClient() {
       viewModeUserSetRef.current = true;
     }
 
+    const savedGridImageMode = window.localStorage.getItem(
+      "showverse:history:gridImageMode",
+    );
+    if (savedGridImageMode === "poster" || savedGridImageMode === "backdrop") {
+      setGridImageMode(savedGridImageMode);
+    }
+
     const savedGroupBy = window.localStorage.getItem(
       "showverse:history:groupBy",
     );
@@ -3165,6 +3235,10 @@ export default function HistoryClient() {
     if (!hydrated) return;
     window.localStorage.setItem("showverse:history:sortBy", sortBy);
   }, [hydrated, sortBy]);
+  useEffect(() => {
+    if (!hydrated) return;
+    window.localStorage.setItem("showverse:history:gridImageMode", gridImageMode);
+  }, [gridImageMode, hydrated]);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 1024px)");
@@ -3637,10 +3711,14 @@ export default function HistoryClient() {
         : estimateVisibleCards({
             columns: pickResponsiveColumns(
               viewMode === "grid"
-                ? { base: 3, sm: 4, md: 5, lg: 6 }
-                : { base: 4, sm: 5, md: 6, lg: 7, xl: 8 },
+                ? gridImageMode === "backdrop"
+                  ? { base: 1, sm: 2, lg: 3 }
+                  : { base: 3, sm: 4, md: 5, lg: 6 }
+                : gridImageMode === "backdrop"
+                  ? { base: 2, sm: 3, md: 4 }
+                  : { base: 4, sm: 5, md: 6, lg: 7, xl: 8 },
             ),
-            aspect: 1.5,
+            aspect: gridImageMode === "backdrop" ? 0.5625 : 1.5,
           });
 
   // Resetear expansiones cuando cambian filtros/ordenación/datos
@@ -4017,11 +4095,15 @@ export default function HistoryClient() {
                       </div>
 
                       <div
-                        className="min-w-0"
+                        className="flex min-w-0 gap-2"
                         style={{ flex: MOBILE_TOOLBAR_RIGHT_COLUMN }}
                       >
+                        <div className="min-w-0 flex-1">
                         <InlineDropdown
                           label="Agrupar"
+                          // Con el botón de imagen al lado no cabe el rótulo:
+                          // icono y valor, como en la barra de escritorio.
+                          compact={viewMode === "grid" || viewMode === "compact"}
                           valueLabel={
                             groupBy === "day"
                               ? "Día"
@@ -4063,6 +4145,16 @@ export default function HistoryClient() {
                             </>
                           )}
                         </InlineDropdown>
+                        </div>
+                        {/* Imagen de las tarjetas: el botón que alterna de
+                            Favoritos (vistas de tarjetas y compacta). En esta
+                            fila porque la de la vista ya lleva el de borrar. */}
+                        {(viewMode === "grid" || viewMode === "compact") && (
+                          <ImageModeToggleButton
+                            value={gridImageMode}
+                            onChange={setGridImageMode}
+                          />
+                        )}
                       </div>
                     </div>
 
@@ -4206,8 +4298,6 @@ export default function HistoryClient() {
                     <input
                       value={q}
                       onChange={(e) => setQ(e.target.value)}
-                      onFocus={() => setDesktopSearchFocused(true)}
-                      onBlur={() => setDesktopSearchFocused(false)}
                       placeholder="Buscar por título..."
                       className="w-full h-11 rounded-2xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
                     />
@@ -4231,7 +4321,7 @@ export default function HistoryClient() {
                           : "Series"
                     }
                     icon={Filter}
-                    compact={desktopSearchFocused}
+                    compact
                   >
                     {({ close }) => (
                       <>
@@ -4276,7 +4366,7 @@ export default function HistoryClient() {
                           : "Año"
                     }
                     icon={Layers}
-                    compact={desktopSearchFocused}
+                    compact
                   >
                     {({ close }) => (
                       <>
@@ -4323,7 +4413,7 @@ export default function HistoryClient() {
                             : "Z-A"
                     }
                     icon={ArrowUpDown}
-                    compact={desktopSearchFocused}
+                    compact
                   >
                     {({ close }) => (
                       <>
@@ -4367,6 +4457,7 @@ export default function HistoryClient() {
                     )}
                   </InlineDropdown>
 
+
                   <div className="flex rounded-2xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
                     <button
                       onClick={() => setViewMode("list")}
@@ -4399,6 +4490,14 @@ export default function HistoryClient() {
                       <LayoutGrid className="w-4 h-4" />
                     </button>
                   </div>
+
+                  {/* Imagen de las tarjetas, junto a la vista (como Favoritos). */}
+                  {(viewMode === "grid" || viewMode === "compact") && (
+                    <ImageModeSegmented
+                      value={gridImageMode}
+                      onChange={setGridImageMode}
+                    />
+                  )}
 
                   <button
                     onClick={() => setEditMode(!editMode)}
@@ -4580,15 +4679,36 @@ export default function HistoryClient() {
                       </div>
 
                       {viewMode === "grid" ? (
-                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+                        // `key` con el modo de imagen: al cambiar póster ↔
+                        // backdrop la rejilla se monta de nuevo y las tarjetas
+                        // repiten su entrada, como en Favoritos (sin ella se
+                        // reutilizaban y solo cambiaban de forma, de golpe).
+                        <div
+                          key={`grid-${gridImageMode}`}
+                          className={`grid gap-3 ${gridImageMode === "backdrop" ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6"}`}
+                        >
                           {g.collapsedItems.map((entry, idx) =>
-                            renderItems(HistoryGridCard, entry, idx),
+                            renderItems(HistoryGridCard, entry, idx, {
+                              imageMode: gridImageMode,
+                            }),
                           )}
                         </div>
                       ) : viewMode === "compact" ? (
-                        <div className="compact-cards-grid grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 gap-2">
+                        // Mismo modo de imagen que la vista de tarjetas y mismas
+                        // columnas en backdrop que el compacto de Favoritos;
+                        // `key` para que la entrada se repita al cambiarlo.
+                        <div
+                          key={`compact-${gridImageMode}`}
+                          className={`compact-cards-grid grid gap-2 ${
+                            gridImageMode === "backdrop"
+                              ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4"
+                              : "grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8"
+                          }`}
+                        >
                           {g.collapsedItems.map((entry, idx) =>
-                            renderItems(HistoryCompactCard, entry, idx),
+                            renderItems(HistoryCompactCard, entry, idx, {
+                              imageMode: gridImageMode,
+                            }),
                           )}
                         </div>
                       ) : (

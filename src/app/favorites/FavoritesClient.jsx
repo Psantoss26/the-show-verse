@@ -3,6 +3,7 @@
 import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
 import LogoutConfirmModal from "@/components/auth/LogoutConfirmModal";
 import { pickBestFavoriteEnglishPoster } from "@/lib/details/tmdbImages";
+import { windowFavoriteGroups, favoriteGroupRenderEnd } from "./renderWindow.mjs";
 
 import OptimizedImage from "@/components/OptimizedImage";
 import useImageLoadReady from "@/lib/hooks/useImageLoadReady";
@@ -18,7 +19,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/lib/i18n";
 import { fetchRatedForUser, getWatchProviders } from "@/lib/api/tmdb";
@@ -2088,6 +2089,8 @@ export default function FavoritesClient() {
   } = useAuth();
   const { t } = useTranslation();
   const isBackNav = useIsHistoryNavigation();
+  const reduceMotion = useReducedMotion();
+  const skipStatsAnimation = isBackNav || reduceMotion;
   // Read each persistent cache only once on mount. These JSON.parse and build
   // Maps from localStorage; calling them several times (favorites x3,
   // providers x2) blocked the first render and added a perceptible delay to the
@@ -3047,7 +3050,10 @@ export default function FavoritesClient() {
       )
       .join("|");
   }, [grouped, sorted]);
-  const renderedGrouped = grouped;
+  const renderedGrouped = useMemo(
+    () => windowFavoriteGroups(grouped, renderLimit),
+    [grouped, renderLimit],
+  );
   // Un título puede pertenecer a varias plataformas (o géneros/subgrupos). El
   // límite incremental ha de contar cada tarjeta que se va a pintar, no solo
   // los títulos únicos, para que los grupos situados al final no queden vacíos.
@@ -3071,9 +3077,13 @@ export default function FavoritesClient() {
   // shows the first cards animating in, exactly like History / In-Progress.
   const [canExpandRender, setCanExpandRender] = useState(false);
   useEffect(() => {
+    if (loading) {
+      setCanExpandRender(false);
+      return;
+    }
     const t = window.setTimeout(() => setCanExpandRender(true), 450);
     return () => window.clearTimeout(t);
-  }, []);
+  }, [loading]);
 
   // Grow the render window up to the full list during idle time, so the rest of
   // the cards appear shortly after the (cheap, fast) first paint.
@@ -3090,6 +3100,7 @@ export default function FavoritesClient() {
   const groupSectionRefs = useRef(new Map());
   const forcedStickyTimerRef = useRef(null);
   const [forcedStickyGroupKey, setForcedStickyGroupKey] = useState(null);
+  const [pendingGroupKey, setPendingGroupKey] = useState(null);
 
   useEffect(() => {
     return () => {
@@ -3140,6 +3151,21 @@ export default function FavoritesClient() {
     });
   }, []);
 
+  // Mount the destination and every preceding card before measuring its
+  // position. Otherwise later batches move the requested heading after scroll.
+  const navigateToGroup = useCallback((key) => {
+    const end = favoriteGroupRenderEnd(grouped, key);
+    if (!end) return;
+    setRenderLimit((previous) => Math.max(previous, end));
+    setPendingGroupKey(key);
+  }, [grouped]);
+
+  useLayoutEffect(() => {
+    if (!pendingGroupKey) return;
+    scrollGroupIntoStickyPosition(pendingGroupKey);
+    setPendingGroupKey(null);
+  }, [pendingGroupKey, renderedGrouped, scrollGroupIntoStickyPosition]);
+
   const scrollToNextGroup = useCallback(
     (currentKey) => {
       if (typeof window === "undefined" || window.innerWidth < 1024) return;
@@ -3151,9 +3177,9 @@ export default function FavoritesClient() {
       const nextGroup = grouped[currentIndex + 1];
       if (!nextGroup) return;
 
-      scrollGroupIntoStickyPosition(nextGroup.key);
+      navigateToGroup(nextGroup.key);
     },
-    [grouped, scrollGroupIntoStickyPosition],
+    [grouped, navigateToGroup],
   );
 
   const scrollToPreviousGroup = useCallback(
@@ -3167,9 +3193,9 @@ export default function FavoritesClient() {
       const previousGroup = grouped[currentIndex - 1];
       if (!previousGroup) return;
 
-      scrollGroupIntoStickyPosition(previousGroup.key);
+      navigateToGroup(previousGroup.key);
     },
-    [grouped, scrollGroupIntoStickyPosition],
+    [grouped, navigateToGroup],
   );
 
   const scoreLoadingLabel =
@@ -3379,40 +3405,59 @@ export default function FavoritesClient() {
               </p>
             </div>
 
-            {!loading && (
               <motion.div
                 className="flex gap-2 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
-                initial={isBackNav ? false : { opacity: 0, y: 20 }}
+                initial={skipStatsAnimation ? false : { opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={
-                  isBackNav ? { duration: 0 } : { duration: 0.5, delay: 0.3 }
+                  skipStatsAnimation ? { duration: 0 } : { duration: 0.5, delay: 0.3 }
                 }
               >
-                <PageStatCard
-                  className="flex-1 lg:flex-none lg:w-auto"
-                  label="Total"
-                  value={stats.total}
-                  icon={Heart}
-                  colorClass="text-red-400"
-                  iconClassName="fill-red-400"
-                />
-                <PageStatCard
-                  className="flex-1 lg:flex-none lg:w-auto"
-                  label="Películas"
-                  value={stats.movies}
-                  icon={Film}
-                  colorClass="text-sky-400"
-                />
-                <PageStatCard
-                  className="flex-1 lg:flex-none lg:w-auto"
-                  label="Series"
-                  value={stats.shows}
-                  icon={TvGlyph}
-                  colorClass="text-purple-400"
-                  iconClassName="text-purple-400"
-                />
+                <motion.div
+                  className="min-w-0 flex-1 lg:flex-none"
+                  initial={skipStatsAnimation ? false : { opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={skipStatsAnimation ? { duration: 0 } : { duration: 0.4, delay: 0.5 }}
+                >
+                  <PageStatCard
+                    loading={loading}
+                    label="Total"
+                    value={stats.total}
+                    icon={Heart}
+                    colorClass="text-red-400"
+                    iconClassName="fill-red-400"
+                  />
+                </motion.div>
+                <motion.div
+                  className="min-w-0 flex-1 lg:flex-none"
+                  initial={skipStatsAnimation ? false : { opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={skipStatsAnimation ? { duration: 0 } : { duration: 0.4, delay: 0.6 }}
+                >
+                  <PageStatCard
+                    loading={loading}
+                    label="Películas"
+                    value={stats.movies}
+                    icon={Film}
+                    colorClass="text-sky-400"
+                  />
+                </motion.div>
+                <motion.div
+                  className="min-w-0 flex-1 lg:flex-none"
+                  initial={skipStatsAnimation ? false : { opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={skipStatsAnimation ? { duration: 0 } : { duration: 0.4, delay: 0.7 }}
+                >
+                  <PageStatCard
+                    loading={loading}
+                    label="Series"
+                    value={stats.shows}
+                    icon={TvGlyph}
+                    colorClass="text-purple-400"
+                    iconClassName="text-purple-400"
+                  />
+                </motion.div>
               </motion.div>
-            )}
           </div>
         </motion.header>
 
@@ -3977,17 +4022,14 @@ export default function FavoritesClient() {
             {(() => {
               let globalCardIndex = 0;
               return renderedGrouped.map((group, groupIndex) => (
-                <motion.div
+                <div
                   key={group.key}
                   ref={(node) => setGroupSectionRef(group.key, node)}
                   className="overflow-visible scroll-mt-[148px]"
-                  initial={isBackNav ? false : { opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: groupIndex * 0.1 }}
                 >
                   <GroupDivider
                     title={group.label}
-                    count={group.items.length}
+                    count={group.count}
                     total={sorted.length}
                     stats={group.stats}
                     groupBy={groupBy}
@@ -3995,7 +4037,7 @@ export default function FavoritesClient() {
                     forceSticky={forcedStickyGroupKey === group.key}
                     disableStickyAnimation={forcedStickyGroupKey === group.key}
                     hasPreviousGroup={groupIndex > 0}
-                    hasNextGroup={groupIndex < renderedGrouped.length - 1}
+                    hasNextGroup={groupIndex < grouped.length - 1}
                     onPreviousGroup={() => scrollToPreviousGroup(group.key)}
                     onNextGroup={() => scrollToNextGroup(group.key)}
                   />
@@ -4008,15 +4050,14 @@ export default function FavoritesClient() {
                         >
                           <SubGroupDivider
                             title={subgroup.label}
-                            count={subgroup.items.length}
+                            count={subgroup.count}
                           />
                           <div
                             key={`subgroup-grid-${group.key}-${subgroup.key}-${viewMode}-${imageMode}`}
                             className={getItemsGridClass(true)}
                           >
-                            {subgroup.items.map((item, idx) => {
+                            {subgroup.items.map((item) => {
                               const currentGlobalIdx = globalCardIndex++;
-                              if (currentGlobalIdx >= renderLimit) return null;
                               return (
                                 <FavoriteCard
                                   key={getMediaKey(item)}
@@ -4046,9 +4087,8 @@ export default function FavoritesClient() {
                       key={`group-grid-${group.key}-${viewMode}-${imageMode}`}
                       className={getItemsGridClass(true)}
                     >
-                      {group.items.map((item, idx) => {
+                      {group.items.map((item) => {
                         const currentGlobalIdx = globalCardIndex++;
-                        if (currentGlobalIdx >= renderLimit) return null;
                         return (
                           <FavoriteCard
                             key={getMediaKey(item)}
@@ -4069,7 +4109,7 @@ export default function FavoritesClient() {
                       })}
                     </div>
                   )}
-                </motion.div>
+                </div>
               ));
             })()}
           </FlipReorder>

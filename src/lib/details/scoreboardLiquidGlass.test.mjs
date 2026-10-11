@@ -185,11 +185,18 @@ test("el liquid glass no hereda opacidad de las animaciones de carga", async () 
   assert.doesNotMatch(detailAtoms, /initial=\{[^}]*opacity: 0/);
   assert.doesNotMatch(scoreboardEntrada, /initial=\{\{ opacity: 0/);
   // Los BOTONES de sección no entran con opacidad (el badge que aparece dentro
-  // de una sección ya visible sí puede: no deja ninguna cáscara vacía).
-  assert.match(
-    sectionMenuEntrada,
-    /<motion\.button[\s\S]{0,900}?initial=\{false\}/,
+  // de una sección ya visible sí puede: no deja ninguna cáscara vacía). Son
+  // `<button>` normales —sin animación de entrada propia, la hace el
+  // contenedor— o, si vuelven a ser de framer, con `initial={false}`.
+  const sectionButton = sectionMenuEntrada.slice(
+    sectionMenuEntrada.search(/<(?:motion\.)?button\b/),
+    sectionMenuEntrada.search(/<\/(?:motion\.)?button>/),
   );
+  assert.ok(sectionButton.length > 0, "botón de sección no encontrado");
+  if (/<motion\.button\b/.test(sectionButton)) {
+    assert.match(sectionButton, /initial=\{false\}/);
+  }
+  assert.doesNotMatch(sectionButton.split(/\{item\.badge &&/)[0], /opacity:\s*0/);
 });
 
 test("DetailsSectionMenu comparte el liquid glass estable de las barras", async () => {

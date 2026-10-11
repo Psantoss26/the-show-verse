@@ -233,6 +233,8 @@ export default function EpisodeRatingsModal({
                 showId={Number(showId)}
                 tmdbSeasons={tmdbSeasons}
                 density="compact"
+                // El tooltip se porta a body: debe superar la capa 10000 del modal.
+                tooltipZIndex={10001}
               />
             </div>
           )}
