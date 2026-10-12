@@ -493,7 +493,7 @@ test("las tarjetas de Detalles y Producción no se esconden a la derecha", async
   // El reparto en sí vive en `.sv-info-cards` (globals.css), donde un container
   // query puede mirar el ancho REAL de la fila y decidir entre una sola línea o
   // parejas. Aquí solo se comprueba que el drawer lo pide.
-  assert.match(tabs, /if \(wrapCards\) return "sv-info-cards"/);
+  assert.match(tabs, /if \(wrapCards\) \{\s*\n\s*return `sv-info-cards\$\{/);
   assert.match(tabs, /return `min-w-0\$\{wide \? " sv-info-card--wide" : ""\}/);
   assert.match(modal, /wrapCards\n/);
 

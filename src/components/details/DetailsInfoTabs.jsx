@@ -66,12 +66,27 @@ function InfoGlassPanel({ children, className = "" }) {
 // Con `wrapCards` la fila envuelve: las tarjetas se reparten en las líneas que
 // hagan falta y ninguna se esconde. `12rem` de base las deja en dos o tres por
 // línea según el ancho del panel, en vez de estirarse una sola por fila.
-export const infoCardsRowClass = ({ mobileLayout, wrapCards }) => {
+export const infoCardsRowClass = ({
+  mobileLayout,
+  wrapCards,
+  // La fila lleva la tarjeta del título original (y si va en fila propia).
+  hasTitle = false,
+  hasWide = false,
+}) => {
   if (mobileLayout) return "flex flex-col gap-3";
   // El reparto lo lleva `.sv-info-cards` en globals.css, con un container
   // query: desde CSS se puede mirar el ancho REAL de la fila, que es lo que
   // decide si las tarjetas caben todas o tienen que ir de dos en dos.
-  if (wrapCards) return "sv-info-cards";
+  //
+  // Qué tarjetas contiene la fila se marca AQUÍ con clases, no con `:has()` en
+  // la hoja de estilos: aquellas reglas (`.sv-info-cards:has(> …) > :not(…)`)
+  // están en el CSS global y Chrome las evaluaba en TODAS las páginas. Insertar
+  // cualquier nodo —p. ej. el desplegable móvil de Favoritos— le hacía dar por
+  // inválidos los estilos del documento entero: ~11.000 elementos recalculados
+  // dos veces, 300 ms de bloqueo con la CPU de un móvil.
+  if (wrapCards) {
+    return `sv-info-cards${hasTitle ? " sv-info-cards--has-title" : ""}${hasWide ? " sv-info-cards--has-wide" : ""}`;
+  }
   return "flex flex-col gap-3 lg:flex-row lg:flex-nowrap lg:items-stretch lg:overflow-x-auto lg:pb-2 lg:[scrollbar-width:none]";
 };
 
@@ -407,7 +422,17 @@ export default function DetailsInfoTabs({
                   />
                 </div>
               ) : (
-                <div className={infoCardsRowClass({ mobileLayout, wrapCards })}>
+                <div
+                  className={infoCardsRowClass({
+                    mobileLayout,
+                    wrapCards,
+                    // Mismas condiciones con las que se pinta la tarjeta del
+                    // título (VisualMetaCard no se pinta sin valor).
+                    hasTitle: !metadataLoading && Boolean(originalTitle),
+                    hasWide:
+                      !metadataLoading && isLongOriginalTitle(originalTitle),
+                  })}
+                >
                   {/* Título Original */}
                   {/* Misma puerta que el resto de la fila. Sin ella conservaba
                       el valor del título ANTERIOR durante el cambio, así que se

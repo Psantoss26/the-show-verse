@@ -307,6 +307,9 @@ export default function EpisodeDetailsClient({
   // Portada móvil: imágenes del episodio a apilar (resueltas en el servidor,
   // lib/details/episodeHeroStills).
   heroStillPaths = [],
+  // Fondo en ordenador, distinto de la portada si se puede (resuelto en el
+  // servidor, lib/details/episodeHeroStills → pickEpisodeBackdrop).
+  heroBackdropPath = null,
 }) {
   const traktRequestIdRef = useRef(0);
 
@@ -338,7 +341,11 @@ export default function EpisodeDetailsClient({
   );
   const showPosterPath = show?.poster_path || null;
   const heroBgPath =
-    stillPath || show?.backdrop_path || show?.poster_path || null;
+    heroBackdropPath ||
+    stillPath ||
+    show?.backdrop_path ||
+    show?.poster_path ||
+    null;
 
   const airDate = episode?.air_date ? formatDateEs(episode.air_date) : null;
   const runtime = Number(episode?.runtime || 0) || null;

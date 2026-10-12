@@ -53,3 +53,32 @@ export function pickEpisodeHeroStills({
   }
   return picked.slice(0, EPISODE_HERO_MAX_BANDS);
 }
+
+// Fondo de la ficha del episodio en ORDENADOR (desde `sm`). La portada de la
+// izquierda ya es la imagen oficial (`still_path`); usar la misma de fondo
+// repetía la escena dos veces. Se busca otra, por este orden:
+//   1. otra imagen del episodio (sin texto si las hay),
+//   2. un fondo sin texto de la serie,
+//   3. el fondo principal de la serie,
+// y solo si no hay ninguna distinta se repite la de la portada.
+export function pickEpisodeBackdrop({
+  stillPath = null,
+  stills = [],
+  showBackdrops = [],
+  showBackdropPath = null,
+} = {}) {
+  const differs = (path) =>
+    typeof path === "string" && path !== "" && path !== stillPath;
+
+  const fromEpisode = textlessFirst(stills).find(differs);
+  if (fromEpisode) return fromEpisode;
+
+  const fromShow = (Array.isArray(showBackdrops) ? showBackdrops : [])
+    .filter((image) => isTextless(image))
+    .map((image) => image?.file_path)
+    .find(differs);
+  if (fromShow) return fromShow;
+
+  if (differs(showBackdropPath)) return showBackdropPath;
+  return stillPath || showBackdropPath || null;
+}

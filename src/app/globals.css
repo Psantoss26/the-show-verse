@@ -1079,6 +1079,36 @@ body {
   overscroll-behavior-y: none;
 }
 
+/* ENTRADA DE LA BARRA DE FILTROS de las páginas de usuario: sube 10px mientras
+   framer la funde. En CSS y no en framer porque depende de la agrupación, que
+   sale de localStorage (el servidor no la conoce y el `initial` de framer no
+   coincidiría al hidratar).
+
+   En MÓVIL con agrupación NO sube: ahí solo hay 8px (`mb-2`) hasta la cabecera
+   del primer grupo y la barra la pisaba durante el recorrido. Va con
+   `translate` (no `transform`) para no chocar con el de framer. */
+@keyframes sv-toolbar-rise {
+  from {
+    translate: 0 10px;
+  }
+}
+
+.sv-toolbar-rise {
+  animation: sv-toolbar-rise 400ms cubic-bezier(0.16, 1, 0.3, 1) 500ms backwards;
+}
+
+@media (max-width: 1023px) {
+  .sv-toolbar-rise[data-grouped] {
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-toolbar-rise {
+    animation: none;
+  }
+}
+
 /* PWA INSTALADA EN MÓVIL: SIN SELECCIÓN DE TEXTO NI PULSACIÓN LARGA. Instalada
    debe comportarse como una app nativa: mantener el dedo sobre un título o una
    tarjeta no selecciona texto ni abre el menú de enlace/imagen (iOS). En
@@ -1550,7 +1580,7 @@ body {
      Con el reparto en parejas quedaban dos en la segunda y una suelta en una
      tercera. Con base 0 se reparten la fila a partes iguales; son una fecha y
      dos cifras, y caben de sobra en un tercio. */
-  .sv-info-cards:has(> .sv-info-card--wide) > :not(.sv-info-card--wide) {
+  .sv-info-cards--has-wide > :not(.sv-info-card--wide) {
     flex: 1 1 0;
   }
 }
@@ -1558,7 +1588,7 @@ body {
 /* En una sola fila, las tarjetas cortas conservan su ancho por contenido.
    El título solo envuelve tras agotar el espacio libre de sus vecinas. */
 @container sv-info-cards (width >= 44rem) {
-  .sv-info-cards:has(> .sv-info-card--title) > :not(.sv-info-card--title) {
+  .sv-info-cards--has-title > :not(.sv-info-card--title) {
     flex-shrink: 0;
   }
 }
@@ -1568,14 +1598,12 @@ body {
    ("17 dic …"). Esas tres tarjetas sueltan el icono y parte del relleno; el
    rótulo ya dice qué es cada cifra. */
 @container sv-info-cards (width < 30rem) {
-  .sv-info-cards:has(> .sv-info-card--wide) > :not(.sv-info-card--wide) {
+  .sv-info-cards--has-wide > :not(.sv-info-card--wide) {
     gap: 0.5rem;
     padding: 0.75rem;
   }
 
-  .sv-info-cards:has(> .sv-info-card--wide)
-    > :not(.sv-info-card--wide)
-    .sv-meta-icon {
+  .sv-info-cards--has-wide > :not(.sv-info-card--wide) .sv-meta-icon {
     display: none;
   }
 }

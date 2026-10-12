@@ -146,8 +146,13 @@ test("un título original largo se queda solo en su fila", async () => {
   // dos debajo y una suelta en una tercera fila.
   assert.match(
     block,
-    /\.sv-info-cards:has\(> \.sv-info-card--wide\) > :not\(\.sv-info-card--wide\) \{\s*\n\s*flex: 1 1 0;/,
+    /\.sv-info-cards--has-wide > :not\(\.sv-info-card--wide\) \{\s*\n\s*flex: 1 1 0;/,
   );
+  // La fila se marca desde React. Sin `:has()` en estas reglas: en el CSS
+  // global, insertar cualquier nodo en otra página (el desplegable de
+  // Favoritos) recalculaba los estilos del documento entero.
+  assert.match(tabs, /hasWide:\s*\n\s*!metadataLoading && isLongOriginalTitle\(originalTitle\)/);
+  assert.doesNotMatch(css, /\.sv-info-cards:has\(/);
 
   // Se decide por LONGITUD del texto, no midiendo el elemento: medir exigiría
   // un observador que se dispararía en cada fotograma del arrastre del panel.
