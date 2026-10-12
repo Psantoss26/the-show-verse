@@ -1116,9 +1116,9 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
                     activeColor="teal"
                     groupId="profile-header-actions"
                     title="Configuración"
-                    className="!h-10 !w-10 @[640px]/detail-page:!h-12 @[640px]/detail-page:!w-12 !border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent shadow-lg backdrop-blur-md hover:!bg-white/15"
+                    className="!h-11 !w-11 @[640px]/detail-page:!h-12 @[640px]/detail-page:!w-12 !border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent shadow-lg backdrop-blur-md hover:!bg-white/15"
                   >
-                    <Settings className="h-4 w-4 @[640px]/detail-page:h-5 @[640px]/detail-page:w-5" />
+                    <Settings className="h-[1.375rem] w-[1.375rem] @[640px]/detail-page:h-5 @[640px]/detail-page:w-5" />
                   </LiquidButton>
                   <LiquidButton
                     onClick={() => setRefreshToken((value) => value + 1)}
@@ -1127,9 +1127,9 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
                     activeColor="green"
                     groupId="profile-header-actions"
                     title="Sincronizar"
-                    className="!h-10 !w-10 @[640px]/detail-page:!h-12 @[640px]/detail-page:!w-12 !border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent shadow-lg backdrop-blur-md hover:!bg-white/15"
+                    className="!h-11 !w-11 @[640px]/detail-page:!h-12 @[640px]/detail-page:!w-12 !border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent shadow-lg backdrop-blur-md hover:!bg-white/15"
                   >
-                    <RotateCcw className={`h-4 w-4 @[640px]/detail-page:h-5 @[640px]/detail-page:w-5 ${syncing ? "animate-spin" : ""}`} />
+                    <RotateCcw className={`h-[1.375rem] w-[1.375rem] @[640px]/detail-page:h-5 @[640px]/detail-page:w-5 ${syncing ? "animate-spin" : ""}`} />
                   </LiquidButton>
                   <LiquidButton
                     onClick={() => setShowLogoutModal(true)}
@@ -1138,9 +1138,9 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
                     groupId="profile-header-actions"
                     title="Cerrar sesión"
                     aria-label="Cerrar sesión"
-                    className="!h-10 !w-10 @[640px]/detail-page:!h-12 @[640px]/detail-page:!w-12 !border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent !text-red-400 shadow-lg backdrop-blur-md hover:!bg-white/15 hover:!text-red-300"
+                    className="!h-11 !w-11 @[640px]/detail-page:!h-12 @[640px]/detail-page:!w-12 !border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent !text-red-400 shadow-lg backdrop-blur-md hover:!bg-white/15 hover:!text-red-300"
                   >
-                    <LogOut className="h-4 w-4 @[640px]/detail-page:h-5 @[640px]/detail-page:w-5" />
+                    <LogOut className="h-[1.375rem] w-[1.375rem] @[640px]/detail-page:h-5 @[640px]/detail-page:w-5" />
                   </LiquidButton>
                   <LogoutConfirmModal
                     open={showLogoutModal}
