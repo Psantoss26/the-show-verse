@@ -960,7 +960,7 @@ const MOBILE_COVER_CONTRAST_SCRIM = `linear-gradient(to bottom,
 // póster (por defecto MOBILE_COVER_BLUR_BAND_PX). Las temporadas lo acortan:
 // sus pósters llevan el título impreso abajo y, con el póster difuminado
 // debajo (`blurredUnderlay`), basta con empezar más cerca del borde.
-export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, collage, collageUnderlay, blurredUnderlay = false, adaptiveContrast = false, edgeBandPx = MOBILE_COVER_BLUR_BAND_PX, ready, animate, inPanel = false }) {
+export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, collage, collageUnderlay, blurredUnderlay = false, adaptiveContrast = false, edgeBandPx = MOBILE_COVER_BLUR_BAND_PX, ready, animate, inPanel = false, objectPosition = 'center bottom' }) {
     const highRef = useRef(null)
     const [highSrc, setHighSrc] = useState(null)
     const firstSrc = lowSrc || src
@@ -1055,9 +1055,8 @@ export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, 
                 {hasImage ? (
                     <>
                         {/* Portada decorativa: <img> directo para controlar
-                            `load`/`decode` de cada capa, como RevealPoster. En
-                            pantallas bajas el recorte es vertical y se saca de
-                            arriba (`object-bottom`), no del título. */}
+                            `load`/`decode` de cada capa, como RevealPoster.
+                            Ambas resoluciones comparten el mismo encuadre. */}
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                             ref={imgRef}
@@ -1068,6 +1067,7 @@ export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, 
                             fetchPriority="high"
                             decoding="async"
                             className="absolute inset-0 h-full w-full object-cover object-bottom"
+                            style={{ objectPosition }}
                         />
                         {hasHigh ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -1077,6 +1077,7 @@ export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, 
                                 alt=""
                                 onLoad={markHigh}
                                 decoding="async"
+                                style={{ objectPosition }}
                                 className={`absolute inset-0 h-full w-full object-cover object-bottom transition-opacity duration-500 motion-reduce:transition-none ${
                                     highReady ? 'opacity-100' : 'opacity-0'
                                 }`}
@@ -1110,23 +1111,29 @@ export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, 
                         className="absolute inset-x-0 top-0 w-full object-cover object-bottom"
                         style={{
                             height: 'var(--mobile-cover-h)',
+                            objectPosition,
                             transform: `scaleX(${MOBILE_COVER_EXTEND_SCALE_X})`,
                         }}
                     />
                     <div
-                        className="absolute inset-x-0 h-[2px] origin-top bg-no-repeat"
+                        className="absolute inset-x-0 h-[2px] origin-top overflow-hidden"
                         style={{
                             // 1px por encima del borde: sin hueco entre ambas.
                             top: 'calc(var(--mobile-cover-h) - 1px)',
-                            backgroundImage: `url(${firstSrc})`,
-                            // El ancho con el que se pinta el póster: todo el
-                            // ancho o, si la portada es más alta que 2:3
-                            // (`fitCover`), el que da su alto.
-                            backgroundSize: 'max(100%, calc(var(--mobile-cover-h) * 2 / 3)) auto',
-                            backgroundPosition: 'center bottom',
                             transform: `scale(${MOBILE_COVER_EXTEND_SCALE_X}, ${(MOBILE_COVER_EXTEND_PX + 1) / 2})`,
                         }}
-                    />
+                    >
+                        {/* Prolonga el borde VISIBLE del recorte, que al
+                            centrarlo ya no coincide con el pie del archivo. */}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                            src={firstSrc}
+                            alt=""
+                            decoding="async"
+                            className="absolute inset-x-0 bottom-0 w-full object-cover"
+                            style={{ height: 'var(--mobile-cover-h)', objectPosition }}
+                        />
+                    </div>
                 </div>
             ) : null}
             {hasImage ? (

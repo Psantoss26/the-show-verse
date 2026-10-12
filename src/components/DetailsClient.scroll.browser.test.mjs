@@ -21,6 +21,15 @@ test('season mobile hero reserves space for its title, actions and compact score
       const holder = page.locator('[data-mobile-reveal-stats]');
       await holder.locator('[data-scoreboard-toolbar]').waitFor();
       await page.waitForTimeout(1200);
+      const posterEdge = await page.locator('.sv-mobile-poster-entry').evaluate((el) => {
+        const extension = Array.from(el.children).find((child) => getComputedStyle(child).filter === 'blur(12px)');
+        return {
+          mask: extension?.style.maskImage,
+          position: el.querySelector('.relative.overflow-hidden img')?.style.objectPosition,
+        };
+      });
+      assert.ok(posterEdge.mask?.includes('64px'), 'season uses the same 64px edge fade as DetailsClient');
+      assert.equal(posterEdge.position, 'center center', 'preserve the centered poster crop');
       const readLayout = () => holder.evaluate((el) => {
         const nav = document.querySelector('.sv-navbar-bottom-shift');
         const stats = el.querySelector('[data-scoreboard-stats]');
