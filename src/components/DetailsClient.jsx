@@ -10409,6 +10409,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 // 4px entre círculos: el ancho recuperado se reparte entre
                 // los botones para agrandarlos sin que lleguen a tocarse.
                 mobileGapClass="gap-1"
+                className={
+                  !isBackdropPoster
+                    ? "lg:[--detail-action-desktop-size:52px] lg:[--detail-action-desktop-icon:24px] lg:!gap-2 lg:[&>.separator]:!mx-1"
+                    : undefined
+                }
                 onTrailer={() => openVideo(preferredVideo)}
                 trailerAvailable={!!preferredVideo}
                 // Con el soundtrack sonando, el reproductor abre en la misma

@@ -53,7 +53,7 @@ const MOBILE_ACTION_BUTTON_BASE = `
                 [&_[data-liquid-button]:not(.labeled)_.text-xs]:!text-[22cqw]`;
 
 const DESKTOP_ACTION_BUTTON_OVERRIDES = `
-                sm:[&_[data-liquid-button]:not(.labeled)_svg]:!w-[22px] sm:[&_[data-liquid-button]:not(.labeled)_svg]:!h-[22px]
+                sm:[&_[data-liquid-button]:not(.labeled)_svg]:!w-[var(--detail-action-desktop-icon,22px)] sm:[&_[data-liquid-button]:not(.labeled)_svg]:!h-[var(--detail-action-desktop-icon,22px)]
                 sm:[&_[data-liquid-button]:not(.labeled)_.text-xl]:!text-[22px]
                 sm:[&_[data-liquid-button]:not(.labeled)_.text-2xl]:!text-[24px]
                 sm:[&_[data-liquid-button]:not(.labeled)_.text-lg]:!text-[18px]
@@ -63,7 +63,7 @@ export const MOBILE_ACTION_BUTTON_CLASS = `${MOBILE_ACTION_BUTTON_BASE} ${DESKTO
 
 // Contrato de tamaño de las acciones circulares de una ficha. Es deliberadamente
 // independiente del número de acciones: ocupan el espacio disponible hasta el
-// tope de DetailsClient (56px en móvil y 48px desde `sm`) y, a partir de ahí,
+// tope por defecto (56px en móvil y 48px desde `sm`) y, a partir de ahí,
 // la fila se centra. El `!` protege este límite frente a wrappers de controles
 // compuestos, como TraktWatchedControl.
 //
@@ -74,7 +74,9 @@ const DETAIL_ACTION_ITEM_FLEX_CLASS =
   "[&>*:not(.separator):not(.labeled)]:!flex-[1_1_0%] [&>*:not(.separator):not(.labeled)]:min-w-[34px]";
 const DETAIL_ACTION_ITEM_CAP_MOBILE_CLASS =
   "[&>*:not(.separator):not(.labeled)]:!max-w-[56px]";
-const DETAIL_ACTION_ITEM_CAP_CLASS = `${DETAIL_ACTION_ITEM_CAP_MOBILE_CLASS} sm:[&>*:not(.separator):not(.labeled)]:!max-w-[48px]`;
+// Una superficie puede ajustar el máximo de escritorio sin cambiar el
+// dimensionado de móvil ni el de otros consumidores de la fila compartida.
+const DETAIL_ACTION_ITEM_CAP_CLASS = `${DETAIL_ACTION_ITEM_CAP_MOBILE_CLASS} sm:[&>*:not(.separator):not(.labeled)]:!max-w-[var(--detail-action-desktop-size,48px)]`;
 export const DETAIL_ACTION_ITEM_SIZING_CLASS = `
                 ${DETAIL_ACTION_ITEM_FLEX_CLASS} ${DETAIL_ACTION_ITEM_CAP_CLASS}`;
 
