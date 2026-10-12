@@ -121,3 +121,23 @@ test("elige la película de TMDb por título y año", () => {
   assert.equal(pickLetterboxdMatch([{ id: 4, title: "Festival", release_date: "2001-01-01" }], { name: "Festival cut", year: 2000 }).id, 4);
   assert.equal(pickLetterboxdMatch([{ id: 5, title: "Distinta" }], { name: "Sin año" }), null);
 });
+
+test("solo envía visionados y notas nuevos o cambiados", async () => {
+  const { pendingLetterboxdImport, letterboxdChunkKeys } = await import("./export.js");
+  const data = buildLetterboxdImport({ "diary.csv": DIARY, "watched.csv": WATCHED, "ratings.csv": RATINGS });
+  const first = pendingLetterboxdImport(data, new Set());
+  assert.equal(first.films.length, 3);
+  const synced = new Set(letterboxdChunkKeys(first));
+  assert.equal(pendingLetterboxdImport(data, synced).films.length, 0);
+
+  // Cambia la nota de Amélie y se registra un visionado nuevo de Heat.
+  const changed = buildLetterboxdImport({
+    "diary.csv": `${DIARY}2025-01-01,Heat,1995,x,,,,2025-01-01\n`,
+    "watched.csv": WATCHED,
+    "ratings.csv": RATINGS.replace("Amélie,2001,https://boxd.it/n,3.5", "Amélie,2001,https://boxd.it/n,5"),
+  });
+  const next = pendingLetterboxdImport(changed, synced);
+  assert.deepEqual(next.films.map((film) => film.key).sort(), ["amelie|2001", "heat|1995"]);
+  assert.deepEqual(next.ratings.map((item) => [item.film, item.rating]), [["amelie|2001", 10]]);
+  assert.deepEqual(next.history.map((item) => item.watchedAt.slice(0, 10)), ["2025-01-01"]);
+});

@@ -279,3 +279,32 @@ export function chunkLetterboxdImport(data, size = LETTERBOXD_CHUNK_FILMS) {
   }
   return chunks;
 }
+
+// ---------------------------------------------------------------------------
+// Sincronización incremental (exportación periódica por la extensión): cada
+// visionado y cada puntuación tienen una clave; solo se envía lo que no se
+// envió antes. Una nota cambiada tiene otra clave, así que vuelve a enviarse.
+
+export function letterboxdHistoryKey(item) {
+  return `h|${item.film}|${item.watchedAt}|${item.undated ? 1 : 0}`;
+}
+
+export function letterboxdRatingKey(item) {
+  return `r|${item.film}|${item.rating}`;
+}
+
+/** Lo que falta por enviar: visionados y notas nuevos, con sus películas. */
+export function pendingLetterboxdImport(data, syncedKeys = new Set()) {
+  const history = (data?.history || []).filter((item) => !syncedKeys.has(letterboxdHistoryKey(item)));
+  const ratings = (data?.ratings || []).filter((item) => !syncedKeys.has(letterboxdRatingKey(item)));
+  const used = new Set([...history, ...ratings].map((item) => item.film));
+  return { films: (data?.films || []).filter((film) => used.has(film.key)), history, ratings };
+}
+
+/** Claves de una tanda ya importada. */
+export function letterboxdChunkKeys(chunk) {
+  return [
+    ...(chunk?.history || []).map(letterboxdHistoryKey),
+    ...(chunk?.ratings || []).map(letterboxdRatingKey),
+  ];
+}

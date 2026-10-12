@@ -129,3 +129,16 @@ content script puente.
 - [[android-companion/README|App companion de Android]] — misma sincronización pero desde
   apps nativas (Netflix, Disney+, Prime Video...) vía `NotificationListenerService`,
   reutilizando el mismo endpoint `/api/netflix/extension-sync`.
+
+## Letterboxd (desde la versión 3.2)
+
+Letterboxd no tiene API pública y bloquea las lecturas desde servidores. Para
+sincronizar **todo** el historial, la extensión descarga la exportación oficial
+de datos de Letterboxd (la misma de *Settings → Data → Export your data*) con la
+sesión que ya tienes iniciada en letterboxd.com en este navegador, y se la pasa a
+The Show Verse, que la importa (`letterboxd-export.js`, permiso de host
+`https://letterboxd.com/*`).
+
+- Se lanza desde Ajustes → Conexiones → Letterboxd y, después, una vez al día al
+  abrir The Show Verse (solo se envía lo nuevo o cambiado).
+- Requisito: tener la sesión iniciada en letterboxd.com en el mismo navegador.

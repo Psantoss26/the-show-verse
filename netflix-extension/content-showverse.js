@@ -117,3 +117,13 @@ document.addEventListener("request-netflix-sync", (event) => {
     }));
   });
 });
+
+// Exportación de Letterboxd (todo el historial) solicitada desde la web: la
+// descarga el service worker con la sesión de letterboxd.com de este navegador.
+document.addEventListener("request-letterboxd-export", () => {
+  safeSendMessage({ action: "letterboxdExport" }, (response) => {
+    document.dispatchEvent(new CustomEvent("response-letterboxd-export", {
+      detail: response || { success: false, code: "extension", error: "La extensión no respondió." }
+    }));
+  });
+});

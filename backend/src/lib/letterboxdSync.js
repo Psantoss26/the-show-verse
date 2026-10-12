@@ -77,13 +77,47 @@ export function letterboxdConnectionView(account) {
     lastResult: meta.lastResult || null,
     lastError: meta.lastError || null,
     backfill: meta.backfill || null,
+    extensionSync: meta.extensionSync || null,
   };
+}
+
+/**
+ * La web hizo la sincronización completa con la exportación oficial
+ * (descargada por la extensión): el historial ya está completo y el servidor
+ * no tiene que volver a leer el perfil.
+ */
+export async function recordLetterboxdExtensionSync(account, summary = {}) {
+  const count = (value) => Math.max(0, Math.floor(Number(value) || 0));
+  const finishedAt = new Date().toISOString();
+  const extensionSync = {
+    finishedAt,
+    films: count(summary.films),
+    history: count(summary.history),
+    ratings: count(summary.ratings),
+    missing: count(summary.missing),
+  };
+  const patch = { extensionSync };
+  if (account.metadata?.backfill?.status !== 'done' || account.metadata?.backfill?.via === 'extension') {
+    patch.backfill = {
+      status: 'done',
+      phase: 'done',
+      via: 'extension',
+      finishedAt,
+      matched: extensionSync.films - extensionSync.missing,
+      history: extensionSync.history,
+      ratings: extensionSync.ratings,
+      error: null,
+    };
+  }
+  await patchMetadata(account.id, patch);
 }
 
 /** ¿Hay que hacer (o rehacer) la sincronización completa de esta cuenta? */
 export function needsLetterboxdBackfill(account, now = Date.now()) {
   const backfill = account?.metadata?.backfill;
   if (!account?.metadata?.username) return false;
+  // Sincronizado con la exportación (extensión): el servidor no lee el perfil.
+  if (account.metadata.extensionSync) return false;
   if (!backfill) return true;
   if (backfill.status === 'done') return false;
   if (backfill.status === 'running') {
@@ -287,7 +321,10 @@ async function runLetterboxdBackfill(account, { log, fetchImpl } = {}) {
       });
     }
   } catch (err) {
-    await save({ status: 'error', finishedAt: new Date().toISOString(), error: err?.message || 'Error al sincronizar' }, true);
+    await save(
+      { status: 'error', finishedAt: new Date().toISOString(), error: err?.message || 'Error al sincronizar', code: err?.code || null },
+      true,
+    );
     log?.warn?.({ err: err?.message, userId: account.userId }, 'letterboxd backfill failed');
   }
 }

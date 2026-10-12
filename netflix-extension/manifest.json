@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "The Show Verse - Streaming Sync",
-  "version": "3.1",
-  "description": "Sincroniza la reproducción de servicios compatibles con The Show Verse. Incluye recuperación de envíos y seguimiento de progreso.",
+  "version": "3.2",
+  "description": "Sincroniza la reproducción de servicios compatibles y tu historial de Letterboxd con The Show Verse. Incluye recuperación de envíos y seguimiento de progreso.",
   "permissions": [
     "cookies",
     "storage",
@@ -20,7 +20,8 @@
     "https://theshowverse.netlify.app/*",
     "https://theshowverse.com/*",
     "https://www.theshowverse.com/*",
-    "https://*.netflix.com/*"
+    "https://*.netflix.com/*",
+    "https://letterboxd.com/*"
   ],
   "background": {
     "service_worker": "background.js"
