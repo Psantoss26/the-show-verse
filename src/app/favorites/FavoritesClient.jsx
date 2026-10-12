@@ -1661,10 +1661,10 @@ function GroupDivider({
   const stickyTransitionClass =
     skipMotion
       ? "transition-none"
-      : "transition-colors duration-200";
+      : "transition-[color,background-color,box-shadow] duration-[340ms] ease-[cubic-bezier(0.22,1,0.36,1)]";
 
   return (
-    <MotionConfig reducedMotion={skipMotion ? "always" : "user"} transition={{ layout: { duration: skipMotion ? 0 : 0.24, ease: [0.22, 1, 0.36, 1] } }}>
+    <MotionConfig reducedMotion={skipMotion ? "always" : "user"} transition={{ layout: { duration: skipMotion ? 0 : 0.34, ease: [0.22, 1, 0.36, 1] } }}>
     <motion.div
       ref={ref}
       layoutRoot

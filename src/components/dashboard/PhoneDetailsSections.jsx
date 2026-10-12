@@ -460,30 +460,66 @@ export default function PhoneDetailsSections({
   ]);
 
   /* --------------------------- MEDIA: VÍDEOS --------------------------- */
-  const [videos, setVideos] = useState([]);
-  const [videosLoading, setVideosLoading] = useState(true);
+  // La ficha completa recibe a veces vídeos ya resueltos con el detalle. Son
+  // una tercera fuente además de las consultas por idioma: conservarlos evita
+  // perder un vídeo si TMDb omite ese resultado en una respuesta localizada.
+  const initialVideos = useMemo(() => {
+    const source = Array.isArray(data?.videos?.results)
+      ? data.videos.results
+      : Array.isArray(data?.videos)
+        ? data.videos
+        : [];
+    const merged = uniqBy(source, (v) => `${v?.site}:${v?.key}`).filter(
+      isPlayableVideo,
+    );
+    merged.sort((a, b) => rankVideo(a) - rankVideo(b));
+    return merged;
+  }, [data?.videos]);
+  const [videos, setVideos] = useState(initialVideos);
+  const [videosLoading, setVideosLoading] = useState(
+    () => initialVideos.length === 0,
+  );
   const [activeVideo, setActiveVideo] = useState(null);
 
   useEffect(() => {
-    if (id == null) return undefined;
+    if (id == null) {
+      setVideos(initialVideos);
+      setVideosLoading(false);
+      return undefined;
+    }
     let cancelled = false;
-    setVideosLoading(true);
+    setVideos(initialVideos);
+    setVideosLoading(initialVideos.length === 0);
+
+    // Igual que DetailsClient: TMDb localiza la respuesta, y muchos títulos
+    // solo tienen tráileres en inglés. Se consultan ambos idiomas en paralelo,
+    // se unen a los datos iniciales y se ordenan con el criterio compartido.
+    const safeFetchVideos = async (language) => {
+      try {
+        const result = await getVideos(type, id, language);
+        return Array.isArray(result?.results) ? result.results : [];
+      } catch {
+        return [];
+      }
+    };
+
     (async () => {
       try {
-        const raw = await getVideos(type, id);
+        const [es, en] = await Promise.all([
+          safeFetchVideos("es-ES"),
+          safeFetchVideos("en-US"),
+        ]);
         if (cancelled) return;
-        const source = Array.isArray(raw?.results)
-          ? raw.results
-          : Array.isArray(raw)
-            ? raw
-            : [];
-        const merged = uniqBy(source, (v) => `${v?.site}:${v?.key}`).filter(
-          isPlayableVideo,
-        );
+        const merged = uniqBy(
+          [...initialVideos, ...es, ...en],
+          (v) => `${v?.site}:${v?.key}`,
+        ).filter(isPlayableVideo);
         merged.sort((a, b) => rankVideo(a) - rankVideo(b));
         setVideos(merged);
       } catch {
-        if (!cancelled) setVideos([]);
+        // Las peticiones individuales ya convierten el error en [], pero se
+        // conserva lo que llegó con el detalle si fallara una capa inesperada.
+        if (!cancelled) setVideos(initialVideos);
       } finally {
         if (!cancelled) setVideosLoading(false);
       }
@@ -491,7 +527,7 @@ export default function PhoneDetailsSections({
     return () => {
       cancelled = true;
     };
-  }, [id, type]);
+  }, [id, type, initialVideos]);
 
   // La sección de soundtrack se ve DENTRO de la ficha, así que sus pistas hay
   // que pedirlas al pintarla; el modal solo las cargaba al abrir su reproductor.

@@ -1449,7 +1449,7 @@ export default function ContinueWatchingClient() {
               // cambiar póster ↔ backdrop se montan de nuevo y repiten su
               // entrada, como en Favoritos (antes framer estiraba la rejilla
               // del alto viejo al nuevo con las tarjetas deformadas).
-              <motion.div key="poster" className={`grid gap-3 lg:gap-4 ${posterImageMode === "backdrop" ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"}`}>
+              <motion.div key="poster" className={`grid gap-3 lg:gap-4 ${posterImageMode === "backdrop" ? "grid-cols-2 lg:grid-cols-3" : "grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"}`}>
                 <Fragment key={posterImageMode}>
                   {filtered.map((item, i) => <ProgressCard key={item.progressId || `${mediaTypeOf(item)}:${item.id}`} item={item} index={i} viewMode="poster" imageMode={posterImageMode} editMode={editMode} busy={busyId === item.progressId} onRemove={handleRemove} />)}
                 </Fragment>

@@ -89,6 +89,9 @@ test("el manifiesto y los iconos de la PWA viven en una caché estable", async (
   const source = await read("public/sw.js");
   const manifest = JSON.parse(await read("public/site.webmanifest"));
 
+  assert.deepEqual(manifest.launch_handler, { client_mode: "navigate-existing" },
+    "la PWA debe reutilizar su ventana al abrir una URL dentro de su ámbito");
+
   const cacheName = /const IDENTITY_CACHE = "([^"]+)";/.exec(source)?.[1];
   assert.ok(cacheName, "sw.js debe declarar IDENTITY_CACHE");
   assert.doesNotMatch(cacheName, /\$\{|VERSION/, "la caché de identidad no puede llevar la versión del build");

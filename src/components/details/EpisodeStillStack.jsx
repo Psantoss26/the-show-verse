@@ -12,27 +12,120 @@
 // - UNIONES DIFUMINADAS: a partir de la segunda, cada banda empieza
 //   `EPISODE_STILL_SEAM_PX` antes y se desvanece en ese tramo sobre la
 //   anterior (máscara), así que no hay ninguna línea recta entre imágenes.
-// - La primera es la que marca cuándo está lista la portada (`imgRef`/
-//   `onLoad` de quien la usa); las demás cargan después, con fundido.
+// - SE REVELAN TODAS A LA VEZ (`useEpisodeStillStackLoad`): la portada está
+//   lista cuando TODAS las bandas han llegado y están decodificadas. Antes
+//   bastaba la primera y las otras entraban después, cada una con su fundido:
+//   mientras tanto se veían las bandas vacías y los bordes de cada imagen.
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 export const EPISODE_STILL_SEAM_PX = 56;
 
+// Si una banda se atasca, la portada no espera indefinidamente: pasado este
+// margen desde la PRIMERA lista, se revela con lo que haya y la rezagada entra
+// con fundido.
+const STACK_REVEAL_CAP_MS = 2500;
+
 const SEAM_MASK = `linear-gradient(to bottom, transparent 0px, #000 ${EPISODE_STILL_SEAM_PX}px)`;
 
-function StillBand({ src, index, count, imgRef, onLoad, onError, priority }) {
-  const [loaded, setLoaded] = useState(false);
-  const first = index === 0;
-  const ownRef = useRef(null);
-  // Una imagen que termina de cargar ANTES de hidratar no dispara `onLoad` en
-  // React: sin esto, esas bandas se quedaban a opacidad 0 para siempre. La
-  // primera lo resuelve el `useImageLoadReady` de quien la usa (su `imgRef`).
+export function episodeStillSrc(path) {
+  return path ? `https://image.tmdb.org/t/p/w780${path}` : null;
+}
+
+// Estado de carga conjunto de las bandas. `ready` = todas descargadas y
+// decodificadas (o fallidas), o el tope tras la primera.
+export function useEpisodeStillStackLoad(paths = []) {
+  // Por contenido, no por referencia: el padre rehace el array en cada render.
+  const sourcesKey = paths.map(episodeStillSrc).filter(Boolean).join("|");
+  const sources = useMemo(
+    () => (sourcesKey ? sourcesKey.split("|") : []),
+    [sourcesKey],
+  );
+  // src → "ok" | "error"
+  const [settled, setSettled] = useState(() => new Map());
+  // Guardan para qué portada (`sourcesKey`) valen: si el componente se
+  // reutiliza con otras imágenes, vuelven a empezar.
+  const [cappedKey, setCappedKey] = useState(null);
+  const capped = cappedKey === sourcesKey;
+  const imgsRef = useRef(new Map());
+
+  const settle = useCallback((src, state) => {
+    setSettled((prev) => {
+      if (prev.get(src) === state) return prev;
+      const next = new Map(prev);
+      next.set(src, state);
+      return next;
+    });
+  }, []);
+
+  const handleLoaded = useCallback(
+    (img) => {
+      const src = img.getAttribute("src");
+      const done = () => settle(src, "ok");
+      // Decodificar ANTES de revelar: si no, cada banda se rasteriza en un
+      // fotograma distinto y se ven aparecer por separado.
+      if (typeof img.decode === "function") img.decode().then(done, done);
+      else done();
+    },
+    [settle],
+  );
+
+  // Una imagen que termina ANTES de hidratar (caché, o HTML del servidor que
+  // llegó antes que el JS) no dispara `onLoad` en React: se mira `complete`.
   useLayoutEffect(() => {
-    if (first) return;
-    const img = ownRef.current;
-    if (img?.complete && img.naturalWidth > 0) setLoaded(true);
-  }, [first, src]);
+    imgsRef.current.forEach((img, src) => {
+      if (!img?.complete) return;
+      if (img.naturalWidth > 0) handleLoaded(img);
+      else settle(src, "error");
+    });
+  }, [sources, handleLoaded, settle]);
+
+  const anySettled = sources.some((src) => settled.has(src));
+  const allSettled = sources.every((src) => settled.has(src));
+  useLayoutEffect(() => {
+    if (!anySettled || allSettled) return;
+    const timer = window.setTimeout(
+      () => setCappedKey(sourcesKey),
+      STACK_REVEAL_CAP_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [anySettled, allSettled, sourcesKey]);
+
+  const bandProps = useCallback(
+    (src) => ({
+      ref: (node) => {
+        if (node) imgsRef.current.set(src, node);
+        else imgsRef.current.delete(src);
+      },
+      onLoad: (event) => handleLoaded(event.currentTarget),
+      onError: () => settle(src, "error"),
+    }),
+    [handleLoaded, settle],
+  );
+
+  const ready = sources.length === 0 || allSettled || (capped && anySettled);
+  // Bandas que ya estaban al revelar: entran con la portada, sin fundido
+  // propio. Se fija en el mismo render en que `ready` pasa a true (estado
+  // derivado), para que ninguna empiece un fundido en ese primer fotograma.
+  const [revealed, setRevealed] = useState(null);
+  const revealedWith = revealed?.key === sourcesKey ? revealed.srcs : null;
+  if (ready && !revealedWith) {
+    setRevealed({ key: sourcesKey, srcs: new Set(settled.keys()) });
+  }
+
+  return {
+    sources,
+    settled,
+    ready,
+    // Solo una banda que llegue DESPUÉS de revelar (tras el tope) entra con
+    // fundido.
+    isLate: (src) => ready && !(revealedWith ?? settled).has(src),
+    bandProps,
+  };
+}
+
+function StillBand({ src, index, count, loaded, late, imgProps }) {
+  const first = index === 0;
   const seam = first ? 0 : EPISODE_STILL_SEAM_PX;
 
   return (
@@ -46,28 +139,25 @@ function StillBand({ src, index, count, imgRef, onLoad, onError, priority }) {
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        ref={first ? imgRef : ownRef}
+        {...imgProps}
         src={src}
         alt=""
         decoding="async"
-        fetchPriority={priority ? "high" : "low"}
-        onLoad={(event) => {
-          setLoaded(true);
-          if (first) onLoad?.(event);
-        }}
-        onError={first ? onError : undefined}
+        // Todas visibles desde el primer momento: todas con prioridad alta,
+        // para que lleguen juntas.
+        fetchPriority="high"
+        // Sin transición salvo para una rezagada: las demás se ponen a
+        // opacidad 1 de golpe (con la portada aún oculta) y aparecen juntas.
         className={`absolute inset-0 h-full w-full object-cover object-center ${
-          first ? "" : `transition-opacity duration-500 motion-reduce:transition-none ${loaded ? "opacity-100" : "opacity-0"}`
-        }`}
+          late ? "transition-opacity duration-500 motion-reduce:transition-none" : ""
+        } ${loaded ? "opacity-100" : "opacity-0"}`}
       />
     </div>
   );
 }
 
-export default function EpisodeStillStack({ paths = [], imgRef, onLoad, onError }) {
-  const sources = paths
-    .filter(Boolean)
-    .map((path) => `https://image.tmdb.org/t/p/w780${path}`);
+export default function EpisodeStillStack({ load }) {
+  const { sources, settled, isLate, bandProps } = load;
   if (!sources.length) return null;
 
   return (
@@ -78,10 +168,9 @@ export default function EpisodeStillStack({ paths = [], imgRef, onLoad, onError 
           src={src}
           index={index}
           count={sources.length}
-          imgRef={imgRef}
-          onLoad={onLoad}
-          onError={onError}
-          priority={index === 0}
+          loaded={settled.get(src) === "ok"}
+          late={isLate(src)}
+          imgProps={bandProps(src)}
         />
       ))}
     </div>

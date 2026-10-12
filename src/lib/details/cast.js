@@ -112,3 +112,38 @@ export function buildCastDataForUI({ baseCast, creativeCredits }) {
 
   return mergedUnique;
 }
+
+// Reparto de un EPISODIO = reparto fijo + invitados, con UNA entrada por
+// persona. TMDb puede repetir a alguien entre ambas listas (o dentro de una)
+// cuando hace varios personajes: en anime es habitual que un mismo actor de
+// doblaje esté en el reparto y entre los invitados (Ataque a los titanes T2E1:
+// Takehito Koyasu como Zeke y como el Titán Bestia). Repetido, rompía la clave
+// de las tarjetas (`person.id`) y React avisaba de claves duplicadas. Sus
+// personajes se unen en uno («Zeke / The Beast Titan»).
+export function mergeEpisodeCast(cast, guestStars, limit = 20) {
+  const merged = [];
+  const byKey = new Map();
+  const all = [
+    ...(Array.isArray(cast) ? cast : []),
+    ...(Array.isArray(guestStars) ? guestStars : []),
+  ];
+  for (const person of all) {
+    if (!person) continue;
+    const key = person.id ?? person.credit_id ?? person.name;
+    if (key == null) continue;
+    const character =
+      typeof person.character === "string" ? person.character.trim() : "";
+    const existing = byKey.get(key);
+    if (existing) {
+      if (character && !existing.characters.includes(character)) {
+        existing.characters.push(character);
+        existing.person.character = existing.characters.join(" / ");
+      }
+      continue;
+    }
+    const entry = { person: { ...person }, characters: character ? [character] : [] };
+    byKey.set(key, entry);
+    merged.push(entry.person);
+  }
+  return merged.slice(0, limit);
+}

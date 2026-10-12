@@ -66,6 +66,27 @@ export default function PwaManager() {
     sweepLocalStorageOnStartup();
   }, []);
 
+  // PWA instalada en móvil: la pulsación larga no abre menú. Chrome Android
+  // ignora `-webkit-touch-callout` (ver globals.css) y en enlaces e imágenes
+  // abre su menú de «abrir en pestaña / descargar imagen»; ese menú sale del
+  // evento `contextmenu`. En campos editables se respeta (pegar, seleccionar).
+  useEffect(() => {
+    const query = window.matchMedia?.(
+      "(display-mode: standalone) and (hover: none) and (pointer: coarse)",
+    );
+    if (!query) return;
+    const onContextMenu = (event) => {
+      if (!query.matches) return;
+      const editable = event.target?.closest?.(
+        'input, textarea, [contenteditable]:not([contenteditable="false"])',
+      );
+      if (editable) return;
+      event.preventDefault();
+    };
+    document.addEventListener("contextmenu", onContextMenu);
+    return () => document.removeEventListener("contextmenu", onContextMenu);
+  }, []);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 

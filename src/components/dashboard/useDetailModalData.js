@@ -29,6 +29,7 @@ import {
   buildCastDataForUI,
   buildCreativeCreditsForCast,
   getMovieDirectorsFromCrew,
+  mergeEpisodeCast,
   normalizeCastFromTmdb,
 } from "@/lib/details/cast";
 import { formatDateEs } from "@/lib/details/formatters";
@@ -417,13 +418,13 @@ export function useDetailModalData(item, { phoneView = false } = {}) {
 
           const ep = epRes || {};
           const showName = showDetails?.name || item.showName || null;
-          // Reparto del episodio = cast + invitados (mismo criterio que EpisodeDetails).
-          const cast = [
-            ...(Array.isArray(epCreditsRes?.cast) ? epCreditsRes.cast : []),
-            ...(Array.isArray(epCreditsRes?.guest_stars)
-              ? epCreditsRes.guest_stars
-              : []),
-          ].slice(0, 20);
+          // Reparto del episodio = cast + invitados (mismo criterio que
+          // EpisodeDetails), una tarjeta por persona: ver mergeEpisodeCast.
+          const cast = mergeEpisodeCast(
+            epCreditsRes?.cast,
+            epCreditsRes?.guest_stars,
+            20,
+          );
 
           const tmdbRatingStr = ratingOf(ep);
           const tmdbRating = tmdbRatingStr !== "–" ? tmdbRatingStr : null;

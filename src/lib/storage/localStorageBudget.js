@@ -49,6 +49,12 @@ const PROTECTED_PREFIXES = [
   "showverse:trakt:rewatchRuns:",
   "showverse:trakt:rewatchStartAt:",
   "showverse:trakt:episodesView:",
+  // Notas IMDb/Trakt de Favoritos y Pendientes (una sola entrada pequeña,
+  // ~50 bytes por título). Fijan el ORDEN de esas páginas desde el primer
+  // pintado: sin ellas, al entrar las tarjetas se ven recolocarse mientras se
+  // vuelven a pedir todas. Además su fecha `t` inicial es la de la nota MÁS
+  // ANTIGUA, así que el desalojo «por antigüedad» la tiraba de las primeras.
+  "showverse:scores:",
 ];
 
 // Cachés por TÍTULO y por sección: todo esto se vuelve a pedir a la red la
@@ -66,7 +72,6 @@ const DISPOSABLE_PREFIXES = [
   "showverse:lists:index:",
   "showverse:list-details:",
   "showverse:dashboard:",
-  "showverse:scores:",
   "showverse:watch-providers:",
   "showverse:plex-library-index:",
 ];

@@ -2511,7 +2511,7 @@ export default function InProgressClient({
                       // (como en Favoritos).
                       <div
                         key={`poster-group-${posterImageMode}`}
-                        className={`grid gap-3 lg:gap-4 ${posterImageMode === "backdrop" ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"}`}
+                        className={`grid gap-3 lg:gap-4 ${posterImageMode === "backdrop" ? "grid-cols-2 lg:grid-cols-3" : "grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"}`}
                       >
                         {group.items.map((item, idx) => (
                           <InProgressCard
@@ -2562,7 +2562,7 @@ export default function InProgressClient({
                 ) : viewMode === "poster" ? (
                   <motion.div
                     key="poster-grid"
-                    className={`grid gap-3 lg:gap-4 ${posterImageMode === "backdrop" ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"}`}
+                    className={`grid gap-3 lg:gap-4 ${posterImageMode === "backdrop" ? "grid-cols-2 lg:grid-cols-3" : "grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"}`}
                     // Sin `layout`: al cambiar póster ↔ backdrop la rejilla
                     // cambia mucho de alto y framer la deformaba mientras las
                     // tarjetas cambiaban de forma. Ahora las tarjetas se montan

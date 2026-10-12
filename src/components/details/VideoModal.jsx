@@ -158,7 +158,7 @@ export default function VideoModal({
         aria-modal="true"
       >
         {/* HEADER: Glass Header */}
-        <div className={`flex w-full items-center justify-between p-3 sm:px-8 sm:pt-8 sm:pb-6 ${LIQUID_GLASS_MODAL_HEADER}`}>
+        <div className={`flex w-full items-center justify-between p-6 sm:px-8 sm:pt-8 sm:pb-6 ${LIQUID_GLASS_MODAL_HEADER}`}>
           <div className="flex flex-col gap-0.5 min-w-0 pr-4">
             <h3 className="text-xl sm:text-2xl font-black text-white drop-shadow-md truncate">
               {video.name || "Tráiler Oficial"}
