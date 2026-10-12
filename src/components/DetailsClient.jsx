@@ -10406,7 +10406,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     }
                   >
                   <DetailActionsRow
-                mobileGapClass="gap-1.5"
+                // 4px entre círculos: el ancho recuperado se reparte entre
+                // los botones para agrandarlos sin que lleguen a tocarse.
+                mobileGapClass="gap-1"
                 onTrailer={() => openVideo(preferredVideo)}
                 trailerAvailable={!!preferredVideo}
                 // Con el soundtrack sonando, el reproductor abre en la misma
