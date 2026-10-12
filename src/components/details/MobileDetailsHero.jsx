@@ -216,7 +216,7 @@ function readBottomNavTop() {
  * cualquier móvil: en los altos la portada crece y se recorta por los lados;
  * en los bajos, se recorta por arriba (`object-bottom`).
  */
-export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, fitGap = 20 } = {}) {
+export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, fitGap = 20, fitCoverMinRatio = 0.75 } = {}) {
     const rootRef = useRef(null)
     const coverSpacerRef = useRef(null)
     const actionRowRef = useRef(null)
@@ -339,7 +339,7 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
                 // Hacia abajo: con `round` el último hueco salía 1px corto.
                 const height = Math.floor(
                     Math.max(
-                        window.innerWidth * 0.75,
+                        window.innerWidth * fitCoverMinRatio,
                         navTopRef.current - fitGap * 2 - visibleCompact - belowCover - coverDocTop,
                     ),
                 )
@@ -410,7 +410,7 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
             fitMutations?.disconnect()
             if (raf) window.cancelAnimationFrame(raf)
         }
-    }, [enabled, isPhone, fitCover, fitGap])
+    }, [enabled, isPhone, fitCover, fitGap, fitCoverMinRatio])
 
     // Recorrido del relevo portada → fondo: 55vh, como en la ficha, salvo que
     // la página no dé para tanto (p. ej. colecciones de una sola fila de
@@ -662,7 +662,7 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
         rootStyle: enabled
             ? {
                 '--mobile-cover-top': `${coverTop}px`,
-                '--mobile-cover-h': fitCover && fittedCoverHeight ? `${fittedCoverHeight}px` : '150vw',
+                '--mobile-cover-h': fitCover && fittedCoverHeight != null ? `${fittedCoverHeight}px` : '150vw',
                 '--mobile-scoreboard-shift': `${scoreboardShift}px`,
                 ...(actionsWidth ? { '--mobile-actions-w': `${actionsWidth}px` } : {}),
             }

@@ -1,6 +1,63 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+test('season mobile hero reserves space for its title, actions and compact scoreboard', {
+  skip: !process.env.PLAYWRIGHT_MODULE,
+}, async () => {
+  const { chromium } = await import(process.env.PLAYWRIGHT_MODULE);
+  const browser = await chromium.launch({
+    headless: true,
+    ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}),
+    args: ['--no-sandbox'],
+  });
+  try {
+    for (const [width, height] of [[390, 844], [390, 560], [550, 950], [360, 640]]) {
+      const page = await browser.newPage({
+        viewport: { width, height }, isMobile: true, hasTouch: true,
+      });
+      const errors = [];
+      page.on('pageerror', (error) => errors.push(error.message));
+      await page.goto(`${process.env.TEST_BASE_URL || 'http://localhost:3000'}/details/tv/1399/season/1`);
+      const holder = page.locator('[data-mobile-reveal-stats]');
+      await holder.locator('[data-scoreboard-toolbar]').waitFor();
+      await page.waitForTimeout(1200);
+      const readLayout = () => holder.evaluate((el) => {
+        const nav = document.querySelector('.sv-navbar-bottom-shift');
+        const stats = el.querySelector('[data-scoreboard-stats]');
+        return {
+          gap: nav.offsetTop - el.getBoundingClientRect().bottom,
+          cover: getComputedStyle(el).getPropertyValue('--mobile-cover-h'),
+          state: el.dataset.mobileRevealStats,
+          statsHeight: stats?.getBoundingClientRect().height || 0,
+          overflow: document.documentElement.scrollWidth > innerWidth,
+        };
+      });
+      const initial = await readLayout();
+      assert.equal(initial.state, 'hidden');
+      assert.ok(initial.statsHeight <= 2, 'season must start compact');
+      assert.ok(initial.gap >= 19 && initial.gap <= 22, `reserve 20px above navigation at ${width}×${height}: ${initial.gap}`);
+      assert.equal(initial.overflow, false);
+      await page.evaluate(() => window.scrollTo({ top: 260, behavior: 'instant' }));
+      await page.waitForTimeout(650);
+      const expanded = await readLayout();
+      assert.equal(expanded.state, 'shown');
+      assert.equal(expanded.cover, initial.cover, 'stats expansion must not resize the poster');
+      await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+      await page.waitForTimeout(650);
+      const reset = await readLayout();
+      assert.equal(reset.state, 'hidden');
+      assert.ok(reset.gap >= 19 && reset.gap <= 22);
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await page.waitForTimeout(300);
+      assert.equal(await page.locator('[data-scoreboard-stats]').first().evaluate((el) => el.inert), false);
+      assert.deepEqual(errors, [], 'no browser runtime or ResizeObserver errors');
+      await page.close();
+    }
+  } finally {
+    await browser.close();
+  }
+});
+
 // Run against a local app with PLAYWRIGHT_MODULE pointing to an installed
 // Playwright module. No browser dependency is required for the unit suite.
 test('mobile scoreboard starts compact, expands on scroll and collapses at the top', {

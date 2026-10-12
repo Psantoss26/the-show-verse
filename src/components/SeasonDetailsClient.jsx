@@ -648,8 +648,8 @@ export default function SeasonDetailsClient({
   const [externalLinksOpen, setExternalLinksOpen] = useState(false);
 
   // ---- MÓVIL: cabecera inmersiva (details/MobileDetailsHero) ----
-  // Póster de la temporada a pantalla completa (pegado arriba, sin recorte
-  // lateral), botones debajo y el marcador de DetailsClient; con el scroll la
+  // Póster ajustado al espacio libre sobre título, botones y marcador
+  // compacto; con el scroll la
   // portada da paso a un póster sin texto difuminado de fondo.
   const isBackNav = useIsHistoryNavigation();
   const animateMobileEntry = !isBackNav;
@@ -669,8 +669,15 @@ export default function SeasonDetailsClient({
     revealProps: heroRevealProps,
     statsRevealProps: heroStatsRevealProps,
     rootStyle: heroRootStyle,
-  } = useMobileDetailsHero(true, { lock: mobileCoverReady });
-  // Qué cabe bajo los botones sin recortar la portada (solo teléfono).
+  } = useMobileDetailsHero(true, {
+    lock: mobileCoverReady,
+    fitCover: true,
+    fitGap: 20,
+    // Incluso en teléfonos bajos prima mantener visibles las puntuaciones:
+    // el póster puede recortarse por debajo del mínimo habitual de 75vw.
+    fitCoverMinRatio: 0,
+  });
+  // En teléfono empieza compacto; las estadísticas se revelan con el scroll.
   const mobileScoreboardMode = isPhone ? heroScoreboardMode : "full";
   const [mobileBackground, setMobileBackground] = useState({ key: "", path: null });
   const mobileBackgroundKey = `${showId}:${seasonNumber}`;
@@ -1806,11 +1813,9 @@ export default function SeasonDetailsClient({
               </div>
             </div>
 
-            {/* SCOREBOARD. MÓVIL: el de DetailsClient (`mobileScoresOnly`), bajo
-                los botones según el sitio que deja la portada, que NUNCA se
-                recorta: completo o solo puntuaciones con la barra de stats al
-                hacer scroll ('compact'). El margen va en el envoltorio: la
-                cabecera mide su alto. */}
+            {/* SCOREBOARD. MÓVIL: siempre compacto y a 20px del navbar al
+                entrar. La portada cede el espacio que necesitan título,
+                botones y puntuaciones; las stats se abren al hacer scroll. */}
             <div
               ref={heroScoreboardRef}
               // Centrado entre los botones y el navbar inferior (ver
