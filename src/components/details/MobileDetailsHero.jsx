@@ -134,8 +134,6 @@ export const MOBILE_REVEAL_ANIMATED = [
 // (la barra de búsqueda de FilterableListItems); null fuera de ella.
 export const MobileHeroRevealContext = createContext(null)
 const MOBILE_REVEAL_SHOW_AT_PX = 16
-// Alto de la navegación inferior flotante que tapa el borde de la pantalla.
-const MOBILE_BOTTOM_NAV_PX = 88
 // Hueco mínimo encima y debajo del marcador (botones → marcador → navbar
 // inferior). Con más sitio, el sobrante se reparte A PARTES IGUALES entre los
 // dos huecos (`--mobile-scoreboard-shift`).
@@ -548,21 +546,28 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
                 targetsDirty = false
             }
             wasAtTop = atTop
+            // La barra inferior no tiene siempre 88px: cambia con la zona
+            // segura, el modelo de teléfono y su estado compacto. Usar su
+            // borde real para el disparador evita abrir las stats antes de
+            // que el centinela llegue a la zona visible (o tarde, dejando un
+            // salto detrás de la barra). Esta lectura comparte la misma línea
+            // que el resto de bloques secundarios justo después del marcador.
+            const revealLine = readBottomNavTop()
             const statsVisible =
                 !atTop &&
                 (statsApplied === true ||
-                    trigger.getBoundingClientRect().top <= window.innerHeight - MOBILE_BOTTOM_NAV_PX)
+                    trigger.getBoundingClientRect().top <= revealLine)
             // Read every position before changing attributes; otherwise each
             // reveal can force layout again for the next block.
             const updates = []
-            let revealLine = null
+            let secondaryRevealLine = null
             let statsPending = null
             revealTargets.forEach((el) => {
                 let visible = false
                 if (!atTop) {
                     if (el.getAttribute(MOBILE_REVEAL_ATTR) === 'shown') visible = true
                     else {
-                        revealLine ??= readBottomNavTop()
+                        secondaryRevealLine ??= revealLine
                         // Lo que el marcador aún va a empujar hacia abajo (y
                         // 2px de margen: los altos de la fila no son enteros).
                         if (statsPending == null) {
@@ -571,7 +576,7 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
                                 : 0
                             statsPending = growth > 0 ? growth + MOBILE_STATS_PENDING_SLACK_PX : 0
                         }
-                        visible = el.getBoundingClientRect().top + statsPending <= revealLine
+                        visible = el.getBoundingClientRect().top + statsPending <= secondaryRevealLine
                     }
                 }
                 const current = el.getAttribute(MOBILE_REVEAL_ATTR)
@@ -606,10 +611,11 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
                 })
             }
         }
-        const observer = new IntersectionObserver(scheduleSync, {
-            rootMargin: `0px 0px -${MOBILE_BOTTOM_NAV_PX}px 0px`,
-            threshold: 0,
-        })
+        // El scroll ya se agrupa por fotograma abajo. El observador solo
+        // despierta el cálculo cuando cambia la intersección; no debe llevar
+        // un margen fijo porque la línea de revelado es el borde real de la
+        // navegación inferior, que puede variar durante la sesión.
+        const observer = new IntersectionObserver(scheduleSync, { threshold: 0 })
         observer.observe(trigger)
         // Bloques que se montan después (la barra de búsqueda llega con los
         // títulos): nacen ocultos y se miran en el siguiente fotograma.
