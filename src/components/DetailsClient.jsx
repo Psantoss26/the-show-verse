@@ -366,10 +366,8 @@ const PUBLIC_SCORE_CACHE = new Map(); // clave -> { ts, data }
 const TTL = 1000 * 60 * 5; // Tiempo de vida del cache: 5 minutos
 
 // Revelado por posición del bloque secundario en móvil (marcador + pestañas).
-// No se anima: estos bloques quedan justo después de la acción principal y en
-// dispositivos lentos incluso una transición compuesta se percibe como carga.
-// `visibility` evita pintar o interactuar con ellos antes del umbral, pero al
-// cruzarlo el contenido y su cristal aparecen en el mismo fotograma.
+// `visibility` evita pintar o interactuar antes del umbral. La entrada se
+// aplica a los hijos: el envoltorio medido por el hero permanece estable.
 //
 // El estado visual lo lleva el atributo `data-mobile-reveal`, que la cabecera
 // compartida (`useMobileDetailsHero`, details/MobileDetailsHero) escribe
@@ -385,6 +383,12 @@ const TTL = 1000 * 60 * 5; // Tiempo de vida del cache: 5 minutos
 const MOBILE_REVEAL_BASE =
   "transform-gpu max-sm:data-[mobile-reveal=hidden]:invisible max-sm:data-[mobile-reveal=hidden]:pointer-events-none max-sm:data-[mobile-reveal=hidden]:**:!transition-none";
 
+// Solo desplazamiento: la opacidad de un ancestro apagaría el cristal de
+// botones y tarjetas. Sin retardo ni transform residual al acabar, y sin
+// animar el propio contenedor que utiliza el cálculo del revelado.
+const MOBILE_SECONDARY_REVEAL_ANIMATION =
+  "max-sm:motion-safe:data-[mobile-reveal=shown]:*:animate-sv-mobile-secondary-reveal";
+
 // FILA DE ACCIONES CON BARRA DE PROGRESO («Viendo»). Espera al primer scroll,
 // pero con SU PROPIA señal: se revela en cuanto ELLA asoma por encima del
 // navbar inferior. Antes compartía la del marcador, cuyo centinela está más
@@ -395,8 +399,7 @@ const MOBILE_ACTIONS_REVEAL_ATTR = "data-mobile-actions-reveal";
 const MOBILE_ACTIONS_REVEAL_BASE =
   "sv-mobile-actions-scroll-reveal transform-gpu max-sm:data-[mobile-actions-reveal=hidden]:invisible max-sm:data-[mobile-actions-reveal=hidden]:pointer-events-none max-sm:data-[mobile-actions-reveal=hidden]:**:!transition-none";
 
-// Aparición animada del marcador al revelarse (solo el marcador; las pestañas y
-// la fila de acciones siguen con el revelado instantáneo). Se reproduce cada vez
+// Aparición animada del marcador al revelarse. Se reproduce cada vez
 // que el atributo pasa a "shown", como las secciones de los dashboards.
 const MOBILE_SCOREBOARD_REVEAL_ANIMATION =
   "max-sm:motion-safe:data-[mobile-reveal=shown]:*:animate-sv-mobile-scoreboard-reveal max-sm:*:[animation-duration:280ms]";
@@ -10469,16 +10472,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
             {/* MÓVIL: los metadatos viven en pestañas tras el marcador, sin una
                 segunda fila de plataformas/estado/premios fuera de la jerarquía
                 informativa. */}
-            <div className={`${detailsEntryReady ? "sv-details-entry" : ""} sv-details-entry--tabs order-3 mb-2 w-full sm:hidden`}>
-              {/* El revelado por posición va en una capa propia, por dentro del
-                  contenedor estable. Comparte señal con el marcador para que
-                  ambos estén disponibles exactamente en el mismo umbral. */}
+            <div className="order-3 mb-2 w-full sm:hidden">
+              {/* Entra al cruzar el navbar, cuando se ve, en vez de animarse
+                  oculta al montar la ficha. El hero descuenta el crecimiento
+                  pendiente de las stats para no revelarla detrás del navbar. */}
               <div
-                // Sin `will-change`: no hay transición pendiente y mantener una
-                // capa extra perjudica a los dispositivos de menor rendimiento.
-                // Aparece al pasar SU borde el navbar inferior (cabecera
-                // compartida, `revealProps`).
-                className={MOBILE_REVEAL_BASE}
+                className={`${MOBILE_REVEAL_BASE} ${detailsRestored || sequenceTransitionActive ? "" : MOBILE_SECONDARY_REVEAL_ANIMATION}`}
                 {...heroRevealProps}
               >
               <DetailsInfoTabs
@@ -10635,7 +10634,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   el título), Enlaces y Compartir en una fila de iconos bajo
                   el marcador. Cada uno abre su modal. Se revela con el scroll
                   al pasar el navbar inferior, como en las temporadas. */}
-              <div className={`mt-3 sm:hidden ${MOBILE_REVEAL_BASE}`} {...heroRevealProps}>
+              <div className={`mt-3 sm:hidden ${MOBILE_REVEAL_BASE} ${detailsRestored || sequenceTransitionActive ? "" : MOBILE_SECONDARY_REVEAL_ANIMATION}`} {...heroRevealProps}>
                 <ScoreboardPillRow>
                   <ScoreboardPill
                     iconOnly
@@ -10779,11 +10778,16 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               backfaceVisibility: "hidden",
             }}
           >
-            <StickySectionMenu
-              store={activeSectionStore}
-              items={sectionItems}
-              onChange={scrollToSection}
-            />
+            <div
+              className={`${MOBILE_REVEAL_BASE} ${detailsRestored || sequenceTransitionActive ? "" : MOBILE_SECONDARY_REVEAL_ANIMATION}`}
+              {...heroRevealProps}
+            >
+              <StickySectionMenu
+                store={activeSectionStore}
+                items={sectionItems}
+                onChange={scrollToSection}
+              />
+            </div>
             {/* Anterior / siguiente de la lista de origen: flechas a los lados
                 del menú, fuera de la columna. Van dentro de este contenedor
                 sticky para acompañar al menú al hacer scroll. Fuera del flujo,
