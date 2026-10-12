@@ -12,6 +12,10 @@ import {
   watchlist,
   connectedAccounts,
 } from '../db/schema.js';
+import {
+  mapLetterboxdRatingItem,
+  selectLetterboxdHistory,
+} from '../lib/letterboxdImport.js';
 
 const TRAKT_BASE = 'https://api.trakt.tv';
 const CLIENT_ID = process.env.TRAKT_CLIENT_ID;
@@ -859,6 +863,74 @@ export default async function importRoutes(fastify) {
       req.log.error({ err, userId }, 'Netflix import failed');
       return reply.status(500).send(progress);
     }
+  });
+
+  // POST /import/letterboxd/data/chunk - una tanda de la exportación de
+  // Letterboxd ya resuelta a TMDb: { history, ratings, reset }. `reset` marca la
+  // primera tanda; los totales se acumulan en el progreso.
+  fastify.post('/letterboxd/data/chunk', async (req, reply) => {
+    const { history = [], ratings = [], reset = false } = req.body || {};
+    if (!Array.isArray(history) || !Array.isArray(ratings)) {
+      return reply.status(400).send({ error: 'history and ratings must be arrays' });
+    }
+    if (history.length > 1000 || ratings.length > 1000) {
+      return reply.status(413).send({ error: 'Import chunk is too large' });
+    }
+
+    const userId = req.user.id;
+    const key = progressKey(userId, 'letterboxd');
+    const previous = importProgress.get(key);
+    const progress =
+      reset || !previous
+        ? {
+            status: 'running',
+            mode: 'history_ratings',
+            startedAt: new Date(),
+            completedAt: null,
+            steps: {},
+            error: null,
+            source: 'letterboxd',
+          }
+        : previous;
+    progress.status = 'running';
+    importProgress.set(key, progress);
+
+    try {
+      const existing = await db.select().from(watchHistory).where(eq(watchHistory.userId, userId));
+      const values = selectLetterboxdHistory(history, existing, userId, historyKey);
+      const imported = values.length ? await insertInChunks(watchHistory, values) : 0;
+      const historyResult = {
+        status: 'done',
+        fetched: history.length,
+        imported,
+        skipped: history.length - imported,
+      };
+
+      const ratingValues = dedupeBy(
+        ratings.map((item) => mapLetterboxdRatingItem(item, userId)).filter(Boolean),
+        ratingKey,
+      );
+      const ratingsResult = ratingValues.length
+        ? await importNormalizedRatingValues(userId, ratingValues, ratings.length)
+        : { status: 'done', fetched: ratings.length, imported: 0, updated: 0 };
+
+      progress.steps.history = mergeStepData(progress.steps.history, historyResult);
+      progress.steps.ratings = mergeStepData(progress.steps.ratings, ratingsResult);
+      progress.status = 'done';
+      progress.completedAt = new Date();
+      return reply.send({ ...progress, chunk: { history: historyResult, ratings: ratingsResult } });
+    } catch (err) {
+      progress.status = 'error';
+      progress.error = err.message;
+      progress.completedAt = new Date();
+      req.log.error({ err, userId }, 'Letterboxd import failed');
+      return reply.status(500).send(progress);
+    }
+  });
+
+  fastify.get('/letterboxd/status', async (req, reply) => {
+    const progress = importProgress.get(progressKey(req.user.id, 'letterboxd'));
+    return reply.send(progress || { status: 'idle', steps: {} });
   });
 
   fastify.get('/netflix/status', async (req, reply) => {
