@@ -1754,6 +1754,11 @@ export default function SeasonDetailsClient({
                   !animateMobileEntry ? "" : mobileCoverReady ? MOBILE_ACTIONS_ENTRY_ANIMATION : "max-sm:invisible"
                 }
               >
+              <h1 className="mb-3 text-center text-[11px] font-bold uppercase leading-4 tracking-[0.14em] text-zinc-400 sm:hidden">
+                {Number(seasonNumber) === 0
+                  ? "Especiales"
+                  : `Temporada ${seasonNumber}`}
+              </h1>
               <SubrouteDetailsActionRow
                 seriesHref={`/details/tv/${showId}`}
                 previousHref={adjacentSeasonHrefs.previousHref}
