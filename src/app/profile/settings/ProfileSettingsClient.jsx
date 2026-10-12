@@ -63,6 +63,7 @@ import Avatar, { getInitial } from "@/components/ui/Avatar";
 import ProfileFavoritesEditor from "@/components/social/ProfileFavoritesEditor";
 import AndroidSyncPanel from "@/components/settings/AndroidSyncPanel";
 import LetterboxdImportPanel from "@/components/settings/LetterboxdImportPanel";
+import LetterboxdConnectionCard from "@/components/settings/LetterboxdConnectionCard";
 import { pairDevice, pairSyncApp, readSyncStatus, useSyncStatus } from "@/lib/android/appBridge";
 import { buildSyncPairLinks } from "@/lib/android/syncPairLink";
 import { useTranslation } from "@/lib/i18n";
@@ -2953,34 +2954,7 @@ function ProfileSettingsClient() {
                   </div>
 
                   {/* Letterboxd Connection */}
-                  <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 flex flex-row items-start justify-between gap-4 sm:items-center sm:gap-5`}>
-                    <div className="flex items-start gap-4">
-                      <div className="shrink-0 h-12 w-12 flex items-center justify-center group-hover:scale-105 transition-all duration-300">
-                        <img src="/logo-Letterboxd.png" alt="Letterboxd" className="h-8 w-8 object-contain" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-base font-extrabold text-white tracking-wide">Letterboxd</h3>
-                          <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 text-zinc-400">
-                            Exportación
-                          </span>
-                        </div>
-                        <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
-                          Importa tu diario de visionados y tus puntuaciones subiendo la exportación de datos de Letterboxd.
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("imports")}
-                      aria-label="Importar"
-                      title="Importar"
-                      className="min-h-10 px-3 sm:px-5 rounded-xl bg-white/5 hover:bg-white/10 text-xs sm:text-sm font-bold text-white transition self-start sm:self-auto shrink-0 flex items-center justify-center"
-                    >
-                      <DownloadCloud className="h-4 w-4 sm:hidden" aria-hidden="true" />
-                      <span className="hidden sm:inline">Importar</span>
-                    </button>
-                  </div>
+                  <LetterboxdConnectionCard className={GLASS_PANEL} onOpenImport={() => setActiveTab("imports")} />
 
                   {/* Filmaffinity Connection */}
                   <div className={`${GLASS_PANEL} rounded-3xl p-5 sm:p-6 flex flex-row items-start justify-between gap-4 sm:items-center sm:gap-5`}>

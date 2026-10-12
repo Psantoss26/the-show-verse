@@ -40,6 +40,13 @@ test('no duplica visionados ni marca otra vez las películas ya vistas', () => {
     { tmdbId: 3, watchedAt: '2021-06-01T12:00:00.000Z', undated: true }, // nueva
   ];
   const values = selectLetterboxdHistory(items, existing, 'u1', keyOf);
+  // Por día (por defecto): el de las 23:00 del mismo día ya está.
+  const sameDay = selectLetterboxdHistory(
+    [{ tmdbId: 1, watchedAt: '2023-01-01T12:00:00.000Z' }],
+    [{ tmdbId: 1, mediaType: 'movie', watchedAt: new Date('2023-01-01T21:30:00Z') }],
+    'u1',
+  );
+  assert.equal(sameDay.length, 0);
   assert.deepEqual(
     values.map((row) => [row.tmdbId, row.watchedAt.toISOString()]),
     [

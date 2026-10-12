@@ -16,6 +16,14 @@ import {
   mapLetterboxdRatingItem,
   selectLetterboxdHistory,
 } from '../lib/letterboxdImport.js';
+import {
+  deleteLetterboxdAccount,
+  getLetterboxdAccount,
+  letterboxdConnectionView,
+  saveLetterboxdAccount,
+  syncLetterboxdAccount,
+} from '../lib/letterboxdSync.js';
+import { fetchLetterboxdFeed, normalizeLetterboxdUsername } from '../lib/letterboxdRss.js';
 
 const TRAKT_BASE = 'https://api.trakt.tv';
 const CLIENT_ID = process.env.TRAKT_CLIENT_ID;
@@ -897,7 +905,7 @@ export default async function importRoutes(fastify) {
 
     try {
       const existing = await db.select().from(watchHistory).where(eq(watchHistory.userId, userId));
-      const values = selectLetterboxdHistory(history, existing, userId, historyKey);
+      const values = selectLetterboxdHistory(history, existing, userId);
       const imported = values.length ? await insertInChunks(watchHistory, values) : 0;
       const historyResult = {
         status: 'done',
@@ -931,6 +939,45 @@ export default async function importRoutes(fastify) {
   fastify.get('/letterboxd/status', async (req, reply) => {
     const progress = importProgress.get(progressKey(req.user.id, 'letterboxd'));
     return reply.send(progress || { status: 'idle', steps: {} });
+  });
+
+  // Sincronización automática por el RSS público del perfil (lib/letterboxdSync).
+  fastify.get('/letterboxd/connection', async (req, reply) => {
+    return reply.send(letterboxdConnectionView(await getLetterboxdAccount(req.user.id)));
+  });
+
+  // POST /import/letterboxd/connection { username } - conecta (o cambia) el
+  // usuario, comprobando antes que su feed existe, y hace la primera pasada.
+  fastify.post('/letterboxd/connection', async (req, reply) => {
+    const username = normalizeLetterboxdUsername(req.body?.username);
+    if (!username) {
+      return reply.status(400).send({ error: 'Escribe un usuario de Letterboxd válido.' });
+    }
+    try {
+      await fetchLetterboxdFeed(username);
+    } catch (err) {
+      return reply
+        .status(err?.code === 'not_found' ? 404 : 502)
+        .send({ error: err?.message || 'No se pudo leer el perfil de Letterboxd.' });
+    }
+    const account = await saveLetterboxdAccount(req.user.id, username);
+    const sync = await syncLetterboxdAccount(account);
+    return reply.send({ ...letterboxdConnectionView(await getLetterboxdAccount(req.user.id)), sync });
+  });
+
+  // POST /import/letterboxd/sync - sincronizar ahora.
+  fastify.post('/letterboxd/sync', async (req, reply) => {
+    const account = await getLetterboxdAccount(req.user.id);
+    if (!account) return reply.status(404).send({ error: 'Letterboxd no está conectado.' });
+    const sync = await syncLetterboxdAccount(account);
+    return reply
+      .status(sync.ok ? 200 : 502)
+      .send({ ...letterboxdConnectionView(await getLetterboxdAccount(req.user.id)), sync });
+  });
+
+  fastify.delete('/letterboxd/connection', async (req, reply) => {
+    await deleteLetterboxdAccount(req.user.id);
+    return reply.send({ connected: false });
   });
 
   fastify.get('/netflix/status', async (req, reply) => {

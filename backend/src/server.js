@@ -38,6 +38,7 @@ import pushRoutes from './routes/push.js';
 import levelRoutes from './routes/level.js';
 import streamingDetectionsRoutes from './routes/streamingDetections.js';
 import { refreshAllPools } from './dashboard/pools.js';
+import { syncAllLetterboxdAccounts } from './lib/letterboxdSync.js';
 
 import { closeRedis, getRedis } from './lib/redis.js';
 
@@ -328,6 +329,34 @@ if (Number.isFinite(POOL_WARM_INTERVAL_MS) && POOL_WARM_INTERVAL_MS > 0) {
   warmDashboardPools();
   const warmTimer = setInterval(warmDashboardPools, POOL_WARM_INTERVAL_MS);
   warmTimer.unref?.(); // no impedir el cierre del proceso
+}
+
+// ────────────────────────────────────────────
+// Sincronización con Letterboxd
+// Lee el RSS público de cada cuenta conectada y añade los visionados y
+// puntuaciones nuevos (lib/letterboxdSync). La primera pasada espera un poco
+// para no competir con el arranque.
+// Ajustable con LETTERBOXD_SYNC_MS (0 para desactivar).
+// ────────────────────────────────────────────
+const LETTERBOXD_SYNC_INTERVAL_MS =
+  process.env.LETTERBOXD_SYNC_MS !== undefined
+    ? Number(process.env.LETTERBOXD_SYNC_MS)
+    : 2 * 60 * 60 * 1000; // 2 h
+
+let letterboxdSyncRunning = false;
+const runLetterboxdSync = () => {
+  if (letterboxdSyncRunning) return;
+  letterboxdSyncRunning = true;
+  syncAllLetterboxdAccounts(fastify.log)
+    .catch((err) => fastify.log.warn({ err }, 'letterboxd sync failed'))
+    .finally(() => {
+      letterboxdSyncRunning = false;
+    });
+};
+
+if (Number.isFinite(LETTERBOXD_SYNC_INTERVAL_MS) && LETTERBOXD_SYNC_INTERVAL_MS > 0) {
+  setTimeout(runLetterboxdSync, 2 * 60 * 1000).unref?.();
+  setInterval(runLetterboxdSync, LETTERBOXD_SYNC_INTERVAL_MS).unref?.();
 }
 
 // ────────────────────────────────────────────

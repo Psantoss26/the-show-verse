@@ -51,16 +51,28 @@ export function mapLetterboxdRatingItem(item, userId, now = new Date()) {
 }
 
 /**
+ * Clave de visionado por DÍA: Letterboxd solo guarda la fecha, así que una
+ * película ya marcada ese mismo día en The Show Verse (a cualquier hora) es el
+ * mismo visionado y no se duplica.
+ */
+export function letterboxdDayKey(item) {
+  const date = new Date(item?.watchedAt);
+  if (Number.isNaN(date.getTime())) return '';
+  return [Number(item.tmdbId), item.mediaType, item.season ?? '', item.episode ?? '', date.toISOString().slice(0, 10)].join(':');
+}
+
+/**
  * Qué visionados entran. Los del diario (con fecha real) entran salvo que ya
  * exista ese mismo visionado (película + instante). Los "sin fecha" (vistas
  * de watched.csv que no están en el diario) solo si la película no tiene
  * ningún visionado: no hay que duplicar lo que ya está marcado como visto.
+ * Además, un mismo día cuenta una vez (letterboxdDayKey).
  *
  * @param items     visionados de la tanda ({ ..., undated }).
  * @param existing  filas de watch_history del usuario.
- * @param keyOf     clave de visionado (historyKey de routes/import).
+ * @param keyOf     clave de visionado (por defecto, por día).
  */
-export function selectLetterboxdHistory(items, existing, userId, keyOf) {
+export function selectLetterboxdHistory(items, existing, userId, keyOf = letterboxdDayKey) {
   const existingKeys = new Set(existing.map(keyOf));
   const watchedMovies = new Set(
     existing.filter((row) => row.mediaType === 'movie').map((row) => Number(row.tmdbId)),
