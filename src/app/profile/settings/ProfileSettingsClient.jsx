@@ -62,6 +62,7 @@ import { useAuth } from "@/context/AuthContext";
 import Avatar, { getInitial } from "@/components/ui/Avatar";
 import ProfileFavoritesEditor from "@/components/social/ProfileFavoritesEditor";
 import AndroidSyncPanel from "@/components/settings/AndroidSyncPanel";
+import LetterboxdImportPanel from "@/components/settings/LetterboxdImportPanel";
 import { pairDevice, pairSyncApp, readSyncStatus, useSyncStatus } from "@/lib/android/appBridge";
 import { buildSyncPairLinks } from "@/lib/android/syncPairLink";
 import { useTranslation } from "@/lib/i18n";
@@ -2582,6 +2583,7 @@ function ProfileSettingsClient() {
                     ]}
                     logoSrc="/logo-TMDb.png"
                   />
+                  <LetterboxdImportPanel className={GLASS_PANEL} />
                 </motion.div>
               )}
 
@@ -2960,23 +2962,23 @@ function ProfileSettingsClient() {
                         <div className="flex items-center gap-2">
                           <h3 className="text-base font-extrabold text-white tracking-wide">Letterboxd</h3>
                           <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-white/5 text-zinc-400">
-                            Próximamente
+                            Exportación
                           </span>
                         </div>
                         <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
-                          Importa tu diario cinéfilo y películas valoradas desde Letterboxd mediante archivo CSV o integración directa.
+                          Importa tu diario de visionados y tus puntuaciones subiendo la exportación de datos de Letterboxd.
                         </p>
                       </div>
                     </div>
                     <button
                       type="button"
-                      disabled
-                      aria-label="Conectar"
-                      title="Conectar"
-                      className="min-h-10 px-3 sm:px-5 rounded-xl bg-white/5 text-xs sm:text-sm font-bold text-zinc-400 cursor-not-allowed opacity-60 self-start sm:self-auto shrink-0 flex items-center justify-center"
+                      onClick={() => setActiveTab("imports")}
+                      aria-label="Importar"
+                      title="Importar"
+                      className="min-h-10 px-3 sm:px-5 rounded-xl bg-white/5 hover:bg-white/10 text-xs sm:text-sm font-bold text-white transition self-start sm:self-auto shrink-0 flex items-center justify-center"
                     >
-                      <Link2 className="h-4 w-4 sm:hidden" aria-hidden="true" />
-                      <span className="hidden sm:inline">Conectar</span>
+                      <DownloadCloud className="h-4 w-4 sm:hidden" aria-hidden="true" />
+                      <span className="hidden sm:inline">Importar</span>
                     </button>
                   </div>
 
