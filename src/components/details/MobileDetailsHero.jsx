@@ -773,12 +773,12 @@ export function usePanelHeroFit(enabled, { panelRef, scrollerRef, actionsRef, sc
 const MOBILE_COVER_EXTEND_PX = 200
 const MOBILE_COVER_BLUR_BAND_PX = 64
 // Curva suave (smoothstep) para la entrada de la capa difuminada.
-const buildCoverExtendMask = (extendPx) => `linear-gradient(to bottom,
-    transparent calc(var(--mobile-cover-h) - ${MOBILE_COVER_BLUR_BAND_PX}px),
-    rgba(0, 0, 0, 0.104) calc(var(--mobile-cover-h) - ${MOBILE_COVER_BLUR_BAND_PX * 0.8}px),
-    rgba(0, 0, 0, 0.352) calc(var(--mobile-cover-h) - ${MOBILE_COVER_BLUR_BAND_PX * 0.6}px),
-    rgba(0, 0, 0, 0.648) calc(var(--mobile-cover-h) - ${MOBILE_COVER_BLUR_BAND_PX * 0.4}px),
-    rgba(0, 0, 0, 0.896) calc(var(--mobile-cover-h) - ${MOBILE_COVER_BLUR_BAND_PX * 0.2}px),
+const buildCoverExtendMask = (extendPx, bandPx = MOBILE_COVER_BLUR_BAND_PX) => `linear-gradient(to bottom,
+    transparent calc(var(--mobile-cover-h) - ${bandPx}px),
+    rgba(0, 0, 0, 0.104) calc(var(--mobile-cover-h) - ${bandPx * 0.8}px),
+    rgba(0, 0, 0, 0.352) calc(var(--mobile-cover-h) - ${bandPx * 0.6}px),
+    rgba(0, 0, 0, 0.648) calc(var(--mobile-cover-h) - ${bandPx * 0.4}px),
+    rgba(0, 0, 0, 0.896) calc(var(--mobile-cover-h) - ${bandPx * 0.2}px),
     #000 var(--mobile-cover-h),
     #000 calc(var(--mobile-cover-h) + 16px),
     rgba(0, 0, 0, 0.784) calc(var(--mobile-cover-h) + ${extendPx * 0.35}px),
@@ -950,7 +950,11 @@ const MOBILE_COVER_CONTRAST_SCRIM = `linear-gradient(to bottom,
 // Llena su contenedor (una capa fija del panel, detrás del contenido con
 // scroll) en vez de colgar de la ventana, y no lleva nada atado al viewport ni
 // al scroll del documento: el relevo con el fondo lo anima el panel.
-export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, collage, collageUnderlay, blurredUnderlay = false, adaptiveContrast = false, ready, animate, inPanel = false }) {
+// `edgeBandPx`: alto de la entrada de la capa difuminada sobre el pie del
+// póster (por defecto MOBILE_COVER_BLUR_BAND_PX). Las temporadas lo acortan:
+// sus pósters llevan el título impreso abajo y, con el póster difuminado
+// debajo (`blurredUnderlay`), basta con empezar más cerca del borde.
+export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, collage, collageUnderlay, blurredUnderlay = false, adaptiveContrast = false, edgeBandPx = MOBILE_COVER_BLUR_BAND_PX, ready, animate, inPanel = false }) {
     const highRef = useRef(null)
     const [highSrc, setHighSrc] = useState(null)
     const firstSrc = lowSrc || src
@@ -972,6 +976,10 @@ export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, 
     }
 
     const mask = hasImage ? undefined : 'var(--sv-poster-fade)'
+    const extendMask =
+        edgeBandPx === MOBILE_COVER_BLUR_BAND_PX
+            ? (blurredUnderlay ? MOBILE_COVER_EXTEND_SHORT_MASK : MOBILE_COVER_EXTEND_MASK)
+            : buildCoverExtendMask(blurredUnderlay ? MOBILE_COVER_EXTEND_SHORT_PX : MOBILE_COVER_EXTEND_PX, edgeBandPx)
 
     return (
         // Relevo con el scroll: la portada se desvanece mientras aparece el
@@ -1084,8 +1092,8 @@ export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, 
                     className="pointer-events-none absolute inset-x-0 top-0 blur-[12px]"
                     style={{
                         height: `calc(var(--mobile-cover-h) + ${MOBILE_COVER_EXTEND_PX}px)`,
-                        WebkitMaskImage: blurredUnderlay ? MOBILE_COVER_EXTEND_SHORT_MASK : MOBILE_COVER_EXTEND_MASK,
-                        maskImage: blurredUnderlay ? MOBILE_COVER_EXTEND_SHORT_MASK : MOBILE_COVER_EXTEND_MASK,
+                        WebkitMaskImage: extendMask,
+                        maskImage: extendMask,
                     }}
                 >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
