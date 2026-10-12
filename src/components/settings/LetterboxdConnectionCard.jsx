@@ -43,11 +43,25 @@ function plural(count, one, many) {
   return `${count} ${count === 1 ? one : many}`;
 }
 
+// "3 visionados nuevos, 2 puntuaciones y 1 reseña" (solo lo que haya).
+function describeCounts(result) {
+  const parts = [
+    [result?.history, "visionado nuevo", "visionados nuevos"],
+    [result?.ratings, "puntuación", "puntuaciones"],
+    [result?.favorites, "favorita", "favoritas"],
+    [result?.reviews, "reseña", "reseñas"],
+  ]
+    .filter(([count]) => Number(count) > 0)
+    .map(([count, one, many]) => plural(Number(count), one, many));
+  if (!parts.length) return "";
+  return parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} y ${parts.at(-1)}`;
+}
+
 function describeSync(sync) {
   if (!sync) return "";
   if (!sync.ok) return sync.error || "No se pudo sincronizar.";
-  if (!sync.history && !sync.ratings) return "Todo al día: no había nada nuevo.";
-  return `Añadidos ${plural(sync.history, "visionado", "visionados")} y ${plural(sync.ratings, "puntuación", "puntuaciones")}.`;
+  const counts = describeCounts(sync);
+  return counts ? `Añadido: ${counts}.` : "Todo al día: no había nada nuevo.";
 }
 
 export default function LetterboxdConnectionCard({ className = "", onOpenImport }) {
@@ -212,7 +226,7 @@ export default function LetterboxdConnectionCard({ className = "", onOpenImport 
                 {lastSync ? ` · última revisión ${lastSync}` : ""}.
               </>
             ) : (
-              "Escribe tu usuario y lo que registres en tu diario de Letterboxd llegará solo por RSS: visionados, rewatches, reseñas y puntuaciones. Tu perfil tiene que ser público."
+              "Escribe tu usuario y lo que registres en tu diario de Letterboxd llegará solo por RSS: visionados, rewatches, puntuaciones, «me gusta» (a Favoritas) y reseñas. Tu perfil tiene que ser público."
             )}
           </p>
         </div>
@@ -221,8 +235,8 @@ export default function LetterboxdConnectionCard({ className = "", onOpenImport 
       {connected && !extRunning && lastResult && !connection?.lastError && (
         <p className="text-xs text-zinc-400">
           <span className="font-bold text-zinc-200">Última revisión del RSS:</span>{" "}
-          {lastResult.entries || lastResult.edited
-            ? `${plural(lastResult.history || 0, "visionado nuevo", "visionados nuevos")} y ${plural(lastResult.ratings || 0, "puntuación", "puntuaciones")}${lastResult.edited ? ` (${plural(lastResult.edited, "entrada editada", "entradas editadas")})` : ""}.`
+          {describeCounts(lastResult)
+            ? `${describeCounts(lastResult)}${lastResult.edited ? ` (${plural(lastResult.edited, "entrada editada", "entradas editadas")})` : ""}.`
             : "sin entradas nuevas."}
         </p>
       )}
@@ -250,7 +264,7 @@ export default function LetterboxdConnectionCard({ className = "", onOpenImport 
       {connected && !extRunning && !extensionDone && (
         <div className="rounded-2xl bg-white/[0.03] border border-white/5 p-3.5 text-xs text-zinc-300">
           <p className="font-bold text-zinc-100">
-            El RSS solo trae tus últimas ~50 entradas del diario, sin favoritas ni pendientes.
+            El RSS solo trae tus últimas ~50 entradas del diario y no incluye la watchlist.
           </p>
           {hasExtension ? (
             <p className="mt-1 leading-relaxed">
@@ -260,7 +274,7 @@ export default function LetterboxdConnectionCard({ className = "", onOpenImport 
             </p>
           ) : (
             <p className="mt-1 leading-relaxed">
-              Para traer todo tu historial, tus favoritas y tu watchlist, importa el ZIP de tu exportación o instala la extensión de The Show Verse
+              Para traer todo tu historial y tu watchlist (Pendientes), importa el ZIP de tu exportación o instala la extensión de The Show Verse
               (versión 3.2 o posterior) con la sesión de letterboxd.com iniciada en este navegador.
             </p>
           )}

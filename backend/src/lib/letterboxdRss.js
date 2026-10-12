@@ -1,8 +1,10 @@
 // src/lib/letterboxdRss.js
 // Feed RSS público de un perfil de Letterboxd (https://letterboxd.com/<user>/rss/).
 // Trae las últimas ~50 entradas del diario, cada una con su fecha de visionado,
-// si fue rewatch, la puntuación y el id de TMDb de la película: con eso se
-// sincroniza sin API (la oficial es privada) y sin buscar títulos.
+// si fue rewatch, la puntuación, el "me gusta" (letterboxd:memberLike), el
+// texto de la reseña (en la descripción) y el id de TMDb de la película: con
+// eso se sincroniza sin API (la oficial es privada) y sin buscar títulos.
+// La watchlist no tiene feed: llega con la exportación oficial.
 
 const FEED_TIMEOUT_MS = 15000;
 const USER_AGENT = 'TheShowVerse/1.0 (Letterboxd RSS sync)';
@@ -38,10 +40,59 @@ function decodeXml(value) {
     .trim();
 }
 
-function tag(block, name) {
+function rawTag(block, name) {
   const escaped = name.replace(':', '\\:');
   const match = block.match(new RegExp(`<${escaped}(?:\\s[^>]*)?>([\\s\\S]*?)</${escaped}>`, 'i'));
-  return match ? decodeXml(match[1]) : '';
+  return match ? match[1] : null;
+}
+
+function tag(block, name) {
+  const raw = rawTag(block, name);
+  return raw == null ? '' : decodeXml(raw);
+}
+
+// El HTML de la descripción (CDATA, o escapado como texto).
+function descriptionHtml(block) {
+  const raw = rawTag(block, 'description');
+  if (raw == null) return '';
+  const cdata = raw.match(/^\s*<!\[CDATA\[([\s\S]*?)\]\]>\s*$/);
+  return cdata ? cdata[1] : decodeXml(raw);
+}
+
+export const LETTERBOXD_REVIEW_MAX = 2000;
+
+/**
+ * Reseña de la descripción de una entrada: { body, spoiler } o null. La
+ * descripción lleva el póster, la reseña en párrafos y, si no hay reseña, una
+ * línea "Watched on …". El aviso de spoilers va en su propio párrafo.
+ */
+export function parseLetterboxdReview(html) {
+  const paragraphs = (String(html || '').match(/<p\b[^>]*>[\s\S]*?<\/p>/gi) || []).map((paragraph) =>
+    decodeXml(
+      paragraph
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<[^>]+>/g, ''),
+    )
+      .replace(/[ \t]+\n/g, '\n')
+      .trim(),
+  );
+  let spoiler = false;
+  const body = paragraphs
+    .filter((text) => {
+      if (!text) return false;
+      if (/^this review may contain spoilers\.?$/i.test(text)) {
+        spoiler = true;
+        return false;
+      }
+      return !/^(re)?watched on [^.]+\.?$/i.test(text) && !/^added .+ to .+$/i.test(text);
+    })
+    .join('\n\n')
+    .trim();
+  if (!body) return null;
+  return {
+    body: body.length > LETTERBOXD_REVIEW_MAX ? `${body.slice(0, LETTERBOXD_REVIEW_MAX - 1).trimEnd()}…` : body,
+    spoiler,
+  };
 }
 
 /** "2024-01-01" → mediodía UTC de ese día (igual que la importación por ZIP). */
@@ -76,6 +127,8 @@ export function parseLetterboxdRss(xml) {
       watchedAt,
       rewatch: /^yes$/i.test(tag(block, 'letterboxd:rewatch')),
       rating: rating >= 1 && rating <= 10 ? rating : null,
+      liked: /^yes$/i.test(tag(block, 'letterboxd:memberLike')),
+      review: parseLetterboxdReview(descriptionHtml(block)),
       publishedAt: Number.isNaN(published.getTime()) ? watchedAt : published.toISOString(),
     });
   }
@@ -154,4 +207,39 @@ export function nextSeenRatings(items) {
 /** Guids recordados: los del feed actual más los anteriores, con tope. */
 export function nextSeenGuids(items, seenGuids = [], limit = 300) {
   return [...new Set([...items.map((item) => item.guid), ...seenGuids])].slice(0, limit);
+}
+
+/** Huella corta de una reseña, para notar si se editó. */
+export function letterboxdReviewHash(review) {
+  const text = `${review?.spoiler ? 1 : 0}|${review?.body || ''}`;
+  let hash = 5381;
+  for (let index = 0; index < text.length; index += 1) hash = ((hash * 33) ^ text.charCodeAt(index)) >>> 0;
+  return hash.toString(36);
+}
+
+/**
+ * Reseñas del feed que tocan:
+ *   create  entradas con reseña que aún no se han importado (nuevas, o ya
+ *           vistas a las que se les añadió reseña).
+ *   update  reseñas ya importadas cuyo texto o aviso de spoilers cambió.
+ * Las que la persona borró aquí ({ id: null }) no se vuelven a crear.
+ *
+ * @param state  { guid: { id, hash } } de lo importado antes.
+ */
+export function pendingLetterboxdReviews(items, state = {}) {
+  const create = [];
+  const update = [];
+  for (const item of items) {
+    if (!item.review) continue;
+    const known = state[item.guid];
+    if (!known) create.push(item);
+    else if (known.id && known.hash !== letterboxdReviewHash(item.review)) update.push({ item, commentId: known.id });
+  }
+  return { create, update };
+}
+
+/** Entradas con "me gusta" aún no aplicadas (una vez por entrada: si luego la quitas de Favoritas, no vuelve). */
+export function pendingLetterboxdLikes(items, likedGuids = []) {
+  const done = new Set(likedGuids);
+  return items.filter((item) => item.liked && !done.has(item.guid));
 }

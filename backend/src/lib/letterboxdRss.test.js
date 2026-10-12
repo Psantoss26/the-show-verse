@@ -23,8 +23,9 @@ const FEED = `<?xml version="1.0" encoding="utf-8"?>
   <letterboxd:filmTitle><![CDATA[Amélie & co]]></letterboxd:filmTitle>
   <letterboxd:filmYear>2001</letterboxd:filmYear>
   <letterboxd:memberRating>4.5</letterboxd:memberRating>
+  <letterboxd:memberLike>Yes</letterboxd:memberLike>
   <tmdb:movieId>194</tmdb:movieId>
-  <description><![CDATA[<p>Hola</p>]]></description>
+  <description><![CDATA[ <p><img src="https://a.ltrbxd.com/amelie.jpg"/></p> <p><em>This review may contain spoilers.</em></p> <p>Preciosa.<br />Otra vez.</p> ]]></description>
 </item>
 <item>
   <title>Heat, 1995</title>
@@ -35,6 +36,7 @@ const FEED = `<?xml version="1.0" encoding="utf-8"?>
   <letterboxd:filmTitle>Heat</letterboxd:filmTitle>
   <letterboxd:filmYear>1995</letterboxd:filmYear>
   <tmdb:movieId>949</tmdb:movieId>
+  <description>&lt;p&gt;&lt;img src="x"/&gt;&lt;/p&gt; &lt;p&gt;Watched on Monday January 1, 2024.&lt;/p&gt;</description>
 </item>
 <item>
   <title>Mi lista</title>
@@ -63,10 +65,14 @@ test('parsea las entradas del diario y descarta listas', () => {
     watchedAt: '2024-01-02T12:00:00.000Z',
     rewatch: true,
     rating: 9,
+    liked: true,
+    review: { body: 'Preciosa.\nOtra vez.', spoiler: true },
     publishedAt: '2024-01-02T08:00:00.000Z',
   });
   assert.equal(items[1].rating, null);
   assert.equal(items[1].rewatch, false);
+  assert.equal(items[1].liked, false);
+  assert.equal(items[1].review, null);
 });
 
 test('solo procesa entradas nuevas y la puntuación más reciente de cada película', () => {
@@ -108,4 +114,36 @@ test('detecta notas editadas en entradas que siguen en el feed', () => {
   assert.deepEqual(ratings.map((item) => [item.tmdbId, item.rating]).sort(), [[1, 8], [3, 4]]);
   // Sin notas recordadas (cuentas antiguas): no hay ediciones que detectar.
   assert.equal(pendingLetterboxdEntries(after, ['a', 'b']).edited.length, 0);
+});
+
+test('reseñas largas se recortan al máximo de la app', async () => {
+  const { parseLetterboxdReview, LETTERBOXD_REVIEW_MAX } = await import('./letterboxdRss.js');
+  const review = parseLetterboxdReview(`<p>${'a'.repeat(3000)}</p>`);
+  assert.equal(review.body.length, LETTERBOXD_REVIEW_MAX);
+  assert.ok(review.body.endsWith('…'));
+});
+
+test('reseñas: nuevas, editadas y borradas aquí', async () => {
+  const { pendingLetterboxdReviews, letterboxdReviewHash } = await import('./letterboxdRss.js');
+  const a = { guid: 'a', review: { body: 'Uno', spoiler: false } };
+  const b = { guid: 'b', review: { body: 'Dos (editada)', spoiler: false } };
+  const c = { guid: 'c', review: { body: 'Tres', spoiler: true } };
+  const d = { guid: 'd', review: null };
+  const state = {
+    b: { id: 'cb', hash: letterboxdReviewHash({ body: 'Dos', spoiler: false }) },
+    c: { id: null, hash: letterboxdReviewHash(c.review) }, // borrada en The Show Verse
+  };
+  const { create, update } = pendingLetterboxdReviews([a, b, c, d], state);
+  assert.deepEqual(create.map((item) => item.guid), ['a']);
+  assert.deepEqual(update.map((entry) => [entry.item.guid, entry.commentId]), [['b', 'cb']]);
+});
+
+test('me gusta: una vez por entrada', async () => {
+  const { pendingLetterboxdLikes } = await import('./letterboxdRss.js');
+  const items = [
+    { guid: 'a', liked: true },
+    { guid: 'b', liked: false },
+    { guid: 'c', liked: true },
+  ];
+  assert.deepEqual(pendingLetterboxdLikes(items, ['a']).map((item) => item.guid), ['c']);
 });

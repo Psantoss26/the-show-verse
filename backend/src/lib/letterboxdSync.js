@@ -4,8 +4,14 @@
 // usuario de Letterboxd y el estado de las pasadas van en metadata.
 //
 //   - Cada pocas horas (server.js) y al pulsar "Sincronizar ahora" se lee el
-//     feed: visionados nuevos del diario (con su fecha y rewatch), reseñas con
-//     visionado y sus puntuaciones. Cada entrada se procesa una vez (guid).
+//     feed: visionados nuevos del diario (con su fecha y rewatch) y sus
+//     puntuaciones. Cada entrada se procesa una vez (guid).
+//   - "Me gusta" → Favoritas, una vez por entrada (si luego la quitas de
+//     Favoritas, no vuelve).
+//   - Reseñas → reseñas de la comunidad en la ficha, a tu nombre y con su
+//     aviso de spoilers. Si la editas en Letterboxd mientras sigue en el feed,
+//     se actualiza; si la borras aquí, no se vuelve a crear.
+//   - La watchlist no tiene feed: llega con la exportación oficial.
 //   - Ediciones: si una entrada que sigue en el feed cambia de nota, se
 //     actualiza. Las eliminaciones y las ediciones de entradas que ya salieron
 //     del feed no se pueden detectar por RSS.
@@ -14,13 +20,20 @@
 
 import { and, eq, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { connectedAccounts, userRatings, watchHistory } from '../db/schema.js';
-import { mapLetterboxdRatingItem, selectLetterboxdHistory } from './letterboxdImport.js';
+import { connectedAccounts, favorites, titleComments, userRatings, users, watchHistory } from '../db/schema.js';
+import {
+  mapLetterboxdCollectionItem,
+  mapLetterboxdRatingItem,
+  selectLetterboxdHistory,
+} from './letterboxdImport.js';
 import {
   fetchLetterboxdFeed,
+  letterboxdReviewHash,
   nextSeenGuids,
   nextSeenRatings,
   pendingLetterboxdEntries,
+  pendingLetterboxdLikes,
+  pendingLetterboxdReviews,
 } from './letterboxdRss.js';
 import { getTitlePoster } from './tmdbPoster.js';
 
@@ -144,6 +157,83 @@ async function applyRatings(userId, items) {
   return { imported, updated };
 }
 
+async function applyLikes(userId, items) {
+  if (!items.length) return 0;
+  const byMovie = new Map(items.map((item) => [item.tmdbId, item]));
+  const values = (await withPosters([...byMovie.values()]))
+    .map((item) => mapLetterboxdCollectionItem({ ...item, addedAt: item.publishedAt }, userId))
+    .filter(Boolean);
+  if (!values.length) return 0;
+  const rows = await db.insert(favorites).values(values).onConflictDoNothing().returning({ id: favorites.id });
+  return rows.length;
+}
+
+/**
+ * Reseñas del feed → reseñas nativas de la ficha (title_comments). Devuelve
+ * el nuevo estado { guid: { id, hash } } (solo de entradas del feed actual:
+ * las que salen del feed ya no pueden volver) y cuántas creó o actualizó.
+ */
+async function applyReviews(userId, items, previous = {}) {
+  const state = {};
+  for (const item of items) if (previous[item.guid]) state[item.guid] = previous[item.guid];
+  const { create, update } = pendingLetterboxdReviews(items, state);
+  if (!create.length && !update.length) return { state, created: 0, updated: 0 };
+
+  const [author] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  let created = 0;
+  let updated = 0;
+  for (const item of create) {
+    // Ya escrita aquí con el mismo texto (p. ej. a mano): se enlaza, no se duplica.
+    const [existing] = await db
+      .select({ id: titleComments.id })
+      .from(titleComments)
+      .where(
+        and(
+          eq(titleComments.userId, userId),
+          eq(titleComments.tmdbId, item.tmdbId),
+          eq(titleComments.mediaType, 'movie'),
+          eq(titleComments.source, 'native'),
+          eq(titleComments.body, item.review.body),
+        ),
+      )
+      .limit(1);
+    let id = existing?.id || null;
+    if (!id) {
+      const [row] = await db
+        .insert(titleComments)
+        .values({
+          tmdbId: item.tmdbId,
+          mediaType: 'movie',
+          source: 'native',
+          userId,
+          authorName: author?.displayName || author?.username || 'Usuario',
+          authorUsername: author?.username || null,
+          authorAvatarUrl: author?.avatarUrl || null,
+          authorIsVip: false,
+          body: item.review.body,
+          likes: 0,
+          spoiler: Boolean(item.review.spoiler),
+          createdAt: new Date(item.publishedAt),
+        })
+        .returning({ id: titleComments.id });
+      id = row?.id || null;
+      if (id) created += 1;
+    }
+    state[item.guid] = { id, hash: letterboxdReviewHash(item.review) };
+  }
+  for (const { item, commentId } of update) {
+    const [row] = await db
+      .update(titleComments)
+      .set({ body: item.review.body, spoiler: Boolean(item.review.spoiler) })
+      .where(and(eq(titleComments.id, commentId), eq(titleComments.userId, userId), eq(titleComments.source, 'native')))
+      .returning({ id: titleComments.id });
+    // Borrada aquí: se recuerda para no volver a crearla.
+    state[item.guid] = { id: row?.id || null, hash: letterboxdReviewHash(item.review) };
+    if (row) updated += 1;
+  }
+  return { state, created, updated };
+}
+
 /**
  * Una pasada para una cuenta: lee el feed, añade los visionados nuevos, aplica
  * las puntuaciones nuevas o editadas y guarda el estado en metadata.
@@ -166,16 +256,22 @@ export async function syncLetterboxdAccount(account, { fetchFeed = fetchLetterbo
       }
     }
     const ratingsResult = await applyRatings(userId, await withPosters(ratings));
+    const favoritesAdded = await applyLikes(userId, pendingLetterboxdLikes(items, meta.likedGuids || []));
+    const reviews = await applyReviews(userId, items, meta.reviews || {});
 
     const lastResult = {
       entries: fresh.length,
       edited: edited.length,
       history: historyImported,
       ratings: ratingsResult.imported + ratingsResult.updated,
+      favorites: favoritesAdded,
+      reviews: reviews.created + reviews.updated,
     };
     await patchMetadata(account.id, {
       seenGuids: nextSeenGuids(items, meta.seenGuids || []),
       seenRatings: nextSeenRatings(items),
+      likedGuids: items.filter((item) => item.liked).map((item) => item.guid),
+      reviews: reviews.state,
       lastSyncedAt: now.toISOString(),
       lastResult,
       lastError: null,
