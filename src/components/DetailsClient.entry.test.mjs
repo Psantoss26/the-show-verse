@@ -21,7 +21,8 @@ test("DetailsClient waits for client readiness before starting entry animations"
   assert.match(source, /window\.addEventListener\("scroll", scheduleActions, \{ passive: true \}\)/);
   assert.match(source, /window\.requestAnimationFrame\(\(\) => \{\s*frame = 0;\s*syncActions\(\);/);
   const hero = await readFile(new URL("./details/MobileDetailsHero.jsx", import.meta.url), "utf8");
-  assert.match(hero, /trigger\.getBoundingClientRect\(\)\.top <= window\.innerHeight - MOBILE_BOTTOM_NAV_PX/);
+  assert.match(hero, /const revealLine = readBottomNavTop\(\)/);
+  assert.match(hero, /trigger\.getBoundingClientRect\(\)\.top <= revealLine/);
   assert.match(hero, /window\.addEventListener\('scroll', scheduleSync, \{ passive: true \}\)/);
   assert.match(hero, /el\.setAttribute\(MOBILE_REVEAL_ATTR, value\)/);
   assert.doesNotMatch(source, /max-sm:delay-\[70ms\]/);
