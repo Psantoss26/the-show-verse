@@ -1414,11 +1414,14 @@ body {
    Scope the temporary fallback to this drawer, including nested glass controls.
    Keep the surface readable and restore its original glass only when settled.
    Do not transition backdrop-filter: that would recreate the expensive frames. */
-.sv-drawer-panel:is([data-drawer-moving], [data-drawer-scrolling]) {
+.sv-drawer-panel[data-drawer-moving],
+.sv-drawer-panel[data-drawer-scrolling]:not(.sv-panel-scroll-scope) {
   background-color: rgb(18 18 18 / 96%);
 }
-.sv-drawer-panel:is([data-drawer-moving], [data-drawer-scrolling]),
-.sv-drawer-panel:is([data-drawer-moving], [data-drawer-scrolling]) * {
+.sv-drawer-panel[data-drawer-moving],
+.sv-drawer-panel[data-drawer-moving] *,
+.sv-drawer-panel[data-drawer-scrolling]:not(.sv-panel-scroll-scope),
+.sv-drawer-panel[data-drawer-scrolling]:not(.sv-panel-scroll-scope) * {
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
 }
@@ -1426,8 +1429,10 @@ body {
    indicador del menú de secciones queda fuera: su desplazamiento es justo lo
    que ocurre durante el scroll (cambia la sección activa) y es solo
    `transform`/`width` de un elemento, sin cristal. */
-.sv-drawer-panel:is([data-drawer-moving], [data-drawer-scrolling]),
-.sv-drawer-panel:is([data-drawer-moving], [data-drawer-scrolling]) *:not(.sv-menu-indicator) {
+.sv-drawer-panel[data-drawer-moving],
+.sv-drawer-panel[data-drawer-moving] *:not(.sv-menu-indicator),
+.sv-drawer-panel[data-drawer-scrolling]:not(.sv-panel-scroll-scope),
+.sv-drawer-panel[data-drawer-scrolling]:not(.sv-panel-scroll-scope) *:not(.sv-menu-indicator) {
   transition: none !important;
 }
 
@@ -1451,7 +1456,7 @@ body {
    hilo principal, recalculando estilos en CADA fotograma del scroll. Se
    excluyen las ligadas al propio scroll (relevo portada → fondo de la vista de
    teléfono), que son las que tienen que seguir al dedo. */
-.sv-drawer-panel[data-drawer-scrolling] *:not(.sv-panel-relay-in, .sv-panel-relay-shade, .sv-panel-relay-out, .sv-menu-icon) {
+.sv-drawer-panel[data-drawer-scrolling]:not(.sv-panel-scroll-scope) *:not(.sv-panel-relay-in, .sv-panel-relay-shade, .sv-panel-relay-out, .sv-menu-icon) {
   animation-play-state: paused !important;
 }
 

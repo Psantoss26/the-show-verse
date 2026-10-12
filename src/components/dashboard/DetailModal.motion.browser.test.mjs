@@ -6,6 +6,31 @@ import { readFileSync } from 'node:fs';
 // needs to be running at TEST_BASE_URL (default localhost:3000).
 const enabled = Boolean(process.env.PLAYWRIGHT_MODULE);
 
+test('phone drawer keeps its visual surface stable while its own scroller moves', () => {
+  const css = readFileSync(new URL('../../app/globals.css', import.meta.url), 'utf8');
+
+  // The compact phone layout is also used inside a tablet-width side drawer.
+  // It must not inherit the performance fallback that removes glass, disables
+  // transitions and pauses CSS animations for every other drawer on scroll:
+  // those per-gesture visual state changes were the visible flicker.
+  assert.match(
+    css,
+    /\.sv-drawer-panel\[data-drawer-scrolling\]:not\(\.sv-panel-scroll-scope\) \{\s*background-color:/,
+  );
+  assert.match(
+    css,
+    /\.sv-drawer-panel\[data-drawer-scrolling\]:not\(\.sv-panel-scroll-scope\) \* \{\s*-webkit-backdrop-filter: none !important;/,
+  );
+  assert.match(
+    css,
+    /\.sv-drawer-panel\[data-drawer-scrolling\]:not\(\.sv-panel-scroll-scope\) \*:not\(\.sv-menu-indicator\) \{\s*transition: none !important;/,
+  );
+  assert.match(
+    css,
+    /\.sv-drawer-panel\[data-drawer-scrolling\]:not\(\.sv-panel-scroll-scope\) \*:not\(\.sv-panel-relay-in, .sv-panel-relay-shade, .sv-panel-relay-out, .sv-menu-icon\) \{\s*animation-play-state: paused !important;/,
+  );
+});
+
 test('touch drawer surfaces stay identical before, during and after scroll', { skip: !enabled }, async () => {
   const browser = await launch();
   try {
