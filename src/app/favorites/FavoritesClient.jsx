@@ -1701,7 +1701,7 @@ function GroupDivider({
           <motion.div layout
             aria-hidden="true"
             style={{ borderRadius: 16 }}
-            className={`pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg ${stickyTransitionClass} ${renderSticky ? "shadow-md" : "shadow-xl"}`}
+            className={`sv-group-surface pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg ${stickyTransitionClass} ${renderSticky ? "shadow-md" : "shadow-xl"}`}
           />
           <motion.div layout="position"
             className={`relative z-10 px-3 sm:px-6 flex items-center justify-between gap-3 sm:gap-6 ${stickyTransitionClass} ${renderSticky ? "py-2 sm:py-2.5" : "py-2.5 sm:py-5"}`}

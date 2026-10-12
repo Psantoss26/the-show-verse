@@ -2595,6 +2595,20 @@ svg.recharts-surface *:focus {
   backdrop-filter: blur(7px) saturate(190%) brightness(1.06);
 }
 
+/* Keep the mobile grouping surface inexpensive and identical in both states.
+   Changing the blur kernel, gradient and shadow while projecting its size
+   rebuilds the backdrop during touch scrolling. Only its geometry animates. */
+@media (max-width: 639px) {
+  [data-group-divider] .sv-group-surface {
+    background-image: none;
+    background-color: rgb(0 0 0 / 0.15);
+    -webkit-backdrop-filter: blur(7px) saturate(190%) brightness(1.06);
+    backdrop-filter: blur(7px) saturate(190%) brightness(1.06);
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    transition: none;
+  }
+}
+
 /* Imagen que no se pudo cargar (p. ej. sin conexión y fuera de caché): no se
    muestra el icono de imagen rota ni su texto alternativo. Ver brokenImages.js. */
 img[data-img-broken] {
