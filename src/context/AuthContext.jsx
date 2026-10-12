@@ -3,6 +3,7 @@
 
 import {
   createContext,
+  startTransition,
   useCallback,
   useContext,
   useEffect,
@@ -243,23 +244,29 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  // Se llama al arrancar (ver `hydrateAuth`): sus cambios de estado van en
+  // transición por lo mismo que los de la sesión (ver el efecto de abajo).
   const loadPreferences = useCallback(async () => {
-    setLoadingPreferences(true);
+    startTransition(() => setLoadingPreferences(true));
     try {
       const res = await fetch("/api/user/preferences", { cache: "no-store" });
       const json = await res.json().catch(() => ({}));
       if (res.ok && json?.preferences) {
         const merged = mergePreferences(json.preferences);
-        setPreferences(merged);
         syncPreferenceCookies(merged);
         writeAuthPreferencesCache(merged);
-        setPreferencesCached(true);
+        startTransition(() => {
+          setPreferences(merged);
+          setPreferencesCached(true);
+        });
       }
     } catch (err) {
       console.warn("No se pudieron cargar las preferencias", err);
     } finally {
-      setLoadingPreferences(false);
-      setPreferencesReady(true);
+      startTransition(() => {
+        setLoadingPreferences(false);
+        setPreferencesReady(true);
+      });
     }
   }, [syncPreferenceCookies]);
 
@@ -327,17 +334,28 @@ export const AuthProvider = ({ children }) => {
     setPreferencesCached(true);
   }, []);
 
-  // Restaura el perfil cacheado antes de que el navegador pinte. El efecto
-  // asíncrono inferior sigue verificando la sesión con el servidor, pero el
-  // navbar no pasa por un placeholder entre recargas cuando ya conocemos al
-  // usuario de este dispositivo.
+  // Restaura el perfil cacheado al montar. El efecto asíncrono inferior sigue
+  // verificando la sesión con el servidor.
+  //
+  // TODO LO QUE CAMBIA ESTE CONTEXTO AL ARRANCAR VA EN TRANSICIÓN. La página
+  // cuelga de un <Suspense> (los `loading.jsx`) que hidrata DESPUÉS que este
+  // proveedor, en cuanto llega el código de la ruta. Si el contexto cambia
+  // antes con una actualización urgente, React no puede conservar el HTML del
+  // servidor: lo tira, vuelve a enseñar el `loading` y pinta la página entera
+  // en el cliente (medido con red móvil en una ficha de episodio: la portada,
+  // ya descargada, se rehacía y aparecía ~1 s más tarde). En transición, React
+  // hidrata primero esa parte y aplica el cambio después. El navbar no pasa por
+  // un placeholder: el avatar lo pinta antes `avatar-boot` (AvatarBootScript).
   useLayoutEffect(() => {
     const cachedUser = readAuthUserCache();
-    if (cachedUser) {
-      setUser(cachedUser);
-      setHydrated(true);
-    }
-    setPreferencesCached(hasAuthPreferencesCache());
+    const cachedPreferences = hasAuthPreferencesCache();
+    startTransition(() => {
+      if (cachedUser) {
+        setUser(cachedUser);
+        setHydrated(true);
+      }
+      setPreferencesCached(cachedPreferences);
+    });
   }, []);
 
   const refreshMe = useCallback(async () => {
@@ -388,8 +406,10 @@ export const AuthProvider = ({ children }) => {
       // sin esperar a la red (igual que History/Stats). Se revalida abajo.
       const cachedUser = readAuthUserCache();
       if (cachedUser) {
-        setUser(cachedUser);
-        setHydrated(true);
+        startTransition(() => {
+          setUser(cachedUser);
+          setHydrated(true);
+        });
       }
 
       const fetchMe = async () => {
@@ -437,21 +457,24 @@ export const AuthProvider = ({ children }) => {
         }
 
         if (cancelled) return;
-        const loggedUser = applyUser(nextUser);
         // 2) Desbloqueamos el navbar/Profile tras UNA sola llamada; las
         // preferencias se cargan en segundo plano (no en la ruta crítica).
-        setHydrated(true);
-        if (loggedUser) {
-          loadPreferences();
-        } else {
-          setPreferencesReady(true);
-        }
+        // En transición: ver el efecto de restauración de arriba.
+        let loggedUser = null;
+        startTransition(() => {
+          loggedUser = applyUser(nextUser);
+          setHydrated(true);
+          if (!loggedUser) setPreferencesReady(true);
+        });
+        if (loggedUser) loadPreferences();
       } catch (e) {
         console.warn("No se pudo hidratar la sesión propia", e);
-        if (!cancelled && !cachedUser) applyUser(null);
         if (!cancelled) {
-          setPreferencesReady(true);
-          setHydrated(true);
+          startTransition(() => {
+            if (!cachedUser) applyUser(null);
+            setPreferencesReady(true);
+            setHydrated(true);
+          });
         }
       }
     }

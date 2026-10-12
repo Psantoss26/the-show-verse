@@ -4,12 +4,20 @@
 // escribe y se refresca: antes cada página tenía su copia y una podía guardar
 // entradas que la otra interpretaba de otra forma.
 
+import { setLocalStorageItem } from "../storage/localStorageBudget.js";
+
 // Los títulos recientes cambian de nota más rápido; los antiguos aguantan más.
 export const SCORE_CACHE_RECENT_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
 export const SCORE_CACHE_ACTIVE_WINDOW_MS = 365 * 24 * 60 * 60 * 1000;
 export const SCORE_CACHE_RECENT_TTL_MS = 12 * 60 * 60 * 1000;
 export const SCORE_CACHE_ACTIVE_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 export const SCORE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+// Edad a la que una entrada se DESCARTA. Ha de ser mayor que cualquier TTL: una
+// nota caducada se sigue usando (y se refresca solo en la caché) para que la
+// lista entre ya ordenada. Antes coincidía con el TTL de los títulos antiguos,
+// que pasaban de «vigente» a «no existe» sin estado intermedio: al entrar se
+// pintaban al final de su grupo y saltaban a su sitio al llegar la nota.
+export const SCORE_CACHE_MAX_AGE_MS = 120 * 24 * 60 * 60 * 1000;
 // Un «sin nota en IMDb» confirmado se vuelve a comprobar pasado un día.
 export const SCORE_CACHE_MISSING_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -48,7 +56,7 @@ export function readScoreCacheEntries(source, now = Date.now()) {
     const cache = new Map();
 
     Object.entries(parsed).forEach(([id, entry]) => {
-      if (!entry?.t || now - entry.t >= SCORE_CACHE_TTL_MS) return;
+      if (!entry?.t || now - entry.t >= SCORE_CACHE_MAX_AGE_MS) return;
       // Una entrada negativa solo vale si el servidor CONFIRMÓ que no hay nota
       // (`none`). Las de una versión anterior podían venir de un fallo pasajero
       // y dejaban títulos con nota clavados al final de su grupo: se ignoran y
@@ -96,7 +104,7 @@ export function writeScoreCache(source, scoresMap, refreshedIds = null) {
     const data = {};
 
     Object.entries(previous || {}).forEach(([id, entry]) => {
-      if (entry?.t && now - entry.t < SCORE_CACHE_TTL_MS) {
+      if (entry?.t && now - entry.t < SCORE_CACHE_MAX_AGE_MS) {
         data[id] = entry;
       }
     });
@@ -109,7 +117,12 @@ export function writeScoreCache(source, scoresMap, refreshedIds = null) {
         score === null ? { score, t: now, none: true } : { score, t: now };
     }
 
-    window.localStorage.setItem(key, JSON.stringify(data));
+    // Si el almacenamiento está lleno, hace sitio tirando cachés regenerables
+    // en vez de fallar en silencio (y dejar la lista sin notas en la próxima
+    // visita).
+    if (!setLocalStorageItem(key, JSON.stringify(data))) {
+      console.warn("Failed to write score cache: storage unavailable");
+    }
   } catch (e) {
     console.warn("Failed to write score cache:", e);
   }

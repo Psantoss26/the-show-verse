@@ -31,7 +31,10 @@ import { offlineMutationFetch } from "@/lib/offline/syncQueue";
 import DetailsInfoTabs from "@/components/details/DetailsInfoTabs";
 import { AnimatedSection } from "@/components/details/AnimatedSection";
 import AnimatedPosterFrame from "@/components/details/AnimatedPosterFrame";
-import EpisodeStillStack from "@/components/details/EpisodeStillStack";
+import EpisodeStillStack, {
+  episodeStillSrc,
+  useEpisodeStillStackLoad,
+} from "@/components/details/EpisodeStillStack";
 import {
   MOBILE_ACTIONS_ENTRY_ANIMATION,
   MOBILE_REVEAL_BASE,
@@ -40,7 +43,7 @@ import {
   MobileHeroCover,
   useMobileDetailsHero,
 } from "@/components/details/MobileDetailsHero";
-import useImageLoadReady from "@/lib/hooks/useImageLoadReady";
+import useFitTextLines from "@/lib/hooks/useFitTextLines";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import StreamingHoverOverlay from "@/components/details/StreamingHoverOverlay";
 import DetailsScoreboardPanel, {
@@ -379,15 +382,18 @@ export default function EpisodeDetailsClient({
       : [];
   const isBackNav = useIsHistoryNavigation();
   const animateMobileEntry = !isBackNav;
-  const mobileCoverFirstSrc = mobileStillPaths[0]
-    ? `https://image.tmdb.org/t/p/w780${mobileStillPaths[0]}`
-    : null;
-  const mobileCoverLoad = useImageLoadReady(mobileCoverFirstSrc);
-  const [mobileCoverFailedSrc, setMobileCoverFailedSrc] = useState(null);
-  const mobileCoverReady =
-    !mobileCoverFirstSrc ||
-    mobileCoverLoad.ready ||
-    mobileCoverFailedSrc === mobileCoverFirstSrc;
+  // La portada (y con ella título y botones) aparece cuando TODAS sus bandas
+  // están listas, no solo la primera: ver EpisodeStillStack.
+  const mobileStillStackLoad = useEpisodeStillStackLoad(mobileStillPaths);
+  const mobileCoverReady = mobileStillStackLoad.ready;
+  // Título del episodio en el teléfono: como mucho DOS líneas. Los nombres
+  // largos bajan de tamaño (36 → 20 px) en vez de ocupar 3-4 líneas.
+  const mobileTitleRef = useFitTextLines({
+    lines: 2,
+    min: 20,
+    max: 36,
+    deps: [epName, mobileCoverReady],
+  });
   const {
     rootRef: heroRootRef,
     coverSpacerRef: heroCoverSpacerRef,
@@ -1447,7 +1453,7 @@ export default function EpisodeDetailsClient({
           // Fondo decorativo difuminado: <img> directo, solo en teléfono.
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={`https://image.tmdb.org/t/p/w780${mobileStillPaths[0]}`}
+            src={episodeStillSrc(mobileStillPaths[0])}
             alt=""
             aria-hidden="true"
             decoding="async"
@@ -1462,14 +1468,7 @@ export default function EpisodeDetailsClient({
           lowSrc={null}
           ready={mobileCoverReady}
           animate={animateMobileEntry}
-          collage={
-            <EpisodeStillStack
-              paths={mobileStillPaths}
-              imgRef={mobileCoverLoad.imgRef}
-              onLoad={mobileCoverLoad.onLoad}
-              onError={() => setMobileCoverFailedSrc(mobileCoverFirstSrc)}
-            />
-          }
+          collage={<EpisodeStillStack load={mobileStillStackLoad} />}
         />
 
         {/* Sombreados de legibilidad. En MÓVIL siguen al scroll hasta el 60%,
@@ -1516,7 +1515,10 @@ export default function EpisodeDetailsClient({
                 <div className="mb-2 text-xs font-bold uppercase tracking-widest text-zinc-300 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
                   Episodio {episodeNumber} · Temporada {seasonNumber}
                 </div>
-                <h1 className="max-w-[92%] text-4xl font-black leading-[1] tracking-tight text-white text-balance drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)]">
+                <h1
+                  ref={mobileTitleRef}
+                  className="line-clamp-2 max-w-[92%] text-4xl font-black leading-[1.05] tracking-tight text-white text-balance drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)]"
+                >
                   {epName}
                 </h1>
                 {inProgressPct != null ? (

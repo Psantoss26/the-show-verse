@@ -1079,6 +1079,35 @@ body {
   overscroll-behavior-y: none;
 }
 
+/* PWA INSTALADA EN MÓVIL: SIN SELECCIÓN DE TEXTO NI PULSACIÓN LARGA. Instalada
+   debe comportarse como una app nativa: mantener el dedo sobre un título o una
+   tarjeta no selecciona texto ni abre el menú de enlace/imagen (iOS). En
+   Android Chrome ignora `-webkit-touch-callout`; ese menú lo corta PwaManager
+   cancelando `contextmenu`.
+
+   Solo con `display-mode: standalone` y puntero táctil: en una pestaña del
+   navegador y en la PWA de escritorio se sigue pudiendo copiar texto. Los
+   campos editables recuperan la selección (en iOS, `user-select: none` en un
+   input impide escribir en él). En `@layer base` para que una utilidad
+   `select-text` pueda reactivarla en un elemento concreto. */
+@layer base {
+  @media (display-mode: standalone) and (hover: none) and (pointer: coarse) {
+    html {
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    input,
+    textarea,
+    [contenteditable]:not([contenteditable="false"]) {
+      -webkit-user-select: text;
+      user-select: text;
+      -webkit-touch-callout: default;
+    }
+  }
+}
+
 /* Velo de la navbar sobre el póster full-bleed de las fichas, en MÓVIL.
 
    La navbar arranca justo en el borde superior del póster. Con el fondo glass,

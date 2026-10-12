@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test, { beforeEach } from "node:test";
 
 import {
+  SCORE_CACHE_MAX_AGE_MS,
   SCORE_CACHE_MISSING_TTL_MS,
+  SCORE_CACHE_TTL_MS,
   fetchImdbScoresForItems,
   readScoreCache,
   readScoreCacheEntries,
@@ -105,4 +107,30 @@ test("un lote sin claves válidas devuelve la forma esperada sin pedir nada", as
   const result = await fetchImdbScoresForItems([{ title: "sin id" }]);
   assert.deepEqual(result.items, {});
   assert.equal(result.unresolved.size, 0);
+});
+
+test("una nota caducada de un título antiguo se sigue leyendo (y se marca para refrescar)", () => {
+  const now = Date.now();
+  const item = { id: 7, title: "antigua", release_date: "1999-03-31" };
+  const writtenAt = now - SCORE_CACHE_TTL_MS - 24 * 60 * 60 * 1000;
+  installStorage({ [KEY]: { "movie:7": { score: 8.7, t: writtenAt } } });
+
+  // Si desapareciera, el título se pintaría al final de su grupo y saltaría a
+  // su sitio al llegar la nota: la lista se reordenaría al entrar.
+  const entries = readScoreCacheEntries("imdb", now);
+  assert.equal(entries.get("movie:7")?.score, 8.7);
+  assert.equal(shouldRefreshScore(item, entries.get("movie:7"), now), true);
+});
+
+test("las entradas demasiado viejas sí se descartan al leer y al escribir", () => {
+  const now = Date.now();
+  installStorage({
+    [KEY]: { "movie:7": { score: 8.7, t: now - SCORE_CACHE_MAX_AGE_MS } },
+  });
+  assert.equal(readScoreCacheEntries("imdb", now).has("movie:7"), false);
+
+  writeScoreCache("imdb", new Map([["movie:8", 6.1]]));
+  const stored = JSON.parse(window.localStorage.getItem(KEY));
+  assert.equal(stored["movie:7"], undefined);
+  assert.equal(stored["movie:8"].score, 6.1);
 });
