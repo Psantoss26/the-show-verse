@@ -1455,6 +1455,23 @@ body {
   animation-play-state: paused !important;
 }
 
+/* Touch scrolling repeatedly alternates between momentum and idle. Keep the
+   inexpensive drawer surface at rest too: restoring live glass after every
+   gesture changes its colour and rebuilds compositing layers (visible flash
+   on tablets/PWAs). Input capability also covers landscape tablets >1024px.
+   Decorative animations can still pause during scroll; the surface is stable. */
+@media (hover: none), (pointer: coarse) {
+  .sv-drawer-panel {
+    background-color: rgb(18 18 18 / 96%);
+  }
+
+  .sv-drawer-panel,
+  .sv-drawer-panel * {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+}
+
 /* LA PÁGINA DE DETRÁS SE REORGANIZA EN DIRECTO mientras se arrastra el
    tirador del drawer acoplado (su margen sigue al panel en cada fotograma, ver
    `updateDrawerWidth` en DetailModalProvider). Sus transiciones se apagan

@@ -1,9 +1,46 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 
 // PLAYWRIGHT_MODULE points to an existing Playwright installation; the app
 // needs to be running at TEST_BASE_URL (default localhost:3000).
 const enabled = Boolean(process.env.PLAYWRIGHT_MODULE);
+
+test('touch drawer surfaces stay identical before, during and after scroll', { skip: !enabled }, async () => {
+  const browser = await launch();
+  try {
+    const css = readFileSync(new URL('../../app/globals.css', import.meta.url), 'utf8');
+    for (const width of [834, 1194]) {
+      const page = await browser.newPage({
+        viewport: { width, height: 1000 }, isMobile: true, hasTouch: true,
+      });
+      await page.setContent(`<style>
+        .sv-drawer-panel { background-color: rgb(0 0 0 / 47%); }
+        .glass { backdrop-filter: blur(16px); }
+      </style><div class="sv-drawer-panel"><button class="glass">Acción</button></div>`);
+      await page.addStyleTag({ content: css });
+      const states = await page.locator('.sv-drawer-panel').evaluate(async (panel) => {
+        const snapshots = [];
+        for (const state of ['', 'data-drawer-scrolling', 'data-drawer-settling', '']) {
+          panel.removeAttribute('data-drawer-scrolling');
+          panel.removeAttribute('data-drawer-settling');
+          if (state) panel.setAttribute(state, '');
+          await new Promise(requestAnimationFrame);
+          snapshots.push({
+            background: getComputedStyle(panel).backgroundColor,
+            filter: getComputedStyle(panel.querySelector('.glass')).backdropFilter,
+          });
+        }
+        return snapshots;
+      });
+      assert.equal(states[0].filter, 'none');
+      for (const state of states.slice(1)) {
+        assert.deepEqual(state, states[0], `surface must not flash at ${width}px`);
+      }
+      await page.close();
+    }
+  } finally { await browser.close(); }
+});
 
 async function launch() {
   const { chromium } = await import(process.env.PLAYWRIGHT_MODULE);

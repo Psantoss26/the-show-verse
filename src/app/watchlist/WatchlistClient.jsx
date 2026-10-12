@@ -1112,11 +1112,15 @@ function StatBox({
           />
         ) : null}
 
-        {!horizontal && (
-          <motion.span layout className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-zinc-400 truncate">
+          <motion.span
+            layout="position"
+            initial={false}
+            animate={{ opacity: horizontal ? 0 : 1 }}
+            aria-hidden={horizontal}
+            className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-zinc-400 truncate ${horizontal ? "w-0 -ml-1.5" : ""}`}
+          >
             {label}
           </motion.span>
-        )}
       </motion.div>
 
       <motion.div layout className="flex items-baseline gap-1.5 min-w-0">
@@ -1160,7 +1164,15 @@ function GroupDivider({
       : "transition-[color,background-color,box-shadow] duration-[340ms] ease-[cubic-bezier(0.22,1,0.36,1)]";
 
   return (
-    <MotionConfig reducedMotion={skipMotion ? "always" : "user"} transition={{ layout: { duration: skipMotion ? 0 : 0.34, ease: [0.22, 1, 0.36, 1] } }}>
+    <MotionConfig
+      reducedMotion={skipMotion ? "always" : "user"}
+      transition={{
+        layout: skipMotion
+          ? { duration: 0 }
+          : { type: "spring", stiffness: 380, damping: 38, mass: 1 },
+        opacity: { duration: skipMotion ? 0 : 0.18 },
+      }}
+    >
     <motion.div
       ref={ref}
       layoutRoot
@@ -1179,28 +1191,32 @@ function GroupDivider({
         skipMotion ? { duration: 0 } : { duration: 0.24, ease: "easeOut" }
       }
     >
-      <motion.div layout className="flex min-w-0 items-center gap-3 lg:gap-4">
-        <motion.div layout
-          className={`relative min-w-0 flex-1 overflow-hidden rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg ${stickyTransitionClass} ${renderSticky ? "shadow-md" : "shadow-xl"}`}
-        >
+      <motion.div layout="position" className="flex min-w-0 items-center gap-3 lg:gap-4">
+        <motion.div layout="position" className="relative isolate min-w-0 flex-1">
+          {/* Only the surface scales. Text must not inherit its projection. */}
           <motion.div layout
+            aria-hidden="true"
+            style={{ borderRadius: 16 }}
+            className={`pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg ${stickyTransitionClass} ${renderSticky ? "shadow-md" : "shadow-xl"}`}
+          />
+          <motion.div layout="position"
             className={`relative z-10 px-3 sm:px-6 flex items-center justify-between gap-3 sm:gap-6 ${stickyTransitionClass} ${renderSticky ? "py-2 sm:py-2.5" : "py-2.5 sm:py-5"}`}
           >
-            <motion.div layout className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+            <motion.div layout="position" className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
               <motion.div layout
                 className={`bg-gradient-to-b from-blue-500 to-cyan-600 shadow-[0_0_15px_rgba(59,130,246,0.4)] shrink-0 ${stickyTransitionClass} ${renderSticky ? "w-2 h-2 rounded-full" : "w-1 sm:w-1.5 h-8 sm:h-12 rounded-full"}`}
               />
 
-              <motion.div layout
+              <motion.div layout="position"
                 className={`min-w-0 flex-1 ${stickyTransitionClass} ${renderSticky ? "flex flex-wrap items-center gap-x-3 gap-y-1" : ""}`}
               >
-                <motion.h2 layout
+                <motion.h2 layout="position"
                   className={`font-black tracking-tight text-white leading-tight line-clamp-1 drop-shadow-md ${stickyTransitionClass} ${renderSticky ? "text-base sm:text-lg" : "text-base sm:text-2xl"}`}
                 >
                   {title}
                 </motion.h2>
 
-                <motion.div layout
+                <motion.div layout="position"
                   className={`text-zinc-500 font-medium flex items-center gap-x-1.5 sm:gap-x-2 ${stickyTransitionClass} ${renderSticky ? "mt-0 text-[10px] sm:text-xs" : "mt-0.5 sm:mt-1 text-[10px] sm:text-sm"}`}
                 >
                   <span className="text-zinc-300 font-bold">{count}</span>
@@ -1258,7 +1274,7 @@ function GroupDivider({
             onClick={onPreviousGroup}
             disabled={!hasPreviousGroup}
             aria-label="Ir a la agrupación anterior"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-zinc-200 transition-all duration-200 hover:bg-blue-500/15 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 disabled:pointer-events-none disabled:opacity-35"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-zinc-200 transition-[color,background-color,opacity] duration-200 hover:bg-blue-500/15 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 disabled:pointer-events-none disabled:opacity-35"
           >
             <ChevronUp className="h-5 w-5" />
           </motion.button>
@@ -1267,7 +1283,7 @@ function GroupDivider({
             onClick={onNextGroup}
             disabled={!hasNextGroup}
             aria-label="Ir a la siguiente agrupación"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-zinc-200 transition-all duration-200 hover:bg-blue-500/15 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 disabled:pointer-events-none disabled:opacity-35"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-zinc-200 transition-[color,background-color,opacity] duration-200 hover:bg-blue-500/15 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 disabled:pointer-events-none disabled:opacity-35"
           >
             <ChevronDown className="h-5 w-5" />
           </motion.button>
