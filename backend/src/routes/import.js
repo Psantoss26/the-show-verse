@@ -13,6 +13,7 @@ import {
   connectedAccounts,
 } from '../db/schema.js';
 import {
+  mapLetterboxdCollectionItem,
   mapLetterboxdRatingItem,
   selectLetterboxdHistory,
 } from '../lib/letterboxdImport.js';
@@ -875,14 +876,15 @@ export default async function importRoutes(fastify) {
   });
 
   // POST /import/letterboxd/data/chunk - una tanda de la exportación de
-  // Letterboxd ya resuelta a TMDb: { history, ratings, reset }. `reset` marca la
-  // primera tanda; los totales se acumulan en el progreso.
+  // Letterboxd ya resuelta a TMDb: { history, ratings, favorites, watchlist,
+  // reset }. `reset` marca la primera tanda; los totales se acumulan en el
+  // progreso.
   fastify.post('/letterboxd/data/chunk', async (req, reply) => {
-    const { history = [], ratings = [], reset = false } = req.body || {};
-    if (!Array.isArray(history) || !Array.isArray(ratings)) {
-      return reply.status(400).send({ error: 'history and ratings must be arrays' });
+    const { history = [], ratings = [], favorites: likes = [], watchlist: queue = [], reset = false } = req.body || {};
+    if (![history, ratings, likes, queue].every(Array.isArray)) {
+      return reply.status(400).send({ error: 'history, ratings, favorites and watchlist must be arrays' });
     }
-    if (history.length > 1000 || ratings.length > 1000) {
+    if ([history, ratings, likes, queue].some((list) => list.length > 1000)) {
       return reply.status(413).send({ error: 'Import chunk is too large' });
     }
 
@@ -923,11 +925,28 @@ export default async function importRoutes(fastify) {
         ? await importNormalizedRatingValues(userId, ratingValues, ratings.length)
         : { status: 'done', fetched: ratings.length, imported: 0, updated: 0 };
 
+      // Favoritas y pendientes: solo se añaden (lo que ya estaba se respeta).
+      const addCollection = async (table, items) => {
+        const values = dedupeBy(
+          items.map((item) => mapLetterboxdCollectionItem(item, userId)).filter(Boolean),
+          (item) => `${item.tmdbId}:${item.mediaType}`,
+        );
+        const imported = values.length ? await insertInChunks(table, values) : 0;
+        return { status: 'done', fetched: items.length, imported, skipped: items.length - imported };
+      };
+      const favoritesResult = await addCollection(favorites, likes);
+      const watchlistResult = await addCollection(watchlist, queue);
+
       progress.steps.history = mergeStepData(progress.steps.history, historyResult);
       progress.steps.ratings = mergeStepData(progress.steps.ratings, ratingsResult);
+      progress.steps.favorites = mergeStepData(progress.steps.favorites, favoritesResult);
+      progress.steps.watchlist = mergeStepData(progress.steps.watchlist, watchlistResult);
       progress.status = 'done';
       progress.completedAt = new Date();
-      return reply.send({ ...progress, chunk: { history: historyResult, ratings: ratingsResult } });
+      return reply.send({
+        ...progress,
+        chunk: { history: historyResult, ratings: ratingsResult, favorites: favoritesResult, watchlist: watchlistResult },
+      });
     } catch (err) {
       progress.status = 'error';
       progress.error = err.message;

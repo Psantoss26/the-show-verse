@@ -101,11 +101,19 @@ export async function resolveLetterboxdFilms(films = []) {
 }
 
 /** Une la tanda con lo resuelto: lo que se manda al backend. */
-export function mapLetterboxdChunk({ history = [], ratings = [] }, resolved) {
+export function mapLetterboxdChunk({ history = [], ratings = [], favorites = [], watchlist = [] }, resolved) {
   const withMovie = (item) => {
     const movie = resolved.get(item?.film);
     return movie ? { ...movie, mediaType: "movie" } : null;
   };
+  // Favoritas (likes) y pendientes (watchlist).
+  const collection = (items) =>
+    (Array.isArray(items) ? items : [])
+      .map((item) => {
+        const movie = withMovie(item);
+        return movie ? { ...movie, addedAt: item.addedAt || null } : null;
+      })
+      .filter(Boolean);
   return {
     history: history
       .map((item) => {
@@ -121,5 +129,7 @@ export function mapLetterboxdChunk({ history = [], ratings = [] }, resolved) {
         return { ...movie, rating: item.rating, ratedAt: item.ratedAt || null };
       })
       .filter(Boolean),
+    favorites: collection(favorites),
+    watchlist: collection(watchlist),
   };
 }

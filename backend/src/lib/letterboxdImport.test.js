@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  mapLetterboxdCollectionItem,
   mapLetterboxdHistoryItem,
   mapLetterboxdRatingItem,
   selectLetterboxdHistory,
@@ -54,4 +55,13 @@ test('no duplica visionados ni marca otra vez las películas ya vistas', () => {
       [3, '2021-06-01T12:00:00.000Z'],
     ],
   );
+});
+
+test('mapea favoritas y pendientes', () => {
+  const now = new Date('2024-01-01T00:00:00Z');
+  const row = mapLetterboxdCollectionItem({ tmdbId: 603, title: 'Matrix', addedAt: '2023-02-02T12:00:00.000Z' }, 'u1', now);
+  assert.equal(row.mediaType, 'movie');
+  assert.equal(row.addedAt.toISOString(), '2023-02-02T12:00:00.000Z');
+  assert.equal(mapLetterboxdCollectionItem({ tmdbId: 603 }, 'u1', now).addedAt, now);
+  assert.equal(mapLetterboxdCollectionItem({ tmdbId: 'x' }, 'u1', now), null);
 });

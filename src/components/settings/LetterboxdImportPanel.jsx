@@ -1,30 +1,20 @@
 "use client";
 
 // Importación desde Letterboxd: el usuario sube su exportación (el ZIP de
-// Settings → Data → Export your data, o diary.csv / watched.csv / ratings.csv),
+// Settings → Data → Export your data, o diary.csv / watched.csv / ratings.csv /
+// watchlist.csv / films.csv de likes),
 // el navegador la lee y la manda por tandas a /api/letterboxd/import, que
 // resuelve cada película con TMDb y guarda visionados y puntuaciones.
 
 import { useCallback, useId, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Check, DownloadCloud, FileArchive, Loader2, X } from "lucide-react";
-import {
-  buildLetterboxdImport,
-  chunkLetterboxdImport,
-  readLetterboxdFiles,
-} from "@/lib/letterboxd/export";
+import { buildLetterboxdImport, readLetterboxdFiles } from "@/lib/letterboxd/export";
+import { runLetterboxdImport } from "@/lib/letterboxd/sync";
 
 const EXPORT_URL = "https://letterboxd.com/settings/data/";
 const MISSING_SAMPLES = 12;
 
-const emptyTotals = () => ({
-  historyImported: 0,
-  historySkipped: 0,
-  ratingsImported: 0,
-  ratingsUpdated: 0,
-  resolved: 0,
-  missing: [],
-});
 
 function plural(count, one, many) {
   return `${count.toLocaleString("es-ES")} ${count === 1 ? one : many}`;
@@ -54,8 +44,8 @@ export default function LetterboxdImportPanel({ className = "" }) {
     setData(null);
     try {
       const texts = await readLetterboxdFiles(files);
-      if (!texts["diary.csv"] && !texts["watched.csv"] && !texts["ratings.csv"]) {
-        throw new Error("No se encontró diary.csv, watched.csv ni ratings.csv. Sube el ZIP de la exportación de Letterboxd.");
+      if (!Object.keys(texts).length) {
+        throw new Error("No se encontró diary.csv, watched.csv, ratings.csv, watchlist.csv ni los likes. Sube el ZIP de la exportación de Letterboxd.");
       }
       const next = buildLetterboxdImport(texts);
       if (!next.films.length) throw new Error("La exportación no tiene películas.");
@@ -70,39 +60,22 @@ export default function LetterboxdImportPanel({ className = "" }) {
 
   const handleImport = useCallback(async () => {
     if (!data || running) return;
-    const chunks = chunkLetterboxdImport(data);
     cancelRef.current = false;
     setRunning(true);
     setFinished(false);
     setError("");
     setProgress({ done: 0, total: data.films.length });
-    const sum = emptyTotals();
-    setTotals({ ...sum });
+    setTotals(null);
 
     try {
-      for (let index = 0; index < chunks.length; index += 1) {
-        if (cancelRef.current) break;
-        const chunk = chunks[index];
-        const res = await fetch("/api/letterboxd/import", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...chunk, reset: index === 0 }),
-        });
-        const json = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(json?.error || "No se pudo importar desde Letterboxd.");
-
-        const history = json?.import?.chunk?.history || {};
-        const ratings = json?.import?.chunk?.ratings || {};
-        sum.historyImported += Number(history.imported || 0);
-        sum.historySkipped += Number(history.skipped || 0);
-        sum.ratingsImported += Number(ratings.imported || 0);
-        sum.ratingsUpdated += Number(ratings.updated || 0);
-        sum.resolved += Number(json?.resolved || 0);
-        sum.missing.push(...(Array.isArray(json?.missing) ? json.missing : []));
-        setTotals({ ...sum, missing: [...sum.missing] });
-        setProgress((current) => ({ ...current, done: current.done + chunk.films.length }));
-      }
-      setFinished(!cancelRef.current);
+      const { cancelled } = await runLetterboxdImport(data, {
+        isCancelled: () => cancelRef.current,
+        onChunk: ({ done, total, totals: next }) => {
+          setTotals(next);
+          setProgress({ done, total });
+        },
+      });
+      setFinished(!cancelled);
     } catch (err) {
       setError(err?.message || "No se pudo importar desde Letterboxd.");
     } finally {
@@ -124,7 +97,7 @@ export default function LetterboxdImportPanel({ className = "" }) {
           <div className="min-w-0">
             <h3 className="text-base font-extrabold text-white tracking-wide">Importar desde Letterboxd</h3>
             <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
-              Trae tu diario de visionados, rewatches incluidos, y tus puntuaciones. En Letterboxd ve a{" "}
+              Trae tu diario de visionados (rewatches incluidos), tus puntuaciones, tus favoritas y tu watchlist. En Letterboxd ve a{" "}
               <a
                 href={EXPORT_URL}
                 target="_blank"
@@ -162,6 +135,22 @@ export default function LetterboxdImportPanel({ className = "" }) {
                 }
                 done={finished}
               />
+              {data.favorites.length > 0 && (
+                <Row
+                  label="Favoritas"
+                  value={plural(data.favorites.length, "película", "películas")}
+                  status={totals ? plural(totals.favoritesImported, "nueva", "nuevas") : null}
+                  done={finished}
+                />
+              )}
+              {data.watchlist.length > 0 && (
+                <Row
+                  label="Pendientes"
+                  value={plural(data.watchlist.length, "película", "películas")}
+                  status={totals ? plural(totals.watchlistImported, "nueva", "nuevas") : null}
+                  done={finished}
+                />
+              )}
               {(running || totals) && (
                 <div className="pt-1">
                   <progress
@@ -178,7 +167,7 @@ export default function LetterboxdImportPanel({ className = "" }) {
             </>
           ) : (
             <p className="text-zinc-500">
-              Se importan las películas del diario con su fecha de visionado, las vistas que no estén en el diario y la puntuación de cada una (½ estrella = 1 punto).
+              Se importan las películas del diario con su fecha de visionado, las vistas que no estén en el diario, la puntuación de cada una (½ estrella = 1 punto), tus películas con «me gusta» como favoritas y tu watchlist como pendientes.
             </p>
           )}
         </div>
@@ -189,8 +178,10 @@ export default function LetterboxdImportPanel({ className = "" }) {
             animate={{ opacity: 1, y: 0 }}
             className="mt-4 text-xs font-bold text-emerald-300"
           >
-            Importación completada: {plural(totals.historyImported, "visionado nuevo", "visionados nuevos")} y{" "}
-            {plural(totals.ratingsImported + totals.ratingsUpdated, "puntuación", "puntuaciones")}.
+            Importación completada: {plural(totals.historyImported, "visionado nuevo", "visionados nuevos")},{" "}
+            {plural(totals.ratingsImported + totals.ratingsUpdated, "puntuación", "puntuaciones")},{" "}
+            {plural(totals.favoritesImported, "favorita", "favoritas")} y{" "}
+            {plural(totals.watchlistImported, "pendiente", "pendientes")}.
           </motion.p>
         )}
         {totals?.missing.length > 0 && !running && (
