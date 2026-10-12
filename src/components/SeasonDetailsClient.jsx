@@ -1612,6 +1612,10 @@ export default function SeasonDetailsClient({
           ready={mobileCoverReady}
           animate={animateMobileEntry}
           collage={null}
+          // Rótulo y botones legibles sobre pósters claros: se oscurece su
+          // zona según lo claro que sea (medido), nada en los oscuros. Igual
+          // que en la ficha de la serie.
+          adaptiveContrast
         />
 
         {/* Sombreados de legibilidad. En MÓVIL siguen al scroll hasta el 60%,
@@ -1754,7 +1758,7 @@ export default function SeasonDetailsClient({
                   !animateMobileEntry ? "" : mobileCoverReady ? MOBILE_ACTIONS_ENTRY_ANIMATION : "max-sm:invisible"
                 }
               >
-              <h1 className="mb-3 text-center text-[11px] font-bold uppercase leading-4 tracking-[0.14em] text-zinc-400 sm:hidden">
+              <h1 className="mb-3 text-center text-[11px] font-bold uppercase leading-4 tracking-[0.14em] text-zinc-300 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] sm:hidden">
                 {Number(seasonNumber) === 0
                   ? "Especiales"
                   : `Temporada ${seasonNumber}`}
