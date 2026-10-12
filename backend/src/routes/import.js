@@ -20,10 +20,8 @@ import {
   deleteLetterboxdAccount,
   getLetterboxdAccount,
   letterboxdConnectionView,
-  needsLetterboxdBackfill,
   recordLetterboxdExtensionSync,
   saveLetterboxdAccount,
-  startLetterboxdBackfill,
   syncLetterboxdAccount,
 } from '../lib/letterboxdSync.js';
 import { fetchLetterboxdFeed, normalizeLetterboxdUsername } from '../lib/letterboxdRss.js';
@@ -946,17 +944,11 @@ export default async function importRoutes(fastify) {
 
   // Sincronización automática por el RSS público del perfil (lib/letterboxdSync).
   fastify.get('/letterboxd/connection', async (req, reply) => {
-    let account = await getLetterboxdAccount(req.user.id);
-    // Cuenta conectada sin historial completo (de antes de existir, o cortada
-    // por un reinicio): se lanza ya, sin esperar a la pasada periódica.
-    if (account && needsLetterboxdBackfill(account) && startLetterboxdBackfill(account, { log: req.log })) {
-      account = await getLetterboxdAccount(req.user.id);
-    }
-    return reply.send(letterboxdConnectionView(account));
+    return reply.send(letterboxdConnectionView(await getLetterboxdAccount(req.user.id)));
   });
 
   // POST /import/letterboxd/connection { username } - conecta (o cambia) el
-  // usuario, comprobando antes que su feed existe, y trae todo su historial.
+  // usuario, comprobando antes que su feed RSS existe, y hace la primera pasada.
   fastify.post('/letterboxd/connection', async (req, reply) => {
     const username = normalizeLetterboxdUsername(req.body?.username);
     if (!username) {
@@ -970,18 +962,9 @@ export default async function importRoutes(fastify) {
         .send({ error: err?.message || 'No se pudo leer el perfil de Letterboxd.' });
     }
     const account = await saveLetterboxdAccount(req.user.id, username);
-    // Todo el historial del perfil, en segundo plano (puede llevar minutos):
-    // el front consulta el progreso en GET /letterboxd/connection.
-    startLetterboxdBackfill(account, { log: req.log });
-    return reply.send(letterboxdConnectionView(await getLetterboxdAccount(req.user.id)));
-  });
-
-  // POST /import/letterboxd/backfill - rehacer la sincronización completa.
-  fastify.post('/letterboxd/backfill', async (req, reply) => {
-    const account = await getLetterboxdAccount(req.user.id);
-    if (!account) return reply.status(404).send({ error: 'Letterboxd no está conectado.' });
-    startLetterboxdBackfill(account, { log: req.log });
-    return reply.send(letterboxdConnectionView(await getLetterboxdAccount(req.user.id)));
+    // Primera pasada del RSS: las últimas entradas del diario, ya.
+    const sync = await syncLetterboxdAccount(account);
+    return reply.send({ ...letterboxdConnectionView(await getLetterboxdAccount(req.user.id)), sync });
   });
 
   // POST /import/letterboxd/sync - sincronizar ahora.

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   fetchLetterboxdFeed,
   nextSeenGuids,
+  nextSeenRatings,
   normalizeLetterboxdUsername,
   parseLetterboxdRss,
   pendingLetterboxdEntries,
@@ -87,4 +88,24 @@ test('errores del feed: usuario inexistente o respuesta no válida', async () =>
   await assert.rejects(fetchLetterboxdFeed('ana', { fetchImpl: html }), { code: 'unavailable' });
   const ok = async () => new Response(FEED, { status: 200 });
   assert.equal((await fetchLetterboxdFeed('ana', { fetchImpl: ok })).length, 2);
+});
+
+test('detecta notas editadas en entradas que siguen en el feed', () => {
+  const before = [
+    { guid: 'a', tmdbId: 1, rating: 6, publishedAt: '2024-01-01T00:00:00.000Z' },
+    { guid: 'b', tmdbId: 2, rating: null, publishedAt: '2024-01-02T00:00:00.000Z' },
+  ];
+  const seenRatings = nextSeenRatings(before);
+  assert.deepEqual(seenRatings, { a: 6, b: null });
+  const after = [
+    { guid: 'a', tmdbId: 1, rating: 8, publishedAt: '2024-01-01T00:00:00.000Z' }, // editada
+    { guid: 'b', tmdbId: 2, rating: null, publishedAt: '2024-01-02T00:00:00.000Z' }, // igual
+    { guid: 'c', tmdbId: 3, rating: 4, publishedAt: '2024-01-03T00:00:00.000Z' }, // nueva
+  ];
+  const { fresh, edited, ratings } = pendingLetterboxdEntries(after, ['a', 'b'], seenRatings);
+  assert.deepEqual(fresh.map((item) => item.guid), ['c']);
+  assert.deepEqual(edited.map((item) => item.guid), ['a']);
+  assert.deepEqual(ratings.map((item) => [item.tmdbId, item.rating]).sort(), [[1, 8], [3, 4]]);
+  // Sin notas recordadas (cuentas antiguas): no hay ediciones que detectar.
+  assert.equal(pendingLetterboxdEntries(after, ['a', 'b']).edited.length, 0);
 });

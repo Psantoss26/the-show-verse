@@ -2,12 +2,13 @@
 
 // Ajustes → Conexiones → Letterboxd.
 //
-//   - Historial completo: con la extensión de The Show Verse, la exportación
-//     oficial de Letterboxd se descarga con la sesión de este navegador y se
-//     importa entera (lib/letterboxd/sync); se repite sola cada día
-//     (LetterboxdAutoSync). Sin extensión, el servidor intenta leer el perfil
-//     público (Letterboxd suele bloquearlo) y queda el ZIP a mano.
-//   - Lo nuevo del diario llega además por el RSS cada pocas horas.
+//   - Sincronización por RSS (servidor): al conectar y cada pocas horas trae
+//     las entradas nuevas del diario (visionados, rewatches, reseñas con
+//     visionado y notas) y las notas editadas de las entradas que siguen en el
+//     feed. Solo cubre las últimas ~50 entradas y no detecta eliminaciones.
+//   - Historial completo: la exportación oficial de Letterboxd, con la
+//     extensión de The Show Verse (la descarga sola con la sesión de este
+//     navegador y se repite cada día, ver LetterboxdAutoSync) o subiendo el ZIP.
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { DownloadCloud, History, Loader2, Puzzle, RefreshCw, Unlink } from "lucide-react";
@@ -29,18 +30,6 @@ function describeExtensionSync(state) {
   if (state.phase === "read") return "Leyendo tu historial…";
   if (!state.total) return "Comprobando cambios…";
   return `Importando… ${n(state.done)} de ${n(state.total)} películas`;
-}
-
-const POLL_MS = 3000;
-
-function describeBackfill(backfill) {
-  if (!backfill) return "Preparando la sincronización de todo tu historial…";
-  const n = (value) => Number(value || 0).toLocaleString("es-ES");
-  if (backfill.phase === "diary") return `Leyendo tu diario… ${n(backfill.diary)} visionados (página ${n(backfill.pages)})`;
-  if (backfill.phase === "films") return `Leyendo tus películas vistas… ${n(backfill.films)} películas`;
-  if (backfill.phase === "resolve") return `Identificando películas… ${n(backfill.resolved)} de ${n(backfill.total)}`;
-  if (backfill.phase === "save") return "Guardando visionados y puntuaciones…";
-  return "Sincronizando todo tu historial…";
 }
 
 function formatSyncDate(value) {
@@ -99,24 +88,6 @@ export default function LetterboxdConnectionCard({ className = "", onOpenImport 
     return () => controller.abort();
   }, []);
 
-  // Mientras la sincronización completa está en marcha, se consulta su progreso.
-  const backfillRunning =
-    Boolean(connection?.connected) &&
-    !connection.extensionSync &&
-    (!connection.backfill || connection.backfill.status === "running");
-  useEffect(() => {
-    if (!backfillRunning) return undefined;
-    const timer = window.setInterval(() => {
-      fetch("/api/letterboxd/connection", { cache: "no-store" })
-        .then((res) => (res.ok ? res.json() : null))
-        .then((json) => {
-          if (json && typeof json.connected === "boolean") setConnection(json);
-        })
-        .catch(() => {});
-    }, POLL_MS);
-    return () => window.clearInterval(timer);
-  }, [backfillRunning]);
-
   const run = useCallback(async (kind, url, init) => {
     setBusy(kind);
     setError("");
@@ -144,7 +115,10 @@ export default function LetterboxdConnectionCard({ className = "", onOpenImport 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username }),
       });
-      if (json) setUsername("");
+      if (json) {
+        setUsername("");
+        if (json.sync) setMessage(`Conectado. ${describeSync(json.sync)}`);
+      }
     },
     [run, username],
   );
@@ -183,19 +157,10 @@ export default function LetterboxdConnectionCard({ className = "", onOpenImport 
     [connection?.username, refreshConnection],
   );
 
-  const resyncAll = useCallback(async () => {
-    if (hasExtension) {
-      await syncWithExtension({ full: true });
-      return;
-    }
-    await run("backfill", "/api/letterboxd/backfill", { method: "POST" });
-  }, [hasExtension, run, syncWithExtension]);
-
-  // Recién conectada (o el servidor no pudo leer el perfil) y con la extensión
-  // en este navegador: se trae todo el historial por la exportación sin esperar.
+  // Recién conectada y con la extensión en este navegador: se trae todo el
+  // historial con la exportación sin esperar (el RSS solo da lo último).
   useEffect(() => {
     if (autoTriedRef.current || !hasExtension || !connection?.connected || connection.extensionSync) return;
-    if (connection.backfill && connection.backfill.status === "done") return;
     autoTriedRef.current = true;
     void syncWithExtension();
   }, [connection, hasExtension, syncWithExtension]);
@@ -209,9 +174,7 @@ export default function LetterboxdConnectionCard({ className = "", onOpenImport 
   const extensionDone = connection?.extensionSync || null;
   const extRunning = Boolean(extSync);
   const lastSync = formatSyncDate(connection?.lastSyncedAt);
-  const backfill = connection?.backfill || null;
-  const progress =
-    backfill?.phase === "resolve" && backfill.total ? Math.round((backfill.resolved / backfill.total) * 100) : null;
+  const lastResult = connection?.lastResult || null;
 
   return (
     <div className={`${className} rounded-3xl p-5 sm:p-6 flex flex-col gap-4`}>
@@ -245,16 +208,24 @@ export default function LetterboxdConnectionCard({ className = "", onOpenImport 
                 >
                   @{connection.username}
                 </a>
-                . Todo tu historial se sincroniza y lo nuevo llega solo
+                . Tu diario se sincroniza por RSS cada pocas horas
                 {lastSync ? ` · última revisión ${lastSync}` : ""}.
               </>
             ) : (
-              "Escribe tu usuario y se sincroniza todo tu historial de Letterboxd: diario, películas vistas y puntuaciones. Después, lo nuevo llega solo. Tu perfil tiene que ser público."
+              "Escribe tu usuario y lo que registres en tu diario de Letterboxd llegará solo por RSS: visionados, rewatches, reseñas y puntuaciones. Tu perfil tiene que ser público."
             )}
           </p>
         </div>
       </div>
 
+      {connected && !extRunning && lastResult && !connection?.lastError && (
+        <p className="text-xs text-zinc-400">
+          <span className="font-bold text-zinc-200">Última revisión del RSS:</span>{" "}
+          {lastResult.entries || lastResult.edited
+            ? `${plural(lastResult.history || 0, "visionado nuevo", "visionados nuevos")} y ${plural(lastResult.ratings || 0, "puntuación", "puntuaciones")}${lastResult.edited ? ` (${plural(lastResult.edited, "entrada editada", "entradas editadas")})` : ""}.`
+            : "sin entradas nuevas."}
+        </p>
+      )}
       {connected && extRunning && (
         <div className="rounded-2xl bg-white/[0.03] border border-white/5 p-3.5 text-xs" aria-live="polite">
           <p className="flex items-center gap-2 font-bold text-zinc-200">
@@ -269,20 +240,6 @@ export default function LetterboxdConnectionCard({ className = "", onOpenImport 
           <p className="mt-1.5 text-zinc-500">Con la exportación oficial de Letterboxd. Deja esta página abierta hasta que termine.</p>
         </div>
       )}
-      {connected && !extRunning && backfillRunning && (
-        <div className="rounded-2xl bg-white/[0.03] border border-white/5 p-3.5 text-xs" aria-live="polite">
-          <p className="flex items-center gap-2 font-bold text-zinc-200">
-            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-emerald-400" aria-hidden="true" />
-            {describeBackfill(backfill)}
-          </p>
-          <progress
-            {...(progress != null ? { value: progress, max: 100 } : {})}
-            aria-label="Progreso de la sincronización completa"
-            className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full accent-emerald-400 [&::-moz-progress-bar]:bg-emerald-400 [&::-webkit-progress-bar]:bg-white/10 [&::-webkit-progress-value]:bg-emerald-400"
-          />
-          <p className="mt-1.5 text-zinc-500">Puede tardar unos minutos con perfiles grandes. Puedes salir de esta página.</p>
-        </div>
-      )}
       {connected && !extRunning && extensionDone && (
         <p className="text-xs text-zinc-400">
           <span className="font-bold text-emerald-300">Historial completo sincronizado</span>
@@ -290,25 +247,18 @@ export default function LetterboxdConnectionCard({ className = "", onOpenImport 
           {formatSyncDate(extensionDone.finishedAt) ? ` (${formatSyncDate(extensionDone.finishedAt)})` : ""}. Se repite solo cada día al abrir The Show Verse en este navegador.
         </p>
       )}
-      {connected && !extRunning && !extensionDone && backfill?.status === "done" && (
-        <p className="text-xs text-zinc-400">
-          <span className="font-bold text-emerald-300">Historial completo sincronizado</span>
-          {` · ${Number(backfill.matched ?? backfill.resolved ?? 0).toLocaleString("es-ES")} películas, ${Number(backfill.history || 0).toLocaleString("es-ES")} visionados nuevos y ${Number(backfill.ratings || 0).toLocaleString("es-ES")} puntuaciones`}
-          {formatSyncDate(backfill.finishedAt) ? ` (${formatSyncDate(backfill.finishedAt)})` : ""}.
-        </p>
-      )}
-      {connected && !extRunning && !extensionDone && backfill?.status === "error" && (
-        <div className="rounded-2xl border border-amber-300/15 bg-amber-300/[0.04] p-3.5 text-xs text-zinc-300" role="alert">
-          <p className="font-bold text-amber-200">Letterboxd no deja leer tu perfil desde el servidor.</p>
+      {connected && !extRunning && !extensionDone && (
+        <div className="rounded-2xl bg-white/[0.03] border border-white/5 p-3.5 text-xs text-zinc-300">
+          <p className="font-bold text-zinc-100">El RSS solo trae tus últimas ~50 entradas del diario.</p>
           {hasExtension ? (
             <p className="mt-1 leading-relaxed">
               Pulsa <strong className="text-white">Sincronizar todo el historial</strong>: la extensión descargará tu
-              exportación oficial con la sesión de letterboxd.com de este navegador (inicia sesión allí si no lo estás).
+              exportación oficial de Letterboxd con la sesión de letterboxd.com de este navegador.
             </p>
           ) : (
             <p className="mt-1 leading-relaxed">
-              Para sincronizar todo el historial automáticamente instala la extensión de The Show Verse (versión 3.2 o
-              posterior) en este navegador e inicia sesión en letterboxd.com. Mientras tanto puedes importar el ZIP.
+              Para traer todo tu historial, importa el ZIP de tu exportación o instala la extensión de The Show Verse
+              (versión 3.2 o posterior) con la sesión de letterboxd.com iniciada en este navegador.
             </p>
           )}
           {!hasExtension && EXTENSION_INSTALL_URL && (
@@ -331,22 +281,24 @@ export default function LetterboxdConnectionCard({ className = "", onOpenImport 
             type="button"
             data-online-only="true"
             onClick={syncNow}
-            disabled={Boolean(busy) || backfillRunning || extRunning}
+            disabled={Boolean(busy) || extRunning}
             className="flex-1 inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-white/5 px-4 text-xs sm:text-sm font-bold text-white transition hover:bg-white/10 disabled:opacity-60"
           >
             {busy === "sync" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <RefreshCw className="h-4 w-4" aria-hidden="true" />}
             Sincronizar ahora
           </button>
-          <button
-            type="button"
-            data-online-only="true"
-            onClick={resyncAll}
-            disabled={Boolean(busy) || backfillRunning || extRunning}
-            className="flex-1 inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-white/5 px-4 text-xs sm:text-sm font-bold text-white transition hover:bg-white/10 disabled:opacity-60"
-          >
-            {busy === "backfill" || extRunning ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <History className="h-4 w-4" aria-hidden="true" />}
-            Sincronizar todo el historial
-          </button>
+          {hasExtension && (
+            <button
+              type="button"
+              data-online-only="true"
+              onClick={() => syncWithExtension({ full: true })}
+              disabled={Boolean(busy) || extRunning}
+              className="flex-1 inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-white/5 px-4 text-xs sm:text-sm font-bold text-white transition hover:bg-white/10 disabled:opacity-60"
+            >
+              {extRunning ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <History className="h-4 w-4" aria-hidden="true" />}
+              Sincronizar todo el historial
+            </button>
+          )}
           <button
             type="button"
             onClick={onOpenImport}

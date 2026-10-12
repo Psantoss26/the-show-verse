@@ -114,21 +114,41 @@ export async function fetchLetterboxdFeed(username, { fetchImpl = fetch } = {}) 
 }
 
 /**
- * Qué entradas del feed tocan en esta pasada: las que no se han visto antes
- * (por guid). La puntuación se toma solo de entradas nuevas, la más reciente
- * de cada película: así, si luego la cambias en The Show Verse, la siguiente
- * pasada no la vuelve a pisar con la de Letterboxd.
+ * Qué toca en esta pasada:
+ *   fresh    entradas que no se habían visto (por guid): visionados nuevos.
+ *   edited   entradas ya vistas que siguen en el feed con otra nota (la
+ *            persona editó el registro en Letterboxd).
+ *   ratings  la nota más reciente de cada película entre las nuevas y las
+ *            editadas. Las entradas ya vistas sin cambios no vuelven a
+ *            aplicar su nota: si luego la cambias en The Show Verse, la
+ *            siguiente pasada no la pisa.
+ *
+ * @param seenRatings  { guid: nota } de las entradas del feed anterior. Sin él
+ *                     (cuentas de antes de existir) no se detectan ediciones.
  */
-export function pendingLetterboxdEntries(items, seenGuids = []) {
+export function pendingLetterboxdEntries(items, seenGuids = [], seenRatings = null) {
   const seen = new Set(seenGuids);
   const fresh = items.filter((item) => !seen.has(item.guid));
+  const edited = seenRatings
+    ? items.filter(
+        (item) =>
+          seen.has(item.guid) &&
+          Object.prototype.hasOwnProperty.call(seenRatings, item.guid) &&
+          (seenRatings[item.guid] ?? null) !== (item.rating ?? null),
+      )
+    : [];
   const ratings = new Map();
-  for (const item of fresh) {
+  for (const item of [...fresh, ...edited]) {
     if (!item.rating) continue;
     const current = ratings.get(item.tmdbId);
     if (!current || current.publishedAt < item.publishedAt) ratings.set(item.tmdbId, item);
   }
-  return { fresh, ratings: [...ratings.values()] };
+  return { fresh, edited, ratings: [...ratings.values()] };
+}
+
+/** Nota de cada entrada del feed actual, para detectar ediciones en la siguiente pasada. */
+export function nextSeenRatings(items) {
+  return Object.fromEntries(items.map((item) => [item.guid, item.rating ?? null]));
 }
 
 /** Guids recordados: los del feed actual más los anteriores, con tope. */

@@ -1,38 +1,36 @@
 // src/lib/letterboxdSync.js
-// Sincronización automática con Letterboxd por su feed RSS público (ver
-// letterboxdRss). La cuenta se guarda en connected_accounts (provider
-// 'letterboxd'); el usuario de Letterboxd y el estado de la última pasada van
-// en metadata.
+// Sincronización con Letterboxd por su feed RSS público (ver letterboxdRss).
+// La cuenta se guarda en connected_accounts (provider 'letterboxd'); el
+// usuario de Letterboxd y el estado de las pasadas van en metadata.
 //
-//   - Al conectar, una SINCRONIZACIÓN COMPLETA en segundo plano lee el perfil
-//     entero (diario y películas vistas, ver letterboxdProfile) y trae todo el
-//     historial y las puntuaciones. Su progreso va en metadata.backfill.
-//   - Después, cada pocas horas, el RSS mantiene al día lo nuevo.
+//   - Cada pocas horas (server.js) y al pulsar "Sincronizar ahora" se lee el
+//     feed: visionados nuevos del diario (con su fecha y rewatch), reseñas con
+//     visionado y sus puntuaciones. Cada entrada se procesa una vez (guid).
+//   - Ediciones: si una entrada que sigue en el feed cambia de nota, se
+//     actualiza. Las eliminaciones y las ediciones de entradas que ya salieron
+//     del feed no se pueden detectar por RSS.
+//   - El RSS solo trae las últimas ~50 entradas: el historial completo entra
+//     con la exportación oficial (ZIP, o la extensión, que la descarga sola).
 
 import { and, eq, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { connectedAccounts, userRatings, watchHistory } from '../db/schema.js';
 import { mapLetterboxdRatingItem, selectLetterboxdHistory } from './letterboxdImport.js';
-import { fetchLetterboxdFeed, nextSeenGuids, pendingLetterboxdEntries } from './letterboxdRss.js';
 import {
-  buildLetterboxdProfileImport,
-  collectLetterboxdProfile,
-  resolveLetterboxdSlug,
-} from './letterboxdProfile.js';
+  fetchLetterboxdFeed,
+  nextSeenGuids,
+  nextSeenRatings,
+  pendingLetterboxdEntries,
+} from './letterboxdRss.js';
 import { getTitlePoster } from './tmdbPoster.js';
 
 export const LETTERBOXD_PROVIDER = 'letterboxd';
 
 const ratingKey = (item) => `${Number(item.tmdbId)}:${item.mediaType}`;
 
-// Una sincronización completa que lleva más de esto "en curso" se dio por
-// perdida (reinicio del servidor a mitad).
-const BACKFILL_STALE_MS = 2 * 60 * 60 * 1000;
-const backfillsRunning = new Set();
-
 /**
- * Mezcla `patch` en metadata en la propia BD (jsonb ||): la sincronización
- * completa y la del RSS escriben a la vez campos distintos y ninguna debe
+ * Mezcla `patch` en metadata en la propia BD (jsonb ||): la pasada del RSS y
+ * el registro de la exportación escriben campos distintos y ninguna debe
  * pisar los de la otra con una copia vieja.
  */
 async function patchMetadata(accountId, patch) {
@@ -40,20 +38,6 @@ async function patchMetadata(accountId, patch) {
     .update(connectedAccounts)
     .set({ metadata: sql`coalesce(${connectedAccounts.metadata}, '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb` })
     .where(eq(connectedAccounts.id, accountId));
-}
-
-async function mapLimit(items, limit, fn) {
-  const results = new Array(items.length);
-  let cursor = 0;
-  const worker = async () => {
-    while (cursor < items.length) {
-      const index = cursor;
-      cursor += 1;
-      results[index] = await fn(items[index], index);
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return results;
 }
 
 export async function getLetterboxdAccount(userId) {
@@ -76,64 +60,31 @@ export function letterboxdConnectionView(account) {
     lastSyncedAt: meta.lastSyncedAt || null,
     lastResult: meta.lastResult || null,
     lastError: meta.lastError || null,
-    backfill: meta.backfill || null,
     extensionSync: meta.extensionSync || null,
   };
 }
 
 /**
- * La web hizo la sincronización completa con la exportación oficial
- * (descargada por la extensión): el historial ya está completo y el servidor
- * no tiene que volver a leer el perfil.
+ * La web importó la exportación completa (descargada por la extensión): se
+ * guarda el resumen para mostrarlo en Ajustes.
  */
 export async function recordLetterboxdExtensionSync(account, summary = {}) {
   const count = (value) => Math.max(0, Math.floor(Number(value) || 0));
-  const finishedAt = new Date().toISOString();
-  const extensionSync = {
-    finishedAt,
-    films: count(summary.films),
-    history: count(summary.history),
-    ratings: count(summary.ratings),
-    missing: count(summary.missing),
-  };
-  const patch = { extensionSync };
-  if (account.metadata?.backfill?.status !== 'done' || account.metadata?.backfill?.via === 'extension') {
-    patch.backfill = {
-      status: 'done',
-      phase: 'done',
-      via: 'extension',
-      finishedAt,
-      matched: extensionSync.films - extensionSync.missing,
-      history: extensionSync.history,
-      ratings: extensionSync.ratings,
-      error: null,
-    };
-  }
-  await patchMetadata(account.id, patch);
-}
-
-/** ¿Hay que hacer (o rehacer) la sincronización completa de esta cuenta? */
-export function needsLetterboxdBackfill(account, now = Date.now()) {
-  const backfill = account?.metadata?.backfill;
-  if (!account?.metadata?.username) return false;
-  // Sincronizado con la exportación (extensión): el servidor no lee el perfil.
-  if (account.metadata.extensionSync) return false;
-  if (!backfill) return true;
-  if (backfill.status === 'done') return false;
-  if (backfill.status === 'running') {
-    // En curso en este proceso: no. Marcada "en curso" pero sin trabajo vivo
-    // (el servidor se reinició a mitad) o colgada: hay que rehacerla.
-    if (backfillsRunning.has(account.id)) return now - new Date(backfill.startedAt || 0).getTime() > BACKFILL_STALE_MS;
-    return true;
-  }
-  // Error: reintentar pasado un día (Letterboxd caído, bloqueo temporal…).
-  return now - new Date(backfill.finishedAt || 0).getTime() > 24 * 60 * 60 * 1000;
+  await patchMetadata(account.id, {
+    extensionSync: {
+      finishedAt: new Date().toISOString(),
+      films: count(summary.films),
+      history: count(summary.history),
+      ratings: count(summary.ratings),
+      missing: count(summary.missing),
+    },
+  });
 }
 
 export async function saveLetterboxdAccount(userId, username) {
   const existing = await getLetterboxdAccount(userId);
   const sameUser = existing?.metadata?.username === username;
-  const metadata = sameUser ? existing.metadata : { username, seenGuids: [] };
+  const metadata = sameUser ? existing.metadata : { username, seenGuids: [], seenRatings: {} };
   if (existing) {
     const [account] = await db
       .update(connectedAccounts)
@@ -158,17 +109,16 @@ export async function deleteLetterboxdAccount(userId) {
 }
 
 async function withPosters(items) {
-  const ids = [...new Set(items.map((item) => item.tmdbId))];
   const posters = new Map();
-  await mapLimit(ids, 6, async (tmdbId) => {
+  for (const tmdbId of new Set(items.map((item) => item.tmdbId))) {
     posters.set(tmdbId, await getTitlePoster({ tmdbId, mediaType: 'movie' }).catch(() => null));
-  });
+  }
   return items.map((item) => ({ ...item, posterPath: posters.get(item.tmdbId) || null }));
 }
 
 async function applyRatings(userId, items) {
   const values = items
-    .map((item) => mapLetterboxdRatingItem({ ...item, ratedAt: item.ratedAt ?? item.publishedAt }, userId))
+    .map((item) => mapLetterboxdRatingItem({ ...item, ratedAt: item.publishedAt }, userId))
     .filter(Boolean);
   if (!values.length) return { imported: 0, updated: 0 };
   const existing = await db.select().from(userRatings).where(eq(userRatings.userId, userId));
@@ -195,8 +145,8 @@ async function applyRatings(userId, items) {
 }
 
 /**
- * Una pasada para una cuenta: lee el feed, añade los visionados nuevos y las
- * puntuaciones de las entradas nuevas, y guarda el estado en metadata.
+ * Una pasada para una cuenta: lee el feed, añade los visionados nuevos, aplica
+ * las puntuaciones nuevas o editadas y guarda el estado en metadata.
  */
 export async function syncLetterboxdAccount(account, { fetchFeed = fetchLetterboxdFeed } = {}) {
   const meta = account.metadata || {};
@@ -204,7 +154,7 @@ export async function syncLetterboxdAccount(account, { fetchFeed = fetchLetterbo
   const now = new Date();
   try {
     const items = await fetchFeed(meta.username);
-    const { fresh, ratings } = pendingLetterboxdEntries(items, meta.seenGuids || []);
+    const { fresh, ratings, edited } = pendingLetterboxdEntries(items, meta.seenGuids || [], meta.seenRatings);
 
     let historyImported = 0;
     if (fresh.length) {
@@ -219,11 +169,13 @@ export async function syncLetterboxdAccount(account, { fetchFeed = fetchLetterbo
 
     const lastResult = {
       entries: fresh.length,
+      edited: edited.length,
       history: historyImported,
       ratings: ratingsResult.imported + ratingsResult.updated,
     };
     await patchMetadata(account.id, {
       seenGuids: nextSeenGuids(items, meta.seenGuids || []),
+      seenRatings: nextSeenRatings(items),
       lastSyncedAt: now.toISOString(),
       lastResult,
       lastError: null,
@@ -238,111 +190,6 @@ export async function syncLetterboxdAccount(account, { fetchFeed = fetchLetterbo
   }
 }
 
-async function insertHistory(userId, items) {
-  if (!items.length) return 0;
-  const existing = await db.select().from(watchHistory).where(eq(watchHistory.userId, userId));
-  const values = selectLetterboxdHistory(await withPosters(items), existing, userId);
-  let inserted = 0;
-  for (let index = 0; index < values.length; index += 500) {
-    const rows = await db
-      .insert(watchHistory)
-      .values(values.slice(index, index + 500))
-      .onConflictDoNothing()
-      .returning({ id: watchHistory.id });
-    inserted += rows.length;
-  }
-  return inserted;
-}
-
-/**
- * Sincronización completa: todo el diario, todas las películas vistas y sus
- * notas. Después deja marcadas como vistas las entradas actuales del RSS.
- */
-async function runLetterboxdBackfill(account, { log, fetchImpl } = {}) {
-  const username = account.metadata?.username;
-  const startedAt = new Date().toISOString();
-  let state = { status: 'running', phase: 'diary', startedAt, finishedAt: null, pages: 0, diary: 0, films: 0, resolved: 0, total: 0, history: 0, ratings: 0, error: null };
-  let lastWrite = 0;
-  const save = async (patch, force = false) => {
-    state = { ...state, ...patch };
-    if (!force && Date.now() - lastWrite < 3000) return;
-    lastWrite = Date.now();
-    await patchMetadata(account.id, { backfill: state }).catch(() => {});
-  };
-
-  try {
-    await save({}, true);
-    const profile = await collectLetterboxdProfile(username, {
-      ...(fetchImpl ? { fetchImpl } : {}),
-      onProgress: (progress) => void save(progress),
-    });
-
-    const slugs = [...new Set([...profile.diary, ...profile.films].map((item) => item.slug))];
-    await save({ phase: 'resolve', total: slugs.length, resolved: 0, diary: profile.diary.length, films: profile.films.length }, true);
-    const resolved = new Map();
-    let done = 0;
-    await mapLimit(slugs, 3, async (slug) => {
-      const film = await resolveLetterboxdSlug(slug, fetchImpl ? { fetchImpl } : {}).catch(() => null);
-      if (film) resolved.set(slug, film);
-      done += 1;
-      await save({ resolved: done });
-    });
-
-    await save({ phase: 'save' }, true);
-    const { history, ratings } = buildLetterboxdProfileImport(profile, resolved);
-    const historyImported = await insertHistory(account.userId, history);
-    const ratingsResult = await applyRatings(account.userId, await withPosters(ratings));
-
-    await save(
-      {
-        status: 'done',
-        phase: 'done',
-        finishedAt: new Date().toISOString(),
-        resolved: done,
-        matched: resolved.size,
-        history: historyImported,
-        ratings: ratingsResult.imported + ratingsResult.updated,
-      },
-      true,
-    );
-    log?.info?.({ userId: account.userId, slugs: slugs.length, history: historyImported }, 'letterboxd backfill done');
-
-    // El RSS solo repite lo que ya se ha traído: sus entradas actuales se dan
-    // por vistas (sin reaplicar notas de registros antiguos sobre la actual) y
-    // a partir de aquí solo cuentan las nuevas.
-    const feed = await fetchLetterboxdFeed(username).catch(() => null);
-    if (feed) {
-      const fresh = await getLetterboxdAccount(account.userId);
-      await patchMetadata(account.id, {
-        seenGuids: nextSeenGuids(feed, fresh?.metadata?.seenGuids || []),
-        lastSyncedAt: new Date().toISOString(),
-        lastResult: { entries: 0, history: historyImported, ratings: ratingsResult.imported + ratingsResult.updated },
-        lastError: null,
-      });
-    }
-  } catch (err) {
-    await save(
-      { status: 'error', finishedAt: new Date().toISOString(), error: err?.message || 'Error al sincronizar', code: err?.code || null },
-      true,
-    );
-    log?.warn?.({ err: err?.message, userId: account.userId }, 'letterboxd backfill failed');
-  }
-}
-
-/**
- * Lanza la sincronización completa en segundo plano (una por cuenta a la vez).
- * Devuelve la promesa, o null si ya había una en curso.
- */
-export function startLetterboxdBackfill(account, options = {}) {
-  if (!account?.id || backfillsRunning.has(account.id)) return null;
-  backfillsRunning.add(account.id);
-  return runLetterboxdBackfill(account, options).finally(() => backfillsRunning.delete(account.id));
-}
-
-export function isLetterboxdBackfillRunning(accountId) {
-  return backfillsRunning.has(accountId);
-}
-
 /** Pasada periódica: todas las cuentas conectadas, una detrás de otra. */
 export async function syncAllLetterboxdAccounts(log) {
   const accounts = await db
@@ -353,18 +200,12 @@ export async function syncAllLetterboxdAccounts(log) {
   let failed = 0;
   for (const account of accounts) {
     if (!account.metadata?.username) continue;
-    // Cuentas sin historial completo (conectadas antes de existir, o cuya
-    // sincronización completa falló o se cortó): se hace ahora.
-    if (needsLetterboxdBackfill(account) && !isLetterboxdBackfillRunning(account.id)) {
-      await startLetterboxdBackfill(account, { log });
-      continue;
-    }
     const result = await syncLetterboxdAccount(account);
     if (result.ok) history += result.history;
     else failed += 1;
     // Sin ráfagas contra Letterboxd.
     await new Promise((resolve) => setTimeout(resolve, 1500));
   }
-  log?.info?.({ accounts: accounts.length, history, failed }, 'letterboxd sync done');
+  log?.info?.({ accounts: accounts.length, history, failed }, 'letterboxd rss sync done');
   return { accounts: accounts.length, history, failed };
 }
