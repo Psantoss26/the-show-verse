@@ -9,6 +9,7 @@ import PwaManager from "@/components/PwaManager";
 import InAppNotifications from "@/components/notifications/InAppNotifications";
 import AndroidSessionClaim from "@/components/android/AndroidSessionClaim";
 import OfflineManager from "@/components/OfflineManager";
+import LetterboxdAutoSync from "@/components/settings/LetterboxdAutoSync";
 import OfflineBanner from "@/components/OfflineBanner";
 import ScrollRestoration from "@/components/ScrollRestoration";
 import MobileUserPageSwipeNavigation from "@/components/MobileUserPageSwipeNavigation";
@@ -101,6 +102,7 @@ export default function RootLayout({ children }) {
             <PwaManager />
             <InAppNotifications />
             <OfflineManager />
+            <LetterboxdAutoSync />
             <AndroidSessionClaim />
             <OfflineBanner />
             <Analytics />

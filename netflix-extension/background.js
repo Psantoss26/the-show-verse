@@ -1,4 +1,4 @@
-importScripts("sync-reliability.js");
+importScripts("sync-reliability.js", "letterboxd-export.js");
 
 // background.js - Service worker with dynamic origin resolution and diagnostic logging
 
@@ -468,6 +468,20 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Exportación oficial de Letterboxd con la sesión de este navegador
+  // (letterboxd-export.js). La pide la web para sincronizar todo el historial.
+  if (message.action === "letterboxdExport") {
+    addLog("Descargando la exportación de Letterboxd...", "info");
+    fetchLetterboxdExport().then((result) => {
+      addLog(
+        result.success ? "Exportación de Letterboxd descargada." : `Letterboxd: ${result.error}`,
+        result.success ? "success" : "error",
+      );
+      sendResponse(result);
+    });
+    return true;
+  }
+
   // 1. Dynamic host origin registration
   if (message.action === "registerSite") {
     const { origin } = message;
@@ -803,6 +817,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
+  // Exportación oficial de Letterboxd con la sesión de este navegador
+  // (letterboxd-export.js). La pide la web para sincronizar todo el historial.
+  if (message.action === "letterboxdExport") {
+    addLog("Descargando la exportación de Letterboxd...", "info");
+    fetchLetterboxdExport().then((result) => {
+      addLog(
+        result.success ? "Exportación de Letterboxd descargada." : `Letterboxd: ${result.error}`,
+        result.success ? "success" : "error",
+      );
+      sendResponse(result);
+    });
+    return true;
+  }
+
   if (message.action === "ping") {
     // La versión viaja en el ping para que Ajustes → Conexiones pueda mostrarla:
     // es la única forma de comprobar, tras actualizar a mano la extensión, que el

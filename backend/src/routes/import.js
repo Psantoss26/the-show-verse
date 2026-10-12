@@ -21,6 +21,7 @@ import {
   getLetterboxdAccount,
   letterboxdConnectionView,
   needsLetterboxdBackfill,
+  recordLetterboxdExtensionSync,
   saveLetterboxdAccount,
   startLetterboxdBackfill,
   syncLetterboxdAccount,
@@ -991,6 +992,15 @@ export default async function importRoutes(fastify) {
     return reply
       .status(sync.ok ? 200 : 502)
       .send({ ...letterboxdConnectionView(await getLetterboxdAccount(req.user.id)), sync });
+  });
+
+  // POST /import/letterboxd/extension-sync - la web importó la exportación
+  // completa que descargó la extensión ({ films, history, ratings, missing }).
+  fastify.post('/letterboxd/extension-sync', async (req, reply) => {
+    const account = await getLetterboxdAccount(req.user.id);
+    if (!account) return reply.status(404).send({ error: 'Letterboxd no está conectado.' });
+    await recordLetterboxdExtensionSync(account, req.body || {});
+    return reply.send(letterboxdConnectionView(await getLetterboxdAccount(req.user.id)));
   });
 
   fastify.delete('/letterboxd/connection', async (req, reply) => {
