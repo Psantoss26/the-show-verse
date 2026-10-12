@@ -1,8 +1,13 @@
 import SeasonDetailsClient from "@/components/SeasonDetailsClient";
 import { getShareData, shareMetadata } from "@/lib/share/shareMeta";
 import { pickPosterByLanguage } from "@/lib/details/tmdbImages";
+import { getStreamingProviders } from "@/lib/api/justwatch";
 
 export const revalidate = 3600; // 1h
+
+// Tope para resolver las plataformas en el servidor: si JustWatch tarda más,
+// la página sale sin ellas y las pide el cliente, como antes.
+const PROVIDERS_SERVER_TIMEOUT_MS = 1500;
 
 const TMDB_API_KEY =
   process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY;
@@ -58,11 +63,34 @@ export default async function SeasonPage({ params }) {
     .then((json) => pickPosterByLanguage(json?.posters, "en")?.file_path || null)
     .catch(() => null);
 
-  const [show, seasonData, englishPosterPath] = await Promise.all([
-    showPromise,
-    seasonPromise,
-    englishPosterPromise,
-  ]);
+  // PLATAFORMAS DE LA SERIE en el HTML: la fila de iconos va bajo el póster y,
+  // si llegaba después de pintar (desde el cliente), la columna crecía 72px y
+  // la sección «Episodios» saltaba hacia abajo. Con ellas ya en el HTML la
+  // página nace con su altura final. `null` = no se resolvieron a tiempo.
+  const providersPromise = showPromise
+    .then((showJson) => {
+      const title = showJson?.name || showJson?.original_name;
+      if (!title) return null;
+      const year = Number(String(showJson?.first_air_date || "").slice(0, 4));
+      return Promise.race([
+        getStreamingProviders(title, "tv", year > 0 ? year : null).then(
+          (result) =>
+            Array.isArray(result?.providers) ? result.providers : null,
+        ),
+        new Promise((resolve) =>
+          setTimeout(() => resolve(null), PROVIDERS_SERVER_TIMEOUT_MS),
+        ),
+      ]);
+    })
+    .catch(() => null);
+
+  const [show, seasonData, englishPosterPath, initialShowProviders] =
+    await Promise.all([
+      showPromise,
+      seasonPromise,
+      englishPosterPromise,
+      providersPromise,
+    ]);
   const season = englishPosterPath
     ? { ...seasonData, poster_path: englishPosterPath }
     : seasonData;
@@ -84,6 +112,7 @@ export default async function SeasonPage({ params }) {
       initialShowWatched={null}
       imdb={null}
       imdbUrl={imdbUrl}
+      initialShowProviders={initialShowProviders}
     />
   );
 }

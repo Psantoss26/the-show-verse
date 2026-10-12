@@ -2176,11 +2176,14 @@ export default function InProgressClient({
         <motion.div
           ref={filtersRef}
           data-menu-pinned={filtersPinned}
-          className={`sticky top-14 z-[70] space-y-3 transition-all duration-300 sm:top-20 sm:mb-6 ${
+          data-grouped={groupBy !== "none" ? "" : undefined}
+          className={`${isBackNav ? "" : "sv-toolbar-rise "}sticky top-14 z-[70] space-y-3 transition-all duration-300 sm:top-20 sm:mb-6 ${
             groupBy === "none" ? "mb-6" : "mb-2"
           }`}
-          initial={isBackNav ? false : { opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
+          // Solo el fundido: la subida va en CSS (`.sv-toolbar-rise`), que
+          // en móvil la quita si hay agrupación.
+          initial={isBackNav ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
           transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.5 }}
         >
           {/* El panel desplaza la lista antes de que la barra se fije; una vez

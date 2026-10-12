@@ -302,6 +302,37 @@ async function fetchSeasonImdbCached({
   return promise;
 }
 
+// Caché de plataformas de la serie en sessionStorage, la MISMA clave y forma
+// que usa DetailsClient (ficha de la serie), con su caducidad de 24 h.
+const SHOW_PROVIDERS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const showProvidersCacheKey = (showId) => `streaming:tv:${showId}`;
+
+function readShowProvidersCache(showId) {
+  try {
+    const raw = window.sessionStorage.getItem(showProvidersCacheKey(showId));
+    if (!raw) return null;
+    const { providers, timestamp } = JSON.parse(raw);
+    if (!Array.isArray(providers)) return null;
+    if (Date.now() - Number(timestamp || 0) >= SHOW_PROVIDERS_CACHE_TTL_MS) {
+      return null;
+    }
+    return providers;
+  } catch {
+    return null;
+  }
+}
+
+function writeShowProvidersCache(showId, providers, justwatchUrl) {
+  try {
+    window.sessionStorage.setItem(
+      showProvidersCacheKey(showId),
+      JSON.stringify({ providers, justwatchUrl, timestamp: Date.now() }),
+    );
+  } catch {
+    // Sin almacenamiento (modo privado): se vuelve a pedir la próxima vez.
+  }
+}
+
 export default function SeasonDetailsClient({
   showId,
   seasonNumber,
@@ -312,6 +343,9 @@ export default function SeasonDetailsClient({
   initialShowWatched,
   imdb,
   imdbUrl,
+  // Plataformas de la serie resueltas en el servidor (`null` si no llegaron
+  // a tiempo): ver page.jsx de la temporada.
+  initialShowProviders = null,
 }) {
   const router = useRouter();
   const traktRequestIdRef = useRef(0);
@@ -390,9 +424,33 @@ export default function SeasonDetailsClient({
 
   // Plataformas de streaming de la SERIE (una temporada no tiene plataforma
   // propia): se usa la principal para el overlay "Ver en" de la portada.
-  const [showProviders, setShowProviders] = useState([]);
+  //
+  // Comparte la caché de sesión de la ficha de la serie (DetailsClient,
+  // `streaming:tv:<id>`). Antes se pedían de nuevo en cada temporada: la fila
+  // de iconos llegaba ~100 ms después de pintar, la columna del póster crecía
+  // 72px y la sección «Episodios» saltaba hacia abajo al pasar de temporada.
+  // Se lee en un layout effect (antes de pintar; en el primer render no, para
+  // no descuadrar la hidratación) y solo se piden si no están.
+  const serverProviders = Array.isArray(initialShowProviders)
+    ? initialShowProviders
+    : null;
+  const [showProviders, setShowProviders] = useState(serverProviders || []);
+  useLayoutEffect(() => {
+    if (!showId) return;
+    // Las del servidor ya están en el HTML: se guardan para la ficha de la
+    // serie y las demás temporadas.
+    if (serverProviders) {
+      if (!readShowProvidersCache(showId)) {
+        writeShowProvidersCache(showId, serverProviders, null);
+      }
+      return;
+    }
+    const cached = readShowProvidersCache(showId);
+    if (cached) setShowProviders(cached);
+  }, [showId, serverProviders]);
   useEffect(() => {
-    if (!showId || !showName) return;
+    if (!showId || !showName || serverProviders) return;
+    if (readShowProvidersCache(showId)) return;
     const controller = new AbortController();
     (async () => {
       try {
@@ -407,7 +465,9 @@ export default function SeasonDetailsClient({
         });
         if (!res.ok) return;
         const json = await res.json().catch(() => null);
-        setShowProviders(Array.isArray(json?.providers) ? json.providers : []);
+        const providers = Array.isArray(json?.providers) ? json.providers : [];
+        setShowProviders(providers);
+        writeShowProvidersCache(showId, providers, json?.justwatchUrl || null);
       } catch (error) {
         if (error?.name !== "AbortError") {
           console.warn("No se pudieron cargar plataformas de la serie:", error);
@@ -415,7 +475,14 @@ export default function SeasonDetailsClient({
       }
     })();
     return () => controller.abort();
-  }, [showId, showName, show?.first_air_date, show?.imdb_id, showImdbId]);
+  }, [
+    showId,
+    showName,
+    show?.first_air_date,
+    show?.imdb_id,
+    showImdbId,
+    serverProviders,
+  ]);
 
   // Plataforma principal del overlay, según orden de prioridad (Netflix, Prime,
   // Crunchyroll, HBO Max, Disney+, Movistar+).

@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   EPISODE_HERO_MAX_BANDS,
+  pickEpisodeBackdrop,
   pickEpisodeHeroStills,
 } from "./episodeHeroStills.js";
 
@@ -64,4 +65,41 @@ test("sin repetidos y tolerante a entradas inválidas", () => {
     }),
     ["/a.jpg", "/b.jpg"],
   );
+});
+
+// Fondo de la ficha en ordenador: distinto de la imagen de portada si se puede.
+test("el fondo usa otra imagen del episodio, distinta de la portada", () => {
+  assert.equal(
+    pickEpisodeBackdrop({
+      stillPath: "/oficial.jpg",
+      stills: [img("/oficial.jpg"), img("/rotulada.jpg", "en"), img("/otra.jpg")],
+      showBackdrops: [img("/serie.jpg")],
+    }),
+    "/otra.jpg",
+  );
+});
+
+test("sin otra imagen del episodio, un fondo sin texto de la serie", () => {
+  assert.equal(
+    pickEpisodeBackdrop({
+      stillPath: "/oficial.jpg",
+      stills: [img("/oficial.jpg")],
+      showBackdrops: [img("/rotulado.jpg", "en"), img("/serie.jpg")],
+      showBackdropPath: "/principal.jpg",
+    }),
+    "/serie.jpg",
+  );
+});
+
+test("después, el fondo principal de la serie; y solo si no hay nada, la portada", () => {
+  assert.equal(
+    pickEpisodeBackdrop({ stillPath: "/oficial.jpg", showBackdropPath: "/principal.jpg" }),
+    "/principal.jpg",
+  );
+  assert.equal(
+    pickEpisodeBackdrop({ stillPath: "/oficial.jpg", showBackdropPath: "/oficial.jpg" }),
+    "/oficial.jpg",
+  );
+  assert.equal(pickEpisodeBackdrop({ stillPath: "/oficial.jpg" }), "/oficial.jpg");
+  assert.equal(pickEpisodeBackdrop({}), null);
 });
