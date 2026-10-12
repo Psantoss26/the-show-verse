@@ -31,6 +31,20 @@ export function mapLetterboxdHistoryItem(item, userId) {
   };
 }
 
+/** Favorita (like) o pendiente (watchlist) → fila de favorites / watchlist. */
+export function mapLetterboxdCollectionItem(item, userId, now = new Date()) {
+  const tmdbId = movieId(item);
+  if (!tmdbId) return null;
+  return {
+    userId,
+    tmdbId,
+    mediaType: 'movie',
+    title: item?.title || null,
+    posterPath: item?.posterPath || null,
+    addedAt: validDate(item?.addedAt, now),
+  };
+}
+
 /** Puntuación (1–10) → fila de user_ratings (o null si no vale). */
 export function mapLetterboxdRatingItem(item, userId, now = new Date()) {
   const tmdbId = movieId(item);

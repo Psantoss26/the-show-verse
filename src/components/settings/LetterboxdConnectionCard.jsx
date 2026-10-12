@@ -145,7 +145,7 @@ export default function LetterboxdConnectionCard({ className = "", onOpenImport 
         await refreshConnection();
         setMessage(
           result.pending
-            ? `Sincronización terminada: ${plural(result.history, "visionado nuevo", "visionados nuevos")} y ${plural(result.ratings, "puntuación", "puntuaciones")}.`
+            ? `Sincronización terminada: ${plural(result.history, "visionado nuevo", "visionados nuevos")}, ${plural(result.ratings, "puntuación", "puntuaciones")}, ${plural(result.favorites || 0, "favorita", "favoritas")} y ${plural(result.watchlist || 0, "pendiente", "pendientes")}.`
             : "Historial completo al día: no había cambios en Letterboxd.",
         );
       } catch (err) {
@@ -249,15 +249,18 @@ export default function LetterboxdConnectionCard({ className = "", onOpenImport 
       )}
       {connected && !extRunning && !extensionDone && (
         <div className="rounded-2xl bg-white/[0.03] border border-white/5 p-3.5 text-xs text-zinc-300">
-          <p className="font-bold text-zinc-100">El RSS solo trae tus últimas ~50 entradas del diario.</p>
+          <p className="font-bold text-zinc-100">
+            El RSS solo trae tus últimas ~50 entradas del diario, sin favoritas ni pendientes.
+          </p>
           {hasExtension ? (
             <p className="mt-1 leading-relaxed">
               Pulsa <strong className="text-white">Sincronizar todo el historial</strong>: la extensión descargará tu
-              exportación oficial de Letterboxd con la sesión de letterboxd.com de este navegador.
+              exportación oficial de Letterboxd (historial, puntuaciones, favoritas y watchlist) con la sesión de
+              letterboxd.com de este navegador.
             </p>
           ) : (
             <p className="mt-1 leading-relaxed">
-              Para traer todo tu historial, importa el ZIP de tu exportación o instala la extensión de The Show Verse
+              Para traer todo tu historial, tus favoritas y tu watchlist, importa el ZIP de tu exportación o instala la extensión de The Show Verse
               (versión 3.2 o posterior) con la sesión de letterboxd.com iniciada en este navegador.
             </p>
           )}

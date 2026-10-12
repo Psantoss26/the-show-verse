@@ -10,6 +10,8 @@
 //                  el diario no tienen fecha de visionado: entran con la fecha
 //                  en que se marcaron y solo si no las tienes ya vistas.
 //   - ratings.csv  la puntuación actual de cada película (0,5–5 estrellas → 1–10).
+//   - likes/films.csv  las películas con "me gusta" (corazón) → Favoritas.
+//   - watchlist.csv    la watchlist → Pendientes.
 
 // Igual que normalizeText de lib/netflix/resolve (que es de servidor).
 export function normalizeText(value) {
@@ -22,7 +24,9 @@ export function normalizeText(value) {
     .trim();
 }
 
-export const LETTERBOXD_FILES = ["diary.csv", "watched.csv", "ratings.csv"];
+export const LETTERBOXD_FILES = ["diary.csv", "watched.csv", "ratings.csv", "watchlist.csv", "likes/films.csv"];
+// Sueltos (sin ZIP), el de likes se llama solo "films.csv".
+const LOOSE_FILES = { "diary.csv": "diary.csv", "watched.csv": "watched.csv", "ratings.csv": "ratings.csv", "watchlist.csv": "watchlist.csv", "films.csv": "likes/films.csv" };
 export const LETTERBOXD_CHUNK_FILMS = 60;
 
 // ---------------------------------------------------------------------------
@@ -96,14 +100,16 @@ export function listZipEntries(buffer) {
   return entries;
 }
 
-// Los CSV del perfil están en la raíz del ZIP (o en una sola carpeta). Los de
-// deleted/, orphaned/, likes/ o lists/ tienen los mismos nombres y no valen.
-function exportFileName(path) {
-  const parts = String(path || "").split("/").filter(Boolean);
-  if (!parts.length || parts.length > 2) return null;
-  const base = parts[parts.length - 1].toLowerCase();
-  if (parts.length === 2 && /^(deleted|orphaned|likes|lists|reviews)$/i.test(parts[0])) return null;
-  return LETTERBOXD_FILES.includes(base) ? base : null;
+// Los CSV del perfil están en la raíz del ZIP (o dentro de una sola carpeta) y
+// los "me gusta" en likes/films.csv. Los de deleted/, orphaned/ o lists/ tienen
+// los mismos nombres y no valen.
+export function exportFileName(path) {
+  let parts = String(path || "").split("/").filter(Boolean).map((part) => part.toLowerCase());
+  if (parts.some((part) => /^(deleted|orphaned|lists|reviews)$/.test(part))) return null;
+  // Carpeta contenedora opcional ("letterboxd-ana-2024-…/diary.csv").
+  if (parts.length === 3 || (parts.length === 2 && parts[0] !== "likes")) parts = parts.slice(1);
+  const relative = parts.join("/");
+  return LETTERBOXD_FILES.includes(relative) ? relative : null;
 }
 
 /**
@@ -122,8 +128,8 @@ export async function readLetterboxdFiles(files) {
         if (!key || texts[key]) continue;
         texts[key] = decoder.decode(await entry.read());
       }
-    } else if (LETTERBOXD_FILES.includes(name)) {
-      texts[name] = await file.text();
+    } else if (LOOSE_FILES[name]) {
+      texts[LOOSE_FILES[name]] = await file.text();
     }
   }
   return texts;
@@ -213,6 +219,8 @@ export function letterboxdFilmKey(name, year) {
  *   films    [{ key, name, year }]
  *   history  [{ film, watchedAt, rewatch, undated }]
  *   ratings  [{ film, rating, ratedAt }]
+ *   favorites [{ film, addedAt }]   (likes/films.csv)
+ *   watchlist [{ film, addedAt }]   (watchlist.csv)
  */
 export function buildLetterboxdImport(texts = {}) {
   const films = new Map();
@@ -260,7 +268,18 @@ export function buildLetterboxdImport(texts = {}) {
     if (!ratings.has(film)) ratings.set(film, item);
   }
 
-  return { films: [...films.values()], history, ratings: [...ratings.values()] };
+  const collection = (text) => {
+    const items = new Map();
+    for (const row of parseCsv(text)) {
+      const film = addFilm(row);
+      if (film && !items.has(film)) items.set(film, { film, addedAt: letterboxdDay(row.date) });
+    }
+    return [...items.values()];
+  };
+  const favorites = collection(texts["likes/films.csv"]);
+  const watchlist = collection(texts["watchlist.csv"]);
+
+  return { films: [...films.values()], history, ratings: [...ratings.values()], favorites, watchlist };
 }
 
 /** Reparte la importación en tandas de películas, cada una con sus visionados y puntuaciones. */
@@ -268,6 +287,8 @@ export function chunkLetterboxdImport(data, size = LETTERBOXD_CHUNK_FILMS) {
   const films = Array.isArray(data?.films) ? data.films : [];
   const historyByFilm = Map.groupBy(data?.history || [], (item) => item.film);
   const ratingsByFilm = Map.groupBy(data?.ratings || [], (item) => item.film);
+  const favoritesByFilm = Map.groupBy(data?.favorites || [], (item) => item.film);
+  const watchlistByFilm = Map.groupBy(data?.watchlist || [], (item) => item.film);
   const chunks = [];
   for (let index = 0; index < films.length; index += size) {
     const chunkFilms = films.slice(index, index + size);
@@ -275,6 +296,8 @@ export function chunkLetterboxdImport(data, size = LETTERBOXD_CHUNK_FILMS) {
       films: chunkFilms,
       history: chunkFilms.flatMap((film) => historyByFilm.get(film.key) || []),
       ratings: chunkFilms.flatMap((film) => ratingsByFilm.get(film.key) || []),
+      favorites: chunkFilms.flatMap((film) => favoritesByFilm.get(film.key) || []),
+      watchlist: chunkFilms.flatMap((film) => watchlistByFilm.get(film.key) || []),
     });
   }
   return chunks;
@@ -282,8 +305,9 @@ export function chunkLetterboxdImport(data, size = LETTERBOXD_CHUNK_FILMS) {
 
 // ---------------------------------------------------------------------------
 // Sincronización incremental (exportación periódica por la extensión): cada
-// visionado y cada puntuación tienen una clave; solo se envía lo que no se
-// envió antes. Una nota cambiada tiene otra clave, así que vuelve a enviarse.
+// visionado, puntuación, favorita y pendiente tienen una clave; solo se envía
+// lo que no se envió antes. Una nota cambiada tiene otra clave, así que vuelve
+// a enviarse. Quitar algo en Letterboxd no lo quita aquí.
 
 export function letterboxdHistoryKey(item) {
   return `h|${item.film}|${item.watchedAt}|${item.undated ? 1 : 0}`;
@@ -293,12 +317,22 @@ export function letterboxdRatingKey(item) {
   return `r|${item.film}|${item.rating}`;
 }
 
-/** Lo que falta por enviar: visionados y notas nuevos, con sus películas. */
+export function letterboxdFavoriteKey(item) {
+  return `f|${item.film}`;
+}
+
+export function letterboxdWatchlistKey(item) {
+  return `w|${item.film}`;
+}
+
+/** Lo que falta por enviar: visionados, notas, favoritas y pendientes nuevos, con sus películas. */
 export function pendingLetterboxdImport(data, syncedKeys = new Set()) {
   const history = (data?.history || []).filter((item) => !syncedKeys.has(letterboxdHistoryKey(item)));
   const ratings = (data?.ratings || []).filter((item) => !syncedKeys.has(letterboxdRatingKey(item)));
-  const used = new Set([...history, ...ratings].map((item) => item.film));
-  return { films: (data?.films || []).filter((film) => used.has(film.key)), history, ratings };
+  const favorites = (data?.favorites || []).filter((item) => !syncedKeys.has(letterboxdFavoriteKey(item)));
+  const watchlist = (data?.watchlist || []).filter((item) => !syncedKeys.has(letterboxdWatchlistKey(item)));
+  const used = new Set([...history, ...ratings, ...favorites, ...watchlist].map((item) => item.film));
+  return { films: (data?.films || []).filter((film) => used.has(film.key)), history, ratings, favorites, watchlist };
 }
 
 /** Claves de una tanda ya importada. */
@@ -306,5 +340,7 @@ export function letterboxdChunkKeys(chunk) {
   return [
     ...(chunk?.history || []).map(letterboxdHistoryKey),
     ...(chunk?.ratings || []).map(letterboxdRatingKey),
+    ...(chunk?.favorites || []).map(letterboxdFavoriteKey),
+    ...(chunk?.watchlist || []).map(letterboxdWatchlistKey),
   ];
 }

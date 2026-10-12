@@ -25,6 +25,14 @@ const RATINGS = `Date,Name,Year,Letterboxd URI,Rating
 2021-07-07,Amélie,2001,https://boxd.it/n,3.5
 `;
 
+const LIKES = `Date,Name,Year,Letterboxd URI
+2022-03-03,Amélie,2001,https://boxd.it/n
+`;
+const WATCHLIST = `Date,Name,Year,Letterboxd URI
+2024-02-02,Paris\, Texas,1984,https://boxd.it/p
+2024-02-03,Paris\, Texas,1984,https://boxd.it/p
+`;
+
 // ZIP mínimo (deflate) para probar el lector.
 function makeZip(files) {
   const encoder = new TextEncoder();
@@ -66,11 +74,13 @@ test("lee los CSV de la raíz del ZIP y no los de deleted/ ni lists/", async () 
     "deleted/diary.csv": "Date,Name\n2000-01-01,Nope\n",
     "lists/ratings.csv": "x",
     "ratings.csv": RATINGS,
+    "likes/films.csv": LIKES,
+    "watchlist.csv": WATCHLIST,
   });
-  assert.equal(listZipEntries(zip).length, 4);
+  assert.equal(listZipEntries(zip).length, 6);
   const file = { name: "letterboxd-export.zip", arrayBuffer: async () => zip };
   const texts = await readLetterboxdFiles([file]);
-  assert.deepEqual(Object.keys(texts).sort(), ["diary.csv", "ratings.csv"]);
+  assert.deepEqual(Object.keys(texts).sort(), ["diary.csv", "likes/films.csv", "ratings.csv", "watchlist.csv"]);
   assert.equal(texts["diary.csv"], DIARY);
 });
 
@@ -140,4 +150,23 @@ test("solo envía visionados y notas nuevos o cambiados", async () => {
   assert.deepEqual(next.films.map((film) => film.key).sort(), ["amelie|2001", "heat|1995"]);
   assert.deepEqual(next.ratings.map((item) => [item.film, item.rating]), [["amelie|2001", 10]]);
   assert.deepEqual(next.history.map((item) => item.watchedAt.slice(0, 10)), ["2025-01-01"]);
+});
+
+test("likes como favoritas y watchlist como pendientes, en sus tandas", async () => {
+  const { pendingLetterboxdImport, letterboxdChunkKeys } = await import("./export.js");
+  const csvWatchlist = 'Date,Name,Year,Letterboxd URI\n2024-02-02,"Paris, Texas",1984,x\n2024-02-03,"Paris, Texas",1984,x\n';
+  const data = buildLetterboxdImport({ "ratings.csv": RATINGS, "likes/films.csv": LIKES, "watchlist.csv": csvWatchlist });
+  assert.deepEqual(data.favorites, [{ film: "amelie|2001", addedAt: "2022-03-03T12:00:00.000Z" }]);
+  assert.deepEqual(data.watchlist, [{ film: "paris texas|1984", addedAt: "2024-02-02T12:00:00.000Z" }]);
+  const [chunk] = chunkLetterboxdImport(data);
+  assert.equal(chunk.favorites.length, 1);
+  assert.equal(chunk.watchlist.length, 1);
+  const synced = new Set(letterboxdChunkKeys(chunk));
+  assert.equal(pendingLetterboxdImport(data, synced).films.length, 0);
+});
+
+test("CSV sueltos: films.csv son los likes", async () => {
+  const file = (name, text) => ({ name, text: async () => text });
+  const texts = await readLetterboxdFiles([file("films.csv", LIKES), file("watchlist.csv", "a")]);
+  assert.deepEqual(Object.keys(texts).sort(), ["likes/films.csv", "watchlist.csv"]);
 });

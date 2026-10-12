@@ -146,7 +146,16 @@ export function writeLastAutoSync(value = Date.now()) {
  */
 export async function runLetterboxdImport(data, { onChunk, onChunkDone, isCancelled } = {}) {
   const chunks = chunkLetterboxdImport(data);
-  const totals = { historyImported: 0, historySkipped: 0, ratingsImported: 0, ratingsUpdated: 0, resolved: 0, missing: [] };
+  const totals = {
+    historyImported: 0,
+    historySkipped: 0,
+    ratingsImported: 0,
+    ratingsUpdated: 0,
+    favoritesImported: 0,
+    watchlistImported: 0,
+    resolved: 0,
+    missing: [],
+  };
   let done = 0;
   for (let index = 0; index < chunks.length; index += 1) {
     if (isCancelled?.()) return { totals, cancelled: true };
@@ -164,6 +173,8 @@ export async function runLetterboxdImport(data, { onChunk, onChunkDone, isCancel
     totals.historySkipped += Number(history.skipped || 0);
     totals.ratingsImported += Number(ratings.imported || 0);
     totals.ratingsUpdated += Number(ratings.updated || 0);
+    totals.favoritesImported += Number(json?.import?.chunk?.favorites?.imported || 0);
+    totals.watchlistImported += Number(json?.import?.chunk?.watchlist?.imported || 0);
     totals.resolved += Number(json?.resolved || 0);
     totals.missing.push(...(Array.isArray(json?.missing) ? json.missing : []));
     done += chunk.films.length;
@@ -200,8 +211,8 @@ async function runExtensionSync({ username, full = false, onPhase, isCancelled }
 
   onPhase?.("read", {});
   const texts = await readLetterboxdFiles([{ name: "letterboxd.zip", arrayBuffer: async () => buffer }]);
-  if (!texts["diary.csv"] && !texts["watched.csv"] && !texts["ratings.csv"]) {
-    throw new LetterboxdSyncError("export", "La exportación de Letterboxd no trae diario, películas vistas ni puntuaciones.");
+  if (!Object.keys(texts).length) {
+    throw new LetterboxdSyncError("export", "La exportación de Letterboxd no trae diario, películas vistas, puntuaciones, favoritas ni pendientes.");
   }
   const all = buildLetterboxdImport(texts);
 
@@ -223,6 +234,8 @@ async function runExtensionSync({ username, full = false, onPhase, isCancelled }
     pending: pending.films.length,
     history: totals.historyImported,
     ratings: totals.ratingsImported + totals.ratingsUpdated,
+    favorites: totals.favoritesImported,
+    watchlist: totals.watchlistImported,
     missing: totals.missing,
   };
   if (!cancelled) {
