@@ -3444,7 +3444,7 @@ function NavbarContent() {
                 <div className="my-2.5 h-px bg-white/5" />
 
                 <Link
-                  href={favHref}
+                  href="/favorites"
                   onClick={() => setMobileMenuOpen(false)}
                   className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     isActive("/favorites")
@@ -3457,7 +3457,7 @@ function NavbarContent() {
                 </Link>
 
                 <Link
-                  href={watchHref}
+                  href="/watchlist"
                   onClick={() => setMobileMenuOpen(false)}
                   className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     isActive("/watchlist")
