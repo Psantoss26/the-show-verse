@@ -1,19 +1,32 @@
 "use client";
 
 import OnlineOnlyForm from "@/components/OnlineOnlyForm";
+import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 import Link from "next/link";
 import { useServerOnline } from "@/context/ServerStatusContext";
 import OfflineStorageStatus from "@/components/OfflineStorageStatus";
+import useBodyScrollLock from "@/hooks/useBodyScrollLock";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
   Check,
   DownloadCloud,
   Eye,
+  Film,
+  CalendarDays,
+  Bookmark,
+  Compass,
+  FolderKanban,
+  Heart,
+  Home,
   LayoutGrid,
+  ListVideo,
   Loader2,
   Music2,
+  Play,
+  PartyPopper,
   RotateCcw,
   Settings,
   Shield,
@@ -34,7 +47,17 @@ import {
   MailCheck,
   X,
   Upload,
+  Tv,
+  ThumbsUp,
+  Users,
 } from "lucide-react";
+import {
+  DEFAULT_MOBILE_BOTTOM_NAV,
+  MOBILE_BOTTOM_NAV_ITEMS,
+  MOBILE_BOTTOM_NAV_MAX_ITEMS,
+  sanitizeMobileBottomNav,
+} from "@/lib/ui/mobileBottomNav";
+import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { useAuth } from "@/context/AuthContext";
 import Avatar, { getInitial } from "@/components/ui/Avatar";
 import ProfileFavoritesEditor from "@/components/social/ProfileFavoritesEditor";
@@ -68,6 +91,34 @@ const STREAMING_PLATFORMS = [
   { id: "disney", name: "Disney+", icon: "/disney.png" },
   { id: "plex", name: "Plex", icon: "/plex.png" },
 ];
+
+const MOBILE_BOTTOM_NAV_PREVIEW_ICONS = {
+  home: Home,
+  movies: Film,
+  series: Tv,
+  discover: Compass,
+  library: FolderKanban,
+  social: Users,
+  lists: ListVideo,
+  "in-progress": Play,
+  history: Eye,
+  favorites: Heart,
+  watchlist: Bookmark,
+  calendar: CalendarDays,
+  recap: PartyPopper,
+  recommendations: ThumbsUp,
+};
+
+const MOBILE_BOTTOM_NAV_PREVIEW_TONES = {
+  pink: "text-pink-300",
+  purple: "text-fuchsia-300",
+  green: "text-emerald-300",
+  red: "text-red-300",
+  blue: "text-sky-300",
+  gold: "text-amber-300",
+  indigo: "text-indigo-300",
+  lime: "text-lime-300",
+};
 
 function PlatformBadges({ activeId = null, className = "" }) {
   return (
@@ -997,6 +1048,271 @@ function SegmentedField({ label, value, options, disabled: disabledProp, onChang
   );
 }
 
+function MobileBottomNavEditor({ isOpen, onClose, value, onSave, saving }) {
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState(() => sanitizeMobileBottomNav(value));
+  const [draggedKey, setDraggedKey] = useState(null);
+  const [draggedFromPalette, setDraggedFromPalette] = useState(false);
+  const [dropTargetIndex, setDropTargetIndex] = useState(null);
+  const [dragPoint, setDragPoint] = useState(null);
+  const dragSessionRef = useRef({ key: null, fromPalette: false, targetKey: null });
+  const suppressPaletteClickRef = useRef(false);
+
+  // Bloquea el scroller real (<html>) y corta el rebote táctil mientras el
+  // compositor está abierto. El fondo no debe poder desplazarse ni recibir
+  // gestos durante una edición.
+  useBodyScrollLock(isOpen);
+
+  useEffect(() => {
+    if (isOpen) setDraft(sanitizeMobileBottomNav(value));
+  }, [isOpen, value]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  const selected = draft.map((key) => MOBILE_BOTTOM_NAV_ITEMS.find((item) => item.key === key));
+  const previewSlots = Array.from(
+    { length: MOBILE_BOTTOM_NAV_MAX_ITEMS },
+    (_, index) => selected[index] || null,
+  );
+  const available = MOBILE_BOTTOM_NAV_ITEMS.filter((item) => !draft.includes(item.key));
+  const getPreviewDropTarget = (event) => {
+    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-mobile-nav-preview-slot]");
+    if (!target) return { key: null, index: null };
+    const index = Number(target.dataset.mobileNavPreviewSlot);
+    return {
+      key: target.dataset.mobileNavPreviewKey || null,
+      index: Number.isInteger(index) ? index : null,
+    };
+  };
+  const reorder = (sourceKey, targetKey) => {
+    if (!sourceKey || sourceKey === targetKey) return;
+    setDraft((current) => {
+      const from = current.indexOf(sourceKey);
+      const to = current.indexOf(targetKey);
+      if (from < 0 || to < 0 || from === to) return current;
+      const next = [...current];
+      next.splice(from, 1);
+      next.splice(to, 0, sourceKey);
+      return next;
+    });
+  };
+  const startPreviewDrag = (event, key) => {
+    if (!event.isPrimary || event.button !== 0) return;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    dragSessionRef.current = {
+      key,
+      fromPalette: false,
+      targetKey: null,
+      startX: event.clientX,
+      startY: event.clientY,
+      didMove: false,
+    };
+    setDraggedFromPalette(false);
+    setDropTargetIndex(null);
+    setDragPoint({ x: event.clientX, y: event.clientY });
+    setDraggedKey(key);
+  };
+  const startPaletteDrag = (event, key) => {
+    if (!event.isPrimary || event.button !== 0) return;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    dragSessionRef.current = {
+      key,
+      fromPalette: true,
+      targetKey: null,
+      startX: event.clientX,
+      startY: event.clientY,
+      didMove: false,
+    };
+    setDraggedFromPalette(true);
+    setDropTargetIndex(null);
+    setDragPoint({ x: event.clientX, y: event.clientY });
+    setDraggedKey(key);
+  };
+  const continuePreviewDrag = (event) => {
+    const session = dragSessionRef.current;
+    if (!session.key) return;
+    setDragPoint({ x: event.clientX, y: event.clientY });
+    const { key: targetKey, index: targetIndex } = getPreviewDropTarget(event);
+    if (Math.hypot(event.clientX - session.startX, event.clientY - session.startY) > 8) {
+      session.didMove = true;
+    }
+    if (session.fromPalette) {
+      session.targetKey = targetKey || null;
+      session.targetIndex = targetIndex;
+      setDropTargetIndex(targetIndex);
+    } else {
+      session.targetKey = targetKey || null;
+      session.targetIndex = targetIndex;
+      if (targetKey) reorder(session.key, targetKey);
+    }
+  };
+  const endPreviewDrag = (event, shouldCommit = true) => {
+    const session = dragSessionRef.current;
+    const { key: targetKey, index: targetIndex } = getPreviewDropTarget(event);
+    if (shouldCommit && session.fromPalette && session.key && targetKey) {
+      setDraft((current) => current.map((key) => (key === targetKey ? session.key : key)));
+    } else if (shouldCommit && session.fromPalette && session.key && targetIndex !== null) {
+      setDraft((current) => {
+        if (current.length >= MOBILE_BOTTOM_NAV_MAX_ITEMS) return current;
+        const next = [...current];
+        next.splice(Math.min(targetIndex, next.length), 0, session.key);
+        return next;
+      });
+    } else if (shouldCommit && !session.fromPalette && session.key && session.didMove && targetIndex !== null && !targetKey) {
+      setDraft((current) => {
+        const next = current.filter((key) => key !== session.key);
+        next.splice(Math.min(targetIndex, next.length), 0, session.key);
+        return next;
+      });
+    } else if (shouldCommit && !session.fromPalette && session.key && session.didMove && !targetKey) {
+      setDraft((current) => current.filter((key) => key !== session.key));
+    }
+    suppressPaletteClickRef.current = session.fromPalette && session.didMove;
+    dragSessionRef.current = { key: null, fromPalette: false, targetKey: null };
+    setDraggedKey(null);
+    setDraggedFromPalette(false);
+    setDropTargetIndex(null);
+    setDragPoint(null);
+  };
+
+  const draggedItem = draggedKey
+    ? MOBILE_BOTTOM_NAV_ITEMS.find((item) => item.key === draggedKey)
+    : null;
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4 backdrop-blur-lg sm:p-6" role="presentation" onPointerDown={onClose}>
+      <motion.section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="mobile-bottom-nav-editor-title"
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ duration: 0.2 }}
+        onPointerDown={(event) => event.stopPropagation()}
+        className={`relative isolate max-h-[calc(100dvh-2rem)] w-full max-w-[48rem] overflow-y-auto overscroll-contain rounded-[2rem] p-4 shadow-[0_28px_90px_-18px_rgba(0,0,0,0.9),0_0_48px_rgba(255,255,255,0.08)] sm:max-h-[90dvh] sm:p-5 md:min-h-[30rem] md:max-w-[42rem] ${LIQUID_GLASS_PANEL}`}
+      >
+        <LiquidGlassOpticalLayers />
+        <div className="relative z-10 md:flex md:min-h-[27.5rem] md:flex-col">
+          <h2 id="mobile-bottom-nav-editor-title" className="sr-only">
+            {t("settings_mobile_nav_title", "Barra inferior móvil")}
+          </h2>
+          <p className="pointer-events-none absolute inset-x-0 top-0 z-10 flex h-10 items-center justify-center pr-12 text-center text-xs leading-4 text-zinc-300">
+            {t("settings_mobile_nav_drag_hint", "Mantén pulsado y arrastra. Sácalo de la barra para quitarlo.")}
+          </p>
+          <button type="button" onClick={onClose} className="absolute right-0 top-0 z-20 grid h-10 w-10 place-items-center rounded-full bg-white/5 text-zinc-300 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white" aria-label={t("close", "Cerrar")}>
+            <X className="h-5 w-5" aria-hidden="true" />
+          </button>
+
+        <div className="rounded-[1.8rem] bg-[radial-gradient(90%_140%_at_50%_0%,rgba(255,255,255,0.12),transparent_55%),rgba(255,255,255,0.04)] p-3 pt-10 shadow-[0_18px_40px_rgba(0,0,0,0.25)] md:flex md:flex-1 md:flex-col md:justify-center">
+          <div role="group" className="mb-5 flex flex-wrap items-center justify-center gap-x-2 gap-y-3 px-2 md:mb-16" aria-label={t("settings_mobile_nav_available", "Accesos disponibles")}>
+            {available.map((item, index) => {
+              const Icon = MOBILE_BOTTOM_NAV_PREVIEW_ICONS[item.key];
+              const dragging = draggedFromPalette && draggedKey === item.key;
+              const scatter = ["-rotate-2 -translate-y-1", "rotate-2 translate-y-1", "-rotate-1 translate-y-2", "rotate-1 -translate-y-2", "-rotate-2 translate-y-1"][index % 5];
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onPointerDown={(event) => startPaletteDrag(event, item.key)}
+                  onPointerMove={continuePreviewDrag}
+                  onPointerUp={endPreviewDrag}
+                  onPointerCancel={(event) => endPreviewDrag(event, false)}
+                  onClick={() => {
+                    if (suppressPaletteClickRef.current) {
+                      suppressPaletteClickRef.current = false;
+                      return;
+                    }
+                    if (draft.length < MOBILE_BOTTOM_NAV_MAX_ITEMS) {
+                      setDraft((current) => [...current, item.key]);
+                    }
+                  }}
+                  className={`touch-none flex min-h-11 items-center gap-1.5 rounded-full bg-zinc-900/90 px-3 py-2 text-xs font-bold text-zinc-200 shadow-lg shadow-black/20 transition-[transform,background-color,opacity] duration-200 hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300 ${scatter} ${dragging ? "scale-110 bg-emerald-500/20 opacity-70 shadow-[0_0_20px_rgba(110,231,183,0.35)]" : "active:scale-95"}`}
+                  aria-label={`${t(item.labelKey, item.fallbackLabel)} · ${t("settings_mobile_nav_drop_hint", "Arrástralo sobre un botón de la barra para sustituirlo")}`}
+                >
+                  <Icon className={`h-4 w-4 ${MOBILE_BOTTOM_NAV_PREVIEW_TONES[item.tone] || "text-white"}`} strokeWidth={2.2} aria-hidden="true" />
+                  <span>{t(item.labelKey, item.fallbackLabel)}</span>
+                </button>
+              );
+            })}
+          </div>
+          <nav aria-label={t("settings_mobile_nav_preview", "Vista previa")} className="grid grid-cols-6 gap-1 rounded-[1.35rem] bg-black/35 p-1.5 backdrop-blur-xl">
+            {previewSlots.map((item, index) => {
+              const isDropTarget = draggedFromPalette && dropTargetIndex === index;
+              if (!item) {
+                return (
+                  <div
+                    key={`empty-slot-${index}`}
+                    data-mobile-nav-preview-slot={index}
+                    aria-hidden="true"
+                    className={`min-h-[3.75rem] rounded-2xl transition-[transform,background-color,box-shadow] duration-200 ${isDropTarget ? "scale-105 bg-emerald-400/20 shadow-[0_0_18px_rgba(110,231,183,0.5)]" : "bg-white/[0.015]"}`}
+                  />
+                );
+              }
+              const Icon = MOBILE_BOTTOM_NAV_PREVIEW_ICONS[item.key];
+              const dragging = !draggedFromPalette && draggedKey === item.key;
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  data-mobile-nav-preview-slot={index}
+                  data-mobile-nav-preview-key={item.key}
+                  onPointerDown={(event) => startPreviewDrag(event, item.key)}
+                  onPointerMove={continuePreviewDrag}
+                  onPointerUp={endPreviewDrag}
+                  onPointerCancel={(event) => endPreviewDrag(event, false)}
+                  className={`touch-none flex min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 text-[9px] font-bold leading-tight transition-[transform,background-color,opacity,box-shadow] duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300 ${dragging ? "scale-110 bg-white/15 opacity-70 shadow-lg shadow-black/40" : isDropTarget ? "scale-105 bg-emerald-400/20 shadow-[0_0_18px_rgba(110,231,183,0.5)]" : "bg-white/[0.035] hover:bg-white/[0.1] active:scale-95"}`}
+                  aria-label={`${t(item.labelKey, item.fallbackLabel)} · ${t("settings_mobile_nav_drag_hint", "Mantén pulsado y arrastra. Sácalo de la barra para quitarlo.")}`}
+                >
+                  <Icon className={`h-5 w-5 ${MOBILE_BOTTOM_NAV_PREVIEW_TONES[item.tone] || "text-white"}`} strokeWidth={2.2} aria-hidden="true" />
+                  <span className="w-full truncate text-zinc-200">{t(item.labelKey, item.fallbackLabel)}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
+        <div className="mt-4 flex items-center justify-between gap-3 px-1 md:mt-6">
+          <button type="button" onClick={() => setDraft(DEFAULT_MOBILE_BOTTOM_NAV)} className="text-xs font-bold text-zinc-400 transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400">
+            {t("settings_reset", "Restablecer")}
+          </button>
+          <button type="button" disabled={saving} onClick={() => { onSave(draft); onClose(); }} className="min-h-10 rounded-xl bg-emerald-400 px-4 text-sm font-black text-black transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300">
+            {t("settings_save", "Guardar cambios")}
+          </button>
+        </div>
+        </div>
+      </motion.section>
+      {draggedItem && dragPoint && createPortal(
+        <motion.div
+          aria-hidden="true"
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.9 }}
+          transition={{ duration: 0.12 }}
+          style={{ left: dragPoint.x + 18, top: dragPoint.y + 18 }}
+          className="pointer-events-none fixed z-[100] flex -translate-y-1/2 items-center gap-2 rounded-full bg-zinc-950/95 px-3 py-2 text-xs font-bold text-white shadow-[0_12px_30px_rgba(0,0,0,0.55),0_0_20px_rgba(110,231,183,0.22)] backdrop-blur-xl"
+        >
+          {(() => {
+            const DragIcon = MOBILE_BOTTOM_NAV_PREVIEW_ICONS[draggedItem.key];
+            return <DragIcon className={`h-4 w-4 ${MOBILE_BOTTOM_NAV_PREVIEW_TONES[draggedItem.tone] || "text-white"}`} strokeWidth={2.2} />;
+          })()}
+          <span>{t(draggedItem.labelKey, draggedItem.fallbackLabel)}</span>
+        </motion.div>,
+        document.body,
+      )}
+    </div>
+  );
+}
+
 function ImportPanel({
   title,
   description,
@@ -1250,7 +1566,7 @@ function ProfileSettingsClient() {
     logout,
   } = useAuth();
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState("personalization");
+  const [activeTab, setActiveTab] = useState("user");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
@@ -1258,6 +1574,7 @@ function ProfileSettingsClient() {
   const [showProfileNamesModal, setShowProfileNamesModal] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [showAccountSecurityModal, setShowAccountSecurityModal] = useState(false);
+  const [showMobileBottomNavEditor, setShowMobileBottomNavEditor] = useState(false);
 
   const saveProfileNames = async ({ username, displayName }) => {
     setProfileSaving(true);
@@ -1855,7 +2172,10 @@ function ProfileSettingsClient() {
   }
 
   const tabs = [
-    { id: "personalization", label: t("settings_personal", "Preferencias"), icon: SlidersHorizontal },
+    { id: "user", label: t("settings_user", "Usuario"), icon: User },
+    { id: "favorites", label: t("settings_favorites", "Favoritos"), icon: Heart },
+    { id: "personalization", label: t("settings_customization", "Personalización"), icon: SlidersHorizontal },
+    { id: "preferences", label: t("settings_personal", "Preferencias"), icon: Settings },
     { id: "imports", label: t("settings_imports", "Importaciones"), icon: DownloadCloud },
     { id: "connections", label: t("settings_connections", "Conexiones"), icon: Link2 },
   ];
@@ -1939,25 +2259,42 @@ function ProfileSettingsClient() {
         {/* Primary Settings Workspace */}
         <div className="grid gap-6 lg:grid-cols-[200px_1fr] items-start">
           {/* Navigation Sidebar */}
-          <nav className="flex flex-row lg:flex-col pb-3 lg:pb-0 gap-1.5 lg:gap-2 border-b lg:border-b-0 lg:border-r border-white/5 shrink-0 z-10 w-full lg:w-auto overflow-x-auto lg:overflow-x-visible scrollbar-none">
+          <nav className="flex w-full flex-row items-center justify-between gap-1.5 overflow-x-auto border-b border-white/5 pb-3 scrollbar-none lg:w-auto lg:flex-col lg:items-stretch lg:justify-start lg:gap-2 lg:overflow-x-visible lg:border-b-0 lg:border-r lg:pb-0">
             {tabs.map((tab) => {
               const active = activeTab === tab.id;
               const Icon = tab.icon;
               return (
-                <button
+                <motion.button
+                  layout
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center justify-center lg:justify-start gap-1.5 lg:gap-3 px-2.5 sm:px-4 py-2 lg:py-2.5 rounded-xl text-[11px] sm:text-xs lg:text-sm font-bold transition-all duration-300 shrink-0 text-center lg:text-left flex-1 lg:flex-none lg:w-full select-none ${
+                  transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                  aria-label={tab.label}
+                  aria-current={active ? "page" : undefined}
+                  className={`flex h-10 items-center justify-center rounded-xl text-[11px] font-bold transition-colors duration-300 shrink-0 text-center select-none lg:h-auto lg:w-full lg:justify-start lg:gap-3 lg:px-4 lg:py-2.5 lg:text-left lg:text-sm lg:flex-none ${
                     active
-                      ? "bg-white/10 text-white shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.1),0_4px_10px_rgba(0,0,0,0.25)]"
-                      : "text-zinc-400 hover:text-white hover:bg-white/5"
+                      ? "w-auto gap-1.5 px-3 bg-white/10 text-white shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.1),0_4px_10px_rgba(0,0,0,0.25)]"
+                      : "w-10 px-0 text-zinc-400 hover:text-white hover:bg-white/5"
                   }`}
                 >
                   <Icon className="h-4 w-4 lg:h-4.5 lg:w-4.5" />
-                  <span className="lg:flex-1">{tab.label}</span>
+                  <span className="hidden lg:flex lg:flex-1">{tab.label}</span>
+                  <AnimatePresence initial={false}>
+                    {active && (
+                      <motion.span
+                        initial={{ opacity: 0, width: 0 }}
+                        animate={{ opacity: 1, width: "auto" }}
+                        exit={{ opacity: 0, width: 0 }}
+                        transition={{ duration: 0.18 }}
+                        className="overflow-hidden whitespace-nowrap lg:hidden"
+                      >
+                        {tab.label}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
                   <ChevronRight className={`hidden lg:block h-3.5 w-3.5 transition-transform duration-300 ${active ? "translate-x-0.5 text-emerald-400" : "opacity-0"}`} />
-                </button>
+                </motion.button>
               );
             })}
           </nav>
@@ -1965,9 +2302,9 @@ function ProfileSettingsClient() {
           {/* Main Settings Display */}
           <div className="min-w-0">
             <AnimatePresence mode="wait">
-              {activeTab === "personalization" && (
+              {activeTab === "user" && (
                 <motion.div
-                  key="personalization"
+                  key="user"
                   initial={{ opacity: 0, x: 10 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -10 }}
@@ -2028,7 +2365,18 @@ function ProfileSettingsClient() {
                     />
                     <OfflineStorageStatus panelClassName={GLASS_PANEL} />
                   </div>
+                </motion.div>
+              )}
 
+              {activeTab === "personalization" && (
+                <motion.div
+                  key="personalization"
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  transition={{ duration: 0.25 }}
+                  className="space-y-6"
+                >
                   <div className="flex flex-col gap-4">
                     <SegmentedField
                       label={t("settings_def_view", "Vista por defecto")}
@@ -2061,9 +2409,41 @@ function ProfileSettingsClient() {
                         })
                       }
                     />
-                    <ProfileFavoritesEditor panelClassName={GLASS_PANEL} />
+                    <SettingActionRow
+                      icon={SlidersHorizontal}
+                      title={t("settings_mobile_nav_title", "Barra inferior móvil")}
+                      description={t("settings_mobile_nav_summary", "Elige y ordena los 6 accesos visibles en la navegación móvil.")}
+                      buttonLabel={t("settings_customize", "Personalizar")}
+                      disabled={saving}
+                      onClick={() => setShowMobileBottomNavEditor(true)}
+                    />
                   </div>
+                </motion.div>
 
+              )}
+
+              {activeTab === "favorites" && (
+                <motion.div
+                  key="favorites"
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  transition={{ duration: 0.25 }}
+                  className="space-y-6"
+                >
+                  <ProfileFavoritesEditor panelClassName={GLASS_PANEL} />
+                </motion.div>
+              )}
+
+              {activeTab === "preferences" && (
+                <motion.div
+                  key="preferences"
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  transition={{ duration: 0.25 }}
+                  className="space-y-6"
+                >
                   <div className="space-y-4">
                     <ToggleRow
                       icon={Eye}
@@ -2824,6 +3204,22 @@ function ProfileSettingsClient() {
             emailVerified={Boolean(user?.emailVerified)}
             hasPassword={Boolean(user?.hasPassword)}
             onPasswordChanged={() => logout({ redirectTo: "/login" })}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showMobileBottomNavEditor && (
+          <MobileBottomNavEditor
+            isOpen={showMobileBottomNavEditor}
+            onClose={() => setShowMobileBottomNavEditor(false)}
+            value={preferences.uiSettings?.mobileBottomNav}
+            saving={saving}
+            onSave={(mobileBottomNav) =>
+              updatePreference({
+                uiSettings: { ...preferences.uiSettings, mobileBottomNav },
+              })
+            }
           />
         )}
       </AnimatePresence>

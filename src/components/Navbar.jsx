@@ -72,6 +72,7 @@ import {
   getTitleCandidates,
   normalizeSearchText,
 } from "@/lib/search/titleMatching";
+import { getMobileBottomNavItems } from "@/lib/ui/mobileBottomNav";
 
 // Búsqueda tolerante a erratas: por debajo de esta longitud de consulta el fuzzy
 // es ruido (todo "se parece"), así que se mantiene el comportamiento por substring.
@@ -100,6 +101,30 @@ const PROFILE_MENU_GROUPS = [
     { href: "/calendar", label: "Calendario", Icon: CalendarDaysIcon, tone: "text-amber-400" },
   ],
 ];
+
+const MOBILE_BOTTOM_NAV_ICONS = {
+  home: HomeIcon,
+  movies: FilmIcon,
+  series: TvIcon,
+  discover: Compass,
+  library: FolderKanban,
+  social: Users,
+  lists: ListVideo,
+  "in-progress": Play,
+  history: Eye,
+  favorites: Heart,
+  watchlist: Bookmark,
+  calendar: CalendarDaysIcon,
+  recap: PartyPopper,
+  recommendations: ThumbsUp,
+};
+
+const MOBILE_BOTTOM_NAV_ACTIVE_ICON_CLASSES = {
+  "in-progress": "fill-emerald-400 text-emerald-300",
+  history: "fill-emerald-400/25",
+  favorites: "fill-red-400 text-red-400",
+  watchlist: "fill-sky-400 text-sky-300",
+};
 
 const FUZZY_MIN_QUERY_LEN = 4;
 // Similitud mínima [0,1] para dar puntos fuzzy (~1-2 letras de diferencia).
@@ -1920,7 +1945,7 @@ export default function Navbar() {
 }
 
 function NavbarContent() {
-  const { account, hydrated } = useAuth();
+  const { account, hydrated, preferences } = useAuth();
   const { t } = useTranslation();
   const pathname = usePathname();
   const router = useRouter();
@@ -2393,6 +2418,8 @@ function NavbarContent() {
     blue: "text-sky-300 drop-shadow-[0_1.5px_4px_rgba(56,189,248,0.5)]",
     purple: "text-fuchsia-300 drop-shadow-[0_1.5px_4px_rgba(232,121,249,0.5)]",
     green: "text-emerald-300 drop-shadow-[0_1.5px_4px_rgba(52,211,153,0.5)]",
+    indigo: "text-indigo-300 drop-shadow-[0_1.5px_4px_rgba(129,140,248,0.5)]",
+    lime: "text-lime-300 drop-shadow-[0_1.5px_4px_rgba(190,242,100,0.5)]",
     // Rosa: el color propio de la sección Social (ver SocialClient).
     pink: "text-pink-300 drop-shadow-[0_1.5px_4px_rgba(244,114,182,0.5)]",
   };
@@ -2439,6 +2466,14 @@ function NavbarContent() {
       green: {
         glow: "shadow-[0_4px_16px_rgba(0,0,0,0.6),0_0_22px_rgba(52,211,153,0.45),inset_0_1px_1.5px_rgba(255,255,255,0.32),inset_0_-2px_4px_rgba(0,0,0,0.3)]",
         bg: "bg-black/25 bg-emerald-500/30 bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,0.32),transparent_70%)]",
+      },
+      indigo: {
+        glow: "shadow-[0_4px_16px_rgba(0,0,0,0.6),0_0_22px_rgba(129,140,248,0.45),inset_0_1px_1.5px_rgba(255,255,255,0.32),inset_0_-2px_4px_rgba(0,0,0,0.3)]",
+        bg: "bg-black/25 bg-indigo-500/30 bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,0.32),transparent_70%)]",
+      },
+      lime: {
+        glow: "shadow-[0_4px_16px_rgba(0,0,0,0.6),0_0_22px_rgba(190,242,100,0.45),inset_0_1px_1.5px_rgba(255,255,255,0.32),inset_0_-2px_4px_rgba(0,0,0,0.3)]",
+        bg: "bg-black/25 bg-lime-500/30 bg-[radial-gradient(circle_at_50%_25%,rgba(255,255,255,0.32),transparent_70%)]",
       },
       red: {
         glow: "shadow-[0_4px_16px_rgba(0,0,0,0.6),0_0_22px_rgba(248,113,113,0.45),inset_0_1px_1.5px_rgba(255,255,255,0.32),inset_0_-2px_4px_rgba(0,0,0,0.3)]",
@@ -2593,18 +2628,13 @@ function NavbarContent() {
       : "scale-100";
 
   // Menú inferior fijo: las secciones siempre son accesibles; cada página muestra
-  // su conexión necesaria si la cuenta correspondiente no está enlazada.
-  const favHref = "/favorites";
-  const watchHref = "/watchlist";
+  // su conexión necesaria si la cuenta correspondiente no está enlazada. La
+  // selección llega de las preferencias de la cuenta y se sanea antes de pintar.
+  const mobileBottomItems = getMobileBottomNavItems(
+    preferences?.uiSettings?.mobileBottomNav,
+  );
   // Sección activa de la barra inferior y su tono, para la cápsula.
-  const mobileBottomActive = [
-    { href: "/social", tone: "pink" },
-    { href: "/lists", tone: "purple" },
-    { href: "/in-progress", tone: "green" },
-    { href: "/history", tone: "green" },
-    { href: favHref, tone: "red" },
-    { href: watchHref, tone: "blue" },
-  ].find((entry) => isActive(entry.href));
+  const mobileBottomActive = mobileBottomItems.find((entry) => isActive(entry.href));
   const loginHref = `/login?next=${encodeURIComponent(
     pathname || "/",
   )}`;
@@ -3236,113 +3266,32 @@ function NavbarContent() {
           )}
         />
 
-        <Link
-          href="/social"
-          prefetch
-          {...navPrefetchHandlers("/social")}
-          className={navLinkClassMobileBottom("/social", "pink")}
-          aria-current={isActive("/social") ? "page" : undefined}
-          aria-label={t("nav_social", "Social")}
-          title={t("nav_social", "Social")}
-        >
-          <span className={mobileBottomIconSlotClass}>
-            <Users
-              className={`${mobileBottomIconClass} ${isActive("/social") ? "text-pink-300" : ""}`}
-              strokeWidth={MOBILE_BOTTOM_ICON_STROKE}
-              style={{ shapeRendering: "geometricPrecision" }}
-            />
-          </span>
-        </Link>
+        {mobileBottomItems.map((item) => {
+          const Icon = MOBILE_BOTTOM_NAV_ICONS[item.key];
+          const active = isActive(item.href);
+          const label = t(item.labelKey, item.fallbackLabel);
 
-        <Link
-          href="/lists"
-          prefetch
-          {...navPrefetchHandlers("/lists")}
-          className={navLinkClassMobileBottom("/lists", "purple")}
-          aria-current={isActive("/lists") ? "page" : undefined}
-          aria-label={t("nav_lists", "Listas")}
-          title={t("nav_lists", "Listas")}
-        >
-          <span className={mobileBottomIconSlotClass}>
-            <ListVideo
-              className={`${mobileBottomIconClass} ${isActive("/lists") ? "text-purple-300" : ""}`}
-              strokeWidth={MOBILE_BOTTOM_ICON_STROKE}
-              style={{ shapeRendering: "geometricPrecision" }}
-            />
-          </span>
-        </Link>
-
-        <Link
-          href="/in-progress"
-          prefetch
-          {...navPrefetchHandlers("/in-progress")}
-          className={navLinkClassMobileBottom("/in-progress", "green")}
-          aria-current={isActive("/in-progress") ? "page" : undefined}
-          aria-label={t("nav_in_progress", "En Progreso")}
-          title={t("nav_in_progress", "En Progreso")}
-        >
-          <span className={mobileBottomIconSlotClass}>
-            <Play
-              className={`${mobileBottomIconClass} ${isActive("/in-progress") ? "fill-emerald-400 text-emerald-300" : ""}`}
-              strokeWidth={MOBILE_BOTTOM_ICON_STROKE}
-              style={{ shapeRendering: "geometricPrecision" }}
-            />
-          </span>
-        </Link>
-
-        <Link
-          href="/history"
-          prefetch
-          {...navPrefetchHandlers("/history")}
-          className={navLinkClassMobileBottom("/history", "green")}
-          aria-current={isActive("/history") ? "page" : undefined}
-          aria-label={t("nav_history", "Historial")}
-          title={t("nav_history", "Historial")}
-        >
-          <span className={mobileBottomIconSlotClass}>
-            <Eye
-              className={`${mobileBottomIconClass} ${isActive("/history") ? "fill-emerald-400/25" : ""}`}
-              strokeWidth={MOBILE_BOTTOM_ICON_STROKE}
-              style={{ shapeRendering: "geometricPrecision" }}
-            />
-          </span>
-        </Link>
-
-        <Link
-          href={favHref}
-          prefetch
-          {...navPrefetchHandlers(favHref)}
-          className={navLinkClassMobileBottom("/favorites", "red")}
-          aria-current={isActive(favHref) ? "page" : undefined}
-          aria-label={t("nav_favorites", "Favoritas")}
-          title={t("nav_favorites", "Favoritas")}
-        >
-          <span className={mobileBottomIconSlotClass}>
-            <Heart
-              className={`${mobileBottomIconClass} ${isActive(favHref) ? "fill-red-400 text-red-400" : ""}`}
-              strokeWidth={MOBILE_BOTTOM_ICON_STROKE}
-              style={{ shapeRendering: "geometricPrecision" }}
-            />
-          </span>
-        </Link>
-
-        <Link
-          href={watchHref}
-          prefetch
-          {...navPrefetchHandlers(watchHref)}
-          className={navLinkClassMobileBottom("/watchlist", "blue")}
-          aria-current={isActive(watchHref) ? "page" : undefined}
-          aria-label={t("nav_watchlist", "Pendientes")}
-          title={t("nav_watchlist", "Pendientes")}
-        >
-          <span className={mobileBottomIconSlotClass}>
-            <Bookmark
-              className={`${mobileBottomIconClass} ${isActive(watchHref) ? "fill-sky-400 text-sky-300" : ""}`}
-              strokeWidth={MOBILE_BOTTOM_ICON_STROKE}
-              style={{ shapeRendering: "geometricPrecision" }}
-            />
-          </span>
-        </Link>
+          return (
+            <Link
+              key={item.key}
+              href={item.href}
+              prefetch
+              {...navPrefetchHandlers(item.href)}
+              className={navLinkClassMobileBottom(item.href, item.tone)}
+              aria-current={active ? "page" : undefined}
+              aria-label={label}
+              title={label}
+            >
+              <span className={mobileBottomIconSlotClass}>
+                <Icon
+                  className={`${mobileBottomIconClass} ${active ? MOBILE_BOTTOM_NAV_ACTIVE_ICON_CLASSES[item.key] || "" : ""}`}
+                  strokeWidth={MOBILE_BOTTOM_ICON_STROKE}
+                  style={{ shapeRendering: "geometricPrecision" }}
+                />
+              </span>
+            </Link>
+          );
+        })}
       </nav>
 
       {/* ===================== DRAWER MENÚ (MÓVIL) ===================== */}
