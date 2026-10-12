@@ -1610,6 +1610,7 @@ export default function SeasonDetailsClient({
         </div>
 
         <MobileHeroCover
+          objectPosition="center center"
           src={posterPath ? `https://image.tmdb.org/t/p/w780${posterPath}` : null}
           lowSrc={mobileCoverLowSrc}
           imgRef={mobileCoverLoad.imgRef}
@@ -1623,9 +1624,8 @@ export default function SeasonDetailsClient({
           // parte central muy difuminada en vez de una franja lisa, así que no
           // se ve el corte donde termina la imagen.
           blurredUnderlay
-          // Y más pegado al borde que en la ficha (64px): el título impreso
-          // al pie del póster («SEASON 2») se queda nítido.
-          edgeBandPx={40}
+          // Comparte la transición inferior de 64px con DetailsClient,
+          // también cuando el encuadre centrado recorta el póster.
           // Rótulo y botones legibles sobre pósters claros: se oscurece su
           // zona según lo claro que sea (medido), nada en los oscuros. Igual
           // que en la ficha de la serie.
