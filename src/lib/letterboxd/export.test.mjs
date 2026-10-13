@@ -211,3 +211,35 @@ test("reseñas sueltas y recorte al máximo", async () => {
   assert.ok(long.endsWith("…"));
   assert.equal(letterboxdReviewBody("x &#128512; &#99999999; y"), "x 😀 &#99999999; y");
 });
+
+test("resolución: no acepta una ficha casi vacía solo porque coincide el año", async () => {
+  const { resolveLetterboxdFilm } = await import("./resolve.js");
+  // Respuestas reales de TMDb (es-ES/en-US) para cada intento.
+  const catalog = {
+    "The Gentlemen": ({ primary_release_year, language }) =>
+      primary_release_year === 2019
+        ? [{ id: 991530, title: "Gentlemen Of The World", original_title: "Gentlemen Of The World", release_date: "2019-06-24", vote_count: 1 }]
+        : [{ id: 522627, title: language === "en-US" ? "The Gentlemen" : "The Gentlemen: Los señores de la mafia", original_title: "The Gentlemen", release_date: "2020-01-01", vote_count: 6000 }],
+    300: ({ primary_release_year }) =>
+      primary_release_year === 2006
+        ? [{ id: 719963, title: "Home Movies 300-1", original_title: "Home Movies 300-1", release_date: "2006-01-01", vote_count: 0 }]
+        : [{ id: 1271, title: "300", original_title: "300", release_date: "2007-03-07", vote_count: 14000 }],
+    Snowpiercer: ({ language }) =>
+      language === "en-US"
+        ? [{ id: 110415, title: "Snowpiercer", original_title: "설국열차", release_date: "2013-08-01", vote_count: 10000 }]
+        : [
+            { id: 612154, title: "Snowpiercer International Special Animation", original_title: "Snowpiercer International Special Animation", release_date: "2013-01-01", vote_count: 2 },
+            { id: 110415, title: "Rompenieves", original_title: "설국열차", release_date: "2013-08-01", vote_count: 10000 },
+          ],
+    "Spirited Away": () => [{ id: 129, title: "El viaje de Chihiro", original_title: "千と千尋の神隠し", release_date: "2001-07-20", vote_count: 17000 }],
+  };
+  const search = async (query, params) => catalog[query]?.(params) || [];
+  const details = async (id) => ({ 110415: { title: "Rompenieves", poster_path: "/es.jpg" }, 522627: { title: "The Gentlemen: Los señores de la mafia" } })[id] || null;
+
+  assert.equal((await resolveLetterboxdFilm({ name: "The Gentlemen", year: 2019 }, { search, details })).tmdbId, 522627);
+  assert.equal((await resolveLetterboxdFilm({ name: "300", year: 2006 }, { search, details })).tmdbId, 1271);
+  const snow = await resolveLetterboxdFilm({ name: "Snowpiercer", year: 2013 }, { search, details });
+  assert.deepEqual(snow, { tmdbId: 110415, title: "Rompenieves", posterPath: "/es.jpg" });
+  // Sin coincidencia de título pero conocida y del mismo año: se acepta.
+  assert.equal((await resolveLetterboxdFilm({ name: "Spirited Away", year: 2001 }, { search: async (q, p) => (p.language === "es-ES" ? catalog["Spirited Away"]() : []), details })).tmdbId, 129);
+});
