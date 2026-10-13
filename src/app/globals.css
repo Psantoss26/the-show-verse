@@ -75,7 +75,63 @@
 :root {
   --background: #000000;
   --foreground: #ededed;
+  --sv-scrollbar-thumb: rgba(255, 255, 255, 0.35);
+  --sv-scrollbar-thumb-hover: rgba(255, 255, 255, 0.5);
+  --sv-scrollbar-track: transparent;
   color-scheme: dark;
+}
+
+/* Estilo por defecto del documento y de los contenedores con scroll.
+   La capa base permite que no-scrollbar y los estilos de cada componente
+   sigan teniendo prioridad, también en carruseles y en la app táctil. */
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--sv-scrollbar-thumb) var(--sv-scrollbar-track);
+  }
+
+  @supports not (scrollbar-color: auto) {
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track,
+    ::-webkit-scrollbar-corner {
+      background: var(--sv-scrollbar-track);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      min-height: 40px;
+      border: 2px solid transparent;
+      border-radius: 999px;
+      background: var(--sv-scrollbar-thumb);
+      background-clip: padding-box;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background-color: var(--sv-scrollbar-thumb-hover);
+    }
+
+    ::-webkit-scrollbar-button {
+      display: none;
+      width: 0;
+      height: 0;
+    }
+  }
+
+  @media (forced-colors: active) {
+    * {
+      scrollbar-color: auto;
+    }
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --sv-scrollbar-thumb: rgba(255, 255, 255, 0.65);
+    --sv-scrollbar-thumb-hover: rgba(255, 255, 255, 0.85);
+  }
 }
 
 @theme inline {
@@ -271,6 +327,52 @@ body {
   background: transparent;
 }
 
+/* Scroll del panel lateral de detalles, integrado en su superficie oscura. */
+.details-sheet-scroll {
+  --scrollbar-thumb: rgba(255, 255, 255, 0.28);
+  --scrollbar-track: transparent;
+  color-scheme: dark;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+/* Safari anterior a scrollbar-color: evita mezclar las dos implementaciones. */
+@supports not (scrollbar-color: auto) {
+  .details-sheet-scroll::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .details-sheet-scroll::-webkit-scrollbar-track,
+  .details-sheet-scroll::-webkit-scrollbar-corner {
+    background: var(--scrollbar-track);
+  }
+
+  .details-sheet-scroll::-webkit-scrollbar-thumb {
+    min-height: 40px;
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: var(--scrollbar-thumb);
+    background-clip: padding-box;
+  }
+
+  .details-sheet-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.45);
+  }
+
+  .details-sheet-scroll::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+}
+
+@media (forced-colors: active) {
+  .details-sheet-scroll {
+    scrollbar-color: auto;
+  }
+}
+
 /* =========================
    Shimmer animation for skeletons
    ========================= */
@@ -441,6 +543,29 @@ html:not([data-avatar-boot]) .alerts-boot {
 
 .sv-fade-in {
   animation: sv-fade-in 200ms ease-out;
+}
+
+/* Vista lateral de una sección de la ficha (details/sectionSheet): entra desde
+   la derecha SOLO con transform. Un fundido de opacidad haría del panel una
+   raíz de backdrop y aplanaría su cristal mientras dura. */
+@keyframes sv-sheet-in {
+  from {
+    transform: translate3d(100%, 0, 0);
+  }
+
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.sv-sheet-in {
+  animation: sv-sheet-in 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-sheet-in {
+    animation: none;
+  }
 }
 
 /* Salida (ver FadePresence): `forwards` la deja a 0 hasta que se desmonta, sin

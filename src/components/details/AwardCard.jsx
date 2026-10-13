@@ -496,3 +496,56 @@ export default function AwardCard({ item, enableHover = false }) {
     </article>
   );
 }
+
+/**
+ * El mismo premio como FILA, para la vista lateral de la sección
+ * (details/sectionSheet): logo del galardón con su color, categoría, galardón,
+ * personas, año y resultado.
+ */
+export function AwardRow({ item }) {
+  const people = Array.isArray(item?.people) ? item.people.filter(Boolean) : [];
+  const visual = getAwardVisual(item?.groupName);
+  const categoryLabel = formatAwardCategory(item?.category, item?.groupName);
+  const groupLabel = formatAwardGroupName(item?.groupName);
+
+  return (
+    <article className="flex items-center gap-3.5 rounded-2xl bg-black/15 p-3">
+      <div
+        className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl"
+        style={{ background: visual.background }}
+      >
+        {item?.groupImageUrl ? (
+          <OptimizedImage
+            src={item.groupImageUrl}
+            alt=""
+            className="h-11 w-11 object-contain drop-shadow-[0_4px_10px_rgba(0,0,0,0.6)]"
+            loading="lazy"
+            decoding="async"
+          />
+        ) : (
+          <span className={`text-[10px] font-black uppercase tracking-widest ${visual.accent}`}>{visual.label}</span>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="line-clamp-2 text-sm font-bold leading-tight text-white">{categoryLabel}</p>
+        <p className="mt-0.5 truncate text-xs font-bold text-yellow-400">{groupLabel}</p>
+        {people.length > 0 ? (
+          <p className="mt-0.5 line-clamp-1 text-xs text-zinc-400">{people.join(", ")}</p>
+        ) : null}
+      </div>
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        <span
+          className={`inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest ${awardResultClass(item?.result)}`}
+        >
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${
+              item?.result === "winner" ? "bg-yellow-400" : item?.result === "nominee" ? "bg-zinc-400" : "bg-zinc-500"
+            }`}
+          />
+          {awardResultLabel(item?.result)}
+        </span>
+        {item?.year ? <span className="text-[11px] font-bold text-zinc-500">{item.year}</span> : null}
+      </div>
+    </article>
+  );
+}

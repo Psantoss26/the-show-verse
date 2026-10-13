@@ -137,7 +137,11 @@ import LiquidButton from "@/components/LiquidButton";
 
 // -- Autenticacion y APIs de cuenta (TMDb) --
 import { useAuth } from "@/context/AuthContext";
-import CommentLikeButton from "@/components/community/CommentLikeButton";
+import TraktCommentCard from "@/components/details/TraktCommentCard";
+import DetailsSectionSheets, {
+  openSectionSheet,
+} from "@/components/details/sectionSheet/DetailsSectionSheets";
+import { getSoundtrackSourceBadge } from "@/lib/details/soundtrackSource";
 import {
   titleStateKey,
   useViewerTitleStates,
@@ -239,7 +243,6 @@ import {
   formatVoteCount,
   formatCountShort,
   stripHtml,
-  formatDateTimeEs,
   sumCount,
   translateGenre,
 } from "@/lib/details/formatters";
@@ -328,28 +331,6 @@ import {
 } from "@/lib/streaming/providers";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 
-function getSoundtrackSourceBadge(source) {
-  const key = String(source || "Spotify").toLowerCase();
-  if (key === "itunes") {
-    return {
-      label: "iTunes",
-      textClass: "text-fuchsia-300",
-      dotClass: "bg-fuchsia-400 shadow-[0_0_6px_rgba(232,121,249,0.8)]",
-    };
-  }
-  if (key === "deezer") {
-    return {
-      label: "Deezer",
-      textClass: "text-orange-300",
-      dotClass: "bg-orange-400 shadow-[0_0_6px_rgba(251,146,60,0.8)]",
-    };
-  }
-  return {
-    label: "Spotify",
-    textClass: "text-emerald-400",
-    dotClass: "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]",
-  };
-}
 
 // ---------------------------------------------------------------------------
 // CONSTANTES GLOBALES
@@ -7695,6 +7676,18 @@ export default function DetailsClient({
   const sectionItems = useMemo(() => {
     const items = [];
 
+    // TV: Temporadas
+    if (type === "tv") {
+      items.push({
+        id: "seasons",
+        label: "Temporadas",
+        icon: Layers,
+        count: visibleTraktSeasons.length || undefined,
+      });
+      // La valoración de episodios no tiene sección: la abre el botón de
+      // acción de la ficha (EpisodeRatingsModal).
+    }
+
     // Reparto
     items.push({
       id: "cast",
@@ -7758,18 +7751,6 @@ export default function DetailsClient({
       label: "Sentimientos",
       icon: Sparkles,
     });
-
-    // TV: Temporadas
-    if (type === "tv") {
-      items.push({
-        id: "seasons",
-        label: "Temporadas",
-        icon: Layers,
-        count: visibleTraktSeasons.length || undefined,
-      });
-      // La valoración de episodios no tiene sección: la abre el botón de
-      // acción de la ficha (EpisodeRatingsModal).
-    }
 
     // Comentarios comunitarios, almacenados en nuestra BBDD.
     const commentsCount = Number(tComments?.total || 0) || 0;
@@ -7835,6 +7816,14 @@ export default function DetailsClient({
   const activeSectionStore = useMemo(
     () => createValueStore(restoredValue(backSnapshot, "activeSectionId", null)),
     [backSnapshot],
+  );
+  // Vista lateral de una sección (details/sectionSheet), al pulsar su título.
+  // Qué sección está abierta vive fuera del estado de la ficha: abrirla o
+  // cerrarla no vuelve a pintar la ficha entera.
+  const sectionSheetStore = useMemo(() => createValueStore(null), []);
+  const sectionSheetOpener = useCallback(
+    (sectionId) => () => openSectionSheet(sectionSheetStore, sectionId),
+    [sectionSheetStore],
   );
   const setActiveSectionId = useCallback(
     (next) => {
@@ -9276,8 +9265,91 @@ export default function DetailsClient({
     ],
   );
 
+  // Tarjetas de temporada: las comparten la sección y su vista lateral.
+  const seasonCardItems =
+    type === "tv"
+      ? visibleTraktSeasons.map((s) => {
+          const sn = getSeasonNumber(s);
+          const imdbRating = toRatingNumber(seasonImdbRatings?.[sn]);
+          const seriesGraphRating = seriesGraphSeasonRatings.get(sn) ?? null;
+          // Datos de TMDb de la temporada: póster, nombre, año, nota y total
+          // de episodios (para el progreso).
+          const tmdbSeason = (data?.seasons || []).find(
+            (x) => Number(x?.season_number) === sn,
+          );
+          const totalEp = Number(tmdbSeason?.episode_count || 0) || null;
+          return {
+            key: sn,
+            seasonNumber: sn,
+            seasonId: tmdbSeason?.id ?? null,
+            name: tmdbSeason?.name || null,
+            posterPath: tmdbSeason?.poster_path || null,
+            fallbackPosterPath: data?.poster_path || null,
+            airDate: tmdbSeason?.air_date || null,
+            tmdbRating: tmdbSeason?.vote_average ?? null,
+            imdbRating: seriesGraphStructuresMismatch
+              ? seriesGraphRating
+              : (imdbRating ?? seriesGraphRating),
+            totalEpisodes: totalEp,
+            watchedEpisodes: getWatchedEpisodeCountForSeason(
+              watchedBySeason,
+              sn,
+              totalEp || 0,
+            ),
+            imdbUrl: resolvedImdbId
+              ? `https://www.imdb.com/title/${resolvedImdbId}/episodes/?season=${sn}`
+              : null,
+            onClick: () => router.push(`/details/tv/${id}/season/${sn}`),
+            onPrefetch: () => prefetchSeasonDetails(sn),
+            hoverLift: true,
+          };
+        })
+      : [];
+
+  // Todo lo que muestran las vistas laterales de las secciones.
+  const sectionSheetData = {
+    type,
+    tmdbId: id,
+    cast: castDataForUI,
+    recommendations,
+    collection: {
+      id: collectionId,
+      name: collectionData?.collection?.name || collectionData?.name || null,
+      items: collectionData?.items,
+    },
+    awards: awardItems,
+    images: {
+      posters: imagesState?.posters,
+      backdrops: imagesState?.backdrops,
+      logos: titleLogos,
+    },
+    videos,
+    onPlayVideo: openVideo,
+    soundtrack: soundtrackHidden ? EMPTY_SOUNDTRACK_TRACKS : soundtrackTracks,
+    onPlayTrack: openSoundtrack,
+    sentiment: tSentiment,
+    seasons: seasonCardItems,
+    comments: {
+      state: tComments,
+      tab: tCommentsTab,
+      onTabChange: selectCommentsTab,
+      onPageChange: selectCommentsPage,
+      profileUsernames: commentProfileUsernames,
+      mediaType: endpointType,
+      tmdbId: id,
+      canLike: authenticated,
+    },
+    lists: {
+      state: tLists,
+      onLoadMore: () => setTLists((p) => ({ ...p, page: (p.page || 1) + 1 })),
+    },
+  };
+
   const detailsModalLayer = (
     <>
+      {/* Vista lateral de la sección cuyo título se pulsó */}
+      <DetailsSectionSheets store={sectionSheetStore} data={sectionSheetData} />
+
       {/* Modal de reproducción de vídeos y tráilers */}
       <VideoModal
         open={videoModalOpen}
@@ -10838,6 +10910,40 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
           {/* Todas las secciones se muestran en orden sin ocultarse */}
           {/* Cada sección se registra para el sistema de detección de scroll */}
           <div className="mt-14 space-y-14">
+            {/* =================================================================
+            SECCIÓN: TEMPORADAS (solo para series)
+           ================================================================= */}
+            {/* Muestra las temporadas disponibles de la serie con información resumida */}
+            {type === "tv" && (
+              <section
+                id="section-seasons"
+                ref={registerSection("seasons")}
+              >
+                <AnimatedSection delay={0.04} renderImmediately>
+                  <section className="mb-12 group/section">
+                    <SectionTitle
+                      title="Temporadas"
+                      icon={Layers}
+                      onOpen={sectionSheetOpener("seasons")}
+                    />
+
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {tSeasons.loading && (
+                        <div className="col-span-full py-10 flex justify-center">
+                          <Loader2 className="animate-spin text-white/50" />
+                        </div>
+                      )}
+
+                      {!tSeasons.loading &&
+                        seasonCardItems.map(({ key, ...season }) => (
+                          <SeasonCard key={key} {...season} />
+                        ))}
+                    </div>
+                  </section>
+                </AnimatedSection>
+              </section>
+            )}
+
             <section
               id="section-cast"
               ref={registerSection("cast")}
@@ -10848,7 +10954,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   castDataForUI &&
                   castDataForUI.length > 0 && (
                     <section className="mb-16 group/section">
-                      <SectionTitle title="Reparto Principal" icon={Users} />
+                      <SectionTitle
+                        title="Reparto Principal"
+                        icon={Users}
+                        onOpen={sectionSheetOpener("cast")}
+                      />
                       <DetailsArrowCarousel
                         spaceBetween={12}
                         slidesPerView={3}
@@ -10908,6 +11018,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     <section className="mb-16 group/section">
                       <SectionTitle
                         title="Recomendaciones"
+                        onOpen={sectionSheetOpener("recs")}
                         icon={MonitorPlay}
                       />
 
@@ -11031,25 +11142,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 >
                   {/* --- COLECCIÓN --- */}
                   <section className="mb-10 group/section">
-                    <Link
-                      href={`/lists/collection/${collectionId}`}
-                      className="group/collection-title flex items-center gap-3 sm:gap-4 mb-8 w-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400"
-                      aria-label="Ver detalles de la colección"
-                    >
-                      <div className="relative flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-[14px] bg-yellow-500/5 backdrop-blur-2xl shadow-[0_4px_24px_rgba(234,179,8,0.12)] shrink-0 overflow-hidden group-hover/section:bg-yellow-500/10 group-hover/section:shadow-[0_8px_32px_rgba(234,179,8,0.2)] transition-all duration-500">
-                        <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/20 via-transparent to-transparent opacity-60" />
-                        <div className="absolute inset-0 shadow-[inset_0_1px_2px_rgba(255,255,255,0.15),inset_0_-1px_2px_rgba(0,0,0,0.2)] rounded-[14px] pointer-events-none" />
-                        <Layers className="relative z-10 w-5 h-5 sm:w-6 sm:h-6 text-yellow-500 group-hover/section:text-yellow-400 group-hover/section:scale-110 transition-all duration-500 drop-shadow-[0_2px_8px_rgba(234,179,8,0.4)]" />
-                      </div>
-                      <h2 className="text-2xl sm:text-[28px] font-black tracking-tight text-white drop-shadow-md shrink-0 flex items-center">
-                        Colección
-                        <ChevronRight className="ml-1 sm:ml-2 h-6 w-6 sm:h-7 sm:w-7 text-yellow-500/70 transition-transform duration-300 group-hover/section:translate-x-1 group-hover/section:text-yellow-400 group-focus-visible/collection-title:translate-x-1 group-focus-visible/collection-title:text-yellow-400" />
-                      </h2>
-                      <div className="ml-2 sm:ml-4 flex-1 h-px bg-gradient-to-r from-white/20 via-white/5 to-transparent relative flex items-center">
-                        <div className="absolute left-0 w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_12px_rgba(234,179,8,1)] opacity-40 group-hover/section:opacity-100 group-hover/section:scale-150 transition-all duration-500" />
-                        <div className="absolute left-0 w-16 sm:w-24 h-[2px] bg-gradient-to-r from-yellow-500 to-transparent opacity-0 group-hover/section:opacity-100 transition-opacity duration-500" />
-                      </div>
-                    </Link>
+                    {/* El título abre la vista lateral con la colección
+                        entera; desde ella se abre también su página. */}
+                    <SectionTitle
+                      title="Colección"
+                      icon={Layers}
+                      onOpen={sectionSheetOpener("collection")}
+                    />
 
                     {collectionLoading ? (
                       <div className="mt-3 sm:mt-4 text-sm text-zinc-400">
@@ -11170,7 +11269,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
               <section id="section-awards" ref={registerSection("awards")}>
                 <AnimatedSection delay={0.04}>
                   <section className="mb-16 group/section">
-                    <SectionTitle title="Premios" icon={Trophy} />
+                    <SectionTitle
+                      title="Premios"
+                      icon={Trophy}
+                      onOpen={sectionSheetOpener("awards")}
+                    />
 
                     <DetailsArrowCarousel
                       spaceBetween={12}
@@ -11234,6 +11337,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           {/* Título de la sección - Alineado a la izquierda */}
                           <SectionTitle
                             title="Portadas y fondos"
+                            onOpen={sectionSheetOpener("images")}
                             icon={ImageIcon}
                             className="!mb-5 sm:!mb-8 !w-auto flex-1 min-w-0 pr-4 sm:pr-6"
                           />
@@ -11921,6 +12025,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       <section className="mt-6 group/section">
                         <SectionTitle
                           title="Tráiler y vídeos"
+                          onOpen={sectionSheetOpener("videos")}
                           icon={MonitorPlay}
                         />
 
@@ -12103,6 +12208,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         <section className="mt-2 mb-10 group/section">
                           <SectionTitle
                             title="Soundtrack y música"
+                            onOpen={sectionSheetOpener("soundtrack")}
                             icon={Music2}
                           />
 
@@ -12281,6 +12387,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       <section className="mb-12 group/section">
                         <SectionTitle
                           title="Análisis de sentimientos"
+                          onOpen={sectionSheetOpener("sentiment")}
                           icon={Sparkles}
                         />
 
@@ -12408,82 +12515,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   </AnimatedSection>
                 </section>
 
-                {/* =================================================================
-                SECCIÓN: TEMPORADAS (solo para series)
-               ================================================================= */}
-                {/* Muestra las temporadas disponibles de la serie con información resumida */}
-                {type === "tv" && (
-                  <section
-                    id="section-seasons"
-                    ref={registerSection("seasons")}
-                  >
-                    <AnimatedSection delay={0.04} renderImmediately>
-                      <section className="mb-12 group/section">
-                        <SectionTitle title="Temporadas" icon={Layers} />
-
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                          {tSeasons.loading && (
-                            <div className="col-span-full py-10 flex justify-center">
-                              <Loader2 className="animate-spin text-white/50" />
-                            </div>
-                          )}
-
-                          {!tSeasons.loading &&
-                            visibleTraktSeasons.map((s) => {
-                              const sn = getSeasonNumber(s);
-                              const imdbRating = toRatingNumber(
-                                seasonImdbRatings?.[sn],
-                              );
-                              const seriesGraphRating =
-                                seriesGraphSeasonRatings.get(sn) ?? null;
-                              const rating = seriesGraphStructuresMismatch
-                                ? seriesGraphRating
-                                : (imdbRating ?? seriesGraphRating);
-
-                              // Datos de TMDb de la temporada: póster, nombre,
-                              // año y total de episodios (para el progreso).
-                              const tmdbSeason = (data?.seasons || []).find(
-                                (x) => Number(x?.season_number) === sn,
-                              );
-                              const totalEp =
-                                Number(tmdbSeason?.episode_count || 0) || null;
-
-                              return (
-                                <SeasonCard
-                                  key={sn}
-                                  seasonNumber={sn}
-                                  seasonId={tmdbSeason?.id ?? null}
-                                  name={tmdbSeason?.name || null}
-                                  posterPath={tmdbSeason?.poster_path || null}
-                                  fallbackPosterPath={data?.poster_path || null}
-                                  airDate={tmdbSeason?.air_date || null}
-                                  tmdbRating={tmdbSeason?.vote_average ?? null}
-                                  imdbRating={rating}
-                                  totalEpisodes={totalEp}
-                                  watchedEpisodes={getWatchedEpisodeCountForSeason(
-                                    watchedBySeason,
-                                    sn,
-                                    totalEp || 0,
-                                  )}
-                                  imdbUrl={
-                                    resolvedImdbId
-                                      ? `https://www.imdb.com/title/${resolvedImdbId}/episodes/?season=${sn}`
-                                      : null
-                                  }
-                                  onClick={() =>
-                                    router.push(`/details/tv/${id}/season/${sn}`)
-                                  }
-                                  onPrefetch={() => prefetchSeasonDetails(sn)}
-                                  hoverLift
-                                />
-                              );
-                            })}
-                        </div>
-                      </section>
-                    </AnimatedSection>
-                  </section>
-                )}
-
                 <section
                   id="section-comments"
                   ref={registerSection("comments")}
@@ -12494,6 +12525,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     <section className="mb-10 group/section">
                       <SectionTitle
                         title="Comentarios"
+                        onOpen={sectionSheetOpener("comments")}
                         icon={MessageSquareIcon}
                       />
 
@@ -12553,113 +12585,18 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               </div>
                             )}
 
-                          {(tComments.items || []).map((c) => {
-                              const user = c?.user || {};
-                              const avatar =
-                                user?.images?.avatar?.full ||
-                                user?.images?.avatar?.medium ||
-                                null;
-                              const text = stripHtml(
-                                c?.comment?.comment ?? c?.comment ?? "",
-                              );
-                              const created = c?.created_at
-                                ? formatDateTimeEs(c.created_at)
-                                : "";
-                              const likes = Number(c?.likes || 0);
-                              const commentUsername = String(
-                                user?.username || "",
-                              ).trim();
-                              const profileUsername = commentProfileUsernames.get(
-                                commentUsername.toLowerCase(),
-                              );
-                              const authorName =
-                                user?.name || user?.username || "Usuario";
-
-                              return (
-                                <div
-                                  key={String(
-                                    c?.id || `${user?.username}-${created}`,
-                                  )}
-                                  // DENTRO del panel de cristal: la tarjeta NO
-                                  // lleva desenfoque propio. Al apilar un
-                                  // backdrop-filter sobre otro se difumina lo ya
-                                  // difuminado y la pieza se vuelve una caja gris
-                                  // plana, justo lo contrario del efecto. Aquí
-                                  // basta un velo translúcido: el cristal que se
-                                  // ve es el del panel, continuo bajo todas.
-                                  //
-                                  // El velo TIÑE EN NEGRO, no en blanco: encima de
-                                  // un panel ya translúcido, blanco sobre blanco se
-                                  // sumaba y sobre un backdrop claro se comía el
-                                  // texto. En negro la tarjeta se separa por
-                                  // contraste, que además es lo que sostiene la
-                                  // lectura.
-                                  className="group relative isolate flex gap-4 overflow-hidden rounded-2xl bg-black/10 p-5 transform-gpu transition-colors duration-300 hover:bg-black/5"
-                                >
-                                  {/* Avatar */}
-                                  <div className="relative z-10 flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10 text-lg font-black text-white shadow-lg ring-2 ring-white/10 transition group-hover:ring-white/20">
-                                    <Avatar
-                                      src={avatar}
-                                      name={authorName}
-                                      alt={user?.username}
-                                    />
-                                  </div>
-
-                                  {/* Content */}
-                                  <div className="relative z-10 min-w-0 flex-1">
-                                    <div className="mb-1 flex items-baseline justify-between gap-2">
-                                      <div className="flex items-center gap-2">
-                                        {profileUsername ? (
-                                          <Link
-                                            href={`/u/${encodeURIComponent(profileUsername)}`}
-                                            className="font-bold text-white transition-colors hover:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"
-                                          >
-                                            {authorName}
-                                          </Link>
-                                        ) : (
-                                          <span className="font-bold text-white">
-                                            {authorName}
-                                          </span>
-                                        )}
-                                        {user?.vip && (
-                                          <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.6)]">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 shadow-[0_0_6px_rgba(250,204,21,0.8)]" />
-                                            VIP
-                                          </span>
-                                        )}
-                                      </div>
-                                      <span className="text-xs text-zinc-500">
-                                        {created}
-                                      </span>
-                                    </div>
-
-                                    <div className="relative text-sm leading-relaxed text-zinc-300">
-                                      {/* Icono de comillas decorativo */}
-                                      <span className="absolute -left-3 -top-1 font-serif text-4xl text-white/5">
-                                        “
-                                      </span>
-                                      <p className="whitespace-pre-line">
-                                        {text}
-                                      </p>
-                                    </div>
-
-                                    {/* Actions Footer */}
-                                    <div className="mt-3 flex items-center gap-4 border-t border-white/5 pt-3">
-                                      <CommentLikeButton
-                                        commentId={c?.id}
-                                        // endpointType, no traktType: el backend
-                                        // espera 'tv'|'movie' y traktType es 'show'.
-                                        mediaType={endpointType}
-                                        tmdbId={id}
-                                        likes={likes}
-                                        liked={Boolean(c?.liked)}
-                                        canLike={authenticated}
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                          })}
+                          {(tComments.items || []).map((c) => (
+                            <TraktCommentCard
+                              key={String(
+                                c?.id || `${c?.user?.username}-${c?.created_at}`,
+                              )}
+                              comment={c}
+                              profileUsernames={commentProfileUsernames}
+                              mediaType={endpointType}
+                              tmdbId={id}
+                              canLike={authenticated}
+                            />
+                          ))}
 
                           {tComments.pageCount > 1 && (
                             <nav
@@ -12716,7 +12653,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     {/* Trakt: listas - Solo mostrar si no hay error */}
                     {!tLists.error && (
                       <section className="mb-12 group/section">
-                        <SectionTitle title="Listas" icon={ListVideo} />
+                        <SectionTitle
+                          title="Listas"
+                          icon={ListVideo}
+                          onOpen={sectionSheetOpener("lists")}
+                        />
 
                         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
                           {tLists.loading ? (
