@@ -17,6 +17,7 @@ import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 import { useAuth } from "@/context/AuthContext";
 import { readSeasonCustomPoster } from "@/lib/details/seasonArtwork";
 import { LIQUID_GLASS_CARD } from "@/lib/ui/liquidGlass";
+import { DETAILS_POSTER_ROW_SIZES, tmdbSrcSet } from "@/lib/tmdb/imageSrcSet";
 
 /**
  * Póster de la temporada: el elegido en «Editar portada», el de TMDb de la
@@ -63,6 +64,8 @@ export default function SeasonCard({
   onPrefetch,
   // Ficha completa con ratón: la tarjeta se eleva al pasar por encima.
   hoverLift = false,
+  // Vista lateral de temporadas (details/sectionSheet): tarjeta más pequeña.
+  compact = false,
 }) {
   const poster = useSeasonPoster({ seasonId, posterPath, fallbackPosterPath });
   const title = `Temporada ${seasonNumber}`;
@@ -95,15 +98,27 @@ export default function SeasonCard({
           en vertical en vez de en la esquina superior. */}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute -right-4 top-1/2 z-0 -translate-y-1/2 select-none text-[110px] font-black leading-none text-white/5 transition-colors group-hover:text-white/10"
+        className={`pointer-events-none absolute -right-4 top-1/2 z-0 -translate-y-1/2 select-none font-black leading-none text-white/5 transition-colors group-hover:text-white/10 ${
+          compact ? "text-[88px]" : "text-[110px]"
+        }`}
       >
         {seasonNumber}
       </span>
 
-      <span className="relative z-10 aspect-[2/3] w-28 shrink-0 overflow-hidden rounded-xl bg-zinc-900 shadow-lg shadow-black/40 sm:w-[7.5rem]">
+      <span
+        // `self-start`: si la columna de datos es más alta, el flex estiraría
+        // el póster y rompería su 2:3.
+        className={`relative z-10 aspect-[2/3] shrink-0 self-start overflow-hidden rounded-xl bg-zinc-900 shadow-lg shadow-black/40 ${
+          compact ? "w-24 sm:w-28" : "w-32 sm:w-36 lg:w-40"
+        }`}
+      >
         {poster ? (
           <OptimizedImage
             src={`https://image.tmdb.org/t/p/w342${poster}`}
+            srcSet={tmdbSrcSet(poster)}
+            // Póster de 128–160px (96–112px en compacto): se pide ~1,5× para
+            // que se vea nítido.
+            sizes={compact ? "(min-width: 640px) 170px, 144px" : "(min-width: 1024px) 240px, (min-width: 640px) 216px, 192px"}
             alt=""
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
             loading="lazy"
@@ -118,7 +133,7 @@ export default function SeasonCard({
       <span className="relative z-10 flex min-w-0 flex-1 flex-col py-1 pr-1">
         <span className="flex items-start justify-between gap-2">
           <span className="min-w-0">
-            <span className="block text-lg font-bold leading-tight text-white">{title}</span>
+            <span className={`block font-bold leading-tight text-white ${compact ? "text-base" : "text-lg"}`}>{title}</span>
             {subtitle ? (
               <span className="mt-0.5 block truncate text-xs font-bold text-zinc-400">{subtitle}</span>
             ) : null}
@@ -144,7 +159,7 @@ export default function SeasonCard({
         </span>
 
         {/* Una fila por dato: año, episodios y notas. */}
-        <span className="mt-2.5 flex flex-col gap-1.5 text-xs font-bold text-zinc-400">
+        <span className={`flex flex-col gap-1.5 text-xs font-bold text-zinc-400 ${compact ? "mt-2" : "mt-2.5"}`}>
           {year ? (
             <span className="flex items-center gap-1.5">
               <CalendarDays className="h-3.5 w-3.5 shrink-0 text-zinc-500" aria-hidden="true" />
@@ -238,6 +253,8 @@ export function SeasonPosterCard({
         {poster ? (
           <OptimizedImage
             src={`https://image.tmdb.org/t/p/w342${poster}`}
+            srcSet={tmdbSrcSet(poster)}
+            sizes={DETAILS_POSTER_ROW_SIZES}
             alt=""
             className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
             loading="lazy"

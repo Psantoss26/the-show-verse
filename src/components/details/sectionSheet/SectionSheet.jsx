@@ -29,13 +29,24 @@ export default function SectionSheet({
   search = null,
   // Acción extra en la cabecera (p. ej. «Ver colección»).
   headerAction = null,
+  // Pie fijo bajo la lista (p. ej. «Cancelar / Guardar» de un editor).
+  footer = null,
+  // El panel puede ser un <form> (`as="form"` + `panelProps.onSubmit`).
+  as: Panel = "div",
+  panelProps = null,
+  panelRef = null,
+  // Mientras se guarda: ni la X ni el velo cierran.
+  closeDisabled = false,
   children,
 }) {
   const titleId = useId();
   const [portalReady, setPortalReady] = useState(false);
   useEffect(() => setPortalReady(true), []);
+  const close = () => {
+    if (!closeDisabled) onClose?.();
+  };
   // Bloquea el scroll de la ficha y cierra con Escape.
-  useModalGuard({ open, onClose });
+  useModalGuard({ open, onClose: close });
 
   if (!open || !portalReady) return null;
 
@@ -49,12 +60,14 @@ export default function SectionSheet({
     >
       <div
         className="absolute inset-0 bg-black/55 backdrop-blur-sm sv-fade-in"
-        onClick={onClose}
+        onClick={close}
         aria-hidden="true"
       />
 
-      <div
-        className={`relative flex h-full w-full flex-col overflow-hidden sm:w-[30rem] sm:rounded-l-[2rem] lg:w-[34rem] ${LIQUID_GLASS_PANEL} sv-sheet-in`}
+      <Panel
+        {...panelProps}
+        ref={panelRef}
+        className={`relative flex h-full w-full flex-col overflow-hidden outline-none sm:w-[30rem] sm:rounded-l-[2rem] lg:w-[34rem] ${LIQUID_GLASS_PANEL} sv-sheet-in`}
       >
         <header className={`shrink-0 ${LIQUID_GLASS_MODAL_HEADER} px-5 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-6 sm:pt-6`}>
           <div className="flex items-start gap-3">
@@ -74,8 +87,9 @@ export default function SectionSheet({
             {headerAction}
             <button
               type="button"
-              onClick={onClose}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/5 text-white/70 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400"
+              onClick={close}
+              disabled={closeDisabled}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/5 text-white/70 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 disabled:opacity-50"
               aria-label="Cerrar"
             >
               <X className="h-5 w-5" />
@@ -129,7 +143,13 @@ export default function SectionSheet({
         <div className="details-sheet-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-1 sm:px-6">
           {children}
         </div>
-      </div>
+
+        {footer ? (
+          <div className="shrink-0 border-t border-white/5 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:px-6">
+            {footer}
+          </div>
+        ) : null}
+      </Panel>
     </div>,
     document.body,
   );

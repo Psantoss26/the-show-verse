@@ -317,6 +317,13 @@ import TraktCommentModal from "@/components/details/TraktCommentModal";
 import PosterStack from "@/components/details/PosterStack";
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
 import SeasonsSection from "@/components/details/SeasonsSection";
+import { buildArtworkSheetTabs } from "@/lib/details/artworkSheetTabs";
+import {
+  DETAILS_GALLERY_BACKDROP_SIZES,
+  DETAILS_GALLERY_POSTER_SIZES,
+  DETAILS_POSTER_ROW_SIZES,
+  tmdbSrcSet,
+} from "@/lib/tmdb/imageSrcSet";
 import { pickExternalIds, withTitleExternalLinks } from "@/lib/details/titleExternalLinks";
 import StreamingHoverOverlay from "@/components/details/StreamingHoverOverlay";
 import DetailsMetaGenresRow, {
@@ -7672,6 +7679,40 @@ export default function DetailsClient({
     return base.filter((person) => person?.id && person?.name);
   }, [tmdbCast, castData]);
 
+  // Portadas y fondos de la vista lateral: las mismas pestañas que la galería
+  // de la ficha (en móvil, Portada y Logo) con la imagen elegida marcada.
+  const sheetPosterActive = (selectedPosterPath || basePosterPath || data?.profile_path) ?? null;
+  const sheetMobilePosterActive = selectedMobilePosterPath || mobileNeutralPosterPath || null;
+  const sheetPreviewActive = selectedPreviewBackdropPath || detailModalPreviewBackdropFallback || null;
+  const sheetBackgroundActive = displayBackdropPath || data?.backdrop_path || null;
+  const sheetArtworkTabs = useMemo(
+    () =>
+      buildArtworkSheetTabs({
+        mobile: isMobileViewport,
+        posters: imagesState?.posters,
+        backdrops: imagesState?.backdrops,
+        logos: titleLogos,
+        active: {
+          poster: sheetPosterActive,
+          mobilePoster: sheetMobilePosterActive,
+          preview: sheetPreviewActive,
+          background: sheetBackgroundActive,
+          logo: displayHeroLogoPath,
+        },
+      }),
+    [
+      isMobileViewport,
+      imagesState?.posters,
+      imagesState?.backdrops,
+      titleLogos,
+      sheetPosterActive,
+      sheetMobilePosterActive,
+      sheetPreviewActive,
+      sheetBackgroundActive,
+      displayHeroLogoPath,
+    ],
+  );
+
   const creativeCreditsLoading =
     (type === "movie" && movieDirectorLoading) ||
     (type === "tv" && tvCreatorsLoading);
@@ -9333,9 +9374,18 @@ export default function DetailsClient({
     },
     awards: awardItems,
     images: {
-      posters: imagesState?.posters,
-      backdrops: imagesState?.backdrops,
-      logos: titleLogos,
+      tabs: sheetArtworkTabs,
+      onSelect: (kind, filePath) => {
+        if (kind === "logo") handleSelectLogo(filePath);
+        else if (kind === "mobilePoster") handleSelectMobilePoster(filePath);
+        else if (kind === "poster") handleSelectPoster(filePath);
+        else if (kind === "preview") handleSelectPreviewBackdrop(filePath);
+        else handleSelectBackground(filePath);
+      },
+      onReset: () => {
+        captureArtworkFlip();
+        handleResetArtwork();
+      },
     },
     videos,
     onPlayVideo: openVideo,
@@ -11108,10 +11158,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                         ? `https://image.tmdb.org/t/p/w342${rec.poster_path}`
                                         : "/placeholder.png"
                                     }
+                                    srcSet={tmdbSrcSet(rec.poster_path)}
                                     alt={recTitle}
                                     loading="lazy"
                                     decoding="async"
-                                    sizes="(max-width: 640px) 32vw, (max-width: 1024px) 20vw, 180px"
+                                    sizes={DETAILS_POSTER_ROW_SIZES}
                                     className={recImageClass}
                                   />
                                   <RecommendationHoverIndicator
@@ -11226,6 +11277,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   {m.poster_path ? (
                                     <OptimizedImage
                                       src={`https://image.tmdb.org/t/p/w342${m.poster_path}`}
+                                      srcSet={tmdbSrcSet(m.poster_path)}
+                                      sizes={DETAILS_POSTER_ROW_SIZES}
                                       alt={m.title}
                                       className={colImageClass}
                                       loading="lazy"
@@ -11864,15 +11917,15 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                                     const imgSrc = `https://image.tmdb.org/t/p/${size}${filePath}`;
                                     const imgSrcSet = isPoster
-                                      ? `https://image.tmdb.org/t/p/w185${filePath} 185w, https://image.tmdb.org/t/p/w342${filePath} 342w, https://image.tmdb.org/t/p/w500${filePath} 500w`
+                                      ? tmdbSrcSet(filePath, "poster")
                                       : isLogoTab
                                         ? `https://image.tmdb.org/t/p/w185${filePath} 185w, https://image.tmdb.org/t/p/w500${filePath} 500w, https://image.tmdb.org/t/p/original${filePath} 1000w`
-                                      : `https://image.tmdb.org/t/p/w300${filePath} 300w, https://image.tmdb.org/t/p/w780${filePath} 780w, https://image.tmdb.org/t/p/w1280${filePath} 1280w`;
+                                      : tmdbSrcSet(filePath, "backdrop");
                                     const imgSizes = isPoster
-                                      ? "(max-width: 640px) 32vw, (max-width: 1024px) 20vw, 140px"
+                                      ? DETAILS_GALLERY_POSTER_SIZES
                                       : isLogoTab
                                         ? "(max-width: 640px) 50vw, (max-width: 1024px) 30vw, 240px"
-                                      : "(max-width: 640px) 50vw, (max-width: 1024px) 30vw, 240px";
+                                      : DETAILS_GALLERY_BACKDROP_SIZES;
 
                                     return (
                                       <SwiperSlide

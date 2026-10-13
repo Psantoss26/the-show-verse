@@ -1,21 +1,17 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { createPortal } from 'react-dom'
-import { Check, Loader2, RotateCcw, X } from 'lucide-react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { Check, Loader2, Pencil, RotateCcw } from 'lucide-react'
+import OptimizedImage from '@/components/OptimizedImage'
+import SectionSheet, { SectionSheetEmpty } from '@/components/details/sectionSheet/SectionSheet'
+import { tmdbSrcSet } from '@/lib/tmdb/imageSrcSet'
 import { useAuth } from '@/context/AuthContext'
-import useModalGuard from '@/hooks/useModalGuard'
 import { saveArtworkOverrides } from '@/lib/artworkApi'
 import { fetchTmdbImages } from '@/lib/tmdb/imageRequests'
-import { LIQUID_GLASS_MODAL_HEADER, LIQUID_GLASS_PANEL } from '@/lib/ui/liquidGlass'
 import {
   COLLECTION_ARTWORK_TYPE,
   buildCollectionArtworkChanges,
 } from '@/lib/lists/collectionCustomization'
-
-const LABEL_CLASS = 'block text-xs font-bold uppercase tracking-wider text-zinc-300'
-// Barra fina y translúcida sin raíl, la de EpisodeRatingsModal.
-const THIN_SCROLLBAR = '[scrollbar-color:rgba(255,255,255,0.18)_transparent] [scrollbar-width:thin]'
 
 // Mismo corte que la página (`sm:` de Tailwind): por debajo, la colección se
 // pinta con un póster de fondo; por encima, con un backdrop.
@@ -26,15 +22,6 @@ const subscribePhone = (onChange) => {
   return () => media.removeEventListener('change', onChange)
 }
 const usePhoneViewport = () => useSyncExternalStore(subscribePhone, () => window.matchMedia(PHONE_QUERY).matches, () => false)
-
-// Columnas visibles por fila: siempre un número exacto de tarjetas completas
-// dentro del margen del modal (gap de 0.75rem entre ellas). El scroll avanza
-// por páginas y encaja en cada tarjeta, así que ninguna queda recortada.
-const ROW_COLUMNS = {
-  portrait: 'auto-cols-[calc((100%_-_1.5rem)/3)] sm:auto-cols-[calc((100%_-_3rem)/5)]',
-  landscape: 'auto-cols-[calc((100%_-_0.75rem)/2)]',
-}
-const ROW_GAP_PX = 12
 
 // Idioma de cada imagen de TMDb (`iso_639_1`). Sin idioma llega como null y, en
 // algunas, como "xx" o cadena vacía: las tres son "imagen sin texto".
@@ -49,102 +36,86 @@ export const titledImages = (list) => (list || []).filter((image) => POSTER_LANG
 // Fondos (móvil y ordenador): sin texto encima, solo imágenes sin idioma.
 const textlessImages = (list) => (list || []).filter((image) => !imageLanguage(image))
 
-// Fila de imágenes a elegir. También la usa «Editar portada» de las temporadas
-// (details/SeasonCoverEditModal).
-export function ArtworkRow({ id, label, field, original, value, candidates, landscape = false, onSelect }) {
-  const paths = [...new Set([original, value, ...(candidates || []).map((item) => item.file_path)].filter(Boolean))]
-  const size = landscape ? 'w300' : 'w185'
-  const rowRef = useRef(null)
-  const [edges, setEdges] = useState({ prev: false, next: false })
+// La original de TMDb, la elegida y el resto, sin repetir.
+const artworkPaths = (original, value, candidates) =>
+  [...new Set([original, value, ...(candidates || []).map((item) => item.file_path)].filter(Boolean))]
 
-  const updateEdges = useCallback(() => {
-    const row = rowRef.current
-    if (!row) return
-    setEdges({ prev: row.scrollLeft > 4, next: row.scrollLeft + row.clientWidth < row.scrollWidth - 4 })
-  }, [])
-
-  useEffect(() => {
-    updateEdges()
-    const row = rowRef.current
-    if (!row || typeof ResizeObserver === 'undefined') return undefined
-    const observer = new ResizeObserver(updateEdges)
-    observer.observe(row)
-    return () => observer.disconnect()
-  }, [updateEdges, paths.length])
-
-  // Una página = las tarjetas visibles más su separación.
-  const scrollRow = (direction) => {
-    const row = rowRef.current
-    row?.scrollBy({ left: direction * (row.clientWidth + ROW_GAP_PX), behavior: 'smooth' })
-  }
-
+// Imágenes de una sección del editor en cuadrícula vertical, como la vista
+// lateral «Portadas y fondos» de la ficha: 3 pósters o 2 apaisadas por fila,
+// la elegida marcada y la original de TMDb con su etiqueta. También la usa
+// «Editar portada» de las temporadas (details/SeasonCoverEditModal).
+export function ArtworkGrid({ label, field, original, value, candidates, landscape = false, onSelect }) {
+  const paths = artworkPaths(original, value, candidates)
+  if (!paths.length) return <SectionSheetEmpty>No hay imágenes disponibles.</SectionSheetEmpty>
   return (
-    <section aria-labelledby={id} className="min-w-0">
-      <div className="flex items-baseline justify-between gap-3">
-        <h3 id={id} className={LABEL_CLASS}>{label}</h3>
-        {paths.length > 0 ? <span className="text-[11px] font-medium text-zinc-500">{paths.length} {paths.length === 1 ? 'imagen' : 'imágenes'}</span> : null}
-      </div>
-      {paths.length > 0 ? (
-        <div className="group/row relative mt-3">
-        {/* Sin barra: en táctil se desliza y con ratón se usan las flechas de
-            los carruseles de la ficha (DetailsArrowCarousel), en el margen. */}
-        <div ref={rowRef} onScroll={updateEdges} className={`grid snap-x snap-mandatory grid-flow-col gap-3 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${landscape ? ROW_COLUMNS.landscape : ROW_COLUMNS.portrait}`}>
-          {paths.map((path, index) => {
-            const selected = value === path
-            const isOriginal = path === original
-            return (
-              <button
-                key={path}
-                type="button"
-                aria-label={`${label} ${index + 1}${isOriginal ? ' · Original de TMDb' : ''}`}
-                aria-pressed={selected}
-                onClick={() => onSelect(field, path)}
-                className={`group relative w-full snap-start overflow-hidden rounded-xl bg-white/5 transition duration-300 focus-visible:outline-none ${landscape ? 'aspect-video' : 'aspect-[2/3]'} ${selected ? '' : 'opacity-70 hover:opacity-100'}`}
-              >
-                {/* Galería acotada de TMDb; la carga diferida nativa evita bajar lo que queda fuera de la fila. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={`https://image.tmdb.org/t/p/${size}${path}`} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                {/* Aro y foco POR DENTRO: un anillo exterior lo recortaría el
-                    borde de la fila en la primera y la última tarjeta. */}
-                <span
-                  aria-hidden="true"
-                  className={`pointer-events-none absolute inset-0 rounded-xl ring-inset ${selected ? 'ring-2 ring-yellow-400' : 'group-focus-visible:ring-2 group-focus-visible:ring-white/80'}`}
-                />
-                {isOriginal && !selected ? (
-                  <span className="absolute bottom-1.5 left-1.5 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-bold text-zinc-200 backdrop-blur-md">TMDb</span>
-                ) : null}
-                {selected ? (
-                  <span className="absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-yellow-400 text-black shadow-lg"><Check className="h-3.5 w-3.5" strokeWidth={3} /></span>
-                ) : null}
-              </button>
-            )
-          })}
-        </div>
-        {[['prev', -1, '-left-6 sm:-left-8', '‹', 'Anterior'], ['next', 1, '-right-6 sm:-right-8', '›', 'Siguiente']].map(([edge, direction, side, glyph, name]) => edges[edge] ? (
-          <button
-            key={edge}
-            type="button"
-            tabIndex={-1}
-            aria-label={`${name} · ${label}`}
-            onClick={() => scrollRow(direction)}
-            className={`absolute inset-y-0 ${side} z-10 hidden w-6 items-center justify-center text-4xl font-semibold text-white/75 opacity-0 drop-shadow-[0_0_12px_rgba(0,0,0,0.95)] transition hover:text-white group-hover/row:opacity-100 sm:flex sm:w-8`}
-          >
-            {glyph}
-          </button>
-        ) : null)}
-        </div>
-      ) : (
-        <p className="mt-3 text-sm text-zinc-500">No hay imágenes disponibles.</p>
-      )}
-    </section>
+    <ul className={`grid gap-2.5 sm:gap-3 ${landscape ? 'grid-cols-2' : 'grid-cols-3'}`}>
+      {paths.map((path, index) => {
+        const selected = value === path
+        const isOriginal = path === original
+        return (
+          <li key={path}>
+            <button
+              type="button"
+              aria-label={`${label} ${index + 1}${isOriginal ? ' · Original de TMDb' : ''}`}
+              aria-pressed={selected}
+              onClick={() => onSelect(field, path)}
+              className={`group/img relative block w-full overflow-hidden rounded-xl bg-zinc-900 after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit] after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 ${landscape ? 'aspect-video' : 'aspect-[2/3]'} ${
+                selected ? 'shadow-[0_0_12px_rgba(16,185,129,0.35)] after:shadow-[inset_0_0_0_2px_rgba(52,211,153,1)]' : ''
+              }`}
+            >
+              <OptimizedImage
+                src={`https://image.tmdb.org/t/p/${landscape ? 'w780' : 'w342'}${path}`}
+                srcSet={tmdbSrcSet(path, landscape ? 'backdrop' : 'poster')}
+                sizes={landscape ? '(min-width: 640px) 400px, 75vw' : '(min-width: 640px) 250px, 48vw'}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                className="h-full w-full object-cover transition-transform duration-500 group-hover/img:scale-[1.03]"
+              />
+              {selected ? (
+                <span className="absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-white shadow-md">
+                  <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden="true" />
+                </span>
+              ) : null}
+              {isOriginal ? (
+                <span className="absolute bottom-1.5 left-1.5 rounded-full bg-black/65 px-2 py-0.5 text-[10px] font-bold text-zinc-200">TMDb</span>
+              ) : null}
+            </button>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+// Pie de los editores de imágenes: Cancelar y Guardar cambios.
+export function ArtworkEditFooter({ saving, canSave, onCancel }) {
+  return (
+    <div className="flex justify-end gap-2">
+      <button
+        type="button"
+        disabled={saving}
+        onClick={onCancel}
+        className="inline-flex h-11 items-center justify-center rounded-xl bg-white/5 px-4 text-sm font-bold text-zinc-300 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 disabled:opacity-50"
+      >
+        Cancelar
+      </button>
+      <button
+        type="submit"
+        data-online-only="true"
+        disabled={saving || !canSave}
+        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-yellow-500 px-4 text-sm font-bold text-black shadow-[0_0_20px_-5px_rgba(234,179,8,0.3)] transition hover:bg-yellow-400 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 disabled:cursor-not-allowed disabled:bg-white/5 disabled:text-zinc-500 disabled:shadow-none disabled:active:scale-100"
+      >
+        {saving && <Loader2 className="h-4 w-4 animate-spin" />}{saving ? 'Guardando…' : 'Guardar cambios'}
+      </button>
+    </div>
   )
 }
 
 /**
  * Edición por usuario de las IMÁGENES de una colección (el nombre y la
- * descripción son siempre los de TMDb), con la estructura de los modales de
- * acciones de DetailsClient: portal, velo difuminado, tarjeta de cristal con
- * cabecera fija y cuerpo con scroll propio.
+ * descripción son siempre los de TMDb), en la vista lateral de las secciones
+ * de la ficha (SectionSheet): una pestaña por imagen editable.
  */
 export default function CollectionEditModal({ original, collection, onClose }) {
   const { authenticated, cacheArtworkOverrides } = useAuth()
@@ -157,9 +128,9 @@ export default function CollectionEditModal({ original, collection, onClose }) {
   const [attempt, setAttempt] = useState(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [tab, setTab] = useState('poster')
   const close = () => { if (!saving) onClose() }
 
-  useModalGuard({ open: true, onClose: close })
   useEffect(() => setPortalReady(true), [])
 
   useEffect(() => {
@@ -207,110 +178,83 @@ export default function CollectionEditModal({ original, collection, onClose }) {
 
   const selectArtwork = (field, path) => setDraft((current) => ({ ...current, [field]: path }))
 
+  // Secciones del editor como pestañas, igual que Portada / Fondo / Logo en
+  // la vista lateral de la ficha. El fondo se edita para la vista en la que se
+  // está: en móvil la colección usa un póster de fondo y en ordenador un
+  // backdrop, y cada uno se guarda por separado; la portada en modo backdrop
+  // solo existe en ordenador.
+  const textlessPosters = textlessImages(images?.posters)
+  const sections = [
+    { id: 'poster', label: 'Póster', field: 'poster_path', candidates: titledImages(images?.posters) },
+    phone ? null : { id: 'cover', label: 'Backdrop de portada', field: 'cover_backdrop_path', candidates: titledImages(images?.backdrops), landscape: true },
+    phone
+      // Siempre sin idioma: pósters sin texto y, si la colección no tiene
+      // ninguno, sus backdrops sin texto (de fondo se recortan en vertical),
+      // los mismos que usa el fondo automático.
+      ? { id: 'background', label: 'Fondo', field: 'mobile_background_path', candidates: textlessPosters.length ? textlessPosters : textlessImages(images?.backdrops) }
+      : { id: 'background', label: 'Fondo', field: 'backdrop_path', candidates: textlessImages(images?.backdrops), landscape: true },
+  ].filter(Boolean).map((section) => ({
+    ...section,
+    count: artworkPaths(original[section.field], draft[section.field], section.candidates).length,
+  }))
+  const section = sections.find((item) => item.id === tab) || sections[0]
+
   if (!portalReady) return null
 
-  return createPortal(
-    <div
-      data-detail-modal-layer=""
-      className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="collection-edit-title"
+  // Misma vista lateral que las secciones de la ficha (details/sectionSheet),
+  // con el panel como formulario y los botones en un pie fijo.
+  return (
+    <SectionSheet
+      open
+      onClose={close}
+      closeDisabled={saving}
+      title="Editar colección"
+      icon={Pencil}
+      subtitle="Solo cambia para tu cuenta"
+      tabs={sections.map(({ id, label, count }) => ({ id, label, count }))}
+      activeTab={section.id}
+      onTabChange={setTab}
+      as="form"
+      panelRef={panelRef}
+      panelProps={{ onSubmit: save, tabIndex: -1 }}
+      headerAction={
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => setDraft({ ...original })}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/5 text-red-400 transition hover:bg-red-500/20 hover:text-red-300 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 disabled:opacity-50"
+          aria-label="Restaurar TMDb"
+          title="Restaurar TMDb"
+        >
+          <RotateCcw className="h-5 w-5" aria-hidden="true" />
+        </button>
+      }
+      footer={<ArtworkEditFooter saving={saving} canSave={authenticated} onCancel={close} />}
     >
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-lg animate-in fade-in duration-300" onClick={close} aria-hidden="true" />
-
-      <form
-        ref={panelRef}
-        tabIndex={-1}
-        onSubmit={save}
-        className={`relative flex max-h-[85dvh] w-full max-w-2xl flex-col overflow-hidden rounded-[2rem] outline-none ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
-      >
-        <div className={`flex w-full shrink-0 items-center justify-between gap-4 ${LIQUID_GLASS_MODAL_HEADER} p-6 sm:px-8 sm:pb-6 sm:pt-8`}>
-          <div className="min-w-0">
-            <h2 id="collection-edit-title" className="bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-xl font-black text-transparent">
-              Editar colección
-            </h2>
-            <p className="mt-1 text-xs font-medium uppercase tracking-wide text-zinc-500">Solo cambia para tu cuenta</p>
-          </div>
-          <button
-            type="button"
-            onClick={close}
-            disabled={saving}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/5 text-white/70 shadow-sm transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400 disabled:opacity-50"
-            aria-label="Cerrar"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        {/* El scroll va en un div: un <fieldset> no encoge dentro del flex y
-            empujaba el pie fuera de la tarjeta. */}
-        <div className={`min-h-0 flex-1 overflow-y-auto overscroll-contain ${THIN_SCROLLBAR}`}>
-        <fieldset disabled={saving} className="min-w-0 space-y-6 p-6 sm:px-8">
-          <ArtworkRow id="collection-edit-poster" label="Póster" field="poster_path" original={original.poster_path} value={draft.poster_path} candidates={titledImages(images?.posters)} onSelect={selectArtwork} />
-          {/* La imagen de la portada en modo backdrop: con el título, en
-              español o inglés. Ese modo solo existe en ordenador, así que en
-              móvil no se ofrece (como el fondo de ordenador). */}
-          {phone ? null : (
-            <ArtworkRow id="collection-edit-cover-backdrop" label="Backdrop de portada" field="cover_backdrop_path" original={original.cover_backdrop_path} value={draft.cover_backdrop_path} candidates={titledImages(images?.backdrops)} landscape onSelect={selectArtwork} />
-          )}
-          {/* El fondo se edita para la vista en la que se está: en móvil la
-              colección usa un póster de fondo y en ordenador un backdrop, y
-              cada uno se guarda por separado. */}
-          {phone ? (
-            // Siempre sin idioma: pósters sin texto y, si la colección no tiene
-            // ninguno, sus backdrops sin texto (de fondo se recortan en
-            // vertical), los mismos que usa el fondo automático.
-            <ArtworkRow key="mobile" id="collection-edit-background" label="Fondo (vista móvil)" field="mobile_background_path" original={original.mobile_background_path} value={draft.mobile_background_path} candidates={textlessImages(images?.posters).length ? textlessImages(images?.posters) : textlessImages(images?.backdrops)} onSelect={selectArtwork} />
-          ) : (
-            <ArtworkRow key="desktop" id="collection-edit-background" label="Fondo (vista ordenador)" field="backdrop_path" original={original.backdrop_path} value={draft.backdrop_path} candidates={textlessImages(images?.backdrops)} landscape onSelect={selectArtwork} />
-          )}
-
-          {!images && !imageError && (
-            <p role="status" className="flex items-center gap-2 text-xs font-medium text-zinc-400"><Loader2 className="h-4 w-4 animate-spin" />Cargando imágenes de TMDb…</p>
-          )}
-          {imageError && (
-            <p role="status" className="text-xs font-medium text-zinc-400">
-              No se pudieron cargar más imágenes.{' '}
-              <button type="button" onClick={() => setAttempt((value) => value + 1)} className="font-bold text-zinc-200 underline underline-offset-2 hover:text-white">Reintentar</button>
-            </p>
-          )}
-          {!authenticated && <p className="rounded-xl bg-yellow-500/10 p-3 text-xs font-medium text-yellow-200">Inicia sesión para guardar tu personalización.</p>}
-          {error && <p role="alert" className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-center text-xs font-medium text-red-400">{error}</p>}
-        </fieldset>
-        </div>
-
-        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-white/5 px-4 py-4 sm:px-8">
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() => setDraft({ ...original })}
-            title="Restaurar TMDb"
-            className="inline-flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold text-zinc-400 transition hover:bg-white/5 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 disabled:opacity-50"
-          >
-            <RotateCcw className="h-4 w-4" /><span className="max-sm:sr-only">Restaurar TMDb</span>
-          </button>
-          <div className="ml-auto flex gap-2">
-            <button
-              type="button"
-              disabled={saving}
-              onClick={close}
-              className="inline-flex h-11 items-center justify-center rounded-xl bg-white/5 px-4 text-sm font-bold text-zinc-300 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 disabled:opacity-50"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              data-online-only="true"
-              disabled={saving || !authenticated}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-yellow-500 px-4 text-sm font-bold text-black shadow-[0_0_20px_-5px_rgba(234,179,8,0.3)] transition hover:bg-yellow-400 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 disabled:cursor-not-allowed disabled:bg-white/5 disabled:text-zinc-500 disabled:shadow-none disabled:active:scale-100"
-            >
-              {saving && <Loader2 className="h-4 w-4 animate-spin" />}{saving ? 'Guardando…' : 'Guardar cambios'}
-            </button>
-          </div>
-        </div>
-      </form>
-    </div>,
-    document.body,
+      <fieldset disabled={saving} className="min-w-0 space-y-4 pb-2">
+        {!authenticated && <p className="rounded-xl bg-yellow-500/10 p-3 text-xs font-medium text-yellow-200">Inicia sesión para guardar tu personalización.</p>}
+        {error && <p role="alert" className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-center text-xs font-medium text-red-400">{error}</p>}
+        {imageError && (
+          <p role="status" className="text-xs font-medium text-zinc-400">
+            No se pudieron cargar más imágenes.{' '}
+            <button type="button" onClick={() => setAttempt((value) => value + 1)} className="font-bold text-zinc-200 underline underline-offset-2 hover:text-white">Reintentar</button>
+          </p>
+        )}
+        {!images && !imageError ? (
+          <p role="status" className="flex items-center justify-center gap-2 py-12 text-xs font-medium text-zinc-400"><Loader2 className="h-4 w-4 animate-spin" />Cargando imágenes de TMDb…</p>
+        ) : (
+          <ArtworkGrid
+            key={section.id}
+            label={section.label}
+            field={section.field}
+            original={original[section.field]}
+            value={draft[section.field]}
+            candidates={section.candidates}
+            landscape={section.landscape}
+            onSelect={selectArtwork}
+          />
+        )}
+      </fieldset>
+    </SectionSheet>
   )
 }
