@@ -1,8 +1,9 @@
 // src/lib/letterboxd/export.js
-// Lectura de la exportación de datos de Letterboxd (Settings → Data → Export
-// your data): un ZIP con diary.csv, watched.csv y ratings.csv, o esos CSV
+// Lectura de la exportación de datos de Letterboxd (letterboxd.com/data/export):
+// un ZIP con diary.csv, watched.csv, ratings.csv, reviews.csv…, o esos CSV
 // sueltos. Todo ocurre en el navegador; a /api/letterboxd/import solo viajan
-// las películas (nombre + año) y sus visionados y puntuaciones, por tandas.
+// las películas (nombre + año) y sus visionados, puntuaciones, colecciones y
+// reseñas, por tandas.
 //
 //   - diary.csv    cada visionado registrado, con su fecha real ("Watched Date")
 //                  y si fue un rewatch: es el historial.
@@ -12,6 +13,8 @@
 //   - ratings.csv  la puntuación actual de cada película (0,5–5 estrellas → 1–10).
 //   - likes/films.csv  las películas con "me gusta" (corazón) → Favoritas.
 //   - watchlist.csv    la watchlist → Pendientes.
+//   - reviews.csv      las reseñas (texto de cada entrada del diario que la
+//                      tiene) → reseñas de la ficha, a tu nombre.
 
 // Igual que normalizeText de lib/netflix/resolve (que es de servidor).
 export function normalizeText(value) {
@@ -24,9 +27,11 @@ export function normalizeText(value) {
     .trim();
 }
 
-export const LETTERBOXD_FILES = ["diary.csv", "watched.csv", "ratings.csv", "watchlist.csv", "likes/films.csv"];
+export const LETTERBOXD_FILES = ["diary.csv", "watched.csv", "ratings.csv", "watchlist.csv", "reviews.csv", "likes/films.csv"];
 // Sueltos (sin ZIP), el de likes se llama solo "films.csv".
-const LOOSE_FILES = { "diary.csv": "diary.csv", "watched.csv": "watched.csv", "ratings.csv": "ratings.csv", "watchlist.csv": "watchlist.csv", "films.csv": "likes/films.csv" };
+const LOOSE_FILES = { "diary.csv": "diary.csv", "watched.csv": "watched.csv", "ratings.csv": "ratings.csv", "watchlist.csv": "watchlist.csv", "reviews.csv": "reviews.csv", "films.csv": "likes/films.csv" };
+// Mismo máximo que las reseñas que llegan por el RSS (backend letterboxdRss).
+export const LETTERBOXD_REVIEW_MAX = 2000;
 export const LETTERBOXD_CHUNK_FILMS = 60;
 
 // ---------------------------------------------------------------------------
@@ -207,6 +212,33 @@ export function letterboxdRating(value) {
   return rating >= 1 && rating <= 10 ? rating : null;
 }
 
+const HTML_ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+
+/**
+ * Texto de una reseña de la exportación. Letterboxd la guarda con su HTML
+ * básico (<i>, <b>, <a>, <blockquote>, <br>, párrafos): aquí queda en texto
+ * plano con sus párrafos y saltos de línea, como las reseñas del RSS.
+ */
+export function letterboxdReviewBody(value) {
+  const text = String(value || "")
+    .replace(/\r\n?/g, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|blockquote)>\s*/gi, "\n\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (match, entity) => {
+      if (entity[0] === "#") {
+        const code = entity[1].toLowerCase() === "x" ? parseInt(entity.slice(2), 16) : parseInt(entity.slice(1), 10);
+        return Number.isInteger(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : match;
+      }
+      return HTML_ENTITIES[entity.toLowerCase()] ?? match;
+    })
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  if (!text) return "";
+  return text.length > LETTERBOXD_REVIEW_MAX ? `${text.slice(0, LETTERBOXD_REVIEW_MAX - 1).trimEnd()}…` : text;
+}
+
 export function letterboxdFilmKey(name, year) {
   const title = normalizeText(name);
   if (!title) return "";
@@ -221,6 +253,7 @@ export function letterboxdFilmKey(name, year) {
  *   ratings  [{ film, rating, ratedAt }]
  *   favorites [{ film, addedAt }]   (likes/films.csv)
  *   watchlist [{ film, addedAt }]   (watchlist.csv)
+ *   reviews   [{ film, body, spoiler, reviewedAt, uri }]   (reviews.csv)
  */
 export function buildLetterboxdImport(texts = {}) {
   const films = new Map();
@@ -279,7 +312,24 @@ export function buildLetterboxdImport(texts = {}) {
   const favorites = collection(texts["likes/films.csv"]);
   const watchlist = collection(texts["watchlist.csv"]);
 
-  return { films: [...films.values()], history, ratings: [...ratings.values()], favorites, watchlist };
+  // Una por entrada del diario con reseña (una película puede tener varias,
+  // una por visionado). "Letterboxd URI" es el enlace de esa reseña.
+  const reviews = [];
+  for (const row of parseCsv(texts["reviews.csv"])) {
+    const film = addFilm(row);
+    const body = letterboxdReviewBody(row.review);
+    const reviewedAt = letterboxdDay(row.date) || letterboxdDay(row["watched date"]);
+    if (!film || !body || !reviewedAt) continue;
+    reviews.push({
+      film,
+      body,
+      spoiler: /^(yes|true|1)$/i.test(row.spoilers || row.spoiler || ""),
+      reviewedAt,
+      uri: row["letterboxd uri"] || null,
+    });
+  }
+
+  return { films: [...films.values()], history, ratings: [...ratings.values()], favorites, watchlist, reviews };
 }
 
 /** Reparte la importación en tandas de películas, cada una con sus visionados y puntuaciones. */
@@ -289,6 +339,7 @@ export function chunkLetterboxdImport(data, size = LETTERBOXD_CHUNK_FILMS) {
   const ratingsByFilm = Map.groupBy(data?.ratings || [], (item) => item.film);
   const favoritesByFilm = Map.groupBy(data?.favorites || [], (item) => item.film);
   const watchlistByFilm = Map.groupBy(data?.watchlist || [], (item) => item.film);
+  const reviewsByFilm = Map.groupBy(data?.reviews || [], (item) => item.film);
   const chunks = [];
   for (let index = 0; index < films.length; index += size) {
     const chunkFilms = films.slice(index, index + size);
@@ -298,6 +349,7 @@ export function chunkLetterboxdImport(data, size = LETTERBOXD_CHUNK_FILMS) {
       ratings: chunkFilms.flatMap((film) => ratingsByFilm.get(film.key) || []),
       favorites: chunkFilms.flatMap((film) => favoritesByFilm.get(film.key) || []),
       watchlist: chunkFilms.flatMap((film) => watchlistByFilm.get(film.key) || []),
+      reviews: chunkFilms.flatMap((film) => reviewsByFilm.get(film.key) || []),
     });
   }
   return chunks;
@@ -325,14 +377,20 @@ export function letterboxdWatchlistKey(item) {
   return `w|${item.film}`;
 }
 
-/** Lo que falta por enviar: visionados, notas, favoritas y pendientes nuevos, con sus películas. */
+// Por reseña (su enlace), no por película: cada visionado puede tener la suya.
+export function letterboxdReviewKey(item) {
+  return `v|${item.uri || `${item.film}|${item.reviewedAt}`}`;
+}
+
+/** Lo que falta por enviar: visionados, notas, favoritas, pendientes y reseñas nuevos, con sus películas. */
 export function pendingLetterboxdImport(data, syncedKeys = new Set()) {
   const history = (data?.history || []).filter((item) => !syncedKeys.has(letterboxdHistoryKey(item)));
   const ratings = (data?.ratings || []).filter((item) => !syncedKeys.has(letterboxdRatingKey(item)));
   const favorites = (data?.favorites || []).filter((item) => !syncedKeys.has(letterboxdFavoriteKey(item)));
   const watchlist = (data?.watchlist || []).filter((item) => !syncedKeys.has(letterboxdWatchlistKey(item)));
-  const used = new Set([...history, ...ratings, ...favorites, ...watchlist].map((item) => item.film));
-  return { films: (data?.films || []).filter((film) => used.has(film.key)), history, ratings, favorites, watchlist };
+  const reviews = (data?.reviews || []).filter((item) => !syncedKeys.has(letterboxdReviewKey(item)));
+  const used = new Set([...history, ...ratings, ...favorites, ...watchlist, ...reviews].map((item) => item.film));
+  return { films: (data?.films || []).filter((film) => used.has(film.key)), history, ratings, favorites, watchlist, reviews };
 }
 
 /** Claves de una tanda ya importada. */
@@ -342,5 +400,6 @@ export function letterboxdChunkKeys(chunk) {
     ...(chunk?.ratings || []).map(letterboxdRatingKey),
     ...(chunk?.favorites || []).map(letterboxdFavoriteKey),
     ...(chunk?.watchlist || []).map(letterboxdWatchlistKey),
+    ...(chunk?.reviews || []).map(letterboxdReviewKey),
   ];
 }

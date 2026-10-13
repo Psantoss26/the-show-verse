@@ -153,6 +153,7 @@ export async function runLetterboxdImport(data, { onChunk, onChunkDone, isCancel
     ratingsUpdated: 0,
     favoritesImported: 0,
     watchlistImported: 0,
+    reviewsImported: 0,
     resolved: 0,
     missing: [],
   };
@@ -175,6 +176,7 @@ export async function runLetterboxdImport(data, { onChunk, onChunkDone, isCancel
     totals.ratingsUpdated += Number(ratings.updated || 0);
     totals.favoritesImported += Number(json?.import?.chunk?.favorites?.imported || 0);
     totals.watchlistImported += Number(json?.import?.chunk?.watchlist?.imported || 0);
+    totals.reviewsImported += Number(json?.import?.chunk?.reviews?.imported || 0);
     totals.resolved += Number(json?.resolved || 0);
     totals.missing.push(...(Array.isArray(json?.missing) ? json.missing : []));
     done += chunk.films.length;
@@ -212,7 +214,7 @@ async function runExtensionSync({ username, full = false, onPhase, isCancelled }
   onPhase?.("read", {});
   const texts = await readLetterboxdFiles([{ name: "letterboxd.zip", arrayBuffer: async () => buffer }]);
   if (!Object.keys(texts).length) {
-    throw new LetterboxdSyncError("export", "La exportación de Letterboxd no trae diario, películas vistas, puntuaciones, favoritas ni pendientes.");
+    throw new LetterboxdSyncError("export", "La exportación de Letterboxd no trae diario, películas vistas, puntuaciones, reseñas, favoritas ni pendientes.");
   }
   const all = buildLetterboxdImport(texts);
 
@@ -236,6 +238,7 @@ async function runExtensionSync({ username, full = false, onPhase, isCancelled }
     ratings: totals.ratingsImported + totals.ratingsUpdated,
     favorites: totals.favoritesImported,
     watchlist: totals.watchlistImported,
+    reviews: totals.reviewsImported,
     missing: totals.missing,
   };
   if (!cancelled) {

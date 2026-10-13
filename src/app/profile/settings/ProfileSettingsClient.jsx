@@ -64,6 +64,7 @@ import Avatar, { getInitial } from "@/components/ui/Avatar";
 import ProfileFavoritesEditor from "@/components/social/ProfileFavoritesEditor";
 import AndroidSyncPanel from "@/components/settings/AndroidSyncPanel";
 import LetterboxdImportPanel from "@/components/settings/LetterboxdImportPanel";
+import ImdbImportPanel from "@/components/settings/ImdbImportPanel";
 import LetterboxdConnectionCard from "@/components/settings/LetterboxdConnectionCard";
 import { pairDevice, pairSyncApp, readSyncStatus, useSyncStatus } from "@/lib/android/appBridge";
 import { buildSyncPairLinks } from "@/lib/android/syncPairLink";
@@ -2639,6 +2640,7 @@ function ProfileSettingsClient() {
                     logoSrc="/logo-TMDb.png"
                   />
                   <LetterboxdImportPanel className={GLASS_PANEL} />
+                  <ImdbImportPanel className={GLASS_PANEL} />
                 </motion.div>
               )}
 

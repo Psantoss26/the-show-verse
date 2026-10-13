@@ -170,3 +170,44 @@ test("CSV sueltos: films.csv son los likes", async () => {
   const texts = await readLetterboxdFiles([file("films.csv", LIKES), file("watchlist.csv", "a")]);
   assert.deepEqual(Object.keys(texts).sort(), ["likes/films.csv", "watchlist.csv"]);
 });
+
+const REVIEWS = `Date,Name,Year,Letterboxd URI,Rating,Rewatch,Review,Tags,Watched Date
+2024-01-02,The Matrix,1999,https://boxd.it/r1,5,Yes,"<p>Still <i>perfect</i> &amp; loud.</p><p>Second line<br />third</p>",,2024-01-01
+2019-03-04,The Matrix,1999,https://boxd.it/r2,4,,First watch,,2019-03-03
+2021-07-07,Amélie,2001,https://boxd.it/r3,3.5,,"   ",,2021-07-07
+`;
+
+test("reseñas: una por entrada, en texto plano y con su fecha", async () => {
+  const { letterboxdChunkKeys, pendingLetterboxdImport } = await import("./export.js");
+  const zip = makeZip({
+    "reviews.csv": REVIEWS,
+    "deleted/reviews.csv": "Date,Name\n2000-01-01,Nope\n",
+  });
+  const texts = await readLetterboxdFiles([{ name: "letterboxd.zip", arrayBuffer: async () => zip }]);
+  assert.deepEqual(Object.keys(texts), ["reviews.csv"]);
+
+  const data = buildLetterboxdImport(texts);
+  assert.deepEqual(
+    data.reviews.map((item) => [item.film, item.body, item.reviewedAt.slice(0, 10), item.uri]),
+    [
+      ["the matrix|1999", "Still perfect & loud.\n\nSecond line\nthird", "2024-01-02", "https://boxd.it/r1"],
+      ["the matrix|1999", "First watch", "2019-03-04", "https://boxd.it/r2"],
+    ],
+  );
+  assert.equal(data.reviews[0].spoiler, false);
+
+  const [chunk] = chunkLetterboxdImport(data);
+  assert.equal(chunk.reviews.length, 2);
+  const synced = new Set(letterboxdChunkKeys(chunk));
+  assert.equal(pendingLetterboxdImport(data, synced).reviews.length, 0);
+});
+
+test("reseñas sueltas y recorte al máximo", async () => {
+  const { letterboxdReviewBody, LETTERBOXD_REVIEW_MAX } = await import("./export.js");
+  const texts = await readLetterboxdFiles([{ name: "reviews.csv", text: async () => REVIEWS }]);
+  assert.deepEqual(Object.keys(texts), ["reviews.csv"]);
+  const long = letterboxdReviewBody("a".repeat(LETTERBOXD_REVIEW_MAX + 50));
+  assert.equal(long.length, LETTERBOXD_REVIEW_MAX);
+  assert.ok(long.endsWith("…"));
+  assert.equal(letterboxdReviewBody("x &#128512; &#99999999; y"), "x 😀 &#99999999; y");
+});
