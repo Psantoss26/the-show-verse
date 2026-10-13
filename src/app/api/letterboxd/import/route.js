@@ -15,7 +15,7 @@ const MAX_ENTRIES = 1000;
 // POST /api/letterboxd/import
 // Una tanda de la exportación de Letterboxd (la lee el navegador, ver
 // lib/letterboxd/export): { films, history, ratings, favorites, watchlist,
-// reset }. Resuelve las películas con TMDb y pasa todo al backend.
+// reviews, reset }. Resuelve las películas con TMDb y pasa todo al backend.
 export async function POST(request) {
   try {
     const body = await request.json().catch(() => null);
@@ -24,18 +24,19 @@ export async function POST(request) {
     const ratings = Array.isArray(body?.ratings) ? body.ratings : [];
     const favorites = Array.isArray(body?.favorites) ? body.favorites : [];
     const watchlist = Array.isArray(body?.watchlist) ? body.watchlist : [];
+    const reviews = Array.isArray(body?.reviews) ? body.reviews : [];
     if (!films) {
       return NextResponse.json({ error: "Faltan las películas de la exportación." }, { status: 400 });
     }
     if (
       films.length > MAX_FILMS ||
-      [history, ratings, favorites, watchlist].some((list) => list.length > MAX_ENTRIES)
+      [history, ratings, favorites, watchlist, reviews].some((list) => list.length > MAX_ENTRIES)
     ) {
       return NextResponse.json({ error: "La tanda es demasiado grande." }, { status: 413 });
     }
 
     const { resolved, missing } = await resolveLetterboxdFilms(films);
-    const payload = mapLetterboxdChunk({ history, ratings, favorites, watchlist }, resolved);
+    const payload = mapLetterboxdChunk({ history, ratings, favorites, watchlist, reviews }, resolved);
 
     const backend = await backendFetchJson(request, "/v1/import/letterboxd/data/chunk", {
       method: "POST",

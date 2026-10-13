@@ -1,7 +1,7 @@
 // src/routes/import.js
 // Importacion puntual desde Trakt.tv hacia la base de datos propia.
 
-import { eq, and, desc, gt } from 'drizzle-orm';
+import { eq, and, desc, gt, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import {
   favorites,
@@ -11,12 +11,22 @@ import {
   watchHistory,
   watchlist,
   connectedAccounts,
+  titleComments,
+  users,
 } from '../db/schema.js';
 import {
   mapLetterboxdCollectionItem,
   mapLetterboxdRatingItem,
   selectLetterboxdHistory,
+  selectLetterboxdReviews,
 } from '../lib/letterboxdImport.js';
+import {
+  imdbListName,
+  mapImdbCollectionItem,
+  mapImdbListItem,
+  mapImdbRatingItem,
+  selectImdbHistory,
+} from '../lib/imdbImport.js';
 import {
   deleteLetterboxdAccount,
   getLetterboxdAccount,
@@ -877,14 +887,21 @@ export default async function importRoutes(fastify) {
 
   // POST /import/letterboxd/data/chunk - una tanda de la exportación de
   // Letterboxd ya resuelta a TMDb: { history, ratings, favorites, watchlist,
-  // reset }. `reset` marca la primera tanda; los totales se acumulan en el
-  // progreso.
+  // reviews, reset }. `reset` marca la primera tanda; los totales se acumulan
+  // en el progreso.
   fastify.post('/letterboxd/data/chunk', async (req, reply) => {
-    const { history = [], ratings = [], favorites: likes = [], watchlist: queue = [], reset = false } = req.body || {};
-    if (![history, ratings, likes, queue].every(Array.isArray)) {
-      return reply.status(400).send({ error: 'history, ratings, favorites and watchlist must be arrays' });
+    const {
+      history = [],
+      ratings = [],
+      favorites: likes = [],
+      watchlist: queue = [],
+      reviews = [],
+      reset = false,
+    } = req.body || {};
+    if (![history, ratings, likes, queue, reviews].every(Array.isArray)) {
+      return reply.status(400).send({ error: 'history, ratings, favorites, watchlist and reviews must be arrays' });
     }
-    if ([history, ratings, likes, queue].some((list) => list.length > 1000)) {
+    if ([history, ratings, likes, queue, reviews].some((list) => list.length > 1000)) {
       return reply.status(413).send({ error: 'Import chunk is too large' });
     }
 
@@ -937,21 +954,179 @@ export default async function importRoutes(fastify) {
       const favoritesResult = await addCollection(favorites, likes);
       const watchlistResult = await addCollection(watchlist, queue);
 
+      // Reseñas → reseñas nativas de la ficha. Solo se añaden: las que ya
+      // llegaron por el RSS o escribiste aquí con el mismo texto se respetan.
+      let reviewsImported = 0;
+      const reviewMovies = [...new Set(reviews.map((item) => Number(item?.tmdbId)).filter(Number.isInteger))];
+      if (reviewMovies.length) {
+        const existingReviews = await db
+          .select({ tmdbId: titleComments.tmdbId, body: titleComments.body })
+          .from(titleComments)
+          .where(
+            and(
+              eq(titleComments.userId, userId),
+              eq(titleComments.mediaType, 'movie'),
+              eq(titleComments.source, 'native'),
+              inArray(titleComments.tmdbId, reviewMovies),
+            ),
+          );
+        const [author] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+        const reviewValues = selectLetterboxdReviews(reviews, existingReviews, userId, author);
+        reviewsImported = reviewValues.length ? await insertInChunks(titleComments, reviewValues) : 0;
+      }
+      const reviewsResult = {
+        status: 'done',
+        fetched: reviews.length,
+        imported: reviewsImported,
+        skipped: reviews.length - reviewsImported,
+      };
+
       progress.steps.history = mergeStepData(progress.steps.history, historyResult);
       progress.steps.ratings = mergeStepData(progress.steps.ratings, ratingsResult);
       progress.steps.favorites = mergeStepData(progress.steps.favorites, favoritesResult);
       progress.steps.watchlist = mergeStepData(progress.steps.watchlist, watchlistResult);
+      progress.steps.reviews = mergeStepData(progress.steps.reviews, reviewsResult);
       progress.status = 'done';
       progress.completedAt = new Date();
       return reply.send({
         ...progress,
-        chunk: { history: historyResult, ratings: ratingsResult, favorites: favoritesResult, watchlist: watchlistResult },
+        chunk: {
+          history: historyResult,
+          ratings: ratingsResult,
+          favorites: favoritesResult,
+          watchlist: watchlistResult,
+          reviews: reviewsResult,
+        },
       });
     } catch (err) {
       progress.status = 'error';
       progress.error = err.message;
       progress.completedAt = new Date();
       req.log.error({ err, userId }, 'Letterboxd import failed');
+      return reply.status(500).send(progress);
+    }
+  });
+
+  // POST /import/imdb/data/chunk - una tanda de las exportaciones de IMDb ya
+  // resuelta a TMDb: { ratings, history, watchlist, lists: [{ name, items }],
+  // reset }. Las listas se buscan por nombre entre las del usuario y se crean
+  // si no existen (privadas: en IMDb pueden serlo), así que repetir la
+  // importación no las duplica.
+  fastify.post('/imdb/data/chunk', async (req, reply) => {
+    const { ratings = [], history = [], watchlist: queue = [], lists = [], reset = false } = req.body || {};
+    if (![ratings, history, queue, lists].every(Array.isArray) || !lists.every((list) => Array.isArray(list?.items))) {
+      return reply.status(400).send({ error: 'ratings, history, watchlist and lists must be arrays' });
+    }
+    const listItems = lists.reduce((sum, list) => sum + list.items.length, 0);
+    if ([ratings.length, history.length, queue.length, listItems].some((count) => count > 1000) || lists.length > 200) {
+      return reply.status(413).send({ error: 'Import chunk is too large' });
+    }
+
+    const userId = req.user.id;
+    const key = progressKey(userId, 'imdb');
+    const previous = importProgress.get(key);
+    const progress =
+      reset || !previous
+        ? {
+            status: 'running',
+            mode: 'all',
+            startedAt: new Date(),
+            completedAt: null,
+            steps: {},
+            error: null,
+            source: 'imdb',
+          }
+        : previous;
+    progress.status = 'running';
+    importProgress.set(key, progress);
+
+    try {
+      const ratingValues = dedupeBy(
+        ratings.map((item) => mapImdbRatingItem(item, userId)).filter(Boolean),
+        ratingKey,
+      );
+      const ratingsResult = ratingValues.length
+        ? await importNormalizedRatingValues(userId, ratingValues, ratings.length)
+        : { status: 'done', fetched: ratings.length, imported: 0, updated: 0 };
+
+      let historyImported = 0;
+      if (history.length) {
+        const existing = await db.select().from(watchHistory).where(eq(watchHistory.userId, userId));
+        const values = selectImdbHistory(history, existing, userId);
+        historyImported = values.length ? await insertInChunks(watchHistory, values) : 0;
+      }
+      const historyResult = {
+        status: 'done',
+        fetched: history.length,
+        imported: historyImported,
+        skipped: history.length - historyImported,
+      };
+
+      // Pendientes: solo se añaden (lo que ya estaba se respeta).
+      const watchlistValues = dedupeBy(
+        queue.map((item) => mapImdbCollectionItem(item, userId)).filter(Boolean),
+        (item) => `${item.tmdbId}:${item.mediaType}`,
+      );
+      const watchlistImported = watchlistValues.length ? await insertInChunks(watchlist, watchlistValues) : 0;
+      const watchlistResult = {
+        status: 'done',
+        fetched: queue.length,
+        imported: watchlistImported,
+        skipped: queue.length - watchlistImported,
+      };
+
+      let listsCreated = 0;
+      let listItemsImported = 0;
+      for (const list of lists) {
+        const name = imdbListName(list.name);
+        if (!name || !list.items.length) continue;
+        let [target] = await db
+          .select({ id: userLists.id })
+          .from(userLists)
+          .where(and(eq(userLists.userId, userId), eq(userLists.name, name)))
+          .limit(1);
+        if (!target) {
+          [target] = await db
+            .insert(userLists)
+            .values({ userId, name, description: 'Importada de IMDb', isPublic: false })
+            .returning({ id: userLists.id });
+          listsCreated += 1;
+        }
+        const values = dedupeBy(
+          list.items.map((item) => mapImdbListItem(item, target.id)).filter(Boolean),
+          (item) => `${item.tmdbId}:${item.mediaType}`,
+        );
+        if (values.length) {
+          listItemsImported += await insertInChunks(userListItems, values);
+          await db.update(userLists).set({ updatedAt: new Date() }).where(eq(userLists.id, target.id));
+        }
+      }
+      const listsResult = {
+        status: 'done',
+        fetched: listItems,
+        imported: listItemsImported,
+        skipped: listItems - listItemsImported,
+        created: listsCreated,
+      };
+
+      progress.steps.ratings = mergeStepData(progress.steps.ratings, ratingsResult);
+      progress.steps.history = mergeStepData(progress.steps.history, historyResult);
+      progress.steps.watchlist = mergeStepData(progress.steps.watchlist, watchlistResult);
+      progress.steps.lists = {
+        ...mergeStepData(progress.steps.lists, listsResult),
+        created: Number(progress.steps.lists?.created || 0) + listsCreated,
+      };
+      progress.status = 'done';
+      progress.completedAt = new Date();
+      return reply.send({
+        ...progress,
+        chunk: { ratings: ratingsResult, history: historyResult, watchlist: watchlistResult, lists: listsResult },
+      });
+    } catch (err) {
+      progress.status = 'error';
+      progress.error = err.message;
+      progress.completedAt = new Date();
+      req.log.error({ err, userId }, 'IMDb import failed');
       return reply.status(500).send(progress);
     }
   });

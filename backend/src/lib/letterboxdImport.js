@@ -104,3 +104,61 @@ export function selectLetterboxdHistory(items, existing, userId, keyOf = letterb
   }
   return values;
 }
+
+// Máximo de una reseña (el mismo que las del RSS, letterboxdRss).
+const REVIEW_MAX = 2000;
+
+/**
+ * Clave para reconocer una reseña ya guardada aunque llegue por otra vía: la
+ * película y el comienzo del texto sin diferencias de espacios ni mayúsculas.
+ * El RSS y la exportación dan el mismo texto con párrafos ligeramente
+ * distintos, y el RSS puede recortarlo.
+ */
+export function letterboxdReviewKey(tmdbId, body) {
+  const text = String(body || '')
+    .replace(/\s+/g, ' ')
+    .replace(/…$/, '')
+    .trim()
+    .toLowerCase()
+    .slice(0, 300);
+  return text ? `${Number(tmdbId)}|${text}` : '';
+}
+
+/**
+ * Qué reseñas de la exportación entran como reseñas nativas de la ficha
+ * (title_comments), a nombre del usuario y con la fecha de Letterboxd. Se
+ * salta la que ya está (llegó por el RSS, se importó antes o la escribiste
+ * aquí con el mismo texto) y las repetidas dentro de la tanda.
+ *
+ * @param items     reseñas de la tanda ({ tmdbId, body, spoiler, reviewedAt }).
+ * @param existing  reseñas nativas del usuario ({ tmdbId, body }).
+ * @param author    fila del usuario (nombre y avatar de la reseña).
+ */
+export function selectLetterboxdReviews(items, existing, userId, author = null, now = new Date()) {
+  const known = new Set(existing.map((row) => letterboxdReviewKey(row.tmdbId, row.body)));
+  const values = [];
+  for (const item of Array.isArray(items) ? items : []) {
+    const tmdbId = movieId(item);
+    let body = typeof item?.body === 'string' ? item.body.trim() : '';
+    if (!tmdbId || !body) continue;
+    if (body.length > REVIEW_MAX) body = `${body.slice(0, REVIEW_MAX - 1).trimEnd()}…`;
+    const key = letterboxdReviewKey(tmdbId, body);
+    if (known.has(key)) continue;
+    known.add(key);
+    values.push({
+      tmdbId,
+      mediaType: 'movie',
+      source: 'native',
+      userId,
+      authorName: author?.displayName || author?.username || 'Usuario',
+      authorUsername: author?.username || null,
+      authorAvatarUrl: author?.avatarUrl || null,
+      authorIsVip: false,
+      body,
+      likes: 0,
+      spoiler: Boolean(item?.spoiler),
+      createdAt: validDate(item?.reviewedAt, now),
+    });
+  }
+  return values;
+}

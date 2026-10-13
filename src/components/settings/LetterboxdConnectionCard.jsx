@@ -159,7 +159,7 @@ export default function LetterboxdConnectionCard({ className = "", onOpenImport 
         await refreshConnection();
         setMessage(
           result.pending
-            ? `Sincronización terminada: ${plural(result.history, "visionado nuevo", "visionados nuevos")}, ${plural(result.ratings, "puntuación", "puntuaciones")}, ${plural(result.favorites || 0, "favorita", "favoritas")} y ${plural(result.watchlist || 0, "pendiente", "pendientes")}.`
+            ? `Sincronización terminada: ${plural(result.history, "visionado nuevo", "visionados nuevos")}, ${plural(result.ratings, "puntuación", "puntuaciones")}, ${plural(result.reviews || 0, "reseña", "reseñas")}, ${plural(result.favorites || 0, "favorita", "favoritas")} y ${plural(result.watchlist || 0, "pendiente", "pendientes")}.`
             : "Historial completo al día: no había cambios en Letterboxd.",
         );
       } catch (err) {
@@ -269,7 +269,7 @@ export default function LetterboxdConnectionCard({ className = "", onOpenImport 
           {hasExtension ? (
             <p className="mt-1 leading-relaxed">
               Pulsa <strong className="text-white">Sincronizar todo el historial</strong>: la extensión descargará tu
-              exportación oficial de Letterboxd (historial, puntuaciones, favoritas y watchlist) con la sesión de
+              exportación oficial de Letterboxd (historial, puntuaciones, reseñas, favoritas y watchlist) con la sesión de
               letterboxd.com de este navegador.
             </p>
           ) : (

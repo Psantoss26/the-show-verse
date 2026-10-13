@@ -5,6 +5,7 @@ import {
   mapLetterboxdHistoryItem,
   mapLetterboxdRatingItem,
   selectLetterboxdHistory,
+  selectLetterboxdReviews,
 } from './letterboxdImport.js';
 
 const keyOf = (item) =>
@@ -64,4 +65,38 @@ test('mapea favoritas y pendientes', () => {
   assert.equal(row.addedAt.toISOString(), '2023-02-02T12:00:00.000Z');
   assert.equal(mapLetterboxdCollectionItem({ tmdbId: 603 }, 'u1', now).addedAt, now);
   assert.equal(mapLetterboxdCollectionItem({ tmdbId: 'x' }, 'u1', now), null);
+});
+
+test('reseñas: no duplica las que ya llegaron por el RSS aunque cambien los espacios', () => {
+  const author = { username: 'ana', displayName: 'Ana', avatarUrl: 'a.png' };
+  const existing = [{ tmdbId: 603, body: 'Still perfect & loud.\n\nSecond line\nthird' }];
+  const rows = selectLetterboxdReviews(
+    [
+      { tmdbId: 603, body: 'Still perfect & loud.\nSecond line third', reviewedAt: '2024-01-02T12:00:00.000Z' },
+      { tmdbId: 603, body: 'First watch', reviewedAt: '2019-03-04T12:00:00.000Z', spoiler: true },
+      { tmdbId: 603, body: 'first   watch', reviewedAt: '2019-03-04T12:00:00.000Z' },
+      { tmdbId: 0, body: 'Sin película' },
+      { tmdbId: 194, body: '   ' },
+    ],
+    existing,
+    'u1',
+    author,
+  );
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].body, 'First watch');
+  assert.equal(rows[0].source, 'native');
+  assert.equal(rows[0].mediaType, 'movie');
+  assert.equal(rows[0].spoiler, true);
+  assert.equal(rows[0].authorName, 'Ana');
+  assert.equal(rows[0].authorUsername, 'ana');
+  assert.equal(rows[0].createdAt.toISOString(), '2019-03-04T12:00:00.000Z');
+});
+
+test('reseñas: el texto se recorta al máximo y se reconoce la versión recortada del RSS', () => {
+  const long = 'x'.repeat(2100);
+  const [row] = selectLetterboxdReviews([{ tmdbId: 1, body: long, reviewedAt: '2024-01-01' }], [], 'u1');
+  assert.equal(row.body.length, 2000);
+  assert.ok(row.body.endsWith('…'));
+  const again = selectLetterboxdReviews([{ tmdbId: 1, body: long, reviewedAt: '2024-01-01' }], [row], 'u1');
+  assert.equal(again.length, 0);
 });

@@ -101,7 +101,7 @@ export async function resolveLetterboxdFilms(films = []) {
 }
 
 /** Une la tanda con lo resuelto: lo que se manda al backend. */
-export function mapLetterboxdChunk({ history = [], ratings = [], favorites = [], watchlist = [] }, resolved) {
+export function mapLetterboxdChunk({ history = [], ratings = [], favorites = [], watchlist = [], reviews = [] }, resolved) {
   const withMovie = (item) => {
     const movie = resolved.get(item?.film);
     return movie ? { ...movie, mediaType: "movie" } : null;
@@ -131,5 +131,13 @@ export function mapLetterboxdChunk({ history = [], ratings = [], favorites = [],
       .filter(Boolean),
     favorites: collection(favorites),
     watchlist: collection(watchlist),
+    reviews: (Array.isArray(reviews) ? reviews : [])
+      .map((item) => {
+        const movie = withMovie(item);
+        const body = typeof item?.body === "string" ? item.body.trim() : "";
+        if (!movie || !body || !item.reviewedAt) return null;
+        return { ...movie, body, spoiler: Boolean(item.spoiler), reviewedAt: item.reviewedAt };
+      })
+      .filter(Boolean),
   };
 }

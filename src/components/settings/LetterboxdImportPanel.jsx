@@ -1,7 +1,7 @@
 "use client";
 
-// Importación desde Letterboxd: el usuario sube su exportación (el ZIP de
-// Settings → Data → Export your data, o diary.csv / watched.csv / ratings.csv /
+// Importación desde Letterboxd: el usuario sube su exportación (el ZIP que
+// descarga letterboxd.com/data/export, o diary.csv / watched.csv / ratings.csv /
 // watchlist.csv / films.csv de likes),
 // el navegador la lee y la manda por tandas a /api/letterboxd/import, que
 // resuelve cada película con TMDb y guarda visionados y puntuaciones.
@@ -12,7 +12,9 @@ import { Check, DownloadCloud, FileArchive, Loader2, X } from "lucide-react";
 import { buildLetterboxdImport, readLetterboxdFiles } from "@/lib/letterboxd/export";
 import { runLetterboxdImport } from "@/lib/letterboxd/sync";
 
-const EXPORT_URL = "https://letterboxd.com/settings/data/";
+// Descarga directa del ZIP de la exportación (requiere la sesión de
+// Letterboxd iniciada), sin pasar por Settings → Data → Export your data.
+const EXPORT_URL = "https://letterboxd.com/data/export";
 const MISSING_SAMPLES = 12;
 
 
@@ -45,7 +47,7 @@ export default function LetterboxdImportPanel({ className = "" }) {
     try {
       const texts = await readLetterboxdFiles(files);
       if (!Object.keys(texts).length) {
-        throw new Error("No se encontró diary.csv, watched.csv, ratings.csv, watchlist.csv ni los likes. Sube el ZIP de la exportación de Letterboxd.");
+        throw new Error("No se encontró diary.csv, watched.csv, ratings.csv, reviews.csv, watchlist.csv ni los likes. Sube el ZIP de la exportación de Letterboxd.");
       }
       const next = buildLetterboxdImport(texts);
       if (!next.films.length) throw new Error("La exportación no tiene películas.");
@@ -97,14 +99,14 @@ export default function LetterboxdImportPanel({ className = "" }) {
           <div className="min-w-0">
             <h3 className="text-base font-extrabold text-white tracking-wide">Importar desde Letterboxd</h3>
             <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
-              Trae tu diario de visionados (rewatches incluidos), tus puntuaciones, tus favoritas y tu watchlist. En Letterboxd ve a{" "}
+              Trae tu diario de visionados (rewatches incluidos), tus puntuaciones, tus reseñas, tus favoritas y tu watchlist.{" "}
               <a
                 href={EXPORT_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-bold text-zinc-200 underline decoration-white/30 underline-offset-2 hover:text-white"
               >
-                Settings → Data → Export your data
+                Descarga tu exportación de Letterboxd
               </a>{" "}
               y sube aquí el ZIP tal cual.
             </p>
@@ -143,6 +145,14 @@ export default function LetterboxdImportPanel({ className = "" }) {
                   done={finished}
                 />
               )}
+              {data.reviews.length > 0 && (
+                <Row
+                  label="Reseñas"
+                  value={plural(data.reviews.length, "reseña", "reseñas")}
+                  status={totals ? plural(totals.reviewsImported, "nueva", "nuevas") : null}
+                  done={finished}
+                />
+              )}
               {data.watchlist.length > 0 && (
                 <Row
                   label="Pendientes"
@@ -167,7 +177,7 @@ export default function LetterboxdImportPanel({ className = "" }) {
             </>
           ) : (
             <p className="text-zinc-500">
-              Se importan las películas del diario con su fecha de visionado, las vistas que no estén en el diario, la puntuación de cada una (½ estrella = 1 punto), tus películas con «me gusta» como favoritas y tu watchlist como pendientes.
+              Se importan las películas del diario con su fecha de visionado, las vistas que no estén en el diario, la puntuación de cada una (½ estrella = 1 punto), tus reseñas en la ficha de cada película, tus películas con «me gusta» como favoritas y tu watchlist como pendientes.
             </p>
           )}
         </div>
@@ -180,6 +190,7 @@ export default function LetterboxdImportPanel({ className = "" }) {
           >
             Importación completada: {plural(totals.historyImported, "visionado nuevo", "visionados nuevos")},{" "}
             {plural(totals.ratingsImported + totals.ratingsUpdated, "puntuación", "puntuaciones")},{" "}
+            {plural(totals.reviewsImported, "reseña", "reseñas")},{" "}
             {plural(totals.favoritesImported, "favorita", "favoritas")} y{" "}
             {plural(totals.watchlistImported, "pendiente", "pendientes")}.
           </motion.p>
@@ -215,11 +226,15 @@ export default function LetterboxdImportPanel({ className = "" }) {
       </div>
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row lg:flex-col xl:flex-row">
+        {/* El MIME del ZIP va PRIMERO: el selector de la app de Android
+            (WebView, FileChooserParams.createIntent) solo usa el primer tipo
+            del `accept`, y con «.zip» —que no es un MIME— no dejaba elegir el
+            archivo descargado. */}
         <input
           ref={inputRef}
           id={inputId}
           type="file"
-          accept=".zip,.csv,application/zip,text/csv"
+          accept="application/zip,application/x-zip-compressed,.zip,text/csv,.csv"
           multiple
           className="sr-only"
           onChange={handleFiles}
