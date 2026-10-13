@@ -71,15 +71,27 @@ test('importa una tanda de IMDb sin duplicar', { skip: !process.env.LISTS_TEST_D
     [3, 1, 1, 1, 2],
   );
 
-  // Repetir: las notas se actualizan, nada más se duplica.
+  // Repetir: nada se duplica ni se modifica (las notas ya existen).
   const second = (await chunk(false)).json().chunk;
   assert.deepEqual(
-    [second.ratings.imported, second.ratings.updated, second.history.imported, second.watchlist.imported, second.lists.created, second.lists.imported],
-    [0, 3, 0, 0, 0, 0],
+    [second.ratings.imported, second.ratings.updated, second.ratings.skipped, second.history.imported, second.watchlist.imported, second.lists.created, second.lists.imported],
+    [0, 0, 3, 0, 0, 0, 0],
   );
+
+  // Una importación NUNCA cambia una nota que ya tenías: la de 7,5 puesta a
+  // mano se queda aunque la importada diga otra cosa.
+  await db.update(userRatings).set({ rating: 7.5 }).where(eq(userRatings.userId, ana));
+  const third = (await app.inject({
+    method: 'POST',
+    url: '/import/imdb/data/chunk',
+    headers: { 'x-test-user': ana },
+    payload: { ratings: [{ tmdbId: MOVIE, mediaType: 'movie', rating: 3, ratedAt: '2026-01-01T12:00:00.000Z' }] },
+  })).json().chunk;
+  assert.deepEqual([third.ratings.imported, third.ratings.updated, third.ratings.skipped], [0, 0, 1]);
 
   const ratings = await db.select().from(userRatings).where(eq(userRatings.userId, ana));
   assert.equal(ratings.length, 3);
+  assert.ok(ratings.every((row) => Number(row.rating) === 7.5), 'las notas que ya tenías no cambian');
   const history = await db.select().from(watchHistory).where(eq(watchHistory.userId, ana));
   assert.equal(history.length, 2);
   assert.equal((await db.select().from(watchlist).where(eq(watchlist.userId, ana))).length, 1);

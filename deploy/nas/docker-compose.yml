@@ -22,6 +22,36 @@ services:
       timeout: 5s
       retries: 10
 
+  # Copia de seguridad diaria de postgres (ver BACKUPS.md). Se guardan FUERA
+  # de la carpeta del código: el despliegue la sincroniza con rsync --delete y
+  # las borraría. La ruta es del NAS (la resuelve su Docker, no el runner).
+  pg-backup:
+    build:
+      context: ./pg-backup
+    restart: unless-stopped
+    environment:
+      PGHOST: postgres
+      PGUSER: tsv
+      PGDATABASE: theshowverse
+      PGPASSWORD: ${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD}
+      TZ: ${TZ:-Europe/Madrid}
+      BACKUP_TIME: ${PG_BACKUP_TIME:-04:30}
+      KEEP_DAILY: ${PG_BACKUP_KEEP_DAILY:-14}
+      KEEP_WEEKLY: ${PG_BACKUP_KEEP_WEEKLY:-8}
+      KEEP_MONTHLY: ${PG_BACKUP_KEEP_MONTHLY:-12}
+    volumes:
+      - ${PG_BACKUP_DIR:-/volume4/docker/theshowverse-backups/postgres}:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Sano mientras la última copia buena tenga menos de 26 h.
+    healthcheck:
+      test: ["CMD-SHELL", "test -n \"$$(find /backups/.last-success -mmin -1560 2>/dev/null)\""]
+      interval: 30m
+      timeout: 10s
+      start_period: 15m
+      retries: 1
+
   redis:
     image: redis:7-alpine
     restart: unless-stopped
