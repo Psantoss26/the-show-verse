@@ -74,6 +74,8 @@ import {
 import TraktWatchedModal from "@/components/trakt/TraktWatchedModal";
 import SubrouteDetailsActionRow from "@/components/details/SubrouteDetailsActionRow";
 import { getAdjacentEpisodeHrefs } from "@/lib/details/subrouteNavigation";
+import { useDetailsSubrouteSwipe } from "@/lib/navigation/detailsSubrouteSwipe";
+import { usePathname } from "next/navigation";
 import {
   invalidateTraktGetCache,
   traktGetItemStatus,
@@ -339,6 +341,10 @@ export default function EpisodeDetailsClient({
       ),
     [showId, seasonNumber, episodeNumber, season?.episodes],
   );
+  // En móvil, deslizar lleva a el episodio anterior/siguiente: los mismos destinos que
+  // las flechas de la fila de acciones (MobileUserPageSwipeNavigation).
+  const pathname = usePathname();
+  useDetailsSubrouteSwipe(pathname, adjacentEpisodeHrefs.previousHref, adjacentEpisodeHrefs.nextHref);
   const showPosterPath = show?.poster_path || null;
   const heroBgPath =
     heroBackdropPath ||

@@ -73,6 +73,8 @@ import TraktEpisodesWatchedModal from "@/components/trakt/TraktEpisodesWatchedMo
 import { useTraktEpisodesWatched } from "@/lib/hooks/useTraktEpisodesWatched";
 import SubrouteDetailsActionRow from "@/components/details/SubrouteDetailsActionRow";
 import { getAdjacentSeasonHrefs } from "@/lib/details/subrouteNavigation";
+import { useDetailsSubrouteSwipe } from "@/lib/navigation/detailsSubrouteSwipe";
+import { usePathname } from "next/navigation";
 import {
   invalidateTraktGetCache,
   traktGetShowWatched,
@@ -397,6 +399,10 @@ export default function SeasonDetailsClient({
     () => getAdjacentSeasonHrefs(showId, seasonNumber, show?.seasons),
     [showId, seasonNumber, show?.seasons],
   );
+  // En móvil, deslizar lleva a la temporada anterior/siguiente: los mismos destinos que
+  // las flechas de la fila de acciones (MobileUserPageSwipeNavigation).
+  const pathname = usePathname();
+  useDetailsSubrouteSwipe(pathname, adjacentSeasonHrefs.previousHref, adjacentSeasonHrefs.nextHref);
   const heroBgPath =
     show?.backdrop_path || season?.poster_path || show?.poster_path || null;
 

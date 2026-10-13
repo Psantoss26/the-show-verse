@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
 import {
@@ -12,6 +12,11 @@ import {
   getUserDetailsSequence,
   saveUserDetailsSequenceFromLink,
 } from "@/lib/navigation/userDetailsSequence";
+import {
+  getDetailsSubrouteSequence,
+  getDetailsSubrouteSnapshot,
+  subscribeDetailsSubrouteSequence,
+} from "@/lib/navigation/detailsSubrouteSwipe";
 import { isBodyScrollLocked } from "@/hooks/useBodyScrollLock";
 
 function preservesNestedGesture(target) {
@@ -21,9 +26,35 @@ function preservesNestedGesture(target) {
   );
 }
 
+// Las fichas de temporada y episodio no marcan sus gestos propios: los
+// carruseles de reparto (Swiper) y las filas con scroll lateral, como la de
+// stats del marcador, también conservan su arrastre.
+function preservesSubrouteGesture(target, root) {
+  if (preservesNestedGesture(target)) return true;
+  for (let node = target; node instanceof Element && node !== root; node = node.parentElement) {
+    if (node.classList.contains("swiper")) return true;
+    const overflowX = getComputedStyle(node).overflowX;
+    if ((overflowX === "auto" || overflowX === "scroll") && node.scrollWidth > node.clientWidth) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function getSwipeDestination(pathname, direction) {
   const pageDestination = getMobileUserPageSwipeDestination(pathname, direction);
   if (pageDestination) return pageDestination;
+
+  // Temporadas y episodios: la ficha montada publica su anterior/siguiente
+  // (los mismos destinos que las flechas de su fila de acciones).
+  const subrouteSequence = getDetailsSubrouteSequence(pathname);
+  if (subrouteSequence) {
+    return direction === "left"
+      ? subrouteSequence.next
+      : direction === "right"
+        ? subrouteSequence.previous
+        : null;
+  }
 
   // Las fichas no forman parte del orden fijo del navbar, pero al venir de una
   // página de usuario sí tienen una secuencia persistida con el mismo contrato
@@ -67,6 +98,13 @@ export default function MobileUserPageSwipeNavigation({ children }) {
   const router = useRouter();
   const navigatingToRef = useRef(null);
   const pageSwipe = useRef(null);
+  // Re-renderiza al publicarse la secuencia de una temporada/episodio para que
+  // `hasAdjacentPage` enganche los handlers en cuanto la ficha monta.
+  useSyncExternalStore(
+    subscribeDetailsSubrouteSequence,
+    getDetailsSubrouteSnapshot,
+    () => null,
+  );
   const hasAdjacentPage = Boolean(
     getSwipeDestination(pathname, "left") ||
       getSwipeDestination(pathname, "right"),
@@ -131,7 +169,9 @@ export default function MobileUserPageSwipeNavigation({ children }) {
     pageSwipe.current = {
       x: event.touches[0].clientX,
       y: event.touches[0].clientY,
-      preservesNestedGesture: preservesNestedGesture(event.target),
+      preservesNestedGesture: getDetailsSubrouteSequence(pathname)
+        ? preservesSubrouteGesture(event.target, event.currentTarget)
+        : preservesNestedGesture(event.target),
     };
   }, [pathname]);
 
