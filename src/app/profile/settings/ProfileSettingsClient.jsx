@@ -2860,15 +2860,15 @@ function ProfileSettingsClient() {
                         </div>
                         <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
                           {plex.connected
-                            ? `Conectado${plex.account?.username ? ` como ${plex.account.username}` : ""}${plex.server?.name ? ` · Servidor: ${plex.server.name}` : "· No se detectó ningún servidor"}.`
+                            ? `Conectado${plex.account?.username ? ` como ${plex.account.username}` : ""}${plex.server?.name ? "" : " · No se detectó ningún servidor"}.`
                             : "Conecta tu cuenta de Plex (inicio de sesión en plex.tv) y detectaremos tu servidor local automáticamente, sin tokens ni configuración manual."}
                         </p>
                         {plex.connected && plex.server && (
-                          <p className="mt-1.5 text-[11px] font-bold">
+                          <p className="mt-1.5 text-xs sm:text-sm font-bold leading-relaxed">
                             {plex.link === undefined ? (
                               <span className="text-zinc-500">Comprobando acceso al servidor…</span>
                             ) : plex.link?.kind === "local" ? (
-                              <span className="text-emerald-400">● Servidor local accesible desde este dispositivo</span>
+                              <span className="text-emerald-400">● Servidor local: {plex.server.name}</span>
                             ) : plex.link?.kind === "relay" ? (
                               <span className="text-amber-400">● Accesible vía relay de Plex (no estás en la red local)</span>
                             ) : plex.link?.kind === "remote" ? (
