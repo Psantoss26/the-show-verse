@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useServerOnline } from "@/context/ServerStatusContext";
 import OfflineStorageStatus from "@/components/OfflineStorageStatus";
 import useBodyScrollLock from "@/hooks/useBodyScrollLock";
+import useFitViewportPage from "@/hooks/useFitViewportPage";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -1605,6 +1606,8 @@ function SettingsTabs({ tabs, activeTab, onSelect }) {
 }
 
 function ProfileSettingsClient() {
+  // Si la sección cabe entera sobre el navbar inferior, la página no se desplaza.
+  useFitViewportPage();
   const {
     preferences,
     updatePreference,
@@ -2267,15 +2270,19 @@ function ProfileSettingsClient() {
   const isNetflixConnected = !!netflixAccountInfo?.connected;
 
   return (
+    // Fuera de escritorio el hueco del navbar inferior ya lo reserva el layout
+    // (pb 5rem + safe area, con min-h 100svh): sin otro alto mínimo ni relleno
+    // aquí, el tope del scroll deja el final de la sección justo encima del
+    // navbar, y si la sección cabe entera la página no se desplaza.
     <main
-      className="min-h-screen bg-black pb-24 text-zinc-100 selection:bg-emerald-500/30 relative overflow-hidden font-sans"
+      className="bg-black text-zinc-100 selection:bg-emerald-500/30 relative overflow-hidden font-sans desktop:min-h-screen desktop:pb-24"
       onTouchStartCapture={handleSettingsTouchStart}
       onTouchEndCapture={handleSettingsTouchEnd}
       onTouchCancelCapture={() => { settingsSwipe.current = null; }}
     >
       <SettingsBackground />
 
-      <div className="relative z-10 mx-auto max-w-6xl px-4 py-8 lg:py-12">
+      <div className="relative z-10 mx-auto max-w-6xl px-4 pt-8 pb-1 lg:pt-12 desktop:pb-12">
         <header className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <Link

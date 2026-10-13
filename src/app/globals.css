@@ -1910,6 +1910,20 @@ body {
    así que sube con la barra y sigue pegado a ella.
 
    Solo fuera de escritorio (ver el bloque `desktop` de abajo). */
+/* PÁGINA QUE CABE EN PANTALLA (hooks/useFitViewportPage). El contenedor de
+   las páginas (layout raíz) tiene `min-h-[100svh]` y el envoltorio del gesto
+   móvil `min-h-screen`, pero la barra superior sticky ya ocupa 4rem en el
+   flujo: con los dos mínimos, el documento siempre medía más que la pantalla.
+   Aquí el mínimo pasa a ser exactamente el alto visible, y el scroll solo
+   aparece cuando el contenido lo necesita. */
+html[data-fit-viewport] [data-mobile-user-page-swipe] {
+  min-height: 0;
+}
+
+html[data-fit-viewport] [data-scroll-restoration-root] {
+  min-height: calc(100svh - 4rem);
+}
+
 .sv-topbar {
   transition:
     background-color 300ms,
