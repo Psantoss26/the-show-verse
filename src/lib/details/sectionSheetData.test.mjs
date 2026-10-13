@@ -35,3 +35,25 @@ test("trabajos en español", () => {
   assert.equal(crewRoleLabel("Executive Producer"), "Productor ejecutivo");
   assert.equal(crewRoleLabel("Gaffer"), "Gaffer");
 });
+
+test("los creadores de una serie van en el equipo, en «Creación» y los primeros", () => {
+  const groups = buildCrewGroups(
+    [{ id: 2, name: "Michelle MacLaren", department: "Directing", jobs: [{ job: "Director", episode_count: 11 }], total_episode_count: 11 }],
+    { creators: [{ id: 1, name: "Vince Gilligan", profile_path: "/v.jpg" }] },
+  );
+  assert.deepEqual(groups.map((group) => [group.label, group.people.map((person) => person.name)]), [
+    ["Creación", ["Vince Gilligan"]],
+    ["Dirección", ["Michelle MacLaren"]],
+  ]);
+  assert.equal(crewRoleLabel(groups[0].people[0].jobs[0].job), "Creador");
+});
+
+test("en cada departamento van primero los trabajos principales", () => {
+  const [directing] = buildCrewGroups([
+    { id: 10, name: "Ayudante", department: "Directing", job: "Second Assistant Director" },
+    { id: 11, name: "Lana", department: "Directing", job: "Director" },
+    { id: 12, name: "Script", department: "Directing", job: "Script Supervisor" },
+    { id: 13, name: "Lilly", department: "Directing", job: "Director" },
+  ]);
+  assert.deepEqual(directing.people.map((person) => person.name), ["Lana", "Lilly", "Ayudante", "Script"]);
+});

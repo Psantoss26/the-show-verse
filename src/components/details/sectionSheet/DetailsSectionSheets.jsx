@@ -107,7 +107,7 @@ function SheetContent({ id, data, onClose }) {
 
 // ─── Reparto y equipo ──────────────────────────────────────────────────────
 
-function useCrew({ type, tmdbId, enabled }) {
+function useCrew({ type, tmdbId, enabled, creators }) {
   const [state, setState] = useState({ loading: false, groups: null, error: false });
   const loaded = state.groups != null;
   useEffect(() => {
@@ -117,7 +117,7 @@ function useCrew({ type, tmdbId, enabled }) {
     if (!enabled || loaded) return undefined;
     const key = process.env.NEXT_PUBLIC_TMDB_API_KEY;
     if (!key || !tmdbId) {
-      setState({ loading: false, groups: [], error: true });
+      setState({ loading: false, groups: buildCrewGroups([], { creators }), error: true });
       return undefined;
     }
     const controller = new AbortController();
@@ -125,11 +125,13 @@ function useCrew({ type, tmdbId, enabled }) {
     const path = type === "tv" ? `tv/${tmdbId}/aggregate_credits` : `movie/${tmdbId}/credits`;
     fetch(`https://api.themoviedb.org/3/${path}?api_key=${key}&language=es-ES`, { signal: controller.signal })
       .then((res) => (res.ok ? res.json() : null))
-      .then((json) => setState({ loading: false, groups: buildCrewGroups(json?.crew), error: !json }))
+      .then((json) => setState({ loading: false, groups: buildCrewGroups(json?.crew, { creators }), error: !json }))
       .catch((error) => {
-        if (error?.name !== "AbortError") setState({ loading: false, groups: [], error: true });
+        if (error?.name !== "AbortError") setState({ loading: false, groups: buildCrewGroups([], { creators }), error: true });
       });
     return () => controller.abort();
+    // `creators` se lee al cargar: llegan con la ficha, antes de abrir el panel.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, loaded, tmdbId, type]);
   return state;
 }
@@ -137,7 +139,7 @@ function useCrew({ type, tmdbId, enabled }) {
 function CastSheet({ meta, data, onClose, tab, setTab, query, setQuery }) {
   const activeTab = tab || "cast";
   const cast = Array.isArray(data.cast) ? data.cast : [];
-  const crew = useCrew({ type: data.type, tmdbId: data.tmdbId, enabled: activeTab === "crew" });
+  const crew = useCrew({ type: data.type, tmdbId: data.tmdbId, enabled: activeTab === "crew", creators: data.creators });
   const filteredCast = cast.filter((person) => matches(query, person.name, person.character));
   const crewGroups = (crew.groups || [])
     .map((group) => ({

@@ -7,10 +7,12 @@
 // total_episode_count }).
 
 const DEPARTMENTS = [
+  // Creadores de una serie: TMDb no los incluye en los créditos del equipo
+  // (vienen en `created_by`), se añaden aparte y van los primeros.
+  ["Creator", "Creación"],
   ["Directing", "Dirección"],
   ["Writing", "Guion"],
   ["Production", "Producción"],
-  ["Creator", "Creación"],
   ["Camera", "Fotografía"],
   ["Editing", "Montaje"],
   ["Sound", "Sonido"],
@@ -71,6 +73,33 @@ const JOBS = {
   "Production Manager": "Jefe de producción",
 };
 
+// Trabajos principales de cada departamento: van delante del resto (TMDb da
+// los créditos en otro orden: en «Dirección» salían antes los ayudantes que
+// el director).
+const KEY_JOBS = [
+  "Creator",
+  "Director",
+  "Co-Director",
+  "Screenplay",
+  "Writer",
+  "Teleplay",
+  "Story",
+  "Novel",
+  "Executive Producer",
+  "Producer",
+  "Original Music Composer",
+  "Director of Photography",
+  "Editor",
+  "Casting",
+  "Production Design",
+  "Costume Design",
+];
+const KEY_JOB_RANK = new Map(KEY_JOBS.map((job, index) => [job, index]));
+
+function jobRank(person) {
+  return Math.min(...person.jobs.map((job) => KEY_JOB_RANK.get(job.job) ?? KEY_JOBS.length));
+}
+
 /** Trabajo de TMDb en español (o tal cual si no se conoce). */
 export function crewRoleLabel(job) {
   return JOBS[job] || job || "";
@@ -79,11 +108,20 @@ export function crewRoleLabel(job) {
 /**
  * [{ department, label, people: [{ id, name, profile_path, jobs: [{ job,
  * episodes }], episodes }] }] ordenado por departamento; dentro, por episodios
- * (series) y luego por el orden de TMDb.
+ * Dentro de cada departamento, primero los trabajos principales (director,
+ * guion, producción…), luego por episodios (series) y luego por el orden de
+ * TMDb.
+ *
+ * `creators`: los creadores de una serie ({ id, name, profile_path }), que
+ * forman el grupo «Creación».
  */
-export function buildCrewGroups(crew) {
+export function buildCrewGroups(crew, { creators = [] } = {}) {
   const groups = new Map();
-  (Array.isArray(crew) ? crew : []).forEach((member, index) => {
+  const members = [
+    ...(Array.isArray(creators) ? creators : []).map((person) => ({ ...person, department: "Creator", job: "Creator" })),
+    ...(Array.isArray(crew) ? crew : []),
+  ];
+  members.forEach((member, index) => {
     if (!member?.id || !member?.name) return;
     const department = member.department || "Crew";
     if (!groups.has(department)) groups.set(department, new Map());
@@ -113,7 +151,9 @@ export function buildCrewGroups(crew) {
     .map(([department, people]) => ({
       department,
       label: DEPARTMENT_LABELS.get(department) || department,
-      people: [...people.values()].sort((a, b) => (b.episodes || 0) - (a.episodes || 0) || a.index - b.index),
+      people: [...people.values()].sort(
+        (a, b) => jobRank(a) - jobRank(b) || (b.episodes || 0) - (a.episodes || 0) || a.index - b.index,
+      ),
     }))
     .sort((a, b) => (DEPARTMENT_ORDER.get(a.department) ?? 99) - (DEPARTMENT_ORDER.get(b.department) ?? 99));
 }

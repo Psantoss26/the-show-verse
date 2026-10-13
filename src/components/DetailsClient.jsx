@@ -316,7 +316,7 @@ import {
 import TraktCommentModal from "@/components/details/TraktCommentModal";
 import PosterStack from "@/components/details/PosterStack";
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
-import SeasonCard from "@/components/details/SeasonCard";
+import SeasonsSection from "@/components/details/SeasonsSection";
 import { pickExternalIds, withTitleExternalLinks } from "@/lib/details/titleExternalLinks";
 import StreamingHoverOverlay from "@/components/details/StreamingHoverOverlay";
 import DetailsMetaGenresRow, {
@@ -7659,6 +7659,19 @@ export default function DetailsClient({
     });
   }, [tmdbCast, castData, creativeCreditsForUI]);
 
+  // Reparto de la vista lateral: solo los intérpretes. El director o los
+  // creadores, que el carrusel de la sección pone delante, van en su pestaña
+  // «Equipo» (ver details/sectionSheet).
+  const sheetCastForUI = useMemo(() => {
+    const base =
+      Array.isArray(tmdbCast) && tmdbCast.length
+        ? tmdbCast
+        : Array.isArray(castData)
+          ? castData
+          : [];
+    return base.filter((person) => person?.id && person?.name);
+  }, [tmdbCast, castData]);
+
   const creativeCreditsLoading =
     (type === "movie" && movieDirectorLoading) ||
     (type === "tv" && tvCreatorsLoading);
@@ -9310,7 +9323,8 @@ export default function DetailsClient({
   const sectionSheetData = {
     type,
     tmdbId: id,
-    cast: castDataForUI,
+    cast: sheetCastForUI,
+    creators: type === "tv" ? tvCreators : [],
     recommendations,
     collection: {
       id: collectionId,
@@ -10920,26 +10934,13 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 ref={registerSection("seasons")}
               >
                 <AnimatedSection delay={0.04} renderImmediately>
-                  <section className="mb-12 group/section">
-                    <SectionTitle
-                      title="Temporadas"
-                      icon={Layers}
-                      onOpen={sectionSheetOpener("seasons")}
-                    />
-
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {tSeasons.loading && (
-                        <div className="col-span-full py-10 flex justify-center">
-                          <Loader2 className="animate-spin text-white/50" />
-                        </div>
-                      )}
-
-                      {!tSeasons.loading &&
-                        seasonCardItems.map(({ key, ...season }) => (
-                          <SeasonCard key={key} {...season} />
-                        ))}
-                    </div>
-                  </section>
+                  {/* Vista de tarjetas (máx. dos filas + «Ver más») o de
+                      pósters en fila: la elige y la guarda la propia sección. */}
+                  <SeasonsSection
+                    items={seasonCardItems}
+                    loading={tSeasons.loading}
+                    onOpenAll={sectionSheetOpener("seasons")}
+                  />
                 </AnimatedSection>
               </section>
             )}
