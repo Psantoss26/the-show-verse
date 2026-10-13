@@ -12457,7 +12457,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   posterPath={tmdbSeason?.poster_path || null}
                                   fallbackPosterPath={data?.poster_path || null}
                                   airDate={tmdbSeason?.air_date || null}
-                                  rating={rating}
+                                  tmdbRating={tmdbSeason?.vote_average ?? null}
+                                  imdbRating={rating}
                                   totalEpisodes={totalEp}
                                   watchedEpisodes={getWatchedEpisodeCountForSeason(
                                     watchedBySeason,
