@@ -2,15 +2,16 @@
 
 // Tarjeta de una temporada en la sección «Temporadas» de la ficha completa
 // (DetailsClient) y de la ficha de teléfono del drawer (PhoneDetailsSections).
-// Póster de la temporada a la izquierda y, a la derecha, el título, año y
-// episodios, la nota, el enlace a IMDb y el progreso de vistos.
+// Póster de la temporada a la izquierda y, a la derecha, en filas: título (y
+// nombre propio), año, episodios, notas de TMDb e IMDb con sus logos y el
+// progreso de vistos. El número de la temporada va en grande al fondo.
 //
 // El póster es el mismo que enseña la ficha de la temporada: el elegido en
 // «Editar portada» (lib/details/seasonArtwork) o el de TMDb de la temporada,
 // y si no tiene, el de la serie.
 
 import { useLayoutEffect, useState } from "react";
-import { ExternalLink, Star } from "lucide-react";
+import { CalendarDays, ExternalLink, Tv } from "lucide-react";
 import OptimizedImage from "@/components/OptimizedImage";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 import { useAuth } from "@/context/AuthContext";
@@ -29,7 +30,10 @@ export default function SeasonCard({
   posterPath = null,
   fallbackPosterPath = null,
   airDate = null,
-  rating = null,
+  // Nota media de TMDb de la temporada (`vote_average`; 0 = sin votos).
+  tmdbRating = null,
+  // Nota de IMDb (o la media de sus episodios en SeriesGraph, que también es de IMDb).
+  imdbRating = null,
   totalEpisodes = null,
   watchedEpisodes = 0,
   imdbUrl = null,
@@ -59,7 +63,8 @@ export default function SeasonCard({
   const watched = Math.max(0, Math.min(Number(watchedEpisodes) || 0, total || 0));
   const percentage = total ? Math.round((watched / total) * 100) : 0;
   const barColor = percentage === 100 ? "bg-emerald-500" : "bg-yellow-500";
-  const meta = [year, total != null ? `${total} episodios` : null].filter(Boolean);
+  const tmdbScore = Number(tmdbRating) > 0 ? Number(tmdbRating) : null;
+  const imdbScore = Number(imdbRating) > 0 ? Number(imdbRating) : null;
 
   return (
     <button
@@ -70,23 +75,32 @@ export default function SeasonCard({
       onTouchStart={onPrefetch}
       // Cristal de TARJETA compartido: van en rejilla, así que sin sombra propia
       // (varias sombras juntas forman una banda oscura detrás del grupo).
-      className={`group relative isolate flex w-full transform-gpu gap-3.5 overflow-hidden rounded-2xl p-2.5 text-left sm:gap-4 ${LIQUID_GLASS_CARD} transition-all ${
+      className={`group relative isolate flex w-full transform-gpu gap-4 overflow-hidden rounded-2xl p-3 text-left ${LIQUID_GLASS_CARD} transition-all ${
         hoverLift ? "hover:-translate-y-1 hover:brightness-110" : ""
       }`}
       aria-label={`Ver ${title}${subtitle ? `: ${subtitle}` : ""}`}
     >
       <LiquidGlassOpticalLayers />
+      {/* Número de la temporada en grande, al fondo, como en las tarjetas de
+          antes: sale por el borde derecho y el borde lo recorta, pero centrado
+          en vertical en vez de en la esquina superior. */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-4 top-1/2 z-0 -translate-y-1/2 select-none text-[110px] font-black leading-none text-white/5 transition-colors group-hover:text-white/10"
+      >
+        {seasonNumber}
+      </span>
 
-      <span className="relative z-10 aspect-[2/3] w-[5.25rem] shrink-0 overflow-hidden rounded-xl bg-zinc-900 shadow-lg shadow-black/40 sm:w-24">
+      <span className="relative z-10 aspect-[2/3] w-28 shrink-0 overflow-hidden rounded-xl bg-zinc-900 shadow-lg shadow-black/40 sm:w-[7.5rem]">
         {poster ? (
           <OptimizedImage
-            src={`https://image.tmdb.org/t/p/w185${poster}`}
+            src={`https://image.tmdb.org/t/p/w342${poster}`}
             alt=""
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
             loading="lazy"
           />
         ) : (
-          <span className="flex h-full w-full items-center justify-center text-3xl font-black text-white/15">
+          <span className="flex h-full w-full items-center justify-center text-4xl font-black text-white/15">
             {seasonNumber}
           </span>
         )}
@@ -95,7 +109,7 @@ export default function SeasonCard({
       <span className="relative z-10 flex min-w-0 flex-1 flex-col py-1 pr-1">
         <span className="flex items-start justify-between gap-2">
           <span className="min-w-0">
-            <span className="block text-base font-bold leading-tight text-white sm:text-lg">{title}</span>
+            <span className="block text-lg font-bold leading-tight text-white">{title}</span>
             {subtitle ? (
               <span className="mt-0.5 block truncate text-xs font-bold text-zinc-400">{subtitle}</span>
             ) : null}
@@ -120,23 +134,40 @@ export default function SeasonCard({
           ) : null}
         </span>
 
-        <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-bold text-zinc-400">
-          {rating != null ? (
-            <span className="flex items-center gap-1 text-yellow-400">
-              <Star className="h-3 w-3 fill-yellow-400" aria-hidden="true" />
-              {rating.toFixed(1)}
+        {/* Una fila por dato: año, episodios y notas. */}
+        <span className="mt-2.5 flex flex-col gap-1.5 text-xs font-bold text-zinc-400">
+          {year ? (
+            <span className="flex items-center gap-1.5">
+              <CalendarDays className="h-3.5 w-3.5 shrink-0 text-zinc-500" aria-hidden="true" />
+              {year}
             </span>
           ) : null}
-          {meta.map((item, index) => (
-            <span key={item} className="flex items-center gap-2">
-              {index > 0 || rating != null ? <span className="text-zinc-600" aria-hidden="true">•</span> : null}
-              {item}
+          {total != null ? (
+            <span className="flex items-center gap-1.5">
+              <Tv className="h-3.5 w-3.5 shrink-0 text-zinc-500" aria-hidden="true" />
+              {total} episodios
             </span>
-          ))}
+          ) : null}
+          {tmdbScore != null || imdbScore != null ? (
+            <span className="flex items-center gap-3 pt-0.5 text-sm text-white">
+              {tmdbScore != null ? (
+                <span className="flex items-center gap-1.5" title="Nota en TMDb">
+                  <OptimizedImage src="/logo-TMDb.png" alt="TMDb" className="h-3.5 w-auto" />
+                  {tmdbScore.toFixed(1)}
+                </span>
+              ) : null}
+              {imdbScore != null ? (
+                <span className="flex items-center gap-1.5" title="Nota en IMDb">
+                  <OptimizedImage src="/logo-IMDb.svg" alt="IMDb" className="h-4 w-auto" />
+                  {imdbScore.toFixed(1)}
+                </span>
+              ) : null}
+            </span>
+          ) : null}
         </span>
 
         {/* Progreso de vistos, abajo del todo para que todas las tarjetas lo
-            alineen aunque el título ocupe una o dos líneas. */}
+            alineen aunque falte algún dato. */}
         {total != null ? (
           <span className="mt-auto block pt-3">
             <span className="mb-1.5 flex items-end justify-between text-xs font-bold">

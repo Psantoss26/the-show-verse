@@ -1855,7 +1855,8 @@ export default function PhoneDetailsSections({
                         posterPath={season?.poster_path || null}
                         fallbackPosterPath={data?.poster_path || null}
                         airDate={season?.air_date || null}
-                        rating={rating}
+                        tmdbRating={season?.vote_average ?? null}
+                        imdbRating={rating}
                         totalEpisodes={totalEp}
                         watchedEpisodes={getWatchedEpisodeCountForSeason(
                           episodesWatched?.watchedBySeason,
