@@ -6577,20 +6577,24 @@ export default function DetailsClient({
     };
   }, [id, type], !ratingsLoading);
 
-  const visibleTraktSeasons = useMemo(() => {
-    if (!Array.isArray(tSeasons?.items)) return [];
-    return tSeasons.items.filter((season) => {
-      const seasonNumber = getSeasonNumber(season);
-      return seasonNumber != null && seasonNumber > 0;
-    });
-  }, [tSeasons?.items]);
+  const visibleSeasons = useMemo(() => {
+    const regularSeasons = (items) =>
+      (Array.isArray(items) ? items : []).filter((season) => {
+        const seasonNumber = getSeasonNumber(season);
+        return seasonNumber != null && seasonNumber > 0;
+      });
+    // TMDb ya llega con la ficha: no esperar al scoreboard ni a Trakt para
+    // pintar las temporadas. Mantener su estructura al recibir otros datos.
+    const tmdbSeasons = regularSeasons(data?.seasons);
+    return tmdbSeasons.length ? tmdbSeasons : regularSeasons(tSeasons?.items);
+  }, [data?.seasons, tSeasons?.items]);
 
   const visibleSeasonNumbers = useMemo(
     () =>
-      visibleTraktSeasons
+      visibleSeasons
         .map((season) => getSeasonNumber(season))
         .filter((seasonNumber) => seasonNumber != null && seasonNumber > 0),
-    [visibleTraktSeasons],
+    [visibleSeasons],
   );
 
   const visibleSeasonNumbersKey = useMemo(
@@ -7736,7 +7740,7 @@ export default function DetailsClient({
         id: "seasons",
         label: "Temporadas",
         icon: Layers,
-        count: visibleTraktSeasons.length || undefined,
+        count: visibleSeasons.length || undefined,
       });
       // La valoración de episodios no tiene sección: la abre el botón de
       // acción de la ficha (EpisodeRatingsModal).
@@ -7831,7 +7835,7 @@ export default function DetailsClient({
     imagesState?.backdrops,
     videos,
     tComments?.total,
-    visibleTraktSeasons.length,
+    visibleSeasons.length,
     tLists?.items,
     castDataForUI,
     castSectionLoading,
@@ -9322,7 +9326,7 @@ export default function DetailsClient({
   // Tarjetas de temporada: las comparten la sección y su vista lateral.
   const seasonCardItems =
     type === "tv"
-      ? visibleTraktSeasons.map((s) => {
+      ? visibleSeasons.map((s) => {
           const sn = getSeasonNumber(s);
           const imdbRating = toRatingNumber(seasonImdbRatings?.[sn]);
           const seriesGraphRating = seriesGraphSeasonRatings.get(sn) ?? null;
