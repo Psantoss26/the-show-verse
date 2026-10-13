@@ -38,6 +38,7 @@ class WebAppBridge(
     private val abrirEnNavegador: (String) -> Unit,
     private val bloquearRecarga: (Boolean) -> Unit = {},
     private val pedirPermisoPush: () -> Unit = {},
+    private val abrirSoloEnNavegador: (String) -> Unit = abrirEnNavegador,
 ) {
 
     /**
@@ -139,6 +140,20 @@ class WebAppBridge(
                 LoginWatcher.vigilar(activity, currentOrigin(), it)
             }
         }
+        return true
+    }
+
+    /**
+     * Abre una página web SIEMPRE en el navegador, aunque haya una app que se
+     * declare dueña de ese dominio. Es para lo que esas apps no tienen: la
+     * exportación de datos de Letterboxd se abría en la app de Letterboxd, que
+     * no la tiene y se quedaba cargando. Solo https.
+     */
+    @JavascriptInterface
+    fun openInBrowser(url: String?): Boolean {
+        if (!propio()) return false
+        val destino = url?.takeIf { WebOrigin.isBrowserUrl(it) } ?: return false
+        activity.runOnUiThread { abrirSoloEnNavegador(destino) }
         return true
     }
 

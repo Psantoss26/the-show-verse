@@ -12,7 +12,6 @@ import { and, asc, desc, eq, gte, inArray, sql } from 'drizzle-orm';
 import {
   streamingEvents,
   titleComments,
-  tmdbCache,
   userRatings,
   watchHistory,
   watchProgress,
@@ -20,6 +19,7 @@ import {
 import { applySpanishTitles, fillMissingPosters, getUserActivity } from './userProfile.js';
 import { getMediaMetadataMap, metadataFor } from '../utils/mediaMetadata.js';
 import { computeShowProgress } from './showProgress.js';
+import { getTmdbCollection } from './tmdbCollection.js';
 import {
   NOTIFICATION_ACTION_TYPES,
   buildReminders,
@@ -37,7 +37,6 @@ const WINDOW_DAYS = 14;
 const ACTIONS_LIMIT = 15;
 const REMINDERS_LIMIT = 10;
 const EVENTS_LIMIT = 20;
-const COLLECTION_CACHE_MS = 24 * 60 * 60 * 1000;
 
 async function getAutoCompleted(db, userId, since) {
   const rows = await db
@@ -206,36 +205,6 @@ async function getShowCompletions(db, userId, watched, since) {
   return { completions, completedShows };
 }
 
-// Colección de TMDb con caché propia en tmdb_cache (cambia muy poco).
-async function getCollection(db, collectionId) {
-  const cacheKey = `bare:collection:${collectionId}`;
-  const [hit] = await db
-    .select({ data: tmdbCache.data, expiresAt: tmdbCache.expiresAt })
-    .from(tmdbCache)
-    .where(eq(tmdbCache.cacheKey, cacheKey))
-    .limit(1);
-  if (hit && (!hit.expiresAt || new Date(hit.expiresAt) > new Date())) return hit.data;
-  if (!process.env.TMDB_API_KEY) return hit?.data || null;
-
-  try {
-    const res = await fetch(
-      `https://api.themoviedb.org/3/collection/${collectionId}?api_key=${process.env.TMDB_API_KEY}&language=es-ES`,
-    );
-    if (!res.ok) return hit?.data || null;
-    const data = await res.json();
-    const now = new Date();
-    const expiresAt = new Date(now.getTime() + COLLECTION_CACHE_MS);
-    await db
-      .insert(tmdbCache)
-      .values({ cacheKey, data, fetchedAt: now, expiresAt })
-      .onConflictDoUpdate({ target: tmdbCache.cacheKey, set: { data, fetchedAt: now, expiresAt } })
-      .catch(() => {});
-    return data;
-  } catch {
-    return hit?.data || null;
-  }
-}
-
 // Tras ver una película de una colección: la siguiente de la saga que aún no
 // se ha visto. Una alerta por colección (la del visionado más reciente).
 async function getCollectionNext(db, userId, watched) {
@@ -268,7 +237,7 @@ async function getCollectionNext(db, userId, watched) {
   for (const { row, collection, watchedTitle } of withCollection) {
     if (seenCollections.has(collection.id)) continue;
     seenCollections.add(collection.id);
-    const data = await getCollection(db, collection.id);
+    const data = await getTmdbCollection(db, collection.id);
     const next = nextInCollection(data?.parts, row.tmdbId, watchedIds);
     if (!next) continue;
     out.push({

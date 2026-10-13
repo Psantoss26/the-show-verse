@@ -416,6 +416,16 @@ export function abrirLoginEnNavegadorNativo(url, appId) {
   return call("openLoginInBrowser", false, url, appId) === true;
 }
 
+/**
+ * Abre una página web SIEMPRE en el navegador, aunque haya una app instalada
+ * que se declare dueña del dominio (p. ej. la exportación de Letterboxd, que
+ * su app no tiene). Devuelve false fuera de la app o si la app instalada es
+ * anterior y no conoce el método.
+ */
+export function abrirSoloEnNavegadorNativo(url) {
+  return call("openInBrowser", false, url) === true;
+}
+
 /** El usuario ya está de vuelta: no hace falta seguir vigilando. */
 export function pararVigilanciaDeLogin() {
   call("stopLoginWatch", undefined);

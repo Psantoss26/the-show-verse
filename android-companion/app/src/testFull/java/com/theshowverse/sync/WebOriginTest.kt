@@ -73,6 +73,16 @@ class WebOriginTest {
     }
 
     @Test
+    fun `solo se fuerzan al navegador paginas https`() {
+        assertTrue(WebOrigin.isBrowserUrl("https://letterboxd.com/data/export"))
+        assertFalse(WebOrigin.isBrowserUrl("http://letterboxd.com/data/export"))
+        assertFalse(WebOrigin.isBrowserUrl("intent://letterboxd.com#Intent;scheme=https;end"))
+        assertFalse(WebOrigin.isBrowserUrl("file:///sdcard/x"))
+        assertFalse(WebOrigin.isBrowserUrl("https:///sin-host"))
+        assertFalse(WebOrigin.isBrowserUrl(null))
+    }
+
+    @Test
     fun `el login de otros proveedores se queda dentro de la app`() {
         assertTrue(WebOrigin.isProviderLogin("https://trakt.tv/oauth/authorize?client_id=x"))
         assertTrue(WebOrigin.isProviderLogin("https://app.plex.tv/auth"))

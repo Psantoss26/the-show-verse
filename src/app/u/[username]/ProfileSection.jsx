@@ -27,6 +27,7 @@ import {
   Search,
   SlidersHorizontal,
   ArrowUpDown,
+  ThumbsUp,
   X,
 } from "lucide-react";
 import ListCoverBackdropCollage from "@/components/lists/ListCoverBackdropCollage";
@@ -49,6 +50,14 @@ import {
   getActivityDetailsHref,
 } from "@/lib/profile/activityRatingTarget";
 import { dedupeActivityItems } from "@/lib/profile/activityItems";
+import {
+  activityActionKey,
+  isLikeActivity,
+  likeAuthor,
+  likeTargetHref,
+  likeTargetName,
+  likeVerb,
+} from "@/lib/profile/activityLikes";
 import {
   filterPendingHistoryRemovals,
   getPendingListChanges,
@@ -110,6 +119,7 @@ const PROFILE_VIEW_STORAGE_PREFIX = "showverse:profile:view-mode:v2:";
 const diarySeasonStillsCache = new Map();
 
 function getItemTitle(item) {
+  if (isLikeActivity(item)) return likeTargetName(item);
   return String(item?.title || item?.name || item?.movie?.title || item?.show?.title || item?.listName || "");
 }
 
@@ -294,6 +304,7 @@ function activityTypeLabel(type) {
     review: "Reseñas",
     list: "Listas",
     list_item: "Elementos de listas",
+    like: "Likes",
   }[type] || "Otros";
 }
 
@@ -326,8 +337,10 @@ function groupProfileItems(items, groupBy, section) {
       key = String(stars);
       label = `${stars} ${stars === 1 ? "estrella" : "estrellas"}`;
     } else if (groupBy === "action" && section === "activity") {
-      key = item?.type || "other";
-      label = activityTypeLabel(item?.type);
+      // Los tres me gusta forman un solo grupo, "Likes".
+      const action = isLikeActivity(item) ? "like" : item?.type;
+      key = action || "other";
+      label = activityTypeLabel(action);
     }
     if (!groups.has(key)) groups.set(key, { key, label, items: [] });
     groups.get(key).items.push(item);
@@ -354,6 +367,7 @@ function sectionMenuOptions(section) {
           ["rating", "Puntuaciones"],
           ["review", "Reseñas"],
           ["list", "Listas"],
+          ["like", "Likes"],
         ]
       : [["all", "Todo"], ["movie", "Películas"], ["tv", "Series"]],
     sorts: [
@@ -771,6 +785,19 @@ function ActivityPoster({ item, className = "" }) {
     </span>
   );
 
+  const likeHref = likeTargetHref(item);
+  if (likeHref) {
+    return (
+      <Link
+        href={likeHref}
+        className={`${className} shrink-0 overflow-hidden bg-zinc-900 transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70`}
+        aria-label={`Ver ${likeTargetName(item)}`}
+      >
+        {poster}
+      </Link>
+    );
+  }
+
   if (!item?.tmdbId || !item?.mediaType) {
     return <span aria-hidden="true" className={`${className} flex items-center justify-center bg-zinc-900`}>{poster}</span>;
   }
@@ -842,12 +869,22 @@ function ActivityRow({ item, actor, compact = false, posterList = false }) {
     rating: { tone: "text-amber-400", text: "ha puntuado" },
     list: { icon: ListPlus, tone: "text-violet-400", text: "ha creado la lista" },
     list_item: { icon: ListPlus, tone: "text-violet-400", text: "ha añadido a una lista" },
+    // Me gusta: los iconos de sus botones (pulgar en reseñas, corazón en listas
+    // y colecciones), en rosa para no confundirlos con Favoritos.
+    like_review: { icon: ThumbsUp, tone: "text-pink-400", filled: true },
+    like_list: { icon: Heart, tone: "text-pink-400", filled: true },
+    like_collection: { icon: Heart, tone: "text-pink-400", filled: true },
   };
   const definition = definitions[item.type] || definitions.watched;
   const Icon = definition.icon;
-  const actionText = item.type === "watched" && item.completedShow
-    ? "ha completado"
-    : definition.text;
+  const isLike = isLikeActivity(item);
+  const actionText = isLike
+    ? likeVerb(item)
+    : item.type === "watched" && item.completedShow
+      ? "ha completado"
+      : definition.text;
+  const author = isLike ? likeAuthor(item) : null;
+  const likeHref = likeTargetHref(item);
   const watchedEpisode = item.type === "watched" ? getEpisodePreview(item) : null;
   const episodeLabel = watchedEpisode
     ? `S${String(watchedEpisode.seasonNumber).padStart(2, "0")}E${String(watchedEpisode.episodeNumber).padStart(2, "0")} de `
@@ -868,7 +905,7 @@ function ActivityRow({ item, actor, compact = false, posterList = false }) {
         </span>
       ) : (
         <span className={`flex h-8 w-8 shrink-0 items-center justify-center [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.65))] ${definition.tone}`} aria-hidden="true">
-          <Icon strokeWidth={2.5} className={`h-5 w-5 ${item.type === "favorite" ? "fill-current" : ""}`} />
+          <Icon strokeWidth={2.5} className={`h-5 w-5 ${item.type === "favorite" || definition.filled ? "fill-current" : ""}`} />
         </span>
       )}
       <p className="min-w-0 flex-1 text-sm leading-5 text-zinc-400">
@@ -877,10 +914,25 @@ function ActivityRow({ item, actor, compact = false, posterList = false }) {
         {ratingTargetLabel || episodeLabel}
         {item.type === "list" ? (
           <Link href={`/lists/${item.id.replace("list:", "")}`} className="font-bold text-white hover:text-emerald-300">{item.name}</Link>
+        ) : likeHref ? (
+          <Link href={likeHref} className="font-bold text-white hover:text-emerald-300">{likeTargetName(item)}</Link>
         ) : (
           <ActivityTitle item={item} />
         )}
         {item.type === "list_item" && item.listName ? <span className="text-zinc-500"> · {item.listName}</span> : null}
+        {author ? (
+          <span className="text-zinc-500">
+            {" · de "}
+            {author.href ? (
+              <Link href={author.href} className="text-zinc-400 transition-colors hover:text-emerald-300">{author.name}</Link>
+            ) : (
+              author.name
+            )}
+          </span>
+        ) : null}
+        {item.type === "like_review" && item.excerpt ? (
+          <span className="mt-0.5 line-clamp-2 block text-xs leading-4 text-zinc-500">“{item.excerpt}”</span>
+        ) : null}
       </p>
       <time dateTime={item.createdAt} className="shrink-0 text-xs font-medium text-zinc-600" title={new Date(item.createdAt).toLocaleString("es-ES")}>
         {relativeActivityTime(item.createdAt)}
@@ -1637,11 +1689,7 @@ function ProfileContentSection({ username, section, actor }) {
       const matchesQuery = !query || getItemTitle(item).toLocaleLowerCase().includes(query);
       if (!matchesQuery) return false;
       if (controls.filter === "all") return true;
-      if (section === "activity") {
-        return controls.filter === "list"
-          ? item?.type === "list" || item?.type === "list_item"
-          : item?.type === controls.filter;
-      }
+      if (section === "activity") return activityActionKey(item) === controls.filter;
       return getItemMediaType(item) === controls.filter;
     });
 
