@@ -1589,8 +1589,8 @@ function SettingsTabs({ tabs, activeTab, onSelect }) {
             type="button"
             onClick={() => onSelect(tab.id)}
             aria-current={active ? "page" : undefined}
-            // Mínimo de un cuarto del ancho como en el Perfil, pero las
-            // etiquetas largas («Personalización») pueden crecer sin solaparse.
+            // Mínimo de un cuarto del ancho como en el Perfil; las etiquetas
+            // largas pueden crecer sin solaparse.
             className={`relative flex min-w-[calc((100%_-_0.75rem)_/_4)] shrink-0 snap-start items-center justify-center whitespace-nowrap px-2 py-2.5 text-[clamp(0.625rem,2.7vw,0.6875rem)] font-bold uppercase tracking-normal transition-colors select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400/70 sm:min-w-0 sm:justify-start sm:px-3.5 sm:text-xs sm:tracking-widest ${
               active ? "text-white" : "text-zinc-500 hover:text-zinc-300"
             }`}
@@ -2230,7 +2230,6 @@ function ProfileSettingsClient() {
   const tabs = [
     { id: "user", label: t("settings_user", "Usuario"), icon: User },
     { id: "favorites", label: t("settings_favorites", "Favoritos"), icon: Heart },
-    { id: "personalization", label: t("settings_customization", "Personalización"), icon: SlidersHorizontal },
     { id: "preferences", label: t("settings_personal", "Preferencias"), icon: Settings },
     { id: "imports", label: t("settings_imports", "Importaciones"), icon: DownloadCloud },
     { id: "connections", label: t("settings_connections", "Conexiones"), icon: Link2 },
@@ -2425,9 +2424,22 @@ function ProfileSettingsClient() {
                 </motion.div>
               )}
 
-              {activeTab === "personalization" && (
+              {activeTab === "favorites" && (
                 <motion.div
-                  key="personalization"
+                  key="favorites"
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  transition={{ duration: 0.25 }}
+                  className="space-y-6"
+                >
+                  <ProfileFavoritesEditor panelClassName={GLASS_PANEL} />
+                </motion.div>
+              )}
+
+              {activeTab === "preferences" && (
+                <motion.div
+                  key="preferences"
                   initial={{ opacity: 0, x: 10 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -10 }}
@@ -2475,32 +2487,6 @@ function ProfileSettingsClient() {
                       onClick={() => setShowMobileBottomNavEditor(true)}
                     />
                   </div>
-                </motion.div>
-
-              )}
-
-              {activeTab === "favorites" && (
-                <motion.div
-                  key="favorites"
-                  initial={{ opacity: 0, x: 10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -10 }}
-                  transition={{ duration: 0.25 }}
-                  className="space-y-6"
-                >
-                  <ProfileFavoritesEditor panelClassName={GLASS_PANEL} />
-                </motion.div>
-              )}
-
-              {activeTab === "preferences" && (
-                <motion.div
-                  key="preferences"
-                  initial={{ opacity: 0, x: 10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -10 }}
-                  transition={{ duration: 0.25 }}
-                  className="space-y-6"
-                >
                   <div className="space-y-4">
                     <ToggleRow
                       icon={Eye}
