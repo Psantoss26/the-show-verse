@@ -7,8 +7,13 @@
 // Extraído de DetailsClient para que la ficha de TELÉFONO del DetailModal use
 // EXACTAMENTE el mismo encabezado en vez de una imitación que se separaría al
 // primer retoque.
+//
+// Con `onOpen`, el título es un botón (con «›») que abre la vista lateral de la
+// sección completa (ver details/sectionSheet).
 
-export default function SectionTitle({ title, icon: Icon, className = "" }) {
+import { ChevronRight } from "lucide-react";
+
+export default function SectionTitle({ title, icon: Icon, className = "", onOpen = null }) {
   return (
     <div
       className={`flex items-center gap-3 sm:gap-4 mb-8 w-full ${className}`}
@@ -20,8 +25,24 @@ export default function SectionTitle({ title, icon: Icon, className = "" }) {
           <Icon className="relative z-10 w-5 h-5 sm:w-6 sm:h-6 text-yellow-500 group-hover/section:text-yellow-400 group-hover/section:scale-110 transition-all duration-500 drop-shadow-[0_2px_8px_rgba(234,179,8,0.4)]" />
         </div>
       )}
-      <h2 className="text-2xl sm:text-[28px] font-black tracking-tight text-white drop-shadow-md shrink-0">
-        {title}
+      <h2 className="text-2xl sm:text-[28px] font-black tracking-tight text-white drop-shadow-md shrink-0 min-w-0">
+        {onOpen ? (
+          <button
+            type="button"
+            onClick={onOpen}
+            aria-haspopup="dialog"
+            aria-label={`${title}: ver todo`}
+            className="group/section-title flex items-center rounded-lg text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400"
+          >
+            <span className="truncate">{title}</span>
+            <ChevronRight
+              aria-hidden="true"
+              className="ml-1 h-6 w-6 shrink-0 text-yellow-500/70 transition-transform duration-300 group-hover/section:text-yellow-400 group-hover/section-title:translate-x-1 group-focus-visible/section-title:translate-x-1 sm:ml-2 sm:h-7 sm:w-7"
+            />
+          </button>
+        ) : (
+          title
+        )}
       </h2>
       <div className="ml-2 sm:ml-4 flex-1 h-px bg-gradient-to-r from-white/20 via-white/5 to-transparent relative flex items-center">
         <div className="absolute left-0 w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_12px_rgba(234,179,8,1)] opacity-40 group-hover/section:opacity-100 group-hover/section:scale-150 transition-all duration-500" />

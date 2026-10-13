@@ -4,7 +4,9 @@ import test from "node:test";
 
 const SEASON = new URL("../../components/SeasonDetailsClient.jsx", import.meta.url);
 const EPISODE = new URL("../../components/EpisodeDetailsClient.jsx", import.meta.url);
-const FICHA = new URL("../../components/DetailsClient.jsx", import.meta.url);
+// El chip de icono de la ficha vive en SectionTitle (la Colección, que lo
+// llevaba copiado en DetailsClient, ya usa SectionTitle).
+const FICHA = new URL("../../components/details/SectionTitle.jsx", import.meta.url);
 
 // Firma del cristal hecho A MANO: la capa de reflejo interior que acompañaba a
 // cada copia del acabado. Es lo que delata que una superficie no usa la receta
