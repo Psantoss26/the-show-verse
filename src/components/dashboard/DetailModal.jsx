@@ -154,6 +154,7 @@ import DetailsArrowCarousel, {
 } from "@/components/details/DetailsArrowCarousel";
 import PhoneDetailsSections from "@/components/dashboard/PhoneDetailsSections";
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
+import { pickExternalIds, withTitleExternalLinks } from "@/lib/details/titleExternalLinks";
 // Fila de botones de acción principal (tráiler, favorito, pendiente, puntuar,
 // listas, reseñas, soundtrack…): MISMO componente presentacional que la ficha
 // completa (DetailsClient) para que la fila sea IDÉNTICA.
@@ -2922,6 +2923,23 @@ export default function DetailModal({
           seriesGraphTitle,
         )}`
       : null;
+  const titleExternalIds = useMemo(
+    () => pickExternalIds(data.externalIds),
+    [data.externalIds],
+  );
+  // Wikipedia la resuelven el modal de enlaces y el marcador (ver DetailsClient).
+  const wikipediaQuery = useMemo(
+    () =>
+      isEpisode
+        ? null
+        : {
+            wikidataId: titleExternalIds.wikidataId,
+            imdbId: data.imdbId || titleExternalIds.imdbId,
+            type: mediaType,
+            tmdbId: item?.id,
+          },
+    [isEpisode, titleExternalIds, data.imdbId, mediaType, item?.id],
+  );
   const filmAffinitySearchUrl = titleQuery
     ? `https://www.filmaffinity.com/es/search.php?stext=${encodeURIComponent(
         titleQuery,
@@ -2981,8 +2999,20 @@ export default function DetailModal({
       });
     }
 
-    return links;
+    // Instagram, IMDb, TMDb y Trakt como en la ficha completa. En la preview
+    // de un episodio no: sus ids serían los del episodio, no los del título.
+    if (isEpisode) return links;
+    return withTitleExternalLinks(links, {
+      instagramId: titleExternalIds.instagramId,
+      type: mediaType,
+      tmdbId: item?.id,
+      imdbId: data.imdbId || titleExternalIds.imdbId,
+    });
   }, [
+    isEpisode,
+    titleExternalIds,
+    item?.id,
+    data.imdbId,
     filmAffinitySearchUrl,
     isMovie,
     justWatchFallbackUrl,
@@ -3489,6 +3519,7 @@ export default function DetailModal({
         open={externalLinksOpen}
         onClose={() => setExternalLinksOpen(false)}
         links={externalLinks}
+        wikipedia={wikipediaQuery}
       />
 
       {/* Actividad de tus amigos, con el diseño del de plataformas: la abren el
@@ -4387,6 +4418,7 @@ export default function DetailModal({
                 // ancha y puntuaciones y stats se partían en dos filas.
                 phoneLayout={mobileDetails}
                 externalLinks={externalLinks}
+                externalLinksWikipedia={wikipediaQuery}
                 onMorePlatforms={(event) => {
                   stopNestedModalOpeningEvent(event);
                   setPlatformsOpen(true);

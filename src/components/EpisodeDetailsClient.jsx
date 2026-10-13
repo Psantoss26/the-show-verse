@@ -66,7 +66,7 @@ import {
   formatDateEs,
   formatCountShort,
 } from "@/lib/details/formatters";
-import { buildTvExternalLinks } from "@/lib/details/tvExternalLinks";
+import { buildTvExternalLinks, tvWikipediaQuery } from "@/lib/details/tvExternalLinks";
 import {
   fetchSeriesGraphRatingsCached,
   getSeriesGraphEpisodeRating,
@@ -326,8 +326,13 @@ export default function EpisodeDetailsClient({
         title: showName,
         originalTitle: show?.original_name,
         homepage: show?.homepage,
+        externalIds: show?.external_ids,
       }),
-    [showId, showName, show?.original_name, show?.homepage],
+    [showId, showName, show?.original_name, show?.homepage, show?.external_ids],
+  );
+  const showWikipediaQuery = useMemo(
+    () => tvWikipediaQuery({ showId, externalIds: show?.external_ids }),
+    [showId, show?.external_ids],
   );
 
   const stillPath = episode?.still_path || null;
@@ -2013,6 +2018,7 @@ export default function EpisodeDetailsClient({
           open={externalLinksOpen}
           onClose={() => setExternalLinksOpen(false)}
           links={episodeExternalLinks}
+          wikipedia={showWikipediaQuery}
         />
       </div>
     </div>

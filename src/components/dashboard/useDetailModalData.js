@@ -180,6 +180,8 @@ const EMPTY_DATA = {
   episodeMeta: null,
   title: null,
   homepage: null,
+  // `external_ids` de TMDb (Instagram, Wikidata…) para los enlaces del título.
+  externalIds: null,
   logoPath: null,
   // ¿Ha TERMINADO ya la búsqueda del logo? La cabecera solo debe caer al
   // título de texto cuando sepamos que no hay logo, nunca mientras carga:
@@ -937,6 +939,7 @@ export function useDetailModalData(item, { phoneView = false } = {}) {
           mediaType,
           title,
           homepage: source?.homepage || null,
+          externalIds: details?.external_ids || source?.external_ids || null,
           overview,
           backdropPath,
           posterPath,

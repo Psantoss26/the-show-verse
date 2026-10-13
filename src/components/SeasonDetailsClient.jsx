@@ -61,7 +61,7 @@ import {
   formatDateEs,
   formatCountShort,
 } from "@/lib/details/formatters";
-import { buildTvExternalLinks } from "@/lib/details/tvExternalLinks";
+import { buildTvExternalLinks, tvWikipediaQuery } from "@/lib/details/tvExternalLinks";
 import {
   fetchSeriesGraphRatingsCached,
   getSeriesGraphEpisodeRating,
@@ -377,8 +377,13 @@ export default function SeasonDetailsClient({
         title: showName,
         originalTitle: show?.original_name,
         homepage: show?.homepage,
+        externalIds: show?.external_ids,
       }),
-    [showId, showName, show?.original_name, show?.homepage],
+    [showId, showName, show?.original_name, show?.homepage, show?.external_ids],
+  );
+  const showWikipediaQuery = useMemo(
+    () => tvWikipediaQuery({ showId, externalIds: show?.external_ids }),
+    [showId, show?.external_ids],
   );
 
   // PORTADA: la elegida en «Editar portada» (por usuario, ver
@@ -2247,6 +2252,7 @@ export default function SeasonDetailsClient({
         open={externalLinksOpen}
         onClose={() => setExternalLinksOpen(false)}
         links={seasonExternalLinks}
+        wikipedia={showWikipediaQuery}
       />
 
       {coverEditing && season?.id ? (

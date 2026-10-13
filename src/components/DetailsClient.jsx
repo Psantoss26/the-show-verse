@@ -315,6 +315,7 @@ import {
 import TraktCommentModal from "@/components/details/TraktCommentModal";
 import PosterStack from "@/components/details/PosterStack";
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
+import { pickExternalIds, withTitleExternalLinks } from "@/lib/details/titleExternalLinks";
 import StreamingHoverOverlay from "@/components/details/StreamingHoverOverlay";
 import DetailsMetaGenresRow, {
   getStatusLabel,
@@ -7211,6 +7212,23 @@ export default function DetailsClient({
 
   const jwHref = justwatchUrl || extLinks.justwatch || null;
 
+  // Ids de TMDb para Instagram y Wikipedia (Facebook y X no se usan).
+  const titleExternalIds = useMemo(
+    () => pickExternalIds(data?.external_ids),
+    [data?.external_ids],
+  );
+  // Wikipedia se resuelve DENTRO del modal de enlaces y del marcador: así su
+  // respuesta no vuelve a pintar la ficha entera a mitad de la entrada.
+  const wikipediaQuery = useMemo(
+    () => ({
+      wikidataId: titleExternalIds.wikidataId,
+      imdbId: resolvedImdbId || titleExternalIds.imdbId,
+      type,
+      tmdbId: id,
+    }),
+    [titleExternalIds, resolvedImdbId, type, id],
+  );
+
   const externalLinks = useMemo(() => {
     const items = [];
 
@@ -7253,7 +7271,15 @@ export default function DetailsClient({
       href: filmAffinitySearchUrl,
     });
 
-    return items;
+    // Instagram oficial (junto a la web) e IMDb, TMDb y Trakt al final, de los
+    // ids que ya trae la ficha. Wikipedia la añaden quienes pintan los enlaces
+    // (ver `wikipediaQuery`).
+    return withTitleExternalLinks(items, {
+      instagramId: titleExternalIds.instagramId,
+      type,
+      tmdbId: id,
+      imdbId: resolvedImdbId || titleExternalIds.imdbId,
+    });
   }, [
     officialSiteUrl,
     jwHref,
@@ -7262,6 +7288,9 @@ export default function DetailsClient({
     type,
     seriesGraphUrl,
     filmAffinitySearchUrl,
+    titleExternalIds,
+    id,
+    resolvedImdbId,
   ]);
 
   const scoreboardExternalLinks = useMemo(
@@ -9305,6 +9334,7 @@ export default function DetailsClient({
         open={externalLinksOpen}
         onClose={() => setExternalLinksOpen(false)}
         links={externalLinks}
+        wikipedia={wikipediaQuery}
       />
 
       <ExternalLinksModal
@@ -10606,6 +10636,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     : null
                 }
                 externalLinks={scoreboardExternalLinks}
+                externalLinksWikipedia={wikipediaQuery}
                 onMoreLinks={() => setExternalLinksOpen(true)}
                 onMorePlatforms={() => setPlatformsOpen(true)}
                 externalLinksMenuOnly
