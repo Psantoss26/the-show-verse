@@ -37,7 +37,7 @@ function readSavedView() {
 }
 
 export default function SeasonsSection({ items = [], loading = false, onOpenAll }) {
-  const [view, setView] = useState("cards");
+  const [view, setView] = useState("posters");
   const [expanded, setExpanded] = useState(false);
   // Tras montar: el servidor no conoce la vista guardada.
   useEffect(() => {
@@ -98,7 +98,7 @@ export default function SeasonsSection({ items = [], loading = false, onOpenAll 
         </div>
       </div>
 
-      {loading ? (
+      {loading && items.length === 0 ? (
         <div className="flex justify-center py-10">
           <Loader2 className="animate-spin text-white/50" aria-label="Cargando temporadas" />
         </div>
