@@ -59,7 +59,7 @@ export function PersonRow({ person, role, episodes = null, badge = null, title =
 }
 
 /** Película o serie (recomendaciones, colección): póster, título, año, tipo y nota. */
-export function TitleRow({ item, mediaType, onNavigate, showImdb = false, imdbRating = null, imdbLoading = false }) {
+export function TitleRow({ item, mediaType, onNavigate, onOpenTitle, showImdb = false, imdbRating = null, imdbLoading = false }) {
   const type = item?.media_type === "tv" || mediaType === "tv" ? "tv" : "movie";
   const title = item?.title || item?.name || "Sin título";
   const year = String(item?.release_date || item?.first_air_date || "").slice(0, 4);
@@ -67,7 +67,15 @@ export function TitleRow({ item, mediaType, onNavigate, showImdb = false, imdbRa
   const imdbScore = Number(imdbRating);
   const hasImdbScore = Number.isFinite(imdbScore) && imdbScore > 0 && imdbScore <= 10;
   return (
-    <Link href={`/details/${type}/${item.id}`} onClick={onNavigate} className={ROW_LINK_LARGE}>
+    <Link href={`/details/${type}/${item.id}`} onClick={(event) => {
+      if (onOpenTitle && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.button === 0) {
+        event.preventDefault();
+        onNavigate?.();
+        onOpenTitle({ ...item, media_type: type });
+      } else if (!onOpenTitle) {
+        onNavigate?.();
+      }
+    }} className={ROW_LINK_LARGE}>
       <Poster src={tmdbImage(item?.poster_path, "w342")} alt="" className={LARGE_POSTER} />
       <span className="min-w-0 flex-1">
         <span className="block line-clamp-2 text-base font-bold leading-tight text-white">{title}</span>

@@ -11,19 +11,20 @@ const read = (relative) => readFile(new URL(relative, import.meta.url), "utf8");
 
 // Orden de arriba abajo, el mismo en las dos superficies.
 const SECTIONS = [
+  "seasons",
   "cast",
   "recs",
   "collection",
   "awards",
   "media",
   "sentiment",
-  "seasons",
   "comments",
   "lists",
 ];
 
 function orderOf(source, prefix) {
-  return SECTIONS.filter((id) => source.includes(`${prefix}${id}"`));
+  return SECTIONS.filter((id) => source.includes(`${prefix}${id}"`))
+    .sort((a, b) => source.indexOf(`${prefix}${a}"`) - source.indexOf(`${prefix}${b}"`));
 }
 
 test("el panel de teléfono tiene las MISMAS secciones que la ficha móvil", async () => {
@@ -505,4 +506,23 @@ test("las tarjetas de Detalles y Producción no se esconden a la derecha", async
     1,
     "la fila que no envuelve solo puede escribirse dentro del ayudante",
   );
+});
+
+
+test("los encabezados del teléfono abren las once vistas laterales compartidas", async () => {
+  const phone = await read("../../components/dashboard/PhoneDetailsSections.jsx");
+  const openers = [...phone.matchAll(/sectionSheetOpener\("([a-z]+)"\)/g)].map((match) => match[1]);
+  assert.deepEqual(openers.sort(), ["seasons", "cast", "recs", "collection", "awards", "images", "videos", "soundtrack", "sentiment", "comments", "lists"].sort());
+  assert.match(phone, /<DetailsSectionSheets store=\{sectionSheetStore\} data=\{sectionSheetData\}/);
+  assert.match(phone, /<SeasonsSection items=\{seasonCardItems\} phoneLayout/);
+  assert.match(phone, /buildArtworkSheetTabs\(\{\s+mobile: true/);
+});
+
+test("los títulos relacionados conservan la navegación dentro del drawer", async () => {
+  const sheets = await read("../../components/details/sectionSheet/DetailsSectionSheets.jsx");
+  const rows = await read("../../components/details/sectionSheet/SectionSheetRows.jsx");
+  assert.equal((sheets.match(/onOpenTitle=\{data.onOpenTitle\}/g) || []).length, 2);
+  assert.match(rows, /event.preventDefault\(\)/);
+  assert.match(rows, /onOpenTitle\(\{ \.\.\.item, media_type: type \}\)/);
+  assert.match(rows, /!event.metaKey && !event.ctrlKey/);
 });

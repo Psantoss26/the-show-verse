@@ -252,6 +252,7 @@ function RecommendationsSheet({ meta, data, onClose, query, setQuery }) {
                 item={item}
                 mediaType={item.media_type}
                 onNavigate={onClose}
+                onOpenTitle={data.onOpenTitle}
                 showImdb
                 imdbRating={imdbScores.get(getScoreItemKey(item))}
                 imdbLoading={imdbLoading && !imdbScores.has(getScoreItemKey(item))}
@@ -293,7 +294,7 @@ function CollectionSheet({ meta, data, onClose }) {
         <ul className="space-y-2">
           {items.map((item) => (
             <li key={item.id}>
-              <TitleRow item={item} mediaType="movie" onNavigate={onClose} />
+              <TitleRow item={item} mediaType="movie" onNavigate={onClose} onOpenTitle={data.onOpenTitle} />
             </li>
           ))}
         </ul>

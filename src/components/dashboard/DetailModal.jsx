@@ -2196,6 +2196,7 @@ export default function DetailModal({
 
   /* --------------------------------- soundtrack -------------------------------- */
   const [soundtrackOpen, setSoundtrackOpen] = useState(false);
+  const [soundtrackInitialTrackId, setSoundtrackInitialTrackId] = useState(null);
   const [soundtrackTracks, setSoundtrackTracks] = useState([]);
   const [soundtrackLoading, setSoundtrackLoading] = useState(false);
   const [soundtrackError, setSoundtrackError] = useState("");
@@ -3487,6 +3488,7 @@ export default function DetailModal({
       {/* Soundtrack — mismo modal reproductor que la ficha completa */}
       <SoundtrackModal
         open={soundtrackOpen}
+        initialTrackId={soundtrackInitialTrackId}
         onClose={() => setSoundtrackOpen(false)}
         title={title}
         tracks={soundtrackTracks}
@@ -5061,7 +5063,8 @@ export default function DetailModal({
                   // esto solo se cargarían al abrir el modal de soundtrack, y
                   // aquí se ven en la propia ficha.
                   onEnsureLoaded: loadSoundtrack,
-                  onOpen: () => {
+                  onOpen: (trackId) => {
+                    setSoundtrackInitialTrackId(trackId || null);
                     setSoundtrackOpen(true);
                     void loadSoundtrack();
                   },

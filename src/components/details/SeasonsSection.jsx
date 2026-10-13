@@ -36,7 +36,7 @@ function readSavedView() {
   }
 }
 
-export default function SeasonsSection({ items = [], loading = false, onOpenAll }) {
+export default function SeasonsSection({ items = [], loading = false, onOpenAll, phoneLayout = false }) {
   const [view, setView] = useState("posters");
   const [expanded, setExpanded] = useState(false);
   // Tras montar: el servidor no conoce la vista guardada.
@@ -58,13 +58,13 @@ export default function SeasonsSection({ items = [], loading = false, onOpenAll 
   const visibleCards = expanded ? items : items.slice(0, COLLAPSED_CARDS);
 
   return (
-    <section className="mb-12 group/section">
-      <div className="flex w-full items-start justify-between gap-3">
+    <section className={`${phoneLayout ? "" : "mb-12"} group/section`}>
+      <div className={`flex w-full items-start justify-between gap-3 ${phoneLayout ? "flex-wrap" : ""}`}>
         <SectionTitle
           title="Temporadas"
           icon={Layers}
           onOpen={onOpenAll}
-          className="!mb-5 sm:!mb-8 !w-auto flex-1 min-w-0 pr-4 sm:pr-6"
+          className={`!mb-5 sm:!mb-8 !w-auto flex-1 min-w-0 pr-4 sm:pr-6 ${phoneLayout ? "basis-64 [&>div:last-child]:overflow-hidden" : ""}`}
         />
         <div
           role="group"
@@ -106,13 +106,16 @@ export default function SeasonsSection({ items = [], loading = false, onOpenAll 
         <DetailsArrowCarousel
           spaceBetween={12}
           slidesPerView={3}
-          breakpoints={{
+          breakpointsBase={phoneLayout ? "container" : "window"}
+          showArrows={!phoneLayout}
+          observeParents={!phoneLayout}
+          breakpoints={phoneLayout ? { 480: { slidesPerView: 3, spaceBetween: 14 } } : {
             500: { slidesPerView: 3, spaceBetween: 14 },
             768: { slidesPerView: 4, spaceBetween: 16 },
             1024: { slidesPerView: 5, spaceBetween: 18 },
             1280: { slidesPerView: 6, spaceBetween: 20 },
           }}
-          className="pb-8 !overflow-visible"
+          className={phoneLayout ? "pb-2" : "pb-8 !overflow-visible"}
         >
           {items.map(({ key, ...season }) => (
             <SwiperSlide key={key}>
@@ -122,7 +125,7 @@ export default function SeasonsSection({ items = [], loading = false, onOpenAll 
         </DetailsArrowCarousel>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className={`grid grid-cols-1 gap-4 ${phoneLayout ? "" : "sm:grid-cols-2 lg:grid-cols-3"}`}>
             {visibleCards.map(({ key, ...season }) => (
               <SeasonCard key={key} {...season} />
             ))}

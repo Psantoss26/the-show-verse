@@ -13,12 +13,9 @@
 // que ya tiene cargado y este componente resuelve el resto.
 //
 // QUÉ SE COMPARTE Y QUÉ SE COPIA
-// Lo que ya estaba extraído se usa tal cual (`SectionTitle`, `AwardCard`,
-// `DetailsSectionMenu`, `DetailsArrowCarousel`, `AnimatedSection`), y los
-// ayudantes puros de premios se movieron a `@/components/details/AwardCard` al
-// escribir esto. El JSX de cada sección sí es una copia del de DetailsClient:
-// es una decisión consciente y tiene un coste conocido -- las dos superficies
-// se separarán en cuanto se toque una sola de ellas.
+// Temporadas, encabezados y vistas laterales reutilizan los componentes de
+// DetailsClient. Las vistas previas restantes adaptan sus carruseles al ancho
+// del panel; los paneles completos reciben los mismos datos y acciones.
 //
 // DIFERENCIAS DELIBERADAS CON LA FICHA MÓVIL
 //  - ESCALA. En un teléfono de verdad manda la mitad móvil de cada clase
@@ -70,7 +67,11 @@ import Avatar from "@/components/ui/Avatar";
 import CommentLikeButton from "@/components/community/CommentLikeButton";
 import PosterStack from "@/components/details/PosterStack";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
-import SeasonCard from "@/components/details/SeasonCard";
+import SeasonsSection from "@/components/details/SeasonsSection";
+import DetailsSectionSheets, { openSectionSheet } from "@/components/details/sectionSheet/DetailsSectionSheets";
+import { createValueStore } from "@/lib/details/valueStore";
+import { buildArtworkSheetTabs } from "@/lib/details/artworkSheetTabs";
+import { tmdbSrcSet } from "@/lib/tmdb/imageSrcSet";
 import {
   LIQUID_GLASS_BAR,
   LIQUID_GLASS_CARD,
@@ -620,15 +621,11 @@ export default function PhoneDetailsSections({
     [data?.seasons],
   );
 
-  // Temporadas visibles: las emitidas, sin los especiales (temporada 0), igual
-  // que `visibleTraktSeasons` en la ficha completa.
+  // TMDb ya llega con la ficha: mostrar sus temporadas sin esperar a ratings,
+  // incluidos los próximos estrenos y excluidos los especiales.
   const visibleSeasons = useMemo(
     () =>
-      tmdbSeasons.filter(
-        (season) =>
-          Number(season?.season_number) > 0 &&
-          Number(season?.episode_count) > 0,
-      ),
+      tmdbSeasons.filter((season) => Number(season?.season_number) > 0),
     [tmdbSeasons],
   );
 
@@ -650,8 +647,9 @@ export default function PhoneDetailsSections({
     const sgSeasons = Array.isArray(episodeRatings?.seasons)
       ? episodeRatings.seasons
       : [];
-    if (!sgSeasons.length || !visibleSeasons.length) return false;
-    return !seasonStructuresAlign(sgSeasons, visibleSeasons);
+    const airedSeasons = visibleSeasons.filter((season) => Number(season?.episode_count) > 0);
+    if (!sgSeasons.length || !airedSeasons.length) return false;
+    return !seasonStructuresAlign(sgSeasons, airedSeasons);
   }, [episodeRatings, visibleSeasons]);
 
   // Nota de IMDb por temporada. Comparte CLAVE DE CACHÉ con la ficha completa,
@@ -966,6 +964,9 @@ export default function PhoneDetailsSections({
 
   const sectionItems = useMemo(() => {
     const items = [];
+    if (type === "tv") {
+      items.push({ id: "seasons", label: "Temporadas", icon: Layers, count: visibleSeasons.length || undefined });
+    }
     items.push({
       id: "cast",
       label: "Reparto",
@@ -1008,11 +1009,6 @@ export default function PhoneDetailsSections({
           videos.length || undefined,
     });
     items.push({ id: "sentiment", label: "Sentimientos", icon: Sparkles });
-    if (type === "tv") {
-      items.push({ id: "seasons", label: "Temporadas", icon: Layers });
-      // La valoración de episodios no tiene sección: la abre el botón de
-      // acción, como en la ficha completa.
-    }
     items.push({
       id: "comments",
       label: "Comentarios",
@@ -1040,7 +1036,77 @@ export default function PhoneDetailsSections({
     images?.logos?.length,
     videos.length,
     type,
+    visibleSeasons.length,
   ]);
+
+  const [sectionSheetStore] = useState(() => createValueStore(null));
+  const sectionSheetOpener = (sectionId) => () => openSectionSheet(sectionSheetStore, sectionId);
+  const seasonCardItems = visibleSeasons.map((season) => {
+    const sn = Number(season.season_number);
+    const imdbRating = toRatingNumber(seasonImdbRatings?.[sn]);
+    const graphRating = seriesGraphSeasonRatings.get(sn) ?? null;
+    const totalEp = Number(season?.episode_count || 0) || null;
+    return {
+      key: sn,
+      seasonNumber: sn,
+      seasonId: season.id ?? null,
+      name: season.name || null,
+      posterPath: season.poster_path || null,
+      fallbackPosterPath: data?.poster_path || null,
+      airDate: season.air_date || null,
+      tmdbRating: season.vote_average ?? null,
+      imdbRating: seasonStructuresMismatch ? graphRating : (imdbRating ?? graphRating),
+      totalEpisodes: totalEp,
+      watchedEpisodes: getWatchedEpisodeCountForSeason(episodesWatched?.watchedBySeason, sn, totalEp || 0),
+      imdbUrl: imdbId ? `https://www.imdb.com/title/${imdbId}/episodes/?season=${sn}` : null,
+      onClick: () => onOpenSeason?.(sn),
+    };
+  });
+  const sheetArtworkTabs = buildArtworkSheetTabs({
+    mobile: true,
+    posters: images?.posters,
+    logos: images?.logos,
+    active: {
+      mobilePoster: selectedMobilePoster || data?.heroPosterPath || null,
+      logo: selectedLogo || data?.logoPath || null,
+    },
+  });
+  const sectionSheetData = {
+    type,
+    tmdbId: id,
+    cast: data?.fullCast || cast.filter((person) => Number(person.order) >= 0),
+    creators: data?.tvCreators || [],
+    recommendations,
+    onOpenTitle,
+    collection: { id: collectionId, name: collectionData?.collection?.name, items: collectionData?.items },
+    awards: awardItems,
+    seasons: seasonCardItems,
+    images: {
+      tabs: sheetArtworkTabs,
+      onSelect: (kind, filePath) => {
+        const source = kind === "logo" ? images?.logos : images?.posters;
+        const chosen = source?.find((image) => image.file_path === filePath);
+        if (kind === "logo") handleSelectLogo(filePath, chosen);
+        else handleSelectMobilePoster(filePath, chosen);
+      },
+      onReset: handleResetArtwork,
+    },
+    videos,
+    onPlayVideo: setActiveVideo,
+    soundtrack: soundtrack?.tracks || [],
+    onPlayTrack: (trackId) => soundtrack?.onOpen?.(trackId),
+    sentiment: data?.sentiment,
+    comments: {
+      state: comments,
+      tab: commentsTab,
+      onTabChange: selectCommentsTab,
+      onPageChange: selectCommentsPage,
+      mediaType: type,
+      tmdbId: id,
+      canLike: canLikeComments,
+    },
+    lists: { state: lists },
+  };
 
   return (
     <div ref={sectionsRef} className="sv-phone-sections mt-2">
@@ -1071,12 +1137,21 @@ export default function PhoneDetailsSections({
       </div>
 
       <div className="mt-10 space-y-10">
+        {/* === TEMPORADAS: mismo orden y selector que DetailsClient === */}
+        {type === "tv" && (
+          <section className="sv-phone-section" id="phone-section-seasons" ref={registerSection("seasons")}>
+            <AnimatedSection delay={0.04} renderImmediately>
+              <SeasonsSection items={seasonCardItems} phoneLayout onOpenAll={sectionSheetOpener("seasons")} />
+            </AnimatedSection>
+          </section>
+        )}
+
         {/* === REPARTO PRINCIPAL === */}
         <section className="sv-phone-section" id="phone-section-cast" ref={registerSection("cast")}>
           <AnimatedSection delay={0.04}>
             {cast.length > 0 && (
               <section className="group/section">
-                <SectionTitle title="Reparto Principal" icon={Users} />
+                <SectionTitle title="Reparto Principal" icon={Users} onOpen={sectionSheetOpener("cast")} />
                 <DetailsArrowCarousel
                   {...PHONE_POSTER_CAROUSEL}
                   className="pb-2"
@@ -1125,7 +1200,7 @@ export default function PhoneDetailsSections({
           <AnimatedSection delay={0.04}>
             {recommendations.length > 0 && (
               <section className="group/section">
-                <SectionTitle title="Recomendaciones" icon={MonitorPlay} />
+                <SectionTitle title="Recomendaciones" icon={MonitorPlay} onOpen={sectionSheetOpener("recs")} />
                 <DetailsArrowCarousel
                   {...PHONE_POSTER_CAROUSEL}
                   className="pb-2"
@@ -1146,7 +1221,9 @@ export default function PhoneDetailsSections({
                                 ? `https://image.tmdb.org/t/p/w342${rec.poster_path}`
                                 : "/placeholder.png"
                             }
-                            alt={rec.title || rec.name || ""}
+                            srcSet={tmdbSrcSet(rec.poster_path)}
+                              sizes="(max-width: 639px) 30vw, 200px"
+                              alt={rec.title || rec.name || ""}
                             loading="lazy"
                             decoding="async"
                             className="w-full h-full object-cover"
@@ -1166,27 +1243,7 @@ export default function PhoneDetailsSections({
           <section className="sv-phone-section" id="phone-section-collection" ref={registerSection("collection")}>
             <AnimatedSection delay={0.04}>
               <section className="group/section">
-                {/* El encabezado no usa <SectionTitle/>: aquí el título entero
-                    es un enlace a la ficha de la saga y lleva su propia flecha,
-                    igual que en la ficha completa. */}
-                <Link
-                  href={`/lists/collection/${collectionId}`}
-                  className="group/collection-title flex items-center gap-3 sm:gap-4 mb-8 w-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400"
-                  aria-label="Ver detalles de la colección"
-                >
-                  <div className="relative flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-[14px] bg-yellow-500/5 backdrop-blur-2xl shadow-[0_4px_24px_rgba(234,179,8,0.12)] shrink-0 overflow-hidden transition-all duration-500">
-                    <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/20 via-transparent to-transparent opacity-60" />
-                    <div className="absolute inset-0 shadow-[inset_0_1px_2px_rgba(255,255,255,0.15),inset_0_-1px_2px_rgba(0,0,0,0.2)] rounded-[14px] pointer-events-none" />
-                    <Layers className="relative z-10 w-5 h-5 sm:w-6 sm:h-6 text-yellow-500 transition-all duration-500 drop-shadow-[0_2px_8px_rgba(234,179,8,0.4)]" />
-                  </div>
-                  <h2 className="text-2xl sm:text-[28px] font-black tracking-tight text-white drop-shadow-md shrink-0 flex items-center">
-                    Colección
-                    <ChevronRight className="ml-1 sm:ml-2 h-6 w-6 sm:h-7 sm:w-7 text-yellow-500/70 transition-transform duration-300 group-hover/collection-title:translate-x-1 group-hover/collection-title:text-yellow-400" />
-                  </h2>
-                  <div className="ml-2 sm:ml-4 flex-1 h-px bg-gradient-to-r from-white/20 via-white/5 to-transparent relative flex items-center">
-                    <div className="absolute left-0 w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_12px_rgba(234,179,8,1)] opacity-40" />
-                  </div>
-                </Link>
+                <SectionTitle title="Colección" icon={Layers} onOpen={sectionSheetOpener("collection")} />
 
                 {collectionLoading ? (
                   <div className="mt-3 sm:mt-4 text-sm text-zinc-400">
@@ -1213,6 +1270,8 @@ export default function PhoneDetailsSections({
                                   ? `https://image.tmdb.org/t/p/w342${movie.poster_path}`
                                   : "/placeholder.png"
                               }
+                              srcSet={tmdbSrcSet(movie.poster_path)}
+                              sizes="(max-width: 639px) 30vw, 200px"
                               alt={movie.title || movie.name || ""}
                               loading="lazy"
                               decoding="async"
@@ -1234,7 +1293,7 @@ export default function PhoneDetailsSections({
           <section className="sv-phone-section" id="phone-section-awards" ref={registerSection("awards")}>
             <AnimatedSection delay={0.04}>
               <section className="group/section">
-                <SectionTitle title="Premios" icon={Trophy} />
+                <SectionTitle title="Premios" icon={Trophy} onOpen={sectionSheetOpener("awards")} />
                 <DetailsArrowCarousel
                   {...PHONE_POSTER_CAROUSEL}
                   className="pb-2"
@@ -1275,7 +1334,7 @@ export default function PhoneDetailsSections({
                   el de restaurar deshace las selecciones. */}
               <div className="flex items-end justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <SectionTitle title="Portadas y fondos" icon={ImageIcon} />
+                  <SectionTitle title="Portadas y fondos" icon={ImageIcon} onOpen={sectionSheetOpener("images")} />
                 </div>
                 <div className="mb-8 flex shrink-0 items-center gap-2">
                   <button
@@ -1470,6 +1529,8 @@ export default function PhoneDetailsSections({
                           >
                             <OptimizedImage
                               src={`https://image.tmdb.org/t/p/${artworkSelection.size}${filePath}`}
+                              srcSet={isLogoTab ? undefined : tmdbSrcSet(filePath)}
+                              sizes={isLogoTab ? undefined : "(max-width: 639px) 30vw, 200px"}
                               alt={
                                 isLogoTab
                                   ? `Logo de ${title}`
@@ -1497,7 +1558,7 @@ export default function PhoneDetailsSections({
           {/* === TRÁILER Y VÍDEOS === */}
           <AnimatedSection delay={0.04}>
             <section className="mt-6 group/section">
-              <SectionTitle title="Tráiler y vídeos" icon={MonitorPlay} />
+              <SectionTitle title="Tráiler y vídeos" icon={MonitorPlay} onOpen={sectionSheetOpener("videos")} />
               {videosLoading && videos.length === 0 ? (
                 <div className="grid grid-cols-1 gap-3">
                   {Array.from({ length: 2 }).map((_, index) => (
@@ -1622,7 +1683,7 @@ export default function PhoneDetailsSections({
           {soundtrack?.query ? (
             <AnimatedSection delay={0.06}>
               <section className="mt-6 group/section">
-                <SectionTitle title="Soundtrack y música" icon={Music2} />
+                <SectionTitle title="Soundtrack y música" icon={Music2} onOpen={sectionSheetOpener("soundtrack")} />
                 {soundtrack.loading && soundtrack.tracks.length === 0 ? (
                   <div className="grid grid-cols-2 gap-3">
                     {Array.from({ length: 2 }).map((_, index) => (
@@ -1735,7 +1796,7 @@ export default function PhoneDetailsSections({
         <section className="sv-phone-section" id="phone-section-sentiment" ref={registerSection("sentiment")}>
           <AnimatedSection delay={0.04} renderImmediately>
             <section className="group/section">
-              <SectionTitle title="Análisis de sentimientos" icon={Sparkles} />
+              <SectionTitle title="Análisis de sentimientos" icon={Sparkles} onOpen={sectionSheetOpener("sentiment")} />
               <div
                 className={`mt-3 sm:mt-4 relative isolate overflow-hidden rounded-2xl transform-gpu ${LIQUID_GLASS_BAR}`}
               >
@@ -1828,61 +1889,11 @@ export default function PhoneDetailsSections({
           </AnimatedSection>
         </section>
 
-        {/* === TEMPORADAS (solo series) === */}
-        {type === "tv" && (
-          <section className="sv-phone-section" id="phone-section-seasons" ref={registerSection("seasons")}>
-            <AnimatedSection delay={0.04} renderImmediately>
-              <section className="group/section">
-                <SectionTitle title="Temporadas" icon={Layers} />
-                {/* Una tarjeta por fila: los `sm:`/`lg:grid-cols` de la ficha
-                    completa van por viewport y aquí darían tres columnas. */}
-                <div className="grid grid-cols-1 gap-4">
-                  {visibleSeasons.map((season) => {
-                    const sn = Number(season.season_number);
-                    const imdbRating = toRatingNumber(seasonImdbRatings?.[sn]);
-                    const graphRating = seriesGraphSeasonRatings.get(sn) ?? null;
-                    const rating = seasonStructuresMismatch
-                      ? graphRating
-                      : (imdbRating ?? graphRating);
-                    const totalEp = Number(season?.episode_count || 0) || null;
-
-                    return (
-                      <SeasonCard
-                        key={sn}
-                        seasonNumber={sn}
-                        seasonId={season?.id ?? null}
-                        name={season?.name || null}
-                        posterPath={season?.poster_path || null}
-                        fallbackPosterPath={data?.poster_path || null}
-                        airDate={season?.air_date || null}
-                        tmdbRating={season?.vote_average ?? null}
-                        imdbRating={rating}
-                        totalEpisodes={totalEp}
-                        watchedEpisodes={getWatchedEpisodeCountForSeason(
-                          episodesWatched?.watchedBySeason,
-                          sn,
-                          totalEp || 0,
-                        )}
-                        imdbUrl={
-                          imdbId
-                            ? `https://www.imdb.com/title/${imdbId}/episodes/?season=${sn}`
-                            : null
-                        }
-                        onClick={() => onOpenSeason?.(sn)}
-                      />
-                    );
-                  })}
-                </div>
-              </section>
-            </AnimatedSection>
-          </section>
-        )}
-
         {/* === COMENTARIOS === */}
         <section className="sv-phone-section" id="phone-section-comments" ref={registerSection("comments")}>
           <AnimatedSection delay={0.04} renderImmediately>
             <section className="group/section">
-              <SectionTitle title="Comentarios" icon={MessageSquare} />
+              <SectionTitle title="Comentarios" icon={MessageSquare} onOpen={sectionSheetOpener("comments")} />
               <div
                 className={`relative isolate overflow-hidden rounded-2xl transform-gpu ${LIQUID_GLASS_HOST} ${LIQUID_GLASS_ELEVATION}`}
               >
@@ -2038,7 +2049,7 @@ export default function PhoneDetailsSections({
           <section className="sv-phone-section" id="phone-section-lists" ref={registerSection("lists")}>
             <AnimatedSection delay={0.04} renderImmediately>
               <section className="group/section">
-                <SectionTitle title="Listas" icon={ListVideo} />
+                <SectionTitle title="Listas" icon={ListVideo} onOpen={sectionSheetOpener("lists")} />
                 {/* Una tarjeta por fila, por el mismo motivo que Temporadas. */}
                 <div className="grid grid-cols-1 gap-6">
                   {lists.loading ? (
@@ -2130,10 +2141,14 @@ export default function PhoneDetailsSections({
         )}
       </div>
 
+      <DetailsSectionSheets store={sectionSheetStore} data={sectionSheetData} />
+
       {/* Reproductor de vídeo, el MISMO componente que la ficha completa. */}
       <VideoModal
         open={!!activeVideo}
         video={activeVideo}
+        videos={videos}
+        onVideoChange={setActiveVideo}
         onClose={() => setActiveVideo(null)}
       />
     </div>
