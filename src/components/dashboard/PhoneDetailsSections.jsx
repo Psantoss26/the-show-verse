@@ -48,7 +48,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ExternalLink,
   Layers,
   ListVideo,
   Loader2,
@@ -60,7 +59,6 @@ import {
   Play,
   RotateCcw,
   SlidersHorizontal,
-  Star,
   ThumbsDown,
   ThumbsUp,
   Trophy,
@@ -72,6 +70,7 @@ import Avatar from "@/components/ui/Avatar";
 import CommentLikeButton from "@/components/community/CommentLikeButton";
 import PosterStack from "@/components/details/PosterStack";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
+import SeasonCard from "@/components/details/SeasonCard";
 import {
   LIQUID_GLASS_BAR,
   LIQUID_GLASS_CARD,
@@ -1845,100 +1844,31 @@ export default function PhoneDetailsSections({
                     const rating = seasonStructuresMismatch
                       ? graphRating
                       : (imdbRating ?? graphRating);
-                    const imdbSeasonUrl = imdbId
-                      ? `https://www.imdb.com/title/${imdbId}/episodes/?season=${sn}`
-                      : null;
                     const totalEp = Number(season?.episode_count || 0) || null;
-                    const watchedEp = getWatchedEpisodeCountForSeason(
-                      episodesWatched?.watchedBySeason,
-                      sn,
-                      totalEp || 0,
-                    );
-                    const percentage = totalEp
-                      ? Math.round((watchedEp / totalEp) * 100)
-                      : 0;
-                    const barColor =
-                      percentage === 100 ? "bg-emerald-500" : "bg-yellow-500";
 
                     return (
-                      <button
+                      <SeasonCard
                         key={sn}
-                        type="button"
+                        seasonNumber={sn}
+                        seasonId={season?.id ?? null}
+                        name={season?.name || null}
+                        posterPath={season?.poster_path || null}
+                        fallbackPosterPath={data?.poster_path || null}
+                        airDate={season?.air_date || null}
+                        rating={rating}
+                        totalEpisodes={totalEp}
+                        watchedEpisodes={getWatchedEpisodeCountForSeason(
+                          episodesWatched?.watchedBySeason,
+                          sn,
+                          totalEp || 0,
+                        )}
+                        imdbUrl={
+                          imdbId
+                            ? `https://www.imdb.com/title/${imdbId}/episodes/?season=${sn}`
+                            : null
+                        }
                         onClick={() => onOpenSeason?.(sn)}
-                        className={`group relative isolate overflow-hidden rounded-2xl transform-gpu text-left w-full ${LIQUID_GLASS_CARD} transition-all`}
-                        aria-label={`Ver Temporada ${sn}`}
-                      >
-                        <LiquidGlassOpticalLayers />
-                        <div className="absolute -right-4 -top-6 text-[100px] font-black text-white/5 select-none z-0">
-                          {sn}
-                        </div>
-
-                        <div className="relative z-10 p-5">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <h4 className="text-lg font-extrabold text-white">
-                                Temporada {sn}
-                              </h4>
-                              <div className="mt-1 flex items-center gap-2 text-xs font-medium text-zinc-400">
-                                {rating != null && (
-                                  <span className="flex items-center gap-1 text-yellow-400">
-                                    <Star className="h-3 w-3 fill-yellow-400" />{" "}
-                                    {rating.toFixed(1)}
-                                  </span>
-                                )}
-                                {totalEp != null && (
-                                  <span>• {totalEp} episodios</span>
-                                )}
-                              </div>
-                            </div>
-
-                            {imdbSeasonUrl && (
-                              <a
-                                href={imdbSeasonUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                onClick={(event) => {
-                                  event.preventDefault();
-                                  event.stopPropagation();
-                                  window.open(
-                                    imdbSeasonUrl,
-                                    "_blank",
-                                    "noopener,noreferrer",
-                                  );
-                                }}
-                                className="flex h-8 w-8 items-center justify-center rounded-full bg-black/20 text-zinc-400 transition hover:bg-white hover:text-black"
-                                aria-label="Ver temporada en IMDb"
-                              >
-                                <ExternalLink className="h-4 w-4" />
-                              </a>
-                            )}
-                          </div>
-
-                          {totalEp != null && (
-                            <div className="mt-6">
-                              <div className="mb-1.5 flex items-end justify-between text-xs font-bold">
-                                <span
-                                  className={
-                                    percentage > 0 ? "text-white" : "text-zinc-500"
-                                  }
-                                >
-                                  {watchedEp}{" "}
-                                  <span className="text-zinc-500 font-normal">
-                                    vistos
-                                  </span>
-                                </span>
-                                <span className="text-zinc-500">{percentage}%</span>
-                              </div>
-                              <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-                                <div
-                                  className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-                                  style={{ width: `${percentage}%` }}
-                                />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </button>
+                      />
                     );
                   })}
                 </div>

@@ -122,11 +122,9 @@ import {
   RotateCcw,
   Play,
   Music2,
-  ExternalLink,
   ThumbsUp,
   ThumbsDown,
   Sparkles,
-  Star,
   Eye,
   LibraryBig,
   MessageSquare,
@@ -315,6 +313,7 @@ import {
 import TraktCommentModal from "@/components/details/TraktCommentModal";
 import PosterStack from "@/components/details/PosterStack";
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
+import SeasonCard from "@/components/details/SeasonCard";
 import { pickExternalIds, withTitleExternalLinks } from "@/lib/details/titleExternalLinks";
 import StreamingHoverOverlay from "@/components/details/StreamingHoverOverlay";
 import DetailsMetaGenresRow, {
@@ -12432,7 +12431,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           {!tSeasons.loading &&
                             visibleTraktSeasons.map((s) => {
                               const sn = getSeasonNumber(s);
-                              const titleSeason = `Temporada ${sn}`;
                               const imdbRating = toRatingNumber(
                                 seasonImdbRatings?.[sn],
                               );
@@ -12441,130 +12439,42 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               const rating = seriesGraphStructuresMismatch
                                 ? seriesGraphRating
                                 : (imdbRating ?? seriesGraphRating);
-                              const imdbSeasonUrl = resolvedImdbId
-                                ? `https://www.imdb.com/title/${resolvedImdbId}/episodes/?season=${sn}`
-                                : null;
 
-                              // Lógica de progreso (usa TMDb para saber total)
+                              // Datos de TMDb de la temporada: póster, nombre,
+                              // año y total de episodios (para el progreso).
                               const tmdbSeason = (data?.seasons || []).find(
                                 (x) => Number(x?.season_number) === sn,
                               );
                               const totalEp =
                                 Number(tmdbSeason?.episode_count || 0) || null;
-                              const watchedEp = getWatchedEpisodeCountForSeason(
-                                watchedBySeason,
-                                sn,
-                                totalEp || 0,
-                              );
-                              const percentage = totalEp
-                                ? Math.round((watchedEp / totalEp) * 100)
-                                : 0;
-
-                              const isComplete = percentage === 100;
-                              const barColor = isComplete
-                                ? "bg-emerald-500"
-                                : "bg-yellow-500";
 
                               return (
-                                <button
+                                <SeasonCard
                                   key={sn}
-                                  type="button"
-                                  onClick={() =>
-                                    router.push(
-                                      `/details/tv/${id}/season/${sn}`,
-                                    )
+                                  seasonNumber={sn}
+                                  seasonId={tmdbSeason?.id ?? null}
+                                  name={tmdbSeason?.name || null}
+                                  posterPath={tmdbSeason?.poster_path || null}
+                                  fallbackPosterPath={data?.poster_path || null}
+                                  airDate={tmdbSeason?.air_date || null}
+                                  rating={rating}
+                                  totalEpisodes={totalEp}
+                                  watchedEpisodes={getWatchedEpisodeCountForSeason(
+                                    watchedBySeason,
+                                    sn,
+                                    totalEp || 0,
+                                  )}
+                                  imdbUrl={
+                                    resolvedImdbId
+                                      ? `https://www.imdb.com/title/${resolvedImdbId}/episodes/?season=${sn}`
+                                      : null
                                   }
-                                  onMouseEnter={() => prefetchSeasonDetails(sn)}
-                                  onFocus={() => prefetchSeasonDetails(sn)}
-                                  onTouchStart={() => prefetchSeasonDetails(sn)}
-                                  // Cristal de TARJETA compartido: van en rejilla,
-                                  // así que sin sombra propia (varias sombras
-                                  // juntas forman una banda oscura detrás del
-                                  // grupo). Conserva elevación y luminosidad al
-                                  // hover, sin dibujar un contorno cromático.
-                                  className={`group relative isolate overflow-hidden rounded-2xl transform-gpu text-left w-full ${LIQUID_GLASS_CARD} transition-all hover:-translate-y-1 hover:brightness-110`}
-                                  aria-label={`Ver ${titleSeason}`}
-                                >
-                                  <LiquidGlassOpticalLayers />
-                                  {/* Fondo decorativo del número de temporada */}
-                                  <div className="absolute -right-4 -top-6 text-[100px] font-black text-white/5 select-none transition group-hover:text-white/10 z-0">
-                                    {sn}
-                                  </div>
-
-                                  <div className="relative z-10 p-5">
-                                    <div className="flex items-start justify-between">
-                                      <div>
-                                        <h4 className="text-lg font-extrabold text-white">
-                                          {titleSeason}
-                                        </h4>
-
-                                        <div className="mt-1 flex items-center gap-2 text-xs font-medium text-zinc-400">
-                                          {rating != null && (
-                                            <span className="flex items-center gap-1 text-yellow-400">
-                                              <Star className="h-3 w-3 fill-yellow-400" />{" "}
-                                              {rating.toFixed(1)}
-                                            </span>
-                                          )}
-                                          {totalEp != null && (
-                                            <span>• {totalEp} episodios</span>
-                                          )}
-                                        </div>
-                                      </div>
-
-                                      {/* Botón externo a IMDb (NO navega a la season page interna) */}
-                                      {imdbSeasonUrl && (
-                                        <a
-                                          href={imdbSeasonUrl}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                          onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            window.open(
-                                              imdbSeasonUrl,
-                                              "_blank",
-                                              "noopener,noreferrer",
-                                            );
-                                          }}
-                                          className="flex h-8 w-8 items-center justify-center rounded-full bg-black/20 text-zinc-400 transition hover:bg-white hover:text-black"
-                                          aria-label="Ver temporada en IMDb"
-                                        >
-                                          <ExternalLink className="h-4 w-4" />
-                                        </a>
-                                      )}
-                                    </div>
-
-                                    {/* Barra de Progreso */}
-                                    {totalEp != null && (
-                                      <div className="mt-6">
-                                        <div className="mb-1.5 flex items-end justify-between text-xs font-bold">
-                                          <span
-                                            className={
-                                              percentage > 0
-                                                ? "text-white"
-                                                : "text-zinc-500"
-                                            }
-                                          >
-                                            {watchedEp}{" "}
-                                            <span className="text-zinc-500 font-normal">
-                                              vistos
-                                            </span>
-                                          </span>
-                                          <span className="text-zinc-500">
-                                            {percentage}%
-                                          </span>
-                                        </div>
-
-                                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-                                          <div
-                                            className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-                                            style={{ width: `${percentage}%` }}
-                                          />
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                </button>
+                                  onClick={() =>
+                                    router.push(`/details/tv/${id}/season/${sn}`)
+                                  }
+                                  onPrefetch={() => prefetchSeasonDetails(sn)}
+                                  hoverLift
+                                />
                               );
                             })}
                         </div>
