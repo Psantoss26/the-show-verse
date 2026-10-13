@@ -265,7 +265,7 @@ export function SeasonPosterCard({
           </span>
         )}
       </button>
-      {total != null ? (
+      {total != null && watched > 0 ? (
         <div
           role="progressbar"
           aria-label={`Episodios vistos de la ${title}`}

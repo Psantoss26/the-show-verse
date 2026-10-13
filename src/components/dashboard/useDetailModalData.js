@@ -254,6 +254,8 @@ const EMPTY_DATA = {
   mcScore: null,
   awards: null,
   cast: [],
+  fullCast: [],
+  tvCreators: [],
   recommendations: [],
   production: EMPTY_PRODUCTION,
   sentiment: EMPTY_SENTIMENT,
@@ -978,6 +980,8 @@ export function useDetailModalData(item, { phoneView = false } = {}) {
           tmdbVotes,
           tmdbRatingResolved: true,
           cast,
+          fullCast: Array.isArray(modalTmdbCast) && modalTmdbCast.length ? modalTmdbCast : fallbackCast,
+          tvCreators: Array.isArray(details?.created_by) ? details.created_by : [],
           recommendations,
           production,
           // Datos crudos para el modal de episodios vistos (solo TV): array de
