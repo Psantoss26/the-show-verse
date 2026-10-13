@@ -18,6 +18,28 @@ import { useAuth } from "@/context/AuthContext";
 import { readSeasonCustomPoster } from "@/lib/details/seasonArtwork";
 import { LIQUID_GLASS_CARD } from "@/lib/ui/liquidGlass";
 
+/**
+ * Póster de la temporada: el elegido en «Editar portada», el de TMDb de la
+ * temporada o, si no tiene, el de la serie. La portada elegida vive en las
+ * preferencias del navegador: el servidor no la conoce y pinta la automática,
+ * así que se aplica tras montar (como la ficha de la temporada) para no romper
+ * la hidratación.
+ */
+export function useSeasonPoster({ seasonId = null, posterPath = null, fallbackPosterPath = null }) {
+  const { preferences } = useAuth();
+  const [mounted, setMounted] = useState(false);
+  useLayoutEffect(() => setMounted(true), []);
+  const customPoster = mounted ? readSeasonCustomPoster(preferences, seasonId) : null;
+  return customPoster || posterPath || fallbackPosterPath || null;
+}
+
+// TMDb pone nombre propio a algunas temporadas («Libro uno: Agua»): se enseña
+// cuando no es el genérico «Temporada N».
+function seasonSubtitle(name, title) {
+  const value = String(name || "").trim();
+  return value && value.toLocaleLowerCase("es-ES") !== title.toLocaleLowerCase("es-ES") ? value : null;
+}
+
 function seasonYear(airDate) {
   const year = Number(String(airDate || "").slice(0, 4));
   return Number.isInteger(year) && year > 1800 ? year : null;
@@ -42,22 +64,9 @@ export default function SeasonCard({
   // Ficha completa con ratón: la tarjeta se eleva al pasar por encima.
   hoverLift = false,
 }) {
-  const { preferences } = useAuth();
-  // La portada elegida vive en las preferencias del navegador: el servidor no
-  // la conoce y pinta la automática. Se aplica tras montar (como la ficha de
-  // la temporada) para no romper la hidratación.
-  const [mounted, setMounted] = useState(false);
-  useLayoutEffect(() => setMounted(true), []);
-  const customPoster = mounted ? readSeasonCustomPoster(preferences, seasonId) : null;
-  const poster = customPoster || posterPath || fallbackPosterPath || null;
-
+  const poster = useSeasonPoster({ seasonId, posterPath, fallbackPosterPath });
   const title = `Temporada ${seasonNumber}`;
-  // TMDb pone nombre propio a algunas temporadas («Libro uno: Agua»): se
-  // enseña debajo cuando no es el genérico.
-  const subtitle =
-    name && name.trim() && name.trim().toLocaleLowerCase("es-ES") !== title.toLocaleLowerCase("es-ES")
-      ? name.trim()
-      : null;
+  const subtitle = seasonSubtitle(name, title);
   const year = seasonYear(airDate);
   const total = Number(totalEpisodes) || null;
   const watched = Math.max(0, Math.min(Number(watchedEpisodes) || 0, total || 0));
@@ -186,5 +195,72 @@ export default function SeasonCard({
         ) : null}
       </span>
     </button>
+  );
+}
+
+/**
+ * La misma temporada como póster, para la vista en fila (carrusel) de la
+ * sección: el póster con el título y el año encima, como las tarjetas de
+ * Reparto y Recomendaciones, y el progreso de vistos en el borde inferior.
+ */
+export function SeasonPosterCard({
+  seasonNumber,
+  seasonId = null,
+  name = null,
+  posterPath = null,
+  fallbackPosterPath = null,
+  totalEpisodes = null,
+  watchedEpisodes = 0,
+  onClick,
+  onPrefetch,
+}) {
+  const poster = useSeasonPoster({ seasonId, posterPath, fallbackPosterPath });
+  const title = `Temporada ${seasonNumber}`;
+  const subtitle = seasonSubtitle(name, title);
+  const total = Number(totalEpisodes) || null;
+  const watched = Math.max(0, Math.min(Number(watchedEpisodes) || 0, total || 0));
+  const percentage = total ? Math.round((watched / total) * 100) : 0;
+
+  // Solo el póster; el progreso va DEBAJO, fuera de la imagen, como en
+  // «Continuar viendo» del dashboard.
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={onClick}
+        onMouseEnter={onPrefetch}
+        onFocus={onPrefetch}
+        onTouchStart={onPrefetch}
+        aria-label={`Ver ${title}${subtitle ? `: ${subtitle}` : ""}`}
+        title={title}
+        className="group relative block aspect-[2/3] w-full overflow-hidden rounded-xl bg-zinc-900 shadow-md transition-shadow duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 lg:hover:shadow-yellow-900/20"
+      >
+        {poster ? (
+          <OptimizedImage
+            src={`https://image.tmdb.org/t/p/w342${poster}`}
+            alt=""
+            className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
+            loading="lazy"
+          />
+        ) : (
+          <span className="flex h-full w-full items-center justify-center bg-neutral-800 text-5xl font-black text-white/15">
+            {seasonNumber}
+          </span>
+        )}
+      </button>
+      {total != null ? (
+        <div
+          role="progressbar"
+          aria-label={`Episodios vistos de la ${title}`}
+          aria-valuemin={0}
+          aria-valuemax={total}
+          aria-valuenow={watched}
+          aria-valuetext={`${watched} de ${total} episodios vistos`}
+          className="mx-auto mt-2 h-1 w-[85%] overflow-hidden rounded-full bg-white/25"
+        >
+          <div className="h-full rounded-full bg-emerald-500" style={{ width: `${percentage}%` }} />
+        </div>
+      ) : null}
+    </div>
   );
 }
