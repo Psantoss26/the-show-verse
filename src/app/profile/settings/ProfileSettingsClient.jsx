@@ -1555,6 +1555,55 @@ function ImportPanel({
   );
 }
 
+// Barra de secciones con el mismo acabado que la del Perfil (`ProfileTabs` en
+// u/[username]/ProfileClient.jsx): texto en versalitas, subrayado esmeralda en
+// la activa y, en móvil, scroll horizontal con cuatro pestañas visibles.
+function SettingsTabs({ tabs, activeTab, onSelect }) {
+  const { t } = useTranslation();
+  const navRef = useRef(null);
+
+  useEffect(() => {
+    const active = navRef.current?.querySelector("[aria-current='page']");
+    if (!active) return;
+    active.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      block: "nearest",
+      inline: "center",
+    });
+  }, [activeTab]);
+
+  return (
+    <nav
+      ref={navRef}
+      data-mobile-page-swipe-ignore
+      aria-label={t("settings_sections", "Secciones de ajustes")}
+      className="flex gap-1 overflow-x-auto border-b border-white/10 pb-px snap-x snap-proximity overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+    >
+      {tabs.map((tab) => {
+        const active = activeTab === tab.id;
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => onSelect(tab.id)}
+            aria-current={active ? "page" : undefined}
+            // Mínimo de un cuarto del ancho como en el Perfil, pero las
+            // etiquetas largas («Personalización») pueden crecer sin solaparse.
+            className={`relative flex min-w-[calc((100%_-_0.75rem)_/_4)] shrink-0 snap-start items-center justify-center whitespace-nowrap px-2 py-2.5 text-[clamp(0.625rem,2.7vw,0.6875rem)] font-bold uppercase tracking-normal transition-colors select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400/70 sm:min-w-0 sm:justify-start sm:px-3.5 sm:text-xs sm:tracking-widest ${
+              active ? "text-white" : "text-zinc-500 hover:text-zinc-300"
+            }`}
+          >
+            {tab.label}
+            {active && (
+              <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-emerald-400" />
+            )}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
 function ProfileSettingsClient() {
   const {
     preferences,
@@ -1569,6 +1618,7 @@ function ProfileSettingsClient() {
   } = useAuth();
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState("user");
+  const settingsSwipe = useRef(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
@@ -2182,11 +2232,47 @@ function ProfileSettingsClient() {
     { id: "connections", label: t("settings_connections", "Conexiones"), icon: Link2 },
   ];
 
+  // Deslizar en móvil pasa a la sección contigua, como en el Perfil. El gesto
+  // cede a lo que ya tiene uno horizontal propio: la barra de secciones y otras
+  // filas con scroll lateral, los controles deslizantes y los modales (capas
+  // fijas montadas dentro de la página).
+  const handleSettingsTouchStart = (event) => {
+    settingsSwipe.current = null;
+    if (window.matchMedia("(min-width: 640px)").matches || event.touches.length !== 1) return;
+    const root = event.currentTarget;
+    for (let node = event.target; node instanceof Element && node !== root; node = node.parentElement) {
+      if (node.matches("input[type='range']")) return;
+      const style = getComputedStyle(node);
+      if (style.position === "fixed") return;
+      if (/(auto|scroll)/.test(style.overflowX) && node.scrollWidth > node.clientWidth) return;
+    }
+    settingsSwipe.current = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+  };
+
+  const handleSettingsTouchEnd = (event) => {
+    const gesture = settingsSwipe.current;
+    settingsSwipe.current = null;
+    if (!gesture || event.changedTouches.length !== 1) return;
+
+    const deltaX = event.changedTouches[0].clientX - gesture.x;
+    const deltaY = event.changedTouches[0].clientY - gesture.y;
+    if (Math.abs(deltaX) < 64 || Math.abs(deltaX) <= Math.abs(deltaY) * 1.25) return;
+
+    const currentIndex = tabs.findIndex((tab) => tab.id === activeTab);
+    const nextIndex = Math.min(tabs.length - 1, Math.max(0, currentIndex + (deltaX < 0 ? 1 : -1)));
+    if (nextIndex !== currentIndex) setActiveTab(tabs[nextIndex].id);
+  };
+
   const netflixAccountInfo = connections.find((c) => c.provider === "netflix");
   const isNetflixConnected = !!netflixAccountInfo?.connected;
 
   return (
-    <main className="min-h-screen bg-black pb-24 text-zinc-100 selection:bg-emerald-500/30 relative overflow-hidden font-sans">
+    <main
+      className="min-h-screen bg-black pb-24 text-zinc-100 selection:bg-emerald-500/30 relative overflow-hidden font-sans"
+      onTouchStartCapture={handleSettingsTouchStart}
+      onTouchEndCapture={handleSettingsTouchEnd}
+      onTouchCancelCapture={() => { settingsSwipe.current = null; }}
+    >
       <SettingsBackground />
 
       <div className="relative z-10 mx-auto max-w-6xl px-4 py-8 lg:py-12">
@@ -2259,50 +2345,11 @@ function ProfileSettingsClient() {
         </div>
 
         {/* Primary Settings Workspace */}
-        <div className="grid gap-6 lg:grid-cols-[200px_1fr] items-start">
-          {/* Navigation Sidebar */}
-          <nav className="flex w-full flex-row items-center justify-between gap-1.5 overflow-x-auto border-b border-white/5 pb-3 scrollbar-none lg:w-auto lg:flex-col lg:items-stretch lg:justify-start lg:gap-2 lg:overflow-x-visible lg:border-b-0 lg:border-r lg:pb-0">
-            {tabs.map((tab) => {
-              const active = activeTab === tab.id;
-              const Icon = tab.icon;
-              return (
-                <motion.button
-                  layout
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  transition={{ type: "spring", stiffness: 420, damping: 32 }}
-                  aria-label={tab.label}
-                  aria-current={active ? "page" : undefined}
-                  className={`flex h-10 items-center justify-center rounded-xl text-[11px] font-bold transition-colors duration-300 shrink-0 text-center select-none lg:h-auto lg:w-full lg:justify-start lg:gap-3 lg:px-4 lg:py-2.5 lg:text-left lg:text-sm lg:flex-none ${
-                    active
-                      ? "w-auto gap-1.5 px-3 bg-white/10 text-white shadow-[inset_0_0.5px_1px_rgba(255,255,255,0.1),0_4px_10px_rgba(0,0,0,0.25)]"
-                      : "w-10 px-0 text-zinc-400 hover:text-white hover:bg-white/5"
-                  }`}
-                >
-                  <Icon className="h-4 w-4 lg:h-4.5 lg:w-4.5" />
-                  <span className="hidden lg:flex lg:flex-1">{tab.label}</span>
-                  <AnimatePresence initial={false}>
-                    {active && (
-                      <motion.span
-                        initial={{ opacity: 0, width: 0 }}
-                        animate={{ opacity: 1, width: "auto" }}
-                        exit={{ opacity: 0, width: 0 }}
-                        transition={{ duration: 0.18 }}
-                        className="overflow-hidden whitespace-nowrap lg:hidden"
-                      >
-                        {tab.label}
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
-                  <ChevronRight className={`hidden lg:block h-3.5 w-3.5 transition-transform duration-300 ${active ? "translate-x-0.5 text-emerald-400" : "opacity-0"}`} />
-                </motion.button>
-              );
-            })}
-          </nav>
+        <div>
+          <SettingsTabs tabs={tabs} activeTab={activeTab} onSelect={setActiveTab} />
 
           {/* Main Settings Display */}
-          <div className="min-w-0">
+          <div className="mt-6 min-w-0">
             <AnimatePresence mode="wait">
               {activeTab === "user" && (
                 <motion.div
