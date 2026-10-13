@@ -29,6 +29,7 @@ import ProfileSection from "./ProfileSection";
 import { PROFILE_TAB_IDS, profileTabHref } from "./profileRoutes";
 import { translateGenreName } from "@/lib/dashboard/media";
 import { getActivityDetailsHref } from "@/lib/profile/activityRatingTarget";
+import { isLikeActivity, likeTargetHref, likeTargetName, likeVerb } from "@/lib/profile/activityLikes";
 import {
   NEURAL_DEFAULTS,
   hasNeuralPreferences,
@@ -438,6 +439,19 @@ function SidebarActivityText({ item, isSelf = false }) {
   }
   if (item.type === "list_item") {
     return <><span className="text-zinc-300">{verb.anadido}</span><SidebarActivityTitle item={item} /><span className="text-zinc-300">{item.listName ? ` a ${item.listName}` : " a una lista"}</span></>;
+  }
+  if (isLikeActivity(item)) {
+    const likeHref = likeTargetHref(item);
+    return (
+      <>
+        <span className="text-zinc-300">{likeVerb(item, { firstPerson: isSelf }).toLocaleLowerCase("es-ES")} </span>
+        {likeHref ? (
+          <Link href={likeHref} className="font-extrabold text-white transition-colors hover:text-emerald-400">{likeTargetName(item)}</Link>
+        ) : (
+          <SidebarActivityTitle item={item} />
+        )}
+      </>
+    );
   }
   return <><span className="text-zinc-300">{verb.visto}</span><span className="text-zinc-300">{episodeLabel}</span><SidebarActivityTitle item={item} /></>;
 }

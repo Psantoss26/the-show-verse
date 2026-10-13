@@ -6,14 +6,19 @@
 // el navegador la lee y la manda por tandas a /api/letterboxd/import, que
 // resuelve cada película con TMDb y guarda visionados y puntuaciones.
 
-import { useCallback, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Check, DownloadCloud, FileArchive, Loader2, X } from "lucide-react";
+import { Check, Copy, DownloadCloud, FileArchive, Loader2, X } from "lucide-react";
+import { abrirSoloEnNavegadorNativo, isAndroidApp } from "@/lib/android/appBridge";
 import { buildLetterboxdImport, readLetterboxdFiles } from "@/lib/letterboxd/export";
 import { runLetterboxdImport } from "@/lib/letterboxd/sync";
+import { androidBrowserIntentUrl, isAndroidBrowser } from "@/lib/navigation/browserOnlyLink";
 
 // Descarga directa del ZIP de la exportación (requiere la sesión de
 // Letterboxd iniciada), sin pasar por Settings → Data → Export your data.
+// En el móvil tiene que abrirse en el NAVEGADOR: la app de Letterboxd se queda
+// con los enlaces de letterboxd.com, no tiene exportación y se quedaba
+// cargando (ver lib/navigation/browserOnlyLink).
 const EXPORT_URL = "https://letterboxd.com/data/export";
 const MISSING_SAMPLES = 12;
 
@@ -22,7 +27,69 @@ function plural(count, one, many) {
   return `${count.toLocaleString("es-ES")} ${count === 1 ? one : many}`;
 }
 
+/**
+ * Cómo abrir la exportación: "app" (la app de Android de The Show Verse, que
+ * la abre en el navegador por el nativo), "android" (navegador de Android:
+ * intent:// a Chrome) o "web". Se decide al montar: el servidor no lo sabe.
+ */
+function useExportLink() {
+  const [mode, setMode] = useState("web");
+  const [touch, setTouch] = useState(false);
+  useEffect(() => {
+    setMode(isAndroidApp() ? "app" : isAndroidBrowser(navigator.userAgent) ? "android" : "web");
+    setTouch(window.matchMedia("(pointer: coarse)").matches);
+  }, []);
+
+  const onClick = (event) => {
+    // Una app anterior sin el método: se sigue con el enlace normal.
+    if (mode === "app" && abrirSoloEnNavegadorNativo(EXPORT_URL)) event.preventDefault();
+  };
+  const android = mode === "android";
+  return {
+    href: android ? androidBrowserIntentUrl(EXPORT_URL) : EXPORT_URL,
+    // Un intent:// no abre pestaña: lo resuelve el sistema.
+    target: android ? undefined : "_blank",
+    onClick,
+    // En el móvil queda la opción de copiar el enlace por si aun así se abre
+    // la app de Letterboxd (o el navegador no entiende el intent).
+    showCopy: touch || mode !== "web",
+  };
+}
+
+function CopyExportLink() {
+  const [copied, setCopied] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(EXPORT_URL);
+      setCopied(true);
+      setFailed(false);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setFailed(true);
+    }
+  };
+  return (
+    <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-relaxed text-zinc-500">
+      <span>¿Se abre la app de Letterboxd? Copia el enlace y pégalo en el navegador:</span>
+      {failed ? (
+        <span className="select-all font-mono text-zinc-300">{EXPORT_URL}</span>
+      ) : (
+        <button
+          type="button"
+          onClick={copy}
+          className="inline-flex min-h-8 items-center gap-1.5 rounded-lg bg-white/[0.06] px-2.5 font-bold text-zinc-200 transition hover:bg-white/[0.1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+        >
+          {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
+          <span aria-live="polite">{copied ? "Copiado" : "Copiar enlace"}</span>
+        </button>
+      )}
+    </p>
+  );
+}
+
 export default function LetterboxdImportPanel({ className = "" }) {
+  const exportLink = useExportLink();
   const inputId = useId();
   const inputRef = useRef(null);
   const cancelRef = useRef(false);
@@ -101,15 +168,17 @@ export default function LetterboxdImportPanel({ className = "" }) {
             <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
               Trae tu diario de visionados (rewatches incluidos), tus puntuaciones, tus reseñas, tus favoritas y tu watchlist.{" "}
               <a
-                href={EXPORT_URL}
-                target="_blank"
+                href={exportLink.href}
+                target={exportLink.target}
                 rel="noopener noreferrer"
+                onClick={exportLink.onClick}
                 className="font-bold text-zinc-200 underline decoration-white/30 underline-offset-2 hover:text-white"
               >
                 Descarga tu exportación de Letterboxd
               </a>{" "}
               y sube aquí el ZIP tal cual.
             </p>
+            {exportLink.showCopy && <CopyExportLink />}
           </div>
         </div>
 

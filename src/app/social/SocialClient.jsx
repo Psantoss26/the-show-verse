@@ -40,6 +40,7 @@ import {
   Search,
   SlidersHorizontal,
   Star,
+  ThumbsUp,
   User,
   Users,
   UserRoundCheck,
@@ -62,6 +63,14 @@ import {
   formatActivityRatingTarget,
   getActivityDetailsHref,
 } from "@/lib/profile/activityRatingTarget";
+import {
+  activityActionKey,
+  isLikeActivity,
+  likeAuthor,
+  likeTargetHref,
+  likeTargetName,
+  likeVerb,
+} from "@/lib/profile/activityLikes";
 import Stars from "@/components/social/Stars";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 import PageStatCard from "@/components/ui/PageStatCard";
@@ -81,6 +90,9 @@ const ACCIONES = {
   review: { Icono: MessageSquare, tono: "text-orange-400" },
   list: { Icono: ListPlus, tono: "text-violet-400" },
   list_item: { Icono: ListPlus, tono: "text-violet-400" },
+  like_review: { Icono: ThumbsUp, tono: "text-pink-400", relleno: true },
+  like_list: { Icono: Heart, tono: "text-pink-400", relleno: true },
+  like_collection: { Icono: Heart, tono: "text-pink-400", relleno: true },
 };
 
 // Conjugación: en "Siguiendo" habla el autor del evento ("Ana ha visto…"); en
@@ -116,6 +128,7 @@ const FILTROS = [
   ["favorite", "Favoritos"],
   ["watchlist", "Pendientes"],
   ["list", "Listas"],
+  ["like", "Likes"],
 ];
 
 // Vista y agrupado se RECUERDAN entre visitas, como en las páginas de usuario:
@@ -140,10 +153,9 @@ function leerAgrupadoGuardado() {
 }
 
 function tipoDeFiltro(evento) {
-  // "Listas" agrupa la creación y los elementos añadidos: para quien lee el
-  // feed son la misma acción.
-  if (evento.type === "list_item") return "list";
-  return evento.type;
+  // "Listas" agrupa la creación y los elementos añadidos, y "Likes" los tres me
+  // gusta: para quien lee el feed son la misma acción.
+  return activityActionKey(evento);
 }
 
 function accionDe(evento) {
@@ -151,6 +163,8 @@ function accionDe(evento) {
 }
 
 function hrefDeEvento(evento) {
+  const likeHref = likeTargetHref(evento);
+  if (likeHref) return likeHref;
   if (evento.type === "list") {
     // En "Siguiendo" el id va prefijado con el autor ("<autor>:list:<id>").
     const id = String(evento.id || "").split("list:").pop();
@@ -162,7 +176,7 @@ function hrefDeEvento(evento) {
 // Título enlazado a su ficha, con el mismo peso que en el perfil y el hover en
 // el rosa de la sección.
 function TituloEvento({ evento }) {
-  const titulo = evento.title || evento.name || "Sin título";
+  const titulo = isLikeActivity(evento) ? likeTargetName(evento) || "Sin título" : evento.title || evento.name || "Sin título";
   const href = hrefDeEvento(evento);
   if (!href) return <span className="font-bold text-white">{titulo}</span>;
   return (
@@ -195,6 +209,7 @@ function SujetoEvento({ evento, mostrarAutor }) {
 }
 
 function verboDe(evento, mostrarAutor) {
+  if (isLikeActivity(evento)) return likeVerb(evento, { firstPerson: !(mostrarAutor && evento.author) });
   const v = mostrarAutor && evento.author ? VERBOS.tercera : VERBOS.primera;
   if (evento.type === "watched" && evento.completedShow) return v.completed;
   return v[evento.type] || v.watched;
@@ -245,6 +260,25 @@ function AvatarEvento({ actor }) {
   );
 }
 
+// Autor de la reseña o de la lista con me gusta (" · de Ana"), enlazado a su
+// perfil si es de aquí.
+function AutorDelMeGusta({ evento }) {
+  const autor = likeAuthor(evento);
+  if (!autor) return null;
+  return (
+    <span className="text-zinc-500">
+      {" · de "}
+      {autor.href ? (
+        <Link href={autor.href} prefetch={false} className="text-zinc-400 transition-colors hover:text-pink-300">
+          {autor.name}
+        </Link>
+      ) : (
+        autor.name
+      )}
+    </span>
+  );
+}
+
 // La MISMA fila que la Actividad del perfil (`ActivityRow`): sin fondo propio,
 // avatar o cartel según la vista, icono (o la nota) de 32px, la frase y la
 // hora a la derecha.
@@ -282,6 +316,10 @@ function EventoFila({ evento, actor, mostrarAutor, conPoster }) {
         <TituloEvento evento={evento} />
         {evento.type === "list_item" && evento.listName ? (
           <span className="text-zinc-500"> · {evento.listName}</span>
+        ) : null}
+        <AutorDelMeGusta evento={evento} />
+        {evento.type === "like_review" && evento.excerpt ? (
+          <span className="mt-0.5 line-clamp-2 block text-xs leading-4 text-zinc-500">“{evento.excerpt}”</span>
         ) : null}
       </p>
       <time

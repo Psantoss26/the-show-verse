@@ -10,6 +10,8 @@
 // respetan el orden elegido en la barra; los otros dos se ordenan por tamaño,
 // que es lo que hace útil la cabecera.
 
+import { activityActionKey } from "../profile/activityLikes.js";
+
 export const SOCIAL_GROUP_OPTIONS = [
   ["none", "Sin agrupar"],
   ["day", "Día"],
@@ -36,6 +38,7 @@ const ACCION_LABELS = {
   favorite: "Favoritos",
   watchlist: "Pendientes",
   list: "Listas",
+  like: "Likes",
 };
 
 const MESES = [
@@ -57,9 +60,12 @@ function conMayuscula(texto) {
   return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
 
-/** "list_item" y "list" son la misma acción para quien lee el feed. */
+/**
+ * "list_item" y "list" son la misma acción para quien lee el feed, y los tres
+ * me gusta (reseñas, listas y colecciones) son "like".
+ */
 export function accionDeEvento(evento) {
-  return evento?.type === "list_item" ? "list" : evento?.type;
+  return activityActionKey(evento);
 }
 
 function fechaValida(evento) {

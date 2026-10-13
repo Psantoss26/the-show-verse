@@ -102,6 +102,19 @@ object WebOrigin {
         "open.spotify.com",
     )
 
+    /**
+     * ¿Se puede abrir en el navegador por petición de la web (openInBrowser)?
+     * Solo páginas https con host: nada de esquemas propios ni de file:.
+     */
+    fun isBrowserUrl(url: String?): Boolean {
+        val uri = try {
+            URI(url ?: return false)
+        } catch (e: Exception) {
+            return false
+        }
+        return uri.scheme?.lowercase() == "https" && !uri.host.isNullOrBlank()
+    }
+
     /** ¿Es el login de un proveedor que debe abrirse dentro de la app? */
     fun isProviderLogin(url: String?): Boolean {
         val host = hostOf(url) ?: return false

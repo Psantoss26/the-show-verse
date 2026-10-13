@@ -16,8 +16,13 @@ import {
   userListItems,
   titleComments,
   tmdbCache,
+  commentLikes,
+  listLikes,
+  collectionLikes,
+  communityLists,
 } from '../db/schema.js';
 import { getTitlePoster } from './tmdbPoster.js';
+import { getTmdbCollection } from './tmdbCollection.js';
 import { getMediaMetadataMap, metadataFor } from '../utils/mediaMetadata.js';
 import {
   countCompletedShows,
@@ -828,6 +833,10 @@ export async function buildSectionCounts(db, targetId, { includePrivateLists = f
         .from(userListItems)
         .innerJoin(userLists, eq(userLists.id, userListItems.listId))
         .where(listVisibility),
+      // Me gusta: en reseñas, listas de la comunidad y colecciones.
+      db.select({ n: count() }).from(commentLikes).where(eq(commentLikes.userId, targetId)),
+      db.select({ n: count() }).from(listLikes).where(eq(listLikes.userId, targetId)),
+      db.select({ n: count() }).from(collectionLikes).where(eq(collectionLikes.userId, targetId)),
     ]),
   ]);
   return {
@@ -1218,6 +1227,77 @@ export async function getUserLists(db, targetId, opts = {}) {
   return result;
 }
 
+// ─── Me gusta en la actividad ───────────────────────────────────────────────
+const LIKE_EXCERPT_MAX = 160;
+
+/** Ruta de TMDb ("/a.jpg") de una URL de imagen de TMDb, o null. */
+export function tmdbImagePath(url) {
+  const match = String(url || '').match(/image\.tmdb\.org\/t\/p\/[^/]+(\/[^/?#]+)$/);
+  return match ? match[1] : null;
+}
+
+/** Fragmento de una reseña para la actividad (nunca el texto con spoilers). */
+export function likeExcerpt(body, spoiler) {
+  if (spoiler) return null;
+  const text = String(body || '').replace(/\s+/g, ' ').trim();
+  if (!text) return null;
+  return text.length > LIKE_EXCERPT_MAX ? `${text.slice(0, LIKE_EXCERPT_MAX - 1).trimEnd()}…` : text;
+}
+
+/** Me gusta en una reseña → evento de actividad (con la ficha de la reseña). */
+export function mapReviewLikeEvent(row) {
+  return {
+    id: `like-review:${row.id}`,
+    type: 'like_review',
+    commentId: row.commentId,
+    tmdbId: row.tmdbId,
+    mediaType: row.mediaType,
+    title: null,
+    posterPath: null,
+    excerpt: likeExcerpt(row.body, row.spoiler),
+    spoiler: Boolean(row.spoiler),
+    // Solo las reseñas de la app enlazan a un perfil de aquí; las de Trakt
+    // llevan el nombre de su autor en Trakt.
+    reviewAuthor: {
+      name: row.authorName || row.authorUsername || null,
+      username: row.authorSource === 'native' ? row.authorUsername || null : null,
+    },
+    createdAt: row.createdAt,
+  };
+}
+
+/** Me gusta en una lista de la comunidad → evento de actividad. */
+export function mapListLikeEvent(row) {
+  const posters = Array.isArray(row.previewPosters) ? row.previewPosters : [];
+  return {
+    id: `like-list:${row.id}`,
+    type: 'like_list',
+    listId: row.listId,
+    name: row.name || null,
+    posterPath: posters.map(tmdbImagePath).find(Boolean) || null,
+    listOwner: {
+      name: row.ownerName || row.ownerUsername || null,
+      username: row.listSource === 'user' ? row.ownerUsername || null : null,
+    },
+    createdAt: row.createdAt,
+  };
+}
+
+/** Nombre y póster de las colecciones con me gusta de la página (best-effort). */
+async function hydrateCollectionLikes(db, items) {
+  const pending = items.filter((item) => item.type === 'like_collection');
+  if (!pending.length) return;
+  const ids = [...new Set(pending.map((item) => item.collectionId))];
+  const collections = new Map(
+    await Promise.all(ids.map(async (id) => [id, await getTmdbCollection(db, id).catch(() => null)])),
+  );
+  for (const item of pending) {
+    const collection = collections.get(item.collectionId);
+    item.name = collection?.name || null;
+    item.posterPath = collection?.poster_path || null;
+  }
+}
+
 // Actividad pública del perfil. Se deriva de los registros ya persistidos en vez
 // de duplicarlos en otra tabla: así incluye también la actividad anterior a esta
 // vista y siempre refleja el estado real de cada sección.
@@ -1227,7 +1307,18 @@ export async function getUserActivity(db, targetId, opts = {}) {
   // que una URL manipulada convierta el feed en una consulta desproporcionada.
   const sourceLimit = Math.min(1000, Math.max(limit + offset + 1, limit + 1));
 
-  const [reviewRows, watchedRows, watchlistRows, favoriteRows, ratingRows, listRows, listItemRows] = await Promise.all([
+  const [
+    reviewRows,
+    watchedRows,
+    watchlistRows,
+    favoriteRows,
+    ratingRows,
+    listRows,
+    listItemRows,
+    reviewLikeRows,
+    listLikeRows,
+    collectionLikeRows,
+  ] = await Promise.all([
     db
       .select({
         id: titleComments.id,
@@ -1321,6 +1412,51 @@ export async function getUserActivity(db, targetId, opts = {}) {
       .where(and(eq(userLists.userId, targetId), eq(userLists.isPublic, true)))
       .orderBy(desc(userListItems.addedAt))
       .limit(sourceLimit),
+    // Me gusta en reseñas (de la app o de Trakt) de una ficha: el título se
+    // hidrata como el resto de eventos con título.
+    db
+      .select({
+        id: commentLikes.id,
+        commentId: titleComments.id,
+        tmdbId: titleComments.tmdbId,
+        mediaType: titleComments.mediaType,
+        body: titleComments.body,
+        spoiler: titleComments.spoiler,
+        authorName: titleComments.authorName,
+        authorUsername: titleComments.authorUsername,
+        authorSource: titleComments.source,
+        createdAt: commentLikes.createdAt,
+      })
+      .from(commentLikes)
+      .innerJoin(titleComments, eq(titleComments.id, commentLikes.commentId))
+      .where(eq(commentLikes.userId, targetId))
+      .orderBy(desc(commentLikes.createdAt))
+      .limit(sourceLimit),
+    // Me gusta en listas de la comunidad (de Trakt o de otros miembros).
+    db
+      .select({
+        id: listLikes.id,
+        listId: communityLists.id,
+        name: communityLists.name,
+        ownerName: communityLists.ownerName,
+        ownerUsername: communityLists.ownerUsername,
+        listSource: communityLists.source,
+        previewPosters: communityLists.previewPosters,
+        createdAt: listLikes.createdAt,
+      })
+      .from(listLikes)
+      .innerJoin(communityLists, eq(communityLists.id, listLikes.listId))
+      .where(eq(listLikes.userId, targetId))
+      .orderBy(desc(listLikes.createdAt))
+      .limit(sourceLimit),
+    // Me gusta en colecciones de TMDb: solo guardan el id; nombre y póster se
+    // piden después, solo para las de la página.
+    db
+      .select({ id: collectionLikes.id, collectionId: collectionLikes.collectionId, createdAt: collectionLikes.createdAt })
+      .from(collectionLikes)
+      .where(eq(collectionLikes.userId, targetId))
+      .orderBy(desc(collectionLikes.createdAt))
+      .limit(sourceLimit),
   ]);
 
   const events = [
@@ -1343,6 +1479,16 @@ export async function getUserActivity(db, targetId, opts = {}) {
     })),
     ...listRows.map((row) => ({ ...row, id: `list:${row.id}`, type: 'list' })),
     ...listItemRows.map((row) => ({ ...row, id: `list-item:${row.id}`, type: 'list_item' })),
+    ...reviewLikeRows.map(mapReviewLikeEvent),
+    ...listLikeRows.map(mapListLikeEvent),
+    ...collectionLikeRows.map((row) => ({
+      id: `like-collection:${row.id}`,
+      type: 'like_collection',
+      collectionId: Number(row.collectionId),
+      name: null,
+      posterPath: null,
+      createdAt: row.createdAt,
+    })),
   ];
 
   events.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -1366,18 +1512,24 @@ export async function getUserActivity(db, targetId, opts = {}) {
   for (const item of reviewItems) {
     item.rating = reviewRatingByKey.get(titleKey(item.mediaType, item.tmdbId)) ?? null;
   }
-  await fillMissingPosters(db, targetId, titleEvents);
+  await Promise.all([
+    fillMissingPosters(db, targetId, titleEvents),
+    hydrateCollectionLikes(db, page.items),
+  ]);
   // Después de rellenar: los títulos guardados en las tablas del usuario pueden
   // venir en inglés de los imports, así que el que se muestra se normaliza a
   // es-ES con TMDb. Best-effort: si falla, se envían los títulos almacenados.
   const titleMetadata = await getMediaMetadataMap(titleEvents).catch(() => new Map());
   applySpanishTitles(page.items, titleMetadata);
   const englishPosters = await resolveEnglishPosterPaths(db, titleEvents);
-  page.items = applyResolvedEnglishPosterPaths(
-    page.items,
-    englishPosters,
-    { strict: true },
-  );
+  // La portada inglesa definitiva solo aplica a los eventos con título: los me
+  // gusta en listas y colecciones traen su propio póster.
+  const titleEventSet = new Set(titleEvents);
+  page.items = page.items.map((item) => (
+    titleEventSet.has(item)
+      ? applyResolvedEnglishPosterPaths([item], englishPosters, { strict: true })[0]
+      : item
+  ));
   return page;
 }
 

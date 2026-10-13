@@ -26,6 +26,7 @@ import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.browser.customtabs.CustomTabsClient
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -240,6 +241,7 @@ class WebAppActivity : AppCompatActivity() {
                 ::abrirEnNavegador,
                 ::bloquearRecarga,
                 ::pedirPermisoPush,
+                ::abrirSoloEnNavegador,
             ),
             WebAppBridge.NAME,
         )
@@ -559,6 +561,23 @@ class WebAppActivity : AppCompatActivity() {
                 .launchUrl(this, Uri.parse(url))
         } catch (e: ActivityNotFoundException) {
             abrirConElSistema(url)
+        }
+    }
+
+    /**
+     * Como [abrirEnNavegador], pero la pestaña va dirigida al navegador por su
+     * paquete. Sin él, Android resuelve la URL y una app verificada para el
+     * dominio (App Links) se la queda antes que el navegador: así pasaba con la
+     * exportación de Letterboxd, que su app no tiene.
+     */
+    private fun abrirSoloEnNavegador(url: String) {
+        val navegador = CustomTabsClient.getPackageName(this, null)
+        try {
+            val pestana = CustomTabsIntent.Builder().setShowTitle(true).build()
+            if (navegador != null) pestana.intent.setPackage(navegador)
+            pestana.launchUrl(this, Uri.parse(url))
+        } catch (e: ActivityNotFoundException) {
+            abrirEnNavegador(url)
         }
     }
 
