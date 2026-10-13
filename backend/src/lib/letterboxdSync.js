@@ -9,12 +9,11 @@
 //   - "Me gusta" → Favoritas, una vez por entrada (si luego la quitas de
 //     Favoritas, no vuelve).
 //   - Reseñas → reseñas de la comunidad en la ficha, a tu nombre y con su
-//     aviso de spoilers. Si la editas en Letterboxd mientras sigue en el feed,
-//     se actualiza; si la borras aquí, no se vuelve a crear.
+//     aviso de spoilers. Si la borras aquí, no se vuelve a crear.
 //   - La watchlist no tiene feed: llega con la exportación oficial.
-//   - Ediciones: si una entrada que sigue en el feed cambia de nota, se
-//     actualiza. Las eliminaciones y las ediciones de entradas que ya salieron
-//     del feed no se pueden detectar por RSS.
+//   - NUNCA se modifica lo que ya tienes aquí: un título que ya tiene nota
+//     conserva la suya y una reseña ya creada no se reescribe, aunque cambien
+//     en Letterboxd. Solo se AÑADE lo que falta.
 //   - El RSS solo trae las últimas ~50 entradas: el historial completo entra
 //     con la exportación oficial (ZIP, o la extensión, que la descarga sola).
 
@@ -129,32 +128,28 @@ async function withPosters(items) {
   return items.map((item) => ({ ...item, posterPath: posters.get(item.tmdbId) || null }));
 }
 
+/**
+ * Puntuaciones del feed: solo las de títulos que aún no tienen nota aquí. Una
+ * importación NUNCA modifica lo que el usuario ya tiene (tampoco si la nota
+ * cambia luego en Letterboxd): su nota de aquí manda.
+ */
 async function applyRatings(userId, items) {
   const values = items
     .map((item) => mapLetterboxdRatingItem({ ...item, ratedAt: item.publishedAt }, userId))
     .filter(Boolean);
   if (!values.length) return { imported: 0, updated: 0 };
   const existing = await db.select().from(userRatings).where(eq(userRatings.userId, userId));
-  const byKey = new Map(
-    existing.filter((row) => row.season == null && row.episode == null).map((row) => [ratingKey(row), row]),
+  const rated = new Set(
+    existing.filter((row) => row.season == null && row.episode == null).map(ratingKey),
   );
   let imported = 0;
-  let updated = 0;
   for (const value of values) {
-    const current = byKey.get(ratingKey(value));
-    if (current) {
-      if (Number(current.rating) === value.rating) continue;
-      await db
-        .update(userRatings)
-        .set({ rating: value.rating, ratedAt: value.ratedAt, updatedAt: new Date() })
-        .where(eq(userRatings.id, current.id));
-      updated += 1;
-    } else {
-      await db.insert(userRatings).values(value).onConflictDoNothing();
-      imported += 1;
-    }
+    if (rated.has(ratingKey(value))) continue;
+    const rows = await db.insert(userRatings).values(value).onConflictDoNothing().returning({ id: userRatings.id });
+    rated.add(ratingKey(value));
+    imported += rows.length;
   }
-  return { imported, updated };
+  return { imported, updated: 0 };
 }
 
 async function applyLikes(userId, items) {
@@ -221,15 +216,11 @@ async function applyReviews(userId, items, previous = {}) {
     }
     state[item.guid] = { id, hash: letterboxdReviewHash(item.review) };
   }
+  // Una reseña que ya existe aquí NO se toca aunque cambie en Letterboxd: una
+  // importación nunca modifica lo que el usuario ya tiene (podría haberla
+  // editado aquí). Solo se recuerda el nuevo texto para no volver a mirarla.
   for (const { item, commentId } of update) {
-    const [row] = await db
-      .update(titleComments)
-      .set({ body: item.review.body, spoiler: Boolean(item.review.spoiler) })
-      .where(and(eq(titleComments.id, commentId), eq(titleComments.userId, userId), eq(titleComments.source, 'native')))
-      .returning({ id: titleComments.id });
-    // Borrada aquí: se recuerda para no volver a crearla.
-    state[item.guid] = { id: row?.id || null, hash: letterboxdReviewHash(item.review) };
-    if (row) updated += 1;
+    state[item.guid] = { id: commentId || null, hash: letterboxdReviewHash(item.review) };
   }
   return { state, created, updated };
 }

@@ -54,7 +54,7 @@ jobs:
           # Se listan los servicios EXPLÍCITAMENTE para NO recrear el propio
           # github-runner (que está ejecutando este job).
           docker compose up -d --build \
-            postgres redis backend web cloudflared ollama
+            postgres pg-backup redis backend web cloudflared ollama
 
       - name: Limpiar imágenes huérfanas
         run: docker image prune -f

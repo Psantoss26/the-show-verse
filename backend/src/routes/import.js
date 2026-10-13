@@ -383,38 +383,39 @@ async function importRatingValues(userId, traktRatings = []) {
   return importNormalizedRatingValues(userId, sourceValues, traktRatings.length);
 }
 
+/**
+ * Puntuaciones importadas (Trakt, TMDb, Letterboxd, IMDb). Una importación
+ * NUNCA modifica lo que el usuario ya tiene: si el título ya tiene nota aquí,
+ * se respeta tal cual y la importada se descarta. Solo entran las nuevas.
+ *
+ * (Antes se sobrescribían: una importación de Letterboxd, que puntúa en
+ * estrellas, cambió las notas de 0,5 en 0,5 de títulos ya puntuados aquí.)
+ */
 async function importNormalizedRatingValues(userId, sourceValues = [], fetched = 0) {
   const existing = await db.select().from(userRatings).where(eq(userRatings.userId, userId));
-  const existingByKey = new Map(existing.map((item) => [ratingKey(item), item]));
+  const existingKeys = new Set(existing.map(ratingKey));
 
   let inserted = 0;
-  let updated = 0;
+  let skipped = 0;
 
   for (const item of sourceValues) {
-    const existingItem = existingByKey.get(ratingKey(item));
-    if (existingItem) {
-      await db
-        .update(userRatings)
-        .set({
-          rating: item.rating,
-          title: item.title,
-          posterPath: item.posterPath || null,
-          ratedAt: item.ratedAt,
-          updatedAt: new Date(),
-        })
-        .where(eq(userRatings.id, existingItem.id));
-      updated += 1;
-    } else {
-      await db.insert(userRatings).values(item).onConflictDoNothing();
-      inserted += 1;
+    const key = ratingKey(item);
+    if (existingKeys.has(key)) {
+      skipped += 1;
+      continue;
     }
+    const rows = await db.insert(userRatings).values(item).onConflictDoNothing().returning({ id: userRatings.id });
+    existingKeys.add(key);
+    if (rows.length) inserted += 1;
+    else skipped += 1;
   }
 
   return {
     status: 'done',
     fetched,
     imported: inserted,
-    updated,
+    updated: 0,
+    skipped,
   };
 }
 
