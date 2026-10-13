@@ -3,6 +3,7 @@
 
 import OptimizedImage from "@/components/OptimizedImage";
 import useModalGuard from "@/hooks/useModalGuard";
+import { useLinksWithWikipedia } from "@/lib/details/useWikipediaLink";
 import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER } from "@/lib/ui/liquidGlass";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -22,10 +23,13 @@ export default function ExternalLinksModal({
     links,
     mode = 'links',
     loading = false,
+    // { wikidataId, imdbId, type, tmdbId }: añade Wikipedia cuando se resuelve.
+    wikipedia = null,
 }) {
     const [portalReady, setPortalReady] = useState(false)
-    const items = Array.isArray(links) ? links.filter((x) => x?.href) : []
     const isPlatformsMode = mode === 'platforms'
+    const allLinks = useLinksWithWikipedia(links, isPlatformsMode ? null : wikipedia)
+    const items = Array.isArray(allLinks) ? allLinks.filter((x) => x?.href) : []
     const modalTitle = isPlatformsMode ? 'Plataformas disponibles' : 'Enlaces externos'
     const modalSubtitle = isPlatformsMode ? 'Dónde ver este título' : 'Fuentes y plataformas'
     const emptyMessage = isPlatformsMode

@@ -39,6 +39,7 @@ import {
   SCOREBOARD_PILL_CLASS,
 } from "@/components/details/DetailHeaderBits";
 import { formatShortNumber } from "@/lib/details/formatters";
+import { useLinksWithWikipedia } from "@/lib/details/useWikipediaLink";
 import { LIQUID_GLASS_SURFACE } from "@/lib/ui/liquidGlass";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 
@@ -521,7 +522,10 @@ function StreamingProviderButton({ provider }) {
 }
 
 function DetailsToolbarActions({
-  externalLinks = null,
+  externalLinks: baseExternalLinks = null,
+  // { wikidataId, imdbId, type, tmdbId }: Wikipedia se añade aquí al
+  // resolverse, sin volver a pintar la ficha (ver useLinksWithWikipedia).
+  wikipedia = null,
   streamingProviders = null,
   onMoreLinks,
   onMorePlatforms,
@@ -535,6 +539,8 @@ function DetailsToolbarActions({
   phone = false,
 }) {
   const prefersReducedMotion = useReducedMotion();
+  const resolvedExternalLinks = useLinksWithWikipedia(baseExternalLinks, wikipedia);
+  const externalLinks = Array.isArray(baseExternalLinks) ? resolvedExternalLinks : baseExternalLinks;
   const hasExternalLinks =
     Array.isArray(externalLinks) && externalLinks.length > 0;
   const hasStreamingProviders =
@@ -772,6 +778,7 @@ export default function DetailsScoreboardPanel({
   statsTrailing = null,
   compactStatsTrailing = false,
   externalLinks = null,
+  externalLinksWikipedia = null,
   streamingProviders = null,
   onMoreLinks,
   onMorePlatforms,
@@ -922,6 +929,7 @@ export default function DetailsScoreboardPanel({
           <div className={mobileScoresOnly ? "contents phone-sb:hidden" : "contents"}>
           <DetailsToolbarActions
             externalLinks={externalLinks}
+            wikipedia={externalLinksWikipedia}
             streamingProviders={streamingProviders}
             onMoreLinks={onMoreLinks}
             onMorePlatforms={onMorePlatforms}

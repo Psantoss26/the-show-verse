@@ -1,4 +1,5 @@
 import { slugifyForSeriesGraph } from "@/lib/details/formatters";
+import { pickExternalIds, withTitleExternalLinks } from "@/lib/details/titleExternalLinks";
 
 function normalizeUrl(value) {
   if (!value) return null;
@@ -12,13 +13,16 @@ function normalizeUrl(value) {
 /**
  * Enlaces de referencia de una serie compartidos por sus fichas de temporada
  * y episodio. Son los equivalentes que puede mostrar DetailsClient sin pedir
- * más datos al montar una subficha.
+ * más datos al montar una subficha: con `externalIds` (los de la serie en
+ * TMDb) suma Instagram, IMDb, TMDb y Trakt; Wikipedia la añade el modal de
+ * enlaces (ver `tvWikipediaQuery`).
  */
 export function buildTvExternalLinks({
   showId,
   title,
   originalTitle,
   homepage,
+  externalIds = null,
 }) {
   const resolvedTitle = String(title || originalTitle || "").trim();
   const seriesGraphTitle = String(originalTitle || title || "").trim();
@@ -61,5 +65,17 @@ export function buildTvExternalLinks({
     });
   }
 
-  return items;
+  const ids = pickExternalIds(externalIds);
+  return withTitleExternalLinks(items, {
+    instagramId: ids.instagramId,
+    type: "tv",
+    tmdbId: showId,
+    imdbId: ids.imdbId,
+  });
+}
+
+/** Consulta de Wikipedia de la serie para el modal de enlaces de una subficha. */
+export function tvWikipediaQuery({ showId, externalIds = null }) {
+  const ids = pickExternalIds(externalIds);
+  return { wikidataId: ids.wikidataId, imdbId: ids.imdbId, type: "tv", tmdbId: showId };
 }
