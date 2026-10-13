@@ -34,6 +34,9 @@ export default function OptimizedImage({
       alt={alt || ""}
       width={fill ? undefined : width}
       height={fill ? undefined : height}
+      // Sin `sizes` el navegador supone 100vw y con `srcSet` baja la imagen
+      // más grande de la lista para cualquier miniatura.
+      sizes={sizes}
       style={finalStyle}
       loading={priority ? "eager" : "lazy"}
       fetchPriority={fetchPriority}
