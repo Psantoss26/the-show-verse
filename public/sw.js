@@ -59,7 +59,9 @@ const isRscRequest = (request, url) => url.searchParams.has("_rsc") || request.h
 const isNavigation = (request) => request.mode === "navigate" || (request.headers.get("Accept") || "").includes("text/html");
 // La exportación de datos (/api/user/export) va siempre a la red: es la
 // biblioteca entera, no cabe en la copia sin conexión y offline daría una vieja.
-const excludedApi = (path) => /\/(?:request-token|pair-mobile|callback|claim|login|connect|disconnect|export)(?:\/|$)/.test(path) || (!["/api/auth/me", "/api/auth/connections", "/api/spotify/auth/status", "/api/plex/auth/status"].includes(path) && /\/(?:auth|session|private-access)(?:\/|$)/.test(path) && path !== "/api/trakt/auth/status");
+// Los nombres de los títulos del buscador (/api/tmdb/title-names) tampoco: cada
+// lote es una URL distinta y el navegador ya los guarda (lib/search/titleNames).
+const excludedApi = (path) => /\/(?:request-token|pair-mobile|callback|claim|login|connect|disconnect|export|title-names)(?:\/|$)/.test(path) || (!["/api/auth/me", "/api/auth/connections", "/api/spotify/auth/status", "/api/plex/auth/status"].includes(path) && /\/(?:auth|session|private-access)(?:\/|$)/.test(path) && path !== "/api/trakt/auth/status");
 
 async function session() {
   if (!sessionPromise) sessionPromise = (async () => {

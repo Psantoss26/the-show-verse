@@ -7,6 +7,7 @@ import { db } from '../db/client.js';
 import { tmdbCache } from '../db/schema.js';
 import { cacheGet, cacheSet } from '../lib/redis.js';
 import { normalizeTitleSearch } from '../lib/titleSearch.js';
+import { parseTitleNameKeys, resolveTitleNames } from '../lib/titleNames.js';
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
 const TMDB_BASE = 'https://api.themoviedb.org/3';
@@ -154,6 +155,22 @@ export async function searchTmdbTitles(q) {
 }
 
 export default async function tmdbRoutes(fastify) {
+  // ──────────────────────────────────────────────
+  // GET /tmdb/title-names?keys=movie:603,tv:1396
+  // Nombre en inglés, en español y original de cada título (hasta 100), para
+  // que el buscador de las páginas de usuario lo encuentre por cualquiera.
+  // ──────────────────────────────────────────────
+  fastify.get(
+    '/title-names',
+    { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } },
+    async (req, reply) => {
+      const keys = parseTitleNameKeys(req.query?.keys);
+      if (!keys.length) return reply.status(400).send({ error: 'keys required' });
+      const names = await resolveTitleNames(db, keys);
+      return reply.send({ names: Object.fromEntries(names) });
+    },
+  );
+
   // ──────────────────────────────────────────────
   // GET /tmdb/movie/:id
   // ──────────────────────────────────────────────

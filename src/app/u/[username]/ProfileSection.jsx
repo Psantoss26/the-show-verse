@@ -70,6 +70,8 @@ import {
 } from "@/lib/userLists/pendingListAdditions";
 import { LIST_CHANGED_EVENT } from "@/lib/userLists/optimisticListCache";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
+import { normalizeSearchText, titleMatchesQuery } from "@/lib/search/titleMatching";
+import { useTitleNameSearch } from "@/lib/search/useTitleNameSearch";
 
 // Sección de Perfil ↔ lista del store de altas optimistas.
 const PROFILE_PENDING_LIST_BY_SECTION = {
@@ -1688,11 +1690,16 @@ function ProfileContentSection({ username, section, actor }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, isSelfProfile, pendingListType, section, pendingVersion]);
 
+  // La búsqueda mira también el nombre en inglés y en español (llegan al escribir).
+  const titleNamesVersion = useTitleNameSearch(menuEnabled ? sourceItems : null, controls.query);
   const visibleItems = useMemo(() => {
     if (!menuEnabled) return sourceItems;
-    const query = controls.query.trim().toLocaleLowerCase();
+    const query = normalizeSearchText(controls.query);
     const filtered = sourceItems.filter((item) => {
-      const matchesQuery = !query || getItemTitle(item).toLocaleLowerCase().includes(query);
+      const matchesQuery =
+        !query ||
+        normalizeSearchText(getItemTitle(item)).includes(query) ||
+        titleMatchesQuery(item, query);
       if (!matchesQuery) return false;
       if (controls.filter === "all") return true;
       if (section === "activity") return activityActionKey(item) === controls.filter;
@@ -1708,7 +1715,9 @@ function ProfileContentSection({ username, section, actor }) {
       const bDate = getItemDate(b)?.getTime() || 0;
       return controls.sort === "oldest" ? aDate - bDate : bDate - aDate;
     });
-  }, [controls, sourceItems, menuEnabled, section]);
+    // titleNamesVersion: recalcular al llegar los nombres en inglés y español.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [controls, sourceItems, menuEnabled, section, titleNamesVersion]);
 
   // El modo con póster es una representación de títulos, no del registro
   // textual de actividad. Las acciones como crear una lista no tienen artwork

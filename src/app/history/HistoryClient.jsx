@@ -54,6 +54,7 @@ import {
   normalizeSearchText,
   titleMatchesQuery,
 } from "@/lib/search/titleMatching";
+import { useTitleNameSearch } from "@/lib/search/useTitleNameSearch";
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 import {
   historyEntryMatchesTarget,
@@ -3569,6 +3570,9 @@ export default function HistoryClient() {
     }
   }, []);
 
+  // También por el nombre en inglés y en español de la película o la serie
+  // (llegan al escribir).
+  const titleNamesVersion = useTitleNameSearch(raw, q);
   const filtered = useMemo(() => {
     const needle = normalizeSearchText(q);
     return (raw || []).filter((e) => {
@@ -3583,7 +3587,9 @@ export default function HistoryClient() {
       }
       return true;
     });
-  }, [raw, q, typeFilter, selectedDay]);
+    // titleNamesVersion: recalcular al llegar los nombres en inglés y español.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [raw, q, typeFilter, selectedDay, titleNamesVersion]);
 
   const sorted = useMemo(() => {
     const items = [...filtered];

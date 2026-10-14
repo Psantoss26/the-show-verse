@@ -39,6 +39,7 @@ import {
   normalizeSearchText,
   titleMatchesQuery,
 } from "@/lib/search/titleMatching";
+import { useTitleNameSearch } from "@/lib/search/useTitleNameSearch";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 
 const INITIAL_RENDER_COUNT = 60;
@@ -235,7 +236,7 @@ function filterAndSortItems(items, getMeta, q, typeFilter, sortBy) {
 
   return (Array.isArray(items) ? items : [])
     .map((item, index) => ({ item, index, meta: getMeta(item, index) }))
-    .filter(({ meta }) => {
+    .filter(({ item, meta }) => {
       if (typeFilter === "movies" && meta.mediaType !== "movie") return false;
       if (typeFilter === "shows" && meta.mediaType !== "tv") return false;
       if (!needle) return true;
@@ -389,9 +390,18 @@ export default function FilterableListItems({
   const skipInitialResetRef = useRef(isBackNav);
   const loadMoreRef = useRef(null);
 
+  // La búsqueda mira también el nombre en inglés y en español: se piden con el
+  // tipo y el id de TMDb normalizados de cada elemento (su meta).
+  const searchMetas = useMemo(
+    () => (Array.isArray(items) ? items.map((item, index) => getMeta(item, index)) : []),
+    [items, getMeta],
+  );
+  const titleNamesVersion = useTitleNameSearch(searchMetas, q);
   const entries = useMemo(
     () => filterAndSortItems(items, getMeta, q, typeFilter, sortBy),
-    [items, getMeta, q, typeFilter, sortBy],
+    // titleNamesVersion: recalcular al llegar los nombres en inglés y español.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [items, getMeta, q, typeFilter, sortBy, titleNamesVersion],
   );
   const groups = useMemo(
     () => groupItems(entries, groupBy),
