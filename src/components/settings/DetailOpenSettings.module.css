@@ -1,0 +1,79 @@
+.dialog {
+  border: 0;
+  background: radial-gradient(ellipse at 15% 0%, rgb(52 211 153 / 5%), transparent 45%), #101113;
+  box-shadow: 0 32px 120px rgb(0 0 0 / 65%);
+}
+.scope {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  gap: 4px;
+  padding: 5px;
+  border-radius: 16px;
+  background: rgb(0 0 0 / 24%);
+}
+.scopeOption {
+  display: block;
+  padding: 10px 16px;
+  border-radius: 12px;
+  color: #a1a1aa;
+  font-size: 13px;
+  font-weight: 600;
+  transition: color 160ms, background-color 160ms, box-shadow 160ms;
+}
+.scopeOption:hover { color: #f4f4f5; }
+input:checked + .scopeOption {
+  background: rgb(255 255 255 / 8%);
+  color: #a7f3d0;
+  box-shadow: 0 3px 10px rgb(0 0 0 / 15%);
+}
+input:focus-visible + .scopeOption { outline: 2px solid #6ee7b7; outline-offset: 2px; }
+.select {
+  appearance: none;
+  width: 100%;
+  min-height: 46px;
+  border: 0;
+  border-radius: 14px;
+  padding: 12px 36px 12px 14px;
+  background: rgb(255 255 255 / 6%);
+  color: #f4f4f5;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 160ms, box-shadow 160ms;
+}
+.select:hover:not(:disabled) { background: rgb(255 255 255 / 10%); }
+.select:focus-visible { outline: 2px solid #6ee7b7; outline-offset: 3px; }
+.select:disabled { opacity: .35; cursor: not-allowed; }
+.select option { background: #222426; color: #f4f4f5; }
+.chevron { pointer-events: none; position: absolute; right: 14px; top: 16px; color: #a1a1aa; }
+/* Progressive enhancement: native accessible pickers remain on Baseline 2024 browsers. */
+@supports (appearance: base-select) {
+  .select, .select::picker(select) { appearance: base-select; }
+  .select { padding-right: 14px; align-items: center; }
+  .select::picker-icon { color: #a1a1aa; transition: rotate 160ms; }
+  .select:open::picker-icon { rotate: 180deg; }
+  .chevron { display: none; }
+  .select::picker(select) {
+    margin-top: 8px;
+    padding: 6px;
+    border: 0;
+    border-radius: 16px;
+    background: #222426;
+    box-shadow: 0 16px 48px rgb(0 0 0 / 50%);
+  }
+  .select option {
+    min-height: 44px;
+    padding: 10px 12px;
+    gap: 12px;
+    border-radius: 10px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .select option:hover, .select option:focus { background: rgb(255 255 255 / 7%); outline: none; }
+  .select option:checked { color: #a7f3d0; background: rgb(52 211 153 / 9%); }
+  .select option::checkmark { color: #6ee7b7; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .select, .scopeOption, .select::picker-icon { transition: none; }
+}
