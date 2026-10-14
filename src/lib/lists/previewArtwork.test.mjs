@@ -74,7 +74,7 @@ test("las vistas de listas resuelven backdrop y poster en inglés", async () => 
   assert.equal(items[0].backdrop_path, "/backdrop-es-base.jpg");
 });
 
-test("el backdrop neutro es el respaldo cuando no existe uno inglés", async () => {
+test("sin backdrop inglés se usa el español antes que el neutro", async () => {
   clearListPreviewArtworkCache();
   const [item] = await enrichListPreviewArtwork(
     [{ id: 20, media_type: "tv", backdrop_path: "/backdrop-base.jpg" }],
@@ -99,7 +99,7 @@ test("el backdrop neutro es el respaldo cuando no existe uno inglés", async () 
     },
   );
 
-  assert.equal(item._listPreviewBackdrop, "/backdrop-neutral.jpg");
+  assert.equal(item._listPreviewBackdrop, "/backdrop-es.jpg");
 });
 
 test("solo se resuelve el artwork de los cinco primeros títulos", async () => {

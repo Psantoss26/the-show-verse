@@ -230,7 +230,9 @@ function useItemBackdrop(item, backdropOverride) {
 
     (async () => {
       try {
-        const preferred = await fetchBestBackdrop(current.id, type);
+        const preferred = await fetchBestBackdrop(current.id, type, {
+          originalLanguage: current.original_language,
+        });
         const chosen = preferred || getPreviewBackdropFallback(current);
         movieBackdropCache.set(key, chosen);
         if (chosen) await preloadImage(buildImg(chosen, BACKDROP_SIZE));

@@ -22,6 +22,7 @@ import {
   communityLists,
 } from '../db/schema.js';
 import { getTitlePoster } from './tmdbPoster.js';
+import { pickByLanguageLadder } from './imageLanguageLadder.js';
 import { getTmdbCollection } from './tmdbCollection.js';
 import { getMediaMetadataMap, metadataFor } from '../utils/mediaMetadata.js';
 import {
@@ -48,7 +49,9 @@ const DEFAULT_MOVIE_RUNTIME_MINS = 100;
 const DEFAULT_EPISODE_RUNTIME_MINS = 45;
 const PROFILE_ENGLISH_POSTER_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 const PROFILE_ENGLISH_POSTER_FETCH_CONCURRENCY = 8;
-const PROFILE_ENGLISH_POSTER_POLICY_VERSION = 'v2';
+// v3: escalera de idioma con español e idioma original (v2 guardaba `null`
+// para los títulos sin arte inglés ni sin idioma).
+const PROFILE_ENGLISH_POSTER_POLICY_VERSION = 'v3';
 const profileEnglishPosterMemory = new Map();
 
 // Normaliza limit/offset de una sección paginada (cotas defensivas).
@@ -95,19 +98,14 @@ function pickHighestQualityPoster(posters) {
     })[0] || null;
 }
 
-// Mismo criterio de DetailsClient: inglés, luego arte sin idioma y, por último,
-// cualquier alternativa que no sea española. Se exporta para cubrir el criterio
-// sin requerir red en los tests.
-export function pickBestEnglishPosterPath(posters) {
-  const valid = Array.isArray(posters)
-    ? posters.filter((poster) => typeof poster?.file_path === 'string' && poster.file_path)
-    : [];
-  const languageOf = (poster) => String(poster?.iso_639_1 || '').toLowerCase();
-  const english = valid.filter((poster) => ['en', 'en-us'].includes(languageOf(poster)));
-  const neutral = valid.filter((poster) => !poster?.iso_639_1);
-  const nonSpanish = valid.filter((poster) => !['es', 'es-es'].includes(languageOf(poster)));
-  const best = pickHighestQualityPoster(english.length ? english : neutral.length ? neutral : nonSpanish);
-  return best?.file_path || null;
+// Escalera de idioma de toda la app (inglés → español → idioma original → sin
+// idioma, ver imageLanguageLadder.js); dentro de cada idioma, el más votado.
+// `null` si no hay ninguno. Antes excluía el español a propósito, y un título
+// con pósters SOLO en español («Señor, dame paciencia») salía sin póster en
+// el Perfil y las notificaciones. Se exporta para cubrir el criterio sin
+// requerir red en los tests.
+export function pickLadderPosterPath(posters, originalLanguage) {
+  return pickByLanguageLadder(posters, pickHighestQualityPoster, { originalLanguage })?.file_path || null;
 }
 
 export function applyResolvedEnglishPosterPaths(
@@ -201,13 +199,15 @@ export async function resolveEnglishPosterPaths(db, items) {
     let posterPath = null;
     let settled = false;
     try {
+      // La ficha con sus imágenes SIN filtro de idioma: trae los pósters de
+      // todos los idiomas y `original_language` para la escalera.
       const response = await fetch(
-        `https://api.themoviedb.org/3/${item.mediaType}/${item.tmdbId}/images?api_key=${apiKey}&include_image_language=en,null`,
+        `https://api.themoviedb.org/3/${item.mediaType}/${item.tmdbId}?api_key=${apiKey}&append_to_response=images`,
         { signal: AbortSignal.timeout(8000) },
       );
       if (response.ok) {
         const payload = await response.json();
-        posterPath = pickBestEnglishPosterPath(payload?.posters);
+        posterPath = pickLadderPosterPath(payload?.images?.posters, payload?.original_language);
         settled = true;
       }
     } catch {

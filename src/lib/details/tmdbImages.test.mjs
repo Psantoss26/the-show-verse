@@ -2,12 +2,13 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   pickBestBackdropForPreview,
-  pickBestFavoriteEnglishPoster,
+  pickLadderBackdrop,
+  pickLadderPoster,
   pickPosterByLanguage,
 } from './tmdbImages.js'
 
-test('pickBestFavoriteEnglishPoster uses the Favorites ordering and ignores non-English posters', () => {
-  const selected = pickBestFavoriteEnglishPoster([
+test('pickLadderPoster: el inglés más votado; sin inglés, español; luego original y sin idioma', () => {
+  const selected = pickLadderPoster([
     { file_path: '/spanish.jpg', iso_639_1: 'es', vote_count: 1000 },
     { file_path: '/english-low.jpg', iso_639_1: 'en', vote_count: 4, width: 1000 },
     { file_path: '/english-best.jpg', iso_639_1: 'en-US', vote_count: 12, vote_average: 5, width: 500 },
@@ -15,7 +16,19 @@ test('pickBestFavoriteEnglishPoster uses the Favorites ordering and ignores non-
   ])
 
   assert.equal(selected?.file_path, '/english-tie.jpg')
-  assert.equal(pickBestFavoriteEnglishPoster([{ file_path: '/es.jpg', iso_639_1: 'es' }]), null)
+  assert.equal(pickLadderPoster([{ file_path: '/es.jpg', iso_639_1: 'es' }])?.file_path, '/es.jpg')
+  const korean = [{ file_path: '/none.jpg', iso_639_1: null }, { file_path: '/ko.jpg', iso_639_1: 'ko' }]
+  assert.equal(pickLadderPoster(korean, { originalLanguage: 'ko' })?.file_path, '/ko.jpg')
+  assert.equal(pickLadderPoster(korean)?.file_path, '/none.jpg')
+  assert.equal(pickLadderPoster([{ file_path: '/fr.jpg', iso_639_1: 'fr' }]), null)
+})
+
+test('pickLadderBackdrop: sin inglés usa el español antes que el sin idioma', () => {
+  const selected = pickLadderBackdrop([
+    { file_path: '/none.jpg', iso_639_1: null, width: 1920, height: 1080 },
+    { file_path: '/es.jpg', iso_639_1: 'es', width: 1280, height: 720 },
+  ])
+  assert.equal(selected?.file_path, '/es.jpg')
 })
 
 test('pickBestBackdropForPreview keeps an English backdrop when it is below the preferred resolution', () => {

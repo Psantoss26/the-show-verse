@@ -5,7 +5,12 @@ import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
 // comparten la misma instancia de caché.
 
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
-import { pickBestBackdropNoLang } from "@/lib/details/tmdbImages";
+import { pickBestBackdropNoLang, pickLadderPoster } from "@/lib/details/tmdbImages";
+import {
+  imageLanguageTiers,
+  pickByLanguageLadder,
+  pickPreferredResolutionBackdrop,
+} from "@/lib/tmdb/imageLanguageLadder";
 import { getMediaTypeForItem } from "./mediaType.mjs";
 import {
   readArtworkPreference,
@@ -228,90 +233,51 @@ export function getArtworkPreference(movieId, mediaType = "movie") {
   );
 }
 
+// Escalera de idioma de toda la app (inglés → español → idioma original → sin
+// idioma, ver lib/tmdb/imageLanguageLadder). Dentro de cada idioma, de los tres
+// primeros de TMDb con el ancho mínimo, el de resolución preferida; `offset`
+// pide el siguiente (segunda imagen del hero). `includeNoLanguage: false`
+// descarta el escalón sin idioma.
+const DASHBOARD_BACKDROP_SIZES = [
+  [1920, 1080],
+  [1712, 964],
+  [3840, 2160],
+];
+
 export function pickBestBackdropByLangResVotes(list, opts = {}) {
   const {
-    preferLangs = ["en", "en-US"],
     minWidth = 1200,
     offset = 0,
     includeNoLanguage = true,
+    originalLanguage,
   } = opts;
-
-  if (!Array.isArray(list) || list.length === 0) return null;
-
-  // Normaliza 'en-US' -> 'en'
-  const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
-  const preferSet = new Set((preferLangs || []).map(norm).filter(Boolean));
-  const isPreferredLang = (img) => preferSet.has(norm(img?.iso_639_1));
-  const hasNoLanguage = (img) => !norm(img?.iso_639_1);
-
-  const preferred = list.filter(isPreferredLang);
-  const withLanguage = list.filter(
-    (img) => norm(img?.iso_639_1) && !isPreferredLang(img),
-  );
-  const noLanguage = list.filter(hasNoLanguage);
-
-  const pickFrom = (pool) => {
-    if (!pool.length) return null;
-    const sizeFiltered =
-      minWidth > 0 ? pool.filter((b) => (b?.width || 0) >= minWidth) : pool;
-    const candidates = (sizeFiltered.length ? sizeFiltered : pool).slice(0, 3);
-    if (!candidates.length) return null;
-
-    const preferredSizes = [
-      [1920, 1080],
-      [1712, 964],
-      [3840, 2160],
-    ];
-    const ordered = [];
-    for (const [width, height] of preferredSizes) {
-      const match = candidates.find(
-        (b) => (b?.width || 0) === width && (b?.height || 0) === height,
-      );
-      if (match && !ordered.includes(match)) ordered.push(match);
-    }
-    for (const candidate of candidates) {
-      if (!ordered.includes(candidate)) ordered.push(candidate);
-    }
-
-    return ordered[Math.min(Math.max(0, offset), ordered.length - 1)] || null;
-  };
-
-  // Forzamos idioma en la vista previa: preferido (en) → cualquier otro idioma
-  // (es…) → y SOLO como último recurso sin idioma (textless). Antes el textless
-  // se elegía antes que un backdrop con idioma, mostrando portadas sin título.
-  return (
-    pickFrom(preferred) ||
-    pickFrom(withLanguage) ||
-    (includeNoLanguage ? pickFrom(noLanguage) : null)
-  );
+  const tiers = imageLanguageTiers(list, { originalLanguage });
+  if (!includeNoLanguage) tiers.pop();
+  for (const tier of tiers) {
+    const picked = pickPreferredResolutionBackdrop(tier, {
+      minWidth,
+      offset,
+      sizes: DASHBOARD_BACKDROP_SIZES,
+    });
+    if (picked) return picked;
+  }
+  return null;
 }
 
+// Póster con la misma escalera; dentro de cada idioma, el de mayor resolución.
 export function pickBestPosterByLangThenResolution(list, opts = {}) {
-  const { preferLangs = ["en", "en-US"], minWidth = 500 } = opts;
-
-  if (!Array.isArray(list) || list.length === 0) return null;
-
+  const { minWidth = 500, originalLanguage } = opts;
   const area = (img) => (img?.width || 0) * (img?.height || 0);
-  const lang = (img) => img?.iso_639_1 || null;
-
-  const sizeFiltered =
-    minWidth > 0 ? list.filter((p) => (p?.width || 0) >= minWidth) : list;
-  const pool0 = sizeFiltered.length ? sizeFiltered : list;
-
-  const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
-  const preferSet = new Set((preferLangs || []).map(norm).filter(Boolean));
-  const english = pool0.filter((p) => preferSet.has(norm(lang(p))));
-  const noLanguage = pool0.filter((p) => !norm(lang(p)));
-  const pool1 = english.length ? english : noLanguage.length ? noLanguage : pool0;
-
-  let maxArea = 0;
-  for (const p of pool1) maxArea = Math.max(maxArea, area(p));
-
-  for (const p of pool1) {
-    if (area(p) === maxArea) return p;
-  }
-
-  return null;
+  return pickByLanguageLadder(
+    list,
+    (tier) => {
+      const sized = minWidth > 0 ? tier.filter((p) => (p?.width || 0) >= minWidth) : tier;
+      const pool = sized.length ? sized : tier;
+      const maxArea = Math.max(...pool.map(area));
+      return pool.find((p) => area(p) === maxArea) || null;
+    },
+    { originalLanguage },
+  );
 }
 
 export async function getMovieImages(itemId, mediaType = "movie", opts = {}) {
@@ -352,8 +318,6 @@ export async function fetchBestBackdrop(itemId, mediaType = "movie", opts = {}) 
   if (!Array.isArray(backdrops) || backdrops.length === 0) return null;
 
   const best = pickBestBackdropByLangResVotes(backdrops, {
-    preferLangs: ["en", "en-US"],
-    resolutionWindow: 0.98,
     minWidth: 1200,
     ...opts,
   });
@@ -387,7 +351,9 @@ export async function preparePreviewBackdrop(item, backdropOverride) {
   if (backdropPath === undefined) {
     try {
       backdropPath =
-        (await fetchBestBackdrop(item.id, mediaType)) ||
+        (await fetchBestBackdrop(item.id, mediaType, {
+          originalLanguage: item.original_language,
+        })) ||
         getPreviewBackdropFallback(item);
     } catch {
       backdropPath = getPreviewBackdropFallback(item);
@@ -403,13 +369,13 @@ export async function preparePreviewBackdrop(item, backdropOverride) {
   return backdropPath || null;
 }
 
-export async function fetchBestPoster(itemId, mediaType = "movie") {
+export async function fetchBestPoster(itemId, mediaType = "movie", opts = {}) {
   const { posters } = await getMovieImages(itemId, mediaType);
   if (!Array.isArray(posters) || posters.length === 0) return null;
 
   const best = pickBestPosterByLangThenResolution(posters, {
-    preferLangs: ["en", "en-US"],
     minWidth: 500,
+    originalLanguage: opts.originalLanguage,
   });
 
   return best?.file_path || null;
@@ -421,63 +387,19 @@ const watchingPosterInFlight = new Map();
 const watchingBackdropChoiceCache = new Map();
 const watchingBackdropInFlight = new Map();
 
-function pickBestWatchingPoster(posters) {
-  if (!Array.isArray(posters) || posters.length === 0) return null;
+// Escalera de idioma de toda la app (lib/tmdb/imageLanguageLadder).
+const pickBestWatchingPoster = (posters, originalLanguage) =>
+  pickLadderPoster(posters, { originalLanguage });
+const pickBestWatchingBackdrop = (backdrops, originalLanguage) =>
+  pickBestBackdropByLangResVotes(backdrops, { minWidth: 1200, originalLanguage });
 
-  const maxVotes = posters.reduce(
-    (max, p) => ((p?.vote_count || 0) > max ? p.vote_count || 0 : max),
-    0,
-  );
-  const withMaxVotes = posters.filter((p) => (p?.vote_count || 0) === maxVotes);
-  if (!withMaxVotes.length) return null;
-
-  const preferredLangs = new Set(["en", "en-US"]);
-  const enGroup = withMaxVotes.filter(
-    (p) => p?.iso_639_1 && preferredLangs.has(p.iso_639_1),
-  );
-  const nullLang = withMaxVotes.filter((p) => p?.iso_639_1 === null);
-  const candidates = enGroup.length
-    ? enGroup
-    : nullLang.length
-      ? nullLang
-      : withMaxVotes;
-
-  return (
-    [...candidates].sort((a, b) => {
-      const va = (b?.vote_average || 0) - (a?.vote_average || 0);
-      if (va !== 0) return va;
-      return (b?.width || 0) - (a?.width || 0);
-    })[0] || null
-  );
-}
-
-// "Continuar viendo" (dashboard). Delega en el selector COMPARTIDO.
-//
-// Antes esto era una copia solo-inglés y sin escalera: recorría el pool
-// quedándose únicamente con los backdrops `en` y, si no había ninguno, devolvía
-// null. El llamador (ContinueWatchingSection) caía entonces a
-// `getPreviewBackdropFallback`, que es el `backdrop_path` crudo de TMDb: el
-// primario, normalmente TEXTLESS y encima sin metadatos de idioma. Resultado:
-// tarjetas sin idioma en el dashboard aunque el título SÍ tuviera backdrop en
-// español. Mismo defecto que tenía la copia de Biblioteca.
-//
-// El selector compartido aplica la escalera en → otro idioma (es…) → textless,
-// así que el escalón `es` deja de perderse y el fallback crudo casi no se usa.
-function pickBestWatchingBackdrop(list, opts = {}) {
-  return pickBestBackdropByLangResVotes(list, {
-    preferLangs: ["en", "en-US"],
-    minWidth: 1200,
-    ...opts,
-  });
-}
-
-async function fetchWatchingImages(itemId, mediaType = "movie") {
+async function fetchWatchingImages(itemId, mediaType = "movie", originalLanguage) {
   const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
   if (!apiKey || !itemId) return { posters: [], backdrops: [] };
 
   try {
     const type = mediaType === "tv" ? "tv" : "movie";
-    const j = await fetchTmdbImages(type, itemId);
+    const j = await fetchTmdbImages(type, itemId, { originalLanguage });
     if (!j) return { posters: [], backdrops: [] };
     return {
       posters: Array.isArray(j?.posters) ? j.posters : [],
@@ -488,7 +410,7 @@ async function fetchWatchingImages(itemId, mediaType = "movie") {
   }
 }
 
-export async function fetchBestWatchingPoster(itemId, mediaType = "movie") {
+export async function fetchBestWatchingPoster(itemId, mediaType = "movie", originalLanguage) {
   const type = mediaType === "tv" ? "tv" : "movie";
   const key = `${type}:${itemId}`;
   if (watchingPosterChoiceCache.has(key)) {
@@ -497,8 +419,8 @@ export async function fetchBestWatchingPoster(itemId, mediaType = "movie") {
   if (watchingPosterInFlight.has(key)) return watchingPosterInFlight.get(key);
 
   const promise = (async () => {
-    const { posters } = await fetchWatchingImages(itemId, type);
-    const chosen = pickBestWatchingPoster(posters)?.file_path || null;
+    const { posters } = await fetchWatchingImages(itemId, type, originalLanguage);
+    const chosen = pickBestWatchingPoster(posters, originalLanguage)?.file_path || null;
     watchingPosterChoiceCache.set(key, chosen);
     watchingPosterInFlight.delete(key);
     return chosen;
@@ -508,7 +430,7 @@ export async function fetchBestWatchingPoster(itemId, mediaType = "movie") {
   return promise;
 }
 
-export async function fetchBestWatchingBackdrop(itemId, mediaType = "movie") {
+export async function fetchBestWatchingBackdrop(itemId, mediaType = "movie", originalLanguage) {
   const type = mediaType === "tv" ? "tv" : "movie";
   const key = `${type}:${itemId}`;
   if (watchingBackdropChoiceCache.has(key)) {
@@ -517,12 +439,8 @@ export async function fetchBestWatchingBackdrop(itemId, mediaType = "movie") {
   if (watchingBackdropInFlight.has(key)) return watchingBackdropInFlight.get(key);
 
   const promise = (async () => {
-    const { backdrops } = await fetchWatchingImages(itemId, type);
-    const chosen =
-      pickBestWatchingBackdrop(backdrops, {
-        preferLangs: ["en", "en-US"],
-        minWidth: 1200,
-      })?.file_path || null;
+    const { backdrops } = await fetchWatchingImages(itemId, type, originalLanguage);
+    const chosen = pickBestWatchingBackdrop(backdrops, originalLanguage)?.file_path || null;
     watchingBackdropChoiceCache.set(key, chosen);
     watchingBackdropInFlight.delete(key);
     return chosen;

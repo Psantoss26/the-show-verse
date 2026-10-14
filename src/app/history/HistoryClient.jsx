@@ -55,7 +55,8 @@ import {
   titleMatchesQuery,
 } from "@/lib/search/titleMatching";
 import { useTitleNameSearch } from "@/lib/search/useTitleNameSearch";
-import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
+import { tmdbImageLangsParam } from "@/lib/tmdb/imageLanguages";
+import { pickLadderBackdrop, pickLadderPoster } from "@/lib/details/tmdbImages";
 import {
   historyEntryMatchesTarget,
   mergeHistoryTopSnapshot,
@@ -694,60 +695,28 @@ function preloadImage(src) {
   });
 }
 
-function pickBestBackdropByLangResVotes(list) {
-  if (!Array.isArray(list) || list.length === 0) return null;
-
-  const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
-  const preferSet = new Set(["en"]);
-  const isPreferredLang = (img) => preferSet.has(norm(img?.iso_639_1));
-
-  const pool = list.filter((b) => (b?.width || 0) >= 1200);
-  const finalPool = pool.length ? pool : list;
-
-  const top3en = [];
-  for (const b of finalPool) {
-    if (isPreferredLang(b)) top3en.push(b);
-    if (top3en.length === 3) break;
-  }
-  if (!top3en.length) return null;
-
-  const isRes = (b, w, h) => (b?.width || 0) === w && (b?.height || 0) === h;
-  const b1080 = top3en.find((b) => isRes(b, 1920, 1080));
-  if (b1080) return b1080;
-
-  const b1440 = top3en.find((b) => isRes(b, 2560, 1440));
-  if (b1440) return b1440;
-
-  const b4k = top3en.find((b) => isRes(b, 3840, 2160));
-  if (b4k) return b4k;
-
-  const b720 = top3en.find((b) => isRes(b, 1280, 720));
-  if (b720) return b720;
-
-  return top3en[0];
-}
-
-async function fetchBestBackdropEN(type, id) {
+// Escalera de idioma de toda la app (inglés → español → original → sin
+// idioma): lib/tmdb/imageLanguageLadder.
+async function fetchBestBackdrop(type, id, originalLanguage) {
   if (!TMDB_API_KEY || !type || !id) return null;
   try {
-    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${TMDB_API_KEY}&${TMDB_IMAGE_LANGS_PARAM}`;
+    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${TMDB_API_KEY}&${tmdbImageLangsParam(originalLanguage)}`;
     const r = await fetch(url, { cache: "force-cache" });
     if (!r.ok) return null;
     const j = await r.json();
-    const best = pickBestBackdropByLangResVotes(j?.backdrops);
-    return best?.file_path || null;
+    return pickLadderBackdrop(j?.backdrops, { originalLanguage, minWidth: 1200 })?.file_path || null;
   } catch {
     return null;
   }
 }
 
-async function getBestBackdropCached(type, id) {
+async function getBestBackdropCached(type, id, originalLanguage) {
   const key = `${type}:${id}`;
   if (backdropCache.has(key)) return backdropCache.get(key);
   if (backdropInflight.has(key)) return backdropInflight.get(key);
 
   const p = (async () => {
-    const chosen = await fetchBestBackdropEN(type, id);
+    const chosen = await fetchBestBackdrop(type, id, originalLanguage);
     backdropCache.set(key, chosen || null);
     backdropInflight.delete(key);
     return chosen || null;
@@ -757,56 +726,26 @@ async function getBestBackdropCached(type, id) {
   return p;
 }
 
-function pickBestPosterEN(posters) {
-  if (!Array.isArray(posters) || posters.length === 0) return null;
-
-  const maxVotes = posters.reduce(
-    (max, p) => ((p.vote_count || 0) > max ? p.vote_count || 0 : max),
-    0,
-  );
-  const withMaxVotes = posters.filter((p) => (p.vote_count || 0) === maxVotes);
-  if (!withMaxVotes.length) return null;
-
-  const preferredLangs = new Set(["en", "en-US"]);
-  const enGroup = withMaxVotes.filter(
-    (p) => p.iso_639_1 && preferredLangs.has(p.iso_639_1),
-  );
-  const nullLang = withMaxVotes.filter((p) => p.iso_639_1 === null);
-  const candidates = enGroup.length
-    ? enGroup
-    : nullLang.length
-      ? nullLang
-      : withMaxVotes;
-
-  return (
-    [...candidates].sort((a, b) => {
-      const va = (b.vote_average || 0) - (a.vote_average || 0);
-      if (va !== 0) return va;
-      return (b.width || 0) - (a.width || 0);
-    })[0] || null
-  );
-}
-
-async function fetchBestPosterEN(type, id) {
+async function fetchBestPoster(type, id, originalLanguage) {
   if (!TMDB_API_KEY || !type || !id) return null;
   try {
-    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${TMDB_API_KEY}&${TMDB_IMAGE_LANGS_PARAM}`;
+    const url = `https://api.themoviedb.org/3/${type}/${id}/images?api_key=${TMDB_API_KEY}&${tmdbImageLangsParam(originalLanguage)}`;
     const r = await fetch(url, { cache: "force-cache" });
     if (!r.ok) return null;
     const j = await r.json();
-    return pickBestPosterEN(j?.posters)?.file_path || null;
+    return pickLadderPoster(j?.posters, { originalLanguage })?.file_path || null;
   } catch {
     return null;
   }
 }
 
-async function getBestPosterCached(type, id) {
+async function getBestPosterCached(type, id, originalLanguage) {
   const key = `${type}:${id}`;
   if (posterChoiceCache.has(key)) return posterChoiceCache.get(key);
   if (posterInFlight.has(key)) return posterInFlight.get(key);
 
   const p = (async () => {
-    const chosen = await fetchBestPosterEN(type, id);
+    const chosen = await fetchBestPoster(type, id, originalLanguage);
     posterChoiceCache.set(key, chosen || null);
     posterInFlight.delete(key);
     return chosen || null;
@@ -824,7 +763,7 @@ async function resolveFinalPosterPath({ type, id, entry }) {
     return posterChoiceCache.get(key) || entry?.poster_path || entry?.backdrop_path || null;
   }
 
-  const best = await getBestPosterCached(tmdbType, id);
+  const best = await getBestPosterCached(tmdbType, id, entry?.original_language);
   if (best) return best;
 
   const tmdb = await fetchTmdbPoster({ type, tmdbId: id });
@@ -1787,7 +1726,7 @@ function Backdrop({ entry, className = "" }) {
       const fallback = entry?.backdrop_path || entry?.poster_path || null;
       const path = backdropCache.has(key)
         ? backdropCache.get(key) || fallback
-        : (await getBestBackdropCached(tmdbType, id)) || fallback;
+        : (await getBestBackdropCached(tmdbType, id, entry?.original_language)) || fallback;
       if (!abort) setBackdropPath(path);
     };
 
@@ -1917,7 +1856,7 @@ const HistoryItemCard = memo(function HistoryItemCard({
       if (backdropCache.has(key)) {
         finalPath = backdropCache.get(key) || entry?.backdrop_path || entry?.poster_path || null;
       } else {
-        const best = await getBestBackdropCached(tmdbType, id);
+        const best = await getBestBackdropCached(tmdbType, id, entry?.original_language);
         if (best) {
           finalPath = best;
         } else {

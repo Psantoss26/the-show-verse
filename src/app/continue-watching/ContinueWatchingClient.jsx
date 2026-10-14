@@ -244,7 +244,7 @@ const posterInFlight = new Map();
 const backdropChoiceCache = new Map();
 const backdropInFlight = new Map();
 
-function cachedImage(type, id, kind) {
+function cachedImage(type, id, kind, originalLanguage) {
   const cache = kind === "poster" ? posterChoiceCache : backdropChoiceCache;
   const inflight = kind === "poster" ? posterInFlight : backdropInFlight;
   const key = `${type}:${id}`;
@@ -253,8 +253,8 @@ function cachedImage(type, id, kind) {
   const p = (async () => {
     const chosen =
       kind === "poster"
-        ? await fetchBestWatchingPoster(id, type)
-        : await fetchBestWatchingBackdrop(id, type);
+        ? await fetchBestWatchingPoster(id, type, originalLanguage)
+        : await fetchBestWatchingBackdrop(id, type, originalLanguage);
     cache.set(key, chosen || null);
     inflight.delete(key);
     return chosen || null;
@@ -268,6 +268,7 @@ function SmartImage({ item, kind, alt, imgClassName = "" }) {
   const id = item.id;
   const itemPosterPath = item.poster_path || null;
   const itemBackdropPath = item.backdrop_path || null;
+  const originalLanguage = item.original_language;
   const [src, setSrc] = useState(null);
   const [ready, setReady] = useState(false);
 
@@ -288,7 +289,7 @@ function SmartImage({ item, kind, alt, imgClassName = "" }) {
       let finalPath;
       if (preferredPath) finalPath = preferredPath;
       else if (cache.has(key)) finalPath = cache.get(key) || fallbackPath;
-      else finalPath = (await cachedImage(type, id, kind)) || fallbackPath;
+      else finalPath = (await cachedImage(type, id, kind, originalLanguage)) || fallbackPath;
       if (!finalPath || abort) return;
       const url = buildImg(finalPath, kind === "poster" ? POSTER_CARD_SIZE : "w1280");
       await preloadImage(url);
@@ -300,7 +301,7 @@ function SmartImage({ item, kind, alt, imgClassName = "" }) {
     return () => {
       abort = true;
     };
-  }, [type, id, kind, itemPosterPath, itemBackdropPath]);
+  }, [type, id, kind, itemPosterPath, itemBackdropPath, originalLanguage]);
 
   const Fallback = kind === "poster" ? Film : Tv;
   return (

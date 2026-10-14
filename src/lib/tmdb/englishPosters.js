@@ -1,16 +1,18 @@
 "use client";
 
-import { pickBestFavoriteEnglishPoster } from "@/lib/details/tmdbImages";
+import { pickLadderPoster } from "@/lib/details/tmdbImages";
 import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
 import { peekListArtwork, requestListArtwork } from "@/lib/tmdb/artworkBatch";
 
-// Póster INGLÉS de un título con el criterio de Favoritos/DetailsClient
-// (pickBestFavoriteEnglishPoster sobre su galería de TMDb). Lo comparten las
-// parrillas de listas (useEnglishPosterItems) y la imagen/vídeo compartibles
-// de una lista, para que enseñen exactamente las mismas portadas.
+// Póster de un título con la escalera de idioma de toda la app (inglés →
+// español → original → sin idioma: pickLadderPoster sobre su galería de TMDb).
+// Lo comparten las parrillas de listas (useEnglishPosterItems) y la
+// imagen/vídeo compartibles de una lista, para que enseñen exactamente las
+// mismas portadas. (Los nombres «English» son de cuando solo valía el inglés.)
 //
-// Caché de la pestaña: `null` significa "resuelto, sin póster inglés" (la
-// parrilla no pinta entonces el póster guardado, y lo compartido tampoco).
+// Caché de la pestaña: `null` significa "resuelto, sin póster en ningún idioma
+// de la escalera" (la parrilla no pinta entonces el póster guardado, y lo
+// compartido tampoco).
 // Solo se guarda lo que TMDb CONTESTÓ: una consulta fallida (red, 429 agotado)
 // no se apunta como «sin póster», o el título quedaba sin portada toda la
 // sesión aunque sí la tuviera.
@@ -43,7 +45,7 @@ export function peekEnglishPosterPath(item) {
   return { hit: true, posterPath: picks.poster || null };
 }
 
-/** Ruta del póster inglés del título (o null). Usa y rellena la caché. */
+/** Ruta del póster del título según la escalera (o null). Usa y rellena la caché. */
 export async function resolveEnglishPosterPath(item, { priority } = {}) {
   const key = englishPosterKey(item);
   if (!key) return null;
@@ -58,16 +60,16 @@ export async function resolveEnglishPosterPath(item, { priority } = {}) {
       englishPosterCache.set(key, picks.poster || null);
       return picks.poster || null;
     }
-    const images = await fetchTmdbImages(mediaType, tmdbId, priority ? { priority } : undefined);
+    const originalLanguage = item?.original_language ?? item?.originalLanguage;
+    const images = await fetchTmdbImages(mediaType, tmdbId, { priority, originalLanguage });
     // `null` = no se pudo consultar: sin póster ahora, pero sin recordarlo.
     if (!images) return null;
-    const posterPath = pickBestFavoriteEnglishPoster(images.posters || [])?.file_path || null;
+    const posterPath = pickLadderPoster(images.posters, { originalLanguage })?.file_path || null;
     englishPosterCache.set(key, posterPath);
     return posterPath;
   } catch {
-    // Una petición fallida tampoco debe exponer un póster localizado
-    // mientras se está mostrando una parrilla que exige arte inglés (ni
-    // recordarse como «sin póster»: la próxima vez se vuelve a consultar).
+    // Una petición fallida no se recuerda como «sin póster»: la próxima vez
+    // se vuelve a consultar.
     return null;
   }
 }

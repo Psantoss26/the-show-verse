@@ -7,6 +7,7 @@ import {
   syncHistoryPage,
   wasInPagePopState,
 } from "@/lib/hooks/useIsHistoryNavigation";
+import { installPageImageRetention } from "@/lib/images/retainPageImages";
 
 const STORAGE_PREFIX = "showverse:scroll-position:";
 const HISTORY_NAVIGATION_MARKER_KEY = "showverse:pending-history-navigation";
@@ -201,6 +202,12 @@ export default function ScrollRestoration() {
   // Mientras restauramos hacemos scroll programático: NO debemos guardar esas
   // posiciones intermedias (machacarían la posición correcta que restauramos).
   const isRestoringRef = useRef(false);
+
+  // Al volver atrás, las imágenes de la página deben seguir en la caché de
+  // memoria para pintarse en el primer fotograma (ver retainPageImages.js).
+  useEffect(() => {
+    installPageImageRetention();
+  }, []);
 
   useEffect(() => {
     if (!("scrollRestoration" in window.history)) return undefined;

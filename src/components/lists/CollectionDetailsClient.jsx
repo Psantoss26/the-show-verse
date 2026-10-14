@@ -25,7 +25,7 @@ import { ratingSummaryBadge, summarizeListRatings } from '@/lib/lists/ratingSumm
 import useListImdbRatings from '@/hooks/useListImdbRatings'
 import { useIsHistoryNavigation } from '@/lib/hooks/useIsHistoryNavigation'
 import { fetchTmdbImages } from '@/lib/tmdb/imageRequests'
-import { pickBestFavoriteEnglishPoster, pickBestNeutralPosterByResVotes, pickHeroBackdropPath } from '@/lib/details/tmdbImages'
+import { pickLadderPoster, pickBestNeutralPosterByResVotes, pickHeroBackdropPath } from '@/lib/details/tmdbImages'
 import { pickCollectionCoverBackdrop } from '@/lib/lists/coverBackdrop'
 import { buildListShareCard, buildListShareStory, listYearSpan, normalizeListShareItem } from '@/lib/lists/shareList'
 
@@ -274,7 +274,7 @@ export default function CollectionDetailsClient({ collectionId }) {
     // la portada espera en vez de enseñar la española y cambiarla.
     const customPoster = artworkOverride.poster ? collection?.poster_path || null : null
     const autoPoster = gallery.done
-        ? pickBestFavoriteEnglishPoster(gallery.images?.posters)?.file_path || state.collection?.poster_path || null
+        ? pickLadderPoster(gallery.images?.posters)?.file_path || state.collection?.poster_path || null
         : null
     const collectionPoster = customPoster || autoPoster
     const posterPending = !customPoster && !gallery.done

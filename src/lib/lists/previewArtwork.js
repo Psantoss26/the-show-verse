@@ -1,8 +1,4 @@
-import {
-  pickBestBackdropForPreview,
-  pickBestEnglishPoster,
-  pickBestNeutralBackdropByResVotes,
-} from "../details/tmdbImages.js";
+import { pickLadderBackdrop, pickLadderPoster } from "../details/tmdbImages.js";
 
 const previewArtworkCache = new Map();
 
@@ -46,29 +42,20 @@ async function resolveArtwork(item, resolveImages, resolvePicks) {
   return resolveFromImages();
 
   function resolveFromImages() {
-  const request = Promise.resolve(resolveImages(mediaType, item.id))
+  const originalLanguage = item?.original_language;
+  const request = Promise.resolve(resolveImages(mediaType, item.id, { originalLanguage }))
     .then((images) => {
       if (!images) {
         previewArtworkCache.delete(key);
         return null;
       }
 
-      const englishBackdrop = pickBestBackdropForPreview(
-        images?.backdrops || [],
-        { preferLangs: ["en", "en-US"], minWidth: 780 },
-      );
-      const neutralBackdrop = pickBestNeutralBackdropByResVotes(
-        images?.backdrops || [],
-        { minWidth: 780 },
-      )?.file_path;
-      const englishPoster = pickBestEnglishPoster(
-        images?.posters || [],
-      )?.file_path;
+      const backdrop = pickLadderBackdrop(images?.backdrops, { originalLanguage, minWidth: 780 });
+      const poster = pickLadderPoster(images?.posters, { originalLanguage });
 
       const resolved = {
-        backdropPath:
-          englishBackdrop || neutralBackdrop || item?.backdrop_path || null,
-        posterPath: englishPoster || item?.poster_path || null,
+        backdropPath: backdrop?.file_path || item?.backdrop_path || null,
+        posterPath: poster?.file_path || item?.poster_path || null,
       };
       previewArtworkCache.set(key, resolved);
       return resolved;

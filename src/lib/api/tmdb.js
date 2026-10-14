@@ -14,6 +14,7 @@ import {
   isTmdbTransientError,
   isTmdbTransientStatus,
 } from "@/lib/api/tmdbRetry";
+import { normalizeImageLanguage, tmdbImageLanguages } from "@/lib/tmdb/imageLanguageLadder";
 
 const API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const BASE_URL = "https://api.themoviedb.org/3";
@@ -467,7 +468,29 @@ export async function getDetails(type, id, params = {}) {
   if (type === "tv" && data) {
     data.imdb_id = data?.external_ids?.imdb_id || null;
   }
+  await addOriginalLanguageImages(type, id, data, resolvedIncludeImageLanguage);
   return data;
+}
+
+// Escalón «idioma original» de la escalera de idioma (inglés → español →
+// original → sin idioma, ver lib/tmdb/imageLanguageLadder). Las imágenes
+// adjuntas se piden filtradas por idioma y el original no se conoce hasta
+// tener la ficha: si no es inglés ni español, su arte se pide aparte y se
+// añade. Solo esos títulos hacen la petición extra.
+async function addOriginalLanguageImages(type, id, data, includeImageLanguage) {
+  const original = normalizeImageLanguage(data?.original_language);
+  if (!data?.images || !includeImageLanguage || !original || ["en", "es"].includes(original)) return;
+  if (String(includeImageLanguage).split(",").includes(original)) return;
+  const extra = await tmdb(
+    `/${type}/${id}/images`,
+    { language: undefined, include_image_language: original },
+    { retries: 1 },
+  ).catch(() => null);
+  for (const kind of ["posters", "backdrops", "logos"]) {
+    if (Array.isArray(extra?.[kind]) && extra[kind].length) {
+      data.images[kind] = [...(data.images[kind] || []), ...extra[kind]];
+    }
+  }
 }
 
 export async function getLogos(type, id) {
@@ -492,7 +515,7 @@ export async function getLogos(type, id) {
 export async function getImages(
   type,
   id,
-  includeImageLanguage = "en,en-US,es,es-ES,null",
+  includeImageLanguage = tmdbImageLanguages(),
 ) {
   if (!type || !id) return { posters: [], backdrops: [] };
   const data = await tmdb(

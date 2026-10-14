@@ -10,6 +10,7 @@
 
 import { pickBestBackdropByLangResVotes } from "../details/tmdbImages.js";
 import { TMDB_IMAGE_LANGS_PARAM } from "../tmdb/imageLanguages.js";
+import { imageLanguageTiers, normalizeImageLanguage } from "../tmdb/imageLanguageLadder.js";
 
 export const SHARE_SITE_NAME = "The Show Verse";
 
@@ -27,22 +28,19 @@ const norm = (value) => (value ? String(value).toLowerCase().split("-")[0] : nul
 /**
  * Backdrop para la tarjeta. Se prefiere uno CON IDIOMA (lleva el título impreso,
  * así la imagen se reconoce sola en un chat), con la misma escalera que el resto
- * del arte de la app: inglés → español → sin texto → backdrop por defecto.
+ * del arte de la app: inglés → español → idioma original → sin texto →
+ * backdrop por defecto.
  */
-export function pickShareBackdrop(backdrops, fallbackPath = null) {
-  const list = Array.isArray(backdrops) ? backdrops.filter((img) => img?.file_path) : [];
-  for (const lang of ["en", "es"]) {
-    const pool = list.filter((img) => norm(img.iso_639_1) === lang);
-    const best = pool.length
-      ? pickBestBackdropByLangResVotes(pool, { preferLangs: [lang], minWidth: SHARE_IMAGE_WIDTH })
-      : null;
+export function pickShareBackdrop(backdrops, fallbackPath = null, originalLanguage = null) {
+  for (const tier of imageLanguageTiers(backdrops, { originalLanguage })) {
+    if (!tier.length) continue;
+    const lang = norm(tier[0].iso_639_1);
+    const best = pickBestBackdropByLangResVotes(tier, {
+      preferLangs: lang ? [lang] : [],
+      minWidth: SHARE_IMAGE_WIDTH,
+    });
     if (best?.file_path) return { path: best.file_path, lang };
   }
-  const textless = list.filter((img) => !norm(img.iso_639_1));
-  const neutral = textless.length
-    ? pickBestBackdropByLangResVotes(textless, { preferLangs: [], minWidth: SHARE_IMAGE_WIDTH })
-    : null;
-  if (neutral?.file_path) return { path: neutral.file_path, lang: null };
   return fallbackPath ? { path: fallbackPath, lang: null } : null;
 }
 
@@ -93,8 +91,8 @@ export function composeDescription(facts, overview) {
   return `${(lastSpace > DESCRIPTION_MAX * 0.6 ? cut.slice(0, lastSpace) : cut).replace(/[\s.,;:·-]+$/, "")}…`;
 }
 
-function imageFor(backdrops, fallbackBackdrop, fallbackPoster) {
-  const picked = pickShareBackdrop(backdrops, fallbackBackdrop);
+function imageFor(backdrops, fallbackBackdrop, fallbackPoster, originalLanguage) {
+  const picked = pickShareBackdrop(backdrops, fallbackBackdrop, originalLanguage);
   if (picked) {
     return {
       url: `https://image.tmdb.org/t/p/${SHARE_IMAGE_SIZE}${picked.path}`,
@@ -126,7 +124,7 @@ export function buildShareData({ kind, item, show = null, seasonNumber, episodeN
         [rating(item?.vote_average), formatRuntime(item?.runtime), genres(item?.genres)],
         item?.overview || `Ver detalles de ${title}.`,
       ),
-      image: imageFor(item?.images?.backdrops, item?.backdrop_path, item?.poster_path),
+      image: imageFor(item?.images?.backdrops, item?.backdrop_path, item?.poster_path, item?.original_language),
     };
   }
 
@@ -147,7 +145,7 @@ export function buildShareData({ kind, item, show = null, seasonNumber, episodeN
         ],
         item?.overview || `Ver detalles de ${name}.`,
       ),
-      image: imageFor(item?.images?.backdrops, item?.backdrop_path, item?.poster_path),
+      image: imageFor(item?.images?.backdrops, item?.backdrop_path, item?.poster_path, item?.original_language),
     };
   }
 
@@ -172,7 +170,7 @@ export function buildShareData({ kind, item, show = null, seasonNumber, episodeN
       ),
       // La serie se reconoce por su arte con título; el póster de la temporada
       // queda como último recurso.
-      image: imageFor(showBackdrops, show?.backdrop_path, item?.poster_path || show?.poster_path),
+      image: imageFor(showBackdrops, show?.backdrop_path, item?.poster_path || show?.poster_path, show?.original_language),
     };
   }
 
@@ -180,7 +178,7 @@ export function buildShareData({ kind, item, show = null, seasonNumber, episodeN
   const episodeName = item?.name || `Episodio ${episodeNumber}`;
   const code = `T${seasonNumber}·E${pad(episodeNumber)}`;
   const image =
-    imageFor(showBackdrops, show?.backdrop_path, null) ||
+    imageFor(showBackdrops, show?.backdrop_path, null, show?.original_language) ||
     (item?.still_path
       ? { url: `https://image.tmdb.org/t/p/${SHARE_IMAGE_SIZE}${item.still_path}`, width: SHARE_IMAGE_WIDTH, height: SHARE_IMAGE_HEIGHT, alt: "" }
       : imageFor(null, null, show?.poster_path));
@@ -207,9 +205,26 @@ async function tmdb(path, { withImages = false } = {}) {
   if (withImages) url += `&append_to_response=images&${TMDB_IMAGE_LANGS_PARAM}`;
   try {
     const res = await fetch(url, { next: { revalidate: 86400 } });
-    return res.ok ? await res.json() : null;
+    const data = res.ok ? await res.json() : null;
+    if (withImages) await addOriginalLanguageBackdrops(path, data, key);
+    return data;
   } catch {
     return null;
+  }
+}
+
+// Escalón «idioma original» de la escalera: si no es inglés ni español, sus
+// backdrops no venían en la petición filtrada y se piden aparte.
+async function addOriginalLanguageBackdrops(path, data, key) {
+  const original = normalizeImageLanguage(data?.original_language);
+  if (!data?.images || !original || ["en", "es"].includes(original)) return;
+  const params = new URLSearchParams({ api_key: key, include_image_language: original });
+  const res = await fetch(`https://api.themoviedb.org/3${path}/images?${params}`, {
+    next: { revalidate: 86400 },
+  }).catch(() => null);
+  const extra = res?.ok ? await res.json().catch(() => null) : null;
+  if (Array.isArray(extra?.backdrops)) {
+    data.images.backdrops = [...(data.images.backdrops || []), ...extra.backdrops];
   }
 }
 

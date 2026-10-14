@@ -655,7 +655,7 @@ function useShowBackdrop(show) {
     const resolveBackdrop = async () => {
       try {
         const fallback =
-          (await fetchBestWatchingBackdrop(show.id, type)) ||
+          (await fetchBestWatchingBackdrop(show.id, type, show.original_language)) ||
           cached ||
           getPreviewBackdropFallback(movie) ||
           null;
@@ -711,7 +711,7 @@ function useShowPoster(show) {
       if (userPoster) return;
 
       const chosen =
-        (await fetchBestWatchingPoster(show.id, type)) ||
+        (await fetchBestWatchingPoster(show.id, type, show.original_language)) ||
         show.poster_path ||
         show.backdrop_path ||
         null;

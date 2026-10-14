@@ -2,9 +2,9 @@
 
 // Pósters de la imagen y el vídeo compartibles de una lista, con el MISMO
 // criterio que las tarjetas de la página (ListDetailsTools →
-// useEnglishPosterItems): el póster inglés elegido por
-// pickBestFavoriteEnglishPoster, y ninguno si el título no lo tiene (la
-// tarjeta tampoco pinta el póster guardado, que puede estar en español).
+// useEnglishPosterItems): el póster de la escalera de idioma (inglés →
+// español → original → sin idioma), y ninguno si el título no tiene ninguno
+// (la tarjeta tampoco pinta entonces el póster guardado).
 //
 // La hoja de compartir lo llama al abrirse, antes de pedir nada al servidor.
 // Comparte caché con la parrilla: los títulos ya pintados no se piden otra vez.

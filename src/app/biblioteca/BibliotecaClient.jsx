@@ -44,7 +44,7 @@ import {
   titleMatchesQuery,
 } from "@/lib/search/titleMatching";
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
-import { pickBestBackdropByLangResVotes } from "@/lib/dashboard/media";
+import { pickLadderBackdrop, pickLadderPoster } from "@/lib/details/tmdbImages";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import HoverExpandCard from "@/components/ui/HoverExpandCard";
@@ -104,12 +104,16 @@ const useIsoLayoutEffect =
 // Caché de los pósters/backdrops localizados de TMDb (mapa tmdbId → path). Se
 // persiste para que, al recargar o volver a entrar, las portadas FINALES estén
 // disponibles de inmediato y no se vean "tarjetas vacías" mientras se re-resuelven.
-const ARTWORK_CACHE_KEY = "showverse:plex-library:artwork:v1";
+// v2: escalera de idioma nueva (las elecciones de v1 preferían el arte sin
+// idioma al español). La clave anterior se borra para no dejarla huérfana.
+const ARTWORK_CACHE_KEY = "showverse:plex-library:artwork:v2";
+const LEGACY_ARTWORK_CACHE_KEY = "showverse:plex-library:artwork:v1";
 const ARTWORK_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 días (las portadas cambian poco)
 
 function readArtworkCache() {
   if (typeof window === "undefined") return null;
   try {
+    window.localStorage.removeItem(LEGACY_ARTWORK_CACHE_KEY);
     const raw = window.localStorage.getItem(ARTWORK_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
@@ -171,46 +175,12 @@ function uniqueImageCandidates(candidates) {
 const tmdbImageCache = new Map();
 const tmdbImageInFlight = new Map();
 
-// Misma lógica que pickBestPosterEN en Favoritos
-function pickBestPosterPath(posters) {
-  if (!Array.isArray(posters) || !posters.length) return null;
-  const maxVotes = posters.reduce(
-    (max, p) => Math.max(max, p.vote_count || 0),
-    0,
-  );
-  const withMaxVotes = posters.filter((p) => (p.vote_count || 0) === maxVotes);
-  if (!withMaxVotes.length) return null;
-  const preferredLangs = new Set(["en", "en-US"]);
-  const enGroup = withMaxVotes.filter(
-    (p) => p.iso_639_1 && preferredLangs.has(p.iso_639_1),
-  );
-  const nullLang = withMaxVotes.filter((p) => p.iso_639_1 === null);
-  const candidates = enGroup.length
-    ? enGroup
-    : nullLang.length
-      ? nullLang
-      : withMaxVotes;
-  return (
-    [...candidates].sort((a, b) => {
-      const va = (b.vote_average || 0) - (a.vote_average || 0);
-      if (va !== 0) return va;
-      return (b.width || 0) - (a.width || 0);
-    })[0]?.file_path || null
-  );
-}
-
-// Antes había aquí una copia local que decía ser "la misma lógica que
-// pickBestBackdropByLangResVotes", pero se había desviado: solo aceptaba
-// inglés y devolvía null si no lo había, sin escalón para otros idiomas ni
-// para textless. Un título sin backdrop en inglés acababa cayendo al
-// backdrop_path por defecto (sin idioma). Las tarjetas de Biblioteca no
-// superponen logo, así que aquí SÍ queremos idioma: usamos el selector
-// compartido, que aplica en → es → textless (último recurso).
+// Escalera de idioma de toda la app (inglés → español → original → sin
+// idioma): lib/tmdb/imageLanguageLadder. Las tarjetas de Biblioteca no
+// superponen logo, así que aquí SÍ queremos idioma.
+const pickBestPosterPath = (posters) => pickLadderPoster(posters)?.file_path || null;
 const pickBestBackdropPath = (backdrops) =>
-  pickBestBackdropByLangResVotes(backdrops, {
-    preferLangs: ["en", "en-US"],
-    minWidth: 1200,
-  })?.file_path || null;
+  pickLadderBackdrop(backdrops, { minWidth: 1200 })?.file_path || null;
 
 // Llamada directa a TMDB desde el navegador (mismo patrón que SmartPoster en Favoritos)
 // Obtiene poster y backdrop en una sola petición y los cachea juntos

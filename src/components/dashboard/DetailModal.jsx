@@ -554,7 +554,9 @@ function SimilarBackdrop({ rec, onOpen }) {
     setSrc(fallback);
     (async () => {
       try {
-        const path = await fetchBestBackdrop(rec.id, recMediaType);
+        const path = await fetchBestBackdrop(rec.id, recMediaType, {
+          originalLanguage: rec.original_language,
+        });
         if (alive && path) setSrc(buildImg(path, "w780"));
       } catch {
         // silencio: conservamos el backdrop por defecto

@@ -2,7 +2,7 @@
 "use client";
 import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
 import LogoutConfirmModal from "@/components/auth/LogoutConfirmModal";
-import { pickBestFavoriteEnglishPoster } from "@/lib/details/tmdbImages";
+import { pickLadderBackdrop, pickLadderPoster } from "@/lib/details/tmdbImages";
 import { windowFavoriteGroups, favoriteGroupRenderEnd } from "./renderWindow.mjs";
 
 import OptimizedImage from "@/components/OptimizedImage";
@@ -79,7 +79,6 @@ import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import { titleMatchesQuery } from "@/lib/search/titleMatching";
 import { useTitleNameSearch } from "@/lib/search/useTitleNameSearch";
-import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { compareImdbRatings } from "@/lib/userLists/imdbRatingSort";
 import HoverExpandCard from "@/components/ui/HoverExpandCard";
@@ -628,76 +627,30 @@ function preloadImage(src) {
   });
 }
 
-function pickBestBackdropByLangResVotes(list, opts = {}) {
-  const { preferLangs = ["en", "en-US"], minWidth = 1200 } = opts;
-  if (!Array.isArray(list) || list.length === 0) return null;
-
-  const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
-  const preferSet = new Set((preferLangs || []).map(norm).filter(Boolean));
-  const isPreferredLang = (img) => {
-    // Excluir explícitamente imágenes sin idioma
-    if (img?.iso_639_1 === null || img?.iso_639_1 === undefined) return false;
-    return preferSet.has(norm(img?.iso_639_1));
-  };
-
-  const englishPool = list.filter(isPreferredLang);
-  if (!englishPool.length) return null;
-
-  const pool0 =
-    minWidth > 0
-      ? englishPool.filter((b) => (b?.width || 0) >= minWidth)
-      : englishPool;
-  const pool = pool0.length ? pool0 : englishPool;
-
-  const top3en = [];
-  for (const b of pool) {
-    top3en.push(b);
-    if (top3en.length === 3) break;
-  }
-
-  const isRes = (b, w, h) => (b?.width || 0) === w && (b?.height || 0) === h;
-
-  const b1080 = top3en.find((b) => isRes(b, 1920, 1080));
-  if (b1080) return b1080;
-
-  const b1440 = top3en.find((b) => isRes(b, 2560, 1440));
-  if (b1440) return b1440;
-
-  const b4k = top3en.find((b) => isRes(b, 3840, 2160));
-  if (b4k) return b4k;
-
-  const b720 = top3en.find((b) => isRes(b, 1280, 720));
-  if (b720) return b720;
-
-  return top3en[0];
-}
-
-async function fetchBestBackdropEN(type, id) {
+// Escalera de idioma de toda la app (inglés → español → original → sin
+// idioma): lib/tmdb/imageLanguageLadder.
+async function fetchBestBackdrop(type, id, originalLanguage) {
   const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
   if (!apiKey || !type || !id) return null;
   try {
     // Pasa por la cola compartida: limita concurrencia y reintenta los 429.
     // Antes cada tarjeta pedía por su cuenta y una lista larga provocaba
     // 429 en ~13% de las tarjetas, que acababan en el backdrop crudo.
-    const j = await fetchTmdbImages(type, id);
+    const j = await fetchTmdbImages(type, id, { originalLanguage });
     if (!j) return null;
-    const best = pickBestBackdropByLangResVotes(j?.backdrops, {
-      preferLangs: ["en", "en-US"],
-      minWidth: 1200,
-    });
-    return best?.file_path || null;
+    return pickLadderBackdrop(j?.backdrops, { originalLanguage, minWidth: 1200 })?.file_path || null;
   } catch {
     return null;
   }
 }
 
-async function getBestBackdropCached(type, id) {
+async function getBestBackdropCached(type, id, originalLanguage) {
   const key = `${type}:${id}`;
   if (backdropChoiceCache.has(key)) return backdropChoiceCache.get(key);
   if (backdropInFlight.has(key)) return backdropInFlight.get(key);
 
   const p = (async () => {
-    const chosen = await fetchBestBackdropEN(type, id);
+    const chosen = await fetchBestBackdrop(type, id, originalLanguage);
     backdropChoiceCache.set(key, chosen || null);
     backdropInFlight.delete(key);
     return chosen || null;
@@ -707,28 +660,26 @@ async function getBestBackdropCached(type, id) {
   return p;
 }
 
-async function fetchBestPosterEN(type, id) {
+async function fetchBestPoster(type, id, originalLanguage) {
   const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
   if (!apiKey || !type || !id) return null;
   try {
     // Pasa por la cola compartida: limita concurrencia y reintenta los 429.
-    // Antes cada tarjeta pedía por su cuenta y una lista larga provocaba
-    // 429 en ~13% de las tarjetas, que acababan en el backdrop crudo.
-    const j = await fetchTmdbImages(type, id);
+    const j = await fetchTmdbImages(type, id, { originalLanguage });
     if (!j) return null;
-    return pickBestFavoriteEnglishPoster(j?.posters)?.file_path || null;
+    return pickLadderPoster(j?.posters, { originalLanguage })?.file_path || null;
   } catch {
     return null;
   }
 }
 
-async function getBestPosterCached(type, id) {
+async function getBestPosterCached(type, id, originalLanguage) {
   const key = `${type}:${id}`;
   if (posterChoiceCache.has(key)) return posterChoiceCache.get(key);
   if (posterInFlight.has(key)) return posterInFlight.get(key);
 
   const p = (async () => {
-    const chosen = await fetchBestPosterEN(type, id);
+    const chosen = await fetchBestPoster(type, id, originalLanguage);
     posterChoiceCache.set(key, chosen || null);
     posterInFlight.delete(key);
     return chosen || null;
@@ -861,6 +812,7 @@ function SmartPoster({ item, title, mode = "poster" }) {
   const type = item.media_type || (item.title ? "movie" : "tv");
   const id = item.id;
   const imageKey = `${type}:${id}`;
+  const originalLanguage = item.original_language;
   const fallbackKey = `${mode}:${type}:${id}`;
   const fallbackPathRef = useRef(null);
   if (fallbackPathRef.current?.key !== fallbackKey) {
@@ -892,7 +844,7 @@ function SmartPoster({ item, title, mode = "poster" }) {
 
     const load = async () => {
       if (mode === "backdrop") {
-        const bestBackdrop = await getBestBackdropCached(type, id);
+        const bestBackdrop = await getBestBackdropCached(type, id, originalLanguage);
         const finalPath = bestBackdrop || fallbackPathRef.current?.path || null;
         const url = finalPath ? buildImg(finalPath, "w1280") : null;
         if (url) await preloadImage(url);
@@ -906,7 +858,7 @@ function SmartPoster({ item, title, mode = "poster" }) {
         return;
       }
 
-      const best = await getBestPosterCached(type, id);
+      const best = await getBestPosterCached(type, id, originalLanguage);
       const finalPath = best || fallbackPathRef.current?.path || null;
       const url = finalPath ? buildImg(finalPath, POSTER_CARD_SIZE) : null;
       if (url) await preloadImage(url);
@@ -920,7 +872,7 @@ function SmartPoster({ item, title, mode = "poster" }) {
     return () => {
       abort = true;
     };
-  }, [mode, type, id, imageKey]);
+  }, [mode, type, id, imageKey, originalLanguage]);
 
   return (
     <div className="relative w-full h-full">

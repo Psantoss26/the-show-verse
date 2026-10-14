@@ -4,7 +4,7 @@
 // original pertenece a la ficha visible y no compite con la navegación.
 import { getDetails } from "@/lib/api/tmdb";
 import { readPersistedArtworkOverride } from "@/lib/artworkApi";
-import { pickBestEnglishPoster, pickHeroBackdropPath } from "@/lib/details/tmdbImages";
+import { pickHeroBackdropPath, pickLadderPoster } from "@/lib/details/tmdbImages";
 
 const warmed = new Map();
 // Mantiene vivas las peticiones en curso: un `Image` sin referencias puede
@@ -44,8 +44,8 @@ const CAST_WARMUP_COUNT = 7;
 
 export function pickSequenceWarmupArtwork(data, override = {}) {
   if (!data) return { posters: [], backdrop: null, profiles: [] };
-  const englishPoster = pickBestEnglishPoster(data.images?.posters || [])?.file_path || null;
-  const posters = [...new Set([override?.poster, englishPoster, data.poster_path].filter(Boolean))];
+  const ladderPoster = pickLadderPoster(data.images?.posters, { originalLanguage: data.original_language })?.file_path || null;
+  const posters = [...new Set([override?.poster, ladderPoster, data.poster_path].filter(Boolean))];
   const backdrop = pickHeroBackdropPath({
     backdropPath: data.backdrop_path,
     backdrops: data.images?.backdrops,

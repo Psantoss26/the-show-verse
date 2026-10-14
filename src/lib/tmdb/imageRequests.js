@@ -21,7 +21,7 @@
 // NO cachea respuestas fallidas: un 429 es transitorio y cachearlo dejaría el
 // título degradado toda la sesión. La caché de resultados vive en los llamadores.
 
-import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
+import { tmdbImageLangsParam } from "@/lib/tmdb/imageLanguages";
 
 // Medido contra la API real, con rangos de IDs distintos por nivel para que
 // nada saliera de la caché HTTP:
@@ -131,6 +131,8 @@ const inFlight = new Map();
  *   necesitan los selectores de logo: prefieren es/en pero, antes que quedarse
  *   sin logo, aceptan el más votado de cualquier idioma. Restringir aquí les
  *   quitaría esa red.
+ * @param {string} [opts.originalLanguage] Idioma original del título: se pide
+ *   también su arte para el escalón «idioma original» de la escalera.
  * @param {"normal"|"high"} [opts.priority] "high" salta al frente de la cola
  *   (ver `schedule`). Para contenido visible de inmediato (p. ej. el hero
  *   destacado) frente al resto de peticiones de fondo del dashboard.
@@ -139,7 +141,7 @@ const inFlight = new Map();
 export function fetchTmdbImages(
   type,
   id,
-  { apiKey, allLanguages = false, priority = "normal" } = {},
+  { apiKey, allLanguages = false, originalLanguage, priority = "normal" } = {},
 ) {
   const key = process.env.NEXT_PUBLIC_TMDB_API_KEY || apiKey;
   if (!key || !type || id == null) return Promise.resolve(null);
@@ -147,13 +149,13 @@ export function fetchTmdbImages(
   const mediaType = type === "collection" ? "collection" : type === "tv" ? "tv" : "movie";
   // Las dos variantes devuelven conjuntos distintos, así que no pueden compartir
   // ni deduplicación ni entrada en vuelo.
-  const cacheKey = `${mediaType}:${id}:${allLanguages ? "all" : "std"}`;
+  const languages = allLanguages ? "" : `&${tmdbImageLangsParam(originalLanguage)}`;
+  const cacheKey = `${mediaType}:${id}:${allLanguages ? "all" : languages}`;
   const existing = inFlight.get(cacheKey);
   if (existing) return existing;
 
   const url =
-    `https://api.themoviedb.org/3/${mediaType}/${id}/images?api_key=${key}` +
-    (allLanguages ? "" : `&${TMDB_IMAGE_LANGS_PARAM}`);
+    `https://api.themoviedb.org/3/${mediaType}/${id}/images?api_key=${key}${languages}`;
 
   const promise = schedule(() => requestImages(url), { priority }).finally(() => {
     inFlight.delete(cacheKey);
