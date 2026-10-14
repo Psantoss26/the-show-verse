@@ -105,15 +105,19 @@ const useIsoLayoutEffect =
 // persiste para que, al recargar o volver a entrar, las portadas FINALES estén
 // disponibles de inmediato y no se vean "tarjetas vacías" mientras se re-resuelven.
 // v2: escalera de idioma nueva (las elecciones de v1 preferían el arte sin
-// idioma al español). La clave anterior se borra para no dejarla huérfana.
-const ARTWORK_CACHE_KEY = "showverse:plex-library:artwork:v2";
-const LEGACY_ARTWORK_CACHE_KEY = "showverse:plex-library:artwork:v1";
+// idioma al español). v3: póster = el PRIMERO de TMDb en su idioma (antes, el
+// más votado). Las claves anteriores se borran para no dejarlas huérfanas.
+const ARTWORK_CACHE_KEY = "showverse:plex-library:artwork:v3";
+const LEGACY_ARTWORK_CACHE_KEYS = [
+  "showverse:plex-library:artwork:v1",
+  "showverse:plex-library:artwork:v2",
+];
 const ARTWORK_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 días (las portadas cambian poco)
 
 function readArtworkCache() {
   if (typeof window === "undefined") return null;
   try {
-    window.localStorage.removeItem(LEGACY_ARTWORK_CACHE_KEY);
+    for (const key of LEGACY_ARTWORK_CACHE_KEYS) window.localStorage.removeItem(key);
     const raw = window.localStorage.getItem(ARTWORK_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);

@@ -380,9 +380,16 @@ export default function ScrollRestoration() {
         );
         (restorationRoot || document.body).appendChild(spacer);
       }
-      // `offsetTop` del spacer = altura del contenido que tiene por encima.
-      const contentHeight = spacer.offsetTop;
-      spacer.style.height = `${Math.max(0, savedPosition.h - contentHeight)}px`;
+      // Altura del contenido REAL: la del documento sin el spacer. No vale su
+      // `offsetTop`: deja fuera lo que va DESPUÉS del contenedor (pie, hueco de
+      // la barra inferior), que `savedPosition.h` sí incluye, y la restauración
+      // no se daba nunca por asentada: seguía los 5 s midiendo el layout en cada
+      // fotograma (el hover iba a tirones al volver).
+      const spacerHeight = spacer.offsetHeight;
+      const contentHeight = documentScrollHeight() - spacerHeight;
+      const nextHeight = `${Math.max(0, savedPosition.h - contentHeight)}px`;
+      // Reescribirlo sin cambios invalidaría el layout en cada fotograma.
+      if (spacer.style.height !== nextHeight) spacer.style.height = nextHeight;
       return contentHeight;
     };
     const removeSpacer = () => {

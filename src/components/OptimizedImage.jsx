@@ -2,6 +2,7 @@
 
 import { useHydrationReady } from "@/lib/hooks/useHydrationReady";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import { isImageRetained } from "@/lib/images/retainPageImages";
 
 export default function OptimizedImage({
   src,
@@ -23,9 +24,14 @@ export default function OptimizedImage({
   // el primer fotograma): se veía parpadear el contenido. En esa vuelta se
   // piden ya y se decodifican en el mismo pintado. Solo tras hidratar: durante
   // la hidratación se pinta lo mismo que el servidor.
+  //
+  // Solo las RETENIDAS (las que estaban cerca del viewport al salir, ya en la
+  // caché de memoria: ver retainPageImages). Antes se aplicaba a todas: con
+  // 200 favoritos, las 200 portadas se pedían y decodificaban de golpe al
+  // volver y la página iba a tirones (hover lento) un par de segundos.
   const hydrated = useHydrationReady();
   const historyNavigation = useIsHistoryNavigation();
-  const restoring = hydrated && historyNavigation;
+  const restoring = hydrated && historyNavigation && isImageRetained(src);
 
   if (!src) return null;
 

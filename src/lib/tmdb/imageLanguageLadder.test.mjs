@@ -4,7 +4,7 @@ import {
   imageLanguageTiers,
   pickByLanguageLadder,
   pickPreferredResolutionBackdrop,
-  pickTopVotedImage,
+  pickFirstImage,
   tmdbImageLanguages,
 } from "./imageLanguageLadder.js";
 import * as backendLadder from "../../../backend/src/lib/imageLanguageLadder.js";
@@ -20,9 +20,9 @@ test("inglés, español, idioma original y sin idioma, en ese orden", () => {
   assert.equal(pickByLanguageLadder([img("/fr", "fr"), img("/none", null)], firstPath, { originalLanguage: "ko" }).file_path, "/none");
 });
 
-test("solo en español (Señor, dame paciencia) elige el español", () => {
+test("solo en español (Señor, dame paciencia) elige el primer español de TMDb", () => {
   const list = [img("/es-1", "es"), img("/es-2", "es", { vote_count: 9 })];
-  assert.equal(pickByLanguageLadder(list, pickTopVotedImage).file_path, "/es-2");
+  assert.equal(pickByLanguageLadder(list, pickFirstImage).file_path, "/es-1");
 });
 
 test("sin ningún escalón disponible devuelve null para que se use el póster por defecto", () => {
@@ -46,9 +46,10 @@ test("pide a TMDb los idiomas de la escalera, con el original si se conoce", () 
   assert.equal(tmdbImageLanguages("es"), "en,en-US,es,es-ES,null");
 });
 
-test("el póster más votado gana; empata por nota y anchura", () => {
-  const list = [img("/a", "en", { vote_count: 3, vote_average: 5 }), img("/b", "en", { vote_count: 3, vote_average: 6 }), img("/c", "en", { vote_count: 1, vote_average: 9 })];
-  assert.equal(pickTopVotedImage(list).file_path, "/b");
+test("póster: el primero en el orden de TMDb, aunque otro tenga más votos", () => {
+  const list = [img("/a", "en", { vote_count: 1 }), img("/b", "en", { vote_count: 9 })];
+  assert.equal(pickFirstImage(list).file_path, "/a");
+  assert.equal(pickFirstImage([]), null);
 });
 
 test("backdrop: entre los tres primeros con ancho mínimo, prefiere 1080p", () => {

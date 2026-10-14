@@ -7,17 +7,25 @@
 // página nadie la referencia y la ficha (con decenas de imágenes grandes) la
 // desaloja: medido con Playwright en móvil, al volver 9 de 10 portadas
 // visibles se volvían a pedir a la caché de disco (35-85 ms + decodificar) y
-// se veía el placeholder y el fundido de cada tarjeta a destiempo. Más
-// frecuente en un teléfono real, que tiene menos memoria para esa caché.
+// se veía el placeholder y el fundido de cada tarjeta a destiempo.
 //
-// Se guarda un `new Image()` por cada imagen cargada, agrupado por página: no
-// pinta nada, pero mantiene la imagen en la caché de memoria. Con él, al
-// volver todas salían pintadas en el primer fotograma (3 de 3 frente a 0 de 3).
+// Se guarda un `new Image()` por cada imagen CERCA DEL VIEWPORT, que son las
+// que se ven al volver (la posición de scroll se restaura). No pinta nada,
+// pero mantiene la imagen en la caché de memoria. Antes se guardaban las
+// últimas 150 CARGADAS: con 200 favoritos, la carga diferida de las de más
+// abajo desplazaba a las de pantalla y al volver 14 de 16 salían de disco.
+//
+// La instantánea se rehace poco después de cada carga o scroll. Entre el
+// cambio de página (commit de React) y su `pushState` no corre ningún evento,
+// así que `location.pathname` siempre es el de las imágenes del documento.
 const MAX_PAGES = 4;
-const MAX_PER_PAGE = 150;
+const MAX_PER_PAGE = 80;
 // Las enormes (fondos `original` de las fichas) ocupan mucho y no son las que
 // parpadean al volver a una página de usuario.
 const MAX_PIXELS = 2_500_000;
+// Margen alrededor del viewport, en alturas de pantalla.
+const VIEWPORT_MARGIN = 0.5;
+const SNAPSHOT_DELAY_MS = 150;
 
 export function createImageRetainer({
   createImage,
@@ -30,20 +38,25 @@ export function createImageRetainer({
   const pages = new Map();
 
   return {
-    retain(pageKey, { src, crossOrigin = null, width = 0, height = 0 }) {
-      if (!/^https?:/.test(src || "")) return;
-      if (width * height > maxPixels) return;
-      const page = pages.get(pageKey) || new Map();
-      pages.delete(pageKey);
-      pages.set(pageKey, page);
-      if (!page.has(src)) {
-        const image = createImage();
-        // Sin el mismo modo CORS la caché de memoria no la reutiliza.
-        if (crossOrigin) image.crossOrigin = crossOrigin;
-        image.src = src;
-        page.set(src, image);
-        if (page.size > maxPerPage) page.delete(page.keys().next().value);
+    // Sustituye lo retenido de la página por estas imágenes.
+    replace(pageKey, images) {
+      const previous = pages.get(pageKey) || new Map();
+      const next = new Map();
+      for (const { src, crossOrigin = null, width = 0, height = 0 } of images) {
+        if (next.size >= maxPerPage) break;
+        if (!/^https?:/.test(src || "") || next.has(src)) continue;
+        if (width * height > maxPixels) continue;
+        let image = previous.get(src);
+        if (!image) {
+          image = createImage();
+          // Sin el mismo modo CORS la caché de memoria no la reutiliza.
+          if (crossOrigin) image.crossOrigin = crossOrigin;
+          image.src = src;
+        }
+        next.set(src, image);
       }
+      pages.delete(pageKey);
+      pages.set(pageKey, next);
       while (pages.size > maxPages) pages.delete(pages.keys().next().value);
     },
     has(src) {
@@ -53,29 +66,48 @@ export function createImageRetainer({
   };
 }
 
-let installed = false;
+let retainer = null;
 
-export function installPageImageRetention() {
-  if (installed || typeof document === "undefined") return;
-  installed = true;
-  const retainer = createImageRetainer({ createImage: () => new Image() });
-  const retain = (image) => {
-    if (!image.complete || !image.naturalWidth) return;
-    retainer.retain(window.location.pathname, {
+// ¿Está retenida (y por tanto en la caché de memoria) esta URL?
+export function isImageRetained(src) {
+  return Boolean(src && retainer?.has(src));
+}
+
+function nearViewportImages() {
+  const margin = window.innerHeight * VIEWPORT_MARGIN;
+  const images = [];
+  for (const image of document.images) {
+    if (!image.complete || !image.naturalWidth) continue;
+    const rect = image.getBoundingClientRect();
+    if (!rect.width || rect.bottom < -margin || rect.top > window.innerHeight + margin) continue;
+    images.push({
       src: image.currentSrc || image.src,
       crossOrigin: image.crossOrigin,
       width: image.naturalWidth,
       height: image.naturalHeight,
     });
+  }
+  return images;
+}
+
+export function installPageImageRetention() {
+  if (retainer || typeof document === "undefined") return;
+  retainer = createImageRetainer({ createImage: () => new Image() });
+  let timer = 0;
+  const schedule = () => {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(() => {
+      retainer.replace(window.location.pathname, nearViewportImages());
+    }, SNAPSHOT_DELAY_MS);
   };
   // `load` no burbujea, pero sí se captura en el documento.
   document.addEventListener(
     "load",
     (event) => {
-      if (event.target instanceof HTMLImageElement) retain(event.target);
+      if (event.target instanceof HTMLImageElement) schedule();
     },
     true,
   );
-  // Las que cargaron antes de que hidratara la app.
-  for (const image of document.images) retain(image);
+  window.addEventListener("scroll", schedule, { passive: true });
+  schedule();
 }

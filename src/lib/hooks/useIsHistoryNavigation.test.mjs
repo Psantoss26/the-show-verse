@@ -27,7 +27,7 @@ globalThis.window = {
 globalThis.performance = globalThis.window.performance;
 
 const { isHistoryNavigation, notifyPushNavigation, syncHistoryPage } =
-  await import("./useIsHistoryNavigation.js");
+  await import("../navigation/historyNavigation.js");
 
 // Un `popstate` real llega ya con la URL de DESTINO. Por defecto se simula
 // volver a Favoritos desde otra página (la ficha de un título).
@@ -107,4 +107,25 @@ test("volver a la misma ruta con OTRA query sí es navegación de historial", ()
   limpiar();
   popstate({ from: "/favorites?tab=series", to: "/favorites" });
   assert.equal(isHistoryNavigation(), true);
+});
+
+// Next renderiza la página NUEVA antes de su `pushState` (que es lo que
+// cancela la ventana): en ese render la URL aún es la de la página a la que se
+// volvió. Lo que se pregunta es si ESA ruta que se renderiza es la de la vuelta.
+test("la página de un enlace pulsado justo después de volver NO es una vuelta atrás", () => {
+  limpiar();
+  popstate({ from: "/details/movie/1", to: "/favorites" });
+  assert.equal(isHistoryNavigation("/favorites"), true, "la página a la que se volvió");
+  assert.equal(isHistoryNavigation("/watchlist"), false, "Pendientes, pulsada antes del pushState");
+});
+
+test("el marcador de sesión tampoco tiñe otra ruta renderizada antes del pushState", () => {
+  limpiar();
+  globalThis.window.location = { pathname: "/favorites", search: "" };
+  globalThis.window.sessionStorage.setItem(
+    "showverse:pending-history-navigation",
+    JSON.stringify({ route: "/favorites", at: Date.now() }),
+  );
+  assert.equal(isHistoryNavigation("/favorites"), true);
+  assert.equal(isHistoryNavigation("/watchlist"), false);
 });

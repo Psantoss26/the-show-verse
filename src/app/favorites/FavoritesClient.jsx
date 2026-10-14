@@ -271,7 +271,8 @@ const TRAKT_SCORE_TTL_MS = 24 * 60 * 60 * 1000;
 
 const FAVORITES_CACHE_KEY = "showverse:favorites:items:v3";
 const FAVORITES_CACHE_TTL_MS = 10 * 60 * 1000;
-const IMAGE_CHOICE_CACHE_KEY = "showverse:favorites:image-choices:v6";
+// v7: el póster elegido es el PRIMERO de TMDb en su idioma (antes, el más votado).
+const IMAGE_CHOICE_CACHE_KEY = "showverse:favorites:image-choices:v7";
 const IMAGE_CHOICE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 let imageChoiceCacheMemory = null;
 let imageChoicePersistHandle = null;

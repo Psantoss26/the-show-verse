@@ -7,7 +7,7 @@ import {
   pickPosterByLanguage,
 } from './tmdbImages.js'
 
-test('pickLadderPoster: el inglés más votado; sin inglés, español; luego original y sin idioma', () => {
+test('pickLadderPoster: el primer inglés de TMDb; sin inglés, español; luego original y sin idioma', () => {
   const selected = pickLadderPoster([
     { file_path: '/spanish.jpg', iso_639_1: 'es', vote_count: 1000 },
     { file_path: '/english-low.jpg', iso_639_1: 'en', vote_count: 4, width: 1000 },
@@ -15,7 +15,7 @@ test('pickLadderPoster: el inglés más votado; sin inglés, español; luego ori
     { file_path: '/english-tie.jpg', iso_639_1: 'en', vote_count: 12, vote_average: 5, width: 600 },
   ])
 
-  assert.equal(selected?.file_path, '/english-tie.jpg')
+  assert.equal(selected?.file_path, '/english-low.jpg')
   assert.equal(pickLadderPoster([{ file_path: '/es.jpg', iso_639_1: 'es' }])?.file_path, '/es.jpg')
   const korean = [{ file_path: '/none.jpg', iso_639_1: null }, { file_path: '/ko.jpg', iso_639_1: 'ko' }]
   assert.equal(pickLadderPoster(korean, { originalLanguage: 'ko' })?.file_path, '/ko.jpg')

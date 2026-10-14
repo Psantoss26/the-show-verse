@@ -50,8 +50,9 @@ const DEFAULT_EPISODE_RUNTIME_MINS = 45;
 const PROFILE_ENGLISH_POSTER_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 const PROFILE_ENGLISH_POSTER_FETCH_CONCURRENCY = 8;
 // v3: escalera de idioma con español e idioma original (v2 guardaba `null`
-// para los títulos sin arte inglés ni sin idioma).
-const PROFILE_ENGLISH_POSTER_POLICY_VERSION = 'v3';
+// para los títulos sin arte inglés ni sin idioma). v4: dentro de cada idioma,
+// el primer póster de TMDb en vez del más votado.
+const PROFILE_ENGLISH_POSTER_POLICY_VERSION = 'v4';
 const profileEnglishPosterMemory = new Map();
 
 // Normaliza limit/offset de una sección paginada (cotas defensivas).
@@ -86,26 +87,15 @@ export function profileEnglishPosterCacheKey(mediaType, tmdbId) {
   return `profile:english-poster:${PROFILE_ENGLISH_POSTER_POLICY_VERSION}:${titleKey(mediaType, tmdbId)}`;
 }
 
-function pickHighestQualityPoster(posters) {
-  if (!posters.length) return null;
-  const maxVotes = Math.max(...posters.map((poster) => Number(poster.vote_count) || 0));
-  return [...posters]
-    .filter((poster) => (Number(poster.vote_count) || 0) === maxVotes)
-    .sort((a, b) => {
-      const voteAverage = (Number(b.vote_average) || 0) - (Number(a.vote_average) || 0);
-      if (voteAverage) return voteAverage;
-      return (Number(b.width) || 0) - (Number(a.width) || 0);
-    })[0] || null;
-}
-
 // Escalera de idioma de toda la app (inglés → español → idioma original → sin
-// idioma, ver imageLanguageLadder.js); dentro de cada idioma, el más votado.
+// idioma, ver imageLanguageLadder.js); dentro de cada idioma, el PRIMERO de
+// TMDb, que es su póster principal.
 // `null` si no hay ninguno. Antes excluía el español a propósito, y un título
 // con pósters SOLO en español («Señor, dame paciencia») salía sin póster en
 // el Perfil y las notificaciones. Se exporta para cubrir el criterio sin
 // requerir red en los tests.
 export function pickLadderPosterPath(posters, originalLanguage) {
-  return pickByLanguageLadder(posters, pickHighestQualityPoster, { originalLanguage })?.file_path || null;
+  return pickByLanguageLadder(posters, (tier) => tier[0], { originalLanguage })?.file_path || null;
 }
 
 export function applyResolvedEnglishPosterPaths(

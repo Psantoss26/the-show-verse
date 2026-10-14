@@ -216,7 +216,8 @@ const backdropInFlight = new Map();
 
 const WATCHLIST_CACHE_KEY = "showverse:watchlist:items:v3";
 const WATCHLIST_CACHE_TTL_MS = 10 * 60 * 1000;
-const IMAGE_CHOICE_CACHE_KEY = "showverse:watchlist:image-choices:v6";
+// v7: el póster elegido es el PRIMERO de TMDb en su idioma (antes, el más votado).
+const IMAGE_CHOICE_CACHE_KEY = "showverse:watchlist:image-choices:v7";
 const IMAGE_CHOICE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const PROVIDER_CACHE_KEY = "showverse:watch-providers:ES:v3";
 const PROVIDER_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
