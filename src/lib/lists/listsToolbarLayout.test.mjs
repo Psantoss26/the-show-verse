@@ -54,5 +54,6 @@ test("Comunidad no expone los modos Trending o Popular", () => {
   assert.doesNotMatch(listsPage, /label="Modo"/);
   assert.doesNotMatch(listsPage, /setTraktMode/);
   assert.doesNotMatch(listsPage, /VALID_TRAKT_MODES/);
-  assert.match(listsPage, /useTraktLists\({ mode: "popular" }\)/);
+  // Modo fijo; el orden y la búsqueda los aplica el servidor (paginado).
+  assert.match(listsPage, /useTraktLists\(\{\s*mode: "popular",/);
 });

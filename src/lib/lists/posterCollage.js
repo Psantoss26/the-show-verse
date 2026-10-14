@@ -197,3 +197,34 @@ export function buildBackgroundCollageTiles(coverTiles, extraImages, count) {
     if (!unique.length) return []
     return Array.from({ length: total }, (_, index) => unique[index % unique.length])
 }
+
+// FONDO DE ESCRITORIO de una lista: el mosaico de sus títulos a pantalla
+// completa, como el de móvil. Celdas 2:3 de al menos este ancho.
+export const DESKTOP_BACKGROUND_MIN_TILE_WIDTH = 150
+const DESKTOP_BACKGROUND_MIN_COLS = 3
+const DESKTOP_BACKGROUND_MAX_COLS = 12
+
+/**
+ * Rejilla del fondo de escritorio para una ventana de `width`×`height` (con
+ * el ancho de cada celda, `tileWidth`, para fundir sus uniones): celdas
+ * 2:3 que la llenan sin pasar de `maxTiles` (las imágenes que se piden). Se
+ * prueban de más a menos columnas —celdas más pequeñas primero, más títulos a
+ * la vista— y se queda la primera que cabe. En ventanas muy altas, si ni con
+ * tres columnas caben, las filas que falten quedan bajo el fundido a #101010.
+ */
+export function getDesktopBackgroundGrid(width, height, maxTiles = MAX_BACKGROUND_TILE_COUNT) {
+    const w = Math.max(1, Number(width) || 0)
+    const h = Math.max(1, Number(height) || 0)
+    const limit = Math.max(1, Math.min(Number(maxTiles) || 0, MAX_BACKGROUND_TILE_COUNT))
+    const widest = Math.min(
+        DESKTOP_BACKGROUND_MAX_COLS,
+        Math.max(DESKTOP_BACKGROUND_MIN_COLS, Math.floor(w / DESKTOP_BACKGROUND_MIN_TILE_WIDTH)),
+    )
+    for (let cols = widest; cols >= DESKTOP_BACKGROUND_MIN_COLS; cols -= 1) {
+        const rows = Math.max(1, Math.ceil(h / ((w / cols) * 1.5)))
+        if (cols * rows <= limit) return { cols, rows, count: cols * rows, tileWidth: w / cols }
+    }
+    const cols = DESKTOP_BACKGROUND_MIN_COLS
+    const rows = Math.max(1, Math.floor(limit / cols))
+    return { cols, rows, count: cols * rows, tileWidth: w / cols }
+}

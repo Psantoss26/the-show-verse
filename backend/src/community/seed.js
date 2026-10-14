@@ -2,13 +2,51 @@
 import { db } from '../db/client.js';
 import { titleCommunityState, titleComments, titleSentiment } from '../db/schema.js';
 import { and, eq, sql } from 'drizzle-orm';
-import { seedDecision, nextRetryDate } from './state.js';
+import { seedDecision, nextRetryDate, SEEDING_TIMEOUT_MS } from './state.js';
 import { resolveTraktId, getComments, getListsContaining, getUserListItems, getSentiments } from './trakt.js';
-import { normalizeTraktComment, normalizeTraktList, posterUrl } from './normalize.js';
+import { normalizeTraktList, posterUrl } from './normalize.js';
+import { collectTitleComments } from './commentsFetch.js';
 import { buildHeuristicSentiment } from './sentiment.js';
 import { translateManyToEs } from './translate.js';
 import { upsertSentiment, upsertCommunityList, insertListMemberships } from './store.js';
 import { tmdbDetails } from '../dashboard/tmdb.js';
+
+const commentsCacheInflight = new Map();
+
+function commentsCacheKey(tmdbId, mediaType) {
+  return `${mediaType}:${Number(tmdbId)}`;
+}
+
+function startCommentsCacheRefresh(args) {
+  const key = commentsCacheKey(args.tmdbId, args.mediaType);
+  const existing = commentsCacheInflight.get(key);
+  if (existing) return existing;
+  const promise = refreshCommentsCache(args).finally(() => {
+    if (commentsCacheInflight.get(key) === promise) commentsCacheInflight.delete(key);
+  });
+  commentsCacheInflight.set(key, promise);
+  return promise;
+}
+
+// Comentarios de Trakt del título (ver commentsFetch.js: hasta 500 por me
+// gusta, más los últimos).
+function fetchTitleComments({ type, traktId, tmdbId, mediaType }) {
+  return collectTitleComments({ getComments, type, traktId, tmdbId, mediaType });
+}
+
+// Guarda los comentarios de Trakt. Los que ya estaban actualizan sus me gusta
+// (la pestaña Top ordena por ellos) en vez de quedarse con los del primer día.
+// El objetivo del conflicto es el índice único PARCIAL de external_id: hace
+// falta su misma condición para que PostgreSQL lo reconozca.
+async function saveTraktComments(rows) {
+  if (!rows.length) return;
+  await db.insert(titleComments).values(rows)
+    .onConflictDoUpdate({
+      target: titleComments.externalId,
+      targetWhere: sql`${titleComments.externalId} IS NOT NULL`,
+      set: { likes: sql`excluded.likes` },
+    });
+}
 
 export async function getState({ tmdbId, mediaType }) {
   const [row] = await db
@@ -45,15 +83,15 @@ export async function runSeed({ tmdbId, mediaType }) {
       await markReady({ tmdbId: numId, mediaType, traktId: null, commentCount: 0 });
       return;
     }
-    // Copy top-10 comments by likes.
-    const commentsRes = await getComments({ type: mediaType, traktId: resolved.traktId, sort: 'likes', page: 1, limit: 10 });
-    if (!commentsRes.ok) throw new Error('trakt comments failed');
-    const items = commentsRes.items;
-    const rows = items.map((raw) => normalizeTraktComment(raw, { tmdbId: numId, mediaType })).filter(Boolean);
-    if (rows.length) {
-      await db.insert(titleComments).values(rows)
-        .onConflictDoNothing();
-    }
+    // Hasta 500 por me gusta y los 100 más recientes (commentsFetch.js). Las
+    // pestañas posteriores consultan PostgreSQL, sin volver a Trakt.
+    const rows = await fetchTitleComments({
+      type: mediaType,
+      traktId: resolved.traktId,
+      tmdbId: numId,
+      mediaType,
+    });
+    await saveTraktComments(rows);
 
     // Sentiment: copia el sentimiento OFICIAL de Trakt (calidad "como Trakt": temas que
     // Trakt precomputa a partir de los comentarios), traducido a español. Es rápido (1-2
@@ -143,7 +181,7 @@ export async function runSeed({ tmdbId, mediaType }) {
 
 async function markReady({ tmdbId, mediaType, traktId, commentCount }) {
   await db.update(titleCommunityState)
-    .set({ status: 'ready', traktId, commentCount, seededAt: new Date(), error: null, updatedAt: new Date() })
+    .set({ status: 'ready', traktId, commentCount, commentsCachedAt: new Date(), seededAt: new Date(), error: null, updatedAt: new Date() })
     .where(and(eq(titleCommunityState.tmdbId, tmdbId), eq(titleCommunityState.mediaType, mediaType)));
 }
 
@@ -155,8 +193,31 @@ async function markFailed({ tmdbId, mediaType, error }) {
     .where(and(eq(titleCommunityState.tmdbId, tmdbId), eq(titleCommunityState.mediaType, mediaType)));
 }
 
-export async function ensureSeeded({ tmdbId, mediaType }) {
+export async function ensureSeeded({ tmdbId, mediaType, waitForCommentsCache = false }) {
   const state = await getState({ tmdbId, mediaType });
+  const cacheKey = commentsCacheKey(tmdbId, mediaType);
+  if (state?.status === 'ready' && !state.commentsCachedAt) {
+    const claimed = await claimCommentsCache({ tmdbId, mediaType });
+    let refresh = commentsCacheInflight.get(cacheKey);
+    if (claimed) {
+      refresh = startCommentsCacheRefresh({ tmdbId, mediaType, traktId: state.traktId });
+    }
+    if (waitForCommentsCache) await refresh?.catch(() => {});
+    return { status: 'ready' };
+  }
+  if (state?.status === 'comments_seeding') {
+    const stale = Date.now() - new Date(state.updatedAt || 0).getTime() > SEEDING_TIMEOUT_MS;
+    let refresh = commentsCacheInflight.get(cacheKey);
+    if (stale) {
+      const claimed = await claimCommentsCache({ tmdbId, mediaType });
+      if (claimed) {
+        refresh = startCommentsCacheRefresh({ tmdbId, mediaType, traktId: state.traktId });
+      }
+    }
+    if (waitForCommentsCache) await refresh?.catch(() => {});
+    // El contenido base sigue listo; la ampliación del caché es en segundo plano.
+    return { status: 'ready' };
+  }
   const decision = seedDecision(state);
   if (decision !== 'seed') return { status: state?.status || 'pending' };
   const shouldSeed = await claimSeedLock({ tmdbId, mediaType });
@@ -165,4 +226,51 @@ export async function ensureSeeded({ tmdbId, mediaType }) {
     runSeed({ tmdbId, mediaType }).catch(() => {});
   }
   return { status: 'seeding' };
+}
+
+async function claimCommentsCache({ tmdbId, mediaType }) {
+  const claimed = await db.execute(sql`
+    UPDATE title_community_state
+       SET status = 'comments_seeding', updated_at = now()
+     WHERE tmdb_id = ${Number(tmdbId)} AND media_type = ${mediaType}
+       AND (
+         (status = 'ready' AND comments_cached_at IS NULL)
+         OR (status = 'comments_seeding' AND updated_at < now() - interval '3 minutes')
+       )
+    RETURNING tmdb_id`);
+  return (claimed?.rows?.length || claimed?.length || 0) > 0;
+}
+
+async function refreshCommentsCache({ tmdbId, mediaType, traktId }) {
+  try {
+    if (!traktId) {
+      await db.update(titleCommunityState)
+        .set({ status: 'ready', commentsCachedAt: new Date(), updatedAt: new Date() })
+        .where(and(eq(titleCommunityState.tmdbId, Number(tmdbId)), eq(titleCommunityState.mediaType, mediaType)));
+      return;
+    }
+    const rows = await fetchTitleComments({
+      type: mediaType,
+      traktId,
+      tmdbId,
+      mediaType,
+    });
+    await saveTraktComments(rows);
+    await db.update(titleCommunityState)
+      .set({
+        status: 'ready',
+        commentCount: rows.length,
+        commentsCachedAt: new Date(),
+        updatedAt: new Date(),
+        error: null,
+      })
+      .where(and(eq(titleCommunityState.tmdbId, Number(tmdbId)), eq(titleCommunityState.mediaType, mediaType)));
+  } catch (error) {
+    // Mantener el estado recuperable; tras el lease de 3 minutos otra visita
+    // podrá reintentar si Trakt falla temporalmente.
+    await db.update(titleCommunityState)
+      .set({ status: 'comments_seeding', updatedAt: new Date(), error: String(error?.message || error).slice(0, 300) })
+      .where(and(eq(titleCommunityState.tmdbId, Number(tmdbId)), eq(titleCommunityState.mediaType, mediaType)))
+      .catch(() => {});
+  }
 }

@@ -339,8 +339,8 @@ function EventoFila({ evento, actor, mostrarAutor, conPoster }) {
 function EventoResena({ evento, actor, mostrarAutor, conPoster }) {
   const [verSpoiler, setVerSpoiler] = useState(false);
   return (
-    <article className="rounded-xl border border-white/[0.09] bg-gradient-to-br from-white/[0.07] via-white/[0.035] to-transparent p-4 shadow-[0_16px_38px_rgba(0,0,0,0.2)] sm:p-5">
-      <div className="flex gap-3 sm:gap-4">
+    <article className="rounded-xl bg-white/[0.04] px-3 py-4 sm:px-4">
+      <div className="flex gap-3">
         {conPoster ? (
           <CartelEvento evento={evento} className="h-32 w-[5.4rem] rounded-lg" />
         ) : (

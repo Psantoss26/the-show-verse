@@ -16,6 +16,7 @@ import {
     buildBackgroundCollageTiles,
     buildPosterCollageTargets,
     buildPosterCollageTiles,
+    getDesktopBackgroundGrid,
     getPosterCollageGrid,
     getPosterCollageLayout,
 } from '@/lib/lists/posterCollage'
@@ -24,6 +25,7 @@ import { requestListArtwork } from '@/lib/tmdb/artworkBatch'
 import { pickListArtwork } from '@/lib/tmdb/artworkPicks'
 import useImageLoadReady from '@/lib/hooks/useImageLoadReady'
 import usePosterViewMode from '@/lib/hooks/usePosterViewMode'
+import { useMediaQuery } from '@/lib/hooks/useMediaQuery'
 import { posterShelfLayout } from '@/lib/lists/coverBackdrop'
 // Capa con fundido de cada modo: la misma que usa DetailsClient.
 import { CoverLayer } from '@/components/details/CoverCrossfade'
@@ -162,7 +164,41 @@ function useBackgroundCoverArt(items, enabled) {
 
     if (state.key === targetKey) return state.paths
     const cached = targets.map((target) => coverArtCache.get(target.key))
-    return cached.every((value) => value === null || typeof value === 'string') ? cached.filter(Boolean) : []
+    // `null` = aún resolviéndose (distinto de «resuelto, sin arte»): el fondo
+    // de escritorio espera a tenerlo todo para no cambiar de imágenes después.
+    return cached.every((value) => value === null || typeof value === 'string') ? cached.filter(Boolean) : null
+}
+
+// Rejilla del fondo de escritorio para la ventana actual (ver
+// getDesktopBackgroundGrid). `null` hasta medir, y sin escuchar si no se usa.
+function useDesktopBackgroundGrid(enabled) {
+    const [grid, setGrid] = useState(null)
+    useEffect(() => {
+        if (!enabled) return undefined
+        let frame = 0
+        const measure = () => {
+            frame = 0
+            const next = getDesktopBackgroundGrid(window.innerWidth, window.innerHeight)
+            setGrid((current) => (
+                current
+                && current.cols === next.cols
+                && current.rows === next.rows
+                && Math.round(current.tileWidth) === Math.round(next.tileWidth)
+                    ? current
+                    : next
+            ))
+        }
+        const onResize = () => {
+            if (!frame) frame = window.requestAnimationFrame(measure)
+        }
+        measure()
+        window.addEventListener('resize', onResize)
+        return () => {
+            window.removeEventListener('resize', onResize)
+            if (frame) window.cancelAnimationFrame(frame)
+        }
+    }, [enabled])
+    return enabled ? grid : null
 }
 
 const useClientLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
@@ -380,26 +416,31 @@ function RevealPoster({ src, lowSrc, alt }) {
 // del mosaico la prolongación cae fuera y se recorta: ahí no hay fundido.
 const COLLAGE_FEATHER_PX = 12
 // Rampa suave (smoothstep) de opaco a transparente sobre la prolongación.
-const featherRamp = (direction) => `linear-gradient(${direction},
+const featherRamp = (direction, px = COLLAGE_FEATHER_PX) => `linear-gradient(${direction},
     transparent 0px,
-    rgba(0, 0, 0, 0.104) ${COLLAGE_FEATHER_PX * 0.2}px,
-    rgba(0, 0, 0, 0.352) ${COLLAGE_FEATHER_PX * 0.4}px,
-    rgba(0, 0, 0, 0.648) ${COLLAGE_FEATHER_PX * 0.6}px,
-    rgba(0, 0, 0, 0.896) ${COLLAGE_FEATHER_PX * 0.8}px,
-    #000 ${COLLAGE_FEATHER_PX}px,
-    #000 calc(100% - ${COLLAGE_FEATHER_PX}px),
-    rgba(0, 0, 0, 0.896) calc(100% - ${COLLAGE_FEATHER_PX * 0.8}px),
-    rgba(0, 0, 0, 0.648) calc(100% - ${COLLAGE_FEATHER_PX * 0.6}px),
-    rgba(0, 0, 0, 0.352) calc(100% - ${COLLAGE_FEATHER_PX * 0.4}px),
-    rgba(0, 0, 0, 0.104) calc(100% - ${COLLAGE_FEATHER_PX * 0.2}px),
+    rgba(0, 0, 0, 0.104) ${px * 0.2}px,
+    rgba(0, 0, 0, 0.352) ${px * 0.4}px,
+    rgba(0, 0, 0, 0.648) ${px * 0.6}px,
+    rgba(0, 0, 0, 0.896) ${px * 0.8}px,
+    #000 ${px}px,
+    #000 calc(100% - ${px}px),
+    rgba(0, 0, 0, 0.896) calc(100% - ${px * 0.8}px),
+    rgba(0, 0, 0, 0.648) calc(100% - ${px * 0.6}px),
+    rgba(0, 0, 0, 0.352) calc(100% - ${px * 0.4}px),
+    rgba(0, 0, 0, 0.104) calc(100% - ${px * 0.2}px),
     transparent 100%)`
-const COLLAGE_TILE_STYLE = {
-    inset: -COLLAGE_FEATHER_PX,
-    WebkitMaskImage: `${featherRamp('to right')}, ${featherRamp('to bottom')}`,
-    maskImage: `${featherRamp('to right')}, ${featherRamp('to bottom')}`,
+const collageTileStyle = (px = COLLAGE_FEATHER_PX) => ({
+    inset: -px,
+    WebkitMaskImage: `${featherRamp('to right', px)}, ${featherRamp('to bottom', px)}`,
+    maskImage: `${featherRamp('to right', px)}, ${featherRamp('to bottom', px)}`,
     WebkitMaskComposite: 'source-in',
     maskComposite: 'intersect',
-}
+})
+const COLLAGE_TILE_STYLE = collageTileStyle()
+// Fundido de las uniones del FONDO DE ESCRITORIO, en proporción a su celda:
+// el de la portada (12 px) es ~15% de una celda de ~80 px; con las celdas del
+// fondo (160-260 px) esos 12 px se quedaban en una línea casi recta.
+const DESKTOP_COLLAGE_FEATHER_RATIO = 0.15
 
 // FONDO MÓVIL DE UNA LISTA: el mosaico de la portada, AMPLIADO. Misma rejilla
 // (columnas y alto de fila, con el alto de la portada), mismo sobrebarrido y
@@ -481,6 +522,78 @@ function MobileCollageExtension({ tiles, cols, rows }) {
         >
             <div style={{ transform: 'scaleX(1.15)', filter: 'blur(24px) brightness(0.48) saturate(1.1)' }}>
                 <MobileCollageGrid tiles={tiles} cols={cols} rows={rows} />
+            </div>
+        </div>
+    )
+}
+
+// FONDO DE ESCRITORIO DE UNA LISTA: el mismo mosaico que el fondo móvil (las
+// imágenes sin texto de la portada primero, después más títulos de la lista),
+// a pantalla completa en celdas 2:3 con las uniones fundidas de la portada.
+// Difuminado y oscurecido como un fondo; encima siguen el fundido a #101010 y
+// los tintes de siempre. Aparece de una vez cuando sus imágenes han llegado
+// (o pasado un tope), no celda a celda; al volver atrás, sin fundido.
+const DESKTOP_COLLAGE_REVEAL_CAP_MS = 2500
+
+// Títulos de los que salen la portada y el fondo: la primera página de una
+// lista de la comunidad (TraktListDetailsClient pide de 48 en 48). Las listas
+// propias y las colecciones llegan enteras; también se toman sus primeros.
+const LIST_ART_SOURCE_ITEMS = 48
+
+function DesktopCollageBackground({ tiles, cols, tileWidth, animate }) {
+    const unique = useMemo(() => [...new Set(tiles)], [tiles])
+    const tileStyle = useMemo(
+        () => collageTileStyle(Math.max(COLLAGE_FEATHER_PX, Math.round(tileWidth * DESKTOP_COLLAGE_FEATHER_RATIO))),
+        [tileWidth],
+    )
+    const [settled, setSettled] = useState(() => new Set())
+    const [capped, setCapped] = useState(false)
+    useEffect(() => {
+        const timer = window.setTimeout(() => setCapped(true), DESKTOP_COLLAGE_REVEAL_CAP_MS)
+        return () => window.clearTimeout(timer)
+    }, [])
+    const settle = (src) => setSettled((current) => {
+        if (current.has(src)) return current
+        const next = new Set(current)
+        next.add(src)
+        return next
+    })
+    const ready = capped || unique.every((src) => settled.has(src))
+
+    return (
+        <div
+            className={`absolute inset-0 overflow-hidden max-sm:hidden ${
+                animate ? 'transition-opacity duration-700 ease-out motion-reduce:transition-none' : ''
+            } ${ready ? 'opacity-100' : 'opacity-0'}`}
+            aria-hidden="true"
+        >
+            <div
+                className="grid bg-neutral-950"
+                style={{
+                    gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+                    // Sobrebarrido: el desenfoque no deja bordes claros.
+                    transform: 'scale(1.06)',
+                    transformOrigin: 'top center',
+                    filter: 'blur(6px) brightness(0.55) saturate(1.1)',
+                }}
+            >
+                {tiles.map((src, index) => (
+                    <div key={`${index}-${src}`} className="relative aspect-[2/3] min-h-0">
+                        <div className="absolute" style={tileStyle}>
+                            {/* Fondo decorativo difuminado: <img> directo. */}
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                                src={src}
+                                alt=""
+                                decoding="async"
+                                fetchPriority="low"
+                                onLoad={() => settle(src)}
+                                onError={() => settle(src)}
+                                className="h-full w-full object-cover"
+                            />
+                        </div>
+                    </div>
+                ))}
             </div>
         </div>
     )
@@ -622,14 +735,22 @@ export default function UnifiedListDetailsLayout({
     const isBackNav = useIsHistoryNavigation()
     const hasTabs = Array.isArray(tabs) && tabs.length > 0 && !!activeTab && typeof onTabChange === 'function'
     const hasInfoTabs = Boolean(description)
-    const finalPosterArtwork = useCoverArtImages(posterItems)
+    // ARTE FIJO DE LA LISTA: portada y fondo salen SOLO de la primera página
+    // de títulos. La portada muestrea a lo largo de los títulos que recibe, y
+    // al cargar más páginas cambiaba de imágenes (y con ella el fondo). Con la
+    // primera página es la misma en cada visita, cargues lo que cargues.
+    const artItems = useMemo(
+        () => (Array.isArray(posterItems) ? posterItems.slice(0, LIST_ART_SOURCE_ITEMS) : []),
+        [posterItems],
+    )
+    const finalPosterArtwork = useCoverArtImages(artItems)
 
     // MODO DE PORTADA póster ↔ backdrop, como en DetailsClient (misma
     // preferencia global, solo escritorio). Disponible con un backdrop con
     // idioma (colecciones) o, en listas, con pósters para la estantería.
     const coverMode = usePosterViewMode()
     const reduceMotion = useReducedMotion()
-    const posterTargetCount = useMemo(() => buildPosterCollageTargets(posterItems).length, [posterItems])
+    const posterTargetCount = useMemo(() => buildPosterCollageTargets(artItems).length, [artItems])
     // Listas: disponible en cuanto hay títulos (la estantería enseña huecos
     // mientras llegan sus pósters). Colecciones: con su backdrop con idioma.
     const backdropAvailable = posterImage ? Boolean(coverBackdrop?.src) : posterTargetCount > 0
@@ -694,17 +815,38 @@ export default function UnifiedListDetailsLayout({
     // mosaico de verdad; sus imágenes se piden cuando la portada ya está lista.
     const coverTiles = useMemo(() => buildPosterCollageTiles(finalPosterArtwork.images), [finalPosterArtwork.images])
     const collageBackground = mobileHero && isPhone && !posterImage && coverTiles.length > 1
-    const backgroundArt = useBackgroundCoverArt(posterItems, collageBackground && mobileCoverReady)
+    // FONDO DE ESCRITORIO (desde `sm`): el mismo mosaico a pantalla completa
+    // (DesktopCollageBackground) en lugar del póster tenue. En un teléfono no
+    // se monta ni pide nada.
+    const phoneViewport = useMediaQuery('(max-width: 639px)')
+    const desktopCollage = !phoneViewport && !heroBackground && !posterImage && coverTiles.length > 1
+    const backgroundArt = useBackgroundCoverArt(
+        artItems,
+        (collageBackground && mobileCoverReady) || (desktopCollage && !finalPosterArtwork.pending),
+    )
+    const backgroundArtUrls = (backgroundArt || []).map((path) => `https://image.tmdb.org/t/p/w185${path}`)
     const collageGrid = getPosterCollageGrid(coverTiles.length)
     // Dos portadas de alto llenan siempre la pantalla (la portada mide al
     // menos 125vw y la pantalla, menos de dos veces eso).
     const backgroundTiles = collageBackground
         ? buildBackgroundCollageTiles(
             coverTiles,
-            backgroundArt.map((path) => `https://image.tmdb.org/t/p/w185${path}`),
+            backgroundArtUrls,
             collageGrid.cols * collageGrid.rows * 2,
         )
         : []
+    const desktopGrid = useDesktopBackgroundGrid(desktopCollage)
+    // Con todo el arte ya resuelto: si no, las celdas cambiarían de imagen.
+    const desktopTiles = desktopCollage && desktopGrid && backgroundArt
+        ? buildBackgroundCollageTiles(coverTiles, backgroundArtUrls, desktopGrid.count)
+        : []
+    // Identidad del mosaico por sus IMÁGENES, no por el número de celdas: al
+    // cambiar el tamaño de la ventana se recoloca sin volver a aparecer.
+    const desktopCollageKey = desktopTiles.length ? [...new Set(desktopTiles)].join('|') : ''
+    // Mientras se resuelve la portada aún no se sabe si habrá mosaico: el
+    // póster tenue de antes no se enseña para no cambiarlo después por él.
+    const desktopCollageMaybe = !phoneViewport && !heroBackground && !posterImage
+        && (finalPosterArtwork.pending || coverTiles.length > 1)
 
     const infoTabs = hasInfoTabs ? (
         <DetailsInfoTabs
@@ -726,7 +868,13 @@ export default function UnifiedListDetailsLayout({
             className="min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-purple-500/30"
             style={heroRootStyle}
         >
-            <div className={`fixed inset-0 pointer-events-none overflow-hidden ${heroBackground ? 'bg-[#0a0a0a]' : mobileHero ? 'max-sm:bg-[#0a0a0a]' : ''}`}>
+            {/* El fondo lleva SIEMPRE su color base. Su imagen es translúcida
+                (`opacity-40`) y la página empieza bajo la barra superior: sin
+                base, detrás de la barra se mezclaba con el negro del <body> y
+                debajo con el #101010 de la página, y la barra transparente se
+                veía como una franja oscura. Con la base, la imagen llega igual
+                hasta arriba, como el fondo de la ficha (DetailsClient). */}
+            <div className={`fixed inset-0 pointer-events-none overflow-hidden ${heroBackground ? 'bg-[#0a0a0a]' : mobileHero ? 'bg-[#101010] max-sm:bg-[#0a0a0a]' : 'bg-[#101010]'}`}>
                 {/* Fondo de la página. MÓVIL con cabecera inmersiva: aparece con
                     el scroll (`--sv-hero-scroll`), detrás de la portada fija,
                     como la capa base de la ficha. */}
@@ -748,15 +896,23 @@ export default function UnifiedListDetailsLayout({
                                 fondo tenue de escritorio sobra: se queda solo
                                 desde `sm`. */}
                             <div className={`absolute inset-0 ${backgroundTiles.length ? 'max-sm:hidden' : ''}`}>
-                                {backdropImage ? (
+                                {desktopTiles.length ? (
+                                    <DesktopCollageBackground
+                                        key={desktopCollageKey}
+                                        tiles={desktopTiles}
+                                        cols={desktopGrid.cols}
+                                        tileWidth={desktopGrid.tileWidth}
+                                        animate={!isBackNav}
+                                    />
+                                ) : desktopCollageMaybe ? null : backdropImage ? (
                                     <OptimizedImage
                                         src={backdropImage}
                                         alt=""
                                         fetchPriority="low"
-                                        className="h-full w-full scale-105 object-cover opacity-25 blur-sm"
+                                        className="h-full w-full scale-105 object-cover opacity-40 blur-sm"
                                     />
                                 ) : null}
-                                <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-[#101010]/90 to-[#101010]" />
+                                <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent_0%,transparent_20%,rgba(16,16,16,0.75)_70%,#101010_100%)]" />
                                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(168,85,247,0.16),transparent_35%),radial-gradient(circle_at_80%_15%,rgba(234,179,8,0.11),transparent_32%)]" />
                             </div>
                             {backgroundTiles.length ? (
@@ -808,11 +964,7 @@ export default function UnifiedListDetailsLayout({
                                 : 'max-sm:opacity-60'
                         } ${heroBackground ? '' : 'sm:hidden'}`}
                     >
-                        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-transparent" />
-                        <div className="absolute inset-0 bg-gradient-to-r from-[#101010]/60 via-transparent to-transparent" />
-                        <div className="absolute inset-0 bg-gradient-to-l from-[#101010]/60 via-transparent to-transparent" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#101010] via-[#101010]/60 to-black/20" />
-                        <div className="absolute inset-0 bg-gradient-to-r from-[#101010] via-transparent to-transparent opacity-30" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#101010] via-[#101010]/60 to-transparent" />
                     </div>
                 ) : null}
             </div>
@@ -1031,6 +1183,10 @@ export default function UnifiedListDetailsLayout({
                             <DetailsScoreboardPanel
                                 mobileScoresOnly
                                 {...scoreboardRatings}
+                                // En móvil, solo la media: sin el recuento de
+                                // títulos que cuentan («146/162») debajo.
+                                tmdb={scoreboardRatings.tmdb ? { ...scoreboardRatings.tmdb, hideSubOnMobile: true } : scoreboardRatings.tmdb}
+                                imdb={scoreboardRatings.imdb ? { ...scoreboardRatings.imdb, hideSubOnMobile: true } : scoreboardRatings.imdb}
                                 statItems={scoreboardStats.length ? scoreboardStats : stats.map((stat) => ({
                                     icon: stat.icon,
                                     label: stat.label,

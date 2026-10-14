@@ -51,6 +51,7 @@ import DetailsScoreboardPanel, {
   ScoreboardPillRow,
 } from "@/components/details/DetailsScoreboardPanel";
 import { ActionShareButton } from "@/components/details/DetailHeaderBits";
+import { buildShareCardPayload } from "@/lib/details/shareCard";
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
 import {
   buildTraktHref,
@@ -345,6 +346,14 @@ export default function EpisodeDetailsClient({
         season?.episodes,
       ),
     [showId, seasonNumber, episodeNumber, season?.episodes],
+  );
+  const nextEpisodes = useMemo(
+    () =>
+      (Array.isArray(season?.episodes) ? season.episodes : [])
+        .filter((item) => Number(item?.episode_number) > Number(episodeNumber))
+        .sort((a, b) => Number(a?.episode_number) - Number(b?.episode_number))
+        .slice(0, 3),
+    [season?.episodes, episodeNumber],
   );
   // En móvil, deslizar lleva a el episodio anterior/siguiente: los mismos destinos que
   // las flechas de la fila de acciones (MobileUserPageSwipeNavigation).
@@ -1428,6 +1437,135 @@ export default function EpisodeDetailsClient({
     applyShowWatchedPayload,
   ]);
 
+  // COMPARTIR (imagen y vídeo), como la ficha y las temporadas: la misma hoja y
+  // las mismas rutas (/api/share/details-card y -story) con la variante de
+  // episodio (`episode`). La portada es la de la cabecera móvil (las imágenes
+  // apiladas de EpisodeStillStack) con «Episodio N · Temporada M» sobre el
+  // nombre; la fila, los estados del usuario del episodio (visto · nota); y en
+  // el vídeo, sus visionados y sus datos.
+  const shareTitle = `${showName} · ${epName}`;
+  const shareKicker = `Episodio ${episodeNumber} · Temporada ${seasonNumber}`;
+  // Por contenido: `mobileStillPaths` se rehace en cada render.
+  const shareStillsKey = mobileStillPaths.join("|");
+  const shareCard = useMemo(() => {
+    const stillPaths = shareStillsKey ? shareStillsKey.split("|") : [];
+    return buildShareCardPayload({
+      type: "tv",
+      title: epName,
+      // El fondo del vídeo es la primera imagen, como el de la página al
+      // hacer scroll.
+      posterPath: stillPaths[0] || null,
+      logoPath: null,
+      episode: true,
+      kicker: shareKicker,
+      stillPaths,
+      trakt: {
+        watched: trakt.watched,
+        plays: episodePlays.plays,
+        badge: null,
+        loading: !watchedStateSettled || (trakt.loading && !watchedBySeasonLoaded),
+      },
+      rating: ratingLoading ? null : userRating,
+      scores: {
+        tmdb: {
+          value: vote?.toFixed(1),
+          sub: voteCount ? formatCountShort(voteCount) : undefined,
+        },
+        trakt: {
+          value: traktDecimal || undefined,
+          sub: tScoreboard.votes ? formatCountShort(tScoreboard.votes) : undefined,
+        },
+        imdb: {
+          value: imdbData?.rating != null ? Number(imdbData.rating).toFixed(1) : undefined,
+          sub: imdbData?.votes ? formatCountShort(imdbData.votes) : undefined,
+        },
+      },
+    });
+  }, [
+    epName,
+    shareKicker,
+    shareStillsKey,
+    trakt.watched,
+    trakt.loading,
+    episodePlays.plays,
+    watchedStateSettled,
+    watchedBySeasonLoaded,
+    ratingLoading,
+    userRating,
+    vote,
+    voteCount,
+    traktDecimal,
+    tScoreboard.votes,
+    imdbData?.rating,
+    imdbData?.votes,
+  ]);
+
+  // Veces visto y fechas del episodio, para la imagen («2 veces») y la sección
+  // de visionados del vídeo. Solo si está visto, después de pintar.
+  useEffect(() => {
+    if (!trakt.connected || !trakt.watched || episodePlaysLoaded) return undefined;
+    return scheduleAfterFirstPaint(() => {
+      loadEpisodePlays();
+    }, 600);
+  }, [trakt.connected, trakt.watched, episodePlaysLoaded, loadEpisodePlays]);
+
+  const shareStory = useMemo(() => {
+    const crew = Array.isArray(episode?.crew) ? episode.crew : [];
+    const directors = crew
+      .filter((member) => member?.job === "Director")
+      .map((member) => member?.name);
+    const creators = (Array.isArray(show?.created_by) ? show.created_by : []).map(
+      (creator) => creator?.name,
+    );
+    return {
+      type: "tv",
+      // La hoja pide al abrirse el progreso de «Continuar viendo».
+      tmdbId: showId,
+      season: Number(seasonNumber),
+      episode: Number(episodeNumber),
+      episodeProgress: inProgressPct,
+      watched: trakt.watched,
+      plays: episodePlays.plays,
+      history: episodePlays.history,
+      lastWatchedAt: episodePlays.lastWatchedAt,
+      details: {
+        year: Number(String(episode?.air_date || "").slice(0, 4)) || null,
+        runtime,
+        genres: show?.genres || [],
+        peopleLabel: directors.length ? "Dirección" : "Creadores",
+        people: (directors.length ? directors : creators).filter(Boolean),
+        overview: episode?.overview || null,
+        facts: {
+          series: showName,
+          release: airDate,
+          format: `T${seasonNumber} · E${episodeNumber}`,
+          duration: runtime ? `${runtime} min` : null,
+          network: showNetwork || null,
+          production: episodeProduction,
+        },
+      },
+    };
+  }, [
+    episode?.crew,
+    episode?.air_date,
+    episode?.overview,
+    show?.created_by,
+    show?.genres,
+    showId,
+    seasonNumber,
+    episodeNumber,
+    inProgressPct,
+    trakt.watched,
+    episodePlays.plays,
+    episodePlays.history,
+    episodePlays.lastWatchedAt,
+    runtime,
+    showName,
+    airDate,
+    showNetwork,
+    episodeProduction,
+  ]);
+
   return (
     <div
       ref={heroRootRef}
@@ -1788,8 +1926,10 @@ export default function EpisodeDetailsClient({
               showFavoritedStat={false}
               onMorePlatforms={() => setPlatformsOpen(true)}
               share={{
-                title: epName,
+                title: shareTitle,
                 text: shareText,
+                card: shareCard,
+                story: shareStory,
               }}
             />
             </div>
@@ -1823,8 +1963,10 @@ export default function EpisodeDetailsClient({
               <ActionShareButton
                 variant="pill"
                 iconOnly
-                title={epName}
+                title={shareTitle}
                 text={shareText}
+                card={shareCard}
+                story={shareStory}
               />
             </ScoreboardPillRow>
             </div>
@@ -1878,6 +2020,64 @@ export default function EpisodeDetailsClient({
           `,
             }}
           />
+        )}
+
+        {nextEpisodes.length > 0 && (
+          <AnimatedSection delay={0.04}>
+            <section className="mb-16 group/section">
+              <SectionTitle title="Episodios" icon={MonitorPlay} />
+              <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-5 [scrollbar-width:thin]">
+                {nextEpisodes.map((nextEpisode) => {
+                  const nextNumber = Number(nextEpisode?.episode_number);
+                  const nextTitle =
+                    nextEpisode?.name || `Episodio ${nextNumber}`;
+                  const nextAirDate = nextEpisode?.air_date
+                    ? formatDateEs(nextEpisode.air_date)
+                    : null;
+                  const still = nextEpisode?.still_path || null;
+
+                  return (
+                    <Link
+                      key={`${seasonNumber}-${nextNumber}`}
+                      href={`/details/tv/${showId}/season/${seasonNumber}/episode/${nextNumber}`}
+                      className="group/episode relative w-[78vw] shrink-0 snap-start overflow-hidden rounded-2xl bg-zinc-900 shadow-lg shadow-black/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.75rem)]"
+                      title={nextTitle}
+                    >
+                      <div className="relative aspect-video overflow-hidden">
+                        {still ? (
+                          <OptimizedImage
+                            src={`https://image.tmdb.org/t/p/w780${still}`}
+                            alt={nextTitle}
+                            className="h-full w-full object-cover transition-transform duration-500 group-hover/episode:scale-105"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center bg-neutral-800 text-neutral-500">
+                            <ImageOff className="h-7 w-7" aria-hidden="true" />
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/15 to-transparent" />
+                        <div className="absolute inset-x-0 bottom-0 p-3 sm:p-4">
+                          <p className="text-xs font-bold uppercase tracking-wider text-zinc-300">
+                            Episodio {nextNumber}
+                          </p>
+                          <h3 className="mt-1 line-clamp-2 text-sm font-extrabold leading-tight text-white sm:text-base">
+                            {nextTitle}
+                          </h3>
+                          {nextAirDate ? (
+                            <p className="mt-1 text-xs font-semibold text-zinc-300">
+                              {nextAirDate}
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </section>
+          </AnimatedSection>
         )}
 
         {/* === Reparto del episodio === */}

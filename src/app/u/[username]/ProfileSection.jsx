@@ -822,8 +822,8 @@ function ActivityReview({ item, actor, compact = false, posterList = false }) {
   const src = item.posterPath ? `https://image.tmdb.org/t/p/w185${item.posterPath}` : null;
 
   return (
-    <article className={`rounded-xl border border-white/[0.09] bg-gradient-to-br from-white/[0.07] via-white/[0.035] to-transparent shadow-[0_16px_38px_rgba(0,0,0,0.2)] ${compact ? "p-3" : "p-4 @[640px]/detail-page:p-5"}`}>
-      <div className="flex gap-3 @[640px]/detail-page:gap-4">
+    <article className={`rounded-xl bg-white/[0.04] px-3 @[640px]/detail-page:px-4 ${compact ? "py-3" : "py-4"}`}>
+      <div className="flex gap-3">
         {posterList ? (
           <ActivityPoster item={item} className="h-32 w-[5.4rem] rounded-lg" />
         ) : (
@@ -1602,6 +1602,12 @@ function ProfileContentSection({ username, section, actor }) {
   const [loadMoreError, setLoadMoreError] = useState(false);
   const loadMoreRef = useRef(null);
   const loadingMoreRef = useRef(false);
+  // Un sentinel puede seguir dentro del rootMargin después de añadir una página.
+  // Como el observer se vuelve a conectar al terminar cada petición, eso podía
+  // encadenar cargas y hacer parpadear «Cargando más...» sin que el usuario
+  // avanzase por el feed. Para Actividad esperamos a que el sentinel salga y
+  // vuelva a entrar en la zona de precarga antes de iniciar otra página.
+  const activityLoadArmedRef = useRef(true);
   const viewerTitleStates = useViewerTitleStates(items, Boolean(viewer?.username));
   const menuEnabled = PROFILE_MENU_SECTIONS.has(section);
   const [controls, setControls] = useState(() => getSectionPreference(cacheKey, section, profileKey));
@@ -1947,13 +1953,21 @@ function ProfileContentSection({ username, section, actor }) {
 
     const observer = new IntersectionObserver(
       ([entry]) => {
+        if (section === "activity") {
+          if (!entry.isIntersecting) {
+            activityLoadArmedRef.current = true;
+            return;
+          }
+          if (!activityLoadArmedRef.current) return;
+          activityLoadArmedRef.current = false;
+        }
         if (entry.isIntersecting) loadMore();
       },
-      { threshold: 0.01, rootMargin: "0px 0px 360px" },
+      { threshold: 0.01, rootMargin: section === "activity" ? "0px 0px 160px" : "0px 0px 360px" },
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [hasMore, loadMore, loadMoreError, loadingMore, status]);
+  }, [hasMore, loadMore, loadMoreError, loadingMore, section, status]);
 
   // En grid, una vista con más columnas puede dejar la última fila incompleta
   // aunque ya hubiese una página cargada. Pedimos exactamente las tarjetas que

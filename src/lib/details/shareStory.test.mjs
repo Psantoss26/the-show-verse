@@ -324,3 +324,51 @@ test("temporada: el progreso es el de la temporada y «continuar viendo» solo s
     ["2x1", "2x2"],
   );
 });
+
+test("episodio: visionados del episodio (veces visto) y «continuar viendo» solo si es él", () => {
+  const input = {
+    type: "tv",
+    season: 1,
+    episode: 3,
+    watched: true,
+    plays: 2,
+    history: [{ watched_at: "2026-01-02T20:00:00.000Z" }, { watched_at: "2025-05-01T20:00:00.000Z" }],
+    details,
+  };
+  const story = sanitizeShareStory(buildShareStoryPayload(input));
+  assert.equal(story.plays.count, 2);
+  assert.equal(story.plays.episode, true);
+  assert.equal(story.plays.dates[0], "2026-01-02T20:00:00.000Z");
+  // Sin lista de episodios: es uno solo.
+  assert.equal(story.episodes, null);
+
+  const otherEpisode = sanitizeShareStory(
+    buildShareStoryPayload({ ...input, continueWatching: { percent: 40, season: 1, episode: 4 } }),
+  );
+  assert.equal(otherEpisode.plays.resume, null);
+
+  // El progreso que la página ya tiene del episodio gana al «más reciente» de la serie.
+  const own = sanitizeShareStory(
+    buildShareStoryPayload({
+      ...input,
+      watched: false,
+      episodeProgress: 35,
+      continueWatching: { percent: 40, season: 1, episode: 4 },
+    }),
+  );
+  assert.deepEqual(own.plays, {
+    count: 0,
+    dates: [],
+    last: null,
+    resume: { percent: 35, season: 1, episode: 3 },
+    episode: true,
+  });
+
+  assert.equal(sanitizeShareStory(buildShareStoryPayload({ ...input, watched: false })).plays, null);
+});
+
+test("episodio: la serie abre «Detalles» y pasa el validador", () => {
+  const story = sanitizeShareStory({ details: { facts: { series: "Breaking Bad" } } });
+  assert.equal(story.details.facts.series, "Breaking Bad");
+  assert.deepEqual(storySceneIds({ type: "tv", episode: true }, story), ["details"]);
+});

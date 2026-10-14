@@ -1,0 +1,1 @@
+ALTER TABLE "title_community_state" ADD COLUMN "comments_cached_at" timestamp with time zone;

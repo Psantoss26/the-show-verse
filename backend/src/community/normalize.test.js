@@ -100,3 +100,9 @@ test('listRowToApi produces the Surface B contract', () => {
   assert.equal(api.user.images.avatar.full, 'http://a/m.png');
   assert.deepEqual(api.previewPosters, ['https://image.tmdb.org/t/p/w342/a.jpg']);
 });
+
+test('listRowToApi exposes where the list comes from (app users first in the index)', () => {
+  assert.equal(listRowToApi({ id: 'U1', name: 'Mía', source: 'user' }).list.origin, 'user');
+  assert.equal(listRowToApi({ id: 'T1', name: 'Importada', source: 'trakt' }).list.origin, 'trakt');
+  assert.equal(listRowToApi({ id: 'X1', name: 'Sin origen' }).list.origin, 'trakt');
+});

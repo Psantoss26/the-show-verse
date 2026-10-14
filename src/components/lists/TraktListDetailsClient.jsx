@@ -383,6 +383,8 @@ export default function TraktListDetailsClient({ username, listId }) {
             heroActions={
                 <ListDetailsActionRow
                     onBack={() => router.back()}
+                    externalHref={list?.traktUrl || null}
+                    externalLabel="Abrir lista en Trakt"
                     share={share}
                     favoriteAction={list?.id ? (
                     <ListLikeButton
@@ -400,6 +402,7 @@ export default function TraktListDetailsClient({ username, listId }) {
                 <FilterableListItems
                     items={items}
                     getMeta={getTraktMeta}
+                    hideMissingPosters
                     emptyTitle="Lista vacía"
                     emptyText="No hay títulos disponibles en esta lista."
                 />

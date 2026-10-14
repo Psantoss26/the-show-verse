@@ -11,7 +11,7 @@ import {
 } from '../db/schema.js';
 import { and, eq, desc, asc, sql, gt, inArray } from 'drizzle-orm';
 import { resolveCommentTab } from './tabs.js';
-import { commentRowToApi, listRowToApi } from './normalize.js';
+import { commentRowToApi, listRowToApi, posterUrl } from './normalize.js';
 import { sentimentRowToApi } from './sentiment.js';
 import { getMediaMetadataMap, metadataFor } from '../utils/mediaMetadata.js';
 import { buildRatingSummary, hydrateListRatings, isMissingVoteAverageColumn } from '../utils/listRatings.js';
@@ -394,7 +394,7 @@ export async function insertListMemberships(listId, items) {
     .onConflictDoNothing({ target: [communityListItems.listId, communityListItems.tmdbId, communityListItems.mediaType] });
 }
 
-export async function getListsForTitle({ tmdbId, mediaType, limit = 6, viewerId = null }) {
+export async function getListsForTitle({ tmdbId, mediaType, limit = 10, viewerId = null }) {
   const rows = await db
     .select({
       id: communityLists.id, externalId: communityLists.externalId, slug: communityLists.slug,
@@ -407,9 +407,25 @@ export async function getListsForTitle({ tmdbId, mediaType, limit = 6, viewerId 
     .innerJoin(communityLists, eq(communityListItems.listId, communityLists.id))
     .where(and(eq(communityListItems.tmdbId, Number(tmdbId)), eq(communityListItems.mediaType, mediaType)))
     .orderBy(desc(communityLists.likes))
-    .limit(Math.min(Number(limit) || 6, 20));
-  const liked = await likedListIds(viewerId, rows.map((row) => row.id));
-  return rows.map((row) => listRowToApi({ ...row, likedByViewer: liked.has(row.id) }));
+    .limit(Math.min(Number(limit) || 10, 20));
+  const previews = await readListPreviews(rows.map((row) => row.id), 5).catch(() => new Map());
+  const refreshed = rows.map((row) => {
+    const items = previews.get(row.id);
+    if (!items?.length) return row;
+    const previewPosters = items.map((item) => posterUrl(item.posterPath)).filter(Boolean);
+    if (previewPosters.length) {
+      row.previewPosters = previewPosters;
+      // La vista ya puede usar la portada completada; persistirla evita repetir
+      // el trabajo en las siguientes visitas del título.
+      db.update(communityLists)
+        .set({ previewPosters })
+        .where(eq(communityLists.id, row.id))
+        .catch(() => {});
+    }
+    return row;
+  });
+  const liked = await likedListIds(viewerId, refreshed.map((row) => row.id));
+  return refreshed.map((row) => listRowToApi({ ...row, likedByViewer: liked.has(row.id) }));
 }
 
 const SORTS = {
@@ -428,6 +444,9 @@ async function readListPreviews(listIds, limit) {
   const ids = [...new Set(listIds.filter(Boolean))];
   const max = Math.min(Math.max(Number(limit) || 0, 0), MAX_DISCOVER_PREVIEW_ITEMS);
   if (!ids.length || !max) return new Map();
+  // Leer candidatos extra permite completar la portada aunque algún elemento
+  // inicial de la lista ya no tenga póster disponible en TMDb.
+  const candidateLimit = Math.min(max * 2, 24);
   const ranked = db
     .select({
       ...communityListItemFields,
@@ -439,12 +458,14 @@ async function readListPreviews(listIds, limit) {
   const rows = await db
     .select()
     .from(ranked)
-    .where(sql`${ranked.rank} <= ${max}`)
+    .where(sql`${ranked.rank} <= ${candidateLimit}`)
     .orderBy(asc(ranked.listId), asc(ranked.position));
   const visible = await hydrateListItemPosters(rows, { allowDelete: false });
   const byList = new Map(ids.map((id) => [id, []]));
   for (const it of visible) {
-    byList.get(it.listId)?.push({
+    const previews = byList.get(it.listId);
+    if (!previews || previews.length >= max) continue;
+    previews.push({
       tmdbId: it.tmdbId,
       mediaType: it.mediaType,
       title: it.title || null,
@@ -454,25 +475,63 @@ async function readListPreviews(listIds, limit) {
   return byList;
 }
 
-export async function discoverLists({ sort = 'items_desc', page = 1, limit = 30, viewerId = null, previewItems = 0 }) {
+// Búsqueda por nombre del índice de «Listas de la comunidad». `ILIKE` con los
+// comodines del usuario escapados: buscar «100%» no es «cualquier cosa».
+export const MAX_DISCOVER_QUERY_LENGTH = 80;
+function discoverNameFilter(query) {
+  const term = String(query || '').trim().slice(0, MAX_DISCOVER_QUERY_LENGTH);
+  if (!term) return undefined;
+  const escaped = term.replace(/[\\%_]/g, (char) => `\\${char}`);
+  return sql`${communityLists.name} ilike ${`%${escaped}%`}`;
+}
+
+// Una página del índice con lo necesario para seguir paginando: `hasMore` (se
+// lee una fila de más) y `totals` (listas, títulos y me gusta de TODAS las
+// listas con ese filtro, para la cabecera; `total` = número de listas). Antes el
+// cliente pedía solo la primera página de 30 y no había forma de ver el resto,
+// aunque la base de datos guardase cientos.
+export async function discoverListsPage({ sort = 'items_desc', page = 1, limit = 30, query = '', viewerId = null, previewItems = 0 }) {
   const orderBy = Object.hasOwn(SORTS, sort) ? SORTS[sort] : SORTS.items_desc;
   const safeLimit = Math.min(Math.max(Number(limit) || 30, 1), 60);
   const offset = (Math.max(Number(page) || 1, 1) - 1) * safeLimit;
+  const where = discoverNameFilter(query);
   // Las listas que publican los usuarios de la app van delante de las
   // importadas de Trakt (cientos, y casi siempre más largas): si no, una lista
-  // recién publicada no llegaría nunca a la primera página.
+  // recién publicada no llegaría nunca a la primera página. El id desempata:
+  // con un orden estable, ninguna lista se repite ni se salta entre páginas.
   const ownFirst = sql`case when ${communityLists.source} = 'user' then 0 else 1 end`;
-  const rows = await db.select().from(communityLists).orderBy(ownFirst, ...orderBy).limit(safeLimit).offset(offset);
-  const listIds = rows.map((row) => row.id);
+  const [rows, [sums = {}]] = await Promise.all([
+    db.select().from(communityLists).where(where)
+      .orderBy(ownFirst, ...orderBy, asc(communityLists.id))
+      .limit(safeLimit + 1).offset(offset),
+    db.select({
+      lists: sql`count(*)::int`,
+      items: sql`coalesce(sum(${communityLists.itemCount}), 0)::bigint`,
+      likes: sql`coalesce(sum(${communityLists.likes}), 0)::bigint`,
+    }).from(communityLists).where(where),
+  ]);
+  const hasMore = rows.length > safeLimit;
+  const pageRows = rows.slice(0, safeLimit);
+  const listIds = pageRows.map((row) => row.id);
   const [liked, previews] = await Promise.all([
     likedListIds(viewerId, listIds),
     // Una vista previa que falla no tumba el índice: el cliente la pide aparte.
     readListPreviews(listIds, previewItems).catch(() => new Map()),
   ]);
-  return rows.map((row) => {
+  const results = pageRows.map((row) => {
     const api = listRowToApi({ ...row, likedByViewer: liked.has(row.id) });
     return previews.has(row.id) ? { ...api, previewItems: previews.get(row.id) } : api;
   });
+  const totals = {
+    lists: Number(sums.lists) || 0,
+    items: Number(sums.items) || 0,
+    likes: Number(sums.likes) || 0,
+  };
+  return { results, hasMore, total: totals.lists, totals };
+}
+
+export async function discoverLists(options = {}) {
+  return (await discoverListsPage(options)).results;
 }
 
 export async function getCommunityListWithItems({ id, page = 1, limit = 50, viewerId = null }) {

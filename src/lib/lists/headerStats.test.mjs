@@ -40,3 +40,17 @@ test("números que caben en la tarjeta", () => {
   assert.equal(formatStatNumber(2_400_000), "2,4M");
   assert.equal(formatStatNumber(undefined), "0");
 });
+
+test("comunidad: con los totales del servidor, cuenta TODAS las listas y no solo las cargadas", () => {
+  const loaded = [{ item_count: 10, likes: 2 }, { item_count: 5, likes: 1 }];
+  const stats = listsHeaderStats("trakt", loaded, { lists: 885, items: 308295, likes: 114017 });
+  assert.deepEqual(
+    stats.map((stat) => stat.value),
+    [formatStatNumber(885), formatStatNumber(308295), formatStatNumber(114017)],
+  );
+  // Sin totales (caché antigua), lo cargado.
+  assert.deepEqual(
+    listsHeaderStats("trakt", loaded).map((stat) => stat.value),
+    [formatStatNumber(2), formatStatNumber(15), formatStatNumber(3)],
+  );
+});

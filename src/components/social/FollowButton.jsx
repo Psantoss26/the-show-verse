@@ -6,11 +6,13 @@ import { UserPlus, UserCheck, Loader2 } from "lucide-react";
 
 // Botón de seguir/dejar de seguir reutilizable. Optimista con reversión si la
 // petición falla. `size` "md" (por defecto) o "sm" (para filas de listas).
+// `bordered={false}` quita el contorno del estado "Siguiendo".
 export default function FollowButton({
   username,
   initialFollowing,
   onChange,
   size = "md",
+  bordered = true,
   className = "",
 }) {
   const serverOnline = useServerOnline();
@@ -50,7 +52,7 @@ export default function FollowButton({
       disabled={busy || !serverOnline}
       className={`inline-flex items-center justify-center gap-1.5 rounded-full font-bold transition-all active:scale-[0.98] disabled:opacity-60 ${dims} ${
         following
-          ? "border border-white/15 bg-white/5 text-zinc-200 hover:border-red-400/40 hover:bg-red-500/10 hover:text-red-300"
+          ? `${bordered ? "border border-white/15 hover:border-red-400/40" : ""} bg-white/5 text-zinc-200 hover:bg-red-500/10 hover:text-red-300`
           : "bg-emerald-500 text-black shadow-[0_10px_30px_-10px_rgba(16,185,129,0.6)] hover:bg-emerald-400"
       } ${className}`}
     >

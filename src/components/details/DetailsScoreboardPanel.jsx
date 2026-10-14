@@ -196,6 +196,7 @@ export function DetailsRatingsBadges({
           large={spread}
           value={resolvedValue(score)}
           sub={score.sub}
+          hideSubOnMobile={!!score.hideSubOnMobile}
           href={score.href}
           disableHoverLift
           tooltip={score.href ? "Ver en TMDb" : "TMDb"}
@@ -248,6 +249,7 @@ export function DetailsRatingsBadges({
           large={spread}
           value={resolvedValue(score)}
           sub={score.sub}
+          hideSubOnMobile={!!score.hideSubOnMobile}
           href={score.href}
           disableHoverLift
           tooltip={score.href ? "Ver en IMDb" : "IMDb"}

@@ -20,10 +20,12 @@ test("las parrillas de listas no revelan el artwork persistido durante la resolu
   assert.match(englishPosterItems, /poster_path: null/);
   assert.match(englishPosterItems, /backdrop_path: null/);
   assert.match(englishPosterItems, /_englishPosterPending: !resolved/);
+  // Resuelto sin póster inglés: las listas de la comunidad lo ocultan.
+  assert.match(englishPosterItems, /_englishPosterMissing: resolved/);
 });
 
 test("las tarjetas usan un placeholder neutro hasta que llega el póster inglés", () => {
-  assert.match(listPosterCard, /function TmdbPoster\(\{ posterPath, alt, loading = false \}\)/);
+  assert.match(listPosterCard, /function TmdbPoster\(\{ posterPath, alt, loading = false, onError \}\)/);
   assert.match(listPosterCard, /animate-pulse bg-zinc-900/);
   assert.match(listPosterCard, /loading=\{posterLoading\}/);
 });

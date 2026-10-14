@@ -10,12 +10,11 @@
 // ficha, que ya los tiene cargados; el equipo técnico y las notas de IMDb de
 // recomendaciones se piden aquí al abrir su vista, con caché compartida.
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import {
   Check,
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
   ExternalLink,
   Image as ImageIcon,
@@ -579,8 +578,97 @@ function SeasonsSheet({ meta, data, onClose }) {
 
 function CommentsSheet({ meta, data, onClose }) {
   const comments = data.comments || {};
-  const state = comments.state || {};
-  const items = Array.isArray(state.items) ? state.items : [];
+  const onLoadPage = comments.onLoadPage;
+  const initialProfileUsernames = comments.profileUsernames;
+  const sourceState = comments.state || {};
+  const seededItems = comments.tab === "recent" && sourceState.page === 1 && Array.isArray(sourceState.items)
+    ? sourceState.items
+    : [];
+  const [activeTab, setActiveTab] = useState(comments.tab || "recent");
+  const [state, setState] = useState(() => ({
+    items: seededItems,
+    page: seededItems.length ? 1 : 0,
+    pageCount: Number(sourceState.pageCount || 0),
+    total: Number(sourceState.total || 0),
+    hasMore: Boolean(sourceState.hasMore),
+    loading: !seededItems.length,
+    error: "",
+    profileUsernames: initialProfileUsernames || new Map(),
+  }));
+  const sentinelRef = useRef(null);
+  const loadingRef = useRef(false);
+  const requestIdRef = useRef(0);
+  const items = state.items;
+
+  const fetchPage = useCallback(async (page, tab, append = false) => {
+    if (!onLoadPage || loadingRef.current) return;
+    loadingRef.current = true;
+    const requestId = ++requestIdRef.current;
+    setState((current) => ({ ...current, loading: true, error: "" }));
+    try {
+      const payload = await onLoadPage(page, tab);
+      if (requestId !== requestIdRef.current) return;
+      const nextItems = Array.isArray(payload?.items) ? payload.items : [];
+      const pagination = payload?.pagination || {};
+      const currentPage = Number(pagination.page || page) || page;
+      const pageCount = Number(pagination.pageCount || 0);
+      let resolvedProfiles = new Map();
+      const usernames = [...new Set(nextItems.map((item) => String(item?.user?.username || "").trim()).filter(Boolean))];
+      if (usernames.length) {
+        try {
+          const response = await fetch(`/api/users/resolve-usernames?usernames=${encodeURIComponent(usernames.join(","))}`, { cache: "no-store" });
+          if (response.ok) {
+            const result = await response.json();
+            resolvedProfiles = new Map((Array.isArray(result?.usernames) ? result.usernames : []).map((username) => [String(username).toLowerCase(), String(username)]));
+          }
+        } catch {}
+      }
+      if (requestId !== requestIdRef.current) return;
+      setState((current) => {
+        const profileUsernames = new Map(append ? current.profileUsernames : initialProfileUsernames || []);
+        for (const [username, profile] of resolvedProfiles) profileUsernames.set(username, profile);
+        return {
+          items: append ? [...current.items, ...nextItems] : nextItems,
+          page: currentPage,
+          pageCount,
+          total: Number(pagination.itemCount || current.total || 0),
+          hasMore: pageCount > currentPage,
+          loading: false,
+          error: "",
+          profileUsernames,
+        };
+      });
+    } catch (error) {
+      if (requestId !== requestIdRef.current) return;
+      setState((current) => ({ ...current, loading: false, error: error?.message || "Error cargando comentarios" }));
+    } finally {
+      if (requestId === requestIdRef.current) loadingRef.current = false;
+    }
+  }, [initialProfileUsernames, onLoadPage]);
+
+  useEffect(() => {
+    if (!state.page && state.loading && !state.error) fetchPage(1, activeTab);
+  }, [activeTab, fetchPage, state.error, state.loading, state.page]);
+
+  const changeTab = (tab) => {
+    if (tab === activeTab) return;
+    requestIdRef.current += 1;
+    loadingRef.current = false;
+    setActiveTab(tab);
+    comments.onTabChange?.(tab);
+    setState({ items: [], page: 0, pageCount: 0, total: 0, hasMore: false, loading: true, error: "", profileUsernames: new Map() });
+  };
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || !state.hasMore || state.loading || state.error || typeof IntersectionObserver === "undefined") return undefined;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && !loadingRef.current) fetchPage(state.page + 1, activeTab, true);
+    }, { root: sentinel.closest(".details-sheet-scroll"), rootMargin: "0px 0px 240px", threshold: 0.01 });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [activeTab, fetchPage, state.error, state.hasMore, state.loading, state.page]);
+
   return (
     <SectionSheet
       open
@@ -589,8 +677,8 @@ function CommentsSheet({ meta, data, onClose }) {
       icon={meta.icon}
       subtitle={state.total > 0 ? plural(state.total, "comentario", "comentarios") : null}
       tabs={COMMENT_TABS}
-      activeTab={comments.tab}
-      onTabChange={comments.onTabChange}
+      activeTab={activeTab}
+      onTabChange={changeTab}
     >
       {state.loading && !items.length ? (
         <div className="flex justify-center py-12">
@@ -602,7 +690,7 @@ function CommentsSheet({ meta, data, onClose }) {
             <li key={String(comment?.id || `${comment?.user?.username}-${comment?.created_at}`)}>
               <TraktCommentCard
                 comment={comment}
-                profileUsernames={comments.profileUsernames}
+                profileUsernames={state.profileUsernames}
                 mediaType={comments.mediaType}
                 tmdbId={comments.tmdbId}
                 canLike={comments.canLike}
@@ -614,30 +702,15 @@ function CommentsSheet({ meta, data, onClose }) {
         <SectionSheetEmpty>Todavía no hay comentarios.</SectionSheetEmpty>
       )}
 
-      {state.pageCount > 1 ? (
-        <nav className="mt-4 flex items-center justify-between gap-3" aria-label="Paginación de comentarios">
-          <button
-            type="button"
-            onClick={() => comments.onPageChange?.(state.page - 1)}
-            disabled={state.loading || state.page <= 1}
-            className="inline-flex min-h-10 items-center gap-1 rounded-xl bg-white/5 px-3 text-xs font-bold text-zinc-300 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-            Anterior
-          </button>
-          <span className="text-xs font-bold text-zinc-500" aria-live="polite">
-            {state.page} / {state.pageCount}
-          </span>
-          <button
-            type="button"
-            onClick={() => comments.onPageChange?.(state.page + 1)}
-            disabled={state.loading || state.page >= state.pageCount}
-            className="inline-flex min-h-10 items-center gap-1 rounded-xl bg-white/5 px-3 text-xs font-bold text-zinc-300 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Siguiente
-            <ChevronRight className="h-4 w-4" aria-hidden="true" />
-          </button>
-        </nav>
+      {state.hasMore ? (
+        <div ref={sentinelRef} className="flex min-h-12 items-center justify-center" aria-live="polite">
+          {state.loading ? <Loader2 className="h-5 w-5 animate-spin text-zinc-500" aria-label="Cargando más comentarios" /> : null}
+        </div>
+      ) : null}
+      {state.error ? (
+        <button type="button" onClick={() => fetchPage(state.page + 1, activeTab, true)} className="mt-3 w-full py-3 text-sm font-bold text-emerald-300">
+          Reintentar cargar comentarios
+        </button>
       ) : null}
     </SectionSheet>
   );

@@ -28,6 +28,8 @@ export const STORY_MAX_EPISODES = 14;
 // longitud máxima.
 export const STORY_FACTS = {
   originalTitle: 80,
+  // Episodios: la serie a la que pertenecen.
+  series: 80,
   release: 40,
   end: 40,
   format: 40,
@@ -157,10 +159,16 @@ function historyDates(history) {
  *
  * La reseña propia va siempre que exista, salvo si está marcada como spoiler
  * (el vídeo se publica y lo ve quien no ha visto el título).
+ *
+ * EPISODIO (`season` + `episode`): los visionados son los del episodio (veces
+ * visto y fechas, como una película) y «Continuar viendo» solo cuenta si es
+ * ese episodio; `episodeProgress` es el que la página ya tiene de él.
  */
 export function buildShareStoryPayload({
   type,
   season = null,
+  episode = null,
+  episodeProgress = null,
   watched,
   plays,
   history,
@@ -181,11 +189,31 @@ export function buildShareStoryPayload({
   // película a medias sale aunque aún no cuente como vista. En una temporada,
   // solo si el episodio a medias es de ella (`tvProgress` y `watchedBySeason`
   // ya llegan de la temporada sola).
-  const resumeAny = resumeData(continueWatching);
+  const isEpisode = isTv && season != null && episode != null;
+  const resumeAny = isEpisode && episodeProgress != null
+    ? resumeData({ percent: episodeProgress, season, episode })
+    : resumeData(continueWatching);
   const resume =
-    season == null || (resumeAny && resumeAny.season === Number(season)) ? resumeAny : null;
+    season == null ||
+    (resumeAny &&
+      resumeAny.season === Number(season) &&
+      (!isEpisode || resumeAny.episode === Number(episode)))
+      ? resumeAny
+      : null;
   let playsData = null;
-  if (isTv && tvProgress?.percent > 0) {
+  if (isEpisode) {
+    if (watched) {
+      playsData = {
+        count: Math.max(Number(plays) || 0, dates.length, 1),
+        dates: dates.slice(0, 4),
+        last,
+        resume,
+        episode: true,
+      };
+    } else if (resume) {
+      playsData = { count: 0, dates: [], last: null, resume, episode: true };
+    }
+  } else if (isTv && tvProgress?.percent > 0) {
     playsData = {
       percent: tvProgress.percent,
       watched: tvProgress.watched,
@@ -267,6 +295,7 @@ export function sanitizeShareStory(body) {
         dates: (Array.isArray(plays.dates) ? plays.dates : []).map(isoDate).filter(Boolean).slice(0, 4),
         last: isoDate(plays.last),
         resume,
+        ...(plays.episode === true ? { episode: true } : {}),
       };
     }
   }
@@ -336,6 +365,7 @@ export function storySceneIds(card, story) {
     !!details &&
     !!(
       facts.originalTitle ||
+      facts.series ||
       facts.release ||
       (tv && facts.end) ||
       (tv && facts.format) ||

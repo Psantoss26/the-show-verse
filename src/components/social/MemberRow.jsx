@@ -5,8 +5,8 @@ import Avatar from "@/components/ui/Avatar";
 import LevelChip from "@/components/level/LevelChip";
 import FollowButton from "./FollowButton";
 
-// Fila de un miembro: avatar + nombre/usuario (+ bio opcional) + botón de
-// seguir. Se usa en la búsqueda de miembros y en las listas seguidores/siguiendo.
+// Fila de un miembro: avatar + nombre/usuario (+ bio opcional) + nivel y
+// botón de seguir. Se usa en la búsqueda de miembros y en las listas seguidores/siguiendo.
 export default function MemberRow({ member }) {
   if (!member?.username) return null;
   const label = member.displayName || member.username;
@@ -21,12 +21,7 @@ export default function MemberRow({ member }) {
 
       <Link href={`/u/${member.username}`} className="min-w-0 flex-1">
         <p className="truncate text-sm font-bold text-white">{label}</p>
-        <div className="flex min-w-0 items-center gap-1.5 text-xs text-zinc-500">
-          <span className="truncate">@{member.username}</span>
-          {member.level ? (
-            <LevelChip level={member.level.level} tier={member.level.tier} />
-          ) : null}
-        </div>
+        <p className="truncate text-xs text-zinc-500">@{member.username}</p>
         {member.bio ? (
           <p className="mt-0.5 truncate text-xs text-zinc-600">{member.bio}</p>
         ) : typeof member.followerCount === "number" ? (
@@ -37,14 +32,21 @@ export default function MemberRow({ member }) {
         ) : null}
       </Link>
 
-      {!member.isSelf && (
-        <FollowButton
-          username={member.username}
-          initialFollowing={member.isFollowing}
-          size="sm"
-          className="flex-shrink-0"
-        />
-      )}
+      {member.level || !member.isSelf ? (
+        <div className="flex flex-shrink-0 items-center gap-2">
+          {member.level ? (
+            <LevelChip level={member.level.level} tier={member.level.tier} />
+          ) : null}
+          {!member.isSelf && (
+            <FollowButton
+              username={member.username}
+              initialFollowing={member.isFollowing}
+              size="sm"
+              bordered={false}
+            />
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

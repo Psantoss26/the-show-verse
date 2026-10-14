@@ -84,6 +84,9 @@ export function normalizeTraktList(raw) {
 }
 
 export function listRowToApi(row) {
+  const traktUrl = row.traktUrl || (row.ownerUsername && row.slug
+    ? `https://trakt.tv/users/${encodeURIComponent(row.ownerUsername)}/lists/${encodeURIComponent(row.slug)}`
+    : null);
   return {
     list: {
       id: row.id,
@@ -92,6 +95,11 @@ export function listRowToApi(row) {
       item_count: Number(row.itemCount) || 0,
       likes: Number(row.likes) || 0,
       ids: { slug: row.slug || null, trakt: row.externalId || null },
+      traktUrl,
+      // Origen: 'user' (publicada desde la app) o 'trakt' (importada). El
+      // índice pone las de usuarios delante; el cliente lo necesita para
+      // ordenar igual lo que pinta desde su caché antes de la respuesta.
+      origin: row.source === 'user' ? 'user' : 'trakt',
     },
     user: {
       username: row.ownerUsername || null,

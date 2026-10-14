@@ -291,7 +291,8 @@ export default function DetailsShareSheet({
     (async () => {
       const [rows, ratings] = await Promise.all([
         getLocalInProgress().catch(() => []),
-        story.type === "tv"
+        // Un episodio no enseña la lista de episodios: sus notas sobran.
+        story.type === "tv" && story.episode == null
           ? fetch(`/api/trakt/ratings?type=episode&tmdbId=${tmdbId}`, { cache: "no-store" })
               .then((res) => (res.ok ? res.json() : null))
               .catch(() => null)
