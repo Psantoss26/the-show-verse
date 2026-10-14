@@ -1,3 +1,8 @@
+"use client";
+
+import { useHydrationReady } from "@/lib/hooks/useHydrationReady";
+import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+
 export default function OptimizedImage({
   src,
   alt,
@@ -11,6 +16,17 @@ export default function OptimizedImage({
   fetchPriority,
   ...props
 }) {
+  // AL VOLVER (atrás/adelante) la página se pinta estática y sus imágenes ya
+  // están en la caché del navegador. Con `loading="lazy"` y decodificación
+  // asíncrona, cada <img> nueva salía VACÍA uno o dos fotogramas antes de
+  // pintarse (medido al volver de una ficha al Perfil: 10 de 11 sin pintar en
+  // el primer fotograma): se veía parpadear el contenido. En esa vuelta se
+  // piden ya y se decodifican en el mismo pintado. Solo tras hidratar: durante
+  // la hidratación se pinta lo mismo que el servidor.
+  const hydrated = useHydrationReady();
+  const historyNavigation = useIsHistoryNavigation();
+  const restoring = hydrated && historyNavigation;
+
   if (!src) return null;
 
   const finalStyle = fill
@@ -41,6 +57,7 @@ export default function OptimizedImage({
       loading={priority ? "eager" : "lazy"}
       fetchPriority={fetchPriority}
       {...props}
+      {...(restoring ? { loading: "eager", decoding: "sync" } : null)}
     />
   );
 }

@@ -132,11 +132,11 @@ export async function runSeed({ tmdbId, mediaType }) {
       });
     }
 
-    // Copy up to 3 lists that contain this title (best-effort: a list-copy failure must not
+    // Copy up to 12 lists that contain this title (las que enseña la ficha) (best-effort: a list-copy failure must not
     // fail the whole seed — comments/sentiment already succeeded by this point). Slower than
     // the rest (fetches list items + hydrates preview posters), so it runs last before ready.
     try {
-      const { items: listItems } = await getListsContaining({ type: mediaType, traktId: resolved.traktId, tab: 'popular', page: 1, limit: 6 });
+      const { items: listItems } = await getListsContaining({ type: mediaType, traktId: resolved.traktId, tab: 'popular', page: 1, limit: 12 });
       for (const raw of listItems) {
         const listRow = normalizeTraktList(raw);
         if (!listRow) continue;

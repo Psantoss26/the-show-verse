@@ -439,7 +439,7 @@ export async function insertListMemberships(listId, items) {
     .onConflictDoNothing({ target: [communityListItems.listId, communityListItems.tmdbId, communityListItems.mediaType] });
 }
 
-export async function getListsForTitle({ tmdbId, mediaType, limit = 10, viewerId = null }) {
+export async function getListsForTitle({ tmdbId, mediaType, limit = 12, viewerId = null }) {
   const rows = await db
     .select({
       id: communityLists.id, externalId: communityLists.externalId, slug: communityLists.slug,
@@ -485,6 +485,17 @@ export const MAX_DISCOVER_PREVIEW_ITEMS = 12;
 // índice de /lists). Antes el navegador pedía /lists/:id por cada tarjeta: doce
 // peticiones de 0,4-0,8 s en producción, cada una calculando además la media de
 // TODA la lista, que la vista previa no usa. Sin borrar nada: es un listado.
+// Filas de vista previa cuyo póster ya se está buscando (una vez por proceso).
+const previewBackfillInflight = new Set();
+function backfillPreviewPosters(rows) {
+  const pending = rows.filter((row) => row?.id && !previewBackfillInflight.has(row.id));
+  if (!pending.length) return;
+  pending.forEach((row) => previewBackfillInflight.add(row.id));
+  hydrateListItemPosters(pending.map((row) => ({ ...row })), { allowDelete: false })
+    .catch(() => {})
+    .finally(() => pending.forEach((row) => previewBackfillInflight.delete(row.id)));
+}
+
 async function readListPreviews(listIds, limit) {
   const ids = [...new Set(listIds.filter(Boolean))];
   const max = Math.min(Math.max(Number(limit) || 0, 0), MAX_DISCOVER_PREVIEW_ITEMS);
@@ -505,7 +516,13 @@ async function readListPreviews(listIds, limit) {
     .from(ranked)
     .where(sql`${ranked.rank} <= ${candidateLimit}`)
     .orderBy(asc(ranked.listId), asc(ranked.position));
-  const visible = await hydrateListItemPosters(rows, { allowDelete: false });
+  // Sin esperar a TMDb: se responde con los pósters ya guardados y los que
+  // faltan se rellenan EN SEGUNDO PLANO (se guardan para la siguiente vez).
+  // Antes la primera petición de cada página esperaba a TMDb (~5 s en local,
+  // más en producción): el service worker la cortaba a los 6 s y la app
+  // enseñaba «no hay copia guardada en este dispositivo» hasta recargar.
+  backfillPreviewPosters(rows.filter((row) => !row.posterPath));
+  const visible = rows.filter((row) => row.posterPath);
   const byList = new Map(ids.map((id) => [id, []]));
   for (const it of visible) {
     const previews = byList.get(it.listId);

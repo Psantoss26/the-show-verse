@@ -154,6 +154,12 @@ function keep(event, work) {
 }
 
 const PREPARE_TIMEOUT = 90000;
+// Lecturas que pueden tardar la primera vez (el índice de listas de la
+// comunidad y sus fichas, con cientos de listas y títulos). Cortarlas a los 6 s
+// las daba por fallo de conexión y sin copia guardada la app enseñaba «no hay
+// una copia guardada en este dispositivo» hasta recargar.
+const SLOW_API_TIMEOUT = 20000;
+const slowApi = (path) => path.startsWith("/api/community/lists");
 async function network(request, timeout = 6000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
@@ -240,7 +246,18 @@ async function apiRead(request, event) {
     // La copia sin conexión (prepare.js) marca sus lecturas: van en segundo
     // plano y algunas son pesadas. Cortarlas a los 6 s no paraba al servidor,
     // que seguía calculándolas, y como contaban como fallo se repetían.
-    const response = await network(request.clone(), request.headers.has("X-Showverse-Prepare") ? PREPARE_TIMEOUT : undefined);
+    const response = await network(
+      request.clone(),
+      request.headers.has("X-Showverse-Prepare") ? PREPARE_TIMEOUT : slowApi(url.pathname) ? SLOW_API_TIMEOUT : undefined,
+    );
+    // Demasiadas peticiones (429) NO es «sin conexión»: el servidor responde.
+    // Se sirve la copia guardada si la hay y, si no, el 429 tal cual para que
+    // la app lo trate (reintentar) en vez de pasar TODA la app a modo sin
+    // conexión durante 15 s con «no hay una copia guardada».
+    if (response.status === 429) {
+      const saved = await cache.match(key);
+      return saved ? offlineResponse(saved) : response;
+    }
     if (unavailable(response)) throw new Error("origin unavailable");
     if (response.ok && !(response.headers.get("Content-Type") || "").includes("application/json")) throw new Error("Invalid API response");
     if (url.pathname === "/api/auth/me" && response.ok) {

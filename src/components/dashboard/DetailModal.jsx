@@ -193,6 +193,7 @@ import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
 // lógica de toggles, rewatches, plays y persistencia en localStorage.
 import { useTraktEpisodesWatched } from "@/lib/hooks/useTraktEpisodesWatched";
 import { statusRetryDelay } from "@/lib/trakt/statusRetry";
+import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 
 const DETAILS_ROUTE_TRANSITION_KEY = "showverse:details-route-transition";
 const DETAILS_ROUTE_REVEAL_MIN_MS = 500;
@@ -953,7 +954,11 @@ export default function DetailModal({
   // Moving backdrop filters must sample the dashboard again every frame,
   // even with a native transform animation. Keep the glass mounted but use
   // its opaque fallback while entering/exiting or scrolling (see globals.css).
-  const [panelSettled, setPanelSettled] = useState(false);
+  // Reabierto al VOLVER atrás/adelante (`?preview=` en la entrada del
+  // historial): aparece ya en su sitio, sin deslizarse, como el resto de la
+  // página, que se pinta estática.
+  const restoredFromHistory = useIsHistoryNavigation();
+  const [panelSettled, setPanelSettled] = useState(restoredFromHistory);
 
   useEffect(() => {
     if (!isRightPlacement) return undefined;
@@ -3686,7 +3691,7 @@ export default function DetailModal({
         // El panel SALIENTE recibe su `custom` del AnimatePresence del provider.
         custom={switching}
         variants={isRightPlacement ? panelVariantsRight : panelVariants}
-        initial="hidden"
+        initial={restoredFromHistory ? false : "hidden"}
         animate={navigatingToFullDetails ? "navigate" : "visible"}
         exit="exit"
         onAnimationComplete={(definition) => {
@@ -4300,7 +4305,7 @@ export default function DetailModal({
                   OMDb (data.awards) formateada con formatDashboardAwards. */}
               {data.awards ? (
                 <motion.div
-                  initial={{ opacity: 0, y: 12 }}
+                  initial={restoredFromHistory ? false : { opacity: 0, y: 12 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, margin: "-10px" }}
                   transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
@@ -4341,7 +4346,7 @@ export default function DetailModal({
                   En EPISODIO: serie · T{n}·E{n} · fecha · duración. */}
               {isEpisode ? (
                 <motion.div
-                  initial={{ opacity: 0, y: 12 }}
+                  initial={restoredFromHistory ? false : { opacity: 0, y: 12 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, margin: "-10px" }}
                   transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
@@ -4360,7 +4365,7 @@ export default function DetailModal({
                 </motion.div>
               ) : hasMetaRow ? (
                 <motion.div
-                  initial={{ opacity: 0, y: 12 }}
+                  initial={restoredFromHistory ? false : { opacity: 0, y: 12 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, margin: "-10px" }}
                   transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
@@ -4520,7 +4525,7 @@ export default function DetailModal({
               <motion.div
                 className="mb-5"
                 style={mobileDetails ? PHONE_SCALED_BLOCK_STYLE : undefined}
-                initial={{ opacity: 0, y: 15 }}
+                initial={restoredFromHistory ? false : { opacity: 0, y: 15 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-10px" }}
                 transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
@@ -4681,7 +4686,7 @@ export default function DetailModal({
             {/* Reparto */}
             {data.cast?.length > 0 && (
               <motion.section
-                initial={{ opacity: 0, y: 15 }}
+                initial={restoredFromHistory ? false : { opacity: 0, y: 15 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-15px" }}
                 transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
@@ -4750,7 +4755,7 @@ export default function DetailModal({
             {/* Títulos similares */}
             {data.recommendations?.length > 0 && (
               <motion.section
-                initial={{ opacity: 0, y: 15 }}
+                initial={restoredFromHistory ? false : { opacity: 0, y: 15 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-15px" }}
                 transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
@@ -4784,7 +4789,7 @@ export default function DetailModal({
             {/* Sentimientos de la comunidad (pros / cons) */}
             {hasSentiment && (
               <motion.section
-                initial={{ opacity: 0, y: 15 }}
+                initial={restoredFromHistory ? false : { opacity: 0, y: 15 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-15px" }}
                 transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
@@ -4859,7 +4864,7 @@ export default function DetailModal({
 
             {showSeasonsSection && (
               <motion.section
-                initial={{ opacity: 0, y: 15 }}
+                initial={restoredFromHistory ? false : { opacity: 0, y: 15 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-15px" }}
                 transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
