@@ -145,10 +145,30 @@ async function refreshBackendAccessToken(baseUrl, refreshToken) {
   });
 }
 
-async function fetchBackendOnce(baseUrl, path, init, accessToken) {
+// IP del VISITANTE para el backend. Sin esto, todas las peticiones de Next le
+// llegaban con la IP del propio servidor de Next, y el límite de peticiones del
+// backend (200/min por IP para quien no tiene sesión) era UNO para todos los
+// visitantes anónimos a la vez: con unos pocos navegando, se agotaba y las
+// páginas fallaban la primera vez (p. ej. «Listas de la comunidad»). El backend
+// confía en el proxy (`trustProxy`) y toma la primera de la cadena.
+export function clientIpFromHeaders(headerList) {
+  const get = (name) => headerList?.get?.(name) || "";
+  const forwarded = get("x-forwarded-for").split(",")[0].trim();
+  return forwarded || get("x-real-ip").trim() || null;
+}
+
+export function clientIpHeaders(request) {
+  const ip = clientIpFromHeaders(request?.headers);
+  return ip ? { "X-Forwarded-For": ip } : {};
+}
+
+async function fetchBackendOnce(baseUrl, path, init, accessToken, request = null) {
   const headers = new Headers(init.headers || {});
   headers.set("Accept", "application/json");
   if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
+  for (const [name, value] of Object.entries(clientIpHeaders(request))) {
+    if (!headers.has(name)) headers.set(name, value);
+  }
 
   if (init.body != null && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
@@ -189,11 +209,11 @@ export async function backendFetchJson(request, path, init = {}) {
     return { ok: false, skipped: true, status: 401, json: null, error: "Backend access token is not available" };
   }
 
-  let result = await fetchBackendOnce(baseUrl, path, init, accessToken);
+  let result = await fetchBackendOnce(baseUrl, path, init, accessToken, request);
   if (result.status === 401 && refreshToken) {
     refreshedTokens = await refreshBackendAccessToken(baseUrl, refreshToken);
     if (refreshedTokens?.accessToken) {
-      result = await fetchBackendOnce(baseUrl, path, init, refreshedTokens.accessToken);
+      result = await fetchBackendOnce(baseUrl, path, init, refreshedTokens.accessToken, request);
     }
   }
 
@@ -218,7 +238,7 @@ export async function backendFetchPublicJson(request, path, init = {}) {
     accessToken = refreshedTokens?.accessToken || null;
   }
 
-  const result = await fetchBackendOnce(baseUrl, path, init, accessToken);
+  const result = await fetchBackendOnce(baseUrl, path, init, accessToken, request);
   return { ...result, refreshedTokens };
 }
 

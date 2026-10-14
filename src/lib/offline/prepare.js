@@ -16,7 +16,11 @@ const READS = [
   "/api/trakt/history?type=all&limit=all&enrich=0",
   "/api/trakt/show/in-progress", "/api/trakt/show/completed", "/api/progress",
   "/api/profile?posters=0", "/api/lists", "/api/auth/connections",
-  "/api/community/lists/discover?sort=items_desc&limit=30",
+  // Índice de la comunidad tal como lo pide la página (useTraktLists): la
+  // primera página con las vistas previas ya dentro. Antes eran 30 lecturas
+  // más, una por lista (algunas de 1.500 títulos), que en el primer uso se
+  // comían el límite de peticiones del backend junto con la navegación.
+  "/api/community/lists/discover?sort=items_desc&limit=60&page=1&preview=12",
   "/api/recommendations?type=all&limit=40", "/api/recommendations?type=movie&limit=40", "/api/recommendations?type=tv&limit=40",
 ];
 
@@ -123,12 +127,6 @@ export async function prepareOfflineAccount(user, { signal, onProgress = () => {
   for (const path of READS) await attempt(path, async () => {
     const payload = await read(path);
     if (path === "/api/lists") for (const item of payload.results || []) if (item.id) listIds.add(item.id);
-    if (path.startsWith("/api/community/lists/discover")) {
-      for (const item of payload.results || []) {
-        const id = item.list?.id;
-        if (id) await attempt(`community-list:${id}`, () => read(`/api/community/lists/${encodeURIComponent(id)}?limit=12`));
-      }
-    }
   });
   // Exhaust pagination, including sections the user has not opened. Record a
   // complete collection only when every page succeeded (never a partial empty).
