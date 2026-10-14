@@ -37,6 +37,8 @@ import { isServerReachable } from "@/lib/offline/client";
 import { getMediaTypeForItem } from "@/lib/dashboard/media";
 import { dashboardDetailHref } from "@/lib/dashboard/detailHref";
 import DetailModal from "@/components/dashboard/DetailModal";
+import { useAuth } from "@/context/AuthContext";
+import { readDetailOpen, withDetailOpen } from "@/lib/ui/detailOpenPreferences";
 import useModalGuard from "@/hooks/useModalGuard";
 import { useIsMobile, useMediaQuery } from "@/lib/hooks/useMediaQuery";
 
@@ -160,6 +162,7 @@ const CONTENT_VIEW_STORAGE_KEY = "showverse:detailModalContentView";
 // revés. Solo ellos pueden además elegir entre modal centrado y lateral.
 const DASHBOARD_STORAGE_PREFIX = "showverse:dashboard:";
 const DASHBOARD_PLACEMENT_STORAGE_KEY = "showverse:dashboard:detailModalPlacement";
+const USER_PAGES_PLACEMENT_STORAGE_KEY = "showverse:detailModalPlacement";
 const PREVIEW_PARAM = "preview";
 const PREVIEW_RE = /^(movie|tv)-(\d+)$/;
 const EPISODE_RE = /^ep-(\d+)-(\d+)-(\d+)$/;
@@ -239,10 +242,29 @@ export default function DetailModalProvider({
   // completa (DetailsClient / EpisodeDetails). La preview lateral es solo de
   // escritorio, también para las páginas de usuario y Configuración.
   const isMobile = useIsMobile();
+  // PREFERENCIA DE APERTURA (Ajustes → «Al abrir un título»), por ámbito:
+  // dashboards o páginas de usuario (lib/ui/detailOpenPreferences). Es el punto
+  // de partida; los controles del panel la cambian también. Sin preferencia
+  // guardada se usa lo de antes: la elección del navegador o el valor por
+  // defecto de la página.
+  const { preferences, updatePreference, authenticated } = useAuth();
+  const openScope = placementSwitchable ? "dashboard" : "userPages";
+  const uiSettings = preferences?.uiSettings;
+  const savedOpen = useMemo(() => readDetailOpen(uiSettings, openScope), [uiSettings, openScope]);
+  const persistOpen = useCallback((patch) => {
+    if (!authenticated || !isServerReachable()) return;
+    try {
+      updatePreference({ uiSettings: withDetailOpen(uiSettings, openScope, patch) });
+    } catch {
+      // La elección sigue en el navegador (localStorage) aunque no se guarde.
+    }
+  }, [authenticated, updatePreference, uiSettings, openScope]);
+  const placementStorageKey = placementSwitchable
+    ? DASHBOARD_PLACEMENT_STORAGE_KEY
+    : USER_PAGES_PLACEMENT_STORAGE_KEY;
   // En móvil el drawer derecho no aplica: si se abre el modal, es centrado.
   const [userPlacement, setUserPlacement] = useState(null);
-  const requestedPlacement =
-    placementSwitchable && userPlacement ? userPlacement : placement;
+  const requestedPlacement = savedOpen.placement || userPlacement || placement;
   const effectivePlacement =
     requestedPlacement === "right" && !isMobile ? "right" : "center";
   const drawerViewKey = placementSwitchable
@@ -257,7 +279,8 @@ export default function DetailModalProvider({
   const isTablet = useMediaQuery(
     "(min-width: 768px) and (max-width: 1023px), (min-width: 768px) and (hover: none), (min-width: 768px) and (pointer: coarse)",
   );
-  const preferredContentView = contentView ?? (isTablet ? "mobile" : "modal");
+  const preferredContentView = savedOpen.contentView ?? contentView ?? (isTablet ? "mobile" : "modal");
+  const activeDrawerView = savedOpen.drawerView ?? drawerView;
   const contentRef = useRef(null);
   const drawerWidthRef = useRef(null);
 
@@ -270,48 +293,47 @@ export default function DetailModalProvider({
       if (window.localStorage.getItem(drawerViewKey) === "docked") {
         setDrawerView("docked");
       }
-      if (placementSwitchable) {
-        const storedPlacement = window.localStorage.getItem(
-          DASHBOARD_PLACEMENT_STORAGE_KEY,
-        );
-        if (storedPlacement === "right" || storedPlacement === "center") {
-          setUserPlacement(storedPlacement);
-        }
+      const storedPlacement = window.localStorage.getItem(placementStorageKey);
+      if (storedPlacement === "right" || storedPlacement === "center") {
+        setUserPlacement(storedPlacement);
       }
     } catch {
       // La vista sigue funcionando cuando el almacenamiento no está disponible.
     }
-  }, [contentViewKey, drawerViewKey, placementSwitchable]);
+  }, [contentViewKey, drawerViewKey, placementStorageKey]);
 
   const changeDrawerView = useCallback((view) => {
     if (view !== "overlay" && view !== "docked") return;
     setDrawerView(view);
+    persistOpen({ drawerView: view });
     try {
       window.localStorage.setItem(drawerViewKey, view);
     } catch {
       // Conserva la elección durante esta sesión.
     }
-  }, [drawerViewKey]);
+  }, [drawerViewKey, persistOpen]);
 
   const changeContentView = useCallback((view) => {
     if (view !== "mobile" && view !== "modal") return;
     setContentView(view);
+    persistOpen({ contentView: view });
     try {
       window.localStorage.setItem(contentViewKey, view);
     } catch {
       // Conserva la elección en memoria si el almacenamiento no está disponible.
     }
-  }, [contentViewKey]);
+  }, [contentViewKey, persistOpen]);
 
   const changePlacement = useCallback((next) => {
     if (next !== "right" && next !== "center") return;
     setUserPlacement(next);
+    persistOpen({ placement: next });
     try {
-      window.localStorage.setItem(DASHBOARD_PLACEMENT_STORAGE_KEY, next);
+      window.localStorage.setItem(placementStorageKey, next);
     } catch {
       // Conserva la elección durante esta sesión.
     }
-  }, []);
+  }, [placementStorageKey, persistOpen]);
 
   // Pila de niveles abiertos. El item activo es el de arriba.
   const [stack, setStack] = useState([]);
@@ -325,7 +347,7 @@ export default function DetailModalProvider({
   const isEpisodeItem = activeItem?.media_type === "episode";
   const effectiveContentView = isEpisodeItem ? "modal" : preferredContentView;
   const docked =
-    activeItem != null && effectivePlacement === "right" && drawerView === "docked";
+    activeItem != null && effectivePlacement === "right" && activeDrawerView === "docked";
 
   // Una propiedad NO heredada evita recalcular el estilo de todas las tarjetas
   // en cada movimiento. El panel y este margen se escriben en el mismo frame.
@@ -429,7 +451,9 @@ export default function DetailModalProvider({
       if (!item || item.id == null || typeof window === "undefined") return;
 
       // MÓVIL: se navega siempre a la ficha completa; la preview es de escritorio.
-      if (isMobile || !isServerReachable()) {
+      // También en escritorio si el usuario prefiere abrir directamente la
+      // ficha completa (Ajustes → «Al abrir un título»).
+      if (isMobile || !isServerReachable() || savedOpen.target === "page") {
         let href;
         if (
           item.media_type === "episode" &&
@@ -490,7 +514,7 @@ export default function DetailModalProvider({
         commit([item]);
       }
     },
-    [commit, isMobile, router],
+    [commit, isMobile, router, savedOpen.target],
   );
 
   const closeDetailModal = useCallback(() => {
@@ -574,10 +598,8 @@ export default function DetailModalProvider({
             item={activeItem}
             onClose={closeDetailModal}
             placement={effectivePlacement}
-            onPlacementChange={
-              placementSwitchable && !isMobile ? changePlacement : undefined
-            }
-            drawerView={drawerView}
+            onPlacementChange={!isMobile ? changePlacement : undefined}
+            drawerView={activeDrawerView}
             contentView={effectiveContentView}
             tabletViewport={isTablet}
             // Sin el interruptor de ficha de teléfono en un episodio: ahí esa

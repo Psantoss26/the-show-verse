@@ -146,8 +146,15 @@ function isRateLimitExempt(user) {
 }
 
 // Rate limiting global (ejecutado en preHandler para tener req.user disponible)
+// Límite por minuto: por CUENTA con sesión (identificada y responsable: la
+// copia sin conexión y la navegación normal comparten este cupo, con 200 se lo
+// comían entre las dos) y por VISITANTE sin ella (su IP real: Next la reenvía,
+// ver clientIpHeaders en el frontend).
+const RATE_LIMIT_PER_USER = 600;
+const RATE_LIMIT_PER_ANON = 200;
+
 await fastify.register(fastifyRateLimit, {
-  max: 200,
+  max: (req) => (req.user ? RATE_LIMIT_PER_USER : RATE_LIMIT_PER_ANON),
   timeWindow: '1 minute',
   hook: 'preHandler',
   // Las sondas de salud NUNCA se limitan: la app (service worker) decide con

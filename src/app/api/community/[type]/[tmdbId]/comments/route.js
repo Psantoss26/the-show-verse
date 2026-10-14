@@ -1,7 +1,7 @@
 // src/app/api/community/[type]/[tmdbId]/comments/route.js
 import { NextResponse } from "next/server";
 import {
-  backendFetchJson, hasBackendCredentials, setBackendAuthCookies,
+  backendFetchJson, clientIpHeaders, hasBackendCredentials, setBackendAuthCookies,
 } from "@/lib/backend/server";
 
 export const runtime = "nodejs";
@@ -9,8 +9,8 @@ export const dynamic = "force-dynamic";
 
 const BASE = process.env.BACKEND_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
 
-async function anon(path) {
-  const res = await fetch(`${BASE}${path}`, { cache: "no-store" });
+async function anon(path, request) {
+  const res = await fetch(`${BASE}${path}`, { cache: "no-store", headers: clientIpHeaders(request) });
   const json = await res.json().catch(() => ({}));
   return NextResponse.json(json, { status: res.status });
 }
@@ -32,7 +32,7 @@ export async function GET(request, { params }) {
       return res;
     }
   }
-  return anon(pathFrom(p, search));
+  return anon(pathFrom(p, search), request);
 }
 
 async function authWrite(request, params, method) {

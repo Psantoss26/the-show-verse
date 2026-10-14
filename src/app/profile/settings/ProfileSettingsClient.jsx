@@ -76,6 +76,7 @@ import {
   connectPlexInteractive,
   syncPlexHistory,
 } from "@/lib/plex/client";
+import DetailOpenSettings from "@/components/settings/DetailOpenSettings";
 
 const GLASS_SURFACE =
   "relative overflow-hidden border border-white/[0.08] bg-black/40 shadow-2xl shadow-black/40 backdrop-blur-xl before:absolute before:inset-0 before:-z-10 before:bg-gradient-to-br before:from-white/[0.08] before:via-white/[0.02] before:to-transparent";
@@ -1013,7 +1014,7 @@ function AvatarModal({ isOpen, onClose, currentAvatarUrl, userName, onSave, load
   );
 }
 
-function SegmentedField({ label, value, options, disabled: disabledProp, onChange }) {
+function SegmentedField({ id, label, value, options, disabled: disabledProp, onChange }) {
   const online = useServerOnline();
   const disabled = disabledProp || !online;
   const colsClass = options.length === 3 ? "grid-cols-3" : "grid-cols-2";
@@ -1039,7 +1040,7 @@ function SegmentedField({ label, value, options, disabled: disabledProp, onChang
             >
               {active && (
                 <motion.div
-                  layoutId={`active-seg-${label}`}
+                  layoutId={`active-seg-${id || label}`}
                   className="absolute inset-0 bg-white -z-10"
                   transition={{ type: "spring", stiffness: 380, damping: 30 }}
                 />
@@ -2488,6 +2489,15 @@ function ProfileSettingsClient() {
                       onClick={() => setShowMobileBottomNavEditor(true)}
                     />
                   </div>
+                  {/* Al abrir un título (escritorio). En el móvil se abre
+                      siempre la ficha completa. */}
+                  <DetailOpenSettings
+                    uiSettings={preferences.uiSettings}
+                    disabled={saving}
+                    panelClassName={GLASS_PANEL}
+                    t={t}
+                    onChange={(uiSettings) => updatePreference({ uiSettings })}
+                  />
                   <div className="space-y-4">
                     <ToggleRow
                       icon={Eye}
