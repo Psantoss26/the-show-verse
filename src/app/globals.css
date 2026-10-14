@@ -190,6 +190,25 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/*
+ * Cifras de SeriesGraph y del diálogo de puntuación.
+ *
+ * Antes se pedía `Inter` sin incluirla en la aplicación. Chrome usaba una
+ * Inter instalada en Windows, pero en Linux y móvil caía en la fuente del
+ * sistema. La fuente se sirve ahora con la app y esta clase fija también sus
+ * rasgos numéricos para que una nota como 8.5 tenga las mismas métricas en
+ * todos los navegadores.
+ */
+.sv-seriesgraph-number {
+  font-family: "Inter Variable", Inter, sans-serif;
+  font-size-adjust: from-font;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  font-synthesis: none;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar {
     display: none;

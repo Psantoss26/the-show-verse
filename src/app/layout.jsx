@@ -1,4 +1,5 @@
 import "./globals.css";
+import "@fontsource-variable/inter/wght.css";
 import Navbar from "@/components/Navbar";
 import { AuthProvider } from "@/context/AuthContext";
 import { ServerStatusProvider } from "@/context/ServerStatusContext";
