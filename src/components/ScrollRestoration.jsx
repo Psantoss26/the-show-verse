@@ -147,6 +147,49 @@ function scrollToPageStart() {
   window.scrollTo({ top: 0, left: 0, behavior: "instant" });
 }
 
+// MODO «VUELTA ATRÁS» (`data-history-restore` en <html>, ver globals.css):
+// desde el `popstate` hasta que la página se asienta, sin transiciones ni
+// animaciones de entrada, para que la página aparezca ya en su estado final
+// en vez de reanimar cada pieza. Se retira al asentarse la restauración, con
+// una navegación nueva o, como mucho, a los HISTORY_RESTORE_MAX_MS.
+const HISTORY_RESTORE_ATTR = "data-history-restore";
+const HISTORY_RESTORE_MAX_MS = 1200;
+// Mínimo, aunque el scroll se asiente antes: lo que llega justo después (datos
+// de la ficha rápida reabierta, botones que cambian de tamaño al recibirlos)
+// también aparece en su estado final, sin transición.
+const HISTORY_RESTORE_MIN_MS = 700;
+let historyRestoreTimer = 0;
+let historyRestoreStartedAt = 0;
+
+function endHistoryRestore() {
+  if (typeof document === "undefined") return;
+  window.clearTimeout(historyRestoreTimer);
+  historyRestoreTimer = 0;
+  document.documentElement.removeAttribute(HISTORY_RESTORE_ATTR);
+}
+
+function beginHistoryRestore() {
+  if (typeof document === "undefined") return;
+  document.documentElement.setAttribute(HISTORY_RESTORE_ATTR, "");
+  historyRestoreStartedAt = window.performance.now();
+  window.clearTimeout(historyRestoreTimer);
+  historyRestoreTimer = window.setTimeout(endHistoryRestore, HISTORY_RESTORE_MAX_MS);
+}
+
+// Al asentarse la página: dos fotogramas después (el primero la pinta ya en su
+// estado final) y nunca antes del mínimo desde la vuelta.
+function endHistoryRestoreSoon() {
+  if (!document.documentElement.hasAttribute(HISTORY_RESTORE_ATTR)) return;
+  const remaining = HISTORY_RESTORE_MIN_MS - (window.performance.now() - historyRestoreStartedAt);
+  const finish = () => window.requestAnimationFrame(() => window.requestAnimationFrame(endHistoryRestore));
+  if (remaining > 0) {
+    window.clearTimeout(historyRestoreTimer);
+    historyRestoreTimer = window.setTimeout(finish, remaining);
+  } else {
+    finish();
+  }
+}
+
 export default function ScrollRestoration() {
   const pathname = usePathname() || "/";
   const currentRouteKeyRef = useRef(null);
@@ -198,6 +241,7 @@ export default function ScrollRestoration() {
       // animación de entrada, como si se estuviera volviendo a ella.
       notifyPushNavigation();
       clearRestorationComplete();
+      endHistoryRestore();
       navigationModeRef.current = "push";
       const result = originalPushState.apply(this, args);
       syncHistoryPage();
@@ -228,6 +272,7 @@ export default function ScrollRestoration() {
       // snapshot cacheado, aunque el commit del App Router llegue tarde.
       markHistoryNavigation();
       clearRestorationComplete();
+      beginHistoryRestore();
       navigationModeRef.current = "history";
       historyNavigationUntilRef.current =
         window.performance.now() + HISTORY_NAVIGATION_WINDOW_MS;
@@ -285,6 +330,7 @@ export default function ScrollRestoration() {
     const savedPosition = readScrollPosition(routeKey);
     if (!savedPosition) {
       window.requestAnimationFrame(scrollToPageStart);
+      endHistoryRestoreSoon();
       return undefined;
     }
 
@@ -370,6 +416,7 @@ export default function ScrollRestoration() {
       isRestoringRef.current = false;
       restoreCleanupRef.current = null;
       if (restored) markRestorationComplete(routeKey);
+      endHistoryRestoreSoon();
     };
 
     window.addEventListener("wheel", onUserIntent, { passive: true });

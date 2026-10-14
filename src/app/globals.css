@@ -3115,3 +3115,47 @@ html[data-details-sequence-transition] .sv-topbar {
     animation: none !important;
   }
 }
+
+/* VUELTA ATRÁS / ADELANTE: LA PÁGINA APARECE YA EN SU ESTADO FINAL.
+   <ScrollRestoration> pone `data-history-restore` en <html> desde el
+   `popstate` hasta que la página se ha asentado (como mucho ~1,2 s). Mientras
+   tanto, ni transiciones ni animaciones de ENTRADA: al volver de una ficha a una
+   página de usuario (Perfil, listas…) cada pieza volvía a animarse desde su
+   estado inicial (barra de búsqueda que sube, marcador que se recoloca,
+   bloques que se funden) y el contenido parpadeaba.
+   Las entradas NO se anulan (`animation: none`): al quitar la marca, volver a
+   poner su nombre la ARRANCARÍA en ese momento. Con duración y retardo 0
+   terminan al montar, y restaurar la duración después no la repite.
+   Las infinitas (pulsos, giros) y las ligadas al scroll (`sv-hero-scroll-*`)
+   no se tocan. */
+:root[data-history-restore] *,
+:root[data-history-restore] *::before,
+:root[data-history-restore] *::after {
+  transition: none !important;
+}
+
+:root[data-history-restore] :is(
+  .animate-in,
+  .sv-fade-in,
+  .animate-slide-left,
+  .animate-slide-right,
+  .animate-scale-in,
+  .sv-profile-entry,
+  .sv-level-rise,
+  .sv-level-bar,
+  .sv-details-entry,
+  .sv-hero-art-in,
+  .section-enter,
+  .sv-toolbar-rise,
+  .sv-phone-actions-reveal > * > *,
+  .sv-mobile-poster-reveal,
+  .sv-mobile-actions-scroll-reveal,
+  .sv-mobile-actions-scroll-reveal > * > *,
+  .sv-mobile-actions-rise,
+  [data-mobile-reveal-piece],
+  [class*="animate-sv-mobile-scoreboard-reveal"] > *,
+  [class*="animate-sv-mobile-secondary-reveal"] > *
+) {
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+}

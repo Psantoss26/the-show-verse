@@ -756,6 +756,11 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
   const [headerAnimating, setHeaderAnimating] = useState(false);
   const router = useRouter();
   const isBackNav = useIsHistoryNavigation();
+  // Entrada del perfil (cabecera, pestañas, contenido): solo al ENTRAR. Al
+  // volver desde una ficha la página se pinta ESTÁTICA; antes la animación CSS
+  // `sv-profile-entry` arrancaba igual desde opacidad 0 y el contenido
+  // parpadeaba ~0,4 s (en ordenador y en móvil, con cualquier gesto atrás).
+  const entry = isBackNav ? "" : "sv-profile-entry";
   const profileSwipe = useRef(null);
   // Al volver desde DetailsClient este montaje sólo existe en el cliente y ya
   // conocemos que es una navegación de historial. Sembrar la instantánea aquí
@@ -1115,7 +1120,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
               escalado al pasar el ratón que no deben cortarse. Solo recorta
               plegada o mientras se anima. */}
           <div className={`min-h-0 ${compactHeader || headerAnimating ? "overflow-hidden" : ""}`}>
-        <header className="sv-profile-entry sv-profile-entry--header flex flex-wrap items-center gap-3 @[1024px]/detail-page:flex-nowrap @[1024px]/detail-page:justify-between @[1024px]/detail-page:gap-6">
+        <header className={`${entry} sv-profile-entry--header flex flex-wrap items-center gap-3 @[1024px]/detail-page:flex-nowrap @[1024px]/detail-page:justify-between @[1024px]/detail-page:gap-6`}>
           <ProfileAvatar user={user} size="h-16 w-16 shrink-0 @[640px]/detail-page:h-26 @[640px]/detail-page:w-26" />
           <div className="min-w-0 flex-1 text-left">
             <div className="flex min-w-0 items-center justify-between gap-2 @[1024px]/detail-page:justify-start @[1024px]/detail-page:gap-4">
@@ -1200,7 +1205,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
         </div>
 
         {/* ── BARRA DE PESTAÑAS ── */}
-        <div className="sv-profile-entry sv-profile-entry--tabs">
+        <div className={`${entry} sv-profile-entry--tabs`}>
           <ProfileTabs
             tab={tab}
             username={user.username}
@@ -1212,11 +1217,11 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
         </div>
 
         {tab === "level" ? (
-          <div className="sv-profile-entry sv-profile-entry--content">
+          <div className={`${entry} sv-profile-entry--content`}>
             <LevelPanel username={user.username} initialSummary={profile.level} />
           </div>
         ) : tab === "statistics" ? (
-          <div className="sv-profile-entry sv-profile-entry--content mt-8">
+          <div className={`${entry} sv-profile-entry--content mt-8`}>
             {isSelf ? <RecapPromoBanner className="mb-6" /> : null}
             {resolvedAnalytics ? (
               <ProfileAnalytics analytics={resolvedAnalytics} />
@@ -1231,7 +1236,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
             )}
           </div>
         ) : tab === "neuronal" ? (
-          <div className="sv-profile-entry sv-profile-entry--content mt-3 @[640px]/detail-page:mt-6">
+          <div className={`${entry} sv-profile-entry--content mt-3 @[640px]/detail-page:mt-6`}>
             <NeuralGraphView
               username={user.username}
               headerCollapsed={neuralHeaderCollapsed}
@@ -1243,7 +1248,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
             />
           </div>
         ) : tab !== "profile" ? (
-          <div className="sv-profile-entry sv-profile-entry--content mt-5 @[640px]/detail-page:mt-6">
+          <div className={`${entry} sv-profile-entry--content mt-5 @[640px]/detail-page:mt-6`}>
             {/* `key={tab}` remonta la sección al cambiar de pestaña: evita un
                 render intermedio con el layout nuevo pero los items del layout
                 anterior (que no comparten forma de `key`) → aviso de keys. */}
@@ -1252,7 +1257,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
         ) : (
         <div className="mt-8 grid grid-cols-1 gap-8 @[1280px]/detail-page:grid-cols-[minmax(0,1fr)_360px] @[1536px]/detail-page:grid-cols-[minmax(0,1fr)_400px]">
           {/* ── COLUMNA PRINCIPAL ── */}
-          <div className="sv-profile-entry sv-profile-entry--content space-y-10">
+          <div className={`${entry} sv-profile-entry--content space-y-10`}>
             {/* Favoritos curados, separados por tipo para mostrar cinco de cada uno. */}
             <section>
               <SectionHeader label="Películas favoritas" />
@@ -1312,7 +1317,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
           </div>
 
           {/* ── COLUMNA LATERAL ── */}
-          <aside className="sv-profile-entry sv-profile-entry--aside space-y-8 @[1280px]/detail-page:sticky @[1280px]/detail-page:top-24 @[1280px]/detail-page:self-start">
+          <aside className={`${entry} sv-profile-entry--aside space-y-8 @[1280px]/detail-page:sticky @[1280px]/detail-page:top-24 @[1280px]/detail-page:self-start`}>
             {/* Nivel y experiencia: encabeza el lateral, antes del resumen del mes */}
             <ProfileLevelSidebar
               level={profile.level}

@@ -39,7 +39,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
-const TITLE_LISTS_PAGE_SIZE = 10;
+const TITLE_LISTS_PAGE_SIZE = 12;
 
 // -- Navegacion de Next.js --
 import { useRouter } from "@/lib/offline/useOfflineRouter";

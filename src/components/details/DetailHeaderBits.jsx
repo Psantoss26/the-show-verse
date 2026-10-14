@@ -8,6 +8,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { Star, Share2, Check } from "lucide-react";
 import { isAndroidApp, shareFromApp } from "@/lib/android/appBridge";
 import { useDetailsStaticMotion } from "@/components/details/AnimatedSection";
+import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import DetailsShareSheet from "@/components/details/DetailsShareSheet";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 import { LIQUID_GLASS_SURFACE } from "@/lib/ui/liquidGlass";
@@ -41,8 +42,10 @@ export function CompactBadge({
   const isInteractive = !!(href || onClick);
   const prefersReducedMotion = useReducedMotion();
   const isStaticDetails = useDetailsStaticMotion();
+  // Al volver atrás/adelante, la página se pinta estática: sin entrada.
+  const isBackNav = useIsHistoryNavigation();
   const shouldAnimateOnMount =
-    animateOnMount && !prefersReducedMotion && !isStaticDetails;
+    animateOnMount && !prefersReducedMotion && !isStaticDetails && !isBackNav;
 
   const titleText =
     tooltip ||

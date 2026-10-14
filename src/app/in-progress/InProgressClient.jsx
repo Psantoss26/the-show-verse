@@ -1066,6 +1066,25 @@ const InProgressCard = memo(function InProgressCard({
             )}
           </div>
         </Link>
+        {/* Progreso DEBAJO de la imagen, fuera de ella, como las temporadas de
+            la ficha (SeasonPosterCard): barra fina centrada al 85 %, con el
+            color del progreso de esta página. Póster y backdrop por igual. */}
+        {activeTab === "inprogress" ? (
+          <div
+            role="progressbar"
+            aria-label={`Progreso de ${title}`}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={progressPct}
+            aria-valuetext={episodeProgress.longLabel || `${progressPct}% visto`}
+            className="mx-auto mt-2 h-1 w-[85%] overflow-hidden rounded-full bg-white/25"
+          >
+            <div
+              className={`h-full rounded-full bg-gradient-to-r ${colors.bar}`}
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+        ) : null}
       </motion.div>
     );
   }

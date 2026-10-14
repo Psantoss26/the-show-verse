@@ -161,7 +161,7 @@ function toRatingNumber(value) {
 }
 
 const COMMENTS_PAGE_SIZE = 5;
-const TITLE_LISTS_PAGE_SIZE = 10;
+const TITLE_LISTS_PAGE_SIZE = 12;
 
 // Cubo de resolución de una imagen, igual que en la ficha completa.
 function imgResBucket(img) {

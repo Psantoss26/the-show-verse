@@ -130,6 +130,11 @@ const RATE_LIMIT_ALLOWLIST = new Set(
     .filter(Boolean),
 );
 
+function isHealthProbe(req) {
+  const path = String(req.url || '').split('?')[0];
+  return path === '/ready' || path === '/health';
+}
+
 function isRateLimitExempt(user) {
   if (!user) return false;
   const username = String(user.username || '').toLowerCase();
@@ -145,7 +150,10 @@ await fastify.register(fastifyRateLimit, {
   max: 200,
   timeWindow: '1 minute',
   hook: 'preHandler',
-  allowList: (req) => isRateLimitExempt(req.user),
+  // Las sondas de salud NUNCA se limitan: la app (service worker) decide con
+  // /ready si el servidor está caído, y un 429 en ella la pasaba entera a modo
+  // sin conexión durante 15 s («no hay copia guardada en este dispositivo»).
+  allowList: (req) => isHealthProbe(req) || isRateLimitExempt(req.user),
   redis: await (async () => {
     try {
       const r = getRedis();

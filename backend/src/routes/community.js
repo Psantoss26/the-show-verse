@@ -174,7 +174,7 @@ export default async function communityRoutes(fastify) {
     const [sentiment, comments, lists] = await Promise.all([
       getSentiment({ tmdbId: t.tmdbId, mediaType: t.type }),
       getCommentsPage({ tmdbId: t.tmdbId, mediaType: t.type, tab: 'top', page: 1, limit: 5, viewerId }),
-      getListsForTitle({ tmdbId: t.tmdbId, mediaType: t.type, limit: 10, viewerId }),
+      getListsForTitle({ tmdbId: t.tmdbId, mediaType: t.type, limit: 12, viewerId }),
     ]);
     setCommunityCache(reply, viewerId, 'public, s-maxage=60, stale-while-revalidate=600');
     return { sentiment, comments, lists: { items: lists }, state: seed.status };
@@ -185,7 +185,7 @@ export default async function communityRoutes(fastify) {
     const t = parseTarget(req, reply); if (!t) return;
     const viewerId = req.user?.id || null;
     const seed = await ensureSeeded({ tmdbId: t.tmdbId, mediaType: t.type });
-    const items = await getListsForTitle({ tmdbId: t.tmdbId, mediaType: t.type, limit: req.query?.limit || 10, viewerId });
+    const items = await getListsForTitle({ tmdbId: t.tmdbId, mediaType: t.type, limit: req.query?.limit || 12, viewerId });
     setCommunityCache(reply, viewerId, 'public, s-maxage=300, stale-while-revalidate=86400');
     return { items, state: seed.status };
   });

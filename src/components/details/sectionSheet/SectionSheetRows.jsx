@@ -9,7 +9,6 @@ import OptimizedImage from "@/components/OptimizedImage";
 import Avatar from "@/components/ui/Avatar";
 import { getSoundtrackSourceBadge } from "@/lib/details/soundtrackSource";
 import { videoThumbUrl } from "@/lib/details/videos";
-import { stripHtml } from "@/lib/details/formatters";
 
 const ROW_BASE = "flex items-center rounded-2xl bg-black/15 transition-colors";
 const ROW = `${ROW_BASE} gap-3.5 p-2.5`;
@@ -200,12 +199,11 @@ export function ListRow({ row, onNavigate }) {
           <ListVideo className="h-8 w-8 text-zinc-600" aria-hidden="true" />
         )}
       </span>
+      {/* Solo título y la fila de autor · títulos · likes (sin descripción):
+          el título, más grande, ocupa el hueco que dejaba la descripción. */}
       <span className="min-w-0 flex-1">
-        <span className="block line-clamp-2 text-sm font-bold leading-tight text-white">{name}</span>
-        {list?.description ? (
-          <span className="mt-0.5 block line-clamp-1 text-xs text-zinc-500">{stripHtml(list.description)}</span>
-        ) : null}
-        <span className="mt-1.5 flex items-center gap-2 text-xs font-bold text-zinc-400">
+        <span className="block line-clamp-2 text-[15px] font-bold leading-snug text-white sm:text-base">{name}</span>
+        <span className="mt-2 flex items-center gap-2 text-xs font-bold text-zinc-400">
           <span className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10 text-[9px] font-black text-white">
             <Avatar src={user?.images?.avatar?.full || null} name={username || "user"} />
           </span>
