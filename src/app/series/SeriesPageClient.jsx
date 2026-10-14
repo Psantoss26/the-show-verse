@@ -73,8 +73,8 @@ import PreviewTrailerAudioButton, {
 import {
   fetchBestBackdropNoLang,
   pickBestBackdropByLangResVotes,
-  pickBestPosterByLangThenResolution,
 } from "@/lib/dashboard/media";
+import { pickLadderPoster } from "@/lib/details/tmdbImages";
 import useSpotlightLogo from "@/lib/dashboard/useSpotlightLogo";
 import DashboardSpotlightPreview from "@/components/dashboard/DashboardSpotlightPreview";
 import DashboardRankNumber from "@/components/dashboard/DashboardRankNumber";
@@ -385,10 +385,7 @@ async function fetchBestTVPoster(showId, originalLanguage) {
   const { posters } = await getShowImages(showId);
   if (!Array.isArray(posters) || posters.length === 0) return null;
 
-  const best = pickBestPosterByLangThenResolution(posters, {
-    minWidth: 500,
-    originalLanguage,
-  });
+  const best = pickLadderPoster(posters, { originalLanguage });
 
   return best?.file_path || null;
 }

@@ -8,7 +8,6 @@ import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 import { pickBestBackdropNoLang, pickLadderPoster } from "@/lib/details/tmdbImages";
 import {
   imageLanguageTiers,
-  pickByLanguageLadder,
   pickPreferredResolutionBackdrop,
 } from "@/lib/tmdb/imageLanguageLadder";
 import { getMediaTypeForItem } from "./mediaType.mjs";
@@ -264,22 +263,6 @@ export function pickBestBackdropByLangResVotes(list, opts = {}) {
   return null;
 }
 
-// Póster con la misma escalera; dentro de cada idioma, el de mayor resolución.
-export function pickBestPosterByLangThenResolution(list, opts = {}) {
-  const { minWidth = 500, originalLanguage } = opts;
-  const area = (img) => (img?.width || 0) * (img?.height || 0);
-  return pickByLanguageLadder(
-    list,
-    (tier) => {
-      const sized = minWidth > 0 ? tier.filter((p) => (p?.width || 0) >= minWidth) : tier;
-      const pool = sized.length ? sized : tier;
-      const maxArea = Math.max(...pool.map(area));
-      return pool.find((p) => area(p) === maxArea) || null;
-    },
-    { originalLanguage },
-  );
-}
-
 export async function getMovieImages(itemId, mediaType = "movie", opts = {}) {
   const cacheKey = `${mediaType}:${itemId}`;
   if (movieImagesCache.has(cacheKey)) return movieImagesCache.get(cacheKey);
@@ -373,10 +356,7 @@ export async function fetchBestPoster(itemId, mediaType = "movie", opts = {}) {
   const { posters } = await getMovieImages(itemId, mediaType);
   if (!Array.isArray(posters) || posters.length === 0) return null;
 
-  const best = pickBestPosterByLangThenResolution(posters, {
-    minWidth: 500,
-    originalLanguage: opts.originalLanguage,
-  });
+  const best = pickLadderPoster(posters, { originalLanguage: opts.originalLanguage });
 
   return best?.file_path || null;
 }

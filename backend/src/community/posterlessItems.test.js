@@ -8,7 +8,7 @@ const response = (status, body = {}) => ({
   json: async () => body,
 });
 
-test('pickGalleryPoster prefiere inglés, luego español, luego sin idioma, luego cualquiera', () => {
+test('pickGalleryPoster: el primero de TMDb en inglés, luego español, sin idioma o cualquiera', () => {
   assert.equal(pickGalleryPoster([]), null);
   assert.equal(
     pickGalleryPoster([
@@ -17,7 +17,7 @@ test('pickGalleryPoster prefiere inglés, luego español, luego sin idioma, lueg
       { file_path: '/en-low.jpg', iso_639_1: 'en', vote_average: 1 },
       { file_path: '/en-top.jpg', iso_639_1: 'en', vote_average: 7 },
     ]),
-    '/en-top.jpg',
+    '/en-low.jpg',
   );
   assert.equal(
     pickGalleryPoster([

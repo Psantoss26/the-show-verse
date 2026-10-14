@@ -2,7 +2,7 @@ import { TMDB_IMAGE_LANGS_PARAM } from '../tmdb/imageLanguages.js'
 import {
     pickByLanguageLadder,
     pickPreferredResolutionBackdrop,
-    pickTopVotedImage,
+    pickFirstImage,
 } from '../tmdb/imageLanguageLadder.js'
 
 export const mergeUniqueImages = (current = [], incoming = []) => {
@@ -77,11 +77,11 @@ export function pickBestImage(list) {
 
 // Póster de tarjetas y fichas con la escalera de idioma (inglés → español →
 // idioma original → sin idioma, ver lib/tmdb/imageLanguageLadder.js); dentro
-// de cada idioma, el más votado. `null` si no hay ninguno: quien llama usa el
+// de cada idioma, el PRIMERO de TMDb (su póster principal). `null` si no hay ninguno: quien llama usa el
 // `poster_path` por defecto de TMDb. Compartido para que un mismo título no
 // cambie de idioma según dónde se muestre.
 export function pickLadderPoster(list, { originalLanguage } = {}) {
-    return pickByLanguageLadder(list, pickTopVotedImage, { originalLanguage })
+    return pickByLanguageLadder(list, pickFirstImage, { originalLanguage })
 }
 
 // Backdrop con la misma escalera; dentro de cada idioma, el de mejor

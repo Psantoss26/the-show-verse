@@ -34,14 +34,12 @@ export function posterItemKey(mediaType, tmdbId) {
 // El mejor póster de la galería con la escalera de idioma de toda la app
 // (inglés → español → sin idioma; aquí no se conoce el idioma original) y, si
 // no hay ninguno, cualquiera: este selector decide qué títulos se dan por «sin
-// póster». Dentro de cada grupo, el mejor valorado.
+// póster». Dentro de cada grupo, el PRIMERO de TMDb (su póster principal).
 export function pickGalleryPoster(posters) {
   const list = Array.isArray(posters) ? posters.filter((p) => p?.file_path) : [];
   if (!list.length) return null;
-  const best = (group) => [...group].sort(
-    (a, b) => (b.vote_average || 0) - (a.vote_average || 0) || (b.vote_count || 0) - (a.vote_count || 0),
-  )[0];
-  return (pickByLanguageLadder(list, best) || best(list)).file_path;
+  const first = (group) => group[0];
+  return (pickByLanguageLadder(list, first) || first(list)).file_path;
 }
 
 async function checkOne(key, { fetchImpl, apiKey }) {

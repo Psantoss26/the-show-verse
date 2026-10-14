@@ -20,6 +20,7 @@
 // del HTML del servidor.
 
 import { useEffect, useLayoutEffect, useMemo } from "react";
+import { usePathname } from "next/navigation";
 import { isHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 
 const SNAPSHOTS = new Map();
@@ -68,9 +69,9 @@ function saveSnapshot(session) {
   }
 }
 
-function openSession(key) {
+function openSession(key, pathname) {
   const snapshot =
-    typeof window !== "undefined" && isHistoryNavigation()
+    typeof window !== "undefined" && isHistoryNavigation(pathname)
       ? readSnapshot(key)
       : null;
   return {
@@ -89,7 +90,10 @@ function openSession(key) {
  * que este montaje viene de atrás/adelante y ha recuperado el estado anterior.
  */
 export function useDetailsSnapshot(key) {
-  const session = useMemo(() => openSession(key), [key]);
+  // La ruta que se renderiza: una ficha abierta justo después de volver a otra
+  // página se renderiza antes de su `pushState` y no debe restaurar nada.
+  const pathname = usePathname();
+  const session = useMemo(() => openSession(key, pathname), [key, pathname]);
   useEffect(() => () => saveSnapshot(session), [session]);
   return session;
 }

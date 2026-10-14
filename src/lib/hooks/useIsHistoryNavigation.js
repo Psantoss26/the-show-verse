@@ -1,123 +1,15 @@
 "use client";
 
 import { useRef } from "react";
+import { usePathname } from "next/navigation";
+import { isHistoryNavigation } from "@/lib/navigation/historyNavigation";
 
-// Detección de navegación de HISTORIAL (atrás/adelante del navegador o
-// router.back()). Sirve para que las páginas de contenido se pinten ESTÁTICAS al
-// volver a ellas: sin animación de entrada y con el contenido completo desde el
-// primer frame, de modo que la altura del documento sea la correcta de inmediato
-// y el <ScrollRestoration> restaure la posición sin saltos ni "chase".
-//
-// Mecanismo: el navegador emite `popstate` en cada navegación atrás/adelante
-// (Next.js App Router también lo dispara). Guardamos el instante del último
-// popstate; como al navegar las páginas RE-MONTAN, el primer render del nuevo
-// componente cae dentro de una ventana breve tras ese popstate.
-
-const HISTORY_NAVIGATION_MARKER_KEY = "showverse:pending-history-navigation";
-// La ficha de detalle puede resolver datos y renderizar antes de que vuelva a
-// montar la lista. La marca escrita por ScrollRestoration conserva el destino
-// exacto de `popstate`, por encima de una simple ventana de tiempo.
-const HISTORY_WINDOW_MS = 10_000;
-const HISTORY_MARKER_MAX_AGE_MS = 30_000;
-let lastHistoryNavAt = -Infinity;
-let installed = false;
-
-// PÁGINA actual del historial: ruta + query SIN `?preview=`.
-//
-// La ficha rápida (DetailModalProvider) vive en la MISMA página y usa el
-// historial para su `?preview=`: al abrirla empuja una entrada y al cerrarla
-// hace `history.go(-n)`, que emite `popstate`. Ese `popstate` no es volver a
-// una página, pero se contaba como tal: durante los 10 s siguientes cualquier
-// tarjeta o sección que montara (cambiar de vista, de agrupación o de
-// pestaña, cargar más) se pintaba estática, SIN su animación de entrada.
-const PREVIEW_PARAM = "preview";
-let currentPageKey = null;
-let lastPopStateStayedOnPage = false;
-
-function readPageKey() {
-  const params = new URLSearchParams(window.location.search);
-  params.delete(PREVIEW_PARAM);
-  const qs = params.toString();
-  return `${window.location.pathname}${qs ? `?${qs}` : ""}`;
-}
-
-// Tras cada `pushState`/`replaceState` (los parchea <ScrollRestoration>).
-export function syncHistoryPage() {
-  if (typeof window === "undefined") return;
-  currentPageKey = readPageKey();
-}
-
-// ¿El último `popstate` se quedó en la MISMA página (solo cambió `?preview=`)?
-// Lo lee <ScrollRestoration>, cuyo listener corre después del de este módulo.
-export function wasInPagePopState() {
-  return lastPopStateStayedOnPage;
-}
-
-function install() {
-  if (installed || typeof window === "undefined") return;
-  installed = true;
-  currentPageKey = readPageKey();
-  // `pageshow` con persisted = bfcache también cuenta como "volver" a la página.
-  window.addEventListener("popstate", () => {
-    const nextPageKey = readPageKey();
-    lastPopStateStayedOnPage = nextPageKey === currentPageKey;
-    currentPageKey = nextPageKey;
-    if (lastPopStateStayedOnPage) return;
-    lastHistoryNavAt = window.performance.now();
-  });
-  window.addEventListener("pageshow", (event) => {
-    if (event.persisted) lastHistoryNavAt = window.performance.now();
-  });
-}
-
-install();
-
-function hasPendingHistoryNavigation() {
-  try {
-    const raw = window.sessionStorage.getItem(HISTORY_NAVIGATION_MARKER_KEY);
-    if (!raw) return false;
-
-    const marker = JSON.parse(raw);
-    const age = Date.now() - Number(marker?.at || 0);
-    if (age < 0 || age > HISTORY_MARKER_MAX_AGE_MS) {
-      window.sessionStorage.removeItem(HISTORY_NAVIGATION_MARKER_KEY);
-      return false;
-    }
-
-    const route = `${window.location.pathname}${window.location.search}`;
-    return marker?.route === route;
-  } catch {
-    return false;
-  }
-}
-
-// Una navegación NORMAL (pulsar un enlace, el desplegable del navbar,
-// `router.push`) cancela la ventana de historial.
-//
-// Sin esto, la ventana de 10 s se aplicaba a cualquier montaje posterior a un
-// `popstate`: si retrocedías y acto seguido entrabas a Favoritos o Pendientes
-// desde el navbar, esa página se pintaba ESTÁTICA —sin su animación de
-// entrada— pese a no ser una vuelta atrás. La ventana existe para tolerar que
-// el remontaje de la lista llegue tarde tras el `popstate`, no para teñir las
-// navegaciones que vengan después.
-//
-// Lo llama el parche de `pushState` de <ScrollRestoration>, que ya es el único
-// sitio que intercepta las navegaciones de empuje (y allí mismo se limpia el
-// marcador de sesión). Mantenerlo en UN solo punto evita dos parches
-// compitiendo por `history.pushState`.
-export function notifyPushNavigation() {
-  lastHistoryNavAt = -Infinity;
-}
-
-// ¿El momento actual está dentro de la ventana posterior a una navegación de
-// historial? (lectura puntual, no reactiva).
-export function isHistoryNavigation() {
-  if (typeof window === "undefined") return false;
-  return (
-    window.performance.now() - lastHistoryNavAt < HISTORY_WINDOW_MS ||
-    hasPendingHistoryNavigation()
-  );
-}
+export {
+  isHistoryNavigation,
+  notifyPushNavigation,
+  syncHistoryPage,
+  wasInPagePopState,
+} from "@/lib/navigation/historyNavigation";
 
 // Captura el valor en el PRIMER render del componente (su montaje) y lo mantiene
 // estable durante toda su vida. Como las páginas re-montan al navegar, el valor
@@ -125,8 +17,11 @@ export function isHistoryNavigation() {
 //   - saltar la animación de entrada:  initial={isBack ? false : "hidden"}
 //   - renderizar el contenido completo: useState(isBack ? full : chunkInicial)
 export function useIsHistoryNavigation() {
+  // La ruta que se RENDERIZA, que puede no ser aún la de la URL (ver
+  // `historyTargetPath`).
+  const pathname = usePathname();
   const ref = useRef(null);
-  if (ref.current === null) ref.current = isHistoryNavigation();
+  if (ref.current === null) ref.current = isHistoryNavigation(pathname);
   return ref.current;
 }
 

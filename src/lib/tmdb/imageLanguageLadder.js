@@ -9,8 +9,9 @@
 // en «solo inglés» o «inglés → sin idioma»: un título con arte SOLO en español
 // («Señor, dame paciencia») salía sin póster en el Perfil y las notificaciones.
 //
-// Cada selector conserva su criterio de CALIDAD dentro de un idioma (votos,
-// resolución…); este módulo solo decide el ORDEN de los idiomas.
+// Dentro de un idioma, los pósters toman el PRIMERO de TMDb (pickFirstImage);
+// los backdrops conservan su criterio de resolución. Este módulo decide el
+// ORDEN de los idiomas.
 //
 // El backend tiene una copia en backend/src/lib/imageLanguageLadder.js (no puede
 // importar de aquí); un test comprueba que las dos coinciden.
@@ -58,16 +59,11 @@ export function tmdbImageLanguages(originalLanguage) {
   return `en,en-US,es,es-ES${extra},null`;
 }
 
-// Póster: el más votado; a igualdad, mejor nota y después más ancho.
-export function pickTopVotedImage(list) {
-  if (!Array.isArray(list) || !list.length) return null;
-  const maxVotes = Math.max(...list.map((image) => Number(image?.vote_count) || 0));
-  return [...list]
-    .filter((image) => (Number(image?.vote_count) || 0) === maxVotes)
-    .sort((a, b) =>
-      (Number(b?.vote_average) || 0) - (Number(a?.vote_average) || 0)
-      || (Number(b?.width) || 0) - (Number(a?.width) || 0),
-    )[0] || null;
+// Póster: el PRIMERO de TMDb en ese idioma. Su orden es el de la web de TMDb y
+// el primero es su póster principal (medido: coincidía con el `poster_path`
+// en inglés en 15 de 15 títulos; el más votado, solo en 4).
+export function pickFirstImage(list) {
+  return (Array.isArray(list) && list[0]) || null;
 }
 
 // Backdrop de tarjeta: de los tres primeros de TMDb con el ancho mínimo, el

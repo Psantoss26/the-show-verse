@@ -23,7 +23,7 @@ import {
 test('English poster decisions use a versioned cache namespace', () => {
   assert.equal(
     profileEnglishPosterCacheKey('movie', 121),
-    'profile:english-poster:v3:movie:121',
+    'profile:english-poster:v4:movie:121',
   );
 });
 
@@ -88,7 +88,8 @@ test('pickLadderPosterPath: inglés, español, idioma original y sin idioma', ()
     { file_path: '/english-low.jpg', iso_639_1: 'en', vote_count: 2, width: 1200 },
     { file_path: '/english-best.jpg', iso_639_1: 'en', vote_count: 8, width: 900 },
   ];
-  assert.equal(pickLadderPosterPath(posters), '/english-best.jpg');
+  // El PRIMERO de TMDb en inglés, no el más votado.
+  assert.equal(pickLadderPosterPath(posters), '/english-low.jpg');
   assert.equal(pickLadderPosterPath(posters.slice(0, 2)), '/spanish.jpg');
   // «Señor, dame paciencia»: solo pósters en español.
   assert.equal(pickLadderPosterPath([{ file_path: '/spanish.jpg', iso_639_1: 'es' }]), '/spanish.jpg');
