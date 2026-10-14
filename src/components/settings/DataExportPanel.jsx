@@ -172,7 +172,7 @@ export default function DataExportPanel({ className = "" }) {
             {FORMATS.map((option) => (
               <label
                 key={option.value}
-                className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-white/5 bg-white/[0.02] p-3 transition hover:bg-white/[0.05] has-[:checked]:border-emerald-400/40 has-[:checked]:bg-emerald-400/[0.06] has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-emerald-400"
+                className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-white/5 bg-white/[0.02] p-3 transition hover:bg-white/[0.05] has-[:checked]:bg-emerald-400/[0.06] has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-emerald-400"
               >
                 <input
                   type="radio"
