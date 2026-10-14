@@ -150,6 +150,19 @@ import {
 } from "@/components/social/useViewerTitleStates";
 import { isOwnedComment } from "@/lib/community/commentOwnership";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
+import CommentFilterBar from "@/components/details/CommentFilterBar";
+import {
+  cachedCommentsResponse,
+  commentsPageFromResponse,
+  prefetchOtherCommentFilters,
+  readCommentsPage,
+  writeCommentsPage,
+} from "@/lib/details/commentsPageCache";
+import {
+  DEFAULT_COMMENT_TAB,
+  commentFiltersKey,
+  normalizeCommentFilters,
+} from "@/lib/details/commentFilters";
 import {
   LIQUID_GLASS_BAR,
   LIQUID_GLASS_CARD,
@@ -4235,7 +4248,17 @@ export default function DetailsClient({
   const [tSentiment, setTSentiment] = useState(() => restoredValue(backSnapshot, "tSentiment", () => initialSentimentState));
 
   // -- Comentarios de la comunidad con paginación y pestañas --
-  const [tCommentsTab, setTCommentsTab] = useState(() => restoredValue(backSnapshot, "tCommentsTab", "recent")); // "likes30" (top 30 dias) | "likesAll" (top historico) | "recent"
+  // Pestaña ("popular" | "recent") y orden por likes (ver lib/details/commentFilters).
+  // Lo restaurado puede ser de los filtros antiguos (Top 30 días / histórico).
+  const [tCommentsTab, setTCommentsTab] = useState(
+    () => normalizeCommentFilters(restoredValue(backSnapshot, "tCommentsTab", DEFAULT_COMMENT_TAB)).tab,
+  );
+  const [tCommentsByLikes, setTCommentsByLikes] = useState(
+    () => normalizeCommentFilters(
+      restoredValue(backSnapshot, "tCommentsTab", DEFAULT_COMMENT_TAB),
+      restoredValue(backSnapshot, "tCommentsByLikes", false),
+    ).byLikes,
+  );
   // Semilla desde `initialComments` (SSR: { items, pagination }).
   const initialCommentsState = useMemo(() => {
     if (!initialComments) {
@@ -4271,21 +4294,36 @@ export default function DetailsClient({
   ));
   const [ownedCommentIds, setOwnedCommentIds] = useState(() => new Set());
   const COMMENTS_PAGE_SIZE = 5;
+  // CAMBIO DE FILTRO SIN PARPADEO. Antes se vaciaba la lista y se marcaba la
+  // carga: el bloque encogía hasta su relleno y volvía a crecer al llegar la
+  // respuesta. Ahora, si ese filtro ya está en la caché de la sesión
+  // (commentsPageCache), se pinta en el mismo render; si no, se quedan los
+  // comentarios de antes atenuados hasta que llegan los nuevos.
+  const showCommentsForFilter = useCallback((tab, byLikes) => {
+    const cached = readCommentsPage({ type: traktType, tmdbId: id, tab, byLikes, page: 1 });
+    setTComments((previous) => (cached
+      ? {
+          ...previous,
+          items: cached.items,
+          page: 1,
+          pageCount: cached.pageCount,
+          hasMore: cached.pageCount > 1,
+          total: cached.total,
+          loading: false,
+          error: "",
+        }
+      : { ...previous, page: 1, loading: true, error: "" }));
+  }, [id, traktType]);
   const selectCommentsTab = useCallback((tab) => {
     if (tab === tCommentsTab) return;
-
     setTCommentsTab(tab);
-    setTComments((previous) => ({
-      ...previous,
-      items: [],
-      page: 1,
-      pageCount: 0,
-      hasMore: false,
-      total: 0,
-      loading: true,
-      error: "",
-    }));
-  }, [tCommentsTab]);
+    showCommentsForFilter(tab, tCommentsByLikes);
+  }, [tCommentsTab, tCommentsByLikes, showCommentsForFilter]);
+  const selectCommentsByLikes = useCallback((byLikes) => {
+    if (!!byLikes === tCommentsByLikes) return;
+    setTCommentsByLikes(!!byLikes);
+    showCommentsForFilter(tCommentsTab, !!byLikes);
+  }, [tCommentsTab, tCommentsByLikes, showCommentsForFilter]);
   const selectCommentsPage = useCallback((page) => {
     setTComments((previous) => {
       const nextPage = Math.min(
@@ -4296,15 +4334,21 @@ export default function DetailsClient({
       return { ...previous, page: nextPage, loading: true, error: "" };
     });
   }, []);
-  const loadCommentsSheetPage = useCallback(async (page, tab) => {
-    const sort = tab === "recent" ? "newest" : tab === "likes30" ? "likes30" : "likes";
-    return traktGetComments({
+  // Vista lateral: lo ya cargado por la ficha (o precargado) sale de la caché.
+  const loadCommentsSheetPage = useCallback(async (page, tab, byLikes = false) => {
+    const filter = { type: traktType, tmdbId: id, tab, byLikes, page };
+    const cached = cachedCommentsResponse(filter);
+    if (cached) return cached;
+    const response = await traktGetComments({
       type: traktType,
       tmdbId: id,
-      sort,
+      tab,
+      byLikes,
       page,
       limit: COMMENTS_PAGE_SIZE,
     });
+    writeCommentsPage(filter, commentsPageFromResponse(response, page));
+    return response;
   }, [COMMENTS_PAGE_SIZE, id, traktType]);
   const myComments = useMemo(() => {
     return (tComments.items || []).filter((item) =>
@@ -4525,8 +4569,8 @@ export default function DetailsClient({
     initialListsState,
   ]);
 
-  // Carga los comentarios de Trakt segun la pestana activa.
-  // likes30: top con likes de los ultimos 30 dias. likesAll: top historico. recent: mas recientes.
+  // Carga los comentarios segun la pestana activa (Populares / Recientes) y el
+  // orden por likes.
   useRestorableEffect(backSnapshot, "comments", () => {
     if (!traktDeferredReady) return;
 
@@ -4537,15 +4581,30 @@ export default function DetailsClient({
     let seedTimers = [];
     let scheduledPoll = false;
 
-    const commentsCacheKey = `showverse:trakt:comments:${traktType}:${id}:${tCommentsTab}`;
+    const commentsCacheKey = `showverse:trakt:comments:${traktType}:${id}:${commentFiltersKey({ tab: tCommentsTab, byLikes: tCommentsByLikes })}`;
 
     const load = async () => {
       const isFirstPage = tComments.page === 1;
 
       // SWR: pintamos la caché al instante (sin spinner) y revalidamos en 2º
       // plano, así al volver a entrar los comentarios aparecen ya cargados.
+      // Primero la de la sesión (cualquier página; ver commentsPageCache) y,
+      // para la primera página, la de localStorage.
+      const pageFilter = { type: traktType, tmdbId: id, tab: tCommentsTab, byLikes: tCommentsByLikes, page: tComments.page };
+      const sessionPage = readCommentsPage(pageFilter);
       let hadCache = false;
-      if (isFirstPage && typeof window !== "undefined") {
+      if (sessionPage) {
+        hadCache = true;
+        setTComments((p) => (p.items === sessionPage.items && !p.loading ? p : {
+          ...p,
+          loading: false,
+          error: "",
+          items: sessionPage.items,
+          pageCount: sessionPage.pageCount,
+          hasMore: sessionPage.page < sessionPage.pageCount,
+          total: sessionPage.total,
+        }));
+      } else if (isFirstPage && typeof window !== "undefined") {
         try {
           const raw = window.localStorage.getItem(commentsCacheKey);
           const cached = raw ? JSON.parse(raw) : null;
@@ -4571,19 +4630,13 @@ export default function DetailsClient({
       setTComments((p) => ({ ...p, loading: !hadCache, error: "" }));
 
       try {
-        const sort =
-          tCommentsTab === "recent"
-            ? "newest"
-            : tCommentsTab === "likes30"
-              ? "likes30"
-              : "likes";
-
         // Timeout generoso para comentarios adicionales de Trakt
         const r = await withTimeout(
           traktGetComments({
             type: traktType,
             tmdbId: id,
-            sort,
+            tab: tCommentsTab,
+            byLikes: tCommentsByLikes,
             page: tComments.page,
             limit: COMMENTS_PAGE_SIZE,
           }),
@@ -4607,6 +4660,17 @@ export default function DetailsClient({
           hasMore: page < pageCount,
           total,
         }));
+        writeCommentsPage(pageFilter, { items, page, pageCount, total });
+        // Con la primera ya en pantalla, la primera página de los otros filtros
+        // en segundo plano: el primer cambio también será instantáneo.
+        if (r?.state !== "seeding") {
+          prefetchOtherCommentFilters({
+            type: traktType,
+            tmdbId: id,
+            current: { tab: tCommentsTab, byLikes: tCommentsByLikes },
+            load: (filter) => traktGetComments({ type: traktType, tmdbId: id, ...filter, page: 1, limit: COMMENTS_PAGE_SIZE }),
+          });
+        }
 
         // Persistimos solo la primera página (lo que se ve al entrar).
         if (isFirstPage && typeof window !== "undefined") {
@@ -4657,6 +4721,7 @@ export default function DetailsClient({
     id,
     traktType,
     tCommentsTab,
+    tCommentsByLikes,
     tComments.page,
     traktDeferredReady,
     COMMENTS_PAGE_SIZE,
@@ -8232,6 +8297,7 @@ export default function DetailsClient({
     traktDeferredReady,
     tSentiment,
     tCommentsTab,
+    tCommentsByLikes,
     tComments,
     commentProfileUsernames,
     tSeasons,
@@ -9463,6 +9529,8 @@ export default function DetailsClient({
       state: tComments,
       tab: tCommentsTab,
       onTabChange: selectCommentsTab,
+      byLikes: tCommentsByLikes,
+      onLikesChange: selectCommentsByLikes,
       onPageChange: selectCommentsPage,
       onLoadPage: loadCommentsSheetPage,
       profileUsernames: commentProfileUsernames,
@@ -12655,41 +12723,28 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         className={`relative isolate overflow-hidden rounded-2xl transform-gpu ${LIQUID_GLASS_HOST} ${LIQUID_GLASS_ELEVATION}`}
                       >
                         <LiquidGlassOpticalLayers />
-                        {/* Filtros estilo Tabs Modernos */}
-                        <div className="relative z-10 flex items-center justify-between border-b border-transparent bg-white/5 px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            {[
-                              { id: "likes30", label: "Top 30 Días" },
-                              { id: "likesAll", label: "Top Histórico" },
-                              { id: "recent", label: "Recientes" },
-                            ].map((t) => (
-                              <button
-                                key={t.id}
-                                type="button"
-                                onClick={() => selectCommentsTab(t.id)}
-                                aria-pressed={tCommentsTab === t.id}
-                                aria-controls="comments-list"
-                                className={`relative isolate flex transform-gpu items-center justify-center rounded-xl px-4 py-1.5 text-xs font-bold transition-all ${
-                                  tCommentsTab === t.id
-                                    ? `${LIQUID_GLASS_CARD} text-white`
-                                    : "bg-transparent text-zinc-400 hover:bg-white/5 hover:text-white"
-                                }`}
-                              >
-                                {tCommentsTab === t.id && (
-                                  <LiquidGlassOpticalLayers />
-                                )}
-                                <span className="relative z-10">{t.label}</span>
-                              </button>
-                            ))}
-                          </div>
-                          {tComments.loading && (
-                            <Loader2 className="h-4 w-4 animate-spin text-zinc-500" />
-                          )}
-                        </div>
+                        {/* Filtros: Populares / Recientes y «Más likes». */}
+                        <CommentFilterBar
+                          tab={tCommentsTab}
+                          byLikes={tCommentsByLikes}
+                          onTabChange={selectCommentsTab}
+                          onLikesChange={selectCommentsByLikes}
+                          loading={tComments.loading}
+                          controlsId="comments-list"
+                        />
 
+                        {/* Mientras llega otro filtro o página, los comentarios de
+                            antes se quedan atenuados (sin vaciar la lista: el
+                            bloque no encoge ni salta). Las tarjetas no llevan
+                            cristal, así que la opacidad no apaga nada. */}
                         <div
                           id="comments-list"
-                          className="relative z-10 space-y-4 p-4 sm:p-6"
+                          aria-busy={tComments.loading}
+                          className={`relative z-10 space-y-4 p-4 transition-opacity duration-200 sm:p-6 ${
+                            tComments.loading && (tComments.items || []).length
+                              ? "opacity-50"
+                              : "opacity-100"
+                          }`}
                         >
 
                           {!tComments.loading &&

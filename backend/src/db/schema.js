@@ -360,6 +360,13 @@ export const titleComments = pgTable('title_comments', {
   authorIsVip: boolean('author_is_vip').default(false),
   body: text('body').notNull(),
   likes: integer('likes').default(0).notNull(),
+  // Respuestas en Trakt: con los me gusta, la popularidad de la pestaña
+  // «Populares» (likes + respuestas).
+  replies: integer('replies').default(0).notNull(),
+  // Idioma detectado (community/commentLanguage.js): 'en', 'es', otro código o
+  // 'und'. Solo se enseñan los de inglés y español. Null en los nativos y en
+  // los guardados antes de detectarlo (se rellena al leerlos).
+  lang: text('lang'),
   spoiler: boolean('spoiler').default(false).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   importedAt: timestamp('imported_at', { withTimezone: true }).defaultNow().notNull(),

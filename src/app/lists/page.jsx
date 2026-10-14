@@ -1950,10 +1950,12 @@ export default function ListsPage() {
           : "personal";
     // Colecciones en v2: sus entradas llevan ya la popularidad (para ordenar
     // por ella sin recolocar las tarjetas al llegar las vivas). Comunidad en
-    // v2: guarda todas las páginas recorridas, por orden y búsqueda; v3: con
-    // el origen de cada lista (las de usuarios van delante, ver `filtered`).
-    return `showverse:lists:index:${source}:${scope}:${source === "personal" ? "v1" : source === "trakt" ? "v3" : "v2"}`;
-  }, [source, collectionsQueryKey, communitySortMode, communityQuery]);
+    // v2: guarda todas las páginas recorridas, por orden y búsqueda; v4: POR
+    // USUARIO (el índice no incluye las listas propias de quien mira, así que
+    // la copia de antes de iniciar sesión no vale después).
+    const viewerScope = source === "trakt" ? `:${account?.id || "anon"}` : "";
+    return `showverse:lists:index:${source}:${scope}${viewerScope}:${source === "personal" ? "v1" : source === "trakt" ? "v4" : "v2"}`;
+  }, [source, collectionsQueryKey, communitySortMode, communityQuery, account?.id]);
 
   // Caché de la pestaña ACTIVA, leída en el mismo render que su clave. Antes era
   // un estado que se actualizaba en un efecto: justo después de cambiar de
@@ -2243,15 +2245,10 @@ export default function ListsPage() {
     // orden (las listas de usuarios delante; su A-Z puede diferir del de
     // `localeCompare` y las páginas siguientes se intercalarían).
     if (source === "trakt" && trakt?.resultsSort === activeSortMode) return base;
-    const sorted = sortLists(base, activeSortMode);
-    // Comunidad pintada desde la caché (antes de la respuesta): el mismo orden
-    // que el servidor, con las listas de usuarios de la app DELANTE. Si no, una
-    // lista tuya corta quedaba al final y, al llegar la respuesta, saltaba al
-    // primer puesto y movía toda la rejilla. `sort` es estable: el resto
-    // conserva el criterio elegido.
-    return source === "trakt"
-      ? sorted.sort((a, b) => (b?.origin === "user") - (a?.origin === "user"))
-      : sorted;
+    // Las listas de usuarios de la app se ordenan como las demás (el servidor
+    // ya no las pone delante), así que lo pintado desde la caché sigue el mismo
+    // orden que la respuesta.
+    return sortLists(base, activeSortMode);
   }, [activeLists, deferredQuery, activeSortMode, source, trakt?.resultsSort]);
 
   const visibleCount = filtered.length;

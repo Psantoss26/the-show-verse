@@ -29,6 +29,8 @@ export default function SectionSheet({
   search = null,
   // Acción extra en la cabecera (p. ej. «Ver colección»).
   headerAction = null,
+  // Control junto a las pestañas, en su misma fila (p. ej. «Más likes»).
+  tabsAccessory = null,
   // Pie fijo bajo la lista (p. ej. «Cancelar / Guardar» de un editor).
   footer = null,
   // El panel puede ser un <form> (`as="form"` + `panelProps.onSubmit`).
@@ -97,10 +99,11 @@ export default function SectionSheet({
           </div>
 
           {Array.isArray(tabs) && tabs.length > 1 ? (
+            <div className="mt-4 flex items-stretch gap-2">
             <div
               role="tablist"
               aria-label={title}
-              className="mt-4 flex gap-1 overflow-x-auto rounded-xl bg-black/20 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              className="flex min-w-0 flex-1 gap-1 overflow-x-auto rounded-xl bg-black/20 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
               {tabs.map((tab) => {
                 const active = tab.id === activeTab;
@@ -122,6 +125,8 @@ export default function SectionSheet({
                   </button>
                 );
               })}
+            </div>
+            {tabsAccessory}
             </div>
           ) : null}
 

@@ -63,11 +63,13 @@ test('listas de usuario en la comunidad: publicar, sincronizar y retirar', {
     const items = await db.select().from(communityListItems).where(eq(communityListItems.listId, row.id));
     assert.deepEqual(items.map((i) => i.tmdbId).sort((a, b) => a - b), [603, 1399]);
     assert.equal((await call('GET', `/lists/${list.id}`)).inCommunity, true);
-    // Y aparece en la primera página de «Listas de la comunidad», delante de
-    // las importadas de Trakt aunque sea más corta.
-    const { discoverLists } = await import('../community/store.js');
-    const discovered = await discoverLists({ sort: 'items_desc', limit: 30 });
-    assert.ok(discovered.some((entry) => entry.list.id === row.id));
+    // Y aparece en «Listas de la comunidad» para los demás (con el orden que
+    // toque, sin ir siempre delante), pero no para su autor.
+    const { discoverListsPage } = await import('../community/store.js');
+    const forOthers = await discoverListsPage({ query: row.name, limit: 60 });
+    assert.ok(forOthers.results.some((entry) => entry.list.id === row.id));
+    const forOwner = await discoverListsPage({ query: row.name, limit: 60, viewerId: uid });
+    assert.ok(!forOwner.results.some((entry) => entry.list.id === row.id));
   });
 
   await t.test('editar la lista resincroniza la copia (y conserva los me gusta)', async () => {

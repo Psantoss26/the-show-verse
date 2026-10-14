@@ -2,17 +2,21 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveCommentTab } from './tabs.js';
 
-test('top → likes, no window', () => {
-  assert.deepEqual(resolveCommentTab('top'), { order: 'likes', sinceDays: null });
-  assert.deepEqual(resolveCommentTab('likesAll'), { order: 'likes', sinceDays: null });
+test('Populares: por popularidad (likes + respuestas) y, con sort=likes, por me gusta', () => {
+  assert.deepEqual(resolveCommentTab('popular'), { tab: 'popular', order: 'popularity', recentWindow: false });
+  assert.deepEqual(resolveCommentTab('popular', 'likes'), { tab: 'popular', order: 'likes', recentWindow: false });
 });
-test('top30 → likes, 30-day window', () => {
-  assert.deepEqual(resolveCommentTab('top30'), { order: 'likes', sinceDays: 30 });
-  assert.deepEqual(resolveCommentTab('likes30'), { order: 'likes', sinceDays: 30 });
+test('Recientes: por fecha y, con sort=likes, los recientes por me gusta', () => {
+  assert.deepEqual(resolveCommentTab('recent'), { tab: 'recent', order: 'recent', recentWindow: false });
+  assert.deepEqual(resolveCommentTab('recent', 'likes'), { tab: 'recent', order: 'likes', recentWindow: true });
+  assert.deepEqual(resolveCommentTab('newest'), { tab: 'recent', order: 'recent', recentWindow: false });
 });
-test('recent → recent, no window', () => {
-  assert.deepEqual(resolveCommentTab('recent'), { order: 'recent', sinceDays: null });
+test('los nombres antiguos siguen funcionando', () => {
+  assert.deepEqual(resolveCommentTab('top'), { tab: 'popular', order: 'popularity', recentWindow: false });
+  assert.deepEqual(resolveCommentTab('likesAll'), { tab: 'popular', order: 'popularity', recentWindow: false });
+  assert.deepEqual(resolveCommentTab('top30'), { tab: 'recent', order: 'likes', recentWindow: true });
+  assert.deepEqual(resolveCommentTab('likes30'), { tab: 'recent', order: 'likes', recentWindow: true });
 });
-test('unknown → default top', () => {
-  assert.deepEqual(resolveCommentTab('nope'), { order: 'likes', sinceDays: null });
+test('desconocido → Populares', () => {
+  assert.deepEqual(resolveCommentTab('nope'), { tab: 'popular', order: 'popularity', recentWindow: false });
 });

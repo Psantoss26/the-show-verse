@@ -11,8 +11,8 @@ test("cada pestaña de comentarios consulta y muestra su propia página", () => 
   assert.match(clientSource, /const COMMENTS_PAGE_SIZE = 5/);
   assert.match(
     clientSource,
-    /tCommentsTab === "likes30"\s*\? "likes30"/,
-    "Top 30 Días debe delegar el filtro temporal a la API paginada",
+    /tab: tCommentsTab,\s*byLikes: tCommentsByLikes,/,
+    "Populares / Recientes y el orden por likes deben delegarse a la API paginada",
   );
   assert.match(
     clientSource,
@@ -32,5 +32,6 @@ test("los comentarios ofrecen navegación anterior y siguiente accesible", () =>
   assert.match(clientSource, /Página \{tComments\.page\} de \{tComments\.pageCount\}/);
   assert.match(clientSource, /selectCommentsPage\(tComments\.page - 1\)/);
   assert.match(clientSource, /selectCommentsPage\(tComments\.page \+ 1\)/);
-  assert.match(clientSource, /aria-controls="comments-list"/);
+  // Los filtros (CommentFilterBar) controlan la lista paginada.
+  assert.match(clientSource, /controlsId="comments-list"/);
 });

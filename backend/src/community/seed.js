@@ -12,6 +12,12 @@ import { upsertSentiment, upsertCommunityList, insertListMemberships } from './s
 import { tmdbDetails } from '../dashboard/tmdb.js';
 
 const commentsCacheInflight = new Map();
+// Los comentarios guardados se renuevan cada semana (en segundo plano, al abrir
+// la sección): así llegan los nuevos y se actualizan los me gusta y las
+// respuestas, que ordenan Populares. Sin esto, un título cacheado no volvía a
+// preguntar a Trakt nunca.
+const COMMENTS_CACHE_MAX_AGE_DAYS = 7;
+const COMMENTS_CACHE_MAX_AGE_MS = COMMENTS_CACHE_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
 
 function commentsCacheKey(tmdbId, mediaType) {
   return `${mediaType}:${Number(tmdbId)}`;
@@ -34,8 +40,9 @@ function fetchTitleComments({ type, traktId, tmdbId, mediaType }) {
   return collectTitleComments({ getComments, type, traktId, tmdbId, mediaType });
 }
 
-// Guarda los comentarios de Trakt. Los que ya estaban actualizan sus me gusta
-// (la pestaña Top ordena por ellos) en vez de quedarse con los del primer día.
+// Guarda los comentarios de Trakt. Los que ya estaban actualizan sus me gusta y
+// respuestas (Populares y el orden por likes van por ellos) en vez de quedarse
+// con los del primer día.
 // El objetivo del conflicto es el índice único PARCIAL de external_id: hace
 // falta su misma condición para que PostgreSQL lo reconozca.
 async function saveTraktComments(rows) {
@@ -44,7 +51,7 @@ async function saveTraktComments(rows) {
     .onConflictDoUpdate({
       target: titleComments.externalId,
       targetWhere: sql`${titleComments.externalId} IS NOT NULL`,
-      set: { likes: sql`excluded.likes` },
+      set: { likes: sql`excluded.likes`, replies: sql`excluded.replies`, lang: sql`excluded.lang` },
     });
 }
 
@@ -196,13 +203,17 @@ async function markFailed({ tmdbId, mediaType, error }) {
 export async function ensureSeeded({ tmdbId, mediaType, waitForCommentsCache = false }) {
   const state = await getState({ tmdbId, mediaType });
   const cacheKey = commentsCacheKey(tmdbId, mediaType);
-  if (state?.status === 'ready' && !state.commentsCachedAt) {
+  const cacheExpired = !!state?.commentsCachedAt
+    && Date.now() - new Date(state.commentsCachedAt).getTime() > COMMENTS_CACHE_MAX_AGE_MS;
+  if (state?.status === 'ready' && (!state.commentsCachedAt || cacheExpired)) {
     const claimed = await claimCommentsCache({ tmdbId, mediaType });
     let refresh = commentsCacheInflight.get(cacheKey);
     if (claimed) {
       refresh = startCommentsCacheRefresh({ tmdbId, mediaType, traktId: state.traktId });
     }
-    if (waitForCommentsCache) await refresh?.catch(() => {});
+    // Solo se espera la PRIMERA vez (sin caché todavía); la renovación semanal
+    // va en segundo plano y se sirve lo guardado.
+    if (waitForCommentsCache && !state.commentsCachedAt) await refresh?.catch(() => {});
     return { status: 'ready' };
   }
   if (state?.status === 'comments_seeding') {
@@ -234,7 +245,10 @@ async function claimCommentsCache({ tmdbId, mediaType }) {
        SET status = 'comments_seeding', updated_at = now()
      WHERE tmdb_id = ${Number(tmdbId)} AND media_type = ${mediaType}
        AND (
-         (status = 'ready' AND comments_cached_at IS NULL)
+         (status = 'ready' AND (
+           comments_cached_at IS NULL
+           OR comments_cached_at < now() - ${`${COMMENTS_CACHE_MAX_AGE_DAYS} days`}::interval
+         ))
          OR (status = 'comments_seeding' AND updated_at < now() - interval '3 minutes')
        )
     RETURNING tmdb_id`);

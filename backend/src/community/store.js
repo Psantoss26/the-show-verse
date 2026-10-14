@@ -9,8 +9,9 @@ import {
   commentLikes,
   listLikes,
 } from '../db/schema.js';
-import { and, eq, desc, asc, sql, gt, inArray } from 'drizzle-orm';
-import { resolveCommentTab } from './tabs.js';
+import { and, eq, desc, asc, sql, inArray } from 'drizzle-orm';
+import { RECENT_MIN_COMMENTS, RECENT_WINDOW_DAYS, resolveCommentTab } from './tabs.js';
+import { COMMENT_LANGUAGES, detectCommentLanguage } from './commentLanguage.js';
 import { commentRowToApi, listRowToApi, posterUrl } from './normalize.js';
 import { sentimentRowToApi } from './sentiment.js';
 import { getMediaMetadataMap, metadataFor } from '../utils/mediaMetadata.js';
@@ -122,16 +123,60 @@ async function hydrateListItemPosters(items, { allowDelete = false } = {}) {
   return items.filter((it) => it.posterPath);
 }
 
-export async function getCommentsPage({ tmdbId, mediaType, tab, page = 1, limit = 5, viewerId = null }) {
-  const { order, sinceDays } = resolveCommentTab(tab);
-  const conds = [eq(titleComments.tmdbId, Number(tmdbId)), eq(titleComments.mediaType, mediaType)];
-  if (sinceDays) {
-    conds.push(gt(titleComments.createdAt, sql`now() - ${`${sinceDays} days`}::interval`));
+// Idioma de los comentarios de Trakt guardados antes de detectarlo: se calcula
+// con su propio texto (sin volver a Trakt) la primera vez que se leen, así los
+// que no están en inglés o español desaparecen ya, sin esperar a renovarlos.
+async function backfillCommentLanguages({ tmdbId, mediaType }) {
+  const pending = await db.select({ id: titleComments.id, body: titleComments.body })
+    .from(titleComments)
+    .where(and(
+      eq(titleComments.tmdbId, Number(tmdbId)),
+      eq(titleComments.mediaType, mediaType),
+      eq(titleComments.source, 'trakt'),
+      sql`${titleComments.lang} IS NULL`,
+    ))
+    .limit(2000);
+  if (!pending.length) return;
+  const byLang = new Map();
+  for (const row of pending) {
+    const lang = detectCommentLanguage(row.body);
+    if (!byLang.has(lang)) byLang.set(lang, []);
+    byLang.get(lang).push(row.id);
+  }
+  await Promise.all([...byLang].map(([lang, ids]) =>
+    db.update(titleComments).set({ lang }).where(inArray(titleComments.id, ids))));
+}
+
+export async function getCommentsPage({ tmdbId, mediaType, tab, sort, page = 1, limit = 5, viewerId = null }) {
+  const { order, recentWindow } = resolveCommentTab(tab, sort);
+  await backfillCommentLanguages({ tmdbId, mediaType }).catch(() => {});
+  const titleConds = [
+    eq(titleComments.tmdbId, Number(tmdbId)),
+    eq(titleComments.mediaType, mediaType),
+    // Solo inglés y español (los de la app se enseñan siempre).
+    sql`(${titleComments.source} = 'native' OR ${inArray(titleComments.lang, COMMENT_LANGUAGES)})`,
+  ];
+  const conds = [...titleConds];
+  if (recentWindow) {
+    // Recientes por likes: los de los últimos 30 días o, si son pocos, los
+    // RECENT_MIN_COMMENTS más nuevos (sin ese mínimo, en la mayoría de títulos
+    // la pestaña salía vacía). Sin tantos comentarios, todos (-infinity).
+    const nthNewest = db.select({ createdAt: titleComments.createdAt }).from(titleComments)
+      .where(and(...titleConds))
+      .orderBy(desc(titleComments.createdAt))
+      .limit(1).offset(RECENT_MIN_COMMENTS - 1);
+    conds.push(sql`${titleComments.createdAt} >= least(
+      now() - ${`${RECENT_WINDOW_DAYS} days`}::interval,
+      coalesce((${nthNewest}), '-infinity'::timestamptz)
+    )`);
   }
   const where = and(...conds);
   const orderBy = order === 'recent'
     ? [desc(titleComments.createdAt)]
-    : [desc(titleComments.likes), desc(titleComments.createdAt)];
+    : order === 'likes'
+      ? [desc(titleComments.likes), desc(titleComments.createdAt)]
+      // Popularidad: me gusta + respuestas; a igualdad, más me gusta y más nuevo.
+      : [desc(sql`${titleComments.likes} + ${titleComments.replies}`), desc(titleComments.likes), desc(titleComments.createdAt)];
 
   const safeLimit = Math.min(Math.max(Number(limit) || 5, 1), 50);
   const safePage = Math.max(Number(page) || 1, 1);
@@ -494,15 +539,21 @@ export async function discoverListsPage({ sort = 'items_desc', page = 1, limit =
   const orderBy = Object.hasOwn(SORTS, sort) ? SORTS[sort] : SORTS.items_desc;
   const safeLimit = Math.min(Math.max(Number(limit) || 30, 1), 60);
   const offset = (Math.max(Number(page) || 1, 1) - 1) * safeLimit;
-  const where = discoverNameFilter(query);
-  // Las listas que publican los usuarios de la app van delante de las
-  // importadas de Trakt (cientos, y casi siempre más largas): si no, una lista
-  // recién publicada no llegaría nunca a la primera página. El id desempata:
-  // con un orden estable, ninguna lista se repite ni se salta entre páginas.
-  const ownFirst = sql`case when ${communityLists.source} = 'user' then 0 else 1 end`;
+  // Quien mira no ve SUS listas publicadas: ya las tiene en «Mis listas».
+  const notOwnedByViewer = viewerId
+    ? sql`NOT EXISTS (
+        SELECT 1 FROM ${userLists}
+         WHERE ${userLists.id} = ${communityLists.userListId}
+           AND ${userLists.userId} = ${viewerId}
+      )`
+    : undefined;
+  const where = and(discoverNameFilter(query), notOwnedByViewer);
+  // Las listas de los usuarios de la app se ordenan como las demás, con el
+  // criterio elegido (antes iban siempre delante). El id desempata: con un
+  // orden estable, ninguna lista se repite ni se salta entre páginas.
   const [rows, [sums = {}]] = await Promise.all([
     db.select().from(communityLists).where(where)
-      .orderBy(ownFirst, ...orderBy, asc(communityLists.id))
+      .orderBy(...orderBy, asc(communityLists.id))
       .limit(safeLimit + 1).offset(offset),
     db.select({
       lists: sql`count(*)::int`,
