@@ -12,10 +12,12 @@ const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright')
 const base = process.env.TEST_BASE_URL || 'http://localhost:3000';
 const userPages = process.env.PREVIEW_SCOPE === 'userPages';
 const output = `public/previews/detail-open${userPages ? '/user-pages' : ''}`;
+// Spider-Man: Brand New Day; the release year marks the sample as loaded.
+const sample = { id: 969681, year: '2026' };
 let favorites = [];
 if (userPages) {
   createRequire(import.meta.url)('@next/env').loadEnvConfig(process.cwd(), true);
-  favorites = await Promise.all([550, 27205, 157336, 238, 680, 155, 13, 603, 129, 120, 424, 807].map(async (id) => {
+  favorites = await Promise.all([sample.id, 27205, 157336, 238, 680, 155, 13, 603, 129, 120, 424, 807].map(async (id) => {
     const url = new URL(`https://api.themoviedb.org/3/movie/${id}`);
     url.searchParams.set('api_key', process.env.NEXT_PUBLIC_TMDB_API_KEY || '');
     url.searchParams.set('language', 'es-ES');
@@ -29,7 +31,8 @@ await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ headless: true, ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}), args: ['--no-sandbox'] });
 try {
   for (const variant of ['center', 'overlay-modal', 'docked-modal', 'overlay-mobile', 'docked-mobile', 'page'].filter(value => !process.env.PREVIEW_VARIANT || process.env.PREVIEW_VARIANT.split(',').includes(value))) {
-    const context = await browser.newContext({ viewport: { width: 1440, height: 810 }, deviceScaleFactor: 2, locale: 'es-ES' });
+    // A maximized browser on a 2K (2560 × 1440) monitor, so panels keep their desktop proportions.
+    const context = await browser.newContext({ viewport: { width: 2560, height: 1280 }, deviceScaleFactor: 1, locale: 'es-ES' });
     if (userPages) {
       const preferences = { language: 'es-ES', uiSettings: { detailOpen: { userPages: {
         target: variant === 'page' ? 'page' : 'panel',
@@ -49,9 +52,11 @@ try {
       localStorage.setItem('showverse:dashboard:detailModalContentView', variant.endsWith('mobile') ? 'mobile' : 'modal');
     }, { variant });
     const page = await context.newPage();
-    await page.goto(`${base}${userPages ? (variant === 'page' ? '/favorites' : '/favorites?preview=movie-550') : (variant === 'page' ? '/details/movie/550' : '/movies?preview=movie-550')}`, { waitUntil: 'domcontentloaded', timeout: 90000 });
+    // Install before loading: timers scheduled earlier would keep firing on real time once paused.
+    await page.clock.install();
+    await page.goto(`${base}${userPages ? (variant === 'page' ? '/favorites' : `/favorites?preview=movie-${sample.id}`) : (variant === 'page' ? `/details/movie/${sample.id}` : `/movies?preview=movie-${sample.id}`)}`, { waitUntil: 'domcontentloaded', timeout: 90000 });
     if (userPages) await page.getByRole('heading', { name: /Favorit/i }).first().waitFor({ timeout: 60000 });
-    if (!(userPages && variant === 'page')) await page.locator('body').getByText('1999', { exact: false }).filter({ visible: true }).first().waitFor({ timeout: 60000 });
+    if (!(userPages && variant === 'page')) await page.locator('body').getByText(sample.year, { exact: false }).filter({ visible: true }).first().waitFor({ timeout: 60000 });
     // Allow artwork, fonts and async rating sources to settle before recording.
     await page.waitForTimeout(10000);
     await page.addStyleTag({ content: 'nextjs-portal { display: none !important; }' });
@@ -60,8 +65,7 @@ try {
     // Capture original pixels, avoiding Playwright's lossy video intermediate.
     // Freeze timers so dashboard carousels do not jump between sampled frames.
     if (!(userPages && variant === 'page')) {
-      await page.clock.install();
-      await page.clock.pauseAt(new Date());
+      await page.clock.pauseAt(await page.evaluate(() => Date.now() + 50));
     }
     await page.screenshot({ path: `${output}/${variant}.jpg`, type: 'jpeg', quality: 96 });
     const frames = join(temp, variant);
@@ -70,16 +74,15 @@ try {
     let previousFrame;
     for (let frame = 0; frame < 120; frame++) {
       if (userPages && variant === 'page' && frame === 24) {
-        await page.goto(`${base}/details/movie/550`, { waitUntil: 'domcontentloaded' });
-        await page.locator('body').getByText('1999', { exact: false }).filter({ visible: true }).first().waitFor();
+        await page.goto(`${base}/details/movie/${sample.id}`, { waitUntil: 'domcontentloaded' });
+        await page.locator('body').getByText(sample.year, { exact: false }).filter({ visible: true }).first().waitFor();
         await page.waitForTimeout(5000);
         await page.addStyleTag({ content: 'nextjs-portal { display: none !important; }' });
-        await page.clock.install();
-        await page.clock.pauseAt(new Date());
+        await page.clock.pauseAt(await page.evaluate(() => Date.now() + 50));
         previousTop = -1;
       }
       const ease = (progress) => (1 - Math.cos(Math.PI * progress)) / 2;
-      const top = Math.round(frame < 24 ? 0 : frame < 48 ? 420 * ease((frame - 24) / 24) : frame < 72 ? 420 : frame < 96 ? 420 * (1 - ease((frame - 72) / 24)) : 0);
+      const top = Math.round(frame < 24 ? 0 : frame < 48 ? 640 * ease((frame - 24) / 24) : frame < 72 ? 640 : frame < 96 ? 640 * (1 - ease((frame - 72) / 24)) : 0);
       const filename = join(frames, `${String(frame).padStart(3, '0')}.png`);
       if (top === previousTop) {
         await copyFile(previousFrame, filename);
@@ -94,7 +97,7 @@ try {
       previousFrame = filename;
     }
     await context.close();
-    // 2880 × 1620, 30 fps, four seconds. Short enough to play without controls.
+    // 2560 × 1280, 30 fps, four seconds. Short enough to play without controls.
     execFileSync(process.env.FFMPEG_PATH || 'ffmpeg', ['-y', '-framerate', '30', '-i', join(frames, '%03d.png'), '-an', '-c:v', 'libvpx', '-threads', '4', '-deadline', 'good', '-cpu-used', '2', '-b:v', '12M', '-crf', '8', '-pix_fmt', 'yuv420p', `${output}/${variant}.webm`], { stdio: ['ignore', 'ignore', 'inherit'] });
     await rm(frames, { recursive: true, force: true });
     console.log(`Recorded ${variant}`);

@@ -56,8 +56,8 @@ try {
      video.onerror = () => reject(new Error(`Cannot decode ${variant}`));
      video.src = `/previews/detail-open/${variant}.webm`;
    }), `${prefix}${variant}`);
-   assert.equal(media.width, 2880, variant);
-   assert.equal(media.height, 1620, variant);
+   assert.equal(media.width, 2560, variant);
+   assert.equal(media.height, 1280, variant);
    assert.ok(media.duration <= 4.1, variant);
  }
 

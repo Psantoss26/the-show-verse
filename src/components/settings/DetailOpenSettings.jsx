@@ -29,7 +29,7 @@ function PreviewVideo({ value, scope, t }) {
     <figure className="overflow-hidden rounded-2xl bg-black/30">
       <video
         ref={videoRef}
-        className="aspect-video max-h-[60dvh] w-full object-contain lg:max-h-[calc(94dvh-22rem)]"
+        className="aspect-[2/1] max-h-[60dvh] w-full object-contain lg:max-h-[calc(94dvh-22rem)]"
         src={`/previews/detail-open/${preview}.webm`}
         poster={`/previews/detail-open/${preview}.jpg`}
         muted playsInline disablePictureInPicture disableRemotePlayback preload="metadata"
