@@ -40,10 +40,11 @@ export default async function communityRoutes(fastify) {
   // GET comments — public; triggers seed if needed.
   fastify.get('/:type/:tmdbId/comments', async (req, reply) => {
     const t = parseTarget(req, reply); if (!t) return;
-    const { tab = 'top', page = '1', limit = '5' } = req.query || {};
+    // tab: popular | recent (y los nombres antiguos); sort=likes reordena por me gusta.
+    const { tab = 'popular', sort = '', page = '1', limit = '5' } = req.query || {};
     const viewerId = req.user?.id || null;
     const seed = await ensureSeeded({ tmdbId: t.tmdbId, mediaType: t.type, waitForCommentsCache: true });
-    const data = await getCommentsPage({ tmdbId: t.tmdbId, mediaType: t.type, tab, page, limit, viewerId });
+    const data = await getCommentsPage({ tmdbId: t.tmdbId, mediaType: t.type, tab, sort, page, limit, viewerId });
     setCommunityCache(reply, viewerId, 'public, s-maxage=60, stale-while-revalidate=600');
     return { ...data, state: seed.status };
   });

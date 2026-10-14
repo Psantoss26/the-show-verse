@@ -5,7 +5,7 @@
 // (details/sectionSheet): mismo marcado en los dos sitios.
 
 import Link from "next/link";
-import { useId, useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import Avatar from "@/components/ui/Avatar";
 import CommentLikeButton from "@/components/community/CommentLikeButton";
 import { formatDateTimeEs, stripHtml } from "@/lib/details/formatters";
@@ -19,11 +19,31 @@ export default function TraktCommentCard({
   canLike = false,
 }) {
   const [expanded, setExpanded] = useState(false);
+  // «Ver más» solo si el texto se corta DE VERDAD a las seis líneas, con el
+  // ancho que tiene aquí. Antes se decidía por número de caracteres (> 360): en
+  // la sección, más ancha, esos caracteres caben en menos líneas y el botón
+  // salía sin nada que desplegar (en la vista lateral, más estrecha, sí se
+  // cortaban). Se mide mientras está recortado y al cambiar el ancho.
+  const [clamped, setClamped] = useState(false);
+  const textRef = useRef(null);
   const commentTextId = useId();
   const user = c?.user || {};
   const avatar = user?.images?.avatar?.full || user?.images?.avatar?.medium || null;
   const text = stripHtml(c?.comment?.comment ?? c?.comment ?? "");
-  const isLong = text.length > 360;
+  // Descartados de entrada los cortos: no hace falta medirlos.
+  const mayOverflow = text.length > 160 || text.split("\n").length > 6;
+  useLayoutEffect(() => {
+    const el = textRef.current;
+    if (!el || expanded || !mayOverflow) return undefined;
+    const measure = () => setClamped(el.scrollHeight - el.clientHeight > 1);
+    measure();
+    if (typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [expanded, mayOverflow, text]);
+  // Desplegado se mantiene «Ver menos» (se midió recortado antes de abrirlo).
+  const isLong = mayOverflow && clamped;
   const created = c?.created_at ? formatDateTimeEs(c.created_at) : "";
   const likes = Number(c?.likes || 0);
   const commentUsername = String(user?.username || "").trim();
@@ -90,7 +110,11 @@ export default function TraktCommentCard({
           <span className="absolute -left-3 -top-1 font-serif text-4xl text-white/5">
             “
           </span>
-          <p id={commentTextId} className={`whitespace-pre-line ${isLong && !expanded ? "line-clamp-6" : ""}`}>
+          <p
+            ref={textRef}
+            id={commentTextId}
+            className={`whitespace-pre-line ${mayOverflow && !expanded ? "line-clamp-6" : ""}`}
+          >
             {text}
           </p>
           {isLong ? (

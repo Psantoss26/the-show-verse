@@ -1,11 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { collectTitleComments, COMMENTS_MAX_PAGES, COMMENTS_PAGE_SIZE } from './commentsFetch.js';
+import { collectTitleComments, COMMENTS_MAX_PAGES, COMMENTS_PAGE_SIZE, COMMENTS_RECENT_COUNT } from './commentsFetch.js';
 
-const comment = (id, likes = 0) => ({ id, comment: `Comentario ${id}`, likes, user: { username: `u${id}` }, created_at: '2026-01-01T00:00:00Z' });
+// Texto en inglés salvo que se pida otro idioma (ver la prueba de idiomas).
+const TEXTS = {
+  en: (id) => `This is the best show I have ever watched, number ${id}`,
+  es: (id) => `La mejor serie que he visto en mi vida, la número ${id}`,
+  pt: (id) => `A melhor série de todos os tempos, não tem igual ${id}`,
+};
+const comment = (id, likes = 0, lang = 'en') => ({ id, comment: TEXTS[lang](id), likes, user: { username: `u${id}` }, created_at: '2026-01-01T00:00:00Z' });
 
 // Trakt simulado: `total` comentarios, 100 por página, con criterios válidos.
-function fakeTrakt({ total, fail = new Set() }) {
+function fakeTrakt({ total, fail = new Set(), langOf = () => 'en' }) {
   const calls = [];
   const getComments = async ({ sort, page, limit }) => {
     calls.push(`${sort}:${page}`);
@@ -13,7 +19,7 @@ function fakeTrakt({ total, fail = new Set() }) {
     if (fail.has(`${sort}:${page}`)) return { ok: false, items: [] };
     const ids = Array.from({ length: total }, (_, i) => i + 1);
     const ordered = sort === 'newest' ? [...ids].reverse() : ids;
-    const items = ordered.slice((page - 1) * limit, page * limit).map((id) => comment(id, total - id));
+    const items = ordered.slice((page - 1) * limit, page * limit).map((id) => comment(id, total - id, langOf(id)));
     return { ok: true, items, pagination: { pageCount: Math.ceil(total / limit) } };
   };
   return { getComments, calls };
@@ -34,7 +40,8 @@ test('con muchos, hasta el tope por me gusta y además los más recientes', asyn
   const trakt = fakeTrakt({ total: 2000 });
   const rows = await collectTitleComments({ ...args, getComments: trakt.getComments });
   const byLikes = COMMENTS_MAX_PAGES * COMMENTS_PAGE_SIZE;
-  assert.equal(rows.length, byLikes + COMMENTS_PAGE_SIZE);
+  // Preferencia por los populares y solo unos pocos recientes.
+  assert.equal(rows.length, byLikes + COMMENTS_RECENT_COUNT);
   // El más reciente (id 2000) está aunque quede fuera del corte por me gusta.
   assert.ok(rows.some((row) => row.externalId === 2000));
   assert.equal(trakt.calls.filter((call) => call.startsWith('likes:')).length, COMMENTS_MAX_PAGES);
@@ -47,4 +54,13 @@ test('un fallo parcial no tira lo conseguido; sin la primera página, se reinten
 
   const broken = fakeTrakt({ total: 350, fail: new Set(['likes:1']) });
   await assert.rejects(collectTitleComments({ ...args, getComments: broken.getComments }), /trakt comments failed/);
+});
+
+test('solo se guardan los comentarios en inglés o español', async () => {
+  const langOf = (id) => (id % 3 === 0 ? 'pt' : id % 3 === 1 ? 'es' : 'en');
+  const trakt = fakeTrakt({ total: 90, langOf });
+  const rows = await collectTitleComments({ ...args, getComments: trakt.getComments });
+  assert.equal(rows.length, 60);
+  assert.ok(rows.every((row) => row.lang === 'en' || row.lang === 'es'));
+  assert.ok(!rows.some((row) => row.externalId % 3 === 0));
 });

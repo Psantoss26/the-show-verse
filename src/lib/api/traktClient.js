@@ -8,6 +8,7 @@ import {
 } from "@/lib/userLists/optimisticListCache";
 import { normalizeHistoryEntryIds } from "@/lib/trakt/historyEntryIds";
 import { unwrapCommentResponse } from "@/lib/community/commentResponse";
+import { commentFiltersQuery } from "@/lib/details/commentFilters";
 
 async function safeJson(res) {
   try {
@@ -560,17 +561,27 @@ export async function traktSetSeasonWatched({
 }
 
 // ✅ COMMUNITY: comentarios, listas, temporadas
+// `tab` ("popular" | "recent") + `byLikes` (ordenar por me gusta). Se sigue
+// aceptando el `sort` de antes (newest | likes30 | likes) para quien aún lo use.
 export async function traktGetComments({
   type,
   tmdbId,
+  tab,
+  byLikes = false,
   sort = "likes",
   page = 1,
   limit = 20,
 }) {
-  const tab = sort === "newest" ? "recent" : sort === "likes30" ? "top30" : "top";
+  const filters = tab
+    ? { tab, byLikes }
+    : sort === "newest"
+      ? { tab: "recent", byLikes: false }
+      : sort === "likes30"
+        ? { tab: "recent", byLikes: true }
+        : { tab: "popular", byLikes: false };
   const t = type === "show" ? "tv" : type;
   const res = await fetch(
-    `/api/community/${t}/${tmdbId}/comments?tab=${tab}&page=${page}&limit=${limit}`,
+    `/api/community/${t}/${tmdbId}/comments?${commentFiltersQuery(filters)}&page=${page}&limit=${limit}`,
     { cache: "no-store" },
   );
   const json = await res.json();

@@ -1,0 +1,1 @@
+ALTER TABLE "title_comments" ADD COLUMN "replies" integer DEFAULT 0 NOT NULL;

@@ -1,0 +1,1 @@
+ALTER TABLE "title_comments" ADD COLUMN "lang" text;

@@ -1,3 +1,5 @@
+import { detectCommentLanguage } from './commentLanguage.js';
+
 export function stripHtml(input) {
   if (!input) return '';
   return String(input)
@@ -29,6 +31,8 @@ export function normalizeTraktComment(raw, { tmdbId, mediaType }) {
     authorIsVip: !!user?.vip,
     body,
     likes: Number(raw?.likes) || 0,
+    replies: Number(raw?.replies) || 0,
+    lang: detectCommentLanguage(body),
     spoiler: !!raw?.spoiler,
     createdAt: raw?.created_at ? new Date(raw.created_at) : new Date(),
   };
@@ -39,6 +43,7 @@ export function commentRowToApi(row) {
     id: row.id,
     comment: row.body,
     likes: Number(row.likes) || 0,
+    replies: Number(row.replies) || 0,
     // Si el visitante ya dio me gusta, para pintar el corazón relleno sin una
     // segunda petición. Falso también cuando no hay sesión.
     liked: !!row.likedByViewer,

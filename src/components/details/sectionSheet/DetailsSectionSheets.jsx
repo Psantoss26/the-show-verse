@@ -17,6 +17,7 @@ import {
   ChevronDown,
   ChevronRight,
   ExternalLink,
+  Heart,
   Image as ImageIcon,
   Layers,
   ListVideo,
@@ -30,6 +31,7 @@ import {
   Users,
 } from "lucide-react";
 import OptimizedImage from "@/components/OptimizedImage";
+import { COMMENT_TABS, DEFAULT_COMMENT_TAB, normalizeCommentFilters } from "@/lib/details/commentFilters";
 import { tmdbSrcSet } from "@/lib/tmdb/imageSrcSet";
 import SectionSheet, { SectionSheetEmpty, SectionSheetGroupTitle } from "./SectionSheet";
 import { ListRow, PersonRow, TitleRow, TrackRow, VideoRow } from "./SectionSheetRows";
@@ -54,11 +56,6 @@ const SECTIONS = {
   lists: { title: "Listas", icon: ListVideo },
 };
 
-const COMMENT_TABS = [
-  { id: "likes30", label: "Top 30 días" },
-  { id: "likesAll", label: "Top histórico" },
-  { id: "recent", label: "Recientes" },
-];
 
 function plural(count, one, many) {
   return `${Number(count).toLocaleString("es-ES")} ${count === 1 ? one : many}`;
@@ -581,10 +578,13 @@ function CommentsSheet({ meta, data, onClose }) {
   const onLoadPage = comments.onLoadPage;
   const initialProfileUsernames = comments.profileUsernames;
   const sourceState = comments.state || {};
-  const seededItems = comments.tab === "recent" && sourceState.page === 1 && Array.isArray(sourceState.items)
+  const initialFilters = normalizeCommentFilters(comments.tab || DEFAULT_COMMENT_TAB, comments.byLikes);
+  // La primera página de la ficha sirve si es del MISMO filtro.
+  const seededItems = sourceState.page === 1 && Array.isArray(sourceState.items)
     ? sourceState.items
     : [];
-  const [activeTab, setActiveTab] = useState(comments.tab || "recent");
+  const [activeTab, setActiveTab] = useState(initialFilters.tab);
+  const [byLikes, setByLikes] = useState(initialFilters.byLikes);
   const [state, setState] = useState(() => ({
     items: seededItems,
     page: seededItems.length ? 1 : 0,
@@ -600,13 +600,13 @@ function CommentsSheet({ meta, data, onClose }) {
   const requestIdRef = useRef(0);
   const items = state.items;
 
-  const fetchPage = useCallback(async (page, tab, append = false) => {
+  const fetchPage = useCallback(async (page, tab, append = false, likes = false) => {
     if (!onLoadPage || loadingRef.current) return;
     loadingRef.current = true;
     const requestId = ++requestIdRef.current;
     setState((current) => ({ ...current, loading: true, error: "" }));
     try {
-      const payload = await onLoadPage(page, tab);
+      const payload = await onLoadPage(page, tab, likes);
       if (requestId !== requestIdRef.current) return;
       const nextItems = Array.isArray(payload?.items) ? payload.items : [];
       const pagination = payload?.pagination || {};
@@ -647,27 +647,39 @@ function CommentsSheet({ meta, data, onClose }) {
   }, [initialProfileUsernames, onLoadPage]);
 
   useEffect(() => {
-    if (!state.page && state.loading && !state.error) fetchPage(1, activeTab);
-  }, [activeTab, fetchPage, state.error, state.loading, state.page]);
+    if (!state.page && state.loading && !state.error) fetchPage(1, activeTab, false, byLikes);
+  }, [activeTab, byLikes, fetchPage, state.error, state.loading, state.page]);
 
-  const changeTab = (tab) => {
-    if (tab === activeTab) return;
+  // Al cambiar de filtro NO se vacía la lista: los comentarios de antes se
+  // quedan atenuados hasta que llegan los nuevos (los ya vistos o precargados
+  // llegan al instante desde la caché de la sesión, vía `onLoadPage`).
+  const resetForFilter = () => {
     requestIdRef.current += 1;
     loadingRef.current = false;
+    setState((current) => ({ ...current, page: 0, hasMore: false, loading: true, error: "" }));
+  };
+  const changeTab = (tab) => {
+    if (tab === activeTab) return;
     setActiveTab(tab);
     comments.onTabChange?.(tab);
-    setState({ items: [], page: 0, pageCount: 0, total: 0, hasMore: false, loading: true, error: "", profileUsernames: new Map() });
+    resetForFilter();
+  };
+  const changeLikes = (next) => {
+    if (next === byLikes) return;
+    setByLikes(next);
+    comments.onLikesChange?.(next);
+    resetForFilter();
   };
 
   useEffect(() => {
     const sentinel = sentinelRef.current;
     if (!sentinel || !state.hasMore || state.loading || state.error || typeof IntersectionObserver === "undefined") return undefined;
     const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting && !loadingRef.current) fetchPage(state.page + 1, activeTab, true);
+      if (entry.isIntersecting && !loadingRef.current) fetchPage(state.page + 1, activeTab, true, byLikes);
     }, { root: sentinel.closest(".details-sheet-scroll"), rootMargin: "0px 0px 240px", threshold: 0.01 });
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [activeTab, fetchPage, state.error, state.hasMore, state.loading, state.page]);
+  }, [activeTab, byLikes, fetchPage, state.error, state.hasMore, state.loading, state.page]);
 
   return (
     <SectionSheet
@@ -679,13 +691,28 @@ function CommentsSheet({ meta, data, onClose }) {
       tabs={COMMENT_TABS}
       activeTab={activeTab}
       onTabChange={changeTab}
+      // «Más likes» junto a las pestañas, solo con el icono (como en la ficha).
+      tabsAccessory={(
+        <button
+          type="button"
+          onClick={() => changeLikes(!byLikes)}
+          aria-pressed={byLikes}
+          aria-label="Ordenar por likes"
+          title={byLikes ? "Quitar el orden por likes" : "Ordenar por likes"}
+          className={`flex w-11 shrink-0 items-center justify-center rounded-xl transition-colors ${
+            byLikes ? "bg-white/15 text-white" : "bg-black/20 text-zinc-400 hover:bg-white/5 hover:text-white"
+          }`}
+        >
+          <Heart className={`h-4 w-4 ${byLikes ? "fill-pink-400 text-pink-400" : ""}`} aria-hidden="true" />
+        </button>
+      )}
     >
       {state.loading && !items.length ? (
         <div className="flex justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-zinc-500" aria-label="Cargando comentarios" />
         </div>
       ) : items.length ? (
-        <ul className={`space-y-3 transition-opacity ${state.loading ? "opacity-60" : ""}`}>
+        <ul aria-busy={state.loading} className={`space-y-3 transition-opacity duration-200 ${state.loading ? "opacity-50" : "opacity-100"}`}>
           {items.map((comment) => (
             <li key={String(comment?.id || `${comment?.user?.username}-${comment?.created_at}`)}>
               <TraktCommentCard
@@ -708,7 +735,7 @@ function CommentsSheet({ meta, data, onClose }) {
         </div>
       ) : null}
       {state.error ? (
-        <button type="button" onClick={() => fetchPage(state.page + 1, activeTab, true)} className="mt-3 w-full py-3 text-sm font-bold text-emerald-300">
+        <button type="button" onClick={() => fetchPage(state.page + 1, activeTab, true, byLikes)} className="mt-3 w-full py-3 text-sm font-bold text-emerald-300">
           Reintentar cargar comentarios
         </button>
       ) : null}

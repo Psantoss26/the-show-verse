@@ -1,13 +1,15 @@
 // backend/src/community/commentsFetch.js
 //
 // QUÉ COMENTARIOS DE TRAKT SE GUARDAN DE UN TÍTULO. Las pestañas de la sección
-// (Top, Top del mes, Recientes) se calculan en PostgreSQL sobre lo guardado
-// (ver tabs.js), así que cuantos más haya, mejor salen las tres.
+// (Populares, Recientes) se calculan en PostgreSQL sobre lo guardado (ver
+// tabs.js).
 //
-//   - Por me gusta (`likes`), paginado de 100 en 100 hasta COMMENTS_MAX_PAGES:
-//     un título con menos de 500 comentarios los guarda TODOS.
-//   - Los más recientes (`newest`), primera página: con más de 500, que los
-//     últimos estén aunque no lleguen al corte por me gusta.
+//   - PREFERENCIA, LOS POPULARES: por me gusta (`likes`), paginado de 100 en
+//     100 hasta COMMENTS_MAX_PAGES.
+//   - Y UNOS POCOS RECIENTES (`newest`, COMMENTS_RECENT_COUNT), para que la
+//     pestaña Recientes tenga lo último aunque no llegue al corte por me gusta.
+//   - SOLO EN INGLÉS O ESPAÑOL (commentLanguage.js): Trakt no filtra por
+//     idioma; el resto no se guarda.
 //
 // Solo la primera página por me gusta es imprescindible (sin ella no hay nada
 // que guardar y se reintenta más tarde). Si falla otra página o la de
@@ -19,9 +21,11 @@
 // daba por fallido: los títulos se quedaban sin comentarios.
 
 import { normalizeTraktComment } from './normalize.js';
+import { isCommentLanguageShown } from './commentLanguage.js';
 
 export const COMMENTS_PAGE_SIZE = 100;
 export const COMMENTS_MAX_PAGES = 5;
+export const COMMENTS_RECENT_COUNT = 20;
 
 /**
  * Comentarios normalizados (filas de title_comments), sin repetir.
@@ -29,9 +33,12 @@ export const COMMENTS_MAX_PAGES = 5;
  * { ok, items, pagination: { pageCount } }.
  */
 export async function collectTitleComments({ getComments, type, traktId, tmdbId, mediaType }) {
-  const request = (sort, page) => getComments({ type, traktId, sort, page, limit: COMMENTS_PAGE_SIZE });
+  const request = (sort, page, limit = COMMENTS_PAGE_SIZE) => getComments({ type, traktId, sort, page, limit });
 
-  const [first, newest] = await Promise.all([request('likes', 1), request('newest', 1)]);
+  const [first, newest] = await Promise.all([
+    request('likes', 1),
+    request('newest', 1, COMMENTS_RECENT_COUNT),
+  ]);
   if (!first?.ok) throw new Error('trakt comments failed');
 
   const pageCount = Math.min(Number(first.pagination?.pageCount) || 1, COMMENTS_MAX_PAGES);
@@ -44,7 +51,7 @@ export async function collectTitleComments({ getComments, type, traktId, tmdbId,
     if (!result?.ok) continue;
     for (const raw of result.items || []) {
       const row = normalizeTraktComment(raw, { tmdbId, mediaType });
-      if (row) unique.set(row.externalId, row);
+      if (row && isCommentLanguageShown(row.lang)) unique.set(row.externalId, row);
     }
   }
   return [...unique.values()];

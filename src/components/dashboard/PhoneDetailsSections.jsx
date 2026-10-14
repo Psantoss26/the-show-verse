@@ -113,6 +113,15 @@ import {
   saveArtworkOverrides,
 } from "@/lib/artworkApi";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
+import CommentFilterBar from "@/components/details/CommentFilterBar";
+import {
+  cachedCommentsResponse,
+  commentsPageFromResponse,
+  prefetchOtherCommentFilters,
+  readCommentsPage,
+  writeCommentsPage,
+} from "@/lib/details/commentsPageCache";
+import { DEFAULT_COMMENT_TAB } from "@/lib/details/commentFilters";
 
 // El menú se pega por debajo de los controles flotantes del panel (cerrar,
 // acoplar, ficha completa): están en `top-4` y miden 40px, así que 56px es
@@ -726,7 +735,9 @@ export default function PhoneDetailsSections({
   }, [type, id, imdbId, visibleSeasonNumbersKey, seasonStructuresMismatch]);
 
   /* --------------------------- COMENTARIOS --------------------------- */
-  const [commentsTab, setCommentsTab] = useState("recent");
+  // Populares / Recientes y orden por likes (lib/details/commentFilters).
+  const [commentsTab, setCommentsTab] = useState(DEFAULT_COMMENT_TAB);
+  const [commentsByLikes, setCommentsByLikes] = useState(false);
   const [comments, setComments] = useState({
     loading: true,
     error: "",
@@ -736,21 +747,27 @@ export default function PhoneDetailsSections({
     total: 0,
   });
 
+  // Cambio de filtro sin parpadeo (como en la ficha): lo cacheado en la sesión
+  // se pinta ya; si no, los comentarios de antes se quedan atenuados.
+  const traktCommentsType = type === "tv" ? "show" : "movie";
+  const showCommentsForFilter = useCallback((tab, byLikes) => {
+    const cached = readCommentsPage({ type: traktCommentsType, tmdbId: id, tab, byLikes, page: 1 });
+    setComments((previous) => (cached
+      ? { ...previous, items: cached.items, page: 1, pageCount: cached.pageCount, total: cached.total, loading: false, error: "" }
+      : { ...previous, page: 1, loading: true, error: "" }));
+  }, [id, traktCommentsType]);
+
   const selectCommentsTab = useCallback((tab) => {
-    setCommentsTab((current) => {
-      if (current === tab) return current;
-      setComments((previous) => ({
-        ...previous,
-        items: [],
-        page: 1,
-        pageCount: 0,
-        total: 0,
-        loading: true,
-        error: "",
-      }));
-      return tab;
-    });
-  }, []);
+    if (tab === commentsTab) return;
+    setCommentsTab(tab);
+    showCommentsForFilter(tab, commentsByLikes);
+  }, [commentsTab, commentsByLikes, showCommentsForFilter]);
+
+  const selectCommentsByLikes = useCallback((byLikes) => {
+    if (!!byLikes === commentsByLikes) return;
+    setCommentsByLikes(!!byLikes);
+    showCommentsForFilter(commentsTab, !!byLikes);
+  }, [commentsTab, commentsByLikes, showCommentsForFilter]);
 
   const selectCommentsPage = useCallback((page) => {
     setComments((previous) => {
@@ -763,54 +780,60 @@ export default function PhoneDetailsSections({
     });
   }, []);
 
-  const loadCommentsSheetPage = useCallback((page, tab) => {
-    const sort = tab === "recent" ? "newest" : tab === "likes30" ? "likes30" : "likes";
-    return traktGetComments({
-      type: type === "tv" ? "show" : "movie",
+  const loadCommentsSheetPage = useCallback(async (page, tab, byLikes = false) => {
+    const filter = { type: traktCommentsType, tmdbId: id, tab, byLikes, page };
+    const cached = cachedCommentsResponse(filter);
+    if (cached) return cached;
+    const response = await traktGetComments({
+      type: traktCommentsType,
       tmdbId: id,
-      sort,
+      tab,
+      byLikes,
       page,
       limit: COMMENTS_PAGE_SIZE,
     });
-  }, [id, type]);
+    writeCommentsPage(filter, commentsPageFromResponse(response, page));
+    return response;
+  }, [id, traktCommentsType]);
 
   const commentsPage = comments.page;
   useEffect(() => {
     if (id == null) return undefined;
     let ignore = false;
     (async () => {
-      setComments((previous) => ({ ...previous, loading: true, error: "" }));
+      const pageFilter = { type: traktCommentsType, tmdbId: id, tab: commentsTab, byLikes: commentsByLikes, page: commentsPage };
+      const cached = readCommentsPage(pageFilter);
+      // Con caché se pinta ya y se revalida en silencio; sin ella, la lista de
+      // antes se queda (atenuada) mientras llega la nueva.
+      setComments((previous) => (cached
+        ? { ...previous, items: cached.items, page: cached.page, pageCount: cached.pageCount, total: cached.total, loading: false, error: "" }
+        : { ...previous, loading: true, error: "" }));
       try {
-        const sort =
-          commentsTab === "recent"
-            ? "newest"
-            : commentsTab === "likes30"
-              ? "likes30"
-              : "likes";
         const result = await traktGetComments({
-          type: type === "tv" ? "show" : "movie",
+          type: traktCommentsType,
           tmdbId: id,
-          sort,
+          tab: commentsTab,
+          byLikes: commentsByLikes,
           page: commentsPage,
           limit: COMMENTS_PAGE_SIZE,
         });
         if (ignore) return;
-        const items = Array.isArray(result?.items) ? result.items : [];
-        const pageCount = Number(result?.pagination?.pageCount || 0);
-        setComments({
-          loading: false,
-          error: "",
-          items,
-          page: Number(result?.pagination?.page || commentsPage) || 1,
-          pageCount,
-          total: Number(result?.pagination?.itemCount || 0),
+        const fresh = commentsPageFromResponse(result, commentsPage);
+        writeCommentsPage(pageFilter, fresh);
+        setComments({ loading: false, error: "", ...fresh });
+        prefetchOtherCommentFilters({
+          type: traktCommentsType,
+          tmdbId: id,
+          current: { tab: commentsTab, byLikes: commentsByLikes },
+          load: (filter) => traktGetComments({ type: traktCommentsType, tmdbId: id, ...filter, page: 1, limit: COMMENTS_PAGE_SIZE }),
         });
       } catch (error) {
         if (!ignore) {
           setComments((previous) => ({
             ...previous,
             loading: false,
-            error: error?.message || "Error",
+            // Con caché a la vista, el error no rompe la sección.
+            error: cached ? "" : error?.message || "Error",
           }));
         }
       }
@@ -818,7 +841,7 @@ export default function PhoneDetailsSections({
     return () => {
       ignore = true;
     };
-  }, [id, type, commentsTab, commentsPage]);
+  }, [id, traktCommentsType, commentsTab, commentsByLikes, commentsPage]);
 
   /* ------------------------------ LISTAS ------------------------------ */
   const [lists, setLists] = useState({ loading: true, error: "", items: [] });
@@ -1151,6 +1174,8 @@ export default function PhoneDetailsSections({
       state: comments,
       tab: commentsTab,
       onTabChange: selectCommentsTab,
+      byLikes: commentsByLikes,
+      onLikesChange: selectCommentsByLikes,
       onPageChange: selectCommentsPage,
       onLoadPage: loadCommentsSheetPage,
       mediaType: type,
@@ -1950,38 +1975,21 @@ export default function PhoneDetailsSections({
                 className={`relative isolate overflow-hidden rounded-2xl transform-gpu ${LIQUID_GLASS_HOST} ${LIQUID_GLASS_ELEVATION}`}
               >
                 <LiquidGlassOpticalLayers />
-                {/* Las pestañas se desplazan en horizontal: los tres rótulos no
-                    caben en el ancho de un teléfono y cortarlos dejaría el
-                    filtro histórico inalcanzable. */}
-                <div className="relative z-10 flex items-center justify-between gap-2 border-b border-transparent bg-white/5 px-4 py-3">
-                  <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    {[
-                      { id: "likes30", label: "Top 30 Días" },
-                      { id: "likesAll", label: "Top Histórico" },
-                      { id: "recent", label: "Recientes" },
-                    ].map((tab) => (
-                      <button
-                        key={tab.id}
-                        type="button"
-                        onClick={() => selectCommentsTab(tab.id)}
-                        aria-pressed={commentsTab === tab.id}
-                        className={`relative isolate flex shrink-0 transform-gpu items-center justify-center rounded-xl px-4 py-1.5 text-xs font-bold transition-all ${
-                          commentsTab === tab.id
-                            ? `${LIQUID_GLASS_CARD} text-white`
-                            : "bg-transparent text-zinc-400 hover:bg-white/5 hover:text-white"
-                        }`}
-                      >
-                        {commentsTab === tab.id && <LiquidGlassOpticalLayers />}
-                        <span className="relative z-10">{tab.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                  {comments.loading && (
-                    <Loader2 className="h-4 w-4 shrink-0 animate-spin text-zinc-500" />
-                  )}
-                </div>
+                {/* Filtros: Populares / Recientes y «Más likes». */}
+                <CommentFilterBar
+                  tab={commentsTab}
+                  byLikes={commentsByLikes}
+                  onTabChange={selectCommentsTab}
+                  onLikesChange={selectCommentsByLikes}
+                  loading={comments.loading}
+                />
 
-                <div className="relative z-10 space-y-4 p-4 sm:p-6">
+                <div
+                  aria-busy={comments.loading}
+                  className={`relative z-10 space-y-4 p-4 transition-opacity duration-200 sm:p-6 ${
+                    comments.loading && comments.items.length ? "opacity-50" : "opacity-100"
+                  }`}
+                >
                   {!comments.loading && comments.items.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-10 text-zinc-500">
                       <MessageSquare className="mb-2 h-8 w-8 opacity-20" />
