@@ -11,7 +11,7 @@ export const COMMENT_TABS = [
   { id: "recent", label: "Recientes" },
 ];
 
-export const DEFAULT_COMMENT_TAB = "recent";
+export const DEFAULT_COMMENT_TAB = "popular";
 
 /**
  * Pestaña y orden válidos a partir de lo que haya guardado (estado restaurado,

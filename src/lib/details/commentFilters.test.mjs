@@ -16,7 +16,7 @@ test("los filtros antiguos guardados pasan a los nuevos", () => {
   assert.deepEqual(normalizeCommentFilters("likes30"), { tab: "recent", byLikes: true });
   assert.deepEqual(normalizeCommentFilters("likesAll"), { tab: "popular", byLikes: false });
   assert.deepEqual(normalizeCommentFilters("recent", true), { tab: "recent", byLikes: true });
-  assert.deepEqual(normalizeCommentFilters("cualquiera"), { tab: "recent", byLikes: false });
+  assert.deepEqual(normalizeCommentFilters("cualquiera"), { tab: "popular", byLikes: false });
 });
 
 test("consulta y clave de caché por combinación", () => {

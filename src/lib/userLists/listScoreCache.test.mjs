@@ -109,6 +109,36 @@ test("un lote sin claves válidas devuelve la forma esperada sin pedir nada", as
   assert.equal(result.unresolved.size, 0);
 });
 
+test("dos modales comparten el lote en curso aunque cambie el orden", async (t) => {
+  let finish;
+  let calls = 0;
+  t.mock.method(globalThis, "fetch", () => {
+    calls += 1;
+    return new Promise((resolve) => { finish = resolve; });
+  });
+  const items = [{ id: 101, media_type: "movie" }, { id: 102, media_type: "tv" }];
+  const first = fetchImdbScoresForItems(items);
+  const reopened = fetchImdbScoresForItems([...items].reverse());
+  assert.equal(calls, 1);
+  finish({ ok: true, json: async () => ({ items: { "movie:101": { rating: 8 } } }) });
+  const [a, b] = await Promise.all([first, reopened]);
+  assert.equal(a.items["movie:101"].rating, 8);
+  assert.deepEqual(a, b);
+});
+
+test("un fallo de red no bloquea el siguiente intento del lote", async (t) => {
+  let calls = 0;
+  t.mock.method(globalThis, "fetch", async () => {
+    if (++calls === 1) throw new Error("network");
+    return { ok: true, json: async () => ({ items: {} }) };
+  });
+  const items = [{ id: 103, media_type: "movie" }];
+  await assert.rejects(fetchImdbScoresForItems(items), /network/);
+  const result = await fetchImdbScoresForItems(items);
+  assert.equal(calls, 2);
+  assert.deepEqual(result.items, {});
+});
+
 test("una nota caducada de un título antiguo se sigue leyendo (y se marca para refrescar)", () => {
   const now = Date.now();
   const item = { id: 7, title: "antigua", release_date: "1999-03-31" };

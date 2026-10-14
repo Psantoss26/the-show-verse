@@ -48,6 +48,8 @@ export default function useImdbScoreLoader({
   frozen,
   setImdbScores,
   setLoading,
+  batchSize = IMDB_SCORE_BATCH_SIZE,
+  parallelBatches = IMDB_SCORE_PARALLEL_BATCHES,
 }) {
   const scoreItemsKey = useMemo(
     () => items.map(getScoreItemKey).sort().join(","),
@@ -66,8 +68,8 @@ export default function useImdbScoreLoader({
 
     const fetchInBatches = async (list, onBatch) => {
       const batches = [];
-      for (let i = 0; i < list.length; i += IMDB_SCORE_BATCH_SIZE) {
-        batches.push(list.slice(i, i + IMDB_SCORE_BATCH_SIZE));
+      for (let i = 0; i < list.length; i += batchSize) {
+        batches.push(list.slice(i, i + batchSize));
       }
       let nextBatch = 0;
       const worker = async () => {
@@ -81,7 +83,7 @@ export default function useImdbScoreLoader({
       };
       await Promise.all(
         Array.from(
-          { length: Math.min(IMDB_SCORE_PARALLEL_BATCHES, batches.length) },
+          { length: Math.min(parallelBatches, batches.length) },
           worker,
         ),
       );
@@ -126,7 +128,10 @@ export default function useImdbScoreLoader({
         return next ?? prev;
       });
 
-      if (missing.length === 0 && stale.length === 0) return;
+      if (missing.length === 0 && stale.length === 0) {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
 
       try {
@@ -173,5 +178,5 @@ export default function useImdbScoreLoader({
     return () => {
       cancelled = true;
     };
-  }, [scoreItemsKey, enabled, frozen, setImdbScores, setLoading]);
+  }, [scoreItemsKey, enabled, frozen, setImdbScores, setLoading, batchSize, parallelBatches]);
 }
