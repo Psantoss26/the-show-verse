@@ -17,6 +17,8 @@ import {
   applyResolvedEnglishPosterPaths,
   profileEnglishPosterCacheKey,
   pickLadderPosterPath,
+  applyListPreviewItems,
+  activityListRef,
   PROFILE_FAVORITES_MAX,
 } from './userProfile.js';
 
@@ -363,4 +365,29 @@ test('applySpanishTitles tolera entradas vacías o inválidas', () => {
 test('applySpanishTitles devuelve los mismos items para poder encadenar', () => {
   const items = [{ tmdbId: 1399, mediaType: 'tv', title: 'Game of Thrones' }];
   assert.equal(applySpanishTitles(items, META_ES), items);
+});
+
+test('las acciones de lista llevan sus primeros títulos para la portada', () => {
+  const items = [
+    { id: 'list:u1', type: 'list' },
+    { id: 'like-list:9', type: 'like_list', listId: 'c1' },
+    { id: 'watched:1', type: 'watched', tmdbId: 1, mediaType: 'movie' },
+  ];
+  assert.deepEqual(activityListRef(items[0]), { source: 'user', id: 'u1' });
+  assert.deepEqual(activityListRef(items[1]), { source: 'community', id: 'c1' });
+  assert.equal(activityListRef(items[2]), null);
+  applyListPreviewItems(items, {
+    user: [
+      { listId: 'u1', tmdbId: 10, mediaType: 'movie', posterPath: '/a.jpg' },
+      { listId: 'u1', tmdbId: 11, mediaType: 'tv', posterPath: null },
+      { listId: 'u1', tmdbId: 12, mediaType: 'movie', posterPath: '/c.jpg' },
+    ],
+    community: [{ listId: 'c1', tmdbId: 20, mediaType: 'movie', posterPath: '/d.jpg' }],
+  }, 2);
+  assert.deepEqual(items[0].previewItems, [
+    { tmdbId: 10, mediaType: 'movie', posterPath: '/a.jpg' },
+    { tmdbId: 11, mediaType: 'tv', posterPath: null },
+  ]);
+  assert.deepEqual(items[1].previewItems, [{ tmdbId: 20, mediaType: 'movie', posterPath: '/d.jpg' }]);
+  assert.equal(items[2].previewItems, undefined);
 });

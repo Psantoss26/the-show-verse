@@ -39,6 +39,7 @@ import {
   MessageSquare,
   Search,
   SlidersHorizontal,
+  MonitorPlay,
   Star,
   ThumbsUp,
   User,
@@ -73,6 +74,8 @@ import {
 } from "@/lib/profile/activityLikes";
 import Stars from "@/components/social/Stars";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
+import ActivityBackdropImage from "@/components/social/ActivityBackdropImage";
+import { hasActivityBackdropArtwork } from "@/lib/profile/activityBackdrops";
 import PageStatCard from "@/components/ui/PageStatCard";
 
 const PAGE_SIZE = 30;
@@ -135,10 +138,11 @@ const FILTROS = [
 // quien elige la lista con póster espera encontrársela la próxima vez.
 const CLAVE_VISTA = "showverse:social:viewMode";
 const CLAVE_AGRUPADO = "showverse:social:groupBy";
-// Las DOS vistas de la Actividad del perfil: "list" (avatar de quien actúa) y
-// "poster-list" (cartel del título). Un valor antiguo guardado ("compact",
-// "grid") ya no existe y vuelve a la lista.
-const VISTAS = new Set(["list", "poster-list"]);
+// Las TRES vistas de la Actividad del perfil: "list" (avatar de quien actúa),
+// "poster-list" (cartel del título) y "backdrop-list" (backdrop del título, más
+// grande). Un valor antiguo guardado ("compact", "grid") ya no existe y vuelve
+// a la lista.
+const VISTAS = new Set(["list", "poster-list", "backdrop-list"]);
 
 function leerVistaGuardada() {
   if (typeof window === "undefined") return "list";
@@ -220,11 +224,14 @@ function tiempoTitle(fecha) {
   return Number.isNaN(d.getTime()) ? undefined : d.toLocaleString("es-ES");
 }
 
-// Cartel enlazado, como `ActivityPoster` del perfil.
-function CartelEvento({ evento, className = "" }) {
+// Cartel enlazado, como `ActivityPoster` del perfil. Con `backdrop`, el
+// backdrop del título (vista «Lista con backdrop»).
+function CartelEvento({ evento, className = "", backdrop = false }) {
   const href = hrefDeEvento(evento);
   const src = evento.posterPath ? `https://image.tmdb.org/t/p/w185${evento.posterPath}` : null;
-  const imagen = src ? (
+  const imagen = backdrop ? (
+    <ActivityBackdropImage item={evento} alt={evento.title || ""} />
+  ) : src ? (
     <OptimizedImage src={src} alt={evento.title || ""} className="h-full w-full object-cover" loading="lazy" />
   ) : (
     <span className="flex h-full w-full items-center justify-center text-zinc-700">
@@ -282,7 +289,7 @@ function AutorDelMeGusta({ evento }) {
 // La MISMA fila que la Actividad del perfil (`ActivityRow`): sin fondo propio,
 // avatar o cartel según la vista, icono (o la nota) de 32px, la frase y la
 // hora a la derecha.
-function EventoFila({ evento, actor, mostrarAutor, conPoster }) {
+function EventoFila({ evento, actor, mostrarAutor, conPoster, conBackdrop }) {
   const { Icono, tono, relleno } = accionDe(evento);
   const objetivo =
     evento.type === "rating"
@@ -293,7 +300,9 @@ function EventoFila({ evento, actor, mostrarAutor, conPoster }) {
 
   return (
     <article className="flex min-w-0 items-center gap-3 px-3 py-3 sm:px-4">
-      {conPoster ? (
+      {conBackdrop ? (
+        <CartelEvento evento={evento} backdrop className={BACKDROP_FILA} />
+      ) : conPoster ? (
         <CartelEvento evento={evento} className="h-[4.25rem] w-[2.85rem] rounded-lg" />
       ) : (
         <AvatarEvento actor={actor} />
@@ -321,11 +330,22 @@ function EventoFila({ evento, actor, mostrarAutor, conPoster }) {
         {evento.type === "like_review" && evento.excerpt ? (
           <span className="mt-0.5 line-clamp-2 block text-xs leading-4 text-zinc-500">“{evento.excerpt}”</span>
         ) : null}
+        {/* Con el backdrop, en móvil la hora va bajo la frase: a la derecha le
+            quitaba a la frase el ancho que ya ocupa la miniatura. */}
+        {conBackdrop ? (
+          <time
+            dateTime={evento.createdAt}
+            title={tiempoTitle(evento.createdAt)}
+            className="mt-1 block text-xs font-medium text-zinc-600 sm:hidden"
+          >
+            {relativeTime(evento.createdAt)}
+          </time>
+        ) : null}
       </p>
       <time
         dateTime={evento.createdAt}
         title={tiempoTitle(evento.createdAt)}
-        className="shrink-0 text-xs font-medium text-zinc-600"
+        className={`shrink-0 text-xs font-medium text-zinc-600 ${conBackdrop ? "hidden sm:block" : ""}`}
       >
         {relativeTime(evento.createdAt)}
       </time>
@@ -336,12 +356,14 @@ function EventoFila({ evento, actor, mostrarAutor, conPoster }) {
 // Reseña: la tarjeta de `ActivityReview` del perfil, con el texto (tapado si
 // tiene spoilers) y la nota en estrellas. En la lista lleva el avatar y, con
 // sitio, el cartel; en la lista con póster, solo el cartel grande.
-function EventoResena({ evento, actor, mostrarAutor, conPoster }) {
+function EventoResena({ evento, actor, mostrarAutor, conPoster, conBackdrop }) {
   const [verSpoiler, setVerSpoiler] = useState(false);
   return (
     <article className="rounded-xl bg-white/[0.04] px-3 py-4 sm:px-4">
       <div className="flex gap-3">
-        {conPoster ? (
+        {conBackdrop ? (
+          <CartelEvento evento={evento} backdrop className={BACKDROP_FILA} />
+        ) : conPoster ? (
           <CartelEvento evento={evento} className="h-32 w-[5.4rem] rounded-lg" />
         ) : (
           <>
@@ -384,16 +406,22 @@ function EventoResena({ evento, actor, mostrarAutor, conPoster }) {
   );
 }
 
+// Miniatura 16:9 de la vista «Lista con backdrop»: mayor que el cartel de la
+// lista con póster para que el backdrop se lea (136 px en móvil, 224 px desde
+// `sm`). El mismo tamaño que en la Actividad del perfil.
+const BACKDROP_FILA = "aspect-video w-[8.5rem] rounded-lg sm:w-56";
+
 // Un bloque de eventos con la vista elegida, como `ActivityFeed` del perfil.
 // Lo usan los dos caminos de pintado (con grupos y sin ellos) para que no
 // puedan divergir. `yo` es el actor de los eventos propios (pestaña "Yo").
 function ListaEventos({ eventos, vista, mostrarAutor, yo }) {
   const conPoster = vista === "poster-list";
+  const conBackdrop = vista === "backdrop-list";
   return (
     <ol role="list" className="space-y-3">
       {eventos.map((evento) => {
         const actor = mostrarAutor && evento.author ? evento.author : yo;
-        const props = { evento, actor, mostrarAutor, conPoster };
+        const props = { evento, actor, mostrarAutor, conPoster, conBackdrop };
         return (
           <li key={evento.id} className="min-w-0">
             {evento.type === "review" ? <EventoResena {...props} /> : <EventoFila {...props} />}
@@ -668,13 +696,14 @@ export default function SocialClient() {
 
   // Lista con póster: como en el perfil, fuera las acciones sin portada (una
   // lista creada, por ejemplo), que dejarían un hueco vacío en lugar del cartel.
-  const visibles = useMemo(
-    () =>
-      vista === "poster-list"
-        ? filtrados.filter((evento) => typeof evento.posterPath === "string" && evento.posterPath.trim())
-        : filtrados,
-    [filtrados, vista],
-  );
+  // Con backdrop entran también las que tienen backdrop de título, colección o
+  // estantería de lista.
+  const visibles = useMemo(() => {
+    const conCartel = (evento) => typeof evento.posterPath === "string" && evento.posterPath.trim();
+    if (vista === "poster-list") return filtrados.filter(conCartel);
+    if (vista === "backdrop-list") return filtrados.filter(hasActivityBackdropArtwork);
+    return filtrados;
+  }, [filtrados, vista]);
 
   // `null` cuando no hay que agrupar: quien pinta decide entre una sola rejilla
   // y una cabecera por grupo sin mirar longitudes.
@@ -834,81 +863,66 @@ export default function SocialClient() {
               propio —cada control lleva su cristal—. Antes de fijarse forma
               parte del flujo y empuja el contenido; al fijarse pasa a overlay
               para no desplazar nada. */}
+          {/* El MISMO desplegable que Favoritos y Pendientes: sin superficie
+              propia, cada control con su cristal (y el del navbar al fijarse,
+              `data-menu-pinned`). La caja negra con desenfoque que llevaba al
+              fijarse tapaba ese cristal: un ancestro con `backdrop-filter` lo
+              aplana y los controles se veían oscuros y opacos. */}
           <MobileFiltersPanel
             open={mobileFiltersOpen}
             ref={panelRef}
             className={`z-[80] lg:hidden ${
               filtersSticky ? "absolute left-0 right-0 top-full" : "relative"
             }`}
-            // Fijado, el panel arranca A RAS del buscador: el hueco de 8px
-            // dejaba ver por debajo la tarjeta que hubiera detrás. La
-            // separación se recupera dentro de la superficie.
-            gapClassName={filtersSticky ? "" : "pt-2"}
+            gapClassName="pt-2"
+            contentClassName="space-y-2"
           >
-            {/* SUPERFICIE PROPIA cuando el panel es overlay.
-                Cada control lleva su cristal, pero entre ellos quedaban
-                huecos por los que se veía —difuminada por el desenfoque de
-                los controles— la tarjeta que hubiera detrás: esa era la
-                "banda difuminada sobre el contenido" al abrir el menú. Con
-                una superficie única el menú tapa lo que cubre. Al principio
-                de la página el panel va en el flujo y no hay nada detrás,
-                así que ahí no hace falta. */}
-            <div
-              className={`space-y-2 ${
-                filtersSticky
-                  ? "rounded-b-3xl bg-black/90 px-2 pb-2 pt-2 shadow-2xl backdrop-blur-2xl"
-                  : ""
-              }`}
-            >
-              {/* Dos controles por fila, como en las páginas de usuario. */}
-              <div className="flex gap-2">
-                <div className="min-w-0 flex-1">
-                  <SelectorSimple
-                    icon={Filter}
-                    label="Acción"
-                    opciones={FILTROS}
-                    valor={filtro}
-                    onChange={setFiltro}
-                    compactMobile
-                  />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <SelectorSimple
-                    icon={Layers3}
-                    label="Agrupar"
-                    opciones={SOCIAL_GROUP_OPTIONS}
-                    etiquetasCortas={SOCIAL_GROUP_SHORT_LABELS}
-                    valor={agrupar}
-                    onChange={setAgrupar}
-                    compactMobile
-                  />
-                </div>
-              </div>
-
-              {/* Segunda fila: orden y vistas, para que el menú quede en dos
-                  filas de dos como en las demás páginas. */}
-              <div className="flex gap-2">
-                <div className="min-w-0 flex-1">
-                  <SelectorSimple
-                    icon={ArrowUpDown}
-                    label="Orden"
-                    opciones={[
-                      ["recent", "Reciente"],
-                      ["oldest", "Antiguo"],
-                    ]}
-                    valor={orden}
-                    onChange={setOrden}
-                    compactMobile
-                  />
-                </div>
-                <SelectorVista
-                  vista={vista}
-                  setVista={setVista}
-                  controlGlass={controlGlass}
-                  activo={activo}
-                  fill
+            {/* Dos controles por fila, como en las páginas de usuario. */}
+            <div className="flex gap-2">
+              <div className="min-w-0 flex-1">
+                <SelectorSimple
+                  icon={Filter}
+                  label="Acción"
+                  opciones={FILTROS}
+                  valor={filtro}
+                  onChange={setFiltro}
                 />
               </div>
+              <div className="min-w-0 flex-1">
+                <SelectorSimple
+                  icon={Layers3}
+                  label="Agrupar"
+                  opciones={SOCIAL_GROUP_OPTIONS}
+                  etiquetasCortas={SOCIAL_GROUP_SHORT_LABELS}
+                  valor={agrupar}
+                  onChange={setAgrupar}
+                  compactMobile
+                />
+              </div>
+            </div>
+
+            {/* Segunda fila: orden y vistas, para que el menú quede en dos
+                filas de dos como en las demás páginas. */}
+            <div className="flex gap-2">
+              <div className="min-w-0 flex-1">
+                <SelectorSimple
+                  icon={ArrowUpDown}
+                  label="Orden"
+                  opciones={[
+                    ["recent", "Reciente"],
+                    ["oldest", "Antiguo"],
+                  ]}
+                  valor={orden}
+                  onChange={setOrden}
+                />
+              </div>
+              <SelectorVista
+                vista={vista}
+                setVista={setVista}
+                controlGlass={controlGlass}
+                activo={activo}
+                fill
+              />
             </div>
           </MobileFiltersPanel>
 
@@ -1170,7 +1184,9 @@ function InlineDropdown({
         // suelta su ancho mínimo: es lo que permite que la fila entera quepa en
         // 1024px sin desbordar (mismo mecanismo que Historial).
         aria-label={compact ? `${label}: ${valueLabel}` : undefined}
-        className={`inline-flex h-11 w-full min-w-0 items-center justify-between gap-3 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 px-4 text-sm text-zinc-200 shadow-lg backdrop-blur-lg transition-[min-width,background-color,color] hover:from-white/15 hover:to-white/10 lg:w-auto lg:max-w-none ${
+        // `gap-2` en móvil: con el selector de tres vistas a su lado, a «ORDEN:
+        // Reciente» le faltaban 4 px y se cortaba.
+        className={`inline-flex h-11 w-full min-w-0 items-center justify-between gap-2 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 px-4 text-sm text-zinc-200 shadow-lg backdrop-blur-lg transition-[min-width,background-color,color] hover:from-white/15 hover:to-white/10 lg:w-auto lg:max-w-none lg:gap-3 ${
           compact ? "lg:min-w-0" : "lg:min-w-[140px]"
         }`}
       >
@@ -1337,6 +1353,7 @@ function SelectorVista({ vista, setVista, controlGlass, activo, fill = false }) 
       {[
         ["list", List, "Lista"],
         ["poster-list", ImageIcon, "Lista con póster"],
+        ["backdrop-list", MonitorPlay, "Lista con backdrop"],
       ].map(([valor, Icono, etiqueta]) => (
         <button
           key={valor}

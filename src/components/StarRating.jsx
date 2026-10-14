@@ -189,7 +189,7 @@ export default function StarRating({
           <span
             ref={ratingRef}
             style={{ transform: `translateY(${ratingOffsetPx}px)` }}
-            className="font-black leading-none text-xl tracking-tighter"
+            className="sv-seriesgraph-number text-xl leading-none"
           >
             {fmt(rating)}
           </span>
@@ -246,7 +246,7 @@ export default function StarRating({
                       className="absolute h-28 w-28 fill-yellow-300/15 text-yellow-300/15 drop-shadow-[0_0_30px_rgba(234,179,8,0.25)]"
                       strokeWidth={1}
                     />
-                    <span className="relative z-10 font-sans text-6xl font-black tracking-tighter text-white drop-shadow-md">
+                    <span className="sv-seriesgraph-number relative z-10 text-6xl leading-none text-white drop-shadow-md">
                       {fmt(value)}
                     </span>
                   </div>

@@ -21,6 +21,7 @@ import {
   Layers,
   Layers3,
   List,
+  MonitorPlay,
   ListPlus,
   Loader2,
   MessageSquare,
@@ -33,6 +34,8 @@ import {
 import ListCoverBackdropCollage from "@/components/lists/ListCoverBackdropCollage";
 import { getListDetails } from "@/lib/api/backendLists";
 import { enrichListPreviewArtwork } from "@/lib/lists/previewArtwork";
+import ActivityBackdropImage from "@/components/social/ActivityBackdropImage";
+import { hasActivityBackdropArtwork } from "@/lib/profile/activityBackdrops";
 import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
 import MemberRow from "@/components/social/MemberRow";
 import PosterTile from "@/components/social/PosterTile";
@@ -154,6 +157,10 @@ function profileItemKey(item, index = 0) {
 function hasActivityPoster(item) {
   return typeof item?.posterPath === "string" && item.posterPath.trim().length > 0;
 }
+
+// Miniatura 16:9 de esa vista: mayor que el cartel de la lista con póster para
+// que el backdrop se lea. El mismo tamaño que en Social.
+const ACTIVITY_BACKDROP_CLASS = "aspect-video w-[8.5rem] rounded-lg @[640px]/detail-page:w-56";
 
 // Los eventos de Perfil pueden representar un episodio sin cambiar el tipo
 // público de la serie (`tv`). Conservamos la serie como ficha padre, pero la
@@ -387,7 +394,11 @@ function sectionMenuOptions(section) {
       ...(ratings ? [["rating", "Estrellas"]] : []),
     ],
     views: activity
-      ? [["list", "Lista", List], ["poster-list", "Lista con póster", Image]]
+      ? [
+          ["list", "Lista", List],
+          ["poster-list", "Lista con póster", Image],
+          ["backdrop-list", "Lista con backdrop", MonitorPlay],
+        ]
       : [["grid", "Cuadrícula", Grid2X2], ["compact", "Compacta", LayoutGrid], ["list", "Lista", List]],
   };
 }
@@ -408,7 +419,7 @@ function readStoredProfileView(profileKey) {
   if (!profileKey || typeof window === "undefined") return null;
   try {
     const value = window.localStorage.getItem(`${PROFILE_VIEW_STORAGE_PREFIX}${profileKey}`);
-    return value === "grid" || value === "compact" || value === "list" || value === "poster-list" ? value : null;
+    return ["grid", "compact", "list", "poster-list", "backdrop-list"].includes(value) ? value : null;
   } catch {
     return null;
   }
@@ -774,12 +785,14 @@ function ActivityTitle({ item, className = "" }) {
   );
 }
 
-function ActivityPoster({ item, className = "" }) {
+function ActivityPoster({ item, className = "", backdrop = false }) {
   const previewClick = usePreviewOpen();
   const type = ["tv", "show", "season", "episode"].includes(item?.mediaType) ? "tv" : "movie";
   const href = getActivityDetailsHref(item);
   const src = item?.posterPath ? `https://image.tmdb.org/t/p/w185${item.posterPath}` : null;
-  const poster = src ? (
+  const poster = backdrop ? (
+    <ActivityBackdropImage item={item} alt={item?.title || ""} />
+  ) : src ? (
     <OptimizedImage src={src} alt={item?.title || ""} className="h-full w-full object-cover" loading="lazy" />
   ) : (
     <span className="flex h-full w-full items-center justify-center text-zinc-700">
@@ -816,7 +829,7 @@ function ActivityPoster({ item, className = "" }) {
   );
 }
 
-function ActivityReview({ item, actor, compact = false, posterList = false }) {
+function ActivityReview({ item, actor, compact = false, posterList = false, backdropList = false }) {
   const [showSpoiler, setShowSpoiler] = useState(false);
   const previewClick = usePreviewOpen();
   const type = ["tv", "show", "season", "episode"].includes(item.mediaType) ? "tv" : "movie";
@@ -826,7 +839,9 @@ function ActivityReview({ item, actor, compact = false, posterList = false }) {
   return (
     <article className={`rounded-xl bg-white/[0.04] px-3 @[640px]/detail-page:px-4 ${compact ? "py-3" : "py-4"}`}>
       <div className="flex gap-3">
-        {posterList ? (
+        {backdropList ? (
+          <ActivityPoster item={item} backdrop className={ACTIVITY_BACKDROP_CLASS} />
+        ) : posterList ? (
           <ActivityPoster item={item} className="h-32 w-[5.4rem] rounded-lg" />
         ) : (
           <>
@@ -863,7 +878,7 @@ function ActivityReview({ item, actor, compact = false, posterList = false }) {
   );
 }
 
-function ActivityRow({ item, actor, compact = false, posterList = false }) {
+function ActivityRow({ item, actor, compact = false, posterList = false, backdropList = false }) {
   const definitions = {
     watched: { icon: Eye, tone: "text-emerald-400", text: "ha visto" },
     watchlist: { icon: BookmarkPlus, tone: "text-sky-400", text: "ha añadido a Pendientes" },
@@ -896,7 +911,9 @@ function ActivityRow({ item, actor, compact = false, posterList = false }) {
 
   return (
     <article className={`flex min-w-0 items-center gap-3 border-b border-white/[0.07] px-3 last:border-b-0 @[640px]/detail-page:px-4 ${compact ? "py-2" : "py-3"}`}>
-      {posterList ? (
+      {backdropList ? (
+        <ActivityPoster item={item} backdrop className={ACTIVITY_BACKDROP_CLASS} />
+      ) : posterList ? (
         <ActivityPoster item={item} className="h-[4.25rem] w-[2.85rem] rounded-lg" />
       ) : (
         <ActivityAvatar actor={actor} />
@@ -935,24 +952,31 @@ function ActivityRow({ item, actor, compact = false, posterList = false }) {
         {item.type === "like_review" && item.excerpt ? (
           <span className="mt-0.5 line-clamp-2 block text-xs leading-4 text-zinc-500">“{item.excerpt}”</span>
         ) : null}
+        {/* Con el backdrop, en estrecho la hora va bajo la frase: a la derecha
+            le quitaba a la frase el ancho que ya ocupa la miniatura. */}
+        {backdropList ? (
+          <time dateTime={item.createdAt} className="mt-1 block text-xs font-medium text-zinc-600 @[640px]/detail-page:hidden" title={new Date(item.createdAt).toLocaleString("es-ES")}>
+            {relativeActivityTime(item.createdAt)}
+          </time>
+        ) : null}
       </p>
-      <time dateTime={item.createdAt} className="shrink-0 text-xs font-medium text-zinc-600" title={new Date(item.createdAt).toLocaleString("es-ES")}>
+      <time dateTime={item.createdAt} className={`shrink-0 text-xs font-medium text-zinc-600 ${backdropList ? "hidden @[640px]/detail-page:block" : ""}`} title={new Date(item.createdAt).toLocaleString("es-ES")}>
         {relativeActivityTime(item.createdAt)}
       </time>
     </article>
   );
 }
 
-function ActivityFeed({ items, actor, compact = false, posterList = false, animateWithin }) {
+function ActivityFeed({ items, actor, compact = false, posterList = false, backdropList = false, animateWithin }) {
   return (
     <ol className={compact ? "space-y-1" : "space-y-3"} role="list">
       {items.map((item, index) => (
         <li key={item.id}>
           <ProfileEntrance index={index} total={items.length} animateWithin={animateWithin}>
             {item.type === "review" ? (
-              <ActivityReview item={item} actor={actor} compact={compact} posterList={posterList} />
+              <ActivityReview item={item} actor={actor} compact={compact} posterList={posterList} backdropList={backdropList} />
             ) : (
-              <ActivityRow item={item} actor={actor} compact={compact} posterList={posterList} />
+              <ActivityRow item={item} actor={actor} compact={compact} posterList={posterList} backdropList={backdropList} />
             )}
           </ProfileEntrance>
         </li>
@@ -1723,17 +1747,19 @@ function ProfileContentSection({ username, section, actor }) {
   // textual de actividad. Las acciones como crear una lista no tienen artwork
   // asociado y no deben producir una tarjeta vacía. La API entrega aquí la
   // portada inglesa definitiva para evitar una sustitución visual posterior.
-  const activityPosterSourceItems = useMemo(
+  const activityArtworkView =
+    section === "activity" && (controls.view === "poster-list" || controls.view === "backdrop-list");
+  const activityArtworkItems = useMemo(
     () => (
       section === "activity" && controls.view === "poster-list"
         ? visibleItems.filter(hasActivityPoster)
-        : []
+        : section === "activity" && controls.view === "backdrop-list"
+          ? visibleItems.filter(hasActivityBackdropArtwork)
+          : []
     ),
     [controls.view, section, visibleItems],
   );
-  const displayItems = section === "activity" && controls.view === "poster-list"
-    ? activityPosterSourceItems
-    : visibleItems;
+  const displayItems = activityArtworkView ? activityArtworkItems : visibleItems;
 
   const effectiveGroup = controls.group;
   const groups = useMemo(
@@ -2032,7 +2058,7 @@ function ProfileContentSection({ username, section, actor }) {
         <div className="flex flex-col items-center gap-2 py-14 text-center">
           <Search className="h-8 w-8 text-zinc-700" aria-hidden="true" />
           <p className="text-sm text-zinc-500">
-            {section === "activity" && controls.view === "poster-list"
+            {activityArtworkView
               ? "No hay acciones con portada para mostrar."
               : "No hay resultados con estos filtros."}
           </p>
@@ -2093,6 +2119,7 @@ function ProfileContentSection({ username, section, actor }) {
                   items={group.items}
                   actor={actor}
                   posterList={controls.view === "poster-list"}
+                  backdropList={controls.view === "backdrop-list"}
                   animateWithin={entranceCount}
                 />
               ) : null}

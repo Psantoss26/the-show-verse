@@ -947,7 +947,7 @@ export default function EpisodeRatingsGrid({
       className="-ml-3 pr-3 overflow-x-auto overflow-y-visible mt-3 [-webkit-overflow-scrolling:touch] overscroll-x-contain sm:ml-0 sm:pr-0"
       style={{ contentVisibility: "auto", containIntrinsicSize: "900px 520px" }}
     >
-      <table className="border-separate border-spacing-x-[5px] border-spacing-y-[8px] [table-layout:fixed] [font-family:Inter,ui-sans-serif,system-ui,sans-serif]">
+      <table className="border-separate border-spacing-x-[5px] border-spacing-y-[8px] [table-layout:fixed]">
         <thead>
           <tr>
             <th
@@ -1043,8 +1043,7 @@ export default function EpisodeRatingsGrid({
                           rounded-[5px]
                           flex items-center justify-center
                           text-[21px] sm:text-[23px] lg:text-[27px]
-                          font-extrabold leading-none
-                          [font-variant-numeric:tabular-nums]
+                          sv-seriesgraph-number leading-none
                           select-none
                           ${clickable ? "cursor-pointer hover:brightness-[1.08]" : "cursor-default"}
                           ${clickable ? "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30" : ""}
@@ -1088,7 +1087,7 @@ export default function EpisodeRatingsGrid({
                     <div
                       className={`${SZ.cell} flex flex-col items-center justify-end gap-[5px]`}
                     >
-                      <span className="text-[24px] lg:text-[27px] font-extrabold leading-none text-white [font-variant-numeric:tabular-nums]">
+                      <span className="sv-seriesgraph-number text-[24px] leading-none text-white lg:text-[27px]">
                         {val ?? "—"}
                       </span>
                       <span
@@ -1116,7 +1115,7 @@ export default function EpisodeRatingsGrid({
       className="-ml-3 pr-3 overflow-x-auto overflow-y-visible mt-3 [-webkit-overflow-scrolling:touch] overscroll-x-contain sm:ml-0 sm:pr-0"
       style={{ contentVisibility: "auto", containIntrinsicSize: "900px 520px" }}
     >
-      <table className="border-separate border-spacing-x-[5px] border-spacing-y-[8px] [table-layout:fixed] [font-family:Inter,ui-sans-serif,system-ui,sans-serif]">
+      <table className="border-separate border-spacing-x-[5px] border-spacing-y-[8px] [table-layout:fixed]">
         <thead>
           <tr>
             <th
@@ -1222,8 +1221,7 @@ export default function EpisodeRatingsGrid({
                           rounded-[5px]
                           ${SZ.cell}
                           flex items-center justify-center
-                          font-extrabold leading-none
-                          [font-variant-numeric:tabular-nums]
+                          sv-seriesgraph-number leading-none
                           text-[21px] sm:text-[23px] lg:text-[27px]
                           ${clickable ? "cursor-pointer hover:brightness-[1.08]" : "cursor-default"}
                           ${clickable ? "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30" : ""}
@@ -1250,7 +1248,7 @@ export default function EpisodeRatingsGrid({
                       <div
                         className={`${SZ.cell} flex flex-col items-center justify-end gap-[5px]`}
                       >
-                        <span className="text-[24px] lg:text-[27px] font-extrabold leading-none text-white [font-variant-numeric:tabular-nums]">
+                        <span className="sv-seriesgraph-number text-[24px] leading-none text-white lg:text-[27px]">
                           {val ?? "—"}
                         </span>
                         <span
@@ -1341,8 +1339,7 @@ export default function EpisodeRatingsGrid({
                         rounded-[5px]
                         ${SZ.cell}
                         flex items-center justify-center
-                        font-extrabold leading-none
-                        [font-variant-numeric:tabular-nums]
+                        sv-seriesgraph-number leading-none
                         text-[21px] sm:text-[23px] lg:text-[27px]
                         ${clickable ? "cursor-pointer hover:brightness-[1.08]" : "cursor-default"}
                         ${clickable ? "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30" : ""}

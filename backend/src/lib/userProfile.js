@@ -20,6 +20,7 @@ import {
   listLikes,
   collectionLikes,
   communityLists,
+  communityListItems,
 } from '../db/schema.js';
 import { getTitlePoster } from './tmdbPoster.js';
 import { pickByLanguageLadder } from './imageLanguageLadder.js';
@@ -1288,6 +1289,78 @@ async function hydrateCollectionLikes(db, items) {
   }
 }
 
+// Títulos de cabeza de cada lista para su portada en la vista «Lista con
+// backdrop» de la Actividad (Perfil y Social): la misma estantería de pósters
+// que el modo backdrop de su página de detalles, que usa sus 48 primeros.
+export const ACTIVITY_LIST_PREVIEW_ITEMS = 48;
+
+/** id de la lista de una acción: la lista creada ("list:<id>") o la del me gusta. */
+export function activityListRef(item) {
+  if (item?.type === 'list') {
+    const id = String(item.id || '').split('list:').pop();
+    return id ? { source: 'user', id } : null;
+  }
+  if (item?.type === 'like_list' && item.listId) return { source: 'community', id: String(item.listId) };
+  return null;
+}
+
+/**
+ * Reparte las filas (ya ordenadas por lista y posición) entre las acciones de
+ * lista: `previewItems` = sus primeros títulos `{ tmdbId, mediaType, posterPath }`.
+ */
+export function applyListPreviewItems(items, rowsBySource, limit = ACTIVITY_LIST_PREVIEW_ITEMS) {
+  const grouped = { user: new Map(), community: new Map() };
+  for (const source of ['user', 'community']) {
+    for (const row of rowsBySource?.[source] || []) {
+      const key = String(row.listId);
+      const list = grouped[source].get(key) || [];
+      if (list.length >= limit) continue;
+      list.push({ tmdbId: Number(row.tmdbId), mediaType: row.mediaType, posterPath: row.posterPath || null });
+      grouped[source].set(key, list);
+    }
+  }
+  for (const item of items || []) {
+    const ref = activityListRef(item);
+    if (ref) item.previewItems = grouped[ref.source].get(ref.id) || [];
+  }
+}
+
+async function readListHeads(db, table, ids, limit) {
+  if (!ids.length) return [];
+  const ranked = db
+    .select({
+      listId: table.listId,
+      tmdbId: table.tmdbId,
+      mediaType: table.mediaType,
+      posterPath: table.posterPath,
+      position: table.position,
+      rank: sql`row_number() over (partition by ${table.listId} order by ${table.position} asc, ${table.addedAt} desc)`.as('rank'),
+    })
+    .from(table)
+    .where(inArray(table.listId, ids))
+    .as('ranked');
+  return db
+    .select()
+    .from(ranked)
+    .where(sql`${ranked.rank} <= ${limit}`)
+    .orderBy(asc(ranked.listId), asc(ranked.rank));
+}
+
+async function hydrateListPreviewItems(db, items) {
+  const refs = (items || []).map(activityListRef).filter(Boolean);
+  if (!refs.length) return;
+  const idsOf = (source) => [...new Set(refs.filter((ref) => ref.source === source).map((ref) => ref.id))];
+  try {
+    const [user, community] = await Promise.all([
+      readListHeads(db, userListItems, idsOf('user'), ACTIVITY_LIST_PREVIEW_ITEMS),
+      readListHeads(db, communityListItems, idsOf('community'), ACTIVITY_LIST_PREVIEW_ITEMS),
+    ]);
+    applyListPreviewItems(items, { user, community });
+  } catch {
+    // Best-effort: sin títulos la fila enseña el póster de la lista.
+  }
+}
+
 // Actividad pública del perfil. Se deriva de los registros ya persistidos en vez
 // de duplicarlos en otra tabla: así incluye también la actividad anterior a esta
 // vista y siempre refleja el estado real de cada sección.
@@ -1505,6 +1578,7 @@ export async function getUserActivity(db, targetId, opts = {}) {
   await Promise.all([
     fillMissingPosters(db, targetId, titleEvents),
     hydrateCollectionLikes(db, page.items),
+    hydrateListPreviewItems(db, page.items),
   ]);
   // Después de rellenar: los títulos guardados en las tablas del usuario pueden
   // venir en inglés de los imports, así que el que se muestra se normaliza a

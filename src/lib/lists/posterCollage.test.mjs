@@ -93,10 +93,13 @@ test('buildPosterCollageTargets keeps only unique TMDb identities for final artw
 // títulos impresos.
 test('the list detail header waits for preloaded textless cover artwork instead of rendering stored posters', async () => {
     const source = await readFile(listDetailsLayoutUrl, 'utf8')
+    // La resolución del arte vive en el módulo compartido con la Actividad.
+    const coverArt = await readFile(new URL('../../components/lists/listCoverArt.jsx', import.meta.url), 'utf8')
 
-    assert.match(source, /coverPoster/)
-    assert.match(source, /requestListArtwork/)
-    assert.match(source, /preloadPoster/)
+    assert.match(coverArt, /coverPoster/)
+    assert.match(coverArt, /requestListArtwork/)
+    assert.match(coverArt, /preloadPoster/)
+    assert.match(source, /from '@\/components\/lists\/listCoverArt'/)
     // Portada (y fondo) de la primera página de títulos: no cambian al cargar más.
     assert.match(source, /posterItems\.slice\(0, LIST_ART_SOURCE_ITEMS\)/)
     assert.match(source, /useCoverArtImages\(artItems\)/)
