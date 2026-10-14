@@ -162,6 +162,9 @@ export default function useTraktLists({ mode = 'trending', sort = 'items_desc', 
             setError(e?.message || 'Error')
             setLists([])
             setHasMore(false)
+            // También con error: quien espera las listas de este orden deja de
+            // esperar (y enseña el error) en vez de quedarse en las anteriores.
+            setResultsSort(sort)
             setConnected(mode !== 'user')
             setRequiresAuth(false)
             setUser(null)

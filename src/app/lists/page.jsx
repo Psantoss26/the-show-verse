@@ -80,6 +80,7 @@ import useTraktLists from "@/lib/hooks/useTraktLists";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import { useHydrationReady } from "@/lib/hooks/useHydrationReady";
 import ListPosterCard from "@/components/lists/ListPosterCard";
+import FlipReorder from "@/components/ui/FlipReorder";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import { TmdbImg } from "@/components/lists/ListCoverBackdropCollage";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
@@ -1335,7 +1336,7 @@ const LIST_ENTRANCE_MAX_DELAY = 0.36;
 // La entrada es de Web Animations y UNA sola vez por tarjeta (useCardEntrance):
 // con la de framer, una tarjeta que cambiaba de sitio durante su entrada (p. ej.
 // al llegar los me gusta con «Más likes») se quedaba invisible.
-function ListEntrance({ index = 0, className = "", instant = false, children }) {
+function ListEntrance({ index = 0, className = "", instant = false, flipKey, children }) {
   const ref = useRef(null);
   useCardEntrance(ref, {
     enabled: !instant,
@@ -1343,8 +1344,9 @@ function ListEntrance({ index = 0, className = "", instant = false, children }) 
     durationS: 0.34,
     fromTransform: "translateY(14px)",
   });
+  // `data-flip-key`: <FlipReorder> la recoloca al cambiar el orden.
   return (
-    <div ref={ref} className={className}>
+    <div ref={ref} className={className} data-list-flip={flipKey ? "" : undefined} data-flip-key={flipKey}>
       {children}
     </div>
   );
@@ -1687,6 +1689,10 @@ const ListsContent = memo(function ListsContent({
   communityLoadMoreError = false,
   onCommunityLoadMore,
 }) {
+  // Firma del orden pintado: al cambiar (otro criterio de orden, o llegan las
+  // listas del criterio nuevo) <FlipReorder> desliza cada tarjeta a su sitio y
+  // las nuevas entran con su animación, en vez de saltar.
+  const orderKey = contentLists.map((l) => `${l.source}-${l.id}`).join("|");
   return (
     <AnimatePresence mode="wait" initial={!isBackNav}>
       <motion.div
@@ -1735,10 +1741,15 @@ const ListsContent = memo(function ListsContent({
         ) : (
           <>
             {viewMode === "grid" && (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
+              <FlipReorder
+                className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4"
+                orderKey={orderKey}
+                itemSelector="[data-list-flip]"
+              >
                 {contentLists.map((l, index) => (
                   <ListEntrance
                     key={`${l.source}-${l.id}`}
+                    flipKey={`${l.source}-${l.id}`}
                     index={index}
                     instant={isBackNav}
                     className={`h-full ${OFFSCREEN_SKIP_GRID}`}
@@ -1750,13 +1761,13 @@ const ListsContent = memo(function ListsContent({
                     />
                   </ListEntrance>
                 ))}
-              </div>
+              </FlipReorder>
             )}
 
             {viewMode === "rows" && (
-              <div className="space-y-12">
+              <FlipReorder className="space-y-12" orderKey={orderKey} itemSelector="[data-list-flip]">
                 {contentLists.map((l, index) => (
-                  <ListEntrance key={`${l.source}-${l.id}`} index={index} instant={isBackNav}>
+                  <ListEntrance key={`${l.source}-${l.id}`} flipKey={`${l.source}-${l.id}`} index={index} instant={isBackNav}>
                     <RowListSection
                       list={l}
                       itemsState={itemsMap[getListCacheKey(l)]}
@@ -1765,14 +1776,15 @@ const ListsContent = memo(function ListsContent({
                     />
                   </ListEntrance>
                 ))}
-              </div>
+              </FlipReorder>
             )}
 
             {viewMode === "list" && (
-              <div className="flex flex-col gap-3">
+              <FlipReorder className="flex flex-col gap-3" orderKey={orderKey} itemSelector="[data-list-flip]">
                 {contentLists.map((l, index) => (
                   <ListEntrance
                     key={`${l.source}-${l.id}`}
+                    flipKey={`${l.source}-${l.id}`}
                     index={index}
                     instant={isBackNav}
                     className={OFFSCREEN_SKIP_LIST}
@@ -1784,7 +1796,7 @@ const ListsContent = memo(function ListsContent({
                     />
                   </ListEntrance>
                 ))}
-              </div>
+              </FlipReorder>
             )}
 
             {/* Comunidad: siguiente página al acercarse al final. DENTRO del
@@ -1983,8 +1995,14 @@ export default function ListsPage() {
   // las de la caché (si no, el contenido encogería y el scroll saltaría).
   // Si una página falla se deja de alcanzar (sin reintentos en bucle) y se
   // pinta lo vivo con el botón de reintentar.
+  // Las listas vivas de la comunidad son del orden ELEGIDO solo cuando su
+  // respuesta ya ha llegado (`resultsSort`). Hasta entonces el hook conserva las
+  // del orden anterior: no se pintan reordenadas en el cliente (eran solo las
+  // ya cargadas, no las primeras de verdad, y luego se reordenaba otra vez) ni
+  // se guardan bajo la clave del orden nuevo.
+  const communityFresh = source === "trakt" && trakt?.resultsSort === communitySortMode;
   const communityCatchingUp =
-    source === "trakt" &&
+    communityFresh &&
     !!trakt?.hasMore &&
     !trakt?.loadMoreError &&
     cachedActiveLists.length > (Array.isArray(trakt?.lists) ? trakt.lists.length : 0);
@@ -2188,10 +2206,12 @@ export default function ListsPage() {
     if (!Array.isArray(fetchedActiveLists) || fetchedActiveLists.length === 0) {
       return;
     }
-    // Sin pisar las páginas de la caché con menos mientras se alcanzan.
+    // Sin pisar las páginas de la caché con menos mientras se alcanzan, ni
+    // guardar las del orden anterior bajo la clave del nuevo.
     if (communityCatchingUp) return;
+    if (source === "trakt" && !communityFresh) return;
     writeSessionJsonCache(activeListsCacheKey, fetchedActiveLists);
-  }, [activeListsCacheKey, fetchedActiveLists, communityCatchingUp]);
+  }, [activeListsCacheKey, fetchedActiveLists, communityCatchingUp, source, communityFresh]);
 
   useEffect(() => {
     if (source !== "trakt" || !trakt?.totals) return;
@@ -2206,8 +2226,16 @@ export default function ListsPage() {
   }, [communityCatchingUp, trakt?.loading, trakt?.loadingMore, traktLoadMore]);
 
   const activeLists = useMemo(() => {
-    if (fetchedActiveLists.length > 0 && !communityCatchingUp) return fetchedActiveLists;
     const cached = Array.isArray(cachedActiveLists) ? cachedActiveLists : [];
+    // Comunidad: lo vivo si es del orden elegido; si no, la caché de ese orden
+    // (ya ordenada por el servidor) o nada todavía, y entonces se sigue
+    // pintando lo anterior (ver `readyContent`) hasta que llegue.
+    if (source === "trakt") {
+      return communityFresh && fetchedActiveLists.length > 0 && !communityCatchingUp
+        ? fetchedActiveLists
+        : cached;
+    }
+    if (fetchedActiveLists.length > 0) return fetchedActiveLists;
     // Colecciones de la caché del índice con los likes más recientes de la
     // sesión (p. ej. el me gusta recién dado en su ficha): pintan ya el orden
     // final y no se recolocan cuando llegan las vivas.
@@ -2217,7 +2245,7 @@ export default function ListsPage() {
         ? { ...c, likes: collectionLikes[c.id] }
         : c,
     );
-  }, [fetchedActiveLists, cachedActiveLists, source, collectionLikes, communityCatchingUp]);
+  }, [fetchedActiveLists, cachedActiveLists, source, collectionLikes, communityCatchingUp, communityFresh]);
 
   // Criterios de la pestaña y el que se aplica de verdad (la popularidad solo
   // en Colecciones).
@@ -2244,12 +2272,10 @@ export default function ListsPage() {
     // Comunidad ya ordenada por el servidor con este criterio: se respeta su
     // orden (las listas de usuarios delante; su A-Z puede diferir del de
     // `localeCompare` y las páginas siguientes se intercalarían).
-    if (source === "trakt" && trakt?.resultsSort === activeSortMode) return base;
-    // Las listas de usuarios de la app se ordenan como las demás (el servidor
-    // ya no las pone delante), así que lo pintado desde la caché sigue el mismo
-    // orden que la respuesta.
+    // Comunidad: siempre en el orden del servidor (lo vivo y la caché lo son).
+    if (source === "trakt") return base;
     return sortLists(base, activeSortMode);
-  }, [activeLists, deferredQuery, activeSortMode, source, trakt?.resultsSort]);
+  }, [activeLists, deferredQuery, activeSortMode, source]);
 
   const visibleCount = filtered.length;
 
@@ -2486,7 +2512,8 @@ export default function ListsPage() {
         : source === "personal"
           ? !!personalInitialized
           : source === "trakt"
-            ? !!trakt?.initialized
+            // Lista para el orden elegido: con su respuesta (o su caché, arriba).
+            ? !!trakt?.initialized && communityFresh
             : (!collectionsWaitForLikes || collectionLikesReady) &&
               (collectionsResolvedKey === collectionsQueryKey ||
                 // Destacadas ya precargadas: listas en este mismo render, sin
