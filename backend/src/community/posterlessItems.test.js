@@ -8,7 +8,7 @@ const response = (status, body = {}) => ({
   json: async () => body,
 });
 
-test('pickGalleryPoster prefiere inglés, luego sin idioma, luego cualquiera', () => {
+test('pickGalleryPoster prefiere inglés, luego español, luego sin idioma, luego cualquiera', () => {
   assert.equal(pickGalleryPoster([]), null);
   assert.equal(
     pickGalleryPoster([
@@ -18,6 +18,13 @@ test('pickGalleryPoster prefiere inglés, luego sin idioma, luego cualquiera', (
       { file_path: '/en-top.jpg', iso_639_1: 'en', vote_average: 7 },
     ]),
     '/en-top.jpg',
+  );
+  assert.equal(
+    pickGalleryPoster([
+      { file_path: '/null.jpg', iso_639_1: null, vote_average: 9 },
+      { file_path: '/es.jpg', iso_639_1: 'es', vote_average: 1 },
+    ]),
+    '/es.jpg',
   );
   assert.equal(pickGalleryPoster([{ file_path: '/de.jpg', iso_639_1: 'de' }]), '/de.jpg');
 });

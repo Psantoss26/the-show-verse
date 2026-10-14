@@ -239,14 +239,15 @@ import {
   mergeUniqueImages,
   buildOriginalImageUrl,
   preloadTmdb,
-  pickBestEnglishPoster,
+  pickLadderPoster,
+  pickLadderBackdrop,
   pickBestNeutralPosterByResVotes,
   isLanguageNeutralImage,
   pickHeroBackdropPath,
   pickBestBackdropByLangResVotes,
   pickBestBackdropTVNeutralFirst,
-  pickBestBackdropForPreview,
 } from "@/lib/details/tmdbImages";
+import { tmdbImageLanguages } from "@/lib/tmdb/imageLanguageLadder";
 import {
   getTitleLogos,
 } from "@/lib/dashboard/media";
@@ -2562,9 +2563,8 @@ export default function DetailsClient({
   ]);
 
   // El cambio de modo de la portada es independiente de la pestaña «Vista
-  // previa». Aquí se conserva la política localizada del póster (inglés antes
-  // que cualquier fallback), que es la que siempre usó la ficha al alternar
-  // entre Póster y Backdrop.
+  // previa». Usa la escalera de idioma de toda la app (inglés → español →
+  // original → sin idioma) al alternar entre Póster y Backdrop.
   const posterBackdropFallback = useMemo(() => {
     // Además de esperar a la inicialización, se espera a saber si hay un
     // backdrop de preview personalizado remoto (`remoteArtworkChecked`): si
@@ -2576,14 +2576,17 @@ export default function DetailsClient({
       ...(imagesState?.backdrops || []),
       ...(data?.images?.backdrops ? data.images.backdrops : []),
     ];
-    const bestPath = pickBestBackdropForPreview(allBackdrops);
+    const bestPath = pickLadderBackdrop(allBackdrops, {
+      originalLanguage: data?.original_language,
+    })?.file_path;
     // `data.backdrop_path` no trae su metadato de idioma, así que no puede ser
-    // un fallback seguro para este modo. Si no existe arte inglés, no se abre la
-    // vista previa antes que degradar a un backdrop localizado.
+    // un fallback seguro para este modo: sin ningún backdrop de la escalera no
+    // se abre la vista previa.
     return bestPath || null;
   }, [
     imagesState?.backdrops,
     data?.images?.backdrops,
+    data?.original_language,
     artworkInitialized,
     remoteArtworkChecked,
   ]);
@@ -3296,6 +3299,7 @@ export default function DetailsClient({
 
       let poster = data.poster_path || data.profile_path || null;
       let backdrop = data.backdrop_path || null;
+      const originalLanguage = data?.original_language;
 
       // La ficha ya trae una portada principal. Pintarla de inmediato evita que
       // el usuario espere la consulta secundaria de `/images` antes incluso de
@@ -3306,7 +3310,7 @@ export default function DetailsClient({
       }
 
       if (data?.images) {
-        const bestPoster = pickBestEnglishPoster(data.images.posters || []);
+        const bestPoster = pickLadderPoster(data.images.posters, { originalLanguage });
         if (bestPoster?.file_path) poster = bestPoster.file_path;
 
         setImagesState((prev) => ({
@@ -3335,10 +3339,10 @@ export default function DetailsClient({
             setImagesLoading(true);
             setImagesError("");
 
-            const fetched = await getImages(endpointType, id);
+            const fetched = await getImages(endpointType, id, tmdbImageLanguages(originalLanguage));
 
             if (!cancelled) {
-              const bestPoster = pickBestEnglishPoster(fetched.posters);
+              const bestPoster = pickLadderPoster(fetched.posters, { originalLanguage });
               const bestBackdropForBackground = pickBestBackdropTVNeutralFirst(
                 fetched.backdrops,
               );
@@ -3365,7 +3369,7 @@ export default function DetailsClient({
           }
         } else {
           // Imágenes del servidor: aplicar selectores TV-optimizados sin fetch adicional
-          const bestPoster = pickBestEnglishPoster(tvPosters);
+          const bestPoster = pickLadderPoster(tvPosters, { originalLanguage });
           const bestBackdropForBackground =
             pickBestBackdropTVNeutralFirst(tvBackdrops);
           const bestPosterPath = asTmdbPath(bestPoster);
@@ -3384,11 +3388,11 @@ export default function DetailsClient({
           setImagesLoading(true);
           setImagesError("");
 
-          const json = await getImages(endpointType, id);
+          const json = await getImages(endpointType, id, tmdbImageLanguages(originalLanguage));
           const posters = json.posters || [];
           const backdrops = json.backdrops || [];
 
-          const bestPoster = pickBestEnglishPoster(posters);
+          const bestPoster = pickLadderPoster(posters, { originalLanguage });
           if (bestPoster?.file_path) {
             poster = bestPoster.file_path;
           }

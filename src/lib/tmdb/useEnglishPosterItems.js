@@ -14,8 +14,8 @@ import {
 // imagen compartible de una lista.
 
 /**
- * Sustituye solo en pantalla el póster de cada título por la elección inglesa
- * de Favoritos. Las superficies que no deben revelar el artwork persistido
+ * Sustituye solo en pantalla el póster de cada título por el de la escalera de
+ * idioma (inglés → español → original → sin idioma). Las superficies que no deben revelar el artwork persistido
  * mientras carga pueden ocultarlo mediante `hideOriginalPosters`.
  */
 export function useEnglishPosterItems(
@@ -94,7 +94,7 @@ export function useEnglishPosterItems(
           backdropPath: null,
           backdrop_path: null,
           _englishPosterPending: !resolved,
-          // Resuelto y sin póster inglés: quien no quiera huecos lo oculta.
+          // Resuelto y sin póster de la escalera: quien no quiera huecos lo oculta.
           _englishPosterMissing: resolved,
         };
       }

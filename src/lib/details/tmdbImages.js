@@ -1,4 +1,9 @@
 import { TMDB_IMAGE_LANGS_PARAM } from '../tmdb/imageLanguages.js'
+import {
+    pickByLanguageLadder,
+    pickPreferredResolutionBackdrop,
+    pickTopVotedImage,
+} from '../tmdb/imageLanguageLadder.js'
 
 export const mergeUniqueImages = (current = [], incoming = []) => {
     const map = new Map()
@@ -70,56 +75,23 @@ export function pickBestImage(list) {
     return sorted[0] || null
 }
 
-// El póster principal de DetailsClient prioriza arte en inglés, conserva el
-// textless como segundo recurso y evita caer en arte español cuando TMDb no
-// ofrece ninguna de las dos opciones. Compartirlo entre superficies evita que
-// una misma ficha cambie de idioma según el lugar donde se muestre.
-export function pickBestEnglishPoster(list) {
-    if (!Array.isArray(list) || list.length === 0) return null
-
-    const isEnglishPoster = (img) => {
-        const language = String(img?.iso_639_1 || '').toLowerCase()
-        return img?.file_path && (language === 'en' || language === 'en-us')
-    }
-    const isSpanishPoster = (img) => {
-        const language = String(img?.iso_639_1 || '').toLowerCase()
-        return language === 'es' || language === 'es-es'
-    }
-
-    const englishPosters = list.filter(isEnglishPoster)
-    if (englishPosters.length) return pickBestImage(englishPosters)
-
-    const neutralPosters = list.filter((img) => img?.file_path && !img?.iso_639_1)
-    if (neutralPosters.length) return pickBestImage(neutralPosters)
-
-    const nonSpanishPosters = list.filter((img) => img?.file_path && !isSpanishPoster(img))
-    return pickBestImage(nonSpanishPosters)
+// Póster de tarjetas y fichas con la escalera de idioma (inglés → español →
+// idioma original → sin idioma, ver lib/tmdb/imageLanguageLadder.js); dentro
+// de cada idioma, el más votado. `null` si no hay ninguno: quien llama usa el
+// `poster_path` por defecto de TMDb. Compartido para que un mismo título no
+// cambie de idioma según dónde se muestre.
+export function pickLadderPoster(list, { originalLanguage } = {}) {
+    return pickByLanguageLadder(list, pickTopVotedImage, { originalLanguage })
 }
 
-// Criterio de Favoritos para las parrillas: solo arte en inglés; dentro de
-// ese grupo se prioriza el consenso de TMDb y se conserva el póster original
-// del llamante si no hay una alternativa inglesa.
-export function pickBestFavoriteEnglishPoster(list) {
-    if (!Array.isArray(list) || list.length === 0) return null
-
-    const languageOf = (value) => value ? String(value).toLowerCase().split('-')[0] : null
-    const englishPosters = list.filter(
-        (poster) => poster?.file_path && languageOf(poster?.iso_639_1) === 'en',
+// Backdrop con la misma escalera; dentro de cada idioma, el de mejor
+// resolución entre los primeros de TMDb.
+export function pickLadderBackdrop(list, { originalLanguage, minWidth = 1200 } = {}) {
+    return pickByLanguageLadder(
+        list,
+        (tier) => pickPreferredResolutionBackdrop(tier, { minWidth }),
+        { originalLanguage },
     )
-    if (!englishPosters.length) return null
-
-    const maxVotes = englishPosters.reduce(
-        (max, poster) => Math.max(max, Number(poster?.vote_count) || 0),
-        0,
-    )
-    const candidates = englishPosters.filter(
-        (poster) => (Number(poster?.vote_count) || 0) === maxVotes,
-    )
-
-    return [...candidates].sort((a, b) =>
-        (Number(b?.vote_average) || 0) - (Number(a?.vote_average) || 0)
-        || (Number(b?.width) || 0) - (Number(a?.width) || 0),
-    )[0] || null
 }
 
 // Póster de un idioma por su POSICIÓN en la lista de TMDb (`/images`), sin

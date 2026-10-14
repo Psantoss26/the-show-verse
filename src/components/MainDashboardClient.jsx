@@ -546,7 +546,9 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
         setReady(false);
       }
 
-      const preferred = await fetchBestPoster(movie.id, mediaType);
+      const preferred = await fetchBestPoster(movie.id, mediaType, {
+        originalLanguage: movie.original_language,
+      });
       const chosen =
         preferred ||
         movie.poster_path ||
@@ -875,7 +877,9 @@ function InlinePreviewCard({
             revealBackdrop(cachedBackdrop);
           } else {
             try {
-              const preferred = await fetchBestBackdrop(movie.id, mediaType);
+              const preferred = await fetchBestBackdrop(movie.id, mediaType, {
+                originalLanguage: movie.original_language,
+              });
               const chosen = preferred || getPreviewBackdropFallback(movie);
 
               movieBackdropCache.set(backdropCacheKey, chosen);
@@ -2148,6 +2152,7 @@ function InlinePreviewCardAnticipated({
             const preferred = await fetchBestBackdrop(
               movie.id,
               mediaTypeForBackdrop,
+              { originalLanguage: movie.original_language },
             );
             const chosen = preferred || getPreviewBackdropFallback(movie);
 
@@ -3848,11 +3853,18 @@ function TopRatedHero({
 
             const override = backdropOverrides?.[id] || null;
             let chosen = override || null;
-            if (!chosen) chosen = await fetchBestBackdrop(id, mediaType);
+            if (!chosen) {
+              chosen = await fetchBestBackdrop(id, mediaType, {
+                originalLanguage: movie.original_language,
+              });
+            }
             if (!chosen)
               chosen = movie?.backdrop_path || movie?.poster_path || null;
 
-            let extra = await fetchBestBackdrop(id, mediaType, { offset: 1 });
+            let extra = await fetchBestBackdrop(id, mediaType, {
+              offset: 1,
+              originalLanguage: movie.original_language,
+            });
             if (extra === chosen) extra = null;
 
             if (chosen) await preloadImage(buildImg(chosen, "w780"));

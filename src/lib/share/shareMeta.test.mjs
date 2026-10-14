@@ -20,6 +20,8 @@ test("backdrop con idioma: inglés, luego español, luego sin texto, luego el de
   assert.deepEqual(pickShareBackdrop([img("/xx.jpg", null)], "/d.jpg"), { path: "/xx.jpg", lang: null });
   assert.deepEqual(pickShareBackdrop([], "/d.jpg"), { path: "/d.jpg", lang: null });
   assert.equal(pickShareBackdrop([], null), null);
+  // Sin inglés ni español: el del idioma original antes que el sin texto.
+  assert.deepEqual(pickShareBackdrop([img("/xx.jpg", null), img("/ko.jpg", "ko")], "/d.jpg", "ko"), { path: "/ko.jpg", lang: "ko" });
 });
 
 test("dentro de un idioma manda la resolución", () => {

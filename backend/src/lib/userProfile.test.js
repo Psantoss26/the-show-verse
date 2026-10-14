@@ -16,14 +16,14 @@ import {
   applySpanishTitles,
   applyResolvedEnglishPosterPaths,
   profileEnglishPosterCacheKey,
-  pickBestEnglishPosterPath,
+  pickLadderPosterPath,
   PROFILE_FAVORITES_MAX,
 } from './userProfile.js';
 
 test('English poster decisions use a versioned cache namespace', () => {
   assert.equal(
     profileEnglishPosterCacheKey('movie', 121),
-    'profile:english-poster:v2:movie:121',
+    'profile:english-poster:v3:movie:121',
   );
 });
 
@@ -81,16 +81,21 @@ test('getUserReviews hydrates title and poster for a review-only user', async ()
   assert.equal(page.items[0].posterPath, '/ejemplo.jpg');
 });
 
-test('pickBestEnglishPosterPath keeps the DetailsClient artwork priority', () => {
+test('pickLadderPosterPath: inglés, español, idioma original y sin idioma', () => {
   const posters = [
     { file_path: '/spanish.jpg', iso_639_1: 'es', vote_count: 100 },
     { file_path: '/neutral.jpg', iso_639_1: null, vote_count: 80 },
     { file_path: '/english-low.jpg', iso_639_1: 'en', vote_count: 2, width: 1200 },
     { file_path: '/english-best.jpg', iso_639_1: 'en', vote_count: 8, width: 900 },
   ];
-  assert.equal(pickBestEnglishPosterPath(posters), '/english-best.jpg');
-  assert.equal(pickBestEnglishPosterPath(posters.slice(0, 2)), '/neutral.jpg');
-  assert.equal(pickBestEnglishPosterPath([{ file_path: '/spanish.jpg', iso_639_1: 'es' }]), null);
+  assert.equal(pickLadderPosterPath(posters), '/english-best.jpg');
+  assert.equal(pickLadderPosterPath(posters.slice(0, 2)), '/spanish.jpg');
+  // «Señor, dame paciencia»: solo pósters en español.
+  assert.equal(pickLadderPosterPath([{ file_path: '/spanish.jpg', iso_639_1: 'es' }]), '/spanish.jpg');
+  const korean = [{ file_path: '/neutral.jpg', iso_639_1: null }, { file_path: '/ko.jpg', iso_639_1: 'ko' }];
+  assert.equal(pickLadderPosterPath(korean, 'ko'), '/ko.jpg');
+  assert.equal(pickLadderPosterPath(korean), '/neutral.jpg');
+  assert.equal(pickLadderPosterPath([{ file_path: '/fr.jpg', iso_639_1: 'fr' }], 'ko'), null);
 });
 
 test('Profile title lists replace persisted Spanish posters with the resolved English artwork', () => {

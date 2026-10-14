@@ -30,6 +30,14 @@ test("elige póster inglés y backdrop con idioma", () => {
   assert.equal(picks.previewBackdrop, "/bd-en.jpg");
 });
 
+test("sin inglés, el español; sin ninguno de los dos, el del idioma original", () => {
+  const es = { file_path: "/es.jpg", iso_639_1: "es", width: 1000, height: 1500 };
+  const ko = { file_path: "/ko.jpg", iso_639_1: "ko", width: 1000, height: 1500 };
+  const none = { file_path: "/none.jpg", iso_639_1: null, width: 1000, height: 1500 };
+  assert.equal(pickListArtwork({ posters: [none, es], backdrops: [] }).poster, "/es.jpg");
+  assert.equal(pickListArtwork({ posters: [none, ko], backdrops: [] }, { originalLanguage: "ko" }).poster, "/ko.jpg");
+});
+
 test("la portada de los mosaicos usa arte SIN texto", () => {
   const titled = { file_path: "/en.jpg", iso_639_1: "en", width: 2000, height: 3000, vote_count: 50 };
   const textless = { file_path: "/null.jpg", iso_639_1: null, width: 1000, height: 1500, vote_count: 1 };

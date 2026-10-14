@@ -1,6 +1,6 @@
 import SeasonDetailsClient from "@/components/SeasonDetailsClient";
 import { getShareData, shareMetadata } from "@/lib/share/shareMeta";
-import { pickPosterByLanguage } from "@/lib/details/tmdbImages";
+import { pickByLanguageLadder } from "@/lib/tmdb/imageLanguageLadder";
 import { getStreamingProviders } from "@/lib/api/justwatch";
 
 export const revalidate = 3600; // 1h
@@ -53,15 +53,28 @@ export default async function SeasonPage({ params }) {
 
   const showPromise = tmdbFetch(`/tv/${showId}?append_to_response=external_ids`);
   const seasonPromise = tmdbFetch(`/tv/${showId}/season/${seasonNumber}`);
-  // PÓSTER EN INGLÉS siempre que lo haya: el PRIMERO de los que devuelve
-  // TMDb para la temporada, en su orden. Sin ninguno, se queda el de español
-  // (`poster_path` con `language=es-ES`). Se resuelve en el servidor para que
-  // la portada no cambie al cargar.
-  const englishPosterPromise = tmdbFetch(
-    `/tv/${showId}/season/${seasonNumber}/images?include_image_language=en`,
+  // PÓSTER con la escalera de idioma de toda la app (inglés → español →
+  // idioma original de la serie → sin idioma): el PRIMERO de los que devuelve
+  // TMDb en ese idioma, en su orden. Sin ninguno, se queda el `poster_path`
+  // de TMDb. Se piden las imágenes de TODOS los idiomas (sin `language` ni
+  // `include_image_language`) en paralelo con la serie, que aporta su idioma
+  // original. Se resuelve en el servidor para que la portada no cambie al
+  // cargar.
+  const seasonImagesPromise = fetch(
+    `https://api.themoviedb.org/3/tv/${showId}/season/${seasonNumber}/images?api_key=${TMDB_API_KEY}`,
+    { next: { revalidate } },
   )
-    .then((json) => pickPosterByLanguage(json?.posters, "en")?.file_path || null)
+    .then((res) => (res.ok ? res.json() : null))
     .catch(() => null);
+  const ladderPosterPromise = Promise.all([
+    showPromise.catch(() => null),
+    seasonImagesPromise,
+  ]).then(
+    ([showJson, images]) =>
+      pickByLanguageLadder(images?.posters, (tier) => tier[0], {
+        originalLanguage: showJson?.original_language,
+      })?.file_path || null,
+  );
 
   // PLATAFORMAS DE LA SERIE en el HTML: la fila de iconos va bajo el póster y,
   // si llegaba después de pintar (desde el cliente), la columna crecía 72px y
@@ -84,15 +97,15 @@ export default async function SeasonPage({ params }) {
     })
     .catch(() => null);
 
-  const [show, seasonData, englishPosterPath, initialShowProviders] =
+  const [show, seasonData, ladderPosterPath, initialShowProviders] =
     await Promise.all([
       showPromise,
       seasonPromise,
-      englishPosterPromise,
+      ladderPosterPromise,
       providersPromise,
     ]);
-  const season = englishPosterPath
-    ? { ...seasonData, poster_path: englishPosterPath }
+  const season = ladderPosterPath
+    ? { ...seasonData, poster_path: ladderPosterPath }
     : seasonData;
 
   const showImdbId = show?.external_ids?.imdb_id || null;

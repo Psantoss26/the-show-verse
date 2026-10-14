@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
 import { artworkItemKey, pickListArtwork } from "@/lib/tmdb/artworkPicks";
-import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 
 // ARTE DE VARIOS TÍTULOS EN UNA PETICIÓN (POST { items: ["movie:603", …] }).
 //
@@ -12,6 +11,10 @@ import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 // con concurrencia limitada y reintentos, y quedan cacheadas UN DÍA para todos
 // los usuarios: la segunda vez es instantáneo. Los criterios de elección son
 // los mismos (lib/tmdb/artworkPicks).
+//
+// Se pide la FICHA con sus imágenes (`append_to_response=images`, sin filtro
+// de idioma): trae el arte de todos los idiomas y `original_language`, que la
+// escalera necesita para su escalón «idioma original».
 
 const TMDB_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const MAX_ITEMS = 60;
@@ -33,9 +36,9 @@ async function limited(task) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function fetchImages(key) {
+async function fetchTitleWithImages(key) {
   const [mediaType, id] = key.split(":");
-  const url = `https://api.themoviedb.org/3/${mediaType}/${id}/images?api_key=${TMDB_KEY}&${TMDB_IMAGE_LANGS_PARAM}`;
+  const url = `https://api.themoviedb.org/3/${mediaType}/${id}?api_key=${TMDB_KEY}&append_to_response=images`;
   for (let attempt = 0; attempt < 4; attempt += 1) {
     const res = await limited(() => fetch(url, { cache: "force-cache", next: { revalidate: DAY } }));
     if (res.ok) return res.json();
@@ -64,7 +67,8 @@ export async function POST(request) {
     keys.map(async (key) => {
       try {
         // `null` = no se pudo consultar (distinto de «consultado, sin póster»).
-        return [key, pickListArtwork(await fetchImages(key))];
+        const details = await fetchTitleWithImages(key);
+        return [key, pickListArtwork(details?.images, { originalLanguage: details?.original_language })];
       } catch {
         return [key, null];
       }

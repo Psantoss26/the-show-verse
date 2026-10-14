@@ -38,7 +38,8 @@ import {
   normalizeSearchText,
   titleMatchesQuery,
 } from "@/lib/search/titleMatching";
-import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
+import { tmdbImageLangsParam } from "@/lib/tmdb/imageLanguages";
+import { pickByLanguageLadder } from "@/lib/tmdb/imageLanguageLadder";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import HoverExpandCard from "@/components/ui/HoverExpandCard";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
@@ -220,32 +221,25 @@ function imgUrl(path, size = "w500") {
   return path ? `https://image.tmdb.org/t/p/${size}${path}` : "";
 }
 
-function pickDashboardBackdrop(backdrops = []) {
-  if (!Array.isArray(backdrops) || backdrops.length === 0) return null;
-  const normLang = (value) =>
-    value ? String(value).toLowerCase().split("-")[0] : null;
+// Escalera de idioma de toda la app (inglés → español → original → sin
+// idioma, lib/tmdb/imageLanguageLadder); dentro de cada idioma, el más grande.
+function pickDashboardBackdrop(backdrops = [], originalLanguage) {
   const area = (img) => (img?.width || 0) * (img?.height || 0);
   const pickLargest = (list) =>
     list.reduce((best, img) => (area(img) > area(best) ? img : best), list[0]);
-  const english = backdrops.filter((img) =>
-    ["en", "en-us"].includes(String(img?.iso_639_1 || "").toLowerCase()),
-  );
-  if (english.length) return pickLargest(english)?.file_path || null;
-  const withLanguage = backdrops.filter((img) => normLang(img?.iso_639_1));
-  if (withLanguage.length) return pickLargest(withLanguage)?.file_path || null;
-  return pickLargest(backdrops)?.file_path || null;
+  return pickByLanguageLadder(backdrops, pickLargest, { originalLanguage })?.file_path || null;
 }
 
-async function fetchDashboardBackdrop(type, id) {
+async function fetchDashboardBackdrop(type, id, originalLanguage) {
   if (!TMDB_API_KEY || !type || !id) return null;
   try {
     const url =
       `https://api.themoviedb.org/3/${type}/${id}/images` +
-      `?api_key=${TMDB_API_KEY}&${TMDB_IMAGE_LANGS_PARAM}`;
+      `?api_key=${TMDB_API_KEY}&${tmdbImageLangsParam(originalLanguage)}`;
     const response = await fetch(url, { cache: "force-cache" });
     if (!response.ok) return null;
     const json = await response.json();
-    return pickDashboardBackdrop(json?.backdrops || []);
+    return pickDashboardBackdrop(json?.backdrops || [], originalLanguage);
   } catch {
     return null;
   }
@@ -865,6 +859,7 @@ export default function DashboardSectionClient({ section }) {
 
     let cancelled = false;
     setPreviewBackdropsReady(false);
+    const originalLanguageByKey = new Map();
     const idsByType = rawItems.reduce(
       (acc, item) => {
         const id = Number(item?.id);
@@ -873,6 +868,7 @@ export default function DashboardSectionClient({ section }) {
           return acc;
         }
         acc[type].add(id);
+        originalLanguageByKey.set(`${type}:${id}`, item?.original_language);
         return acc;
       },
       { movie: new Set(), tv: new Set() },
@@ -888,7 +884,11 @@ export default function DashboardSectionClient({ section }) {
           const pairs = await Promise.all(
             ids.map(async (id) => [
               `${type}:${id}`,
-              await fetchDashboardBackdrop(type, id),
+              await fetchDashboardBackdrop(
+                type,
+                id,
+                originalLanguageByKey.get(`${type}:${id}`),
+              ),
             ]),
           );
           entries.push(...pairs);

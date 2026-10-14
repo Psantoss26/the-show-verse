@@ -70,7 +70,11 @@ import DetailModalProvider from "@/components/dashboard/DetailModalProvider";
 import PreviewTrailerAudioButton, {
   usePreviewTrailerAudio,
 } from "@/components/dashboard/PreviewTrailerAudioControl";
-import { fetchBestBackdropNoLang } from "@/lib/dashboard/media";
+import {
+  fetchBestBackdropNoLang,
+  pickBestBackdropByLangResVotes,
+  pickBestPosterByLangThenResolution,
+} from "@/lib/dashboard/media";
 import useSpotlightLogo from "@/lib/dashboard/useSpotlightLogo";
 import DashboardSpotlightPreview from "@/components/dashboard/DashboardSpotlightPreview";
 import DashboardRankNumber from "@/components/dashboard/DashboardRankNumber";
@@ -373,96 +377,17 @@ async function getShowImages(showId) {
 /* ====================================================================
  * LOGICA IMAGENES (Backdrops / Posters)
  * ==================================================================== */
-function pickBestBackdropByLangResVotes(list, opts = {}) {
-  const {
-    preferLangs = ["en", "en-US"],
-    minWidth = 1200,
-    offset = 0,
-    includeNoLanguage = true,
-  } = opts;
-
-  if (!Array.isArray(list) || list.length === 0) return null;
-
-  // Normaliza 'en-US' -> 'en'
-  const norm = (v) => (v ? String(v).toLowerCase().split("-")[0] : null);
-  const preferSet = new Set((preferLangs || []).map(norm).filter(Boolean));
-  const isPreferredLang = (img) => preferSet.has(norm(img?.iso_639_1));
-  const hasNoLanguage = (img) => !norm(img?.iso_639_1);
-
-  const preferred = list.filter(isPreferredLang);
-  const withLanguage = list.filter(
-    (img) => norm(img?.iso_639_1) && !isPreferredLang(img),
-  );
-  const noLanguage = list.filter(hasNoLanguage);
-
-  const pickFrom = (pool) => {
-    if (!pool.length) return null;
-
-    const sizeFiltered =
-      minWidth > 0 ? pool.filter((b) => (b?.width || 0) >= minWidth) : pool;
-    const candidates = (sizeFiltered.length ? sizeFiltered : pool).slice(0, 3);
-    if (!candidates.length) return null;
-
-    const preferredSizes = [
-      [1920, 1080],
-      [1712, 964],
-      [3840, 2160],
-    ];
-    const ordered = [];
-    for (const [width, height] of preferredSizes) {
-      const match = candidates.find(
-        (b) => (b?.width || 0) === width && (b?.height || 0) === height,
-      );
-      if (match && !ordered.includes(match)) ordered.push(match);
-    }
-    for (const candidate of candidates) {
-      if (!ordered.includes(candidate)) ordered.push(candidate);
-    }
-
-    return ordered[Math.min(Math.max(0, offset), ordered.length - 1)] || null;
-  };
-
-  // Mismo criterio que MainDashboard: ingles -> cualquier idioma -> sin idioma.
-  return (
-    pickFrom(preferred) ||
-    pickFrom(withLanguage) ||
-    (includeNoLanguage ? pickFrom(noLanguage) : null)
-  );
-}
-
-function pickBestPosterByLangThenResolution(list, opts = {}) {
-  const { preferLangs = ["en", "en-US"], minWidth = 500 } = opts;
-  if (!Array.isArray(list) || list.length === 0) return null;
-
-  const area = (img) => (img?.width || 0) * (img?.height || 0);
-  const lang = (img) => img?.iso_639_1 || null;
-
-  const sizeFiltered =
-    minWidth > 0 ? list.filter((p) => (p?.width || 0) >= minWidth) : list;
-  const pool0 = sizeFiltered.length ? sizeFiltered : list;
-
-  const hasPreferred = pool0.some((p) => preferLangs.includes(lang(p)));
-  const pool1 = hasPreferred
-    ? pool0.filter((p) => preferLangs.includes(lang(p)))
-    : pool0;
-
-  let maxArea = 0;
-  for (const p of pool1) maxArea = Math.max(maxArea, area(p));
-
-  for (const p of pool1) {
-    if (area(p) === maxArea) return p;
-  }
-  return null;
-}
+// Selectores compartidos con la escalera de idioma de toda la app (inglés →
+// español → original → sin idioma): lib/dashboard/media.
 
 /* ========= Poster preferido TV ========= */
-async function fetchBestTVPoster(showId) {
+async function fetchBestTVPoster(showId, originalLanguage) {
   const { posters } = await getShowImages(showId);
   if (!Array.isArray(posters) || posters.length === 0) return null;
 
   const best = pickBestPosterByLangThenResolution(posters, {
-    preferLangs: ["en", "en-US"],
     minWidth: 500,
+    originalLanguage,
   });
 
   return best?.file_path || null;
@@ -474,8 +399,6 @@ async function fetchBestTVBackdrop(showId, opts = {}) {
   if (!Array.isArray(backdrops) || backdrops.length === 0) return null;
 
   const best = pickBestBackdropByLangResVotes(backdrops, {
-    preferLangs: ["en", "en-US"],
-    resolutionWindow: 0.98,
     minWidth: 1200,
     ...opts,
   });
@@ -491,8 +414,9 @@ async function preparePreviewBackdrop(show) {
   if (backdropPath === undefined) {
     try {
       backdropPath =
-        (await fetchBestTVBackdrop(show.id)) ||
-        getPreviewBackdropFallback(show);
+        (await fetchBestTVBackdrop(show.id, {
+          originalLanguage: show.original_language,
+        })) || getPreviewBackdropFallback(show);
     } catch {
       backdropPath = getPreviewBackdropFallback(show);
     }
@@ -558,7 +482,7 @@ function PosterImage({ show, cache }) {
 
       // 4) Buscar el poster preferido en inglés; el base solo actúa como placeholder.
       if (!basePoster) setReady(false);
-      const preferred = await fetchBestTVPoster(show.id);
+      const preferred = await fetchBestTVPoster(show.id, show.original_language);
       const chosen = preferred || basePoster || null;
 
       if (!abort) {
@@ -647,7 +571,9 @@ function Top10MobileBackdropCardTV({
       }
 
       try {
-        const preferred = await fetchBestTVBackdrop(show.id);
+        const preferred = await fetchBestTVBackdrop(show.id, {
+          originalLanguage: show.original_language,
+        });
         const chosen = preferred || getPreviewBackdropFallback(show);
         tvBackdropCache.set(show.id, chosen);
         revealBackdrop(chosen);
@@ -815,7 +741,9 @@ function InlinePreviewCard({ show, heightClass, isSpotlight = false }) {
           revealBackdrop(cachedBackdrop);
         } else {
           try {
-            const preferred = await fetchBestTVBackdrop(show.id);
+            const preferred = await fetchBestTVBackdrop(show.id, {
+              originalLanguage: show.original_language,
+            });
             const chosen = preferred || getPreviewBackdropFallback(show);
 
             tvBackdropCache.set(show.id, chosen);

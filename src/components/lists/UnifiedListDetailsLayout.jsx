@@ -60,9 +60,9 @@ function preloadPoster(src) {
 }
 
 // PORTADA DE LA LISTA: arte SIN TEXTO de cada título (`coverPoster` de
-// lib/tmdb/artworkPicks: póster sin idioma → backdrop sin idioma → póster
-// inglés). El mosaico recorta cada imagen a su celda y con el póster inglés
-// cortaba los títulos impresos. Se pide en LOTE (/api/tmdb/artwork: una
+// lib/tmdb/artworkPicks: póster sin idioma → backdrop sin idioma → póster de
+// la escalera de idioma). El mosaico recorta cada imagen a su celda y con un
+// póster con texto cortaba los títulos impresos. Se pide en LOTE (/api/tmdb/artwork: una
 // petición para toda la lista, cacheada un día en el servidor) y, si el lote
 // falla, a /images del título con el mismo criterio.
 async function resolveCoverArt(target, priority) {
