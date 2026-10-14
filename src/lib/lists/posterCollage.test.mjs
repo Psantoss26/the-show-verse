@@ -97,7 +97,9 @@ test('the list detail header waits for preloaded textless cover artwork instead 
     assert.match(source, /coverPoster/)
     assert.match(source, /requestListArtwork/)
     assert.match(source, /preloadPoster/)
-    assert.match(source, /useCoverArtImages\(posterItems\)/)
+    // Portada (y fondo) de la primera página de títulos: no cambian al cargar más.
+    assert.match(source, /posterItems\.slice\(0, LIST_ART_SOURCE_ITEMS\)/)
+    assert.match(source, /useCoverArtImages\(artItems\)/)
     assert.doesNotMatch(source, /fallbackImage/)
 })
 
@@ -130,4 +132,22 @@ test('el fondo móvil empieza por la portada, sigue con el resto y repite si fal
         'https://x/w342/b.jpg',
     ])
     assert.deepEqual(buildBackgroundCollageTiles([], [], 4), [])
+})
+
+test("fondo de escritorio: celdas 2:3 que llenan la ventana sin pasar del tope de imágenes", async () => {
+    const { getDesktopBackgroundGrid, MAX_BACKGROUND_TILE_COUNT } = await import("./posterCollage.js")
+    for (const [width, height] of [[1024, 768], [1440, 900], [1920, 1080], [2560, 1440], [1366, 1024]]) {
+        const grid = getDesktopBackgroundGrid(width, height)
+        assert.ok(grid.count <= MAX_BACKGROUND_TILE_COUNT, `${width}x${height}: ${grid.count} celdas`)
+        assert.equal(grid.count, grid.cols * grid.rows)
+        // Las filas cubren todo el alto de la ventana.
+        assert.ok(grid.rows * (width / grid.cols) * 1.5 >= height, `${width}x${height} no llega abajo`)
+        assert.ok(grid.cols >= 3)
+    }
+    // Más columnas cuanto más ancha (celdas pequeñas primero): 1440×900 → 9×4.
+    assert.deepEqual(getDesktopBackgroundGrid(1440, 900), { cols: 9, rows: 4, count: 36, tileWidth: 160 })
+    // Ventana altísima: tres columnas y las filas que quepan en el tope.
+    const tall = getDesktopBackgroundGrid(700, 4000)
+    assert.equal(tall.cols, 3)
+    assert.ok(tall.count <= MAX_BACKGROUND_TILE_COUNT)
 })

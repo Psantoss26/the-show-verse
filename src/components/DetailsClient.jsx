@@ -39,6 +39,8 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
+const TITLE_LISTS_PAGE_SIZE = 10;
+
 // -- Navegacion de Next.js --
 import { useRouter } from "@/lib/offline/useOfflineRouter";
 
@@ -4294,6 +4296,16 @@ export default function DetailsClient({
       return { ...previous, page: nextPage, loading: true, error: "" };
     });
   }, []);
+  const loadCommentsSheetPage = useCallback(async (page, tab) => {
+    const sort = tab === "recent" ? "newest" : tab === "likes30" ? "likes30" : "likes";
+    return traktGetComments({
+      type: traktType,
+      tmdbId: id,
+      sort,
+      page,
+      limit: COMMENTS_PAGE_SIZE,
+    });
+  }, [COMMENTS_PAGE_SIZE, id, traktType]);
   const myComments = useMemo(() => {
     return (tComments.items || []).filter((item) =>
       isOwnedComment(item, {
@@ -4455,6 +4467,10 @@ export default function DetailsClient({
     };
   }, [initialLists]);
   const [tLists, setTLists] = useState(() => restoredValue(backSnapshot, "tLists", () => initialListsState));
+  const [expandedTitleLists, setExpandedTitleLists] = useState(false);
+  const titleListItems = Array.isArray(tLists.items) ? tLists.items : [];
+  const visibleTitleLists = expandedTitleLists ? titleListItems : titleListItems.slice(0, 6);
+  const hiddenTitleListsCount = Math.max(0, titleListItems.length - 6);
 
   useRestorableEffect(backSnapshot, "scoreboardReset", () => {
     setTScoreboard(initialScoreboardState);
@@ -4500,6 +4516,7 @@ export default function DetailsClient({
     setTSeasons({ loading: false, error: "", items: [] });
     setTLists(initialListsState);
     setTListsTab("popular");
+    setExpandedTitleLists(false);
   }, [
     id,
     traktType,
@@ -4801,14 +4818,14 @@ export default function DetailsClient({
         }
 
         try {
-          // Cargar 6 listas con todos sus detalles
+          // Cargar 10 listas con todos sus detalles
           const r = await withTimeout(
             traktGetLists({
               type: traktType,
               tmdbId: id,
               tab: tListsTab,
               page: tLists.page,
-              limit: 6,
+              limit: TITLE_LISTS_PAGE_SIZE,
               countOnly: false, // Siempre cargar listas completas con previews
             }),
             20000,
@@ -4906,11 +4923,14 @@ export default function DetailsClient({
       if (timeoutId) clearTimeout(timeoutId);
       seedTimers.forEach((t) => window.clearTimeout(t));
     };
-  }, [id, traktType, tListsTab, tLists.page, traktDeferredReady], !tLists.loading);
+  // Incluir el límite en las dependencias invalida instantáneas de navegación
+  // atrás creadas cuando solo se cargaban 6 listas y fuerza su revalidación.
+  }, [id, traktType, tListsTab, tLists.page, traktDeferredReady, TITLE_LISTS_PAGE_SIZE], !tLists.loading);
 
   // Resetear paginacion de listas al cambiar de pestana
   useRestorableEffect(backSnapshot, "listsTabReset", () => {
     setTLists((p) => ({ ...p, items: [], page: 1, hasMore: false, total: 0 }));
+    setExpandedTitleLists(false);
   }, [tListsTab]);
 
   // -- Sincronizacion TMDb <-> Trakt --
@@ -9364,6 +9384,48 @@ export default function DetailsClient({
         })
       : [];
 
+  const specialSeason =
+    type === "tv"
+      ? (Array.isArray(data?.seasons) ? data.seasons : []).find(
+          (season) => getSeasonNumber(season) === 0,
+        ) ||
+        (Array.isArray(tSeasons?.items) ? tSeasons.items : []).find(
+          (season) => getSeasonNumber(season) === 0,
+        )
+      : null;
+  const specialSeasonCardItems = specialSeason
+    ? [
+        {
+          key: 0,
+          seasonNumber: 0,
+          seasonId: specialSeason?.id ?? null,
+          name: "Especiales",
+          posterPath: specialSeason?.poster_path || null,
+          fallbackPosterPath: data?.poster_path || null,
+          airDate: specialSeason?.air_date || null,
+          tmdbRating: specialSeason?.vote_average ?? null,
+          imdbRating: seriesGraphStructuresMismatch
+            ? (seriesGraphSeasonRatings.get(0) ?? null)
+            : (toRatingNumber(seasonImdbRatings?.[0]) ??
+              seriesGraphSeasonRatings.get(0) ??
+              null),
+          totalEpisodes: Number(specialSeason?.episode_count || 0) || null,
+          watchedEpisodes: getWatchedEpisodeCountForSeason(
+            watchedBySeason,
+            0,
+            Number(specialSeason?.episode_count || 0) || 0,
+          ),
+          imdbUrl: resolvedImdbId
+            ? `https://www.imdb.com/title/${resolvedImdbId}/episodes/?season=0`
+            : null,
+          onClick: () => router.push(`/details/tv/${id}/season/0`),
+          onPrefetch: () => prefetchSeasonDetails(0),
+          hoverLift: true,
+        },
+      ]
+    : [];
+  const seasonSheetCardItems = [...seasonCardItems, ...specialSeasonCardItems];
+
   // Todo lo que muestran las vistas laterales de las secciones.
   const sectionSheetData = {
     type,
@@ -9396,12 +9458,13 @@ export default function DetailsClient({
     soundtrack: soundtrackHidden ? EMPTY_SOUNDTRACK_TRACKS : soundtrackTracks,
     onPlayTrack: openSoundtrack,
     sentiment: tSentiment,
-    seasons: seasonCardItems,
+    seasons: seasonSheetCardItems,
     comments: {
       state: tComments,
       tab: tCommentsTab,
       onTabChange: selectCommentsTab,
       onPageChange: selectCommentsPage,
+      onLoadPage: loadCommentsSheetPage,
       profileUsernames: commentProfileUsernames,
       mediaType: endpointType,
       tmdbId: id,
@@ -10987,7 +11050,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 id="section-seasons"
                 ref={registerSection("seasons")}
               >
-                <AnimatedSection delay={0.04} renderImmediately>
+                <AnimatedSection delay={0.04}>
                   {/* Vista de tarjetas (máx. dos filas + «Ver más») o de
                       pósters en fila: la elige y la guarda la propia sección. */}
                   <SeasonsSection
@@ -11193,7 +11256,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 ref={registerSection("collection")}
               >
                 <AnimatedSection
-                  key={`${id}-collection-${collectionLoading ? "loading" : "ready"}-${collectionData?.items?.length || 0}`}
                   delay={0.04}
                 >
                   {/* --- COLECCIÓN --- */}
@@ -11380,7 +11442,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                    ================================================================= */}
                 <section id="section-media" ref={registerSection("media")}>
                   <AnimatedSection
-                    key={`${id}-artwork-${artworkInitialized ? "ready" : "loading"}`}
                     delay={0.04}
                   >
                     {/* Galería de imágenes: pósters, backdrops y fondos del contenido */}
@@ -12071,7 +12132,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   </AnimatedSection>
 
                   <AnimatedSection
-                    key={`${id}-videos-${videosResolved ? "ready" : "loading"}-${videos.length}`}
                     delay={0.04}
                   >
                     {/* =================================================================
@@ -12256,8 +12316,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   </AnimatedSection>
 
                   <AnimatedSection
-                    key={`${id}-soundtrack-${soundtrackResolved ? "ready" : "loading"}-${soundtrackTracks.length}`}
-                    delay={0.06}
+                    delay={0.04}
                   >
                     {soundtrackSearchQuery &&
                       (soundtrackLoading ||
@@ -12438,7 +12497,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   id="section-sentiment"
                   ref={registerSection("sentiment")}
                 >
-                  <AnimatedSection delay={0.04} renderImmediately>
+                  <AnimatedSection delay={0.04}>
                     {/* ===================================================== */}
                     {/* Trakt: sentimientos - Solo mostrar si no hay error */}
                     {!tSentiment.error && (
@@ -12577,7 +12636,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   id="section-comments"
                   ref={registerSection("comments")}
                 >
-                  <AnimatedSection delay={0.04} renderImmediately>
+                  <AnimatedSection delay={0.04}>
                     {/* ===================================================== */}
                     {/* Trakt: comentarios */}
                     <section className="mb-10 group/section">
@@ -12706,7 +12765,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 </section>
 
                 <section id="section-lists" ref={registerSection("lists")}>
-                  <AnimatedSection delay={0.04} renderImmediately>
+                  <AnimatedSection delay={0.04}>
                     {/* ===================================================== */}
                     {/* Trakt: listas - Solo mostrar si no hay error */}
                     {!tLists.error && (
@@ -12726,7 +12785,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               </span>
                             </div>
                           ) : (
-                            (tLists.items || []).map((row) => {
+                            visibleTitleLists.map((row) => {
                               const list = row?.list || row || {};
                               const user = row?.user || list?.user || {};
                               const previews = row?.previewPosters || [];
@@ -12833,24 +12892,25 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           )}
                         </div>
 
-                        {tLists.hasMore && (
+                        {hiddenTitleListsCount > 0 && (
                           <div className="mt-8 flex justify-center">
                             <button
-                              onClick={() =>
-                                setTLists((p) => ({
-                                  ...p,
-                                  page: (p.page || 1) + 1,
-                                }))
-                              }
-                              className="group relative inline-flex items-center justify-center overflow-hidden rounded-full p-0.5 font-bold focus:outline-none"
+                              type="button"
+                              onClick={() => setExpandedTitleLists((value) => !value)}
+                              aria-expanded={expandedTitleLists}
+                              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 px-5 text-sm font-bold text-zinc-200 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] backdrop-blur-[50px] transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400"
                             >
-                              <span className="absolute h-full w-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 opacity-0 transition-opacity duration-300 group-hover:opacity-100"></span>
-                              <span className="relative flex items-center gap-2 rounded-full bg-black px-6 py-2.5 transition-all duration-300 group-hover:bg-opacity-0">
-                                <span className="bg-gradient-to-r from-indigo-200 to-white bg-clip-text text-transparent group-hover:text-white">
-                                  Cargar más listas
-                                </span>
-                                <ChevronDown className="h-4 w-4 text-indigo-300 group-hover:text-white" />
-                              </span>
+                              {expandedTitleLists ? (
+                                <>
+                                  Ver menos
+                                  <ChevronUp className="h-4 w-4" aria-hidden="true" />
+                                </>
+                              ) : (
+                                <>
+                                  Ver {hiddenTitleListsCount} {hiddenTitleListsCount === 1 ? "lista más" : "listas más"}
+                                  <ChevronDown className="h-4 w-4" aria-hidden="true" />
+                                </>
+                              )}
                             </button>
                           </div>
                         )}

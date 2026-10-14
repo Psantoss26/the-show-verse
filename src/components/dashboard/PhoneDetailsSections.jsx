@@ -45,6 +45,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Layers,
   ListVideo,
   Loader2,
@@ -151,6 +152,7 @@ function toRatingNumber(value) {
 }
 
 const COMMENTS_PAGE_SIZE = 5;
+const TITLE_LISTS_PAGE_SIZE = 10;
 
 // Cubo de resolución de una imagen, igual que en la ficha completa.
 function imgResBucket(img) {
@@ -761,6 +763,17 @@ export default function PhoneDetailsSections({
     });
   }, []);
 
+  const loadCommentsSheetPage = useCallback((page, tab) => {
+    const sort = tab === "recent" ? "newest" : tab === "likes30" ? "likes30" : "likes";
+    return traktGetComments({
+      type: type === "tv" ? "show" : "movie",
+      tmdbId: id,
+      sort,
+      page,
+      limit: COMMENTS_PAGE_SIZE,
+    });
+  }, [id, type]);
+
   const commentsPage = comments.page;
   useEffect(() => {
     if (id == null) return undefined;
@@ -821,7 +834,7 @@ export default function PhoneDetailsSections({
           tmdbId: id,
           sort: "popular",
           page: 1,
-          limit: 6,
+          limit: TITLE_LISTS_PAGE_SIZE,
         });
         if (ignore) return;
         const items = Array.isArray(result?.items)
@@ -836,10 +849,13 @@ export default function PhoneDetailsSections({
         }
       }
     })();
-    return () => {
-      ignore = true;
-    };
+    return () => { ignore = true; };
   }, [id, type]);
+
+  const [expandedTitleLists, setExpandedTitleLists] = useState(false);
+  const visibleTitleLists = expandedTitleLists ? lists.items : lists.items.slice(0, 6);
+  const hiddenTitleListsCount = Math.max(0, lists.items.length - 6);
+  useEffect(() => setExpandedTitleLists(false), [id, type]);
 
   /* ------------------- MENÚ PEGAJOSO Y SECCIÓN ACTIVA ------------------- */
   const sectionElsRef = useRef({});
@@ -1062,6 +1078,41 @@ export default function PhoneDetailsSections({
       onClick: () => onOpenSeason?.(sn),
     };
   });
+  const specialSeason = tmdbSeasons.find(
+    (season) => Number(season?.season_number) === 0,
+  );
+  const seasonSheetCardItems = [
+    ...seasonCardItems,
+    ...(specialSeason
+      ? [
+          {
+            key: 0,
+            seasonNumber: 0,
+            seasonId: specialSeason.id ?? null,
+            name: "Especiales",
+            posterPath: specialSeason.poster_path || null,
+            fallbackPosterPath: data?.poster_path || null,
+            airDate: specialSeason.air_date || null,
+            tmdbRating: specialSeason.vote_average ?? null,
+            imdbRating: seasonStructuresMismatch
+              ? (seriesGraphSeasonRatings.get(0) ?? null)
+              : (toRatingNumber(seasonImdbRatings?.[0]) ??
+                seriesGraphSeasonRatings.get(0) ??
+                null),
+            totalEpisodes: Number(specialSeason.episode_count || 0) || null,
+            watchedEpisodes: getWatchedEpisodeCountForSeason(
+              episodesWatched?.watchedBySeason,
+              0,
+              Number(specialSeason.episode_count || 0) || 0,
+            ),
+            imdbUrl: imdbId
+              ? `https://www.imdb.com/title/${imdbId}/episodes/?season=0`
+              : null,
+            onClick: () => onOpenSeason?.(0),
+          },
+        ]
+      : []),
+  ];
   const sheetArtworkTabs = buildArtworkSheetTabs({
     mobile: true,
     posters: images?.posters,
@@ -1080,7 +1131,7 @@ export default function PhoneDetailsSections({
     onOpenTitle,
     collection: { id: collectionId, name: collectionData?.collection?.name, items: collectionData?.items },
     awards: awardItems,
-    seasons: seasonCardItems,
+    seasons: seasonSheetCardItems,
     images: {
       tabs: sheetArtworkTabs,
       onSelect: (kind, filePath) => {
@@ -1101,6 +1152,7 @@ export default function PhoneDetailsSections({
       tab: commentsTab,
       onTabChange: selectCommentsTab,
       onPageChange: selectCommentsPage,
+      onLoadPage: loadCommentsSheetPage,
       mediaType: type,
       tmdbId: id,
       canLike: canLikeComments,
@@ -1140,7 +1192,7 @@ export default function PhoneDetailsSections({
         {/* === TEMPORADAS: mismo orden y selector que DetailsClient === */}
         {type === "tv" && (
           <section className="sv-phone-section" id="phone-section-seasons" ref={registerSection("seasons")}>
-            <AnimatedSection delay={0.04} renderImmediately>
+            <AnimatedSection delay={0.04}>
               <SeasonsSection items={seasonCardItems} phoneLayout onOpenAll={sectionSheetOpener("seasons")} />
             </AnimatedSection>
           </section>
@@ -1681,7 +1733,7 @@ export default function PhoneDetailsSections({
 
           {/* === SOUNDTRACK Y MÚSICA === */}
           {soundtrack?.query ? (
-            <AnimatedSection delay={0.06}>
+            <AnimatedSection delay={0.04}>
               <section className="mt-6 group/section">
                 <SectionTitle title="Soundtrack y música" icon={Music2} onOpen={sectionSheetOpener("soundtrack")} />
                 {soundtrack.loading && soundtrack.tracks.length === 0 ? (
@@ -1794,7 +1846,7 @@ export default function PhoneDetailsSections({
 
         {/* === ANÁLISIS DE SENTIMIENTOS === */}
         <section className="sv-phone-section" id="phone-section-sentiment" ref={registerSection("sentiment")}>
-          <AnimatedSection delay={0.04} renderImmediately>
+          <AnimatedSection delay={0.04}>
             <section className="group/section">
               <SectionTitle title="Análisis de sentimientos" icon={Sparkles} onOpen={sectionSheetOpener("sentiment")} />
               <div
@@ -1891,7 +1943,7 @@ export default function PhoneDetailsSections({
 
         {/* === COMENTARIOS === */}
         <section className="sv-phone-section" id="phone-section-comments" ref={registerSection("comments")}>
-          <AnimatedSection delay={0.04} renderImmediately>
+          <AnimatedSection delay={0.04}>
             <section className="group/section">
               <SectionTitle title="Comentarios" icon={MessageSquare} onOpen={sectionSheetOpener("comments")} />
               <div
@@ -2047,12 +2099,12 @@ export default function PhoneDetailsSections({
         {/* === LISTAS === */}
         {!lists.error && (
           <section className="sv-phone-section" id="phone-section-lists" ref={registerSection("lists")}>
-            <AnimatedSection delay={0.04} renderImmediately>
+            <AnimatedSection delay={0.04}>
               <section className="group/section">
                 <SectionTitle title="Listas" icon={ListVideo} onOpen={sectionSheetOpener("lists")} />
                 {/* Una tarjeta por fila, por el mismo motivo que Temporadas. */}
                 <div className="grid grid-cols-1 gap-6">
-                  {lists.loading ? (
+                  {lists.loading && lists.items.length === 0 ? (
                     <div className="py-20 flex flex-col items-center justify-center text-zinc-500 gap-3">
                       <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
                       <span className="text-sm font-medium animate-pulse">
@@ -2060,7 +2112,7 @@ export default function PhoneDetailsSections({
                       </span>
                     </div>
                   ) : (
-                    lists.items.map((row) => {
+                    visibleTitleLists.map((row) => {
                       const list = row?.list || row || {};
                       const user = row?.user || list?.user || {};
                       const previews = row?.previewPosters || [];
@@ -2135,6 +2187,29 @@ export default function PhoneDetailsSections({
                     })
                   )}
                 </div>
+                {hiddenTitleListsCount > 0 && !lists.loading ? (
+                  <div className="mt-8 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedTitleLists((value) => !value)}
+                      aria-expanded={expandedTitleLists}
+                      className="inline-flex min-h-10 items-center gap-2 rounded-full bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 px-5 text-sm font-bold text-zinc-200 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] backdrop-blur-[50px] transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400"
+                    >
+                      {expandedTitleLists ? (
+                        <>
+                          Ver menos
+                          <ChevronUp className="h-4 w-4" aria-hidden="true" />
+                        </>
+                      ) : (
+                        <>
+                          Ver {hiddenTitleListsCount}{" "}
+                          {hiddenTitleListsCount === 1 ? "lista más" : "listas más"}
+                          <ChevronDown className="h-4 w-4" aria-hidden="true" />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                ) : null}
               </section>
             </AnimatedSection>
           </section>

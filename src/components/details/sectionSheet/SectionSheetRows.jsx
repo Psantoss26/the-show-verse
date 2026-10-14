@@ -15,9 +15,9 @@ const ROW_BASE = "flex items-center rounded-2xl bg-black/15 transition-colors";
 const ROW = `${ROW_BASE} gap-3.5 p-2.5`;
 const LINK_STATES = "hover:bg-white/[0.07] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400";
 const ROW_LINK = `${ROW} ${LINK_STATES}`;
-// Personas y títulos: tarjeta más grande (foto o póster de 80px).
-const ROW_LINK_LARGE = `${ROW_BASE} gap-4 p-3 ${LINK_STATES}`;
-const LARGE_POSTER = "aspect-[2/3] w-20 rounded-xl";
+// Personas y títulos: compacto hasta Full HD; más amplio en monitores grandes.
+const ROW_LINK_LARGE = `${ROW_BASE} gap-3 p-2.5 min-[1920px]:gap-4 min-[1920px]:p-3 ${LINK_STATES}`;
+const LARGE_POSTER = "aspect-[2/3] w-16 min-[1920px]:w-20 rounded-xl";
 
 function tmdbImage(path, size) {
   return path ? `https://image.tmdb.org/t/p/${size}${path}` : null;
@@ -46,10 +46,10 @@ export function PersonRow({ person, role, episodes = null, badge = null, title =
         icon={User}
       />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-base font-bold leading-tight text-white">{person.name}</span>
-        {role ? <span className="mt-1 block line-clamp-2 text-sm text-zinc-400">{role}</span> : null}
+        <span className="block truncate text-sm font-bold leading-tight text-white min-[1920px]:text-base">{person.name}</span>
+        {role ? <span className="mt-1 block line-clamp-2 text-xs text-zinc-400 min-[1920px]:text-sm">{role}</span> : null}
         {tag ? (
-          <span className="mt-2 inline-flex rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-bold text-zinc-200">
+          <span className="mt-2 inline-flex rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-bold text-zinc-200 min-[1920px]:px-2.5 min-[1920px]:text-xs">
             {tag}
           </span>
         ) : null}
@@ -78,12 +78,12 @@ export function TitleRow({ item, mediaType, onNavigate, onOpenTitle, showImdb = 
     }} className={ROW_LINK_LARGE}>
       <Poster src={tmdbImage(item?.poster_path, "w342")} alt="" className={LARGE_POSTER} />
       <span className="min-w-0 flex-1">
-        <span className="block line-clamp-2 text-base font-bold leading-tight text-white">{title}</span>
-        <span className="mt-1 block text-sm font-bold text-zinc-400">
+        <span className="block line-clamp-2 text-sm font-bold leading-tight text-white min-[1920px]:text-base">{title}</span>
+        <span className="mt-1 block text-xs font-bold text-zinc-400 min-[1920px]:text-sm">
           {[year, type === "tv" ? "Serie" : "Película"].filter(Boolean).join(" · ")}
         </span>
         {rating != null || showImdb ? (
-          <span className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm font-bold tabular-nums text-white">
+          <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs font-bold tabular-nums text-white min-[1920px]:gap-x-4 min-[1920px]:text-sm">
             {rating != null ? (
               <span className="inline-flex items-center gap-1.5">
                 <OptimizedImage src="/logo-TMDb.png" alt="TMDb" className="h-3.5 w-auto" />

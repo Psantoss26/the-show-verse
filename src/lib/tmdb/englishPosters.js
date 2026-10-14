@@ -11,6 +11,9 @@ import { peekListArtwork, requestListArtwork } from "@/lib/tmdb/artworkBatch";
 //
 // Caché de la pestaña: `null` significa "resuelto, sin póster inglés" (la
 // parrilla no pinta entonces el póster guardado, y lo compartido tampoco).
+// Solo se guarda lo que TMDb CONTESTÓ: una consulta fallida (red, 429 agotado)
+// no se apunta como «sin póster», o el título quedaba sin portada toda la
+// sesión aunque sí la tuviera.
 export const englishPosterCache = new Map();
 
 export function englishPosterKey(item) {
@@ -56,13 +59,15 @@ export async function resolveEnglishPosterPath(item, { priority } = {}) {
       return picks.poster || null;
     }
     const images = await fetchTmdbImages(mediaType, tmdbId, priority ? { priority } : undefined);
-    const posterPath = pickBestFavoriteEnglishPoster(images?.posters || [])?.file_path || null;
+    // `null` = no se pudo consultar: sin póster ahora, pero sin recordarlo.
+    if (!images) return null;
+    const posterPath = pickBestFavoriteEnglishPoster(images.posters || [])?.file_path || null;
     englishPosterCache.set(key, posterPath);
     return posterPath;
   } catch {
     // Una petición fallida tampoco debe exponer un póster localizado
-    // mientras se está mostrando una parrilla que exige arte inglés.
-    englishPosterCache.set(key, null);
+    // mientras se está mostrando una parrilla que exige arte inglés (ni
+    // recordarse como «sin póster»: la próxima vez se vuelve a consultar).
     return null;
   }
 }

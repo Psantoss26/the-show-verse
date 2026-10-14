@@ -2198,11 +2198,13 @@ function NavbarContent() {
   // temporadas en todas las vistas (transparente en la posición inicial, cristal
   // al desplazarse): su fondo es una imagen fija a pantalla completa, así que
   // la barra transparente siempre tiene detrás la imagen del episodio.
-  //
-  // Los detalles de lista, de lista de la comunidad y de colección pintan
-  // también su imagen a pantalla completa detrás de la cabecera: llevan la
-  // MISMA navbar transparente que la ficha, en escritorio y en móvil.
-  const isListDetailsRoute = /^\/lists\/(?:collection\/|community\/)?[^/]+\/?$/.test(pathname || "");
+  // Los detalles de listas y colecciones también colocan su imagen de fondo
+  // bajo la cabecera. Se consideran inmersivos para conservar la entrada
+  // transparente de DetailsClient; el índice /lists queda fuera y usa la
+  // misma barra estándar que Favoritos y Pendientes.
+  const isListDetailsRoute = /^\/lists\/(?:collection\/|community\/)?[^/]+\/?$/.test(
+    pathname || "",
+  );
   const isSeasonDetailsRoute = /^\/details\/tv\/[^/]+\/season\/[^/]+\/?$/.test(pathname || "");
   const isEpisodeDetailsRoute = /^\/details\/tv\/[^/]+\/season\/[^/]+\/episode\/[^/]+\/?$/.test(pathname || "");
   const isDetailsRoute =
@@ -2666,10 +2668,8 @@ function NavbarContent() {
         // móvil). Lo leen los avisos emergentes para colocarse justo debajo.
         data-immersive={isImmersiveRoute ? "" : undefined}
         className={`sv-topbar sticky top-0 z-40 w-full transition-[background-color,backdrop-filter,box-shadow] duration-300 ${
-          heroNavMode
-            ? "bg-gradient-to-b from-black/60 via-black/25 to-transparent"
-            : desktopDetailsNavMode
-              ? "desktop:bg-gradient-to-b desktop:from-black/60 desktop:via-black/25 desktop:to-transparent"
+          heroNavMode || desktopDetailsNavMode
+            ? ""
             : isImmersiveRoute
               ? // FICHA / RECOMENDACIONES: escritorio glass tras scroll (desktop:);
                 // MÓVIL transparente, compacto y visible/interactivo desde la
@@ -2703,7 +2703,8 @@ function NavbarContent() {
             En MÓVIL y TABLET la barra es TRANSPARENTE arriba del todo y el
             cristal aparece al desplazarse (`.sv-topbar-glass-fade`): en reposo
             solo tenía detrás el fondo de la página, y en las de usuario lo
-            teñía de su color. En escritorio sigue siempre presente. */}
+            teñía de su color. En escritorio el cristal estándar permanece
+            visible, igual que en Favoritos y Pendientes. */}
         {!heroNavMode && !isImmersiveRoute && (
           <TopBarGlass className="-z-10 sv-topbar-glass-fade" dataScrolled={isScrolled} />
         )}

@@ -332,6 +332,7 @@ export const titleCommunityState = pgTable('title_community_state', {
   traktId: integer('trakt_id'),
   status: text('status').default('pending').notNull(),// pending|seeding|ready|failed
   commentCount: integer('comment_count').default(0).notNull(),
+  commentsCachedAt: timestamp('comments_cached_at', { withTimezone: true }),
   seededAt: timestamp('seeded_at', { withTimezone: true }),
   sentimentBuiltAt: timestamp('sentiment_built_at', { withTimezone: true }),
   sentimentProvider: text('sentiment_provider'),      // heuristic|ollama|openai|gemini

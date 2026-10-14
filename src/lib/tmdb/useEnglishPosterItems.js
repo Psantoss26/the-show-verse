@@ -94,6 +94,8 @@ export function useEnglishPosterItems(
           backdropPath: null,
           backdrop_path: null,
           _englishPosterPending: !resolved,
+          // Resuelto y sin póster inglés: quien no quiera huecos lo oculta.
+          _englishPosterMissing: resolved,
         };
       }
       return item;

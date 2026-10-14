@@ -8,6 +8,11 @@
 // de temporada anterior/siguiente y el lápiz de editar son navegación/edición
 // de la página: en una imagen no significan nada.
 //
+// Y la de un EPISODIO (`episode`): el mismo dibujo, con la portada de su
+// cabecera móvil (sus imágenes horizontales apiladas, `stillPaths`), el
+// antetítulo «Episodio N · Temporada M» (`kicker`) sobre su nombre y la misma
+// fila reducida que la temporada: visto · nota.
+//
 // Lo usan los dos extremos:
 //   - el cliente (DetailsClient) arma el payload con `buildShareCardPayload`;
 //   - la ruta /api/share/details-card lo valida con `sanitizeShareCard` y pinta
@@ -21,6 +26,8 @@ export const SHARE_CARD_HEIGHT = 1920;
 const TMDB_PATH_RE = /^\/[\w-]+\.(?:jpg|jpeg|png|svg|webp)$/i;
 const PERCENT_RE = /^(\d{1,3})%$/;
 const SCORE_KEYS = ["tmdb", "trakt", "imdb"];
+// Bandas de la portada de un episodio: las de EpisodeStillStack.
+export const SHARE_CARD_MAX_STILLS = 3;
 
 function text(value, max) {
   return String(value ?? "")
@@ -49,6 +56,11 @@ function percent(value) {
 function seasonData(raw) {
   if (!raw || typeof raw !== "object") return null;
   return { previous: raw.previous === true, next: raw.next === true };
+}
+
+function stillPaths(raw) {
+  if (!Array.isArray(raw)) return [];
+  return [...new Set(raw.map(tmdbImagePath).filter(Boolean))].slice(0, SHARE_CARD_MAX_STILLS);
 }
 
 function score(raw) {
@@ -98,6 +110,10 @@ export function sanitizeShareCard(body) {
     scores: Object.fromEntries(SCORE_KEYS.map((key) => [key, score(scores[key])])),
     // Temporada: si hay temporada anterior / siguiente (sus flechas).
     season: type === "tv" ? seasonData(body?.season) : null,
+    // Episodio: portada de imágenes apiladas y antetítulo sobre el nombre.
+    episode: type === "tv" && body?.episode === true,
+    kicker: text(body?.kicker, 60) || null,
+    stillPaths: type === "tv" ? stillPaths(body?.stillPaths) : [],
   };
 }
 
@@ -122,6 +138,9 @@ export function buildShareCardPayload({
   commentsActive,
   scores,
   season = null,
+  episode = false,
+  kicker = null,
+  stillPaths: stills = [],
 }) {
   // Misma lectura que TraktWatchedControl: en series el badge es el progreso
   // ("45%"); en películas, el número de visionados.
@@ -159,6 +178,9 @@ export function buildShareCardPayload({
       }),
     ),
     season: season ? { previous: !!season.previous, next: !!season.next } : null,
+    episode: !!episode,
+    kicker: kicker || null,
+    stillPaths: Array.isArray(stills) ? stills.filter(Boolean) : [],
   };
 }
 
@@ -177,7 +199,7 @@ export function buildShareCardPayload({
  * un número par de botones, justo a la izquierda del centro (con dos, a la
  * izquierda del todo).
  *
- * Temporadas: visto · nota (sin flechas ni editar).
+ * Temporadas y episodios: visto · nota (sin flechas ni editar).
  *
  * Cada botón: { key, icon, variant: "active", color, label?, labelSuffix?, fill?, filledIcon?, iconColor?, wide? }
  */
@@ -200,7 +222,7 @@ export function shareCardActionButtons(card) {
     } else if (a.plays > 0) {
       watched = { ...base, label: String(a.plays), labelSuffix: a.plays === 1 ? " vez" : " veces" };
     } else {
-      watched = { ...base, label: "Vista" };
+      watched = { ...base, label: card.episode ? "Visto" : "Vista" };
     }
   }
 
@@ -213,7 +235,7 @@ export function shareCardActionButtons(card) {
       : null;
 
   const others = [rating];
-  if (!card.season) {
+  if (!card.season && !card.episode) {
     others.push(
       toggle("favorite", "heart", a.favorite, "red", true),
       toggle("watchlist", "bookmark", a.watchlist, "blue", true),

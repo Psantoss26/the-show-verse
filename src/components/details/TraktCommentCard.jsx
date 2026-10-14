@@ -5,6 +5,7 @@
 // (details/sectionSheet): mismo marcado en los dos sitios.
 
 import Link from "next/link";
+import { useId, useState } from "react";
 import Avatar from "@/components/ui/Avatar";
 import CommentLikeButton from "@/components/community/CommentLikeButton";
 import { formatDateTimeEs, stripHtml } from "@/lib/details/formatters";
@@ -17,9 +18,12 @@ export default function TraktCommentCard({
   tmdbId,
   canLike = false,
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const commentTextId = useId();
   const user = c?.user || {};
   const avatar = user?.images?.avatar?.full || user?.images?.avatar?.medium || null;
   const text = stripHtml(c?.comment?.comment ?? c?.comment ?? "");
+  const isLong = text.length > 360;
   const created = c?.created_at ? formatDateTimeEs(c.created_at) : "";
   const likes = Number(c?.likes || 0);
   const commentUsername = String(user?.username || "").trim();
@@ -86,9 +90,20 @@ export default function TraktCommentCard({
           <span className="absolute -left-3 -top-1 font-serif text-4xl text-white/5">
             “
           </span>
-          <p className="whitespace-pre-line">
+          <p id={commentTextId} className={`whitespace-pre-line ${isLong && !expanded ? "line-clamp-6" : ""}`}>
             {text}
           </p>
+          {isLong ? (
+            <button
+              type="button"
+              aria-expanded={expanded}
+              aria-controls={commentTextId}
+              onClick={() => setExpanded((value) => !value)}
+              className="mt-1 rounded text-xs font-bold text-emerald-300 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/80"
+            >
+              {expanded ? "Ver menos" : "Ver más"}
+            </button>
+          ) : null}
         </div>
 
         {/* Actions Footer */}

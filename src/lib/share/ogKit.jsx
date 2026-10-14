@@ -332,6 +332,16 @@ export function loadAmbientBase(posterPath) {
   return posterPath ? fetchImage(`${TMDB}/w92${posterPath}`, 4000) : null;
 }
 
+// Bandas de la portada de un episodio (stills 16:9 a lo ancho de la imagen):
+// w1280 basta para 1080 px; si no llega a tiempo, w780.
+export async function loadStill(stillPath) {
+  if (!stillPath) return null;
+  return (
+    (await fetchImage(`${TMDB}/w1280${stillPath}`, 5000)) ||
+    fetchImage(`${TMDB}/w780${stillPath}`, 4000)
+  );
+}
+
 // Fondo de las secciones del VÍDEO: la portada RECONOCIBLE (apenas difuminada),
 // así que hace falta más resolución que para el ambiental.
 export async function loadStoryPoster(posterPath) {
@@ -535,6 +545,9 @@ export function ScoreBadge({ logo, size, score }) {
 
 // Logo del título encajado en su caja máxima, apoyado sobre la fila de
 // acciones; sin logo, el título en texto (salvo que la portada ya lo traiga).
+// Alto del antetítulo con su margen (32 px de letra + 22 de aire).
+const KICKER_H = 64;
+
 export function TitleArt({ card, logo, bottom = LOGO_BOTTOM }) {
   let box = null;
   if (logo) {
@@ -544,6 +557,25 @@ export function TitleArt({ card, logo, bottom = LOGO_BOTTOM }) {
   }
   if (!box && !card.showTitle) return null;
   const height = box ? box.height : 220;
+  const kickerH = card.kicker ? KICKER_H : 0;
+  // Antetítulo (episodios: «Episodio N · Temporada M»), como en la cabecera
+  // móvil: pequeño, en mayúsculas y espaciado, justo encima del nombre.
+  const kicker = card.kicker ? (
+    <div
+      style={{
+        display: "flex",
+        marginBottom: 22,
+        fontSize: 32,
+        fontWeight: 700,
+        letterSpacing: 6,
+        textTransform: "uppercase",
+        color: "rgba(212,212,216,0.95)",
+        textShadow: "0 2px 16px rgba(0,0,0,0.9)",
+      }}
+    >
+      {card.kicker}
+    </div>
+  ) : null;
 
   return (
     <div
@@ -551,13 +583,15 @@ export function TitleArt({ card, logo, bottom = LOGO_BOTTOM }) {
         position: "absolute",
         left: 0,
         width: W,
-        top: bottom - height,
-        height,
+        top: bottom - height - kickerH,
+        height: height + kickerH,
         display: "flex",
-        alignItems: "flex-end",
-        justifyContent: "center",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "flex-end",
       }}
     >
+      {kicker}
       {box ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img

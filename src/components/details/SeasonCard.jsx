@@ -68,7 +68,8 @@ export default function SeasonCard({
   compact = false,
 }) {
   const poster = useSeasonPoster({ seasonId, posterPath, fallbackPosterPath });
-  const title = `Temporada ${seasonNumber}`;
+  const isSpecials = Number(seasonNumber) === 0;
+  const title = isSpecials ? "Especiales" : `Temporada ${seasonNumber}`;
   const subtitle = seasonSubtitle(name, title);
   const year = seasonYear(airDate);
   const total = Number(totalEpisodes) || null;
@@ -230,7 +231,8 @@ export function SeasonPosterCard({
   onPrefetch,
 }) {
   const poster = useSeasonPoster({ seasonId, posterPath, fallbackPosterPath });
-  const title = `Temporada ${seasonNumber}`;
+  const isSpecials = Number(seasonNumber) === 0;
+  const title = isSpecials ? "Especiales" : `Temporada ${seasonNumber}`;
   const subtitle = seasonSubtitle(name, title);
   const total = Number(totalEpisodes) || null;
   const watched = Math.max(0, Math.min(Number(watchedEpisodes) || 0, total || 0));

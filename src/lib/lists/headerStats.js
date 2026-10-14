@@ -19,7 +19,9 @@ export function formatStatNumber(value) {
 
 const sum = (lists, field) => lists.reduce((total, list) => total + (Number(list?.[field]) || 0), 0);
 
-export function listsHeaderStats(source, lists) {
+// `totals` (solo comunidad): las cifras de TODAS las listas guardadas, que el
+// índice trae del servidor; las cargadas son solo las páginas ya recorridas.
+export function listsHeaderStats(source, lists, totals = null) {
   const rows = Array.isArray(lists) ? lists : [];
   const count = rows.length;
   const items = sum(rows, "item_count");
@@ -33,9 +35,9 @@ export function listsHeaderStats(source, lists) {
   }
   if (source === "trakt") {
     return [
-      { key: "count", label: "Listas", value: formatStatNumber(count), icon: "list", tone: "purple" },
-      { key: "items", label: "Títulos", value: formatStatNumber(items), icon: "film", tone: "sky" },
-      { key: "likes", label: "Me gusta", value: formatStatNumber(sum(rows, "likes")), icon: "heart", tone: "rose" },
+      { key: "count", label: "Listas", value: formatStatNumber(totals?.lists ?? count), icon: "list", tone: "purple" },
+      { key: "items", label: "Títulos", value: formatStatNumber(totals?.items ?? items), icon: "film", tone: "sky" },
+      { key: "likes", label: "Me gusta", value: formatStatNumber(totals?.likes ?? sum(rows, "likes")), icon: "heart", tone: "rose" },
     ];
   }
   return [

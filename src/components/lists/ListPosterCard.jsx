@@ -16,7 +16,7 @@ const DETAILS_HREF_RE = /^\/details\/(movie|tv)\/(\d+)(?:[/?#]|$)/;
 // navegador —p. ej. precargada desde el índice de /lists al pasar el ratón por
 // la lista— se pinta tal cual en el primer fotograma, sin pulso ni fundido; si
 // no, aparece con su fundido cuando está descargada y decodificada.
-function TmdbPoster({ posterPath, alt, loading = false }) {
+function TmdbPoster({ posterPath, alt, loading = false, onError }) {
   const [failed, setFailed] = useState(false);
   const src = posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : null;
   const { imgRef, onLoad, ready: loaded, instant } = useImageLoadReady(loading ? null : src);
@@ -44,7 +44,10 @@ function TmdbPoster({ posterPath, alt, loading = false }) {
         loading="lazy"
         draggable={false}
         onLoad={onLoad}
-        onError={() => setFailed(true)}
+        onError={() => {
+          setFailed(true);
+          onError?.();
+        }}
       />
     </>
   );
@@ -90,6 +93,9 @@ export default function ListPosterCard({
   voteAverage,
   imdbRating,
   posterLoading = false,
+  // La imagen no carga (borrada en TMDb, ruta rota): quien no quiera huecos
+  // en la parrilla quita la tarjeta.
+  onPosterError,
   children,
   onClick,
   className = "",
@@ -117,7 +123,7 @@ export default function ListPosterCard({
     <div
       className={`relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-black/20 bg-gradient-to-br from-white/10 via-transparent to-black/35 shadow-lg backdrop-blur-[28px] ${className}`}
     >
-      <TmdbPoster posterPath={posterPath} alt={title} loading={posterLoading} />
+      <TmdbPoster posterPath={posterPath} alt={title} loading={posterLoading} onError={onPosterError} />
 
       {!disableHover ? (
         <>

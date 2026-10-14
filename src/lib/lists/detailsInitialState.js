@@ -114,6 +114,7 @@ export function communityListPreviewFromIndex(entry) {
     description: entry.description || '',
     item_count: Number(entry.item_count) || 0,
     likes: Number(entry.likes) || 0,
+    traktUrl: entry.traktUrl || null,
     user: entry.user || null,
   }
 }

@@ -359,6 +359,11 @@ export default function FilterableListItems({
   emptyText = "No se encontraron títulos con estos filtros.",
   // Solo quien puede gestionar la lista ve el modo borrar.
   editable = false,
+  // Listas de la comunidad: los títulos sin portada (sin póster inglés en
+  // TMDb, o cuya imagen no carga) no se enseñan, en vez de dejar un hueco gris.
+  // En las listas propias se quedan: el usuario tiene que poder verlos y
+  // quitarlos.
+  hideMissingPosters = false,
 }) {
   const previewClick = usePreviewOpen();
   const [q, setQ] = useState("");
@@ -420,16 +425,40 @@ export default function FilterableListItems({
   const englishPosterItems = useEnglishPosterItems(visibleItems, true, {
     hideOriginalPosters: true,
   });
+  // Tarjetas cuya imagen no cargó (solo con `hideMissingPosters`).
+  const [brokenPosters, setBrokenPosters] = useState(() => new Set());
+  const markPosterBroken = useCallback((path) => {
+    if (!path) return;
+    setBrokenPosters((current) => {
+      if (current.has(path)) return current;
+      const next = new Set(current);
+      next.add(path);
+      return next;
+    });
+  }, []);
   const visibleGroupsWithEnglishPosters = useMemo(() => {
     let itemIndex = 0;
-    return visibleGroups.map((group) => ({
-      ...group,
-      entries: group.entries.map((entry) => {
-        const item = englishPosterItems[itemIndex++] || entry.item;
-        return { ...entry, item, meta: getMeta(item, entry.index) };
-      }),
-    }));
-  }, [visibleGroups, englishPosterItems, getMeta]);
+    return visibleGroups
+      .map((group) => ({
+        ...group,
+        entries: group.entries
+          .map((entry) => {
+            const item = englishPosterItems[itemIndex++] || entry.item;
+            return { ...entry, item, meta: getMeta(item, entry.index) };
+          })
+          .filter(
+            (entry) =>
+              !hideMissingPosters ||
+              !(
+                entry.item?._englishPosterMissing ||
+                brokenPosters.has(entry.meta.posterPath)
+              ),
+          ),
+      }))
+      .filter((group) => group.entries.length);
+  }, [visibleGroups, englishPosterItems, getMeta, hideMissingPosters, brokenPosters]);
+  const posterErrorHandler = (entry) =>
+    hideMissingPosters ? () => markPosterBroken(entry.meta.posterPath) : undefined;
 
   useEffect(() => {
     if (skipInitialResetRef.current) {
@@ -495,6 +524,7 @@ export default function FilterableListItems({
         voteAverage={entry.meta.voteAverage}
         imdbRating={entry.meta.imdbRating}
         posterLoading={entry.meta.posterLoading}
+        onPosterError={posterErrorHandler(entry)}
         disableHover={viewMode === "compact"}
       />
     );
@@ -679,6 +709,7 @@ export default function FilterableListItems({
                         mediaType={entry.meta.mediaType}
                         posterPath={entry.meta.posterPath}
                         posterLoading={entry.meta.posterLoading}
+                        onPosterError={posterErrorHandler(entry)}
                       />
                     </div>
                     <div className="min-w-0 flex-1">

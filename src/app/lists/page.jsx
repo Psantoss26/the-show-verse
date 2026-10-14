@@ -183,7 +183,7 @@ function ListsLoaderState({
     <div
       className={
         fullscreen
-          ? "min-h-screen bg-[#101010] flex items-center justify-center"
+          ? "min-h-screen bg-black flex items-center justify-center"
           : "flex flex-col items-center justify-center py-32"
       }
     >
@@ -357,6 +357,47 @@ const useInView = ({ rootMargin = "320px 0px", threshold = 0.01 } = {}) => {
 
   return [ref, inView];
 };
+
+/* --- Scroll infinito: pide más al acercarse al final ---
+   El observador se rehace al terminar cada carga: si tras ella el centinela
+   sigue a la vista (página corta, pantalla alta), su primera notificación ya
+   lo dice y se pide la siguiente sin esperar a otro scroll. */
+function LoadMoreSentinel({ onVisible, loading, failed = false }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    // Tras un fallo no se observa: se reintenta con el botón (si no, el
+    // centinela, aún a la vista, volvería a pedir en bucle).
+    if (!el || loading || failed || typeof IntersectionObserver === "undefined") return undefined;
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) onVisible?.();
+      },
+      { rootMargin: "1200px 0px" },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [onVisible, loading, failed]);
+
+  return (
+    <div ref={ref} className="flex min-h-16 items-center justify-center pt-8" aria-live="polite">
+      {loading ? (
+        <span className="inline-flex items-center gap-2 text-sm font-semibold text-zinc-400">
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          Cargando más listas…
+        </span>
+      ) : failed ? (
+        <button
+          type="button"
+          onClick={() => onVisible?.()}
+          className="rounded-xl bg-gradient-to-br from-white/10 to-white/5 px-5 py-2.5 text-sm font-bold text-zinc-200 shadow-lg backdrop-blur-lg transition hover:from-white/15 hover:to-white/10 hover:text-white"
+        >
+          No se pudieron cargar más listas · Reintentar
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
 function ListPreviewPosterStrip({ items = [], alt = "" }) {
   const previewItems = items.slice(0, 5);
@@ -1641,6 +1682,10 @@ const ListsContent = memo(function ListsContent({
   ensureListItems,
   isMobile,
   isBackNav,
+  communityHasMore = false,
+  communityLoadingMore = false,
+  communityLoadMoreError = false,
+  onCommunityLoadMore,
 }) {
   return (
     <AnimatePresence mode="wait" initial={!isBackNav}>
@@ -1741,6 +1786,19 @@ const ListsContent = memo(function ListsContent({
                 ))}
               </div>
             )}
+
+            {/* Comunidad: siguiente página al acercarse al final. DENTRO del
+                contenido, para que nazca con él: fuera, durante el relevo
+                entre pestañas (sale lo anterior y aún no ha entrado esto)
+                quedaba arriba, a la vista, y pedía más listas —«Cargando más
+                listas…»— antes de enseñar ninguna. */}
+            {contentSource === "trakt" && communityHasMore ? (
+              <LoadMoreSentinel
+                onVisible={onCommunityLoadMore}
+                loading={communityLoadingMore}
+                failed={communityLoadMoreError}
+              />
+            ) : null}
           </>
         )}
       </motion.div>
@@ -1775,7 +1833,7 @@ export default function ListsPage() {
     hasMore,
     create,
   } = useTmdbLists();
-  const { session, account } = useAuth();
+  const { session, account, hydrated: authHydrated } = useAuth();
 
   const [authStatus, setAuthStatus] = useState("checking");
   const [hasCompletedInitialLoad, setHasCompletedInitialLoad] = useState(false);
@@ -1807,7 +1865,16 @@ export default function ListsPage() {
   // Último contenido que SÍ estuvo listo (ver el relevo entre fuentes, más abajo).
   const [readyContent, setReadyContent] = useState({ source, lists: [] });
 
-  const trakt = useTraktLists({ mode: "popular" });
+  // Comunidad: el orden y la búsqueda los aplica el servidor sobre TODAS las
+  // listas guardadas, y se recorren por páginas (scroll infinito). Antes se
+  // pedía una sola página de 30 y el resto no se veía nunca.
+  const communitySortMode = effectiveSortMode(sortMode, "trakt");
+  const communityQuery = source === "trakt" ? deferredQuery.trim().toLowerCase() : "";
+  const trakt = useTraktLists({
+    mode: "popular",
+    sort: communitySortMode,
+    query: communityQuery,
+  });
   const [featuredCollections, setFeaturedCollections] = useState([]);
   const featuredCollectionsCount = featuredCollections.length;
   const [collectionsLoading, setCollectionsLoading] = useState(false);
@@ -1858,12 +1925,14 @@ export default function ListsPage() {
     });
   }, [prefsHydrated, query, sortMode, viewMode, source]);
 
-  // ✅ Auth
+  // ✅ Auth. «Sin sesión» solo cuando AuthContext ha terminado de comprobarla
+  // (`hydrated`): al arrancar su sesión es `null` hasta recuperar el perfil
+  // (caché o /api/auth/me), y al recargar Mis listas salía un instante el
+  // aviso de iniciar sesión aunque la hubiera.
   useEffect(() => {
-    if (session === undefined) return;
     if (session && account?.id) setAuthStatus("authenticated");
-    else setAuthStatus("anonymous");
-  }, [session, account]);
+    else if (authHydrated) setAuthStatus("anonymous");
+  }, [session, account, authHydrated]);
 
   const safePersonalLists = Array.isArray(lists) ? lists : [];
   const collectionsQueryKey =
@@ -1875,14 +1944,16 @@ export default function ListsPage() {
   const activeListsCacheKey = useMemo(() => {
     const scope =
       source === "trakt"
-        ? "popular"
+        ? `popular:${communitySortMode}:${communityQuery}`
         : source === "collections"
           ? collectionsQueryKey || "featured"
           : "personal";
     // Colecciones en v2: sus entradas llevan ya la popularidad (para ordenar
-    // por ella sin recolocar las tarjetas al llegar las vivas).
-    return `showverse:lists:index:${source}:${scope}:${source === "collections" ? "v2" : "v1"}`;
-  }, [source, collectionsQueryKey]);
+    // por ella sin recolocar las tarjetas al llegar las vivas). Comunidad en
+    // v2: guarda todas las páginas recorridas, por orden y búsqueda; v3: con
+    // el origen de cada lista (las de usuarios van delante, ver `filtered`).
+    return `showverse:lists:index:${source}:${scope}:${source === "personal" ? "v1" : source === "trakt" ? "v3" : "v2"}`;
+  }, [source, collectionsQueryKey, communitySortMode, communityQuery]);
 
   // Caché de la pestaña ACTIVA, leída en el mismo render que su clave. Antes era
   // un estado que se actualizaba en un efecto: justo después de cambiar de
@@ -1898,6 +1969,23 @@ export default function ListsPage() {
     );
     return Array.isArray(cached) ? cached : [];
   }, [prefsHydrated, activeListsCacheKey]);
+  // Totales de la comunidad guardados con sus páginas (cabecera al volver).
+  const cachedCommunityTotals = useMemo(() => {
+    if (!prefsHydrated || source !== "trakt") return null;
+    const cached = readSessionJsonCache(`${activeListsCacheKey}:totals`, LISTS_SOURCE_CACHE_TTL_MS);
+    return cached && typeof cached === "object" ? cached : null;
+  }, [prefsHydrated, source, activeListsCacheKey]);
+  const communityTotals = trakt?.totals || cachedCommunityTotals;
+  // Al volver, la caché trae todas las páginas que se habían recorrido y la
+  // petición viva empieza por la primera: hasta alcanzarlas se siguen pintando
+  // las de la caché (si no, el contenido encogería y el scroll saltaría).
+  // Si una página falla se deja de alcanzar (sin reintentos en bucle) y se
+  // pinta lo vivo con el botón de reintentar.
+  const communityCatchingUp =
+    source === "trakt" &&
+    !!trakt?.hasMore &&
+    !trakt?.loadMoreError &&
+    cachedActiveLists.length > (Array.isArray(trakt?.lists) ? trakt.lists.length : 0);
 
   // ✅ precarga las colecciones destacadas en segundo plano estando en otra
   // pestaña. Antes solo se pedían al pulsar "Colecciones", y la primera vez de
@@ -2098,11 +2186,25 @@ export default function ListsPage() {
     if (!Array.isArray(fetchedActiveLists) || fetchedActiveLists.length === 0) {
       return;
     }
+    // Sin pisar las páginas de la caché con menos mientras se alcanzan.
+    if (communityCatchingUp) return;
     writeSessionJsonCache(activeListsCacheKey, fetchedActiveLists);
-  }, [activeListsCacheKey, fetchedActiveLists]);
+  }, [activeListsCacheKey, fetchedActiveLists, communityCatchingUp]);
+
+  useEffect(() => {
+    if (source !== "trakt" || !trakt?.totals) return;
+    writeSessionJsonCache(`${activeListsCacheKey}:totals`, trakt.totals);
+  }, [source, activeListsCacheKey, trakt?.totals]);
+
+  // Alcanzar las páginas de la caché, una tras otra.
+  const traktLoadMore = trakt?.loadMore;
+  useEffect(() => {
+    if (!communityCatchingUp || trakt?.loading || trakt?.loadingMore) return;
+    traktLoadMore?.();
+  }, [communityCatchingUp, trakt?.loading, trakt?.loadingMore, traktLoadMore]);
 
   const activeLists = useMemo(() => {
-    if (fetchedActiveLists.length > 0) return fetchedActiveLists;
+    if (fetchedActiveLists.length > 0 && !communityCatchingUp) return fetchedActiveLists;
     const cached = Array.isArray(cachedActiveLists) ? cachedActiveLists : [];
     // Colecciones de la caché del índice con los likes más recientes de la
     // sesión (p. ej. el me gusta recién dado en su ficha): pintan ya el orden
@@ -2113,7 +2215,7 @@ export default function ListsPage() {
         ? { ...c, likes: collectionLikes[c.id] }
         : c,
     );
-  }, [fetchedActiveLists, cachedActiveLists, source, collectionLikes]);
+  }, [fetchedActiveLists, cachedActiveLists, source, collectionLikes, communityCatchingUp]);
 
   // Criterios de la pestaña y el que se aplica de verdad (la popularidad solo
   // en Colecciones).
@@ -2131,12 +2233,26 @@ export default function ListsPage() {
       return sortLists(activeLists, activeSortMode);
     }
 
-    // Para las listas propias y de comunidad, filtrar localmente.
+    // Para las listas propias y de comunidad, filtrar localmente (en la
+    // comunidad, al instante sobre lo cargado mientras llega la búsqueda del
+    // servidor).
     const base = q
       ? activeLists.filter((l) => (l?.name || "").toLowerCase().includes(q))
       : activeLists;
-    return sortLists(base, activeSortMode);
-  }, [activeLists, deferredQuery, activeSortMode, source]);
+    // Comunidad ya ordenada por el servidor con este criterio: se respeta su
+    // orden (las listas de usuarios delante; su A-Z puede diferir del de
+    // `localeCompare` y las páginas siguientes se intercalarían).
+    if (source === "trakt" && trakt?.resultsSort === activeSortMode) return base;
+    const sorted = sortLists(base, activeSortMode);
+    // Comunidad pintada desde la caché (antes de la respuesta): el mismo orden
+    // que el servidor, con las listas de usuarios de la app DELANTE. Si no, una
+    // lista tuya corta quedaba al final y, al llegar la respuesta, saltaba al
+    // primer puesto y movía toda la rejilla. `sort` es estable: el resto
+    // conserva el criterio elegido.
+    return source === "trakt"
+      ? sorted.sort((a, b) => (b?.origin === "user") - (a?.origin === "user"))
+      : sorted;
+  }, [activeLists, deferredQuery, activeSortMode, source, trakt?.resultsSort]);
 
   const visibleCount = filtered.length;
 
@@ -2163,7 +2279,7 @@ export default function ListsPage() {
     source === "personal"
       ? `${safePersonalLists.length} listas creadas`
       : source === "trakt"
-        ? `${visibleCount} listas`
+        ? `${communityTotals?.lists ?? visibleCount} listas`
         : `${visibleCount} colecciones`;
 
   // ✅ ensureListItems multi-origen
@@ -2239,15 +2355,20 @@ export default function ListsPage() {
         }
 
         if (src === "trakt") {
-          // Comunidad: traemos una muestra de items de la lista desde nuestro
-          // backend y resolvemos el artwork final antes de pintar la tarjeta.
-          const res = await fetch(
-            `/api/community/lists/${encodeURIComponent(listId)}?limit=12`,
-            { signal: ctrl.signal, cache: "no-store" },
-          );
-          const j = await res.json().catch(() => ({}));
+          // Comunidad: una muestra de items de la lista y el artwork final
+          // resuelto antes de pintar la tarjeta. La muestra suele venir ya con
+          // el índice (`previewItems`); solo si no, se pide la lista.
+          let sample = Array.isArray(listObj?.previewItems) ? listObj.previewItems : null;
+          if (!sample) {
+            const res = await fetch(
+              `/api/community/lists/${encodeURIComponent(listId)}?limit=12`,
+              { signal: ctrl.signal, cache: "no-store" },
+            );
+            const j = await res.json().catch(() => ({}));
+            sample = Array.isArray(j?.items) ? j.items : [];
+          }
           await resolveAndStorePreview(
-            (Array.isArray(j?.items) ? j.items : [])
+            sample
               .filter((it) => it?.tmdbId)
               .map((it) => ({
                 id: it.tmdbId,
@@ -2413,8 +2534,13 @@ export default function ListsPage() {
     ? (deferredQuery.trim() ? searchedCollections : featuredCollections)
     : contentLists;
   const headerStats = useMemo(
-    () => listsHeaderStats(contentSource, statsLists),
-    [contentSource, statsLists],
+    () =>
+      listsHeaderStats(
+        contentSource,
+        statsLists,
+        contentSource === "trakt" ? communityTotals : null,
+      ),
+    [contentSource, statsLists, communityTotals],
   );
   const headerStatsLoading = !sourceInitialized && statsLists.length === 0;
   // Al volver atrás, las tarjetas de la pestaña con la que se vuelve salen
@@ -2442,7 +2568,7 @@ export default function ListsPage() {
 
   if (authStatus === "anonymous" && source === "personal") {
     return (
-      <div className="min-h-screen bg-[#101010] text-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-black text-gray-100 flex items-center justify-center">
         <div className="max-w-md text-center px-4">
           <div className="w-16 h-16 bg-zinc-900 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg border border-zinc-800">
             <ListVideo className="w-8 h-8 text-zinc-500" />
@@ -2463,7 +2589,10 @@ export default function ListsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#050505] text-zinc-100 font-sans selection:bg-purple-500/30">
+    // Fondo `bg-black`, el mismo del <body> (como Favoritos y Pendientes): la
+    // barra superior va sobre el <body>, y con otro tono la página empezaba
+    // bajo ella y la barra se veía como una franja negra con su borde.
+    <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-purple-500/30">
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-purple-600/15 blur-[120px] sm:blur-[150px]" />
         <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-purple-700/20 blur-[120px] sm:blur-[150px]" />
@@ -2883,6 +3012,10 @@ export default function ListsPage() {
             ensureListItems={ensureListItems}
             isMobile={isMobile}
             isBackNav={isBackNav}
+            communityHasMore={source === "trakt" && !!trakt?.hasMore && !communityCatchingUp}
+            communityLoadingMore={!!trakt?.loadingMore}
+            communityLoadMoreError={!!trakt?.loadMoreError}
+            onCommunityLoadMore={trakt?.loadMore}
           />
         ) : null}
 

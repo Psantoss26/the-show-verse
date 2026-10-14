@@ -30,6 +30,7 @@ import {
   loadLogo,
   loadPoster,
   loadShareFonts,
+  loadStill,
   posterFit,
   px,
   rgba,
@@ -65,8 +66,64 @@ export const dynamic = "force-dynamic";
 // desvanecer («SEASON 1» casi no se leía). Se encaja como el póster de las
 // colecciones (`posterFit` + `PosterWithContinuation`): sube lo justo para
 // terminar bajo la fila de acciones y se funde solo en su último tramo.
+//
+// EPISODIOS (`card.episode`): no tienen póster. La portada es la de su cabecera
+// móvil (EpisodeStillStack): sus imágenes horizontales apiladas en bandas
+// iguales, cada una fundida sobre la anterior en la unión, y el conjunto
+// fundido con el fondo por abajo como el póster. Encima, el antetítulo
+// «Episodio N · Temporada M» y el nombre; la fila, la de la temporada.
 
-function Card({ card, poster, ambient, ambientBase, logo, assets, fonts }) {
+// Unión difuminada entre bandas: los 56 px de EpisodeStillStack a la escala de
+// la imagen (~2,7× la pantalla del teléfono).
+const STILL_SEAM = 150;
+// Mismo fundido final que el póster a sangre: [opacidad, % del alto].
+const COVER_FADE = [[1, 58], [0.75, 72], [0.3, 86], [0, 98]];
+const fadeStop = ([alpha, pct], toPct = (value) => value) =>
+  `rgba(0,0,0,${alpha}) ${toPct(pct).toFixed(2)}%`;
+
+function StillStack({ stills }) {
+  const count = stills.length;
+  const band = POSTER_H / count;
+  return (
+    <div style={{ position: "absolute", top: 0, left: 0, width: W, height: POSTER_H, display: "flex" }}>
+      {stills.map((still, index) => {
+        const seam = index ? STILL_SEAM : 0;
+        const top = Math.round(index * band - seam);
+        const height = Math.round(band + seam);
+        // Cada banda entra fundiéndose sobre la anterior; la última, además,
+        // se desvanece hacia el fondo en el tramo final de la portada (el del
+        // póster, pasado a su caja).
+        const toBand = (pct) => (((pct / 100) * POSTER_H - top) / height) * 100;
+        const stops = [
+          ...(seam ? [fadeStop([0, 0]), fadeStop([1, (seam / height) * 100])] : []),
+          ...(index === count - 1 ? COVER_FADE.map((stop) => fadeStop(stop, toBand)) : []),
+        ];
+        return (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={still.src}
+            src={still.src}
+            width={W}
+            height={height}
+            alt=""
+            style={{
+              position: "absolute",
+              top,
+              left: 0,
+              width: W,
+              height,
+              objectFit: "cover",
+              objectPosition: "50% 50%",
+              ...(stops.length ? { maskImage: `linear-gradient(180deg, ${stops.join(", ")})` } : {}),
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function Card({ card, poster, stills, ambient, ambientBase, logo, assets, fonts }) {
   const buttons = shareCardActionButtons(card);
   const scores = ["tmdb", "trakt", "imdb"].filter((key) => card.scores[key]);
   // El de visionado va ampliado (ocupa dos botones): se suma su ancho real.
@@ -76,7 +133,7 @@ function Card({ card, poster, ambient, ambientBase, logo, assets, fonts }) {
   // Lo primero que va sobre la portada: la fila de estados o, si no hay
   // ninguno, el propio marcador (el logo se apoya en él).
   const stackTop = buttons.length ? BUTTONS_TOP : PANEL_TOP;
-  const burnedTitle = Boolean(poster && !logo && !card.showTitle);
+  const burnedTitle = Boolean(!stills.length && poster && !logo && !card.showTitle);
   const size = poster?.size?.width && poster?.size?.height ? poster.size : { width: 2, height: 3 };
   const fit = burnedTitle
     ? posterFit({ ratio: size.height / size.width, stackTop })
@@ -103,7 +160,9 @@ function Card({ card, poster, ambient, ambientBase, logo, assets, fonts }) {
         {/* Portada a sangre, fundida con el fondo por máscara (la de la ficha
             móvil): no se oscurece hacia negro, se vuelve transparente y deja ver
             el fondo ambiental, así no hay corte entre portada y botones. */}
-        {poster ? (
+        {stills.length ? (
+          <StillStack stills={stills} />
+        ) : poster ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={poster.src}
@@ -118,8 +177,7 @@ function Card({ card, poster, ambient, ambientBase, logo, assets, fonts }) {
               height: POSTER_H,
               objectFit: "cover",
               objectPosition: "50% 0%",
-              maskImage:
-                "linear-gradient(180deg, #000 0%, #000 58%, rgba(0,0,0,0.75) 72%, rgba(0,0,0,0.3) 86%, rgba(0,0,0,0) 98%)",
+              maskImage: `linear-gradient(180deg, #000 0%, ${COVER_FADE.map((stop) => fadeStop(stop)).join(", ")})`,
             }}
           />
         ) : null}
@@ -230,17 +288,19 @@ export async function POST(request) {
   }
 
   const card = sanitizeShareCard(body);
-  const [fonts, assets, poster, ambient, ambientBase, logo] = await Promise.all([
+  const [fonts, assets, poster, stills, ambient, ambientBase, logo] = await Promise.all([
     loadShareFonts(),
     loadLocalAssets(),
-    loadPoster(card.posterPath),
+    // Con portada de bandas (episodio), el póster no se pinta: no se pide.
+    card.stillPaths.length ? null : loadPoster(card.posterPath),
+    Promise.all(card.stillPaths.map(loadStill)).then((list) => list.filter(Boolean)),
     loadAmbient(card.posterPath),
     loadAmbientBase(card.posterPath),
     loadLogo(card.logoPath),
   ]);
 
   return new ImageResponse(
-    <Card card={card} poster={poster} ambient={ambient} ambientBase={ambientBase} logo={logo} assets={assets} fonts={Boolean(fonts)} />,
+    <Card card={card} poster={poster} stills={stills} ambient={ambient} ambientBase={ambientBase} logo={logo} assets={assets} fonts={Boolean(fonts)} />,
     {
       width: W,
       height: H,

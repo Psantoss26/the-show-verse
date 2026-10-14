@@ -2136,11 +2136,11 @@ html[data-fit-viewport] [data-scroll-restoration-root] {
   );
 }
 
-/* MÓVIL Y TABLET: TRANSPARENTE ARRIBA, CRISTAL AL DESPLAZARSE (páginas que no
-   son dashboard ni ficha). Arriba del todo el cristal solo tenía detrás el
-   fondo de la página y, en las de usuario, lo teñía de su color. La opacidad va
-   en CADA capa (TopBarGlass las hace hermanas): en un contenedor apagaría su
-   `backdrop-filter` mientras dura el fundido. Escritorio, igual que antes. */
+/* BARRA SUPERIOR: en móvil y tablet es transparente en la entrada y muestra
+   el cristal al desplazarse. En escritorio, las páginas estándar (Favoritos,
+   Pendientes, /lists...) comparten siempre el mismo acabado de cristal.
+   La opacidad va en CADA capa (TopBarGlass las hace hermanas): en un contenedor
+   apagaría su `backdrop-filter` mientras dura el fundido. */
 .sv-topbar-glass-fade {
   opacity: 0;
   transition: opacity 300ms;

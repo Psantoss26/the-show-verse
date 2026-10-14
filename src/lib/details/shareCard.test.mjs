@@ -284,3 +284,48 @@ test("a watched movie without a play count reads 'Vista'", () => {
     " vez",
   );
 });
+
+test("episode card: stacked stills cover, kicker and only watched · rating", () => {
+  const card = sanitizeShareCard(
+    buildShareCardPayload({
+      ...baseInput,
+      type: "tv",
+      title: "Piloto",
+      posterPath: "/still1.jpg",
+      logoPath: null,
+      episode: true,
+      kicker: "Episodio 1 · Temporada 1",
+      stillPaths: ["/still1.jpg", "/still2.jpg", "/still3.jpg"],
+      trakt: { watched: true, plays: 0, badge: null, loading: false },
+      rating: 9,
+    }),
+  );
+  assert.equal(card.episode, true);
+  assert.equal(card.kicker, "Episodio 1 · Temporada 1");
+  assert.deepEqual(card.stillPaths, ["/still1.jpg", "/still2.jpg", "/still3.jpg"]);
+  assert.equal(card.season, null);
+
+  const buttons = shareCardActionButtons(card);
+  assert.deepEqual(keysAndVariants(buttons), ["watched:active", "rating:active"]);
+  // Un episodio es masculino: «Visto», no «Vista».
+  assert.equal(byKey(buttons, "watched").label, "Visto");
+
+  const twice = shareCardActionButtons(
+    sanitizeShareCard({ ...card, actions: { ...card.actions, plays: 2 } }),
+  );
+  assert.equal(byKey(twice, "watched").label, "2");
+  assert.equal(byKey(twice, "watched").labelSuffix, " veces");
+});
+
+test("episode stills: only TMDb paths, deduplicated, at most three, tv only", () => {
+  const card = sanitizeShareCard({
+    type: "tv",
+    episode: true,
+    stillPaths: ["/a.jpg", "/a.jpg", "https://evil/x.jpg", "/b.jpg", "/c.jpg", "/d.jpg"],
+  });
+  assert.deepEqual(card.stillPaths, ["/a.jpg", "/b.jpg", "/c.jpg"]);
+  const movie = sanitizeShareCard({ type: "movie", episode: true, stillPaths: ["/a.jpg"] });
+  assert.equal(movie.episode, false);
+  assert.deepEqual(movie.stillPaths, []);
+  assert.equal(sanitizeShareCard({ type: "tv", episode: "yes" }).episode, false);
+});

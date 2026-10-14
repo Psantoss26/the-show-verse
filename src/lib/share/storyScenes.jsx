@@ -247,10 +247,27 @@ export function StoryHeader({ card, logo, brand, fonts }) {
           width: W,
           height: HEADER_TITLE_MAX_H,
           display: "flex",
+          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
         }}
       >
+        {/* Episodios: «Episodio N · Temporada M» sobre el nombre, como en la portada. */}
+        {card.kicker ? (
+          <div
+            style={{
+              display: "flex",
+              marginBottom: 12,
+              fontSize: 26,
+              fontWeight: 700,
+              letterSpacing: 5,
+              textTransform: "uppercase",
+              color: WHITE(0.72),
+            }}
+          >
+            {card.kicker}
+          </div>
+        ) : null}
         {box ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={logo.src} width={box.width} height={box.height} alt="" />
@@ -261,7 +278,8 @@ export function StoryHeader({ card, logo, brand, fonts }) {
               maxWidth: 900,
               textAlign: "center",
               justifyContent: "center",
-              fontSize: card.title.length > 28 ? 58 : 72,
+              // Con antetítulo, un punto menos para que dos líneas quepan igual.
+              fontSize: card.kicker || card.title.length > 28 ? 58 : 72,
               fontWeight: 700,
               lineHeight: 1.1,
             }}
@@ -401,7 +419,7 @@ export function PlaysScene({ plays, fonts }) {
     <SceneBody fonts={fonts}>
       <Eyebrow icon="eye" label="Visionados" color={GREEN_300} />
       <BigFigure value={String(plays.count)} color={GREEN_300} glow={GREEN_GLOW} />
-      <Caption>{plays.count === 1 ? "vez vista" : "veces vista"}</Caption>
+      <Caption>{`${plays.count === 1 ? "vez" : "veces"} ${plays.episode ? "visto" : "vista"}`}</Caption>
       {plays.dates.length ? (
         <Glass style={{ width: PANEL_W, marginTop: 64, padding: "28px 56px" }}>
           {/* Con el bloque de «Viendo» debajo, una fecha menos para que quepa. */}
@@ -673,17 +691,20 @@ export function detailsFacts(card, details) {
   const push = (value, fact) => {
     if (value) list.push({ ...fact, value });
   };
+  // Episodio: las celdas de su ficha (Serie · Emisión · Duración · Episodio).
+  const episode = tv && card.episode;
+  push(facts.series, { icon: "tv", label: "Serie", wide: true });
   push(facts.originalTitle, { icon: tv ? "tv" : "film", label: "Título original", wide: true });
   push(facts.release || (details.year ? String(details.year) : null), {
     icon: "calendar",
-    label: facts.release ? (tv ? "Inicio" : "Estreno") : "Año",
+    label: facts.release ? (episode ? "Emisión" : tv ? "Inicio" : "Estreno") : "Año",
   });
   if (tv) push(facts.end, { icon: "calendar", label: details.endLabel || "Última emisión" });
   let format = facts.format;
   if (!format && tv && details.seasons) {
     format = `${details.seasons} Temp.${details.episodes ? ` · ${details.episodes} Eps.` : ""}`;
   }
-  if (tv) push(format, { icon: "layers", label: "Formato" });
+  if (tv) push(format, { icon: "layers", label: episode ? "Episodio" : "Formato" });
   push(facts.duration || (!tv && details.runtime ? formatRuntime(details.runtime) : null), { icon: "clock", label: "Duración" });
   push(facts.status, { icon: "badgeCheck", label: "Estado" });
   return list;

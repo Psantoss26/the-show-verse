@@ -2,7 +2,7 @@
 import { z } from 'zod';
 import { ensureSeeded } from '../community/seed.js';
 import {
-  getCommentsPage, getSentiment, getListsForTitle, discoverLists, getCommunityListWithItems,
+  getCommentsPage, getSentiment, getListsForTitle, discoverListsPage, getCommunityListWithItems,
   insertNativeComment, updateNativeComment, deleteNativeComment,
   likeComment, unlikeComment, likeCommunityList, unlikeCommunityList,
   getCommentOwnerId, getCommunityListOwnerId,
@@ -42,7 +42,7 @@ export default async function communityRoutes(fastify) {
     const t = parseTarget(req, reply); if (!t) return;
     const { tab = 'top', page = '1', limit = '5' } = req.query || {};
     const viewerId = req.user?.id || null;
-    const seed = await ensureSeeded({ tmdbId: t.tmdbId, mediaType: t.type });
+    const seed = await ensureSeeded({ tmdbId: t.tmdbId, mediaType: t.type, waitForCommentsCache: true });
     const data = await getCommentsPage({ tmdbId: t.tmdbId, mediaType: t.type, tab, page, limit, viewerId });
     setCommunityCache(reply, viewerId, 'public, s-maxage=60, stale-while-revalidate=600');
     return { ...data, state: seed.status };
@@ -173,7 +173,7 @@ export default async function communityRoutes(fastify) {
     const [sentiment, comments, lists] = await Promise.all([
       getSentiment({ tmdbId: t.tmdbId, mediaType: t.type }),
       getCommentsPage({ tmdbId: t.tmdbId, mediaType: t.type, tab: 'top', page: 1, limit: 5, viewerId }),
-      getListsForTitle({ tmdbId: t.tmdbId, mediaType: t.type, limit: 6, viewerId }),
+      getListsForTitle({ tmdbId: t.tmdbId, mediaType: t.type, limit: 10, viewerId }),
     ]);
     setCommunityCache(reply, viewerId, 'public, s-maxage=60, stale-while-revalidate=600');
     return { sentiment, comments, lists: { items: lists }, state: seed.status };
@@ -184,7 +184,7 @@ export default async function communityRoutes(fastify) {
     const t = parseTarget(req, reply); if (!t) return;
     const viewerId = req.user?.id || null;
     const seed = await ensureSeeded({ tmdbId: t.tmdbId, mediaType: t.type });
-    const items = await getListsForTitle({ tmdbId: t.tmdbId, mediaType: t.type, limit: req.query?.limit || 6, viewerId });
+    const items = await getListsForTitle({ tmdbId: t.tmdbId, mediaType: t.type, limit: req.query?.limit || 10, viewerId });
     setCommunityCache(reply, viewerId, 'public, s-maxage=300, stale-while-revalidate=86400');
     return { items, state: seed.status };
   });
@@ -193,11 +193,15 @@ export default async function communityRoutes(fastify) {
   fastify.get('/lists/discover', async (req, reply) => {
     // `preview=N`: los N primeros títulos de cada lista, para pintar las
     // vistas previas del índice sin una petición por lista.
-    const { sort = 'items_desc', page = '1', limit = '30', preview = '0' } = req.query || {};
+    // `q`: búsqueda por nombre. `hasMore`/`total`: para recorrer TODAS las
+    // listas guardadas, no solo la primera página.
+    const { sort = 'items_desc', page = '1', limit = '30', preview = '0', q = '' } = req.query || {};
     const viewerId = req.user?.id || null;
-    const results = await discoverLists({ sort, page, limit, viewerId, previewItems: preview });
+    const { results, hasMore, total, totals } = await discoverListsPage({
+      sort, page, limit, query: q, viewerId, previewItems: preview,
+    });
     setCommunityCache(reply, viewerId, 'public, s-maxage=300, stale-while-revalidate=86400');
-    return { results };
+    return { results, hasMore, total, totals };
   });
 
   // List detail.
