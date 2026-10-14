@@ -4556,7 +4556,7 @@ export default function DetailsClient({
     setTSentiment(initialSentimentState);
     setTComments(initialCommentsState);
     setOwnedCommentIds(new Set());
-    setTCommentsTab("recent");
+    setTCommentsTab(DEFAULT_COMMENT_TAB);
     setTSeasons({ loading: false, error: "", items: [] });
     setTLists(initialListsState);
     setTListsTab("popular");

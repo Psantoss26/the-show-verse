@@ -134,6 +134,8 @@ export function writeScoreCache(source, scoresMap, refreshedIds = null) {
 // los títulos cuyo id de IMDb no se pudo averiguar (p. ej. TMDb limitó la
 // ráfaga): tampoco se sabe nada de ellos. Solo el resto, si no trae nota, es un
 // «sin nota» confirmado que puede guardarse como negativo.
+const imdbBatchesInFlight = new Map();
+
 export async function fetchImdbScoresForItems(items) {
   const payloadItems = (Array.isArray(items) ? items : [])
     .map((item) => {
@@ -150,6 +152,18 @@ export async function fetchImdbScoresForItems(items) {
 
   if (!payloadItems.length) return { items: {}, unresolved: new Set() };
 
+  // Un modal puede desmontarse y volver a abrirse antes de recibir el lote.
+  // Comparte esa petición, sin retener errores ni respuestas ya terminadas.
+  const requestKey = JSON.stringify([...payloadItems].sort((a, b) => a.key.localeCompare(b.key)));
+  if (imdbBatchesInFlight.has(requestKey)) return imdbBatchesInFlight.get(requestKey);
+  const request = requestImdbBatch(payloadItems).finally(() => {
+    imdbBatchesInFlight.delete(requestKey);
+  });
+  imdbBatchesInFlight.set(requestKey, request);
+  return request;
+}
+
+async function requestImdbBatch(payloadItems) {
   const res = await fetch("/api/imdb/ratings", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

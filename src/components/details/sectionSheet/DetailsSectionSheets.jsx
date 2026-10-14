@@ -229,6 +229,8 @@ function RecommendationsSheet({ meta, data, onClose, query, setQuery }) {
     frozen: false,
     setImdbScores,
     setLoading: setImdbLoading,
+    batchSize: 6,
+    parallelBatches: 2,
   });
   const filtered = items.filter((item) => matches(query, item.title, item.name));
   return (
@@ -265,7 +267,24 @@ function RecommendationsSheet({ meta, data, onClose, query, setQuery }) {
 
 function CollectionSheet({ meta, data, onClose }) {
   const collection = data.collection || {};
-  const items = Array.isArray(collection.items) ? collection.items : [];
+  const items = useMemo(
+    () => (Array.isArray(collection.items) ? collection.items : []).map((item) => ({
+      ...item,
+      media_type: "movie",
+    })),
+    [collection.items],
+  );
+  const [imdbScores, setImdbScores] = useState(() => readScoreCache("imdb"));
+  const [imdbLoading, setImdbLoading] = useState(true);
+  useImdbScoreLoader({
+    items,
+    enabled: true,
+    frozen: false,
+    setImdbScores,
+    setLoading: setImdbLoading,
+    batchSize: 6,
+    parallelBatches: 2,
+  });
   return (
     <SectionSheet
       open
@@ -290,7 +309,15 @@ function CollectionSheet({ meta, data, onClose }) {
         <ul className="space-y-2">
           {items.map((item) => (
             <li key={item.id}>
-              <TitleRow item={item} mediaType="movie" onNavigate={onClose} onOpenTitle={data.onOpenTitle} />
+              <TitleRow
+                item={item}
+                mediaType="movie"
+                onNavigate={onClose}
+                onOpenTitle={data.onOpenTitle}
+                showImdb
+                imdbRating={imdbScores.get(getScoreItemKey(item))}
+                imdbLoading={imdbLoading && !imdbScores.has(getScoreItemKey(item))}
+              />
             </li>
           ))}
         </ul>

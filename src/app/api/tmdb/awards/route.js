@@ -180,7 +180,9 @@ function parseAwardsHtml(html) {
         /<a[^>]*href="\/award\/[^"]+\/ceremony\/[^"]*"[^>]*>\s*([\s\S]*?)\s*<\/a>/,
       );
       const resultMatch = row.match(
-        /<span[^>]*>\s*(Winner|Nominee)\s*<\/span>\s*<a[^>]*href="\/award\/[^"]+\/category\/[^"]*"[^>]*>\s*([\s\S]*?)\s*<\/a>/,
+        // TMDb ahora enlaza la categoría como ancla de la ceremonia; se
+        // conserva también la URL independiente usada en páginas anteriores.
+        /<span[^>]*>\s*(Winner|Nominee)\s*<\/span>\s*<a[^>]*href="\/award\/[^"/]+\/(?:category\/[^"#?]+(?:[?#][^"]*)?|ceremony\/[^"#]+#category-[^"#]+)"[^>]*>\s*([\s\S]*?)\s*<\/a>/,
       );
       const yearMatch = row.match(
         /<p class="md:text-right font-bold">\s*(\d{4})\s*<\/p>/,
@@ -228,7 +230,7 @@ function parseAwardsHtml(html) {
 }
 
 async function fetchAwards(type, id) {
-  const cacheKey = `v3:${type}:${id}`;
+  const cacheKey = `v4:${type}:${id}`;
   const now = Date.now();
   const cached = cache.get(cacheKey);
   if (cached && now - cached.t < CACHE_TTL_MS) return cached.data;
