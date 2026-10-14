@@ -2,10 +2,14 @@ package com.theshowverse.sync
 
 import android.app.Activity
 import android.content.ClipData
+import android.content.ContentValues
 import android.content.Intent
+import android.os.Build
+import android.provider.MediaStore
 import android.provider.Settings
 import android.util.Base64
 import android.webkit.JavascriptInterface
+import android.widget.Toast
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.FileProvider
 import org.json.JSONObject
@@ -372,6 +376,56 @@ class WebAppBridge(
     }
 
     /**
+     * Guardar un FICHERO generado por la web —la exportación de favoritos,
+     * pendientes y puntuaciones— en Descargas. El WebView no sabe descargar una
+     * URL `blob:` (el DownloadManager solo entiende http), así que la web lo
+     * manda en base64. En Android 10+ va a Descargas por MediaStore, sin
+     * permisos; en 8 y 9 eso exigiría el de almacenamiento y se ofrece el
+     * selector de compartir (Drive, correo, Archivos…). Solo tipos conocidos.
+     */
+    @JavascriptInterface
+    fun saveFile(base64: String?, mimeType: String?, fileName: String?): Boolean {
+        if (!propio()) return false
+        val tipo = mimeType?.substringBefore(';')?.trim()?.lowercase() ?: return false
+        val extension = EXTENSIONES_DESCARGABLES[tipo] ?: return false
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            return compartirArchivo(base64, tipo, fileName, null, null)
+        }
+        val bytes = try {
+            Base64.decode(base64.orEmpty(), Base64.DEFAULT)
+        } catch (_: IllegalArgumentException) {
+            return false
+        }
+        if (bytes.isEmpty() || bytes.size > MAX_ARCHIVO_COMPARTIDO) return false
+
+        val nombre = "${nombreSeguro(fileName)}.$extension"
+        val resolver = activity.contentResolver
+        val valores = ContentValues().apply {
+            put(MediaStore.Downloads.DISPLAY_NAME, nombre)
+            put(MediaStore.Downloads.MIME_TYPE, tipo)
+            put(MediaStore.Downloads.IS_PENDING, 1)
+        }
+        val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, valores) ?: return false
+        try {
+            resolver.openOutputStream(uri)?.use { it.write(bytes) } ?: throw IOException("sin salida")
+            resolver.update(uri, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null)
+        } catch (_: Exception) {
+            resolver.delete(uri, null, null)
+            return false
+        }
+        activity.runOnUiThread {
+            Toast.makeText(activity, activity.getString(R.string.file_saved, nombre), Toast.LENGTH_LONG).show()
+        }
+        return true
+    }
+
+    private fun nombreSeguro(fileName: String?): String = fileName.orEmpty()
+        .substringBeforeLast('.')
+        .replace(Regex("[^A-Za-z0-9._-]"), "")
+        .take(80)
+        .ifBlank { "the-show-verse" }
+
+    /**
      * Solo se conserva el último fichero: cada llamada vacía la carpeta antes de
      * escribir, así la caché no crece con cada título compartido.
      */
@@ -383,7 +437,7 @@ class WebAppBridge(
         url: String?,
     ): Boolean {
         if (!propio()) return false
-        val extension = EXTENSIONES_COMPARTIBLES[tipo] ?: return false
+        val extension = EXTENSIONES_COMPARTIBLES[tipo] ?: EXTENSIONES_DESCARGABLES[tipo] ?: return false
         val bytes = try {
             Base64.decode(base64.orEmpty(), Base64.DEFAULT)
         } catch (_: IllegalArgumentException) {
@@ -391,11 +445,7 @@ class WebAppBridge(
         }
         if (bytes.isEmpty() || bytes.size > MAX_ARCHIVO_COMPARTIDO) return false
 
-        val nombre = fileName.orEmpty()
-            .substringBeforeLast('.')
-            .replace(Regex("[^A-Za-z0-9._-]"), "")
-            .take(80)
-            .ifBlank { "the-show-verse" }
+        val nombre = nombreSeguro(fileName)
         val carpeta = File(activity.cacheDir, CARPETA_COMPARTIDAS)
         val archivo = File(carpeta, "$nombre.$extension")
         try {
@@ -508,6 +558,13 @@ class WebAppBridge(
             "image/png" to "png",
             "video/mp4" to "mp4",
             "video/webm" to "webm",
+        )
+
+        /** Tipos que la web puede guardar en Descargas ([saveFile]). */
+        private val EXTENSIONES_DESCARGABLES = mapOf(
+            "application/zip" to "zip",
+            "text/csv" to "csv",
+            "application/json" to "json",
         )
     }
 }

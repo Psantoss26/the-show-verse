@@ -57,7 +57,9 @@ const jsonResponse = (body, status = 503) => new Response(JSON.stringify(body), 
 const missing = () => jsonResponse({ offline: true, error: "No hay una copia guardada de estos datos en este dispositivo." });
 const isRscRequest = (request, url) => url.searchParams.has("_rsc") || request.headers.get("RSC") === "1" || (request.headers.get("Accept") || "").includes("text/x-component");
 const isNavigation = (request) => request.mode === "navigate" || (request.headers.get("Accept") || "").includes("text/html");
-const excludedApi = (path) => /\/(?:request-token|pair-mobile|callback|claim|login|connect|disconnect)(?:\/|$)/.test(path) || (!["/api/auth/me", "/api/auth/connections", "/api/spotify/auth/status", "/api/plex/auth/status"].includes(path) && /\/(?:auth|session|private-access)(?:\/|$)/.test(path) && path !== "/api/trakt/auth/status");
+// La exportación de datos (/api/user/export) va siempre a la red: es la
+// biblioteca entera, no cabe en la copia sin conexión y offline daría una vieja.
+const excludedApi = (path) => /\/(?:request-token|pair-mobile|callback|claim|login|connect|disconnect|export)(?:\/|$)/.test(path) || (!["/api/auth/me", "/api/auth/connections", "/api/spotify/auth/status", "/api/plex/auth/status"].includes(path) && /\/(?:auth|session|private-access)(?:\/|$)/.test(path) && path !== "/api/trakt/auth/status");
 
 async function session() {
   if (!sessionPromise) sessionPromise = (async () => {
