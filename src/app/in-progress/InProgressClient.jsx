@@ -50,6 +50,7 @@ import {
   normalizeSearchText,
   titleMatchesQuery,
 } from "@/lib/search/titleMatching";
+import { useTitleNameSearch } from "@/lib/search/useTitleNameSearch";
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
@@ -1691,7 +1692,8 @@ export default function InProgressClient({
     };
   }, [currentItems, currentStats]);
 
-  // Filter + Sort
+  // Filter + Sort. La búsqueda mira también el nombre en inglés y en español.
+  const titleNamesVersion = useTitleNameSearch(currentItems, q);
   const filtered = useMemo(() => {
     let list = [...currentItems];
 
@@ -1749,7 +1751,9 @@ export default function InProgressClient({
     }
 
     return list;
-  }, [currentItems, q, sortBy]);
+    // titleNamesVersion: recalcular al llegar los nombres en inglés y español.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentItems, q, sortBy, titleNamesVersion]);
 
   const allSortLabels = {
     recent: "Recientes",

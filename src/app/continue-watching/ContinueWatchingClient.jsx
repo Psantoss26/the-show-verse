@@ -51,6 +51,7 @@ import {
   normalizeSearchText,
   titleMatchesQuery,
 } from "@/lib/search/titleMatching";
+import { useTitleNameSearch } from "@/lib/search/useTitleNameSearch";
 import {
   buildImg,
   fetchBestWatchingBackdrop,
@@ -1004,6 +1005,8 @@ export default function ContinueWatchingClient() {
   }, []);
   const closeAddModal = useCallback(() => setAddModalOpen(false), []);
 
+  // La búsqueda mira también el nombre en inglés y en español (llegan al escribir).
+  const titleNamesVersion = useTitleNameSearch(currentItems, q);
   const filtered = useMemo(() => {
     let list = Array.isArray(currentItems) ? [...currentItems] : [];
     if (typeFilter !== "all") list = list.filter((x) => mediaTypeOf(x) === typeFilter);
@@ -1031,7 +1034,9 @@ export default function ContinueWatchingClient() {
         break;
     }
     return list;
-  }, [currentItems, q, sortBy, typeFilter]);
+    // titleNamesVersion: recalcular al llegar los nombres en inglés y español.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentItems, q, sortBy, typeFilter, titleNamesVersion]);
 
   const stats = useMemo(() => {
     const list = Array.isArray(currentItems) ? currentItems : [];

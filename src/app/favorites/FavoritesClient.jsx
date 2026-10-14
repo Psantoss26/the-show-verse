@@ -78,6 +78,7 @@ import {
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import { titleMatchesQuery } from "@/lib/search/titleMatching";
+import { useTitleNameSearch } from "@/lib/search/useTitleNameSearch";
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { compareImdbRatings } from "@/lib/userLists/imdbRatingSort";
@@ -2731,7 +2732,8 @@ export default function FavoritesClient() {
     loadWatchHistory();
   }, [historyLoaded, items, loadingHistory]);
 
-  // Filter and sort
+  // Filter and sort. También por el nombre en inglés y en español (llegan al escribir).
+  const titleNamesVersion = useTitleNameSearch(items, q);
   const filtered = useMemo(() => {
     const needle = normText(q);
     return items.filter((item) => {
@@ -2743,7 +2745,9 @@ export default function FavoritesClient() {
       }
       return true;
     });
-  }, [items, q, typeFilter]);
+    // titleNamesVersion: recalcular al llegar los nombres en inglés y español.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, q, typeFilter, titleNamesVersion]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];

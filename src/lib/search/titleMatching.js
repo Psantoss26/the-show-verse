@@ -1,3 +1,5 @@
+import { getTitleNames } from "./titleNames.js";
+
 const DEFAULT_TITLE_FIELDS = [
   "title",
   "name",
@@ -78,7 +80,8 @@ export function buildSearchableTitleText(item, extraFields = []) {
 export function titleMatchesQuery(item, query, extraFields = []) {
   const normalizedQuery = normalizeSearchText(query);
   if (!normalizedQuery) return true;
-  return getTitleCandidates(item, extraFields).some((title) =>
-    normalizeSearchText(title).includes(normalizedQuery),
-  );
+  const matches = (title) => normalizeSearchText(title).includes(normalizedQuery);
+  if (getTitleCandidates(item, extraFields).some(matches)) return true;
+  // Nombres en inglés y en español, si la página los ha pedido (useTitleNameSearch).
+  return getTitleNames(item).some(matches);
 }
