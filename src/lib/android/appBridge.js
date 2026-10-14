@@ -222,6 +222,20 @@ export function shareFileFromApp({ base64, mimeType, fileName, text, url }) {
   );
 }
 
+/**
+ * ¿La app sabe guardar en Descargas un fichero generado en la página? El
+ * WebView no descarga URLs `blob:`; las versiones con `saveFile` sí lo hacen.
+ */
+export function canSaveFileFromApp() {
+  const api = bridge();
+  return !!api && typeof api.saveFile === "function";
+}
+
+/** Guarda un ZIP, CSV o JSON en Descargas (`base64` sin prefijo `data:`). */
+export function saveFileFromApp({ base64, mimeType, fileName }) {
+  return call("saveFile", false, base64 || "", mimeType || "", fileName || "") === true;
+}
+
 // ---------------------------------------------------------------------------
 // Inicio de sesión con Google, nativo.
 //

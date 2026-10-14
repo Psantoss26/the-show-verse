@@ -65,6 +65,7 @@ import ProfileFavoritesEditor from "@/components/social/ProfileFavoritesEditor";
 import AndroidSyncPanel from "@/components/settings/AndroidSyncPanel";
 import LetterboxdImportPanel from "@/components/settings/LetterboxdImportPanel";
 import ImdbImportPanel from "@/components/settings/ImdbImportPanel";
+import DataExportPanel from "@/components/settings/DataExportPanel";
 import LetterboxdConnectionCard from "@/components/settings/LetterboxdConnectionCard";
 import { pairDevice, pairSyncApp, readSyncStatus, useSyncStatus } from "@/lib/android/appBridge";
 import { buildSyncPairLinks } from "@/lib/android/syncPairLink";
@@ -2231,7 +2232,7 @@ function ProfileSettingsClient() {
     { id: "user", label: t("settings_user", "Usuario"), icon: User },
     { id: "favorites", label: t("settings_favorites", "Favoritos"), icon: Heart },
     { id: "preferences", label: t("settings_personal", "Preferencias"), icon: Settings },
-    { id: "imports", label: t("settings_imports", "Importaciones"), icon: DownloadCloud },
+    { id: "imports", label: t("settings_imports", "Datos"), icon: DownloadCloud },
     { id: "connections", label: t("settings_connections", "Conexiones"), icon: Link2 },
   ];
 
@@ -2593,6 +2594,7 @@ function ProfileSettingsClient() {
                   transition={{ duration: 0.25 }}
                   className="grid gap-6 grid-cols-1"
                 >
+                  <DataExportPanel className={GLASS_PANEL} />
                   <ImportPanel
                     title={t("settings_import_trakt", "Importar desde Trakt")}
                     description={t("settings_import_trakt_desc", "Trae tu historial de visionado y tus puntuaciones a The Show Verse.")}

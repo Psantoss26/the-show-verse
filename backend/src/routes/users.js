@@ -36,6 +36,8 @@ import {
 import { getLevelSummaries } from '../level/store.js';
 import { getUserNotifications } from '../lib/notifications.js';
 import { getUserNeuralGraph } from '../lib/neuralGraph.js';
+import { loadUserExport } from '../lib/userExport.js';
+import { parseExportSections } from '../lib/userExportCore.js';
 
 const ARTWORK_KINDS = ['poster', 'mobilePoster', 'backdrop', 'background', 'logo'];
 export const artworkChangeSchema = z.object({
@@ -294,6 +296,21 @@ export default async function usersRoutes(fastify) {
     });
     return reply.send({ results });
   });
+
+  // GET /users/me/export?include=favorites,watchlist,ratings — exportación
+  // completa de favoritos, pendientes y puntuaciones (el navegador la convierte
+  // en CSV, JSON o el formato de Letterboxd). Lee toda la biblioteca de una vez:
+  // límite propio porque es la lectura más pesada de la API.
+  fastify.get(
+    '/me/export',
+    { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
+    async (req, reply) => {
+      const sections = parseExportSections(req.query?.include);
+      const data = await loadUserExport(db, req.user, sections);
+      reply.header('Cache-Control', 'private, no-store');
+      return reply.send(data);
+    },
+  );
 
   // GET /users/me/profile-favorites — 5 películas y 5 series destacadas.
   fastify.get('/me/profile-favorites', async (req, reply) => {
