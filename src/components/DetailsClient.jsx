@@ -11128,6 +11128,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                   <SeasonsSection
                     items={seasonCardItems}
                     loading={tSeasons.loading}
+                    isMobile={isMobileViewport}
                     onOpenAll={sectionSheetOpener("seasons")}
                   />
                 </AnimatedSection>

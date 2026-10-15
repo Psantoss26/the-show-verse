@@ -814,7 +814,7 @@ function ActivityPoster({ item, className = "", backdrop = false }) {
   }
 
   if (!item?.tmdbId || !item?.mediaType) {
-    return <span aria-hidden="true" className={`${className} flex items-center justify-center bg-zinc-900`}>{poster}</span>;
+    return <span aria-hidden="true" className={`${className} flex shrink-0 items-center justify-center overflow-hidden bg-zinc-900`}>{poster}</span>;
   }
 
   return (
@@ -838,15 +838,15 @@ function ActivityReview({ item, actor, compact = false, posterList = false, back
 
   return (
     <article className={`rounded-xl bg-white/[0.04] px-3 @[640px]/detail-page:px-4 ${compact ? "py-3" : "py-4"}`}>
-      <div className="flex gap-3">
+      <div className="flex items-start gap-3">
         {backdropList ? (
-          <ActivityPoster item={item} backdrop className={ACTIVITY_BACKDROP_CLASS} />
+          <ActivityPoster item={item} backdrop className={`${ACTIVITY_BACKDROP_CLASS} self-start`} />
         ) : posterList ? (
-          <ActivityPoster item={item} className="h-32 w-[5.4rem] rounded-lg" />
+          <ActivityPoster item={item} className="h-32 w-[5.4rem] self-start rounded-lg" />
         ) : (
           <>
             <ActivityAvatar actor={actor} />
-            <Link href={href} onClick={previewClick(item, { mediaType: type, episode: getEpisodePreview(item) })} className="hidden h-28 w-[76px] shrink-0 overflow-hidden rounded-lg bg-zinc-900 @[640px]/detail-page:block">
+            <Link href={href} onClick={previewClick(item, { mediaType: type, episode: getEpisodePreview(item) })} className="hidden h-28 w-[76px] shrink-0 self-start overflow-hidden rounded-lg bg-zinc-900 @[640px]/detail-page:block">
               {src ? (
                 <OptimizedImage src={src} alt={item.title || ""} className="h-full w-full object-cover" loading="lazy" />
               ) : (
