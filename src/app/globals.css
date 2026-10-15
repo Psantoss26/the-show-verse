@@ -209,6 +209,15 @@ body {
   letter-spacing: 0;
 }
 
+/* Las celdas y medias del gráfico de SeriesGraph usan Inter semibold.
+   El peso 800 de los controles de valoración no se aplica a la cuadrícula. */
+.sv-seriesgraph-grid .sv-seriesgraph-number {
+  font-family: "Inter Variable", Inter, sans-serif;
+  font-size-adjust: none;
+  font-style: normal;
+  font-weight: 600;
+}
+
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar {
     display: none;

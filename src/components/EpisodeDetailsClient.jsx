@@ -34,7 +34,6 @@ import DetailsInfoTabs from "@/components/details/DetailsInfoTabs";
 import { AnimatedSection } from "@/components/details/AnimatedSection";
 import AnimatedPosterFrame from "@/components/details/AnimatedPosterFrame";
 import EpisodeStillStack, {
-  episodeStillSrc,
   useEpisodeStillStackLoad,
 } from "@/components/details/EpisodeStillStack";
 import {
@@ -312,9 +311,6 @@ export default function EpisodeDetailsClient({
   // Portada móvil: imágenes del episodio a apilar (resueltas en el servidor,
   // lib/details/episodeHeroStills).
   heroStillPaths = [],
-  // Fondo en ordenador, distinto de la portada si se puede (resuelto en el
-  // servidor, lib/details/episodeHeroStills → pickEpisodeBackdrop).
-  heroBackdropPath = null,
 }) {
   const router = useRouter();
   const traktRequestIdRef = useRef(0);
@@ -363,13 +359,6 @@ export default function EpisodeDetailsClient({
   const pathname = usePathname();
   useDetailsSubrouteSwipe(pathname, adjacentEpisodeHrefs.previousHref, adjacentEpisodeHrefs.nextHref);
   const showPosterPath = show?.poster_path || null;
-  const heroBgPath =
-    heroBackdropPath ||
-    stillPath ||
-    show?.backdrop_path ||
-    show?.poster_path ||
-    null;
-
   const airDate = episode?.air_date ? formatDateEs(episode.air_date) : null;
   const runtime = Number(episode?.runtime || 0) || null;
   const vote =
@@ -394,12 +383,6 @@ export default function EpisodeDetailsClient({
 
   const tmdbEpisodeUrl = `https://www.themoviedb.org/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`;
 
-  const heroBackgroundStyle = useMemo(() => {
-    if (!heroBgPath) return null;
-    const url = `https://image.tmdb.org/t/p/original${heroBgPath}`;
-    return { backgroundImage: `url(${url})` };
-  }, [heroBgPath]);
-
   // ---- MÓVIL: cabecera inmersiva, la de las temporadas (details/MobileDetailsHero) ----
   // El episodio no tiene póster: la portada vertical son sus imágenes
   // horizontales apiladas (EpisodeStillStack), pegada arriba y a los lados.
@@ -415,6 +398,10 @@ export default function EpisodeDetailsClient({
   // La portada (y con ella título y botones) aparece cuando TODAS sus bandas
   // están listas, no solo la primera: ver EpisodeStillStack.
   const mobileStillStackLoad = useEpisodeStillStackLoad(mobileStillPaths);
+  // El fondo de página reutiliza la composición completa de la portada, no
+  // una sola imagen ampliada. Tiene su propio estado de carga porque se pinta
+  // en una capa distinta a la portada fija.
+  const pageBackgroundStackLoad = useEpisodeStillStackLoad(mobileStillPaths);
   const mobileCoverReady = mobileStillStackLoad.ready;
   useEffect(() => {
     if (mobileCoverReady) sendEmbeddedDetailsAction("hero-ready");
@@ -1581,49 +1568,17 @@ export default function EpisodeDetailsClient({
     >
       {/* Background */}
       <div className="fixed inset-0 z-0 overflow-hidden bg-[#0a0a0a] pointer-events-none">
-        {/* Fondo de la página. MÓVIL: aparece con el scroll, detrás de la
-            portada fija, y es la primera imagen de la portada difuminada (como
-            el póster sin texto de las temporadas). */}
+        {/* Fondo de página: reutiliza las mismas imágenes compuestas de la
+            portada, ampliadas para cubrir los bordes. En móvil aparece con el
+            scroll detrás de la portada fija. */}
         <div className="sv-hero-scroll-in absolute inset-0 max-sm:[opacity:var(--sv-hero-scroll,0)] sm:opacity-100">
-        <div className="absolute inset-0 max-sm:hidden">
-        {heroBackgroundStyle ? (
-          <>
-            {/* Capa base: siempre cubre (evita marcos laterales) */}
-            <div
-              className="absolute inset-0 bg-cover bg-center transition-opacity duration-500"
-              style={{
-                ...heroBackgroundStyle,
-                transform: "scale(1)",
-                filter: "brightness(0.75) saturate(1.03)",
-              }}
-            />
-            {/* Capa detalle: posicionamiento superior */}
-            <div
-              className="absolute inset-0 bg-cover transition-opacity duration-500"
-              style={{
-                ...heroBackgroundStyle,
-                backgroundPosition: "center top",
-                transform: "scale(1)",
-                transformOrigin: "center top",
-              }}
-            />
-          </>
-        ) : (
-          <div className="absolute inset-0 bg-[#0a0a0a]" />
-        )}
-        </div>
-        {isPhone && mobileStillPaths[0] ? (
-          // Fondo decorativo difuminado: <img> directo, solo en teléfono.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={episodeStillSrc(mobileStillPaths[0])}
-            alt=""
-            aria-hidden="true"
-            decoding="async"
-            fetchPriority="low"
-            className="absolute inset-0 h-full w-full scale-[1.12] object-cover blur-[4px] brightness-90 saturate-[1.03] sm:hidden"
-          />
-        ) : null}
+          {pageBackgroundStackLoad.sources.length > 0 ? (
+            <div className="absolute -inset-[4%] scale-[1.08] blur-[3px] brightness-[0.62] saturate-[1.03]">
+              <EpisodeStillStack load={pageBackgroundStackLoad} />
+            </div>
+          ) : (
+            <div className="absolute inset-0 bg-[#0a0a0a]" />
+          )}
         </div>
 
         <MobileHeroCover
@@ -2032,9 +1987,9 @@ export default function EpisodeDetailsClient({
 
         {nextEpisodes.length > 0 && (
           <AnimatedSection className="sv-phone-scaled-section" delay={0.04}>
-            <section className="mb-16 group/section">
+            <section className="mb-8 group/section">
               <SectionTitle title="Episodios" icon={MonitorPlay} />
-              <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-5 [scrollbar-width:thin]">
+              <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain pb-8 [scrollbar-width:thin] max-sm:[scrollbar-width:none] max-sm:[-ms-overflow-style:none] max-sm:[&::-webkit-scrollbar]:hidden">
                 {nextEpisodes.map((nextEpisode) => {
                   const nextNumber = Number(nextEpisode?.episode_number);
                   const nextTitle =
@@ -2048,7 +2003,7 @@ export default function EpisodeDetailsClient({
                     <Link
                       key={`${seasonNumber}-${nextNumber}`}
                       href={`/details/tv/${showId}/season/${seasonNumber}/episode/${nextNumber}`}
-                      className="group/episode relative w-[78vw] shrink-0 snap-start overflow-hidden rounded-2xl bg-zinc-900 shadow-lg shadow-black/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.75rem)]"
+                      className="group/episode relative w-full min-w-0 shrink-0 snap-start overflow-hidden rounded-2xl bg-zinc-900 shadow-lg shadow-black/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.75rem)]"
                       title={nextTitle}
                     >
                       <div className="relative aspect-video overflow-hidden">

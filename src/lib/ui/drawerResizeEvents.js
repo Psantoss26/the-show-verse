@@ -19,10 +19,13 @@ export function isDrawerResizeActive() {
   );
 }
 
-export function emitDrawerResize(active) {
-  if (typeof window === "undefined") return;
-  window.dispatchEvent(
-    new CustomEvent(DRAWER_RESIZE_EVENT, { detail: { active: Boolean(active) } }),
+// `target`: otra ventana a la que avisar. El panel de temporada/episodio pinta
+// la ficha en un iframe, con su propio documento y sus propios carruseles: el
+// aviso se le reenvía para que también esperen al final del gesto.
+export function emitDrawerResize(active, target = typeof window === "undefined" ? null : window) {
+  if (!target) return;
+  target.dispatchEvent(
+    new target.CustomEvent(DRAWER_RESIZE_EVENT, { detail: { active: Boolean(active) } }),
   );
 }
 

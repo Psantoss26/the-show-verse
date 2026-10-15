@@ -54,9 +54,9 @@ export function pickEpisodeHeroStills({
   return picked.slice(0, EPISODE_HERO_MAX_BANDS);
 }
 
-// Fondo de la ficha del episodio en ORDENADOR (desde `sm`). La portada de la
-// izquierda ya es la imagen oficial (`still_path`); usar la misma de fondo
-// repetía la escena dos veces. Se busca otra, por este orden:
+// Selector alternativo de un único fondo para consumidores que no usan la
+// composición completa de la portada. La portada ya empieza por la imagen
+// oficial (`still_path`); usarla de fondo repetiría la escena. Se busca otra:
 //   1. otra imagen del episodio (sin texto si las hay),
 //   2. un fondo sin texto de la serie,
 //   3. el fondo principal de la serie,

@@ -565,12 +565,10 @@ function getHistoryIndicatorClass({
   ].join(" ");
 }
 
-function HistoryGroupedEpisodesIndicator({ count, compact = false }) {
+function HistoryGroupedEpisodesIndicator({ count, compact = false, className = "" }) {
   return (
     <div
-      className={`pointer-events-none absolute left-0 top-0 z-30 flex items-center justify-center rounded-br-2xl bg-emerald-500/15 text-emerald-300 shadow-sm backdrop-blur-md ${compact ? "p-1.5 sm:p-2" : "p-2 sm:p-2.5"}`}
-      data-hover-expand-fixed-size=""
-      style={{ scale: 1 }}
+      className={`pointer-events-none absolute left-0 top-0 z-30 flex items-center justify-center rounded-br-2xl bg-emerald-500/15 text-emerald-300 shadow-sm backdrop-blur-md ${compact ? "p-1.5 sm:p-2" : "p-2 sm:p-2.5"} ${className}`}
       aria-hidden="true"
     >
       <div className={`flex items-center font-bold ${compact ? "gap-1 text-[10px] sm:text-xs" : "gap-1 text-xs sm:text-sm"}`}>
@@ -1116,11 +1114,10 @@ function CalendarWithPosters({
           const isSelected = key === selectedDayKey;
           const hasItems = inMonth && items.length > 0;
           const visiblePosterCount = Math.min(items.length, MAX_POSTERS);
-          // Cada portada ocupa solo una parte del ancho del grupo para dejar
-          // una franja reconocible de las demás, incluso en los días con muchos
-          // visionados. El ligero desfase vertical conserva la lectura de pila.
-          const stackCardWidth = visiblePosterCount > 1 ? "58%" : "100%";
-          const stackCardHeight = visiblePosterCount > 1 ? "94%" : "100%";
+          // Cada portada conserva el tamaño y la proporción de una tarjeta
+          // individual; solo se desplaza para dejar ver que hay una pila.
+          const stackCardWidth = "100%";
+          const stackCardHeight = "100%";
           const stackStepX =
             visiblePosterCount > 1
               ? 42 / (visiblePosterCount - 1)
@@ -2115,6 +2112,18 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
     <HoverExpandCard
       cellClassName={imageMode === "backdrop" ? "aspect-video" : "aspect-[2/3]"}
       className={`compact-card group overflow-hidden rounded-lg bg-zinc-900 shadow-md ${disabledCls}`}
+      // El contador de episodios agrupados NO crece con la tarjeta: va fuera de
+      // ella y solo acompaña a su esquina (ver HoverExpandCard). Fuera, ya no lo
+      // recortan las esquinas redondeadas ni lo tapa la confirmación de borrar.
+      fixedOverlay={
+        isGroup && !confirmDel ? (
+          <HistoryGroupedEpisodesIndicator
+            count={groupCount}
+            compact
+            className="rounded-tl-lg"
+          />
+        ) : null
+      }
     >
       <div className="absolute inset-0 rounded-[inherit] overflow-hidden">
         {/* Póster o backdrop, según el modo de imagen (como en Favoritos). */}
@@ -2125,10 +2134,7 @@ const HistoryCompactCard = memo(function HistoryCompactCard({
         )}
 
         {isGroup && (
-          <>
-            <div className="absolute inset-x-0 top-0 z-10 h-20 pointer-events-none bg-gradient-to-b from-black/50 via-black/10 to-transparent" />
-            <HistoryGroupedEpisodesIndicator count={groupCount} compact />
-          </>
+          <div className="absolute inset-x-0 top-0 z-10 h-20 pointer-events-none bg-gradient-to-b from-black/50 via-black/10 to-transparent" />
         )}
         <HistoryHoverIndicator type={type} dateParts={watchedDate} compact />
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useRef } from "react";
+import { isDrawerResizeActive, onDrawerResize } from "@/lib/ui/drawerResizeEvents";
 
 // Mayor tamaño de letra (en px, entre `min` y `max`) con el que el texto cabe
 // en `lines` líneas. Se pensó para títulos de episodio, que pueden ser larguísimos
@@ -54,13 +55,31 @@ export default function useFitTextLines({
     const container = el.parentElement;
     if (!container || typeof ResizeObserver === "undefined") return;
     let width = container.clientWidth;
-    const observer = new ResizeObserver(() => {
+    // Arrastrando el tirador del panel lateral (la ficha en el iframe del
+    // panel de temporada/episodio), el ancho cambia en cada fotograma y cada
+    // ajuste son ~5 medidas que fuerzan la maquetación: era lo que más
+    // costaba del gesto. Se espera al final y se ajusta una vez.
+    let pending = false;
+    const refit = () => {
+      // Antes de medir: leer el ancho ya fuerza la maquetación.
+      if (isDrawerResizeActive()) {
+        pending = true;
+        return;
+      }
+      pending = false;
       if (container.clientWidth === width) return;
       width = container.clientWidth;
       fit();
-    });
+    };
+    const observer = new ResizeObserver(refit);
     observer.observe(container);
-    return () => observer.disconnect();
+    const stopDrawerResize = onDrawerResize((active) => {
+      if (!active && pending) refit();
+    });
+    return () => {
+      observer.disconnect();
+      stopDrawerResize();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lines, min, max, ...deps]);
 

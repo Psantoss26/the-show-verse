@@ -1,9 +1,6 @@
 import EpisodeDetailsClient from "@/components/EpisodeDetailsClient";
 import { getShareData, shareMetadata } from "@/lib/share/shareMeta";
-import {
-  pickEpisodeBackdrop,
-  pickEpisodeHeroStills,
-} from "@/lib/details/episodeHeroStills";
+import { pickEpisodeHeroStills } from "@/lib/details/episodeHeroStills";
 
 export const revalidate = 3600; // 1h
 
@@ -93,14 +90,6 @@ export default async function EpisodePage({ params }) {
     stills: episodeImages?.stills,
     showBackdrops: showImages?.backdrops,
   });
-  // Fondo en ordenador: otra imagen que la de la portada, si la hay.
-  const heroBackdropPath = pickEpisodeBackdrop({
-    stillPath: episode?.still_path || null,
-    stills: episodeImages?.stills,
-    showBackdrops: showImages?.backdrops,
-    showBackdropPath: show?.backdrop_path || null,
-  });
-
   const showImdbId = show?.external_ids?.imdb_id || null;
 
   const imdbUrl = showImdbId
@@ -121,7 +110,6 @@ export default async function EpisodePage({ params }) {
       imdbId={showImdbId}
       imdbUrl={imdbUrl}
       heroStillPaths={heroStillPaths}
-      heroBackdropPath={heroBackdropPath}
     />
   );
 }

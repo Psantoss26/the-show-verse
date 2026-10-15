@@ -27,7 +27,7 @@ test("phone shell overlays controls and waits for artwork, without a separate he
       radius: getComputedStyle(el).borderTopLeftRadius,
       top: el.getBoundingClientRect().top,
       frameTop: el.querySelector('iframe').getBoundingClientRect().top,
-      closeTop: el.querySelector('[aria-label="Cerrar ficha"]').getBoundingClientRect().top,
+      closeTop: el.querySelector('[aria-label="Cerrar modal"]').getBoundingClientRect().top,
     }));
     assert.equal(layout.radius, '16px');
     assert.equal(layout.top, layout.frameTop);
@@ -58,15 +58,15 @@ test("season phone panel drills into actual episode page, returns, and releases 
     await page.locator('iframe[title="Episodio 1×1"]').waitFor();
     assert.match(page.url(), /preview=ep-1399-1-1/);
     await page.frameLocator('iframe[title="Episodio 1×1"]').locator('[data-embedded-details]').waitFor({ timeout: 60000 });
-    await page.getByRole('button', { name: 'Vista amplia', exact: true }).click();
+    await page.getByRole('button', { name: 'Mostrar ficha móvil', exact: true, pressed: true }).click();
     await page.locator('iframe[title="Episodio 1×1"]').waitFor({ state: 'detached' });
     await page.getByRole('button', { name: 'Mostrar ficha móvil', exact: true }).click();
     await page.locator('iframe[title="Episodio 1×1"]').waitFor();
     await page.goBack();
     await page.locator('iframe[title="Episodio 1×1"]').waitFor({ state: "detached" });
-    await page.getByRole('button', { name: 'Superponer panel', exact: true }).click();
+    await page.getByRole('button', { name: 'Acoplar panel lateral', exact: true, pressed: true }).click();
     assert.equal(await page.locator('[data-detail-page-content]').evaluate(el => el.style.marginRight), "");
-    await page.getByRole('button', { name: 'Cerrar ficha', exact: true }).click();
+    await page.getByRole('button', { name: 'Cerrar modal', exact: true }).click();
     await page.locator('.sv-drawer-panel').waitFor({ state: 'detached' });
     assert.equal(await page.evaluate(() => document.documentElement.style.getPropertyValue('--sv-detail-drawer-inset')), "");
   } finally { await browser.close(); }

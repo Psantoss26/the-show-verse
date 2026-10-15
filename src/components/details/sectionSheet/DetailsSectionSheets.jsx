@@ -15,7 +15,7 @@ import Link from "next/link";
 import {
   Check,
   ChevronDown,
-  ChevronRight,
+  ArrowUpRight,
   ExternalLink,
   Heart,
   Image as ImageIcon,
@@ -41,6 +41,7 @@ import TraktCommentCard from "@/components/details/TraktCommentCard";
 import { buildCrewGroups, crewRoleLabel } from "@/lib/details/sectionSheetData";
 import useImdbScoreLoader from "@/hooks/useImdbScoreLoader";
 import { getScoreItemKey, readScoreCache } from "@/lib/userLists/listScoreCache";
+import { DETAIL_MODAL_GLASS_CONTROL } from "@/lib/ui/liquidGlass";
 
 const SECTIONS = {
   cast: { title: "Reparto", icon: Users },
@@ -297,10 +298,15 @@ function CollectionSheet({ meta, data, onClose }) {
           <Link
             href={`/lists/collection/${collection.id}`}
             onClick={onClose}
-            className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-white/5 px-3 text-xs font-bold text-zinc-200 transition hover:bg-white/10 hover:text-white"
+            aria-label="Abrir colección completa"
+            className={`group flex h-10 w-10 shrink-0 select-none items-center justify-center gap-0 overflow-hidden rounded-full px-0 transition-all duration-300 ease-out sm:hover:w-[148px] sm:hover:gap-1.5 sm:hover:px-2 sm:focus-visible:w-[148px] sm:focus-visible:gap-1.5 sm:focus-visible:px-2 ${DETAIL_MODAL_GLASS_CONTROL}`}
           >
-            Abrir
-            <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center transition-transform duration-300 group-hover:rotate-45 group-focus-visible:rotate-45">
+              <ArrowUpRight className="h-5 w-5 shrink-0" aria-hidden="true" />
+            </span>
+            <span className="hidden max-w-0 translate-y-px overflow-hidden whitespace-nowrap text-xs font-bold leading-normal tracking-wide opacity-0 transition-[max-width,opacity] duration-200 sm:block sm:group-hover:max-w-[108px] sm:group-hover:opacity-100 sm:group-focus-visible:max-w-[108px] sm:group-focus-visible:opacity-100">
+              Abrir colección
+            </span>
           </Link>
         ) : null
       }

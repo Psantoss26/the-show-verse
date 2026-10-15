@@ -282,11 +282,16 @@ export default function DetailActionsRow({
     : forceMobile
       ? DETAIL_ACTION_ITEM_CAP_MOBILE_CLASS
       : DETAIL_ACTION_ITEM_CAP_CLASS;
-  // Tamaño de los botones-icono en labeled-row
+  // Tamaño de los botones-icono en labeled-row (las previews del dashboard usan
+  // "md", con una escala intermedia ampliada de 46px e iconos/tipografía
+  // escalados proporcionalmente para que los botones y números tengan buen
+  // empaque manteniendo los márgenes laterales intactos en series y películas).
   const labeledSizeClass =
     size === "lg"
-      ? "[&.labeled-row>*:not(.separator):not(.labeled)]:!w-12 [&.labeled-row>*:not(.separator):not(.labeled)]:!h-12 [&.labeled-row_[data-liquid-button]:not(.labeled)_svg]:!h-6 [&.labeled-row_[data-liquid-button]:not(.labeled)_svg]:!w-6"
-      : "[&.labeled-row>*:not(.separator):not(.labeled)]:!w-10 [&.labeled-row>*:not(.separator):not(.labeled)]:!h-10";
+      ? "[&.labeled-row>*:not(.separator):not(.labeled)]:!w-12 [&.labeled-row>*:not(.separator):not(.labeled)]:!h-12 [&.labeled-row_[data-liquid-button]:not(.labeled)_svg]:!h-6 [&.labeled-row_[data-liquid-button]:not(.labeled)_svg]:!w-6 sm:[&.labeled-row_[data-liquid-button]:not(.labeled)_.text-xl]:!text-[22px] sm:[&.labeled-row_[data-liquid-button]:not(.labeled)_.text-2xl]:!text-[24px]"
+      : size === "sm"
+        ? "[&.labeled-row>*:not(.separator):not(.labeled)]:!w-10 [&.labeled-row>*:not(.separator):not(.labeled)]:!h-10 [&.labeled-row]:!gap-2 sm:[&.labeled-row]:!gap-2 [&.labeled-row>.separator]:!h-7 [&.labeled-row>.separator]:!mx-1 sm:[&.labeled-row>.separator]:!mx-1 sm:[&.labeled-row_[data-liquid-button]:not(.labeled)_svg]:!w-[18px] sm:[&.labeled-row_[data-liquid-button]:not(.labeled)_svg]:!h-[18px] sm:[&.labeled-row_[data-liquid-button]:not(.labeled)_.text-xl]:!text-[17px] sm:[&.labeled-row_[data-liquid-button]:not(.labeled)_.text-2xl]:!text-[19px] sm:[&.labeled-row_[data-liquid-button]:not(.labeled)_.text-lg]:!text-[15px] sm:[&.labeled-row_[data-liquid-button]:not(.labeled)_.text-xs]:!text-[10px]"
+        : "[&.labeled-row>*:not(.separator):not(.labeled)]:!w-[46px] [&.labeled-row>*:not(.separator):not(.labeled)]:!h-[46px] [&.labeled-row]:!gap-2 sm:[&.labeled-row]:!gap-2 [&.labeled-row>.separator]:!h-[32px] [&.labeled-row>.separator]:!mx-1 sm:[&.labeled-row>.separator]:!mx-1 sm:[&.labeled-row_[data-liquid-button]:not(.labeled)_svg]:!w-[21px] sm:[&.labeled-row_[data-liquid-button]:not(.labeled)_svg]:!h-[21px] sm:[&.labeled-row_[data-liquid-button]:not(.labeled)_.text-xl]:!text-[20.5px] sm:[&.labeled-row_[data-liquid-button]:not(.labeled)_.text-2xl]:!text-[22.5px] sm:[&.labeled-row_[data-liquid-button]:not(.labeled)_.text-lg]:!text-[17px] sm:[&.labeled-row_[data-liquid-button]:not(.labeled)_.text-xs]:!text-[11.5px]";
   const rowClass = [
     fitToContainer ? FIT_ACTION_ROW_CLASS : buildBaseRowClass(forceMobile),
     !fitToContainer && labeledSizeClass,
@@ -607,7 +612,11 @@ export default function DetailActionsRow({
             className={
               showLabel
                 ? `labeled shrink-0 !aspect-auto !w-auto !max-w-none !bg-white !text-black ${
-                    size === "lg" ? "!h-12 px-5" : "!h-10 px-4"
+                    size === "lg"
+                      ? "!h-12 px-5"
+                      : size === "sm"
+                        ? "!h-10 px-4"
+                        : "!h-[46px] px-4 sm:px-[18px]"
                   }`
                 : "shrink-0 !bg-white !text-black"
             }
@@ -618,14 +627,20 @@ export default function DetailActionsRow({
                 showLabel
                   ? size === "lg"
                     ? "mr-2 h-5 w-5"
-                    : "mr-2 h-4 w-4"
+                    : size === "sm"
+                      ? "mr-2 h-4 w-4"
+                      : "mr-2 h-[19px] w-[19px]"
                   : "ml-0.5 sm:ml-1"
               }`}
             />
             {showLabel && (
               <span
                 className={`whitespace-nowrap font-bold ${
-                  size === "lg" ? "text-sm sm:text-base" : "text-[13px]"
+                  size === "lg"
+                    ? "text-sm sm:text-base"
+                    : size === "sm"
+                      ? "text-[13px]"
+                      : "text-[13.75px]"
                 }`}
               >
                 {play.label}
@@ -660,7 +675,11 @@ export default function DetailActionsRow({
               trailerAvailable ? "!bg-white !text-black" : "",
               trailerTextShown
                 ? `labeled shrink-0 !aspect-auto !w-auto !max-w-none ${
-                    size === "lg" ? "!h-12 px-5" : "!h-10 px-4"
+                    size === "lg"
+                      ? "!h-12 px-5"
+                      : size === "sm"
+                        ? "!h-10 px-4"
+                        : "!h-[46px] px-4 sm:px-[18px]"
                   }`
                 : "",
             ]
@@ -676,7 +695,13 @@ export default function DetailActionsRow({
           >
             {trailerTextShown && trailerLoading ? (
               <Loader2
-                className={`animate-spin ${size === "lg" ? "mr-2 h-5 w-5" : "mr-2 h-4 w-4"}`}
+                className={`animate-spin ${
+                  size === "lg"
+                    ? "mr-2 h-5 w-5"
+                    : size === "sm"
+                      ? "mr-2 h-4 w-4"
+                      : "mr-2 h-[19px] w-[19px]"
+                }`}
               />
             ) : trailerPlaying ? (
               <X
@@ -684,7 +709,9 @@ export default function DetailActionsRow({
                   trailerTextShown
                     ? size === "lg"
                       ? "mr-2 h-5 w-5"
-                      : "mr-2 h-4 w-4"
+                      : size === "sm"
+                        ? "mr-2 h-4 w-4"
+                        : "mr-2 h-[19px] w-[19px]"
                     : ""
                 }
               />
@@ -694,7 +721,9 @@ export default function DetailActionsRow({
                   trailerTextShown
                     ? size === "lg"
                       ? "mr-2 h-5 w-5"
-                      : "mr-2 h-4 w-4"
+                      : size === "sm"
+                        ? "mr-2 h-4 w-4"
+                        : "mr-2 h-[19px] w-[19px]"
                     : trailerAvailable
                       ? "ml-0.5 sm:ml-1"
                       : ""
@@ -704,7 +733,11 @@ export default function DetailActionsRow({
             {trailerTextShown && (
               <span
                 className={`grid justify-items-center whitespace-nowrap font-bold ${
-                  size === "lg" ? "text-sm sm:text-base" : "text-[13px]"
+                  size === "lg"
+                    ? "text-sm sm:text-base"
+                    : size === "sm"
+                      ? "text-[13px]"
+                      : "text-[13.75px]"
                 }`}
               >
                 <span

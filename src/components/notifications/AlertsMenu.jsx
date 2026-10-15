@@ -283,7 +283,12 @@ export function AlertsMenuBoot({ variant = "desktop", heroNavMode = false }) {
  * `variant` solo cambia el tamaño del botón para que case con los controles
  * de cada barra (escritorio: 40px como Buscar; móvil: 44px como Menú).
  */
-export default function AlertsMenu({ account, variant = "desktop", heroNavMode = false }) {
+export default function AlertsMenu({
+  account,
+  variant = "desktop",
+  heroNavMode = false,
+  alignRef = null,
+}) {
   const { t } = useTranslation();
   const pathname = usePathname();
   const accountId = account?.id || null;
@@ -479,7 +484,7 @@ export default function AlertsMenu({ account, variant = "desktop", heroNavMode =
   }, [panelReady]);
 
   // Posición: bajo la barra (con el mismo aire que el menú de Perfil) y con el
-  // borde derecho alineado al botón, sin salirse de la pantalla.
+  // borde derecho alineado al ancla de perfil o al botón, sin salirse de la pantalla.
   useLayoutEffect(() => {
     if (!open || !wrapperRef.current) {
       setPosition(null);
@@ -490,14 +495,17 @@ export default function AlertsMenu({ account, variant = "desktop", heroNavMode =
       frameId = 0;
       const rect = wrapperRef.current?.getBoundingClientRect();
       if (!rect) return;
+      const alignEl = alignRef?.current || wrapperRef.current;
+      const alignRect = alignEl?.getBoundingClientRect() || rect;
       const padding = 16;
       const width = Math.min(420, window.innerWidth - padding * 2);
+      const rightAnchor = alignRect.right;
       const left = Math.min(
         window.innerWidth - width - padding,
-        Math.max(padding, rect.right - width),
+        Math.max(padding, rightAnchor - width),
       );
       // Mismo aire respecto a la barra que el desplegable de Perfil.
-      const top = rect.bottom + 20;
+      const top = (alignRect || rect).bottom + 20;
       const next = { top, left, width };
       setPosition((current) =>
         current && current.top === top && current.left === left && current.width === width
@@ -516,7 +524,7 @@ export default function AlertsMenu({ account, variant = "desktop", heroNavMode =
       window.removeEventListener("resize", schedule);
       window.removeEventListener("scroll", schedule, true);
     };
-  }, [open]);
+  }, [open, alignRef]);
 
   const computedUnread = alerts && lastSeenAt ? countUnread(alerts, lastSeenAt) : null;
   useEffect(() => {
