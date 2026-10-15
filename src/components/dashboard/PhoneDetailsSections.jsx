@@ -122,7 +122,7 @@ import {
   writeCommentsPage,
 } from "@/lib/details/commentsPageCache";
 import { DEFAULT_COMMENT_TAB } from "@/lib/details/commentFilters";
-
+import { prefetchSubrouteDetails } from "@/lib/navigation/subroutePrefetch";
 // El menú se pega por debajo de los controles flotantes del panel (cerrar,
 // acoplar, ficha completa): están en `top-4` y miden 40px, así que 56px es
 // justo donde dejan de estorbar. En la ficha completa este hueco lo marca el
@@ -1099,6 +1099,8 @@ export default function PhoneDetailsSections({
       watchedEpisodes: getWatchedEpisodeCountForSeason(episodesWatched?.watchedBySeason, sn, totalEp || 0),
       imdbUrl: imdbId ? `https://www.imdb.com/title/${imdbId}/episodes/?season=${sn}` : null,
       onClick: () => onOpenSeason?.(sn),
+      // Su panel (iframe) se precarga al apuntar a la tarjeta (subroutePrefetch).
+      onPrefetch: () => prefetchSubrouteDetails({ media_type: "season", id: item?.id, showId: item?.id, seasonNumber: sn }),
     };
   });
   const specialSeason = tmdbSeasons.find(
@@ -1132,6 +1134,7 @@ export default function PhoneDetailsSections({
               ? `https://www.imdb.com/title/${imdbId}/episodes/?season=0`
               : null,
             onClick: () => onOpenSeason?.(0),
+            onPrefetch: () => prefetchSubrouteDetails({ media_type: "season", id: item?.id, showId: item?.id, seasonNumber: 0 }),
           },
         ]
       : []),

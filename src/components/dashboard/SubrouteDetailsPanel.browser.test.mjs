@@ -58,7 +58,8 @@ test("season phone panel drills into actual episode page, returns, and releases 
     await page.locator('iframe[title="Episodio 1×1"]').waitFor();
     assert.match(page.url(), /preview=ep-1399-1-1/);
     await page.frameLocator('iframe[title="Episodio 1×1"]').locator('[data-embedded-details]').waitFor({ timeout: 60000 });
-    await page.getByRole('button', { name: 'Mostrar ficha móvil', exact: true, pressed: true }).click();
+    // El panel de la temporada aún puede estar saliendo (fundido cruzado).
+    await page.getByRole('dialog', { name: 'Episodio 1×1' }).getByRole('button', { name: 'Mostrar ficha móvil', exact: true, pressed: true }).click();
     await page.locator('iframe[title="Episodio 1×1"]').waitFor({ state: 'detached' });
     await page.getByRole('button', { name: 'Mostrar ficha móvil', exact: true }).click();
     await page.locator('iframe[title="Episodio 1×1"]').waitFor();
@@ -97,5 +98,25 @@ test("saved user-page preference overrides local panel choice and dashboard scop
       await page.waitForURL(`${base}${path}`, { timeout: 60000 });
       assert.equal(await page.locator('.sv-drawer-panel').count(), 0);
     }
+  } finally { await browser.close(); }
+});
+
+test("clicking the season cover opens the full page like the title drawer artwork", { skip: !enabled }, async () => {
+  const browser = await launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    await page.addInitScript(() => {
+      localStorage.setItem("showverse:detailModalContentView", "mobile");
+      localStorage.setItem("showverse:detailModalPlacement", "right");
+    });
+    await page.goto(`${base}/favorites?preview=season-1399-1`);
+    const frame = page.frameLocator('iframe[title="Temporada 1"]');
+    const cover = frame.locator('[data-mobile-cover-spacer]');
+    await cover.waitFor({ timeout: 60000 });
+    await page.locator('[aria-busy="false"]:has(> iframe)').waitFor({ timeout: 60000 });
+    // La parte visible de la portada (empieza un poco por encima del borde).
+    const box = await cover.boundingBox();
+    await cover.click({ position: { x: box.width / 2, y: Math.max(80, box.height * 0.4) } });
+    await page.waitForURL(`${base}/details/tv/1399/season/1`, { timeout: 60000 });
   } finally { await browser.close(); }
 });
