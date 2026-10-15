@@ -16,6 +16,7 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
+import { isHistoryNavigation } from "@/lib/navigation/historyNavigation";
 import { createPortal } from "react-dom";
 import "@/app/globals.css";
 import { useAuth } from "@/context/AuthContext";
@@ -1959,6 +1960,21 @@ function NavbarContent() {
   // arriba del todo, y además lo comparten la barra superior y el fondo del hero.
   const [bottomNavCompact, setBottomNavCompact] = useState(false);
   const bottomNavCompactRef = useRef(false);
+  // Referencia de scroll de la barra inferior (la usa su efecto de scroll; la
+  // vuelta atrás la resincroniza, ver más abajo).
+  const bottomNavLastYRef = useRef(null);
+  // AL VOLVER ATRÁS, LAS BARRAS YA ESTÁN EN SU ESTADO FINAL.
+  // La ficha deja la barra superior sin compactar (en móvil/tablet va inmersiva)
+  // y la inferior como quedara al desplazarse por ella. Al volver, la página
+  // reaparece en su scroll guardado y las dos cambiaban de estado CON su
+  // transición: la superior se compactaba ante los ojos (-16px en 300 ms) y la
+  // inferior, que tomaba el salto de scroll por un gesto hacia abajo, se
+  // encogía. `instantBars` quita sus transiciones solo en ese cambio.
+  const [instantBars, setInstantBars] = useState(false);
+  // Estado de la barra inferior en cada página, para recuperarlo al volver a
+  // ella tal como se dejó.
+  const bottomNavByPageRef = useRef(new Map());
+  const barsPageRef = useRef(null);
   // Destino marcado de forma optimista al pulsar un enlace: el indicador del
   // navbar resalta de inmediato la sección a la que vas, sin esperar a que la
   // transición de ruta haga commit (lo que dejaba el indicador en la página de
@@ -2070,6 +2086,44 @@ function NavbarContent() {
     };
   }, []);
 
+  // Vuelta atrás/adelante: estado FINAL de las dos barras antes de pintar.
+  // `ScrollRestoration` (antes que este componente en el layout) ya ha puesto la
+  // página en su scroll guardado en su efecto de layout.
+  useLayoutEffect(() => {
+    const previous = barsPageRef.current;
+    if (previous && previous !== pathname) {
+      bottomNavByPageRef.current.set(previous, bottomNavCompactRef.current);
+    }
+    barsPageRef.current = pathname;
+    if (!previous || previous === pathname || !isHistoryNavigation(pathname)) return;
+
+    const y = Math.max(0, window.scrollY);
+    const nextScrolled = y > 40;
+    const nextBottom = y > 48 && Boolean(bottomNavByPageRef.current.get(pathname));
+    // El salto al scroll restaurado no es un gesto: no compacta ni expande.
+    bottomNavLastYRef.current = y;
+    // Siempre sin transición: aunque `isScrolled` no cambie, la ficha es una
+    // ruta inmersiva (barra superior sin compactar) y la página no.
+    isScrolledRef.current = nextScrolled;
+    bottomNavCompactRef.current = nextBottom;
+    setIsScrolled(nextScrolled);
+    setBottomNavCompact(nextBottom);
+    setInstantBars(true);
+  }, [pathname]);
+
+  // Las transiciones vuelven tras pintar el estado final.
+  useEffect(() => {
+    if (!instantBars) return undefined;
+    let second = 0;
+    const first = window.requestAnimationFrame(() => {
+      second = window.requestAnimationFrame(() => setInstantBars(false));
+    });
+    return () => {
+      window.cancelAnimationFrame(first);
+      window.cancelAnimationFrame(second);
+    };
+  }, [instantBars]);
+
   // AL CAMBIAR DE RUTA se recalcula de inmediato.
   //
   // `isScrolled` es global y solo se actualiza con eventos de scroll, así que al
@@ -2126,13 +2180,14 @@ function NavbarContent() {
     const TOP_ZONE = 48;
 
     let frameId = 0;
-    let lastY = window.scrollY;
+    bottomNavLastYRef.current = window.scrollY;
     let lastHeight = document.documentElement.scrollHeight;
 
     const updateBottomNav = () => {
       frameId = 0;
       const y = Math.max(0, window.scrollY);
       const height = document.documentElement.scrollHeight;
+      const lastY = bottomNavLastYRef.current;
       const delta = y - lastY;
       const heightDelta = height - lastHeight;
       lastHeight = height;
@@ -2146,14 +2201,14 @@ function NavbarContent() {
       // Solo cubre ese caso concreto: si el usuario desplaza de verdad mientras
       // el documento crece (scroll infinito), el gesto se procesa con normalidad.
       if (heightDelta < 0 && delta < 0 && Math.abs(delta - heightDelta) <= 2) {
-        lastY = y;
+        bottomNavLastYRef.current = y;
         return;
       }
 
       // Sin actualizar `lastY`, los desplazamientos lentos se van acumulando
       // hasta superar el umbral en vez de ignorarse frame a frame.
       if (Math.abs(delta) < DELTA) return;
-      lastY = y;
+      bottomNavLastYRef.current = y;
 
       const next = y > TOP_ZONE && delta > 0;
       if (next === bottomNavCompactRef.current) return;
@@ -2665,6 +2720,8 @@ function NavbarContent() {
         // Compactado por scroll en móvil/tablet: solo con `transform`, igual que
         // la barra inferior. Ver `.sv-topbar` en globals.css.
         data-compact={isScrolled && !isImmersiveRoute ? "" : undefined}
+        // Vuelta atrás: el estado final sin transición (ver `instantBars`).
+        data-bars-instant={instantBars ? "" : undefined}
         // Ficha / recomendaciones: nacen ya con el alto compacto (ver la fila
         // móvil). Lo leen los avisos emergentes para colocarse justo debajo.
         data-immersive={isImmersiveRoute ? "" : undefined}
@@ -3207,6 +3264,7 @@ function NavbarContent() {
       {/* ===================== BOTTOM BAR (MÓVIL) ===================== */}
       <nav
         aria-label={t("mobile_bottom_nav_label", "Navegación principal")}
+        data-bars-instant={instantBars ? "" : undefined}
         // Píldora flotante con margen amplio a los lados. Solo se anima
         // `transform` (scale desde el borde inferior): al no tocar width/height
         // no hay recálculo de layout, así la compactación es fluida en todo

@@ -2190,6 +2190,13 @@ html[data-fit-viewport] [data-scroll-restoration-root] {
   }
 }
 
+/* Vuelta atrás a una página: las barras toman su estado final (compacta o
+   no) sin animarlo (Navbar, `instantBars`). Solo dura ese cambio. */
+[data-bars-instant],
+[data-bars-instant] * {
+  transition: none !important;
+}
+
 .sv-topbar-row {
   transition:
     margin-right 320ms cubic-bezier(0.22, 1, 0.36, 1),
