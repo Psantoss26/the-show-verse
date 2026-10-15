@@ -61,6 +61,17 @@ function install() {
   if (installed || typeof window === "undefined") return;
   installed = true;
   currentPageKey = readPageKey();
+  // DOCUMENTO NUEVO (recarga, URL escrita, enlace externo): nunca es una vuelta
+  // dentro de la app. La marca de sesión es del documento anterior y sobrevive
+  // a la recarga: recargar hasta 30 s después de volver de una ficha pintaba la
+  // página estática, sin su animación de entrada, y el primer render del
+  // cliente (instantánea de vuelta) no coincidía con el del servidor (error de
+  // hidratación en Historial).
+  try {
+    window.sessionStorage.removeItem(HISTORY_NAVIGATION_MARKER_KEY);
+  } catch {
+    // Session storage may be unavailable in private browsing.
+  }
   // `pageshow` con persisted = bfcache también cuenta como "volver" a la página.
   window.addEventListener("popstate", () => {
     const nextPageKey = readPageKey();

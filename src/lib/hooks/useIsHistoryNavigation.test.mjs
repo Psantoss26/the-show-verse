@@ -12,7 +12,14 @@ globalThis.window = {
   performance: { now: () => ahora },
   location: { pathname: "/favorites", search: "" },
   sessionStorage: {
-    _d: new Map(),
+    // Recarga hasta 30 s después de volver de una ficha: la marca de sesión
+    // del documento anterior sigue ahí al cargar el módulo.
+    _d: new Map([
+      [
+        "showverse:pending-history-navigation",
+        JSON.stringify({ route: "/favorites", at: Date.now() }),
+      ],
+    ]),
     getItem(k) {
       return this._d.has(k) ? this._d.get(k) : null;
     },
@@ -39,6 +46,14 @@ const popstate = ({ from = "/details/movie/1", to = "/favorites" } = {}) => {
   globalThis.window.location = { pathname: toPath, search: toSearch ? `?${toSearch}` : "" };
   listeners.get("popstate")?.();
 };
+test("recargar tras volver de una ficha NO es navegación de historial", () => {
+  assert.equal(isHistoryNavigation("/favorites"), false);
+  assert.equal(
+    globalThis.window.sessionStorage.getItem("showverse:pending-history-navigation"),
+    null,
+  );
+});
+
 const limpiar = () => {
   globalThis.window.sessionStorage._d.clear();
   notifyPushNavigation();
