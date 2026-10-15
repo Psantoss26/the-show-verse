@@ -143,10 +143,10 @@ export function isOverlayOpen() {
 //     dispararse al salir de `display: none` (el icono de reserva de cada
 //     póster: cientos de fundidos) y framer, al reponer su `initial`, hacía
 //     fundirse a 0 la barra de filtros (`transition-all`). En tres fotogramas
-//     aún no hay transiciones del usuario (hover) que respetar. Las que
-//     DESVANECEN no se terminan (pintaría un fotograma a 0 antes de que framer
-//     reponga el 1): se congelan en su inicio y, si siguen ahí al acabar, se
-//     reanudan.
+//     aún no hay transiciones del usuario (hover) que respetar. Las que se
+//     ALEJAN del reposo (desvanecer, desplazar) no se terminan (pintaría un
+//     fotograma el `initial` de framer antes de que lo deshaga): se congelan en
+//     su inicio y, si siguen ahí al acabar, se reanudan (ver `leavesRest`).
 // Sin marcas en <html>: con selectores universales, ponerlas y quitarlas
 // recalculaba el estilo de TODO el documento (100-260 ms cada vez con CPU ×4)
 // y el hover iba a tirones un par de segundos tras volver.
@@ -160,12 +160,35 @@ let revealTimer = 0;
 
 const heldFadeOuts = new Set();
 
-function fadesOut(animation) {
+// ¿Transformación en reposo? (`none`, la identidad o sus equivalentes.)
+const REST_TRANSFORMS = new Set([
+  "none",
+  "matrix(1, 0, 0, 1, 0, 0)",
+  "matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)",
+  "0px", "0px 0px", "0px 0px 0px", "1", "1 1",
+]);
+function atRest(value) {
+  return value == null || REST_TRANSFORMS.has(String(value).trim());
+}
+
+// ¿La transición SE ALEJA del reposo? Desvanecer, o desplazar/escalar desde la
+// posición normal. Al reaparecer la página es framer reponiendo su `initial`
+// (`opacity: 0`, `y: 10`…) sobre lo que ya se veía, y en el fotograma
+// siguiente lo deshace: terminarla dejaba pintado ese estado de partida (la
+// barra de filtros del Historial, 10px más abajo durante un fotograma). Las que
+// VUELVEN al reposo (`@starting-style`: el icono de reserva de cada póster)
+// sí se terminan.
+function leavesRest(animation) {
   if (typeof CSSTransition === "undefined" || !(animation instanceof CSSTransition)) return false;
   const keyframes = animation.effect?.getKeyframes?.() || [];
-  const from = Number.parseFloat(keyframes[0]?.opacity);
-  const to = Number.parseFloat(keyframes.at(-1)?.opacity);
-  return to < from;
+  const first = keyframes[0] || {};
+  const last = keyframes.at(-1) || {};
+  const from = Number.parseFloat(first.opacity);
+  const to = Number.parseFloat(last.opacity);
+  if (to < from) return true;
+  return ["transform", "translate", "scale", "rotate"].some(
+    (property) => property in first && atRest(first[property]) && !atRest(last[property]),
+  );
 }
 
 function finishRevealAnimations({ last = true } = {}) {
@@ -177,7 +200,7 @@ function finishRevealAnimations({ last = true } = {}) {
     if (!target || !root.contains(target)) continue;
     if (!Number.isFinite(animation.effect.getComputedTiming?.().endTime)) continue;
     if (heldFadeOuts.has(animation)) continue;
-    if (fadesOut(animation)) {
+    if (leavesRest(animation)) {
       if (animation.playState === "running") {
         animation.pause();
         animation.currentTime = 0;
