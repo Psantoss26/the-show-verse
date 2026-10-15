@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import styles from "./HoverExpandCard.module.css";
 import { applyTmdbResponsiveImage } from "@/lib/ui/tmdbResponsiveImage";
 import {
@@ -93,6 +93,43 @@ function prefersReducedMotion() {
   );
 }
 
+function stopFixedSizeSync(frameRef) {
+  if (frameRef.current) {
+    window.cancelAnimationFrame(frameRef.current);
+    frameRef.current = null;
+  }
+}
+
+function syncFixedSizeChildren(el, frameRef, duration) {
+  if (!el) return;
+  stopFixedSizeSync(frameRef);
+  // Solo las tarjetas que los llevan (el Historial): `getComputedStyle` en cada
+  // fotograma fuerza el estilo de la página, y tras volver de una ficha (estilo
+  // de toda la página pendiente) cada hover costaba cientos de ms.
+  if (!el.querySelector("[data-hover-expand-fixed-size]")) return;
+  const startedAt = performance.now();
+
+  const sync = (now) => {
+    const transform = getComputedStyle(el).transform;
+    const matrix = transform === "none"
+      ? new DOMMatrixReadOnly()
+      : new DOMMatrixReadOnly(transform);
+    const scaleX = Math.hypot(matrix.a, matrix.b) || 1;
+    const scaleY = Math.hypot(matrix.c, matrix.d) || 1;
+    el.querySelectorAll("[data-hover-expand-fixed-size]").forEach((child) => {
+      child.style.scale = `${1 / scaleX} ${1 / scaleY}`;
+    });
+
+    if (now - startedAt < duration) {
+      frameRef.current = window.requestAnimationFrame(sync);
+    } else {
+      frameRef.current = null;
+    }
+  };
+
+  frameRef.current = window.requestAnimationFrame(sync);
+}
+
 export default function HoverExpandCard({
   as: Tag = "div",
   cellClassName = "",
@@ -110,6 +147,7 @@ export default function HoverExpandCard({
   // mitad de la salida no debe acabar encogiendo la tarjeta).
   const gestureRef = useRef(0);
   const leaveTimerRef = useRef(null);
+  const fixedSizeFrameRef = useRef(null);
   // Escala "encogida" del gesto en curso (la que iguala la celda).
   const shrunkRef = useRef("none");
 
@@ -120,7 +158,30 @@ export default function HoverExpandCard({
     }
   };
 
-  useEffect(() => () => clearLeaveTimer(), []);
+  // Algunos overlays (p. ej. el contador de episodios agrupados) deben
+  // conservar su tamaño visual mientras la tarjeta ejecuta el FLIP. Se
+  // compensa solo la escala heredada; la posición sigue acompañando a la
+  // esquina de la tarjeta ampliada.
+  useEffect(() => () => {
+    clearLeaveTimer();
+    stopFixedSizeSync(fixedSizeFrameRef);
+  }, []);
+
+  // AL OCULTARSE LA PÁGINA, A REPOSO. Pulsar la tarjeta abre la ficha y la
+  // página queda oculta debajo (<Activity>, ver OverlayRouteHost): el puntero
+  // ya no puede salir de la tarjeta, así que nunca llegaba `pointerleave` y al
+  // volver seguía ampliada hasta mover el ratón. La limpieza de un efecto de
+  // layout corre justo al ocultarse (y al desmontar), antes de pintar.
+  useLayoutEffect(() => () => {
+    const el = cardRef.current;
+    if (!el) return;
+    gestureRef.current += 1;
+    clearLeaveTimer();
+    el.style.transition = "none";
+    el.style.transform = "";
+    el.style.inset = "";
+    el.classList.remove(styles.expanded);
+  }, []);
 
   const expand = useCallback(() => {
     const el = cardRef.current;
@@ -149,6 +210,7 @@ export default function HoverExpandCard({
     }
     el.style.transition = `transform ${DURATION_MS}ms ${EASING}`;
     el.style.transform = "";
+    syncFixedSizeChildren(el, fixedSizeFrameRef, DURATION_MS + 50);
   }, []);
 
   const collapse = useCallback(() => {
@@ -172,6 +234,11 @@ export default function HoverExpandCard({
 
     el.style.transition = `transform ${Math.round(DURATION_MS * 0.8)}ms cubic-bezier(0.22, 1, 0.36, 1)`;
     el.style.transform = shrunkRef.current;
+    syncFixedSizeChildren(
+      el,
+      fixedSizeFrameRef,
+      Math.round(DURATION_MS * 0.8) + 50,
+    );
     // Al terminar la animación la tarjeta recupera su tamaño normal. Con un
     // temporizador y no con `transitionend`, que no llega si la transición se
     // interrumpe o no llega a arrancar.

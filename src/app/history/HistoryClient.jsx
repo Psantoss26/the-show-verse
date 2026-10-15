@@ -569,6 +569,8 @@ function HistoryGroupedEpisodesIndicator({ count, compact = false }) {
   return (
     <div
       className={`pointer-events-none absolute left-0 top-0 z-30 flex items-center justify-center rounded-br-2xl bg-emerald-500/15 text-emerald-300 shadow-sm backdrop-blur-md ${compact ? "p-1.5 sm:p-2" : "p-2 sm:p-2.5"}`}
+      data-hover-expand-fixed-size=""
+      style={{ scale: 1 }}
       aria-hidden="true"
     >
       <div className={`flex items-center font-bold ${compact ? "gap-1 text-[10px] sm:text-xs" : "gap-1 text-xs sm:text-sm"}`}>

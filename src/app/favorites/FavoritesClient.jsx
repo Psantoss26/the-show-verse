@@ -54,6 +54,7 @@ import {
   useIsHistoryNavigation,
   useBackNavOrderFreeze,
 } from "@/lib/hooks/useIsHistoryNavigation";
+import { useStableState } from "@/lib/hooks/useStableState";
 import {
   pickResponsiveColumns,
   estimateVisibleCards,
@@ -2048,17 +2049,17 @@ export default function FavoritesClient() {
   // que terminen la hidratación de sesión y la revalidación habitual.
   const [loading, setLoading] = useState(() => !shouldRestoreSnapshot);
   const [logoutLoading, setLogoutLoading] = useState(false);
-  const [items, setItems] = useState(() =>
+  const [items, setItems] = useStableState(() =>
     shouldRestoreSnapshot ? initialCache.favorites.items : [],
   );
-  const [ratedItems, setRatedItems] = useState(() =>
+  const [ratedItems, setRatedItems] = useStableState(() =>
     shouldRestoreSnapshot ? initialCache.favorites.ratedItems || [] : [],
   );
-  const [imdbScores, setImdbScores] = useState(() => readScoreCache("imdb"));
-  const [traktScores, setTraktScores] = useState(() => readScoreCache("trakt"));
+  const [imdbScores, setImdbScores] = useStableState(() => readScoreCache("imdb"));
+  const [traktScores, setTraktScores] = useStableState(() => readScoreCache("trakt"));
   const layoutImdbScores = imdbScores;
   const layoutTraktScores = traktScores;
-  const [providersByItem, setProvidersByItem] = useState(
+  const [providersByItem, setProvidersByItem] = useStableState(
     () => initialCache.providers,
   );
   // El agrupado debe reaccionar a cada lote de plataformas. Mantener una copia
@@ -2084,8 +2085,8 @@ export default function FavoritesClient() {
   );
 
   // El historial alimenta tanto la ordenación como el indicador de visionado.
-  const [watchDates, setWatchDates] = useState(new Map());
-  const [watchCounts, setWatchCounts] = useState(new Map());
+  const [watchDates, setWatchDates] = useStableState(new Map());
+  const [watchCounts, setWatchCounts] = useStableState(new Map());
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
 

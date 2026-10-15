@@ -2868,7 +2868,7 @@ function NavbarContent() {
                 <button
                   type="button"
                   onClick={() => setDesktopSearchOpen(true)}
-                  className="grid h-10 w-10 place-items-center rounded-full text-zinc-300 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                  className="grid h-10 w-10 place-items-center rounded-full text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
                   aria-label={t("search_input_label", "Buscar en The Show Verse")}
                 >
                   <SearchIcon className="h-6 w-6" />
@@ -3104,7 +3104,7 @@ function NavbarContent() {
             <button
               type="button"
               onClick={() => setShowMobileSearch(true)}
-              className="grid h-11 w-11 place-items-center rounded-full text-white transition-[background-color,transform] duration-200 hover:bg-white/10 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 md:hidden"
+              className="grid h-11 w-11 place-items-center rounded-full text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] transition-transform duration-200 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 md:hidden"
               aria-label="Buscar"
             >
               <SearchIcon className="h-6 w-6" aria-hidden="true" />
@@ -3128,7 +3128,7 @@ function NavbarContent() {
                 <button
                   type="button"
                   onClick={() => setTabletSearchOpen(true)}
-                  className="grid h-11 w-11 place-items-center rounded-full text-white transition-[background-color,transform] duration-200 hover:bg-white/10 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+                  className="grid h-11 w-11 place-items-center rounded-full text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] transition-transform duration-200 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
                   aria-label="Buscar"
                 >
                   <SearchIcon className="h-6 w-6" aria-hidden="true" />
@@ -3315,6 +3315,7 @@ function NavbarContent() {
               exit={{ x: -320 }}
               transition={{ type: "spring", damping: 28, stiffness: 280 }}
               className={`h-full w-[280px] sm:w-[300px] max-w-[85vw] ${LIQUID_GLASS_PANEL} px-4 pt-3 pb-6 flex flex-col select-none transform-gpu overflow-y-auto scrollbar-none`}
+              style={{ backgroundColor: "rgba(0, 0, 0, 0.62)" }}
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
@@ -3351,7 +3352,7 @@ function NavbarContent() {
                   className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     isActive("/")
                       ? "bg-white/15 text-white font-bold"
-                      : "text-neutral-300 hover:text-white hover:bg-white/5"
+                      : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
                   }`}
                 >
                   <HomeIcon className="h-5 w-5 text-white" />
@@ -3366,7 +3367,7 @@ function NavbarContent() {
                   className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     isActive("/movies")
                       ? "bg-sky-500/20 text-sky-300 font-bold"
-                      : "text-neutral-300 hover:text-white hover:bg-white/5"
+                      : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
                   }`}
                 >
                   <FilmIcon className="h-5 w-5 text-sky-400" />
@@ -3381,7 +3382,7 @@ function NavbarContent() {
                   className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     isActive("/series")
                       ? "bg-fuchsia-500/20 text-fuchsia-300 font-bold"
-                      : "text-neutral-300 hover:text-white hover:bg-white/5"
+                      : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
                   }`}
                 >
                   <TvIcon className="h-5 w-5 text-fuchsia-400" />
@@ -3394,7 +3395,7 @@ function NavbarContent() {
                   className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     isActive("/discover")
                       ? "bg-indigo-500/20 text-indigo-300 font-bold"
-                      : "text-neutral-300 hover:text-white hover:bg-white/5"
+                      : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
                   }`}
                 >
                   <Compass className="h-5 w-5 text-indigo-400" />
@@ -3407,7 +3408,7 @@ function NavbarContent() {
                   className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     isActive("/biblioteca")
                       ? "bg-amber-500/20 text-amber-300 font-bold"
-                      : "text-neutral-300 hover:text-white hover:bg-white/5"
+                      : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
                   }`}
                 >
                   <FolderKanban className="h-5 w-5 text-amber-400" />
@@ -3422,7 +3423,7 @@ function NavbarContent() {
                   className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     isActive("/in-progress")
                       ? "bg-emerald-500/20 text-emerald-300 font-bold"
-                      : "text-neutral-300 hover:text-white hover:bg-white/5"
+                      : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
                   }`}
                 >
                   <Play className="h-5 w-5 text-emerald-400" fill="currentColor" />
@@ -3435,7 +3436,7 @@ function NavbarContent() {
                   className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     isActive("/history")
                       ? "bg-emerald-500/20 text-emerald-300 font-bold"
-                      : "text-neutral-300 hover:text-white hover:bg-white/5"
+                      : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
                   }`}
                 >
                   <Eye className="h-5 w-5 text-emerald-400" />
@@ -3450,7 +3451,7 @@ function NavbarContent() {
                   className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     isActive("/favorites")
                       ? "bg-red-500/20 text-red-300 font-bold"
-                      : "text-neutral-300 hover:text-white hover:bg-white/5"
+                      : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
                   }`}
                 >
                   <Heart className="h-5 w-5 text-red-400" />
@@ -3463,7 +3464,7 @@ function NavbarContent() {
                   className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     isActive("/watchlist")
                       ? "bg-sky-500/20 text-sky-300 font-bold"
-                      : "text-neutral-300 hover:text-white hover:bg-white/5"
+                      : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
                   }`}
                 >
                   <Bookmark className="h-5 w-5 text-sky-400" />
@@ -3478,7 +3479,7 @@ function NavbarContent() {
                   className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     isActive("/social")
                       ? "bg-pink-500/20 text-pink-300 font-bold"
-                      : "text-neutral-300 hover:text-white hover:bg-white/5"
+                      : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
                   }`}
                 >
                   <Users className="h-5 w-5 text-pink-400" />
@@ -3491,7 +3492,7 @@ function NavbarContent() {
                   className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     isActive("/lists")
                       ? "bg-purple-500/20 text-purple-300 font-bold"
-                      : "text-neutral-300 hover:text-white hover:bg-white/5"
+                      : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
                   }`}
                 >
                   <ListVideo className="h-5 w-5 text-purple-400" />
@@ -3504,7 +3505,7 @@ function NavbarContent() {
                   className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                     isActive("/calendar")
                       ? "bg-amber-500/20 text-amber-300 font-bold"
-                      : "text-neutral-300 hover:text-white hover:bg-white/5"
+                      : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
                   }`}
                 >
                   <CalendarDaysIcon className="h-5 w-5 text-amber-400" />
@@ -3520,7 +3521,7 @@ function NavbarContent() {
                     className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                       isActive("/recap")
                         ? "bg-lime-500/20 text-lime-200 font-bold"
-                        : "text-neutral-300 hover:text-white hover:bg-white/5"
+                        : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
                     }`}
                   >
                     <PartyPopper className="h-5 w-5 text-lime-300" />
@@ -3533,7 +3534,7 @@ function NavbarContent() {
                     className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
                       isActive("/recommendations")
                         ? "bg-emerald-500/20 text-emerald-300 font-bold"
-                        : "text-neutral-300 hover:text-white hover:bg-white/5"
+                        : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
                     }`}
                   >
                     <ThumbsUp className="h-5 w-5 text-emerald-400" />

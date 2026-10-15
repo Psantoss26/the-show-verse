@@ -8,6 +8,7 @@ import {
   wasInPagePopState,
 } from "@/lib/hooks/useIsHistoryNavigation";
 import { installPageImageRetention } from "@/lib/images/retainPageImages";
+import { isOverlayOpen } from "@/components/navigation/OverlayRouteHost";
 
 const STORAGE_PREFIX = "showverse:scroll-position:";
 const HISTORY_NAVIGATION_MARKER_KEY = "showverse:pending-history-navigation";
@@ -279,7 +280,13 @@ export default function ScrollRestoration() {
       // snapshot cacheado, aunque el commit del App Router llegue tarde.
       markHistoryNavigation();
       clearRestorationComplete();
-      beginHistoryRestore();
+      // Volver de una ficha a la página que sigue viva debajo (OverlayRouteHost):
+      // no se monta nada de nuevo, así que no hace falta el modo «vuelta atrás».
+      // Ponerlo y quitarlo recalculaba el estilo de todo el documento justo
+      // cuando la página reaparece (el hover iba a tirones un par de segundos).
+      if (!(isOverlayOpen() && !window.location.pathname.startsWith("/details"))) {
+        beginHistoryRestore();
+      }
       navigationModeRef.current = "history";
       historyNavigationUntilRef.current =
         window.performance.now() + HISTORY_NAVIGATION_WINDOW_MS;

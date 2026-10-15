@@ -13,6 +13,7 @@ import OfflineManager from "@/components/OfflineManager";
 import LetterboxdAutoSync from "@/components/settings/LetterboxdAutoSync";
 import OfflineBanner from "@/components/OfflineBanner";
 import ScrollRestoration from "@/components/ScrollRestoration";
+import OverlayRouteHost from "@/components/navigation/OverlayRouteHost";
 import MobileUserPageSwipeNavigation from "@/components/MobileUserPageSwipeNavigation";
 import { AVATAR_BOOT_SCRIPT } from "@/components/auth/AvatarBootScript";
 import { anton, ptSans } from "./fonts";
@@ -51,7 +52,7 @@ export const viewport = {
   userScalable: false,
 };
 
-export default function RootLayout({ children }) {
+export default function RootLayout({ children, overlay }) {
   return (
     // `suppressHydrationWarning`: AvatarBootScript marca <html> antes de
     // hidratar, y React no debe leer ese atributo como una discrepancia.
@@ -97,7 +98,9 @@ export default function RootLayout({ children }) {
                 data-scroll-restoration-root
                 className="relative min-h-[100svh] bg-black pb-[calc(5rem+env(safe-area-inset-bottom))] desktop:pb-0"
               >
-                {children}
+                {/* Fichas abiertas desde la página por encima de ella, que
+                    sigue viva debajo (ver OverlayRouteHost). */}
+                <OverlayRouteHost overlay={overlay}>{children}</OverlayRouteHost>
               </div>
             </MobileUserPageSwipeNavigation>
             <PwaManager />

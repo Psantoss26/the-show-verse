@@ -49,6 +49,7 @@ import {
   useIsHistoryNavigation,
   useBackNavOrderFreeze,
 } from "@/lib/hooks/useIsHistoryNavigation";
+import { useStableState } from "@/lib/hooks/useStableState";
 import {
   pickResponsiveColumns,
   estimateVisibleCards,
@@ -1776,14 +1777,14 @@ export default function WatchlistClient() {
   // que terminen la hidratación de sesión y la revalidación habitual.
   const [loading, setLoading] = useState(() => !shouldRestoreSnapshot);
   const [logoutLoading, setLogoutLoading] = useState(false);
-  const [items, setItems] = useState(() =>
+  const [items, setItems] = useStableState(() =>
     shouldRestoreSnapshot ? initialCache.watchlist.items : [],
   );
-  const [imdbScores, setImdbScores] = useState(() => readScoreCache("imdb"));
-  const [traktScores, setTraktScores] = useState(() => readScoreCache("trakt"));
+  const [imdbScores, setImdbScores] = useStableState(() => readScoreCache("imdb"));
+  const [traktScores, setTraktScores] = useStableState(() => readScoreCache("trakt"));
   const layoutImdbScores = imdbScores;
   const layoutTraktScores = traktScores;
-  const [providersByItem, setProvidersByItem] = useState(
+  const [providersByItem, setProvidersByItem] = useStableState(
     () => initialCache.providers,
   );
   // El agrupado debe reaccionar a cada lote de plataformas. Mantener una copia

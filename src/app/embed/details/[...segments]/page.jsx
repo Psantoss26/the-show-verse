@@ -31,7 +31,7 @@ export default async function EmbeddedDetailsPage({ params, searchParams }) {
   if (!content) notFound();
 
   return (
-    <div data-embedded-details className="pt-12">
+    <div data-embedded-details className={segments.length === 2 ? "pt-12" : undefined}>
       <EmbeddedDetailsBridge />
       {content}
     </div>

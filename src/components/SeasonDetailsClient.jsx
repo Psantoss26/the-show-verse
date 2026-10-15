@@ -4,6 +4,7 @@
 import OptimizedImage from "@/components/OptimizedImage";
 import { useMemo, useEffect, useLayoutEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
+import { sendEmbeddedDetailsAction } from "@/lib/navigation/embeddedDetails";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { motion } from "framer-motion";
 
@@ -669,6 +670,9 @@ export default function SeasonDetailsClient({
   const [mobileCoverFailedSrc, setMobileCoverFailedSrc] = useState(null);
   const mobileCoverReady =
     !mobileCoverLowSrc || mobileCoverLoad.ready || mobileCoverFailedSrc === mobileCoverLowSrc;
+  useEffect(() => {
+    if (mobileCoverReady) sendEmbeddedDetailsAction("hero-ready");
+  }, [mobileCoverReady]);
   const {
     rootRef: heroRootRef,
     coverSpacerRef: heroCoverSpacerRef,
@@ -1192,7 +1196,7 @@ export default function SeasonDetailsClient({
         );
 
         if (res.status === 401) {
-          window.location.href = `/login?next=/details/tv/${showId}/season/${seasonNumber}`;
+          router.push(`/login?next=/details/tv/${showId}/season/${seasonNumber}`);
           return false;
         }
 
@@ -1209,7 +1213,7 @@ export default function SeasonDetailsClient({
         setRatingLoading(false);
       }
     },
-    [showId, seasonNumber, showName, posterPath],
+    [showId, seasonNumber, showName, posterPath, router],
   );
 
   useEffect(() => {
@@ -1288,7 +1292,7 @@ export default function SeasonDetailsClient({
       }
 
       if (!connected) {
-        window.location.href = `/login?next=/details/tv/${showId}/season/${seasonNumber}`;
+        router.push(`/login?next=/details/tv/${showId}/season/${seasonNumber}`);
         return;
       }
 
@@ -1318,7 +1322,7 @@ export default function SeasonDetailsClient({
       } catch (error) {
         const needsReauth = /401|unauthorized/i.test(error?.message || "");
         if (needsReauth) {
-          window.location.href = `/login?next=/details/tv/${showId}/season/${seasonNumber}`;
+          router.push(`/login?next=/details/tv/${showId}/season/${seasonNumber}`);
           return;
         }
         await reloadSeasonTraktState({ background: true });
@@ -1332,6 +1336,7 @@ export default function SeasonDetailsClient({
       trakt.traktId,
       watchedBusy,
       seasonFullyWatched,
+      router,
       seasonNumber,
       reloadSeasonTraktState,
       showId,
@@ -1812,7 +1817,7 @@ export default function SeasonDetailsClient({
                   loading: ratingLoading,
                   connected: traktConnected,
                   onConnect: () =>
-                    (window.location.href = `/login?next=/details/tv/${showId}/season/${seasonNumber}`),
+                    router.push(`/login?next=/details/tv/${showId}/season/${seasonNumber}`),
                   onRate: handleRate,
                   onClear: () => handleRate(null),
                   min: 1,
@@ -1828,6 +1833,7 @@ export default function SeasonDetailsClient({
                 entrar. La portada cede el espacio que necesitan título,
                 botones y puntuaciones; las stats se abren al hacer scroll. */}
             <div
+              data-phone-scaled
               ref={heroScoreboardRef}
               // Centrado entre los botones y el navbar inferior (ver
               // `--mobile-scoreboard-shift` en details/MobileDetailsHero).
@@ -1905,7 +1911,7 @@ export default function SeasonDetailsClient({
               aria-hidden="true"
               className="block h-px sm:hidden"
             />
-            <div className={`mb-3 sm:hidden ${MOBILE_REVEAL_BASE}`} {...heroRevealProps}>
+            <div data-phone-scaled className={`mb-3 sm:hidden ${MOBILE_REVEAL_BASE}`} {...heroRevealProps}>
               <ScoreboardPillRow>
                 <ScoreboardPill
                   iconOnly
@@ -1933,7 +1939,7 @@ export default function SeasonDetailsClient({
                 />
               </ScoreboardPillRow>
             </div>
-            <div className={`sm:hidden ${MOBILE_REVEAL_BASE}`} {...heroRevealProps}>
+            <div data-phone-scaled className={`sm:hidden ${MOBILE_REVEAL_BASE}`} {...heroRevealProps}>
               <DetailsInfoTabs
                 layoutId="seasonTabInlineMobile"
                 enableMobileTabSwipe
@@ -1966,7 +1972,7 @@ export default function SeasonDetailsClient({
 
         {/* Episodes */}
         <AnimatedSection
-          className="mb-12 group/section"
+          className="sv-phone-scaled-section mb-12 group/section"
           delay={0.04}
           renderImmediately
         >
