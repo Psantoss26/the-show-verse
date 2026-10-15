@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, useIsPresent, useMotionValue, useReducedMotion } from "framer-motion";
 import { ArrowUpRight, PanelRight, Pin, Smartphone, X } from "lucide-react";
@@ -187,25 +187,6 @@ export default function SubrouteDetailsPanel({ item, placement, contentView, dra
   useLayoutEffect(() => () => setNavigating(false), []);
   useEffect(() => () => resizeCleanupRef.current?.(), [right, docked, phone]);
 
-  useEffect(() => {
-    const receive = (event) => {
-      if (event.origin !== window.location.origin || event.source !== frame.current?.contentWindow || event.data?.type !== EMBEDDED_DETAILS_MESSAGE) return;
-      const { action, href: destination, detail } = event.data;
-      if (action === "content-ready" || action === "hero-ready") syncContentScale();
-      if (action === "hero-ready" || (action === "content-ready" && !phone)) setLoading(false);
-      if (action === "close") onClose();
-      if (action === "list-changed") window.dispatchEvent(new CustomEvent("showverse:list-changed", { detail }));
-      if (action !== "navigate" || typeof destination !== "string") return;
-      let url;
-      try { url = canonicalDetailsHref(destination, window.location.origin); } catch { return; }
-      if (url.origin !== window.location.origin) return;
-      const next = detailPreviewFromHref(url.href, window.location.origin);
-      if (next) onOpenDetail(next, { drill: true });
-      else router.push(`${url.pathname}${url.search}${url.hash}`);
-    };
-    window.addEventListener("message", receive);
-    return () => window.removeEventListener("message", receive);
-  }, [onClose, onOpenDetail, router, phone, syncContentScale]);
 
   // Cierre al pulsar FUERA del panel lateral superpuesto, como DetailModal. Los
   // clics dentro del iframe no llegan a este documento.
@@ -385,7 +366,8 @@ export default function SubrouteDetailsPanel({ item, placement, contentView, dra
     }
   };
 
-  // A la ficha completa con la misma transición que DetailModal.
+  // A la ficha completa con la misma transición que DetailModal. También al
+  // pulsar la portada de la ficha (mensaje `open-full` del iframe).
   const goToFullDetails = async () => {
     if (navigating || !href) return;
     if (!isServerReachable()) {
@@ -408,6 +390,32 @@ export default function SubrouteDetailsPanel({ item, placement, contentView, dra
         .finally(routeTransition.reveal);
     }
   };
+
+  // La portada del iframe pide la ficha completa (ver EmbeddedDetailsBridge).
+  const openFullFromFrame = useEffectEvent(() => {
+    goToFullDetails();
+  });
+
+  useEffect(() => {
+    const receive = (event) => {
+      if (event.origin !== window.location.origin || event.source !== frame.current?.contentWindow || event.data?.type !== EMBEDDED_DETAILS_MESSAGE) return;
+      const { action, href: destination, detail } = event.data;
+      if (action === "content-ready" || action === "hero-ready") syncContentScale();
+      if (action === "hero-ready" || (action === "content-ready" && !phone)) setLoading(false);
+      if (action === "close") onClose();
+      if (action === "open-full") openFullFromFrame();
+      if (action === "list-changed") window.dispatchEvent(new CustomEvent("showverse:list-changed", { detail }));
+      if (action !== "navigate" || typeof destination !== "string") return;
+      let url;
+      try { url = canonicalDetailsHref(destination, window.location.origin); } catch { return; }
+      if (url.origin !== window.location.origin) return;
+      const next = detailPreviewFromHref(url.href, window.location.origin);
+      if (next) onOpenDetail(next, { drill: true });
+      else router.push(`${url.pathname}${url.search}${url.hash}`);
+    };
+    window.addEventListener("message", receive);
+    return () => window.removeEventListener("message", receive);
+  }, [onClose, onOpenDetail, router, phone, syncContentScale]);
 
   return createPortal(
     <div
@@ -561,7 +569,9 @@ export default function SubrouteDetailsPanel({ item, placement, contentView, dra
                 const doc = frame.current?.contentDocument;
                 if (doc && (!doc.querySelector("[data-embedded-details]") || doc.querySelector("[data-details-error]"))) setLoading(false);
               }}
-              className={`relative h-full w-full border-0 transition-opacity duration-500 motion-reduce:transition-none ${loading ? "opacity-0" : "opacity-100"}`}
+              // Fundido corto: la ficha ya tiene su portada lista (`hero-ready`);
+              // con 500 ms tardaba en verse medio segundo más que la de títulos.
+              className={`relative h-full w-full border-0 transition-opacity duration-200 motion-reduce:transition-none ${loading ? "opacity-0" : "opacity-100"}`}
             />
           </div>
         </div>

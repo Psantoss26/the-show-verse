@@ -1679,6 +1679,9 @@ export default function SeasonDetailsClient({
               la página y se coloca donde cae este hueco. */}
           <div
             ref={heroCoverSpacerRef}
+            // En el panel lateral (iframe), pulsar la portada abre la ficha
+            // completa, como en el panel de títulos (EmbeddedDetailsBridge).
+            data-mobile-cover-spacer=""
             className="relative -mx-4 w-[calc(100%+2rem)] max-w-none flex-shrink-0 sm:hidden"
             // Solo la portada: los botones van justo debajo.
             style={{ height: "var(--mobile-cover-h)" }}

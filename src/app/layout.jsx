@@ -14,6 +14,7 @@ import LetterboxdAutoSync from "@/components/settings/LetterboxdAutoSync";
 import OfflineBanner from "@/components/OfflineBanner";
 import ScrollRestoration from "@/components/ScrollRestoration";
 import OverlayRouteHost from "@/components/navigation/OverlayRouteHost";
+import OutsideEmbed from "@/components/navigation/OutsideEmbed";
 import MobileUserPageSwipeNavigation from "@/components/MobileUserPageSwipeNavigation";
 import { AVATAR_BOOT_SCRIPT } from "@/components/auth/AvatarBootScript";
 import { anton, ptSans } from "./fonts";
@@ -103,14 +104,16 @@ export default function RootLayout({ children, overlay }) {
                 <OverlayRouteHost overlay={overlay}>{children}</OverlayRouteHost>
               </div>
             </MobileUserPageSwipeNavigation>
-            <PwaManager />
-            <InAppNotifications />
-            <OfflineManager />
-            <LetterboxdAutoSync />
-            <AndroidSessionClaim />
-            <OfflineBanner />
-            <Analytics />
-            <SpeedInsights />
+            <OutsideEmbed>
+              <PwaManager />
+              <InAppNotifications />
+              <OfflineManager />
+              <LetterboxdAutoSync />
+              <AndroidSessionClaim />
+              <OfflineBanner />
+              <Analytics />
+              <SpeedInsights />
+            </OutsideEmbed>
           </ServerStatusProvider>
         </AuthProvider>
       </body>

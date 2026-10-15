@@ -808,7 +808,7 @@ function InProgressPosterHoverIndicator({
           {nextEpisode || "Próximo episodio"}
         </span>
       </span>
-      <span className={`flex h-9 w-10 shrink-0 items-center justify-center text-xl font-black leading-none tabular-nums ${progressColor}`}>
+      <span className={`flex h-9 shrink-0 items-center justify-center pl-1.5 pr-2 text-xl font-black leading-none tabular-nums ${progressColor}`}>
         <span className="leading-none">{progressPct}%</span>
       </span>
     </div>
@@ -834,7 +834,7 @@ function CompletedHoverIndicator({ lastWatchedAt, rating }) {
           {formatWatchMonthYear(lastWatchedAt)}
         </span>
       </span>
-      <span className="flex h-9 w-10 shrink-0 items-center justify-center text-xl font-black leading-none tabular-nums text-amber-300">
+      <span className="flex h-9 shrink-0 items-center justify-center pl-1.5 pr-2 text-xl font-black leading-none tabular-nums text-amber-300">
         <span className="leading-none">{ratingLabel}</span>
       </span>
     </div>
@@ -1055,8 +1055,8 @@ const InProgressCard = memo(function InProgressCard({
             />
 
             {/* Gradient overlay softened to reduce cover darkening */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-black/10" />
-            <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-black/35 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/15 to-transparent" />
+            <div className="absolute top-0 left-0 right-0 h-14 bg-gradient-to-b from-black/20 to-transparent" />
 
             {/* Progress circular gauge badge / User rating badge - top-right with consistent border margins */}
             <div className="absolute top-3 right-3">

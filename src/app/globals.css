@@ -3189,6 +3189,12 @@ html[data-details-sequence-transition] .sv-topbar {
   animation-delay: 0s !important;
 }
 
+/* Panel lateral de temporada/episodio: la portada abre la ficha completa
+   (EmbeddedDetailsBridge), como el arte del panel de títulos. */
+[data-embedded-details] [data-mobile-cover-spacer] {
+  cursor: pointer;
+}
+
 /* Same content zoom as the title phone panel. The cover and floating controls
    keep their geometry; standalone pages and wide panels retain scale 1. */
 [data-embedded-details] [data-phone-scaled],

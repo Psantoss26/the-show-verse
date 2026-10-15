@@ -1620,6 +1620,9 @@ export default function EpisodeDetailsClient({
               temporadas tienen el de su póster. */}
           <div
             ref={heroCoverSpacerRef}
+            // En el panel lateral (iframe), pulsar la portada abre la ficha
+            // completa, como en el panel de títulos (EmbeddedDetailsBridge).
+            data-mobile-cover-spacer=""
             className="relative -mx-4 w-[calc(100%+2rem)] max-w-none flex-shrink-0 sm:hidden"
             style={{ height: "var(--mobile-cover-h)" }}
           >

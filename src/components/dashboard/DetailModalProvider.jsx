@@ -38,6 +38,7 @@ import { getMediaTypeForItem } from "@/lib/dashboard/media";
 import { dashboardDetailHref } from "@/lib/dashboard/detailHref";
 import SubrouteDetailsPanel from "@/components/dashboard/SubrouteDetailsPanel";
 import { detailPreviewFromHref, subrouteDetailsHref } from "@/lib/navigation/detailPreview";
+import { createSubrouteLinkIntent } from "@/lib/navigation/subroutePrefetch";
 import DetailModal from "@/components/dashboard/DetailModal";
 import { useAuth } from "@/context/AuthContext";
 import { readDetailOpen, withDetailOpen } from "@/lib/ui/detailOpenPreferences";
@@ -459,6 +460,15 @@ export default function DetailModalProvider({
       // ficha completa (Ajustes → «Al abrir un título»).
       if (isMobile || !isServerReachable() || savedOpen.target === "page") {
         const href = subrouteDetailsHref(item) || dashboardDetailHref(item);
+        // Un enlace con `?preview=` abre el panel ANTES de que lleguen las
+        // preferencias; si mandan abrir la ficha completa, este efecto vuelve
+        // a correr y navega. El panel ya abierto se cierra: si no, se quedaba
+        // abierto en la página, que sigue viva debajo de la ficha
+        // (OverlayRouteHost), y reaparecía al volver.
+        if (stackRef.current.length > 0) {
+          ownedRef.current = 0;
+          commit([]);
+        }
         if (href) router.push(href);
         return;
       }
@@ -561,6 +571,25 @@ export default function DetailModalProvider({
     lockScroll: effectivePlacement !== "right",
   });
 
+  // Apuntar a un enlace de temporada/episodio precarga su panel (ver
+  // subroutePrefetch): solo si de verdad se va a abrir en panel.
+  const panelOpensRef = useRef(false);
+  const panelOpens = !isMobile && savedOpen.target !== "page";
+  useLayoutEffect(() => {
+    panelOpensRef.current = panelOpens;
+  }, [panelOpens]);
+  const subrouteIntentRef = useRef(null);
+  useEffect(() => {
+    const intent = createSubrouteLinkIntent({
+      enabled: () => panelOpensRef.current && isServerReachable(),
+    });
+    subrouteIntentRef.current = intent;
+    return () => {
+      intent.dispose();
+      subrouteIntentRef.current = null;
+    };
+  }, []);
+
   // El valor del contexto NO incluye el item activo: todas las tarjetas de la
   // página lo consumen (para abrir la ficha) y, con él dentro, abrir o cerrar
   // el panel re-renderizaba cientos de tarjetas justo mientras la rejilla se
@@ -577,6 +606,9 @@ export default function DetailModalProvider({
       <div
         ref={contentRef}
         data-detail-page-content=""
+        onPointerOverCapture={(event) => subrouteIntentRef.current?.onPointerOver(event)}
+        onPointerOutCapture={(event) => subrouteIntentRef.current?.onPointerOut(event)}
+        onFocusCapture={(event) => subrouteIntentRef.current?.onFocusIn(event)}
         onClickCapture={(event) => {
           if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
           const link = event.target.closest?.("a[href]");

@@ -584,7 +584,7 @@ function ContinueWatchingPosterHoverIndicator({
           </span>
         )}
       </span>
-      <span className={`flex h-9 w-10 shrink-0 items-center justify-center text-xl font-black leading-none tabular-nums ${progressColor}`}>
+      <span className={`flex h-9 shrink-0 items-center justify-center pl-1.5 pr-2 text-xl font-black leading-none tabular-nums ${progressColor}`}>
         <span className="leading-none">{pct}%</span>
       </span>
     </div>
@@ -732,6 +732,24 @@ const ProgressCard = memo(function ProgressCard({
             />
           </div>
         </Link>
+        {/* Progreso DEBAJO de la imagen, fuera de ella, con el mismo diseño que en
+            la página En progreso (InProgressClient): barra fina centrada al 85 %,
+            con fondo translúcido y degradado de color según el porcentaje.
+            Aplica a póster y backdrop por igual. */}
+        <div
+          role="progressbar"
+          aria-label={`Progreso de ${title}`}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={pct}
+          aria-valuetext={labelText || `${pct}% visto`}
+          className="mx-auto mt-2 h-1 w-[85%] overflow-hidden rounded-full bg-white/25"
+        >
+          <div
+            className={`h-full rounded-full bg-gradient-to-r ${colors.bar}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
       </motion.div>
     );
   }
@@ -739,7 +757,7 @@ const ProgressCard = memo(function ProgressCard({
   // ==== CARDS (por defecto) ====
   return (
     <motion.div initial={isBackNav ? false : { opacity: 0, y: 30, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.4, delay: isBackNav ? 0 : animDelay, ease: [0.25, 0.46, 0.45, 0.94] }}>
-      <Link href={href} prefetch={false} onClick={onPreviewClick} draggable={false} className="block group [-webkit-tap-highlight-color:transparent]">
+      <Link href={href} prefetch={false} onClick={onPreviewClick} draggable={false} aria-label={title} className="block group [-webkit-tap-highlight-color:transparent]">
         <div
           className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg transition-all duration-300 hover:shadow-xl"
           onMouseEnter={(e) => {
@@ -751,7 +769,7 @@ const ProgressCard = memo(function ProgressCard({
         >
           <div className="relative aspect-video overflow-hidden">
             <SmartImage item={item} kind="backdrop" alt={title} imgClassName="transition-transform duration-500 group-hover:scale-105" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-black/10" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/15 to-transparent" />
             <div className="absolute top-3 right-3">
               {canDelete ? (
                 confirmDel ? null : (
@@ -769,9 +787,6 @@ const ProgressCard = memo(function ProgressCard({
                 <span className="text-white drop-shadow-sm">{labelText}</span>
               </div>
             ) : null}
-            <div className="absolute bottom-0 left-0 right-0 p-4 pr-16">
-              <h3 className={`text-white font-black text-lg lg:text-xl leading-tight line-clamp-1 group-hover:text-emerald-200 transition-colors ${confirmDel ? "invisible" : ""}`}>{title}</h3>
-            </div>
             {/* Platform logo badge - bottom right corner */}
             {platform && (
               platformIconUrl ? (
