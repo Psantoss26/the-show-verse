@@ -307,6 +307,15 @@ export async function unlikeComment({ commentId, userId }) {
 
 /** Marca me gusta en una lista de la comunidad. */
 export async function likeCommunityList({ listId, userId }) {
+  // Una lista que no existe es un 404, no un error de clave ajena (500) al
+  // insertar el me gusta.
+  const [exists] = await db
+    .select({ id: communityLists.id })
+    .from(communityLists)
+    .where(eq(communityLists.id, listId))
+    .limit(1);
+  if (!exists) return null;
+
   const inserted = await db
     .insert(listLikes)
     .values({ listId, userId })
@@ -623,7 +632,12 @@ export async function getCommunityListWithItems({ id, page = 1, limit = 50, view
   const visibleItems = mergeListItemRatings(hydrated, ratedItems);
   const api = listRowToApi(list);
   return {
-    list: { ...api.list, user: api.user },
+    // `liked` va DENTRO de la lista: es donde lo lee la ficha (list.liked).
+    // `listRowToApi` lo deja al lado de `list` (así lo usa el índice), y aquí
+    // solo se copiaban `list` y `user`: con sesión la ficha recibía siempre
+    // la lista sin `liked` y, al volver o recargar, el corazón salía vacío
+    // aunque el me gusta estuviera guardado en list_likes.
+    list: { ...api.list, user: api.user, liked: api.liked },
     items: visibleItems,
     ratingSummary: buildRatingSummary(ratedItems),
     // La muestra para IMDb es deliberadamente ligera: permite una media más

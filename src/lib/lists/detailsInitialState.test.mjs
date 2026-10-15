@@ -12,6 +12,7 @@ import {
   resolveCollectionDetailsInitialState,
   resolveCommunityListDetailsInitialState,
   shouldRenderCachedListDuringAuthHydration,
+  updateListInIndexCache,
 } from "./detailsInitialState.js";
 
 test("hydrates collection details from the cached snapshot before effects run", () => {
@@ -111,6 +112,24 @@ test('findListInIndexCache busca la lista en cualquier ámbito de su fuente', ()
   assert.equal(findListInIndexCache('trakt', '656', { storage, now })?.name, 'Otra')
   assert.equal(findListInIndexCache('personal', '656', { storage, now }), null)
   assert.equal(findListInIndexCache('collections', '999', { storage, now }), null)
+})
+
+test('updateListInIndexCache corrige los likes de la lista en todas las cachés de su fuente', () => {
+  const entries = {
+    'showverse:lists:index:trakt:popular:v1': JSON.stringify({ t: 5, data: [{ id: 'a', likes: 3 }, { id: 'b', likes: 1 }] }),
+    'showverse:lists:index:trakt:search:x:v1': JSON.stringify({ t: 7, data: [{ id: 'a', likes: 3 }] }),
+    'showverse:lists:index:collections:featured:v1': JSON.stringify({ t: 5, data: [{ id: 'a', likes: 9 }] }),
+    'otra:clave': 'no-json',
+  }
+  const storage = { ...fakeStorage(entries), setItem: (key, value) => { entries[key] = value } }
+  updateListInIndexCache('trakt', 'a', { likes: 4 }, { storage })
+  const read = (key) => JSON.parse(entries[key])
+  assert.deepEqual(read('showverse:lists:index:trakt:popular:v1'), { t: 5, data: [{ id: 'a', likes: 4 }, { id: 'b', likes: 1 }] })
+  assert.deepEqual(read('showverse:lists:index:trakt:search:x:v1'), { t: 7, data: [{ id: 'a', likes: 4 }] })
+  // Otra fuente con el mismo id no se toca.
+  assert.equal(read('showverse:lists:index:collections:featured:v1').data[0].likes, 9)
+  // Sin almacenamiento no falla.
+  updateListInIndexCache('trakt', 'a', { likes: 5 }, { storage: null })
 })
 
 test('findListInIndexCache ignora cachés caducadas o corruptas', () => {

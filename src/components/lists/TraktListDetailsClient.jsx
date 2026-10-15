@@ -18,6 +18,7 @@ import {
     findListInIndexCache,
     getCommunityListDetailsCacheKey,
     resolveCommunityListDetailsInitialState,
+    updateListInIndexCache,
 } from '@/lib/lists/detailsInitialState'
 import { useIsHistoryNavigation } from '@/lib/hooks/useIsHistoryNavigation'
 import { buildListShareCard, buildListShareStory, listNoun, normalizeListShareItem } from '@/lib/lists/shareList'
@@ -140,6 +141,14 @@ export default function TraktListDetailsClient({ username, listId }) {
         stateRef.current = state
     }, [state])
 
+    // ¿El me gusta que se ve es el del SERVIDOR para este usuario? Lo que se
+    // pinta primero sale de la caché de la ficha o del índice de /lists (el
+    // índice ni siquiera lo trae), y el botón solo leía su estado al montarse:
+    // al volver o recargar, el corazón salía vacío aunque el me gusta estuviera
+    // guardado. Como en la ficha de colección, el botón espera a la respuesta y
+    // se monta de nuevo con ella.
+    const [likeReady, setLikeReady] = useState(false)
+
     // `listId` ahora es el uuid interno de community_lists (lo llevan las
     // tarjetas de discover vía list.id — ver useTraktLists.js). `username` ya
     // no participa en la ruta del backend; se conserva como prop solo para
@@ -195,8 +204,10 @@ export default function TraktListDetailsClient({ username, listId }) {
                     writeDetailsCache(listId, nextState)
 
                     setState(nextState)
+                    setLikeReady(true)
                 } catch (e) {
                     if (cancelled) return
+                    setLikeReady(true)
                     setState((p) => ({
                         ...p,
                         loading: false,
@@ -213,8 +224,21 @@ export default function TraktListDetailsClient({ username, listId }) {
 
         return () => {
             cancelled = true
+            setLikeReady(false)
         }
     }, [baseApiUrl, fetchPage, username, listId])
+
+    // Lo que confirma el servidor al dar o quitar el me gusta se guarda en la
+    // lista, en su caché (para volver) y en el índice de /lists (recuento).
+    const handleLikeChange = useCallback((confirmed) => {
+        setState((p) => {
+            if (!p?.list) return p
+            const next = { ...p, list: { ...p.list, liked: confirmed.liked, likes: confirmed.likes } }
+            writeDetailsCache(listId, next)
+            return next
+        })
+        updateListInIndexCache('trakt', listId, { likes: confirmed.likes })
+    }, [listId])
 
     const handleLoadMore = useCallback(async () => {
         const current = stateRef.current
@@ -388,10 +412,13 @@ export default function TraktListDetailsClient({ username, listId }) {
                     share={share}
                     favoriteAction={list?.id ? (
                     <ListLikeButton
+                        // Se monta de nuevo con el estado del servidor al llegar.
+                        key={likeReady ? 'ready' : 'pending'}
                         listId={list.id}
                         likes={Number(list?.likes || 0)}
                         liked={Boolean(list?.liked)}
-                        canLike={authenticated}
+                        canLike={authenticated && likeReady}
+                        onChange={handleLikeChange}
                         liquidGlass
                     />
                     ) : null}

@@ -26,6 +26,15 @@ export default function ListLikeButton({
   const online = useServerOnline();
   const [state, setState] = useState({ liked: Boolean(liked), likes: Number(likes) || 0 });
   const [pending, setPending] = useState(false);
+  // Si quien lo usa recibe un estado nuevo (p. ej. el del servidor tras pintar
+  // la caché), el botón lo sigue; antes solo leía `liked`/`likes` al montarse y
+  // se quedaba con el viejo. Durante un clic manda el estado optimista.
+  const [received, setReceived] = useState({ liked: Boolean(liked), likes: Number(likes) || 0 });
+  if (!pending && (received.liked !== Boolean(liked) || received.likes !== (Number(likes) || 0))) {
+    const next = { liked: Boolean(liked), likes: Number(likes) || 0 };
+    setReceived(next);
+    setState(next);
+  }
 
   const toggle = async () => {
     const url = endpoint || (listId ? `/api/community/lists/${encodeURIComponent(listId)}/like` : null);
