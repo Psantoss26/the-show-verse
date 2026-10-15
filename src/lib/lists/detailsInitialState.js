@@ -88,6 +88,37 @@ export function findListInIndexCache(source, id, {
   return null
 }
 
+/**
+ * Aplica `patch` a la lista `id` en las cachés del índice de la fuente (las
+ * mismas que lee `findListInIndexCache`). Sin tocar su fecha: solo corrige un
+ * dato que el usuario acaba de cambiar (p. ej. los likes de una lista de la
+ * comunidad), para que al volver al índice no aparezca el valor viejo.
+ */
+export function updateListInIndexCache(source, id, patch, {
+  storage = typeof window !== 'undefined' ? window.sessionStorage : null,
+} = {}) {
+  if (!storage || id == null || id === '' || !patch) return
+  const prefix = `${LISTS_INDEX_CACHE_PREFIX}${source}:`
+  const wanted = String(id)
+  try {
+    for (let index = 0; index < storage.length; index += 1) {
+      const key = storage.key(index)
+      if (!key || !key.startsWith(prefix)) continue
+      const parsed = JSON.parse(storage.getItem(key) || 'null')
+      if (!Array.isArray(parsed?.data)) continue
+      let changed = false
+      const data = parsed.data.map((list) => {
+        if (String(list?.id) !== wanted) return list
+        changed = true
+        return { ...list, ...patch }
+      })
+      if (changed) storage.setItem(key, JSON.stringify({ ...parsed, data }))
+    }
+  } catch {
+    // Storage no disponible o lleno: el índice se corrige en su próxima carga.
+  }
+}
+
 // El índice guarda el nombre de las colecciones SIN «- Colección» (lo limpia
 // /api/tmdb/collections/featured); la ficha usa el de TMDb, que lo lleva. Se
 // repone para que el título no cambie al llegar los datos.
