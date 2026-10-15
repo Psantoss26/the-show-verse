@@ -360,15 +360,15 @@ function EventoResena({ evento, actor, mostrarAutor, conPoster, conBackdrop }) {
   const [verSpoiler, setVerSpoiler] = useState(false);
   return (
     <article className="rounded-xl bg-white/[0.04] px-3 py-4 sm:px-4">
-      <div className="flex gap-3">
+      <div className="flex items-start gap-3">
         {conBackdrop ? (
-          <CartelEvento evento={evento} backdrop className={BACKDROP_FILA} />
+          <CartelEvento evento={evento} backdrop className={`${BACKDROP_FILA} self-start`} />
         ) : conPoster ? (
-          <CartelEvento evento={evento} className="h-32 w-[5.4rem] rounded-lg" />
+          <CartelEvento evento={evento} className="h-32 w-[5.4rem] self-start rounded-lg" />
         ) : (
           <>
             <AvatarEvento actor={actor} />
-            <CartelEvento evento={evento} className="hidden h-28 w-[76px] rounded-lg sm:block" />
+            <CartelEvento evento={evento} className="hidden h-28 w-[76px] self-start rounded-lg sm:block" />
           </>
         )}
         <div className="min-w-0 flex-1">

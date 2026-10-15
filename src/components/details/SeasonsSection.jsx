@@ -10,7 +10,7 @@
 // de vista solo re-renderiza esta sección, no la ficha entera. La vista se
 // recuerda en el navegador.
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { SwiperSlide } from "swiper/react";
 import { ChevronDown, ChevronUp, GalleryHorizontalEnd, Layers, LayoutGrid, Loader2 } from "lucide-react";
 import DetailsArrowCarousel from "@/components/details/DetailsArrowCarousel";
@@ -26,6 +26,23 @@ const VIEWS = [
 ];
 // Dos filas de la rejilla de escritorio (3 columnas).
 const COLLAPSED_CARDS = 6;
+const MOBILE_QUERY = "(max-width: 640px)";
+
+function subscribeMobile(callback) {
+  if (typeof window === "undefined") return () => {};
+  const media = window.matchMedia(MOBILE_QUERY);
+  if (media.addEventListener) {
+    media.addEventListener("change", callback);
+    return () => media.removeEventListener("change", callback);
+  }
+  media.addListener(callback);
+  return () => media.removeListener(callback);
+}
+
+function getMobileSnapshot() {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia(MOBILE_QUERY).matches;
+}
 
 function readSavedView() {
   try {
@@ -36,21 +53,58 @@ function readSavedView() {
   }
 }
 
-export default function SeasonsSection({ items = [], loading = false, onOpenAll, phoneLayout = false }) {
-  const [view, setView] = useState("posters");
+export function computeDefaultSeasonsView(itemsCount, isMobile) {
+  // Serie con 1 sola temporada: vista de recuadro ("cards") tanto en móvil como en escritorio.
+  if (itemsCount === 1) return "cards";
+  // Serie con 2 o 3 temporadas en escritorio: recuadros ("cards") para aprovechar el ancho horizontal.
+  if (!isMobile && (itemsCount === 2 || itemsCount === 3)) return "cards";
+  // En móvil con más de 1 temporada: por defecto carrusel de pósters ("posters").
+  if (isMobile) return "posters";
+  // Series de más de 3 temporadas en escritorio: preferencia guardada o pósters por defecto.
+  const saved = readSavedView();
+  return saved || "posters";
+}
+
+export default function SeasonsSection({
+  items = [],
+  loading = false,
+  onOpenAll,
+  phoneLayout = false,
+  isMobile: isMobileProp,
+}) {
+  const isMobileViewport = useSyncExternalStore(
+    subscribeMobile,
+    getMobileSnapshot,
+    () => false,
+  );
+  const isMobile = Boolean(phoneLayout || isMobileProp || isMobileViewport);
+
+  const [view, setView] = useState(() =>
+    computeDefaultSeasonsView(items.length, isMobile),
+  );
   const [expanded, setExpanded] = useState(false);
-  // Tras montar: el servidor no conoce la vista guardada.
+
+  const seriesSignature = items.map((s) => s.seasonId ?? s.seasonNumber ?? s.key).join(",");
+
+  // Tras montar o cambiar de serie/viewport:
+  // - Si tiene 1 temporada: vista de recuadro ("cards") en móvil y en escritorio.
+  // - Si tiene 2 o 3 temporadas en escritorio: recuadros ("cards") para llenar las columnas.
+  // - En móvil con más de 1 temporada: pósters en carrusel horizontal ("posters").
+  // - Para series de más de 3 temporadas en escritorio: preferencia guardada o "posters".
   useEffect(() => {
-    const saved = readSavedView();
-    if (saved) setView(saved);
-  }, []);
+    setView(computeDefaultSeasonsView(items.length, isMobile));
+  }, [isMobile, items.length, seriesSignature]);
 
   const chooseView = (next) => {
     setView(next);
-    try {
-      window.localStorage.setItem(VIEW_KEY, next);
-    } catch {
-      // Sin almacenamiento: la vista vale para esta visita.
+    // Solo guardamos en localStorage para series de más de 3 temporadas en escritorio,
+    // garantizando que las series de 1-3 temporadas abran siempre en recuadros en escritorio.
+    if (!isMobile && items.length > 3) {
+      try {
+        window.localStorage.setItem(VIEW_KEY, next);
+      } catch {
+        // Sin almacenamiento: la vista vale para esta visita.
+      }
     }
   };
 

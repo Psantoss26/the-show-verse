@@ -27,8 +27,15 @@ test("Trakt sigue disponible como respaldo cuando faltan temporadas de TMDb", ()
   assert.deepEqual(selectSeasons({}, {}, getSeasonNumber), []);
 });
 
-test("la sección empieza en pósteres y no oculta contenido durante cargas adicionales", () => {
-  assert.match(section, /\[view, setView\] = useState\("posters"\)/);
-  assert.match(section, /loading && items\.length === 0 \?/);
-  assert.match(section, /if \(saved\) setView\(saved\)/);
+test("la serie con solo 1 temporada muestra recuadro (cards) en vista móvil de detailsclient y en escritorio", () => {
+  assert.match(section, /itemsCount === 1\)\s*return "cards"/);
 });
+
+test("las series con 2 o 3 temporadas muestran recuadros en escritorio", () => {
+  assert.match(section, /!isMobile && \(itemsCount === 2 \|\| itemsCount === 3\)\)\s*return "cards"/);
+});
+
+test("en vista móvil con más de 1 temporada se muestra el carrusel de pósters", () => {
+  assert.match(section, /if \(isMobile\)\s*return "posters"/);
+});
+
