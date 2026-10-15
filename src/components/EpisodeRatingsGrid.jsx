@@ -1288,7 +1288,7 @@ export default function EpisodeRatingsGrid({
               {showSeasonAvg && avg != null && (
                 <span className="text-xs text-zinc-400">
                   Avg{" "}
-                  <span className="font-semibold text-white">
+                  <span className="sv-seriesgraph-number text-white">
                     {format1(avg)}
                   </span>
                 </span>
@@ -1370,7 +1370,7 @@ export default function EpisodeRatingsGrid({
 
   return (
     <>
-      <div ref={inViewRef} className="space-y-3">
+      <div ref={inViewRef} className="sv-seriesgraph-grid space-y-3">
         {/* Controles */}
         <div className="flex items-center justify-between gap-1.5 sm:gap-2.5 w-full">
           <div className="flex items-center gap-1.5 sm:gap-2.5">

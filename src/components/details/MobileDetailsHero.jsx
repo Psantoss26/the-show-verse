@@ -36,7 +36,7 @@
 // constantes locales que sus tests leen del propio fichero); si cambian allí,
 // hay que cambiarlas aquí.
 
-import { createContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createContext, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 // Modo 'compact': la barra de stats del marcador se oculta hasta el scroll
 // (con el mismo disparador que lo secundario). No con `display: none`: se
@@ -218,6 +218,14 @@ function readBottomNavTop() {
  * cualquier móvil: en los altos la portada crece y se recorta por los lados;
  * en los bajos, se recorta por arriba (`object-bottom`).
  */
+const HERO_SCROLL_END_SETTLE_MS = 150
+
+const HERO_ROOT_START_STYLE = {
+    '--mobile-cover-top': '0px',
+    '--mobile-cover-h': '150vw',
+    '--mobile-scoreboard-shift': '0px',
+}
+
 export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, fitGap = 20, fitCoverMinRatio = 0.75 } = {}) {
     const rootRef = useRef(null)
     const coverSpacerRef = useRef(null)
@@ -233,19 +241,30 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
     // pintó completo (en modo 'compact' no está en el DOM).
     const statsRowHeightRef = useRef(0)
     const [isPhone, setIsPhone] = useState(false)
-    const [coverTop, setCoverTop] = useState(0)
     // Qué cabe bajo los botones sin tocar la portada (ver arriba). Arranca en
     // 'full' para pintar y medir el marcador completo; todo esto ocurre antes
     // de que se vean portada y marcador (esperan a que cargue la imagen).
     const [scoreboardMode, setScoreboardMode] = useState(fitCover ? 'compact' : 'full')
-    // Alto de la portada con `fitCover` (px); null hasta la primera medida.
-    const [fittedCoverHeight, setFittedCoverHeight] = useState(null)
-    // Margen extra encima del marcador para que quede centrado entre los
-    // botones y el navbar inferior (puede ser negativo: ver abajo).
-    const [scoreboardShift, setScoreboardShift] = useState(0)
-    // Ancho de referencia para un marcador estrecho (`--mobile-actions-w`): el
-    // mayor entre lo que ocupan los botones y el navbar inferior.
-    const [actionsWidth, setActionsWidth] = useState(0)
+    // LAS MEDIDAS SE ESCRIBEN EN EL DOM, NO EN EL ESTADO: posición y alto de la
+    // portada (`--mobile-cover-top`, `--mobile-cover-h`), margen que centra el
+    // marcador (`--mobile-scoreboard-shift`) y ancho de referencia de un
+    // marcador estrecho (`--mobile-actions-w`). Como estado, cada cambio de
+    // tamaño de la ventana volvía a renderizar la ficha ENTERA y la nueva
+    // medida llegaba un fotograma tarde: en el panel lateral de temporadas y
+    // episodios (la ficha en un iframe que cambia de tamaño al arrastrar el
+    // tirador) cada fotograma del arrastre costaba un render completo y el
+    // marcador saltaba arriba y abajo. Igual que `usePanelHeroFit` en el panel
+    // de títulos. `rootStyle` solo trae los valores de partida.
+    const heroVarsRef = useRef({ el: null, values: {} })
+    const writeHeroVar = useCallback((name, value) => {
+        const el = rootRef.current
+        if (!el) return
+        const applied = heroVarsRef.current
+        if (applied.el !== el) heroVarsRef.current = { el, values: {} }
+        if (heroVarsRef.current.values[name] === value) return
+        heroVarsRef.current.values[name] = value
+        el.style.setProperty(name, value)
+    }, [])
 
     useClientLayoutEffect(() => {
         lockRef.current = lock
@@ -283,14 +302,14 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
             // con la portada ya visible (p. ej. si cambia el número de botones).
             const nav = document.querySelector(MOBILE_BOTTOM_NAV_SELECTOR)
             const span = Math.round(Math.max(readActionsSpan(row), nav?.offsetWidth || 0))
-            setActionsWidth((current) => (current === span ? current : span))
+            if (span) writeHeroVar('--mobile-actions-w', `${span}px`)
             const widthChanged = window.innerWidth !== lastWidth
             lastWidth = window.innerWidth
             // Posición del hueco en el documento (no en pantalla), así no
             // depende del scroll.
             const spacer = coverSpacerRef.current
             const top = spacer ? Math.max(0, Math.round(spacer.getBoundingClientRect().top + window.scrollY)) : 0
-            setCoverTop((current) => (current === top ? current : top))
+            writeHeroVar('--mobile-cover-top', `${top}px`)
             if (!scoreboard) return
             const rowRect = readUntransformedRect(row)
             const scoreboardRect = readUntransformedRect(scoreboard)
@@ -345,10 +364,10 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
                         navTopRef.current - fitGap * 2 - visibleCompact - belowCover - coverDocTop,
                     ),
                 )
-                setFittedCoverHeight((current) => (current === height ? current : height))
+                writeHeroVar('--mobile-cover-h', `${height}px`)
                 setScoreboardMode((current) => (current === 'compact' ? current : 'compact'))
                 const fitShift = Math.round((fitGap - baseGap) * 2) / 2
-                setScoreboardShift((current) => (current === fitShift ? current : fitShift))
+                writeHeroVar('--mobile-scoreboard-shift', `${fitShift}px`)
                 return
             }
             const space = navTopRef.current - rowBottom
@@ -359,7 +378,7 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
             const visibleHeight = mode === 'full' ? fullHeight : compactHeight
             const gap = Math.max(MOBILE_SCOREBOARD_MIN_GAP_PX, (space - visibleHeight) / 2)
             const shift = Math.round((gap - baseGap) * 2) / 2
-            setScoreboardShift((current) => (current === shift ? current : shift))
+            writeHeroVar('--mobile-scoreboard-shift', `${shift}px`)
         }
         update()
         window.addEventListener('resize', update, { passive: true })
@@ -412,7 +431,7 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
             fitMutations?.disconnect()
             if (raf) window.cancelAnimationFrame(raf)
         }
-    }, [enabled, isPhone, fitCover, fitGap, fitCoverMinRatio])
+    }, [enabled, isPhone, fitCover, fitGap, fitCoverMinRatio, writeHeroVar])
 
     // Recorrido del relevo portada → fondo: 55vh, como en la ficha, salvo que
     // la página no dé para tanto (p. ej. colecciones de una sola fila de
@@ -443,12 +462,24 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
             applied = value
             root.style.setProperty('--sv-hero-scroll-end', value)
         }
+        // Los cambios de tamaño se recogen al ASENTARSE, no en cada evento:
+        // leer el alto de la página justo después de que el ajuste de la
+        // portada la cambie fuerza otra maquetación, y escribir la variable en
+        // <html> recalcula el estilo de todo el documento. Al arrastrar el
+        // tirador del panel lateral (la ficha en un iframe) eran dos pasadas
+        // extra por fotograma. El recorrido solo importa al desplazar.
+        let timer = 0
+        const schedule = () => {
+            window.clearTimeout(timer)
+            timer = window.setTimeout(update, HERO_SCROLL_END_SETTLE_MS)
+        }
         update()
-        window.addEventListener('resize', update, { passive: true })
-        const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update)
+        window.addEventListener('resize', schedule, { passive: true })
+        const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule)
         if (rootRef.current) observer?.observe(rootRef.current)
         return () => {
-            window.removeEventListener('resize', update)
+            window.clearTimeout(timer)
+            window.removeEventListener('resize', schedule)
             observer?.disconnect()
             heroScrollEndRef.current = 0
             root.style.removeProperty('--sv-hero-scroll-end')
@@ -660,15 +691,10 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
         statsRevealProps: enabled
             ? { [MOBILE_STATS_REVEAL_ATTR]: 'hidden' }
             : {},
-        // La portada: el póster entero (2:3 a todo el ancho), siempre.
-        rootStyle: enabled
-            ? {
-                '--mobile-cover-top': `${coverTop}px`,
-                '--mobile-cover-h': fitCover && fittedCoverHeight != null ? `${fittedCoverHeight}px` : '150vw',
-                '--mobile-scoreboard-shift': `${scoreboardShift}px`,
-                ...(actionsWidth ? { '--mobile-actions-w': `${actionsWidth}px` } : {}),
-            }
-            : undefined,
+        // Valores de PARTIDA (la portada: el póster entero, 2:3 a todo el
+        // ancho); las medidas los sustituyen directamente en el DOM. Siempre
+        // los mismos: React no vuelve a escribirlos encima de una medida.
+        rootStyle: enabled ? HERO_ROOT_START_STYLE : undefined,
     }
 }
 

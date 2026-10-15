@@ -2538,6 +2538,7 @@ function NavbarContent() {
   // es justo lo que pasa al usar el asistente.
   const [assistantOpen, setAssistantOpen] = useState(false);
   const profileMenuRef = useRef(null);
+  const mobileRightRef = useRef(null);
   // El panel se saca de la barra con un portal (ver más abajo), así que deja de
   // estar dentro de `profileMenuRef`: sin este segundo ref, pulsar en el propio
   // menú contaría como "pulsar fuera" y lo cerraría.
@@ -2883,7 +2884,11 @@ function NavbarContent() {
             {profileAuthLoading ? (
               <AlertsMenuBoot heroNavMode={heroNavMode} />
             ) : account ? (
-              <AlertsMenu account={account} heroNavMode={heroNavMode} />
+              <AlertsMenu
+                account={account}
+                heroNavMode={heroNavMode}
+                alignRef={profileMenuRef}
+              />
             ) : null}
 
             {/* SIN ICONO PROPIO EN LA BARRA: el asistente se abre desde el
@@ -3172,12 +3177,13 @@ function NavbarContent() {
 
           {/* Derecha: alertas y perfil. */}
           <div
+            ref={mobileRightRef}
             className={`flex flex-shrink-0 origin-right items-center gap-2 pr-1 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${mobileTopControlScaleClass}`}
           >
             {profileAuthLoading ? (
               <AlertsMenuBoot variant="mobile" />
             ) : account ? (
-              <AlertsMenu account={account} variant="mobile" />
+              <AlertsMenu account={account} variant="mobile" alignRef={mobileRightRef} />
             ) : null}
             {profileAuthLoading ? (
               <UserAvatarBoot />

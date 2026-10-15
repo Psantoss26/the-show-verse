@@ -1716,6 +1716,7 @@ function ContinueWatchingPreviewCard({
               `fitToContainer` la fila se centraba y encogía los botones.) */}
           <DetailActionsRow
             compactLabelWhenTight
+            size="md"
             onTrailer={isCalendar ? handleToggleTrailer : undefined}
             trailerAvailable={isCalendar}
             trailerLoading={isCalendar ? trailerLoading : false}

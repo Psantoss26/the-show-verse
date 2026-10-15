@@ -32,3 +32,25 @@
     0 20px 25px -5px rgb(0 0 0 / 0.5),
     0 8px 10px -6px rgb(0 0 0 / 0.5);
 }
+
+/* CONTENIDO DE TAMAÑO FIJO (`fixedOverlay`): fuera de la tarjeta, sobre ella y
+   en su misma capa (después en el DOM, mismo z-index), así que se apila
+   respecto a las tarjetas vecinas igual que la suya. El componente lo desplaza
+   a la esquina de la tarjeta ampliada. */
+.fixedOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.fixedOverlay[data-expanded] {
+  z-index: var(--sv-hover-expand-z, 100);
+}
+
+/* Siempre en su capa, como la tarjeta: sin cambio de nitidez al acabar. */
+@media (hover: hover) and (pointer: fine) {
+  .fixedOverlay {
+    will-change: translate;
+  }
+}

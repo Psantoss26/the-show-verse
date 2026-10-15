@@ -59,6 +59,19 @@ import {
 //   enabled:       sin ampliación cuando es `false`.
 //   zIndex:        capa de la tarjeta ampliada (por defecto 100).
 //   as:            etiqueta de la tarjeta (`div` por defecto).
+//   fixedOverlay:  contenido anclado a la ESQUINA SUPERIOR IZQUIERDA de la
+//                  tarjeta que NO cambia de tamaño al ampliarse (p. ej. el
+//                  contador de episodios agrupados del Historial).
+//
+// CONTENIDO DE TAMAÑO FIJO. Dentro de la tarjeta, todo se escala con ella
+// durante el FLIP: un indicador se encogía al arrancar y crecía hasta su
+// tamaño. Compensar la escala en cada fotograma (rAF + getComputedStyle) iba
+// un fotograma tarde y escalaba desde su centro, así que temblaba y se salía
+// de la esquina. `fixedOverlay` se pinta FUERA de la tarjeta, hermano en la
+// misma celda (la escala no le llega), y se desplaza con `translate` a la
+// esquina de la tarjeta ampliada con la MISMA duración y curva: la esquina de
+// una caja escalada desde su centro avanza en línea recta con la escala, así
+// que las dos transiciones coinciden en cada fotograma, también en el rebote.
 
 const EXPAND = 1.15;
 const DURATION_MS = 360;
@@ -76,6 +89,8 @@ function measureExpansion(el) {
   return {
     inset: `${-dy}px ${-dx}px`,
     shrunk: `scale(${width / (width + 2 * dx)}, ${height / (height + 2 * dy)})`,
+    // Esquina superior izquierda de la tarjeta ampliada respecto a la celda.
+    corner: `${-dx}px ${-dy}px`,
   };
 }
 
@@ -93,41 +108,17 @@ function prefersReducedMotion() {
   );
 }
 
-function stopFixedSizeSync(frameRef) {
-  if (frameRef.current) {
-    window.cancelAnimationFrame(frameRef.current);
-    frameRef.current = null;
-  }
+// `fixedOverlay` sigue a la esquina de la tarjeta (ver la nota de arriba).
+function moveOverlay(overlay, translate, transition = "none") {
+  if (!overlay) return;
+  overlay.style.transition = transition;
+  overlay.style.translate = translate;
 }
 
-function syncFixedSizeChildren(el, frameRef, duration) {
-  if (!el) return;
-  stopFixedSizeSync(frameRef);
-  // Solo las tarjetas que los llevan (el Historial): `getComputedStyle` en cada
-  // fotograma fuerza el estilo de la página, y tras volver de una ficha (estilo
-  // de toda la página pendiente) cada hover costaba cientos de ms.
-  if (!el.querySelector("[data-hover-expand-fixed-size]")) return;
-  const startedAt = performance.now();
-
-  const sync = (now) => {
-    const transform = getComputedStyle(el).transform;
-    const matrix = transform === "none"
-      ? new DOMMatrixReadOnly()
-      : new DOMMatrixReadOnly(transform);
-    const scaleX = Math.hypot(matrix.a, matrix.b) || 1;
-    const scaleY = Math.hypot(matrix.c, matrix.d) || 1;
-    el.querySelectorAll("[data-hover-expand-fixed-size]").forEach((child) => {
-      child.style.scale = `${1 / scaleX} ${1 / scaleY}`;
-    });
-
-    if (now - startedAt < duration) {
-      frameRef.current = window.requestAnimationFrame(sync);
-    } else {
-      frameRef.current = null;
-    }
-  };
-
-  frameRef.current = window.requestAnimationFrame(sync);
+function restOverlay(overlay) {
+  if (!overlay) return;
+  moveOverlay(overlay, "");
+  delete overlay.dataset.expanded;
 }
 
 export default function HoverExpandCard({
@@ -139,17 +130,20 @@ export default function HoverExpandCard({
   style,
   onPointerEnter,
   onPointerLeave,
+  fixedOverlay = null,
   children,
   ...props
 }) {
   const cardRef = useRef(null);
+  const overlayRef = useRef(null);
   // Cada gesto invalida el cierre pendiente del anterior (entrar de nuevo a
   // mitad de la salida no debe acabar encogiendo la tarjeta).
   const gestureRef = useRef(0);
   const leaveTimerRef = useRef(null);
-  const fixedSizeFrameRef = useRef(null);
-  // Escala "encogida" del gesto en curso (la que iguala la celda).
+  // Escala "encogida" del gesto en curso (la que iguala la celda) y esquina de
+  // la tarjeta ampliada (para `fixedOverlay`).
   const shrunkRef = useRef("none");
+  const cornerRef = useRef("0px 0px");
 
   const clearLeaveTimer = () => {
     if (leaveTimerRef.current) {
@@ -158,14 +152,7 @@ export default function HoverExpandCard({
     }
   };
 
-  // Algunos overlays (p. ej. el contador de episodios agrupados) deben
-  // conservar su tamaño visual mientras la tarjeta ejecuta el FLIP. Se
-  // compensa solo la escala heredada; la posición sigue acompañando a la
-  // esquina de la tarjeta ampliada.
-  useEffect(() => () => {
-    clearLeaveTimer();
-    stopFixedSizeSync(fixedSizeFrameRef);
-  }, []);
+  useEffect(() => () => clearLeaveTimer(), []);
 
   // AL OCULTARSE LA PÁGINA, A REPOSO. Pulsar la tarjeta abre la ficha y la
   // página queda oculta debajo (<Activity>, ver OverlayRouteHost): el puntero
@@ -181,6 +168,7 @@ export default function HoverExpandCard({
     el.style.transform = "";
     el.style.inset = "";
     el.classList.remove(styles.expanded);
+    restOverlay(overlayRef.current);
   }, []);
 
   const expand = useCallback(() => {
@@ -191,13 +179,16 @@ export default function HoverExpandCard({
 
     const wasExpanded = el.classList.contains(styles.expanded);
     if (!wasExpanded) {
-      const { inset, shrunk } = measureExpansion(el);
+      const { inset, shrunk, corner } = measureExpansion(el);
       shrunkRef.current = shrunk;
+      cornerRef.current = corner;
       el.style.transition = "none";
       el.style.inset = inset;
       el.classList.add(styles.expanded);
+      if (overlayRef.current) overlayRef.current.dataset.expanded = "";
       if (prefersReducedMotion()) {
         el.style.transform = "";
+        moveOverlay(overlayRef.current, corner);
         return;
       }
       // Tamaño final YA, compensado con la escala inversa: visualmente la
@@ -210,7 +201,7 @@ export default function HoverExpandCard({
     }
     el.style.transition = `transform ${DURATION_MS}ms ${EASING}`;
     el.style.transform = "";
-    syncFixedSizeChildren(el, fixedSizeFrameRef, DURATION_MS + 50);
+    moveOverlay(overlayRef.current, cornerRef.current, `translate ${DURATION_MS}ms ${EASING}`);
   }, []);
 
   const collapse = useCallback(() => {
@@ -225,6 +216,7 @@ export default function HoverExpandCard({
       el.classList.remove(styles.expanded);
       el.style.inset = "";
       el.style.transform = "";
+      restOverlay(overlayRef.current);
     };
 
     if (prefersReducedMotion()) {
@@ -232,13 +224,10 @@ export default function HoverExpandCard({
       return;
     }
 
-    el.style.transition = `transform ${Math.round(DURATION_MS * 0.8)}ms cubic-bezier(0.22, 1, 0.36, 1)`;
+    const collapseTransition = `${Math.round(DURATION_MS * 0.8)}ms cubic-bezier(0.22, 1, 0.36, 1)`;
+    el.style.transition = `transform ${collapseTransition}`;
     el.style.transform = shrunkRef.current;
-    syncFixedSizeChildren(
-      el,
-      fixedSizeFrameRef,
-      Math.round(DURATION_MS * 0.8) + 50,
-    );
+    moveOverlay(overlayRef.current, "0px 0px", `translate ${collapseTransition}`);
     // Al terminar la animación la tarjeta recupera su tamaño normal. Con un
     // temporizador y no con `transitionend`, que no llega si la transición se
     // interrumpe o no llega a arrancar.
@@ -325,10 +314,14 @@ export default function HoverExpandCard({
     el.style.transform = "";
     el.style.inset = "";
     el.classList.remove(styles.expanded);
+    restOverlay(overlayRef.current);
   }, [enabled]);
 
+  const layerStyle =
+    zIndex != null ? { "--sv-hover-expand-z": zIndex } : undefined;
+
   return (
-    <div className={`relative ${cellClassName}`}>
+    <div className={`relative ${cellClassName}`} style={layerStyle}>
       <Tag
         ref={cardRef}
         className={`absolute inset-0 ${enabled ? styles.expand : ""} ${className}`}
@@ -343,6 +336,11 @@ export default function HoverExpandCard({
       >
         {children}
       </Tag>
+      {fixedOverlay ? (
+        <div ref={overlayRef} className={styles.fixedOverlay}>
+          {fixedOverlay}
+        </div>
+      ) : null}
     </div>
   );
 }

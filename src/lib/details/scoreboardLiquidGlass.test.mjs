@@ -31,6 +31,10 @@ const detailModalPath = new URL(
   "../../components/dashboard/DetailModal.jsx",
   import.meta.url,
 );
+const detailPanelMotionPath = new URL(
+  "../../components/dashboard/detailPanelMotion.js",
+  import.meta.url,
+);
 const sectionMenuPath = new URL(
   "../../components/DetailsSectionMenu.jsx",
   import.meta.url,
@@ -174,7 +178,10 @@ test("el liquid glass no hereda opacidad de las animaciones de carga", async () 
     modalInfoTabsParent,
     /initial=\{\{ opacity: 0/,
   );
-  assert.match(detailModal, /hidden: \{ opacity: 1, y: 86, scale: 0\.965 \}/);
+  // Las variantes del panel viven en su módulo compartido (también las usa el
+  // panel de temporada/episodio).
+  const panelMotion = await readFile(detailPanelMotionPath, "utf8");
+  assert.match(panelMotion, /hidden: \{ opacity: 1, y: 86, scale: 0\.965 \}/);
   // NI el cristal NI su contenido entran con opacidad.
   //
   // Antes se animaba solo el contenido para que el cristal no heredara el

@@ -100,3 +100,34 @@ test("all detail action variants use the shared liquid glass surface", async () 
     /function RecommendationActionButton[\s\S]*?<LiquidButton\s+liquidGlass/,
   );
 });
+
+test("dashboard hover preview cards use size='md' with proportional intermediate 46px button, number, and gap scaling to preserve lateral margins", async () => {
+  const [actions, continueWatching, backdropRow, mainDashboard] = await Promise.all([
+    readFile(componentPath, "utf8"),
+    readFile(path.resolve(currentDirectory, "../../components/ContinueWatchingSection.jsx"), "utf8"),
+    readFile(path.resolve(currentDirectory, "../../components/dashboard/DashboardBackdropRow.jsx"), "utf8"),
+    readFile(path.resolve(currentDirectory, "../../components/MainDashboardClient.jsx"), "utf8"),
+  ]);
+
+  // DetailActionsRow defaults to size="md" (intermediate 46px scale)
+  assert.match(actions, /size\s*=\s*"md"/);
+
+  // DetailActionsRow scales numbers and icons proportionally in intermediate size="md"
+  assert.match(actions, /sm:\[&.labeled-row_\[data-liquid-button\]:not\(\.labeled\)_\.text-xl\]:!text-\[20\.5px\]/);
+  assert.match(actions, /sm:\[&.labeled-row_\[data-liquid-button\]:not\(\.labeled\)_\.text-2xl\]:!text-\[22\.5px\]/);
+  assert.match(actions, /sm:\[&.labeled-row_\[data-liquid-button\]:not\(\.labeled\)_svg\]:!w-\[21px\]/);
+  assert.match(actions, /sm:\[&.labeled-row\]:!gap-2/);
+  assert.match(actions, /\[&.labeled-row>\*:not\(\.separator\):not\(\.labeled\)\]:!w-\[46px\]/);
+  assert.match(actions, /\[&.labeled-row>\*:not\(\.separator\):not\(\.labeled\)\]:!h-\[46px\]/);
+
+  // ContinueWatchingSection uses size="md"
+  assert.match(continueWatching, /<DetailActionsRow[\s\S]*?compactLabelWhenTight[\s\S]*?size="md"/);
+
+  // DashboardBackdropRow uses size="md"
+  assert.match(backdropRow, /<DetailActionsRow[\s\S]*?compactLabelWhenTight[\s\S]*?size="md"/);
+
+  // MainDashboardClient preview cards use size="md"
+  const matches = mainDashboard.match(/<DetailActionsRow[\s\S]*?compactLabelWhenTight[\s\S]*?size="md"/g) || [];
+  assert.ok(matches.length >= 2, "MainDashboardClient preview cards must use size='md'");
+});
+
