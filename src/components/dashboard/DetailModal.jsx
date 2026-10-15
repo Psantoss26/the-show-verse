@@ -73,7 +73,7 @@ import {
   getSoundtrackFeedback,
   SOUNDTRACK_EXCLUDE_PARAM,
 } from "@/lib/soundtrack/soundtrackFeedback";
-import { LIQUID_GLASS_PANEL, LIQUID_GLASS_DETAIL_SURFACE } from "@/lib/ui/liquidGlass";
+import { LIQUID_GLASS_DETAIL_SURFACE, DETAIL_MODAL_GLASS_CONTROL } from "@/lib/ui/liquidGlass";
 import {
   clampDrawerWidth,
   clampMobileDetailsWidth,
@@ -198,7 +198,6 @@ import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 const DETAILS_ROUTE_TRANSITION_KEY = "showverse:details-route-transition";
 const DETAILS_ROUTE_REVEAL_MIN_MS = 500;
 const DETAILS_ROUTE_CLEANUP_MS = 420;
-const DETAIL_MODAL_GLASS_CONTROL = `${LIQUID_GLASS_PANEL} border-0 text-white/80 hover:bg-black/[0.34] hover:text-white active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 disabled:pointer-events-none disabled:opacity-60`;
 
 function wait(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -2764,7 +2763,7 @@ export default function DetailModal({
       ? `/details/tv/${episodeMeta.showId}/season/${episodeMeta.seasonNumber}`
       : null;
 
-  const goToSeasonDetails = () => goToDetailsRoute(seasonHref);
+  const goToSeasonDetails = () => openDetailModal?.({ media_type: "season", id: episodeMeta.showId, showId: episodeMeta.showId, seasonNumber: episodeMeta.seasonNumber }, { drill: true });
 
   /* --------------------------------- derivados --------------------------------- */
   // Las pestañas (estado activo + cuerpos) las gestiona <DetailsInfoTabs>.
@@ -5054,7 +5053,7 @@ export default function DetailModal({
                 onSectionRequestHandled={setRequestedPhoneSection}
                 onOpenTitle={(rec) => openDetailModal?.(rec)}
                 onOpenSeason={(seasonNumber) =>
-                  goToDetailsRoute(`/details/tv/${item?.id}/season/${seasonNumber}`)
+                  openDetailModal?.({ media_type: "season", id: item?.id, showId: item?.id, seasonNumber }, { drill: true })
                 }
                 episodesWatched={episodesWatched}
                 imdbId={data.imdbId}

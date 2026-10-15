@@ -250,12 +250,10 @@ function AlertRow({ kind, item, isNew, onNavigate, onDismiss }) {
 
 // Clases del botón de la campana. Las comparten el botón real y el marcador de
 // arranque (AlertsMenuBoot), para que el relevo entre los dos no se note.
-function alertsButtonClass({ variant, open = false, heroNavMode = false }) {
+function alertsButtonClass({ variant }) {
   return variant === "mobile"
-    ? "relative grid h-11 w-11 place-items-center rounded-full text-white transition-[background-color,transform] duration-200 hover:bg-white/10 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
-    : `relative grid h-10 w-10 place-items-center rounded-full transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
-        open ? "bg-white/10 text-white" : "text-zinc-300"
-      } ${heroNavMode ? "drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]" : ""}`;
+    ? "relative grid h-11 w-11 place-items-center rounded-full text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] transition-transform duration-200 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+    : "relative grid h-10 w-10 place-items-center rounded-full text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70";
 }
 
 /**

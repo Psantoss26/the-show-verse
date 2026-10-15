@@ -10,6 +10,8 @@ import {
   useRef,
 } from "react";
 import Link from "next/link";
+import { sendEmbeddedDetailsAction } from "@/lib/navigation/embeddedDetails";
+import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { motion } from "framer-motion";
 import { SwiperSlide } from "swiper/react";
 import "swiper/swiper-bundle.css";
@@ -314,6 +316,7 @@ export default function EpisodeDetailsClient({
   // servidor, lib/details/episodeHeroStills → pickEpisodeBackdrop).
   heroBackdropPath = null,
 }) {
+  const router = useRouter();
   const traktRequestIdRef = useRef(0);
 
   const showName = show?.name || "Serie";
@@ -413,6 +416,9 @@ export default function EpisodeDetailsClient({
   // están listas, no solo la primera: ver EpisodeStillStack.
   const mobileStillStackLoad = useEpisodeStillStackLoad(mobileStillPaths);
   const mobileCoverReady = mobileStillStackLoad.ready;
+  useEffect(() => {
+    if (mobileCoverReady) sendEmbeddedDetailsAction("hero-ready");
+  }, [mobileCoverReady]);
   // Título del episodio en el teléfono: como mucho DOS líneas. Los nombres
   // largos bajan de tamaño (36 → 20 px) en vez de ocupar 3-4 líneas.
   const mobileTitleRef = useFitTextLines({
@@ -432,7 +438,7 @@ export default function EpisodeDetailsClient({
     revealProps: heroRevealProps,
     statsRevealProps: heroStatsRevealProps,
     rootStyle: heroRootStyle,
-  } = useMobileDetailsHero(true, { lock: mobileCoverReady });
+  } = useMobileDetailsHero(true, { lock: mobileCoverReady, fitCover: pathname?.startsWith("/embed/details/"), fitGap: 20, fitCoverMinRatio: 0 });
   // Qué cabe bajo los botones sin recortar la portada (solo teléfono).
   const mobileScoreboardMode = isPhone ? heroScoreboardMode : "full";
 
@@ -970,7 +976,7 @@ export default function EpisodeDetailsClient({
         );
 
         if (res.status === 401) {
-          window.location.href = `/login?next=/details/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`;
+          router.push(`/login?next=/details/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`);
           return;
         }
 
@@ -985,7 +991,7 @@ export default function EpisodeDetailsClient({
         setRatingLoading(false);
       }
     },
-    [showId, seasonNumber, episodeNumber, showName, showPosterPath],
+    [showId, seasonNumber, episodeNumber, showName, showPosterPath, router],
   );
 
   // Trigger (mismo hueco visual que antes)
@@ -1385,7 +1391,7 @@ export default function EpisodeDetailsClient({
     }
 
     if (!connected) {
-      window.location.href = `/login?next=/details/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`;
+      router.push(`/login?next=/details/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`);
       return;
     }
 
@@ -1416,7 +1422,7 @@ export default function EpisodeDetailsClient({
       console.error("Error al marcar episodio:", e);
       const needsReauth = /401|unauthorized/i.test(e?.message || "");
       if (needsReauth) {
-        window.location.href = `/login?next=/details/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`;
+        router.push(`/login?next=/details/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`);
         return;
       }
       await reloadEpisodeTraktState({ background: true });
@@ -1429,6 +1435,7 @@ export default function EpisodeDetailsClient({
     trakt.traktId,
     trakt.watched,
     watchedBusy,
+    router,
     reloadEpisodeTraktState,
     showId,
     seasonNumber,
@@ -1856,7 +1863,7 @@ export default function EpisodeDetailsClient({
                   loading: ratingLoading,
                   connected: traktConnected,
                   onConnect: () =>
-                    (window.location.href = `/login?next=/details/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`),
+                    router.push(`/login?next=/details/tv/${showId}/season/${seasonNumber}/episode/${episodeNumber}`),
                   onRate: handleRate,
                 }}
               />
@@ -1868,6 +1875,7 @@ export default function EpisodeDetailsClient({
                 ancho; Plataformas, Enlaces y Compartir van debajo como
                 píldoras. Desde `sm`, el marcador de siempre con sus botones. */}
             <div
+              data-phone-scaled
               ref={heroScoreboardRef}
               // Centrado entre los botones y el navbar inferior (ver
               // `--mobile-scoreboard-shift` en details/MobileDetailsHero); en
@@ -1942,7 +1950,7 @@ export default function EpisodeDetailsClient({
               aria-hidden="true"
               className="block h-px sm:hidden"
             />
-            <div className={`mb-3 sm:hidden ${MOBILE_REVEAL_BASE}`} {...heroRevealProps}>
+            <div data-phone-scaled className={`mb-3 sm:hidden ${MOBILE_REVEAL_BASE}`} {...heroRevealProps}>
             <ScoreboardPillRow>
               <ScoreboardPill
                 iconOnly
@@ -1970,7 +1978,7 @@ export default function EpisodeDetailsClient({
               />
             </ScoreboardPillRow>
             </div>
-            <div className={`mb-10 sm:hidden ${MOBILE_REVEAL_BASE}`} {...heroRevealProps}>
+            <div data-phone-scaled className={`mb-10 sm:hidden ${MOBILE_REVEAL_BASE}`} {...heroRevealProps}>
               <DetailsInfoTabs
                 layoutId="episodeTabBackdrop"
                 mobileLayout
@@ -2023,7 +2031,7 @@ export default function EpisodeDetailsClient({
         )}
 
         {nextEpisodes.length > 0 && (
-          <AnimatedSection delay={0.04}>
+          <AnimatedSection className="sv-phone-scaled-section" delay={0.04}>
             <section className="mb-16 group/section">
               <SectionTitle title="Episodios" icon={MonitorPlay} />
               <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-5 [scrollbar-width:thin]">
@@ -2082,7 +2090,7 @@ export default function EpisodeDetailsClient({
 
         {/* === Reparto del episodio === */}
         {cast.length > 0 && (
-          <AnimatedSection delay={0.04}>
+          <AnimatedSection className="sv-phone-scaled-section" delay={0.04}>
             <section className="mb-16 group/section">
               <SectionTitle title="Reparto del episodio" icon={UsersIcon} />
               <DetailsArrowCarousel
@@ -2136,7 +2144,7 @@ export default function EpisodeDetailsClient({
 
         {/* === Invitados === */}
         {guestStars.length > 0 && (
-          <AnimatedSection delay={0.04}>
+          <AnimatedSection className="sv-phone-scaled-section" delay={0.04}>
             <section className="mb-16 group/section">
               <SectionTitle title="Invitados" icon={UsersIcon} />
               <DetailsArrowCarousel

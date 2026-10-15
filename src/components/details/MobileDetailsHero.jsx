@@ -192,6 +192,8 @@ function readInnerHeight(el) {
 }
 
 function readBottomNavTop() {
+    // Embedded phone panels have no bottom navbar: use the full panel height.
+    if (document.querySelector("[data-embedded-details]")) return window.innerHeight
     const nav = document.querySelector(MOBILE_BOTTOM_NAV_SELECTOR)
     // `offsetTop` (fijo: respecto a la ventana) y no el rectángulo: el navbar
     // se esconde con un `transform` al hacer scroll y eso no debe contar.

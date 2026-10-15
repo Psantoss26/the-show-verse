@@ -7,6 +7,7 @@ import { sendEmbeddedDetailsAction } from "@/lib/navigation/embeddedDetails";
 // salen al documento principal para no añadir entradas al historial del iframe.
 export default function EmbeddedDetailsBridge() {
   useEffect(() => {
+    sendEmbeddedDetailsAction("content-ready");
     const onClick = (event) => {
       if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const link = event.target.closest?.("a[href]");

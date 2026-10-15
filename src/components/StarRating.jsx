@@ -189,7 +189,7 @@ export default function StarRating({
           <span
             ref={ratingRef}
             style={{ transform: `translateY(${ratingOffsetPx}px)` }}
-            className="sv-seriesgraph-number text-xl leading-none"
+            className="text-xl font-black leading-none tracking-tighter"
           >
             {fmt(rating)}
           </span>

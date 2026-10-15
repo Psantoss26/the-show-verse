@@ -36,6 +36,8 @@ import { isServerReachable } from "@/lib/offline/client";
 
 import { getMediaTypeForItem } from "@/lib/dashboard/media";
 import { dashboardDetailHref } from "@/lib/dashboard/detailHref";
+import SubrouteDetailsPanel from "@/components/dashboard/SubrouteDetailsPanel";
+import { detailPreviewFromHref, subrouteDetailsHref } from "@/lib/navigation/detailPreview";
 import DetailModal from "@/components/dashboard/DetailModal";
 import { useAuth } from "@/context/AuthContext";
 import { readDetailOpen, withDetailOpen } from "@/lib/ui/detailOpenPreferences";
@@ -165,12 +167,14 @@ const DASHBOARD_PLACEMENT_STORAGE_KEY = "showverse:dashboard:detailModalPlacemen
 const USER_PAGES_PLACEMENT_STORAGE_KEY = "showverse:detailModalPlacement";
 const PREVIEW_PARAM = "preview";
 const PREVIEW_RE = /^(movie|tv)-(\d+)$/;
+const SEASON_RE = /^season-(\d+)-(\d+)$/;
 const EPISODE_RE = /^ep-(\d+)-(\d+)-(\d+)$/;
 
 // Identidad de un item para la URL `?preview=` y para el `key` del modal (cada
 // nivel debe tener su propio key para que AnimatePresence anime el cambio).
 function previewToken(item) {
   if (!item) return "";
+  if (item.media_type === "season") return `season-${item.showId ?? item.id}-${item.seasonNumber}`;
   if (item.media_type === "episode") {
     const showId = item.showId ?? item.id;
     return `ep-${showId}-${item.seasonNumber}-${item.episodeNumber}`;
@@ -204,6 +208,9 @@ function readPreviewFromLocation() {
   if (typeof window === "undefined") return null;
   const value = new URLSearchParams(window.location.search).get(PREVIEW_PARAM);
   if (!value) return null;
+
+  const season = SEASON_RE.exec(value);
+  if (season) return { media_type: "season", id: Number(season[1]), showId: Number(season[1]), seasonNumber: Number(season[2]) };
 
   const ep = EPISODE_RE.exec(value);
   if (ep) {
@@ -339,13 +346,10 @@ export default function DetailModalProvider({
   const [stack, setStack] = useState([]);
   const activeItem = stack.length > 0 ? stack[stack.length - 1] : null;
 
-  // La ficha de TELÉFONO está maquetada para películas y series. Un EPISODIO
-  // tiene otra ficha (serie de origen, temporada, número, ficha de la
-  // temporada...) que no cabe en ella, así que se abre siempre en el modal
-  // ancho. No se toca la preferencia guardada: al volver a una película o una
-  // serie, la vista de teléfono sigue donde estaba.
-  const isEpisodeItem = activeItem?.media_type === "episode";
-  const effectiveContentView = isEpisodeItem ? "modal" : preferredContentView;
+  const effectiveContentView = preferredContentView;
+  const usesSubroutePanel = activeItem?.media_type === "season" ||
+    (activeItem?.media_type === "episode" && effectivePlacement === "right" && effectiveContentView === "mobile");
+  const ActiveDetailPanel = usesSubroutePanel ? SubrouteDetailsPanel : DetailModal;
   const docked =
     activeItem != null && effectivePlacement === "right" && activeDrawerView === "docked";
 
@@ -454,17 +458,7 @@ export default function DetailModalProvider({
       // También en escritorio si el usuario prefiere abrir directamente la
       // ficha completa (Ajustes → «Al abrir un título»).
       if (isMobile || !isServerReachable() || savedOpen.target === "page") {
-        let href;
-        if (
-          item.media_type === "episode" &&
-          item.seasonNumber != null &&
-          item.episodeNumber != null
-        ) {
-          const showId = item.showId ?? item.id;
-          href = `/details/tv/${showId}/season/${item.seasonNumber}/episode/${item.episodeNumber}`;
-        } else {
-          href = dashboardDetailHref(item);
-        }
+        const href = subrouteDetailsHref(item) || dashboardDetailHref(item);
         if (href) router.push(href);
         return;
       }
@@ -583,6 +577,16 @@ export default function DetailModalProvider({
       <div
         ref={contentRef}
         data-detail-page-content=""
+        onClickCapture={(event) => {
+          if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          const link = event.target.closest?.("a[href]");
+          if (!link || link.hasAttribute("download") || (link.target && link.target !== "_self")) return;
+          const item = detailPreviewFromHref(link.href, window.location.origin);
+          if (!item || !["season", "episode"].includes(item.media_type)) return;
+          event.preventDefault();
+          event.stopPropagation();
+          openDetailModal(item);
+        }}
         className="min-w-0 @container/detail-page"
       >
         {children}
@@ -590,21 +594,20 @@ export default function DetailModalProvider({
 
       <AnimatePresence custom={switching}>
         {activeItem && (
-          <DetailModal
+          <ActiveDetailPanel
             // La colocación forma parte de la identidad: al cambiar de centrado
             // a lateral (o al revés) sale el panel de una forma y entra el de la
             // otra, cada uno con su propia animación de entrada y salida.
             key={`${previewToken(activeItem)}:${effectivePlacement}`}
             item={activeItem}
             onClose={closeDetailModal}
+            onOpenDetail={openDetailModal}
             placement={effectivePlacement}
             onPlacementChange={!isMobile ? changePlacement : undefined}
             drawerView={activeDrawerView}
             contentView={effectiveContentView}
             tabletViewport={isTablet}
-            // Sin el interruptor de ficha de teléfono en un episodio: ahí esa
-            // vista no se ofrece.
-            onContentViewChange={isEpisodeItem ? undefined : changeContentView}
+            onContentViewChange={changeContentView}
             onDrawerViewChange={changeDrawerView}
             onDrawerWidthChange={updateDrawerWidth}
             // `custom` de AnimatePresence solo llega al panel que SALE. El que

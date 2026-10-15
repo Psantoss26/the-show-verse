@@ -171,3 +171,6 @@ export const LIQUID_GLASS_DETAIL_TINT =
   "bg-black/[0.47] bg-gradient-to-br from-white/[0.12] via-transparent to-white/[0.04] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15)]";
 export const LIQUID_GLASS_DETAIL_SHADOW =
   "shadow-[0_25px_50px_-12px_rgba(0,0,0,0.85)]";
+
+// Controles flotantes compartidos por las fichas rápidas.
+export const DETAIL_MODAL_GLASS_CONTROL = `${LIQUID_GLASS_PANEL} border-0 text-white/80 hover:bg-black/[0.34] hover:text-white active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 disabled:pointer-events-none disabled:opacity-60`;

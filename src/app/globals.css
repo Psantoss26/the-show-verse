@@ -2824,6 +2824,7 @@ img[data-img-broken] {
    las páginas de usuario. Ocultar la barra en el contenedor padre no afecta al
    documento embebido, así que se aplica aquí sin desactivar su desplazamiento. */
 html:has([data-embedded-details]) {
+  scrollbar-gutter: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
@@ -3177,4 +3178,11 @@ html[data-details-sequence-transition] .sv-topbar {
 ) {
   animation-duration: 0s !important;
   animation-delay: 0s !important;
+}
+
+/* Same content zoom as the title phone panel. The cover and floating controls
+   keep their geometry; standalone pages and wide panels retain scale 1. */
+[data-embedded-details] [data-phone-scaled],
+[data-embedded-details] .sv-phone-scaled-section {
+  zoom: var(--sv-phone-scale, 1);
 }
