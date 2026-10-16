@@ -292,6 +292,7 @@ export function DetailsTabsMenu({
   // teléfono del drawer en tablet). Los `sm:`/`max-sm:` de abajo miran el
   // viewport: en tablet salía el menú de escritorio y "Enlaces" bajaba de fila.
   phone = false,
+  accentColor,
 }) {
   // En móvil, con tres o cuatro secciones (Detalles · Producción · Sinopsis,
   // más Enlaces en temporadas y episodios), la cuadrícula les reserva columnas
@@ -327,7 +328,7 @@ export function DetailsTabsMenu({
           key={tab.id}
           type="button"
           onClick={() => onChangeTab(tab.id)}
-          className={`relative z-10 rounded-md px-0.5 pb-2 pt-2 font-bold uppercase transition-colors duration-300 [text-shadow:0_1px_2px_rgba(0,0,0,0.9),0_0_10px_rgba(0,0,0,0.6)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 ${
+          className={`relative z-10 rounded-md px-0.5 pb-2 pt-2 font-bold uppercase transition-colors duration-300 [text-shadow:0_1px_2px_rgba(0,0,0,0.9),0_0_10px_rgba(0,0,0,0.6)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${accentColor === "emerald" ? "focus-visible:outline-emerald-400" : "focus-visible:outline-yellow-400"} ${
             phone
               ? hasFourMobileTabs
                 ? "justify-self-center text-[11px] tracking-[0.06em]"
@@ -346,7 +347,7 @@ export function DetailsTabsMenu({
           {activeTab === tab.id && (
             <motion.div
               layoutId={layoutId}
-              className={`absolute bottom-0.5 left-0 right-0 h-0.5 bg-gradient-to-r from-yellow-500 to-amber-500 rounded-full shadow-[0_1.5px_6px_rgba(245,158,11,0.5)] z-20 ${phone ? "" : "sm:bottom-0"}`}
+              className={`absolute bottom-0.5 left-0 right-0 h-0.5 bg-gradient-to-r ${accentColor === "emerald" ? "from-emerald-400 to-green-500 shadow-[0_1.5px_6px_rgba(16,185,129,0.5)]" : "from-yellow-500 to-amber-500 shadow-[0_1.5px_6px_rgba(245,158,11,0.5)]"} rounded-full z-20 ${phone ? "" : "sm:bottom-0"}`}
               transition={{ type: "spring", stiffness: 380, damping: 30 }}
             />
           )}

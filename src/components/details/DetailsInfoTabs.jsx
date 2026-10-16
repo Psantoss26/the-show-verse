@@ -194,6 +194,10 @@ export default function DetailsInfoTabs({
   // únicamente los metadatos que realmente existen sin falsear etiquetas.
   detailCards = null,
   productionCards = null,
+  productionTabLabel = "Producción",
+  synopsisTabLabel = "Sinopsis",
+  synopsisBelowTabs = false,
+  accentColor,
   showDetailsTab = true,
   showProductionTab = true,
   // Las fichas que solo tienen sinopsis no necesitan una navegación de una
@@ -225,8 +229,8 @@ export default function DetailsInfoTabs({
   const tabs = useMemo(
     () => [
       ...(showDetailsTab ? [{ id: "details", label: "Detalles" }] : []),
-      ...(showProductionTab ? [{ id: "production", label: "Producción" }] : []),
-      { id: "synopsis", label: "Sinopsis" },
+      ...(showProductionTab ? [{ id: "production", label: productionTabLabel }] : []),
+      ...(!synopsisBelowTabs ? [{ id: "synopsis", label: synopsisTabLabel }] : []),
       ...(hasPlatformsTab ? [{ id: "platforms", label: "Plataformas" }] : []),
       ...(hasExternalLinksTab ? [{ id: "links", label: "Enlaces" }] : []),
       ...(hasAwardsTab ? [{ id: "awards", label: "Premios" }] : []),
@@ -234,6 +238,9 @@ export default function DetailsInfoTabs({
     [
       showDetailsTab,
       showProductionTab,
+      productionTabLabel,
+      synopsisTabLabel,
+      synopsisBelowTabs,
       hasPlatformsTab,
       hasExternalLinksTab,
       hasAwardsTab,
@@ -271,6 +278,45 @@ export default function DetailsInfoTabs({
         .join(" · ")
     : "";
 
+  const synopsisPanel = (
+    <InfoGlassPanel className="p-5 sm:p-6">
+      {tagline && (
+        <div className="mb-3 font-serif text-lg italic text-yellow-500/80">
+          {isBackdrop ? `"${tagline}"` : `“${tagline}”`}
+        </div>
+      )}
+      <div>
+        <p
+          id={synopsisId}
+          className={`whitespace-pre-line text-justify text-base leading-relaxed text-zinc-200 md:text-lg ${
+            synopsisIsExpandable && !showFullSynopsis
+              ? "line-clamp-4 mask-fade-bottom"
+              : ""
+          }`}
+        >
+          {overview || "No hay descripción disponible."}
+        </p>
+        {synopsisIsExpandable && (
+          <button
+            type="button"
+            onClick={() => setShowFullSynopsis((value) => !value)}
+            aria-expanded={showFullSynopsis}
+            aria-controls={synopsisId}
+            className={`mt-2 flex items-center gap-1 text-xs font-bold uppercase tracking-wide transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${accentColor === "emerald" ? "text-emerald-400 hover:text-emerald-300 focus-visible:outline-emerald-300" : "text-purple-400 hover:text-purple-300 focus-visible:outline-purple-300"}`}
+          >
+            {showFullSynopsis ? "Ver menos" : "Ver más"}
+            <ChevronDown
+              className={`h-3 w-3 transition-transform ${
+                showFullSynopsis ? "rotate-180" : ""
+              }`}
+              aria-hidden="true"
+            />
+          </button>
+        )}
+      </div>
+    </InfoGlassPanel>
+  );
+
   return (
     <div className="contents">
       {/* ========== MENÚ DE NAVEGACIÓN DE TABS ========== */}
@@ -282,6 +328,7 @@ export default function DetailsInfoTabs({
           layoutId={layoutId}
           swipeHandlers={swipeHandlers}
           phone={phoneMenu}
+          accentColor={accentColor}
         />
       ) : null}
 
@@ -291,48 +338,13 @@ export default function DetailsInfoTabs({
           desplazamiento vertical de la página como comportamiento nativo. */}
       <div
         {...swipeHandlers}
-        className="relative min-h-[100px] touch-pan-y sm:touch-auto"
+        className={`relative ${synopsisBelowTabs ? "" : "min-h-[100px]"} touch-pan-y sm:touch-auto`}
       >
         <AnimatePresence mode="wait">
           {/* ===== TAB: SINOPSIS ===== */}
-          {activeTab === "synopsis" && (
+          {!synopsisBelowTabs && activeTab === "synopsis" && (
             <div key="synopsis">
-              <InfoGlassPanel className="p-5 sm:p-6">
-                {tagline && (
-                  <div className="mb-3 font-serif text-lg italic text-yellow-500/80">
-                    {isBackdrop ? `"${tagline}"` : `“${tagline}”`}
-                  </div>
-                )}
-                <div>
-                  <p
-                    id={synopsisId}
-                    className={`whitespace-pre-line text-justify text-base leading-relaxed text-zinc-200 md:text-lg ${
-                      synopsisIsExpandable && !showFullSynopsis
-                        ? "line-clamp-4 mask-fade-bottom"
-                        : ""
-                    }`}
-                  >
-                    {overview || "No hay descripción disponible."}
-                  </p>
-                  {synopsisIsExpandable && (
-                    <button
-                      type="button"
-                      onClick={() => setShowFullSynopsis((value) => !value)}
-                      aria-expanded={showFullSynopsis}
-                      aria-controls={synopsisId}
-                      className="mt-2 flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-purple-400 transition-colors hover:text-purple-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-300"
-                    >
-                      {showFullSynopsis ? "Ver menos" : "Ver más"}
-                      <ChevronDown
-                        className={`h-3 w-3 transition-transform ${
-                          showFullSynopsis ? "rotate-180" : ""
-                        }`}
-                        aria-hidden="true"
-                      />
-                    </button>
-                  )}
-                </div>
-              </InfoGlassPanel>
+              {synopsisPanel}
             </div>
           )}
 
@@ -802,6 +814,7 @@ export default function DetailsInfoTabs({
           )}
         </AnimatePresence>
       </div>
+      {synopsisBelowTabs && <div className="mt-3 lg:mt-1">{synopsisPanel}</div>}
     </div>
   );
 }
