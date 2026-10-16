@@ -50,7 +50,6 @@ import {
 import {
   AnimatedSection,
   FadeIn,
-  ScaleIn,
 } from "@/components/details/AnimatedSection";
 import { useShareAction } from "@/components/details/DetailHeaderBits";
 import {
@@ -60,6 +59,7 @@ import {
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
 import { buildActorShare } from "@/lib/actor/shareActor";
 import DetailsSectionMenu from "./DetailsSectionMenu";
+import DetailsInfoTabs from "@/components/details/DetailsInfoTabs";
 import useDetailsStickyTop from "@/hooks/useDetailsStickyTop";
 import { careerRange, formatCareerRange } from "@/lib/actor/careerRange";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
@@ -1678,7 +1678,6 @@ export default function ActorDetails({
   );
 
   // UI States
-  const [showFullBio, setShowFullBio] = useState(false);
   const [loadingExtra, setLoadingExtra] = useState(
     Boolean(personId && TMDB_API_KEY && !hasInitialExtra),
   );
@@ -1955,7 +1954,6 @@ export default function ActorDetails({
     setYearTo("");
     setSort("date_desc");
     setMobileFiltersOpen(false);
-    setShowFullBio(false);
     setExternalIds(initialExternalIds);
     setCombinedCredits(actorDetails?.combined_credits || null);
     setImages(actorDetails?.images || null);
@@ -2907,131 +2905,59 @@ export default function ActorDetails({
 
             </FadeIn>
 
-            <ScaleIn delay={0.18} className="mb-6">
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                {[
-                  {
-                    label: "Conocido/a por",
-                    value: actorDetails?.known_for_department || "—",
-                    icon: Briefcase,
-                    tone: "emerald",
-                  },
-                  {
-                    label: "Créditos",
-                    value: stats.total,
-                    sub: `${stats.movies} películas · ${stats.tv} series`,
-                    icon: Film,
-                    tone: "sky",
-                  },
-                  {
-                    label: "Trayectoria",
-                    value: careerYears,
-                    icon: Calendar,
-                    tone: "violet",
-                  },
-                  {
-                    label: "Premios",
-                    value: loadingAwards ? "..." : awardStats.total || "—",
-                    sub:
-                      awardStats.total > 0
-                        ? `${awardStats.wins} ganados · ${awardStats.nominations} nominaciones`
-                        : "Wikidata",
-                    icon: Trophy,
-                    tone: "yellow",
-                  },
-                ].map((item) => {
-                  const Icon = item.icon;
-                  const tones = {
-                    emerald: "from-emerald-500/18 text-emerald-300",
-                    sky: "from-sky-500/18 text-sky-300",
-                    violet: "from-violet-500/18 text-violet-300",
-                    yellow: "from-yellow-500/18 text-yellow-300",
-                  };
-                  return (
-                    <div
-                      key={item.label}
-                      className={`${ACTOR_LIQUID_CARD_CLASS} p-4 sm:p-5`}
-                    >
-                      <div className={ACTOR_LIQUID_CARD_LAYER_CLASS} />
-                      <div
-                        className={`absolute -right-8 -top-8 h-24 w-24 rounded-full bg-gradient-to-br ${tones[item.tone]} to-transparent blur-2xl opacity-80`}
-                      />
-                      <div className="relative z-10 flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <span className="block text-[10px] font-black uppercase tracking-wider text-zinc-500">
-                            {item.label}
-                          </span>
-                          <span className="mt-1 block truncate text-lg font-black text-white">
-                            {item.value}
-                          </span>
-                          {item.sub ? (
-                            <span className="mt-0.5 block truncate text-xs font-semibold text-zinc-500">
-                              {item.sub}
-                            </span>
-                          ) : null}
-                        </div>
-                        <Icon
-                          className={`h-5 w-5 shrink-0 ${tones[item.tone].split(" ")[1]}`}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </ScaleIn>
-
-            {mostPopularCredit && (
-              <FadeIn delay={0.2} className="mb-5">
-                <div className={`${ACTOR_LIQUID_CARD_CLASS} flex items-center gap-3 p-4`}>
-                  <div className={ACTOR_LIQUID_CARD_LAYER_CLASS} />
-                  <div className="pointer-events-none absolute -left-10 -top-10 h-28 w-28 rounded-full bg-emerald-500/15 blur-2xl" />
-                  <div className="relative z-10 flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-300">
-                    <Star className="h-5 w-5 fill-emerald-300" />
-                  </div>
-                  <div className="relative z-10 min-w-0">
-                    <p className="text-[10px] font-black uppercase tracking-wider text-emerald-300/80">
-                      Crédito más popular
-                    </p>
-                    <p className="truncate text-sm font-bold text-white">
-                      {mostPopularCredit.title || mostPopularCredit.name}
-                      {mostPopularCredit.year
-                        ? ` · ${mostPopularCredit.year}`
-                        : ""}
-                    </p>
-                  </div>
-                </div>
-              </FadeIn>
-            )}
-
-            <FadeIn delay={0.24}>
-              <div className={`${ACTOR_LIQUID_CARD_CLASS} p-5 sm:p-6`}>
-                <div className={ACTOR_LIQUID_CARD_LAYER_CLASS} />
-                <p
-                  className={`relative z-10 text-zinc-200 text-base leading-relaxed text-justify whitespace-pre-line ${
-                    !showFullBio && bio.length > 420
-                      ? "line-clamp-4 mask-fade-bottom"
-                      : ""
-                  }`}
-                >
-                  {bio || (
-                    <span className="italic text-zinc-500">
-                      Sin biografía disponible.
+            <DetailsInfoTabs
+              key={personId}
+              layoutId={`actor-info-tabs-${personId}`}
+              productionTabLabel="Popular"
+              synopsisTabLabel="Biografía"
+              synopsisBelowTabs
+              accentColor="emerald"
+              showAwardsTab={false}
+              showPlatformsTab={false}
+              enableMobileTabSwipe
+              expandableSynopsis
+              detailCards={[
+                {
+                  label: "Conocido/a por",
+                  value: actorDetails?.known_for_department || "—",
+                  icon: Briefcase,
+                },
+                {
+                  label: "Créditos",
+                  value: (
+                    <span title={`${stats.movies} películas · ${stats.tv} series`}>
+                      {stats.total}
                     </span>
-                  )}
-                </p>
-                {bio.length > 420 && (
-                  <button
-                    onClick={() => setShowFullBio(!showFullBio)}
-                    className="relative z-10 mt-2 text-xs font-bold text-emerald-400 hover:text-emerald-300 uppercase tracking-wide flex items-center gap-1"
-                  >
-                    {showFullBio ? "Ver menos" : "Leer más"}{" "}
-                    <ChevronDown
-                      className={`w-3 h-3 transition-transform ${showFullBio ? "rotate-180" : ""}`}
-                    />
-                  </button>
-                )}
-              </div>
-            </FadeIn>
+                  ),
+                  icon: Film,
+                },
+                {
+                  label: "Trayectoria",
+                  value: careerYears || "—",
+                  icon: Calendar,
+                },
+                {
+                  label: "Premios",
+                  value: loadingAwards ? "Cargando…" : (
+                    <span title={`${awardStats.wins} ganados · ${awardStats.nominations} nominaciones`}>
+                      {awardStats.total || "—"}
+                    </span>
+                  ),
+                  icon: Trophy,
+                },
+              ]}
+              productionCards={[
+                {
+                  label: "Crédito más popular",
+                  icon: Star,
+                  value: mostPopularCredit
+                    ? `${mostPopularCredit.title || mostPopularCredit.name}${mostPopularCredit.year ? ` · ${mostPopularCredit.year}` : ""}`
+                    : "Sin créditos disponibles.",
+                },
+              ]}
+              overview={bio || "Sin biografía disponible."}
+            />
+
           </div>
         </motion.div>
 
