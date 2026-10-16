@@ -2,7 +2,7 @@
 import { z } from 'zod';
 import { ensureSeeded } from '../community/seed.js';
 import {
-  getCommentsPage, getSentiment, getListsForTitle, discoverListsPage, getCommunityListWithItems,
+  getCommentsPage, getViewerComments, getSentiment, getListsForTitle, discoverListsPage, getCommunityListWithItems,
   insertNativeComment, updateNativeComment, deleteNativeComment,
   likeComment, unlikeComment, likeCommunityList, unlikeCommunityList,
   getCommentOwnerId, getCommunityListOwnerId,
@@ -41,8 +41,14 @@ export default async function communityRoutes(fastify) {
   fastify.get('/:type/:tmdbId/comments', async (req, reply) => {
     const t = parseTarget(req, reply); if (!t) return;
     // tab: popular | recent (y los nombres antiguos); sort=likes reordena por me gusta.
-    const { tab = 'popular', sort = '', page = '1', limit = '5' } = req.query || {};
+    const { tab = 'popular', sort = '', page = '1', limit = '5', mine = '' } = req.query || {};
     const viewerId = req.user?.id || null;
+    // ?mine=1 → solo las reseñas del visitante (estado del botón de reseña).
+    if (mine === '1' || mine === 'true') {
+      reply.header('Cache-Control', 'private, no-store');
+      const items = await getViewerComments({ tmdbId: t.tmdbId, mediaType: t.type, userId: viewerId });
+      return { items };
+    }
     const seed = await ensureSeeded({ tmdbId: t.tmdbId, mediaType: t.type, waitForCommentsCache: true });
     const data = await getCommentsPage({ tmdbId: t.tmdbId, mediaType: t.type, tab, sort, page, limit, viewerId });
     setCommunityCache(reply, viewerId, 'public, s-maxage=60, stale-while-revalidate=600');

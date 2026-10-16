@@ -111,7 +111,7 @@ import {
   createPanelVariantsRight,
 } from "@/components/dashboard/detailPanelMotion";
 import {
-  selectOwnedComments,
+  mergeOwnedComments,
 } from "@/lib/details/detailActionState";
 
 import {
@@ -192,6 +192,7 @@ import {
   traktUpdateComment,
   traktDeleteComment,
   traktGetComments,
+  traktGetMyComments,
   traktGetItemStatus,
   traktAddWatchPlay,
   traktUpdateWatchPlay,
@@ -2120,14 +2121,18 @@ export default function DetailModal({
   const [titleComments, setTitleComments] = useState([]);
   const [ownedCommentIds, setOwnedCommentIds] = useState(() => new Set());
   const [traktUsername, setTraktUsername] = useState(null);
+  // Reseñas propias pedidas aparte: la lista de comentarios solo trae los 50
+  // más recientes de la ventana de "Recientes" y una reseña más antigua no
+  // aparecía, dejando el botón sin estado (igual que en DetailsClient).
+  const [viewerComments, setViewerComments] = useState([]);
   const myComments = useMemo(
     () =>
-      selectOwnedComments(titleComments, {
+      mergeOwnedComments(viewerComments, titleComments, {
         appUsername: account?.username,
         traktUsername,
         ownedCommentIds,
       }),
-    [account?.username, ownedCommentIds, titleComments, traktUsername],
+    [account?.username, ownedCommentIds, titleComments, traktUsername, viewerComments],
   );
 
   useEffect(() => {
@@ -2182,6 +2187,23 @@ export default function DetailModal({
     };
   }, [isEpisode, item?.id, traktType]);
 
+  const canLoadViewerComments = !!session && !!account?.id;
+  useEffect(() => {
+    setViewerComments([]);
+    if (!item?.id || isEpisode || !canLoadViewerComments) return undefined;
+
+    let cancelled = false;
+    traktGetMyComments({ type: traktType, tmdbId: item.id })
+      .then((items) => {
+        if (!cancelled) setViewerComments(items);
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canLoadViewerComments, isEpisode, item?.id, traktType]);
+
   const handleCommentSubmit = async ({ comment, spoiler }) => {
     const result = await traktAddComment({
       type: traktType,
@@ -2224,7 +2246,7 @@ export default function DetailModal({
       type: traktType,
       tmdbId: item.id,
     });
-    setTitleComments((previous) =>
+    const applyUpdate = (previous) =>
       previous.map((entry) =>
         String(entry?.id) === String(commentId)
           ? {
@@ -2234,8 +2256,9 @@ export default function DetailModal({
               spoiler: result?.spoiler ?? spoiler,
             }
           : entry,
-      ),
-    );
+      );
+    setTitleComments(applyUpdate);
+    setViewerComments(applyUpdate);
     return result;
   };
   const handleCommentDelete = async ({ commentId }) => {
@@ -2245,9 +2268,10 @@ export default function DetailModal({
       next.delete(String(commentId));
       return next;
     });
-    setTitleComments((previous) =>
-      previous.filter((entry) => String(entry?.id) !== String(commentId)),
-    );
+    const removeComment = (previous) =>
+      previous.filter((entry) => String(entry?.id) !== String(commentId));
+    setTitleComments(removeComment);
+    setViewerComments(removeComment);
   };
 
   /* ------------------------------ visto en Trakt ------------------------------ */

@@ -2,7 +2,6 @@
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowUpDown,
@@ -20,6 +19,7 @@ import {
 import ListPosterCard, {
   listPosterGridClass,
 } from "@/components/lists/ListPosterCard";
+import { TitleRow } from "@/components/details/sectionSheet/SectionSheetRows";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import {
@@ -356,6 +356,7 @@ export default function FilterableListItems({
   items,
   getMeta = getListItemMeta,
   renderCard,
+  renderAction,
   emptyTitle = "No hay elementos",
   emptyText = "No se encontraron títulos con estos filtros.",
   // Solo quien puede gestionar la lista ve el modo borrar.
@@ -693,52 +694,49 @@ export default function FilterableListItems({
             ) : null}
 
             {viewMode === "list" ? (
-              <div className="space-y-3">
-                {group.entries.map((entry) => (
-                  <Link
-                    key={`${entry.meta.mediaType}-${entry.meta.id}-${entry.index}-list`}
-                    href={entry.meta.href || "#"}
-                    onClick={
-                      entry.meta.href
-                        ? previewClick(
-                            {
-                              id: entry.meta.id,
-                              title: entry.meta.title,
-                              name: entry.meta.title,
-                              poster_path: entry.meta.posterPath,
-                            },
-                            { mediaType: entry.meta.mediaType },
-                          )
-                        : undefined
-                    }
-                    className="group flex items-center gap-4 rounded-xl bg-black/[0.08] bg-gradient-to-br from-white/10 via-transparent to-black/15 p-3 shadow-none backdrop-blur-[28px] transition hover:bg-white/10"
-                  >
-                    <div className="h-20 w-14 shrink-0 overflow-hidden rounded-lg bg-zinc-900">
-                      <ListPosterCard
-                        title={entry.meta.title}
+              <ul className="space-y-2">
+                {group.entries.map((entry) => {
+                  const action = renderAction
+                    ? renderAction(entry.item, entry.meta, editMode)
+                    : null;
+                  return (
+                    <li
+                      key={`${entry.meta.mediaType}-${entry.meta.id}-${entry.index}-list`}
+                    >
+                      <TitleRow
+                        item={entry.item}
                         mediaType={entry.meta.mediaType}
+                        href={entry.meta.href}
+                        onClick={
+                          entry.meta.href
+                            ? previewClick(
+                                {
+                                  id: entry.meta.id,
+                                  title: entry.meta.title,
+                                  name: entry.meta.title,
+                                  poster_path: entry.meta.posterPath,
+                                },
+                                { mediaType: entry.meta.mediaType },
+                              )
+                            : undefined
+                        }
+                        title={entry.meta.title}
+                        year={entry.meta.year}
+                        voteAverage={entry.meta.voteAverage}
                         posterPath={entry.meta.posterPath}
                         posterLoading={entry.meta.posterLoading}
                         onPosterError={posterErrorHandler(entry)}
+                        showImdb={Boolean(
+                          entry.meta.imdbRating != null ||
+                            entry.meta.voteAverage != null,
+                        )}
+                        imdbRating={entry.meta.imdbRating}
+                        action={action}
                       />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="truncate font-bold text-white group-hover:text-purple-200">
-                        {entry.meta.title}
-                      </h3>
-                      <p className="text-sm text-zinc-500">
-                        {entry.meta.mediaType === "tv" ? "Serie" : "Película"}
-                        {entry.meta.year ? ` · ${entry.meta.year}` : ""}
-                      </p>
-                    </div>
-                    {entry.meta.voteAverage ? (
-                      <span className="font-mono text-sm font-black text-emerald-300">
-                        {entry.meta.voteAverage.toFixed(1)}
-                      </span>
-                    ) : null}
-                  </Link>
-                ))}
-              </div>
+                    </li>
+                  );
+                })}
+              </ul>
             ) : (
               <div
                 className={

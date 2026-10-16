@@ -201,6 +201,27 @@ export async function getCommentsPage({ tmdbId, mediaType, tab, sort, page = 1, 
   };
 }
 
+// Reseñas propias del visitante en un título, sin paginar ni filtrar por
+// pestaña/idioma: el botón de reseña de la ficha necesita saber si existe aunque
+// no salga en la página de comentarios que se está mostrando (una reseña con 0
+// me gusta casi nunca entra en la primera página de "Populares").
+export async function getViewerComments({ tmdbId, mediaType, userId }) {
+  if (!userId) return [];
+  const rows = await db
+    .select()
+    .from(titleComments)
+    .where(and(
+      eq(titleComments.tmdbId, Number(tmdbId)),
+      eq(titleComments.mediaType, mediaType),
+      eq(titleComments.source, 'native'),
+      eq(titleComments.userId, userId),
+    ))
+    .orderBy(desc(titleComments.createdAt))
+    .limit(20);
+  const liked = await likedCommentIds(userId, rows.map((row) => row.id));
+  return rows.map((row) => commentRowToApi({ ...row, likedByViewer: liked.has(row.id) }));
+}
+
 export async function getCommentCount({ tmdbId, mediaType }) {
   const [{ count }] = await db
     .select({ count: sql`count(*)::int` })

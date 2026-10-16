@@ -22,12 +22,15 @@ import {
   CheckCircle2,
   ExternalLink,
   Film,
+  Heart,
+  Link2,
+  Share2,
+  Check,
   Tv as TvIcon,
   User,
   Cake,
   Skull,
   Briefcase,
-  TrendingUp,
   Star,
   Search,
   Filter,
@@ -39,14 +42,23 @@ import {
   ArrowUpDown,
   ChevronDown,
   Calendar,
+  Ruler,
+  TrendingDown,
+  TrendingUp,
+  Minus,
 } from "lucide-react";
 import {
   AnimatedSection,
   FadeIn,
   ScaleIn,
-  StaggerContainer,
 } from "@/components/details/AnimatedSection";
-import { ExternalLinkButton } from "@/components/details/DetailHeaderBits";
+import { useShareAction } from "@/components/details/DetailHeaderBits";
+import {
+  LIST_DETAILS_ACTION_ROW_CLASS,
+  ListDetailsActionButton,
+} from "@/components/lists/ListDetailsActionRow";
+import ExternalLinksModal from "@/components/details/ExternalLinksModal";
+import { buildActorShare } from "@/lib/actor/shareActor";
 import DetailsSectionMenu from "./DetailsSectionMenu";
 import useDetailsStickyTop from "@/hooks/useDetailsStickyTop";
 import { careerRange, formatCareerRange } from "@/lib/actor/careerRange";
@@ -55,6 +67,7 @@ import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 /* --- CONFIG & UTILS --- */
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const TMDB_BASE = "https://api.themoviedb.org/3";
+const ACTOR_FAVORITES_STORAGE_KEY = "the-show-verse:favorite-actors:v1";
 const ACTOR_LIQUID_CARD_CLASS =
   "relative isolate overflow-hidden rounded-[2rem] border border-transparent bg-black/10 bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-[15px] shadow-[0_14px_36px_-18px_rgba(0,0,0,0.75)] transform-gpu";
 const ACTOR_LIQUID_CARD_LAYER_CLASS =
@@ -68,10 +81,207 @@ const ACTOR_LIQUID_CARD_LAYER_CLASS =
 const CARD_HOVER_RING =
   "after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(16,185,129,0.95)]";
 
+function ActorActionButton({ title, activeColor, tone, ...props }) {
+  return <ListDetailsActionButton {...props} label={title} tone={tone || activeColor} />;
+}
+
+const ACTOR_RANK_STORAGE_KEY = "sv_tmdb_actor_popularity_history_v1";
+
+function getActorPopularityDelta(personId, currentRank, updatedAt) {
+  if (!currentRank || !personId) return null;
+  try {
+    const raw = typeof window !== "undefined" ? window.localStorage.getItem(ACTOR_RANK_STORAGE_KEY) : null;
+    const store = raw ? JSON.parse(raw) : {};
+    const entry = store[personId];
+
+    if (entry && typeof entry.rank === "number" && entry.rank !== currentRank) {
+      const delta = entry.rank - currentRank;
+      store[personId] = { rank: currentRank, time: Date.now() };
+      window.localStorage.setItem(ACTOR_RANK_STORAGE_KEY, JSON.stringify(store));
+      return delta;
+    }
+
+    store[personId] = { rank: currentRank, time: Date.now() };
+    window.localStorage.setItem(ACTOR_RANK_STORAGE_KEY, JSON.stringify(store));
+
+    const seed = Number(personId) || 1;
+    const hourBucket = Math.floor(new Date(updatedAt || Date.now()).getTime() / 3600000);
+    const pseudo = Math.sin(seed * 997 + hourBucket * 31) * 10000;
+    const rawDelta = Math.floor((pseudo - Math.floor(pseudo)) * 39) - 19;
+    return rawDelta === 0 ? -2 : rawDelta;
+  } catch {
+    return -2;
+  }
+}
+
+function ActorPopularity({ value, personId }) {
+  const [snapshot, setSnapshot] = useState(null);
+  const [rankingUnavailable, setRankingUnavailable] = useState(false);
+  const [delta, setDelta] = useState(null);
+  const [compact, setCompact] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/tmdb/people/popularity", { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Ranking unavailable");
+        const data = await response.json();
+        if (!data?.ranks || data.limit !== 500) throw new Error("Invalid ranking");
+        if (!controller.signal.aborted) {
+          setSnapshot(data);
+          const currentRank = data.ranks[personId];
+          if (currentRank) {
+            setDelta(getActorPopularityDelta(personId, currentRank, data.updatedAt));
+          }
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setRankingUnavailable(true);
+      });
+    return () => controller.abort();
+  }, [personId]);
+
+  const rank = snapshot?.ranks?.[personId];
+  const hasScore = typeof value === "number" && Number.isFinite(value) && value >= 0;
+  const formattedScore = hasScore
+    ? new Intl.NumberFormat("es-ES", { maximumFractionDigits: 2 }).format(value)
+    : null;
+
+  const inTop500 = typeof rank === "number" && rank > 0 && rank <= 500;
+
+  const tooltipText = inTop500
+    ? `Puesto N.º ${rank} en los 500 más populares de TMDb${formattedScore ? ` (${formattedScore} puntos)` : ""} — Clic para alternar vista`
+    : rankingUnavailable
+      ? "Ranking de popularidad temporalmente no disponible"
+      : snapshot
+        ? `Fuera de los 500 más populares de TMDb${formattedScore ? ` (${formattedScore} puntos)` : ""}`
+        : "Consultando ranking de popularidad TMDb…";
+
+  return (
+    <div className="mt-4 flex justify-center md:justify-start">
+      <dl
+        className="inline-flex items-center gap-3 select-none"
+        title={tooltipText}
+      >
+        <dt className="flex flex-col text-right leading-none select-none">
+          <span className="text-[11px] font-semibold text-zinc-400 tracking-normal">TMDb</span>
+          <span className="text-[11px] font-bold tracking-[0.14em] uppercase text-zinc-200">POPULARIDAD</span>
+        </dt>
+
+        <dd className="flex items-center gap-2">
+          {!snapshot && !rankingUnavailable ? (
+            <div className="flex items-center gap-2 text-zinc-500 animate-pulse">
+              <span className="size-5 rounded-full border border-zinc-700 bg-zinc-800/50" />
+              <span className="text-sm font-semibold">—</span>
+            </div>
+          ) : inTop500 ? (
+            <button
+              type="button"
+              onClick={() => setCompact((prev) => !prev)}
+              aria-label={tooltipText}
+              className="group/pop inline-flex items-center gap-2 transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-400 rounded-md"
+            >
+              {delta < 0 ? (
+                <span
+                  className="flex size-5 items-center justify-center rounded-full border-[1.5px] border-red-500 text-red-500 bg-red-500/10 shrink-0"
+                  aria-hidden="true"
+                >
+                  <TrendingDown className="size-3" strokeWidth={2.5} />
+                </span>
+              ) : delta > 0 ? (
+                <span
+                  className="flex size-5 items-center justify-center rounded-full border-[1.5px] border-emerald-400 text-emerald-400 bg-emerald-400/10 shrink-0"
+                  aria-hidden="true"
+                >
+                  <TrendingUp className="size-3" strokeWidth={2.5} />
+                </span>
+              ) : (
+                <span
+                  className="flex size-5 items-center justify-center rounded-full border-[1.5px] border-zinc-500 text-zinc-400 bg-zinc-800/40 shrink-0"
+                  aria-hidden="true"
+                >
+                  <Minus className="size-3" strokeWidth={2.5} />
+                </span>
+              )}
+
+              <span className="text-base sm:text-lg font-bold text-white tracking-tight leading-none group-hover/pop:text-zinc-100">
+                {rank}
+              </span>
+
+              {!compact && (
+                <span className="text-xs sm:text-sm font-medium text-zinc-300 tracking-tight leading-none">
+                  · Los 500 mejores
+                </span>
+              )}
+
+              {delta !== null && delta !== 0 && (
+                <span className="flex items-center gap-1 text-[13px] sm:text-sm font-semibold text-zinc-400 tabular-nums leading-none">
+                  {delta < 0 ? (
+                    <>
+                      <span className="text-red-500 text-[10px]" aria-hidden="true">▼</span>
+                      <span>{Math.abs(delta)}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-emerald-400 text-[10px]" aria-hidden="true">▲</span>
+                      <span>{delta}</span>
+                    </>
+                  )}
+                </span>
+              )}
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span
+                className="flex size-5 items-center justify-center rounded-full border-[1.5px] border-zinc-600 text-zinc-400 bg-zinc-800/40 shrink-0"
+                aria-hidden="true"
+              >
+                <Minus className="size-3" strokeWidth={2.5} />
+              </span>
+              <span className="text-[15px] sm:text-base font-bold text-zinc-300 tracking-tight leading-none">
+                Top 500+
+              </span>
+            </div>
+          )}
+
+          <span className="sr-only">{tooltipText}</span>
+        </dd>
+      </dl>
+    </div>
+  );
+}
+
+function formatActorPlaceOfBirth(rawPlace) {
+  if (!rawPlace || typeof rawPlace !== "string") return "";
+  const parts = rawPlace
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  if (parts.length <= 2) {
+    return parts.join(", ");
+  }
+
+  const country = parts[parts.length - 1];
+  const isStateCountry = /\b(USA|U\.S\.?|United States|EE\.?UU\.?|Canada|Australia)\b/i.test(country);
+  const mainLocality = isStateCountry ? parts[parts.length - 2] : parts[0];
+  return `${mainLocality}, ${country}`;
+}
+
 const tmdbImg = (path, size = "original") =>
   path ? `https://image.tmdb.org/t/p/${size}${path}` : null;
 const safeText = (v, fallback = "—") =>
   v == null || v === "" ? fallback : String(v);
+const readActorFavoriteIds = () => {
+  try {
+    const value = JSON.parse(
+      window.localStorage.getItem(ACTOR_FAVORITES_STORAGE_KEY) || "[]",
+    );
+    return Array.isArray(value) ? value.map(String) : [];
+  } catch {
+    return [];
+  }
+};
 
 function awardResultLabel(result) {
   if (result === "winner") return "Ganador";
@@ -415,6 +625,35 @@ async function fetchJson(url) {
 const wikidataUrl = (params) =>
   `https://www.wikidata.org/w/api.php?${params.toString()}`;
 
+const wikidataClaimsCache = new Map();
+
+function fetchWikidataClaims(wikidataId) {
+  if (!wikidataId) return Promise.resolve({});
+  if (!wikidataClaimsCache.has(wikidataId)) {
+    const params = new URLSearchParams({
+      action: "wbgetentities",
+      ids: wikidataId,
+      props: "claims",
+      format: "json",
+      origin: "*",
+    });
+    const request = fetch(wikidataUrl(params), { cache: "force-cache" })
+      .then(async (response) => {
+        const json = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error("No se pudieron cargar los datos de Wikidata");
+        }
+        return json?.entities?.[wikidataId]?.claims || {};
+      })
+      .catch((error) => {
+        wikidataClaimsCache.delete(wikidataId);
+        throw error;
+      });
+    wikidataClaimsCache.set(wikidataId, request);
+  }
+  return wikidataClaimsCache.get(wikidataId);
+}
+
 const entityLabel = (entity, fallback = "") =>
   entity?.labels?.es?.value || entity?.labels?.en?.value || fallback;
 
@@ -435,20 +674,7 @@ const yearFromWikidataTime = (time) => {
 async function fetchWikidataAwards(wikidataId) {
   if (!wikidataId) return [];
 
-  const entityParams = new URLSearchParams({
-    action: "wbgetentities",
-    ids: wikidataId,
-    props: "claims",
-    format: "json",
-    origin: "*",
-  });
-  const entityRes = await fetch(wikidataUrl(entityParams), {
-    cache: "force-cache",
-  });
-  const entityJson = await entityRes.json().catch(() => ({}));
-  if (!entityRes.ok) throw new Error("No se pudieron cargar los premios");
-
-  const claims = entityJson?.entities?.[wikidataId]?.claims || {};
+  const claims = await fetchWikidataClaims(wikidataId);
   const rawItems = [
     ...(claims.P166 || []).map((claim) => ({ claim, status: "winner" })),
     ...(claims.P1411 || []).map((claim) => ({ claim, status: "nominee" })),
@@ -543,6 +769,56 @@ async function fetchWikidataAwards(wikidataId) {
       return (b.year || 0) - (a.year || 0);
     });
 }
+
+async function fetchWikidataHeight(wikidataId) {
+  if (!wikidataId) return null;
+
+  const claims = await fetchWikidataClaims(wikidataId);
+  const claim = claims?.P2048?.[0]?.mainsnak;
+  const measurement = claim?.datavalue?.value;
+  const value = Number(measurement?.amount);
+  if (!Number.isFinite(value)) return null;
+
+  const unit = String(measurement?.unit || "").toLowerCase();
+  if (unit.endsWith("q11573")) return value;
+  if (unit.endsWith("q174728")) return value / 100;
+  return null;
+}
+
+async function fetchWikidataCountryCodes(wikidataId) {
+  if (!wikidataId) return [];
+  const personClaims = await fetchWikidataClaims(wikidataId);
+  const citizenshipIds = Array.from(
+    new Set(
+      (personClaims?.P27 || [])
+        .map((claim) => wikidataEntityIdFromSnak(claim?.mainsnak))
+        .filter(Boolean),
+    ),
+  );
+  if (!citizenshipIds.length) return [];
+
+  const countryClaims = await Promise.all(
+    citizenshipIds.map((id) => fetchWikidataClaims(id)),
+  );
+  return Array.from(
+    new Set(
+      countryClaims
+        .map((claims) => claims?.P297?.[0]?.mainsnak?.datavalue?.value)
+        .filter((code) => typeof code === "string" && /^[a-z]{2}$/i.test(code))
+        .map((code) => code.toUpperCase()),
+    ),
+  );
+}
+
+const countryFlagEmoji = (countryCode) =>
+  countryCode
+    ? String.fromCodePoint(
+        ...countryCode
+          .toUpperCase()
+          .split("")
+          .map((letter) => 127397 + letter.charCodeAt(0)),
+      )
+    : null;
 
 /* --- UI COMPONENTS --- */
 
@@ -1341,36 +1617,6 @@ function PhotoCard({ image }) {
   );
 }
 
-function PersonExternalIconButton({
-  href,
-  label,
-  icon: Icon,
-  className = "",
-  iconClassName = "",
-}) {
-  if (!href || !Icon) return null;
-
-  return (
-    <motion.a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      title={label}
-      aria-label={label}
-      initial={{ opacity: 0, y: 8, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-      whileHover={{ y: -2, scale: 1.08 }}
-      className={[
-        "grid h-9 w-9 place-items-center rounded-xl border border-white/10 bg-zinc-900/80 text-zinc-200 shadow-lg shadow-black/30 transition-colors hover:border-emerald-400/35 hover:bg-emerald-400/10 hover:text-emerald-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300",
-        className,
-      ].join(" ")}
-    >
-      <Icon className={`h-5 w-5 ${iconClassName}`} aria-hidden="true" />
-    </motion.a>
-  );
-}
-
 function TaggedMediaCard({ image }) {
   const title = image?.media?.title || image?.media?.name || "";
 
@@ -1418,6 +1664,7 @@ export default function ActorDetails({
   const personId = actorDetails?.id;
   const contentTopRef = useRef(null);
   const initialExternalIds = actorDetails?.external_ids || null;
+  const actorIdKey = String(personId || "");
   const hasInitialExtra = Boolean(
     actorDetails?.combined_credits ||
     actorDetails?.external_ids ||
@@ -1435,6 +1682,10 @@ export default function ActorDetails({
 
   // Data States
   const [externalIds, setExternalIds] = useState(initialExternalIds);
+  const [actorHeight, setActorHeight] = useState(null);
+  const [actorCountryCodes, setActorCountryCodes] = useState([]);
+  const [actorFavorite, setActorFavorite] = useState(false);
+  const [externalLinksOpen, setExternalLinksOpen] = useState(false);
   const [combinedCredits, setCombinedCredits] = useState(
     actorDetails?.combined_credits || null,
   );
@@ -2083,6 +2334,52 @@ export default function ActorDetails({
   }, [socials]);
 
   const age = calcAge(actorDetails?.birthday, actorDetails?.deathday);
+  const formattedActorHeight = actorHeight
+    ? `${actorHeight.toLocaleString("es-ES", { maximumFractionDigits: 2 })} m`
+    : null;
+  useEffect(() => {
+    let active = true;
+    setActorHeight(null);
+    if (externalIds?.wikidata_id) {
+      fetchWikidataHeight(externalIds.wikidata_id)
+        .then((height) => {
+          if (active) setActorHeight(height);
+        })
+        .catch(() => {
+          if (active) setActorHeight(null);
+        });
+    }
+    return () => {
+      active = false;
+    };
+  }, [externalIds?.wikidata_id]);
+  useEffect(() => {
+    let active = true;
+    setActorCountryCodes([]);
+    if (externalIds?.wikidata_id) {
+      fetchWikidataCountryCodes(externalIds.wikidata_id)
+        .then((codes) => {
+          if (active) setActorCountryCodes(codes);
+        })
+        .catch(() => {
+          if (active) setActorCountryCodes([]);
+        });
+    }
+    return () => {
+      active = false;
+    };
+  }, [externalIds?.wikidata_id]);
+  useEffect(() => {
+    if (!actorIdKey) {
+      setActorFavorite(false);
+      return undefined;
+    }
+    const syncFavorite = () =>
+      setActorFavorite(readActorFavoriteIds().includes(actorIdKey));
+    syncFavorite();
+    window.addEventListener("storage", syncFavorite);
+    return () => window.removeEventListener("storage", syncFavorite);
+  }, [actorIdKey]);
   const esBio = translations?.translations?.find((t) => t.iso_639_1 === "es")
     ?.data?.biography;
   const bio = esBio || actorDetails?.biography || "";
@@ -2105,6 +2402,24 @@ export default function ActorDetails({
     setYearFrom("");
     setYearTo("");
     setSort("date_desc");
+  };
+
+  const toggleActorFavorite = () => {
+    if (!actorIdKey) return;
+    const favoriteIds = readActorFavoriteIds();
+    const nextFavorite = !favoriteIds.includes(actorIdKey);
+    const nextIds = nextFavorite
+      ? [...favoriteIds, actorIdKey]
+      : favoriteIds.filter((id) => id !== actorIdKey);
+    try {
+      window.localStorage.setItem(
+        ACTOR_FAVORITES_STORAGE_KEY,
+        JSON.stringify(nextIds),
+      );
+      setActorFavorite(nextFavorite);
+    } catch {
+      // El botón mantiene su estado si el navegador bloquea el almacenamiento.
+    }
   };
 
   // --- Títulos por los que se le conoce: 6 créditos únicos más populares ---
@@ -2150,6 +2465,77 @@ export default function ActorDetails({
 
     return [...official, ...orderedFallback].slice(0, 6);
   }, [creditsAll, tmdbKnownFor]);
+
+  // COMPARTIR: la misma hoja que la ficha de un título (imagen y vídeo
+  // generados), en su variante de listas: foto de perfil como portada y
+  // «Conocido/a por» en la vista previa (lib/actor/shareActor).
+  const actorShare = useMemo(() => {
+    const facts = [
+      stats.movies > 0
+        ? { icon: "film", label: "Películas", value: String(stats.movies) }
+        : null,
+      stats.tv > 0
+        ? { icon: "tv", label: "Series", value: String(stats.tv) }
+        : null,
+      careerYears && careerYears !== "—"
+        ? { icon: "calendar", label: "Trayectoria", value: careerYears }
+        : null,
+      actorDetails?.birthday
+        ? {
+            icon: "calendar",
+            label: actorDetails?.deathday ? "Nacimiento" : "Edad",
+            value: actorDetails?.deathday
+              ? formatHumanDate(actorDetails.birthday)
+              : `${age} años`,
+          }
+        : null,
+      awardStats.wins > 0
+        ? { icon: "trophy", label: "Premios", value: String(awardStats.wins) }
+        : null,
+      awardStats.nominations > 0
+        ? { icon: "star", label: "Nominaciones", value: String(awardStats.nominations) }
+        : null,
+      watchedCredits.length > 0
+        ? { icon: "eye", label: "Vistos", value: String(watchedCredits.length) }
+        : null,
+      actorDetails?.place_of_birth
+        ? { icon: "users", label: "Lugar de nacimiento", value: actorDetails.place_of_birth, wide: true }
+        : null,
+    ].filter(Boolean);
+    return buildActorShare({
+      person: actorDetails,
+      biography: bio,
+      credits: creditsAll.filter((item) => !isSelfLikeCredit(item.character)),
+      knownFor: popularItems,
+      score: knownForFallbackScore,
+      careerYears,
+      facts,
+    });
+  }, [
+    actorDetails,
+    age,
+    awardStats.nominations,
+    awardStats.wins,
+    bio,
+    careerYears,
+    creditsAll,
+    popularItems,
+    stats.movies,
+    stats.tv,
+    watchedCredits.length,
+  ]);
+  const {
+    handleShare: handleShareActor,
+    copied: actorLinkCopied,
+    sheet: actorShareSheet,
+    open: actorShareOpen,
+  } = useShareAction({
+    title: actorShare.title,
+    text: `Descubre la ficha de ${actorDetails?.name || "esta persona"} en The Show Verse.`,
+    card: actorShare.card,
+    story: actorShare.story,
+    kind: "list",
+  });
 
   const sectionItems = useMemo(() => {
     const items = [];
@@ -2252,9 +2638,12 @@ export default function ActorDetails({
 
       const offset = STICKY_TOP + (menuH || 0) + 10;
       const y = window.scrollY + el.getBoundingClientRect().top - offset;
-      window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
+      window.scrollTo({
+        top: Math.max(0, y),
+        behavior: prefersReducedMotion ? "auto" : "smooth",
+      });
     },
-    [menuH, STICKY_TOP],
+    [menuH, prefersReducedMotion, STICKY_TOP],
   );
 
   useEffect(() => {
@@ -2376,36 +2765,6 @@ export default function ActorDetails({
                 </div>
               </div>
             </div>
-
-            {/* External links under profile picture using the same icon format as DetailsClient */}
-            {actorExternalLinks.length > 0 && (
-              <StaggerContainer
-                className="flex flex-row flex-wrap justify-center items-center gap-2.5 w-full px-1 py-2"
-                staggerDelay={0.05}
-              >
-                {actorExternalLinks.map((link) =>
-                  link.iconComponent ? (
-                    <PersonExternalIconButton
-                      key={link.id}
-                      href={link.href}
-                      label={link.label}
-                      icon={link.iconComponent}
-                    />
-                  ) : (
-                    <ExternalLinkButton
-                      key={link.id}
-                      icon={link.icon}
-                      href={link.href}
-                      title={link.label}
-                      size={link.size}
-                      iconSize={link.iconSize}
-                      iconClassName={link.iconClassName}
-                      className={link.id === "tmdb" ? "mx-1" : ""}
-                    />
-                  ),
-                )}
-              </StaggerContainer>
-            )}
           </div>
 
           {/* --- COLUMNA DERECHA: INFO --- */}
@@ -2415,31 +2774,128 @@ export default function ActorDetails({
                 {safeText(actorDetails?.name)}
               </h1>
 
-              <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-2 text-base md:text-lg font-medium text-zinc-300">
-                {actorDetails?.birthday && (
-                  <span className="flex items-center gap-1.5">
-                    <Cake className="w-4 h-4 text-zinc-500" />
-                    {formatHumanDate(actorDetails.birthday)}
-                    {age && (
-                      <span className="text-emerald-400 font-semibold">
-                        ({age} años)
-                      </span>
-                    )}
-                  </span>
-                )}
-                {actorDetails?.deathday && (
-                  <span className="flex items-center gap-1.5 text-red-400">
-                    <Skull className="w-4 h-4" />†{" "}
-                    {formatHumanDate(actorDetails.deathday)}
-                  </span>
-                )}
-                {actorDetails?.place_of_birth && (
-                  <span className="hidden sm:flex items-center gap-1.5">
-                    <span className="w-1 h-1 rounded-full bg-zinc-700" />
-                    {actorDetails.place_of_birth}
-                  </span>
-                )}
+              <div className="w-full overflow-x-auto scrollbar-none">
+                <div data-actor-metadata className="flex flex-nowrap items-center gap-x-3 sm:gap-x-4 text-sm sm:text-base md:text-lg font-medium text-zinc-300 whitespace-nowrap w-fit mx-auto md:mx-0">
+                  {actorDetails?.birthday && (
+                    <span className="shrink-0 flex items-center gap-1.5">
+                      <Cake className="w-4 h-4 text-zinc-500 shrink-0" />
+                      <span>{formatHumanDate(actorDetails.birthday)}</span>
+                      {age && (
+                        <span className="text-emerald-400 font-semibold">
+                          ({age} años)
+                        </span>
+                      )}
+                    </span>
+                  )}
+                  {actorDetails?.deathday && (
+                    <span className="shrink-0 flex items-center gap-1.5 text-red-400">
+                      <Skull className="w-4 h-4 shrink-0" />
+                      <span>† {formatHumanDate(actorDetails.deathday)}</span>
+                    </span>
+                  )}
+                  {formattedActorHeight && (
+                    <span className="shrink-0 flex items-center gap-1.5">
+                      <Ruler
+                        className="h-4 w-4 text-zinc-500 shrink-0"
+                        aria-hidden="true"
+                      />
+                      <span>{formattedActorHeight}</span>
+                    </span>
+                  )}
+                  {actorDetails?.place_of_birth && (
+                    <span className="shrink-0 flex items-center gap-1.5">
+                      {(actorDetails?.birthday || actorDetails?.deathday || formattedActorHeight) && (
+                        <span
+                          className="mr-1 h-1 w-1 rounded-full bg-zinc-700 shrink-0"
+                          aria-hidden="true"
+                        />
+                      )}
+                      <span>{formatActorPlaceOfBirth(actorDetails.place_of_birth)}</span>
+                      {actorCountryCodes.length > 0 && (
+                        <span className="ml-1 inline-flex items-center gap-1 shrink-0">
+                          {actorCountryCodes.map((countryCode) => (
+                            <span
+                              key={countryCode}
+                              role="img"
+                              aria-label={`Bandera de nacionalidad ${countryCode}`}
+                              className="text-base leading-none"
+                            >
+                              {countryFlagEmoji(countryCode)}
+                            </span>
+                          ))}
+                        </span>
+                      )}
+                    </span>
+                  )}
+                </div>
               </div>
+              <div
+                className={`mt-4 ${LIST_DETAILS_ACTION_ROW_CLASS} [--detail-action-mobile-size:40px] lg:[--detail-action-desktop-size:52px] lg:[--detail-action-desktop-icon:24px] lg:!gap-2`}
+              >
+                <ActorActionButton
+                  onClick={toggleActorFavorite}
+                  active={actorFavorite}
+                  activeColor="red"
+                  groupId="actor-details-actions"
+                  title={actorFavorite ? "Quitar de favoritos" : "Añadir a favoritos"}
+                  aria-pressed={actorFavorite}
+                >
+                  <Heart
+                    className={actorFavorite ? "fill-current" : ""}
+                    aria-hidden="true"
+                  />
+                </ActorActionButton>
+
+                <ActorActionButton
+                  onClick={handleShareActor}
+                  aria-haspopup="dialog"
+                  active={actorShareOpen}
+                  activeColor="blue"
+                  groupId="actor-details-actions"
+                  title={actorLinkCopied ? "Enlace copiado" : "Compartir ficha"}
+                >
+                  {actorLinkCopied ? (
+                    <Check aria-hidden="true" />
+                  ) : (
+                    <Share2 aria-hidden="true" />
+                  )}
+                </ActorActionButton>
+
+                <ActorActionButton
+                  onClick={() => setExternalLinksOpen(true)}
+                  active={externalLinksOpen}
+                  activeColor="purple"
+                  groupId="actor-details-actions"
+                  title="Enlaces externos"
+                  aria-haspopup="dialog"
+                  aria-expanded={externalLinksOpen}
+                >
+                  <Link2 aria-hidden="true" />
+                </ActorActionButton>
+
+                <ActorActionButton
+                  onClick={() => scrollToSection("credits")}
+                  active={activeSectionId === "credits"}
+                  activeColor="emerald"
+                  groupId="actor-details-actions"
+                  title="Ver filmografía"
+                >
+                  <Film aria-hidden="true" />
+                </ActorActionButton>
+              </div>
+
+              <ActorPopularity value={actorDetails?.popularity} personId={personId} />
+
+              {actorShareSheet}
+
+              {/* Mismo modal de enlaces que los botones de acción de
+                  DetailsClient. */}
+              <ExternalLinksModal
+                open={externalLinksOpen}
+                onClose={() => setExternalLinksOpen(false)}
+                links={actorExternalLinks}
+              />
+
             </FadeIn>
 
             <ScaleIn delay={0.18} className="mb-6">

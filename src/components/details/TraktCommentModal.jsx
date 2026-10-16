@@ -159,10 +159,10 @@ export default function TraktCommentModal({
         <div className="flex-1 overflow-y-auto sv-scroll">
           <div className="px-5 py-5 sm:px-6 sm:py-6 space-y-5 sm:space-y-6">
             {/* Form */}
-            <OnlineOnlyForm onSubmit={handleSubmit} className="flex flex-col space-y-4">
+            <OnlineOnlyForm onSubmit={handleSubmit} className="flex flex-col gap-4">
               {/* Sin el aviso del mínimo, esta fila solo tiene algo que decir
                   mientras se edita. Va CONDICIONAL y no como fila vacía: el
-                  `space-y-4` del formulario le reservaría su hueco igualmente y
+                  `gap-4` del formulario le reservaría su hueco igualmente y
                   el campo aparecería hundido sin motivo. */}
               {editingCommentId && (
                 <div className="text-xs font-bold text-zinc-400">

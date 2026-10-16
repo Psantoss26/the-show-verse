@@ -655,6 +655,30 @@ export default function ListDetailsPage() {
                             </div>
                         )
                     }}
+                    renderAction={(it, meta, editMode) => {
+                        if (!canManage) return null
+                        const id = it?.id
+                        return (
+                            <button data-online-only="true"
+                                type="button"
+                                disabled={busyId === id}
+                                onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    handleRemove(it)
+                                }}
+                                className={`flex h-8 w-8 items-center justify-center rounded-full bg-black/30 bg-gradient-to-br from-white/10 via-transparent to-black/40 text-zinc-300 shadow-lg backdrop-blur-[28px] transition-all hover:bg-red-500/70 hover:text-white focus:opacity-100 ${
+                                    editMode
+                                        ? 'opacity-100 bg-red-500/70 text-white'
+                                        : 'opacity-0 group-hover:opacity-100'
+                                } ${busyId === id ? 'opacity-100 cursor-wait' : ''}`}
+                                title="Quitar de la lista"
+                                aria-label="Quitar de la lista"
+                            >
+                                {busyId === id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                            </button>
+                        )
+                    }}
                     emptyTitle="Sin resultados"
                     emptyText="No hay títulos que coincidan con los filtros."
                 />

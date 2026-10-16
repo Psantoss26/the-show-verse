@@ -11,17 +11,18 @@ import { useShareAction } from "@/components/details/DetailHeaderBits";
 import { LIQUID_GLASS_ELEVATION, LIQUID_GLASS_SURFACE_CARD } from "@/lib/ui/liquidGlass";
 import { ArrowLeft, Check, Eraser, ExternalLink, Loader2, Pencil, Plus, Share2, Trash2, Users } from "lucide-react";
 
-const ROW_CLASS = `flex w-full flex-nowrap items-center justify-center gap-1 sm:justify-start sm:gap-3
+export const LIST_DETAILS_ACTION_ROW_CLASS = `flex w-full flex-nowrap items-center justify-center gap-1 sm:justify-start sm:gap-3
   ${DETAIL_ACTION_ITEM_SIZING_CLASS}
   ${MOBILE_ACTION_BUTTON_CLASS}`;
 
-function ActionButton({ label, children, disabled, onClick, tone = "blue", mutation = false }) {
+export function ListDetailsActionButton({ label, children, disabled, onClick, tone = "blue", mutation = false, groupId = "list-details-actions", ...buttonProps }) {
   const online = useServerOnline();
   return (
     <LiquidButton
+      {...buttonProps}
       type="button"
       liquidGlass
-      groupId="list-details-actions"
+      groupId={groupId}
       title={label}
       aria-label={label}
       activeColor={tone}
@@ -34,6 +35,8 @@ function ActionButton({ label, children, disabled, onClick, tone = "blue", mutat
     </LiquidButton>
   );
 }
+
+const ActionButton = ListDetailsActionButton;
 
 function ActionLink({ href, label }) {
   if (!href) return null;
@@ -107,7 +110,7 @@ export default function ListDetailsActionRow({
   share = null,
 }) {
   return (
-    <div className={ROW_CLASS}>
+    <div className={LIST_DETAILS_ACTION_ROW_CLASS}>
       <ActionButton label="Retroceder" onClick={onBack}>
         <ArrowLeft />
       </ActionButton>

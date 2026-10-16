@@ -148,7 +148,7 @@ import {
   titleStateKey,
   useViewerTitleStates,
 } from "@/components/social/useViewerTitleStates";
-import { isOwnedComment } from "@/lib/community/commentOwnership";
+import { mergeOwnedComments } from "@/lib/details/detailActionState";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 import CommentFilterBar from "@/components/details/CommentFilterBar";
 import {
@@ -199,6 +199,7 @@ import {
   traktUpdateWatchPlay,
   traktRemoveWatchPlay,
   traktGetComments,
+  traktGetMyComments,
   traktAddComment,
   traktUpdateComment,
   traktDeleteComment,
@@ -4354,15 +4355,49 @@ export default function DetailsClient({
     writeCommentsPage(filter, commentsPageFromResponse(response, page));
     return response;
   }, [COMMENTS_PAGE_SIZE, id, traktType]);
-  const myComments = useMemo(() => {
-    return (tComments.items || []).filter((item) =>
-      isOwnedComment(item, {
-        appUsername: account?.username,
-        traktUsername,
-        ownedCommentIds,
-      }),
-    );
-  }, [account?.username, ownedCommentIds, tComments.items, traktUsername]);
+  // Reseñas propias del título pedidas aparte (?mine=1): el feed solo trae la
+  // página visible de la pestaña activa y la reseña del usuario, con pocos me
+  // gusta, casi nunca está en ella; sin esto el botón de reseña salía sin estado.
+  // Lleva la clave del título para no heredar las de otra ficha.
+  const viewerCommentsKey = `${traktType}:${id}`;
+  const [viewerComments, setViewerComments] = useState(() =>
+    restoredValue(backSnapshot, "viewerComments", { key: "", items: [] }),
+  );
+  const canLoadViewerComments = authenticated || hasBackendSession;
+  useRestorableEffect(backSnapshot, "viewerComments", () => {
+    if (!canLoadViewerComments || !id) return undefined;
+    let cancelled = false;
+    traktGetMyComments({ type: traktType, tmdbId: id })
+      .then((items) => {
+        if (!cancelled) setViewerComments({ key: viewerCommentsKey, items });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [canLoadViewerComments, id, traktType, viewerCommentsKey],
+  // Si se salió con la consulta a medias, se repite al volver.
+  !canLoadViewerComments || viewerComments.key === viewerCommentsKey);
+  const myComments = useMemo(
+    () =>
+      mergeOwnedComments(
+        viewerComments.key === viewerCommentsKey ? viewerComments.items : [],
+        tComments.items,
+        {
+          appUsername: account?.username,
+          traktUsername,
+          ownedCommentIds,
+        },
+      ),
+    [
+      account?.username,
+      ownedCommentIds,
+      tComments.items,
+      traktUsername,
+      viewerComments,
+      viewerCommentsKey,
+    ],
+  );
 
   // Los comentarios pueden venir de Trakt y sus handles no tienen por qué
   // pertenecer a The Show Verse. Resolvemos todos los autores visibles de una
@@ -4476,10 +4511,26 @@ export default function DetailsClient({
         items: nextItems,
       };
     });
+    setViewerComments((prev) => ({
+      ...prev,
+      items: prev.items.map((item) =>
+        String(item.id) === String(commentId)
+          ? {
+              ...item,
+              comment: result?.comment || comment,
+              spoiler: result?.spoiler ?? spoiler,
+            }
+          : item,
+      ),
+    }));
   };
 
   const handleCommentDelete = async ({ commentId }) => {
     await traktDeleteComment({ commentId, type: traktType, tmdbId: id });
+    setViewerComments((prev) => ({
+      ...prev,
+      items: prev.items.filter((item) => String(item.id) !== String(commentId)),
+    }));
 
     // Eliminar localmente del feed
     setTComments((prev) => {
@@ -8303,6 +8354,7 @@ export default function DetailsClient({
     tCommentsTab,
     tCommentsByLikes,
     tComments,
+    viewerComments,
     commentProfileUsernames,
     tSeasons,
     tListsTab,

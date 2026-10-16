@@ -3,6 +3,7 @@
 // Filas de la vista lateral de las secciones (SectionSheet): una por tipo de
 // contenido, todas en el mismo formato de lista de arriba abajo.
 
+import { useState } from "react";
 import Link from "next/link";
 import { ImageOff, ListVideo, Music2, Play, ThumbsUp, User } from "lucide-react";
 import OptimizedImage from "@/components/OptimizedImage";
@@ -22,13 +23,29 @@ function tmdbImage(path, size) {
   return path ? `https://image.tmdb.org/t/p/${size}${path}` : null;
 }
 
-function Poster({ src, alt = "", className = "", icon: Icon = ImageOff }) {
+function Poster({ src, alt = "", className = "", icon: Icon = ImageOff, loading = false, onError }) {
+  const [failedSrc, setFailedSrc] = useState(null);
+  const failed = failedSrc === src;
+  const showFallback = !src || failed;
+
   return (
     <span className={`flex shrink-0 items-center justify-center overflow-hidden bg-zinc-900 ${className}`}>
-      {src ? (
-        <OptimizedImage src={src} alt={alt} className="h-full w-full object-cover" loading="lazy" decoding="async" />
-      ) : (
+      {loading ? (
+        <span className="h-full w-full animate-pulse bg-zinc-900" aria-hidden="true" />
+      ) : showFallback ? (
         <Icon className="h-5 w-5 text-zinc-600" aria-hidden="true" />
+      ) : (
+        <OptimizedImage
+          src={src}
+          alt={alt}
+          className="h-full w-full object-cover"
+          loading="lazy"
+          decoding="async"
+          onError={() => {
+            setFailedSrc(src);
+            onError?.();
+          }}
+        />
       )}
     </span>
   );
@@ -57,47 +74,123 @@ export function PersonRow({ person, role, episodes = null, badge = null, title =
   );
 }
 
-/** Película o serie (recomendaciones, colección): póster, título, año, tipo y nota. */
-export function TitleRow({ item, mediaType, onNavigate, onOpenTitle, showImdb = false, imdbRating = null, imdbLoading = false }) {
+/** Película o serie (recomendaciones, colección, listas): póster, título, año, tipo y nota. */
+export function TitleRow({
+  item,
+  mediaType,
+  href,
+  onNavigate,
+  onOpenTitle,
+  onClick,
+  showImdb = false,
+  imdbRating = null,
+  imdbLoading = false,
+  posterPath = null,
+  posterLoading = false,
+  onPosterError = null,
+  title: customTitle,
+  year: customYear,
+  voteAverage: customVoteAverage,
+  action = null,
+  className = "",
+}) {
   const type = item?.media_type === "tv" || mediaType === "tv" ? "tv" : "movie";
-  const title = item?.title || item?.name || "Sin título";
-  const year = String(item?.release_date || item?.first_air_date || "").slice(0, 4);
-  const rating = Number(item?.vote_average) > 0 ? Number(item.vote_average) : null;
+  const title = customTitle || item?.title || item?.name || "Sin título";
+  const year =
+    customYear !== undefined
+      ? customYear
+      : String(item?.release_date || item?.first_air_date || "").slice(0, 4);
+  const rawVoteAverage =
+    customVoteAverage !== undefined ? customVoteAverage : item?.vote_average;
+  const rating = Number(rawVoteAverage) > 0 ? Number(rawVoteAverage) : null;
   const imdbScore = Number(imdbRating);
   const hasImdbScore = Number.isFinite(imdbScore) && imdbScore > 0 && imdbScore <= 10;
-  return (
-    <Link href={`/details/${type}/${item.id}`} onClick={(event) => {
-      if (onOpenTitle && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.button === 0) {
-        event.preventDefault();
-        onNavigate?.();
-        onOpenTitle({ ...item, media_type: type });
-      } else if (!onOpenTitle) {
-        onNavigate?.();
-      }
-    }} className={ROW_LINK_LARGE}>
-      <Poster src={tmdbImage(item?.poster_path, "w342")} alt="" className={LARGE_POSTER} />
+  const shouldShowImdb = showImdb || hasImdbScore;
+
+  const targetHref = href || (item?.id ? `/details/${type}/${item.id}` : "#");
+
+  const resolvedPosterPath =
+    posterPath !== null && posterPath !== undefined
+      ? posterPath
+      : item?.poster_path;
+  const posterSrc = resolvedPosterPath
+    ? resolvedPosterPath.startsWith("http")
+      ? resolvedPosterPath
+      : tmdbImage(resolvedPosterPath, "w342")
+    : null;
+
+  const rowLink = (
+    <Link
+      href={targetHref}
+      onClick={(event) => {
+        if (onClick) {
+          onClick(event);
+          return;
+        }
+        if (
+          onOpenTitle &&
+          !event.metaKey &&
+          !event.ctrlKey &&
+          !event.shiftKey &&
+          !event.altKey &&
+          event.button === 0
+        ) {
+          event.preventDefault();
+          onNavigate?.();
+          onOpenTitle({ ...item, media_type: type });
+        } else if (!onOpenTitle) {
+          onNavigate?.();
+        }
+      }}
+      className={`${ROW_LINK_LARGE} ${action ? "pr-14" : ""} ${className}`}
+    >
+      <Poster
+        src={posterSrc}
+        alt=""
+        className={LARGE_POSTER}
+        loading={posterLoading}
+        onError={onPosterError}
+      />
       <span className="min-w-0 flex-1">
-        <span className="block line-clamp-2 text-sm font-bold leading-tight text-white min-[1920px]:text-base">{title}</span>
+        <span className="block line-clamp-2 text-sm font-bold leading-tight text-white min-[1920px]:text-base">
+          {title}
+        </span>
         <span className="mt-1 block text-xs font-bold text-zinc-400 min-[1920px]:text-sm">
           {[year, type === "tv" ? "Serie" : "Película"].filter(Boolean).join(" · ")}
         </span>
-        {rating != null || showImdb ? (
+        {rating != null || shouldShowImdb ? (
           <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs font-bold tabular-nums text-white min-[1920px]:gap-x-4 min-[1920px]:text-sm">
             {rating != null ? (
               <span className="inline-flex items-center gap-1.5">
-                <OptimizedImage src="/logo-TMDb.png" alt="TMDb" className="h-3.5 w-auto" />
-                {rating.toFixed(1)}<span className="sr-only"> sobre 10</span>
+                <OptimizedImage
+                  src="/logo-TMDb.png"
+                  alt="TMDb"
+                  className="h-3.5 w-auto"
+                />
+                {rating.toFixed(1)}
+                <span className="sr-only"> sobre 10</span>
               </span>
             ) : null}
-            {showImdb ? (
+            {shouldShowImdb ? (
               <span className="inline-flex items-center gap-1.5">
-                <OptimizedImage src="/logo-IMDb.svg" alt="IMDb" className="h-3.5 w-auto" />
+                <OptimizedImage
+                  src="/logo-IMDb.svg"
+                  alt="IMDb"
+                  className="h-3.5 w-auto"
+                />
                 {hasImdbScore ? (
-                  <>{imdbScore.toFixed(1)}<span className="sr-only"> sobre 10</span></>
+                  <>
+                    {imdbScore.toFixed(1)}
+                    <span className="sr-only"> sobre 10</span>
+                  </>
                 ) : (
                   <span className="text-zinc-500">
                     <span aria-hidden="true">{imdbLoading ? "…" : "—"}</span>
-                    <span className="sr-only">{imdbLoading ? "Cargando puntuación" : "Puntuación no disponible"}</span>
+                    <span className="sr-only">
+                      {imdbLoading
+                        ? "Cargando puntuación"
+                        : "Puntuación no disponible"}
+                    </span>
                   </span>
                 )}
               </span>
@@ -107,6 +200,19 @@ export function TitleRow({ item, mediaType, onNavigate, onOpenTitle, showImdb = 
       </span>
     </Link>
   );
+
+  if (action) {
+    return (
+      <div className="group relative">
+        {rowLink}
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 z-10">
+          {action}
+        </div>
+      </div>
+    );
+  }
+
+  return rowLink;
 }
 
 const VIDEO_TYPES = {

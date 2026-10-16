@@ -73,7 +73,7 @@ export const MOBILE_ACTION_BUTTON_CLASS = `${MOBILE_ACTION_BUTTON_BASE} ${DESKTO
 const DETAIL_ACTION_ITEM_FLEX_CLASS =
   "[&>*:not(.separator):not(.labeled)]:!flex-[1_1_0%] [&>*:not(.separator):not(.labeled)]:min-w-[34px]";
 const DETAIL_ACTION_ITEM_CAP_MOBILE_CLASS =
-  "[&>*:not(.separator):not(.labeled)]:!max-w-[56px]";
+  "[&>*:not(.separator):not(.labeled)]:!max-w-[var(--detail-action-mobile-size,56px)]";
 // Una superficie puede ajustar el máximo de escritorio sin cambiar el
 // dimensionado de móvil ni el de otros consumidores de la fila compartida.
 const DETAIL_ACTION_ITEM_CAP_CLASS = `${DETAIL_ACTION_ITEM_CAP_MOBILE_CLASS} sm:[&>*:not(.separator):not(.labeled)]:!max-w-[var(--detail-action-desktop-size,48px)]`;
