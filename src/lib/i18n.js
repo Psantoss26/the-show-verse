@@ -34,7 +34,7 @@ const translations = {
     search_prev_page: "Resultados anteriores",
     search_next_page: "Más resultados",
     search_page_label: "Página",
-    search_badge_actor: "Actor/actriz",
+    search_badge_actor: "Actor",
     search_badge_director: "Director/a",
     search_badge_user: "Usuario",
     search_user_follower: "seguidor",

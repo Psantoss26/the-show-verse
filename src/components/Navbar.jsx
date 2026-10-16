@@ -1273,7 +1273,7 @@ function SearchBar({
       case "person":
         return item.known_for_department === "Directing"
           ? t("search_badge_director", "Director/a")
-          : t("search_badge_actor", "Actor/actriz");
+          : t("search_badge_actor", "Actor");
       case "collection":
         return t("search_badge_collection", "Colección");
       case "user":
