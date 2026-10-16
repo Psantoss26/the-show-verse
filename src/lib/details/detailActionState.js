@@ -32,3 +32,16 @@ export function selectOwnedComments(comments, ownership) {
     isOwnedComment(comment, ownership),
   );
 }
+
+// Reseñas propias = las que el backend dice que son del usuario (`viewerComments`,
+// sin paginar) + las del feed visible que se reconocen como suyas (recién
+// publicadas, o de Trakt con su usuario). Sin duplicados; manda la copia del
+// feed, que es la que se actualiza al editar.
+export function mergeOwnedComments(viewerComments, comments, ownership) {
+  const owned = selectOwnedComments(comments, ownership);
+  const seen = new Set(owned.map((comment) => String(comment?.id)));
+  const extra = (viewerComments || []).filter(
+    (comment) => comment?.id != null && !seen.has(String(comment.id)),
+  );
+  return [...owned, ...extra];
+}

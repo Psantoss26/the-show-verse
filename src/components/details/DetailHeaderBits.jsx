@@ -408,7 +408,8 @@ export function useShareAction({ title, text, url, card = null, story = null, ki
     />
   ) : null;
 
-  return { handleShare, sheet, copied, buttonRef };
+  // `open`: la hoja está abierta (botones que se marcan activos mientras tanto).
+  return { handleShare, sheet, copied, buttonRef, open: sheetOpen };
 }
 
 export function ActionShareButton({ title, text, url, card = null, story = null, kind = "details", iconOnly = false, animateEntrance = true, variant = "default", className = "" }) {

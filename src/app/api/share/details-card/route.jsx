@@ -126,7 +126,6 @@ function StillStack({ stills }) {
 function Card({ card, poster, stills, ambient, ambientBase, logo, assets, fonts }) {
   const buttons = shareCardActionButtons(card);
   const scores = ["tmdb", "trakt", "imdb"].filter((key) => card.scores[key]);
-  // El de visionado va ampliado (ocupa dos botones): se suma su ancho real.
   const rowWidth =
     buttons.reduce((total, button) => total + actionButtonWidth(button), 0) +
     Math.max(0, buttons.length - 1) * BUTTON_GAP;

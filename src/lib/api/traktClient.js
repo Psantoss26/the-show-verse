@@ -589,6 +589,18 @@ export async function traktGetComments({
   return json;
 }
 
+// Reseñas propias del usuario en el título (vacío sin sesión). Independiente de
+// la pestaña y la página de comentarios que se esté mostrando.
+export async function traktGetMyComments({ type, tmdbId }) {
+  const t = type === "show" ? "tv" : type;
+  const res = await fetch(`/api/community/${t}/${tmdbId}/comments?mine=1`, {
+    cache: "no-store",
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || "Error cargando tus reseñas");
+  return Array.isArray(json?.items) ? json.items : [];
+}
+
 export async function traktGetSentiments({ type, tmdbId }) {
   const t = type === "show" ? "tv" : type;
   const res = await fetch(`/api/community/${t}/${tmdbId}/sentiment`, { cache: "no-store" });

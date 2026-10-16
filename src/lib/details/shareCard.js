@@ -193,36 +193,48 @@ export function buildShareCardPayload({
  * el título, no reproduce la fila entera. Sin ningún estado, la lista va vacía
  * y la imagen no lleva fila.
  *
- * El de VISIONADO va AMPLIADO (`wide`: píldora del ancho de dos botones) con el
- * ojo y el estado escrito: el porcentaje en series y temporadas —también el
- * 100%— y las veces vista en películas. Se coloca en el CENTRO de la fila; con
- * un número par de botones, justo a la izquierda del centro (con dos, a la
- * izquierda del todo).
- *
  * Temporadas y episodios: visto · nota (sin flechas ni editar).
  *
- * Cada botón: { key, icon, variant: "active", color, label?, labelSuffix?, fill?, filledIcon?, iconColor?, wide? }
+ * Cada botón: { key, icon, variant: "active", color, label?, labelSuffix?, fill?, filledIcon?, iconColor? }
  */
 export function shareCardActionButtons(card) {
   const a = card.actions;
 
   let watched = null;
   if (a.watched) {
-    const base = { key: "watched", icon: "eye", variant: "active", color: "green", wide: true };
-    if (a.progress) {
+    if (a.progress === "100%") {
+      watched = {
+        key: "watched",
+        icon: "eye",
+        variant: "active",
+        color: "green",
+        iconColor: "emerald",
+        fill: 100,
+      };
+    } else if (a.progress) {
       const percent = Number.parseInt(a.progress, 10);
       watched = {
-        ...base,
+        key: "watched",
+        variant: "active",
+        color: "green",
         label: String(percent),
         labelSuffix: "%",
         fill: percent,
-        // Terminada: el ojo esmeralda de la ficha.
-        ...(percent >= 100 ? { iconColor: "emerald" } : {}),
       };
     } else if (a.plays > 0) {
-      watched = { ...base, label: String(a.plays), labelSuffix: a.plays === 1 ? " vez" : " veces" };
+      watched = {
+        key: "watched",
+        variant: "active",
+        color: "green",
+        label: String(a.plays),
+      };
     } else {
-      watched = { ...base, label: card.episode ? "Visto" : "Vista" };
+      watched = {
+        key: "watched",
+        icon: "eye",
+        variant: "active",
+        color: "green",
+      };
     }
   }
 
@@ -234,21 +246,19 @@ export function shareCardActionButtons(card) {
       ? { key: "rating", variant: "active", color: "yellow", label: formatUserRating(a.rating) }
       : null;
 
-  const others = [rating];
-  if (!card.season && !card.episode) {
-    others.push(
-      toggle("favorite", "heart", a.favorite, "red", true),
-      toggle("watchlist", "bookmark", a.watchlist, "blue", true),
-      toggle("list", "list", a.list, "purple"),
-      toggle("comments", "message", a.comments, "orange"),
-    );
-  }
-  const buttons = others.filter(Boolean);
-  if (!watched) return buttons;
-  // Centro de la fila completa (n = botones + el de visionado); con n par, el
-  // hueco de la izquierda del centro: n=2 → 0, n=4 → 1, n=6 → 2.
-  const middle = Math.ceil((buttons.length + 1) / 2) - 1;
-  buttons.splice(middle, 0, watched);
+  const buttons = [
+    watched,
+    rating,
+    ...(!card.season && !card.episode
+      ? [
+          toggle("favorite", "heart", a.favorite, "red", true),
+          toggle("watchlist", "bookmark", a.watchlist, "blue", true),
+          toggle("list", "list", a.list, "purple"),
+          toggle("comments", "message", a.comments, "orange"),
+        ]
+      : []),
+  ].filter(Boolean);
+
   return buttons;
 }
 

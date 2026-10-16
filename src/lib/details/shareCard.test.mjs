@@ -31,22 +31,22 @@ const baseInput = {
 const keysAndVariants = (buttons) => buttons.map((b) => `${b.key}:${b.variant}`);
 const byKey = (buttons, key) => buttons.find((b) => b.key === key);
 
-test("movie card shows only the actions with a user state, the watched pill in the middle", () => {
+test("movie card shows only the actions with a user state in DetailActionsRow order", () => {
   const card = sanitizeShareCard(buildShareCardPayload(baseInput));
   const buttons = shareCardActionButtons(card);
 
   // Sin tráiler, banda sonora ni los botones apagados: solo lo que el usuario
-  // ha hecho con el título.
-  // El de visionado, ampliado, va en el centro.
+  // ha hecho con el título, en el orden de DetailActionsRow (visto · nota · favorito).
   assert.deepEqual(keysAndVariants(buttons), [
-    "rating:active",
     "watched:active",
+    "rating:active",
     "favorite:active",
   ]);
   const watched = byKey(buttons, "watched");
-  assert.equal(watched.wide, true);
-  assert.equal(watched.icon, "eye");
-  assert.deepEqual([watched.label, watched.labelSuffix], ["2", " veces"]);
+  assert.equal(watched.wide, undefined);
+  assert.equal(watched.icon, undefined);
+  assert.equal(watched.label, "2");
+  assert.equal(watched.labelSuffix, undefined);
   assert.equal(watched.color, "green");
   assert.equal(byKey(buttons, "rating").label, "9");
   assert.equal(byKey(buttons, "rating").color, "yellow");
@@ -70,17 +70,18 @@ test("finished series with every state: watched, rating, favorite, list and revi
     ),
   );
   assert.deepEqual(keysAndVariants(buttons), [
+    "watched:active",
     "rating:active",
     "favorite:active",
-    "watched:active",
     "list:active",
     "comments:active",
   ]);
-  // También al 100%: el ojo (esmeralda) y el porcentaje, con la píldora llena.
+  // Terminada al 100%: el ojo esmeralda con el relleno completo, como en la ficha.
   const watched = byKey(buttons, "watched");
-  assert.equal(watched.wide, true);
+  assert.equal(watched.wide, undefined);
   assert.deepEqual([watched.icon, watched.iconColor], ["eye", "emerald"]);
-  assert.deepEqual([watched.label, watched.labelSuffix, watched.fill], ["100", "%", 100]);
+  assert.equal(watched.fill, 100);
+  assert.equal(watched.label, undefined);
   assert.equal(byKey(buttons, "rating").label, "10");
 });
 
@@ -137,7 +138,7 @@ test("tv card keeps the series progress and drops the media buttons", () => {
   assert.equal(buttons[0].label, "45");
   assert.equal(buttons[0].labelSuffix, "%");
   assert.equal(buttons[0].fill, 45);
-  assert.equal(buttons[0].icon, "eye");
+  assert.equal(buttons[0].icon, undefined);
   assert.equal(buttons[1].label, "7.5");
 });
 
@@ -235,7 +236,7 @@ test("season card keeps only the user states: watched and rating (no series butt
   ]);
   assert.ok(!buttons.some((b) => /arrow|pencil|edit/i.test(`${b.key} ${b.icon ?? ""}`)));
   assert.equal(buttons[0].label, "43");
-  assert.equal(buttons[0].wide, true);
+  assert.equal(buttons[0].wide, undefined);
   assert.equal(buttons[1].label, "8");
 });
 
@@ -248,7 +249,7 @@ test("only tv cards can be season cards, and the flags are booleans", () => {
   assert.equal(sanitizeShareCard({ type: "tv" }).season, null);
 });
 
-test("the wide watched pill sits in the middle, or just left of it with an even count", () => {
+test("the watched button maintains the exact DetailActionsRow order", () => {
   const keysFor = (extra) =>
     shareCardActionButtons(
       sanitizeShareCard(
@@ -264,25 +265,24 @@ test("the wide watched pill sits in the middle, or just left of it with an even 
 
   assert.deepEqual(keysFor({}), ["watched"]);
   assert.deepEqual(keysFor({ favorite: true }), ["watched", "favorite"]);
-  assert.deepEqual(keysFor({ favorite: true, watchlist: true }), ["favorite", "watched", "watchlist"]);
-  assert.deepEqual(keysFor({ rating: 8, favorite: true, watchlist: true }), ["rating", "watched", "favorite", "watchlist"]);
+  assert.deepEqual(keysFor({ favorite: true, watchlist: true }), ["watched", "favorite", "watchlist"]);
+  assert.deepEqual(keysFor({ rating: 8, favorite: true, watchlist: true }), ["watched", "rating", "favorite", "watchlist"]);
   assert.deepEqual(
     keysFor({ rating: 8, favorite: true, watchlist: true, listActive: true, commentsActive: true }),
-    ["rating", "favorite", "watched", "watchlist", "list", "comments"],
+    ["watched", "rating", "favorite", "watchlist", "list", "comments"],
   );
 });
 
-test("a watched movie without a play count reads 'Vista'", () => {
+test("a watched movie without a play count shows the eye icon", () => {
   const watched = shareCardActionButtons(
     sanitizeShareCard(buildShareCardPayload({ ...baseInput, trakt: { watched: true, plays: 0, loading: false } })),
   ).find((b) => b.key === "watched");
-  assert.deepEqual([watched.icon, watched.label, watched.labelSuffix ?? null], ["eye", "Vista", null]);
-  assert.equal(
-    shareCardActionButtons(
-      sanitizeShareCard(buildShareCardPayload({ ...baseInput, trakt: { watched: true, plays: 1, loading: false } })),
-    ).find((b) => b.key === "watched").labelSuffix,
-    " vez",
-  );
+  assert.deepEqual([watched.icon, watched.label, watched.labelSuffix ?? null], ["eye", undefined, null]);
+  const watched1 = shareCardActionButtons(
+    sanitizeShareCard(buildShareCardPayload({ ...baseInput, trakt: { watched: true, plays: 1, loading: false } })),
+  ).find((b) => b.key === "watched");
+  assert.equal(watched1.label, "1");
+  assert.equal(watched1.labelSuffix, undefined);
 });
 
 test("episode card: stacked stills cover, kicker and only watched · rating", () => {
@@ -307,14 +307,15 @@ test("episode card: stacked stills cover, kicker and only watched · rating", ()
 
   const buttons = shareCardActionButtons(card);
   assert.deepEqual(keysAndVariants(buttons), ["watched:active", "rating:active"]);
-  // Un episodio es masculino: «Visto», no «Vista».
-  assert.equal(byKey(buttons, "watched").label, "Visto");
+  // Sin play count muestra el icono del ojo, sin texto.
+  assert.equal(byKey(buttons, "watched").icon, "eye");
+  assert.equal(byKey(buttons, "watched").label, undefined);
 
   const twice = shareCardActionButtons(
     sanitizeShareCard({ ...card, actions: { ...card.actions, plays: 2 } }),
   );
   assert.equal(byKey(twice, "watched").label, "2");
-  assert.equal(byKey(twice, "watched").labelSuffix, " veces");
+  assert.equal(byKey(twice, "watched").labelSuffix, undefined);
 });
 
 test("episode stills: only TMDb paths, deduplicated, at most three, tv only", () => {
