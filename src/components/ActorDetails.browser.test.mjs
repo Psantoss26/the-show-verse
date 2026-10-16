@@ -74,8 +74,8 @@ test('actor action buttons match DetailsClient sizing and have distinct colors',
   try {
     const baseUrl = process.env.TEST_BASE_URL || 'http://localhost:3000';
 
-    // Test sizing on mobile (390px) and desktop (1280px)
-    for (const width of [390, 1280]) {
+    // Test sizing on mobile (360px, 390px), tablet (768px) and desktop (1280px)
+    for (const width of [360, 390, 768, 1280]) {
       const page = await browser.newPage({ viewport: { width, height: 800 } });
       await page.goto(`${baseUrl}/details/person/287`, { waitUntil: 'domcontentloaded' });
       await page.waitForTimeout(1000);
@@ -85,7 +85,7 @@ test('actor action buttons match DetailsClient sizing and have distinct colors',
       assert.equal(count, 4, 'there should be 4 action buttons');
 
       const firstBox = await buttons.nth(0).boundingBox();
-      const expectedSize = width < 640 ? 40 : 52;
+      const expectedSize = width === 360 ? 36.25 : width === 390 ? 40 : width === 768 ? 48 : 52;
       assert.ok(
         Math.abs(firstBox.width - expectedSize) <= 1,
         `actor action button width on ${width}px (${firstBox.width}) should match ${expectedSize}px`
@@ -179,6 +179,27 @@ test('actor metadata displays deathday before height and place of birth in a sin
       // Verify single-line layout (no multiline wrap)
       const box = await metadata.boundingBox();
       assert.ok(box.height < 40, `metadata row height (${box.height}px) must be a single line (<40px)`);
+
+      // Verify "Conocido por" section has correct TMDB titles
+      const popularSection = page.locator('#section-popular');
+      await popularSection.waitFor({ state: 'visible' });
+      const popularText = await popularSection.innerText();
+
+      assert.ok(popularText.includes('Fast & Furious 6'), 'Known For must include Fast & Furious 6');
+      assert.ok(popularText.includes('Fast & Furious 5'), 'Known For must include Fast & Furious 5');
+      assert.ok(
+        popularText.includes('Fast & Furious: Aún más rápido') || popularText.includes('Fast & Furious'),
+        'Known For must include Fast & Furious'
+      );
+      assert.ok(popularText.includes('Fast & Furious 7'), 'Known For must include Fast & Furious 7');
+      assert.ok(popularText.includes('A todo gas'), 'Known For must include A todo gas');
+      assert.ok(popularText.includes('2 Fast 2 Furious'), 'Known For must include 2 Fast 2 Furious');
+
+      // Timeline and She's All That (Alguien como tú) should not be among the top Known For
+      const cards = await page.locator('#section-popular a[href*="/details/"]').allInnerTexts();
+      const firstSix = cards.slice(0, 6).join(' ');
+      assert.ok(!firstSix.includes('Timeline'), 'Timeline should not be in the top 6 Known For');
+      assert.ok(!firstSix.includes('Alguien como tú'), 'Alguien como tú should not be in the top 6 Known For');
 
       await page.close();
     }
