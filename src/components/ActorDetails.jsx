@@ -43,9 +43,6 @@ import {
   ChevronDown,
   Calendar,
   Ruler,
-  TrendingDown,
-  TrendingUp,
-  Minus,
 } from "lucide-react";
 import {
   AnimatedSection,
@@ -63,15 +60,17 @@ import DetailsInfoTabs from "@/components/details/DetailsInfoTabs";
 import useDetailsStickyTop from "@/hooks/useDetailsStickyTop";
 import { careerRange, formatCareerRange } from "@/lib/actor/careerRange";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
+import RecommendationHoverIndicator from "@/components/details/RecommendationHoverIndicator";
+import { useAuth } from "@/context/AuthContext";
+import { titleStateKey, useViewerTitleStates } from "@/components/social/useViewerTitleStates";
+import { getMediaAccountStates, getExternalIds } from "@/lib/api/tmdb";
+import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
+import ActorCollageBackground from "@/components/details/ActorCollageBackground";
 
 /* --- CONFIG & UTILS --- */
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const TMDB_BASE = "https://api.themoviedb.org/3";
 const ACTOR_FAVORITES_STORAGE_KEY = "the-show-verse:favorite-actors:v1";
-const ACTOR_LIQUID_CARD_CLASS =
-  "relative isolate overflow-hidden rounded-[2rem] border border-transparent bg-black/10 bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-[15px] shadow-[0_14px_36px_-18px_rgba(0,0,0,0.75)] transform-gpu";
-const ACTOR_LIQUID_CARD_LAYER_CLASS =
-  "pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-br from-white/10 via-transparent to-black/10 opacity-70";
 // Estilo de "borde" de las tarjetas de contenido: SIN borde en reposo + anillo
 // EMERALD inset (2.5px) en hover, vía pseudo-elemento `after`. Misma receta que las
 // secciones de Reparto y Recomendaciones de DetailsClient, pero con el verde
@@ -96,32 +95,93 @@ function getActorPopularityDelta(personId, currentRank, updatedAt) {
 
     if (entry && typeof entry.rank === "number" && entry.rank !== currentRank) {
       const delta = entry.rank - currentRank;
-      store[personId] = { rank: currentRank, time: Date.now() };
+      store[personId] = { rank: currentRank, delta, updatedAt, time: Date.now() };
       window.localStorage.setItem(ACTOR_RANK_STORAGE_KEY, JSON.stringify(store));
       return delta;
     }
 
-    store[personId] = { rank: currentRank, time: Date.now() };
-    window.localStorage.setItem(ACTOR_RANK_STORAGE_KEY, JSON.stringify(store));
+    if (entry && typeof entry.delta === "number" && entry.delta !== 0) {
+      return entry.delta;
+    }
 
     const seed = Number(personId) || 1;
     const hourBucket = Math.floor(new Date(updatedAt || Date.now()).getTime() / 3600000);
     const pseudo = Math.sin(seed * 997 + hourBucket * 31) * 10000;
     const rawDelta = Math.floor((pseudo - Math.floor(pseudo)) * 39) - 19;
-    return rawDelta === 0 ? -2 : rawDelta;
+    const delta = rawDelta === 0 ? -2 : rawDelta;
+
+    store[personId] = { rank: currentRank, delta, updatedAt, time: Date.now() };
+    window.localStorage.setItem(ACTOR_RANK_STORAGE_KEY, JSON.stringify(store));
+    return delta;
   } catch {
     return -2;
   }
+}
+
+function PopularityTrendIcon({ delta, className = "size-5 sm:size-[22px]" }) {
+  if (delta < 0) {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        className={`shrink-0 text-red-500 ${className}`}
+        aria-hidden="true"
+      >
+        <circle cx="12" cy="12" r="9.5" stroke="currentColor" strokeWidth="2" />
+        <path
+          d="M7 9.5 L10.5 13.5 L13.5 11 L15.5 13.5"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <polygon points="12.5,16.5 17,16.5 17,12" fill="currentColor" />
+      </svg>
+    );
+  }
+  if (delta > 0) {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        className={`shrink-0 text-emerald-400 ${className}`}
+        aria-hidden="true"
+      >
+        <circle cx="12" cy="12" r="9.5" stroke="currentColor" strokeWidth="2" />
+        <path
+          d="M7 14.5 L10.5 10.5 L13.5 13 L15.5 10.5"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <polygon points="12.5,7.5 17,7.5 17,12" fill="currentColor" />
+      </svg>
+    );
+  }
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      className={`shrink-0 text-zinc-500 ${className}`}
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9.5" stroke="currentColor" strokeWidth="2" />
+      <line x1="7.5" y1="12" x2="16.5" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
 }
 
 function ActorPopularity({ value, personId }) {
   const [snapshot, setSnapshot] = useState(null);
   const [rankingUnavailable, setRankingUnavailable] = useState(false);
   const [delta, setDelta] = useState(null);
-  const [compact, setCompact] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
+    setSnapshot(null);
+    setDelta(null);
+    setRankingUnavailable(false);
     fetch("/api/tmdb/people/popularity", { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error("Ranking unavailable");
@@ -150,7 +210,7 @@ function ActorPopularity({ value, personId }) {
   const inTop500 = typeof rank === "number" && rank > 0 && rank <= 500;
 
   const tooltipText = inTop500
-    ? `Puesto N.º ${rank} en los 500 más populares de TMDb${formattedScore ? ` (${formattedScore} puntos)` : ""} — Clic para alternar vista`
+    ? `Puesto N.º ${rank} en los 500 más populares de TMDb${formattedScore ? ` (${formattedScore} puntos)` : ""}`
     : rankingUnavailable
       ? "Ranking de popularidad temporalmente no disponible"
       : snapshot
@@ -158,93 +218,54 @@ function ActorPopularity({ value, personId }) {
         : "Consultando ranking de popularidad TMDb…";
 
   return (
-    <div className="mt-4 flex justify-center md:justify-start">
+    <div className="shrink-0 pb-1 sm:pb-1.5 leading-none">
       <dl
-        className="inline-flex items-center gap-3 select-none"
+        data-actor-popularity
+        className="flex items-center gap-2 select-none"
         title={tooltipText}
       >
-        <dt className="flex flex-col text-right leading-none select-none">
-          <span className="text-[11px] font-semibold text-zinc-400 tracking-normal">TMDb</span>
-          <span className="text-[11px] font-bold tracking-[0.14em] uppercase text-zinc-200">POPULARIDAD</span>
-        </dt>
+        <dt className="sr-only">Popularidad en TMDb</dt>
 
         <dd className="flex items-center gap-2">
           {!snapshot && !rankingUnavailable ? (
-            <div className="flex items-center gap-2 text-zinc-500 animate-pulse">
-              <span className="size-5 rounded-full border border-zinc-700 bg-zinc-800/50" />
-              <span className="text-sm font-semibold">—</span>
+            <div className="flex items-center gap-2 text-zinc-600 animate-pulse">
+              <PopularityTrendIcon delta={0} className="size-5 sm:size-[22px] text-zinc-700" />
+              <span className="text-sm font-semibold text-zinc-600">—</span>
             </div>
           ) : inTop500 ? (
-            <button
-              type="button"
-              onClick={() => setCompact((prev) => !prev)}
-              aria-label={tooltipText}
-              className="group/pop inline-flex items-center gap-2 transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-emerald-400 rounded-md"
-            >
-              {delta < 0 ? (
-                <span
-                  className="flex size-5 items-center justify-center rounded-full border-[1.5px] border-red-500 text-red-500 bg-red-500/10 shrink-0"
-                  aria-hidden="true"
-                >
-                  <TrendingDown className="size-3" strokeWidth={2.5} />
-                </span>
-              ) : delta > 0 ? (
-                <span
-                  className="flex size-5 items-center justify-center rounded-full border-[1.5px] border-emerald-400 text-emerald-400 bg-emerald-400/10 shrink-0"
-                  aria-hidden="true"
-                >
-                  <TrendingUp className="size-3" strokeWidth={2.5} />
-                </span>
-              ) : (
-                <span
-                  className="flex size-5 items-center justify-center rounded-full border-[1.5px] border-zinc-500 text-zinc-400 bg-zinc-800/40 shrink-0"
-                  aria-hidden="true"
-                >
-                  <Minus className="size-3" strokeWidth={2.5} />
-                </span>
-              )}
+            <span className="inline-flex items-center gap-2">
+              <PopularityTrendIcon delta={delta} />
 
-              <span className="text-base sm:text-lg font-bold text-white tracking-tight leading-none group-hover/pop:text-zinc-100">
+              <span className="text-base sm:text-lg md:text-xl font-bold text-white tracking-tight leading-none tabular-nums">
                 {rank}
               </span>
 
-              {!compact && (
-                <span className="text-xs sm:text-sm font-medium text-zinc-300 tracking-tight leading-none">
-                  · Los 500 mejores
-                </span>
-              )}
-
               {delta !== null && delta !== 0 && (
-                <span className="flex items-center gap-1 text-[13px] sm:text-sm font-semibold text-zinc-400 tabular-nums leading-none">
+                <span className="flex items-center gap-1 text-[13px] sm:text-sm font-semibold tabular-nums leading-none">
                   {delta < 0 ? (
                     <>
-                      <span className="text-red-500 text-[10px]" aria-hidden="true">▼</span>
-                      <span>{Math.abs(delta)}</span>
+                      <span className="text-red-500 text-[10px] leading-none select-none font-black" aria-hidden="true">▼</span>
+                      <span className="text-zinc-200">{Math.abs(delta)}</span>
                     </>
                   ) : (
                     <>
-                      <span className="text-emerald-400 text-[10px]" aria-hidden="true">▲</span>
-                      <span>{delta}</span>
+                      <span className="text-emerald-400 text-[10px] leading-none select-none font-black" aria-hidden="true">▲</span>
+                      <span className="text-zinc-200">{delta}</span>
                     </>
                   )}
                 </span>
               )}
-            </button>
+            </span>
           ) : (
             <div className="flex items-center gap-2">
-              <span
-                className="flex size-5 items-center justify-center rounded-full border-[1.5px] border-zinc-600 text-zinc-400 bg-zinc-800/40 shrink-0"
-                aria-hidden="true"
-              >
-                <Minus className="size-3" strokeWidth={2.5} />
-              </span>
-              <span className="text-[15px] sm:text-base font-bold text-zinc-300 tracking-tight leading-none">
+              <PopularityTrendIcon delta={0} className="size-5 sm:size-[22px] text-zinc-500" />
+              <span className="text-sm sm:text-base font-bold text-zinc-300 tracking-tight leading-none">
                 Top 500+
               </span>
             </div>
           )}
 
-          <span className="sr-only">{tooltipText}</span>
+          <span className="sr-only">{tooltipText}{delta !== null ? ` · ${delta > 0 ? "Sube" : delta < 0 ? "Baja" : "Sin cambios:"} ${Math.abs(delta)} puestos respecto a la última consulta guardada en este navegador.` : ""}</span>
         </dd>
       </dl>
     </div>
@@ -298,13 +319,6 @@ function awardResultClass(result) {
   }
   return "text-zinc-400 drop-shadow-[0_0_8px_rgba(161,161,170,0.3)]";
 }
-
-const genderLabel = (g) => {
-  if (g === 1) return "Mujer";
-  if (g === 2) return "Hombre";
-  if (g === 3) return "No binario";
-  return "N/A";
-};
 
 const calcAge = (birthday, deathday) => {
   if (!birthday) return null;
@@ -1406,39 +1420,66 @@ function ActorRowCarousel({ children, variant = "poster" }) {
 }
 
 /**
- * PosterCard (CRÉDITOS EN PANTALLA)
- * Mismo diseño y hover que las tarjetas de Perfil.
+ * PosterCard (CONOCIDO POR, TÍTULOS VISTOS, CRÉDITOS EN PANTALLA)
+ * Mismo diseño y estilo de indicador hover que las tarjetas de Colección en DetailsClient.
  */
-function PosterCard({ item }) {
+function PosterCard({
+  item,
+  viewerStates,
+  accountStates,
+  imdbRatings,
+  onPrefetchHover,
+}) {
   const title = item?.title || item?.name || "Sin título";
   const poster = tmdbImg(item?.poster_path || item?.profile_path, "w500");
-  const subtitle = item?.subtitle || "";
-  const year = item?.year || yearFromDate(item?.date) || null;
-  const mediaType = item?.media_type === "tv" ? "tv" : "movie";
+  const mediaType =
+    item?.media_type === "tv" || item?.kind === "tv" ? "tv" : "movie";
   const href =
     mediaType === "movie"
       ? `/details/movie/${item?.id}`
       : `/details/tv/${item?.id}`;
-  const typeLabel = mediaType === "tv" ? "Serie" : "Película";
-  const meta = subtitle || [year, typeLabel].filter(Boolean).join(" · ");
 
   const [err, setErr] = useState(false);
+
+  const key = `${mediaType}:${item?.id}`;
+  const accountState = accountStates?.[key] || null;
+  const viewerState =
+    viewerStates?.[titleStateKey({ tmdbId: item?.id, mediaType })] || null;
+
+  const isFavorite = Boolean(viewerState?.favorite || accountState?.favorite);
+  const isWatchlist = Boolean(viewerState?.watchlist || accountState?.watchlist);
+  const rawRating = viewerState?.rating ?? accountState?.rating;
+  const userRating =
+    typeof rawRating === "number" && Number.isFinite(rawRating) && rawRating > 0
+      ? rawRating
+      : null;
+  const imdbRating = imdbRatings?.[key] ?? null;
+  const tmdbRating = item?.vote_average ?? null;
+
+  const handleHover = () => {
+    if (onPrefetchHover) {
+      onPrefetchHover(item, mediaType, isFavorite);
+    }
+  };
 
   return (
     <Link
       href={href}
       prefetch={false}
-      className="group relative block w-full"
+      className="group relative block w-full bg-zinc-900 rounded-xl overflow-hidden shadow-md transition-all duration-300"
+      aria-label={title}
       title={title}
+      onMouseEnter={handleHover}
+      onFocus={handleHover}
     >
       <div
-        className={`relative aspect-[2/3] overflow-hidden rounded-xl bg-zinc-800 shadow-md transition-all duration-300 lg:hover:shadow-emerald-900/20 ${CARD_HOVER_RING}`}
+        className={`relative aspect-[2/3] overflow-hidden rounded-xl bg-zinc-900 shadow-md transition-all duration-300 lg:hover:shadow-emerald-900/20 ${CARD_HOVER_RING}`}
       >
         {poster && !err ? (
           <OptimizedImage
             src={poster}
             alt={title}
-            className="w-full h-full object-cover grayscale-[18%] group-hover:scale-110 group-hover:grayscale-0 transition-transform duration-500"
+            className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
             loading="lazy"
             decoding="async"
             onError={() => setErr(true)}
@@ -1453,16 +1494,15 @@ function PosterCard({ item }) {
           </div>
         )}
 
-        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent opacity-70 group-hover:opacity-85 transition" />
+        <RecommendationHoverIndicator
+          favorite={isFavorite}
+          watchlist={isWatchlist}
+          userRating={userRating}
+          tmdbRating={tmdbRating}
+          imdbRating={imdbRating}
+        />
 
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 via-black/35 to-transparent px-2.5 pb-2.5 pt-8 backdrop-blur-[1.5px]">
-          <p className="line-clamp-2 text-[13px] font-extrabold leading-[1.12] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]">
-            {title}
-          </p>
-          <p className="mt-0.5 truncate text-[11px] font-semibold leading-tight text-emerald-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]">
-            {meta}
-          </p>
-        </div>
+        <span className="sr-only">{title}</span>
       </div>
     </Link>
   );
@@ -2473,6 +2513,42 @@ export default function ActorDetails({
     );
   }, [creditsAll, tmdbKnownFor]);
 
+  const knownForPosters = useMemo(() => {
+    const urls = [];
+    const seen = new Set();
+    const source =
+      popularItems && popularItems.length > 0
+        ? popularItems
+        : tmdbKnownFor && tmdbKnownFor.length > 0
+          ? tmdbKnownFor
+          : initialKnownFor && initialKnownFor.length > 0
+            ? initialKnownFor
+            : [];
+
+    for (const item of source) {
+      const p = item?.poster_path;
+      if (!p || seen.has(p)) continue;
+      seen.add(p);
+      urls.push(
+        /^https?:\/\//i.test(p) ? p : `https://image.tmdb.org/t/p/w185${p}`
+      );
+    }
+
+    if (urls.length < 4 && Array.isArray(creditsAll)) {
+      for (const item of creditsAll) {
+        const p = item?.poster_path;
+        if (!p || seen.has(p)) continue;
+        seen.add(p);
+        urls.push(
+          /^https?:\/\//i.test(p) ? p : `https://image.tmdb.org/t/p/w185${p}`
+        );
+        if (urls.length >= 8) break;
+      }
+    }
+
+    return urls;
+  }, [popularItems, tmdbKnownFor, initialKnownFor, creditsAll]);
+
   // COMPARTIR: la misma hoja que la ficha de un título (imagen y vídeo
   // generados), en su variante de listas: foto de perfil como portada y
   // «Conocido/a por» en la vista previa (lib/actor/shareActor).
@@ -2544,6 +2620,129 @@ export default function ActorDetails({
     kind: "list",
   });
 
+  const { session, account, authenticated = false } = useAuth();
+  const [hasBackendSession] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const cookie = document.cookie || "";
+    return (
+      cookie.includes("showverse_access_token=") ||
+      cookie.includes("backend_access_token=") ||
+      cookie.includes("access_token=")
+    );
+  });
+
+  const allCardItems = useMemo(() => {
+    const map = new Map();
+    const addItem = (item) => {
+      if (!item?.id) return;
+      const tmdbId = Number(item.id);
+      const mediaType =
+        item.media_type === "tv" || item.kind === "tv" ? "tv" : "movie";
+      const k = `${mediaType}:${tmdbId}`;
+      if (!map.has(k)) {
+        map.set(k, { tmdbId, mediaType });
+      }
+    };
+    (popularItems || []).forEach(addItem);
+    (watchedCredits || []).forEach(addItem);
+    (combinedCredits?.cast || []).forEach(addItem);
+    (combinedCredits?.crew || []).forEach(addItem);
+    return Array.from(map.values());
+  }, [popularItems, watchedCredits, combinedCredits]);
+
+  const actorViewerStates = useViewerTitleStates(
+    allCardItems,
+    authenticated || hasBackendSession
+  );
+
+  const [actorAccountStates, setActorAccountStates] = useState({});
+  const actorAccountStatesRef = useRef({});
+  const actorAccountStateInFlightRef = useRef(new Set());
+
+  const [actorImdbRatings, setActorImdbRatings] = useState({});
+  const actorImdbRatingsRef = useRef({});
+  const actorImdbRatingInFlightRef = useRef(new Set());
+
+  useEffect(() => {
+    actorAccountStatesRef.current = actorAccountStates;
+  }, [actorAccountStates]);
+
+  useEffect(() => {
+    actorImdbRatingsRef.current = actorImdbRatings;
+  }, [actorImdbRatings]);
+
+  const handlePrefetchHover = useCallback(
+    async (item, mediaType, isFavorite) => {
+      if (!item?.id) return;
+
+      if (session && account?.id && session !== "showverse") {
+        const key = `${mediaType}:${item.id}`;
+        if (
+          !actorAccountStatesRef.current[key] &&
+          !actorAccountStateInFlightRef.current.has(key)
+        ) {
+          actorAccountStateInFlightRef.current.add(key);
+          try {
+            const st = await getMediaAccountStates(mediaType, item.id, session);
+            const next = {
+              favorite: Boolean(st?.favorite),
+              watchlist: Boolean(st?.watchlist),
+              rating:
+                st?.rated && typeof st.rated.value === "number"
+                  ? st.rated.value
+                  : null,
+            };
+            setActorAccountStates((prev) => ({ ...prev, [key]: next }));
+          } catch {
+            setActorAccountStates((prev) => ({
+              ...prev,
+              [key]: { favorite: false, watchlist: false, rating: null },
+            }));
+          } finally {
+            actorAccountStateInFlightRef.current.delete(key);
+          }
+        }
+      }
+
+      if (!isFavorite) {
+        const key = `${mediaType}:${item.id}`;
+        if (
+          !Object.prototype.hasOwnProperty.call(
+            actorImdbRatingsRef.current,
+            key
+          ) &&
+          !actorImdbRatingInFlightRef.current.has(key)
+        ) {
+          actorImdbRatingInFlightRef.current.add(key);
+          try {
+            const ext =
+              item?.imdb_id || item?.imdbId
+                ? null
+                : await getExternalIds(mediaType, item.id);
+            const imdbId =
+              item?.imdb_id || item?.imdbId || ext?.imdb_id || null;
+            if (imdbId) {
+              const payload = await fetchImdbRatingByImdb(imdbId, {
+                timeoutMs: 5_000,
+              });
+              const rating = Number(payload?.rating);
+              const nextRating =
+                Number.isFinite(rating) && rating > 0 ? rating : null;
+              setActorImdbRatings((prev) => ({ ...prev, [key]: nextRating }));
+            } else {
+              setActorImdbRatings((prev) => ({ ...prev, [key]: null }));
+            }
+          } catch {
+            setActorImdbRatings((prev) => ({ ...prev, [key]: null }));
+          } finally {
+            actorImdbRatingInFlightRef.current.delete(key);
+          }
+        }
+      }
+    },
+    [account?.id, session]
+  );
+
   const sectionItems = useMemo(() => {
     const items = [];
     if (popularItems.length > 0)
@@ -2582,7 +2781,6 @@ export default function ActorDetails({
         icon: Tags,
         count: taggedCount,
       });
-    items.push({ id: "about", label: "Perfil", icon: User });
     return items;
   }, [
     popularItems.length,
@@ -2695,11 +2893,7 @@ export default function ActorDetails({
 
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-emerald-500/30 selection:text-emerald-200">
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-emerald-600/15 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute top-[15%] -right-[5%] w-[55vw] max-w-[700px] aspect-square rounded-full bg-emerald-700/20 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-teal-800/25 blur-[120px] sm:blur-[150px]" />
-      </div>
+      <ActorCollageBackground titles={popularItems} fallbackPosters={knownForPosters} />
       <div
         ref={contentTopRef}
         className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 lg:pt-12 pb-24"
@@ -2777,9 +2971,12 @@ export default function ActorDetails({
           {/* --- COLUMNA DERECHA: INFO --- */}
           <div className="flex-1 flex flex-col min-w-0 w-full">
             <FadeIn delay={0.06} className="mb-5 px-1">
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[1] tracking-tight text-balance drop-shadow-xl mb-3 text-center md:text-left">
-                {safeText(actorDetails?.name)}
-              </h1>
+              <div className="mb-3 flex flex-wrap items-end justify-center gap-x-4 gap-y-2 md:justify-start">
+                <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[1] tracking-tight text-balance drop-shadow-xl text-center md:text-left">
+                  {safeText(actorDetails?.name)}
+                </h1>
+                <ActorPopularity value={actorDetails?.popularity} personId={personId} />
+              </div>
 
               <div className="w-full overflow-x-auto scrollbar-none">
                 <div data-actor-metadata className="flex flex-nowrap items-center gap-x-3 sm:gap-x-4 text-sm sm:text-base md:text-lg font-medium text-zinc-300 whitespace-nowrap w-fit mx-auto md:mx-0">
@@ -2891,8 +3088,6 @@ export default function ActorDetails({
                 </ActorActionButton>
               </div>
 
-              <ActorPopularity value={actorDetails?.popularity} personId={personId} />
-
               {actorShareSheet}
 
               {/* Mismo modal de enlaces que los botones de acción de
@@ -2994,6 +3189,10 @@ export default function ActorDetails({
                         <PosterCard
                           key={`popular-${item.id}-${item.credit_id || index}`}
                           item={item}
+                          viewerStates={actorViewerStates}
+                          accountStates={actorAccountStates}
+                          imdbRatings={actorImdbRatings}
+                          onPrefetchHover={handlePrefetchHover}
                         />
                       ))}
                     </ActorRowCarousel>
@@ -3016,6 +3215,10 @@ export default function ActorDetails({
                         <PosterCard
                           key={`watched-${item.media_type || "movie"}-${item.id}-${index}`}
                           item={item}
+                          viewerStates={actorViewerStates}
+                          accountStates={actorAccountStates}
+                          imdbRatings={actorImdbRatings}
+                          onPrefetchHover={handlePrefetchHover}
                         />
                       ))}
                     </ActorRowCarousel>
@@ -3183,6 +3386,10 @@ export default function ActorDetails({
                               <PosterCard
                                 key={`${group.key}-${c.id}-${c.credit_id || index}-${c.media_type || "m"}`}
                                 item={c}
+                                viewerStates={actorViewerStates}
+                                accountStates={actorAccountStates}
+                                imdbRatings={actorImdbRatings}
+                                onPrefetchHover={handlePrefetchHover}
                               />
                             ))}
                           </ActorRowCarousel>
@@ -3290,126 +3497,6 @@ export default function ActorDetails({
                 </AnimatedSection>
               </section>
             )}
-
-            <section id="section-about" ref={registerSection("about")}>
-              <AnimatedSection delay={0.04}>
-                <section className="mb-16 group/section">
-                  <SectionTitle
-                    title="Perfil"
-                    subtitle="Datos del actor/actriz"
-                    icon={User}
-                  />
-                  <div className="mt-3 grid sm:grid-cols-2 gap-4">
-                    <div className={`${ACTOR_LIQUID_CARD_CLASS} p-5 sm:p-6`}>
-                      <div className={ACTOR_LIQUID_CARD_LAYER_CLASS} />
-                      <div className="relative z-10 space-y-4">
-                        <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-wider">
-                          Información
-                        </h3>
-                        <div className="flex justify-between border-b border-white/5 pb-2 gap-4">
-                          <span className="text-zinc-400">Género</span>
-                          <span className="text-white text-right">
-                            {genderLabel(actorDetails?.gender)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between border-b border-white/5 pb-2 gap-4">
-                          <span className="text-zinc-400">Lugar</span>
-                          <span className="text-white text-right max-w-[60%] truncate">
-                            {safeText(actorDetails?.place_of_birth)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between border-b border-white/5 pb-2 gap-4">
-                          <span className="text-zinc-400">Conocido/a por</span>
-                          <span className="text-white text-right">
-                            {safeText(actorDetails?.known_for_department)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between gap-4">
-                          <span className="text-zinc-400">TMDb ID</span>
-                          <span className="text-white font-mono">
-                            {safeText(actorDetails?.id)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className={`${ACTOR_LIQUID_CARD_CLASS} p-5 sm:p-6`}>
-                      <div className={ACTOR_LIQUID_CARD_LAYER_CLASS} />
-                      <div className="relative z-10 space-y-4">
-                        <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-wider">
-                          Enlaces & Alias
-                        </h3>
-
-                        <div className="flex flex-wrap gap-2">
-                          {actorExternalLinks.map((link) => {
-                            const Icon = link.iconComponent;
-                            return (
-                              <a
-                                key={link.id}
-                                href={link.href}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-transparent bg-white/5 px-3 py-1.5 text-sm text-zinc-200 shadow-sm backdrop-blur-md transition-colors hover:bg-emerald-500/15 hover:text-emerald-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
-                                aria-label={`Abrir ${link.label}`}
-                              >
-                                {Icon ? (
-                                  <Icon
-                                    className="h-3.5 w-3.5"
-                                    aria-hidden="true"
-                                  />
-                                ) : link.icon ? (
-                                  <OptimizedImage
-                                    src={link.icon}
-                                    alt=""
-                                    className={
-                                      link.menuIconClassName ||
-                                      "h-3.5 w-3.5 rounded-sm object-contain"
-                                    }
-                                    draggable="false"
-                                  />
-                                ) : (
-                                  <ExternalLink
-                                    className="h-3.5 w-3.5"
-                                    aria-hidden="true"
-                                  />
-                                )}
-                                <span>{link.label}</span>
-                              </a>
-                            );
-                          })}
-                        </div>
-
-                        <div className="mt-1">
-                          <h4 className="text-xs text-zinc-500 mb-2">
-                            También conocido/a como
-                          </h4>
-                          <div className="flex flex-wrap gap-1.5">
-                            {(actorDetails?.also_known_as || [])
-                              .slice(0, 14)
-                              .map((a) => (
-                                <span
-                                  key={a}
-                                  className="px-2 py-0.5 rounded bg-white/5 text-xs text-zinc-400"
-                                >
-                                  {a}
-                                </span>
-                              ))}
-                            {(actorDetails?.also_known_as || []).length >
-                              14 && (
-                              <span className="px-2 py-0.5 rounded bg-white/5 text-xs text-zinc-500">
-                                +
-                                {(actorDetails?.also_known_as || []).length -
-                                  14}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </section>
-              </AnimatedSection>
-            </section>
           </div>
         </div>
       </div>

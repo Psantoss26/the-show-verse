@@ -1,10 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+async function getChromium() {
+  const mod = await import(process.env.PLAYWRIGHT_MODULE);
+  return mod.chromium || mod.default?.chromium;
+}
+
 test('actor portrait loads eagerly, keeps its frame and handles image failure', {
   skip: !process.env.PLAYWRIGHT_MODULE,
 }, async () => {
-  const { chromium } = await import(process.env.PLAYWRIGHT_MODULE);
+  const chromium = await getChromium();
   const browser = await chromium.launch({
     headless: true,
     ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}),
@@ -65,7 +70,7 @@ test('actor portrait loads eagerly, keeps its frame and handles image failure', 
 test('actor action buttons match DetailsClient sizing and have distinct colors', {
   skip: !process.env.PLAYWRIGHT_MODULE,
 }, async () => {
-  const { chromium } = await import(process.env.PLAYWRIGHT_MODULE);
+  const chromium = await getChromium();
   const browser = await chromium.launch({
     headless: true,
     ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}),
@@ -115,22 +120,17 @@ test('actor action buttons match DetailsClient sizing and have distinct colors',
         }
       }
 
-      // Verify popularity widget matches IMDb styling with current rank visible
-      const popularity = page.locator('dl:has(dt:has-text("POPULARIDAD"))');
+      // Verify popularity widget matches IMDb styling with current rank visible (without visible label)
+      const popularity = page.locator('[data-actor-popularity]');
       await popularity.waitFor({ state: 'visible' });
       const popText = await popularity.innerText();
-      assert.ok(popText.includes('TMDb'), 'popularity widget must show TMDb');
-      assert.ok(popText.includes('POPULARIDAD'), 'popularity widget must show POPULARIDAD');
       assert.ok(popText.includes('33'), 'popularity widget must show current rank position 33 by default');
-      assert.ok(popText.includes('Los 500 mejores'), 'popularity widget must show Los 500 mejores');
 
-      // Click to toggle compact rank view
-      const popBtn = popularity.locator('button');
-      await popBtn.click();
-      await page.waitForTimeout(100);
-      const toggledText = await popularity.innerText();
-      assert.ok(toggledText.includes('33'), 'toggled popularity widget must still show rank 33');
-      assert.ok(!toggledText.includes('Los 500 mejores'), 'toggled popularity widget hides extra text for compact view');
+      // Verify presence of popularity circular icon and ranking variation delta
+      const popIcon = popularity.locator('svg').first();
+      await popIcon.waitFor({ state: 'visible' });
+      const hasDelta = popText.includes('▲') || popText.includes('▼');
+      assert.ok(hasDelta, 'popularity widget must show ranking variation delta indicator');
 
       await page.close();
     }
@@ -142,7 +142,7 @@ test('actor action buttons match DetailsClient sizing and have distinct colors',
 test('actor metadata displays deathday before height and place of birth in a single row', {
   skip: !process.env.PLAYWRIGHT_MODULE,
 }, async () => {
-  const { chromium } = await import(process.env.PLAYWRIGHT_MODULE);
+  const chromium = await getChromium();
   const browser = await chromium.launch({
     headless: true,
     ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}),
@@ -200,6 +200,54 @@ test('actor metadata displays deathday before height and place of birth in a sin
       const firstSix = cards.slice(0, 6).join(' ');
       assert.ok(!firstSix.includes('Timeline'), 'Timeline should not be in the top 6 Known For');
       assert.ok(!firstSix.includes('Alguien como tú'), 'Alguien como tú should not be in the top 6 Known For');
+
+      await page.close();
+    }
+  } finally {
+    await browser.close();
+  }
+});
+
+test('actor details page renders a full-screen poster collage background with known-for titles', {
+  skip: !process.env.PLAYWRIGHT_MODULE,
+}, async () => {
+  const chromium = await getChromium();
+  const browser = await chromium.launch({
+    headless: true,
+    ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}),
+    args: ['--no-sandbox'],
+  });
+
+  try {
+    for (const width of [390, 1280]) {
+      const page = await browser.newPage({ viewport: { width, height: 900 } });
+      await page.goto(`${process.env.TEST_BASE_URL || 'http://localhost:3000'}/details/person/8167`, { waitUntil: 'domcontentloaded' });
+
+      const bg = page.locator('[data-actor-background="collage"]');
+      await bg.waitFor({ state: 'attached' });
+
+      // Check fixed full-screen positioning
+      const isFixed = await bg.evaluate((el) => {
+        const style = window.getComputedStyle(el);
+        return style.position === 'fixed' && style.top === '0px' && style.left === '0px';
+      });
+      assert.ok(isFixed, 'actor background must be fixed at (0, 0) covering the viewport');
+
+      // Wait for grid and poster images to populate
+      const grid = page.locator('[data-actor-collage-grid]');
+      await grid.waitFor({ state: 'attached', timeout: 5000 });
+      const imgCount = await grid.locator('img').count();
+      assert.ok(imgCount >= (width < 640 ? 10 : 20), `collage grid must have multiple poster tiles (found ${imgCount})`);
+
+      // Verify that images include posters of known titles and are unique
+      const srcs = await grid.locator('img').evaluateAll((imgs) => imgs.map((img) => img.src));
+      assert.ok(srcs.length > 0 && srcs.some((s) => s.includes('image.tmdb.org')), 'collage tiles must load TMDb posters');
+      const uniqueCount = new Set(srcs).size;
+      assert.equal(uniqueCount, srcs.length, `all ${srcs.length} tiles must be unique without duplicate posters`);
+
+      // Verify absence of heavy green blur blobs
+      const blobCount = await bg.locator('.rounded-full').count();
+      assert.equal(blobCount, 0, 'heavy blur blobs must be removed for a clean list-details look');
 
       await page.close();
     }
