@@ -51,3 +51,14 @@ test("los dos desplegables de la barra llevan la marca", async () => {
   assert.match(filtros, /data-search-portal/);
   assert.match(resultados, /data-search-portal/);
 });
+
+test("la etiqueta de resultados de búsqueda para actores es 'Actor' y no 'Actor/actriz'", async () => {
+  const navbar = await readFile(NAVBAR, "utf8");
+  const i18n = await readFile(new URL("../../lib/i18n.js", import.meta.url), "utf8");
+
+  assert.doesNotMatch(navbar, /search_badge_actor.*Actor\/actriz/);
+  assert.match(navbar, /t\("search_badge_actor",\s*"Actor"\)/);
+  assert.doesNotMatch(i18n, /search_badge_actor:\s*"Actor\/actriz"/);
+  assert.match(i18n, /search_badge_actor:\s*"Actor"/);
+});
+
