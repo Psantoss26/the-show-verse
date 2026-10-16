@@ -631,14 +631,24 @@ export async function getActorMovies(id) {
 }
 
 export async function getActorKnownFor(id, name) {
-  if (!id || !name) return [];
-  const data = await tmdb("/search/person", {
+  if (!id) return [];
+  try {
+    const data = await tmdb(`/person/${id}/known_for`, { language: "es-ES" });
+    if (Array.isArray(data?.results) && data.results.length > 0) {
+      return data.results;
+    }
+  } catch {
+    // Si falla el endpoint directo de persona, recurrir a búsqueda por nombre
+  }
+
+  if (!name) return [];
+  const searchData = await tmdb("/search/person", {
     language: "es-ES",
     query: name,
     include_adult: false,
     page: 1,
-  });
-  const match = (data?.results || []).find(
+  }).catch(() => null);
+  const match = (searchData?.results || []).find(
     (result) => String(result?.id) === String(id),
   );
   return match?.known_for || [];

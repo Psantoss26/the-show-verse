@@ -347,6 +347,7 @@ const normalizeKnownForItem = (item) => {
   const date = media_type === "tv" ? item.first_air_date : item.release_date;
   return {
     ...item,
+    title: item.title || item.name,
     kind: "acting",
     media_type,
     year: yearFromDate(date),
@@ -517,15 +518,18 @@ const knownForFallbackScore = (item) => {
   const order = Number.isFinite(Number(item?.order)) ? Number(item.order) : 99;
   const episodeCount = Number(item?.episode_count || 0);
   const isMovie = item?.media_type !== "tv";
-  const roleScore = Math.max(0, 20 - Math.min(order, 20)) * 2.2;
-  const voteScore = Math.log10(voteCount + 1) * 8;
-  const popularityScore = Math.sqrt(Math.max(popularity, 0)) * 7;
-  const mediaScore = isMovie ? 18 : Math.min(episodeCount, 30) * 0.9;
+  const roleFactor =
+    order <= 2 ? 1.0 : order <= 5 ? 0.85 : order <= 10 ? 0.6 : 0.25;
+  const voteScore = Math.log10(voteCount + 1) * 28;
+  const popularityScore = Math.log10(popularity + 1) * 12;
+  const ratingScore = voteAverage * 2;
+  const mediaScore = isMovie ? 10 : Math.min(episodeCount, 20);
   const guestPenalty =
     !isMovie && episodeCount > 0 && episodeCount < 6 ? 0.2 : 1;
 
   return (
-    (popularityScore + voteScore + voteAverage * 1.5 + roleScore + mediaScore) *
+    (voteScore + popularityScore + ratingScore + mediaScore) *
+    roleFactor *
     guestPenalty
   );
 };
@@ -1896,11 +1900,7 @@ export default function ActorDetails({
       images: `${TMDB_BASE}/person/${personId}/images?${qs}`,
       tagged: `${TMDB_BASE}/person/${personId}/tagged_images?${qs}&page=1`,
       translations: `${TMDB_BASE}/person/${personId}/translations?${qs}`,
-      knownFor: actorDetails?.name
-        ? `${TMDB_BASE}/search/person?${qs}${lang}&query=${encodeURIComponent(
-            actorDetails.name,
-          )}&include_adult=false&page=1`
-        : null,
+      knownFor: `${TMDB_BASE}/person/${personId}/known_for?${qs}${lang}`,
     };
 
     const settled = await Promise.allSettled([
@@ -1925,19 +1925,25 @@ export default function ActorDetails({
     if (im.status === "fulfilled") setImages(im.value);
     if (tg.status === "fulfilled") setTaggedImages(tg.value);
     if (tr.status === "fulfilled") setTranslations(tr.value);
-    if (kf.status === "fulfilled") {
-      const match = (kf.value?.results || []).find(
-        (result) => String(result?.id) === String(personId),
-      );
-      const knownFor = (match?.known_for || [])
+    if (kf.status === "fulfilled" && kf.value) {
+      const results = Array.isArray(kf.value?.results)
+        ? kf.value.results
+        : Array.isArray(kf.value?.known_for)
+          ? kf.value.known_for
+          : (kf.value?.results || []).find(
+              (result) => String(result?.id) === String(personId),
+            )?.known_for || [];
+      const knownFor = results
         .map(normalizeKnownForItem)
         .filter((item) => item?.poster_path);
-      setTmdbKnownFor(knownFor);
+      if (knownFor.length > 0) {
+        setTmdbKnownFor(knownFor);
+      }
     }
 
     setLoadingExtra(false);
     loadAwardsForWikidata(nextExternal?.wikidata_id);
-  }, [actorDetails?.name, loadAwardsForWikidata, personId]);
+  }, [loadAwardsForWikidata, personId]);
 
   useEffect(() => {
     const defaultCreditFilters = getDefaultCreditFilters(actorDetails);
@@ -2463,7 +2469,10 @@ export default function ActorDetails({
     const orderedFallback =
       movies.length >= 6 - official.length ? movies : [...movies, ...tv];
 
-    return [...official, ...orderedFallback].slice(0, 6);
+    return [...official, ...orderedFallback].slice(
+      0,
+      Math.max(6, Math.min(official.length, 8)),
+    );
   }, [creditsAll, tmdbKnownFor]);
 
   // COMPARTIR: la misma hoja que la ficha de un título (imagen y vídeo
@@ -2830,7 +2839,7 @@ export default function ActorDetails({
                 </div>
               </div>
               <div
-                className={`mt-4 ${LIST_DETAILS_ACTION_ROW_CLASS} [--detail-action-mobile-size:40px] lg:[--detail-action-desktop-size:52px] lg:[--detail-action-desktop-icon:24px] lg:!gap-2`}
+                className={`mt-4 ${LIST_DETAILS_ACTION_ROW_CLASS} [--detail-action-mobile-size:clamp(34px,calc((100vw-70px)/8),56px)] lg:[--detail-action-desktop-size:52px] lg:[--detail-action-desktop-icon:24px] lg:!gap-2`}
               >
                 <ActorActionButton
                   onClick={toggleActorFavorite}
