@@ -31,7 +31,6 @@ const collageTileStyle = (px = COLLAGE_FEATHER_PX) => ({
 });
 
 const DESKTOP_COLLAGE_FEATHER_RATIO = 0.15;
-const DESKTOP_COLLAGE_REVEAL_CAP_MS = 2500;
 const useClientLayoutEffect =
   typeof window === "undefined" ? useEffect : useLayoutEffect;
 
@@ -64,6 +63,10 @@ export default function ActorCollageBackground({
   titles = [],
   fallbackPosters = [],
 }) {
+  // Sin medida hasta montar, igual en el servidor y en el cliente: calcularla
+  // al crear el estado (con `window` en el cliente y 1280×900 en el
+  // servidor) daba HTML distinto y React avisaba de un error de hidratación.
+  // Se mide en el efecto de maquetación, antes de pintar.
   const [grid, setGrid] = useState(null);
   const [textlessPosters, setTextlessPosters] = useState([]);
 
@@ -95,8 +98,12 @@ export default function ActorCollageBackground({
     };
   }, []);
 
-  // Obtener carátulas sin texto de los títulos conocidos (múltiples por título)
+  // Si ya tenemos suficientes pósters de la filmografía (fallbackPosters),
+  // no saturamos con peticiones individuales a TMDb; de lo contrario, buscamos en segundo plano.
   useEffect(() => {
+    if (fallbackPosters.length >= (grid?.count || 12)) {
+      return;
+    }
     if (!Array.isArray(titles) || titles.length === 0) {
       setTextlessPosters([]);
       return;
@@ -105,6 +112,7 @@ export default function ActorCollageBackground({
     let cancelled = false;
     const targets = titles
       .filter((t) => t?.id)
+      .slice(0, 10)
       .map((t) => ({
         id: t.id,
         mediaType: t.media_type === "tv" ? "tv" : "movie",
@@ -154,12 +162,13 @@ export default function ActorCollageBackground({
     return () => {
       cancelled = true;
     };
-  }, [titles]);
+  }, [titles, fallbackPosters.length, grid?.count]);
 
   const activePosters = useMemo(() => {
+    if (fallbackPosters.length >= (grid?.count || 12)) return fallbackPosters;
     if (textlessPosters.length > 0) return textlessPosters;
     return fallbackPosters;
-  }, [textlessPosters, fallbackPosters]);
+  }, [fallbackPosters, textlessPosters, grid?.count]);
 
   const uniquePosters = useMemo(() => {
     const valid = (Array.isArray(activePosters) ? activePosters : []).filter(
@@ -190,31 +199,6 @@ export default function ActorCollageBackground({
     [tileWidth]
   );
 
-  const [settled, setSettled] = useState(() => new Set());
-  const [capped, setCapped] = useState(false);
-
-  useEffect(() => {
-    setSettled(new Set());
-    setCapped(false);
-    const timer = window.setTimeout(
-      () => setCapped(true),
-      DESKTOP_COLLAGE_REVEAL_CAP_MS
-    );
-    return () => window.clearTimeout(timer);
-  }, [uniquePosters]);
-
-  const settle = (src) =>
-    setSettled((current) => {
-      if (current.has(src)) return current;
-      const next = new Set(current);
-      next.add(src);
-      return next;
-    });
-
-  const ready =
-    tiles.length > 0 &&
-    (capped || uniquePosters.every((src) => settled.has(src)));
-
   return (
     <div
       data-actor-background="collage"
@@ -225,9 +209,7 @@ export default function ActorCollageBackground({
       {tiles.length > 0 && grid ? (
         <div
           data-actor-collage-grid
-          className={`absolute inset-0 overflow-hidden transition-opacity duration-700 ease-out motion-reduce:transition-none ${
-            ready ? "opacity-100" : "opacity-0"
-          }`}
+          className="absolute inset-0 overflow-hidden transition-opacity duration-300 ease-out"
         >
           <div
             className="grid bg-neutral-950 w-full h-full"
@@ -249,9 +231,7 @@ export default function ActorCollageBackground({
                     src={src}
                     alt=""
                     decoding="async"
-                    fetchPriority="low"
-                    onLoad={() => settle(src)}
-                    onError={() => settle(src)}
+                    loading={index < (grid.cols * 2) ? "eager" : "lazy"}
                     className="h-full w-full object-cover"
                   />
                 </div>

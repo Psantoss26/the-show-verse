@@ -2262,9 +2262,12 @@ function NavbarContent() {
   );
   const isSeasonDetailsRoute = /^\/details\/tv\/[^/]+\/season\/[^/]+\/?$/.test(pathname || "");
   const isEpisodeDetailsRoute = /^\/details\/tv\/[^/]+\/season\/[^/]+\/episode\/[^/]+\/?$/.test(pathname || "");
+  // La ficha de una persona (ActorDetails) usa en móvil la misma cabecera
+  // inmersiva que listas y colecciones: su foto también va bajo la barra.
   const isDetailsRoute =
     /^\/details\/movie\/[^/]+\/?$/.test(pathname || "") ||
     /^\/details\/tv\/[^/]+\/?$/.test(pathname || "") ||
+    /^\/details\/person\/[^/]+\/?$/.test(pathname || "") ||
     isListDetailsRoute ||
     isSeasonDetailsRoute ||
     isEpisodeDetailsRoute;

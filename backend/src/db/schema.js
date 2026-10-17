@@ -552,6 +552,20 @@ export const collectionLikes = pgTable('collection_likes', {
   userIdx: index('idx_collection_likes_user').on(t.userId, t.createdAt),
 }));
 
+// Me gusta en los ACTORES / PERSONAS de TMDb (/details/person/:id). No viven en
+// nuestra base de datos (se piden a TMDb), así que se apuntan por su id de TMDb
+// y el recuento se calcula al vuelo, igual que con las colecciones.
+export const actorLikes = pgTable('actor_likes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  personId: integer('person_id').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  uniqueLike: uniqueIndex('idx_actor_likes_unique').on(t.userId, t.personId),
+  actorIdx: index('idx_actor_likes_person').on(t.personId),
+  userIdx: index('idx_actor_likes_user').on(t.userId, t.createdAt),
+}));
+
 // ─────────────────────────────────────────────
 // RECOMMENDATION DISMISSALS (títulos descartados en la sección de
 // Recomendaciones, con su flujo de deslizar). Se guardan en la base de datos y

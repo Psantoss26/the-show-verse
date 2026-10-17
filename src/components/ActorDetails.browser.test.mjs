@@ -67,7 +67,7 @@ test('actor portrait loads eagerly, keeps its frame and handles image failure', 
   }
 });
 
-test('actor action buttons match DetailsClient sizing and have distinct colors', {
+test('actor action buttons match list details sizing and have distinct colors', {
   skip: !process.env.PLAYWRIGHT_MODULE,
 }, async () => {
   const chromium = await getChromium();
@@ -90,7 +90,8 @@ test('actor action buttons match DetailsClient sizing and have distinct colors',
       assert.equal(count, 4, 'there should be 4 action buttons');
 
       const firstBox = await buttons.nth(0).boundingBox();
-      const expectedSize = width === 360 ? 36.25 : width === 390 ? 40 : width === 768 ? 48 : 52;
+      // Same contract as list/collection details (ListDetailsActionRow): up to 56px on phones, 48px from `sm`.
+      const expectedSize = width < 640 ? 56 : 48;
       assert.ok(
         Math.abs(firstBox.width - expectedSize) <= 1,
         `actor action button width on ${width}px (${firstBox.width}) should match ${expectedSize}px`
@@ -156,7 +157,20 @@ test('actor metadata displays deathday before height and place of birth in a sin
       await page.goto(`${baseUrl}/details/person/8167`, { waitUntil: 'domcontentloaded' });
       await page.waitForTimeout(1000);
 
-      const metadata = page.locator('[data-actor-metadata]');
+      // Phone: the data is the first tab ("Perfil", open by default) of the
+      // info menu, revealed on scroll; from 640px it is the header row.
+      const phone = width < 640;
+      if (phone) {
+        assert.equal(await page.locator('[data-actor-metadata]').isVisible(), false, 'the header row is hidden on phones');
+        await page.evaluate(() => window.scrollTo(0, 450));
+        const tabNames = await page.locator('button').evaluateAll((buttons) => buttons
+          .map((button) => button.textContent.trim())
+          .filter((label) => ['Perfil', 'Detalles', 'Popular', 'Biografía'].includes(label)));
+        assert.deepEqual(tabNames, ['Perfil', 'Detalles', 'Popular', 'Biografía'], 'Perfil is the first info tab on phones');
+      }
+      const metadata = phone
+        ? page.locator('.sv-info-cards-scope').first()
+        : page.locator('[data-actor-metadata]');
       await metadata.waitFor({ state: 'visible' });
       const text = await metadata.innerText();
 
@@ -176,9 +190,18 @@ test('actor metadata displays deathday before height and place of birth in a sin
       assert.ok(deathIndex < heightIndex, 'deathday must be displayed BEFORE height');
       assert.ok(heightIndex < placeIndex, 'height must be displayed before place of birth');
 
-      // Verify single-line layout (no multiline wrap)
       const box = await metadata.boundingBox();
-      assert.ok(box.height < 40, `metadata row height (${box.height}px) must be a single line (<40px)`);
+      if (width >= 640) {
+        // Verify single-line layout (no multiline wrap)
+        assert.ok(box.height < 40, `metadata row height (${box.height}px) must be a single line (<40px)`);
+      } else {
+        // Phone: every card fits fully inside the viewport
+        const outside = await metadata.evaluate((el) => [...el.querySelectorAll('*')].some((item) => {
+          const r = item.getBoundingClientRect();
+          return r.width > 0 && (r.left < 0 || r.right > window.innerWidth);
+        }));
+        assert.equal(outside, false, 'every profile card must be fully visible on phones');
+      }
 
       // Verify "Conocido por" section has correct TMDB titles
       const popularSection = page.locator('#section-popular');

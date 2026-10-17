@@ -191,7 +191,7 @@ function readInnerHeight(el) {
     return Math.max(0, el.getBoundingClientRect().height - borders)
 }
 
-function readBottomNavTop() {
+export function readBottomNavTop() {
     // Embedded phone panels have no bottom navbar: use the full panel height.
     if (document.querySelector("[data-embedded-details]")) return window.innerHeight
     const nav = document.querySelector(MOBILE_BOTTOM_NAV_SELECTOR)

@@ -8,8 +8,8 @@
 //     que añade la API).
 
 const TV_TYPES = new Set(["tv", "show", "season", "episode"]);
-// Sin ficha de título propia: el arte es el de la lista o la colección.
-const WITHOUT_TITLE = new Set(["list", "like_list", "like_collection"]);
+// Sin ficha de título propia: el arte es el de la lista, la colección o el actor.
+const WITHOUT_TITLE = new Set(["list", "like_list", "like_collection", "like_actor"]);
 
 /** Título de TMDb cuyo backdrop corresponde a la acción, o null. */
 export function activityBackdropTarget(item) {
@@ -26,11 +26,12 @@ export function activityBackdropSrc(path, size = "w780") {
 /**
  * ¿Tiene imagen la acción en la vista «Lista con backdrop»? Su póster, el
  * backdrop de su título, la estantería de su lista (`previewItems`) o el
- * backdrop de su colección.
+ * backdrop de su colección o foto del actor.
  */
 export function hasActivityBackdropArtwork(item) {
   if (typeof item?.posterPath === "string" && item.posterPath.trim()) return true;
   if (activityBackdropTarget(item)) return true;
   if ((item?.type === "list" || item?.type === "like_list") && item.previewItems?.length) return true;
+  if (item?.type === "like_actor" && Number(item.personId) > 0) return true;
   return item?.type === "like_collection" && Number(item.collectionId) > 0;
 }

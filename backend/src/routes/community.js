@@ -10,6 +10,9 @@ import {
 import {
   getCollectionLikes, likeCollection, unlikeCollection, parseCollectionId, parseCollectionIds,
 } from '../community/collectionLikes.js';
+import {
+  getActorLikes, likeActor, unlikeActor, parsePersonId, parsePersonIds,
+} from '../community/actorLikes.js';
 import { db } from '../db/client.js';
 import { invalidateLevelState } from '../level/store.js';
 import { getFollowingTitleActivity } from '../lib/followingTitleActivity.js';
@@ -162,6 +165,27 @@ export default async function communityRoutes(fastify) {
 
   fastify.delete('/collections/:id/like', { preHandler: fastify.requireAuth }, (req, reply) =>
     toggleCollectionLike(req, reply, unlikeCollection));
+
+  // ── ME GUSTA en actores / personas de TMDb ───
+  fastify.get('/actors/likes', async (req, reply) => {
+    const ids = parsePersonIds(req.query?.ids);
+    const viewerId = req.user?.id || null;
+    const likes = await getActorLikes({ ids, viewerId });
+    setCommunityCache(reply, viewerId, 'public, s-maxage=60, stale-while-revalidate=600');
+    return { likes };
+  });
+
+  async function toggleActorLike(req, reply, action) {
+    const personId = parsePersonId(req.params.id);
+    if (!personId) return reply.status(404).send({ error: 'Person not found' });
+    return reply.send(await action({ personId, userId: req.user.id }));
+  }
+
+  fastify.post('/actors/:id/like', { preHandler: fastify.requireAuth }, (req, reply) =>
+    toggleActorLike(req, reply, likeActor));
+
+  fastify.delete('/actors/:id/like', { preHandler: fastify.requireAuth }, (req, reply) =>
+    toggleActorLike(req, reply, unlikeActor));
 
   // GET /:type/:tmdbId/following — "Tus amigos": qué han hecho con este título
   // las cuentas que sigue el usuario. Solo con sesión; nunca se cachea en el borde.

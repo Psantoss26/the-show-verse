@@ -1,7 +1,8 @@
 "use client";
 
 // src/components/community/ListLikeButton.jsx
-// Me gusta en una lista de la comunidad (o, con `endpoint`, en una colección).
+// Me gusta en una lista de la comunidad (o, con `endpoint`, en una colección
+// o una persona de TMDb).
 //
 // Mismo trato que el de las reseñas: optimista, reversible y idempotente en el
 // servidor. Sin sesión enseña el recuento pero no invita a pulsar.
@@ -22,6 +23,8 @@ export default function ListLikeButton({
   endpoint = null,
   // Avisa del estado confirmado por el servidor ({ liked, likes }).
   onChange = null,
+  // Grupo de cristal de la fila de botones donde va (la de un actor usa el suyo).
+  groupId = "list-details-actions",
 }) {
   const online = useServerOnline();
   const [state, setState] = useState({ liked: Boolean(liked), likes: Number(likes) || 0 });
@@ -70,7 +73,7 @@ export default function ListLikeButton({
       <LiquidButton
         type="button"
         liquidGlass
-        groupId="list-details-actions"
+        groupId={groupId}
         title={label}
         aria-label={label}
         aria-pressed={active}

@@ -19,12 +19,14 @@ import {
   commentLikes,
   listLikes,
   collectionLikes,
+  actorLikes,
   communityLists,
   communityListItems,
 } from '../db/schema.js';
 import { getTitlePoster } from './tmdbPoster.js';
 import { pickByLanguageLadder } from './imageLanguageLadder.js';
 import { getTmdbCollection } from './tmdbCollection.js';
+import { getTmdbPerson } from './tmdbPerson.js';
 import { getMediaMetadataMap, metadataFor } from '../utils/mediaMetadata.js';
 import {
   countCompletedShows,
@@ -824,10 +826,11 @@ export async function buildSectionCounts(db, targetId, { includePrivateLists = f
         .from(userListItems)
         .innerJoin(userLists, eq(userLists.id, userListItems.listId))
         .where(listVisibility),
-      // Me gusta: en reseñas, listas de la comunidad y colecciones.
+      // Me gusta: en reseñas, listas de la comunidad, colecciones y actores.
       db.select({ n: count() }).from(commentLikes).where(eq(commentLikes.userId, targetId)),
       db.select({ n: count() }).from(listLikes).where(eq(listLikes.userId, targetId)),
       db.select({ n: count() }).from(collectionLikes).where(eq(collectionLikes.userId, targetId)),
+      db.select({ n: count() }).from(actorLikes).where(eq(actorLikes.userId, targetId)),
     ]),
   ]);
   return {
@@ -1289,6 +1292,21 @@ async function hydrateCollectionLikes(db, items) {
   }
 }
 
+/** Nombre y foto de los actores con me gusta de la página (best-effort). */
+async function hydrateActorLikes(db, items) {
+  const pending = items.filter((item) => item.type === 'like_actor');
+  if (!pending.length) return;
+  const ids = [...new Set(pending.map((item) => item.personId))];
+  const people = new Map(
+    await Promise.all(ids.map(async (id) => [id, await getTmdbPerson(db, id).catch(() => null)])),
+  );
+  for (const item of pending) {
+    const person = people.get(item.personId);
+    item.name = person?.name || null;
+    item.posterPath = person?.profile_path || null;
+  }
+}
+
 // Títulos de cabeza de cada lista para su portada en la vista «Lista con
 // backdrop» de la Actividad (Perfil y Social): la misma estantería de pósters
 // que el modo backdrop de su página de detalles, que usa sus 48 primeros.
@@ -1381,6 +1399,7 @@ export async function getUserActivity(db, targetId, opts = {}) {
     reviewLikeRows,
     listLikeRows,
     collectionLikeRows,
+    actorLikeRows,
   ] = await Promise.all([
     db
       .select({
@@ -1520,6 +1539,14 @@ export async function getUserActivity(db, targetId, opts = {}) {
       .where(eq(collectionLikes.userId, targetId))
       .orderBy(desc(collectionLikes.createdAt))
       .limit(sourceLimit),
+    // Me gusta en personas de TMDb (actores, directores…): solo guardan el
+    // personId; nombre y foto se piden después, solo para los de la página.
+    db
+      .select({ id: actorLikes.id, personId: actorLikes.personId, createdAt: actorLikes.createdAt })
+      .from(actorLikes)
+      .where(eq(actorLikes.userId, targetId))
+      .orderBy(desc(actorLikes.createdAt))
+      .limit(sourceLimit),
   ]);
 
   const events = [
@@ -1552,6 +1579,14 @@ export async function getUserActivity(db, targetId, opts = {}) {
       posterPath: null,
       createdAt: row.createdAt,
     })),
+    ...actorLikeRows.map((row) => ({
+      id: `like-actor:${row.id}`,
+      type: 'like_actor',
+      personId: Number(row.personId),
+      name: null,
+      posterPath: null,
+      createdAt: row.createdAt,
+    })),
   ];
 
   events.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -1578,6 +1613,7 @@ export async function getUserActivity(db, targetId, opts = {}) {
   await Promise.all([
     fillMissingPosters(db, targetId, titleEvents),
     hydrateCollectionLikes(db, page.items),
+    hydrateActorLikes(db, page.items),
     hydrateListPreviewItems(db, page.items),
   ]);
   // Después de rellenar: los títulos guardados en las tablas del usuario pueden
