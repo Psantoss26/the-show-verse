@@ -3593,7 +3593,7 @@ export default function ActorDetails({
 
           {/* MÓVIL: la última sección sin su margen inferior; queda solo el
               hueco del carrusel para la sombra del hover (`pb-8`), así la
-              página topa con la última fila ~30px sobre el navbar inferior. */}
+              página topa con la última fila unos 35px sobre el navbar inferior. */}
           <div className="mt-6 space-y-14 max-sm:[&>section:last-child_section]:mb-0">
             {popularItems.length > 0 && (
               <section id="section-popular" ref={registerSection("popular")}>
