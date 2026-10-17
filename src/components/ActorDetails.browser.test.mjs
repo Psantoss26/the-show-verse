@@ -90,9 +90,9 @@ test('actor action buttons match list details sizing and have distinct colors', 
       assert.equal(count, 4, 'there should be 4 action buttons');
 
       const firstBox = await buttons.nth(0).boundingBox();
-      // Same contract as every details page: up to 56px on phones, 48px from `sm`
-      // and DetailsClient's 52px from `lg` (DETAIL_ACTION_DESKTOP_SIZE_CLASS).
-      const expectedSize = width < 640 ? 56 : width < 1024 ? 48 : 52;
+      // DetailsClient's sizes: on phones its 8-button share of the row
+      // (36.25px at 360, 40px at 390), 48px from `sm`, 52px from `lg`.
+      const expectedSize = width === 360 ? 36.25 : width === 390 ? 40 : width < 1024 ? 48 : 52;
       assert.ok(
         Math.abs(firstBox.width - expectedSize) <= 1,
         `actor action button width on ${width}px (${firstBox.width}) should match ${expectedSize}px`
