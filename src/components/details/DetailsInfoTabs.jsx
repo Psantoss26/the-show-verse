@@ -207,10 +207,19 @@ export default function DetailsInfoTabs({
   // inicialmente de forma compacta y se expanden bajo demanda, sin crear un
   // segundo scroll dentro de la página.
   expandableSynopsis = false,
+  // Líneas de la sinopsis recogida (`expandableSynopsis`). La ficha de un
+  // actor en teléfono pide más: su biografía es una pestaña junto a otras de
+  // 4 tarjetas y así mide más o menos lo mismo que ellas.
+  synopsisCollapsedLines = 4,
+  // Pestaña de tarjetas propia, la PRIMERA del menú: `{ id, label, cards }`
+  // (mismo formato que `detailCards`). La usa la ficha de un actor en
+  // teléfono para sus datos personales.
+  leadingTab = null,
 }) {
-  const [activeTab, setActiveTab] = useState(() =>
-    showDetailsTab ? "details" : showProductionTab ? "production" : "synopsis",
-  );
+  // Sin elegir (null), la primera pestaña del menú. Así una pestaña inicial
+  // que llega después del primer render (la de teléfono, tras hidratar) se
+  // abre sola mientras el usuario no haya cambiado de pestaña.
+  const [selectedTab, setActiveTab] = useState(null);
   const [showFullSynopsis, setShowFullSynopsis] = useState(false);
   const synopsisId = useId();
   const isBackdrop = variant === "backdrop";
@@ -226,8 +235,12 @@ export default function DetailsInfoTabs({
   // UNA sola lista de pestañas: la pinta el menú y la recorre el gesto de
   // deslizar. Si cada uno tuviera la suya se desincronizarían en cuanto una
   // pestaña condicional (Plataformas, Premios) entra o sale.
+  // Solo su id y su etiqueta: el objeto se crea en cada render de la página.
+  const leadingTabId = leadingTab?.id;
+  const leadingTabLabel = leadingTab?.label;
   const tabs = useMemo(
     () => [
+      ...(leadingTabId ? [{ id: leadingTabId, label: leadingTabLabel }] : []),
       ...(showDetailsTab ? [{ id: "details", label: "Detalles" }] : []),
       ...(showProductionTab ? [{ id: "production", label: productionTabLabel }] : []),
       ...(!synopsisBelowTabs ? [{ id: "synopsis", label: synopsisTabLabel }] : []),
@@ -236,6 +249,8 @@ export default function DetailsInfoTabs({
       ...(hasAwardsTab ? [{ id: "awards", label: "Premios" }] : []),
     ],
     [
+      leadingTabId,
+      leadingTabLabel,
       showDetailsTab,
       showProductionTab,
       productionTabLabel,
@@ -247,11 +262,19 @@ export default function DetailsInfoTabs({
     ],
   );
 
+  // Si la pestaña elegida deja de existir (p. ej. la Biografía del actor, que
+  // solo es pestaña en teléfono, al ensanchar la ventana), se muestra la
+  // primera en vez de dejar el panel vacío.
+  const activeTab = tabs.some((tab) => tab.id === selectedTab)
+    ? selectedTab
+    : tabs[0]?.id ?? selectedTab;
+
   // En móvil se cambia de sección deslizando sobre el menú, sin tener que
   // apuntar a la etiqueta. Sin ciclo: en la primera y en la última el gesto no
   // hace nada, que es justo lo que está prometiendo la posición del subrayado.
   const goToAdjacentTab = (step) => {
-    setActiveTab((current) => {
+    setActiveTab((selected) => {
+      const current = tabs.some((tab) => tab.id === selected) ? selected : tabs[0]?.id;
       const index = tabs.findIndex((tab) => tab.id === current);
       if (index < 0) return current;
       const next = index + step;
@@ -293,6 +316,11 @@ export default function DetailsInfoTabs({
               ? "line-clamp-4 mask-fade-bottom"
               : ""
           }`}
+          style={
+            synopsisIsExpandable && !showFullSynopsis && synopsisCollapsedLines !== 4
+              ? { WebkitLineClamp: synopsisCollapsedLines, lineClamp: synopsisCollapsedLines }
+              : undefined
+          }
         >
           {overview || "No hay descripción disponible."}
         </p>
@@ -345,6 +373,17 @@ export default function DetailsInfoTabs({
           {!synopsisBelowTabs && activeTab === "synopsis" && (
             <div key="synopsis">
               {synopsisPanel}
+            </div>
+          )}
+
+          {/* ===== TAB INICIAL PROPIA (`leadingTab`) ===== */}
+          {leadingTab && activeTab === leadingTab.id && (
+            <div key={leadingTab.id} className="sv-info-cards-scope">
+              <CustomInfoCards
+                cards={leadingTab.cards}
+                mobileLayout={mobileLayout}
+                wrapCards={wrapCards}
+              />
             </div>
           )}
 

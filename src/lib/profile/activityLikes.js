@@ -3,9 +3,10 @@
 //   - like_review      reseña de una ficha (tmdbId/mediaType del título, autor y fragmento)
 //   - like_list        lista de la comunidad (listId, name, listOwner)
 //   - like_collection  colección de TMDb (collectionId, name)
-// Para filtrar y agrupar, los tres son una sola acción: "like".
+//   - like_actor       persona de TMDb: actor, actriz, dirección… (personId, name)
+// Para filtrar y agrupar, los cuatro son una sola acción: "like".
 
-export const LIKE_ACTIVITY_TYPES = Object.freeze(["like_review", "like_list", "like_collection"]);
+export const LIKE_ACTIVITY_TYPES = Object.freeze(["like_review", "like_list", "like_collection", "like_actor"]);
 
 export function isLikeActivity(item) {
   return LIKE_ACTIVITY_TYPES.includes(item?.type);
@@ -30,6 +31,10 @@ export function likeTargetHref(item) {
   if (item?.type === "like_collection" && Number.isInteger(collectionId) && collectionId > 0) {
     return `/lists/collection/${collectionId}`;
   }
+  const personId = Number(item?.personId);
+  if (item?.type === "like_actor" && Number.isInteger(personId) && personId > 0) {
+    return `/details/person/${personId}`;
+  }
   return null;
 }
 
@@ -40,6 +45,7 @@ export function likeTargetName(item) {
   if (item?.type === "like_collection") {
     return String(item.name || "").replace(/\s*[-–—]\s*(colecci[oó]n|collection)\s*$/i, "").trim() || "Colección";
   }
+  if (item?.type === "like_actor") return item.name || "una persona";
   return item?.title || "";
 }
 
@@ -56,11 +62,14 @@ const LIKE_VERBS = {
     like_review: "ha dado me gusta a una reseña de",
     like_list: "ha dado me gusta a la lista",
     like_collection: "ha dado me gusta a la colección",
+    // Neutro: vale para actores, actrices, directores… («a Brad Pitt»).
+    like_actor: "ha dado me gusta a",
   },
   first: {
     like_review: "Has dado me gusta a una reseña de",
     like_list: "Has dado me gusta a la lista",
     like_collection: "Has dado me gusta a la colección",
+    like_actor: "Has dado me gusta a",
   },
 };
 

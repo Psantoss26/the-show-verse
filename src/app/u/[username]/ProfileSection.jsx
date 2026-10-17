@@ -891,6 +891,7 @@ function ActivityRow({ item, actor, compact = false, posterList = false, backdro
     like_review: { icon: ThumbsUp, tone: "text-pink-400", filled: true },
     like_list: { icon: Heart, tone: "text-pink-400", filled: true },
     like_collection: { icon: Heart, tone: "text-pink-400", filled: true },
+    like_actor: { icon: Heart, tone: "text-pink-400", filled: true },
   };
   const definition = definitions[item.type] || definitions.watched;
   const Icon = definition.icon;

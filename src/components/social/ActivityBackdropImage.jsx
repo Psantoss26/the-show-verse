@@ -156,5 +156,6 @@ function ListShelf({ item, alt }) {
 export default function ActivityBackdropImage({ item, alt = "", sizes = DEFAULT_SIZES }) {
   if (item?.type === "list" || item?.type === "like_list") return <ListShelf item={item} alt={alt} />;
   if (item?.type === "like_collection") return <CollectionBackdrop item={item} alt={alt} sizes={sizes} />;
+  if (item?.type === "like_actor") return <PosterFallback item={item} alt={alt} />;
   return <TitleBackdrop item={item} alt={alt} sizes={sizes} />;
 }

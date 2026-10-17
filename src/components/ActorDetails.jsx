@@ -22,7 +22,6 @@ import {
   CheckCircle2,
   ExternalLink,
   Film,
-  Heart,
   Link2,
   Share2,
   Check,
@@ -43,6 +42,7 @@ import {
   ChevronDown,
   Calendar,
   Ruler,
+  MapPin,
 } from "lucide-react";
 import {
   AnimatedSection,
@@ -66,11 +66,28 @@ import { titleStateKey, useViewerTitleStates } from "@/components/social/useView
 import { getMediaAccountStates, getExternalIds } from "@/lib/api/tmdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
 import ActorCollageBackground from "@/components/details/ActorCollageBackground";
+import {
+  MOBILE_ACTIONS_ENTRY_ANIMATION,
+  MOBILE_REVEAL_BASE,
+  MobileHeroCover,
+  readBottomNavTop,
+  useMobileDetailsHero,
+} from "@/components/details/MobileDetailsHero";
+import useImageLoadReady from "@/lib/hooks/useImageLoadReady";
+import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import useActorLike from "@/hooks/useActorLike";
+import ListLikeButton from "@/components/community/ListLikeButton";
 
 /* --- CONFIG & UTILS --- */
+// Cabecera móvil (ver el ajuste en ActorDetails): hueco del pie de los
+// botones al navbar inferior y alto mínimo del hueco de la foto respecto al
+// ancho (pantallas muy bajas: el nombre no sube más allá).
+const ACTOR_HERO_NAV_GAP_PX = 20;
+const ACTOR_HERO_MIN_SPACER_RATIO = 1;
+// Alto de la banda del pie de la foto móvil que pasa a desenfocada.
+const ACTOR_COVER_EDGE_BAND_PX = 160;
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const TMDB_BASE = "https://api.themoviedb.org/3";
-const ACTOR_FAVORITES_STORAGE_KEY = "the-show-verse:favorite-actors:v1";
 // Estilo de "borde" de las tarjetas de contenido: SIN borde en reposo + anillo
 // EMERALD inset (2.5px) en hover, vía pseudo-elemento `after`. Misma receta que las
 // secciones de Reparto y Recomendaciones de DetailsClient, pero con el verde
@@ -293,16 +310,6 @@ const tmdbImg = (path, size = "original") =>
   path ? `https://image.tmdb.org/t/p/${size}${path}` : null;
 const safeText = (v, fallback = "—") =>
   v == null || v === "" ? fallback : String(v);
-const readActorFavoriteIds = () => {
-  try {
-    const value = JSON.parse(
-      window.localStorage.getItem(ACTOR_FAVORITES_STORAGE_KEY) || "[]",
-    );
-    return Array.isArray(value) ? value.map(String) : [];
-  } catch {
-    return [];
-  }
-};
 
 function awardResultLabel(result) {
   if (result === "winner") return "Ganador";
@@ -1237,8 +1244,20 @@ function ActorRowCarousel({ children, variant = "poster" }) {
   const slides = Children.toArray(children);
   const isWide = variant === "wide";
   const isAward = variant === "award";
+  // Una página por vista (TaggedMediaRow): cada página ya llena el ancho
+  // exacto, así que se avanza de página en página, sin desplazamiento libre
+  // que dejara una tarjeta cortada al borde. Mismos huecos que entre las
+  // tarjetas de cada página (MEDIA_ROW_GAPS).
+  const isPages = variant === "pages";
 
-  const breakpoints = isAward
+  const breakpoints = isPages
+    ? {
+        0: { slidesPerView: 1, spaceBetween: 8 },
+        640: { slidesPerView: 1, spaceBetween: 14 },
+        900: { slidesPerView: 1, spaceBetween: 16 },
+        1280: { slidesPerView: 1, spaceBetween: 18 },
+      }
+    : isAward
     ? {
         0: { slidesPerView: 3, spaceBetween: 8 },
         500: { slidesPerView: 3, spaceBetween: 14 },
@@ -1345,7 +1364,7 @@ function ActorRowCarousel({ children, variant = "poster" }) {
           style={{ overflowX: "clip", overflowY: "visible" }}
         >
           <Swiper
-            slidesPerView={3}
+            slidesPerView={isPages ? 1 : 3}
             spaceBetween={8}
             onSwiper={handleSwiper}
             onSlideChange={updateNav}
@@ -1358,7 +1377,11 @@ function ActorRowCarousel({ children, variant = "poster" }) {
             grabCursor
             simulateTouch
             allowTouchMove
-            freeMode={{ enabled: true, momentum: true, momentumRatio: 0.55 }}
+            freeMode={
+              isPages
+                ? false
+                : { enabled: true, momentum: true, momentumRatio: 0.55 }
+            }
             modules={[FreeMode]}
             className="!overflow-visible pb-8"
           >
@@ -1661,7 +1684,165 @@ function PhotoCard({ image }) {
   );
 }
 
-function TaggedMediaCard({ image }) {
+// Proporción de cada imagen etiquetada (TMDb da `aspect_ratio`, y si no, su
+// ancho y alto): la tarjeta la respeta para no recortar la imagen.
+function taggedImageAspect(image) {
+  const ratio = Number(image?.aspect_ratio);
+  if (Number.isFinite(ratio) && ratio > 0) return ratio;
+  const width = Number(image?.width);
+  const height = Number(image?.height);
+  return width > 0 && height > 0 ? width / height : 16 / 9;
+}
+
+// Alto objetivo y hueco de las páginas de apariciones en medios según el
+// ancho de la ventana (los mismos cortes que el carrusel).
+const MEDIA_ROW_HEIGHTS = [
+  [1024, 208],
+  [640, 176],
+  [0, 144],
+];
+const MEDIA_ROW_GAPS = [
+  [1280, 18],
+  [900, 16],
+  [640, 14],
+  [0, 8],
+];
+const pickByViewport = (table, viewport) =>
+  table.find(([min]) => viewport >= min)[1];
+
+// Reparto en páginas JUSTIFICADAS (como una galería de fotos): en cada
+// página las tarjetas comparten alto y ese alto se ajusta para que, con su
+// proporción, llenen el ancho exacto de la fila. Ninguna imagen se recorta y
+// ninguna tarjeta queda cortada en el borde. Se añaden tarjetas a la página
+// mientras el alto resultante no baje del objetivo; con la siguiente ya por
+// debajo, se queda la opción (con o sin ella) más cercana al objetivo. La
+// última página, si no llega a llenar, va al alto objetivo y alineada a la
+// izquierda en vez de agrandarse.
+// TELÉFONO (`phone`): una imagen apaisada (backdrop) va como mucho con un
+// póster al lado y nunca con otra apaisada; con dos pósters la fila quedaba
+// demasiado apretada.
+function buildJustifiedMediaPages(images, width, gap, targetHeight, { phone = false } = {}) {
+  const pages = [];
+  let page = [];
+  let aspectSum = 0;
+  const heightFor = (count, sum) => (width - gap * (count - 1)) / sum;
+  const isLandscape = (aspect) => aspect > 1;
+  for (const image of images) {
+    const aspect = taggedImageAspect(image);
+    if (phone && page.length > 0) {
+      const landscapes =
+        page.filter((item) => isLandscape(item.aspect)).length +
+        (isLandscape(aspect) ? 1 : 0);
+      if (landscapes > 1 || (landscapes === 1 && page.length + 1 > 2)) {
+        pages.push({ items: page, height: heightFor(page.length, aspectSum) });
+        page = [];
+        aspectSum = 0;
+      }
+    }
+    if (page.length > 0) {
+      const withNext = heightFor(page.length + 1, aspectSum + aspect);
+      if (withNext < targetHeight) {
+        const without = heightFor(page.length, aspectSum);
+        if (Math.abs(withNext - targetHeight) < Math.abs(without - targetHeight)) {
+          page.push({ image, aspect });
+          pages.push({ items: page, height: withNext });
+          page = [];
+          aspectSum = 0;
+          continue;
+        }
+        pages.push({ items: page, height: without });
+        page = [];
+        aspectSum = 0;
+      }
+    }
+    page.push({ image, aspect });
+    aspectSum += aspect;
+  }
+  if (page.length > 0) {
+    pages.push({
+      items: page,
+      height: Math.min(targetHeight, heightFor(page.length, aspectSum)),
+    });
+  }
+  return pages;
+}
+
+function TaggedMediaRow({ images }) {
+  const ref = useRef(null);
+  const [layout, setLayout] = useState(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    const measure = () => {
+      const width = Math.floor(el.getBoundingClientRect().width);
+      const viewport = window.innerWidth;
+      const next = {
+        width,
+        gap: pickByViewport(MEDIA_ROW_GAPS, viewport),
+        height: pickByViewport(MEDIA_ROW_HEIGHTS, viewport),
+        phone: viewport < 640,
+      };
+      setLayout((current) =>
+        current &&
+        current.width === next.width &&
+        current.gap === next.gap &&
+        current.height === next.height &&
+        current.phone === next.phone
+          ? current
+          : next,
+      );
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", measure);
+      return () => window.removeEventListener("resize", measure);
+    }
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const pages = useMemo(
+    () =>
+      layout?.width
+        ? buildJustifiedMediaPages(images, layout.width, layout.gap, layout.height, {
+            phone: layout.phone,
+          })
+        : [],
+    [images, layout],
+  );
+
+  return (
+    // Hasta medir, el hueco del alto objetivo: la sección no salta al llegar.
+    <div ref={ref} className={pages.length ? "" : "h-36 sm:h-44 lg:h-52"}>
+      {pages.length ? (
+        <ActorRowCarousel variant="pages">
+          {pages.map((page) => (
+            <div
+              key={page.items[0].image.file_path}
+              className="flex"
+              style={{ gap: layout.gap }}
+            >
+              {page.items.map(({ image, aspect }) => (
+                <TaggedMediaCard
+                  key={image.file_path}
+                  image={image}
+                  // Ancho redondeado hacia abajo: la suma nunca pasa del de
+                  // la fila por decimales.
+                  width={Math.floor(page.height * aspect * 100) / 100}
+                  height={page.height}
+                />
+              ))}
+            </div>
+          ))}
+        </ActorRowCarousel>
+      ) : null}
+    </div>
+  );
+}
+
+function TaggedMediaCard({ image, width, height }) {
   const title = image?.media?.title || image?.media?.name || "";
 
   return (
@@ -1669,7 +1850,10 @@ function TaggedMediaCard({ image }) {
       href={tmdbImg(image.file_path, "original")}
       target="_blank"
       rel="noreferrer"
-      className={`group relative z-0 block aspect-[16/10] overflow-hidden rounded-2xl bg-zinc-900/60 hover:z-[60] focus:z-[60] focus:outline-none ${CARD_HOVER_RING}`}
+      // Tamaño de su página justificada (TaggedMediaRow), con la proporción
+      // de la imagen: sin recortes ni bandas.
+      className={`group relative z-0 block shrink-0 overflow-hidden rounded-2xl bg-zinc-900/60 hover:z-[60] focus:z-[60] focus:outline-none ${CARD_HOVER_RING}`}
+      style={{ width, height }}
       whileHover={{
         y: -7,
         boxShadow:
@@ -1708,7 +1892,6 @@ export default function ActorDetails({
   const personId = actorDetails?.id;
   const contentTopRef = useRef(null);
   const initialExternalIds = actorDetails?.external_ids || null;
-  const actorIdKey = String(personId || "");
   const hasInitialExtra = Boolean(
     actorDetails?.combined_credits ||
     actorDetails?.external_ids ||
@@ -1727,7 +1910,6 @@ export default function ActorDetails({
   const [externalIds, setExternalIds] = useState(initialExternalIds);
   const [actorHeight, setActorHeight] = useState(null);
   const [actorCountryCodes, setActorCountryCodes] = useState([]);
-  const [actorFavorite, setActorFavorite] = useState(false);
   const [externalLinksOpen, setExternalLinksOpen] = useState(false);
   const [combinedCredits, setCombinedCredits] = useState(
     actorDetails?.combined_credits || null,
@@ -1767,10 +1949,90 @@ export default function ActorDetails({
   const [sort, setSort] = useState("date_desc");
 
   const profileSrc = tmdbImg(actorDetails?.profile_path, "h632");
+  const profileLowSrc = tmdbImg(actorDetails?.profile_path, "w342");
   const [failedProfileSrc, setFailedProfileSrc] = useState(null);
   const tmdbUrl = personId
     ? `https://www.themoviedb.org/person/${personId}`
     : null;
+
+  const mobileCoverLoad = useImageLoadReady(profileLowSrc || profileSrc);
+  const [mobileCoverFailedSrc, setMobileCoverFailedSrc] = useState(null);
+  const mobileCoverReady =
+    !profileSrc || mobileCoverLoad.ready || mobileCoverFailedSrc === (profileLowSrc || profileSrc);
+
+  const isBackNav = useIsHistoryNavigation();
+  const animateMobileEntry = !isBackNav;
+
+  const {
+    rootRef: heroRootRef,
+    coverSpacerRef: heroCoverSpacerRef,
+    actionRowRef: heroActionRowRef,
+    secondaryTriggerRef: heroSecondaryTriggerRef,
+    isPhone,
+    revealProps: heroRevealProps,
+    rootStyle: heroRootStyle,
+  } = useMobileDetailsHero(true, {
+    lock: mobileCoverReady,
+  });
+
+  // MÓVIL: ranking, nombre y botones van lo más abajo posible, con los
+  // botones justo encima del navbar inferior (ACTOR_HERO_NAV_GAP_PX). La foto
+  // NO cambia: entera a todo el ancho (`--mobile-cover-h` = 150vw, sin zoom
+  // ni recorte) y con su borde inferior difuminado, como en las demás
+  // páginas de detalles. Solo crece el hueco en flujo
+  // (`--actor-cover-spacer-h`); en móviles altos el grupo queda bajo el pie
+  // de la foto, sobre su prolongación difuminada.
+  // La medida va directa al DOM (como en useMobileDetailsHero) y el navbar se
+  // relee solo si cambia el ancho una vez vista la foto: la barra de
+  // direcciones cambia el alto al hacer scroll.
+  const heroActionsWrapRef = useRef(null);
+  const mobileCoverReadyRef = useRef(mobileCoverReady);
+  useLayoutEffect(() => {
+    mobileCoverReadyRef.current = mobileCoverReady;
+  }, [mobileCoverReady]);
+  useLayoutEffect(() => {
+    const root = heroRootRef.current;
+    const spacer = heroCoverSpacerRef.current;
+    const actions = heroActionsWrapRef.current;
+    if (!isPhone || !root || !spacer || !actions) return undefined;
+    let navTop = null;
+    let lastWidth = 0;
+    const applied = {};
+    const write = (name, value) => {
+      if (applied[name] === value) return;
+      applied[name] = value;
+      root.style.setProperty(name, value);
+    };
+    const update = () => {
+      const widthChanged = window.innerWidth !== lastWidth;
+      lastWidth = window.innerWidth;
+      if (navTop == null || widthChanged || !mobileCoverReadyRef.current) {
+        navTop = readBottomNavTop();
+      }
+      const spacerRect = spacer.getBoundingClientRect();
+      // La caja de la fila (con su `-top-2`), no la fila: esta entra subiendo
+      // con un `transform` y una medida a medio camino la descolocaría.
+      const belowSpacer = actions.getBoundingClientRect().bottom - spacerRect.bottom;
+      const spacerTop = spacerRect.top + window.scrollY;
+      const spacerHeight = Math.max(
+        window.innerWidth * ACTOR_HERO_MIN_SPACER_RATIO,
+        navTop - ACTOR_HERO_NAV_GAP_PX - belowSpacer - spacerTop,
+      );
+      write("--actor-cover-spacer-h", `${Math.floor(spacerHeight)}px`);
+    };
+    update();
+    window.addEventListener("resize", update, { passive: true });
+    const observer =
+      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
+    observer?.observe(actions);
+    return () => {
+      window.removeEventListener("resize", update);
+      observer?.disconnect();
+      root.style.removeProperty("--actor-cover-spacer-h");
+    };
+  }, [isPhone, heroRootRef, heroCoverSpacerRef]);
+
+  const actorLike = useActorLike(personId);
 
   // ====== Poster 3D Tilt ======
   const posterWrapRef = useRef(null);
@@ -2260,9 +2522,6 @@ export default function ActorDetails({
       homepage: actorDetails?.homepage,
       imdb: imdb ? `https://www.imdb.com/name/${imdb}` : null,
       tmdb: tmdbUrl,
-      wikipedia: ex?.wikidata_id
-        ? `https://es.wikipedia.org/wiki/Special:EntityPage/${ex.wikidata_id}`
-        : null,
       instagram: ex?.instagram_id
         ? `https://www.instagram.com/${ex.instagram_id}`
         : null,
@@ -2278,6 +2537,17 @@ export default function ActorDetails({
       tiktok: tiktokId ? `https://www.tiktok.com/@${tiktokId}` : null,
     };
   }, [externalIds, actorDetails, tmdbUrl]);
+
+  // Wikipedia la resuelve el modal como en las fichas de títulos
+  // (/api/links/wikipedia): el artículo en español o, si no hay, en inglés,
+  // por la entidad de Wikidata o, sin ella, por el id de IMDb (nm…). Antes se
+  // enlazaba `es.wikipedia.org/wiki/Special:EntityPage/Q…`, que Wikipedia no
+  // resuelve.
+  const actorWikipediaQuery = useMemo(() => {
+    const wikidataId = externalIds?.wikidata_id || null;
+    const imdbId = actorDetails?.imdb_id || externalIds?.imdb_id || null;
+    return wikidataId || imdbId ? { wikidataId, imdbId } : null;
+  }, [externalIds?.wikidata_id, externalIds?.imdb_id, actorDetails?.imdb_id]);
 
   const actorExternalLinks = useMemo(() => {
     const links = [
@@ -2298,17 +2568,6 @@ export default function ActorDetails({
             iconSize: { width: 42, height: 22 },
             iconClassName:
               "!w-[42px] !h-[22px] lg:!w-[44px] lg:!h-[22px] rounded-none object-contain overflow-visible",
-          }
-        : null,
-      socials.wikipedia
-        ? {
-            id: "wikipedia",
-            label: "Wikipedia",
-            icon: "/wikipedia.png",
-            href: socials.wikipedia,
-            iconSize: { width: 24, height: 24 },
-            iconClassName: "!h-6 !w-6 rounded-none object-contain overflow-visible",
-            menuIconClassName: "h-4 w-4 rounded-none object-contain",
           }
         : null,
       socials.instagram
@@ -2381,6 +2640,62 @@ export default function ActorDetails({
   const formattedActorHeight = actorHeight
     ? `${actorHeight.toLocaleString("es-ES", { maximumFractionDigits: 2 })} m`
     : null;
+  // TELÉFONO: nacimiento, fallecimiento, altura y lugar (con banderas) no van
+  // en la cabecera sino como primera pestaña del menú Detalles · Popular ·
+  // Biografía, con las mismas tarjetas. Desde `sm` siguen en su fila.
+  const actorProfileTab = isPhone
+    ? {
+        id: "profile",
+        label: "Perfil",
+        cards: [
+          {
+            label: "Nacimiento",
+            icon: Cake,
+            value: actorDetails?.birthday ? (
+              <span>
+                {formatHumanDate(actorDetails.birthday)}
+                {age ? (
+                  <span className="ml-1.5 text-emerald-400">({age} años)</span>
+                ) : null}
+              </span>
+            ) : null,
+          },
+          {
+            label: "Fallecimiento",
+            icon: Skull,
+            value: actorDetails?.deathday ? (
+              <span className="text-red-400">
+                † {formatHumanDate(actorDetails.deathday)}
+              </span>
+            ) : null,
+          },
+          {
+            label: "Altura",
+            icon: Ruler,
+            value: formattedActorHeight,
+          },
+          {
+            label: "Lugar de nacimiento",
+            icon: MapPin,
+            value: actorDetails?.place_of_birth ? (
+              <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span>{formatActorPlaceOfBirth(actorDetails.place_of_birth)}</span>
+                {actorCountryCodes.map((countryCode) => (
+                  <span
+                    key={countryCode}
+                    role="img"
+                    aria-label={`Bandera de nacionalidad ${countryCode}`}
+                    className="text-base leading-none"
+                  >
+                    {countryFlagEmoji(countryCode)}
+                  </span>
+                ))}
+              </span>
+            ) : null,
+          },
+        ],
+      }
+    : null;
   useEffect(() => {
     let active = true;
     setActorHeight(null);
@@ -2413,17 +2728,6 @@ export default function ActorDetails({
       active = false;
     };
   }, [externalIds?.wikidata_id]);
-  useEffect(() => {
-    if (!actorIdKey) {
-      setActorFavorite(false);
-      return undefined;
-    }
-    const syncFavorite = () =>
-      setActorFavorite(readActorFavoriteIds().includes(actorIdKey));
-    syncFavorite();
-    window.addEventListener("storage", syncFavorite);
-    return () => window.removeEventListener("storage", syncFavorite);
-  }, [actorIdKey]);
   const esBio = translations?.translations?.find((t) => t.iso_639_1 === "es")
     ?.data?.biography;
   const bio = esBio || actorDetails?.biography || "";
@@ -2448,23 +2752,6 @@ export default function ActorDetails({
     setSort("date_desc");
   };
 
-  const toggleActorFavorite = () => {
-    if (!actorIdKey) return;
-    const favoriteIds = readActorFavoriteIds();
-    const nextFavorite = !favoriteIds.includes(actorIdKey);
-    const nextIds = nextFavorite
-      ? [...favoriteIds, actorIdKey]
-      : favoriteIds.filter((id) => id !== actorIdKey);
-    try {
-      window.localStorage.setItem(
-        ACTOR_FAVORITES_STORAGE_KEY,
-        JSON.stringify(nextIds),
-      );
-      setActorFavorite(nextFavorite);
-    } catch {
-      // El botón mantiene su estado si el navegador bloquea el almacenamiento.
-    }
-  };
 
   // --- Títulos por los que se le conoce: 6 créditos únicos más populares ---
   const popularItems = useMemo(() => {
@@ -2534,20 +2821,25 @@ export default function ActorDetails({
       );
     }
 
-    if (urls.length < 4 && Array.isArray(creditsAll)) {
-      for (const item of creditsAll) {
-        const p = item?.poster_path;
-        if (!p || seen.has(p)) continue;
-        seen.add(p);
-        urls.push(
-          /^https?:\/\//i.test(p) ? p : `https://image.tmdb.org/t/p/w185${p}`
-        );
-        if (urls.length >= 8) break;
-      }
+    const extraSource =
+      (Array.isArray(creditsAll) && creditsAll.length > 0)
+        ? creditsAll
+        : (Array.isArray(actorMovies) && actorMovies.length > 0)
+          ? actorMovies
+          : (actorDetails?.combined_credits?.cast || []);
+
+    for (const item of extraSource) {
+      if (urls.length >= 48) break;
+      const p = item?.poster_path;
+      if (!p || seen.has(p)) continue;
+      seen.add(p);
+      urls.push(
+        /^https?:\/\//i.test(p) ? p : `https://image.tmdb.org/t/p/w185${p}`
+      );
     }
 
     return urls;
-  }, [popularItems, tmdbKnownFor, initialKnownFor, creditsAll]);
+  }, [popularItems, tmdbKnownFor, initialKnownFor, creditsAll, actorMovies, actorDetails?.combined_credits?.cast]);
 
   // COMPARTIR: la misma hoja que la ficha de un título (imagen y vídeo
   // generados), en su variante de listas: foto de perfil como portada y
@@ -2892,20 +3184,83 @@ export default function ActorDetails({
   }, [sectionItems, menuH, STICKY_TOP]);
 
   return (
-    <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-emerald-500/30 selection:text-emerald-200">
-      <ActorCollageBackground titles={popularItems} fallbackPosters={knownForPosters} />
+    <div
+      ref={heroRootRef}
+      style={heroRootStyle}
+      className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-emerald-500/30 selection:text-emerald-200"
+    >
+      {/* Fondo de la página. MÓVIL: aparece con el scroll detrás de la
+          portada fija, como en los detalles de listas y colecciones. */}
+      <div className="sv-hero-scroll-in max-sm:[opacity:var(--sv-hero-scroll,0)] sm:opacity-100">
+        <ActorCollageBackground titles={popularItems} fallbackPosters={knownForPosters} />
+      </div>
+
+      {/* MÓVIL (<640px): la cabecera inmersiva de listas y colecciones. La
+          foto va FIJA en el fondo, pegada arriba y a los lados bajo el navbar
+          transparente, con el borde inferior prolongado y difuminado; con el
+          scroll se desvanece mientras entra el fondo. */}
+      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden sm:hidden">
+        <div data-actor-portrait="">
+          <MobileHeroCover
+            objectPosition="center 20%"
+            src={profileSrc}
+            lowSrc={profileLowSrc}
+            imgRef={mobileCoverLoad.imgRef}
+            onLoad={mobileCoverLoad.onLoad}
+            onError={() => setMobileCoverFailedSrc(profileLowSrc || profileSrc)}
+            failed={mobileCoverFailedSrc === (profileLowSrc || profileSrc)}
+            ready={mobileCoverReady}
+            animate={animateMobileEntry}
+            blurredUnderlay
+            adaptiveContrast
+            // Transición a la prolongación difuminada más larga que la de
+            // serie (64px): la foto se va desenfocando poco a poco y no se
+            // nota una franja en el pie.
+            edgeBandPx={ACTOR_COVER_EDGE_BAND_PX}
+            collage={(
+              <div
+                role="img"
+                aria-label={`Sin foto de ${actorDetails?.name || "esta persona"}`}
+                className="flex h-full w-full items-center justify-center text-zinc-700"
+              >
+                <User className="h-20 w-20" />
+              </div>
+            )}
+          />
+        </div>
+
+        {/* Sombreados de legibilidad: siguen al scroll hasta el 60%; la foto
+            entra limpia. */}
+        <div className="sv-hero-scroll-shade absolute inset-0 max-sm:[opacity:calc(var(--sv-hero-scroll,0)*0.6)]">
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
+        </div>
+      </div>
+
       <div
         ref={contentTopRef}
-        className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 lg:pt-12 pb-24"
+        // MÓVIL sin relleno inferior: el layout ya reserva el navbar inferior
+        // y, con los 96px de aquí, al llegar al tope quedaba un hueco vacío.
+        className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 lg:pt-12 pb-24 max-sm:pb-0"
       >
         <motion.div
           initial={false}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-          className="flex flex-col lg:flex-row gap-8 lg:gap-12 mb-12 items-start transform-gpu"
+          // MÓVIL inmersivo: sube hasta el borde superior (los 2rem del `pt-8`
+          // + los 3rem del navbar) para que el hueco coincida con la portada
+          // fija, y sin `transform` (como en los detalles de listas).
+          className="-mt-[5rem] sm:mt-0 flex flex-col lg:flex-row gap-5 sm:gap-8 lg:gap-12 mb-12 items-start transform-gpu max-sm:![transform:none]"
         >
-          {/* --- COLUMNA IZQUIERDA: POSTER + SOCIALS --- */}
-          <div className="w-full max-w-[280px] lg:max-w-[320px] mx-auto lg:mx-0 flex-shrink-0 flex flex-col gap-5 relative z-10 transition-[max-width] duration-500 ease-out">
+          {/* Hueco en flujo de la portada fija para la vista móvil */}
+          <div
+            ref={heroCoverSpacerRef}
+            data-mobile-cover-spacer=""
+            className="relative -mx-4 w-[calc(100%+2rem)] max-w-none flex-shrink-0 sm:hidden"
+            style={{ height: "var(--actor-cover-spacer-h, var(--mobile-cover-h))" }}
+          />
+
+          {/* --- COLUMNA IZQUIERDA: POSTER + SOCIALS EN ESCRITORIO --- */}
+          <div className="w-full max-w-[280px] lg:max-w-[320px] mx-auto lg:mx-0 flex-shrink-0 hidden sm:flex flex-col gap-5 relative z-10 transition-[max-width] duration-500 ease-out">
             {/* Profile Image */}
             <div className="relative">
               <div
@@ -2929,7 +3284,8 @@ export default function ActorDetails({
                 <div
                   ref={posterTiltRef}
                   data-actor-portrait=""
-                  className="relative rounded-2xl overflow-hidden shadow-2xl shadow-black/80 border border-white/10 bg-black/40 aspect-[2/3]"
+                  // Sin borde ni anillo claro: marcaban el contorno de la foto.
+                  className="relative rounded-2xl overflow-hidden shadow-2xl shadow-black/80 bg-black/40 aspect-[2/3]"
                   style={{
                     transformStyle: "preserve-3d",
                     backfaceVisibility: "hidden",
@@ -2939,7 +3295,6 @@ export default function ActorDetails({
                     willChange: poster3dEnabled ? "transform" : undefined,
                   }}
                 >
-                  <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/10 z-20" />
                   <div className="absolute inset-0 bg-neutral-950 z-10 overflow-hidden">
                     {profileSrc && failedProfileSrc !== profileSrc ? (
                       <OptimizedImage
@@ -2970,19 +3325,38 @@ export default function ActorDetails({
 
           {/* --- COLUMNA DERECHA: INFO --- */}
           <div className="flex-1 flex flex-col min-w-0 w-full">
-            <FadeIn delay={0.06} className="mb-5 px-1">
-              <div className="mb-3 flex flex-wrap items-end justify-center gap-x-4 gap-y-2 md:justify-start">
+            {/* MÓVIL: columna con los botones primero y los datos debajo; el
+                nombre sube sobre el pie de la foto (donde listas y
+                colecciones ponen su título) y la entrada de FadeIn no aplica:
+                su `opacity` dejaría plano el cristal de los botones. */}
+            <FadeIn
+              delay={0.06}
+              className="relative mb-5 px-1 max-sm:flex max-sm:flex-col max-sm:![opacity:1] max-sm:![transform:none]"
+            >
+              <div
+                className={`mb-3 flex flex-wrap items-end justify-center gap-x-4 gap-y-2 md:justify-start max-sm:pointer-events-none max-sm:absolute max-sm:inset-x-0 max-sm:bottom-[calc(100%+1.5rem)] max-sm:mb-0 max-sm:flex-col-reverse max-sm:items-center max-sm:gap-y-2.5 max-sm:px-4 max-sm:[&_h1]:drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)] ${
+                  !animateMobileEntry
+                    ? ""
+                    : mobileCoverReady
+                      ? "max-sm:motion-safe:animate-sv-mobile-scoreboard-reveal max-sm:[animation-delay:140ms]"
+                      : "max-sm:invisible"
+                }`}
+              >
                 <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[1] tracking-tight text-balance drop-shadow-xl text-center md:text-left">
                   {safeText(actorDetails?.name)}
                 </h1>
                 <ActorPopularity value={actorDetails?.popularity} personId={personId} />
               </div>
 
-              <div className="w-full overflow-x-auto scrollbar-none">
-                <div data-actor-metadata className="flex flex-nowrap items-center gap-x-3 sm:gap-x-4 text-sm sm:text-base md:text-lg font-medium text-zinc-300 whitespace-nowrap w-fit mx-auto md:mx-0">
+              {/* Desde `sm`. En teléfono estos datos son la primera pestaña
+                  de las de abajo («Perfil», `actorProfileTab`). */}
+              {/* Iconos y texto con sombra (y los iconos en claro): sobre
+                  pósters claros del mosaico de fondo se perdían. */}
+              <div className="hidden sm:block w-full overflow-x-auto no-scrollbar">
+                <div data-actor-metadata className="flex flex-nowrap items-center gap-x-3 sm:gap-x-4 text-sm sm:text-base md:text-lg font-medium text-zinc-300 whitespace-nowrap w-fit mx-auto md:mx-0 [text-shadow:0_1px_2px_rgba(0,0,0,0.9),0_0_10px_rgba(0,0,0,0.6)] [&_svg]:drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)]">
                   {actorDetails?.birthday && (
                     <span className="shrink-0 flex items-center gap-1.5">
-                      <Cake className="w-4 h-4 text-zinc-500 shrink-0" />
+                      <Cake className="w-4 h-4 text-zinc-300 shrink-0" />
                       <span>{formatHumanDate(actorDetails.birthday)}</span>
                       {age && (
                         <span className="text-emerald-400 font-semibold">
@@ -3000,7 +3374,7 @@ export default function ActorDetails({
                   {formattedActorHeight && (
                     <span className="shrink-0 flex items-center gap-1.5">
                       <Ruler
-                        className="h-4 w-4 text-zinc-500 shrink-0"
+                        className="h-4 w-4 text-zinc-300 shrink-0"
                         aria-hidden="true"
                       />
                       <span>{formattedActorHeight}</span>
@@ -3010,7 +3384,7 @@ export default function ActorDetails({
                     <span className="shrink-0 flex items-center gap-1.5">
                       {(actorDetails?.birthday || actorDetails?.deathday || formattedActorHeight) && (
                         <span
-                          className="mr-1 h-1 w-1 rounded-full bg-zinc-700 shrink-0"
+                          className="mr-1 h-1 w-1 rounded-full bg-zinc-300 shrink-0 shadow-[0_0_3px_rgba(0,0,0,0.95)]"
                           aria-hidden="true"
                         />
                       )}
@@ -3033,59 +3407,81 @@ export default function ActorDetails({
                   )}
                 </div>
               </div>
+              {/* MÓVIL: justo bajo la foto (`-top-2`), con la entrada de
+                  listas y colecciones (la fila sube y los botones caen en
+                  cascada) cuando la foto está lista; hasta entonces, invisible
+                  pero ocupando su sitio. */}
               <div
-                className={`mt-4 ${LIST_DETAILS_ACTION_ROW_CLASS} [--detail-action-mobile-size:clamp(34px,calc((100vw-70px)/8),56px)] lg:[--detail-action-desktop-size:52px] lg:[--detail-action-desktop-icon:24px] lg:!gap-2`}
+                ref={heroActionsWrapRef}
+                className="relative mt-4 max-sm:order-1 max-sm:mt-0 max-sm:-top-2 max-sm:mb-4"
               >
-                <ActorActionButton
-                  onClick={toggleActorFavorite}
-                  active={actorFavorite}
-                  activeColor="red"
-                  groupId="actor-details-actions"
-                  title={actorFavorite ? "Quitar de favoritos" : "Añadir a favoritos"}
-                  aria-pressed={actorFavorite}
+                <div
+                  ref={heroActionRowRef}
+                  className={
+                    !animateMobileEntry
+                      ? ""
+                      : mobileCoverReady
+                        ? MOBILE_ACTIONS_ENTRY_ANIMATION
+                        : "max-sm:invisible"
+                  }
                 >
-                  <Heart
-                    className={actorFavorite ? "fill-current" : ""}
-                    aria-hidden="true"
-                  />
-                </ActorActionButton>
+                  <div
+                    // La misma fila que los detalles de listas y colecciones
+                    // (ListDetailsActionRow), sin tamaños propios.
+                    className={LIST_DETAILS_ACTION_ROW_CLASS}
+                  >
+                    {/* Me gusta en el servidor, igual que en colecciones y
+                        listas: cuenta en el perfil y queda en la actividad
+                        (like_actor). Sin sesión, desactivado. */}
+                    <ListLikeButton
+                      key={actorLike.ready ? "ready" : "pending"}
+                      endpoint={`/api/community/actors/${encodeURIComponent(personId)}/like`}
+                      likes={actorLike.likes}
+                      liked={actorLike.liked}
+                      canLike={authenticated && actorLike.ready}
+                      onChange={actorLike.update}
+                      groupId="actor-details-actions"
+                      liquidGlass
+                    />
 
-                <ActorActionButton
-                  onClick={handleShareActor}
-                  aria-haspopup="dialog"
-                  active={actorShareOpen}
-                  activeColor="blue"
-                  groupId="actor-details-actions"
-                  title={actorLinkCopied ? "Enlace copiado" : "Compartir ficha"}
-                >
-                  {actorLinkCopied ? (
-                    <Check aria-hidden="true" />
-                  ) : (
-                    <Share2 aria-hidden="true" />
-                  )}
-                </ActorActionButton>
+                    <ActorActionButton
+                      onClick={handleShareActor}
+                      aria-haspopup="dialog"
+                      active={actorShareOpen}
+                      activeColor="blue"
+                      groupId="actor-details-actions"
+                      title={actorLinkCopied ? "Enlace copiado" : "Compartir ficha"}
+                    >
+                      {actorLinkCopied ? (
+                        <Check aria-hidden="true" />
+                      ) : (
+                        <Share2 aria-hidden="true" />
+                      )}
+                    </ActorActionButton>
 
-                <ActorActionButton
-                  onClick={() => setExternalLinksOpen(true)}
-                  active={externalLinksOpen}
-                  activeColor="purple"
-                  groupId="actor-details-actions"
-                  title="Enlaces externos"
-                  aria-haspopup="dialog"
-                  aria-expanded={externalLinksOpen}
-                >
-                  <Link2 aria-hidden="true" />
-                </ActorActionButton>
+                    <ActorActionButton
+                      onClick={() => setExternalLinksOpen(true)}
+                      active={externalLinksOpen}
+                      activeColor="purple"
+                      groupId="actor-details-actions"
+                      title="Enlaces externos"
+                      aria-haspopup="dialog"
+                      aria-expanded={externalLinksOpen}
+                    >
+                      <Link2 aria-hidden="true" />
+                    </ActorActionButton>
 
-                <ActorActionButton
-                  onClick={() => scrollToSection("credits")}
-                  active={activeSectionId === "credits"}
-                  activeColor="emerald"
-                  groupId="actor-details-actions"
-                  title="Ver filmografía"
-                >
-                  <Film aria-hidden="true" />
-                </ActorActionButton>
+                    <ActorActionButton
+                      onClick={() => scrollToSection("credits")}
+                      active={activeSectionId === "credits"}
+                      activeColor="emerald"
+                      groupId="actor-details-actions"
+                      title="Ver filmografía"
+                    >
+                      <Film aria-hidden="true" />
+                    </ActorActionButton>
+                  </div>
+                </div>
               </div>
 
               {actorShareSheet}
@@ -3096,62 +3492,79 @@ export default function ActorDetails({
                 open={externalLinksOpen}
                 onClose={() => setExternalLinksOpen(false)}
                 links={actorExternalLinks}
+                wikipedia={actorWikipediaQuery}
               />
 
             </FadeIn>
 
-            <DetailsInfoTabs
-              key={personId}
-              layoutId={`actor-info-tabs-${personId}`}
-              productionTabLabel="Popular"
-              synopsisTabLabel="Biografía"
-              synopsisBelowTabs
-              accentColor="emerald"
-              showAwardsTab={false}
-              showPlatformsTab={false}
-              enableMobileTabSwipe
-              expandableSynopsis
-              detailCards={[
-                {
-                  label: "Conocido/a por",
-                  value: actorDetails?.known_for_department || "—",
-                  icon: Briefcase,
-                },
-                {
-                  label: "Créditos",
-                  value: (
-                    <span title={`${stats.movies} películas · ${stats.tv} series`}>
-                      {stats.total}
-                    </span>
-                  ),
-                  icon: Film,
-                },
-                {
-                  label: "Trayectoria",
-                  value: careerYears || "—",
-                  icon: Calendar,
-                },
-                {
-                  label: "Premios",
-                  value: loadingAwards ? "Cargando…" : (
-                    <span title={`${awardStats.wins} ganados · ${awardStats.nominations} nominaciones`}>
-                      {awardStats.total || "—"}
-                    </span>
-                  ),
-                  icon: Trophy,
-                },
-              ]}
-              productionCards={[
-                {
-                  label: "Crédito más popular",
-                  icon: Star,
-                  value: mostPopularCredit
-                    ? `${mostPopularCredit.title || mostPopularCredit.name}${mostPopularCredit.year ? ` · ${mostPopularCredit.year}` : ""}`
-                    : "Sin créditos disponibles.",
-                },
-              ]}
-              overview={bio || "Sin biografía disponible."}
+            {/* MÓVIL: centinela del revelado; la biografía y sus pestañas
+                aparecen al hacer scroll, como la sinopsis de las colecciones. */}
+            <span
+              ref={heroSecondaryTriggerRef}
+              aria-hidden="true"
+              className="block h-px sm:hidden"
             />
+
+            <div className={MOBILE_REVEAL_BASE} {...heroRevealProps}>
+              <DetailsInfoTabs
+                key={personId}
+                layoutId={`actor-info-tabs-${personId}`}
+                leadingTab={actorProfileTab}
+                productionTabLabel="Popular"
+                synopsisTabLabel="Biografía"
+                // En teléfono la biografía es una pestaña más (Detalles · Popular ·
+                // Biografía); desde `sm`, debajo de las pestañas.
+                synopsisBelowTabs={!isPhone}
+                // En teléfono, la biografía recogida mide como una pestaña de
+                // 4 tarjetas (Detalles): 8 líneas en vez de 4.
+                synopsisCollapsedLines={isPhone ? 8 : 4}
+                accentColor="emerald"
+                showAwardsTab={false}
+                showPlatformsTab={false}
+                enableMobileTabSwipe
+                expandableSynopsis
+                detailCards={[
+                  {
+                    label: "Conocido/a por",
+                    value: actorDetails?.known_for_department || "—",
+                    icon: Briefcase,
+                  },
+                  {
+                    label: "Créditos",
+                    value: (
+                      <span title={`${stats.movies} películas · ${stats.tv} series`}>
+                        {stats.total}
+                      </span>
+                    ),
+                    icon: Film,
+                  },
+                  {
+                    label: "Trayectoria",
+                    value: careerYears || "—",
+                    icon: Calendar,
+                  },
+                  {
+                    label: "Premios",
+                    value: loadingAwards ? "Cargando…" : (
+                      <span title={`${awardStats.wins} ganados · ${awardStats.nominations} nominaciones`}>
+                        {awardStats.total || "—"}
+                      </span>
+                    ),
+                    icon: Trophy,
+                  },
+                ]}
+                productionCards={[
+                  {
+                    label: "Crédito más popular",
+                    icon: Star,
+                    value: mostPopularCredit
+                      ? `${mostPopularCredit.title || mostPopularCredit.name}${mostPopularCredit.year ? ` · ${mostPopularCredit.year}` : ""}`
+                      : "Sin créditos disponibles.",
+                  },
+                ]}
+                overview={bio || "Sin biografía disponible."}
+              />
+            </div>
 
           </div>
         </motion.div>
@@ -3178,7 +3591,10 @@ export default function ActorDetails({
             />
           </div>
 
-          <div className="mt-6 space-y-14">
+          {/* MÓVIL: la última sección sin su margen inferior; queda solo el
+              hueco del carrusel para la sombra del hover (`pb-8`), así la
+              página topa con la última fila ~30px sobre el navbar inferior. */}
+          <div className="mt-6 space-y-14 max-sm:[&>section:last-child_section]:mb-0">
             {popularItems.length > 0 && (
               <section id="section-popular" ref={registerSection("popular")}>
                 <AnimatedSection delay={0.04}>
@@ -3488,11 +3904,7 @@ export default function ActorDetails({
                       subtitle="Imágenes donde aparece etiquetado/a"
                       icon={Tags}
                     />
-                    <ActorRowCarousel variant="wide">
-                      {taggedImages.results.map((t) => (
-                        <TaggedMediaCard key={t.file_path} image={t} />
-                      ))}
-                    </ActorRowCarousel>
+                    <TaggedMediaRow images={taggedImages.results} />
                   </section>
                 </AnimatedSection>
               </section>

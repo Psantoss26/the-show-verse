@@ -96,6 +96,7 @@ const ACCIONES = {
   like_review: { Icono: ThumbsUp, tono: "text-pink-400", relleno: true },
   like_list: { Icono: Heart, tono: "text-pink-400", relleno: true },
   like_collection: { Icono: Heart, tono: "text-pink-400", relleno: true },
+  like_actor: { Icono: Heart, tono: "text-pink-400", relleno: true },
 };
 
 // Conjugación: en "Siguiendo" habla el autor del evento ("Ana ha visto…"); en

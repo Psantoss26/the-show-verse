@@ -59,7 +59,8 @@ export async function GET(request) {
   const type = searchParams.get("type") === "tv" ? "tv" : "movie";
 
   const validWikidata = /^Q\d+$/.test(wikidataParam) ? wikidataParam : null;
-  const validImdb = /^tt\d{5,10}$/.test(imdb) ? imdb : null;
+  // tt… títulos; nm… personas (la ficha de un actor).
+  const validImdb = /^(tt|nm)\d{5,10}$/.test(imdb) ? imdb : null;
   const validTmdb = Number.isInteger(tmdb) && tmdb > 0 ? tmdb : null;
   if (!validWikidata && !validImdb && !validTmdb) {
     return NextResponse.json({ error: "Falta el id del título." }, { status: 400 });
