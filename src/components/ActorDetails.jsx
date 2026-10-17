@@ -3272,7 +3272,6 @@ export default function ActorDetails({
                     <ActorActionButton
                       onClick={handleShareActor}
                       aria-haspopup="dialog"
-                      active={actorShareOpen}
                       activeColor="blue"
                       groupId="actor-details-actions"
                       title={actorLinkCopied ? "Enlace copiado" : "Compartir ficha"}
@@ -3286,7 +3285,6 @@ export default function ActorDetails({
 
                     <ActorActionButton
                       onClick={() => setExternalLinksOpen(true)}
-                      active={externalLinksOpen}
                       activeColor="purple"
                       groupId="actor-details-actions"
                       title="Enlaces externos"
