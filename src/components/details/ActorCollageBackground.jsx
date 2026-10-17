@@ -5,7 +5,7 @@ import {
   buildBackgroundCollageTiles,
   getDesktopBackgroundGrid,
 } from "@/lib/lists/posterCollage";
-import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
+import { peekListArtwork, requestListArtwork } from "@/lib/tmdb/artworkBatch";
 
 const COLLAGE_FEATHER_PX = 12;
 const featherRamp = (direction, px = COLLAGE_FEATHER_PX) => `linear-gradient(${direction},
@@ -34,41 +34,31 @@ const DESKTOP_COLLAGE_FEATHER_RATIO = 0.15;
 const useClientLayoutEffect =
   typeof window === "undefined" ? useEffect : useLayoutEffect;
 
-// Caché en memoria para almacenar las carátulas sin idioma por título
-const textlessPostersCache = new Map();
+// Títulos de los que se piden pósters: los primeros de la lista que llega
+// (ya ordenada por relevancia). Caben en UN lote de /api/tmdb/artwork.
+const MAX_COLLAGE_TITLES = 60;
 
-function interleaveTextlessPosters(postersByTitle) {
-  const result = [];
-  const seen = new Set();
-  let round = 0;
-  let added = true;
-  while (added) {
-    added = false;
-    for (const list of postersByTitle) {
-      if (round < list.length) {
-        const url = list[round];
-        if (url && !seen.has(url)) {
-          seen.add(url);
-          result.push(url);
-          added = true;
-        }
-      }
-    }
-    round += 1;
-  }
-  return result;
-}
+const titleTarget = (title) => {
+  const id = Number(title?.id);
+  if (!Number.isInteger(id) || id <= 0) return null;
+  const mediaType = title?.media_type === "tv" ? "tv" : "movie";
+  return { id, mediaType, key: `${mediaType}:${id}` };
+};
 
-export default function ActorCollageBackground({
-  titles = [],
-  fallbackPosters = [],
-}) {
+const textlessPosterUrl = (picks) =>
+  picks?.textlessPoster ? `https://image.tmdb.org/t/p/w185${picks.textlessPoster}` : null;
+
+// FONDO de la ficha de una persona: un mosaico SOLO con pósters SIN IDIOMA
+// (sin título impreso) de los títulos de su filmografía, más relevantes
+// primero. Se piden todos en un único lote al servidor (/api/tmdb/artwork,
+// cacheado un día); un título sin póster neutro no entra (ni su backdrop ni
+// un póster con texto). Sin ninguno, queda el fondo liso.
+export default function ActorCollageBackground({ titles = [] }) {
   // Sin medida hasta montar, igual en el servidor y en el cliente: calcularla
   // al crear el estado (con `window` en el cliente y 1280×900 en el
   // servidor) daba HTML distinto y React avisaba de un error de hidratación.
   // Se mide en el efecto de maquetación, antes de pintar.
   const [grid, setGrid] = useState(null);
-  const [textlessPosters, setTextlessPosters] = useState([]);
 
   useClientLayoutEffect(() => {
     let frame = 0;
@@ -98,77 +88,48 @@ export default function ActorCollageBackground({
     };
   }, []);
 
-  // Si ya tenemos suficientes pósters de la filmografía (fallbackPosters),
-  // no saturamos con peticiones individuales a TMDb; de lo contrario, buscamos en segundo plano.
+  const targets = useMemo(() => {
+    const seen = new Set();
+    const out = [];
+    for (const title of Array.isArray(titles) ? titles : []) {
+      const target = titleTarget(title);
+      if (!target || seen.has(target.key)) continue;
+      seen.add(target.key);
+      out.push(target);
+      if (out.length >= MAX_COLLAGE_TITLES) break;
+    }
+    return out;
+  }, [titles]);
+  const targetKey = targets.map((target) => target.key).join("|");
+
+  // Lo que ya está en la caché del lote (volver a la ficha) sale al momento;
+  // si falta algo se espera al lote completo para no cambiar las celdas
+  // después.
+  const [resolved, setResolved] = useState({ key: "", posters: [] });
   useEffect(() => {
-    if (fallbackPosters.length >= (grid?.count || 12)) {
-      return;
-    }
-    if (!Array.isArray(titles) || titles.length === 0) {
-      setTextlessPosters([]);
-      return;
-    }
-
+    if (!targets.length) return undefined;
     let cancelled = false;
-    const targets = titles
-      .filter((t) => t?.id)
-      .slice(0, 10)
-      .map((t) => ({
-        id: t.id,
-        mediaType: t.media_type === "tv" ? "tv" : "movie",
-        key: `${t.media_type === "tv" ? "tv" : "movie"}:${t.id}`,
-      }));
-
-    if (targets.length === 0) {
-      setTextlessPosters([]);
-      return;
-    }
-
-    const allCached = targets.every((t) => textlessPostersCache.has(t.key));
-    if (allCached) {
-      const lists = targets.map((t) => textlessPostersCache.get(t.key) || []);
-      const interleaved = interleaveTextlessPosters(lists);
-      setTextlessPosters(interleaved);
-      return;
-    }
-
     Promise.all(
-      targets.map(async (t) => {
-        if (textlessPostersCache.has(t.key)) {
-          return textlessPostersCache.get(t.key);
-        }
-        try {
-          const images = await fetchTmdbImages(t.mediaType, t.id, {
-            allLanguages: true,
-          });
-          const list = (images?.posters || [])
-            .filter(
-              (p) => p.file_path && (!p.iso_639_1 || p.iso_639_1 === "xx")
-            )
-            .map((p) => `https://image.tmdb.org/t/p/w185${p.file_path}`);
-          textlessPostersCache.set(t.key, list);
-          return list;
-        } catch {
-          textlessPostersCache.set(t.key, []);
-          return [];
-        }
-      })
-    ).then((lists) => {
-      if (cancelled) return;
-      const interleaved = interleaveTextlessPosters(lists);
-      setTextlessPosters(interleaved);
+      targets.map((target) => requestListArtwork(target.mediaType, target.id)),
+    ).then((picks) => {
+      if (!cancelled) {
+        setResolved({ key: targetKey, posters: picks.map(textlessPosterUrl).filter(Boolean) });
+      }
     });
-
     return () => {
       cancelled = true;
     };
-  }, [titles, fallbackPosters.length, grid?.count]);
+    // `targetKey` identifica la lista de títulos.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetKey]);
 
   const activePosters = useMemo(() => {
-    if (fallbackPosters.length >= (grid?.count || 12)) return fallbackPosters;
-    if (textlessPosters.length > 0) return textlessPosters;
-    return fallbackPosters;
-  }, [fallbackPosters, textlessPosters, grid?.count]);
+    if (resolved.key === targetKey) return resolved.posters;
+    const cached = targets.map((target) => peekListArtwork(target.mediaType, target.id));
+    return cached.every((picks) => picks !== undefined)
+      ? cached.map(textlessPosterUrl).filter(Boolean)
+      : [];
+  }, [resolved, targetKey, targets]);
 
   const uniquePosters = useMemo(() => {
     const valid = (Array.isArray(activePosters) ? activePosters : []).filter(

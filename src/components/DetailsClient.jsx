@@ -318,7 +318,7 @@ import {
 // Fila de botones de acción principal (tráiler, favorito, pendiente, puntuar,
 // listas, reseñas, soundtrack…): componente PRESENTACIONAL compartido con la
 // ficha rápida del dashboard (DetailModal) para que la fila sea IDÉNTICA.
-import DetailActionsRow from "@/components/details/DetailActionsRow";
+import DetailActionsRow, { DETAIL_ACTION_DESKTOP_SIZE_CLASS } from "@/components/details/DetailActionsRow";
 
 // -- Modales del componente --
 import AddToListModal from "@/components/details/AddToListModal";
@@ -10713,7 +10713,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 mobileGapClass="gap-1"
                 className={
                   !isBackdropPoster
-                    ? "lg:[--detail-action-desktop-size:52px] lg:[--detail-action-desktop-icon:24px] lg:!gap-2 lg:[&>.separator]:!mx-1"
+                    ? DETAIL_ACTION_DESKTOP_SIZE_CLASS
                     : undefined
                 }
                 onTrailer={() => openVideo(preferredVideo)}

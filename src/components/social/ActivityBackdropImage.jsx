@@ -64,6 +64,29 @@ function PosterFallback({ item, alt }) {
   );
 }
 
+// Persona (me gusta a un actor, directora…): SOLO su foto, centrada a todo el
+// alto de la caja y con sus propias esquinas; sin el relleno difuminado de
+// los lados (la caja va sin fondo, ver `isPortraitActivity`).
+function PersonPortrait({ item, alt }) {
+  const photo = item?.posterPath ? `https://image.tmdb.org/t/p/w185${item.posterPath}` : null;
+  return (
+    <span className="flex h-full w-full items-center justify-center">
+      {photo ? (
+        <OptimizedImage
+          src={photo}
+          alt={alt}
+          className="aspect-[2/3] h-full w-auto rounded-lg object-cover"
+          loading="lazy"
+        />
+      ) : (
+        <span className="flex aspect-[2/3] h-full items-center justify-center rounded-lg bg-zinc-900 text-zinc-700">
+          <ImageOff className="h-5 w-5" aria-hidden="true" />
+        </span>
+      )}
+    </span>
+  );
+}
+
 // Título: su backdrop de la escalera de idioma, pedido en lote con las demás
 // filas que montan a la vez (lib/tmdb/artworkBatch).
 function TitleBackdrop({ item, alt, sizes }) {
@@ -156,6 +179,6 @@ function ListShelf({ item, alt }) {
 export default function ActivityBackdropImage({ item, alt = "", sizes = DEFAULT_SIZES }) {
   if (item?.type === "list" || item?.type === "like_list") return <ListShelf item={item} alt={alt} />;
   if (item?.type === "like_collection") return <CollectionBackdrop item={item} alt={alt} sizes={sizes} />;
-  if (item?.type === "like_actor") return <PosterFallback item={item} alt={alt} />;
+  if (item?.type === "like_actor") return <PersonPortrait item={item} alt={alt} />;
   return <TitleBackdrop item={item} alt={alt} sizes={sizes} />;
 }

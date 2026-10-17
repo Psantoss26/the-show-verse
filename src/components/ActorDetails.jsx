@@ -4,6 +4,7 @@
 import OptimizedImage from "@/components/OptimizedImage";
 import {
   Children,
+  createElement,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -12,7 +13,6 @@ import {
   useRef,
 } from "react";
 import Link from "next/link";
-import { createPortal } from "react-dom";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { FreeMode } from "swiper/modules";
 import "swiper/swiper-bundle.css";
@@ -32,13 +32,11 @@ import {
   Briefcase,
   Star,
   Search,
-  Filter,
   SlidersHorizontal,
   Images,
   Tags,
   Trophy,
   X,
-  ArrowUpDown,
   ChevronDown,
   Calendar,
   Ruler,
@@ -66,6 +64,15 @@ import { titleStateKey, useViewerTitleStates } from "@/components/social/useView
 import { getMediaAccountStates, getExternalIds } from "@/lib/api/tmdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
 import ActorCollageBackground from "@/components/details/ActorCollageBackground";
+import SectionTitle from "@/components/details/SectionTitle";
+import {
+  CreditsFilterDropdowns,
+  YearFilterDropdown,
+} from "@/components/details/CreditFilterControls";
+import ActorSectionSheets, {
+  openActorSectionSheet,
+} from "@/components/details/sectionSheet/ActorSectionSheets";
+import { createValueStore } from "@/lib/details/valueStore";
 import {
   MOBILE_ACTIONS_ENTRY_ANIMATION,
   MOBILE_REVEAL_BASE,
@@ -847,39 +854,6 @@ const countryFlagEmoji = (countryCode) =>
 
 /* --- UI COMPONENTS --- */
 
-function SectionTitle({ title, subtitle, icon: Icon, right }) {
-  return (
-    <div className="flex items-start justify-between gap-4 mb-5 w-full">
-      <div className="flex items-center gap-3 flex-1 min-w-0">
-        {Icon && (
-          <div className="relative flex items-center justify-center p-2.5 rounded-[14px] bg-emerald-500/5 backdrop-blur-2xl shadow-[0_4px_24px_rgba(16,185,129,0.12)] shrink-0 overflow-hidden group-hover/section:bg-emerald-500/10 group-hover/section:shadow-[0_8px_32px_rgba(16,185,129,0.2)] transition-all duration-500">
-            <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/20 via-transparent to-transparent opacity-60" />
-            <div className="absolute inset-0 shadow-[inset_0_1px_2px_rgba(255,255,255,0.15),inset_0_-1px_2px_rgba(0,0,0,0.2)] rounded-[14px] pointer-events-none" />
-            <Icon className="relative z-10 w-5 h-5 text-emerald-500 group-hover/section:text-emerald-400 group-hover/section:scale-110 transition-all duration-500 drop-shadow-[0_2px_8px_rgba(16,185,129,0.4)]" />
-          </div>
-        )}
-        <div className="flex flex-col flex-1 min-w-0">
-          <div className="flex items-center w-full">
-            <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight shrink-0">
-              {title}
-            </h2>
-            <div className="ml-3 sm:ml-4 flex-1 h-px bg-gradient-to-r from-white/20 via-white/5 to-transparent relative flex items-center min-w-[20px]">
-              <div className="absolute left-0 w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,1)] opacity-40 group-hover/section:opacity-100 group-hover/section:scale-150 transition-all duration-500" />
-              <div className="absolute left-0 w-16 sm:w-24 h-[2px] bg-gradient-to-r from-emerald-500 to-transparent opacity-0 group-hover/section:opacity-100 transition-opacity duration-500" />
-            </div>
-          </div>
-          {subtitle && (
-            <p className="text-xs sm:text-sm text-zinc-400 mt-0.5 truncate">
-              {subtitle}
-            </p>
-          )}
-        </div>
-      </div>
-      {right ? <div className="shrink-0">{right}</div> : null}
-    </div>
-  );
-}
-
 // Custom select wrapper
 function SelectInput({
   value,
@@ -917,322 +891,230 @@ function SelectInput({
   );
 }
 
-function InlineDropdown({
-  label,
-  valueLabel,
-  icon: Icon,
-  children,
-  className = "",
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-  const buttonRef = useRef(null);
-  const menuRef = useRef(null);
-  const [menuStyle, setMenuStyle] = useState(null);
+// Filtros de una sección de créditos (Películas o Series). Sin filtrar:
+// todos los créditos en el orden por defecto (lo que enseña la vista lateral).
+const CREDIT_FILTERS_ALL = Object.freeze({
+  q: "",
+  creditFilter: "all",
+  yearFrom: "",
+  yearTo: "",
+  sort: "date_desc",
+});
 
-  const updateMenuPosition = useCallback(() => {
-    if (!buttonRef.current || typeof window === "undefined") return;
-    const rect = buttonRef.current.getBoundingClientRect();
-    const menuWidth = Math.min(rect.width, window.innerWidth - 24);
-    const left = Math.min(
-      Math.max(12, rect.left),
-      Math.max(12, window.innerWidth - menuWidth - 12),
-    );
-
-    setMenuStyle({
-      position: "fixed",
-      top: rect.bottom + 8,
-      left,
-      width: menuWidth,
-      zIndex: 1000,
+function filterAndSortCredits(credits, filters) {
+  let out = [...credits];
+  const needle = String(filters.q || "").trim().toLowerCase();
+  if (filters.creditFilter !== "all")
+    out = out.filter((x) => x.kind === filters.creditFilter);
+  if (filters.yearFrom)
+    out = out.filter((x) => (x.year || -Infinity) >= Number(filters.yearFrom));
+  if (filters.yearTo)
+    out = out.filter((x) => (x.year || Infinity) <= Number(filters.yearTo));
+  if (needle) {
+    out = out.filter((x) => {
+      const t = String(x.title || x.name || "").toLowerCase();
+      const s = String(x.subtitle || "").toLowerCase();
+      return t.includes(needle) || s.includes(needle);
     });
-  }, []);
+  }
 
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e) => {
-      const target = e.target;
-      if (ref.current?.contains(target) || menuRef.current?.contains(target)) {
-        return;
-      }
-      setOpen(false);
-    };
-    document.addEventListener("pointerdown", onDown);
-    return () => document.removeEventListener("pointerdown", onDown);
-  }, [open]);
-
-  useLayoutEffect(() => {
-    if (!open) return;
-    updateMenuPosition();
-    window.addEventListener("resize", updateMenuPosition);
-    window.addEventListener("scroll", updateMenuPosition, true);
-    return () => {
-      window.removeEventListener("resize", updateMenuPosition);
-      window.removeEventListener("scroll", updateMenuPosition, true);
-    };
-  }, [open, updateMenuPosition]);
-
-  return (
-    <div
-      ref={ref}
-      className={`relative w-full lg:w-auto lg:shrink-0 ${className}`}
-    >
-      <button
-        ref={buttonRef}
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="h-11 w-full inline-flex items-center justify-between gap-3 px-4 rounded-xl transition text-sm lg:min-w-[145px] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 focus:outline-none border border-white/10"
-      >
-        <div className="flex min-w-0 items-center gap-2">
-          {Icon && <Icon className="h-4 w-4 shrink-0 text-emerald-400" />}
-          <span className="shrink-0 text-xs font-bold uppercase tracking-wider text-zinc-500">
-            {label}:
-          </span>
-          <span className="truncate font-semibold text-white">
-            {valueLabel}
-          </span>
-        </div>
-        <ChevronDown
-          className={`h-3.5 w-3.5 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`}
-        />
-      </button>
-
-      {typeof document !== "undefined" &&
-        createPortal(
-          <AnimatePresence>
-            {open && menuStyle && (
-              <motion.div
-                ref={menuRef}
-                initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                transition={{ duration: 0.16, ease: "easeOut" }}
-                style={menuStyle}
-                className="sv-scroll max-h-[min(360px,calc(100vh-96px))] overflow-y-auto rounded-2xl border border-white/10 bg-black/40 bg-gradient-to-br from-white/10 to-white/5 shadow-2xl backdrop-blur-2xl p-2"
-              >
-                {children({ close: () => setOpen(false) })}
-              </motion.div>
-            )}
-          </AnimatePresence>,
-          document.body,
-        )}
-    </div>
-  );
+  const sort = filters.sort;
+  if (sort === "date_desc") out.sort(compareCreditsByRecentRelevance);
+  else if (sort === "date_asc")
+    out.sort((a, b) => {
+      const tierDiff = creditRelevanceTier(a) - creditRelevanceTier(b);
+      if (tierDiff !== 0) return tierDiff;
+      return creditTimestamp(a) - creditTimestamp(b);
+    });
+  else if (sort === "pop_desc")
+    out.sort((a, b) => {
+      const tierDiff = creditRelevanceTier(a) - creditRelevanceTier(b);
+      if (tierDiff !== 0) return tierDiff;
+      return creditPopularityScore(b) - creditPopularityScore(a);
+    });
+  else if (sort === "rating_desc")
+    out.sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
+  else if (sort === "alpha")
+    out.sort((a, b) =>
+      String(a.title || a.name || "").localeCompare(
+        String(b.title || b.name || ""),
+      ),
+    );
+  return out;
 }
 
-function DropdownItem({ active, onClick, children }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition ${
-        active
-          ? "bg-white/10 text-white font-bold"
-          : "text-zinc-300 hover:bg-white/5 hover:text-white"
-      }`}
-    >
-      <span className="font-medium">{children}</span>
-      {active && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />}
-    </button>
-  );
+// Filtros de partida de una sección: los de la persona (actuación o equipo
+// según por qué se la conoce) salvo que en ESTE tipo no tenga ninguno de esos
+// créditos; entonces todos, para no abrir la sección vacía.
+function defaultCreditFiltersFor(person, credits) {
+  const { creditFilter } = getDefaultCreditFilters(person);
+  const hasKind = credits.some((item) => item.kind === creditFilter);
+  return { ...CREDIT_FILTERS_ALL, creditFilter: hasKind ? creditFilter : "all" };
 }
 
-function YearFilterDropdown({
-  label,
-  value,
-  setValue,
-  options,
-  className = "",
+// Botón de filtros con la receta de las páginas de usuario (Favoritos).
+const FILTER_TOGGLE_BASE =
+  "relative h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400";
+
+// Una sección de créditos de UN tipo (Películas o Series) con el título de
+// DetailsClient (abre su vista lateral) y su propio desplegable de filtros y
+// ajustes: búsqueda, rol, orden y años. Cada sección guarda los suyos.
+function CreditsMediaSection({
+  title,
+  icon,
+  credits,
+  totalCount,
+  countLabel,
+  person,
+  onOpen,
+  renderCard,
 }) {
+  const defaults = useMemo(
+    () => defaultCreditFiltersFor(person, credits),
+    [person, credits],
+  );
+  const [filters, setFilters] = useState(defaults);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const setFilter = (key) => (value) =>
+    setFilters((current) => ({ ...current, [key]: value }));
+  const resetFilters = () => setFilters(defaults);
+  const filtersChanged = Object.keys(defaults).some(
+    (key) => defaults[key] !== filters[key],
+  );
+
+  const yearOptions = useMemo(() => {
+    const set = new Set(credits.map((c) => c.year).filter((y) => y > 0));
+    return Array.from(set)
+      .sort((a, b) => b - a)
+      .map((y) => ({ value: String(y), label: String(y) }));
+  }, [credits]);
+
+  const items = useMemo(
+    () => dedupeCreditsForDisplay(filterAndSortCredits(credits, filters)),
+    [credits, filters],
+  );
+
   return (
-    <InlineDropdown
-      label={label}
-      valueLabel={value || "Todos"}
-      icon={Calendar}
-      className={className}
-    >
-      {({ close }) => (
-        <>
-          <DropdownItem
-            active={!value}
-            onClick={() => {
-              setValue("");
-              close();
-            }}
+    <section className="mb-16 group/section">
+      {/* Título SIN margen inferior: el hueco va encima de las tarjetas. Con
+          el margen en el título, el panel lo compensaba dentro de lo que
+          anima y, ya plegado, medía 32px menos que desmontado: al terminar de
+          cerrarse las tarjetas saltaban. */}
+      <SectionTitle
+        accent="emerald"
+        className="!mb-0"
+        title={title}
+        icon={icon}
+        onOpen={onOpen}
+        subtitle={`${items.length} de ${totalCount} ${countLabel}`}
+        right={
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((open) => !open)}
+            aria-expanded={filtersOpen}
+            aria-label={`Filtros y ajustes de ${title.toLowerCase()}`}
+            title="Filtros y ajustes"
+            className={`${FILTER_TOGGLE_BASE} ${
+              filtersOpen
+                ? "text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                : "text-zinc-200 hover:bg-black/30"
+            }`}
+            style={{ WebkitTapHighlightColor: "transparent" }}
           >
-            Todos
-          </DropdownItem>
-          {options.map((option) => (
-            <DropdownItem
-              key={`${label}-${option.value}`}
-              active={value === option.value}
-              onClick={() => {
-                setValue(option.value);
-                close();
-              }}
-            >
-              {option.label}
-            </DropdownItem>
-          ))}
-        </>
+            <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+            {/* Filtros distintos de los de partida: un punto, también cerrado. */}
+            {filtersChanged ? (
+              <span
+                aria-hidden="true"
+                className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]"
+              />
+            ) : null}
+          </button>
+        }
+      />
+
+      <MobileFiltersPanel
+        open={filtersOpen}
+        className="relative z-[2]"
+        gapClassName="pt-5"
+      >
+        <div className="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center lg:gap-3">
+          <div className="relative w-full lg:min-w-[240px] lg:flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400 z-10 pointer-events-none" />
+            <input
+              type="text"
+              value={filters.q}
+              onChange={(e) => setFilter("q")(e.target.value)}
+              placeholder="Buscar por título o rol..."
+              className="w-full h-11 rounded-2xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
+            />
+            {filters.q && (
+              <button
+                type="button"
+                onClick={() => setFilter("q")("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded-md transition-colors"
+                aria-label="Limpiar búsqueda"
+              >
+                <X className="w-3.5 h-3.5 text-zinc-400 hover:text-white" />
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-2 lg:flex lg:flex-nowrap lg:gap-3">
+            <CreditsFilterDropdowns
+              creditFilter={filters.creditFilter}
+              setCreditFilter={setFilter("creditFilter")}
+              sort={filters.sort}
+              setSort={setFilter("sort")}
+            />
+            <YearFilterDropdown
+              className="lg:w-[150px] lg:shrink-0"
+              label="Desde"
+              value={filters.yearFrom}
+              setValue={setFilter("yearFrom")}
+              options={yearOptions}
+            />
+            <YearFilterDropdown
+              className="lg:w-[150px] lg:shrink-0"
+              label="Hasta"
+              value={filters.yearTo}
+              setValue={setFilter("yearTo")}
+              options={yearOptions}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={resetFilters}
+            disabled={!filtersChanged}
+            className="h-11 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 px-4 text-sm font-semibold text-zinc-200 shadow-lg backdrop-blur-lg transition hover:from-white/15 hover:to-white/10 hover:text-white disabled:opacity-40 lg:shrink-0"
+          >
+            Limpiar filtros
+          </button>
+        </div>
+      </MobileFiltersPanel>
+
+      {/* El hueco bajo el título (el `mb-8` de SectionTitle) y `flow-root`
+          para que el `mt-3` del carrusel quede dentro y no se funda con él:
+          abierto, plegado o desmontado el panel, las tarjetas no se mueven. */}
+      <div className="flow-root mt-8">
+      {items.length > 0 ? (
+        <ActorRowCarousel>{items.map(renderCard)}</ActorRowCarousel>
+      ) : (
+        <div className="py-16 text-center border border-dashed border-white/10 rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+          {icon ? createElement(icon, { className: "w-12 h-12 text-zinc-600 mx-auto mb-3" }) : null}
+          <p className="text-zinc-400">
+            No se encontraron créditos con estos filtros.
+          </p>
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="mt-4 text-sm text-emerald-400 hover:underline"
+          >
+            Limpiar filtros
+          </button>
+        </div>
       )}
-    </InlineDropdown>
-  );
-}
-
-function CreditsFilterDropdowns({
-  mediaFilter,
-  setMediaFilter,
-  creditFilter,
-  setCreditFilter,
-  sort,
-  setSort,
-}) {
-  const mediaLabel =
-    mediaFilter === "all"
-      ? "Todo"
-      : mediaFilter === "movie"
-        ? "Películas"
-        : "Series";
-  const creditLabel =
-    creditFilter === "all"
-      ? "Todos"
-      : creditFilter === "crew"
-        ? "Equipo"
-        : "Actuación";
-  const sortLabel =
-    sort === "date_asc"
-      ? "Antiguos"
-      : sort === "pop_desc"
-        ? "Popularidad"
-        : sort === "rating_desc"
-          ? "Mejor valorados"
-          : sort === "alpha"
-            ? "A-Z"
-            : "Recientes";
-
-  return (
-    <>
-      <InlineDropdown label="Tipo" valueLabel={mediaLabel} icon={Filter}>
-        {({ close }) => (
-          <>
-            <DropdownItem
-              active={mediaFilter === "all"}
-              onClick={() => {
-                setMediaFilter("all");
-                close();
-              }}
-            >
-              Todo
-            </DropdownItem>
-            <DropdownItem
-              active={mediaFilter === "movie"}
-              onClick={() => {
-                setMediaFilter("movie");
-                close();
-              }}
-            >
-              Películas
-            </DropdownItem>
-            <DropdownItem
-              active={mediaFilter === "tv"}
-              onClick={() => {
-                setMediaFilter("tv");
-                close();
-              }}
-            >
-              Series
-            </DropdownItem>
-          </>
-        )}
-      </InlineDropdown>
-
-      <InlineDropdown label="Rol" valueLabel={creditLabel} icon={Briefcase}>
-        {({ close }) => (
-          <>
-            <DropdownItem
-              active={creditFilter === "acting"}
-              onClick={() => {
-                setCreditFilter("acting");
-                close();
-              }}
-            >
-              Actuación
-            </DropdownItem>
-            <DropdownItem
-              active={creditFilter === "crew"}
-              onClick={() => {
-                setCreditFilter("crew");
-                close();
-              }}
-            >
-              Equipo técnico
-            </DropdownItem>
-            <DropdownItem
-              active={creditFilter === "all"}
-              onClick={() => {
-                setCreditFilter("all");
-                close();
-              }}
-            >
-              Todos
-            </DropdownItem>
-          </>
-        )}
-      </InlineDropdown>
-
-      <InlineDropdown label="Ordenar" valueLabel={sortLabel} icon={ArrowUpDown}>
-        {({ close }) => (
-          <>
-            <DropdownItem
-              active={sort === "date_desc"}
-              onClick={() => {
-                setSort("date_desc");
-                close();
-              }}
-            >
-              Más recientes
-            </DropdownItem>
-            <DropdownItem
-              active={sort === "date_asc"}
-              onClick={() => {
-                setSort("date_asc");
-                close();
-              }}
-            >
-              Más antiguos
-            </DropdownItem>
-            <DropdownItem
-              active={sort === "pop_desc"}
-              onClick={() => {
-                setSort("pop_desc");
-                close();
-              }}
-            >
-              Popularidad
-            </DropdownItem>
-            <DropdownItem
-              active={sort === "rating_desc"}
-              onClick={() => {
-                setSort("rating_desc");
-                close();
-              }}
-            >
-              Mejor valorados
-            </DropdownItem>
-            <DropdownItem
-              active={sort === "alpha"}
-              onClick={() => {
-                setSort("alpha");
-                close();
-              }}
-            >
-              Título A-Z
-            </DropdownItem>
-          </>
-        )}
-      </InlineDropdown>
-    </>
+      </div>
+    </section>
   );
 }
 
@@ -1935,18 +1817,6 @@ export default function ActorDetails({
     normalizeWatchedCredits(initialWatchedCredits),
   );
 
-  // Filter States (Créditos)
-  const [q, setQ] = useState("");
-  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-  const [mediaFilter, setMediaFilter] = useState("all");
-  const initialCreditFilters = getDefaultCreditFilters(actorDetails);
-  const [creditFilter, setCreditFilter] = useState(
-    initialCreditFilters.creditFilter,
-  );
-  const [deptFilter, setDeptFilter] = useState(initialCreditFilters.deptFilter);
-  const [yearFrom, setYearFrom] = useState("");
-  const [yearTo, setYearTo] = useState("");
-  const [sort, setSort] = useState("date_desc");
 
   const profileSrc = tmdbImg(actorDetails?.profile_path, "h632");
   const profileLowSrc = tmdbImg(actorDetails?.profile_path, "w342");
@@ -2247,15 +2117,6 @@ export default function ActorDetails({
   }, [loadAwardsForWikidata, personId]);
 
   useEffect(() => {
-    const defaultCreditFilters = getDefaultCreditFilters(actorDetails);
-    setQ("");
-    setMediaFilter("all");
-    setCreditFilter(defaultCreditFilters.creditFilter);
-    setDeptFilter(defaultCreditFilters.deptFilter);
-    setYearFrom("");
-    setYearTo("");
-    setSort("date_desc");
-    setMobileFiltersOpen(false);
     setExternalIds(initialExternalIds);
     setCombinedCredits(actorDetails?.combined_credits || null);
     setImages(actorDetails?.images || null);
@@ -2370,99 +2231,26 @@ export default function ActorDetails({
       .filter((x) => x.id);
   }, [combinedCredits, actorMovies]);
 
-  const deptOptions = useMemo(() => {
-    const set = new Set(
-      creditsAll.filter((c) => c.kind === "crew").map((c) => c.department),
-    );
-    return Array.from(set)
-      .sort()
-      .map((d) => ({ value: d, label: d }));
-  }, [creditsAll]);
-
-  const yearOptions = useMemo(() => {
-    const set = new Set(creditsAll.map((c) => c.year).filter((y) => y > 0));
-    return Array.from(set)
-      .sort((a, b) => b - a)
-      .map((y) => ({ value: String(y), label: String(y) }));
-  }, [creditsAll]);
-
-  const filteredCredits = useMemo(() => {
-    let out = [...creditsAll];
-    const needle = q.trim().toLowerCase();
-
-    if (mediaFilter !== "all")
-      out = out.filter((x) => x.media_type === mediaFilter);
-    if (creditFilter !== "all")
-      out = out.filter((x) => x.kind === creditFilter);
-    if (creditFilter === "crew" && deptFilter !== "all")
-      out = out.filter((x) => x.department === deptFilter);
-    if (yearFrom)
-      out = out.filter((x) => (x.year || -Infinity) >= Number(yearFrom));
-    if (yearTo) out = out.filter((x) => (x.year || Infinity) <= Number(yearTo));
-    if (needle) {
-      out = out.filter((x) => {
-        const t = String(x.title || x.name || "").toLowerCase();
-        const s = String(x.subtitle || "").toLowerCase();
-        return t.includes(needle) || s.includes(needle);
-      });
-    }
-
-    if (sort === "date_desc") out.sort(compareCreditsByRecentRelevance);
-    else if (sort === "date_asc")
-      out.sort((a, b) => {
-        const tierDiff = creditRelevanceTier(a) - creditRelevanceTier(b);
-        if (tierDiff !== 0) return tierDiff;
-        return creditTimestamp(a) - creditTimestamp(b);
-      });
-    else if (sort === "pop_desc")
-      out.sort((a, b) => {
-        const tierDiff = creditRelevanceTier(a) - creditRelevanceTier(b);
-        if (tierDiff !== 0) return tierDiff;
-        return creditPopularityScore(b) - creditPopularityScore(a);
-      });
-    else if (sort === "rating_desc")
-      out.sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
-    else if (sort === "alpha")
-      out.sort((a, b) =>
-        String(a.title || a.name || "").localeCompare(
-          String(b.title || b.name || ""),
-        ),
-      );
-
-    return out;
-  }, [
-    creditsAll,
-    q,
-    mediaFilter,
-    creditFilter,
-    deptFilter,
-    yearFrom,
-    yearTo,
-    sort,
-  ]);
-
-  const displayCreditGroups = useMemo(() => {
-    const unique = dedupeCreditsForDisplay(filteredCredits);
-    const shouldShowMovies = mediaFilter === "all" || mediaFilter === "movie";
-    const shouldShowSeries = mediaFilter === "all" || mediaFilter === "tv";
-    const groups = [];
-
-    if (shouldShowMovies) {
-      const movies = unique.filter((item) => item.media_type === "movie");
-      if (movies.length) {
-        groups.push({ key: "movies", title: "Películas", items: movies });
-      }
-    }
-
-    if (shouldShowSeries) {
-      const series = unique.filter((item) => item.media_type === "tv");
-      if (series.length) {
-        groups.push({ key: "series", title: "Series", items: series });
-      }
-    }
-
-    return groups;
-  }, [filteredCredits, mediaFilter]);
+  // Créditos de cada tipo, sin filtrar: cada sección (Películas, Series)
+  // aplica los suyos (CreditsMediaSection).
+  const movieCredits = useMemo(
+    () => creditsAll.filter((item) => item.media_type === "movie"),
+    [creditsAll],
+  );
+  const seriesCredits = useMemo(
+    () => creditsAll.filter((item) => item.media_type === "tv"),
+    [creditsAll],
+  );
+  // Los mismos sin repetir título, en el orden por defecto: lo que enseñan
+  // las vistas laterales y cuentan el menú y los títulos de sección.
+  const movieCreditsAll = useMemo(
+    () => dedupeCreditsForDisplay(filterAndSortCredits(movieCredits, CREDIT_FILTERS_ALL)),
+    [movieCredits],
+  );
+  const seriesCreditsAll = useMemo(
+    () => dedupeCreditsForDisplay(filterAndSortCredits(seriesCredits, CREDIT_FILTERS_ALL)),
+    [seriesCredits],
+  );
 
   const stats = useMemo(
     () => ({
@@ -2741,16 +2529,6 @@ export default function ActorDetails({
   const taggedCount = taggedImages?.results?.length || 0;
   const photosCount = photos.length;
 
-  const clearFilters = () => {
-    const defaultCreditFilters = getDefaultCreditFilters(actorDetails);
-    setQ("");
-    setMediaFilter("all");
-    setCreditFilter(defaultCreditFilters.creditFilter);
-    setDeptFilter(defaultCreditFilters.deptFilter);
-    setYearFrom("");
-    setYearTo("");
-    setSort("date_desc");
-  };
 
 
   // --- Títulos por los que se le conoce: 6 créditos únicos más populares ---
@@ -2800,46 +2578,20 @@ export default function ActorDetails({
     );
   }, [creditsAll, tmdbKnownFor]);
 
-  const knownForPosters = useMemo(() => {
-    const urls = [];
-    const seen = new Set();
-    const source =
-      popularItems && popularItems.length > 0
-        ? popularItems
-        : tmdbKnownFor && tmdbKnownFor.length > 0
-          ? tmdbKnownFor
-          : initialKnownFor && initialKnownFor.length > 0
-            ? initialKnownFor
-            : [];
-
-    for (const item of source) {
-      const p = item?.poster_path;
-      if (!p || seen.has(p)) continue;
-      seen.add(p);
-      urls.push(
-        /^https?:\/\//i.test(p) ? p : `https://image.tmdb.org/t/p/w185${p}`
-      );
-    }
-
-    const extraSource =
-      (Array.isArray(creditsAll) && creditsAll.length > 0)
-        ? creditsAll
-        : (Array.isArray(actorMovies) && actorMovies.length > 0)
-          ? actorMovies
-          : (actorDetails?.combined_credits?.cast || []);
-
-    for (const item of extraSource) {
-      if (urls.length >= 48) break;
-      const p = item?.poster_path;
-      if (!p || seen.has(p)) continue;
-      seen.add(p);
-      urls.push(
-        /^https?:\/\//i.test(p) ? p : `https://image.tmdb.org/t/p/w185${p}`
-      );
-    }
-
-    return urls;
-  }, [popularItems, tmdbKnownFor, initialKnownFor, creditsAll, actorMovies, actorDetails?.combined_credits?.cast]);
+  // Títulos del FONDO de mosaico, por relevancia: «Conocido por» y después el
+  // resto de créditos por popularidad, sin apariciones como sí mismo/a. El
+  // fondo pide sus pósters SIN IDIOMA en un lote (ActorCollageBackground).
+  const collageTitles = useMemo(() => {
+    const knownFor = popularItems?.length
+      ? popularItems
+      : tmdbKnownFor?.length
+        ? tmdbKnownFor
+        : initialKnownFor || [];
+    const credits = (creditsAll.length ? creditsAll : actorMovies || [])
+      .filter((item) => item?.id && !isSelfLikeCredit(item.character))
+      .sort((a, b) => creditPopularityScore(b) - creditPopularityScore(a));
+    return [...knownFor, ...credits];
+  }, [popularItems, tmdbKnownFor, initialKnownFor, creditsAll, actorMovies]);
 
   // COMPARTIR: la misma hoja que la ficha de un título (imagen y vídeo
   // generados), en su variante de listas: foto de perfil como portada y
@@ -3035,6 +2787,63 @@ export default function ActorDetails({
     [account?.id, session]
   );
 
+  // Tarjeta de un crédito en los carruseles de Películas y Series.
+  const renderCreditCard = useCallback(
+    (c, index) => (
+      <PosterCard
+        key={`${c.media_type || "m"}-${c.id}-${c.credit_id || index}`}
+        item={c}
+        viewerStates={actorViewerStates}
+        accountStates={actorAccountStates}
+        imdbRatings={actorImdbRatings}
+        onPrefetchHover={handlePrefetchHover}
+      />
+    ),
+    [actorViewerStates, actorAccountStates, actorImdbRatings, handlePrefetchHover],
+  );
+
+  // VISTAS LATERALES de las secciones (como en DetailsClient): pulsar el
+  // título abre su contenido completo. Qué panel está abierto vive en un
+  // almacén fuera del estado de la ficha: abrirlo no la re-renderiza.
+  const sectionSheetStore = useMemo(() => createValueStore(null), []);
+  const sectionSheetOpener = useCallback(
+    (id) => () => openActorSectionSheet(sectionSheetStore, id),
+    [sectionSheetStore],
+  );
+  const sectionSheetData = useMemo(
+    () => ({
+      popular: popularItems,
+      watched: watchedCredits,
+      movies: movieCreditsAll,
+      series: seriesCreditsAll,
+      // Sin deduplicar, para que la vista lateral los filtre como la sección.
+      moviesRaw: movieCredits,
+      seriesRaw: seriesCredits,
+      filterCredits: (list, filters) =>
+        dedupeCreditsForDisplay(
+          filterAndSortCredits(list, { ...CREDIT_FILTERS_ALL, ...filters }),
+        ),
+      // Al formato de las filas de premios de la ficha (AwardRow).
+      awards: awards.map((item) => {
+        const awardTitle = cleanAwardTitle(item?.award);
+        return {
+          id: item.id,
+          category: awardTitle,
+          groupName: awardTitle,
+          groupImageUrl: item.groupImageUrl || fallbackAwardImageUrl(awardTitle),
+          people: item.work ? [item.work] : [],
+          result: item.status === "winner" ? "winner" : "nominee",
+          year: item.year,
+        };
+      }),
+      photos,
+      tagged: taggedImages?.results || [],
+      // Todos los créditos (actuación y equipo) para el camino por años.
+      filmography: creditsAll,
+    }),
+    [popularItems, watchedCredits, movieCreditsAll, seriesCreditsAll, movieCredits, seriesCredits, awards, photos, taggedImages, creditsAll],
+  );
+
   const sectionItems = useMemo(() => {
     const items = [];
     if (popularItems.length > 0)
@@ -3046,12 +2855,19 @@ export default function ActorDetails({
         icon: CheckCircle2,
         count: watchedCredits.length,
       });
-    if (stats.total > 0)
+    if (movieCreditsAll.length > 0)
       items.push({
-        id: "credits",
-        label: "Créditos",
+        id: "movies",
+        label: "Películas",
         icon: Film,
-        count: stats.total,
+        count: movieCreditsAll.length,
+      });
+    if (seriesCreditsAll.length > 0)
+      items.push({
+        id: "series",
+        label: "Series",
+        icon: TvIcon,
+        count: seriesCreditsAll.length,
       });
     items.push({
       id: "awards",
@@ -3077,7 +2893,8 @@ export default function ActorDetails({
   }, [
     popularItems.length,
     watchedCredits.length,
-    stats.total,
+    movieCreditsAll.length,
+    seriesCreditsAll.length,
     awardStats.total,
     photosCount,
     taggedCount,
@@ -3192,7 +3009,7 @@ export default function ActorDetails({
       {/* Fondo de la página. MÓVIL: aparece con el scroll detrás de la
           portada fija, como en los detalles de listas y colecciones. */}
       <div className="sv-hero-scroll-in max-sm:[opacity:var(--sv-hero-scroll,0)] sm:opacity-100">
-        <ActorCollageBackground titles={popularItems} fallbackPosters={knownForPosters} />
+        <ActorCollageBackground titles={collageTitles} />
       </div>
 
       {/* MÓVIL (<640px): la cabecera inmersiva de listas y colecciones. La
@@ -3426,9 +3243,17 @@ export default function ActorDetails({
                   }
                 >
                   <div
-                    // La misma fila que los detalles de listas y colecciones
-                    // (ListDetailsActionRow), sin tamaños propios.
-                    className={LIST_DETAILS_ACTION_ROW_CLASS}
+                    // La fila de listas y colecciones (en escritorio, los 52px
+                    // de DetailsClient) con el tamaño MÓVIL de DetailsClient:
+                    // sus 8 botones se reparten el ancho, así que aquí cada
+                    // uno mide lo de un octavo de fila aunque haya 4 (36px a
+                    // 360px, 40px a 390px, 45px a 430px).
+                    // Sobre el ancho de la propia fila (el `%` del tope se
+                    // resuelve contra ella, como el reparto de DetailsClient:
+                    // 8 botones y 7 huecos de 4px), no de la ventana. Los 8px
+                    // de más son el `px-1` de esta columna, que la fila de
+                    // DetailsClient no tiene: 100% + 8px − 28px.
+                    className={`${LIST_DETAILS_ACTION_ROW_CLASS} [--detail-action-mobile-size:clamp(34px,calc((100%-20px)/8),56px)]`}
                   >
                     {/* Me gusta en el servidor, igual que en colecciones y
                         listas: cuenta en el perfil y queda en la actividad
@@ -3471,12 +3296,14 @@ export default function ActorDetails({
                       <Link2 aria-hidden="true" />
                     </ActorActionButton>
 
+                    {/* Abre la vista lateral «Filmografía»: todo lo que ha
+                        hecho, por departamento y año, como en TMDb. */}
                     <ActorActionButton
-                      onClick={() => scrollToSection("credits")}
-                      active={activeSectionId === "credits"}
+                      onClick={sectionSheetOpener("filmography")}
                       activeColor="emerald"
                       groupId="actor-details-actions"
                       title="Ver filmografía"
+                      aria-haspopup="dialog"
                     >
                       <Film aria-hidden="true" />
                     </ActorActionButton>
@@ -3594,12 +3421,19 @@ export default function ActorDetails({
           {/* MÓVIL: la última sección sin su margen inferior; queda solo el
               hueco del carrusel para la sombra del hover (`pb-8`), así la
               página topa con la última fila unos 35px sobre el navbar inferior. */}
-          <div className="mt-6 space-y-14 max-sm:[&>section:last-child_section]:mb-0">
+          {/* `mt-14`: el mismo hueco que DetailsClient entre el menú de
+              secciones y la primera sección. */}
+          <div className="mt-14 space-y-14 max-sm:[&>section:last-child_section]:mb-0">
             {popularItems.length > 0 && (
               <section id="section-popular" ref={registerSection("popular")}>
                 <AnimatedSection delay={0.04}>
                   <section className="mb-16 group/section">
-                    <SectionTitle title="Conocido por" icon={Star} />
+                    <SectionTitle
+                      accent="emerald"
+                      title="Conocido por"
+                      icon={Star}
+                      onOpen={sectionSheetOpener("popular")}
+                    />
                     <ActorRowCarousel>
                       {popularItems.map((item, index) => (
                         <PosterCard
@@ -3622,6 +3456,8 @@ export default function ActorDetails({
                 <AnimatedSection delay={0.04}>
                   <section className="mb-16 group/section">
                     <SectionTitle
+                      accent="emerald"
+                      onOpen={sectionSheetOpener("watched")}
                       title="Títulos vistos"
                       subtitle={`${watchedCredits.length} títulos vistos de ${safeText(actorDetails?.name)}`}
                       icon={CheckCircle2}
@@ -3643,197 +3479,50 @@ export default function ActorDetails({
               </section>
             )}
 
-            <section id="section-credits" ref={registerSection("credits")}>
-              <AnimatedSection delay={0.04}>
-                <section className="mb-16 group/section">
-                  <SectionTitle
-                    title="Créditos en pantalla"
-                    subtitle={`${displayCreditGroups.reduce((total, group) => total + group.items.length, 0)} de ${stats.total} títulos`}
+            {/* Créditos en pantalla, en dos secciones: Películas y Series,
+                cada una con sus filtros y su vista lateral. */}
+            {movieCredits.length > 0 && (
+              <section id="section-movies" ref={registerSection("movies")}>
+                <AnimatedSection delay={0.04}>
+                  <CreditsMediaSection
+                    key={`movies-${personId}`}
+                    title="Películas"
                     icon={Film}
-                    right={
-                      <button
-                        type="button"
-                        onClick={clearFilters}
-                        className="px-4 py-2 rounded-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 backdrop-blur-md shadow-sm hover:from-white/15 hover:to-white/10 transition text-xs font-bold text-zinc-200 hover:text-white"
-                        title="Limpiar filtros"
-                      >
-                        Limpiar
-                      </button>
-                    }
+                    credits={movieCredits}
+                    totalCount={movieCreditsAll.length}
+                    countLabel="películas"
+                    person={actorDetails}
+                    onOpen={sectionSheetOpener("movies")}
+                    renderCard={renderCreditCard}
                   />
+                </AnimatedSection>
+              </section>
+            )}
 
-                  {/* Filters */}
-                  <div className="mt-3 mb-6 space-y-3">
-                    <div className="flex gap-3 lg:hidden">
-                      <div className="relative flex-1">
-                        <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-                        <input
-                          type="text"
-                          value={q}
-                          onChange={(e) => setQ(e.target.value)}
-                          placeholder="Buscar por título o rol..."
-                          className="h-11 w-full rounded-xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg border border-white/10 text-white"
-                        />
-                        {q && (
-                          <button
-                            type="button"
-                            onClick={() => setQ("")}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 transition-colors hover:bg-zinc-800"
-                            aria-label="Limpiar búsqueda"
-                          >
-                            <X className="h-3.5 w-3.5 text-zinc-500" />
-                          </button>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setMobileFiltersOpen((v) => !v)}
-                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg border border-white/10 ${
-                          mobileFiltersOpen
-                            ? "text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
-                            : "text-zinc-200 hover:text-white hover:bg-white/10 hover:border-white/20"
-                        }`}
-                        aria-label="Filtros"
-                      >
-                        <SlidersHorizontal className="h-4 w-4" />
-                      </button>
-                    </div>
-
-                    <MobileFiltersPanel
-                      open={mobileFiltersOpen}
-                      className="lg:hidden"
-                      gapClassName=""
-                    >
-                      <div className="grid grid-cols-1 gap-2 pt-1 sm:grid-cols-2">
-                        <CreditsFilterDropdowns
-                          mediaFilter={mediaFilter}
-                          setMediaFilter={setMediaFilter}
-                          creditFilter={creditFilter}
-                          setCreditFilter={setCreditFilter}
-                          sort={sort}
-                          setSort={setSort}
-                        />
-                        <YearFilterDropdown
-                          label="Desde"
-                          value={yearFrom}
-                          setValue={setYearFrom}
-                          options={yearOptions}
-                        />
-                        <YearFilterDropdown
-                          label="Hasta"
-                          value={yearTo}
-                          setValue={setYearTo}
-                          options={yearOptions}
-                        />
-                      </div>
-                    </MobileFiltersPanel>
-
-                    <div className="hidden flex-nowrap items-center gap-3 overflow-x-auto pb-1 lg:flex">
-                      <div className="relative min-w-[240px] flex-1">
-                        <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-                        <input
-                          type="text"
-                          value={q}
-                          onChange={(e) => setQ(e.target.value)}
-                          placeholder="Buscar por título o rol..."
-                          className="h-11 w-full rounded-xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg border border-white/10 text-white"
-                        />
-                        {q && (
-                          <button
-                            type="button"
-                            onClick={() => setQ("")}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 transition-colors hover:bg-zinc-800"
-                            aria-label="Limpiar búsqueda"
-                          >
-                            <X className="h-3.5 w-3.5 text-zinc-500" />
-                          </button>
-                        )}
-                      </div>
-
-                      <CreditsFilterDropdowns
-                        mediaFilter={mediaFilter}
-                        setMediaFilter={setMediaFilter}
-                        creditFilter={creditFilter}
-                        setCreditFilter={setCreditFilter}
-                        sort={sort}
-                        setSort={setSort}
-                      />
-
-                      <YearFilterDropdown
-                        className="w-[150px] shrink-0"
-                        label="Desde"
-                        value={yearFrom}
-                        setValue={setYearFrom}
-                        options={yearOptions}
-                      />
-
-                      <YearFilterDropdown
-                        className="w-[150px] shrink-0"
-                        label="Hasta"
-                        value={yearTo}
-                        setValue={setYearTo}
-                        options={yearOptions}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Results */}
-                  {displayCreditGroups.length > 0 ? (
-                    <div className="space-y-8">
-                      {displayCreditGroups.map((group) => (
-                        <div key={group.key}>
-                          <div className="mb-2 flex items-center gap-2 text-white">
-                            <span className="flex h-7 w-7 items-center justify-center rounded-full border border-emerald-400/25 bg-emerald-400/10 text-emerald-300">
-                              {group.key === "movies" ? (
-                                <Film className="h-3.5 w-3.5" />
-                              ) : (
-                                <TvIcon className="h-3.5 w-3.5" />
-                              )}
-                            </span>
-                            <h3 className="text-lg font-black">
-                              {group.title}
-                            </h3>
-                            <span className="text-xs font-semibold text-zinc-500">
-                              {group.items.length}
-                            </span>
-                          </div>
-                          <ActorRowCarousel>
-                            {group.items.map((c, index) => (
-                              <PosterCard
-                                key={`${group.key}-${c.id}-${c.credit_id || index}-${c.media_type || "m"}`}
-                                item={c}
-                                viewerStates={actorViewerStates}
-                                accountStates={actorAccountStates}
-                                imdbRatings={actorImdbRatings}
-                                onPrefetchHover={handlePrefetchHover}
-                              />
-                            ))}
-                          </ActorRowCarousel>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="py-16 text-center border border-dashed border-white/10 rounded-[2rem] bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-                      <Film className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
-                      <p className="text-zinc-400">
-                        No se encontraron créditos con estos filtros.
-                      </p>
-                      <button
-                        onClick={clearFilters}
-                        className="mt-4 text-sm text-emerald-400 hover:underline"
-                      >
-                        Limpiar filtros
-                      </button>
-                    </div>
-                  )}
-                </section>
-              </AnimatedSection>
-            </section>
+            {seriesCredits.length > 0 && (
+              <section id="section-series" ref={registerSection("series")}>
+                <AnimatedSection delay={0.04}>
+                  <CreditsMediaSection
+                    key={`series-${personId}`}
+                    title="Series"
+                    icon={TvIcon}
+                    credits={seriesCredits}
+                    totalCount={seriesCreditsAll.length}
+                    countLabel="series"
+                    person={actorDetails}
+                    onOpen={sectionSheetOpener("series")}
+                    renderCard={renderCreditCard}
+                  />
+                </AnimatedSection>
+              </section>
+            )}
 
             <section id="section-awards" ref={registerSection("awards")}>
               <AnimatedSection delay={0.04}>
                 <section className="mb-16 group/section">
                   <SectionTitle
+                    accent="emerald"
+                    onOpen={sectionSheetOpener("awards")}
                     title="Premios"
                     subtitle={
                       loadingAwards
@@ -3881,6 +3570,8 @@ export default function ActorDetails({
                 <AnimatedSection delay={0.04}>
                   <section className="mb-16 group/section">
                     <SectionTitle
+                      accent="emerald"
+                      onOpen={sectionSheetOpener("photos")}
                       title="Fotos"
                       subtitle={`${photos.length} imágenes`}
                       icon={Images}
@@ -3900,6 +3591,8 @@ export default function ActorDetails({
                 <AnimatedSection delay={0.04}>
                   <section className="mb-16 group/section">
                     <SectionTitle
+                      accent="emerald"
+                      onOpen={sectionSheetOpener("tagged")}
                       title="Apariciones en medios"
                       subtitle="Imágenes donde aparece etiquetado/a"
                       icon={Tags}
@@ -3912,6 +3605,8 @@ export default function ActorDetails({
           </div>
         </div>
       </div>
+
+      <ActorSectionSheets store={sectionSheetStore} data={sectionSheetData} />
 
       <style jsx global>{`
         @keyframes actor-profile-enter {

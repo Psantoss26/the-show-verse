@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, Layers, MonitorPlay, Pencil } from "lucide-react
 import StarRating from "@/components/StarRating";
 import TraktWatchedControl from "@/components/trakt/TraktWatchedControl";
 import {
+  DETAIL_ACTION_DESKTOP_SIZE_CLASS,
   DETAIL_ACTION_ITEM_SIZING_CLASS,
   MOBILE_ACTION_BUTTON_CLASS,
 } from "@/components/details/DetailActionsRow";
@@ -16,7 +17,8 @@ import {
 
 const ROW_CLASS = `flex w-full flex-nowrap items-center justify-center gap-1 sm:justify-start sm:gap-3
   ${DETAIL_ACTION_ITEM_SIZING_CLASS}
-  ${MOBILE_ACTION_BUTTON_CLASS}`;
+  ${MOBILE_ACTION_BUTTON_CLASS}
+  ${DETAIL_ACTION_DESKTOP_SIZE_CLASS}`;
 
 function NavigationAction({ href, label, children }) {
   if (!href) {

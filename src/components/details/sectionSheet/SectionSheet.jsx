@@ -15,6 +15,29 @@ import { Search, X } from "lucide-react";
 import useModalGuard from "@/hooks/useModalGuard";
 import { LIQUID_GLASS_MODAL_HEADER, LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 
+// Superficie de los controles del panel (barra de pestañas, buscador, botones
+// de filtros): la misma de cristal que los desplegables de filtros
+// (CreditFilterControls, receta de las páginas de usuario), para que todos
+// los controles de la cabecera se vean iguales. 44px de alto todos.
+export const SHEET_CONTROL =
+  "rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg";
+
+// Acento del panel: amarillo en las fichas de títulos, verde en la de un actor.
+const SHEET_ACCENTS = {
+  yellow: {
+    iconBox: "bg-yellow-500/10 text-yellow-400",
+    count: "text-yellow-400",
+    focus: "focus-visible:outline-yellow-400",
+    searchRing: "focus-within:ring-yellow-400/50",
+  },
+  emerald: {
+    iconBox: "bg-emerald-500/10 text-emerald-400",
+    count: "text-emerald-400",
+    focus: "focus-visible:outline-emerald-400",
+    searchRing: "focus-within:ring-emerald-400/50",
+  },
+};
+
 export default function SectionSheet({
   open,
   onClose,
@@ -33,14 +56,23 @@ export default function SectionSheet({
   tabsAccessory = null,
   // Pie fijo bajo la lista (p. ej. «Cancelar / Guardar» de un editor).
   footer = null,
+  // Control a la derecha del buscador, en su misma fila (p. ej. el botón que
+  // despliega los filtros).
+  searchAccessory = null,
+  // Fila de controles bajo el buscador, en la cabecera fija (p. ej. los
+  // filtros de orden y años de los créditos de un actor). Si es un
+  // desplegable, lo anima quien lo pasa (MobileFiltersPanel).
+  toolbar = null,
   // El panel puede ser un <form> (`as="form"` + `panelProps.onSubmit`).
   as: Panel = "div",
   panelProps = null,
   panelRef = null,
   // Mientras se guarda: ni la X ni el velo cierran.
   closeDisabled = false,
+  accent = "yellow",
   children,
 }) {
+  const tone = SHEET_ACCENTS[accent] || SHEET_ACCENTS.yellow;
   const titleId = useId();
   const [portalReady, setPortalReady] = useState(false);
   useEffect(() => setPortalReady(true), []);
@@ -74,7 +106,7 @@ export default function SectionSheet({
         <header className={`shrink-0 ${LIQUID_GLASS_MODAL_HEADER} px-5 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-6 sm:pt-6`}>
           <div className="flex items-start gap-3">
             {Icon ? (
-              <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-yellow-500/10 text-yellow-400">
+              <span className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tone.iconBox}`}>
                 <Icon className="h-5 w-5" aria-hidden="true" />
               </span>
             ) : null}
@@ -91,7 +123,7 @@ export default function SectionSheet({
               type="button"
               onClick={close}
               disabled={closeDisabled}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/5 text-white/70 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 disabled:opacity-50"
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/5 text-white/70 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${tone.focus} disabled:opacity-50`}
               aria-label="Cerrar"
             >
               <X className="h-5 w-5" />
@@ -103,7 +135,7 @@ export default function SectionSheet({
             <div
               role="tablist"
               aria-label={title}
-              className="flex min-w-0 flex-1 gap-1 overflow-x-auto rounded-xl bg-black/20 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              className={`flex min-w-0 flex-1 gap-1 overflow-x-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${SHEET_CONTROL}`}
             >
               {tabs.map((tab) => {
                 const active = tab.id === activeTab;
@@ -114,13 +146,13 @@ export default function SectionSheet({
                     role="tab"
                     aria-selected={active}
                     onClick={() => onTabChange?.(tab.id)}
-                    className={`flex min-h-9 flex-1 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-xs font-bold transition ${
+                    className={`flex min-h-9 flex-1 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-3 text-xs font-bold transition ${
                       active ? "bg-white/15 text-white" : "text-zinc-400 hover:bg-white/5 hover:text-white"
                     }`}
                   >
                     {tab.label}
                     {typeof tab.count === "number" ? (
-                      <span className={active ? "text-yellow-400" : "text-zinc-500"}>{tab.count}</span>
+                      <span className={active ? tone.count : "text-zinc-500"}>{tab.count}</span>
                     ) : null}
                   </button>
                 );
@@ -131,7 +163,8 @@ export default function SectionSheet({
           ) : null}
 
           {search ? (
-            <label className="mt-3 flex min-h-11 items-center gap-2.5 rounded-xl bg-black/25 px-3.5 text-zinc-400 focus-within:ring-2 focus-within:ring-yellow-400/50">
+            <div className="mt-3 flex items-stretch gap-2">
+            <label className={`flex min-h-11 min-w-0 flex-1 items-center gap-2.5 px-3.5 text-zinc-400 focus-within:ring-2 ${SHEET_CONTROL} ${tone.searchRing}`}>
               <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
               <input
                 type="search"
@@ -142,7 +175,13 @@ export default function SectionSheet({
                 className="min-w-0 flex-1 bg-transparent text-sm text-white placeholder:text-zinc-500 focus:outline-none"
               />
             </label>
+            {searchAccessory}
+            </div>
+          ) : searchAccessory ? (
+            <div className="mt-3 flex justify-end">{searchAccessory}</div>
           ) : null}
+
+          {toolbar}
         </header>
 
         <div className="details-sheet-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-1 sm:px-6">

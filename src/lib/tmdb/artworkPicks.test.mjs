@@ -13,7 +13,7 @@ test("claves de título normalizadas", () => {
 
 test("sin respuesta de TMDb no hay elección (null, no «sin póster»)", () => {
   assert.equal(pickListArtwork(null), null);
-  assert.deepEqual(pickListArtwork({ posters: [], backdrops: [] }), { poster: null, previewPoster: null, previewBackdrop: null, coverPoster: null });
+  assert.deepEqual(pickListArtwork({ posters: [], backdrops: [] }), { poster: null, previewPoster: null, previewBackdrop: null, textlessPoster: null, coverPoster: null });
 });
 
 test("elige póster inglés y backdrop con idioma", () => {
@@ -51,4 +51,14 @@ test("la portada de los mosaicos usa arte SIN texto", () => {
   assert.equal(pickListArtwork({ posters: [titled], backdrops: [englishBackdrop, neutralBackdrop] }).coverPoster, "/bd.jpg");
   // Sin nada sin texto: el póster inglés.
   assert.equal(pickListArtwork({ posters: [titled], backdrops: [englishBackdrop] }).coverPoster, "/en.jpg");
+});
+
+test("textlessPoster: solo un póster sin idioma, nunca backdrop ni póster con texto", () => {
+  const withText = { file_path: "/en.jpg", iso_639_1: "en", width: 2000, height: 3000, vote_average: 9, vote_count: 50 };
+  const neutralBackdrop = { file_path: "/bd.jpg", iso_639_1: null, width: 3840, height: 2160 };
+  assert.equal(pickListArtwork({ posters: [withText], backdrops: [neutralBackdrop] }).textlessPoster, null);
+  const neutral = { file_path: "/xx.jpg", iso_639_1: "xx", width: 1000, height: 1500 };
+  const picks = pickListArtwork({ posters: [withText, neutral], backdrops: [neutralBackdrop] });
+  assert.equal(picks.textlessPoster, "/xx.jpg");
+  assert.equal(picks.coverPoster, "/xx.jpg");
 });

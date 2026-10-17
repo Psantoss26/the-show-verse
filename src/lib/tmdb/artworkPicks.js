@@ -13,6 +13,9 @@
 //                    título no tiene ninguno, su backdrop sin idioma (de
 //                    celda vertical se recorta sin problema); solo si tampoco
 //                    hay, el de la escalera.
+//   - textlessPoster: SOLO un póster sin idioma, o null (sin recurrir a
+//                    backdrops ni a pósters con texto). El fondo de mosaico
+//                    de la ficha de una persona (ActorCollageBackground).
 
 import {
   pickBestNeutralPosterByResVotes,
@@ -37,12 +40,14 @@ export function pickListArtwork(images, { originalLanguage } = {}) {
   const posters = images.posters || [];
   const backdrops = images.backdrops || [];
   const poster = pickLadderPoster(posters, { originalLanguage })?.file_path || null;
+  const textlessPoster = pickBestNeutralPosterByResVotes(textlessImages(posters))?.file_path || null;
   return {
     poster,
     previewPoster: poster,
     previewBackdrop: pickLadderBackdrop(backdrops, { originalLanguage, minWidth: 780 })?.file_path || null,
+    textlessPoster,
     coverPoster:
-      pickBestNeutralPosterByResVotes(textlessImages(posters))?.file_path ||
+      textlessPoster ||
       pickBestNeutralPosterByResVotes(textlessImages(backdrops))?.file_path ||
       poster,
   };

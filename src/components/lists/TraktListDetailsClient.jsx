@@ -21,9 +21,13 @@ import {
     updateListInIndexCache,
 } from '@/lib/lists/detailsInitialState'
 import { useIsHistoryNavigation } from '@/lib/hooks/useIsHistoryNavigation'
+import { requestListArtwork } from '@/lib/tmdb/artworkBatch'
 import { buildListShareCard, buildListShareStory, listNoun, normalizeListShareItem } from '@/lib/lists/shareList'
 
 const PAGE_SIZE = 48
+// Títulos de la primera pantalla cuyo arte se espera antes de pedir las notas
+// de IMDb (ver `imdbReady`).
+const IMDB_AFTER_ARTWORK_ITEMS = 24
 const TRAKT_LIST_DETAILS_CACHE_TTL_MS = 20 * 60 * 1000
 const useClientLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
 
@@ -307,9 +311,35 @@ export default function TraktListDetailsClient({ username, listId }) {
     const items = Array.isArray(state.items) ? state.items : []
     const creatorUsername = list?.user?.username || username || 'Usuario'
     const listItemCount = Number(list?.item_count || items.length)
-    const imdbRatingItems = state.imdbRatingItems.length > 0
-        ? state.imdbRatingItems
-        : items
+    // Las notas de IMDb (120 títulos de muestra, sin id de IMDb: el servidor
+    // consulta TMDb por cada uno) esperan al arte de la primera pantalla.
+    // Salían a la vez y competían en el servidor y con el límite de ráfagas de
+    // TMDb: las tarjetas, que esperan a su póster, tardaban ~5 s en frío por
+    // algo que solo da la media del marcador. La espera se engancha a las
+    // MISMAS peticiones del lote de arte (no añade ninguna).
+    const [imdbReady, setImdbReady] = useState(false)
+    const firstScreenKey = items
+        .slice(0, IMDB_AFTER_ARTWORK_ITEMS)
+        .map((item) => `${item?.mediaType}:${item?.tmdbId}`)
+        .join('|')
+    useEffect(() => {
+        if (imdbReady || !firstScreenKey) return undefined
+        let cancelled = false
+        const firstScreen = firstScreenKey.split('|').map((key) => key.split(':'))
+        Promise.all(
+            firstScreen.map(([mediaType, tmdbId]) => requestListArtwork(mediaType === 'tv' ? 'tv' : 'movie', tmdbId)),
+        ).finally(() => {
+            if (!cancelled) setImdbReady(true)
+        })
+        return () => {
+            cancelled = true
+        }
+    }, [firstScreenKey, imdbReady])
+    const imdbRatingItems = !imdbReady
+        ? []
+        : state.imdbRatingItems.length > 0
+            ? state.imdbRatingItems
+            : items
     const { ratingsByKey: imdbRatings, summary: imdbSummary } = useListImdbRatings(imdbRatingItems, { totalCount: listItemCount })
 
     const firstPoster = items.find((item) => item?.posterPath)?.posterPath
