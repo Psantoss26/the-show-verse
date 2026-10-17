@@ -37,7 +37,7 @@ import { isServerReachable } from "@/lib/offline/client";
 import { getMediaTypeForItem } from "@/lib/dashboard/media";
 import { dashboardDetailHref } from "@/lib/dashboard/detailHref";
 import SubrouteDetailsPanel from "@/components/dashboard/SubrouteDetailsPanel";
-import { detailPreviewFromHref, subrouteDetailsHref } from "@/lib/navigation/detailPreview";
+import { detailPreviewFromHref, panelDetailsHref } from "@/lib/navigation/detailPreview";
 import { createSubrouteLinkIntent } from "@/lib/navigation/subroutePrefetch";
 import DetailModal from "@/components/dashboard/DetailModal";
 import { useAuth } from "@/context/AuthContext";
@@ -170,11 +170,13 @@ const PREVIEW_PARAM = "preview";
 const PREVIEW_RE = /^(movie|tv)-(\d+)$/;
 const SEASON_RE = /^season-(\d+)-(\d+)$/;
 const EPISODE_RE = /^ep-(\d+)-(\d+)-(\d+)$/;
+const PERSON_RE = /^person-(\d+)$/;
 
 // Identidad de un item para la URL `?preview=` y para el `key` del modal (cada
 // nivel debe tener su propio key para que AnimatePresence anime el cambio).
 function previewToken(item) {
   if (!item) return "";
+  if (item.media_type === "person") return `person-${item.id}`;
   if (item.media_type === "season") return `season-${item.showId ?? item.id}-${item.seasonNumber}`;
   if (item.media_type === "episode") {
     const showId = item.showId ?? item.id;
@@ -209,6 +211,9 @@ function readPreviewFromLocation() {
   if (typeof window === "undefined") return null;
   const value = new URLSearchParams(window.location.search).get(PREVIEW_PARAM);
   if (!value) return null;
+
+  const person = PERSON_RE.exec(value);
+  if (person) return { media_type: "person", id: Number(person[1]) };
 
   const season = SEASON_RE.exec(value);
   if (season) return { media_type: "season", id: Number(season[1]), showId: Number(season[1]), seasonNumber: Number(season[2]) };
@@ -347,12 +352,19 @@ export default function DetailModalProvider({
   const [stack, setStack] = useState([]);
   const activeItem = stack.length > 0 ? stack[stack.length - 1] : null;
 
-  const effectiveContentView = preferredContentView;
-  const usesSubroutePanel = activeItem?.media_type === "season" ||
-    (activeItem?.media_type === "episode" && effectivePlacement === "right" && effectiveContentView === "mobile");
+  // TEMPORADAS Y PERSONAS solo existen como página completa o como panel
+  // lateral en vista teléfono (decisión de producto): ignoran la colocación
+  // centrada y la vista «modal», y el panel no ofrece cambiarlas.
+  const phoneOnlyPanel = activeItem?.media_type === "season" || activeItem?.media_type === "person";
+  const panelPlacement = phoneOnlyPanel && !isMobile ? "right" : effectivePlacement;
+  const effectiveContentView = phoneOnlyPanel ? "mobile" : preferredContentView;
+  // Personas (desde el Reparto de la vista teléfono): su página real en el
+  // mismo panel con iframe que temporadas y episodios.
+  const usesSubroutePanel = activeItem?.media_type === "season" || activeItem?.media_type === "person" ||
+    (activeItem?.media_type === "episode" && panelPlacement === "right" && effectiveContentView === "mobile");
   const ActiveDetailPanel = usesSubroutePanel ? SubrouteDetailsPanel : DetailModal;
   const docked =
-    activeItem != null && effectivePlacement === "right" && activeDrawerView === "docked";
+    activeItem != null && panelPlacement === "right" && activeDrawerView === "docked";
 
   // Una propiedad NO heredada evita recalcular el estilo de todas las tarjetas
   // en cada movimiento. El panel y este margen se escriben en el mismo frame.
@@ -369,7 +381,7 @@ export default function DetailModalProvider({
     // deslizándose con su transición de 320 ms: eso es el parpadeo al cerrar.
     // Se nota sobre todo en TABLET, que es donde la ficha se abre como drawer y
     // por tanto donde el hueco llega a publicarse.
-    if (activeItem == null || effectivePlacement !== "right") return;
+    if (activeItem == null || panelPlacement !== "right") return;
     // El margen del contenido solo aplica ACOPLADO; la variable se publica
     // siempre, porque el navbar tiene que apartarse en los dos modos: el panel
     // tapa el borde derecho igual esté acoplado o superpuesto.
@@ -387,7 +399,7 @@ export default function DetailModalProvider({
     // `[data-detail-page-content]` en globals.css) para que las tarjetas se
     // recoloquen pegadas al tirador en vez de animar cada cambio.
     applyContentMargin(contentRef.current, `${width}px`);
-  }, [docked, activeItem, effectivePlacement]);
+  }, [docked, activeItem, panelPlacement]);
 
   // Sin drawer no hay variable. `DetailModal` la escribe mientras está montado
   // (vía `updateDrawerWidth`), así que aquí solo hay que retirarla al cerrar
@@ -397,9 +409,9 @@ export default function DetailModalProvider({
   // solo depende de si hay ficha abierta y de dónde se coloca, así que basta con
   // reaccionar a esos dos.
   useLayoutEffect(() => {
-    if (activeItem != null && effectivePlacement === "right") return;
+    if (activeItem != null && panelPlacement === "right") return;
     publishDrawerInset(null);
-  }, [activeItem, effectivePlacement]);
+  }, [activeItem, panelPlacement]);
 
   useEffect(() => () => {
     publishDrawerInset(null);
@@ -458,8 +470,17 @@ export default function DetailModalProvider({
       // MÓVIL: se navega siempre a la ficha completa; la preview es de escritorio.
       // También en escritorio si el usuario prefiere abrir directamente la
       // ficha completa (Ajustes → «Al abrir un título»).
-      if (isMobile || !isServerReachable() || savedOpen.target === "page") {
-        const href = subrouteDetailsHref(item) || dashboardDetailHref(item);
+      // Una PERSONA solo se abre en panel desde la ficha en vista teléfono del
+      // panel lateral; en cualquier otro caso, su página como siempre. Salvo el
+      // enlace directo `?preview=person-…` (`push: false`): al montar aún no se
+      // ha leído la vista guardada, y el panel también la pinta fuera de la
+      // vista teléfono.
+      const personOutsidePhoneView =
+        item.media_type === "person" &&
+        opts.push !== false &&
+        !(effectivePlacement === "right" && preferredContentView === "mobile");
+      if (isMobile || !isServerReachable() || savedOpen.target === "page" || personOutsidePhoneView) {
+        const href = panelDetailsHref(item) || dashboardDetailHref(item);
         // Un enlace con `?preview=` abre el panel ANTES de que lleguen las
         // preferencias; si mandan abrir la ficha completa, este efecto vuelve
         // a correr y navega. El panel ya abierto se cierra: si no, se quedaba
@@ -518,7 +539,7 @@ export default function DetailModalProvider({
         commit([item]);
       }
     },
-    [commit, isMobile, router, savedOpen.target],
+    [commit, effectivePlacement, isMobile, preferredContentView, router, savedOpen.target],
   );
 
   const closeDetailModal = useCallback(() => {
@@ -568,7 +589,7 @@ export default function DetailModalProvider({
   useModalGuard({
     open: activeItem != null,
     onClose: closeDetailModal,
-    lockScroll: effectivePlacement !== "right",
+    lockScroll: panelPlacement !== "right",
   });
 
   // Apuntar a un enlace de temporada/episodio precarga su panel (ver
@@ -613,6 +634,12 @@ export default function DetailModalProvider({
           if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
           const link = event.target.closest?.("a[href]");
           if (!link || link.hasAttribute("download") || (link.target && link.target !== "_self")) return;
+          // Un control DENTRO del enlace (la papelera del modo borrar de
+          // Continuar viendo e Historial, su «¿Quitar?»…) gestiona su propio
+          // clic. Esta captura llegaba antes que él y lo anulaba: en los
+          // episodios (enlace a la subruta) no se podía borrar nada.
+          const control = event.target.closest?.('button, [role="button"], input, select, textarea, label, summary');
+          if (control && link.contains(control)) return;
           const item = detailPreviewFromHref(link.href, window.location.origin);
           if (!item || !["season", "episode"].includes(item.media_type)) return;
           event.preventDefault();
@@ -630,16 +657,16 @@ export default function DetailModalProvider({
             // La colocación forma parte de la identidad: al cambiar de centrado
             // a lateral (o al revés) sale el panel de una forma y entra el de la
             // otra, cada uno con su propia animación de entrada y salida.
-            key={`${previewToken(activeItem)}:${effectivePlacement}`}
+            key={`${previewToken(activeItem)}:${panelPlacement}`}
             item={activeItem}
             onClose={closeDetailModal}
             onOpenDetail={openDetailModal}
-            placement={effectivePlacement}
-            onPlacementChange={!isMobile ? changePlacement : undefined}
+            placement={panelPlacement}
+            onPlacementChange={!isMobile && !phoneOnlyPanel ? changePlacement : undefined}
             drawerView={activeDrawerView}
             contentView={effectiveContentView}
             tabletViewport={isTablet}
-            onContentViewChange={changeContentView}
+            onContentViewChange={phoneOnlyPanel ? undefined : changeContentView}
             onDrawerViewChange={changeDrawerView}
             onDrawerWidthChange={updateDrawerWidth}
             // `custom` de AnimatePresence solo llega al panel que SALE. El que

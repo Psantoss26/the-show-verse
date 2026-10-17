@@ -13,7 +13,7 @@
 // en una rejilla de episodios no se precarga todo lo que se cruza.
 
 import { buildEmbeddedDetailsHref } from "@/lib/navigation/embeddedDetails";
-import { detailPreviewFromHref, subrouteDetailsHref } from "@/lib/navigation/detailPreview";
+import { detailPreviewFromHref, panelDetailsHref } from "@/lib/navigation/detailPreview";
 
 const INTENT_DELAY_MS = 80;
 // Tope por documento: cada precarga es una página renderizada en el servidor.
@@ -29,7 +29,7 @@ export function prefetchSubrouteDetails(target) {
     typeof target === "string"
       ? detailPreviewFromHref(target, window.location.origin)
       : target;
-  const href = subrouteDetailsHref(item);
+  const href = panelDetailsHref(item);
   if (!href) return false;
   const embedHref = buildEmbeddedDetailsHref(href);
   if (prefetched.has(embedHref)) return true;

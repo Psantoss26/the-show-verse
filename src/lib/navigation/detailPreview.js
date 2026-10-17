@@ -3,6 +3,13 @@ export function detailPreviewFromHref(href, origin) {
   try {
     const url = new URL(href, origin);
     if (url.origin !== origin) return null;
+    // Ficha de una persona: solo se abre en panel desde la vista teléfono (ver
+    // DetailModalProvider); quien no la quiera la filtra por `media_type`.
+    const person = /^\/details\/person\/(\d+)\/?$/.exec(url.pathname);
+    if (person) {
+      const id = Number(person[1]);
+      return id > 0 ? { id, media_type: "person" } : null;
+    }
     const match = /^\/details\/(movie|tv)\/(\d+)(?:\/season\/(\d+)(?:\/episode\/(\d+))?)?\/?$/.exec(url.pathname);
     if (!match || (match[1] === "movie" && match[3] != null)) return null;
     const id = Number(match[2]);
@@ -22,4 +29,13 @@ export function subrouteDetailsHref(item) {
   if (!["season", "episode"].includes(item?.media_type)) return null;
   const base = `/details/tv/${item.showId ?? item.id}/season/${item.seasonNumber}`;
   return item.media_type === "episode" ? `${base}/episode/${item.episodeNumber}` : base;
+}
+
+// Ruta de la página que pinta el panel con iframe (SubrouteDetailsPanel):
+// temporadas, episodios y personas. Aparte de `subrouteDetailsHref` porque esa
+// la usan también la precarga por intención y la navegación móvil, que solo
+// tratan temporadas y episodios.
+export function panelDetailsHref(item) {
+  if (item?.media_type === "person") return item.id > 0 ? `/details/person/${item.id}` : null;
+  return subrouteDetailsHref(item);
 }

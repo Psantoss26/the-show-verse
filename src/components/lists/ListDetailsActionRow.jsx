@@ -17,11 +17,10 @@ export const LIST_DETAILS_ACTION_ROW_CLASS = `flex w-full flex-nowrap items-cent
   ${MOBILE_ACTION_BUTTON_CLASS}
   ${DETAIL_ACTION_DESKTOP_SIZE_CLASS}`;
 
-// Las acciones van COLOREADAS por defecto con su tono (como el tráiler y el
-// soundtrack de DetailsClient): `active` encendido salvo que quien la usa diga
-// otra cosa. El me gusta / favorito no pasa por aquí (ListLikeButton) y solo
-// se colorea al marcarlo.
-export function ListDetailsActionButton({ label, children, disabled, onClick, tone = "blue", mutation = false, groupId = "list-details-actions", active = true, ...buttonProps }) {
+// Las acciones van NEUTRAS por defecto (cristal sin color): `tone` solo se
+// enciende cuando quien la usa pasa `active` (un estado real, p. ej. el me
+// gusta, que va por ListLikeButton y se colorea al marcarlo).
+export function ListDetailsActionButton({ label, children, disabled, onClick, tone = "blue", mutation = false, groupId = "list-details-actions", active = false, ...buttonProps }) {
   const online = useServerOnline();
   return (
     <LiquidButton
@@ -45,14 +44,8 @@ export function ListDetailsActionButton({ label, children, disabled, onClick, to
 
 const ActionButton = ListDetailsActionButton;
 
-// El enlace externo es un <a> (no un LiquidButton): lleva a mano el mismo
-// coloreado de un botón activo morado (fondo al 30%, icono en su tono claro y
-// halo), como el botón de enlaces externos de la ficha de un actor.
-const ACTION_LINK_TONE_STYLE = {
-  backgroundColor: "rgba(168, 85, 247, 0.3)",
-  color: "rgb(216, 180, 254)",
-  boxShadow: "0 0 20px rgba(168, 85, 247, 0.5)",
-};
+// El enlace externo es un <a> (no un LiquidButton): lleva a mano el aspecto
+// de un botón inactivo (cristal neutro, icono zinc-200 que se aclara al pasar).
 
 function ActionLink({ href, label }) {
   if (!href) return null;
@@ -64,8 +57,7 @@ function ActionLink({ href, label }) {
       title={label}
       aria-label={label}
       data-liquid-button="true"
-      style={ACTION_LINK_TONE_STYLE}
-      className={`relative isolate flex !h-auto !w-full aspect-square items-center justify-center overflow-hidden rounded-full transition hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400 ${LIQUID_GLASS_SURFACE_CARD} ${LIQUID_GLASS_ELEVATION}`}
+      className={`relative isolate flex !h-auto !w-full aspect-square items-center justify-center overflow-hidden rounded-full text-zinc-200 transition hover:scale-105 hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400 ${LIQUID_GLASS_SURFACE_CARD} ${LIQUID_GLASS_ELEVATION}`}
     >
       <LiquidGlassOpticalLayers />
       <ExternalLink className="relative z-10" />
@@ -97,7 +89,6 @@ function ShareActionButton({ share }) {
         title={label}
         aria-label={label}
         aria-haspopup={share.card ? "dialog" : undefined}
-        active
         activeColor="blue"
         onClick={handleShare}
         className="!w-full !h-auto aspect-square"

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import DetailsPage from "@/app/details/[type]/[id]/page";
+import ActorDetailsPage from "@/app/details/person/[id]/page";
 import EpisodePage from "@/app/details/tv/[id]/season/[season]/episode/[episode]/page";
 import SeasonPage from "@/app/details/tv/[id]/season/[season]/page";
 import EmbeddedDetailsBridge from "@/components/details/EmbeddedDetailsBridge";
@@ -10,10 +11,13 @@ export const revalidate = 600;
 export default async function EmbeddedDetailsPage({ params, searchParams }) {
   const { segments } = await params;
   const [type, id, seasonKey, season, episodeKey, episode] = segments;
-  if (!["movie", "tv"].includes(type) || !/^\d+$/.test(id || "")) notFound();
+  if (!["movie", "tv", "person"].includes(type) || !/^\d+$/.test(id || "")) notFound();
 
   let content;
-  if (segments.length === 2) {
+  if (type === "person") {
+    // Ficha de una persona (desde el Reparto de la vista teléfono del panel).
+    if (segments.length === 2) content = <ActorDetailsPage params={Promise.resolve({ id })} />;
+  } else if (segments.length === 2) {
     content = (
       <DetailsPage
         params={Promise.resolve({ type, id })}
@@ -31,7 +35,7 @@ export default async function EmbeddedDetailsPage({ params, searchParams }) {
   if (!content) notFound();
 
   return (
-    <div data-embedded-details className={segments.length === 2 ? "pt-12" : undefined}>
+    <div data-embedded-details className={segments.length === 2 && type !== "person" ? "pt-12" : undefined}>
       <EmbeddedDetailsBridge />
       {content}
     </div>

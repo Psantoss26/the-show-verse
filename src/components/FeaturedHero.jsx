@@ -25,6 +25,8 @@ import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
 import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
 
 import { useAuth } from "@/context/AuthContext";
+import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import { isSoundtrackAutoplayOn } from "@/lib/soundtrack/autoplayPreference";
 import {
   markAsFavorite,
   markInWatchlist,
@@ -68,6 +70,8 @@ const HERO_BACKDROP_SIZE = "w1280";
 const HERO_BACKDROP_MAX_SIZE = "original";
 const HERO_POSTER_SIZE = "w780";
 const HERO_AUTO_ADVANCE_MS = 6000;
+// Lo que el contenido espera al fondo como mucho antes de entrar sin él.
+const HERO_ENTRANCE_MAX_WAIT_MS = 1200;
 const HERO_SWIPE_THRESHOLD_PX = 60;
 // Cuánto puede moverse el dedo y seguir contando como TOQUE (abrir la ficha).
 //
@@ -488,8 +492,12 @@ function FeaturedSlide({
   soundtrackVisible,
   soundtrackPreferenceReady,
   toggleSoundtrackVisible,
+  staticEntrance = false,
 }) {
-  const { session, account } = useAuth();
+  const { session, account, preferences } = useAuth();
+  // Ajustes > Reproducción automática del soundtrack (desactivada por
+  // defecto): sin ella, el soundtrack solo suena en el título donde se pulsa.
+  const soundtrackAutoplay = isSoundtrackAutoplayOn(preferences);
   const { openDetailModal } = useDetailModal();
 
   const mediaType = getMediaTypeForItem(movie);
@@ -523,9 +531,14 @@ function FeaturedSlide({
   const [loadedBackdropSrc, setLoadedBackdropSrc] = useState("");
   const trailerIframeRef = useRef(null);
 
-  // Soundtrack: suena por defecto al mostrar el título; su visibilidad y el
-  // silencio se conservan como preferencias globales para todos los FeaturedHero.
+  // Soundtrack: su visibilidad y el silencio se conservan como preferencias
+  // globales para todos los FeaturedHero. Solo arranca solo con la
+  // reproducción automática activada; si no, únicamente tras pulsar play en
+  // ESTE título (`soundtrackStartedHere`), y al dejar de estar activo se olvida:
+  // activar el sonido en un título no hace que el siguiente suene solo.
   const [soundtrackMuted, , setSoundtrackMuted] = useSoundtrackMuted();
+  const [soundtrackStartedHere, setSoundtrackStartedHere] = useState(false);
+  const soundtrackMayPlay = soundtrackAutoplay || soundtrackStartedHere;
   const [soundtrackVolume, setSoundtrackVolume] = useSoundtrackVolume();
   const [soundtrackTracks, setSoundtrackTracks] = useState([]);
   const [soundtrackTrack, setSoundtrackTrack] = useState(null);
@@ -716,6 +729,10 @@ function FeaturedSlide({
     if (audioRef.current) audioRef.current.volume = playbackVolume;
   }, [soundtrackTrack, playbackVolume]);
 
+  useEffect(() => {
+    if (!isActive) setSoundtrackStartedHere(false);
+  }, [isActive]);
+
   // Reproduce el soundtrack cuando el título está activo, no está silenciado y
   // no se está viendo el trailer (que tiene su propio audio). Si el navegador
   // bloquea el autoplay con sonido, arranca tras la primera interacción.
@@ -729,6 +746,7 @@ function FeaturedSlide({
       soundtrackPreferenceReady &&
       soundtrackVisible &&
       !soundtrackMuted &&
+      soundtrackMayPlay &&
       !!soundtrackTrack;
     audio.muted = !soundtrackVisible || soundtrackMuted;
 
@@ -766,6 +784,7 @@ function FeaturedSlide({
   }, [
     isActive,
     showTrailer,
+    soundtrackMayPlay,
     soundtrackMuted,
     soundtrackPreferenceReady,
     soundtrackVisible,
@@ -806,6 +825,7 @@ function FeaturedSlide({
       ? playbackVolume
       : DEFAULT_SOUNDTRACK_VOLUME;
     if (hasSoundtrackPlayer && soundtrackVolume === 0) setSoundtrackVolume(volume);
+    setSoundtrackStartedHere(true);
     setSoundtrackMuted(false);
     audio.volume = volume;
     audio.muted = false;
@@ -882,7 +902,8 @@ function FeaturedSlide({
       !showTrailer &&
       soundtrackPreferenceReady &&
       soundtrackVisible &&
-      !soundtrackMuted
+      !soundtrackMuted &&
+      soundtrackMayPlay
     ) {
       audio.play().catch(() => setSoundtrackPlaying(false));
     }
@@ -1227,9 +1248,26 @@ function FeaturedSlide({
     }`
     : null;
 
+  // ENTRADA COORDINADA: el contenido (logo, botones, datos) espera a que el
+  // fondo esté cargado y entran juntos; antes aparecía sobre negro y el fondo
+  // llegaba después por su cuenta. Con tope: si la imagen tarda, el contenido
+  // no se queda esperando.
+  // Sin ruta de fondo puede ser que aún se esté resolviendo (no que no haya):
+  // solo cuenta como «sin fondo» cuando las imágenes del título ya llegaron.
+  const backdropReady = bgSrc ? loadedBackdropSrc === bgSrc : logoResolved;
+  const [entranceTimedOut, setEntranceTimedOut] = useState(false);
+  useEffect(() => {
+    if (backdropReady || staticEntrance) return undefined;
+    const timer = window.setTimeout(() => setEntranceTimedOut(true), HERO_ENTRANCE_MAX_WAIT_MS);
+    return () => window.clearTimeout(timer);
+  }, [backdropReady, staticEntrance]);
+  const entranceReady = staticEntrance || backdropReady || entranceTimedOut || showTrailer;
+
   return (
     <div
-      className="relative w-full h-full bg-black hero-wide:bg-transparent cursor-pointer hero-wide:absolute hero-wide:inset-0 hero-wide:h-full hero-wide:w-full hero-wide:block select-none"
+      className={`hero-slide relative w-full h-full bg-black hero-wide:bg-transparent cursor-pointer hero-wide:absolute hero-wide:inset-0 hero-wide:h-full hero-wide:w-full hero-wide:block select-none ${
+        entranceReady ? "hero-slide-ready" : ""
+      } ${staticEntrance ? "hero-slide-static" : ""}`}
       onClick={openPreviewModal}
     >
       {/* FONDO enmascarado (solo desktop): envuelve imagen + sombras + base negra
@@ -1446,7 +1484,7 @@ function FeaturedSlide({
                 forma absoluta debajo para no desplazar la información. */}
             <div className="hero-info-actions relative mb-4 w-full max-w-full hero-wide:mb-6 hero-wide:w-auto">
             <div
-              className="hero-reveal flex flex-nowrap items-center justify-center gap-1.5 hero-wide:justify-start hero-wide:gap-3 w-full max-w-full"
+              className="hero-reveal hero-reveal-glass flex flex-nowrap items-center justify-center gap-1.5 hero-wide:justify-start hero-wide:gap-3 w-full max-w-full"
               style={{ "--hero-delay": "130ms" }}
             >
               {/* Fila de acciones COMPARTIDA con DetailsClient/DetailModal y las
@@ -1765,11 +1803,14 @@ function FeaturedSlide({
           }
         }
 
+        /* Solo opacidad y transform: los compone la GPU sin repintar. El
+           desenfoque animado sobre una imagen a pantalla completa (y dentro
+           de una mascara) era lo que daba tirones, sobre todo en la primera
+           carga, cuando coincide con el arranque de la pagina. */
         .hero-backdrop-reveal {
           opacity: 0;
           transform: translate3d(0, 0, 0);
-          filter: blur(0);
-          will-change: opacity, transform, filter;
+          will-change: opacity, transform;
         }
 
         /* Bloque de información en layout ANCHO. Se maqueta SIEMPRE al mismo
@@ -1838,7 +1879,7 @@ function FeaturedSlide({
         }
 
         .hero-backdrop-ready {
-          animation: heroBackdropReveal 920ms cubic-bezier(0.16, 1, 0.3, 1)
+          animation: heroBackdropReveal 1100ms cubic-bezier(0.22, 1, 0.36, 1)
             both;
         }
 
@@ -1846,12 +1887,46 @@ function FeaturedSlide({
           animation-name: heroPosterRevealMobile;
         }
 
+        /* backwards (no both) y sin will-change de opacidad: un ancestro con
+           opacidad (animada o con will-change) apaga el cristal de los
+           botones; asi, al terminar no queda ninguna capa promovida. */
         .hero-reveal {
-          animation: heroContentReveal 680ms cubic-bezier(0.22, 1, 0.36, 1)
-            both;
+          animation: heroContentReveal 640ms cubic-bezier(0.22, 1, 0.36, 1)
+            backwards;
           animation-delay: var(--hero-delay, 0ms);
           transform-origin: left center;
-          will-change: opacity, transform, filter;
+        }
+
+        /* Fila de botones de CRISTAL: solo desplazamiento, nunca opacidad ni
+           filtro, para que el cristal funcione durante toda la entrada. */
+        .hero-reveal-glass {
+          animation-name: heroGlassReveal;
+        }
+
+        /* Hasta que el fondo esta listo el contenido espera en su primer
+           fotograma (oculto); la fila de cristal, con visibility, que no
+           apaga el cristal como lo haria la opacidad. */
+        .hero-slide:not(.hero-slide-ready) .hero-reveal {
+          animation-play-state: paused;
+        }
+
+        .hero-slide:not(.hero-slide-ready) .hero-reveal-glass {
+          visibility: hidden;
+        }
+
+        /* Al volver atras: el destacado ya esta colocado, sin repetir la
+           entrada. El fondo solo hace un fundido corto si aun no ha cargado. */
+        .hero-slide-static .hero-reveal,
+        .hero-slide-static .hero-backdrop-ready {
+          animation: none;
+        }
+
+        .hero-slide-static .hero-backdrop-reveal {
+          transition: opacity 180ms ease-out;
+        }
+
+        .hero-slide-static .hero-backdrop-ready {
+          opacity: 1;
         }
 
         .hero-nowplaying {
@@ -1911,16 +1986,14 @@ function FeaturedSlide({
         @keyframes heroBackdropReveal {
           from {
             opacity: 0;
-            transform: translate3d(18px, 0, 0) scale(1.025);
-            filter: blur(10px) saturate(0.9);
+            transform: scale(1.04);
           }
-          55% {
+          60% {
             opacity: 1;
           }
           to {
             opacity: 1;
-            transform: translate3d(0, 0, 0) scale(1);
-            filter: blur(0) saturate(1);
+            transform: scale(1);
           }
         }
 
@@ -1928,7 +2001,6 @@ function FeaturedSlide({
           from {
             opacity: 0;
             transform: translate3d(0, 10px, 0);
-            filter: blur(8px) saturate(0.92);
           }
           60% {
             opacity: 1;
@@ -1936,7 +2008,6 @@ function FeaturedSlide({
           to {
             opacity: 1;
             transform: translate3d(0, 0, 0);
-            filter: blur(0) saturate(1);
           }
         }
 
@@ -1948,26 +2019,31 @@ function FeaturedSlide({
         @keyframes heroContentReveal {
           from {
             opacity: 0;
-            transform: translate3d(0, 18px, 0);
-            filter: blur(8px);
+            transform: translate3d(0, 12px, 0);
           }
           to {
             opacity: 1;
             transform: translate3d(0, 0, 0);
-            filter: blur(0);
+          }
+        }
+
+        @keyframes heroGlassReveal {
+          from {
+            transform: translate3d(0, 12px, 0);
+          }
+          to {
+            transform: translate3d(0, 0, 0);
           }
         }
 
         @keyframes heroTitleReveal {
           from {
             opacity: 0;
-            transform: translate3d(0, 24px, 0) scale(0.96);
-            filter: blur(10px);
+            transform: translate3d(0, 16px, 0) scale(0.97);
           }
           to {
             opacity: 1;
             transform: translate3d(0, 0, 0) scale(1);
-            filter: blur(0);
           }
         }
 
@@ -1982,6 +2058,10 @@ function FeaturedSlide({
             opacity: 1;
             transform: none;
             filter: none;
+          }
+
+          .hero-slide:not(.hero-slide-ready) .hero-reveal-glass {
+            visibility: visible;
           }
         }
       `}</style>
@@ -2271,6 +2351,13 @@ export default function FeaturedHero({
   ]);
 
   const activeMovie = list[activeIndex] || list[0] || null;
+
+  // AL VOLVER ATRÁS el primer destacado aparece ya colocado (sin repetir la
+  // entrada). Solo ese: los cambios de destacado posteriores se animan.
+  const isBackNav = useIsHistoryNavigation();
+  const [firstSlideId, setFirstSlideId] = useState(null);
+  if (firstSlideId == null && activeMovie) setFirstSlideId(activeMovie.id);
+  const staticEntrance = isBackNav && activeMovie != null && activeMovie.id === firstSlideId;
   const resolvedActiveAssets = activeMovie ? assets[activeMovie.id] : null;
   const activeAssets = resolvedActiveAssets || {};
   const activeBackdropOptions = useMemo(() => {
@@ -2508,6 +2595,7 @@ export default function FeaturedHero({
           soundtrackVisible={soundtrackVisible}
           soundtrackPreferenceReady={soundtrackPreferenceReady}
           toggleSoundtrackVisible={toggleSoundtrackVisible}
+          staticEntrance={staticEntrance}
         />
 
         {/* Flechas (solo desktop) */}

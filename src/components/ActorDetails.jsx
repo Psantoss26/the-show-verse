@@ -53,6 +53,7 @@ import {
 } from "@/components/lists/ListDetailsActionRow";
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
 import { buildActorShare } from "@/lib/actor/shareActor";
+import { sendEmbeddedDetailsAction } from "@/lib/navigation/embeddedDetails";
 import DetailsSectionMenu from "./DetailsSectionMenu";
 import DetailsInfoTabs from "@/components/details/DetailsInfoTabs";
 import useDetailsStickyTop from "@/hooks/useDetailsStickyTop";
@@ -142,56 +143,33 @@ function getActorPopularityDelta(personId, currentRank, updatedAt) {
   }
 }
 
+// Icono de tendencia del ranking (estilo MOVIEmeter): círculo con la línea de
+// tendencia. La punta es un ángulo recto con el MISMO trazo que la línea y
+// alineado con su último tramo (45°), y el conjunto va centrado en el círculo;
+// antes era un triángulo relleno que no seguía la dirección de la línea.
+const TREND_PATHS = {
+  down: "M6.75 9.25 10 12.5l2.5-2.5 4.75 4.75M13.75 14.75h3.5v-3.5",
+  up: "M6.75 14.75 10 11.5l2.5 2.5 4.75-4.75M13.75 9.25h3.5v3.5",
+  flat: "M7.5 12h9",
+};
+
 function PopularityTrendIcon({ delta, className = "size-5 sm:size-[22px]" }) {
-  if (delta < 0) {
-    return (
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        className={`shrink-0 text-red-500 ${className}`}
-        aria-hidden="true"
-      >
-        <circle cx="12" cy="12" r="9.5" stroke="currentColor" strokeWidth="2" />
-        <path
-          d="M7 9.5 L10.5 13.5 L13.5 11 L15.5 13.5"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <polygon points="12.5,16.5 17,16.5 17,12" fill="currentColor" />
-      </svg>
-    );
-  }
-  if (delta > 0) {
-    return (
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        className={`shrink-0 text-emerald-400 ${className}`}
-        aria-hidden="true"
-      >
-        <circle cx="12" cy="12" r="9.5" stroke="currentColor" strokeWidth="2" />
-        <path
-          d="M7 14.5 L10.5 10.5 L13.5 13 L15.5 10.5"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <polygon points="12.5,7.5 17,7.5 17,12" fill="currentColor" />
-      </svg>
-    );
-  }
+  const trend = delta < 0 ? "down" : delta > 0 ? "up" : "flat";
+  const tone =
+    trend === "down" ? "text-red-500" : trend === "up" ? "text-emerald-400" : "text-zinc-500";
   return (
     <svg
       viewBox="0 0 24 24"
       fill="none"
-      className={`shrink-0 text-zinc-500 ${className}`}
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`shrink-0 ${tone} ${className}`}
       aria-hidden="true"
     >
-      <circle cx="12" cy="12" r="9.5" stroke="currentColor" strokeWidth="2" />
-      <line x1="7.5" y1="12" x2="16.5" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <circle cx="12" cy="12" r="9.5" />
+      <path d={TREND_PATHS[trend]} />
     </svg>
   );
 }
@@ -242,7 +220,7 @@ function ActorPopularity({ value, personId }) {
         : "Consultando ranking de popularidad TMDb…";
 
   return (
-    <div className="shrink-0 pb-1 sm:pb-1.5 leading-none">
+    <div data-phone-scaled className="shrink-0 pb-1 sm:pb-1.5 leading-none">
       <dl
         data-actor-popularity
         className="flex items-center gap-2 select-none"
@@ -1829,6 +1807,11 @@ export default function ActorDetails({
   const [mobileCoverFailedSrc, setMobileCoverFailedSrc] = useState(null);
   const mobileCoverReady =
     !profileSrc || mobileCoverLoad.ready || mobileCoverFailedSrc === (profileLowSrc || profileSrc);
+  // Dentro del panel con iframe (vista teléfono del panel lateral): el panel
+  // muestra su esqueleto hasta que la portada está lista, como en temporadas.
+  useEffect(() => {
+    if (mobileCoverReady) sendEmbeddedDetailsAction("hero-ready");
+  }, [mobileCoverReady]);
 
   const isBackNav = useIsHistoryNavigation();
   const animateMobileEntry = !isBackNav;
@@ -3159,7 +3142,11 @@ export default function ActorDetails({
                       : "max-sm:invisible"
                 }`}
               >
-                <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[1] tracking-tight text-balance drop-shadow-xl text-center md:text-left">
+                {/* `data-phone-scaled`: en el panel lateral en vista teléfono
+                    (iframe), texto y contenido crecen con el ancho del panel
+                    como en la ficha de un título (ver globals.css). La foto y
+                    la fila de botones conservan su tamaño. */}
+                <h1 data-phone-scaled className="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-[1] tracking-tight text-balance drop-shadow-xl text-center md:text-left">
                   {safeText(actorDetails?.name)}
                 </h1>
                 <ActorPopularity value={actorDetails?.popularity} personId={personId} />
@@ -3242,19 +3229,9 @@ export default function ActorDetails({
                         : "max-sm:invisible"
                   }
                 >
-                  <div
-                    // La fila de listas y colecciones (en escritorio, los 52px
-                    // de DetailsClient) con el tamaño MÓVIL de DetailsClient:
-                    // sus 8 botones se reparten el ancho, así que aquí cada
-                    // uno mide lo de un octavo de fila aunque haya 4 (36px a
-                    // 360px, 40px a 390px, 45px a 430px).
-                    // Sobre el ancho de la propia fila (el `%` del tope se
-                    // resuelve contra ella, como el reparto de DetailsClient:
-                    // 8 botones y 7 huecos de 4px), no de la ventana. Los 8px
-                    // de más son el `px-1` de esta columna, que la fila de
-                    // DetailsClient no tiene: 100% + 8px − 28px.
-                    className={`${LIST_DETAILS_ACTION_ROW_CLASS} [--detail-action-mobile-size:clamp(34px,calc((100%-20px)/8),56px)]`}
-                  >
+                  {/* La misma fila que las fichas de listas y colecciones, con
+                      su mismo tamaño de botón en móvil y en escritorio. */}
+                  <div className={LIST_DETAILS_ACTION_ROW_CLASS}>
                     {/* Me gusta en el servidor, igual que en colecciones y
                         listas: cuenta en el perfil y queda en la actividad
                         (like_actor). Sin sesión, desactivado. */}
@@ -3330,7 +3307,7 @@ export default function ActorDetails({
               className="block h-px sm:hidden"
             />
 
-            <div className={MOBILE_REVEAL_BASE} {...heroRevealProps}>
+            <div data-phone-scaled className={MOBILE_REVEAL_BASE} {...heroRevealProps}>
               <DetailsInfoTabs
                 key={personId}
                 layoutId={`actor-info-tabs-${personId}`}
@@ -3408,12 +3385,15 @@ export default function ActorDetails({
               backfaceVisibility: "hidden",
             }}
           >
-            <DetailsSectionMenu
-              items={sectionItems}
-              activeId={activeSectionId}
-              onChange={scrollToSection}
-              colorScheme="emerald"
-            />
+            {/* Escala el menú, no su contenedor pegajoso (su `top`). */}
+            <div data-phone-scaled>
+              <DetailsSectionMenu
+                items={sectionItems}
+                activeId={activeSectionId}
+                onChange={scrollToSection}
+                colorScheme="emerald"
+              />
+            </div>
           </div>
 
           {/* MÓVIL: la última sección sin su margen inferior; queda solo el
@@ -3421,7 +3401,7 @@ export default function ActorDetails({
               página topa con la última fila unos 35px sobre el navbar inferior. */}
           {/* `mt-14`: el mismo hueco que DetailsClient entre el menú de
               secciones y la primera sección. */}
-          <div className="mt-14 space-y-14 max-sm:[&>section:last-child_section]:mb-0">
+          <div data-phone-scaled className="mt-14 space-y-14 max-sm:[&>section:last-child_section]:mb-0">
             {popularItems.length > 0 && (
               <section id="section-popular" ref={registerSection("popular")}>
                 <AnimatedSection delay={0.04}>

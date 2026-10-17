@@ -38,8 +38,8 @@ function preloadImage(size, path) {
  * Selección de imágenes que pintará la ficha en escritorio, según los datos
  * de TMDb y la selección guardada del usuario.
  */
-// Primeras tarjetas visibles del Reparto Principal: dirección y luego reparto,
-// en el orden de la ficha (buildCastDataForUI).
+// Primeras tarjetas visibles del Reparto Principal: solo intérpretes, en el
+// orden de la ficha (sin dirección ni creadores, como el carrusel).
 const CAST_WARMUP_COUNT = 7;
 
 export function pickSequenceWarmupArtwork(data, override = {}) {
@@ -51,9 +51,8 @@ export function pickSequenceWarmupArtwork(data, override = {}) {
     backdrops: data.images?.backdrops,
     preferredPaths: [override?.background],
   });
-  const directors = (data.credits?.crew || []).filter((person) => person?.job === "Director");
   const cast = [...(data.credits?.cast || [])].sort((a, b) => (a?.order ?? 999) - (b?.order ?? 999));
-  const profiles = [...new Set([...directors, ...cast].map((person) => person?.profile_path).filter(Boolean))]
+  const profiles = [...new Set(cast.map((person) => person?.profile_path).filter(Boolean))]
     .slice(0, CAST_WARMUP_COUNT);
   return { posters, backdrop, profiles };
 }

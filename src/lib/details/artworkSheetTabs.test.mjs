@@ -15,7 +15,7 @@ const backdrops = [
 ];
 const logos = [{ file_path: "/logo.png", iso_639_1: "es" }];
 
-test("móvil: las mismas pestañas que la ficha (Portada sin idioma y Logo)", () => {
+test("móvil: las mismas pestañas que la ficha (Portada sin idioma, Con idioma y Logo)", () => {
   const tabs = buildArtworkSheetTabs({
     mobile: true,
     posters,
@@ -23,7 +23,11 @@ test("móvil: las mismas pestañas que la ficha (Portada sin idioma y Logo)", ()
     logos,
     active: { mobilePoster: "/neutral-2.jpg", logo: "/logo.png" },
   });
-  assert.deepEqual(tabs.map((tab) => [tab.id, tab.label]), [["posters", "Portada"], ["logos", "Logo"]]);
+  assert.deepEqual(tabs.map((tab) => [tab.id, tab.label]), [
+    ["posters", "Portada"],
+    ["localizedPosters", "Con idioma"],
+    ["logos", "Logo"],
+  ]);
   // Solo portadas sin idioma, con la elegida primero.
   assert.deepEqual(tabs[0].images.map((img) => img.file_path), ["/neutral-2.jpg", "/neutral-1.jpg"]);
   assert.equal(tabs[0].activePath, "/neutral-2.jpg");
@@ -40,10 +44,20 @@ test("escritorio: Portada, Vista previa, Fondo y Logo", () => {
   assert.deepEqual(tabs[2].images.map((img) => img.file_path), ["/limpio.jpg", "/main.jpg"]);
 });
 
-test("sin portadas neutras se muestran todas; pestañas vacías fuera", () => {
+test("móvil sin portadas neutras: solo «Con idioma»; pestañas vacías fuera", () => {
   const tabs = buildArtworkSheetTabs({ mobile: true, posters: [posters[0]], backdrops: [], logos: [] });
-  assert.deepEqual(tabs.map((tab) => tab.id), ["posters"]);
+  assert.deepEqual(tabs.map((tab) => tab.id), ["localizedPosters"]);
   assert.deepEqual(tabs[0].images.map((img) => img.file_path), ["/es.jpg"]);
+});
+
+test("móvil: la portada elegida se marca solo en su pestaña", () => {
+  const tabs = buildArtworkSheetTabs({ mobile: true, posters, backdrops, logos, active: { mobilePoster: "/es.jpg" } });
+  const [neutral, localized] = tabs;
+  assert.deepEqual(neutral.images.map((img) => img.file_path), ["/neutral-1.jpg", "/neutral-2.jpg"]);
+  assert.deepEqual(localized.images.map((img) => img.file_path), ["/es.jpg"]);
+  assert.equal(localized.kind, "mobilePoster");
+  assert.equal(localized.activePath, "/es.jpg");
+  assert.equal("injectActive" in localized, false);
 });
 
 test("la elegida aparece aunque el filtro de su pestaña la deje fuera", () => {

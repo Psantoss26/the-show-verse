@@ -230,7 +230,6 @@ import {
 } from "@/lib/details/omdbCache";
 import {
   buildCastDataForUI,
-  buildCreativeCreditsForCast,
   formatCreditNames,
   getMovieDirectorsFromCrew,
   normalizeCastFromTmdb,
@@ -325,6 +324,7 @@ import AddToListModal from "@/components/details/AddToListModal";
 import VideoModal from "@/components/details/VideoModal";
 import SoundtrackModal from "@/components/details/SoundtrackModal";
 import useAmbientSoundtrack from "@/lib/details/useAmbientSoundtrack";
+import { isSoundtrackAutoplayOn, withSoundtrackAutoplay } from "@/lib/soundtrack/autoplayPreference";
 import {
   getSoundtrackFeedback,
   SOUNDTRACK_EXCLUDE_PARAM,
@@ -2109,7 +2109,7 @@ export default function DetailsClient({
     // Oculto en esta ficha: tampoco suena de fondo.
     tracks: soundtrackHidden ? EMPTY_SOUNDTRACK_TRACKS : soundtrackTracks,
     // Ajustes > Reproducción automática del soundtrack.
-    enabled: preferences?.uiSettings?.soundtrackAutoplay !== false,
+    enabled: isSoundtrackAutoplayOn(preferences),
     suspended: soundtrackModalOpen || videoModalOpen,
     resetKey: `${endpointType}:${id}`,
   });
@@ -2118,14 +2118,14 @@ export default function DetailsClient({
   // Ajustes, así que los dos siempre dicen lo mismo. Al activarlo se borra
   // además el silencio local que dejaba el altavoz cuando hacía de interruptor
   // (versiones anteriores); si no, seguiría sin sonar sin forma de saber por qué.
-  const soundtrackAutoplayPref = preferences?.uiSettings?.soundtrackAutoplay !== false;
+  const soundtrackAutoplayPref = isSoundtrackAutoplayOn(preferences);
   const { setAutoplay: setAmbientAutoplay } = soundtrackAmbient;
   const handleSoundtrackAutoplayChange = useCallback(
     (value) => {
       if (value) setAmbientAutoplay(true);
       if (value === soundtrackAutoplayPref) return;
       updatePreference?.({
-        uiSettings: { ...preferences?.uiSettings, soundtrackAutoplay: value },
+        uiSettings: withSoundtrackAutoplay(preferences?.uiSettings, value),
       });
     },
     [preferences?.uiSettings, setAmbientAutoplay, soundtrackAutoplayPref, updatePreference],
@@ -2585,15 +2585,20 @@ export default function DetailsClient({
    */
   const artworkSelection = useMemo(() => {
     const isLogoTab = activeImagesTab === "logos";
+    // MÓVIL: dos pestañas para la MISMA capa (la portada del hero): «Portada»
+    // (sin idioma, con el logo encima) y «Con idioma» (trae el título impreso,
+    // así que el logo se oculta: ver `mobilePosterHasBurnedTitle`).
+    const isLocalizedPosterTab =
+      isMobileViewport && activeImagesTab === "localizedPosters";
     const isMobilePosterTab =
-      isMobileViewport && activeImagesTab === "posters";
+      isMobileViewport && (activeImagesTab === "posters" || isLocalizedPosterTab);
+    const isPoster = activeImagesTab === "posters" || isLocalizedPosterTab;
     const rawList = isLogoTab
       ? titleLogos
-      : activeImagesTab === "posters"
+      : isPoster
         ? imagesState?.posters
         : imagesState?.backdrops;
 
-    const isPoster = activeImagesTab === "posters";
     const isBackdropTab = activeImagesTab === "backdrops";
     const isBackgroundTab = activeImagesTab === "background";
     const aspect = isPoster ? "aspect-[2/3]" : "aspect-[16/9]";
@@ -2644,8 +2649,14 @@ export default function DetailsClient({
     };
 
     // Filtrar imagenes por resolucion e idioma, siempre incluyendo la imagen activa
+    // Las dos pestañas de portada móvil solo enseñan las suyas (también la
+    // elegida: se marca en la que le corresponde, no en las dos).
+    const inMobilePosterTab = (img) =>
+      isLocalizedPosterTab ? !isLanguageNeutralImage(img) : isLanguageNeutralImage(img);
+
     const filtered = withPath.filter((img) => {
       const fp = img?.file_path;
+      if (isMobilePosterTab && !inMobilePosterTab(img)) return false;
       if (fp === activePath) return true; // Siempre incluir la imagen activa
 
       if (imagesResFilter !== "all") {
@@ -2658,10 +2669,7 @@ export default function DetailsClient({
         return !img?.iso_639_1;
       }
 
-      if (isMobilePosterTab) {
-        // El hero móvil usa una portada sin idioma para no duplicar el logo.
-        return !img?.iso_639_1;
-      }
+      if (isMobilePosterTab) return true;
 
       if (isLogoTab) return matchesLang(img);
 
@@ -2678,6 +2686,8 @@ export default function DetailsClient({
     // Fallback relajado: si los filtros son demasiado restrictivos, se relajan
     const relaxed = (() => {
       if (!withPath.length) return [];
+      // Portada móvil: se relaja la resolución, nunca el idioma.
+      if (isMobilePosterTab) return withPath.filter(inMobilePosterTab);
       if (isBackgroundTab) {
         const neutral = withPath.filter((img) => !img?.iso_639_1);
         return neutral.length ? neutral : withPath;
@@ -2725,6 +2735,7 @@ export default function DetailsClient({
       ordered,
       isPoster,
       isMobilePosterTab,
+      isLocalizedPosterTab,
       isLogoTab,
       isBackdropTab,
       isBackgroundTab,
@@ -2752,6 +2763,13 @@ export default function DetailsClient({
     displayBackdropPath,
     data?.backdrop_path,
   ]);
+
+  // «Con idioma» solo existe en móvil: en escritorio la portada es otra capa.
+  useEffect(() => {
+    if (!isMobileViewport && activeImagesTab === "localizedPosters") {
+      setActiveImagesTab("posters");
+    }
+  }, [isMobileViewport, activeImagesTab]);
 
   // REORDENACIÓN ANIMADA (FLIP) al elegir una imagen de la galería.
   //
@@ -7734,14 +7752,9 @@ export default function DetailsClient({
     };
   }, [id, endpointType], !tmdbCastLoading);
 
-  const creativeCreditsForUI = useMemo(() => {
-    return buildCreativeCreditsForCast({
-      type,
-      movieDirectors: movieDirectorsCrew,
-      tvCreators,
-    });
-  }, [type, movieDirectorsCrew, tvCreators]);
-
+  // Reparto Principal: SOLO los intérpretes, en el orden de TMDb. El director o
+  // los creadores ya salen en la vista lateral de la sección (pestaña
+  // «Equipo»), así que no se repiten delante de los actores.
   const castDataForUI = useMemo(() => {
     const base =
       Array.isArray(tmdbCast) && tmdbCast.length
@@ -7750,15 +7763,11 @@ export default function DetailsClient({
           ? castData
           : [];
 
-    return buildCastDataForUI({
-      baseCast: base,
-      creativeCredits: creativeCreditsForUI,
-    });
-  }, [tmdbCast, castData, creativeCreditsForUI]);
+    return buildCastDataForUI({ baseCast: base, creativeCredits: [] });
+  }, [tmdbCast, castData]);
 
   // Reparto de la vista lateral: solo los intérpretes. El director o los
-  // creadores, que el carrusel de la sección pone delante, van en su pestaña
-  // «Equipo» (ver details/sectionSheet).
+  // creadores van en su pestaña «Equipo» (ver details/sectionSheet).
   const sheetCastForUI = useMemo(() => {
     const base =
       Array.isArray(tmdbCast) && tmdbCast.length
@@ -11760,6 +11769,27 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     <ImageIcon className="w-4 h-4" />
                                     <span className="text-xs font-semibold">Portada</span>
                                   </button>
+                                  {/* Portada CON IDIOMA: sustituye a la portada sin
+                                      idioma + logo (trae el título impreso). */}
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setActiveImagesTab("localizedPosters")
+                                    }
+                                    className={`px-2.5 h-full rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                                      activeImagesTab === "localizedPosters"
+                                        ? "bg-white/10 text-white shadow-md"
+                                        : "text-zinc-400 hover:text-white hover:bg-white/10"
+                                    }`}
+                                    style={{
+                                      WebkitTapHighlightColor: "transparent",
+                                    }}
+                                    aria-label="Portada con idioma"
+                                    aria-pressed={activeImagesTab === "localizedPosters"}
+                                  >
+                                    <Languages className="w-4 h-4" />
+                                    <span className="text-xs font-semibold">Con idioma</span>
+                                  </button>
                                   <button
                                     type="button"
                                     onClick={() =>
@@ -11936,6 +11966,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             ordered,
                             isPoster,
                             isMobilePosterTab,
+                            isLocalizedPosterTab,
                             isLogoTab,
                             isBackdropTab,
                             aspect,
@@ -11945,7 +11976,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                           // 2 en móvil y 4 en escritorio para imágenes apaisadas
                           // (vista previa, fondo y logos).
-                          const isBackdropLike = activeImagesTab !== "posters";
+                          const isBackdropLike = !isPoster;
 
                           const breakpoints = isPoster
                             ? {
@@ -12044,7 +12075,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     const isPriority =
                                       index < artworkPreloadCount;
                                     const imgAlt = isPoster
-                                      ? `${isMobilePosterTab ? "Portada sin idioma" : "Portada"} de ${title}`
+                                      ? `${isLocalizedPosterTab ? "Portada con idioma" : isMobilePosterTab ? "Portada sin idioma" : "Portada"} de ${title}`
                                       : isLogoTab
                                         ? `Logo de ${title}`
                                       : isBackdropTab
