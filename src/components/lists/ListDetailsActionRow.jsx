@@ -3,6 +3,7 @@
 import { useServerOnline } from "@/context/ServerStatusContext";
 import LiquidButton from "@/components/LiquidButton";
 import {
+  DETAIL_ACTION_DESKTOP_SIZE_CLASS,
   DETAIL_ACTION_ITEM_SIZING_CLASS,
   MOBILE_ACTION_BUTTON_CLASS,
 } from "@/components/details/DetailActionsRow";
@@ -13,7 +14,8 @@ import { ArrowLeft, Check, Eraser, ExternalLink, Loader2, Pencil, Plus, Share2, 
 
 export const LIST_DETAILS_ACTION_ROW_CLASS = `flex w-full flex-nowrap items-center justify-center gap-1 sm:justify-start sm:gap-3
   ${DETAIL_ACTION_ITEM_SIZING_CLASS}
-  ${MOBILE_ACTION_BUTTON_CLASS}`;
+  ${MOBILE_ACTION_BUTTON_CLASS}
+  ${DETAIL_ACTION_DESKTOP_SIZE_CLASS}`;
 
 export function ListDetailsActionButton({ label, children, disabled, onClick, tone = "blue", mutation = false, groupId = "list-details-actions", ...buttonProps }) {
   const online = useServerOnline();

@@ -16,8 +16,10 @@ import {
   Check,
   ChevronDown,
   ArrowUpRight,
+  ArrowUpDown,
   ExternalLink,
   Heart,
+  Languages,
   Image as ImageIcon,
   Layers,
   ListVideo,
@@ -26,6 +28,7 @@ import {
   MonitorPlay,
   Music2,
   RotateCcw,
+  SlidersHorizontal,
   Sparkles,
   Trophy,
   Users,
@@ -33,15 +36,16 @@ import {
 import OptimizedImage from "@/components/OptimizedImage";
 import { COMMENT_TABS, DEFAULT_COMMENT_TAB, normalizeCommentFilters } from "@/lib/details/commentFilters";
 import { tmdbSrcSet } from "@/lib/tmdb/imageSrcSet";
-import SectionSheet, { SectionSheetEmpty, SectionSheetGroupTitle } from "./SectionSheet";
+import SectionSheet, { SHEET_CONTROL, SectionSheetEmpty, SectionSheetGroupTitle } from "./SectionSheet";
 import { ListRow, PersonRow, TitleRow, TrackRow, VideoRow } from "./SectionSheetRows";
 import { AwardRow } from "@/components/details/AwardCard";
 import SeasonCard from "@/components/details/SeasonCard";
 import TraktCommentCard from "@/components/details/TraktCommentCard";
 import { buildCrewGroups, crewRoleLabel } from "@/lib/details/sectionSheetData";
+import { DropdownItem, InlineDropdown } from "@/components/details/CreditFilterControls";
+import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 import useImdbScoreLoader from "@/hooks/useImdbScoreLoader";
 import { getScoreItemKey, readScoreCache } from "@/lib/userLists/listScoreCache";
-import { DETAIL_MODAL_GLASS_CONTROL } from "@/lib/ui/liquidGlass";
 
 const SECTIONS = {
   cast: { title: "Reparto", icon: Users },
@@ -295,18 +299,16 @@ function CollectionSheet({ meta, data, onClose }) {
       subtitle={plural(items.length, "película", "películas")}
       headerAction={
         collection.id ? (
+          // El mismo botón que el de cerrar del panel (SectionSheet): mismo
+          // círculo, fondo y estados; el nombre va de tooltip.
           <Link
             href={`/lists/collection/${collection.id}`}
             onClick={onClose}
             aria-label="Abrir colección completa"
-            className={`group flex h-10 w-10 shrink-0 select-none items-center justify-center gap-0 overflow-hidden rounded-full px-0 transition-all duration-300 ease-out sm:hover:w-[148px] sm:hover:gap-1.5 sm:hover:px-2 sm:focus-visible:w-[148px] sm:focus-visible:gap-1.5 sm:focus-visible:px-2 ${DETAIL_MODAL_GLASS_CONTROL}`}
+            title="Abrir colección"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/5 text-white/70 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400"
           >
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center transition-transform duration-300 group-hover:rotate-45 group-focus-visible:rotate-45">
-              <ArrowUpRight className="h-5 w-5 shrink-0" aria-hidden="true" />
-            </span>
-            <span className="hidden max-w-0 translate-y-px overflow-hidden whitespace-nowrap text-xs font-bold leading-normal tracking-wide opacity-0 transition-[max-width,opacity] duration-200 sm:block sm:group-hover:max-w-[108px] sm:group-hover:opacity-100 sm:group-focus-visible:max-w-[108px] sm:group-focus-visible:opacity-100">
-              Abrir colección
-            </span>
+            <ArrowUpRight className="h-5 w-5" aria-hidden="true" />
           </Link>
         ) : null
       }
@@ -378,6 +380,33 @@ function AwardsSheet({ meta, data, onClose, tab, setTab }) {
 
 // ─── Portadas y fondos ────────────────────────────────────────────────────
 
+// Orden y filtro de idioma de «Portadas y fondos».
+const IMAGE_SORTS = [
+  { id: "default", label: "Por defecto" },
+  { id: "res_desc", label: "Mayor resolución" },
+  { id: "res_asc", label: "Menor resolución" },
+];
+// Imágenes sin idioma (sin texto): TMDb las marca con null, "" o "xx".
+const NO_LANGUAGE = "none";
+const imageLanguage = (image) => {
+  const code = String(image?.iso_639_1 || "").toLowerCase();
+  return code && code !== "xx" ? code : NO_LANGUAGE;
+};
+const imagePixels = (image) => (Number(image?.width) || 0) * (Number(image?.height) || 0);
+let languageNames = null;
+function languageLabel(code) {
+  if (code === NO_LANGUAGE) return "Sin idioma";
+  try {
+    languageNames ??= new Intl.DisplayNames(["es"], { type: "language" });
+    const name = languageNames.of(code);
+    return name ? name.charAt(0).toLocaleUpperCase("es-ES") + name.slice(1) : code.toUpperCase();
+  } catch {
+    return code.toUpperCase();
+  }
+}
+// Menús por encima del panel (z-[10000]).
+const SHEET_MENU_Z = 10050;
+
 function ImagesSheet({ meta, data, onClose, tab, setTab }) {
   // Pestañas ya calculadas por la ficha (lib/details/artworkSheetTabs): las
   // mismas que su galería, con la imagen elegida primero.
@@ -385,20 +414,149 @@ function ImagesSheet({ meta, data, onClose, tab, setTab }) {
   const onSelect = data.images?.onSelect;
   const onReset = data.images?.onReset;
   const current = tabs.find((item) => item.id === tab) || tabs[0] || null;
-  const images = current?.images || [];
+  const currentImages = current?.images;
+  const tabImages = useMemo(() => currentImages || [], [currentImages]);
   const isPoster = current?.aspect === "poster";
   const isLogo = current?.aspect === "logo";
   const total = tabs.reduce((sum, item) => sum + item.count, 0);
+  // Orden por resolución y filtro por idioma. El idioma depende de la
+  // pestaña: al cambiarla vuelve a «Todos».
+  const [sort, setSort] = useState("default");
+  const [language, setLanguage] = useState("all");
+  const languages = useMemo(() => {
+    const counts = new Map();
+    tabImages.forEach((image) => {
+      const code = imageLanguage(image);
+      counts.set(code, (counts.get(code) || 0) + 1);
+    });
+    // Sin idioma primero; luego por número de imágenes.
+    return [...counts.entries()]
+      .sort(([a, na], [b, nb]) => (a === NO_LANGUAGE ? -1 : b === NO_LANGUAGE ? 1 : nb - na))
+      .map(([code, count]) => ({ code, count, label: languageLabel(code) }));
+  }, [tabImages]);
+  const images = useMemo(() => {
+    const filtered =
+      language === "all" ? tabImages : tabImages.filter((image) => imageLanguage(image) === language);
+    if (sort === "default") return filtered;
+    const direction = sort === "res_asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => direction * (imagePixels(a) - imagePixels(b)));
+  }, [tabImages, language, sort]);
+  const changeTab = (id) => {
+    setLanguage("all");
+    setTab(id);
+  };
+  // Los filtros se despliegan con su botón, junto a las pestañas.
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filtersChanged = sort !== "default" || language !== "all";
+  const filtersToggle =
+    tabImages.length > 1 ? (
+      // La misma pastilla que la barra de pestañas (SectionSheet).
+      <div className={`flex shrink-0 p-1 ${SHEET_CONTROL}`}>
+        <button
+          type="button"
+          onClick={() => setFiltersOpen((open) => !open)}
+          aria-expanded={filtersOpen}
+          aria-label="Filtros: ordenar e idioma"
+          title="Ordenar y filtrar por idioma"
+          className={`relative flex min-h-9 w-9 items-center justify-center rounded-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-yellow-400 ${
+            filtersOpen ? "bg-white/15 text-white" : "text-zinc-400 hover:bg-white/5 hover:text-white"
+          }`}
+        >
+          <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+          {/* Filtros cambiados: un punto, también cerrado. */}
+          {filtersChanged ? (
+            <span
+              aria-hidden="true"
+              className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-yellow-400 shadow-[0_0_6px_rgba(250,204,21,0.9)]"
+            />
+          ) : null}
+        </button>
+      </div>
+    ) : null;
+  const sortLabel = IMAGE_SORTS.find((item) => item.id === sort)?.label || IMAGE_SORTS[0].label;
+  const languageValue = language === "all" ? "Todos" : languageLabel(language);
   return (
     <SectionSheet
       open
       onClose={onClose}
       title={meta.title}
       icon={meta.icon}
-      subtitle={plural(total, "imagen", "imágenes")}
+      subtitle={
+        language === "all"
+          ? plural(total, "imagen", "imágenes")
+          : `${images.length} de ${plural(tabImages.length, "imagen", "imágenes")}`
+      }
       tabs={tabs.map(({ id, label, count }) => ({ id, label, count }))}
       activeTab={current?.id}
-      onTabChange={setTab}
+      onTabChange={changeTab}
+      tabsAccessory={tabs.length > 1 ? filtersToggle : null}
+      // Con una sola pestaña no hay barra: el botón va solo, a la derecha.
+      searchAccessory={tabs.length > 1 ? null : filtersToggle}
+      toolbar={
+        tabImages.length > 1 ? (
+          <MobileFiltersPanel open={filtersOpen} gapClassName="pt-3">
+          <div className="grid grid-cols-2 gap-2">
+            <InlineDropdown
+              accent="yellow"
+              label="Ordenar"
+              valueLabel={sortLabel}
+              icon={ArrowUpDown}
+              menuZIndex={SHEET_MENU_Z}
+              fullWidth
+            >
+              {({ close }) =>
+                IMAGE_SORTS.map((option) => (
+                  <DropdownItem
+                    key={option.id}
+                    active={sort === option.id}
+                    onClick={() => {
+                      setSort(option.id);
+                      close();
+                    }}
+                  >
+                    {option.label}
+                  </DropdownItem>
+                ))
+              }
+            </InlineDropdown>
+            <InlineDropdown
+              accent="yellow"
+              label="Idioma"
+              valueLabel={languageValue}
+              icon={Languages}
+              menuZIndex={SHEET_MENU_Z}
+              fullWidth
+            >
+              {({ close }) => (
+                <>
+                  <DropdownItem
+                    active={language === "all"}
+                    onClick={() => {
+                      setLanguage("all");
+                      close();
+                    }}
+                  >
+                    Todos ({tabImages.length})
+                  </DropdownItem>
+                  {languages.map((option) => (
+                    <DropdownItem
+                      key={option.code}
+                      active={language === option.code}
+                      onClick={() => {
+                        setLanguage(option.code);
+                        close();
+                      }}
+                    >
+                      {option.label} ({option.count})
+                    </DropdownItem>
+                  ))}
+                </>
+              )}
+            </InlineDropdown>
+          </div>
+          </MobileFiltersPanel>
+        ) : null
+      }
       headerAction={
         onReset ? (
           // El mismo «restablecer» que la galería de la ficha: vuelve a las
@@ -477,7 +635,7 @@ function ImagesSheet({ meta, data, onClose, tab, setTab }) {
           })}
         </ul>
       ) : (
-        <SectionSheetEmpty>No hay imágenes.</SectionSheetEmpty>
+        <SectionSheetEmpty>{tabImages.length ? "Ninguna imagen en ese idioma." : "No hay imágenes."}</SectionSheetEmpty>
       )}
     </SectionSheet>
   );
@@ -732,8 +890,8 @@ function CommentsSheet({ meta, data, onClose }) {
           aria-pressed={byLikes}
           aria-label="Ordenar por likes"
           title={byLikes ? "Quitar el orden por likes" : "Ordenar por likes"}
-          className={`flex w-11 shrink-0 items-center justify-center rounded-xl transition-colors ${
-            byLikes ? "bg-white/15 text-white" : "bg-black/20 text-zinc-400 hover:bg-white/5 hover:text-white"
+          className={`flex w-11 shrink-0 items-center justify-center transition-colors ${SHEET_CONTROL} ${
+            byLikes ? "!from-white/20 !to-white/15 text-white" : "text-zinc-400 hover:from-white/15 hover:to-white/10 hover:text-white"
           }`}
         >
           <Heart className={`h-4 w-4 ${byLikes ? "fill-pink-400 text-pink-400" : ""}`} aria-hidden="true" />

@@ -2,15 +2,19 @@
 
 // Cliente por LOTES de /api/tmdb/artwork: las peticiones de arte que llegan en
 // el mismo instante (una parrilla que monta, las vistas previas del índice) se
-// agrupan en un solo POST de hasta 60 títulos. El servidor consulta TMDb y lo
-// cachea un día (ver la ruta).
+// agrupan en POSTs de hasta MAX_PER_REQUEST títulos, en el orden en que se
+// pidieron. El servidor consulta TMDb y lo cachea un día (ver la ruta).
 //
 // Devuelve las elecciones { poster, previewPoster, previewBackdrop } o
 // `undefined` si no se pudo consultar (el llamador cae a pedir /images él
 // mismo). Solo se recuerda lo que llega bien.
 
 const BATCH_WINDOW_MS = 16;
-const MAX_PER_REQUEST = 60;
+// Lo que el servidor resuelve de una tanda (su MAX_CONCURRENT): cada POST
+// vuelve tras UNA ronda de TMDb. Con 60 por POST, las tarjetas de la primera
+// pantalla de una lista esperaban a las 60 (3,4 s medidos en frío en una de
+// la comunidad); así llegan con el primer lote y el resto va detrás.
+const MAX_PER_REQUEST = 16;
 
 const resolved = new Map(); // "movie:603" -> picks
 const waiting = new Map(); // "movie:603" -> [resolve, …]

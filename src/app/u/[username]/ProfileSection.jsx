@@ -35,7 +35,7 @@ import ListCoverBackdropCollage from "@/components/lists/ListCoverBackdropCollag
 import { getListDetails } from "@/lib/api/backendLists";
 import { enrichListPreviewArtwork } from "@/lib/lists/previewArtwork";
 import ActivityBackdropImage from "@/components/social/ActivityBackdropImage";
-import { hasActivityBackdropArtwork } from "@/lib/profile/activityBackdrops";
+import { hasActivityBackdropArtwork, isPortraitActivity } from "@/lib/profile/activityBackdrops";
 import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
 import MemberRow from "@/components/social/MemberRow";
 import PosterTile from "@/components/social/PosterTile";
@@ -802,10 +802,12 @@ function ActivityPoster({ item, className = "", backdrop = false }) {
 
   const likeHref = likeTargetHref(item);
   if (likeHref) {
+    // Me gusta a una persona con backdrop: solo su foto centrada, sin fondo.
+    const surface = backdrop && isPortraitActivity(item) ? "" : "bg-zinc-900";
     return (
       <Link
         href={likeHref}
-        className={`${className} shrink-0 overflow-hidden bg-zinc-900 transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70`}
+        className={`${className} shrink-0 overflow-hidden ${surface} transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70`}
         aria-label={`Ver ${likeTargetName(item)}`}
       >
         {poster}

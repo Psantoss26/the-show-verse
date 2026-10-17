@@ -11,6 +11,15 @@ const TV_TYPES = new Set(["tv", "show", "season", "episode"]);
 // Sin ficha de título propia: el arte es el de la lista, la colección o el actor.
 const WITHOUT_TITLE = new Set(["list", "like_list", "like_collection", "like_actor"]);
 
+/**
+ * ¿La acción se pinta con un RETRATO (la foto de una persona) en vez de un
+ * backdrop? Me gusta a una persona: en la vista «Lista con backdrop» va solo
+ * su foto, centrada en la caja 16:9 y sin fondo detrás.
+ */
+export function isPortraitActivity(item) {
+  return item?.type === "like_actor";
+}
+
 /** Título de TMDb cuyo backdrop corresponde a la acción, o null. */
 export function activityBackdropTarget(item) {
   if (!item || WITHOUT_TITLE.has(item.type)) return null;

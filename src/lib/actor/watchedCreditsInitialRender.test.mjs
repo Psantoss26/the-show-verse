@@ -24,9 +24,12 @@ test("la sección Vistos recibe créditos ya resueltos en el render inicial", as
     /useState\(\(\) =>\s*normalizeWatchedCredits\(initialWatchedCredits\),?\s*\)/,
   );
 
+  // Inicio del efecto que reinicia la ficha al cambiar de persona (los
+  // filtros de créditos ya no viven aquí: cada sección guarda los suyos).
   const resetEffectStart = actorDetails.indexOf(
-    "const defaultCreditFilters = getDefaultCreditFilters(actorDetails);",
+    "setExternalIds(initialExternalIds);",
   );
+  assert.ok(resetEffectStart > 0, "no se encuentra el efecto de reinicio");
   const watchedRefreshEffectStart = actorDetails.indexOf(
     "  useEffect(() => {\n    if (!personId)",
     resetEffectStart,

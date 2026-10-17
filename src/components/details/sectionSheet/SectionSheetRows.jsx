@@ -92,6 +92,8 @@ export function TitleRow({
   year: customYear,
   voteAverage: customVoteAverage,
   action = null,
+  // Línea extra bajo año y tipo (p. ej. el papel de un actor: «como Walter White»).
+  detail = null,
   className = "",
 }) {
   const type = item?.media_type === "tv" || mediaType === "tv" ? "tv" : "movie";
@@ -105,7 +107,9 @@ export function TitleRow({
   const rating = Number(rawVoteAverage) > 0 ? Number(rawVoteAverage) : null;
   const imdbScore = Number(imdbRating);
   const hasImdbScore = Number.isFinite(imdbScore) && imdbScore > 0 && imdbScore <= 10;
-  const shouldShowImdb = showImdb || hasImdbScore;
+  // Solo con nota (o mientras se carga, «…»): sin nota en IMDb no se pinta
+  // ni el logo ni «—».
+  const shouldShowImdb = hasImdbScore || (showImdb && imdbLoading);
 
   const targetHref = href || (item?.id ? `/details/${type}/${item.id}` : "#");
 
@@ -158,6 +162,9 @@ export function TitleRow({
         <span className="mt-1 block text-xs font-bold text-zinc-400 min-[1920px]:text-sm">
           {[year, type === "tv" ? "Serie" : "Película"].filter(Boolean).join(" · ")}
         </span>
+        {detail ? (
+          <span className="mt-1 block line-clamp-2 text-xs text-zinc-400 min-[1920px]:text-sm">{detail}</span>
+        ) : null}
         {rating != null || shouldShowImdb ? (
           <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs font-bold tabular-nums text-white min-[1920px]:gap-x-4 min-[1920px]:text-sm">
             {rating != null ? (

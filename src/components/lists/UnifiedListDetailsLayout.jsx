@@ -813,7 +813,21 @@ export default function UnifiedListDetailsLayout({
                                 : 'max-sm:opacity-60'
                         } ${heroBackground ? '' : 'sm:hidden'}`}
                     >
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#101010] via-[#101010]/60 to-transparent" />
+                        {heroBackground ? (
+                            // Los MISMOS velos que la ficha (DetailsClient):
+                            // superior, laterales y el inferior hasta `black/20`
+                            // arriba. Con solo el inferior (transparente arriba)
+                            // la cabecera quedaba sobre el backdrop sin oscurecer.
+                            <>
+                                <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-transparent" />
+                                <div className="absolute inset-0 bg-gradient-to-r from-[#101010]/60 via-transparent to-transparent" />
+                                <div className="absolute inset-0 bg-gradient-to-l from-[#101010]/60 via-transparent to-transparent" />
+                                <div className="absolute inset-0 bg-gradient-to-t from-[#101010] via-[#101010]/60 to-black/20" />
+                                <div className="absolute inset-0 bg-gradient-to-r from-[#101010] via-transparent to-transparent opacity-30" />
+                            </>
+                        ) : (
+                            <div className="absolute inset-0 bg-gradient-to-t from-[#101010] via-[#101010]/60 to-transparent" />
+                        )}
                     </div>
                 ) : null}
             </div>

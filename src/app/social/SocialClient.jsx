@@ -75,7 +75,7 @@ import {
 import Stars from "@/components/social/Stars";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 import ActivityBackdropImage from "@/components/social/ActivityBackdropImage";
-import { hasActivityBackdropArtwork } from "@/lib/profile/activityBackdrops";
+import { hasActivityBackdropArtwork, isPortraitActivity } from "@/lib/profile/activityBackdrops";
 import PageStatCard from "@/components/ui/PageStatCard";
 
 const PAGE_SIZE = 30;
@@ -230,6 +230,8 @@ function tiempoTitle(fecha) {
 function CartelEvento({ evento, className = "", backdrop = false }) {
   const href = hrefDeEvento(evento);
   const src = evento.posterPath ? `https://image.tmdb.org/t/p/w185${evento.posterPath}` : null;
+  // Me gusta a una persona con backdrop: solo su foto centrada, sin fondo.
+  const fondo = backdrop && isPortraitActivity(evento) ? "" : "bg-zinc-900";
   const imagen = backdrop ? (
     <ActivityBackdropImage item={evento} alt={evento.title || ""} />
   ) : src ? (
@@ -241,7 +243,7 @@ function CartelEvento({ evento, className = "", backdrop = false }) {
   );
   if (!href) {
     return (
-      <span aria-hidden="true" className={`${className} flex shrink-0 items-center justify-center overflow-hidden bg-zinc-900`}>
+      <span aria-hidden="true" className={`${className} flex shrink-0 items-center justify-center overflow-hidden ${fondo}`}>
         {imagen}
       </span>
     );
@@ -251,7 +253,7 @@ function CartelEvento({ evento, className = "", backdrop = false }) {
       href={href}
       prefetch={false}
       aria-label={`Ver ${evento.title || evento.name || "ficha"}`}
-      className={`${className} shrink-0 overflow-hidden bg-zinc-900 transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/70`}
+      className={`${className} shrink-0 overflow-hidden ${fondo} transition-transform hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/70`}
     >
       {imagen}
     </Link>

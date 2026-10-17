@@ -80,6 +80,13 @@ const DETAIL_ACTION_ITEM_CAP_CLASS = `${DETAIL_ACTION_ITEM_CAP_MOBILE_CLASS} sm:
 export const DETAIL_ACTION_ITEM_SIZING_CLASS = `
                 ${DETAIL_ACTION_ITEM_FLEX_CLASS} ${DETAIL_ACTION_ITEM_CAP_CLASS}`;
 
+// Botones de la ficha en ESCRITORIO (`lg`): 52px, iconos de 24px y 8px entre
+// ellos (los de DetailsClient). Lo comparten las fichas de listas,
+// colecciones, temporadas, episodios y personas para que en escritorio todas
+// tengan exactamente los mismos botones.
+export const DETAIL_ACTION_DESKTOP_SIZE_CLASS =
+  "lg:[--detail-action-desktop-size:52px] lg:[--detail-action-desktop-icon:24px] lg:!gap-2 lg:[&>.separator]:!mx-1";
+
 // Contenedor con el mismo escalado responsivo (container queries) que la fila
 // original de DetailsClient. Se mantiene idéntico para no re-estilar.
 const buildBaseRowClass = (forceMobile) => `flex flex-nowrap items-center justify-center w-full ${
