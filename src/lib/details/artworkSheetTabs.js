@@ -3,8 +3,9 @@
 // imágenes (sin los filtros de resolución/idioma de la galería).
 //
 //   - Escritorio: Portada, Vista previa, Fondo y Logo.
-//   - Móvil: Portada y Logo, las dos capas del hero móvil; la portada móvil es
-//     la que va sin idioma (el logo va encima).
+//   - Móvil: Portada, Con idioma y Logo. La portada móvil va sin idioma con el
+//     logo encima; elegir una «Con idioma» la sustituye y el logo se oculta (ya
+//     trae el título impreso). Las dos pestañas guardan la misma preferencia.
 //
 // En cada pestaña la imagen elegida va primero y se marca (`activePath`).
 
@@ -18,11 +19,12 @@ const orAll = (subset, all) => (subset.length ? subset : all);
 
 // La elegida va primero. Como en la galería, aparece aunque el filtro de la
 // categoría la dejara fuera (p. ej. la vista previa por defecto con texto).
-function selectedFirst(list, activePath, source) {
+function selectedFirst(list, activePath, source, injectActive = true) {
   if (!activePath) return list;
   const index = list.findIndex((img) => img.file_path === activePath);
   if (index === 0) return list;
   if (index > 0) return [list[index], ...list.slice(0, index), ...list.slice(index + 1)];
+  if (!injectActive) return list;
   const selected = source.find((img) => img.file_path === activePath);
   return selected ? [selected, ...list] : list;
 }
@@ -46,8 +48,20 @@ export function buildArtworkSheetTabs({ mobile = false, posters, backdrops, logo
           label: "Portada",
           kind: "mobilePoster",
           aspect: "poster",
-          images: orAll(allPosters.filter(isLanguageNeutralImage), allPosters),
+          // Solo sin idioma: las que lo tienen van en «Con idioma».
+          images: allPosters.filter(isLanguageNeutralImage),
           activePath: active.mobilePoster,
+          // La elegida solo se marca en la pestaña que le corresponde.
+          injectActive: false,
+        },
+        {
+          id: "localizedPosters",
+          label: "Con idioma",
+          kind: "mobilePoster",
+          aspect: "poster",
+          images: allPosters.filter((img) => !isLanguageNeutralImage(img)),
+          activePath: active.mobilePoster,
+          injectActive: false,
         },
         { id: "logos", label: "Logo", kind: "logo", aspect: "logo", images: allLogos, activePath: active.logo },
       ]
@@ -74,8 +88,9 @@ export function buildArtworkSheetTabs({ mobile = false, posters, backdrops, logo
 
   return tabs
     .map((tab) => {
-      const images = selectedFirst(tab.images, tab.activePath, sources[tab.kind]);
-      return { ...tab, images, count: images.length };
+      const { injectActive = true, ...rest } = tab;
+      const images = selectedFirst(tab.images, tab.activePath, sources[tab.kind], injectActive);
+      return { ...rest, images, count: images.length };
     })
     .filter((tab) => tab.count > 0);
 }

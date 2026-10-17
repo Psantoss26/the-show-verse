@@ -189,7 +189,12 @@ export default function StarRating({
           <span
             ref={ratingRef}
             style={{ transform: `translateY(${ratingOffsetPx}px)` }}
-            className="text-xl font-black leading-none tracking-tighter"
+            // Misma tipografía que el número de visionados del botón de visto
+            // (LiquidButton → playsCount): fuente de la app en negrita, una
+            // cifra en text-2xl y más en text-xl apretado.
+            className={`font-black leading-none ${
+              fmt(rating).length === 1 ? "text-2xl" : "text-xl tracking-tighter"
+            }`}
           >
             {fmt(rating)}
           </span>
@@ -246,7 +251,7 @@ export default function StarRating({
                       className="absolute h-28 w-28 fill-yellow-300/15 text-yellow-300/15 drop-shadow-[0_0_30px_rgba(234,179,8,0.25)]"
                       strokeWidth={1}
                     />
-                    <span className="sv-seriesgraph-number relative z-10 text-6xl leading-none text-white drop-shadow-md">
+                    <span className="relative z-10 text-6xl font-black leading-none tracking-tighter text-white drop-shadow-md">
                       {fmt(value)}
                     </span>
                   </div>

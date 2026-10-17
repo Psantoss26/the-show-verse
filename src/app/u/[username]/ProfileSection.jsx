@@ -162,6 +162,16 @@ function hasActivityPoster(item) {
 // que el backdrop se lea. El mismo tamaño que en Social.
 const ACTIVITY_BACKDROP_CLASS = "aspect-video w-[8.5rem] rounded-lg @[640px]/detail-page:w-56";
 
+// Cartel 2:3 de la vista con póster: crece con el ancho de la página (en
+// escritorio iguala el alto de la miniatura del backdrop y en monitores 2K
+// llega a 96×144 px). Los mismos tamaños que en Social, con container queries
+// porque el perfil también se pinta en el panel lateral.
+const ACTIVITY_POSTER_CLASS =
+  "h-[4.25rem] w-[2.85rem] rounded-lg @[640px]/detail-page:h-24 @[640px]/detail-page:w-16 @[1280px]/detail-page:h-[7.875rem] @[1280px]/detail-page:w-[5.25rem] @[1536px]/detail-page:h-36 @[1536px]/detail-page:w-24";
+// Cartel de una reseña en esa vista (más grande que el de la fila).
+const ACTIVITY_REVIEW_POSTER_CLASS =
+  "h-32 w-[5.4rem] rounded-lg @[1280px]/detail-page:h-40 @[1280px]/detail-page:w-[6.75rem] @[1536px]/detail-page:h-48 @[1536px]/detail-page:w-32";
+
 // Los eventos de Perfil pueden representar un episodio sin cambiar el tipo
 // público de la serie (`tv`). Conservamos la serie como ficha padre, pero la
 // preview debe recibir su temporada y episodio concretos.
@@ -785,11 +795,11 @@ function ActivityTitle({ item, className = "" }) {
   );
 }
 
-function ActivityPoster({ item, className = "", backdrop = false }) {
+function ActivityPoster({ item, className = "", backdrop = false, size = "w185" }) {
   const previewClick = usePreviewOpen();
   const type = ["tv", "show", "season", "episode"].includes(item?.mediaType) ? "tv" : "movie";
   const href = getActivityDetailsHref(item);
-  const src = item?.posterPath ? `https://image.tmdb.org/t/p/w185${item.posterPath}` : null;
+  const src = item?.posterPath ? `https://image.tmdb.org/t/p/${size}${item.posterPath}` : null;
   const poster = backdrop ? (
     <ActivityBackdropImage item={item} alt={item?.title || ""} />
   ) : src ? (
@@ -844,7 +854,7 @@ function ActivityReview({ item, actor, compact = false, posterList = false, back
         {backdropList ? (
           <ActivityPoster item={item} backdrop className={`${ACTIVITY_BACKDROP_CLASS} self-start`} />
         ) : posterList ? (
-          <ActivityPoster item={item} className="h-32 w-[5.4rem] self-start rounded-lg" />
+          <ActivityPoster item={item} size="w342" className={`${ACTIVITY_REVIEW_POSTER_CLASS} self-start`} />
         ) : (
           <>
             <ActivityAvatar actor={actor} />
@@ -917,7 +927,7 @@ function ActivityRow({ item, actor, compact = false, posterList = false, backdro
       {backdropList ? (
         <ActivityPoster item={item} backdrop className={ACTIVITY_BACKDROP_CLASS} />
       ) : posterList ? (
-        <ActivityPoster item={item} className="h-[4.25rem] w-[2.85rem] rounded-lg" />
+        <ActivityPoster item={item} className={ACTIVITY_POSTER_CLASS} />
       ) : (
         <ActivityAvatar actor={actor} />
       )}

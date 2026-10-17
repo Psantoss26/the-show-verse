@@ -13,7 +13,7 @@ import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import { emitDrawerResize, isDrawerResizeActive } from "@/lib/ui/drawerResizeEvents";
 import { useDrawerWidthVar } from "@/lib/ui/drawerWidthVar";
 import { buildEmbeddedDetailsHref, canonicalDetailsHref, EMBEDDED_DETAILS_MESSAGE } from "@/lib/navigation/embeddedDetails";
-import { detailPreviewFromHref, subrouteDetailsHref } from "@/lib/navigation/detailPreview";
+import { detailPreviewFromHref, panelDetailsHref } from "@/lib/navigation/detailPreview";
 import { clampDrawerWidth, clampMobileDetailsWidth, phoneContentScale, MOBILE_DETAILS_ASPECT_RATIO } from "@/lib/ui/detailModalSizing";
 import {
   backdropVariants,
@@ -112,8 +112,12 @@ export default function SubrouteDetailsPanel({ item, placement, contentView, dra
   const right = placement === "right";
   const phone = right && contentView === "mobile";
   const docked = right && drawerView === "docked";
-  const href = subrouteDetailsHref(item);
-  const label = item.media_type === "season" ? `Temporada ${item.seasonNumber}` : `Episodio ${item.seasonNumber}×${item.episodeNumber}`;
+  const href = panelDetailsHref(item);
+  const label = item.media_type === "person"
+    ? item.name || "Ficha de la persona"
+    : item.media_type === "season"
+      ? `Temporada ${item.seasonNumber}`
+      : `Episodio ${item.seasonNumber}×${item.episodeNumber}`;
   const panelVariantsRight = useMemo(() => createPanelVariantsRight(reducedMotion), [reducedMotion]);
   const [panelSettled, setPanelSettled] = useState(restoredFromHistory);
   const [loading, setLoading] = useState(true);

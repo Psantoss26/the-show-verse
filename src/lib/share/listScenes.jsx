@@ -44,8 +44,11 @@ const PREVIEW_H = Math.round(PREVIEW_W * 1.5);
 const PANEL_TOP = 1664;
 const PREVIEW_TOP = PANEL_TOP - 52 - PREVIEW_H;
 const TITLE_GAP = 48;
-// Sin marcador, la vista previa y el título bajan para no dejar un hueco.
-const NO_SCORES_SHIFT = 120;
+// Sin marcador (personas, listas sin notas), la vista previa baja hasta el pie
+// de la imagen —con el mismo aire inferior que deja el marcador— y el título
+// la acompaña: antes bajaba solo 120 px y quedaban ~190 px vacíos debajo.
+const NO_SCORES_BOTTOM_MARGIN = 72;
+const NO_SCORES_SHIFT = H - NO_SCORES_BOTTOM_MARGIN - (PREVIEW_TOP + PREVIEW_H);
 // Separación entre las piezas del mosaico (la `gap-px` sobre negro de la página).
 const COLLAGE_GAP = 4;
 

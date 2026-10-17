@@ -4851,6 +4851,9 @@ export default function DetailModal({
                 requestedSection={requestedPhoneSection}
                 onSectionRequestHandled={setRequestedPhoneSection}
                 onOpenTitle={(rec) => openDetailModal?.(rec)}
+                onOpenPerson={(person) =>
+                  openDetailModal?.({ media_type: "person", id: person.id, name: person.name }, { drill: true })
+                }
                 onOpenSeason={(seasonNumber) =>
                   openDetailModal?.({ media_type: "season", id: item?.id, showId: item?.id, seasonNumber }, { drill: true })
                 }

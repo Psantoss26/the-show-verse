@@ -2079,7 +2079,7 @@ export default function TraktEpisodesWatchedModal({
                                     {loading ? (
                                       <Loader2 className="w-5 h-5 animate-spin" />
                                     ) : hasRating ? (
-                                      <span className="sv-seriesgraph-number text-base leading-none">
+                                      <span className="text-base font-black leading-none tracking-tighter">
                                         {rating}
                                       </span>
                                     ) : (

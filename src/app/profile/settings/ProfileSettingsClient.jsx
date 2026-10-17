@@ -77,6 +77,7 @@ import {
   syncPlexHistory,
 } from "@/lib/plex/client";
 import DetailOpenSettings from "@/components/settings/DetailOpenSettings";
+import { isSoundtrackAutoplayOn, withSoundtrackAutoplay } from "@/lib/soundtrack/autoplayPreference";
 
 const GLASS_SURFACE =
   "relative overflow-hidden border border-white/[0.08] bg-black/40 shadow-2xl shadow-black/40 backdrop-blur-xl before:absolute before:inset-0 before:-z-10 before:bg-gradient-to-br before:from-white/[0.08] before:via-white/[0.02] before:to-transparent";
@@ -2535,11 +2536,11 @@ function ProfileSettingsClient() {
                       icon={Music2}
                       title={t("settings_soundtrack_autoplay", "Reproducción automática del soundtrack")}
                       description={t("settings_soundtrack_autoplay_desc", "La banda sonora suena al abrir la ficha de una película o serie. Desactivada, solo suena al abrir el reproductor del soundtrack.")}
-                      checked={preferences.uiSettings.soundtrackAutoplay !== false}
+                      checked={isSoundtrackAutoplayOn(preferences)}
                       disabled={saving}
                       onChange={(value) =>
                         updatePreference({
-                          uiSettings: { ...preferences.uiSettings, soundtrackAutoplay: value },
+                          uiSettings: withSoundtrackAutoplay(preferences.uiSettings, value),
                         })
                       }
                     />

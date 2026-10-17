@@ -227,9 +227,9 @@ function tiempoTitle(fecha) {
 
 // Cartel enlazado, como `ActivityPoster` del perfil. Con `backdrop`, el
 // backdrop del título (vista «Lista con backdrop»).
-function CartelEvento({ evento, className = "", backdrop = false }) {
+function CartelEvento({ evento, className = "", backdrop = false, size = "w185" }) {
   const href = hrefDeEvento(evento);
-  const src = evento.posterPath ? `https://image.tmdb.org/t/p/w185${evento.posterPath}` : null;
+  const src = evento.posterPath ? `https://image.tmdb.org/t/p/${size}${evento.posterPath}` : null;
   // Me gusta a una persona con backdrop: solo su foto centrada, sin fondo.
   const fondo = backdrop && isPortraitActivity(evento) ? "" : "bg-zinc-900";
   const imagen = backdrop ? (
@@ -306,7 +306,7 @@ function EventoFila({ evento, actor, mostrarAutor, conPoster, conBackdrop }) {
       {conBackdrop ? (
         <CartelEvento evento={evento} backdrop className={BACKDROP_FILA} />
       ) : conPoster ? (
-        <CartelEvento evento={evento} className="h-[4.25rem] w-[2.85rem] rounded-lg" />
+        <CartelEvento evento={evento} className={POSTER_FILA} />
       ) : (
         <AvatarEvento actor={actor} />
       )}
@@ -367,7 +367,7 @@ function EventoResena({ evento, actor, mostrarAutor, conPoster, conBackdrop }) {
         {conBackdrop ? (
           <CartelEvento evento={evento} backdrop className={`${BACKDROP_FILA} self-start`} />
         ) : conPoster ? (
-          <CartelEvento evento={evento} className="h-32 w-[5.4rem] self-start rounded-lg" />
+          <CartelEvento evento={evento} size="w342" className={`${POSTER_RESENA} self-start`} />
         ) : (
           <>
             <AvatarEvento actor={actor} />
@@ -413,6 +413,16 @@ function EventoResena({ evento, actor, mostrarAutor, conPoster, conBackdrop }) {
 // lista con póster para que el backdrop se lea (136 px en móvil, 224 px desde
 // `sm`). El mismo tamaño que en la Actividad del perfil.
 const BACKDROP_FILA = "aspect-video w-[8.5rem] rounded-lg sm:w-56";
+
+// Cartel 2:3 de la vista «Lista con póster». Crece con la pantalla: en
+// escritorio (desde `xl`) iguala el alto de la miniatura del backdrop y en
+// monitores grandes (2K, desde `2xl`) llega a 96×144 px, donde el tamaño de
+// móvil se quedaba diminuto en filas de 1600 px. El mismo que en la Actividad
+// del perfil.
+const POSTER_FILA =
+  "h-[4.25rem] w-[2.85rem] rounded-lg sm:h-24 sm:w-16 xl:h-[7.875rem] xl:w-[5.25rem] 2xl:h-36 2xl:w-24";
+// Cartel de una reseña en esa vista (más grande que el de la fila).
+const POSTER_RESENA = "h-32 w-[5.4rem] rounded-lg xl:h-40 xl:w-[6.75rem] 2xl:h-48 2xl:w-32";
 
 // Un bloque de eventos con la vista elegida, como `ActivityFeed` del perfil.
 // Lo usan los dos caminos de pintado (con grupos y sin ellos) para que no

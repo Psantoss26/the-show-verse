@@ -27,7 +27,8 @@
 //    una rejilla de 5 columnas en un panel de 400px.
 //  - NAVEGACIÓN. Un título relacionado abre la ficha EN EL PROPIO PANEL
 //    (`onOpenTitle`) en lugar de navegar fuera, que cerraría el drawer entero.
-//    Las personas sí navegan: no tienen ficha en el modal.
+//    Las personas del Reparto principal también (`onOpenPerson`): su página
+//    real en el panel con iframe, como temporadas y episodios.
 //  - DESPLAZAMIENTO. El menú pegajoso y el resaltado de la sección activa
 //    miran el contenedor con scroll DEL PANEL, no la ventana.
 
@@ -272,6 +273,7 @@ export default function PhoneDetailsSections({
   imdbId,
   canLikeComments = false,
   onOpenSeason,
+  onOpenPerson,
   onArtworkSelection,
   soundtrack,
 }) {
@@ -1240,6 +1242,15 @@ export default function PhoneDetailsSections({
                     <SwiperSlide key={actor.id ?? actor.credit_id ?? actor.name}>
                       <Link
                         href={`/details/person/${actor.id}`}
+                        onClick={(event) => {
+                          // Con modificadores o botón central, el enlace normal.
+                          if (!onOpenPerson || actor.id == null || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                          event.preventDefault();
+                          onOpenPerson(actor);
+                        }}
+                        onPointerEnter={() => {
+                          if (onOpenPerson && actor.id != null) prefetchSubrouteDetails({ media_type: "person", id: actor.id });
+                        }}
                         className="block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md transition-all duration-300"
                       >
                         <div className="aspect-[2/3] overflow-hidden relative">
