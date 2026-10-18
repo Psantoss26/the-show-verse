@@ -541,6 +541,8 @@ function PosterCollage({ images, pending }) {
  * - coverBackdropPending?: boolean (aún se está buscando ese backdrop)
  * - posterItems?: Array (títulos TMDb para el mosaico de portada, con su arte SIN
  *   texto: ver `resolveCoverArt`)
+ * - itemsPending?: boolean (aún no han llegado los títulos: portada pendiente,
+ *   no vacía)
  * - heroBackground?: { desktop?: string, mobile?: string } (fondo estilo
  *   DetailsClient: backdrop en escritorio, póster en móvil; sustituye al
  *   `backdropImage` tenue)
@@ -563,6 +565,7 @@ export default function UnifiedListDetailsLayout({
     coverBackdrop = null,
     coverBackdropPending = false,
     posterPending = false,
+    itemsPending = false,
     backdropImage,
     heroBackground,
     sourceLabel = 'Lista',
@@ -593,6 +596,12 @@ export default function UnifiedListDetailsLayout({
         [posterItems],
     )
     const finalPosterArtwork = useCoverArtImages(artItems)
+    // Sin títulos AÚN (`itemsPending`: la página los está trayendo, p. ej. con
+    // la vista provisional del índice) la portada también está pendiente. Si
+    // no, salía el icono de lista vacía y, en móvil, la cabecera entraba, se
+    // ocultaba al llegar los títulos (su arte pasaba a pendiente) y volvía a
+    // entrar: el parpadeo de «lista vacía».
+    const coverArtPending = finalPosterArtwork.pending || (itemsPending && artItems.length === 0)
 
     // MODO DE PORTADA póster ↔ backdrop, como en DetailsClient (misma
     // preferencia global, solo escritorio). Disponible con un backdrop con
@@ -638,7 +647,7 @@ export default function UnifiedListDetailsLayout({
     const mobileCoverFailed = Boolean(mobileCoverFirstSrc) && mobileCoverFailedSrc === mobileCoverFirstSrc
     const mobileCoverReady = mobileCoverFirstSrc
         ? mobileCoverLoad.ready || mobileCoverFailed
-        : !posterPending && !finalPosterArtwork.pending
+        : !posterPending && !coverArtPending
     // Al volver atrás todo se pinta tal cual, sin entrada.
     const animateMobileEntry = !isBackNav
 
@@ -671,7 +680,7 @@ export default function UnifiedListDetailsLayout({
     const desktopCollage = !phoneViewport && !heroBackground && !posterImage && coverTiles.length > 1
     const backgroundArt = useBackgroundCoverArt(
         artItems,
-        (collageBackground && mobileCoverReady) || (desktopCollage && !finalPosterArtwork.pending),
+        (collageBackground && mobileCoverReady) || (desktopCollage && !coverArtPending),
     )
     const backgroundArtUrls = (backgroundArt || []).map((path) => `https://image.tmdb.org/t/p/w185${path}`)
     const collageGrid = getPosterCollageGrid(coverTiles.length)
@@ -695,7 +704,7 @@ export default function UnifiedListDetailsLayout({
     // Mientras se resuelve la portada aún no se sabe si habrá mosaico: el
     // póster tenue de antes no se enseña para no cambiarlo después por él.
     const desktopCollageMaybe = !phoneViewport && !heroBackground && !posterImage
-        && (finalPosterArtwork.pending || coverTiles.length > 1)
+        && (coverArtPending || coverTiles.length > 1)
 
     const infoTabs = hasInfoTabs ? (
         <DetailsInfoTabs
@@ -788,7 +797,7 @@ export default function UnifiedListDetailsLayout({
                         collage={(
                             <PosterCollage
                                 images={finalPosterArtwork.images}
-                                pending={finalPosterArtwork.pending}
+                                pending={coverArtPending}
                             />
                         )}
                         collageUnderlay={backgroundTiles.length ? (
@@ -941,7 +950,7 @@ export default function UnifiedListDetailsLayout({
                                         <div className="absolute inset-0 z-10 bg-neutral-950">
                                             <PosterCollage
                                                 images={finalPosterArtwork.images}
-                                                pending={finalPosterArtwork.pending}
+                                                pending={coverArtPending}
                                             />
                                         </div>
                                     </div>
@@ -959,7 +968,7 @@ export default function UnifiedListDetailsLayout({
                                     ) : (
                                         <PosterShelf
                                             images={finalPosterArtwork.images}
-                                            pending={finalPosterArtwork.pending}
+                                            pending={coverArtPending}
                                             count={posterTargetCount}
                                         />
                                     )}

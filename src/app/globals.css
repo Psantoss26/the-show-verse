@@ -2419,11 +2419,18 @@ button:focus-visible > .sv-nav-glass > .sv-nav-glass__tint {
      negro; entra con un zoom corto y continuo. La opacidad se mantiene
      separada porque también responde al progreso de scroll del hero. */
   .sv-mobile-poster-entry {
-    transition: opacity 720ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition: opacity 560ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .sv-mobile-poster-reveal {
-    animation: sv-mobile-detail-poster-reveal 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: sv-mobile-detail-poster-reveal 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* Logo (o título) sobre la portada: entra con la cascada de los botones
+     (su primer retardo, 40ms) y solo opacidad + transform, que anima el
+     compositor aunque el hilo principal siga ocupado con la carga. */
+  .sv-mobile-logo-reveal {
+    animation: sv-mobile-detail-logo-reveal 360ms cubic-bezier(0.16, 1, 0.3, 1) 40ms both;
   }
 
   /* Los botones entran después de que la portada esté lista. El escalonado
@@ -2496,6 +2503,18 @@ button:focus-visible > .sv-nav-glass > .sv-nav-glass__tint {
    La sensación de "enfocarse" la da ahora el propio zoom que se asienta, con
    `opacity` para la aparición: las dos son propiedades que la GPU compone sin
    volver a rasterizar nada. */
+@keyframes sv-mobile-detail-logo-reveal {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0) scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @keyframes sv-mobile-detail-poster-reveal {
   from {
     opacity: 0;
@@ -2536,6 +2555,7 @@ button:focus-visible > .sv-nav-glass > .sv-nav-glass__tint {
   }
 
   .sv-mobile-poster-reveal,
+  .sv-mobile-logo-reveal,
   .sv-mobile-actions-reveal > * > *,
   .sv-mobile-actions-rise,
   .sv-mobile-actions-scroll-reveal[data-mobile-actions-reveal="shown"],
@@ -2548,6 +2568,7 @@ button:focus-visible > .sv-nav-glass > .sv-nav-glass__tint {
    pinta exactamente como se dejó, así que ninguna pieza repite su entrada. */
 [data-details-restored] .sv-details-entry,
 [data-details-restored] .sv-mobile-poster-reveal,
+[data-details-restored] .sv-mobile-logo-reveal,
 [data-details-restored] .sv-mobile-actions-reveal > * > *,
 [data-details-restored] .sv-mobile-actions-rise {
   animation: none;
@@ -3185,6 +3206,7 @@ html[data-details-sequence-transition] .sv-topbar {
   .sv-toolbar-rise,
   .sv-phone-actions-reveal > * > *,
   .sv-mobile-poster-reveal,
+  .sv-mobile-logo-reveal,
   .sv-mobile-actions-scroll-reveal,
   .sv-mobile-actions-scroll-reveal > * > *,
   .sv-mobile-actions-rise,

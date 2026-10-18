@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import ActorDetails from "@/components/ActorDetails";
 import { getActorDetailsFull, getActorKnownFor } from "@/lib/api/tmdb";
+import { buildActorCollageTitles } from "@/lib/actor/collageTitles";
+import { getActorCollagePosters } from "@/lib/tmdb/actorCollagePosters";
 
 async function getInitialWatchedCredits(personId) {
   const requestHeaders = await headers();
@@ -56,6 +58,17 @@ export default async function ActorDetailsPage({ params }) {
     watchedCreditsPromise,
   ]);
   const actorMovies = actorDetails?.combined_credits?.cast || [];
+  // Fondo de mosaico: SIN esperarlo. La promesa viaja al cliente por el
+  // stream de la página y el fondo la lee con `use()` en su Suspense.
+  const collagePosters = getActorCollagePosters(
+    buildActorCollageTitles({
+      knownFor,
+      credits: [
+        ...(actorDetails?.combined_credits?.cast || []),
+        ...(actorDetails?.combined_credits?.crew || []),
+      ],
+    }),
+  ).catch(() => null);
 
   return (
     <ActorDetails
@@ -63,6 +76,7 @@ export default async function ActorDetailsPage({ params }) {
       actorMovies={actorMovies}
       initialKnownFor={knownFor}
       initialWatchedCredits={initialWatchedCredits}
+      collagePosters={collagePosters}
     />
   );
 }
