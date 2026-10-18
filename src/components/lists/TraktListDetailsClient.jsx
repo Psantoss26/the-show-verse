@@ -309,6 +309,7 @@ export default function TraktListDetailsClient({ username, listId }) {
 
     const list = state.list
     const items = Array.isArray(state.items) ? state.items : []
+    const itemsPending = state.loading && items.length === 0
     const creatorUsername = list?.user?.username || username || 'Usuario'
     const listItemCount = Number(list?.item_count || items.length)
     // Las notas de IMDb (120 títulos de muestra, sin id de IMDb: el servidor
@@ -422,6 +423,7 @@ export default function TraktListDetailsClient({ username, listId }) {
             description={list?.description || ''}
             sourceLabel="Lista de la comunidad"
             posterItems={items}
+            itemsPending={itemsPending}
             backdropImage={tmdbImg(firstBackdrop, 'original')}
             scoreboardStats={[
                 { icon: ListVideo, label: 'ELEMENTOS', value: listItemCount, tooltip: 'Títulos de la lista' },
@@ -455,15 +457,17 @@ export default function TraktListDetailsClient({ username, listId }) {
                 />
             }
         >
-            {items.length > 0 || !state.loading ? (
-                <FilterableListItems
-                    items={items}
-                    getMeta={getTraktMeta}
-                    hideMissingPosters
-                    emptyTitle="Lista vacía"
-                    emptyText="No hay títulos disponibles en esta lista."
-                />
-            ) : null}
+            {/* Con la vista provisional del índice los títulos aún no han
+                llegado: tarjetas en carga en vez de un hueco que se leía
+                como una lista vacía. */}
+            <FilterableListItems
+                items={items}
+                getMeta={getTraktMeta}
+                hideMissingPosters
+                loading={itemsPending}
+                emptyTitle="Lista vacía"
+                emptyText="No hay títulos disponibles en esta lista."
+            />
 
             {state.hasMore && (
                 <div ref={loadMoreRef} className="mt-10 flex min-h-14 justify-center">

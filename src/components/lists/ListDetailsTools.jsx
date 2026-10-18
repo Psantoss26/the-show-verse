@@ -43,6 +43,8 @@ import { useTitleNameSearch } from "@/lib/search/useTitleNameSearch";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 
 const INITIAL_RENDER_COUNT = 60;
+// Tarjetas en carga mientras llegan los títulos (dos filas en escritorio).
+const LOADING_PLACEHOLDER_CARDS = 12;
 const RENDER_BATCH_SIZE = 60;
 
 function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
@@ -366,6 +368,8 @@ export default function FilterableListItems({
   // En las listas propias se quedan: el usuario tiene que poder verlos y
   // quitarlos.
   hideMissingPosters = false,
+  // Los títulos aún no han llegado: tarjetas en carga, no el aviso de vacía.
+  loading = false,
 }) {
   const previewClick = usePreviewOpen();
   const [q, setQ] = useState("");
@@ -676,7 +680,13 @@ export default function FilterableListItems({
         </div>
       </motion.div>
 
-      {entries.length === 0 ? (
+      {entries.length === 0 && loading ? (
+        <div className={listPosterGridClass} aria-busy="true">
+          {Array.from({ length: LOADING_PLACEHOLDER_CARDS }, (_, index) => (
+            <ListPosterCard key={index} posterLoading disableHover />
+          ))}
+        </div>
+      ) : entries.length === 0 ? (
         <div className="rounded-3xl bg-black/[0.08] bg-gradient-to-br from-white/10 via-transparent to-black/15 py-20 text-center shadow-none backdrop-blur-[28px]">
           <h3 className="text-lg font-bold text-zinc-300">{emptyTitle}</h3>
           <p className="mt-1 text-sm text-zinc-500">{emptyText}</p>

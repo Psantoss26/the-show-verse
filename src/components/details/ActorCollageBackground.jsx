@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { Suspense, use, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { preload } from "react-dom";
 import {
   buildBackgroundCollageTiles,
   getDesktopBackgroundGrid,
@@ -50,44 +51,54 @@ const textlessPosterUrl = (picks) =>
 
 // FONDO de la ficha de una persona: un mosaico SOLO con pósters SIN IDIOMA
 // (sin título impreso) de los títulos de su filmografía, más relevantes
-// primero. Se piden todos en un único lote al servidor (/api/tmdb/artwork,
-// cacheado un día); un título sin póster neutro no entra (ni su backdrop ni
-// un póster con texto). Sin ninguno, queda el fondo liso.
-export default function ActorCollageBackground({ titles = [] }) {
-  // Sin medida hasta montar, igual en el servidor y en el cliente: calcularla
-  // al crear el estado (con `window` en el cliente y 1280×900 en el
-  // servidor) daba HTML distinto y React avisaba de un error de hidratación.
-  // Se mide en el efecto de maquetación, antes de pintar.
-  const [grid, setGrid] = useState(null);
+// primero. Un título sin póster neutro no entra (ni su backdrop ni un póster
+// con texto). Sin ninguno, queda el fondo liso.
+//
+// Los pósters los resuelve el SERVIDOR durante el SSR y llegan como promesa
+// (`postersPromise`, lib/tmdb/actorCollagePosters) por el stream de la
+// página: no espera a hidratar ni a un POST del navegador. Si el servidor no
+// pudo (null) o no hay promesa, se piden aquí en un lote a /api/tmdb/artwork.
+export default function ActorCollageBackground({ titles = [], postersPromise = null }) {
+  return (
+    <div
+      data-actor-background="collage"
+      className="fixed inset-0 pointer-events-none overflow-hidden z-0 bg-black select-none"
+      aria-hidden="true"
+    >
+      {/* Sin pósters aún: el fondo liso de debajo, sin bloquear la página. */}
+      <Suspense fallback={null}>
+        {postersPromise ? (
+          <ServerCollageGrid postersPromise={postersPromise} titles={titles} />
+        ) : (
+          <ClientCollageGrid titles={titles} />
+        )}
+      </Suspense>
 
-  useClientLayoutEffect(() => {
-    let frame = 0;
-    const measure = () => {
-      frame = 0;
-      const next = getDesktopBackgroundGrid(
-        window.innerWidth,
-        window.innerHeight
-      );
-      setGrid((current) =>
-        current &&
-        current.cols === next.cols &&
-        current.rows === next.rows &&
-        Math.round(current.tileWidth) === Math.round(next.tileWidth)
-          ? current
-          : next
-      );
-    };
-    const onResize = () => {
-      if (!frame) frame = window.requestAnimationFrame(measure);
-    };
-    measure();
-    window.addEventListener("resize", onResize);
-    return () => {
-      window.removeEventListener("resize", onResize);
-      if (frame) window.cancelAnimationFrame(frame);
-    };
-  }, []);
+      {/* Degradado vertical tenue para contraste y legibilidad, idéntico al de detalles de listas */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent_0%,transparent_20%,rgba(0,0,0,0.75)_70%,#000000_100%)]" />
 
+      {/* Tinte radial sutil y limpio similar a detalles de listas, sin niebla verde invasiva */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(16,185,129,0.12),transparent_35%),radial-gradient(circle_at_80%_15%,rgba(13,148,136,0.08),transparent_32%)]" />
+    </div>
+  );
+}
+
+// Lo que cabe en el mosaico más pequeño (teléfono: 3 columnas × 5 filas):
+// se precarga desde el HTML que llega por el stream, antes de hidratar y de
+// medir la cuadrícula. En prioridad baja para no quitarle ancho de banda a
+// la foto de la persona.
+const PRELOAD_POSTERS = 15;
+
+function ServerCollageGrid({ postersPromise, titles }) {
+  const posters = use(postersPromise);
+  if (!Array.isArray(posters)) return <ClientCollageGrid titles={titles} />;
+  for (const src of posters.slice(0, PRELOAD_POSTERS)) {
+    preload(src, { as: "image", fetchPriority: "low" });
+  }
+  return <CollageGrid posters={posters} />;
+}
+
+function ClientCollageGrid({ titles }) {
   const targets = useMemo(() => {
     const seen = new Set();
     const out = [];
@@ -131,12 +142,50 @@ export default function ActorCollageBackground({ titles = [] }) {
       : [];
   }, [resolved, targetKey, targets]);
 
+  return <CollageGrid posters={activePosters} />;
+}
+
+function CollageGrid({ posters }) {
+  // Sin medida hasta montar, igual en el servidor y en el cliente: calcularla
+  // al crear el estado (con `window` en el cliente y 1280×900 en el
+  // servidor) daba HTML distinto y React avisaba de un error de hidratación.
+  // Se mide en el efecto de maquetación, antes de pintar.
+  const [grid, setGrid] = useState(null);
+
+  useClientLayoutEffect(() => {
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      const next = getDesktopBackgroundGrid(
+        window.innerWidth,
+        window.innerHeight
+      );
+      setGrid((current) =>
+        current &&
+        current.cols === next.cols &&
+        current.rows === next.rows &&
+        Math.round(current.tileWidth) === Math.round(next.tileWidth)
+          ? current
+          : next
+      );
+    };
+    const onResize = () => {
+      if (!frame) frame = window.requestAnimationFrame(measure);
+    };
+    measure();
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, []);
+
   const uniquePosters = useMemo(() => {
-    const valid = (Array.isArray(activePosters) ? activePosters : []).filter(
+    const valid = (Array.isArray(posters) ? posters : []).filter(
       (p) => typeof p === "string" && p.trim()
     );
     return [...new Set(valid)];
-  }, [activePosters]);
+  }, [posters]);
 
   // Si hay suficientes pósters únicos sin texto, se recortan exactamente al número de celdas sin repetir ninguno.
   // Solo se recurre a buildBackgroundCollageTiles (que cicla) si el total es menor a la cantidad de celdas.
@@ -160,53 +209,39 @@ export default function ActorCollageBackground({ titles = [] }) {
     [tileWidth]
   );
 
-  return (
+  // Cuadrícula de pósters con desenfoque suave y difuminado
+  return tiles.length > 0 && grid ? (
     <div
-      data-actor-background="collage"
-      className="fixed inset-0 pointer-events-none overflow-hidden z-0 bg-black select-none"
-      aria-hidden="true"
+      data-actor-collage-grid
+      className="absolute inset-0 overflow-hidden transition-opacity duration-300 ease-out"
     >
-      {/* Cuadrícula de pósters con desenfoque suave y difuminado */}
-      {tiles.length > 0 && grid ? (
-        <div
-          data-actor-collage-grid
-          className="absolute inset-0 overflow-hidden transition-opacity duration-300 ease-out"
-        >
+      <div
+        className="grid bg-neutral-950 w-full h-full"
+        style={{
+          gridTemplateColumns: `repeat(${grid.cols}, minmax(0, 1fr))`,
+          transform: "scale(1.06)",
+          transformOrigin: "top center",
+          filter: "blur(6px) brightness(0.55) saturate(1.1)",
+        }}
+      >
+        {tiles.map((src, index) => (
           <div
-            className="grid bg-neutral-950 w-full h-full"
-            style={{
-              gridTemplateColumns: `repeat(${grid.cols}, minmax(0, 1fr))`,
-              transform: "scale(1.06)",
-              transformOrigin: "top center",
-              filter: "blur(6px) brightness(0.55) saturate(1.1)",
-            }}
+            key={`${index}-${src}`}
+            className="relative aspect-[2/3] min-h-0"
           >
-            {tiles.map((src, index) => (
-              <div
-                key={`${index}-${src}`}
-                className="relative aspect-[2/3] min-h-0"
-              >
-                <div className="absolute" style={tileStyle}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={src}
-                    alt=""
-                    decoding="async"
-                    loading={index < (grid.cols * 2) ? "eager" : "lazy"}
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-              </div>
-            ))}
+            <div className="absolute" style={tileStyle}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={src}
+                alt=""
+                decoding="async"
+                loading={index < (grid.cols * 2) ? "eager" : "lazy"}
+                className="h-full w-full object-cover"
+              />
+            </div>
           </div>
-        </div>
-      ) : null}
-
-      {/* Degradado vertical tenue para contraste y legibilidad, idéntico al de detalles de listas */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent_0%,transparent_20%,rgba(0,0,0,0.75)_70%,#000000_100%)]" />
-
-      {/* Tinte radial sutil y limpio similar a detalles de listas, sin niebla verde invasiva */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(16,185,129,0.12),transparent_35%),radial-gradient(circle_at_80%_15%,rgba(13,148,136,0.08),transparent_32%)]" />
+        ))}
+      </div>
     </div>
-  );
+  ) : null;
 }

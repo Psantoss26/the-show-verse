@@ -35,12 +35,17 @@ function textlessImages(list) {
     .map((image) => ({ ...image, iso_639_1: null }));
 }
 
+/** Póster SIN idioma de un título (o null), sin recurrir a otro arte. */
+export function pickTextlessPoster(posters) {
+  return pickBestNeutralPosterByResVotes(textlessImages(posters))?.file_path || null;
+}
+
 export function pickListArtwork(images, { originalLanguage } = {}) {
   if (!images) return null;
   const posters = images.posters || [];
   const backdrops = images.backdrops || [];
   const poster = pickLadderPoster(posters, { originalLanguage })?.file_path || null;
-  const textlessPoster = pickBestNeutralPosterByResVotes(textlessImages(posters))?.file_path || null;
+  const textlessPoster = pickTextlessPoster(posters);
   return {
     poster,
     previewPoster: poster,

@@ -65,6 +65,10 @@ import { titleStateKey, useViewerTitleStates } from "@/components/social/useView
 import { getMediaAccountStates, getExternalIds } from "@/lib/api/tmdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
 import ActorCollageBackground from "@/components/details/ActorCollageBackground";
+import {
+  creditPopularityScore,
+  isSelfLikeCredit,
+} from "@/lib/actor/collageTitles";
 import SectionTitle from "@/components/details/SectionTitle";
 import {
   CreditsFilterDropdowns,
@@ -330,11 +334,6 @@ const yearFromDate = (s) => {
   return /^\d{4}$/.test(y) ? Number(y) : null;
 };
 
-const isSelfLikeCredit = (character = "") =>
-  /\b(self|himself|herself|host|archive footage|uncredited)\b/i.test(
-    String(character),
-  );
-
 const getDefaultCreditFilters = (person) => {
   const department = String(person?.known_for_department || "").toLowerCase();
   const isActingPrimary = !department || department === "acting";
@@ -556,25 +555,6 @@ const creditRelevanceTier = (item) => {
 
 const creditTimestamp = (item) =>
   item?.date ? new Date(item.date).getTime() || -Infinity : -Infinity;
-
-const creditPopularityScore = (item) => {
-  const popularity = Number(item?.popularity || 0);
-  const voteCount = Number(item?.vote_count || 0);
-  const voteAverage = Number(item?.vote_average || 0);
-  const order = Number.isFinite(Number(item?.order)) ? Number(item.order) : 99;
-  const episodeCount = Number(item?.episode_count || 0);
-  const roleWeight = Math.max(0, 18 - Math.min(order, 18));
-  const episodeWeight =
-    item?.media_type === "tv" ? Math.min(episodeCount, 30) * 0.35 : 4;
-
-  return (
-    Math.sqrt(Math.max(popularity, 0)) * 9 +
-    Math.log10(voteCount + 1) * 6 +
-    voteAverage +
-    roleWeight +
-    episodeWeight
-  );
-};
 
 const compareCreditsByRecentRelevance = (a, b) => {
   const tierDiff = creditRelevanceTier(a) - creditRelevanceTier(b);
@@ -1748,6 +1728,7 @@ export default function ActorDetails({
   actorMovies,
   initialKnownFor = [],
   initialWatchedCredits = [],
+  collagePosters = null,
 }) {
   const personId = actorDetails?.id;
   const contentTopRef = useRef(null);
@@ -2562,8 +2543,9 @@ export default function ActorDetails({
   }, [creditsAll, tmdbKnownFor]);
 
   // Títulos del FONDO de mosaico, por relevancia: «Conocido por» y después el
-  // resto de créditos por popularidad, sin apariciones como sí mismo/a. El
-  // fondo pide sus pósters SIN IDIOMA en un lote (ActorCollageBackground).
+  // resto de créditos por popularidad, sin apariciones como sí mismo/a. Solo
+  // es el RESPALDO del fondo: sus pósters SIN IDIOMA los resuelve el servidor
+  // (`collagePosters`, lib/actor/collageTitles + lib/tmdb/actorCollagePosters).
   const collageTitles = useMemo(() => {
     const knownFor = popularItems?.length
       ? popularItems
@@ -2992,7 +2974,10 @@ export default function ActorDetails({
       {/* Fondo de la página. MÓVIL: aparece con el scroll detrás de la
           portada fija, como en los detalles de listas y colecciones. */}
       <div className="sv-hero-scroll-in max-sm:[opacity:var(--sv-hero-scroll,0)] sm:opacity-100">
-        <ActorCollageBackground titles={collageTitles} />
+        <ActorCollageBackground
+          titles={collageTitles}
+          postersPromise={collagePosters}
+        />
       </div>
 
       {/* MÓVIL (<640px): la cabecera inmersiva de listas y colecciones. La

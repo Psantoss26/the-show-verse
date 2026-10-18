@@ -37,7 +37,7 @@ import {
   useTransition,
   useSyncExternalStore,
 } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, preload } from "react-dom";
 
 const TITLE_LISTS_PAGE_SIZE = 12;
 
@@ -850,7 +850,10 @@ function useDeferredOriginalUpgrade({ path, previewLoaded, enabled = true }) {
 // como estado final. La original se descarga a baja prioridad después de que
 // w500, la página y el hilo principal estén listos, y se intercambia solo cuando
 // está cargada y decodificada.
-function ProgressiveHeroLogo({ path, title }) {
+// `onReady`: la primera versión que se pinta ya está cargada Y decodificada
+// (la entrada del logo espera a esto: antes se animaba la caja vacía y el
+// logo aparecía de golpe a mitad). `onFailed`: no hay ninguna que mostrar.
+function ProgressiveHeroLogo({ path, title, onReady, onFailed }) {
   const [previewPathLoaded, setPreviewPathLoaded] = useState(null);
   const [previewPathFailed, setPreviewPathFailed] = useState(null);
   const [originalPathReady, setOriginalPathReady] = useState(null);
@@ -894,16 +897,57 @@ function ProgressiveHeroLogo({ path, title }) {
       unoptimized
       decoding="async"
       fetchPriority={useOriginal && !previewFailed ? "low" : "high"}
-      onLoad={() => {
+      onLoad={(event) => {
         if (!useOriginal) setPreviewPathLoaded(path);
+        if (useOriginal && !previewFailed) return;
+        const img = event.currentTarget;
+        const done = () => onReady?.(path);
+        if (typeof img.decode === "function") img.decode().then(done, done);
+        else done();
       }}
       onError={() => {
         // Mantiene el fallback que existía: si TMDb no sirve w500, se prueba la
         // ruta original directamente.
         if (!useOriginal) setPreviewPathFailed(path);
+        else if (previewFailed) onFailed?.(path);
       }}
       className="relative z-10 h-auto max-h-24 w-auto max-w-[85%] object-contain drop-shadow-[0_3px_14px_rgba(0,0,0,0.85)]"
     />
+  );
+}
+
+// MÓVIL: logo (o título) al pie de la portada, a MOBILE_HERO_FIT_GAP_PX de
+// los botones. Entra con una animación CSS (`sv-mobile-logo-reveal`):
+// opacidad y transform los anima el compositor aunque el hilo principal esté
+// ocupado con la carga. Antes la llevaba framer con `y`/`scale` sueltos, que
+// no pasan a WAAPI y se calculaban fotograma a fotograma en el hilo principal
+// (medido con CPU x4: saltos de 33-83 ms). Espera a que el logo esté
+// decodificado; el estado vive aquí para no re-renderizar la ficha entera a
+// mitad de la entrada.
+function MobileHeroLogoReveal({ path, title, showTitle, animate }) {
+  const [readyPath, setReadyPath] = useState(null);
+  const [failedPath, setFailedPath] = useState(null);
+  const failed = Boolean(path) && failedPath === path;
+  const ready = !path || failed || readyPath === path;
+  return (
+    <div
+      className={`pointer-events-none absolute inset-x-0 bottom-0 z-[16] flex items-end justify-center px-4 pt-4 pb-2 sm:p-4 ${
+        ready ? (animate ? "sv-mobile-logo-reveal" : "") : "opacity-0"
+      }`}
+    >
+      {path && !failed ? (
+        <ProgressiveHeroLogo
+          path={path}
+          title={title}
+          onReady={setReadyPath}
+          onFailed={setFailedPath}
+        />
+      ) : showTitle || failed ? (
+        <h2 className="relative z-10 max-w-[90%] text-center text-2xl font-black leading-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)]">
+          {title}
+        </h2>
+      ) : null}
+    </div>
   );
 }
 
@@ -3503,6 +3547,15 @@ export default function DetailsClient({
     const lang = chosen?.iso_639_1;
     return typeof lang === "string" && lang.trim() !== "";
   }, [mobileNeutralPosterPath, imagesState?.posters]);
+
+  // MÓVIL: el logo de la portada se pide en cuanto se conoce, no al montarse
+  // su capa (eso espera a la portada y a los botones, y el logo llegaba tarde
+  // a su propia entrada). Misma URL que la primera de ProgressiveHeroLogo.
+  if (mobilePosterPath && !mobilePosterHasBurnedTitle && displayHeroLogoPath) {
+    preload(`https://image.tmdb.org/t/p/w500${displayHeroLogoPath}`, {
+      as: "image",
+    });
+  }
 
   // Selecciona la imagen de fondo del hero segun el viewport:
   // - Desktop: usa el backdrop horizontal
@@ -10346,54 +10399,24 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       mobilePosterPath &&
                       !mobilePosterHasBurnedTitle &&
                       (displayHeroLogoPath || heroLogoResolved) && (
-                      <motion.div
-                        // SIN `filter: blur` animado. Era lo más caro de toda la
-                        // entrada: un desenfoque no lo puede resolver el
-                        // compositor, así que el navegador tenía que recalcular
-                        // el gaussiano del logo EN CADA FOTOGRAMA, y encima
-                        // mientras la capa cambiaba de tamaño por el `scale` (o
-                        // sea, rasterizando de nuevo cada vez). Justo en la
-                        // carga, que es cuando el hilo principal está más
-                        // ocupado. `opacity` y `transform` los compone la GPU
-                        // sin volver a rasterizar; la entrada se lee igual.
-                        initial={
-                          prefersReducedMotion || detailsRestored
-                            ? false
-                            : { opacity: 0, y: 18, scale: 0.94 }
-                        }
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        transition={{
-                          duration: prefersReducedMotion ? 0 : 0.48,
-                          delay: prefersReducedMotion ? 0 : 0.14,
-                          ease: [0.16, 1, 0.3, 1],
-                        }}
-                        // MÓVIL: al pie de la portada con 8px de aire: queda a
-                        // MOBILE_HERO_FIT_GAP_PX de los botones.
-                        className="pointer-events-none absolute inset-x-0 bottom-0 z-[16] flex items-end justify-center px-4 pt-4 pb-2 sm:p-4"
-                      >
-                        {/* Aquí había una sombra de 10rem para el logo. No era un
-                            degradado anclado sino una FRANJA flotante: negro al
-                            45% en su punto medio y transparente por arriba Y por
-                            abajo. Sobre pósters claros se leía como una mancha
-                            oscura suspendida (la "línea negra"), y encima
-                            oscurecía por segunda vez la zona que ya difumina la
-                            máscara. Ya no hace falta: la máscara deja el fondo
-                            casi a alfa 0 donde va el logo, así que detrás queda
-                            el fondo oscuro de la página, y el logo/título llevan
-                            su propio drop-shadow fuerte para el contraste local.
-                            (Sin citar las clases: el escáner de Tailwind no
-                            distingue comentarios y volvería a emitir ese CSS.) */}
-                        {displayHeroLogoPath ? (
-                          <ProgressiveHeroLogo
-                            path={displayHeroLogoPath}
-                            title={title}
-                          />
-                        ) : heroLogoResolved ? (
-                          <h2 className="relative z-10 max-w-[90%] text-center text-2xl font-black leading-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)]">
-                            {title}
-                          </h2>
-                        ) : null}
-                      </motion.div>
+                      // SIN `filter: blur` animado: un desenfoque no lo
+                      // resuelve el compositor y había que recalcular el
+                      // gaussiano del logo en cada fotograma de la carga.
+                      //
+                      // Sin la sombra de 10rem que tuvo el logo: era una
+                      // FRANJA flotante (negro al 45% en su punto medio,
+                      // transparente arriba Y abajo) que sobre pósters claros
+                      // se leía como una mancha oscura suspendida. La máscara
+                      // ya deja el fondo casi a alfa 0 donde va el logo, y
+                      // logo y título llevan su propio drop-shadow. (Sin citar
+                      // las clases: el escáner de Tailwind no distingue
+                      // comentarios y volvería a emitir ese CSS.)
+                      <MobileHeroLogoReveal
+                        path={displayHeroLogoPath}
+                        title={title}
+                        showTitle={heroLogoResolved}
+                        animate={!prefersReducedMotion && !detailsRestored}
+                      />
                     )}
 
                     {/* Overlay VISUAL DENTRO del marco: se inclina con la imagen
