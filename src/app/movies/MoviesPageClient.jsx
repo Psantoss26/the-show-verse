@@ -73,9 +73,9 @@ import PreviewTrailerAudioButton, {
 import {
   fetchBestBackdropNoLang,
   getArtworkPreference,
-  pickBestBackdropByLangResVotes,
+  fetchBestBackdrop as fetchBestCardBackdrop,
+  fetchBestPoster as fetchBestCardPoster,
 } from "@/lib/dashboard/media";
-import { pickLadderPoster } from "@/lib/details/tmdbImages";
 import useSpotlightLogo from "@/lib/dashboard/useSpotlightLogo";
 import DashboardSpotlightPreview from "@/components/dashboard/DashboardSpotlightPreview";
 import DashboardRankNumber from "@/components/dashboard/DashboardRankNumber";
@@ -283,65 +283,19 @@ function preloadImage(src) {
 const movieExtrasCache = new Map(); // movie.id -> { runtime, awards, imdbRating }
 const movieBackdropCache = new Map(); // movie.id -> backdrop file_path | null | undefined
 const movieSpotlightBackdropCache = new Map();
-const movieImagesCache = new Map(); // movie.id -> { posters, backdrops }
 
 /* ====================================================================
  * LOGICA IMAGENES (Backdrops / Posters)
  * ==================================================================== */
 // Selectores compartidos con la escalera de idioma de toda la app (inglés →
-// español → original → sin idioma): lib/dashboard/media.
-
-async function getMovieImages(movieId) {
-  if (movieImagesCache.has(movieId)) return movieImagesCache.get(movieId);
-
-  const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
-  if (!apiKey) {
-    const fallback = { posters: [], backdrops: [] };
-    movieImagesCache.set(movieId, fallback);
-    return fallback;
-  }
-
-  try {
-    // No limitamos idiomas aqui: el selector prioriza ingles y solo cae a
-    // backdrops sin idioma como ultimo recurso.
-    const url =
-      `https://api.themoviedb.org/3/movie/${movieId}/images` +
-      `?api_key=${apiKey}`;
-
-    const r = await fetch(url, { cache: "force-cache" });
-    const j = await r.json();
-    const posters = Array.isArray(j?.posters) ? j.posters : [];
-    const backdrops = Array.isArray(j?.backdrops) ? j.backdrops : [];
-
-    const data = { posters, backdrops };
-    movieImagesCache.set(movieId, data);
-    return data;
-  } catch {
-    const fallback = { posters: [], backdrops: [] };
-    movieImagesCache.set(movieId, fallback);
-    return fallback;
-  }
-}
-
+// español → original → sin idioma): lib/dashboard/media, que los elige en
+// lote en el servidor.
 async function fetchBestPoster(movieId, originalLanguage) {
-  const { posters } = await getMovieImages(movieId);
-  if (!Array.isArray(posters) || posters.length === 0) return null;
-
-  const best = pickLadderPoster(posters, { originalLanguage });
-
-  return best?.file_path || null;
+  return fetchBestCardPoster(movieId, "movie", { originalLanguage });
 }
 
 async function fetchBestBackdrop(movieId, opts = {}) {
-  const { backdrops } = await getMovieImages(movieId);
-  if (!Array.isArray(backdrops) || backdrops.length === 0) return null;
-
-  const best = pickBestBackdropByLangResVotes(backdrops, {
-    minWidth: 1200,
-    ...opts,
-  });
-
-  return best?.file_path || null;
+  return fetchBestCardBackdrop(movieId, "movie", opts);
 }
 
 async function preparePreviewBackdrop(movie) {

@@ -1,7 +1,8 @@
 "use client";
 
-import { Activity, Fragment, createContext, useContext, useLayoutEffect, useRef, useState } from "react";
+import { Activity, useContext, useEffect, useLayoutEffect, useState } from "react";
 import { useSelectedLayoutSegments } from "next/navigation";
+import { LayoutRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import {
   NavigationPromisesContext,
   PathParamsContext,
@@ -10,17 +11,34 @@ import {
 } from "next/dist/shared/lib/hooks-client-context.shared-runtime";
 import { MotionGlobalConfig } from "framer-motion";
 import { isHistoryNavigation } from "@/lib/navigation/historyNavigation";
+import { createScreenStack, navigateScreens } from "@/lib/navigation/screenStack";
+import {
+  beginScreenReveal,
+  currentScreenReveal,
+  endScreenReveal,
+} from "@/lib/navigation/screenReveal";
 
-// PÁGINA DE ORIGEN VIVA MIENTRAS SE VE UNA FICHA.
+// LAS PANTALLAS ANTERIORES SIGUEN VIVAS: VOLVER NO MONTA NADA.
 //
 // El layout raíz pinta aquí la página (`children`) y el slot `@overlay`, donde
 // Next pone las fichas abiertas con navegación interna (ver
-// src/app/@overlay/(.)details/layout.jsx). Mientras hay ficha, la página queda
-// en <Activity mode="hidden">: fuera de la vista (`display: none`) y sin
-// efectos, pero con su DOM y su estado. Al volver, reaparece en el mismo commit
-// en que se quita la ficha, antes de pintar: es el mismo mecanismo con el que
-// Next conserva las rutas con Cache Components.
-const OverlayRouteContext = createContext(null);
+// src/app/@overlay/(.)details/layout.jsx). Cada URL visitada es una PANTALLA:
+// la página de `children` o la ficha del slot. Al navegar, la pantalla que se
+// deja queda en <Activity mode="hidden"> —fuera de la vista (`display: none`) y
+// sin efectos, pero con su DOM, su estado, sus imágenes y su scroll— y al volver
+// reaparece en el mismo commit, antes de pintar.
+//
+// Antes solo sobrevivía la página de DEBAJO de la ficha. Una ficha abierta
+// desde un dashboard vive en el slot, y al ir desde ella a una temporada, un
+// actor o un episodio el slot pasaba a pintar esa otra ficha: DetailsClient se
+// desmontaba y al volver se montaba de cero (carga, portada y secciones que
+// entran de nuevo: el parpadeo). Igual al ir a una lista u otra página. Ahora
+// cada pantalla pinta su slot con una COPIA CONGELADA del contexto del router
+// de Next (`LayoutRouterContext`: árbol y caché de esa URL) y de la URL
+// (`PageNavigation`), así que sigue mostrando lo suyo aunque la URL viva sea
+// otra. Es lo que hace Next con Cache Components (layout-router guarda rutas
+// en Activity), pero ordenado por el historial y sin migrar todas las rutas.
+// La pila (qué pantallas viven y cuál se ve) está en lib/navigation/screenStack.
 
 // <Activity> oculta el DOM pero no detiene lo que suena: un tráiler o un vídeo
 // de la página seguiría reproduciéndose debajo de la ficha. Al ocultarla se
@@ -44,42 +62,93 @@ function pauseHiddenPageMedia() {
 }
 
 export default function OverlayRouteHost({ children, overlay }) {
-  // Nº de marcadores montados (al pasar de una ficha a otra conviven un instante).
-  const [overlays, setOverlays] = useState(0);
-  // Montaje de la página. Solo VOLVER ATRÁS la recupera tal cual: si la ficha
-  // se cierra con una navegación nueva a la MISMA página (Favoritos → ficha →
-  // enlace a Favoritos), Next reutilizaría la oculta y entraría sin su
-  // animación de entrada y con el estado viejo. Ahí se vuelve a montar.
-  const [generation, setGeneration] = useState(0);
-  const previousOverlays = useRef(overlays);
-  useLayoutEffect(() => {
-    const had = previousOverlays.current > 0;
-    if (!had && overlays > 0) pauseHiddenPageMedia();
-    previousOverlays.current = overlays;
-    if (had && overlays === 0) {
-      // Efecto de layout: el `pushState` de la navegación ya ha ocurrido y el
-      // remontaje entra antes de pintar.
-      if (!isHistoryNavigation()) setGeneration((value) => value + 1);
-      // La página ya es visible en este commit: sus animaciones reiniciadas
-      // se terminan antes de que se pinte nada.
-      else finishRevealAnimations({ last: false });
-    }
-  }, [overlays]);
-  // Lo que hay en el slot, en el MISMO render en que Next cambia la URL (el
-  // marcador cuenta un commit después): la página no llega a ver la de la
-  // ficha, y una página nueva que entra al cerrarla ya ve la suya.
+  const pathname = useContext(PathnameContext) || "/";
+  // Lo que hay en el slot, en el MISMO render en que Next cambia la URL: la
+  // pantalla que se deja no llega a ver la nueva.
   const overlaySegments = useSelectedLayoutSegments("overlay");
-  const overlayActive = Boolean(overlaySegments?.includes("(.)details"));
-  return (
-    <OverlayRouteContext.Provider value={setOverlays}>
-      <Activity mode={overlays > 0 ? "hidden" : "visible"}>
-        <PageNavigation frozen={overlayActive}>
-          <Fragment key={generation}>{children}</Fragment>
-        </PageNavigation>
+  const kind = overlaySegments?.includes("(.)details") ? "overlay" : "page";
+
+  const [stack, setStack] = useState(() => createScreenStack(pathname, kind));
+  let state = stack;
+  const current = state.screens[state.active];
+  if (current.key !== pathname || current.kind !== kind) {
+    const history = isHistoryNavigation(pathname);
+    state = navigateScreens(state, pathname, kind, history);
+    // VOLVER ATRÁS: framer debe saltar ya sus entradas, antes del commit que
+    // muestra la pantalla (sus efectos corren antes que los de este componente).
+    if (state.revealed) {
+      beginQuietReveal();
+      // Sus efectos de carga no deben repetirse (ver lib/navigation/screenReveal).
+      beginScreenReveal();
+    }
+    setStack(state);
+  }
+
+  const activeId = state.screens[state.active].id;
+  const revealed = state.revealed;
+  // Fin del revelado cuando ya han corrido los efectos de la pantalla revelada:
+  // en la tarea siguiente, no en este efecto. Los de los hijos van antes que
+  // los de este componente, pero en desarrollo StrictMode los vuelve a ejecutar
+  // al reaparecer el <Activity>, después de este efecto.
+  useEffect(() => {
+    if (!revealed) return undefined;
+    const reveal = currentScreenReveal();
+    const timer = window.setTimeout(() => endScreenReveal(reveal), 0);
+    return () => {
+      window.clearTimeout(timer);
+      endScreenReveal(reveal);
+    };
+  }, [activeId, revealed]);
+  useLayoutEffect(() => {
+    // La pantalla que se deja puede tener un tráiler sonando.
+    pauseHiddenPageMedia();
+    // La pantalla recuperada ya es visible en este commit: sus animaciones
+    // reiniciadas se terminan antes de que se pinte nada.
+    if (revealed) finishRevealAnimations({ last: false });
+  }, [activeId, revealed]);
+
+  return state.screens.map((screen, index) => {
+    const active = index === state.active;
+    return (
+      <Activity key={screen.id} mode={active ? "visible" : "hidden"}>
+        <ScreenRouter frozen={!active}>
+          <PageNavigation frozen={!active}>
+            {screen.kind === "overlay" ? overlay : children}
+          </PageNavigation>
+        </ScreenRouter>
       </Activity>
-      {overlay}
-    </OverlayRouteContext.Provider>
-  );
+    );
+  });
+}
+
+// CADA PANTALLA PINTA SU URL, NO LA VIVA.
+// Los slots (`children`, `overlay`) son layout-routers de Next: leen el árbol y
+// la caché de `LayoutRouterContext`. Mientras la pantalla está oculta se le da
+// el último valor con el que se pintó, así que sigue mostrando su página (y no
+// se vuelve a renderizar) aunque el router ya esté en otra URL.
+// Al volver a ser la activa conserva ese valor hasta que el router cambie de
+// nuevo: tras el `popstate`, Next entrega el árbol de esa misma URL pero con
+// objetos nuevos, y pasárselo en el commit que la revela obligaba a reconciliar
+// toda la página (el payload RSC entero) justo cuando tiene que aparecer quieta.
+// Con el primer cambio real del router (otra búsqueda, un `refresh`) recibe el
+// vivo, y desde ahí lo sigue.
+function ScreenRouter({ frozen, children }) {
+  const live = useContext(LayoutRouterContext);
+  const [state, setState] = useState(() => ({ value: live, frozen, liveAtReveal: null }));
+  let next = state;
+  if (frozen) {
+    if (!state.frozen) next = { ...state, frozen: true };
+  } else if (state.frozen) {
+    // Se revela: sigue con lo que pintaba mientras el router siga en el valor
+    // con el que ha vuelto (ver abajo).
+    next = { value: state.value, frozen: false, liveAtReveal: live };
+  } else if (state.liveAtReveal !== null && live !== state.liveAtReveal) {
+    next = { value: live, frozen: false, liveAtReveal: null };
+  } else if (state.liveAtReveal === null && live !== state.value) {
+    next = { ...state, value: live };
+  }
+  if (next !== state) setState(next);
+  return <LayoutRouterContext.Provider value={next.value}>{children}</LayoutRouterContext.Provider>;
 }
 
 // LA PÁGINA OCULTA NO VE LA URL DE LA FICHA.
@@ -233,22 +302,17 @@ function beginQuietReveal() {
   }, REVEAL_MS);
 }
 
-// Lo monta el layout del slot: con él (también mientras carga la ficha) la
-// página de origen se oculta. Efecto de LAYOUT: ocultar y mostrar ocurre antes
-// de pintar, sin un fotograma con las dos a la vez.
+// Lo monta el layout del slot: cuenta las fichas VISIBLES (una ficha oculta en
+// la pila deshace sus efectos de layout) para `isOverlayOpen`.
 export function OverlayRouteMarker({ children }) {
-  const setOverlays = useContext(OverlayRouteContext);
   useLayoutEffect(() => {
-    if (!setOverlays) return undefined;
     mountedOverlays += 1;
-    setOverlays((count) => count + 1);
     return () => {
       mountedOverlays = Math.max(0, mountedOverlays - 1);
-      // Se cierra la ficha VOLVIENDO ATRÁS: la página reaparece tal cual estaba.
-      // Antes del commit que la muestra, para que framer ya no anime nada.
+      // Se deja la ficha VOLVIENDO ATRÁS a una página que se monta de nuevo
+      // (ya no estaba en la pila): que entre quieta, como al volver.
       if (isHistoryNavigation()) beginQuietReveal();
-      setOverlays((count) => Math.max(0, count - 1));
     };
-  }, [setOverlays]);
+  }, []);
   return children;
 }

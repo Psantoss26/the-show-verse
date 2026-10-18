@@ -49,6 +49,59 @@ async function fetchTitleWithImages(key) {
   return null;
 }
 
+// Elecciones ya resueltas, en memoria del proceso. La caché de datos de `fetch`
+// guarda la ficha entera (decenas de KB por título, hasta ~150 KB) y hay que
+// leerla y volver a elegir en cada lote; los dashboards piden cientos de
+// títulos al cargar, así que se recuerda directamente la elección (unas pocas
+// rutas). Solo se guardan las que llegan bien: un fallo de TMDb es transitorio.
+const PICKS_TTL_MS = DAY * 1000;
+const MAX_REMEMBERED_PICKS = 6000;
+const rememberedPicks = new Map(); // key -> { picks, expiresAt }
+const picksInFlight = new Map(); // key -> Promise<picks|null>
+
+function readRememberedPicks(key) {
+  const entry = rememberedPicks.get(key);
+  if (!entry) return undefined;
+  if (entry.expiresAt <= Date.now()) {
+    rememberedPicks.delete(key);
+    return undefined;
+  }
+  return entry.picks;
+}
+
+function rememberPicks(key, picks) {
+  if (rememberedPicks.size >= MAX_REMEMBERED_PICKS) {
+    // El más antiguo primero (orden de inserción del Map).
+    rememberedPicks.delete(rememberedPicks.keys().next().value);
+  }
+  rememberedPicks.set(key, { picks, expiresAt: Date.now() + PICKS_TTL_MS });
+}
+
+// `null` = no se pudo consultar (distinto de «consultado, sin póster»).
+function resolvePicks(key) {
+  const remembered = readRememberedPicks(key);
+  if (remembered !== undefined) return Promise.resolve(remembered);
+  const pending = picksInFlight.get(key);
+  if (pending) return pending;
+
+  const promise = (async () => {
+    try {
+      const details = await fetchTitleWithImages(key);
+      const picks = pickListArtwork(details?.images, {
+        originalLanguage: details?.original_language,
+      });
+      if (picks) rememberPicks(key, picks);
+      return picks;
+    } catch {
+      return null;
+    } finally {
+      picksInFlight.delete(key);
+    }
+  })();
+  picksInFlight.set(key, promise);
+  return promise;
+}
+
 export async function POST(request) {
   if (!TMDB_KEY) return NextResponse.json({ error: "Missing TMDb key" }, { status: 500 });
   const body = await request.json().catch(() => null);
@@ -64,15 +117,7 @@ export async function POST(request) {
   ].slice(0, MAX_ITEMS);
 
   const entries = await Promise.all(
-    keys.map(async (key) => {
-      try {
-        // `null` = no se pudo consultar (distinto de «consultado, sin póster»).
-        const details = await fetchTitleWithImages(key);
-        return [key, pickListArtwork(details?.images, { originalLanguage: details?.original_language })];
-      } catch {
-        return [key, null];
-      }
-    }),
+    keys.map(async (key) => [key, await resolvePicks(key)]),
   );
 
   return NextResponse.json(

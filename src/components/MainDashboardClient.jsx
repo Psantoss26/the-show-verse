@@ -74,7 +74,10 @@ import {
 
 import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
-import { fetchArtworkOverrides } from "@/lib/artworkApi";
+import {
+  fetchArtworkOverrides,
+  readPersistedArtworkOverrides,
+} from "@/lib/artworkApi";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
 // Fila de acciones + fila meta/géneros COMPARTIDAS con DetailsClient/DetailModal:
 // misma UI y estilo que la ficha rápida del dashboard.
@@ -460,29 +463,20 @@ function ExpandableSectionTitle({ title, href, className = "", accent = "amber" 
 }
 
 
-function runWhenBrowserIdle(callback, { timeout = 1500, delay = 250 } = {}) {
-  if (typeof window === "undefined") return () => {};
+// Pósters ya pintados en esta sesión: al volver a montarse (volver atrás,
+// fila que se recrea) se muestran sin esqueleto ni animación de entrada.
+const loadedPosterSrcs = new Set();
 
-  if (typeof window.requestIdleCallback === "function") {
-    const idleId = window.requestIdleCallback(callback, { timeout });
-    return () => {
-      if (typeof window.cancelIdleCallback === "function") {
-        window.cancelIdleCallback(idleId);
-      }
-    };
-  }
-
-  const timeoutId = window.setTimeout(callback, delay);
-  return () => window.clearTimeout(timeoutId);
-}
-
+// Tarjetas de cada fila cuya imagen se pide aunque esté fuera de pantalla (las
+// visibles y alguna más, ver `eagerPosterLimit` en Row). El resto son `lazy` y
+// el navegador las trae al entrar en la parte visible de la fila.
+const EAGER_POSTER_SLIDES = 8;
 
 /* ====================================================================
  * Portada (2:3) — SOLO en móvil: “3 por fila” completas (sin recorte)
  * ==================================================================== */
-function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
+function PosterImage({ movie, cache, heightClass, isMobile, posterOverride, eager = false }) {
   const [posterPath, setPosterPath] = useState(null);
-  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let abort = false;
@@ -496,56 +490,34 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
           ? "tv"
           : "movie";
       const posterCacheKey = `${mediaType}:${movie.id}`;
+      const reveal = (path) => {
+        if (abort) return;
+        cache.current.set(posterCacheKey, path);
+        setPosterPath(path);
+      };
 
       const { poster: userPoster } = getArtworkPreference(movie.id);
-      if (userPoster) {
-        const url = buildImg(userPoster, "w342");
-        await preloadImage(url);
-        if (!abort) {
-          cache.current.set(posterCacheKey, userPoster);
-          setPosterPath(userPoster);
-          setReady(true);
-        }
-        return;
-      }
+      if (userPoster) return reveal(userPoster);
 
       const cached = cache.current.get(posterCacheKey);
-      if (cached) {
-        const url = buildImg(cached, "w342");
-        await preloadImage(url);
-        if (!abort) {
-          setPosterPath(cached);
-          setReady(true);
-        }
-        return;
-      }
+      if (cached) return reveal(cached);
 
       // Si todavía NO sabemos si hay override (porque aún no cargó el fetch batch),
       // no pintamos el poster base: eso provoca el cambio visible base → final.
       if (posterOverride === undefined) {
-        if (!abort) {
-          setPosterPath(null);
-          setReady(false);
-        }
+        if (!abort) setPosterPath(null);
         return;
       }
 
-      if (posterOverride) {
-        const url = buildImg(posterOverride, "w342");
-        await preloadImage(url);
-        if (!abort) {
-          cache.current.set(posterCacheKey, posterOverride);
-          setPosterPath(posterOverride);
-          setReady(true);
-        }
-        return;
-      }
+      if (posterOverride) return reveal(posterOverride);
 
-      if (!abort) {
-        setPosterPath(null);
-        setReady(false);
-      }
+      if (!abort) setPosterPath(null);
 
+      // Solo se ELIGE la ruta (en lote, ver `fetchBestPoster`); la imagen la
+      // descarga el propio <img>. Antes cada tarjeta la precargaba con
+      // `new Image()` antes de pintarse, y eso ignora `loading="lazy"`: al
+      // llegar el arte se bajaban a la vez los pósters de TODAS las filas y las
+      // tarjetas visibles se repartían el ancho de banda con las de fuera.
       const preferred = await fetchBestPoster(movie.id, mediaType, {
         originalLanguage: movie.original_language,
       });
@@ -556,13 +528,7 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
         movie.profile_path ||
         null;
 
-      const url = chosen ? buildImg(chosen, "w342") : null;
-      await preloadImage(url);
-      if (!abort) {
-        cache.current.set(posterCacheKey, chosen);
-        setPosterPath(chosen);
-        setReady(!!chosen);
-      }
+      reveal(chosen);
     };
 
     load();
@@ -571,72 +537,99 @@ function PosterImage({ movie, cache, heightClass, isMobile, posterOverride }) {
     };
   }, [movie, cache, posterOverride]);
 
+  const src = posterPath ? buildImg(posterPath, "w342") : null;
+  const [loadedSrc, setLoadedSrc] = useState(null);
+  const loaded = !!src && (loadedSrc === src || loadedPosterSrcs.has(src));
+  // Ya estaba pintado al montar: sin animación de entrada.
+  const [mountedLoaded] = useState(loaded);
+  const markLoaded = () => {
+    if (!src) return;
+    loadedPosterSrcs.add(src);
+    setLoadedSrc(src);
+  };
+  const loading = eager ? "eager" : "lazy";
+
   const boxClass = isMobile ? "aspect-[2/3]" : heightClass;
 
-  if (!ready || !posterPath) {
-    return (
-      <div
-        className={`relative w-full ${boxClass} rounded-lg overflow-hidden bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900`}
-      >
-        <motion.div
-          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
-          variants={shimmer}
-          animate="animate"
-          style={{ backgroundSize: "200% 100%" }}
-        />
-      </div>
-    );
+  // El esqueleto queda DEBAJO hasta que la imagen ha cargado; la imagen se
+  // monta en cuanto se conoce su ruta para que el navegador la pida ya.
+  const placeholder = loaded ? null : (
+    <div
+      className={`absolute inset-0 rounded-lg overflow-hidden bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900`}
+    >
+      <motion.div
+        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent"
+        variants={shimmer}
+        animate="animate"
+        style={{ backgroundSize: "200% 100%" }}
+      />
+    </div>
+  );
+
+  if (!src) {
+    return <div className={`relative w-full ${boxClass}`}>{placeholder}</div>;
   }
 
   if (!isMobile) {
     return (
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.3 }}
-        className="relative w-full h-full"
-      >
-        {/* Sin realce propio al pasar el cursor: la respuesta al hover es la
-            vista previa, que arranca con una copia exacta de este póster
-            (`usePreviewMorph`). Un oscurecido o brillo de hover no estaría en
-            esa copia y el primer fotograma de la vista previa saltaría. */}
-        <NextImage
-          src={buildImg(posterPath, "w342")}
-          alt={movie.title || movie.name}
-          fill
-          sizes="(min-width:1280px) 210px, (min-width:768px) 190px, 140px"
-          className="object-cover rounded-lg"
-          loading="lazy"
-        />
-      </motion.div>
+      <div className="relative w-full h-full">
+        {placeholder}
+        <motion.div
+          initial={mountedLoaded ? false : { opacity: 0, scale: 0.9 }}
+          animate={loaded ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.9 }}
+          transition={{ duration: 0.3 }}
+          className="relative w-full h-full"
+        >
+          {/* Sin realce propio al pasar el cursor: la respuesta al hover es la
+              vista previa, que arranca con una copia exacta de este póster
+              (`usePreviewMorph`). Un oscurecido o brillo de hover no estaría en
+              esa copia y el primer fotograma de la vista previa saltaría. */}
+          <NextImage
+            key={src}
+            src={src}
+            alt={movie.title || movie.name}
+            fill
+            sizes="(min-width:1280px) 210px, (min-width:768px) 190px, 140px"
+            className="object-cover rounded-lg"
+            loading={loading}
+            onLoad={markLoaded}
+          />
+        </motion.div>
+      </div>
     );
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.4 }}
-      className={`relative w-full ${boxClass} rounded-lg overflow-hidden bg-neutral-900`}
-    >
-      <NextImage
-        src={buildImg(posterPath, "w342")}
-        alt=""
-        aria-hidden="true"
-        fill
-        sizes="33vw"
-        className="object-cover blur-xl opacity-35 scale-110"
-        loading="lazy"
-      />
-      <NextImage
-        src={buildImg(posterPath, "w342")}
-        alt={movie.title || movie.name}
-        fill
-        sizes="33vw"
-        className="object-contain"
-        loading="lazy"
-      />
-    </motion.div>
+    <div className={`relative w-full ${boxClass}`}>
+      {placeholder}
+      <motion.div
+        initial={mountedLoaded ? false : { opacity: 0 }}
+        animate={{ opacity: loaded ? 1 : 0 }}
+        transition={{ duration: 0.4 }}
+        className={`relative w-full ${boxClass} rounded-lg overflow-hidden bg-neutral-900`}
+      >
+        <NextImage
+          key={`blur:${src}`}
+          src={src}
+          alt=""
+          aria-hidden="true"
+          fill
+          sizes="33vw"
+          className="object-cover blur-xl opacity-35 scale-110"
+          loading={loading}
+        />
+        <NextImage
+          key={src}
+          src={src}
+          alt={movie.title || movie.name}
+          fill
+          sizes="33vw"
+          className="object-contain"
+          loading={loading}
+          onLoad={markLoaded}
+        />
+      </motion.div>
+    </div>
   );
 }
 
@@ -2949,6 +2942,10 @@ export function Row({
   const normalPreviewWidthClass =
     "w-[391px] sm:w-[462px] md:w-[533px] xl:w-[604px]";
   const posterBoxClass = isMobile ? "aspect-[2/3]" : heightClassDesktop;
+  // Pósters que se piden ya: desde la primera tarjeta visible, una tanda más
+  // allá; con el cursor sobre la fila (va a usar las flechas), dos.
+  const eagerPosterLimit =
+    activeIndex + (isHoveredRow ? EAGER_POSTER_SLIDES * 2 : EAGER_POSTER_SLIDES);
 
   if (!hasItems) {
     if (!reserveWhileEmpty) return null;
@@ -3273,6 +3270,7 @@ export function Row({
                     heightClass={posterBoxClass}
                     isMobile={isMobile}
                     posterOverride={posterOverride}
+                    eager={i < eagerPosterLimit}
                   />
                 </button>
               );
@@ -3869,8 +3867,10 @@ function TopRatedHero({
             });
             if (extra === chosen) extra = null;
 
-            if (chosen) await preloadImage(buildImg(chosen, "w780"));
-            if (extra) await preloadImage(buildImg(extra, "w780"));
+            // Sin precargar: la sección esperaba a descargar DOS backdrops w780
+            // de cada título (~56 imágenes, la mayoría fuera de pantalla) antes
+            // de pintar ninguno. Las diapositivas ya piden sus imágenes con
+            // `eager` (las visibles) o `lazy` (el resto).
             return [itemKey, chosen, extra];
           }),
         );
@@ -4352,6 +4352,19 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
         return;
       }
 
+      // Con la instantánea de preferencias de la cuenta en el dispositivo
+      // (AuthContext la guarda y la revalida), `PosterImage` ya lee de ella la
+      // portada elegida (`getArtworkPreference`) y esta petición no aporta nada.
+      // Esperarla dejaba TODAS las tarjetas póster en esqueleto hasta que el
+      // navegador quedaba ocioso y respondía /api/user/preferences.
+      if (readPersistedArtworkOverrides() != null) {
+        if (!cancelled) {
+          setPosterOverrides({});
+          setOverridesReady(true);
+        }
+        return;
+      }
+
       if (!cancelled) setOverridesReady(false);
 
       try {
@@ -4372,11 +4385,12 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
       }
     };
 
-    const cancelIdle = runWhenBrowserIdle(loadOverrides);
+    // Sin diferirla a cuando el navegador esté ocioso: las tarjetas póster
+    // esperan esta respuesta para pintarse.
+    loadOverrides();
 
     return () => {
       cancelled = true;
-      cancelIdle();
     };
   }, [allMovieIds]);
 

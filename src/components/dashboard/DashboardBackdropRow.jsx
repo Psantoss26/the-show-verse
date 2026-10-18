@@ -20,7 +20,12 @@ import RowNavGlass, { ROW_NAV_FADE } from "@/components/dashboard/RowNavGlass";
 import useTrailerAutoDismiss from "@/hooks/useTrailerAutoDismiss";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, FreeMode } from "swiper/modules";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import {
+  AnimatePresence,
+  motion,
+  useInView,
+  useReducedMotion,
+} from "framer-motion";
 import "swiper/swiper-bundle.css";
 import Link from "next/link";
 import NextImage from "next/image";
@@ -173,7 +178,11 @@ function getInitialItemBackdrop(item, backdropOverride) {
 
 // Resuelve el mejor backdrop del título compartiendo `movieBackdropCache` con el
 // resto del dashboard. Mismo criterio que InlinePreviewCard (rama no-spotlight).
-function useItemBackdrop(item, backdropOverride) {
+// `preload`: descargar la imagen ANTES de revelarla. Lo quiere la vista previa
+// (aparece de golpe); la tarjeta base no: tiene su propio fundido al cargar y,
+// precargada con `new Image()`, se saltaba `loading="lazy"` y cada fila bajaba
+// los backdrops de TODAS sus tarjetas al montar el dashboard.
+function useItemBackdrop(item, backdropOverride, { preload = true } = {}) {
   const mediaType = getMediaTypeForItem(item);
   const [backdropPath, setBackdropPath] = useState(() =>
     getInitialItemBackdrop(item, backdropOverride),
@@ -235,7 +244,7 @@ function useItemBackdrop(item, backdropOverride) {
         });
         const chosen = preferred || getPreviewBackdropFallback(current);
         movieBackdropCache.set(key, chosen);
-        if (chosen) await preloadImage(buildImg(chosen, BACKDROP_SIZE));
+        if (chosen && preload) await preloadImage(buildImg(chosen, BACKDROP_SIZE));
         reveal(chosen);
       } catch {
         const fallback = getPreviewBackdropFallback(current);
@@ -247,7 +256,7 @@ function useItemBackdrop(item, backdropOverride) {
     return () => {
       abort = true;
     };
-  }, [itemKey, backdropOverride]);
+  }, [itemKey, backdropOverride, preload]);
 
   return { backdropPath, mediaType };
 }
@@ -256,8 +265,12 @@ function useItemBackdrop(item, backdropOverride) {
  * Tarjeta base (sin hover): backdrop 16:9 + degradado inferior con título
  * y badge de nota. Shimmer mientras carga la imagen.
  * ==================================================================== */
-function BackdropBaseCard({ item, backdropOverride }) {
-  const { backdropPath } = useItemBackdrop(item, backdropOverride);
+// `loadImage`: la fila está cerca de la pantalla (antes no se pide la imagen).
+// `eager`: tarjeta visible o de la siguiente tanda; el resto, `lazy`.
+function BackdropBaseCard({ item, backdropOverride, loadImage = true, eager = false }) {
+  const { backdropPath } = useItemBackdrop(item, backdropOverride, {
+    preload: false,
+  });
   const bgSrc = backdropPath ? buildImg(backdropPath, BACKDROP_SIZE) : null;
 
   const [imgReady, setImgReady] = useState(() =>
@@ -288,7 +301,7 @@ function BackdropBaseCard({ item, backdropOverride }) {
         </div>
       )}
 
-      {bgSrc && (
+      {bgSrc && (loadImage || imgReady) && (
         <NextImage
           key={bgSrc}
           src={bgSrc}
@@ -298,7 +311,7 @@ function BackdropBaseCard({ item, backdropOverride }) {
           className={`object-cover transition-opacity duration-200 ${
             imgReady ? "opacity-100" : "opacity-0"
           }`}
-          loading="eager"
+          loading={eager ? "eager" : "lazy"}
           onLoad={markImageReady}
         />
       )}
@@ -1407,6 +1420,9 @@ export default function DashboardBackdropRow({
 
   const swiperRef = useRef(null);
   const rowRef = useRef(null);
+  // Las imágenes de la fila se piden al acercarse a la pantalla, como las filas
+  // póster (que no se montan hasta entonces).
+  const nearViewport = useInView(rowRef, { once: true, margin: "600px" });
   const standardRevealProps = useScrollRevealProps();
   const topResetRevealProps = useTopResetRevealProps(
     rowRef,
@@ -1734,6 +1750,11 @@ export default function DashboardBackdropRow({
                       <BackdropBaseCard
                         item={item}
                         backdropOverride={backdropOverride}
+                        loadImage={nearViewport}
+                        eager={
+                          i <
+                          activeIndex + (isHoveredRow ? perView * 2 : perView) + 2
+                        }
                       />
                     </div>
                     <AnimatePresence
