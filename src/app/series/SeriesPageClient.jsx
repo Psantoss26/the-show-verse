@@ -72,9 +72,9 @@ import PreviewTrailerAudioButton, {
 } from "@/components/dashboard/PreviewTrailerAudioControl";
 import {
   fetchBestBackdropNoLang,
-  pickBestBackdropByLangResVotes,
+  fetchBestBackdrop as fetchBestCardBackdrop,
+  fetchBestPoster as fetchBestCardPoster,
 } from "@/lib/dashboard/media";
-import { pickLadderPoster } from "@/lib/details/tmdbImages";
 import useSpotlightLogo from "@/lib/dashboard/useSpotlightLogo";
 import DashboardSpotlightPreview from "@/components/dashboard/DashboardSpotlightPreview";
 import DashboardRankNumber from "@/components/dashboard/DashboardRankNumber";
@@ -250,7 +250,6 @@ function preloadImage(src) {
 const tvExtrasCache = new Map(); // show.id -> { runtime, awards, imdbRating }
 const tvBackdropCache = new Map(); // show.id -> backdrop file_path | null | undefined
 const tvSpotlightBackdropCache = new Map();
-const tvImagesCache = new Map(); // show.id -> { posters, backdrops }
 
 /* =================== TRAILERS (TMDb videos - TV) =================== */
 const tvTrailerCache = new Map(); // showId -> { key, site, type } | null
@@ -339,41 +338,6 @@ function getTVArtworkPreference(showId) {
   };
 }
 
-/* ========= Fetch genérico de imágenes TV desde TMDb ========= */
-async function getShowImages(showId) {
-  if (tvImagesCache.has(showId)) return tvImagesCache.get(showId);
-
-  const apiKey = process.env.NEXT_PUBLIC_TMDB_API_KEY;
-  if (!apiKey || !showId) {
-    const fallback = { posters: [], backdrops: [] };
-    tvImagesCache.set(showId, fallback);
-    return fallback;
-  }
-
-  try {
-    // No limitamos idiomas aqui: el selector prioriza ingles y solo cae a
-    // backdrops sin idioma como ultimo recurso.
-    const url =
-      `https://api.themoviedb.org/3/tv/${showId}/images` + `?api_key=${apiKey}`;
-
-    const r = await fetch(url, { cache: "force-cache" });
-    if (!r.ok) throw new Error("TMDb TV images error");
-
-    const j = await r.json();
-    const data = {
-      posters: Array.isArray(j?.posters) ? j.posters : [],
-      backdrops: Array.isArray(j?.backdrops) ? j.backdrops : [],
-    };
-
-    tvImagesCache.set(showId, data);
-    return data;
-  } catch {
-    const fallback = { posters: [], backdrops: [] };
-    tvImagesCache.set(showId, fallback);
-    return fallback;
-  }
-}
-
 /* ====================================================================
  * LOGICA IMAGENES (Backdrops / Posters)
  * ==================================================================== */
@@ -382,25 +346,12 @@ async function getShowImages(showId) {
 
 /* ========= Poster preferido TV ========= */
 async function fetchBestTVPoster(showId, originalLanguage) {
-  const { posters } = await getShowImages(showId);
-  if (!Array.isArray(posters) || posters.length === 0) return null;
-
-  const best = pickLadderPoster(posters, { originalLanguage });
-
-  return best?.file_path || null;
+  return fetchBestCardPoster(showId, "tv", { originalLanguage });
 }
 
 /* ========= Backdrop preferido TV ========= */
 async function fetchBestTVBackdrop(showId, opts = {}) {
-  const { backdrops } = await getShowImages(showId);
-  if (!Array.isArray(backdrops) || backdrops.length === 0) return null;
-
-  const best = pickBestBackdropByLangResVotes(backdrops, {
-    minWidth: 1200,
-    ...opts,
-  });
-
-  return best?.file_path || null;
+  return fetchBestCardBackdrop(showId, "tv", opts);
 }
 
 async function preparePreviewBackdrop(show) {

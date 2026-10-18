@@ -22,6 +22,7 @@
 import { useEffect, useLayoutEffect, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import { isHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import { isScreenReveal } from "@/lib/navigation/screenReveal";
 
 const SNAPSHOTS = new Map();
 const MAX_SNAPSHOTS = 8;
@@ -82,6 +83,8 @@ function openSession(key, pathname) {
     deps: snapshot ? { ...snapshot.deps } : null,
     live: {},
     liveDeps: {},
+    // Dependencias de la última ejecución de cada efecto EN ESTE MONTAJE.
+    ran: {},
   };
 }
 
@@ -122,11 +125,26 @@ export function useSnapshotValues(session, values) {
   });
 }
 
-// ¿Se puede saltar esta ejecución? Solo si el montaje es restaurado, el efecto
-// se ejecutó por última vez con las mismas dependencias y su trabajo había
-// terminado (`settled`): si se salió con una carga a medias, se repite.
+// ¿Se puede saltar esta ejecución? Solo si el efecto ya se ejecutó con las
+// mismas dependencias y su trabajo había terminado (`settled`; si se salió con
+// una carga a medias, se repite), y además:
+//   - la ficha REAPARECE sin haberse desmontado (OverlayRouteHost la tenía en
+//     <Activity hidden>): React repite sus efectos al mostrarla, pero su estado
+//     sigue ahí; repetirlos lo vaciaba y lo volvía a cargar delante del usuario;
+//   - o el montaje es restaurado (volver a una ficha que sí se desmontó).
 function shouldSkip(session, name, deps, settled) {
+  const ran = session.ran[name];
+  session.ran[name] = deps;
   session.liveDeps[name] = normalizeDeps(deps);
+  if (
+    settled &&
+    ran &&
+    isScreenReveal() &&
+    ran.length === deps.length &&
+    ran.every((value, index) => Object.is(value, deps[index]))
+  ) {
+    return true;
+  }
   const saved = session.deps?.[name];
   if (!saved) return false;
   if (settled && sameDeps(saved, deps)) return true;

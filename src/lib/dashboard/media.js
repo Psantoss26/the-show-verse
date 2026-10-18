@@ -6,10 +6,8 @@ import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
 
 import { TMDB_IMAGE_LANGS_PARAM } from "@/lib/tmdb/imageLanguages";
 import { pickBestBackdropNoLang, pickLadderPoster } from "@/lib/details/tmdbImages";
-import {
-  imageLanguageTiers,
-  pickPreferredResolutionBackdrop,
-} from "@/lib/tmdb/imageLanguageLadder";
+import { pickBestBackdropByLangResVotes } from "@/lib/tmdb/artworkPicks";
+import { requestListArtwork } from "@/lib/tmdb/artworkBatch";
 import { getMediaTypeForItem } from "./mediaType.mjs";
 import {
   readArtworkPreference,
@@ -232,36 +230,10 @@ export function getArtworkPreference(movieId, mediaType = "movie") {
   );
 }
 
-// Escalera de idioma de toda la app (inglés → español → idioma original → sin
-// idioma, ver lib/tmdb/imageLanguageLadder). Dentro de cada idioma, de los tres
-// primeros de TMDb con el ancho mínimo, el de resolución preferida; `offset`
-// pide el siguiente (segunda imagen del hero). `includeNoLanguage: false`
-// descarta el escalón sin idioma.
-const DASHBOARD_BACKDROP_SIZES = [
-  [1920, 1080],
-  [1712, 964],
-  [3840, 2160],
-];
-
-export function pickBestBackdropByLangResVotes(list, opts = {}) {
-  const {
-    minWidth = 1200,
-    offset = 0,
-    includeNoLanguage = true,
-    originalLanguage,
-  } = opts;
-  const tiers = imageLanguageTiers(list, { originalLanguage });
-  if (!includeNoLanguage) tiers.pop();
-  for (const tier of tiers) {
-    const picked = pickPreferredResolutionBackdrop(tier, {
-      minWidth,
-      offset,
-      sizes: DASHBOARD_BACKDROP_SIZES,
-    });
-    if (picked) return picked;
-  }
-  return null;
-}
+// El selector de backdrop del dashboard vive en `@/lib/tmdb/artworkPicks`
+// (módulo puro) porque también lo usa el servidor al elegir el arte de las
+// tarjetas en lote. Se reexporta para no tocar a quien ya lo importaba de aquí.
+export { pickBestBackdropByLangResVotes };
 
 export async function getMovieImages(itemId, mediaType = "movie", opts = {}) {
   const cacheKey = `${mediaType}:${itemId}`;
@@ -296,7 +268,43 @@ export async function getMovieImages(itemId, mediaType = "movie", opts = {}) {
   }
 }
 
+// ARTE DE LAS TARJETAS, EN LOTE.
+//
+// Cada tarjeta de los dashboards pedía su /images a TMDb desde el navegador
+// (todos los idiomas, decenas de KB por título): Inicio sin hacer scroll eran
+// ~435 peticiones y ~1 MB de JSON, y las tarjetas visibles esperaban en la
+// misma cola que las de filas y slides fuera de pantalla. El servidor
+// (/api/tmdb/artwork) aplica los MISMOS selectores (lib/tmdb/artworkPicks),
+// agrupa los títulos que se piden a la vez en una sola petición y guarda la
+// elección para todos los usuarios: lo que llega al navegador son rutas.
+// `undefined` = el lote no respondió; entonces se cae a /images como antes.
+const BATCHED_BACKDROP_OPTIONS = new Set(["originalLanguage", "offset", "minWidth"]);
+
+function batchedBackdropField(opts) {
+  for (const [name, value] of Object.entries(opts || {})) {
+    if (value === undefined) continue;
+    if (!BATCHED_BACKDROP_OPTIONS.has(name)) return null;
+    if (name === "minWidth" && value !== 1200) return null;
+  }
+  const offset = Number(opts?.offset) || 0;
+  if (offset === 0) return "dashboardBackdrop";
+  if (offset === 1) return "dashboardBackdropAlt";
+  return null;
+}
+
+async function requestBatchedPick(itemId, mediaType, field) {
+  const picks = await requestListArtwork(mediaType, itemId);
+  if (!picks || !Object.hasOwn(picks, field)) return undefined;
+  return picks[field] || null;
+}
+
 export async function fetchBestBackdrop(itemId, mediaType = "movie", opts = {}) {
+  const field = batchedBackdropField(opts);
+  if (field) {
+    const batched = await requestBatchedPick(itemId, mediaType, field);
+    if (batched !== undefined) return batched;
+  }
+
   const { backdrops } = await getMovieImages(itemId, mediaType);
   if (!Array.isArray(backdrops) || backdrops.length === 0) return null;
 
@@ -353,6 +361,9 @@ export async function preparePreviewBackdrop(item, backdropOverride) {
 }
 
 export async function fetchBestPoster(itemId, mediaType = "movie", opts = {}) {
+  const batched = await requestBatchedPick(itemId, mediaType, "poster");
+  if (batched !== undefined) return batched;
+
   const { posters } = await getMovieImages(itemId, mediaType);
   if (!Array.isArray(posters) || posters.length === 0) return null;
 

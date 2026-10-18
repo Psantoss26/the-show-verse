@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { artworkItemKey, pickListArtwork } from "./artworkPicks.js";
+import { artworkItemKey, pickBestBackdropByLangResVotes, pickListArtwork } from "./artworkPicks.js";
 
 test("claves de título normalizadas", () => {
   assert.equal(artworkItemKey("tv", "1399"), "tv:1399");
@@ -13,7 +13,7 @@ test("claves de título normalizadas", () => {
 
 test("sin respuesta de TMDb no hay elección (null, no «sin póster»)", () => {
   assert.equal(pickListArtwork(null), null);
-  assert.deepEqual(pickListArtwork({ posters: [], backdrops: [] }), { poster: null, previewPoster: null, previewBackdrop: null, textlessPoster: null, coverPoster: null });
+  assert.deepEqual(pickListArtwork({ posters: [], backdrops: [] }), { poster: null, previewPoster: null, previewBackdrop: null, textlessPoster: null, coverPoster: null, dashboardBackdrop: null, dashboardBackdropAlt: null });
 });
 
 test("elige póster inglés y backdrop con idioma", () => {
@@ -61,4 +61,21 @@ test("textlessPoster: solo un póster sin idioma, nunca backdrop ni póster con 
   const picks = pickListArtwork({ posters: [withText, neutral], backdrops: [neutralBackdrop] });
   assert.equal(picks.textlessPoster, "/xx.jpg");
   assert.equal(picks.coverPoster, "/xx.jpg");
+});
+
+test("backdrop de los dashboards: ≥1200 px, escalera de idioma y resolución preferida", () => {
+  const small = { file_path: "/en-780.jpg", iso_639_1: "en", width: 780, height: 439 };
+  const en4k = { file_path: "/en-4k.jpg", iso_639_1: "en", width: 3840, height: 2160 };
+  const enHd = { file_path: "/en-hd.jpg", iso_639_1: "en", width: 1920, height: 1080 };
+  const es = { file_path: "/es.jpg", iso_639_1: "es", width: 1920, height: 1080 };
+  const picks = pickListArtwork({ posters: [], backdrops: [es, small, en4k, enHd] });
+  // 1920×1080 antes que 4K dentro del inglés; el pequeño no cuenta.
+  assert.equal(picks.dashboardBackdrop, "/en-hd.jpg");
+  // El SIGUIENTE (segunda imagen de «Mejor valoradas»).
+  assert.equal(picks.dashboardBackdropAlt, "/en-4k.jpg");
+  // Mismo resultado que el selector que usaba el navegador por tarjeta.
+  assert.equal(picks.dashboardBackdrop, pickBestBackdropByLangResVotes([es, small, en4k, enHd])?.file_path);
+  assert.equal(picks.dashboardBackdropAlt, pickBestBackdropByLangResVotes([es, small, en4k, enHd], { offset: 1 })?.file_path);
+  // Sin inglés, el español.
+  assert.equal(pickListArtwork({ posters: [], backdrops: [es] }).dashboardBackdrop, "/es.jpg");
 });

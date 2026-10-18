@@ -16,12 +16,53 @@
 //   - textlessPoster: SOLO un póster sin idioma, o null (sin recurrir a
 //                    backdrops ni a pósters con texto). El fondo de mosaico
 //                    de la ficha de una persona (ActorCollageBackground).
+//   - dashboardBackdrop / dashboardBackdropAlt: el backdrop de las tarjetas y
+//                    vistas previas de los dashboards (≥1200 px, misma
+//                    escalera, resolución preferida) y el SIGUIENTE (segunda
+//                    imagen de «Mejor valoradas»). Con ellos los dashboards
+//                    eligen el arte de cada tarjeta en lote, sin pedir /images
+//                    desde el navegador por cada una.
 
 import {
   pickBestNeutralPosterByResVotes,
   pickLadderBackdrop,
   pickLadderPoster,
 } from "../details/tmdbImages.js";
+import {
+  imageLanguageTiers,
+  pickPreferredResolutionBackdrop,
+} from "./imageLanguageLadder.js";
+
+// Resoluciones preferidas de los backdrops del dashboard, en orden.
+const DASHBOARD_BACKDROP_SIZES = [
+  [1920, 1080],
+  [1712, 964],
+  [3840, 2160],
+];
+
+// Escalera de idioma de toda la app (inglés → español → idioma original → sin
+// idioma). Dentro de cada idioma, de los tres primeros de TMDb con el ancho
+// mínimo, el de resolución preferida; `offset` pide el siguiente (segunda imagen
+// del hero). `includeNoLanguage: false` descarta el escalón sin idioma.
+export function pickBestBackdropByLangResVotes(list, opts = {}) {
+  const {
+    minWidth = 1200,
+    offset = 0,
+    includeNoLanguage = true,
+    originalLanguage,
+  } = opts;
+  const tiers = imageLanguageTiers(list, { originalLanguage });
+  if (!includeNoLanguage) tiers.pop();
+  for (const tier of tiers) {
+    const picked = pickPreferredResolutionBackdrop(tier, {
+      minWidth,
+      offset,
+      sizes: DASHBOARD_BACKDROP_SIZES,
+    });
+    if (picked) return picked;
+  }
+  return null;
+}
 
 // Sin idioma en TMDb: `iso_639_1` nulo, vacío o "xx". Se normaliza a null
 // porque los selectores neutros solo reconocen ese valor, y se filtra ANTES:
@@ -55,6 +96,10 @@ export function pickListArtwork(images, { originalLanguage } = {}) {
       textlessPoster ||
       pickBestNeutralPosterByResVotes(textlessImages(backdrops))?.file_path ||
       poster,
+    dashboardBackdrop:
+      pickBestBackdropByLangResVotes(backdrops, { originalLanguage })?.file_path || null,
+    dashboardBackdropAlt:
+      pickBestBackdropByLangResVotes(backdrops, { originalLanguage, offset: 1 })?.file_path || null,
   };
 }
 
