@@ -2392,8 +2392,23 @@ export default function ActorDetails({
   const formattedActorHeight = actorHeight
     ? `${actorHeight.toLocaleString("es-ES", { maximumFractionDigits: 2 })} m`
     : null;
+  // «Conocido/a por» y «Crédito más popular»: desde `sm` van en Detalles y en
+  // Popular; en teléfono no hay pestaña Popular, así que el crédito pasa a
+  // Detalles y «Conocido/a por» a Perfil.
+  const knownForDepartmentCard = {
+    label: "Conocido/a por",
+    value: actorDetails?.known_for_department || "—",
+    icon: Briefcase,
+  };
+  const mostPopularCreditCard = {
+    label: "Crédito más popular",
+    icon: Star,
+    value: mostPopularCredit
+      ? `${mostPopularCredit.title || mostPopularCredit.name}${mostPopularCredit.year ? ` · ${mostPopularCredit.year}` : ""}`
+      : "Sin créditos disponibles.",
+  };
   // TELÉFONO: nacimiento, fallecimiento, altura y lugar (con banderas) no van
-  // en la cabecera sino como primera pestaña del menú Detalles · Popular ·
+  // en la cabecera sino como primera pestaña del menú Perfil · Detalles ·
   // Biografía, con las mismas tarjetas. Desde `sm` siguen en su fila.
   const actorProfileTab = isPhone
     ? {
@@ -2445,6 +2460,7 @@ export default function ActorDetails({
               </span>
             ) : null,
           },
+          knownForDepartmentCard,
         ],
       }
     : null;
@@ -3298,8 +3314,10 @@ export default function ActorDetails({
                 layoutId={`actor-info-tabs-${personId}`}
                 leadingTab={actorProfileTab}
                 productionTabLabel="Popular"
+                // En teléfono no hay pestaña Popular: su tarjeta va en Detalles.
+                showProductionTab={!isPhone}
                 synopsisTabLabel="Biografía"
-                // En teléfono la biografía es una pestaña más (Detalles · Popular ·
+                // En teléfono la biografía es una pestaña más (Perfil · Detalles ·
                 // Biografía); desde `sm`, debajo de las pestañas.
                 synopsisBelowTabs={!isPhone}
                 // En teléfono, la biografía recogida mide como una pestaña de
@@ -3311,11 +3329,7 @@ export default function ActorDetails({
                 enableMobileTabSwipe
                 expandableSynopsis
                 detailCards={[
-                  {
-                    label: "Conocido/a por",
-                    value: actorDetails?.known_for_department || "—",
-                    icon: Briefcase,
-                  },
+                  isPhone ? mostPopularCreditCard : knownForDepartmentCard,
                   {
                     label: "Créditos",
                     value: (
@@ -3340,15 +3354,7 @@ export default function ActorDetails({
                     icon: Trophy,
                   },
                 ]}
-                productionCards={[
-                  {
-                    label: "Crédito más popular",
-                    icon: Star,
-                    value: mostPopularCredit
-                      ? `${mostPopularCredit.title || mostPopularCredit.name}${mostPopularCredit.year ? ` · ${mostPopularCredit.year}` : ""}`
-                      : "Sin créditos disponibles.",
-                  },
-                ]}
+                productionCards={[mostPopularCreditCard]}
                 overview={bio || "Sin biografía disponible."}
               />
             </div>
