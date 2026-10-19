@@ -25,6 +25,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { statusRetryDelay } from "@/lib/trakt/statusRetry";
+import { mergeRewatchRuns } from "@/lib/trakt/mergeRewatchRuns";
 import {
   traktGetShowWatched,
   traktGetShowPlays,
@@ -339,101 +340,6 @@ export function useTraktEpisodesWatched({
     [buildRewatchViewCacheKey],
   );
 
-  const mergeRewatchRuns = useCallback((currentRuns, incomingRuns) => {
-    const normalizeRun = (run) => {
-      const startedAt = String(run?.startedAt || run?.id || "");
-      if (!startedAt) return null;
-      return {
-        id: String(run?.id || startedAt),
-        startedAt,
-        label: run?.label || `Rewatch · ${startedAt.slice(0, 10)}`,
-        completedAt: run?.completedAt || null,
-        completed: typeof run?.completed === "boolean" ? run.completed : null,
-        progressCount:
-          typeof run?.progressCount === "number" ? run.progressCount : null,
-      };
-    };
-
-    const mergeRunData = (baseRun, overlayRun) => ({
-      ...(baseRun || {}),
-      ...(overlayRun || {}),
-      id: String(baseRun?.id || overlayRun?.id || ""),
-      startedAt: String(baseRun?.startedAt || overlayRun?.startedAt || ""),
-      label:
-        baseRun?.label ||
-        overlayRun?.label ||
-        `Rewatch · ${String(baseRun?.startedAt || overlayRun?.startedAt || "").slice(0, 10)}`,
-      completedAt: overlayRun?.completedAt ?? baseRun?.completedAt ?? null,
-      completed:
-        typeof overlayRun?.completed === "boolean"
-          ? overlayRun.completed
-          : (baseRun?.completed ?? null),
-      progressCount:
-        overlayRun?.progressCount ?? baseRun?.progressCount ?? null,
-    });
-
-    const normalizedCurrent = (Array.isArray(currentRuns) ? currentRuns : [])
-      .map(normalizeRun)
-      .filter(Boolean)
-      .sort(
-        (a, b) =>
-          new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
-      );
-    const normalizedIncoming = (Array.isArray(incomingRuns) ? incomingRuns : [])
-      .map(normalizeRun)
-      .filter(Boolean)
-      .sort(
-        (a, b) =>
-          new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
-      );
-
-    const mergedById = new Map();
-
-    for (const run of normalizedCurrent) {
-      mergedById.set(run.id, run);
-    }
-
-    for (const incomingRun of normalizedIncoming) {
-      const exact = mergedById.get(incomingRun.id);
-      if (exact) {
-        mergedById.set(incomingRun.id, mergeRunData(exact, incomingRun));
-        continue;
-      }
-
-      const incomingTs = new Date(incomingRun.startedAt).getTime();
-      const candidateLocal = normalizedCurrent.find((localRun, index) => {
-        const localTs = new Date(localRun.startedAt).getTime();
-        const newerLocalTs =
-          index > 0
-            ? new Date(normalizedCurrent[index - 1].startedAt).getTime()
-            : Number.NaN;
-
-        if (!Number.isFinite(incomingTs) || !Number.isFinite(localTs)) {
-          return false;
-        }
-        if (incomingTs < localTs) return false;
-        if (Number.isFinite(newerLocalTs) && incomingTs >= newerLocalTs) {
-          return false;
-        }
-        return true;
-      });
-
-      if (candidateLocal) {
-        mergedById.set(
-          candidateLocal.id,
-          mergeRunData(candidateLocal, incomingRun),
-        );
-        continue;
-      }
-
-      mergedById.set(incomingRun.id, incomingRun);
-    }
-
-    return Array.from(mergedById.values()).sort(
-      (a, b) =>
-        new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
-    );
-  }, []);
 
   const persistRuns = useCallback(
     (nextRuns) => {
@@ -628,7 +534,6 @@ export function useTraktEpisodesWatched({
       id,
       type,
       connected,
-      mergeRewatchRuns,
       rewatchRunsStorageKey,
       cacheRewatchViewState,
       restoreRewatchViewStateFromCache,

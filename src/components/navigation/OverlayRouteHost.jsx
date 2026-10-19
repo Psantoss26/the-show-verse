@@ -11,7 +11,11 @@ import {
 } from "next/dist/shared/lib/hooks-client-context.shared-runtime";
 import { MotionGlobalConfig } from "framer-motion";
 import { isHistoryNavigation } from "@/lib/navigation/historyNavigation";
-import { createScreenStack, navigateScreens } from "@/lib/navigation/screenStack";
+import {
+  createScreenStack,
+  navigateScreens,
+  screenKeyForPathname,
+} from "@/lib/navigation/screenStack";
 import {
   beginScreenReveal,
   currentScreenReveal,
@@ -68,12 +72,14 @@ export default function OverlayRouteHost({ children, overlay }) {
   const overlaySegments = useSelectedLayoutSegments("overlay");
   const kind = overlaySegments?.includes("(.)details") ? "overlay" : "page";
 
-  const [stack, setStack] = useState(() => createScreenStack(pathname, kind));
+  const screenKey = screenKeyForPathname(pathname);
+
+  const [stack, setStack] = useState(() => createScreenStack(screenKey, kind));
   let state = stack;
   const current = state.screens[state.active];
-  if (current.key !== pathname || current.kind !== kind) {
+  if (current.key !== screenKey || current.kind !== kind) {
     const history = isHistoryNavigation(pathname);
-    state = navigateScreens(state, pathname, kind, history);
+    state = navigateScreens(state, screenKey, kind, history);
     // VOLVER ATRÁS: framer debe saltar ya sus entradas, antes del commit que
     // muestra la pantalla (sus efectos corren antes que los de este componente).
     if (state.revealed) {
