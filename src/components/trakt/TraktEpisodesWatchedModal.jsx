@@ -44,6 +44,7 @@ import Link from "next/link";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { motion, AnimatePresence } from "framer-motion";
 import useModalGuard from "@/hooks/useModalGuard";
+import CalendarPickerModal, { formatPickerValue } from "@/components/trakt/CalendarPickerModal";
 import {
   dismissLocalProgress,
   getLocalInProgress,
@@ -55,6 +56,8 @@ import {
   Check,
   Eye,
   EyeOff,
+  CalendarDays,
+  CalendarClock,
   Loader2,
   MonitorPlay,
   X,
@@ -92,6 +95,69 @@ const fromLocalDatetimeInput = (value) => {
   if (Number.isNaN(d.getTime())) return null;
   return d.toISOString();
 };
+
+// Campo de fecha y hora: abre el calendario de cristal (CalendarPickerModal)
+// en lugar del desplegable nativo de `datetime-local`. Mismo valor
+// ("YYYY-MM-DDTHH:mm") para no tocar la lógica que lo convierte a ISO.
+function DateTimeField({
+  value,
+  onChange,
+  disabled = false,
+  title = "Fecha y hora",
+  placeholder = "Elegir fecha y hora",
+  accent = "emerald",
+  allowClear = false,
+  // Compacto en móvil: botón de 36px como el control segmentado de al lado.
+  compact = false,
+  className = "",
+}) {
+  const [open, setOpen] = useState(false);
+  const label = formatPickerValue(value, { withTime: true });
+  const ring = accent === "purple" ? "focus-visible:ring-purple-300/50" : "focus-visible:ring-emerald-300/50";
+  const icon = accent === "purple" ? "text-purple-200" : "text-emerald-300";
+  return (
+    <>
+      <div className={`flex items-center gap-2 ${className}`}>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => setOpen(true)}
+          aria-haspopup="dialog"
+          aria-label={`${title}: ${label || placeholder}`}
+          className={`flex min-w-0 flex-1 items-center rounded-2xl ${PAGE_CONTROL} text-left font-semibold text-zinc-200 transition ${PAGE_CONTROL_HOVER} focus-visible:outline-none focus-visible:ring-2 ${ring} disabled:cursor-not-allowed disabled:opacity-50 ${
+            compact
+              ? "h-9 gap-2 rounded-xl px-2.5 text-xs sm:h-11 sm:gap-2.5 sm:rounded-2xl sm:px-3.5 sm:text-sm"
+              : "h-11 gap-2.5 px-3.5 text-sm"
+          }`}
+        >
+          <CalendarDays className={`h-4 w-4 shrink-0 ${icon}`} />
+          <span className={`truncate ${label ? "" : "text-white/50"}`}>{label || placeholder}</span>
+        </button>
+        {allowClear && label && !disabled && (
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${PAGE_CONTROL} text-zinc-300 transition ${PAGE_CONTROL_HOVER}`}
+            aria-label="Quitar fecha"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+      <CalendarPickerModal
+        open={open}
+        withTime
+        title={title}
+        value={value}
+        onSelect={(next) => {
+          onChange(next);
+          setOpen(false);
+        }}
+        onClose={() => setOpen(false)}
+      />
+    </>
+  );
+}
 
 const formatDate = (iso) => {
   if (!iso) return "—";
@@ -859,11 +925,11 @@ export default function TraktEpisodesWatchedModal({
       return;
     }
     if (addPlayMode === "play" && !hasAddPlayHandler) {
-      setAddPlayError("Falta pasar onAddShowPlay desde DetailsClient.jsx");
+      setAddPlayError("No se puede añadir el visionado desde aquí.");
       return;
     }
     if (addPlayMode === "rewatch" && !hasCreateRewatchHandler) {
-      setAddPlayError("Falta pasar onCreateRewatchRun desde DetailsClient.jsx");
+      setAddPlayError("No se puede crear el rewatch desde aquí.");
       return;
     }
 
@@ -1153,11 +1219,12 @@ export default function TraktEpisodesWatchedModal({
                   <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">
                     Fecha y hora (opcional)
                   </label>
-                  <input
-                    type="datetime-local"
+                  <DateTimeField
                     value={movieEditValue}
-                    onChange={(e) => setMovieEditValue(e.target.value)}
-                    className="w-full rounded-xl bg-black/30 px-4 py-3 text-sm text-white backdrop-blur-md transition focus:ring-2 focus:ring-emerald-300/50 focus:outline-none"
+                    onChange={setMovieEditValue}
+                    title="Fecha de visionado"
+                    placeholder="Ahora"
+                    allowClear
                   />
                   {movieWatchedAt && (
                     <p className="mt-2 text-xs text-emerald-400">
@@ -1792,50 +1859,83 @@ export default function TraktEpisodesWatchedModal({
           )}
 
           {isConnected && isRewatchView && (
-            <div className="rounded-2xl bg-purple-500/5 px-3.5 py-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <div className="text-[11px] font-black uppercase tracking-wider text-purple-200">
-                  Fecha al marcar episodios
+            // Móvil: título y Hoy / Otra fecha en una fila; el campo de fecha
+            // se despliega debajo. Desde sm, título con su explicación y todo
+            // en línea (lg) o en dos filas (sm-lg).
+            <div
+              role="group"
+              aria-label="Fecha de episodios"
+              className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 rounded-2xl bg-purple-500/5 py-2 pl-3 pr-2 sm:flex sm:flex-col sm:items-stretch sm:gap-3 sm:px-3.5 sm:py-3 lg:flex-row lg:items-center lg:justify-between"
+            >
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-purple-200">
+                  <CalendarClock className="h-3.5 w-3.5 shrink-0 sm:hidden" aria-hidden="true" />
+                  <span className="truncate">Fecha de episodios</span>
                 </div>
-                <div className="text-xs text-zinc-400 mt-1">
-                  Usa hoy o una fecha concreta para el episodio.
+                <div className="mt-0.5 truncate text-[11px] text-zinc-400 sm:mt-1 sm:text-xs">
+                  <span className="sm:hidden">Al marcarlos como vistos</span>
+                  <span className="hidden sm:inline">Usa hoy o una fecha concreta para el episodio.</span>
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setRewatchMarkPreset("today")}
-                    className={`px-3 py-2 rounded-xl text-xs font-black transition ${
-                      rewatchMarkPreset === "today"
-                        ? "bg-purple-500/15 text-purple-100"
-                        : `${GLASS_CONTROL} text-white/70 hover:bg-white/10`
-                    }`}
-                  >
-                    Hoy
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRewatchMarkPreset("other_date")}
-                    className={`px-3 py-2 rounded-xl text-xs font-black whitespace-nowrap transition ${
-                      rewatchMarkPreset === "other_date"
-                        ? "bg-purple-500/15 text-purple-100"
-                        : `${GLASS_CONTROL} text-white/70 hover:bg-white/10`
-                    }`}
-                  >
-                    Otra fecha
-                  </button>
+              {/* En móvil sus dos hijos son celdas de la rejilla de arriba. */}
+              <div className="contents sm:flex sm:items-center">
+                {/* Mismo control segmentado que Lista / Tabla de la barra. */}
+                <div className={`flex h-9 shrink-0 gap-1 rounded-xl ${PAGE_CONTROL} p-1 sm:h-11 sm:rounded-2xl`}>
+                  {[
+                    { id: "today", label: "Hoy" },
+                    { id: "other_date", label: "Otra fecha" },
+                  ].map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setRewatchMarkPreset(option.id)}
+                      aria-pressed={rewatchMarkPreset === option.id}
+                      className={`h-full whitespace-nowrap rounded-lg px-2.5 text-xs font-semibold transition-all sm:rounded-xl sm:px-3.5 sm:text-sm ${
+                        rewatchMarkPreset === option.id
+                          ? "bg-white/90 text-black shadow-lg"
+                          : "text-zinc-300 hover:bg-white/10 hover:text-white"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
                 </div>
 
-                {rewatchMarkPreset === "other_date" && (
-                  <input
-                    type="datetime-local"
-                    value={rewatchMarkOtherValue}
-                    onChange={(e) => setRewatchMarkOtherValue(e.target.value)}
-                    className={`w-full rounded-xl ${GLASS_CONTROL} px-3.5 py-2.5 text-sm text-white transition focus:ring-2 focus:ring-purple-300/50 focus:outline-none sm:w-[230px]`}
-                  />
-                )}
+                {/* Campo de fecha: se despliega en vez de aparecer de golpe.
+                    Anima el hueco que ocupa (en móvil, debajo: filas 0fr→1fr;
+                    desde sm, al lado: columnas 0fr→1fr, y el control de al lado
+                    se desplaza a la vez) y el campo entra con un desplazamiento
+                    corto. Sin opacity: aplanaría el cristal. El margen va DENTRO
+                    de lo que anima y el campo sigue montado plegado (invisible +
+                    inert) para poder animar la salida. */}
+                <div
+                  inert={rewatchMarkPreset !== "other_date" || undefined}
+                  className={`col-span-2 grid transition-[grid-template-rows,grid-template-columns,visibility] duration-[280ms] ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${
+                    rewatchMarkPreset === "other_date"
+                      ? "visible grid-rows-[1fr] sm:grid-cols-[1fr]"
+                      : "invisible grid-rows-[0fr] sm:grid-rows-[1fr] sm:grid-cols-[0fr]"
+                  }`}
+                >
+                  <div className="min-h-0 min-w-0 overflow-hidden">
+                    <div
+                      className={`pt-2 transition-transform duration-[280ms] ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none sm:w-[238px] sm:pl-2 sm:pt-0 ${
+                        rewatchMarkPreset === "other_date"
+                          ? "translate-x-0 translate-y-0"
+                          : "-translate-y-2 sm:-translate-x-3 sm:translate-y-0"
+                      }`}
+                    >
+                      <DateTimeField
+                        value={rewatchMarkOtherValue}
+                        onChange={setRewatchMarkOtherValue}
+                        title="Fecha de episodios"
+                        accent="purple"
+                        compact
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -2286,7 +2386,7 @@ export default function TraktEpisodesWatchedModal({
                     <p className="text-xs text-zinc-400 mt-1">
                       {addPlayMode === "rewatch"
                         ? "Crea un rewatch vacío. No marcará la serie completa y después podrás ir episodio a episodio."
-                        : "Añade un play completo. Si tiene fecha, también podrás usarlo como vista de rewatch."}
+                        : "Añade un visionado completo. Si tiene fecha, también podrás usarlo como vista de rewatch."}
                     </p>
                   </div>
                   <button
@@ -2319,7 +2419,7 @@ export default function TraktEpisodesWatchedModal({
                             : "bg-black/30 text-white/70 hover:bg-white/10"
                         }`}
                       >
-                        <div>Play completo</div>
+                        <div>Visionado completo</div>
                         <div className="text-[11px] font-medium text-zinc-500 mt-1">
                           Registra la serie como visionado completo.
                         </div>
@@ -2350,7 +2450,7 @@ export default function TraktEpisodesWatchedModal({
                   <div className="text-[11px] font-black text-zinc-400 uppercase tracking-wider">
                     {addPlayMode === "rewatch"
                       ? "Inicio del rewatch"
-                      : "Fecha del play"}
+                      : "Fecha del visionado"}
                   </div>
 
                   <div className="flex flex-wrap gap-2">
@@ -2360,14 +2460,14 @@ export default function TraktEpisodesWatchedModal({
                           { id: "other_date", label: "Otra fecha" },
                         ]
                       : [
-                          { id: "just_finished", label: "Just finished" },
+                          { id: "just_finished", label: "Recién terminado" },
                           {
                             id: "release_date",
-                            label: "Release date",
+                            label: "Fecha de estreno",
                             disabled: !showReleaseDate,
                           },
-                          { id: "unknown", label: "Unknown date" },
-                          { id: "other_date", label: "Other date" },
+                          { id: "unknown", label: "Fecha desconocida" },
+                          { id: "other_date", label: "Otra fecha" },
                         ]
                     ).map((opt) => (
                       <button
@@ -2384,7 +2484,7 @@ export default function TraktEpisodesWatchedModal({
                           ${opt.disabled ? "opacity-40 cursor-not-allowed" : ""}`}
                         aria-label={
                           opt.id === "release_date" && !showReleaseDate
-                            ? "Falta showReleaseDate"
+                            ? "Fecha de estreno no disponible"
                             : undefined
                         }
                       >
@@ -2398,12 +2498,11 @@ export default function TraktEpisodesWatchedModal({
                       <label className="block text-[11px] font-bold text-zinc-500 mb-2">
                         Elige fecha y hora
                       </label>
-                      <input
-                        type="datetime-local"
+                      <DateTimeField
                         value={addPlayOtherValue}
-                        onChange={(e) => setAddPlayOtherValue(e.target.value)}
+                        onChange={setAddPlayOtherValue}
                         disabled={addPlayBusy}
-                        className="w-full rounded-xl bg-black/30 px-4 py-3 text-sm text-white backdrop-blur-md transition focus:ring-2 focus:ring-emerald-300/50 focus:outline-none"
+                        title={addPlayMode === "rewatch" ? "Inicio del rewatch" : "Fecha del visionado"}
                       />
                     </div>
                   )}
@@ -2441,12 +2540,12 @@ export default function TraktEpisodesWatchedModal({
                       )}
                       {addPlayMode === "rewatch"
                         ? "Crear rewatch"
-                        : "Añadir play"}
+                        : "Añadir visionado"}
                     </button>
                   </div>
 
                   <div className="text-[11px] text-zinc-500 leading-relaxed">
-                    <span className="text-zinc-300 font-semibold">Tip:</span>{" "}
+                    <span className="text-zinc-300 font-semibold">Consejo:</span>{" "}
                     {addPlayMode === "rewatch"
                       ? "Crea el rewatch con la fecha más antigua que vayas a usar para sus episodios."
                       : "Si añades una fecha, aparecerá también como “Rewatch · fecha” en el selector de vista."}
