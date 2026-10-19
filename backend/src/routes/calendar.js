@@ -12,11 +12,12 @@ import {
   getCalendarShowDetails,
   buildUpcomingEpisodeEntries,
   mapLimit,
-  getShowEpisodesInRange,
+  getShowEpisodeSource,
+  showEpisodesInRange,
 } from '../dashboard/pools.js';
 import { loadLibrary, libraryBasisHash } from '../dashboard/library.js';
 import { getUserRecommendations } from '../dashboard/recommendations.js';
-import { parseCalendarRange } from '../dashboard/calendarRange.js';
+import { parseCalendarRange, parseCalendarRanges } from '../dashboard/calendarRange.js';
 
 const MAX_ITEMS = 30;
 // Series "en progreso" a considerar: las más recientes del historial. Evita
@@ -129,10 +130,75 @@ async function loadUserShowSources(userId) {
   return sourcesByShow;
 }
 
+// Episodios de cada rango pedido. Las series se leen UNA vez (ficha + temporada
+// de su próximo episodio) y luego se filtran por rango: el resultado de cada
+// rango es el mismo que pedirlo solo, pero sin repetir las lecturas por rango.
+//  - Anónimo: series de la base popular (pool cacheado).
+//  - Autenticado: las series del usuario, priorizadas por fuente.
+async function buildRangeItems(userId, ranges) {
+  let showIds;
+  let sourcesFor = () => [];
+  let concurrency;
+  if (!userId) {
+    const base = await getPool('calendar_episodes_v3', 'tv').catch(() => []);
+    showIds = [
+      ...new Set(base.map((e) => Number(e?.show?.tmdbId)).filter(Boolean)),
+    ].slice(0, 80);
+    concurrency = 6;
+  } else {
+    const sourcesByShow = await loadUserShowSources(userId);
+    showIds = [...sourcesByShow.entries()]
+      .sort(([, a], [, b]) => sourceRank(a) - sourceRank(b))
+      .map(([id]) => id)
+      .slice(0, MAX_USER_ENRICH);
+    sourcesFor = (id) => orderSources(sourcesByShow.get(id));
+    concurrency = 8;
+  }
+
+  const shows = await mapLimit(showIds, concurrency, (id) => getShowEpisodeSource(id));
+
+  return ranges.map(({ startMs, endMs }) =>
+    dedupeByShowNearest(
+      shows.flatMap((source, index) => {
+        const eps = showEpisodesInRange(source, { startMs, endMs });
+        if (!userId) return eps;
+        const src = sourcesFor(showIds[index]);
+        return eps.map((e) => ({ ...e, sources: src }));
+      }),
+      startMs,
+    )
+      .sort(byAirDate)
+      .slice(0, MAX_ITEMS),
+  );
+}
+
 export default async function calendarRoutes(fastify) {
   // GET /v1/calendar/episodes
   fastify.get('/episodes', async (req, reply) => {
     const userId = req.user?.id || null;
+
+    // Varios rangos (`ranges=AAAA-MM-DD:días,…`): la ventana del Calendario
+    // dedicado en una sola petición. Responde `{ ranges: [{ start, days,
+    // items }] }`, cada rango como si se hubiera pedido solo.
+    if (req.query?.ranges != null) {
+      const ranges = parseCalendarRanges(req.query.ranges);
+      try {
+        const lists = await buildRangeItems(userId, ranges);
+        reply.header('Cache-Control', userId ? 'private, no-store' : 'public, max-age=300');
+        return {
+          ranges: ranges.map((range, index) => ({
+            start: range.startDate,
+            days: range.days,
+            items: lists[index],
+          })),
+        };
+      } catch (err) {
+        req.log?.warn?.({ err }, 'calendar episodes ranges failed');
+        return {
+          ranges: ranges.map((range) => ({ start: range.startDate, days: range.days, items: [] })),
+        };
+      }
+    }
 
     // Rango explícito (`start`/`days`): usado por el Calendario dedicado para
     // navegar semanas/meses. Devuelve pronto, sin caer en la lógica de pool
@@ -140,50 +206,12 @@ export default async function calendarRoutes(fastify) {
     const hasRange = req.query?.start != null || req.query?.days != null;
     if (hasRange) {
       try {
-        const { startMs, endMs } = parseCalendarRange({
+        const range = parseCalendarRange({
           start: req.query.start,
           days: req.query.days,
         });
-
-        // Anónimo: series de la base popular (pool cacheado) dentro del rango.
-        if (!userId) {
-          const base = await getPool('calendar_episodes_v3', 'tv').catch(() => []);
-          const baseIds = [
-            ...new Set(base.map((e) => Number(e?.show?.tmdbId)).filter(Boolean)),
-          ].slice(0, 80);
-          const items = dedupeByShowNearest(
-            (
-              await mapLimit(baseIds, 6, (id) =>
-                getShowEpisodesInRange(id, { startMs, endMs }),
-              )
-            ).flat(),
-            startMs,
-          )
-            .sort(byAirDate)
-            .slice(0, MAX_ITEMS);
-          reply.header('Cache-Control', 'public, max-age=300');
-          return { items };
-        }
-
-        // Autenticado: las series del usuario dentro del rango, priorizadas por fuente.
-        const sourcesByShow = await loadUserShowSources(userId);
-        const userIds = [...sourcesByShow.entries()]
-          .sort(([, a], [, b]) => sourceRank(a) - sourceRank(b))
-          .map(([id]) => id)
-          .slice(0, MAX_USER_ENRICH);
-        const items = dedupeByShowNearest(
-          (
-            await mapLimit(userIds, 8, async (id) => {
-              const eps = await getShowEpisodesInRange(id, { startMs, endMs });
-              const src = orderSources(sourcesByShow.get(id));
-              return eps.map((e) => ({ ...e, sources: src }));
-            })
-          ).flat(),
-          startMs,
-        )
-          .sort(byAirDate)
-          .slice(0, MAX_ITEMS);
-        reply.header('Cache-Control', 'private, no-store');
+        const [items] = await buildRangeItems(userId, [range]);
+        reply.header('Cache-Control', userId ? 'private, no-store' : 'public, max-age=300');
         return { items };
       } catch (err) {
         req.log?.warn?.({ err }, 'calendar episodes range failed');

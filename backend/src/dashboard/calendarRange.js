@@ -31,3 +31,22 @@ export function withinRange(airDate, startMs, endMs) {
   if (t == null) return false;
   return t >= startMs && t <= endMs;
 }
+
+// Varios rangos en una petición (`?ranges=2026-10-01:62,2026-12-01:62`): el
+// Calendario pide su ventana a trozos de 62 días y, uno por petición, el backend
+// repetía en cada uno la lectura de todas las series. Cada trozo se acota igual
+// que un `start`/`days` suelto. Como mucho MAX_RANGES (los 12 trozos de la
+// ventana más larga y el mes del panel lateral).
+export const MAX_RANGES = 16;
+
+export function parseCalendarRanges(raw) {
+  return String(raw || '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .slice(0, MAX_RANGES)
+    .map((part) => {
+      const [start, days] = part.split(':');
+      return parseCalendarRange({ start, days });
+    });
+}

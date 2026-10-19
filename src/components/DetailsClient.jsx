@@ -355,6 +355,8 @@ import {
   dedupeStreamingProviders,
 } from "@/lib/streaming/providers";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
+import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
+import { useLadderListPreviews } from "@/lib/lists/useLadderListPreviews";
 
 
 // ---------------------------------------------------------------------------
@@ -1101,6 +1103,19 @@ export default function DetailsClient({
     return cookie.includes("showverse_access_token=") ||
            cookie.includes("backend_access_token=") ||
            cookie.includes("access_token=");
+  });
+  // Pósters de Recomendaciones (y de su vista lateral) con la escalera de idioma
+  // de toda la app, por el lote de /api/tmdb/artwork; el de TMDb llega en
+  // español. Con el tipo de la ficha si TMDb no trae `media_type`.
+  const typedRecommendations = useMemo(
+    () =>
+      (Array.isArray(recommendations) ? recommendations : []).map((rec) =>
+        rec?.media_type ? rec : { ...rec, media_type: type === "tv" ? "tv" : "movie" },
+      ),
+    [recommendations, type],
+  );
+  const ladderRecommendations = useEnglishPosterItems(typedRecommendations, true, {
+    holdOriginalPosters: true,
   });
   const recommendationViewerItems = useMemo(
     () =>
@@ -4584,7 +4599,8 @@ export default function DetailsClient({
   }, [initialLists]);
   const [tLists, setTLists] = useState(() => restoredValue(backSnapshot, "tLists", () => initialListsState));
   const [expandedTitleLists, setExpandedTitleLists] = useState(false);
-  const titleListItems = Array.isArray(tLists.items) ? tLists.items : [];
+  // Portadas de las tarjetas con la escalera de idioma (lote de /api/tmdb/artwork).
+  const titleListItems = useLadderListPreviews(tLists.items);
   const visibleTitleLists = expandedTitleLists ? titleListItems : titleListItems.slice(0, 6);
   const hiddenTitleListsCount = Math.max(0, titleListItems.length - 6);
 
@@ -6362,6 +6378,10 @@ export default function DetailsClient({
 
   const [collectionData, setCollectionData] = useState(() => restoredValue(backSnapshot, "collectionData", null));
   const [collectionLoading, setCollectionLoading] = useState(() => restoredValue(backSnapshot, "collectionLoading", false));
+  // Pósters de la saga con la escalera de idioma (como Recomendaciones).
+  const ladderCollectionItems = useEnglishPosterItems(collectionData?.items, true, {
+    holdOriginalPosters: true,
+  });
   const collectionViewerItems = useMemo(
     () =>
       (Array.isArray(collectionData?.items) ? collectionData.items : []).map(
@@ -9488,6 +9508,7 @@ export default function DetailsClient({
           const totalEp = Number(tmdbSeason?.episode_count || 0) || null;
           return {
             key: sn,
+            showId: id,
             seasonNumber: sn,
             seasonId: tmdbSeason?.id ?? null,
             name: tmdbSeason?.name || null,
@@ -9527,6 +9548,7 @@ export default function DetailsClient({
     ? [
         {
           key: 0,
+          showId: id,
           seasonNumber: 0,
           seasonId: specialSeason?.id ?? null,
           name: "Especiales",
@@ -9562,11 +9584,11 @@ export default function DetailsClient({
     tmdbId: id,
     cast: sheetCastForUI,
     creators: type === "tv" ? tvCreators : [],
-    recommendations,
+    recommendations: ladderRecommendations,
     collection: {
       id: collectionId,
       name: collectionData?.collection?.name || collectionData?.name || null,
-      items: collectionData?.items,
+      items: collectionData?.items ? ladderCollectionItems : collectionData?.items,
     },
     awards: awardItems,
     images: {
@@ -9603,7 +9625,7 @@ export default function DetailsClient({
       canLike: authenticated,
     },
     lists: {
-      state: tLists,
+      state: { ...tLists, items: titleListItems },
       onLoadMore: () => setTLists((p) => ({ ...p, page: (p.page || 1) + 1 })),
     },
   };
@@ -11254,7 +11276,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         }}
                         className="pb-8 !overflow-visible"
                       >
-                        {recommendations.slice(0, 15).map((rec) => {
+                        {ladderRecommendations.slice(0, 15).map((rec) => {
                           const recTitle = rec.title || rec.name;
                           const recType =
                             rec.media_type === "movie" ||
@@ -11322,19 +11344,23 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                 }
                               >
                                 <div className="aspect-[2/3] overflow-hidden relative">
-                                  <OptimizedImage
-                                    src={
-                                      rec.poster_path
-                                        ? `https://image.tmdb.org/t/p/w342${rec.poster_path}`
-                                        : "/placeholder.png"
-                                    }
-                                    srcSet={tmdbSrcSet(rec.poster_path)}
-                                    alt={recTitle}
-                                    loading="lazy"
-                                    decoding="async"
-                                    sizes={DETAILS_POSTER_ROW_SIZES}
-                                    className={recImageClass}
-                                  />
+                                  {/* Mientras llega el de la escalera de
+                                      idioma, solo el fondo de la tarjeta. */}
+                                  {rec._englishPosterPending ? null : (
+                                    <OptimizedImage
+                                      src={
+                                        rec.poster_path
+                                          ? `https://image.tmdb.org/t/p/w342${rec.poster_path}`
+                                          : "/placeholder.png"
+                                      }
+                                      srcSet={tmdbSrcSet(rec.poster_path)}
+                                      alt={recTitle}
+                                      loading="lazy"
+                                      decoding="async"
+                                      sizes={DETAILS_POSTER_ROW_SIZES}
+                                      className={recImageClass}
+                                    />
+                                  )}
                                   <RecommendationHoverIndicator
                                     favorite={recIsFavorite}
                                     watchlist={recIsWatchlist}
@@ -11387,7 +11413,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         }}
                         className="pb-8"
                       >
-                        {collectionData.items.map((m) => {
+                        {ladderCollectionItems.map((m) => {
                           const colAccountState =
                             recAccountStates[`movie:${m.id}`] || null;
                           const colViewerState =
@@ -11453,7 +11479,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       loading="lazy"
                                       decoding="async"
                                     />
-                                  ) : (
+                                  ) : m._englishPosterPending ? null : (
                                     <div className="w-full h-full bg-neutral-700 flex items-center justify-center text-neutral-500">
                                       <ImageOff className="w-10 h-10 opacity-60" />
                                     </div>
@@ -12901,6 +12927,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               const list = row?.list || row || {};
                               const user = row?.user || list?.user || {};
                               const previews = row?.previewPosters || [];
+                              const previewPending = Boolean(row?._previewPending);
 
                               const name = list?.name || "Lista";
                               const itemCount = Number(
@@ -12949,7 +12976,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       <div className="h-full w-full flex items-center justify-center overflow-visible">
                                         <PosterStack posters={previews} />
                                       </div>
-                                    ) : (
+                                    ) : previewPending ? null : (
                                       <div className="flex h-full items-center justify-center opacity-10">
                                         <ListVideo className="h-20 w-20" />
                                       </div>

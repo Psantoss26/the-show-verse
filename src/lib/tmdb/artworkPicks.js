@@ -103,9 +103,31 @@ export function pickListArtwork(images, { originalLanguage } = {}) {
   };
 }
 
+// Póster de una TEMPORADA (tarjetas de «Temporadas» de la ficha), con la misma
+// escalera que el de los títulos. Su galería de TMDb solo trae pósters.
+export function pickSeasonArtwork(images, { originalLanguage } = {}) {
+  if (!images) return null;
+  return { poster: pickLadderPoster(images.posters || [], { originalLanguage })?.file_path || null };
+}
+
 /** Normaliza la clave de un título: "movie:603" | "tv:1399" (o null). */
 export function artworkItemKey(mediaType, id) {
   const numeric = Number(id);
   if (!Number.isInteger(numeric) || numeric <= 0) return null;
   return `${mediaType === "tv" ? "tv" : "movie"}:${numeric}`;
+}
+
+/** Clave de una temporada: "season:1396:2" (0 = especiales; o null). */
+export function seasonArtworkKey(showId, seasonNumber) {
+  const show = Number(showId);
+  const season = Number(seasonNumber);
+  if (!Number.isInteger(show) || show <= 0) return null;
+  if (!Number.isInteger(season) || season < 0) return null;
+  return `season:${show}:${season}`;
+}
+
+/** Normaliza cualquier clave del lote (título o temporada), o null. */
+export function normalizeArtworkKey(raw) {
+  const [kind, id, season] = String(raw).split(":");
+  return kind === "season" ? seasonArtworkKey(id, season) : artworkItemKey(kind, id);
 }

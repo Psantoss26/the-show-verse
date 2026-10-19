@@ -22,6 +22,16 @@ function emptyItems() {
   return NextResponse.json({ items: [] });
 }
 
+// Con `ranges=` (varios trozos en una petición) el backend responde
+// `{ ranges: [...] }`; sin él, `{ items }`. Se reenvía la forma que toque. Un
+// backend que aún no entienda `ranges` contesta `{ items }` y el cliente cae a
+// pedir los trozos uno a uno.
+function pickPayload(json) {
+  if (Array.isArray(json?.ranges)) return { ranges: json.ranges };
+  if (Array.isArray(json?.items)) return { items: json.items };
+  return null;
+}
+
 export async function GET(request) {
   const baseUrl = getBackendBaseUrl();
   if (!baseUrl) return emptyItems();
@@ -33,8 +43,9 @@ export async function GET(request) {
     // Con sesión → endpoint autenticado (prioriza las series del usuario).
     if (hasBackendCredentials(request)) {
       const backend = await backendFetchJson(request, path);
-      if (backend.ok && Array.isArray(backend.json?.items)) {
-        const res = NextResponse.json({ items: backend.json.items });
+      const payload = backend.ok ? pickPayload(backend.json) : null;
+      if (payload) {
+        const res = NextResponse.json(payload);
         setBackendAuthCookies(res, backend, {
           secure: request.nextUrl.protocol === "https:",
         });
@@ -50,8 +61,9 @@ export async function GET(request) {
     });
     if (anon.ok) {
       const json = await anon.json().catch(() => null);
-      if (Array.isArray(json?.items)) {
-        const res = NextResponse.json({ items: json.items });
+      const payload = pickPayload(json);
+      if (payload) {
+        const res = NextResponse.json(payload);
         res.headers.set("Cache-Control", "public, max-age=300");
         return res;
       }

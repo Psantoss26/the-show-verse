@@ -17,11 +17,14 @@ import {
  * Sustituye solo en pantalla el póster de cada título por el de la escalera de
  * idioma (inglés → español → original → sin idioma). Las superficies que no deben revelar el artwork persistido
  * mientras carga pueden ocultarlo mediante `hideOriginalPosters`.
+ * `holdOriginalPosters` lo oculta SOLO mientras se resuelve
+ * (`_englishPosterPending`) y, si no hay póster de la escalera, deja el de
+ * TMDb del título (las filas de la ficha: el último escalón es ese).
  */
 export function useEnglishPosterItems(
   items,
   enabled = true,
-  { hideOriginalPosters = false } = {},
+  { hideOriginalPosters = false, holdOriginalPosters = false } = {},
 ) {
   const [resolvedPosters, setResolvedPosters] = useState(() => new Map());
   const itemKeys = useMemo(
@@ -98,8 +101,11 @@ export function useEnglishPosterItems(
           _englishPosterMissing: resolved,
         };
       }
+      if (holdOriginalPosters && enabled && key && !resolvedPosters.has(key) && !englishPosterCache.has(key)) {
+        return { ...item, posterPath: null, poster_path: null, _englishPosterPending: true };
+      }
       return item;
     }),
-    [items, resolvedPosters, hideOriginalPosters],
+    [items, resolvedPosters, hideOriginalPosters, holdOriginalPosters, enabled],
   );
 }

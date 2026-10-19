@@ -16,22 +16,34 @@ import OptimizedImage from "@/components/OptimizedImage";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 import { useAuth } from "@/context/AuthContext";
 import { readSeasonCustomPoster } from "@/lib/details/seasonArtwork";
+import { useSeasonLadderPoster } from "@/lib/tmdb/useSeasonLadderPoster";
 import { LIQUID_GLASS_CARD } from "@/lib/ui/liquidGlass";
 import { DETAILS_POSTER_ROW_SIZES, tmdbSrcSet } from "@/lib/tmdb/imageSrcSet";
 
 /**
- * Póster de la temporada: el elegido en «Editar portada», el de TMDb de la
- * temporada o, si no tiene, el de la serie. La portada elegida vive en las
+ * Póster de la temporada: el elegido en «Editar portada», el de la escalera de
+ * idioma (inglés → español → original → sin idioma; `pending` mientras llega),
+ * el de TMDb de la temporada o, si no tiene, el de la serie. La portada elegida vive en las
  * preferencias del navegador: el servidor no la conoce y pinta la automática,
  * así que se aplica tras montar (como la ficha de la temporada) para no romper
  * la hidratación.
  */
-export function useSeasonPoster({ seasonId = null, posterPath = null, fallbackPosterPath = null }) {
+export function useSeasonPoster({
+  showId = null,
+  seasonNumber = null,
+  seasonId = null,
+  posterPath = null,
+  fallbackPosterPath = null,
+}) {
   const { preferences } = useAuth();
   const [mounted, setMounted] = useState(false);
   useLayoutEffect(() => setMounted(true), []);
+  // El automático sigue la escalera de idioma de toda la app (con `showId`).
+  const ladder = useSeasonLadderPoster(showId, seasonNumber);
   const customPoster = mounted ? readSeasonCustomPoster(preferences, seasonId) : null;
-  return customPoster || posterPath || fallbackPosterPath || null;
+  if (customPoster) return { poster: customPoster, pending: false };
+  if (ladder.pending) return { poster: null, pending: true };
+  return { poster: ladder.poster || posterPath || fallbackPosterPath || null, pending: false };
 }
 
 // TMDb pone nombre propio a algunas temporadas («Libro uno: Agua»): se enseña
@@ -47,6 +59,8 @@ function seasonYear(airDate) {
 }
 
 export default function SeasonCard({
+  // Serie de la temporada: con ella el póster sigue la escalera de idioma.
+  showId = null,
   seasonNumber,
   seasonId = null,
   name = null,
@@ -67,7 +81,13 @@ export default function SeasonCard({
   // Vista lateral de temporadas (details/sectionSheet): tarjeta más pequeña.
   compact = false,
 }) {
-  const poster = useSeasonPoster({ seasonId, posterPath, fallbackPosterPath });
+  const { poster, pending: posterPending } = useSeasonPoster({
+    showId,
+    seasonNumber,
+    seasonId,
+    posterPath,
+    fallbackPosterPath,
+  });
   const isSpecials = Number(seasonNumber) === 0;
   const title = isSpecials ? "Especiales" : `Temporada ${seasonNumber}`;
   const subtitle = seasonSubtitle(name, title);
@@ -124,7 +144,7 @@ export default function SeasonCard({
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
             loading="lazy"
           />
-        ) : (
+        ) : posterPending ? null : (
           <span className="flex h-full w-full items-center justify-center text-4xl font-black text-white/15">
             {seasonNumber}
           </span>
@@ -220,6 +240,7 @@ export default function SeasonCard({
  * Reparto y Recomendaciones, y el progreso de vistos en el borde inferior.
  */
 export function SeasonPosterCard({
+  showId = null,
   seasonNumber,
   seasonId = null,
   name = null,
@@ -230,7 +251,13 @@ export function SeasonPosterCard({
   onClick,
   onPrefetch,
 }) {
-  const poster = useSeasonPoster({ seasonId, posterPath, fallbackPosterPath });
+  const { poster, pending: posterPending } = useSeasonPoster({
+    showId,
+    seasonNumber,
+    seasonId,
+    posterPath,
+    fallbackPosterPath,
+  });
   const isSpecials = Number(seasonNumber) === 0;
   const title = isSpecials ? "Especiales" : `Temporada ${seasonNumber}`;
   const subtitle = seasonSubtitle(name, title);
@@ -261,7 +288,7 @@ export function SeasonPosterCard({
             className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
             loading="lazy"
           />
-        ) : (
+        ) : posterPending ? null : (
           <span className="flex h-full w-full items-center justify-center bg-neutral-800 text-5xl font-black text-white/15">
             {seasonNumber}
           </span>

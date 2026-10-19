@@ -500,7 +500,14 @@ export async function getListsForTitle({ tmdbId, mediaType, limit = 12, viewerId
     return row;
   });
   const liked = await likedListIds(viewerId, refreshed.map((row) => row.id));
-  return refreshed.map((row) => listRowToApi({ ...row, likedByViewer: liked.has(row.id) }));
+  return refreshed.map((row) => {
+    const api = listRowToApi({ ...row, likedByViewer: liked.has(row.id) });
+    // Los títulos de la portada ({ tmdbId, mediaType, posterPath }): con ellos
+    // el cliente pinta sus pósters con la escalera de idioma de toda la app
+    // (los guardados son los de la importación, a menudo en español).
+    const items = previews.get(row.id);
+    return items?.length ? { ...api, previewItems: items } : api;
+  });
 }
 
 const SORTS = {

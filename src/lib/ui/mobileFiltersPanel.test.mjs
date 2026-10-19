@@ -9,7 +9,7 @@ const panel = read("components/ui/MobileFiltersPanel.jsx");
 // Todos los menús desplegables móviles comparten la MISMA animación.
 const PAGES = [
   "app/biblioteca/BibliotecaClient.jsx",
-  "app/calendar/page.jsx",
+  "app/calendar/CalendarClient.jsx",
   "app/continue-watching/ContinueWatchingClient.jsx",
   "app/dashboard/[section]/DashboardSectionClient.jsx",
   "app/favorites/FavoritesClient.jsx",

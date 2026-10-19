@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { artworkItemKey, pickListArtwork } from "@/lib/tmdb/artworkPicks";
+import { normalizeArtworkKey, pickListArtwork, pickSeasonArtwork } from "@/lib/tmdb/artworkPicks";
 
 // ARTE DE VARIOS TÍTULOS EN UNA PETICIÓN (POST { items: ["movie:603", …] }).
 //
@@ -15,6 +15,10 @@ import { artworkItemKey, pickListArtwork } from "@/lib/tmdb/artworkPicks";
 // Se pide la FICHA con sus imágenes (`append_to_response=images`, sin filtro
 // de idioma): trae el arte de todos los idiomas y `original_language`, que la
 // escalera necesita para su escalón «idioma original».
+//
+// También admite TEMPORADAS ("season:1396:2", tarjetas de «Temporadas» de la
+// ficha): su galería sin filtro de idioma más la ficha de la serie, que aporta
+// el idioma original (y es la misma petición cacheada que "tv:1396").
 
 const TMDB_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const MAX_ITEMS = 60;
@@ -36,9 +40,7 @@ async function limited(task) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function fetchTitleWithImages(key) {
-  const [mediaType, id] = key.split(":");
-  const url = `https://api.themoviedb.org/3/${mediaType}/${id}?api_key=${TMDB_KEY}&append_to_response=images`;
+async function fetchTmdbJson(url) {
   for (let attempt = 0; attempt < 4; attempt += 1) {
     const res = await limited(() => fetch(url, { cache: "force-cache", next: { revalidate: DAY } }));
     if (res.ok) return res.json();
@@ -47,6 +49,33 @@ async function fetchTitleWithImages(key) {
     await sleep(Number.isFinite(retryAfter) ? retryAfter * 1000 : 300 * 2 ** attempt);
   }
   return null;
+}
+
+// Compartida en vuelo: las temporadas de una serie llegan en el mismo lote y
+// cada una necesita la ficha de la serie (en frío, una sola petición a TMDb).
+const titlesInFlight = new Map();
+function fetchTitleWithImages(mediaType, id) {
+  const url = `https://api.themoviedb.org/3/${mediaType}/${id}?api_key=${TMDB_KEY}&append_to_response=images`;
+  const pending = titlesInFlight.get(url);
+  if (pending) return pending;
+  const promise = fetchTmdbJson(url).finally(() => titlesInFlight.delete(url));
+  titlesInFlight.set(url, promise);
+  return promise;
+}
+
+async function fetchPicks(key) {
+  const [kind, id, season] = key.split(":");
+  if (kind === "season") {
+    const [show, images] = await Promise.all([
+      fetchTitleWithImages("tv", id),
+      fetchTmdbJson(`https://api.themoviedb.org/3/tv/${id}/season/${season}/images?api_key=${TMDB_KEY}`),
+    ]);
+    return pickSeasonArtwork(images, { originalLanguage: show?.original_language });
+  }
+  const details = await fetchTitleWithImages(kind, id);
+  return pickListArtwork(details?.images, {
+    originalLanguage: details?.original_language,
+  });
 }
 
 // Elecciones ya resueltas, en memoria del proceso. La caché de datos de `fetch`
@@ -86,10 +115,7 @@ function resolvePicks(key) {
 
   const promise = (async () => {
     try {
-      const details = await fetchTitleWithImages(key);
-      const picks = pickListArtwork(details?.images, {
-        originalLanguage: details?.original_language,
-      });
+      const picks = await fetchPicks(key);
       if (picks) rememberPicks(key, picks);
       return picks;
     } catch {
@@ -108,10 +134,7 @@ export async function POST(request) {
   const keys = [
     ...new Set(
       (Array.isArray(body?.items) ? body.items : [])
-        .map((raw) => {
-          const [mediaType, id] = String(raw).split(":");
-          return artworkItemKey(mediaType, id);
-        })
+        .map(normalizeArtworkKey)
         .filter(Boolean),
     ),
   ].slice(0, MAX_ITEMS);

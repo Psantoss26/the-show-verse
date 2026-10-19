@@ -5,6 +5,7 @@ import {
   dedupeCards,
   withinCalendarWindow,
   buildUpcomingEpisodeEntry,
+  showEpisodesInRange,
   CALENDAR_PAST_DAYS,
   CALENDAR_AHEAD_DAYS,
 } from './pools.js';
@@ -52,4 +53,38 @@ test('buildUpcomingEpisodeEntry returns null without a valid next episode', () =
   assert.equal(buildUpcomingEpisodeEntry(show, null), null); // sin next episode
   assert.equal(buildUpcomingEpisodeEntry(show, { air_date: '2026-07-06' }), null); // sin season/number
   assert.equal(buildUpcomingEpisodeEntry(null, { air_date: '2026-07-06', season_number: 1, episode_number: 1 }), null);
+});
+
+// Una serie leída una vez (getShowEpisodeSource) sirve para cualquier rango:
+// el Calendario la filtra por cada trozo de su ventana (?ranges=).
+const episodeSource = {
+  show: { tmdbId: 7, title: 'Serie', posterPath: '/p.jpg', backdropPath: '/b.jpg' },
+  seasonNum: 2,
+  nextEp: { season_number: 2, episode_number: 3, air_date: '2026-10-20', name: 'Tres' },
+  episodes: [
+    { season_number: 2, episode_number: 1, air_date: '2026-10-06', name: 'Uno' },
+    { season_number: 2, episode_number: 2, air_date: '2026-10-13', name: 'Dos' },
+    { season_number: 2, episode_number: 3, air_date: '2026-10-20', name: 'Tres' },
+    { season_number: 2, episode_number: 4, air_date: '2026-12-01', name: 'Cuatro' },
+    { season_number: 2, episode_number: 5, air_date: null, name: 'Sin fecha' },
+  ],
+};
+const utc = (ymd) => Date.parse(`${ymd}T00:00:00Z`);
+
+test('showEpisodesInRange keeps only the episodes inside each range, sorted and capped', () => {
+  const october = showEpisodesInRange(episodeSource, { startMs: utc('2026-10-01'), endMs: utc('2026-10-31') });
+  assert.deepEqual(october.map((e) => e.episode.number), [1, 2, 3]);
+  assert.equal(october[0].id, 'tv:7:2:1');
+  const december = showEpisodesInRange(episodeSource, { startMs: utc('2026-12-01'), endMs: utc('2026-12-31') });
+  assert.deepEqual(december.map((e) => e.episode.number), [4]);
+  const capped = showEpisodesInRange(episodeSource, { startMs: utc('2026-10-01'), endMs: utc('2026-12-31'), max: 2 });
+  assert.deepEqual(capped.map((e) => e.episode.number), [1, 2]);
+});
+
+test('showEpisodesInRange falls back to next_episode_to_air when the season has nothing in range', () => {
+  const source = { ...episodeSource, episodes: [] };
+  const hit = showEpisodesInRange(source, { startMs: utc('2026-10-15'), endMs: utc('2026-10-25') });
+  assert.deepEqual(hit.map((e) => e.episode.number), [3]);
+  assert.deepEqual(showEpisodesInRange(source, { startMs: utc('2026-11-01'), endMs: utc('2026-11-30') }), []);
+  assert.deepEqual(showEpisodesInRange(null, { startMs: 0, endMs: 1 }), []);
 });

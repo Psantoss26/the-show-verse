@@ -308,7 +308,7 @@ export function ListRow({ row, onNavigate }) {
               <OptimizedImage src={src} alt="" className="h-full w-full object-cover" loading="lazy" decoding="async" />
             </span>
           ))
-        ) : (
+        ) : row?._previewPending ? null : (
           <ListVideo className="h-8 w-8 text-zinc-600" aria-hidden="true" />
         )}
       </span>
