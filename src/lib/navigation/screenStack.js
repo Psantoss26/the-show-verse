@@ -7,7 +7,21 @@
 //
 // Sin dependencias de React ni de Next (se testea con Node).
 
+import { PROFILE_SECTION_IDS } from "../../app/u/[username]/profileRoutes.js";
+
 export const MAX_SCREENS = 5;
+
+// Clave de pantalla de una URL. Casi siempre es la ruta, pero las secciones
+// del Perfil (/profile/…, /u/<usuario>/…) son UNA pantalla: su layout mantiene
+// montado ProfileClient y solo cambia la sección. Con la ruta como clave cada
+// sección montaba un perfil nuevo y la cabecera, las tarjetas y el menú
+// repetían su entrada (parpadeo al cambiar de sección).
+export function screenKeyForPathname(pathname) {
+  const path = String(pathname || "/").replace(/\/+$/, "") || "/";
+  const match = /^(\/profile|\/u\/[^/]+)\/([^/]+)$/.exec(path);
+  if (match && PROFILE_SECTION_IDS.has(match[2])) return match[1];
+  return path;
+}
 
 function createScreen(state, key, kind) {
   return {

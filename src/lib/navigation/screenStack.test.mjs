@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { MAX_SCREENS, createScreenStack, navigateScreens } from "./screenStack.js";
+import {
+  MAX_SCREENS,
+  createScreenStack,
+  navigateScreens,
+  screenKeyForPathname,
+} from "./screenStack.js";
 
 const keys = (state) => state.screens.map((screen) => screen.key);
 const activeKey = (state) => state.screens[state.active].key;
@@ -67,4 +72,25 @@ test("tope de pantallas: se descarta la más antigua salvo la página de partida
   assert.equal(activeKey(state), `/details/movie/${MAX_SCREENS + 2}`);
   // Los ids siguen siendo únicos (son la `key` de React de cada pantalla).
   assert.equal(new Set(state.screens.map((screen) => screen.id)).size, state.screens.length);
+});
+
+test("las secciones del Perfil comparten pantalla; Ajustes y seguidores no", () => {
+  assert.equal(screenKeyForPathname("/profile"), "/profile");
+  assert.equal(screenKeyForPathname("/profile/level"), "/profile");
+  assert.equal(screenKeyForPathname("/profile/statistics/"), "/profile");
+  assert.equal(screenKeyForPathname("/profile/settings"), "/profile/settings");
+  assert.equal(screenKeyForPathname("/u/ana/watchlist"), "/u/ana");
+  assert.equal(screenKeyForPathname("/u/ana/followers"), "/u/ana/followers");
+  assert.equal(screenKeyForPathname("/details/tv/1"), "/details/tv/1");
+});
+
+test("cambiar de sección del Perfil no monta otra pantalla", () => {
+  let state = createScreenStack(screenKeyForPathname("/profile"), "page");
+  const profile = state.screens[0];
+  // OverlayRouteHost solo navega si la clave cambia: aquí no cambia.
+  assert.equal(screenKeyForPathname("/profile/level"), profile.key);
+  state = navigateScreens(state, "/details/tv/1", "overlay", false);
+  state = navigateScreens(state, screenKeyForPathname("/profile/level"), "page", true);
+  assert.equal(state.screens[state.active], profile);
+  assert.equal(state.revealed, true);
 });
