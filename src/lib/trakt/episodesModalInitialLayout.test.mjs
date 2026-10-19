@@ -103,7 +103,7 @@ test("el desplegable conserva el formato y color morado de los rewatch", () => {
 test("el cuadro de fecha de rewatch no muestra borde", () => {
   assert.match(
     modalSource,
-    /rounded-2xl bg-purple-500\/5 px-3\.5 py-3 flex flex-col gap-3 lg:flex-row/,
+    /items-center gap-x-2 rounded-2xl bg-purple-500\/5 py-2 pl-3 pr-2 sm:flex sm:flex-col/,
   );
   assert.doesNotMatch(
     modalSource,

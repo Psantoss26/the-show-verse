@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const source = await readFile(
-  new URL("../../components/trakt/TraktWatchedModal.jsx", import.meta.url),
+  new URL("../../components/trakt/CalendarPickerModal.jsx", import.meta.url),
   "utf8",
 );
 
