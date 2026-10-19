@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { artworkItemKey, pickBestBackdropByLangResVotes, pickListArtwork } from "./artworkPicks.js";
+import {
+  artworkItemKey,
+  normalizeArtworkKey,
+  pickBestBackdropByLangResVotes,
+  pickListArtwork,
+  pickSeasonArtwork,
+  seasonArtworkKey,
+} from "./artworkPicks.js";
 
 test("claves de título normalizadas", () => {
   assert.equal(artworkItemKey("tv", "1399"), "tv:1399");
@@ -78,4 +85,25 @@ test("backdrop de los dashboards: ≥1200 px, escalera de idioma y resolución p
   assert.equal(picks.dashboardBackdropAlt, pickBestBackdropByLangResVotes([es, small, en4k, enHd], { offset: 1 })?.file_path);
   // Sin inglés, el español.
   assert.equal(pickListArtwork({ posters: [], backdrops: [es] }).dashboardBackdrop, "/es.jpg");
+});
+
+test("claves de temporada y normalización de cualquier clave del lote", () => {
+  assert.equal(seasonArtworkKey("1396", "2"), "season:1396:2");
+  assert.equal(seasonArtworkKey(1396, 0), "season:1396:0");
+  assert.equal(seasonArtworkKey(1396, -1), null);
+  assert.equal(seasonArtworkKey("x", 1), null);
+  assert.equal(normalizeArtworkKey("season:1396:3"), "season:1396:3");
+  assert.equal(normalizeArtworkKey("tv:1396"), "tv:1396");
+  assert.equal(normalizeArtworkKey("season:1396:x"), null);
+});
+
+test("póster de temporada con la escalera de idioma", () => {
+  const es = { file_path: "/s-es.jpg", iso_639_1: "es" };
+  const en = { file_path: "/s-en.jpg", iso_639_1: "en" };
+  const none = { file_path: "/s-none.jpg", iso_639_1: null };
+  assert.equal(pickSeasonArtwork(null), null);
+  assert.deepEqual(pickSeasonArtwork({ posters: [es, none, en] }), { poster: "/s-en.jpg" });
+  assert.deepEqual(pickSeasonArtwork({ posters: [none, es] }), { poster: "/s-es.jpg" });
+  assert.deepEqual(pickSeasonArtwork({ posters: [none] }), { poster: "/s-none.jpg" });
+  assert.deepEqual(pickSeasonArtwork({ posters: [] }), { poster: null });
 });

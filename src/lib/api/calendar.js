@@ -4,7 +4,7 @@
 // día: el 1 de agosto a las 00:00 locales se envía como "2026-07-31". La ventana
 // arrancaba un día antes de la cuenta y colaba el mes anterior como primer grupo
 // del listado.
-function ymd(date) {
+export function ymd(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
@@ -26,13 +26,16 @@ function ymd(date) {
 // aparecen como un grupo suelto de un mes que nadie ha pedido.
 const spanishReleasesCache = new Map();
 
-async function fetchSpanishReleases(movieId) {
+// `fetchInit`: opciones de `fetch` del que llama. En el servidor (página del
+// Calendario) van con la caché de datos de Next; en el navegador, sin nada.
+async function fetchSpanishReleases(movieId, fetchInit) {
   if (spanishReleasesCache.has(movieId)) return spanishReleasesCache.get(movieId);
 
   let dates = [];
   try {
     const res = await fetch(
       `https://api.themoviedb.org/3/movie/${movieId}/release_dates?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`,
+      fetchInit,
     );
     if (res.ok) {
       const json = await res.json();
@@ -50,7 +53,7 @@ async function fetchSpanishReleases(movieId) {
   return dates;
 }
 
-async function applySpanishReleaseDates(movies, start, end) {
+async function applySpanishReleaseDates(movies, start, end, fetchInit) {
   const inRange = (date) => date && date >= start && date <= end;
   const needsFix = movies.filter((movie) => !inRange(movie?.release_date));
   if (needsFix.length === 0) return movies;
@@ -62,7 +65,7 @@ async function applySpanishReleaseDates(movies, start, end) {
   for (let i = 0; i < needsFix.length; i += batchSize) {
     const batch = needsFix.slice(i, i + batchSize);
     const results = await Promise.all(
-      batch.map((movie) => fetchSpanishReleases(movie.id)),
+      batch.map((movie) => fetchSpanishReleases(movie.id, fetchInit)),
     );
     batch.forEach((movie, index) => {
       resolved.set(movie.id, results[index].find(inRange) || null);
@@ -80,7 +83,7 @@ async function applySpanishReleaseDates(movies, start, end) {
   }, []);
 }
 
-export async function getMoviesByDateRange(startDate, endDate) {
+export async function getMoviesByDateRange(startDate, endDate, { fetchInit } = {}) {
   const formattedStart = ymd(startDate);
   const formattedEnd = ymd(endDate);
   let page = 1;
@@ -90,7 +93,7 @@ export async function getMoviesByDateRange(startDate, endDate) {
   do {
     const url = `https://api.themoviedb.org/3/discover/movie?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}&language=es-ES&sort_by=release_date.asc&release_date.gte=${formattedStart}&release_date.lte=${formattedEnd}&region=ES&page=${page}`;
 
-    const res = await fetch(url);
+    const res = await fetch(url, fetchInit);
     const data = await res.json();
 
     if (data?.results?.length > 0) {
@@ -101,7 +104,7 @@ export async function getMoviesByDateRange(startDate, endDate) {
     page++;
   } while (page <= totalPages && page <= 5); // Limitar a 5 páginas para rangos amplios
 
-  return applySpanishReleaseDates(movies, formattedStart, formattedEnd);
+  return applySpanishReleaseDates(movies, formattedStart, formattedEnd, fetchInit);
 }
 
 // Una consulta a `discover` se corta en 5 páginas (100 películas) y viene
@@ -109,7 +112,7 @@ export async function getMoviesByDateRange(startDate, endDate) {
 // agotan dentro del primero y del segundo no llega nada: agrupar por año
 // enseñaba un único grupo. Partiendo la ventana por años naturales, cada año
 // gasta su propio presupuesto de páginas.
-export async function getMoviesByWindow(startDate, endDate) {
+export async function getMoviesByWindow(startDate, endDate, options = {}) {
   const segments = [];
   let cursor = new Date(startDate);
   while (cursor <= endDate) {
@@ -120,7 +123,7 @@ export async function getMoviesByWindow(startDate, endDate) {
   }
 
   const results = await Promise.all(
-    segments.map(([from, to]) => getMoviesByDateRange(from, to)),
+    segments.map(([from, to]) => getMoviesByDateRange(from, to, options)),
   );
 
   // Un estreno puede aparecer en dos segmentos si tiene fechas en ambos.
@@ -139,7 +142,8 @@ export async function getMoviesByWindow(startDate, endDate) {
 const MAX_DAYS_PER_REQUEST = 62;
 const MAX_CHUNKS = 12;
 
-export async function getTrackedEpisodesByWindow(startDate, endDate) {
+// Trozos de la ventana [startDate, endDate]: [inicio, días] de hasta 62 días.
+export function episodeWindowChunks(startDate, endDate) {
   const dayMs = 24 * 60 * 60 * 1000;
   const totalDays =
     Math.max(0, Math.round((endDate.getTime() - startDate.getTime()) / dayMs)) +
@@ -149,19 +153,17 @@ export async function getTrackedEpisodesByWindow(startDate, endDate) {
     Math.ceil(totalDays / MAX_DAYS_PER_REQUEST),
   );
 
-  const chunks = Array.from({ length: chunkCount }, (_, index) => {
+  return Array.from({ length: chunkCount }, (_, index) => {
     const chunkStart = new Date(
       startDate.getTime() + index * MAX_DAYS_PER_REQUEST * dayMs,
     );
     const remaining = totalDays - index * MAX_DAYS_PER_REQUEST;
-    return getTrackedEpisodesByDateRange(
-      chunkStart,
-      Math.min(MAX_DAYS_PER_REQUEST, remaining),
-    );
+    return [chunkStart, Math.min(MAX_DAYS_PER_REQUEST, remaining)];
   });
+}
 
-  const results = await Promise.all(chunks);
-
+// Episodios de los trozos que ya han llegado ([{ items }], en orden), juntos.
+export function mergeEpisodeChunks(results) {
   // Un episodio puede repetirse si dos trozos se rozan: gana el primero.
   const byId = new Map();
   for (const result of results) {
@@ -170,8 +172,52 @@ export async function getTrackedEpisodesByWindow(startDate, endDate) {
       if (!byId.has(key)) byId.set(key, item);
     }
   }
-
   return { connected: true, items: [...byId.values()] };
+}
+
+// `ranges=AAAA-MM-DD:días,…`: varios trozos en UNA petición. El backend lee
+// cada serie una vez para todos (antes, una por trozo, y atendía los trozos en
+// fila: ~0,6-1,9 s la ventana de 12 meses frente a ~0,2 s).
+export function episodeRangesParam(chunks) {
+  return chunks.map(([start, days]) => `${ymd(start)}:${days}`).join(",");
+}
+
+// Todos los trozos por la ruta de la API en una petición. `null` si el backend
+// no entiende `ranges` (aún sin desplegar): el que llama los pide uno a uno.
+export async function getTrackedEpisodesByRanges(chunks) {
+  const params = new URLSearchParams({ ranges: episodeRangesParam(chunks) });
+  const res = await fetch(`/api/calendar/episodes-range?${params.toString()}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  return mapEpisodeRanges(await res.json(), chunks.length);
+}
+
+// `{ ranges: [{ items }] }` → [{ items }] con la forma de la página (o null).
+export function mapEpisodeRanges(json, expected) {
+  const ranges = Array.isArray(json?.ranges) ? json.ranges : null;
+  if (!ranges || ranges.length !== expected) return null;
+  return ranges.map((range) => mapEpisodeRangeItems(range));
+}
+
+// `fetchRanges(chunks)` pide todos los trozos de una vez; por defecto, la ruta
+// de la API desde el navegador. La página del Calendario pasa la suya para
+// pedirlo en el servidor directamente al backend. Si no puede (null), se
+// piden uno a uno con `fetchRange(start, days)`.
+export async function getTrackedEpisodesByWindow(
+  startDate,
+  endDate,
+  {
+    fetchRanges = getTrackedEpisodesByRanges,
+    fetchRange = getTrackedEpisodesByDateRange,
+  } = {},
+) {
+  const chunks = episodeWindowChunks(startDate, endDate);
+  const batched = await fetchRanges(chunks).catch(() => null);
+  if (batched) return mergeEpisodeChunks(batched);
+  return mergeEpisodeChunks(
+    await Promise.all(chunks.map(([start, days]) => fetchRange(start, days))),
+  );
 }
 
 export async function getTrackedEpisodesByDateRange(startDate, days) {
@@ -187,8 +233,12 @@ export async function getTrackedEpisodesByDateRange(startDate, days) {
 
   if (!res.ok) return { connected: true, items: [] };
 
-  const json = await res.json();
-  const items = (json.items || []).map((e) => ({
+  return mapEpisodeRangeItems(await res.json());
+}
+
+// Respuesta de /v1/calendar/episodes (o de su ruta proxy) → forma de la página.
+export function mapEpisodeRangeItems(json) {
+  const items = (json?.items || []).map((e) => ({
     id: e.id,
     type: "episode",
     source: e.sources || [],
@@ -207,4 +257,18 @@ export async function getTrackedEpisodesByDateRange(startDate, days) {
   }));
 
   return { connected: true, items };
+}
+
+// Fecha de emisión → Date. El backend la da como día sin hora ("2026-10-01"):
+// `new Date("2026-10-01")` es la medianoche UTC, que al oeste de Greenwich cae
+// el día anterior y, además, cambia según la zona horaria de quien la pinta
+// (servidor y navegador no coincidirían al hidratar). Como día que es, se toma
+// a medianoche LOCAL, igual que las fechas de estreno.
+export function parseAirDate(value) {
+  if (!value) return null;
+  const raw = String(value);
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(raw)
+    ? new Date(`${raw}T00:00:00`)
+    : new Date(raw);
+  return Number.isFinite(date.getTime()) ? date : null;
 }

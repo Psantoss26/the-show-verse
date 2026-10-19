@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCalendarRange, withinRange } from './calendarRange.js';
+import { MAX_RANGES, parseCalendarRange, parseCalendarRanges, withinRange } from './calendarRange.js';
 
 test('parses a valid range', () => {
   const r = parseCalendarRange({ start: '2026-07-06', days: 7 });
@@ -31,4 +31,21 @@ test('withinRange is inclusive on both ends', () => {
   assert.equal(withinRange('2026-07-05', startMs, endMs), false);
   assert.equal(withinRange('2026-07-13', startMs, endMs), false);
   assert.equal(withinRange(null, startMs, endMs), false);
+});
+
+test('parseCalendarRanges parses each start:days, clamped like a single range', () => {
+  const ranges = parseCalendarRanges('2026-10-01:62, 2026-12-01:999,,2027-02-01:0');
+  assert.deepEqual(ranges.map((r) => [r.startDate, r.days]), [
+    ['2026-10-01', 62],
+    ['2026-12-01', 62],
+    ['2027-02-01', 1],
+  ]);
+  assert.deepEqual(ranges[0], parseCalendarRange({ start: '2026-10-01', days: 62 }));
+});
+
+test('parseCalendarRanges caps the number of ranges and tolerates empty input', () => {
+  const many = Array.from({ length: MAX_RANGES + 4 }, () => '2026-10-01:7').join(',');
+  assert.equal(parseCalendarRanges(many).length, MAX_RANGES);
+  assert.deepEqual(parseCalendarRanges(''), []);
+  assert.deepEqual(parseCalendarRanges(undefined), []);
 });

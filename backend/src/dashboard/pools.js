@@ -419,9 +419,13 @@ export async function getCalendarShowDetails(tmdbId) {
 // Próximos episodios de una serie DENTRO de un rango arbitrario (para /calendar,
 // vistas Día/Semana/Mes). No usa el caché de ventana fija de getCalendarShowDetails
 // porque el rango es variable; sí reutiliza tmdbDetails/tmdbSeason.
-export async function getShowEpisodesInRange(tmdbId, { startMs, endMs, max = 6 }) {
+// Lo que hace falta de una serie para sacar sus episodios de CUALQUIER rango:
+// la ficha y la temporada de su próximo episodio (dos lecturas de TMDb). Se
+// separa del filtrado para que el Calendario, que pide varios rangos a la vez
+// (?ranges=), lea cada serie UNA vez y no una por rango.
+export async function getShowEpisodeSource(tmdbId) {
   const details = await tmdbDetails('tv', tmdbId);
-  if (!details) return [];
+  if (!details) return null;
   const show = {
     tmdbId: Number(tmdbId),
     title: details.name || null,
@@ -430,11 +434,21 @@ export async function getShowEpisodesInRange(tmdbId, { startMs, endMs, max = 6 }
   };
   const nextEp = details.next_episode_to_air || null;
   const seasonNum = Number(nextEp?.season_number);
-  const out = [];
+  let episodes = [];
   if (Number.isFinite(seasonNum)) {
     const season = await tmdbSeason(tmdbId, seasonNum);
-    const eps = Array.isArray(season?.episodes) ? season.episodes : [];
-    for (const e of eps) {
+    episodes = Array.isArray(season?.episodes) ? season.episodes : [];
+  }
+  return { show, nextEp, seasonNum, episodes };
+}
+
+// Episodios de la serie (de getShowEpisodeSource) dentro de [startMs, endMs].
+export function showEpisodesInRange(source, { startMs, endMs, max = 6 }) {
+  if (!source) return [];
+  const { show, nextEp, seasonNum, episodes } = source;
+  const out = [];
+  if (Number.isFinite(seasonNum)) {
+    for (const e of episodes) {
       if (!e?.air_date || !withinRange(e.air_date, startMs, endMs)) continue;
       const entry = buildUpcomingEpisodeEntry(show, {
         season_number: Number.isFinite(Number(e.season_number)) ? Number(e.season_number) : seasonNum,
@@ -451,6 +465,10 @@ export async function getShowEpisodesInRange(tmdbId, { startMs, endMs, max = 6 }
   return out
     .sort((a, b) => (a.episode.airDate || '').localeCompare(b.episode.airDate || ''))
     .slice(0, max);
+}
+
+export async function getShowEpisodesInRange(tmdbId, range) {
+  return showEpisodesInRange(await getShowEpisodeSource(tmdbId), range);
 }
 
 // Construye una entrada de episodio próximo (forma consumida por el cliente).

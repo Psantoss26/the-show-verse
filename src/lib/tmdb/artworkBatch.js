@@ -8,6 +8,10 @@
 // Devuelve las elecciones { poster, previewPoster, previewBackdrop } o
 // `undefined` si no se pudo consultar (el llamador cae a pedir /images él
 // mismo). Solo se recuerda lo que llega bien.
+//
+// Las temporadas ("season:1396:2") van por el mismo lote: solo traen `poster`.
+
+import { artworkItemKey, seasonArtworkKey } from "./artworkPicks.js";
 
 const BATCH_WINDOW_MS = 16;
 // Lo que el servidor resuelve de una tanda (su MAX_CONCURRENT): cada POST
@@ -19,12 +23,6 @@ const MAX_PER_REQUEST = 16;
 const resolved = new Map(); // "movie:603" -> picks
 const waiting = new Map(); // "movie:603" -> [resolve, …]
 let timer = 0;
-
-function keyOf(mediaType, id) {
-  const numeric = Number(id);
-  if (!Number.isInteger(numeric) || numeric <= 0) return null;
-  return `${mediaType === "tv" ? "tv" : "movie"}:${numeric}`;
-}
 
 async function send(keys) {
   try {
@@ -60,15 +58,11 @@ function flush() {
 }
 const inFlight = new Set();
 
-/** Lo ya resuelto de un título, sin esperar (undefined si aún no se tiene). */
-export function peekListArtwork(mediaType, id) {
-  const key = keyOf(mediaType, id);
+function peekKey(key) {
   return key ? resolved.get(key) : undefined;
 }
 
-/** Elecciones de arte de un título (lote compartido con quien pida a la vez). */
-export function requestListArtwork(mediaType, id) {
-  const key = keyOf(mediaType, id);
+function requestKey(key) {
   if (!key) return Promise.resolve(undefined);
   if (resolved.has(key)) return Promise.resolve(resolved.get(key));
   return new Promise((resolve) => {
@@ -77,4 +71,24 @@ export function requestListArtwork(mediaType, id) {
     else waiting.set(key, [resolve]);
     if (!inFlight.has(key) && !timer) timer = setTimeout(flush, BATCH_WINDOW_MS);
   });
+}
+
+/** Lo ya resuelto de un título, sin esperar (undefined si aún no se tiene). */
+export function peekListArtwork(mediaType, id) {
+  return peekKey(artworkItemKey(mediaType, id));
+}
+
+/** Elecciones de arte de un título (lote compartido con quien pida a la vez). */
+export function requestListArtwork(mediaType, id) {
+  return requestKey(artworkItemKey(mediaType, id));
+}
+
+/** Lo ya resuelto de una temporada ({ poster }), sin esperar. */
+export function peekSeasonArtwork(showId, seasonNumber) {
+  return peekKey(seasonArtworkKey(showId, seasonNumber));
+}
+
+/** Póster de una temporada con la escalera de idioma ({ poster } o undefined). */
+export function requestSeasonArtwork(showId, seasonNumber) {
+  return requestKey(seasonArtworkKey(showId, seasonNumber));
 }

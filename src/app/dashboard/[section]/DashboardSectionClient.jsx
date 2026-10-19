@@ -41,6 +41,7 @@ import {
 import { tmdbImageLangsParam } from "@/lib/tmdb/imageLanguages";
 import { pickByLanguageLadder } from "@/lib/tmdb/imageLanguageLadder";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
+import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import HoverExpandCard from "@/components/ui/HoverExpandCard";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 import PageStatCard from "@/components/ui/PageStatCard";
@@ -49,6 +50,15 @@ import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import useUserTitleStates, {
   userTitleKey,
 } from "@/lib/hooks/useUserTitleStates";
+import {
+  peekListArtwork,
+  requestListArtwork,
+} from "@/lib/tmdb/artworkBatch";
+import {
+  isSectionImageMode,
+  isSectionViewMode,
+  writeSectionViewPrefsCookie,
+} from "@/lib/dashboard/sectionViewPrefs";
 import {
   fetchImdbScoresForItems,
   getScoreItemKey,
@@ -249,12 +259,36 @@ function dashboardImageKey(item) {
   return `${resolveType(item)}:${item?.id}`;
 }
 
+// Backdrop de la tarjeta: el del lote de arte (/api/tmdb/artwork, el mismo que
+// usan las filas del dashboard) y, si el lote no responde, /images directo.
+// `undefined` = aún sin respuesta.
+function peekDashboardBackdrop(item) {
+  const picks = peekListArtwork(resolveType(item), item?.id);
+  return picks ? picks.dashboardBackdrop || null : undefined;
+}
+
+async function loadDashboardBackdrop(item) {
+  const type = resolveType(item);
+  const picks = await requestListArtwork(type, item?.id);
+  if (picks) return picks.dashboardBackdrop || null;
+  return fetchDashboardBackdrop(type, item?.id, item?.original_language);
+}
+
+// Las primeras tarjetas (lo que cabe en la primera pantalla de la rejilla más
+// densa) piden su imagen ya; el resto, al acercarse.
+const EAGER_IMAGE_COUNT = 24;
+// Tarjetas que entran animadas: lo que cabe en la primera pantalla de la
+// rejilla más densa (compacta, 8 columnas × 6 filas). Favoritos lo estima con
+// el viewport; aquí tiene que valer ya en el HTML del servidor.
+const ENTRY_ANIMATED_CARDS = 48;
+
 function PosterImage({
   item,
   mode = "poster",
   title,
   previewBackdropPath,
   backdropPending = false,
+  eager = false,
 }) {
   const [failed, setFailed] = useState(false);
   const poster = item?.poster_path;
@@ -281,6 +315,9 @@ function PosterImage({
         : preferredPath;
 
   if (!path) {
+    // Backdrop aún en camino (lote de arte): el fondo de la tarjeta, sin el
+    // icono de «sin imagen», que se veía como tarjeta rota un instante.
+    if (backdropPending) return <div className="h-full w-full bg-zinc-900" />;
     return (
       <div className="flex h-full w-full items-center justify-center bg-zinc-900 text-zinc-700">
         <Film className="h-8 w-8 opacity-60" />
@@ -293,7 +330,7 @@ function PosterImage({
       src={imgUrl(path, mode === "backdrop" ? "w780" : "w500")}
       alt={title}
       className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-      loading="lazy"
+      loading={eager ? "eager" : "lazy"}
       decoding="async"
       onError={() => setFailed(true)}
     />
@@ -580,13 +617,32 @@ function SectionCard({
   const effectiveImageMode = viewMode === "list" ? "backdrop" : imageMode;
   const aspect =
     effectiveImageMode === "backdrop" ? "aspect-[16/9]" : "aspect-[2/3]";
-  const animDelay =
-    totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
-  const shouldAnimate = index < 60;
+  // ENTRADA = la de Favoritos: fundido + leve escala (y subida en lista y
+  // compacta), en cascada, solo lo que cabe en pantalla. En CSS (ver
+  // `.sv-section-card-*` en globals.css): la lista llega pintada del servidor.
+  // Se decide UNA vez, al montar: si la clase cambiara al reordenar, la
+  // animación volvería a arrancar. Al volver atrás no se anima.
+  const isBackNav = useIsHistoryNavigation();
+  const [entry] = useState(() =>
+    !isBackNav && index < ENTRY_ANIMATED_CARDS
+      ? {
+          className:
+            viewMode === "list" || viewMode === "compact"
+              ? " sv-section-card-rise"
+              : " sv-section-card-grow",
+          style: {
+            "--sv-enter-delay": `${Math.round(
+              (totalItems > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03) * 1000,
+            )}ms`,
+          },
+        }
+      : { className: "", style: undefined },
+  );
   // El hover gana al foco (ver Favoritos): la tarjeta señalada queda siempre
   // encima, también de la que conserva el foco tras abrir su ficha rápida.
   const shellClassName =
-    "relative z-0 overflow-visible focus-within:z-[40] hover:z-[50]";
+    "relative z-0 overflow-visible focus-within:z-[40] hover:z-[50]" +
+    entry.className;
   const indicator = (compact) => (
     <SectionHoverIndicator
       type={type}
@@ -604,14 +660,8 @@ function SectionCard({
     return (
       <motion.div
         className={shellClassName}
-        initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -10, scale: 0.95 }}
-        transition={{
-          duration: 0.25,
-          delay: shouldAnimate ? animDelay : 0,
-          ease: [0.25, 0.1, 0.25, 1],
-        }}
+        style={entry.style}
+        initial={false}
         layout
       >
         <Link
@@ -628,6 +678,7 @@ function SectionCard({
                 title={title}
                 previewBackdropPath={previewBackdropPath}
                 backdropPending={backdropPending}
+                eager={index < EAGER_IMAGE_COUNT}
               />
             </div>
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
@@ -650,14 +701,8 @@ function SectionCard({
     return (
       <motion.div
         className={shellClassName}
-        initial={shouldAnimate ? { opacity: 0, y: 10, scale: 0.95 } : false}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -10, scale: 0.95 }}
-        transition={{
-          duration: 0.25,
-          delay: shouldAnimate ? animDelay : 0,
-          ease: [0.25, 0.1, 0.25, 1],
-        }}
+        style={entry.style}
+        initial={false}
         layout
       >
         <Link
@@ -677,6 +722,7 @@ function SectionCard({
               title={title}
               previewBackdropPath={previewBackdropPath}
               backdropPending={backdropPending}
+              eager={index < EAGER_IMAGE_COUNT}
             />
             {indicator(true)}
           </HoverExpandCard>
@@ -686,13 +732,7 @@ function SectionCard({
   }
 
   return (
-    <motion.div
-      className={shellClassName}
-      initial={shouldAnimate ? { opacity: 0, scale: 0.95 } : false}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.2, delay: shouldAnimate ? animDelay : 0 }}
-    >
+    <div className={shellClassName} style={entry.style}>
       <Link
         href={href}
         prefetch={false}
@@ -711,11 +751,12 @@ function SectionCard({
             title={title}
             previewBackdropPath={previewBackdropPath}
             backdropPending={backdropPending}
+            eager={index < EAGER_IMAGE_COUNT}
           />
           {indicator(false)}
         </div>
       </Link>
-    </motion.div>
+    </div>
   );
 }
 
@@ -772,51 +813,79 @@ function favoritesGridClassFor(viewMode, imageMode, withTopMargin = false) {
   return `grid gap-3 ${gridCols}${withTopMargin ? " mt-3" : ""}${hoverBleedSpace}`;
 }
 
-export default function DashboardSectionClient({ section }) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+export default function DashboardSectionClient({
+  section,
+  initialData = null,
+  initialTitle = null,
+  initialDescription = null,
+  initialViewMode = null,
+  initialImageMode = null,
+  initialBackdrops = null,
+}) {
+  // La lista llega normalmente con la página (ver page.jsx): sin petición ni
+  // esqueletos. Solo si el servidor no la pudo dar, se pide aquí.
+  const serverData = initialData?.section === section ? initialData : null;
+  const [data, setData] = useState(serverData);
+  const [loading, setLoading] = useState(!serverData);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
   const [mediaFilter, setMediaFilter] = useState("all");
   const [sortBy, setSortBy] = useState("rank");
   const [groupBy, setGroupBy] = useState("none");
-  const [viewMode, setViewMode] = useState("compact");
-  const [imageMode, setImageMode] = useState("poster");
+  const [viewMode, setViewMode] = useState(initialViewMode || "compact");
+  const [imageMode, setImageMode] = useState(initialImageMode || "poster");
+  // Entrada (framer) de los bloques de grupo, que solo se montan al agrupar,
+  // después de abrir la página: nunca sobre lo que entrega el servidor, que
+  // con `initial` de framer saldría invisible hasta hidratar.
+  const [entryAnimations, setEntryAnimations] = useState(!serverData);
+  // Al volver atrás la página se ve tal cual estaba, sin entrada.
+  const isBackNav = useIsHistoryNavigation();
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
   const { isSticky: filtersSticky, isPinned: filtersPinned } =
     useStickyToolbarState(filtersRef);
-  const [previewBackdropsByItem, setPreviewBackdropsByItem] = useState({});
-  const [previewBackdropsReady, setPreviewBackdropsReady] = useState(false);
+  const [previewBackdropsByItem, setPreviewBackdropsByItem] = useState(
+    () => initialBackdrops || {},
+  );
 
   useEffect(() => {
-    document.title = formatPageTitle(data?.title || "Dashboard");
-  }, [data?.title]);
-
-  useEffect(() => {
-    const saved = window.localStorage.getItem(VIEW_MODE_STORAGE_KEY);
-    if (saved === "grid" || saved === "compact" || saved === "list") {
-      setViewMode(saved);
-    }
+    setEntryAnimations(true);
   }, []);
 
   useEffect(() => {
-    const saved = window.localStorage.getItem(IMAGE_MODE_STORAGE_KEY);
-    if (saved === "poster" || saved === "backdrop") {
-      setImageMode(saved);
+    document.title = formatPageTitle(data?.title || initialTitle || "Dashboard");
+  }, [data?.title, initialTitle]);
+
+  // Vista guardada antes de que existiera la cookie (solo localStorage): se
+  // recupera aquí una vez y, desde entonces, la cookie la trae el servidor.
+  useEffect(() => {
+    try {
+      const savedView = window.localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+      if (!initialViewMode && isSectionViewMode(savedView)) {
+        setViewMode(savedView);
+      }
+      const savedImage = window.localStorage.getItem(IMAGE_MODE_STORAGE_KEY);
+      if (!initialImageMode && isSectionImageMode(savedImage)) {
+        setImageMode(savedImage);
+      }
+    } catch {
+      // Sin almacenamiento: la vista por defecto.
     }
-  }, []);
+  }, [initialImageMode, initialViewMode]);
 
   useEffect(() => {
-    window.localStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode);
-  }, [viewMode]);
+    try {
+      window.localStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode);
+      window.localStorage.setItem(IMAGE_MODE_STORAGE_KEY, imageMode);
+    } catch {
+      // Sin almacenamiento: queda la cookie.
+    }
+    writeSectionViewPrefsCookie(viewMode, imageMode);
+  }, [imageMode, viewMode]);
 
   useEffect(() => {
-    window.localStorage.setItem(IMAGE_MODE_STORAGE_KEY, imageMode);
-  }, [imageMode]);
-
-  useEffect(() => {
+    if (serverData) return undefined;
     let cancelled = false;
     const load = async () => {
       try {
@@ -838,83 +907,52 @@ export default function DashboardSectionClient({ section }) {
     return () => {
       cancelled = true;
     };
-  }, [section]);
+  }, [section, serverData]);
 
   const rawItems = useMemo(
     () => (Array.isArray(data?.items) ? data.items : []),
     [data?.items],
   );
 
+  // Backdrops (vista lista o modo backdrop) por el lote de arte, EN ORDEN y
+  // por tandas: cada tarjeta se pinta en cuanto llega la suya, sin esperar a
+  // las 200. Lo ya resuelto en esta visita (p. ej. las filas del dashboard)
+  // está desde el primer render (peekDashboardBackdrop).
+  const wantsPreviewBackdrops = viewMode === "list" || imageMode === "backdrop";
   useEffect(() => {
-    const shouldLoadPreviewBackdrops =
-      viewMode === "list" || imageMode === "backdrop";
-
-    if (!shouldLoadPreviewBackdrops || rawItems.length === 0) {
-      setPreviewBackdropsByItem((current) =>
-        Object.keys(current).length ? {} : current,
-      );
-      setPreviewBackdropsReady(true);
-      return;
-    }
+    if (!wantsPreviewBackdrops || rawItems.length === 0) return undefined;
 
     let cancelled = false;
-    setPreviewBackdropsReady(false);
-    const originalLanguageByKey = new Map();
-    const idsByType = rawItems.reduce(
-      (acc, item) => {
-        const id = Number(item?.id);
-        const type = resolveType(item);
-        if (!Number.isFinite(id) || (type !== "movie" && type !== "tv")) {
-          return acc;
-        }
-        acc[type].add(id);
-        originalLanguageByKey.set(`${type}:${id}`, item?.original_language);
-        return acc;
-      },
-      { movie: new Set(), tv: new Set() },
-    );
-
-    const loadPreviewBackdrops = async () => {
-      const entries = [];
-      await Promise.all(
-        Object.entries(idsByType).map(async ([type, idsSet]) => {
-          const ids = Array.from(idsSet);
-          if (!ids.length) return;
-
-          const pairs = await Promise.all(
-            ids.map(async (id) => [
-              `${type}:${id}`,
-              await fetchDashboardBackdrop(
-                type,
-                id,
-                originalLanguageByKey.get(`${type}:${id}`),
-              ),
-            ]),
-          );
-          entries.push(...pairs);
-        }),
+    const pending = rawItems.filter((item) => {
+      const type = resolveType(item);
+      return (
+        Number.isFinite(Number(item?.id)) &&
+        (type === "movie" || type === "tv") &&
+        initialBackdrops?.[dashboardImageKey(item)] === undefined &&
+        peekDashboardBackdrop(item) === undefined
       );
-
-      if (!cancelled) {
+    });
+    const BATCH = 16;
+    for (let start = 0; start < pending.length; start += BATCH) {
+      const chunk = pending.slice(start, start + BATCH);
+      Promise.all(
+        chunk.map(async (item) => [
+          dashboardImageKey(item),
+          await loadDashboardBackdrop(item).catch(() => null),
+        ]),
+      ).then((entries) => {
+        if (cancelled) return;
         setPreviewBackdropsByItem((current) => ({
           ...current,
           ...Object.fromEntries(entries),
         }));
-        setPreviewBackdropsReady(true);
-      }
-    };
-
-    loadPreviewBackdrops().catch(() => {
-      if (!cancelled) {
-        setPreviewBackdropsByItem({});
-        setPreviewBackdropsReady(true);
-      }
-    });
+      });
+    }
 
     return () => {
       cancelled = true;
     };
-  }, [imageMode, rawItems, viewMode]);
+  }, [initialBackdrops, rawItems, wantsPreviewBackdrops]);
 
   const filtered = useMemo(() => {
     const q = normText(deferredQuery);
@@ -955,16 +993,17 @@ export default function DashboardSectionClient({ section }) {
   }, [filtered, sortBy, rawItems]);
 
   const getPreviewBackdropPath = useCallback(
-    (item) => previewBackdropsByItem[dashboardImageKey(item)],
-    [previewBackdropsByItem],
+    (item) => {
+      if (!wantsPreviewBackdrops) return undefined;
+      const known = previewBackdropsByItem[dashboardImageKey(item)];
+      return known !== undefined ? known : peekDashboardBackdrop(item);
+    },
+    [previewBackdropsByItem, wantsPreviewBackdrops],
   );
 
   const isPreviewBackdropPending = useCallback(
-    (item) =>
-      (viewMode === "list" || imageMode === "backdrop") &&
-      !previewBackdropsReady &&
-      getPreviewBackdropPath(item) === undefined,
-    [getPreviewBackdropPath, imageMode, previewBackdropsReady, viewMode],
+    (item) => wantsPreviewBackdrops && getPreviewBackdropPath(item) === undefined,
+    [getPreviewBackdropPath, wantsPreviewBackdrops],
   );
 
   // Visionados y nota del usuario para la píldora del hover (como Favoritos).
@@ -1028,12 +1067,8 @@ export default function DashboardSectionClient({ section }) {
       </div>
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-        <motion.header
-          className="mb-10"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
-        >
+        {/* Entrada de Favoritos, en CSS (ver `.sv-section-*` en globals.css). */}
+        <header className={`mb-10${isBackNav ? "" : " sv-section-header-in"}`}>
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div>
               <div className="flex items-center gap-3 mb-2">
@@ -1056,47 +1091,52 @@ export default function DashboardSectionClient({ section }) {
                 ) : null}
               </div>
               <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
-                {data?.title || "Cargando"}
+                {data?.title || initialTitle || "Sección"}
                 <span className="text-amber-500">.</span>
               </h1>
               <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
-                {data?.description || "Explora todos los títulos de esta sección."}
+                {data?.description ||
+                  initialDescription ||
+                  "Explora todos los títulos de esta sección."}
               </p>
             </div>
 
             {!loading && (
-              <motion.div
-                className="flex gap-2 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.3 }}
+              <div
+                className={`flex gap-2 md:gap-4 w-full lg:w-auto justify-center lg:justify-end${
+                  isBackNav ? "" : " sv-section-stats-in"
+                }`}
               >
                 {[
-                  { label: "Total", value: rawItems.length, icon: Star, color: "text-amber-400" },
-                  { label: "Películas", value: stats.movies, icon: Film, color: "text-sky-400" },
-                  { label: "Series", value: stats.shows, icon: MonitorPlay, color: "text-purple-400" },
-                ].map(({ label, value, icon, color }) => (
-                  <PageStatCard
+                  { label: "Total", value: rawItems.length, icon: Star, color: "text-amber-400", delay: 500 },
+                  { label: "Películas", value: stats.movies, icon: Film, color: "text-sky-400", delay: 600 },
+                  { label: "Series", value: stats.shows, icon: MonitorPlay, color: "text-purple-400", delay: 700 },
+                ].map(({ label, value, icon, color, delay }) => (
+                  <div
                     key={label}
-                    className="flex-1 lg:flex-none lg:w-auto"
-                    label={label}
-                    value={value}
-                    icon={icon}
-                    colorClass={color}
-                  />
+                    className={`min-w-0 flex-1 lg:flex-none${isBackNav ? "" : " sv-section-stat-in"}`}
+                    style={isBackNav ? undefined : { "--sv-enter-delay": `${delay}ms` }}
+                  >
+                    <PageStatCard
+                      label={label}
+                      value={value}
+                      icon={icon}
+                      colorClass={color}
+                    />
+                  </div>
                 ))}
-              </motion.div>
+              </div>
             )}
           </div>
-        </motion.header>
+        </header>
 
-        <motion.section
+        <section
           ref={filtersRef}
           data-menu-pinned={filtersPinned}
-          className="relative sticky top-14 z-[70] space-y-1 mb-1 transition-all duration-300 sm:top-20 lg:mb-6"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.5 }}
+          data-grouped={groupBy !== "none" ? "" : undefined}
+          className={`relative sticky top-14 z-[70] space-y-1 mb-1 transition-all duration-300 sm:top-20 lg:mb-6${
+            isBackNav ? "" : " sv-section-toolbar-in"
+          }`}
         >
           <div className="relative z-10 flex gap-2 lg:hidden">
             <div className="relative flex-1">
@@ -1390,7 +1430,7 @@ export default function DashboardSectionClient({ section }) {
             </div>
           </div>
 
-        </motion.section>
+        </section>
 
         {loading ? (
           <div className={favoritesGridClassFor(viewMode, imageMode)}>
@@ -1418,7 +1458,7 @@ export default function DashboardSectionClient({ section }) {
               <motion.div
                 key={group.key}
                 className="overflow-visible"
-                initial={{ opacity: 0, y: 20 }}
+                initial={entryAnimations ? { opacity: 0, y: 20 } : false}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: groupIndex * 0.1 }}
               >

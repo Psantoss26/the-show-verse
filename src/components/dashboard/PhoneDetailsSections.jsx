@@ -124,6 +124,8 @@ import {
 } from "@/lib/details/commentsPageCache";
 import { DEFAULT_COMMENT_TAB } from "@/lib/details/commentFilters";
 import { prefetchSubrouteDetails } from "@/lib/navigation/subroutePrefetch";
+import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
+import { useLadderListPreviews } from "@/lib/lists/useLadderListPreviews";
 // El menú se pega por debajo de los controles flotantes del panel (cerrar,
 // acoplar, ficha completa): están en `top-4` y miden 40px, así que 56px es
 // justo donde dejan de estorbar. En la ficha completa este hueco lo marca el
@@ -878,7 +880,9 @@ export default function PhoneDetailsSections({
   }, [id, type]);
 
   const [expandedTitleLists, setExpandedTitleLists] = useState(false);
-  const visibleTitleLists = expandedTitleLists ? lists.items : lists.items.slice(0, 6);
+  // Portadas de las tarjetas con la escalera de idioma (lote de /api/tmdb/artwork).
+  const ladderLists = useLadderListPreviews(lists.items);
+  const visibleTitleLists = expandedTitleLists ? ladderLists : ladderLists.slice(0, 6);
   const hiddenTitleListsCount = Math.max(0, lists.items.length - 6);
   useEffect(() => setExpandedTitleLists(false), [id, type]);
 
@@ -999,9 +1003,21 @@ export default function PhoneDetailsSections({
     : [];
 
   const cast = Array.isArray(data?.cast) ? data.cast : [];
-  const recommendations = Array.isArray(data?.recommendations)
-    ? data.recommendations
-    : [];
+  const rawRecommendations = data?.recommendations;
+  const typedRecommendations = useMemo(
+    () =>
+      (Array.isArray(rawRecommendations) ? rawRecommendations : []).map((rec) =>
+        rec?.media_type ? rec : { ...rec, media_type: type },
+      ),
+    [rawRecommendations, type],
+  );
+  // Pósters con la escalera de idioma de toda la app (como la ficha completa).
+  const recommendations = useEnglishPosterItems(typedRecommendations, true, {
+    holdOriginalPosters: true,
+  });
+  const collectionItems = useEnglishPosterItems(collectionData?.items, true, {
+    holdOriginalPosters: true,
+  });
 
   const sectionItems = useMemo(() => {
     const items = [];
@@ -1089,6 +1105,7 @@ export default function PhoneDetailsSections({
     const totalEp = Number(season?.episode_count || 0) || null;
     return {
       key: sn,
+      showId: item?.id ?? null,
       seasonNumber: sn,
       seasonId: season.id ?? null,
       name: season.name || null,
@@ -1114,6 +1131,7 @@ export default function PhoneDetailsSections({
       ? [
           {
             key: 0,
+            showId: item?.id ?? null,
             seasonNumber: 0,
             seasonId: specialSeason.id ?? null,
             name: "Especiales",
@@ -1157,7 +1175,7 @@ export default function PhoneDetailsSections({
     creators: data?.tvCreators || [],
     recommendations,
     onOpenTitle,
-    collection: { id: collectionId, name: collectionData?.collection?.name, items: collectionData?.items },
+    collection: { id: collectionId, name: collectionData?.collection?.name, items: collectionData?.items ? collectionItems : collectionData?.items },
     awards: awardItems,
     seasons: seasonSheetCardItems,
     images: {
@@ -1187,7 +1205,7 @@ export default function PhoneDetailsSections({
       tmdbId: id,
       canLike: canLikeComments,
     },
-    lists: { state: lists },
+    lists: { state: { ...lists, items: ladderLists } },
   };
 
   return (
@@ -1306,6 +1324,7 @@ export default function PhoneDetailsSections({
                         className="block w-full text-left relative bg-zinc-900 rounded-xl overflow-hidden shadow-md"
                       >
                         <div className="aspect-[2/3] overflow-hidden relative">
+                          {rec._englishPosterPending ? null : (
                           <OptimizedImage
                             src={
                               rec.poster_path
@@ -1319,6 +1338,7 @@ export default function PhoneDetailsSections({
                             decoding="async"
                             className="w-full h-full object-cover"
                           />
+                          )}
                         </div>
                       </button>
                     </SwiperSlide>
@@ -1345,7 +1365,7 @@ export default function PhoneDetailsSections({
                     {...PHONE_POSTER_CAROUSEL}
                     className="pb-2"
                   >
-                    {collectionData.items.map((movie) => (
+                    {collectionItems.map((movie) => (
                       <SwiperSlide key={movie.id}>
                         <button
                           type="button"
@@ -1355,6 +1375,7 @@ export default function PhoneDetailsSections({
                           className="block w-full text-left relative bg-zinc-900 rounded-xl overflow-hidden shadow-md"
                         >
                           <div className="aspect-[2/3] overflow-hidden relative">
+                            {movie._englishPosterPending ? null : (
                             <OptimizedImage
                               src={
                                 movie.poster_path
@@ -1368,6 +1389,7 @@ export default function PhoneDetailsSections({
                               decoding="async"
                               className="w-full h-full object-cover"
                             />
+                            )}
                           </div>
                         </button>
                       </SwiperSlide>
@@ -2162,7 +2184,7 @@ export default function PhoneDetailsSections({
                               <div className="h-full w-full flex items-center justify-center overflow-visible">
                                 <PosterStack posters={previews} />
                               </div>
-                            ) : (
+                            ) : row?._previewPending ? null : (
                               <div className="flex h-full items-center justify-center opacity-10">
                                 <ListVideo className="h-20 w-20" />
                               </div>
