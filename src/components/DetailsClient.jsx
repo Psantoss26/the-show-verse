@@ -4319,9 +4319,8 @@ export default function DetailsClient({
       items,
       page: 1,
       pageCount: Number(pagination.pageCount || 0),
-      hasMore: !!(
-        pagination.pageCount && pagination.page < pagination.pageCount
-      ),
+      // Sin `page` en la paginación inicial es la primera.
+      hasMore: Number(pagination.page || 1) < Number(pagination.pageCount || 0),
       total: Number(pagination.itemCount || 0),
     };
   }, [initialComments]);
