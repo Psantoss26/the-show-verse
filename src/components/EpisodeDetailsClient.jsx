@@ -1983,6 +1983,9 @@ export default function EpisodeDetailsClient({
             @media (min-width: 768px) { .ssr-swiper-fix .swiper-slide { width: calc(25% - 12px) !important; margin-right: 16px !important; } }
             @media (min-width: 1024px) { .ssr-swiper-fix .swiper-slide { width: calc(20% - 14.4px) !important; margin-right: 18px !important; } }
             @media (min-width: 1280px) { .ssr-swiper-fix .swiper-slide { width: calc(16.666% - 16.67px) !important; margin-right: 20px !important; } }
+            .ssr-swiper-fix-episodes .swiper-slide { width: 100% !important; margin-right: 16px !important; display: block; }
+            @media (min-width: 640px) { .ssr-swiper-fix-episodes .swiper-slide { width: calc(50% - 8px) !important; } }
+            @media (min-width: 1024px) { .ssr-swiper-fix-episodes .swiper-slide { width: calc(33.333% - 10.67px) !important; } }
           `,
             }}
           />
@@ -1992,60 +1995,71 @@ export default function EpisodeDetailsClient({
           <AnimatedSection className="sv-phone-scaled-section" delay={0.04}>
             <section className="mb-8 group/section">
               <SectionTitle title="Episodios" icon={MonitorPlay} />
-              {/* En teléfono el arrastre lateral sobre la fila la desplaza: no
-                  cambia de episodio (MobileUserPageSwipeNavigation). */}
-              <div
-                data-mobile-page-swipe-ignore=""
-                className="flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain pb-8 [scrollbar-width:thin] max-sm:[scrollbar-width:none] max-sm:[-ms-overflow-style:none] max-sm:[&::-webkit-scrollbar]:hidden"
-              >
-                {nextEpisodes.map((nextEpisode) => {
-                  const nextNumber = Number(nextEpisode?.episode_number);
-                  const nextTitle =
-                    nextEpisode?.name || `Episodio ${nextNumber}`;
-                  const nextAirDate = nextEpisode?.air_date
-                    ? formatDateEs(nextEpisode.air_date)
-                    : null;
-                  const still = nextEpisode?.still_path || null;
+              {/* Carrusel Swiper, como el reparto: el arrastre lo gestiona el
+                  propio carrusel y en teléfono no cambia de episodio
+                  (MobileUserPageSwipeNavigation). */}
+              <div data-mobile-page-swipe-ignore="">
+                <DetailsArrowCarousel
+                  spaceBetween={16}
+                  slidesPerView={1}
+                  // Al soltar, la fila se ajusta a la tarjeta más cercana.
+                  freeMode={{ enabled: true, sticky: true, momentum: true, momentumRatio: 0.55 }}
+                  breakpoints={{
+                    640: { slidesPerView: 2, spaceBetween: 16 },
+                    1024: { slidesPerView: 3, spaceBetween: 16 },
+                  }}
+                  className={`pb-8 !overflow-visible ${!isMounted ? "ssr-swiper-fix-episodes" : ""}`}
+                >
+                  {nextEpisodes.map((nextEpisode) => {
+                    const nextNumber = Number(nextEpisode?.episode_number);
+                    const nextTitle =
+                      nextEpisode?.name || `Episodio ${nextNumber}`;
+                    const nextAirDate = nextEpisode?.air_date
+                      ? formatDateEs(nextEpisode.air_date)
+                      : null;
+                    const still = nextEpisode?.still_path || null;
 
-                  return (
-                    <Link
-                      key={`${seasonNumber}-${nextNumber}`}
-                      href={`/details/tv/${showId}/season/${seasonNumber}/episode/${nextNumber}`}
-                      className="group/episode relative w-full min-w-0 shrink-0 snap-start overflow-hidden rounded-2xl bg-zinc-900 shadow-lg shadow-black/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.75rem)]"
-                      title={nextTitle}
-                    >
-                      <div className="relative aspect-video overflow-hidden">
-                        {still ? (
-                          <OptimizedImage
-                            src={`https://image.tmdb.org/t/p/w780${still}`}
-                            alt={nextTitle}
-                            className="h-full w-full object-cover transition-transform duration-500 group-hover/episode:scale-105"
-                            loading="lazy"
-                            decoding="async"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-neutral-800 text-neutral-500">
-                            <ImageOff className="h-7 w-7" aria-hidden="true" />
+                    return (
+                      <SwiperSlide key={`${seasonNumber}-${nextNumber}`}>
+                        <Link
+                          href={`/details/tv/${showId}/season/${seasonNumber}/episode/${nextNumber}`}
+                          className="group/episode relative block w-full overflow-hidden rounded-2xl bg-zinc-900 shadow-lg shadow-black/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400"
+                          title={nextTitle}
+                        >
+                          <div className="relative aspect-video overflow-hidden">
+                            {still ? (
+                              <OptimizedImage
+                                src={`https://image.tmdb.org/t/p/w780${still}`}
+                                alt={nextTitle}
+                                className="h-full w-full object-cover transition-transform duration-500 group-hover/episode:scale-105"
+                                loading="lazy"
+                                decoding="async"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center bg-neutral-800 text-neutral-500">
+                                <ImageOff className="h-7 w-7" aria-hidden="true" />
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/15 to-transparent" />
+                            <div className="absolute inset-x-0 bottom-0 p-3 sm:p-4">
+                              <p className="text-xs font-bold uppercase tracking-wider text-zinc-300">
+                                Episodio {nextNumber}
+                              </p>
+                              <h3 className="mt-1 line-clamp-2 text-sm font-extrabold leading-tight text-white sm:text-base">
+                                {nextTitle}
+                              </h3>
+                              {nextAirDate ? (
+                                <p className="mt-1 text-xs font-semibold text-zinc-300">
+                                  {nextAirDate}
+                                </p>
+                              ) : null}
+                            </div>
                           </div>
-                        )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/15 to-transparent" />
-                        <div className="absolute inset-x-0 bottom-0 p-3 sm:p-4">
-                          <p className="text-xs font-bold uppercase tracking-wider text-zinc-300">
-                            Episodio {nextNumber}
-                          </p>
-                          <h3 className="mt-1 line-clamp-2 text-sm font-extrabold leading-tight text-white sm:text-base">
-                            {nextTitle}
-                          </h3>
-                          {nextAirDate ? (
-                            <p className="mt-1 text-xs font-semibold text-zinc-300">
-                              {nextAirDate}
-                            </p>
-                          ) : null}
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                })}
+                        </Link>
+                      </SwiperSlide>
+                    );
+                  })}
+                </DetailsArrowCarousel>
               </div>
             </section>
           </AnimatedSection>
