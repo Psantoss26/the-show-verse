@@ -783,12 +783,17 @@ function CommentsSheet({ meta, data, onClose }) {
     page: seededItems.length ? 1 : 0,
     pageCount: Number(sourceState.pageCount || 0),
     total: Number(sourceState.total || 0),
-    hasMore: Boolean(sourceState.hasMore),
+    // La sembrada es la página 1: hay más si la ficha lo dice o si hay más páginas.
+    hasMore: seededItems.length > 0 && (Boolean(sourceState.hasMore) || Number(sourceState.pageCount || 0) > 1),
     loading: !seededItems.length,
     error: "",
     profileUsernames: initialProfileUsernames || new Map(),
   }));
-  const sentinelRef = useRef(null);
+  // El centinela va en estado (ref de callback), no en un ref: SectionSheet no
+  // pinta nada hasta tener el portal listo, así que en el primer efecto aún no
+  // existe. Con el nodo como dependencia el observador se engancha al montarse;
+  // si no, la primera pestaña no cargaba más hasta cambiar de filtro.
+  const [sentinel, setSentinel] = useState(null);
   const loadingRef = useRef(false);
   const requestIdRef = useRef(0);
   const items = state.items;
@@ -865,14 +870,13 @@ function CommentsSheet({ meta, data, onClose }) {
   };
 
   useEffect(() => {
-    const sentinel = sentinelRef.current;
     if (!sentinel || !state.hasMore || state.loading || state.error || typeof IntersectionObserver === "undefined") return undefined;
     const observer = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting && !loadingRef.current) fetchPage(state.page + 1, activeTab, true, byLikes);
     }, { root: sentinel.closest(".details-sheet-scroll"), rootMargin: "0px 0px 240px", threshold: 0.01 });
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [activeTab, byLikes, fetchPage, state.error, state.hasMore, state.loading, state.page]);
+  }, [activeTab, byLikes, fetchPage, sentinel, state.error, state.hasMore, state.loading, state.page]);
 
   return (
     <SectionSheet
@@ -923,7 +927,7 @@ function CommentsSheet({ meta, data, onClose }) {
       )}
 
       {state.hasMore ? (
-        <div ref={sentinelRef} className="flex min-h-12 items-center justify-center" aria-live="polite">
+        <div ref={setSentinel} className="flex min-h-12 items-center justify-center" aria-live="polite">
           {state.loading ? <Loader2 className="h-5 w-5 animate-spin text-zinc-500" aria-label="Cargando más comentarios" /> : null}
         </div>
       ) : null}
