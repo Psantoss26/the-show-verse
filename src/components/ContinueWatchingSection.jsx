@@ -2494,10 +2494,12 @@ function ContinueWatchingSection({
               const isAnimatingOut = animatingOutId === itemKey;
 
               const base = "relative flex-shrink-0";
-              // Escritorio: el ancho lo fija Swiper (según breakpoint) y el alto
-              // sale del aspect-video. Móvil: 2 por fila (ancho lo fija Swiper)
-              // con alto fijo; la barra de progreso queda fuera de la imagen.
-              const dimensionClasses = isMobile
+              // El ancho lo fija Swiper (según breakpoint; en móvil, 2 por fila)
+              // y el alto sale del aspect-video: el backdrop se ve entero, sin
+              // recortes. Solo el Calendario móvil mantiene el alto fijo, que
+              // necesita para su texto superpuesto. La barra de progreso queda
+              // fuera de la imagen.
+              const dimensionClasses = isMobile && isCalendar
                 ? `w-full ${ROW_HEIGHT}`
                 : "w-full aspect-video";
               const sizeClasses = dimensionClasses;
