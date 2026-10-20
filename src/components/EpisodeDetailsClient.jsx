@@ -1992,7 +1992,12 @@ export default function EpisodeDetailsClient({
           <AnimatedSection className="sv-phone-scaled-section" delay={0.04}>
             <section className="mb-8 group/section">
               <SectionTitle title="Episodios" icon={MonitorPlay} />
-              <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain pb-8 [scrollbar-width:thin] max-sm:[scrollbar-width:none] max-sm:[-ms-overflow-style:none] max-sm:[&::-webkit-scrollbar]:hidden">
+              {/* En teléfono el arrastre lateral sobre la fila la desplaza: no
+                  cambia de episodio (MobileUserPageSwipeNavigation). */}
+              <div
+                data-mobile-page-swipe-ignore=""
+                className="flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain pb-8 [scrollbar-width:thin] max-sm:[scrollbar-width:none] max-sm:[-ms-overflow-style:none] max-sm:[&::-webkit-scrollbar]:hidden"
+              >
                 {nextEpisodes.map((nextEpisode) => {
                   const nextNumber = Number(nextEpisode?.episode_number);
                   const nextTitle =
