@@ -4,7 +4,7 @@
 import DashboardPreviewGlass from "@/components/dashboard/DashboardPreviewGlass";
 import RowNavGlass, { ROW_NAV_FADE } from "@/components/dashboard/RowNavGlass";
 import { useHoverCapable } from "@/lib/hooks/useMediaQuery";
-import { useCallback, useRef, useEffect, useState, memo } from "react";
+import { useCallback, useMemo, useRef, useEffect, useState, memo } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, FreeMode } from "swiper/modules";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -78,6 +78,8 @@ import {
   DASHBOARD_PREVIEW_OPEN_DELAY_MS,
 } from "@/lib/dashboard/previewTiming";
 import { useScrollRevealProps } from "@/lib/hooks/useHasScrolled";
+import PosterImage from "@/components/dashboard/DashboardPosterImage";
+import { getMobileCardsPerRow } from "@/lib/ui/mobileCardsPerRow";
 
 const EMPTY_ARRAY = [];
 const MAX_ITEMS = 20;
@@ -262,8 +264,6 @@ const shimmer = {
 };
 
 /* =================== STYLE CONSTANTS =================== */
-// Tamaños base (backdrop horizontal ~16:9) y alto de fila compartido.
-const ROW_HEIGHT = "h-[126px] sm:h-[146px] md:h-[168px] xl:h-[190px]";
 const CONTINUE_WATCHING_BACKDROP_SIZE = "w1280";
 const CONTINUE_WATCHING_IMAGE_QUALITY = 92;
 const CONTINUE_WATCHING_TRAILER_LANGUAGE_FILTER = "en,es,null";
@@ -728,6 +728,52 @@ function useShowPoster(show) {
   }, [show]);
 
   return posterPath;
+}
+
+/* ====================================================================
+ * Tarjeta MÓVIL: el mismo póster (2:3) que el resto de filas del dashboard
+ * (DashboardPosterImage). En Calendario lleva encima la fecha y el episodio.
+ * ==================================================================== */
+function ContinueWatchingMobilePosterCard({ show, mode = "continue" }) {
+  const movie = useMemo(
+    () => ({
+      id: show?.id,
+      media_type: mediaTypeOf(show),
+      title: show?.title,
+      name: show?.title,
+      poster_path: show?.poster_path || null,
+      backdrop_path: show?.backdrop_path || null,
+      original_language: show?.original_language,
+    }),
+    [show],
+  );
+  const ep = show?.nextEpisode;
+  const calendar = mode === "calendar" ? show?.calendar || null : null;
+
+  return (
+    <div className="relative w-full">
+      <PosterImage movie={movie} isMobile posterOverride={null} eager />
+      {calendar ? (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 overflow-hidden rounded-b-lg bg-gradient-to-t from-black/90 via-black/55 to-transparent px-2 pb-1.5 pt-6">
+          {calendar.isPremiere && (
+            <span className="mb-1 inline-block rounded bg-white px-1 py-px text-[8px] font-black uppercase tracking-wide text-black">
+              Estreno
+            </span>
+          )}
+          {calendar.countdown ? (
+            <div className="truncate text-[10px] font-semibold text-white drop-shadow">
+              {calendar.countdown}
+            </div>
+          ) : null}
+          {ep ? (
+            <div className="truncate text-[10px] font-semibold text-white/80">
+              T{ep.season}·E{ep.number}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 /* ====================================================================
@@ -2007,7 +2053,9 @@ function ContinueWatchingSection({
   mode = "continue",
 }) {
   const reduceMotion = useReducedMotion();
-  const { authenticated, hydrated: authReady } = useAuth();
+  const { authenticated, hydrated: authReady, preferences } = useAuth();
+  // En móvil, mismas tarjetas por fila que las demás filas de pósters.
+  const mobileCardsPerRow = getMobileCardsPerRow(preferences);
   const { openDetailModal } = useDetailModal();
   const { showHoverBackdrop, clearHoverBackdrop, prewarmHoverBackdrop } =
     useDashboardHoverBackdrop();
@@ -2387,11 +2435,10 @@ function ContinueWatchingSection({
   if (loading) return null;
 
   // En escritorio el nº de tarjetas por fila escala con el ancho disponible
-  // hasta un máximo de 6. En móvil se mantiene el ancho fijo con scroll.
+  // hasta un máximo de 6. En móvil, pósters con la densidad de las demás filas.
   const breakpoints = isMobile
     ? {
-        0: { slidesPerView: 2, spaceBetween: 10 },
-        640: { slidesPerView: 2, spaceBetween: 12 },
+        0: { slidesPerView: mobileCardsPerRow, spaceBetween: 12 },
       }
     : {
         768: { slidesPerView: 3, spaceBetween: 14 },
@@ -2400,7 +2447,7 @@ function ContinueWatchingSection({
         1536: { slidesPerView: 6, spaceBetween: 20 },
       };
 
-  const swiperKey = `${mode}-landscape-${hydrated ? "h" : "s"}-${isMobile ? "m" : "d"}`;
+  const swiperKey = `${mode}-landscape-${hydrated ? "h" : "s"}-${isMobile ? `m${mobileCardsPerRow}` : "d"}`;
 
   return (
     <motion.div
@@ -2447,8 +2494,8 @@ function ContinueWatchingSection({
         <div className={!hydrated ? "pointer-events-none touch-none" : ""}>
           <Swiper
             key={swiperKey}
-            slidesPerView={isMobile ? 2 : 3}
-            spaceBetween={isMobile ? 10 : 16}
+            slidesPerView={isMobile ? mobileCardsPerRow : 3}
+            spaceBetween={isMobile ? 12 : 16}
             onSwiper={handleSwiper}
             onSlideChange={updateNav}
             onResize={updateNav}
@@ -2494,13 +2541,11 @@ function ContinueWatchingSection({
               const isAnimatingOut = animatingOutId === itemKey;
 
               const base = "relative flex-shrink-0";
-              // El ancho lo fija Swiper (según breakpoint; en móvil, 2 por fila)
-              // y el alto sale del aspect-video: el backdrop se ve entero, sin
-              // recortes. Solo el Calendario móvil mantiene el alto fijo, que
-              // necesita para su texto superpuesto. La barra de progreso queda
-              // fuera de la imagen.
-              const dimensionClasses = isMobile && isCalendar
-                ? `w-full ${ROW_HEIGHT}`
+              // El ancho lo fija Swiper (según breakpoint). Escritorio: backdrop
+              // con aspect-video. Móvil: póster 2:3, como el resto de filas. La
+              // barra de progreso queda fuera de la imagen.
+              const dimensionClasses = isMobile
+                ? "w-full aspect-[2/3]"
                 : "w-full aspect-video";
               const sizeClasses = dimensionClasses;
 
@@ -2527,7 +2572,11 @@ function ContinueWatchingSection({
                       className="h-full w-full cursor-pointer"
                       onClick={() => openDetailModal?.(show)}
                     >
-                      <ContinueWatchingBaseCard show={show} mode={mode} />
+                      {isMobile ? (
+                        <ContinueWatchingMobilePosterCard show={show} mode={mode} />
+                      ) : (
+                        <ContinueWatchingBaseCard show={show} mode={mode} />
+                      )}
                     </div>
                     <AnimatePresence
                       initial={false}
