@@ -11,6 +11,7 @@ import { useServerOnline } from "@/context/ServerStatusContext";
 import { useState } from "react";
 import { Heart, Loader2 } from "lucide-react";
 import LiquidButton from "@/components/LiquidButton";
+import ListToggleConfirmModal from "@/components/details/ListToggleConfirmModal";
 
 export default function ListLikeButton({
   listId,
@@ -25,10 +26,15 @@ export default function ListLikeButton({
   onChange = null,
   // Grupo de cristal de la fila de botones donde va (la de un actor usa el suyo).
   groupId = "list-details-actions",
+  // Modal de confirmación del botón de la ficha (`liquidGlass`): qué se marca
+  // («esta lista», «esta colección»…) y su nombre.
+  confirmSubject = "esta lista",
+  confirmTitle = "",
 }) {
   const online = useServerOnline();
   const [state, setState] = useState({ liked: Boolean(liked), likes: Number(likes) || 0 });
   const [pending, setPending] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   // Si quien lo usa recibe un estado nuevo (p. ej. el del servidor tras pintar
   // la caché), el botón lo sigue; antes solo leía `liked`/`likes` al montarse y
   // se quedaba con el viejo. Durante un clic manda el estado optimista.
@@ -70,6 +76,7 @@ export default function ListLikeButton({
       ? "Inicia sesión para marcar como favorito"
       : active ? "Quitar de favoritos" : "Marcar como favorito";
     return (
+      <>
       <LiquidButton
         type="button"
         liquidGlass
@@ -81,11 +88,25 @@ export default function ListLikeButton({
         activeColor="red"
         disabled={!canLike || pending}
         readOnly={!online}
-        onClick={toggle}
+        // En la ficha, el favorito se confirma antes de cambiarlo.
+        onClick={() => setConfirmOpen(true)}
         className={`!h-auto !w-full aspect-square ${className}`}
       >
         {pending ? <Loader2 className="animate-spin" /> : <Heart className={active ? "fill-current" : ""} />}
       </LiquidButton>
+      <ListToggleConfirmModal
+        open={confirmOpen}
+        kind="favorite"
+        active={active}
+        subject={confirmSubject}
+        itemTitle={confirmTitle}
+        onConfirm={() => {
+          setConfirmOpen(false);
+          toggle();
+        }}
+        onClose={() => setConfirmOpen(false)}
+      />
+      </>
     );
   }
 

@@ -3244,6 +3244,8 @@ export default function ActorDetails({
                       canLike={authenticated && actorLike.ready}
                       onChange={actorLike.update}
                       groupId="actor-details-actions"
+                      confirmSubject="esta persona"
+                      confirmTitle={actorDetails?.name || ""}
                       liquidGlass
                     />
 

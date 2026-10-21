@@ -3188,6 +3188,7 @@ export default function DetailModal({
           watchlist={watchlist}
           watchlistLoading={loadingStates || updating}
           onToggleWatchlist={handleToggleWatchlist}
+          itemTitle={title}
           onAddToList={openListsModal}
           listBusy={listsLoadingHook || listsPresenceLoading}
           listActive={Object.values(membershipMap || {}).some(Boolean)}

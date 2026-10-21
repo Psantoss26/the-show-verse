@@ -7,6 +7,8 @@
 // consumidor (DetailsClient o DetailModal), que pasa handlers + flags por props.
 
 import { useServerOnline } from "@/context/ServerStatusContext";
+import { useAuth } from "@/context/AuthContext";
+import ListToggleConfirmModal from "@/components/details/ListToggleConfirmModal";
 import { useLayoutEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import BaseLiquidButton from "@/components/LiquidButton";
@@ -214,8 +216,53 @@ export default function DetailActionsRow({
   showComments = false,
   commentsActive = false,
   onComments,
+
+  // Nombre del título para el modal de confirmación de favorito/pendiente.
+  itemTitle = "",
 }) {
   const serverOnline = useServerOnline();
+
+  // FAVORITO y PENDIENTE piden confirmación antes de cambiar la lista. El clic
+  // se corta aquí (como hacen los handlers de DetailModal y de las vistas
+  // previas, que tampoco deben abrir ni cerrar nada por debajo) y el handler
+  // del consumidor se llama al confirmar. Sin sesión no hay nada que confirmar:
+  // el handler va directo y pide iniciar sesión.
+  const { authenticated } = useAuth();
+  const [confirmKind, setConfirmKind] = useState(null);
+  const requestToggle = (kind, handler) => (event) => {
+    if (!authenticated) {
+      handler?.(event);
+      return;
+    }
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    event?.nativeEvent?.stopImmediatePropagation?.();
+    setConfirmKind(kind);
+  };
+  const requestFavorite = requestToggle("favorite", onToggleFavorite);
+  const requestWatchlist = requestToggle("watchlist", onToggleWatchlist);
+  const closeConfirm = () => setConfirmKind(null);
+  const confirmToggle = () => {
+    const handler = confirmKind === "watchlist" ? onToggleWatchlist : onToggleFavorite;
+    setConfirmKind(null);
+    // Los handlers esperan el evento del clic para cortar su propagación; aquí
+    // ya se cortó, así que reciben uno inerte.
+    handler?.({
+      preventDefault() {},
+      stopPropagation() {},
+      nativeEvent: { stopImmediatePropagation() {} },
+    });
+  };
+  const confirmModal = (
+    <ListToggleConfirmModal
+      open={Boolean(confirmKind)}
+      kind={confirmKind || "favorite"}
+      active={confirmKind === "watchlist" ? watchlist : favorite}
+      itemTitle={itemTitle}
+      onConfirm={confirmToggle}
+      onClose={closeConfirm}
+    />
+  );
   const [mediaExpanded, setMediaExpanded] = useState(false);
 
   // MODO SOUNDTRACK (ver useAmbientSoundtrack): mientras suena de fondo, el
@@ -354,7 +401,7 @@ export default function DetailActionsRow({
 
   const favoriteButton = onToggleFavorite ? (
     <LiquidButton
-      onClick={onToggleFavorite}
+      onClick={requestFavorite}
       data-online-only="true"
       readOnly={!serverOnline}
       disabled={favoriteLoading}
@@ -374,7 +421,7 @@ export default function DetailActionsRow({
 
   const watchlistButton = onToggleWatchlist ? (
     <LiquidButton
-      onClick={onToggleWatchlist}
+      onClick={requestWatchlist}
       data-online-only="true"
       readOnly={!serverOnline}
       disabled={watchlistLoading}
@@ -832,7 +879,7 @@ export default function DetailActionsRow({
         {/* Favoritos */}
         {onToggleFavorite && (
           <LiquidButton
-            onClick={onToggleFavorite}
+            onClick={requestFavorite}
             data-online-only="true"
       readOnly={!serverOnline}
       disabled={favoriteLoading}
@@ -865,7 +912,7 @@ export default function DetailActionsRow({
         {/* Pendientes */}
         {onToggleWatchlist && (
           <LiquidButton
-            onClick={onToggleWatchlist}
+            onClick={requestWatchlist}
             data-online-only="true"
       readOnly={!serverOnline}
       disabled={watchlistLoading}
@@ -936,6 +983,8 @@ export default function DetailActionsRow({
           </LiquidButton>
         )}
       </div>
+      {/* Portal: no deja nodo en la fila. */}
+      {confirmModal}
     </>
   );
 }
