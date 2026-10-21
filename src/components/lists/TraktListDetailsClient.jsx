@@ -451,6 +451,8 @@ export default function TraktListDetailsClient({ username, listId }) {
                         liked={Boolean(list?.liked)}
                         canLike={authenticated && likeReady}
                         onChange={handleLikeChange}
+                        confirmSubject="esta lista"
+                        confirmTitle={list?.name || ''}
                         liquidGlass
                     />
                     ) : null}

@@ -10811,6 +10811,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 watchlist={watchlistActionValue}
                 watchlistLoading={watchlistActionLoading}
                 onToggleWatchlist={toggleWatchlist}
+                itemTitle={title}
                 onAddToList={canUseLists ? openListsModal : irAlLogin}
                 listBusy={listsPresenceLoading}
                 listActive={listActive}

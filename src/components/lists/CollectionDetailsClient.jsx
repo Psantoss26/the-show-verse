@@ -377,6 +377,8 @@ export default function CollectionDetailsClient({ collectionId }) {
                     liked={like.liked}
                     canLike={authenticated && like.ready}
                     onChange={like.update}
+                    confirmSubject="esta colección"
+                    confirmTitle={collection?.name || ''}
                     liquidGlass
                 />
             )} onCast={castMembers.length ? () => setCastOpen(true) : null} share={share} />}
