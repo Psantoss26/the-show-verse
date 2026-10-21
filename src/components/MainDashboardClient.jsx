@@ -37,6 +37,7 @@ import useSpotlightExpansion from "@/lib/dashboard/useSpotlightExpansion";
 import "swiper/swiper-bundle.css";
 import Link from "next/link";
 import NextImage from "next/image";
+import { useRouter } from "@/lib/offline/useOfflineRouter";
 import PosterImage from "@/components/dashboard/DashboardPosterImage";
 import OptimizedImage from "@/components/OptimizedImage";
 import {
@@ -426,9 +427,52 @@ const SECTION_ACCENTS = {
   },
 };
 
+// Máximo desplazamiento (px) entre pulsar y soltar para contar como toque.
+const SECTION_TITLE_TAP_MAX_MOVE_PX = 10;
+
 function ExpandableSectionTitle({ title, href, className = "", accent = "amber" }) {
   const displayTitle = normalizeDashboardSectionTitle(title);
   const sectionAccent = SECTION_ACCENTS[accent] || SECTION_ACCENTS.amber;
+  const router = useRouter();
+  const tapRef = useRef(null);
+  const suppressClickRef = useRef(false);
+
+  // TOQUE en pantallas táctiles: se navega con el `pointerup` real, como el
+  // título del hero (FeaturedHero). Los navegadores móviles suprimen o retrasan
+  // el `click` sintetizado cuando el elemento pulsado se está animando, y este
+  // título se anima al pulsarlo (`active:scale`) y vive en filas con animación
+  // de entrada: en el teléfono el toque no llegaba a abrir la sección. Con ratón
+  // se mantiene el clic normal del enlace.
+  const tapHandlers = href
+    ? {
+        onPointerDown: (event) => {
+          if (event.pointerType === "mouse" || !event.isPrimary) return;
+          tapRef.current = { id: event.pointerId, x: event.clientX, y: event.clientY };
+        },
+        onPointerUp: (event) => {
+          const start = tapRef.current;
+          tapRef.current = null;
+          if (!start || start.id !== event.pointerId) return;
+          const moved = Math.hypot(event.clientX - start.x, event.clientY - start.y);
+          if (moved > SECTION_TITLE_TAP_MAX_MOVE_PX) return;
+          // Si el navegador sí emite el click, se cancela: una sola navegación.
+          suppressClickRef.current = true;
+          window.setTimeout(() => {
+            suppressClickRef.current = false;
+          }, 800);
+          router.push(href);
+        },
+        onPointerCancel: () => {
+          tapRef.current = null;
+        },
+        onClick: (event) => {
+          if (!suppressClickRef.current) return;
+          suppressClickRef.current = false;
+          event.preventDefault();
+          event.stopPropagation();
+        },
+      }
+    : null;
   const content = (
     <>
       <span>{displayTitle}</span>
@@ -454,6 +498,7 @@ function ExpandableSectionTitle({ title, href, className = "", accent = "amber" 
   return (
     <Link
       href={href}
+      {...tapHandlers}
       className={`group/title inline-flex w-fit items-center text-xl sm:text-2xl md:text-3xl font-black tracking-tighter bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-transparent transition-all duration-200 ${sectionAccent.hover} active:scale-[0.98] active:opacity-90 ${className}`}
       aria-label={`Ver todos los títulos de ${displayTitle}`}
     >
