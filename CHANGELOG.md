@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Ficha de actor: patrimonio neto estimado (con su año) cuando Wikidata lo tiene, junto a la altura en escritorio y como tarjeta «Patrimonio» en el perfil móvil.
 - Ficha móvil de películas a medias: la barra «Viendo» bajo la portada entra con el logo y los botones, con su misma animación, en lugar de aparecer antes y de golpe.
 - Documentación puesta al día con las funcionalidades de julio a octubre de 2026: referencia completa de la API, mapa de páginas y nueva carpeta [`docs/features/`](docs/features/Features.md).
 
