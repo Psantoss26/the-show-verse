@@ -15,7 +15,6 @@ import {
   Play,
   Pause,
   Award,
-  CalendarDays,
   ChevronRight,
   Music2,
   Loader2,
@@ -535,8 +534,8 @@ function ContinueWatchingBaseCard({ show, mode = "continue" }) {
           progreso solo aparece en la vista previa al pasar el ratón. */}
       <div className={`pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-3 pb-2 pt-8 ${isCalendar ? "" : "hidden"}`}>
         {isCalendar && calendar?.countdown ? (
+          // Primera línea: solo la fecha («Mañana»), sin icono.
           <div className="mb-1 flex items-center gap-1.5 truncate text-[11px] font-semibold text-white drop-shadow">
-            <CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <span>{calendar.countdown}</span>
             {calendar.isPremiere && (
               <span className="rounded bg-white px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide text-black">
@@ -1382,12 +1381,7 @@ function ContinueWatchingPreviewCard({
               >
                 {episodeAirLabel && (
                   <div className="flex min-w-0 items-center gap-1.5 text-xs font-bold leading-4">
-                    {/* 1px abajo: centrado ÓPTICO con el texto (PT Sans asienta
-                        las minúsculas por debajo del centro de su línea). */}
-                    <CalendarDays
-                      className="block h-3.5 w-3.5 shrink-0 translate-y-px"
-                      aria-hidden="true"
-                    />
+                    {/* Solo la fecha («Mañana»), sin icono: igual que la tarjeta. */}
                     <span className="truncate">{episodeAirLabel}</span>
                     {calendar?.isPremiere && (
                       <span className="shrink-0 rounded bg-white px-1.5 text-[9px] font-black uppercase leading-4 tracking-wide text-black">

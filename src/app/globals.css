@@ -1713,26 +1713,25 @@ body {
    populated dashboard it can re-rasterize the whole moving panel each frame.
    Scope the temporary fallback to this drawer, including nested glass controls.
    Keep the surface readable and restore its original glass only when settled.
-   Do not transition backdrop-filter: that would recreate the expensive frames. */
-.sv-drawer-panel[data-drawer-moving],
-.sv-drawer-panel[data-drawer-scrolling]:not(.sv-panel-scroll-scope) {
+   Do not transition backdrop-filter: that would recreate the expensive frames.
+
+   SOLO mientras el panel SE MUEVE (entrar, salir, cambiar de vista). Durante
+   el SCROLL ya no: también se cambiaba el cristal por este fondo opaco y al
+   desplazarse el modal pasaba de cristal a gris y vuelta en cada gesto (pedido
+   de Pablo, 2026-10-22: el estilo tiene que mantenerse siempre igual). Con el
+   panel quieto la página de detrás no se mueve, así que su desenfoque no se
+   recalcula por fotograma; la vista de teléfono ya lo conservaba. */
+.sv-drawer-panel[data-drawer-moving] {
   background-color: rgb(18 18 18 / 96%);
 }
 .sv-drawer-panel[data-drawer-moving],
-.sv-drawer-panel[data-drawer-moving] *,
-.sv-drawer-panel[data-drawer-scrolling]:not(.sv-panel-scroll-scope),
-.sv-drawer-panel[data-drawer-scrolling]:not(.sv-panel-scroll-scope) * {
+.sv-drawer-panel[data-drawer-moving] * {
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
 }
-/* transition-all on glass buttons would otherwise animate blur to zero. El
-   indicador del menú de secciones queda fuera: su desplazamiento es justo lo
-   que ocurre durante el scroll (cambia la sección activa) y es solo
-   `transform`/`width` de un elemento, sin cristal. */
+/* transition-all on glass buttons would otherwise animate blur to zero. */
 .sv-drawer-panel[data-drawer-moving],
-.sv-drawer-panel[data-drawer-moving] *:not(.sv-menu-indicator),
-.sv-drawer-panel[data-drawer-scrolling]:not(.sv-panel-scroll-scope),
-.sv-drawer-panel[data-drawer-scrolling]:not(.sv-panel-scroll-scope) *:not(.sv-menu-indicator) {
+.sv-drawer-panel[data-drawer-moving] *:not(.sv-menu-indicator) {
   transition: none !important;
 }
 
