@@ -9,19 +9,19 @@ import {
 
 const img = (file_path, iso_639_1 = null) => ({ file_path, iso_639_1 });
 
-test("tres bandas como máximo: la imagen oficial del episodio primero y luego el orden de TMDb", () => {
+test("dos bandas como máximo: la imagen oficial del episodio primero y luego el orden de TMDb", () => {
   const paths = pickEpisodeHeroStills({
     stillPath: "/oficial.jpg",
     stills: [img("/a.jpg"), img("/oficial.jpg"), img("/b.jpg"), img("/c.jpg"), img("/d.jpg")],
   });
-  assert.equal(EPISODE_HERO_MAX_BANDS, 3);
-  assert.deepEqual(paths, ["/oficial.jpg", "/a.jpg", "/b.jpg"]);
+  assert.equal(EPISODE_HERO_MAX_BANDS, 2);
+  assert.deepEqual(paths, ["/oficial.jpg", "/a.jpg"]);
 });
 
 test("solo imágenes sin texto si las hay; las rotuladas, únicamente si no queda otra", () => {
   assert.deepEqual(
     pickEpisodeHeroStills({ stills: [img("/en.jpg", "en"), img("/a.jpg"), img("/xx.jpg", "xx"), img("/b.jpg", "")] }),
-    ["/a.jpg", "/xx.jpg", "/b.jpg"],
+    ["/a.jpg", "/xx.jpg"],
   );
   assert.deepEqual(
     pickEpisodeHeroStills({ stills: [img("/en.jpg", "en"), img("/es.jpg", "es")] }),

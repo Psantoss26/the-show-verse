@@ -302,7 +302,7 @@ test("episode card: stacked stills cover, kicker and only watched · rating", ()
   );
   assert.equal(card.episode, true);
   assert.equal(card.kicker, "Episodio 1 · Temporada 1");
-  assert.deepEqual(card.stillPaths, ["/still1.jpg", "/still2.jpg", "/still3.jpg"]);
+  assert.deepEqual(card.stillPaths, ["/still1.jpg", "/still2.jpg"]);
   assert.equal(card.season, null);
 
   const buttons = shareCardActionButtons(card);
@@ -324,7 +324,7 @@ test("episode stills: only TMDb paths, deduplicated, at most three, tv only", ()
     episode: true,
     stillPaths: ["/a.jpg", "/a.jpg", "https://evil/x.jpg", "/b.jpg", "/c.jpg", "/d.jpg"],
   });
-  assert.deepEqual(card.stillPaths, ["/a.jpg", "/b.jpg", "/c.jpg"]);
+  assert.deepEqual(card.stillPaths, ["/a.jpg", "/b.jpg"]);
   const movie = sanitizeShareCard({ type: "movie", episode: true, stillPaths: ["/a.jpg"] });
   assert.equal(movie.episode, false);
   assert.deepEqual(movie.stillPaths, []);
