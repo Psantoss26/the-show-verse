@@ -27,6 +27,10 @@ import {
 // provoca el «tirar para actualizar» o un clic sintético que cierra el modal.
 // Mientras dure el bloqueo se activa además la guardia de `touchScrollGuard`.
 //
+// Mientras haya alguno abierto, <html> lleva `data-sv-modal-open`: la señal
+// para el CSS (p. ej. los avisos emergentes suben al borde superior en móvil,
+// porque el velo del modal tapa la barra superior; ver `.sv-toast-stack`).
+//
 // Uso:  useBodyScrollLock(open)   // se bloquea mientras `active` sea true.
 
 let lockCount = 0;
@@ -68,6 +72,7 @@ export default function useBodyScrollLock(active = true) {
       html.style.overscrollBehavior = "none";
       body.style.overflow = "hidden";
       body.style.overscrollBehavior = "none";
+      html.setAttribute("data-sv-modal-open", "");
       installTouchScrollGuard();
     }
     lockCount += 1;
@@ -79,6 +84,7 @@ export default function useBodyScrollLock(active = true) {
         html.style.overscrollBehavior = saved.htmlOverscroll;
         body.style.overflow = saved.bodyOverflow;
         body.style.overscrollBehavior = saved.bodyOverscroll;
+        html.removeAttribute("data-sv-modal-open");
         uninstallTouchScrollGuard();
         saved = null;
       }
