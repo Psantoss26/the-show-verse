@@ -17,13 +17,13 @@ import {
   ArrowLeft,
   ArrowUpDown,
   Bookmark,
-  Calendar,
   CheckCircle2,
   ChevronDown,
   Eye,
   Film,
   Filter,
   Grid2X2,
+  Layers3,
   LayoutGrid,
   List,
   MonitorPlay,
@@ -41,6 +41,9 @@ import {
 import { tmdbImageLangsParam } from "@/lib/tmdb/imageLanguages";
 import { pickByLanguageLadder } from "@/lib/tmdb/imageLanguageLadder";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
+import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
+import LiquidButton from "@/components/LiquidButton";
+import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import HoverExpandCard from "@/components/ui/HoverExpandCard";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
@@ -109,26 +112,43 @@ const TV_GENRES = {
   37: "Western",
 };
 
+// `short`: el valor en el botón del panel móvil, como en Favoritos ("Reciente",
+// "Sin agr."), para que quepa entero junto a su rótulo.
 const SORT_OPTIONS = [
-  { key: "rank", label: "Ranking original" },
-  { key: "title-asc", label: "Título A-Z" },
-  { key: "title-desc", label: "Título Z-A" },
-  { key: "rating-desc", label: "Mejor valoración" },
-  { key: "rating-asc", label: "Peor valoración" },
-  { key: "date-desc", label: "Más recientes" },
-  { key: "date-asc", label: "Más antiguos" },
+  { key: "rank", label: "Ranking original", short: "Ranking" },
+  { key: "title-asc", label: "Título A-Z", short: "A-Z" },
+  { key: "title-desc", label: "Título Z-A", short: "Z-A" },
+  { key: "rating-desc", label: "Mejor valoración", short: "Mejor" },
+  { key: "rating-asc", label: "Peor valoración", short: "Peor" },
+  { key: "date-desc", label: "Más recientes", short: "Reciente" },
+  { key: "date-asc", label: "Más antiguos", short: "Antiguo" },
 ];
 
 const GROUP_OPTIONS = [
-  { key: "none", label: "Sin agrupar" },
-  { key: "media", label: "Tipo" },
-  { key: "genre", label: "Género" },
-  { key: "year", label: "Año" },
-  { key: "decade", label: "Década" },
-  { key: "rating", label: "Valoración" },
+  { key: "none", label: "Sin agrupar", short: "Sin agr." },
+  { key: "media", label: "Tipo", short: "Tipo" },
+  { key: "genre", label: "Género", short: "Género" },
+  { key: "year", label: "Año", short: "Año" },
+  { key: "decade", label: "Década", short: "Década" },
+  { key: "rating", label: "Valoración", short: "Valoración" },
 ];
 
-const VIEW_MODE_STORAGE_KEY = "showverse:dashboard-section:viewMode:v2";
+const VIEW_MODE_BUTTONS = [
+  ["list", List, "Vista lista"],
+  ["compact", Grid2X2, "Vista compacta"],
+  ["grid", LayoutGrid, "Vista cuadrícula"],
+];
+const IMAGE_MODE_BUTTONS = [
+  ["poster", Film, "Pósters"],
+  ["backdrop", MonitorPlay, "Fondos"],
+];
+// Botón activo de los selectores de vista: el acento de la sección (ámbar) con
+// la forma de los de Favoritos.
+const ACTIVE_TOGGLE_CLASS =
+  "bg-gradient-to-br from-amber-400 to-yellow-600 text-black shadow-lg shadow-amber-500/20";
+const INACTIVE_TOGGLE_CLASS = "text-zinc-400 hover:text-white hover:bg-white/10";
+
+const VIEW_MODE_STORAGE_KEY = "showverse:dashboard-section:viewMode:v3";
 const IMAGE_MODE_STORAGE_KEY = "showverse:dashboard-section:imageMode";
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 
@@ -354,10 +374,14 @@ function Dropdown({
   const updateMenuPosition = useCallback(() => {
     if (!buttonRef.current || typeof window === "undefined") return;
     const rect = buttonRef.current.getBoundingClientRect();
-    const menuWidth = Math.min(rect.width, window.innerWidth - 24);
+    // Como en Favoritos: el menú mide lo que su contenido (nunca menos que su
+    // botón ni más que la ventana). Al estrecharse la barra el botón queda en
+    // un icono y el menú no debe heredar ese ancho.
+    const menuMaxWidth = window.innerWidth - 24;
+    const measured = menuRef.current?.offsetWidth || rect.width;
     const left = Math.min(
       Math.max(12, rect.left),
-      Math.max(12, window.innerWidth - menuWidth - 12),
+      Math.max(12, window.innerWidth - Math.min(measured, menuMaxWidth) - 12),
     );
 
     const availableBelow = window.innerHeight - rect.bottom - 12;
@@ -367,7 +391,9 @@ function Dropdown({
       position: "fixed",
       top: rect.bottom + 8,
       left,
-      width: menuWidth,
+      width: "max-content",
+      minWidth: rect.width,
+      maxWidth: menuMaxWidth,
       maxHeight: menuMaxHeight,
       zIndex: 1000,
     });
@@ -405,21 +431,21 @@ function Dropdown({
         ref={buttonRef}
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-2xl transition text-sm lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+        className="h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-2xl transition text-sm sv-page-toolbar-trigger lg:min-w-[140px] lg:w-auto lg:max-w-none bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
       >
         <div className="flex min-w-0 items-center gap-2">
           {Icon && <Icon className="w-4 h-4 text-amber-400" />}
           <span
-            className={`text-zinc-500 font-bold text-xs uppercase tracking-wider ${
+            className={`sv-page-toolbar-label text-zinc-500 font-bold text-xs uppercase tracking-wider ${
               compactMobile ? "hidden sm:inline" : ""
             }`}
           >
             {label}:
           </span>
-          <span className="hidden min-w-0 truncate font-semibold text-white sm:inline lg:overflow-visible lg:whitespace-nowrap">
+          <span className="sv-page-toolbar-value hidden min-w-0 truncate font-semibold text-white sm:inline lg:overflow-visible lg:whitespace-nowrap">
             {valueLabel}
           </span>
-          <span className="min-w-0 truncate font-semibold text-white sm:hidden">
+          <span className="sv-page-toolbar-value min-w-0 truncate font-semibold text-white sm:hidden">
             {mobileValueLabel || valueLabel}
           </span>
         </div>
@@ -463,14 +489,19 @@ function DropdownItem({ active, onClick, children }) {
     <button
       type="button"
       onClick={onClick}
-      className={`w-full px-3 py-2 rounded-xl text-left text-sm transition flex items-center justify-between ${
+      className={`w-full px-3 py-2 rounded-xl text-left text-sm transition flex items-center justify-between gap-6 ${
         active
           ? "bg-white/10 text-white font-bold"
           : "text-zinc-300 hover:bg-white/5 hover:text-white"
       }`}
     >
-      <span className="font-medium">{children}</span>
-      {active && <CheckCircle2 className="w-4 h-4 text-amber-400" />}
+      <span className="font-medium whitespace-nowrap">{children}</span>
+      {/* Hueco de la marca siempre reservado: el menú mide lo que su contenido. */}
+      {active ? (
+        <CheckCircle2 className="w-4 h-4 shrink-0 text-amber-400" />
+      ) : (
+        <span aria-hidden="true" className="w-4 h-4 shrink-0" />
+      )}
     </button>
   );
 }
@@ -833,7 +864,8 @@ export default function DashboardSectionClient({
   const [mediaFilter, setMediaFilter] = useState("all");
   const [sortBy, setSortBy] = useState("rank");
   const [groupBy, setGroupBy] = useState("none");
-  const [viewMode, setViewMode] = useState(initialViewMode || "compact");
+  // Por defecto, la rejilla de Favoritos.
+  const [viewMode, setViewMode] = useState(initialViewMode || "grid");
   const [imageMode, setImageMode] = useState(initialImageMode || "poster");
   // Entrada (framer) de los bloques de grupo, que solo se montan al agrupar,
   // después de abrir la página: nunca sobre lo que entrega el servidor, que
@@ -842,6 +874,8 @@ export default function DashboardSectionClient({
   // Al volver atrás la página se ve tal cual estaba, sin entrada.
   const isBackNav = useIsHistoryNavigation();
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const router = useRouter();
+  const toolbarSearchFitRef = usePageToolbarSearchFit();
   const filtersRef = useRef(null);
   const { isSticky: filtersSticky, isPinned: filtersPinned } =
     useStickyToolbarState(filtersRef);
@@ -1053,10 +1087,59 @@ export default function DashboardSectionClient({
 
   const sectionLabel = data?.title ? deriveSectionLabel(data.title) : null;
 
-  const sortLabel =
-    SORT_OPTIONS.find((option) => option.key === sortBy)?.label || "Orden";
-  const groupLabel =
-    GROUP_OPTIONS.find((option) => option.key === groupBy)?.label || "Agrupar";
+  const sortOption = SORT_OPTIONS.find((option) => option.key === sortBy);
+  const sortLabel = sortOption?.label || "Orden";
+  const sortShortLabel = sortOption?.short || sortLabel;
+  const groupOption = GROUP_OPTIONS.find((option) => option.key === groupBy);
+  const groupLabel = groupOption?.label || "Agrupar";
+  const groupShortLabel = groupOption?.short || groupLabel;
+  const mediaTypeLabel =
+    mediaFilter === "all" ? "Todo" : mediaFilter === "movie" ? "Películas" : "Series";
+
+  // Opciones de los desplegables, compartidas por el panel móvil y la barra.
+  const renderMediaOptions = ({ close }) =>
+    [
+      ["all", "Todo"],
+      ["movie", "Películas"],
+      ["tv", "Series"],
+    ].map(([key, label]) => (
+      <DropdownItem
+        key={key}
+        active={mediaFilter === key}
+        onClick={() => {
+          setMediaFilter(key);
+          close();
+        }}
+      >
+        {label}
+      </DropdownItem>
+    ));
+  const renderSortOptions = ({ close }) =>
+    SORT_OPTIONS.map((option) => (
+      <DropdownItem
+        key={option.key}
+        active={sortBy === option.key}
+        onClick={() => {
+          setSortBy(option.key);
+          close();
+        }}
+      >
+        {option.label}
+      </DropdownItem>
+    ));
+  const renderGroupOptions = ({ close }) =>
+    GROUP_OPTIONS.map((option) => (
+      <DropdownItem
+        key={option.key}
+        active={groupBy === option.key}
+        onClick={() => {
+          setGroupBy(option.key);
+          close();
+        }}
+      >
+        {option.label}
+      </DropdownItem>
+    ));
 
   return (
     <main className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-amber-500/30">
@@ -1068,33 +1151,38 @@ export default function DashboardSectionClient({
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         {/* Entrada de Favoritos, en CSS (ver `.sv-section-*` en globals.css). */}
-        <header className={`mb-10${isBackNav ? "" : " sv-section-header-in"}`}>
+        {/* Cabecera de Favoritos: etiqueta, título con sus acciones al lado
+            (aquí, volver al dashboard), descripción y estadísticas. */}
+        <header className={`mb-6 sm:mb-10${isBackNav ? "" : " sv-section-header-in"}`}>
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div>
+              {/* La misma etiqueta que lleva la sección en el dashboard
+                  (TENDENCIAS, POPULARES, PARA TI, ANTICIPADAS…). */}
               <div className="flex items-center gap-3 mb-2">
-                <Link
-                  href="/"
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-white/10 to-white/5 text-zinc-300 shadow-lg backdrop-blur-lg transition hover:bg-white/15 hover:text-white"
-                  aria-label="Volver al dashboard"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                </Link>
-                {/* La misma etiqueta que lleva la sección en el dashboard
-                    (TENDENCIAS, POPULARES, PARA TI, ANTICIPADAS…). */}
-                {sectionLabel ? (
-                  <>
-                    <div className="h-px w-12 bg-amber-500" />
-                    <span className="text-amber-400 font-bold uppercase tracking-widest text-xs">
-                      {sectionLabel}
-                    </span>
-                  </>
-                ) : null}
+                <div className="h-px w-12 bg-amber-500" />
+                <span className="text-amber-400 font-bold uppercase tracking-widest text-xs">
+                  {sectionLabel || "Dashboard"}
+                </span>
               </div>
-              <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
-                {data?.title || initialTitle || "Sección"}
-                <span className="text-amber-500">.</span>
-              </h1>
-              <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
+              <div className="flex items-center gap-6">
+                <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-white">
+                  {data?.title || initialTitle || "Sección"}
+                  <span className="text-amber-500">.</span>
+                </h1>
+                <LiquidButton
+                  onClick={() => router.push("/")}
+                  activeColor="amber"
+                  groupId="dashboard-section-header-actions"
+                  title="Volver al dashboard"
+                  aria-label="Volver al dashboard"
+                  className="!bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent !border-0 shadow-lg backdrop-blur-md hover:!bg-white/15"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </LiquidButton>
+              </div>
+              {/* Más ancha que en Favoritos: estas descripciones son más largas
+                  y, en dos líneas, la cabecera crecía y descolocaba las cifras. */}
+              <p className="mt-2 text-zinc-400 max-w-3xl text-lg hidden md:block">
                 {data?.description ||
                   initialDescription ||
                   "Explora todos los títulos de esta sección."}
@@ -1130,13 +1218,17 @@ export default function DashboardSectionClient({
           </div>
         </header>
 
+        {/* Barra de filtros de Favoritos: en móvil, buscador + botón de
+            filtros con su panel (Tipo · Agrupar / Orden · vistas · imagen);
+            en escritorio, una sola fila que ajusta el buscador
+            (usePageToolbarSearchFit). */}
         <section
           ref={filtersRef}
           data-menu-pinned={filtersPinned}
           data-grouped={groupBy !== "none" ? "" : undefined}
-          className={`relative sticky top-14 z-[70] space-y-1 mb-1 transition-all duration-300 sm:top-20 lg:mb-6${
-            isBackNav ? "" : " sv-section-toolbar-in"
-          }`}
+          className={`relative sticky top-14 z-[70] space-y-1 transition-all duration-300 sm:top-20 sm:mb-5 lg:mb-6 ${
+            groupBy === "none" ? "mb-6" : "mb-2"
+          }${isBackNav ? "" : " sv-section-toolbar-in"}`}
         >
           <div className="relative z-10 flex gap-2 lg:hidden">
             <div className="relative flex-1">
@@ -1175,139 +1267,92 @@ export default function DashboardSectionClient({
 
           <MobileFiltersPanel
             open={mobileFiltersOpen}
-            className={`lg:hidden ${
-              filtersSticky ? "absolute left-0 right-0 top-full z-[80]" : "relative"
+            className={`z-[80] lg:hidden ${
+              filtersSticky ? "absolute left-0 right-0 top-full" : "relative"
             }`}
-            gapClassName={filtersSticky ? "pt-2" : ""}
-            contentClassName="space-y-1 pt-1 pb-1"
+            gapClassName="pt-2"
+            contentClassName="space-y-2"
           >
             <div className="flex gap-2">
-              <div className="min-w-0 flex-1">
+              <div className="flex-1">
                 <Dropdown
                   label="Tipo"
-                  valueLabel={
-                    mediaFilter === "all"
-                      ? "Todo"
-                      : mediaFilter === "movie"
-                        ? "Películas"
-                        : "Series"
-                  }
+                  valueLabel={mediaTypeLabel}
                   icon={Filter}
                 >
-                  {({ close }) => (
-                    <>
-                      {[
-                        ["all", "Todo"],
-                        ["movie", "Películas"],
-                        ["tv", "Series"],
-                      ].map(([key, label]) => (
-                        <DropdownItem
-                          key={key}
-                          active={mediaFilter === key}
-                          onClick={() => {
-                            setMediaFilter(key);
-                            close();
-                          }}
-                        >
-                          {label}
-                        </DropdownItem>
-                      ))}
-                    </>
-                  )}
+                  {renderMediaOptions}
                 </Dropdown>
               </div>
-
-              <div className="min-w-0 flex-1">
-                <Dropdown label="Orden" valueLabel={sortLabel} icon={ArrowUpDown}>
-                  {({ close }) => (
-                    <>
-                      {SORT_OPTIONS.map((option) => (
-                        <DropdownItem
-                          key={option.key}
-                          active={sortBy === option.key}
-                          onClick={() => {
-                            setSortBy(option.key);
-                            close();
-                          }}
-                        >
-                          {option.label}
-                        </DropdownItem>
-                      ))}
-                    </>
-                  )}
+              <div className="flex-1">
+                <Dropdown
+                  label="Agrupar"
+                  valueLabel={groupLabel}
+                  mobileValueLabel={groupShortLabel}
+                  compactMobile
+                  icon={Layers3}
+                >
+                  {renderGroupOptions}
                 </Dropdown>
               </div>
             </div>
 
             <div className="flex gap-2">
-              <div className="min-w-0 flex-1">
-                <Dropdown label="Agrupar" valueLabel={groupLabel} icon={Calendar}>
-                  {({ close }) => (
-                    <>
-                      {GROUP_OPTIONS.map((option) => (
-                        <DropdownItem
-                          key={option.key}
-                          active={groupBy === option.key}
-                          onClick={() => {
-                            setGroupBy(option.key);
-                            close();
-                          }}
-                        >
-                          {option.label}
-                        </DropdownItem>
-                      ))}
-                    </>
-                  )}
+              <div className="flex-1">
+                <Dropdown
+                  label="Orden"
+                  valueLabel={sortLabel}
+                  mobileValueLabel={sortShortLabel}
+                  icon={ArrowUpDown}
+                >
+                  {renderSortOptions}
                 </Dropdown>
               </div>
-            </div>
-
-            <div className="flex gap-2">
-              <div className="flex flex-1 rounded-2xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-                {[
-                  ["list", List],
-                  ["compact", Grid2X2],
-                  ["grid", LayoutGrid],
-                ].map(([mode, Icon]) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => setViewMode(mode)}
-                    className={`flex-1 px-2 h-full rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                      viewMode === mode
-                        ? "bg-gradient-to-br from-amber-400 to-yellow-600 text-black shadow-lg shadow-amber-500/20"
-                        : "text-zinc-400 hover:text-white hover:bg-white/10"
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex flex-1 rounded-2xl p-1 h-11 items-center bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-                {[
-                  ["poster", Film],
-                  ["backdrop", MonitorPlay],
-                ].map(([mode, Icon]) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => setImageMode(mode)}
-                    className={`flex-1 px-2 h-full rounded-lg text-sm font-bold transition-all flex items-center justify-center ${
-                      imageMode === mode
-                        ? "bg-gradient-to-br from-amber-400 to-yellow-600 text-black shadow-lg shadow-amber-500/20"
-                        : "text-zinc-400 hover:text-white hover:bg-white/10"
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                  </button>
-                ))}
+              <div className="flex-1 flex gap-2">
+                <div className="flex rounded-2xl p-1 h-11 items-center flex-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+                  {VIEW_MODE_BUTTONS.map(([mode, Icon, label]) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setViewMode(mode)}
+                      aria-label={label}
+                      aria-pressed={viewMode === mode}
+                      className={`flex-1 h-full px-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center ${
+                        viewMode === mode ? ACTIVE_TOGGLE_CLASS : INACTIVE_TOGGLE_CLASS
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" />
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setImageMode(imageMode === "poster" ? "backdrop" : "poster")
+                  }
+                  aria-label={
+                    imageMode === "poster" ? "Mostrar fondos" : "Mostrar pósters"
+                  }
+                  className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
+                    imageMode === "backdrop"
+                      ? "text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.28)]"
+                      : "text-zinc-200 hover:bg-black/30"
+                  }`}
+                >
+                  {imageMode === "poster" ? (
+                    <Film className="w-4 h-4" />
+                  ) : (
+                    <MonitorPlay className="w-4 h-4" />
+                  )}
+                </button>
               </div>
             </div>
           </MobileFiltersPanel>
 
-          <div className="relative z-10 hidden gap-3 lg:flex">
-            <div className="relative min-w-0 flex-1">
+          <div
+            ref={toolbarSearchFitRef}
+            className="sv-page-toolbar relative z-10 hidden lg:flex gap-3"
+          >
+            <div className="sv-page-toolbar-search relative flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-400 z-10 pointer-events-none" />
               <input
                 value={query}
@@ -1327,81 +1372,28 @@ export default function DashboardSectionClient({
               )}
             </div>
 
-            <Dropdown label="Tipo" valueLabel={mediaFilter === "all" ? "Todo" : mediaFilter === "movie" ? "Películas" : "Series"} icon={Filter}>
-                {({ close }) => (
-                  <>
-                    {[
-                      ["all", "Todo"],
-                      ["movie", "Películas"],
-                      ["tv", "Series"],
-                    ].map(([key, label]) => (
-                      <DropdownItem
-                        key={key}
-                        active={mediaFilter === key}
-                        onClick={() => {
-                          setMediaFilter(key);
-                          close();
-                        }}
-                      >
-                        {label}
-                      </DropdownItem>
-                    ))}
-                  </>
-                )}
-              </Dropdown>
+            <Dropdown label="Tipo" valueLabel={mediaTypeLabel} icon={Filter}>
+              {renderMediaOptions}
+            </Dropdown>
 
-              <Dropdown label="Orden" valueLabel={sortLabel} icon={ArrowUpDown}>
-                {({ close }) => (
-                  <>
-                    {SORT_OPTIONS.map((option) => (
-                      <DropdownItem
-                        key={option.key}
-                        active={sortBy === option.key}
-                        onClick={() => {
-                          setSortBy(option.key);
-                          close();
-                        }}
-                      >
-                        {option.label}
-                      </DropdownItem>
-                    ))}
-                  </>
-                )}
-              </Dropdown>
+            <Dropdown label="Ordenar" valueLabel={sortLabel} icon={ArrowUpDown}>
+              {renderSortOptions}
+            </Dropdown>
 
-              <Dropdown label="Agrupar" valueLabel={groupLabel} icon={Calendar}>
-                {({ close }) => (
-                  <>
-                    {GROUP_OPTIONS.map((option) => (
-                      <DropdownItem
-                        key={option.key}
-                        active={groupBy === option.key}
-                        onClick={() => {
-                          setGroupBy(option.key);
-                          close();
-                        }}
-                      >
-                        {option.label}
-                      </DropdownItem>
-                    ))}
-                  </>
-                )}
-              </Dropdown>
+            <Dropdown label="Agrupar" valueLabel={groupLabel} icon={Layers3}>
+              {renderGroupOptions}
+            </Dropdown>
 
             <div className="flex rounded-2xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-              {[
-                ["list", List],
-                ["compact", Grid2X2],
-                ["grid", LayoutGrid],
-              ].map(([mode, Icon]) => (
+              {VIEW_MODE_BUTTONS.map(([mode, Icon, label]) => (
                 <button
                   key={mode}
                   type="button"
                   onClick={() => setViewMode(mode)}
-                  className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
-                    viewMode === mode
-                      ? "bg-gradient-to-br from-amber-400 to-yellow-600 text-black shadow-lg shadow-amber-500/20"
-                      : "text-zinc-400 hover:text-white hover:bg-white/10"
+                  aria-label={label}
+                  aria-pressed={viewMode === mode}
+                  className={`px-3 h-full rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
+                    viewMode === mode ? ACTIVE_TOGGLE_CLASS : INACTIVE_TOGGLE_CLASS
                   }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -1410,18 +1402,15 @@ export default function DashboardSectionClient({
             </div>
 
             <div className="flex rounded-2xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-              {[
-                ["poster", Film],
-                ["backdrop", MonitorPlay],
-              ].map(([mode, Icon]) => (
+              {IMAGE_MODE_BUTTONS.map(([mode, Icon, label]) => (
                 <button
                   key={mode}
                   type="button"
                   onClick={() => setImageMode(mode)}
-                  className={`px-3 h-full rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
-                    imageMode === mode
-                      ? "bg-gradient-to-br from-amber-400 to-yellow-600 text-black shadow-lg shadow-amber-500/20"
-                      : "text-zinc-400 hover:text-white hover:bg-white/10"
+                  aria-label={label}
+                  aria-pressed={imageMode === mode}
+                  className={`px-3 h-full rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
+                    imageMode === mode ? ACTIVE_TOGGLE_CLASS : INACTIVE_TOGGLE_CLASS
                   }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -1429,7 +1418,6 @@ export default function DashboardSectionClient({
               ))}
             </div>
           </div>
-
         </section>
 
         {loading ? (

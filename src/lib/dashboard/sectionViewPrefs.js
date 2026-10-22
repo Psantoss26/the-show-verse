@@ -4,7 +4,10 @@
 // en el cliente, la página nacía en la vista por defecto y saltaba a la
 // guardada tras hidratar (y las tarjetas se montaban dos veces).
 
-export const SECTION_VIEW_COOKIE = "showverse_section_view";
+// `_v2`: la vista por defecto pasó de compacta a rejilla (la de Favoritos). La
+// cookie se escribía en cada visita aunque no se eligiera nada, así que la
+// anterior no distingue una elección de la vista por defecto.
+export const SECTION_VIEW_COOKIE = "showverse_section_view_v2";
 
 const VIEW_MODES = new Set(["grid", "compact", "list"]);
 const IMAGE_MODES = new Set(["poster", "backdrop"]);
