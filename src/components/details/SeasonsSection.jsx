@@ -142,7 +142,9 @@ export default function SeasonsSection({
                   "relative z-10 grid h-9 w-9 place-items-center rounded-full transition-[color,background-color,box-shadow,transform] duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-300",
                   active
                     ? "bg-white/[0.16] text-white shadow-[0_6px_18px_-8px_rgba(0,0,0,0.9)]"
-                    : "text-white/65 hover:bg-white/[0.08] hover:text-white",
+                    : phoneLayout
+                      ? "text-white/65"
+                      : "text-white/65 hover:bg-white/[0.08] hover:text-white",
                 ].join(" ")}
               >
                 <Icon className="h-4 w-4" aria-hidden="true" />
@@ -173,7 +175,9 @@ export default function SeasonsSection({
         >
           {items.map(({ key, ...season }) => (
             <SwiperSlide key={key}>
-              <SeasonPosterCard {...season} />
+              {/* Vista de teléfono del modal lateral: sin hover, como el
+                  resto de secciones (el diseño que se replica es el táctil). */}
+              <SeasonPosterCard {...season} enableHover={!phoneLayout} />
             </SwiperSlide>
           ))}
         </DetailsArrowCarousel>
@@ -181,7 +185,7 @@ export default function SeasonsSection({
         <>
           <div className={`grid grid-cols-1 gap-4 ${phoneLayout ? "" : "sm:grid-cols-2 lg:grid-cols-3"}`}>
             {visibleCards.map(({ key, ...season }) => (
-              <SeasonCard key={key} {...season} />
+              <SeasonCard key={key} {...season} enableHover={!phoneLayout} />
             ))}
           </div>
           {hiddenCount > 0 ? (
@@ -190,7 +194,7 @@ export default function SeasonsSection({
                 type="button"
                 onClick={() => setExpanded((value) => !value)}
                 aria-expanded={expanded}
-                className="inline-flex min-h-10 items-center gap-2 rounded-full bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 px-5 text-sm font-bold text-zinc-200 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] backdrop-blur-[50px] transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400"
+                className={`inline-flex min-h-10 items-center gap-2 rounded-full bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 px-5 text-sm font-bold text-zinc-200 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] backdrop-blur-[50px] transition ${phoneLayout ? "" : "hover:text-white"} focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400`}
               >
                 {expanded ? (
                   <>

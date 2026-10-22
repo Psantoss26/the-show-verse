@@ -80,6 +80,9 @@ export default function SeasonCard({
   hoverLift = false,
   // Vista lateral de temporadas (details/sectionSheet): tarjeta más pequeña.
   compact = false,
+  // Sin efectos al pasar el ratón (vista de teléfono del modal lateral): el
+  // diseño que se replica es el táctil, como el resto de secciones.
+  enableHover = true,
 }) {
   const { poster, pending: posterPending } = useSeasonPoster({
     showId,
@@ -109,7 +112,7 @@ export default function SeasonCard({
       // Cristal de TARJETA compartido: van en rejilla, así que sin sombra propia
       // (varias sombras juntas forman una banda oscura detrás del grupo).
       className={`group relative isolate flex w-full transform-gpu gap-4 overflow-hidden rounded-2xl p-3 text-left ${LIQUID_GLASS_CARD} transition-all ${
-        hoverLift ? "hover:-translate-y-1 hover:brightness-110" : ""
+        hoverLift && enableHover ? "hover:-translate-y-1 hover:brightness-110" : ""
       }`}
       aria-label={`Ver ${title}${subtitle ? `: ${subtitle}` : ""}`}
     >
@@ -119,7 +122,7 @@ export default function SeasonCard({
           en vertical en vez de en la esquina superior. */}
       <span
         aria-hidden="true"
-        className={`pointer-events-none absolute -right-4 top-1/2 z-0 -translate-y-1/2 select-none font-black leading-none text-white/5 transition-colors group-hover:text-white/10 ${
+        className={`pointer-events-none absolute -right-4 top-1/2 z-0 -translate-y-1/2 select-none font-black leading-none text-white/5 transition-colors ${enableHover ? "group-hover:text-white/10" : ""} ${
           compact ? "text-[88px]" : "text-[110px]"
         }`}
       >
@@ -141,7 +144,7 @@ export default function SeasonCard({
             // que se vea nítido.
             sizes={compact ? "(min-width: 640px) 170px, 144px" : "(min-width: 1024px) 240px, (min-width: 640px) 216px, 192px"}
             alt=""
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+            className={`h-full w-full object-cover transition-transform duration-500 ${enableHover ? "group-hover:scale-[1.04]" : ""}`}
             loading="lazy"
           />
         ) : posterPending ? null : (
@@ -171,7 +174,7 @@ export default function SeasonCard({
                 event.stopPropagation();
                 window.open(imdbUrl, "_blank", "noopener,noreferrer");
               }}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black/20 text-zinc-400 transition hover:bg-white hover:text-black"
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black/20 text-zinc-400 transition ${enableHover ? "hover:bg-white hover:text-black" : ""}`}
               aria-label="Ver temporada en IMDb"
             >
               <ExternalLink className="h-4 w-4" />
@@ -250,6 +253,8 @@ export function SeasonPosterCard({
   watchedEpisodes = 0,
   onClick,
   onPrefetch,
+  // Ver SeasonCard: sin efectos al pasar el ratón en la vista de teléfono.
+  enableHover = true,
 }) {
   const { poster, pending: posterPending } = useSeasonPoster({
     showId,
@@ -277,7 +282,7 @@ export function SeasonPosterCard({
         onTouchStart={onPrefetch}
         aria-label={`Ver ${title}${subtitle ? `: ${subtitle}` : ""}`}
         title={title}
-        className="group relative block aspect-[2/3] w-full overflow-hidden rounded-xl bg-zinc-900 shadow-md transition-shadow duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 lg:hover:shadow-yellow-900/20"
+        className={`group relative block aspect-[2/3] w-full overflow-hidden rounded-xl bg-zinc-900 shadow-md transition-shadow duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 ${enableHover ? "lg:hover:shadow-yellow-900/20" : ""}`}
       >
         {poster ? (
           <OptimizedImage
@@ -285,7 +290,7 @@ export function SeasonPosterCard({
             srcSet={tmdbSrcSet(poster)}
             sizes={DETAILS_POSTER_ROW_SIZES}
             alt=""
-            className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
+            className={`h-full w-full object-cover transition-transform duration-500 ease-out ${enableHover ? "group-hover:scale-110" : ""}`}
             loading="lazy"
           />
         ) : posterPending ? null : (
