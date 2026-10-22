@@ -2562,6 +2562,15 @@ button:focus-visible > .sv-nav-glass > .sv-nav-glass__tint {
     animation: sv-mobile-detail-logo-reveal 360ms cubic-bezier(0.16, 1, 0.3, 1) 40ms both;
   }
 
+  /* Barra «Viendo» bajo la portada (películas a medias): entra con el logo y
+     los botones, con su misma curva y su primer retardo. Antes no tenía
+     entrada: se pintaba en cuanto llegaba /api/progress, antes que la
+     portada, el logo y los botones. Solo opacidad + transform, sin escala
+     (en una barra a lo ancho se leería como un zoom). */
+  .sv-mobile-progress-reveal {
+    animation: sv-mobile-detail-progress-reveal 360ms cubic-bezier(0.16, 1, 0.3, 1) 40ms both;
+  }
+
   /* Los botones entran después de que la portada esté lista. El escalonado
      conserva la lectura de cada acción SIN convertirse en una espera: iba de
      180ms a 630ms, de modo que el ultimo boton tardaba mas de medio segundo en
@@ -2644,6 +2653,18 @@ button:focus-visible > .sv-nav-glass > .sv-nav-glass__tint {
   }
 }
 
+@keyframes sv-mobile-detail-progress-reveal {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @keyframes sv-mobile-detail-poster-reveal {
   from {
     opacity: 0;
@@ -2685,6 +2706,7 @@ button:focus-visible > .sv-nav-glass > .sv-nav-glass__tint {
 
   .sv-mobile-poster-reveal,
   .sv-mobile-logo-reveal,
+  .sv-mobile-progress-reveal,
   .sv-mobile-actions-reveal > * > *,
   .sv-mobile-actions-rise,
   .sv-mobile-actions-scroll-reveal[data-mobile-actions-reveal="shown"],
@@ -2698,6 +2720,7 @@ button:focus-visible > .sv-nav-glass > .sv-nav-glass__tint {
 [data-details-restored] .sv-details-entry,
 [data-details-restored] .sv-mobile-poster-reveal,
 [data-details-restored] .sv-mobile-logo-reveal,
+[data-details-restored] .sv-mobile-progress-reveal,
 [data-details-restored] .sv-mobile-actions-reveal > * > *,
 [data-details-restored] .sv-mobile-actions-rise {
   animation: none;
