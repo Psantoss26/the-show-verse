@@ -262,34 +262,63 @@ function writeSessionJsonCache(key, data) {
 // segundo plano y por el cambio de pestaña, para que pulsar "Colecciones"
 // mientras la precarga vuela no dispare una segunda petición, sino que espere
 // a la que ya está en curso. Una respuesta vacía o fallida no se memoriza.
-// v2: la selección de destacadas creció (y se corrigieron ids erróneos); la
-// versión nueva evita servir la anterior de la caché de la sesión.
-const FEATURED_COLLECTIONS_CACHE_KEY = "showverse:lists:featured-collections:v5";
+//
+// GUARDADAS ENTRE VISITAS (localStorage, no solo la sesión): son casi siempre
+// las mismas, así que se pintan al instante con la copia guardada y se
+// refrescan detrás. Antes cada sesión nueva empezaba de cero y la pestaña
+// esperaba al catálogo y, fila a fila, a cada colección y a su arte.
+// v6: cada colección trae ya sus películas (`previewItems`) y el arte de las
+// primeras: las filas se pintan sin pedir nada más.
+const FEATURED_COLLECTIONS_CACHE_KEY = "showverse:lists:featured-collections:v6";
+// Hasta cuándo vale la copia guardada para pintar (se refresca siempre detrás).
+const FEATURED_COLLECTIONS_STORE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+// Una copia más reciente que esto no se refresca: evita pedir el catálogo en
+// cada cambio de pestaña.
+const FEATURED_COLLECTIONS_FRESH_MS = 30 * 60 * 1000;
+const FEATURED_COLLECTIONS_URL = "/api/tmdb/collections/featured?v=6";
 let featuredCollectionsRequest = null;
 
-function readCachedFeaturedCollections() {
-  const cached = readSessionJsonCache(
-    FEATURED_COLLECTIONS_CACHE_KEY,
-    LISTS_SOURCE_CACHE_TTL_MS,
-  );
-  return Array.isArray(cached) && cached.length > 0 ? cached : null;
+function readStoredFeaturedCollections() {
+  if (typeof window === "undefined") return null;
+  try {
+    const parsed = JSON.parse(
+      window.localStorage.getItem(FEATURED_COLLECTIONS_CACHE_KEY) || "null",
+    );
+    const t = Number(parsed?.t || 0);
+    if (!t || Date.now() - t > FEATURED_COLLECTIONS_STORE_TTL_MS) return null;
+    const data = parsed?.data;
+    return Array.isArray(data) && data.length > 0 ? { data, t } : null;
+  } catch {
+    return null;
+  }
 }
 
-function loadFeaturedCollections({ force = false } = {}) {
-  if (!force) {
-    const cached = readCachedFeaturedCollections();
-    if (cached) return Promise.resolve(cached);
+function readCachedFeaturedCollections() {
+  return readStoredFeaturedCollections()?.data || null;
+}
+
+function writeStoredFeaturedCollections(cols) {
+  try {
+    window.localStorage.setItem(
+      FEATURED_COLLECTIONS_CACHE_KEY,
+      JSON.stringify({ t: Date.now(), data: cols }),
+    );
+  } catch {
+    // Sin espacio o sin almacenamiento: queda la copia de esta pestaña.
   }
+}
+
+function fetchFeaturedCollections({ force = false } = {}) {
   if (featuredCollectionsRequest) return featuredCollectionsRequest;
 
-  const request = fetch("/api/tmdb/collections/featured?v=5", {
+  const request = fetch(FEATURED_COLLECTIONS_URL, {
     cache: force ? "no-cache" : "default",
   })
     .then((res) => res.json().catch(() => ({})))
     .then((j) => (Array.isArray(j?.collections) ? j.collections : []))
     .catch(() => [])
     .then((cols) => {
-      if (cols.length > 0) writeSessionJsonCache(FEATURED_COLLECTIONS_CACHE_KEY, cols);
+      if (cols.length > 0) writeStoredFeaturedCollections(cols);
       return cols;
     })
     .finally(() => {
@@ -298,6 +327,65 @@ function loadFeaturedCollections({ force = false } = {}) {
     });
   featuredCollectionsRequest = request;
   return request;
+}
+
+function loadFeaturedCollections({ force = false } = {}) {
+  if (!force) {
+    const cached = readCachedFeaturedCollections();
+    if (cached) return Promise.resolve(cached);
+  }
+  return fetchFeaturedCollections({ force });
+}
+
+// ¿Toca refrescar la copia guardada? (Se pinta igual mientras llega.)
+function featuredCollectionsStale() {
+  const stored = readStoredFeaturedCollections();
+  return !stored || Date.now() - stored.t > FEATURED_COLLECTIONS_FRESH_MS;
+}
+
+// Sin copia guardada y con la pestaña Colecciones elegida, la petición sale en
+// cuanto se evalúa este módulo: en paralelo a la hidratación, no después.
+if (typeof window !== "undefined") {
+  try {
+    const prefs = JSON.parse(window.localStorage.getItem(LISTS_MENU_PREFS_KEY) || "null");
+    if (prefs?.source === "collections" && featuredCollectionsStale()) {
+      fetchFeaturedCollections();
+    }
+  } catch {
+    // Preferencias ilegibles: se pedirá al elegir la pestaña.
+  }
+}
+
+// Películas de una colección del catálogo, listas para su fila (o null si el
+// catálogo no las trae). `complete`: con el arte de las primeras ya elegido.
+const catalogPreviewMemo = new WeakMap();
+function catalogPreviewItems(list) {
+  if (list?.source !== "collections" || !Array.isArray(list?.previewItems)) return null;
+  let items = catalogPreviewMemo.get(list.previewItems);
+  if (!items) {
+    items = dedupePreviewItems(list.previewItems);
+    catalogPreviewMemo.set(list.previewItems, items);
+  }
+  return items;
+}
+
+// Lo que pinta la tarjeta de una lista: lo cargado o, en las PRIMERAS
+// colecciones, sus películas del catálogo desde el primer render (sin pasar
+// por el esqueleto). Las demás siguen montándose al entrar en pantalla
+// (`ensureListItems`, ya sin red): dárselas todas de golpe montaba los 255
+// carruseles y sus ~950 tarjetas al abrir la pestaña.
+function listItemsState(itemsMap, list, index) {
+  const loaded = itemsMap[getListCacheKey(list)];
+  if (loaded !== undefined && loaded !== null) return loaded;
+  if (index >= PRELOAD_FIRST_N_LISTS) return loaded;
+  const fromCatalog = catalogPreviewItems(list);
+  return fromCatalog && previewArtworkComplete(fromCatalog) ? fromCatalog : loaded;
+}
+
+function previewArtworkComplete(items) {
+  return items
+    .slice(0, 5)
+    .every((item) => item?._listPreviewPoster !== undefined);
 }
 
 /* --- Hook SIMPLE: layout móvil SOLO por anchura (NO por touch) --- */
@@ -1756,7 +1844,7 @@ const ListsContent = memo(function ListsContent({
                   >
                     <GridListCard
                       list={l}
-                      itemsState={itemsMap[getListCacheKey(l)]}
+                      itemsState={listItemsState(itemsMap, l, index)}
                       ensureListItems={ensureListItems}
                     />
                   </ListEntrance>
@@ -1770,7 +1858,7 @@ const ListsContent = memo(function ListsContent({
                   <ListEntrance key={`${l.source}-${l.id}`} flipKey={`${l.source}-${l.id}`} index={index} instant={isBackNav}>
                     <RowListSection
                       list={l}
-                      itemsState={itemsMap[getListCacheKey(l)]}
+                      itemsState={listItemsState(itemsMap, l, index)}
                       ensureListItems={ensureListItems}
                       isMobile={isMobile}
                     />
@@ -1791,7 +1879,7 @@ const ListsContent = memo(function ListsContent({
                   >
                     <ListModeRow
                       list={l}
-                      itemsState={itemsMap[getListCacheKey(l)]}
+                      itemsState={listItemsState(itemsMap, l, index)}
                       ensureListItems={ensureListItems}
                     />
                   </ListEntrance>
@@ -1924,8 +2012,25 @@ export default function ListsPage() {
       setSource(prefs.source);
       setReadyContent({ source: prefs.source, lists: [] });
     }
+    // Catálogo de colecciones guardado: la pestaña se pinta en este mismo
+    // primer fotograma, sin esperar a ninguna petición.
+    const storedCollections = readCachedFeaturedCollections();
+    if (storedCollections) setFeaturedCollections(storedCollections);
     setPrefsHydrated(true);
   }, []);
+
+  // Copia guardada vieja: se refresca detrás, sin dejar de pintarla.
+  useEffect(() => {
+    if (!prefsHydrated || source !== "collections") return;
+    if (!featuredCollectionsStale()) return;
+    let alive = true;
+    fetchFeaturedCollections().then((cols) => {
+      if (alive && cols.length > 0) setFeaturedCollections(cols);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [prefsHydrated, source]);
 
   useEffect(() => {
     if (!prefsHydrated) return;
@@ -2405,7 +2510,18 @@ export default function ListsPage() {
           return;
         }
 
-        // collections
+        // collections: las películas vienen con el catálogo; solo falta el
+        // arte de las primeras si el servidor no lo tenía aún (en frío).
+        const fromCatalog = catalogPreviewItems(listObj);
+        if (fromCatalog) {
+          if (previewArtworkComplete(fromCatalog)) {
+            writeSessionJsonCache(previewCacheKey, fromCatalog);
+            setItemsMap((prev) => ({ ...prev, [cacheKey]: fromCatalog }));
+          } else {
+            await resolveAndStorePreview(fromCatalog);
+          }
+          return;
+        }
         const res = await fetch(
           // `lite`: solo sus películas; la vista previa no usa créditos ni
           // taquilla, que son una petición más a TMDb por película.

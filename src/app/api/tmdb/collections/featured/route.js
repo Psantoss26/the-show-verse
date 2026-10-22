@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
-import { FEATURED_COLLECTION_IDS, toCollectionSummary } from "@/lib/tmdb/featuredCollections";
+import {
+  COLLECTION_PREVIEW_ARTWORK_COUNT,
+  FEATURED_COLLECTION_IDS,
+  toCollectionPreviewItems,
+  toCollectionSummary,
+  withCollectionPreviewArtwork,
+} from "@/lib/tmdb/featuredCollections";
+import { pickListArtwork } from "@/lib/tmdb/artworkPicks";
 
 const TMDB_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 const TMDB_API = "https://api.themoviedb.org/3";
@@ -31,6 +38,106 @@ async function limited(task) {
   }
 }
 
+const DAY = 86_400;
+
+// Arte de las vistas previas, con su propio tope (no compite con el catálogo).
+const MAX_CONCURRENT_ARTWORK = 16;
+let activeArtwork = 0;
+const waitingArtwork = [];
+async function limitedArtwork(task) {
+  if (activeArtwork >= MAX_CONCURRENT_ARTWORK) {
+    await new Promise((resolve) => waitingArtwork.push(resolve));
+  }
+  activeArtwork += 1;
+  try {
+    return await task();
+  } finally {
+    activeArtwork -= 1;
+    waitingArtwork.shift()?.();
+  }
+}
+
+// Lo que una respuesta espera al arte de las vistas previas en frío (tras un
+// despliegue). Lo que no llegue lo resuelve el cliente por lote, como antes; el
+// arte sigue calentándose en segundo plano y sale en las respuestas siguientes.
+const PREVIEW_ARTWORK_BUDGET_MS = 1500;
+
+// Misma petición (URL y caché de un día) y mismo criterio que
+// /api/tmdb/artwork: lo elegido aquí es lo que el cliente habría elegido.
+async function fetchMoviePicks(id) {
+  const url = `${TMDB_API}/movie/${id}?api_key=${TMDB_KEY}&append_to_response=images`;
+  const res = await limitedArtwork(() =>
+    fetch(url, { cache: "force-cache", next: { revalidate: DAY } }),
+  );
+  if (!res.ok) throw new Error(`TMDb ${res.status}`);
+  const details = await res.json();
+  return pickListArtwork(details?.images, {
+    originalLanguage: details?.original_language,
+  });
+}
+
+// Elecciones de UNA colección, guardadas un día: la regeneración horaria del
+// catálogo lee unas pocas rutas por colección, no la ficha entera de cada
+// película. Si falla alguna no se guarda (un fallo de TMDb es transitorio).
+const readCollectionPreviewPicks = unstable_cache(
+  async (_collectionId, idsKey) => {
+    const ids = idsKey.split(",").filter(Boolean);
+    const entries = await Promise.all(
+      ids.map(async (id) => [`movie:${id}`, await fetchMoviePicks(id)]),
+    );
+    return Object.fromEntries(entries);
+  },
+  ["featured-collection-preview-picks-v1"],
+  { revalidate: DAY },
+);
+
+// Elecciones ya leídas, en memoria del proceso: cada respuesta del catálogo
+// las añade sin volver a la caché de datos (son cientos de colecciones).
+const PICKS_MEMO_TTL_MS = 6 * 60 * 60 * 1000;
+const picksMemo = new Map(); // `${collectionId}:${idsKey}` -> { picks, expiresAt }
+
+async function collectionPreviewPicks(collection, deadline) {
+  const items = Array.isArray(collection?.previewItems) ? collection.previewItems : [];
+  const idsKey = items
+    .slice(0, COLLECTION_PREVIEW_ARTWORK_COUNT)
+    .map((item) => item.id)
+    .join(",");
+  if (!idsKey) return null;
+  const memoKey = `${collection.id}:${idsKey}`;
+  const memo = picksMemo.get(memoKey);
+  if (memo && memo.expiresAt > Date.now()) return memo.picks;
+
+  const request = readCollectionPreviewPicks(String(collection.id), idsKey).then(
+    (picks) => {
+      picksMemo.set(memoKey, { picks, expiresAt: Date.now() + PICKS_MEMO_TTL_MS });
+      return picks;
+    },
+    () => null,
+  );
+  let timer = 0;
+  const picks = await Promise.race([
+    request,
+    new Promise((resolve) => {
+      timer = setTimeout(() => resolve(null), Math.max(0, deadline - Date.now()));
+    }),
+  ]);
+  clearTimeout(timer);
+  return picks;
+}
+
+async function withPreviewArtwork(collections) {
+  const deadline = Date.now() + PREVIEW_ARTWORK_BUDGET_MS;
+  return Promise.all(
+    collections.map(async (collection) => ({
+      ...collection,
+      previewItems: withCollectionPreviewArtwork(
+        collection.previewItems || [],
+        await collectionPreviewPicks(collection, deadline),
+      ),
+    })),
+  );
+}
+
 async function fetchJson(url, init) {
   const res = await fetch(url, init);
   const j = await res.json().catch(() => ({}));
@@ -51,7 +158,7 @@ const readFeaturedCollections = unstable_cache(async () => {
             next: { revalidate: 3600 }, // 1 hora
             signal: AbortSignal.timeout(8000),
           }));
-          return toCollectionSummary(c);
+          return { summary: toCollectionSummary(c), raw: c };
         } catch (err) {
           console.warn(`❌ Error colección ${id}:`, err.message);
           return null;
@@ -59,8 +166,15 @@ const readFeaturedCollections = unstable_cache(async () => {
       }),
     );
 
-    // Filtrar nulos y eliminar duplicados por ID y nombre
-    const validCollections = collections.filter(Boolean);
+    // Las películas de cada colección viajan con el catálogo: el índice pinta
+    // sus filas sin pedir cada colección aparte. El arte de las primeras se
+    // añade en cada respuesta (ver `withPreviewArtwork`).
+    const validCollections = collections
+      .filter(Boolean)
+      .map(({ summary, raw }) => ({
+        ...summary,
+        previewItems: toCollectionPreviewItems(raw),
+      }));
 
     // Deduplicar primero por ID
     const uniqueById = Array.from(
@@ -72,7 +186,7 @@ const readFeaturedCollections = unstable_cache(async () => {
       throw Object.assign(new Error("Incomplete collections catalog"), { collections: uniqueById });
     }
     return uniqueById;
-}, ["featured-collections-summary-v1"], { revalidate: 3600 });
+}, ["featured-collections-summary-v2"], { revalidate: 3600 });
 
 let pendingCollections = null;
 function loadFeaturedCollections() {
@@ -86,22 +200,30 @@ export async function GET() {
   try {
     if (!TMDB_KEY)
       return NextResponse.json({ error: "Missing TMDb key" }, { status: 500 });
-    const uniqueById = await loadFeaturedCollections();
+    const collections = await withPreviewArtwork(await loadFeaturedCollections());
+    // En frío falta arte: que el navegador no guarde esta respuesta diez
+    // minutos, para recibir el completo en cuanto esté.
+    const complete = collections.every((c) =>
+      (c.previewItems || [])
+        .slice(0, COLLECTION_PREVIEW_ARTWORK_COUNT)
+        .every((item) => item._listPreviewPoster !== undefined),
+    );
 
     // No deduplicar por nombre, ya que diferentes versiones pueden tener nombres similares
     return NextResponse.json(
-      { ok: true, collections: uniqueById },
+      { ok: true, collections },
       {
         headers: {
-          "Cache-Control":
-            "public, max-age=600, s-maxage=3600, stale-while-revalidate=7200",
+          "Cache-Control": complete
+            ? "public, max-age=600, s-maxage=3600, stale-while-revalidate=7200"
+            : "no-store",
         },
       },
     );
   } catch (e) {
     if (Array.isArray(e?.collections) && e.collections.length > 0) {
       return NextResponse.json(
-        { ok: true, collections: e.collections },
+        { ok: true, collections: await withPreviewArtwork(e.collections) },
         { headers: { "Cache-Control": "no-store" } },
       );
     }

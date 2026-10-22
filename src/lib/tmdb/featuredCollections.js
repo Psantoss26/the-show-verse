@@ -326,3 +326,56 @@ export function toCollectionSummary(c) {
     tmdbUrl: c?.id ? `https://www.themoviedb.org/collection/${c.id}` : null,
   };
 }
+
+// Cuántas películas de cada colección llevan el arte de la vista previa ya
+// elegido (portada y franja de pósters del índice): las mismas que resolvía el
+// cliente con `enrichListPreviewArtwork(…, { limit: 5 })`.
+export const COLLECTION_PREVIEW_ARTWORK_COUNT = 5;
+
+/**
+ * Películas de una colección (respuesta de /collection/{id}) para las vistas
+ * previas del índice, por fecha de estreno (como /api/tmdb/collection) y con
+ * solo lo que pintan las tarjetas. Viajan con el catálogo: antes el índice
+ * pedía cada colección otra vez, una a una, al pintarse su fila.
+ */
+export function toCollectionPreviewItems(c) {
+  const parts = Array.isArray(c?.parts) ? [...c.parts] : [];
+  parts.sort((a, b) =>
+    (a?.release_date || "9999-99-99").localeCompare(b?.release_date || "9999-99-99"),
+  );
+  const seen = new Set();
+  const items = [];
+  for (const part of parts) {
+    if (part?.id == null || seen.has(part.id)) continue;
+    seen.add(part.id);
+    items.push({
+      id: part.id,
+      media_type: "movie",
+      title: part.title || null,
+      poster_path: part.poster_path || null,
+      backdrop_path: part.backdrop_path || null,
+      release_date: part.release_date || null,
+      vote_average: typeof part.vote_average === "number" ? part.vote_average : null,
+      original_language: part.original_language || null,
+    });
+  }
+  return items;
+}
+
+/**
+ * Añade a las primeras películas el arte elegido (`picks` de pickListArtwork,
+ * por "movie:{id}"), con los mismos campos que `enrichListPreviewArtwork`. Las
+ * que no lo tengan se quedan sin esos campos: el cliente las resuelve por lote.
+ */
+export function withCollectionPreviewArtwork(items, picksByKey) {
+  return items.map((item, index) => {
+    if (index >= COLLECTION_PREVIEW_ARTWORK_COUNT) return item;
+    const picks = picksByKey?.[`movie:${item.id}`];
+    if (!picks) return item;
+    return {
+      ...item,
+      _listPreviewBackdrop: picks.previewBackdrop || item.backdrop_path || null,
+      _listPreviewPoster: picks.previewPoster || item.poster_path || null,
+    };
+  });
+}
