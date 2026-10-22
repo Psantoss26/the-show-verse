@@ -301,7 +301,7 @@ function CreditsSheet({ meta, data, items: dedupedItems, rawItems, onClose, tab,
         {/* Ordenar · Desde · Hasta en UNA fila: cada botón parte del ancho
             de su contenido y reparte el sobrante (o encoge) según el ancho
             del panel (`@container`, ver `compact` en InlineDropdown). */}
-        <div className="@container flex gap-2">
+        <div className="@container flex gap-1.5">
           <CreditsFilterDropdowns
             showRole={false}
             sort={sort}
@@ -316,7 +316,6 @@ function CreditsSheet({ meta, data, items: dedupedItems, rawItems, onClose, tab,
             options={yearOptions}
             menuZIndex={SHEET_MENU_Z}
             compact
-            compactIcon="wide"
           />
           <YearFilterDropdown
             label="Hasta"
@@ -325,7 +324,6 @@ function CreditsSheet({ meta, data, items: dedupedItems, rawItems, onClose, tab,
             options={yearOptions}
             menuZIndex={SHEET_MENU_Z}
             compact
-            compactIcon="wide"
           />
         </div>
         </MobileFiltersPanel>
