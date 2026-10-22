@@ -11,9 +11,12 @@ aliases: [Companion Apps, Apps de sincronización, Sync]
 | Cliente | Qué hace | Doc |
 |---|---|---|
 | Extensión de navegador | Captura reproducción en Netflix/plataformas web y la sincroniza. | [[netflix-extension/README\|Extensión de navegador]] |
-| App companion de Android | Sincroniza desde las apps nativas (Netflix, Disney+, Prime, Max, Crunchyroll, Movistar+…). | [[android-companion/README\|App companion de Android]] |
+| Apps de Android | Dos variantes del mismo proyecto: la **app completa** (`com.theshowverse.app`, la web en WebView más la sincronización) y **The Show Verse Sync** (`com.theshowverse.sync`, solo sincronización). Sincronizan desde las apps nativas (Netflix, Disney+, Prime, Max, Crunchyroll, Movistar+…), reciben notificaciones push (FCM) y tienen su propio registro de detecciones. | [[android-companion/README\|App companion de Android]] |
 
 ## Diseño e implementación
+- [[detecciones-streaming|Detecciones y su corrección]]
+- [[streaming-sync-reliability|Fiabilidad del sync]]
+- [[android-play-store|Publicar en Google Play]]
 - [[2026-07-03-universal-streaming-sync-design|Diseño del Universal Streaming Sync]]
 - [[2026-07-03-universal-streaming-sync|Plan de implementación del sync]]
 

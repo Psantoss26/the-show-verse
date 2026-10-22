@@ -12,7 +12,21 @@
 - **[Arranque local (guía exacta)](./infrastructure/ARRANQUE-LOCAL.md)** — levantar el proyecto completo en tu máquina.
 - **[Infraestructura (índice)](./infrastructure/README.md)** — despliegue, Docker, NAS, Cloudflare, CI/CD.
 
+## 🆕 Al día
+
+- **[CHANGELOG](../CHANGELOG.md)** — qué ha cambiado, mes a mes.
+- **[Roadmap](./ROADMAP.md)** — estado de los planes y lo que falta.
+
 ## 📂 Secciones
+
+### [`features/`](./features/Features.md) — funcionalidades
+- [Niveles y logros](./features/niveles-y-logros.md)
+- [Social y perfiles públicos](./features/social-y-perfiles.md)
+- [Comunidad: comentarios, sentimiento, listas y «me gusta»](./features/comunidad.md)
+- [Recap anual](./features/recap-anual.md)
+- [Detecciones de streaming](./features/detecciones-streaming.md)
+- [Páginas de usuario y ajustes](./features/paginas-de-usuario.md)
+- [Notificaciones push](./push-notifications.md) · [Fiabilidad del sync de streaming](./streaming-sync-reliability.md) · [Apps complementarias](./Companion-Apps.md)
 
 ### [`backend/`](./backend/) — API propia (Fastify + PostgreSQL + Redis)
 - [Referencia de la API](./backend/backend_api_reference.md)
@@ -42,6 +56,7 @@ GitHub Actions. Ver su [índice](./infrastructure/README.md).
 ### [`planning/`](./planning/) — planes y mejoras
 - [Mejora de recomendaciones del dashboard](./planning/dashboard-recommendations-improvement-plan.md)
 - [Optimización de recursos en Vercel](./planning/vercel-resource-optimization-plan.md)
+- Estado de todos los planes: [ROADMAP](./ROADMAP.md)
 
 ### [`tfg/`](./tfg/) — memoria académica (Trabajo Fin de Grado)
 Documentación del TFG y sus capturas ([`tfg/images/`](./tfg/images/)). Entradas
@@ -59,6 +74,9 @@ Diseños e implementaciones generados durante el desarrollo (`superpowers/specs/
 `superpowers/plans/`). No editar a mano.
 
 ---
+
+> **Mantener al día:** cada cambio visible actualiza el [CHANGELOG](../CHANGELOG.md) y su documento de
+> `docs/` en el mismo PR (regla en [`AGENTS.md`](../AGENTS.md)).
 
 > **Convención:** los documentos conservan sus nombres originales; solo se han
 > reorganizado en subcarpetas temáticas. Los enlaces internos entre documentos son
