@@ -8,7 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
-- Ficha de actor, panel lateral de Películas y Series: Ordenar, Desde y Hasta en una sola fila, con sus iconos, ajustando tamaño y espacio al ancho del panel para que ningún texto se corte.
+- Ficha de actor, panel lateral de Películas y Series: Ordenar, Desde y Hasta en una sola fila, con su icono y su flecha, ajustando tamaño y espacio al ancho del panel para que ningún texto se corte. En sus menús, la barra de scroll ya no queda pegada a las opciones.
 - Móvil: con un modal abierto, los avisos emergentes salen en el borde superior (la barra queda tapada por el modal) en lugar de taparle la cabecera.
 - Ficha móvil de películas a medias: la barra «Viendo» bajo la portada entra a la vez que los botones de acción y con su misma animación (la fila sube y el contenido entra con el rebote del primer botón), en lugar de aparecer antes y de golpe.
 - Documentación puesta al día con las funcionalidades de julio a octubre de 2026: referencia completa de la API, mapa de páginas y nueva carpeta [`docs/features/`](docs/features/Features.md).
