@@ -58,19 +58,23 @@ async function applySpanishReleaseDates(movies, start, end, fetchInit) {
   const needsFix = movies.filter((movie) => !inRange(movie?.release_date));
   if (needsFix.length === 0) return movies;
 
-  // En tandas: cada película descuadrada es una petición y un mes cargado puede
-  // traer veinte. Todas a la vez y TMDB empieza a cortar.
-  const batchSize = 8;
+  // Con un tope de peticiones a la vez: cada película descuadrada es una
+  // petición y una ventana larga trae decenas. Todas de golpe y TMDB empieza a
+  // cortar. Antes iban en tandas cerradas de 8 (cada tanda esperaba a la más
+  // lenta de la anterior); ahora cada hueco que se libera coge la siguiente.
+  const concurrency = 8;
   const resolved = new Map();
-  for (let i = 0; i < needsFix.length; i += batchSize) {
-    const batch = needsFix.slice(i, i + batchSize);
-    const results = await Promise.all(
-      batch.map((movie) => fetchSpanishReleases(movie.id, fetchInit)),
-    );
-    batch.forEach((movie, index) => {
-      resolved.set(movie.id, results[index].find(inRange) || null);
-    });
-  }
+  let next = 0;
+  const worker = async () => {
+    while (next < needsFix.length) {
+      const movie = needsFix[next++];
+      const dates = await fetchSpanishReleases(movie.id, fetchInit);
+      resolved.set(movie.id, dates.find(inRange) || null);
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, needsFix.length) }, worker),
+  );
 
   return movies.reduce((acc, movie) => {
     if (inRange(movie?.release_date)) {
@@ -86,23 +90,23 @@ async function applySpanishReleaseDates(movies, start, end, fetchInit) {
 export async function getMoviesByDateRange(startDate, endDate, { fetchInit } = {}) {
   const formattedStart = ymd(startDate);
   const formattedEnd = ymd(endDate);
-  let page = 1;
-  let totalPages = 1;
-  const movies = [];
+  const pageUrl = (page) =>
+    `https://api.themoviedb.org/3/discover/movie?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}&language=es-ES&sort_by=release_date.asc&release_date.gte=${formattedStart}&release_date.lte=${formattedEnd}&region=ES&page=${page}`;
+  const fetchPage = async (page) => {
+    const res = await fetch(pageUrl(page), fetchInit);
+    return res.json();
+  };
 
-  do {
-    const url = `https://api.themoviedb.org/3/discover/movie?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}&language=es-ES&sort_by=release_date.asc&release_date.gte=${formattedStart}&release_date.lte=${formattedEnd}&region=ES&page=${page}`;
-
-    const res = await fetch(url, fetchInit);
-    const data = await res.json();
-
-    if (data?.results?.length > 0) {
-      movies.push(...data.results);
-    }
-
-    totalPages = data.total_pages || 1;
-    page++;
-  } while (page <= totalPages && page <= 5); // Limitar a 5 páginas para rangos amplios
+  // La primera página dice cuántas hay; el resto (hasta 5, para rangos amplios)
+  // se piden A LA VEZ. Antes iban en fila: cinco viajes a TMDB por año pedido.
+  const first = await fetchPage(1);
+  const totalPages = Math.min(first?.total_pages || 1, 5);
+  const rest = await Promise.all(
+    Array.from({ length: totalPages - 1 }, (_, index) =>
+      fetchPage(index + 2).catch(() => null),
+    ),
+  );
+  const movies = [first, ...rest].flatMap((data) => data?.results || []);
 
   return applySpanishReleaseDates(movies, formattedStart, formattedEnd, fetchInit);
 }

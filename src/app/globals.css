@@ -1384,13 +1384,27 @@ body {
     var(--sv-enter-delay, 0ms) backwards;
 }
 
+/* Panel lateral del Calendario (escritorio ancho): entra desde la derecha
+   detrás de la barra. */
+@keyframes sv-section-aside-in {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+}
+
+.sv-section-aside-in {
+  animation: sv-section-aside-in 500ms ease-out 400ms backwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sv-section-header-in,
   .sv-section-stats-in,
   .sv-section-stat-in,
   .sv-section-toolbar-in,
   .sv-section-card-rise,
-  .sv-section-card-grow {
+  .sv-section-card-grow,
+  .sv-section-aside-in {
     animation: none;
   }
 }
@@ -3306,6 +3320,7 @@ html[data-details-sequence-transition] .sv-topbar {
   .sv-section-toolbar-in,
   .sv-section-card-rise,
   .sv-section-card-grow,
+  .sv-section-aside-in,
   .sv-phone-actions-reveal > * > *,
   .sv-mobile-poster-reveal,
   .sv-mobile-logo-reveal,
