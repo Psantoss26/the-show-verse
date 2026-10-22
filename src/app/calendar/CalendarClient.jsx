@@ -46,6 +46,7 @@ import {
   Grid3x3,
 } from "lucide-react";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 
 import {
   getMoviesByDateRange,
@@ -332,20 +333,99 @@ function CalendarHoverIndicator({ kind, dateParts, compact = false }) {
 }
 
 
-// ¿Se animan las entradas de las tarjetas? No las que llegan con la página
-// (datos del servidor): esas se ven ya, sin fundido desde opacidad 0. Sí las que
-// monta después un cambio de periodo, filtro o vista.
-const CardEntryContext = createContext(true);
+// CÓMO ENTRAN LAS TARJETAS.
+//
+//  - "css": las que llegan con la página (HTML del servidor). La entrada de las
+//    secciones del dashboard y Favoritos, en CSS (`.sv-section-card-*` en
+//    globals.css): arranca en el primer pintado. Con framer el HTML saldría a
+//    opacidad 0 hasta hidratar. Solo las primeras (las que se ven).
+//  - "motion": las que monta después un cambio de periodo, filtro o vista, o
+//    las que pide el cliente porque el servidor no llegó a tiempo.
+//  - "none": al volver atrás la página se ve tal cual estaba.
+const CardEntryContext = createContext({ mode: "motion", animateBelow: Infinity });
 
 const CARD_ENTRY_INITIAL = { opacity: 0, y: 10, scale: 0.95 };
 
-function useCardEntry(animation) {
-  return useContext(CardEntryContext) ? animation : false;
-}
+// Tarjetas que monta el primer render (y las únicas que entran animadas): la
+// primera pantalla de la rejilla más densa. Antes se montaban TODAS de golpe
+// (~200 en la vista de 12 meses, ~525 KB de HTML) y en móvil el primer pintado
+// y la hidratación se iban a segundos. El resto entra por tandas en ratos
+// libres, cuando ya ha terminado la entrada.
+const CALENDAR_INITIAL_RENDER_LIMIT = 36;
+const CALENDAR_RENDER_CHUNK_SIZE = 36;
 
 // Retraso de entrada en cascada, tarjeta a tarjeta, como en Historial.
 function entranceDelay(index, total) {
   return total > 30 ? Math.min(index * 0.015, 0.25) : index * 0.03;
+}
+
+// Se decide UNA vez, al montar: si cambiara después (al reordenar, al crecer la
+// ventana de render) la animación volvería a arrancar.
+function useCardEntry(index, total, rise = true) {
+  const { mode, animateBelow } = useContext(CardEntryContext);
+  const [entry] = useState(() => {
+    // Las que entran luego por tandas (ya fuera de pantalla), sin animar.
+    if (mode === "motion" && index < animateBelow) {
+      return { initial: CARD_ENTRY_INITIAL, className: "" };
+    }
+    if (mode === "css" && index < CALENDAR_INITIAL_RENDER_LIMIT) {
+      return {
+        initial: false,
+        className: rise ? " sv-section-card-rise" : " sv-section-card-grow",
+        style: {
+          "--sv-enter-delay": `${Math.round(entranceDelay(index, total) * 1000)}ms`,
+        },
+      };
+    }
+    return { initial: false, className: "" };
+  });
+  return entry;
+}
+
+// Tarjetas pintadas hasta el borde inferior de la pantalla (la primera que
+// queda por debajo corta: van en orden). Se lee en el render del cambio: el DOM
+// aún es el de antes, que es justo lo que se está viendo.
+function countCardsInView() {
+  const container =
+    typeof document === "undefined"
+      ? null
+      : document.querySelector("[data-calendar-content]");
+  if (!container) return 0;
+  const cards = container.querySelectorAll("a[href]");
+  const bottom = window.innerHeight;
+  let count = 0;
+  for (const card of cards) {
+    if (card.getBoundingClientRect().top > bottom) break;
+    count += 1;
+  }
+  return count;
+}
+
+function scheduleRenderChunk(callback) {
+  if ("requestIdleCallback" in window) {
+    return window.requestIdleCallback(callback, { timeout: 220 });
+  }
+  return window.setTimeout(callback, 48);
+}
+
+function cancelRenderChunk(handle) {
+  if ("cancelIdleCallback" in window) window.cancelIdleCallback(handle);
+  else window.clearTimeout(handle);
+}
+
+// Las primeras `limit` tarjetas (la tira de episodios va delante), con los
+// grupos que las contienen. Las cabeceras siguen contando el grupo entero.
+function windowCalendarItems(loneEpisodes, groups, limit) {
+  const lone = loneEpisodes.slice(0, limit);
+  let remaining = limit - lone.length;
+  const visibleGroups = [];
+  for (const group of groups) {
+    if (remaining <= 0) break;
+    const items = group.items.slice(0, remaining);
+    remaining -= items.length;
+    visibleGroups.push({ ...group, count: group.items.length, items });
+  }
+  return { lone, groups: visibleGroups };
 }
 
 const CalendarListCard = memo(function CalendarListCard({
@@ -357,10 +437,12 @@ const CalendarListCard = memo(function CalendarListCard({
     ? format(item.date, "d 'de' MMMM 'de' yyyy", { locale: es })
     : null;
 
-  const entryInitial = useCardEntry(CARD_ENTRY_INITIAL);
+  const entry = useCardEntry(index, total);
   return (
     <motion.div
-      initial={entryInitial}
+      className={entry.className || undefined}
+      style={entry.style}
+      initial={entry.initial}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{
         duration: 0.25,
@@ -417,11 +499,12 @@ const CalendarCompactCard = memo(function CalendarCompactCard({
 }) {
   const dateParts = badgeDateParts(item.date);
 
-  const entryInitial = useCardEntry(CARD_ENTRY_INITIAL);
+  const entry = useCardEntry(index, total);
   return (
     <motion.div
-      className="relative z-0 overflow-visible focus-within:z-[40] hover:z-[50]"
-      initial={entryInitial}
+      className={`relative z-0 overflow-visible focus-within:z-[40] hover:z-[50]${entry.className}`}
+      style={entry.style}
+      initial={entry.initial}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{
         duration: 0.25,
@@ -459,10 +542,12 @@ const CalendarGridCard = memo(function CalendarGridCard({
 }) {
   const dateParts = badgeDateParts(item.date);
 
-  const entryInitial = useCardEntry(CARD_ENTRY_INITIAL);
+  const entry = useCardEntry(index, total, false);
   return (
     <motion.div
-      initial={entryInitial}
+      className={entry.className || undefined}
+      style={entry.style}
+      initial={entry.initial}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{
         duration: 0.25,
@@ -960,8 +1045,12 @@ export default function CalendarClient({
   );
   const [moviesLoading, setMoviesLoading] = useState(!serverCalendar);
   const [episodesLoading, setEpisodesLoading] = useState(!serverCalendar);
-  // Entradas animadas solo para lo que se monta DESPUÉS de abrir la página.
-  const [cardEntries, setCardEntries] = useState(!serverCalendar);
+  // Al volver atrás, la página tal cual: sin entrada y entera desde el primer
+  // render (la altura correcta para restaurar el scroll).
+  const isBackNav = useIsHistoryNavigation();
+  const [renderLimit, setRenderLimit] = useState(
+    isBackNav ? Number.MAX_SAFE_INTEGER : CALENDAR_INITIAL_RENDER_LIMIT,
+  );
 
   // Lo entregado, a las cachés por ventana: volver a este periodo es inmediato.
   if (serverCalendar && !moviesCache.has(serverCalendar.windowKey)) {
@@ -970,7 +1059,6 @@ export default function CalendarClient({
   }
 
   useEffect(() => {
-    setCardEntries(true);
     writeCalendarTimeZoneCookie();
   }, []);
 
@@ -1316,6 +1404,49 @@ export default function CalendarClient({
     return { offsets, total: acc };
   }, [groups, loneEpisodes]);
 
+  // Modo de entrada de las tarjetas (ver CardEntryContext). En cuanto el
+  // usuario cambia algo de lo que se ve, lo nuevo entra con framer, como antes.
+  const entryKey = [windowKey, typeFilter, groupBy, sortBy, cardView, selectedDay, query].join("|");
+  //
+  // Y la ventana de render ENCOGE a lo que se ve (como en Favoritos): rehacer
+  // las ~200 tarjetas de una ventana larga, todas animando, tardaba en aplicarse.
+  // Solo anima lo que se monta en ese momento; el resto vuelve por tandas.
+  const [entryState, setEntryState] = useState(() => ({
+    key: entryKey,
+    mode: isBackNav ? "none" : serverCalendar ? "css" : "motion",
+    animateBelow: Infinity,
+  }));
+  if (entryState.key !== entryKey) {
+    const limit = Math.max(
+      CALENDAR_INITIAL_RENDER_LIMIT,
+      Math.min(renderLimit, countCardsInView() + CALENDAR_RENDER_CHUNK_SIZE),
+    );
+    setRenderLimit(limit);
+    setEntryState({ key: entryKey, mode: "motion", animateBelow: limit });
+  }
+
+  // La ventana de render crece hasta la lista entera en ratos libres, y solo
+  // DESPUÉS de la entrada: crecer a mitad la entrecortaría.
+  const [canExpandRender, setCanExpandRender] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setCanExpandRender(true), 450);
+    return () => window.clearTimeout(timer);
+  }, []);
+  useEffect(() => {
+    if (!canExpandRender || renderLimit >= cardOrder.total) return undefined;
+    const handle = scheduleRenderChunk(() => {
+      setRenderLimit((prev) =>
+        Math.min(prev + CALENDAR_RENDER_CHUNK_SIZE, cardOrder.total),
+      );
+    });
+    return () => cancelRenderChunk(handle);
+  }, [canExpandRender, renderLimit, cardOrder.total]);
+
+  const rendered = useMemo(
+    () => windowCalendarItems(loneEpisodes, groups, renderLimit),
+    [loneEpisodes, groups, renderLimit],
+  );
+
   const typeLabel =
     TYPE_FILTERS.find(({ id }) => id === typeFilter)?.label ?? "Todo";
   const groupLabel =
@@ -1352,7 +1483,7 @@ export default function CalendarClient({
 
 
   return (
-    <CardEntryContext.Provider value={cardEntries}>
+    <CardEntryContext.Provider value={entryState}>
     <div className="min-h-screen bg-black text-gray-100 font-sans selection:bg-yellow-500/30 pb-20">
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         <div className="absolute -top-[10%] -left-[5%] w-[60vw] max-w-[800px] aspect-square rounded-full bg-yellow-600/15 blur-[120px] sm:blur-[150px]" />
@@ -1362,11 +1493,11 @@ export default function CalendarClient({
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-2 sm:px-6 lg:px-8 py-6 lg:py-12">
         {/* Header Section */}
+        {/* Entrada de las secciones del dashboard y Favoritos, en CSS (ver
+            `.sv-section-*` en globals.css): arranca con el HTML del servidor. */}
         <div
-          className={`relative z-30 mb-8 sm:mb-12 ${
-            serverCalendar
-              ? ""
-              : "animate-in fade-in slide-in-from-top-4 duration-500"
+          className={`relative z-30 mb-8 sm:mb-12${
+            isBackNav ? "" : " sv-section-header-in"
           }`}
         >
           {/* Título. Los controles ya no viven aquí: están en la barra fija de
@@ -1391,19 +1522,18 @@ export default function CalendarClient({
 
         {/* Layout Principal: contenido a la izquierda, calendario a la derecha. */}
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-8 items-start">
-          <div className="min-w-0">
+          <div data-calendar-content className="min-w-0">
 
             {/* MENÚ FIJO. Mismo patrón que el del Historial: en escritorio una sola
                 fila con todo; en móvil la fila principal y un panel desplegable con
                 lo secundario. `data-menu-pinned` es lo que enciende el cristal del
                 navbar sobre la barra cuando queda pegada (regla en globals.css). */}
-            <motion.div
+            <div
               ref={filtersRef}
               data-menu-pinned={filtersPinned}
-              className="sticky top-14 z-[70] space-y-3 mb-6 transition-all duration-300 sm:top-20"
-              initial={serverCalendar ? false : { opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.2 }}
+              className={`sticky top-14 z-[70] space-y-3 mb-6 transition-all duration-300 sm:top-20${
+                isBackNav ? "" : " sv-section-toolbar-in"
+              }`}
             >
               {/* Móvil: fila principal + panel de controles. Antes de fijarse el
                   panel va en el flujo y empuja el contenido; una vez fijada la barra
@@ -1679,7 +1809,7 @@ export default function CalendarClient({
                   <RotateCcw className="w-4 h-4" />
                 </button>
               </div>
-            </motion.div>
+            </div>
 
             {/* CONTENIDO. Sin pantalla de carga: cada fuente entra en cuanto
                 llega, y los avisos de "no hay nada" esperan a que las dos hayan
@@ -1716,7 +1846,9 @@ export default function CalendarClient({
                     un "0 películas · 0 episodios" de medio segundo al entrar es
                     peor que no decir nada todavía. */}
                 <div
-                  className={`mb-6 sm:mb-8 px-2 sm:px-0 ${hasAnyItems ? "" : "hidden"}`}
+                  className={`mb-6 sm:mb-8 px-2 sm:px-0 ${hasAnyItems ? "" : "hidden"}${
+                    isBackNav ? "" : " sv-section-stats-in"
+                  }`}
                 >
                   <div className="flex items-center gap-3">
                     <div className="h-px flex-1 bg-gradient-to-r from-transparent via-yellow-500/40 to-yellow-500/15" />
@@ -1749,7 +1881,7 @@ export default function CalendarClient({
                     la primera cabecera de agrupación, y con las mismas tarjetas
                     que el resto. Solo aparece con "Tipo: Todo"; filtrando por
                     episodios no hay nada de lo que separarlos. */}
-                {loneEpisodes.length > 0 && (
+                {rendered.lone.length > 0 && (
                   <div className="mb-8 px-2 sm:px-0">
                     <div className="flex items-center gap-3 py-1.5 sm:py-4 mb-2">
                       <div className="h-px flex-1 bg-gradient-to-r from-transparent via-violet-500/40 to-violet-500/15" />
@@ -1766,7 +1898,7 @@ export default function CalendarClient({
                     </div>
 
                     <CalendarCardGrid
-                      items={loneEpisodes}
+                      items={rendered.lone}
                       cardView={cardView}
                       baseIndex={0}
                       total={cardOrder.total}
@@ -1812,7 +1944,7 @@ export default function CalendarClient({
                   </div>
                 ) : (
                   <div className="space-y-8 px-2 sm:px-0">
-                    {groups.map((group, groupIndex) => {
+                    {rendered.groups.map((group, groupIndex) => {
                       // Índice global de la primera tarjeta del grupo, para que
                       // la cascada de entrada no se reinicie en cada cabecera.
                       const baseIndex = cardOrder.offsets[groupIndex] ?? 0;
@@ -1826,8 +1958,8 @@ export default function CalendarClient({
                                 {formatGroupHeader(group.date, selectedDay ? "day" : groupBy)}
                               </span>
                               <span className="relative z-10 shrink-0 text-[10px] font-bold text-yellow-300/80">
-                                {group.items.length}{" "}
-                                {group.items.length === 1 ? "título" : "títulos"}
+                                {group.count}{" "}
+                                {group.count === 1 ? "título" : "títulos"}
                               </span>
                             </div>
                             <div className="h-px flex-1 bg-gradient-to-l from-transparent via-yellow-500/40 to-yellow-500/15" />
@@ -1850,11 +1982,10 @@ export default function CalendarClient({
 
           {/* Derecha: calendario del mes (solo escritorio ancho). En pantallas
               menores el mismo panel se abre desde el botón del menú. */}
-          <motion.div
-            className="hidden xl:block space-y-6 sticky top-20"
-            initial={serverCalendar ? false : { opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
+          <div
+            className={`hidden xl:block space-y-6 sticky top-20${
+              isBackNav ? "" : " sv-section-aside-in"
+            }`}
           >
             <CalendarSidePanel
               monthDate={panelMonth}
@@ -1867,7 +1998,7 @@ export default function CalendarClient({
               onClearDay={clearSelectedDay}
               loading={monthCountsLoading}
             />
-          </motion.div>
+          </div>
         </div>
       </div>
 

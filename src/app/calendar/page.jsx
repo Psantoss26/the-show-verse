@@ -1,4 +1,5 @@
 import { cookies, headers } from "next/headers";
+import { unstable_cache } from "next/cache";
 import { endOfMonth, startOfMonth } from "date-fns";
 import CalendarClient from "./CalendarClient";
 import {
@@ -52,6 +53,38 @@ function slimMovie(movie) {
     backdrop_path: movie.backdrop_path || null,
   };
 }
+
+// LA VENTANA DE ESTRENOS ENTERA, YA RECORTADA, EN LA CACHÉ DE DATOS.
+//
+// Con la caché por URL de cada `fetch`, cada visita seguía rehaciendo decenas de
+// lecturas (páginas de `discover` + fechas españolas de cada película
+// descuadrada) y el trabajo de juntarlas. Los estrenos no dependen del usuario:
+// la lista final se guarda por ventana y una visita la lee de una vez.
+const getCachedMovies = unstable_cache(
+  async (startYmd, endYmd) => {
+    const movies = await getMoviesByWindow(
+      dateFromYmd(startYmd),
+      dateFromYmd(endYmd),
+      { fetchInit: TMDB_FETCH },
+    );
+    return movies.map(slimMovie);
+  },
+  ["calendar-movies-window-v1"],
+  { revalidate: 60 * 60 },
+);
+
+const getCachedMonthMovies = unstable_cache(
+  async (startYmd, endYmd) => {
+    const movies = await getMoviesByDateRange(
+      dateFromYmd(startYmd),
+      dateFromYmd(endYmd),
+      { fetchInit: TMDB_FETCH },
+    );
+    return movies.map(slimMovie);
+  },
+  ["calendar-movies-month-v1"],
+  { revalidate: 60 * 60 },
+);
 
 function withBudget(promise) {
   let timer = 0;
@@ -127,20 +160,18 @@ async function loadInitialCalendar({ today, groupBy, cookieStore, headerList }) 
 
   const load = async () => {
     const [movies, episodeData, monthMovies] = await Promise.all([
-      getMoviesByWindow(range.start, range.end, { fetchInit: TMDB_FETCH }),
+      getCachedMovies(ymd(range.start), ymd(range.end)),
       loadEpisodes(),
       sameAsMonth
         ? null
-        : getMoviesByDateRange(monthStart, monthEnd, { fetchInit: TMDB_FETCH }).catch(
-            () => [],
-          ),
+        : getCachedMonthMovies(ymd(monthStart), ymd(monthEnd)).catch(() => []),
     ]);
     const episodes = episodeData.window;
     const monthEpisodes = episodeData.month;
     return {
       today,
       windowKey: calendarWindowKey(range),
-      movies: movies.map(slimMovie),
+      movies,
       episodes: episodes.items,
       monthKey: calendarMonthKey(monthStart),
       monthCounts: sameAsMonth
