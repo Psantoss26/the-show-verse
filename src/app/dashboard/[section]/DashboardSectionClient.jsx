@@ -27,6 +27,7 @@ import {
   LayoutGrid,
   List,
   MonitorPlay,
+  RotateCcw,
   Search,
   SlidersHorizontal,
   Star,
@@ -1169,16 +1170,32 @@ export default function DashboardSectionClient({
                   {data?.title || initialTitle || "Sección"}
                   <span className="text-amber-500">.</span>
                 </h1>
-                <LiquidButton
-                  onClick={() => router.push("/")}
-                  activeColor="amber"
-                  groupId="dashboard-section-header-actions"
-                  title="Volver al dashboard"
-                  aria-label="Volver al dashboard"
-                  className="!bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent !border-0 shadow-lg backdrop-blur-md hover:!bg-white/15"
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                </LiquidButton>
+                {/* Acciones junto al título, como las de Favoritos: volver al
+                    dashboard y recargar la sección. */}
+                <div className="flex items-center gap-2">
+                  <LiquidButton
+                    onClick={() => router.push("/")}
+                    activeColor="amber"
+                    groupId="dashboard-section-header-actions"
+                    title="Volver al dashboard"
+                    aria-label="Volver al dashboard"
+                    className="!bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent !border-0 shadow-lg backdrop-blur-md hover:!bg-white/15"
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                  </LiquidButton>
+                  <LiquidButton
+                    onClick={() => window.location.reload()}
+                    disabled={loading}
+                    loading={loading}
+                    activeColor="amber"
+                    groupId="dashboard-section-header-actions"
+                    title="Recargar sección"
+                    aria-label="Recargar sección"
+                    className="!bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent !border-0 shadow-lg backdrop-blur-md hover:!bg-white/15"
+                  >
+                    <RotateCcw className={`w-5 h-5 ${loading ? "animate-spin" : ""}`} />
+                  </LiquidButton>
+                </div>
               </div>
               {/* Más ancha que en Favoritos: estas descripciones son más largas
                   y, en dos líneas, la cabecera crecía y descolocaba las cifras. */}
