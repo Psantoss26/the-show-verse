@@ -50,11 +50,14 @@ export function InlineDropdown({
   // Hasta en una sola fila). Solo icono y valor, sin la etiqueta, en cualquier
   // ancho, y el botón parte del ancho de su contenido (`flex: 1 1 auto`):
   // reparte el sobrante o encoge con los demás. La fila debe ser `@container`
-  // flex; `compactIcon: "wide"` muestra el icono solo si la fila mide ≥ 28rem
-  // y, por debajo de 24rem (panel en un teléfono), la flecha se oculta: así
-  // los tres valores caben enteros («Valoración · Desde 2010 · Hasta 2017»).
+  // flex y el botón se ajusta a SU ancho para que los tres valores quepan
+  // enteros, siempre con su icono («Valoración · Desde 2010 · Hasta 2017»):
+  //   - ≥ 28rem (panel de escritorio): icono, valor y flecha;
+  //   - < 28rem (tablet): sin la flecha;
+  //   - < 24rem (teléfono): además, relleno, huecos e icono algo menores y
+  //     texto de 13px;
+  //   - < 21rem (teléfonos estrechos, ~360px): texto de 12px y menos relleno.
   compact = false,
-  compactIcon = "always",
   accent = "emerald",
 }) {
   const tone = ACCENTS[accent] || ACCENTS.emerald;
@@ -130,15 +133,15 @@ export function InlineDropdown({
         onClick={() => setOpen((v) => !v)}
         className={`h-11 min-w-0 w-full inline-flex items-center justify-between rounded-2xl transition text-sm ${
           compact
-            ? "gap-1.5 px-3"
+            ? "gap-1 px-2 text-xs @min-[21rem]:gap-1.5 @min-[21rem]:px-2.5 @min-[21rem]:text-[13px] @min-[24rem]:px-3 @min-[24rem]:text-sm"
             : `gap-3 px-4 lg:min-w-[140px] ${fullWidth ? "" : "lg:w-auto"}`
         } bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 focus-visible:outline focus-visible:outline-2 ${tone.focus}`}
       >
-        <div className={`flex min-w-0 items-center ${compact ? "gap-1.5" : "gap-2"}`}>
+        <div className={`flex min-w-0 items-center ${compact ? "gap-1 @min-[24rem]:gap-1.5" : "gap-2"}`}>
           {Icon && (
             <Icon
-              className={`h-4 w-4 shrink-0 ${tone.icon} ${
-                compact && compactIcon === "wide" ? "hidden @min-[28rem]:block" : ""
+              className={`shrink-0 ${tone.icon} ${
+                compact ? "h-3.5 w-3.5 @min-[24rem]:h-4 @min-[24rem]:w-4" : "h-4 w-4"
               }`}
             />
           )}
@@ -164,7 +167,7 @@ export function InlineDropdown({
         </div>
         <ChevronDown
           className={`h-3.5 w-3.5 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""} ${
-            compact ? "hidden @min-[24rem]:block" : ""
+            compact ? "hidden @min-[28rem]:block" : ""
           }`}
         />
       </button>
@@ -232,14 +235,12 @@ export function YearFilterDropdown({
   menuZIndex,
   fullWidth,
   compact,
-  compactIcon,
 }) {
   return (
     <InlineDropdown
       menuZIndex={menuZIndex}
       fullWidth={fullWidth}
       compact={compact}
-      compactIcon={compactIcon}
       label={label}
       valueLabel={value || "Todos"}
       mobileValueLabel={value ? `${label} ${value}` : label}
