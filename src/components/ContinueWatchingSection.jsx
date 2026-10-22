@@ -1707,14 +1707,43 @@ function ContinueWatchingPreviewCard({
           )}
 
           {isCalendar ? (
-            // La fecha/cuenta atrás NO se repite sobre la portada: ya se muestra
-            // abajo en el panel (línea de episodio). Aquí solo se conserva el badge
-            // "Estreno" para los estrenos (S1E1).
-            calendar?.isPremiere ? (
-              <div className="absolute inset-x-3 bottom-2 z-10">
-                <span className="rounded bg-white px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-black">
-                  Estreno
-                </span>
+            // EPISODIO Y FECHA en el pie del backdrop, encima de las acciones: el
+            // mismo sitio que el progreso de "Continuar viendo" (y se queda
+            // aunque haya tráiler). En DOS líneas, como en la tarjeta de la fila:
+            // fecha/cuenta atrás (con "Estreno" en los S1E1) y, debajo,
+            // T{season}·E{number} • {nombre del episodio}. Con el mismo margen
+            // que el panel de abajo, para alinear con los botones.
+            ep || episodeAirLabel ? (
+              <div className="pointer-events-none absolute inset-x-4 bottom-2.5 z-10 flex min-w-0 flex-col gap-1 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)] sm:inset-x-5">
+                {episodeAirLabel && (
+                  <div className="flex min-w-0 items-center gap-1.5 text-xs font-bold leading-4">
+                    {/* 1px abajo: centrado ÓPTICO con el texto (PT Sans asienta
+                        las minúsculas por debajo del centro de su línea). */}
+                    <CalendarDays
+                      className="block h-3.5 w-3.5 shrink-0 translate-y-px"
+                      aria-hidden="true"
+                    />
+                    <span className="truncate">{episodeAirLabel}</span>
+                    {calendar?.isPremiere && (
+                      <span className="shrink-0 rounded bg-white px-1.5 text-[9px] font-black uppercase leading-4 tracking-wide text-black">
+                        Estreno
+                      </span>
+                    )}
+                  </div>
+                )}
+                {ep && (
+                  <div className="flex min-w-0 items-center gap-1.5 text-xs font-bold leading-4">
+                    <span className="shrink-0">
+                      T{ep.season}·E{ep.number}
+                    </span>
+                    {episodeTitle && (
+                      <>
+                        <span className="text-white/40" aria-hidden="true">•</span>
+                        <span className="truncate">{episodeTitle}</span>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             ) : null
           ) : (
@@ -1746,7 +1775,8 @@ function ContinueWatchingPreviewCard({
 
       {/* Panel de info (mismo lenguaje visual que BackdropPreviewCard):
           [Continuar] reproducir episodio + progreso · acciones compartidas · meta/géneros · premios ·
-          [Calendario] línea de episodio · meta/géneros · puntuaciones. */}
+          [Calendario] tráiler + acciones · meta/géneros · puntuaciones (la línea
+          de episodio va en el pie del backdrop, como el progreso). */}
       <div
         data-preview-info=""
         className="w-full bg-transparent px-4 py-3.5 sm:px-5 sm:py-4"
@@ -1822,25 +1852,6 @@ function ContinueWatchingPreviewCard({
           />
         </div>
 
-        {/* Calendario: LÍNEA DE EPISODIO justo encima de la fila meta.
-            Formato: T{season}·E{number} · {nombre episodio} · {fecha/cuenta atrás}.
-            Estilo discreto (como la línea de premios). */}
-        {isCalendar && ep && (
-          <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-zinc-300 sm:text-xs">
-            <CalendarDays
-              className="h-3.5 w-3.5 shrink-0 text-amber-300"
-              aria-hidden="true"
-            />
-            <span className="line-clamp-1">
-              <span className="text-amber-300">
-                T{ep.season}·E{ep.number}
-              </span>
-              {episodeTitle ? ` · ${episodeTitle}` : ""}
-              {episodeAirLabel ? ` · ${episodeAirLabel}` : ""}
-            </span>
-          </div>
-        )}
-
         {/* Fila meta + géneros COMPARTIDA con DetailModal/DetailsClient:
             año · duración/temporadas · estado · géneros (mismo componente). */}
         <DetailsMetaGenresRow
@@ -1852,7 +1863,7 @@ function ContinueWatchingPreviewCard({
 
         {/* Premios (OMDb) — se muestran debajo de la fila meta para mantener el
             mismo orden visual en todas las vistas previas. En Calendario NO se
-            muestra: la línea de episodio/fecha ocupa su lugar. */}
+            muestra. */}
         {!isCalendar && (
           <div className="mt-1.5 mb-1.5 flex min-h-[1.1rem] items-center gap-2 text-[11px] font-bold text-emerald-300 drop-shadow-md sm:text-xs">
             {extras?.awards && (
