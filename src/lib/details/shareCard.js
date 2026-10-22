@@ -1,3 +1,5 @@
+import { EPISODE_HERO_MAX_BANDS } from "./episodeHeroStills.js";
+
 // Modelo de la IMAGEN COMPARTIBLE de una ficha (estilo "captura" de la ficha
 // móvil: portada, logo, fila de acciones con sus estados y un marcador con solo
 // TMDb, Trakt e IMDb).
@@ -26,8 +28,9 @@ export const SHARE_CARD_HEIGHT = 1920;
 const TMDB_PATH_RE = /^\/[\w-]+\.(?:jpg|jpeg|png|svg|webp)$/i;
 const PERCENT_RE = /^(\d{1,3})%$/;
 const SCORE_KEYS = ["tmdb", "trakt", "imdb"];
-// Bandas de la portada de un episodio: las de EpisodeStillStack.
-export const SHARE_CARD_MAX_STILLS = 3;
+// Bandas de la portada de un episodio: las MISMAS que EpisodeStillStack, para
+// que la imagen compartida sea la portada que se ve en el teléfono.
+export const SHARE_CARD_MAX_STILLS = EPISODE_HERO_MAX_BANDS;
 
 function text(value, max) {
   return String(value ?? "")

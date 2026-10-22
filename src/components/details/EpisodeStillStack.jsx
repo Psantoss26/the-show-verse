@@ -7,8 +7,8 @@
 // lados y la funde con el fondo por abajo.
 //
 // - Cada banda ocupa la misma fracción del alto y encaja su imagen con
-//   `object-cover`: con tres bandas apenas se recorta; con dos, un poco por
-//   los lados (nunca quedan huecos en los bordes).
+//   `object-cover`: son dos (EPISODE_HERO_MAX_BANDS), así que cada escena se
+//   recorta un poco por los lados (nunca quedan huecos en los bordes).
 // - UNIONES DIFUMINADAS: a partir de la segunda, cada banda empieza
 //   `EPISODE_STILL_SEAM_PX` antes y se desvanece en ese tramo sobre la
 //   anterior (máscara), así que no hay ninguna línea recta entre imágenes.
