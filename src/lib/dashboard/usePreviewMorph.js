@@ -54,6 +54,9 @@
 //     `[data-preview-media]` (la ventana de la imagen, con `overflow-hidden`),
 //     `[data-preview-media-inner]` (su contenido, `absolute inset-0`) y
 //     `[data-preview-info]` (la info).
+//   - Opcional, `[data-preview-media-overlay]`: texto/indicadores pintados
+//     SOBRE la imagen de la vista previa (episodio y fecha en Calendario, el
+//     progreso en Continuar viendo). Ver `fadeOverlays`.
 //
 // Tiene que montarse dentro de un <AnimatePresence>: retiene el desmontaje con
 // `usePresence` hasta que termina el cierre.
@@ -239,6 +242,59 @@ export function getPreviewMorphLead(tile) {
   );
 }
 const STYLE_PROPS = ["transform", "opacity", "border-radius", "transform-origin"];
+const OVERLAY_ID = "sv-preview-overlay";
+// Lo que tarda en irse el texto sobre la imagen al empezar el cierre: antes de
+// que la copia de la tarjeta (con su propio texto) asome debajo.
+const OVERLAY_OUT_MS = 90;
+// En la apertura aparece en el último tramo, cuando la copia ya se ha ido.
+const OVERLAY_IN_FROM = 0.6;
+
+// TEXTO SOBRE LA IMAGEN DE LA VISTA PREVIA. Va dentro de la ventana, así que
+// en el cierre se encogía con ella —se veía deformado— mientras la copia de la
+// tarjeta, con su PROPIO texto («Mañana · T2·E6», «Quedan 1 min»), volvía a
+// aparecer debajo: los dos textos solapados. Ahora se va en cuanto empieza el
+// cierre y solo vuelve al final de la apertura; nunca coincide con la copia.
+// Se buscan en cada movimiento: algunos se montan después (al llegar datos).
+// `resume`: reapertura a mitad del cierre (el texto sube desde donde estaba);
+// en la apertura normal arranca oculto aunque su estilo sea opaco.
+function fadeOverlays(state, opening, duration, { resume = false } = {}) {
+  const overlays = state.parts.card.querySelectorAll("[data-preview-media-overlay]");
+  for (const el of overlays) {
+    const from = Number(getComputedStyle(el).opacity);
+    cancelOverlay(el);
+    if (opening) {
+      // Reabierta a mitad del cierre: sube desde donde estaba, sin bajar antes.
+      const frames =
+        resume && from > 0.01
+          ? [{ opacity: from }, { opacity: 1 }]
+          : [{ opacity: 0 }, { opacity: 0, offset: OVERLAY_IN_FROM }, { opacity: 1 }];
+      const animation = el.animate(
+        frames,
+        { duration: Math.max(duration, 1), easing: "linear", fill: "both" },
+      );
+      animation.id = OVERLAY_ID;
+    } else {
+      const animation = el.animate([{ opacity: from }, { opacity: 0 }], {
+        duration: Math.max(Math.min(OVERLAY_OUT_MS, duration), 1),
+        easing: "ease-out",
+        fill: "forwards",
+      });
+      animation.id = OVERLAY_ID;
+    }
+  }
+}
+
+function cancelOverlay(el) {
+  for (const running of el.getAnimations()) {
+    if (running.id === OVERLAY_ID) running.cancel();
+  }
+}
+
+function clearOverlays(state) {
+  for (const el of state.parts.card.querySelectorAll("[data-preview-media-overlay]")) {
+    cancelOverlay(el);
+  }
+}
 
 function cancelMorph(el) {
   if (!el) return;
@@ -413,6 +469,7 @@ export default function usePreviewMorph(
     stateRef.current = state;
 
     const lead = runMorph(state, 0, 1, ENTER_MS * speed, ENTER_CURVE);
+    fadeOverlays(state, true, ENTER_MS * speed);
     lead.finished.then(() => settleOpen(state, lead)).catch(() => {});
 
     // La tarjeta original se oculta mientras exista la vista previa (donde la
@@ -442,6 +499,7 @@ export default function usePreviewMorph(
         state.parts.card.style.removeProperty("pointer-events");
         const e = currentProgress(state);
         const lead = runMorph(state, e, 1, ENTER_MS * (1 - e) * state.speed, ENTER_CURVE);
+        fadeOverlays(state, true, ENTER_MS * (1 - e) * state.speed, { resume: true });
         lead.finished.then(() => settleOpen(state, lead)).catch(() => {});
       }
       return;
@@ -464,6 +522,7 @@ export default function usePreviewMorph(
     // Duración proporcional a lo que queda por recorrer: cerrar a mitad de la
     // apertura no tarda lo mismo que cerrar del todo.
     const lead = runMorph(state, e, 0, EXIT_MS * e * state.speed, EXIT_CURVE);
+    fadeOverlays(state, false, EXIT_MS * e * state.speed);
     lead.finished
       .then(() => {
         if (stateRef.current === state && state.closing) safeToRemoveRef.current?.();
@@ -489,6 +548,7 @@ function scheduleTeardown(stateRef, state) {
       cancelMorph(el);
       for (const prop of STYLE_PROPS) el.style.removeProperty(prop);
     }
+    clearOverlays(state);
     parts.card.style.removeProperty("pointer-events");
     state.tileArt.style.removeProperty("visibility");
     parts.ghost.remove();
@@ -513,6 +573,7 @@ function settleOpen(state, lead) {
     for (const prop of ["transform", "opacity", "border-radius"]) el.style.removeProperty(prop);
   }
   if (geometry.settleTransform) parts.card.style.transform = geometry.settleTransform;
+  clearOverlays(state);
   state.open = true;
   state.run = null;
 }

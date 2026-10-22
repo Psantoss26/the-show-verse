@@ -4,7 +4,7 @@
 import { useRef, useEffect, useState, useMemo, useCallback, memo } from "react";
 import DashboardPreviewGlass from "@/components/dashboard/DashboardPreviewGlass";
 import RowNavGlass, { ROW_NAV_FADE } from "@/components/dashboard/RowNavGlass";
-import useTrailerAutoDismiss from "@/hooks/useTrailerAutoDismiss";
+import usePreviewAutoTrailer from "@/hooks/usePreviewAutoTrailer";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Autoplay, FreeMode } from "swiper/modules";
 import {
@@ -123,7 +123,6 @@ import {
   fetchBestBackdropNoLang,
   fetchBestLogo,
   preparePreviewBackdrop,
-  getBestTrailerCached,
 } from "@/lib/dashboard/media";
 
 // Constantes para evitar recreación de referencias
@@ -595,26 +594,32 @@ function InlinePreviewCard({
   const audioRef = useRef(null);
   const soundtrackAbortRef = useRef(null);
 
-  const [showTrailer, setShowTrailer] = useState(false);
-  const [trailer, setTrailer] = useState(null);
-  const [trailerLoading, setTrailerLoading] = useState(false);
   const trailerIframeRef = useRef(null);
+  // Tráiler con autoplay al hacer hover: estado, precarga, un solo intento con
+  // el tráiler bueno y paso al siguiente si YouTube no deja reproducirlo (ver
+  // usePreviewAutoTrailer). El backdrop cubre el iframe hasta `trailerPlaying`.
+  const {
+    trailer,
+    showTrailer,
+    setShowTrailer,
+    trailerLoading,
+    trailerPlaying,
+    trailerError,
+    toggleTrailer: handleToggleTrailer,
+  } = usePreviewAutoTrailer({
+    id: movie?.id,
+    mediaType: mediaType,
+    iframeRef: trailerIframeRef,
+    onBeforeOpen: () => closeSoundtrackOverlay(),
+  });
+  useEffect(() => {
+    if (trailerError) setError(trailerError);
+  }, [trailerError]);
   const {
     muted: trailerMuted,
     toggle: handleToggleTrailerAudio,
     sync: syncTrailerAudio,
   } = usePreviewTrailerAudio(trailerIframeRef, { volume: 30 });
-
-  // Si el tráiler está restringido (edad/embedding) o no disponible, ocultarlo
-  // (fallback al backdrop) en vez de mostrar el error de YouTube en la tarjeta.
-  // `trailerPlaying` = el vídeo se reproduce DE VERDAD: hasta entonces el backdrop
-  // sigue cubriendo el iframe, así el mensaje de "no disponible" nunca se ve.
-  const { playing: trailerPlaying } = useTrailerAutoDismiss({
-    open: showTrailer,
-    iframeRef: trailerIframeRef,
-    videoKey: trailer?.key,
-    onUnavailable: () => setShowTrailer(false),
-  });
 
   // Datos enriquecidos para la fila meta compartida (<DetailsMetaGenresRow>):
   // estado TMDb crudo, géneros [{id,name}], temporadas y duración de respaldo.
@@ -652,9 +657,6 @@ function InlinePreviewCard({
   }, [mediaIdentity, backdropOverride]);
 
   useEffect(() => {
-    setShowTrailer(false);
-    setTrailer(null);
-    setTrailerLoading(false);
     soundtrackAbortRef.current?.abort();
     soundtrackAbortRef.current = null;
     audioRef.current?.pause();
@@ -1146,58 +1148,7 @@ function InlinePreviewCard({
     }
   };
 
-  const handleToggleTrailer = async (e) => {
-    e?.stopPropagation?.();
-    closeSoundtrackOverlay();
-
-    if (showTrailer) {
-      setShowTrailer(false);
-      return;
-    }
-
-    try {
-      setTrailerLoading(true);
-      setError("");
-
-      const t = await getBestTrailerCached(movie.id, mediaType);
-
-      if (!t?.key) {
-        setTrailer(null);
-        setShowTrailer(false);
-        // Sin aviso: en la vista previa el tráiler se pide solo al hacer hover,
-        // así que no tenerlo no es un error que haya que mostrar.
-        return;
-      }
-
-      setTrailer(t);
-      setShowTrailer(true);
-    } catch {
-      setTrailer(null);
-      setShowTrailer(false);
-      setError("No se pudo cargar el trailer.");
-    } finally {
-      setTrailerLoading(false);
-    }
-  };
-
-  // Autoplay del tráiler ~1s después del hover. Esta tarjeta se MONTA al hacer
-  // hover, así que un temporizador al montar equivale a "poco después del hover".
-  // Si dejas de hacer hover antes, la tarjeta se desmonta y el cleanup cancela el
-  // temporizador (no arranca). El ref lee el estado más reciente para no cerrar
-  // un tráiler que ya hayas abierto manualmente dentro de esa ventana.
-  const autoTrailerRef = useRef(null);
-  autoTrailerRef.current = {
-    showTrailer,
-    trailerLoading,
-    play: handleToggleTrailer,
-  };
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const s = autoTrailerRef.current;
-      if (s && !s.showTrailer && !s.trailerLoading) s.play();
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, []);
+  // (Autoplay y apertura del tráiler: usePreviewAutoTrailer, arriba.)
 
   const handleToggleSoundtrack = async (e) => {
     e.stopPropagation();
@@ -1873,24 +1824,30 @@ function InlinePreviewCardAnticipated({
     runtimeFallback: null,
   });
 
-  const [showTrailer, setShowTrailer] = useState(false);
-  const [trailer, setTrailer] = useState(null);
-  const [trailerLoading, setTrailerLoading] = useState(false);
   const trailerIframeRef = useRef(null);
+  // Tráiler con autoplay al hacer hover: estado, precarga, un solo intento con
+  // el tráiler bueno y paso al siguiente si YouTube no deja reproducirlo (ver
+  // usePreviewAutoTrailer). El backdrop cubre el iframe hasta `trailerPlaying`.
+  const {
+    trailer,
+    showTrailer,
+    trailerLoading,
+    trailerPlaying,
+    trailerError,
+    toggleTrailer: handleToggleTrailer,
+  } = usePreviewAutoTrailer({
+    id: movie?.id,
+    mediaType: mediaType,
+    iframeRef: trailerIframeRef,
+  });
+  useEffect(() => {
+    if (trailerError) setError(trailerError);
+  }, [trailerError]);
   const {
     muted: trailerMuted,
     toggle: handleToggleTrailerAudio,
     sync: syncTrailerAudio,
   } = usePreviewTrailerAudio(trailerIframeRef, { volume: 30 });
-
-  // Tráiler restringido/no disponible → ocultarlo (fallback al backdrop). Hasta
-  // que `trailerPlaying` sea true el backdrop cubre el iframe (no se ve el error).
-  const { playing: trailerPlaying } = useTrailerAutoDismiss({
-    open: showTrailer,
-    iframeRef: trailerIframeRef,
-    videoKey: trailer?.key,
-    onUnavailable: () => setShowTrailer(false),
-  });
 
   useEffect(() => {
     setStableBackdropState((prev) =>
@@ -1901,9 +1858,6 @@ function InlinePreviewCardAnticipated({
   }, [mediaIdentity, backdropOverride]);
 
   useEffect(() => {
-    setShowTrailer(false);
-    setTrailer(null);
-    setTrailerLoading(false);
   }, [movie?.id]);
 
   useEffect(() => {
@@ -2116,50 +2070,7 @@ function InlinePreviewCardAnticipated({
     }
   };
 
-  const handleToggleTrailer = async (e) => {
-    e?.stopPropagation?.();
-    if (showTrailer) {
-      setShowTrailer(false);
-      return;
-    }
-
-    try {
-      setTrailerLoading(true);
-      setError("");
-      const t = await getBestTrailerCached(movie.id, mediaType);
-      if (!t?.key) {
-        setTrailer(null);
-        setShowTrailer(false);
-        // Sin aviso: en la vista previa el tráiler se pide solo al hacer hover,
-        // así que no tenerlo no es un error que haya que mostrar.
-        return;
-      }
-      setTrailer(t);
-      setShowTrailer(true);
-    } catch {
-      setTrailer(null);
-      setShowTrailer(false);
-      setError("No se pudo cargar el trailer.");
-    } finally {
-      setTrailerLoading(false);
-    }
-  };
-
-  // Autoplay del tráiler ~1s tras el hover (la tarjeta se monta al hacer hover;
-  // el cleanup lo cancela si dejas de hacer hover antes).
-  const autoTrailerRef = useRef(null);
-  autoTrailerRef.current = {
-    showTrailer,
-    trailerLoading,
-    play: handleToggleTrailer,
-  };
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const s = autoTrailerRef.current;
-      if (s && !s.showTrailer && !s.trailerLoading) s.play();
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, []);
+  // (Autoplay y apertura del tráiler: usePreviewAutoTrailer, arriba.)
 
   const bgSrc = backdropPath
     ? buildImg(backdropPath, PREVIEW_BACKDROP_SIZE)
