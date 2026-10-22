@@ -1642,7 +1642,7 @@ export default function DashboardBackdropRow({
           <span>{displayTitle}</span>
           <span className={sectionAccent.dot}>.</span>
           <ChevronRight
-            className={`ml-1 h-5 w-5 translate-x-[-4px] opacity-0 transition duration-200 group-hover/title:translate-x-0 group-hover/title:opacity-100 sm:h-6 sm:w-6 ${sectionAccent.chevron}`}
+            className={`ml-1 h-5 w-5 opacity-60 transition duration-200 group-hover/title:translate-x-1 group-hover/title:opacity-100 sm:h-6 sm:w-6 ${sectionAccent.chevron}`}
           />
         </Link>
       ) : (

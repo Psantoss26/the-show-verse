@@ -2413,8 +2413,9 @@ function ContinueWatchingSection({
         </span>
       </div>
       {/* Mismo indicador de título que el resto de secciones del dashboard
-          (ExpandableSectionTitle): flecha que aparece al pasar el cursor. El
-          `pointer-events-auto` lo hace clicable aunque la cabecera no lo sea. */}
+          (ExpandableSectionTitle): flecha tenue, siempre visible, que se aviva
+          y avanza al pasar el cursor. El `pointer-events-auto` lo hace
+          clicable aunque la cabecera no lo sea. */}
       <Link
         href={isCalendar ? "/calendar" : "/continue-watching"}
         className="group/title pointer-events-auto inline-flex w-fit items-center bg-gradient-to-r from-white via-neutral-100 to-neutral-200 bg-clip-text text-xl font-black tracking-tighter text-transparent transition-all duration-200 hover:from-amber-100 hover:via-white hover:to-amber-200 active:scale-[0.98] active:opacity-90 sm:text-2xl md:text-3xl"
@@ -2422,7 +2423,7 @@ function ContinueWatchingSection({
       >
         <span>{isCalendar ? "Calendario" : "Continuar viendo"}</span>
         <span className="text-amber-500">.</span>
-        <ChevronRight className="ml-1 h-5 w-5 translate-x-[-4px] text-amber-400 opacity-0 transition duration-200 group-hover/title:translate-x-0 group-hover/title:opacity-100 sm:h-6 sm:w-6" />
+        <ChevronRight className="ml-1 h-5 w-5 text-amber-400 opacity-60 transition duration-200 group-hover/title:translate-x-1 group-hover/title:opacity-100 sm:h-6 sm:w-6" />
       </Link>
     </motion.div>
   );
@@ -2526,8 +2527,15 @@ function ContinueWatchingSection({
             // hover/clic a las filas vecinas; las tarjetas reactivan los eventos
             // (pointer-events es heredado y el arrastre sigue funcionando por
             // propagación desde la tarjeta).
-            className={`group relative !pt-14 sm:!pt-16 md:!pt-44 !pb-44 sm:!pb-56 md:!pb-80 !-mt-14 sm:!-mt-16 md:!-mt-44 !-mb-44 sm:!-mb-56 md:!-mb-80 ${
-              isMobile ? "" : "pointer-events-none"
+            // En MÓVIL no hay vista previa: ni relleno ni márgenes negativos.
+            // Ese relleno transparente (que sí recibe toques en móvil) tapaba
+            // el título de la sección siguiente —«Recomendaciones» tras
+            // Continuar viendo, «Más esperadas» tras el Calendario— y el toque
+            // no llegaba a abrir su página.
+            className={`group relative ${
+              isMobile
+                ? ""
+                : "!pt-14 sm:!pt-16 md:!pt-44 !pb-44 sm:!pb-56 md:!pb-80 !-mt-14 sm:!-mt-16 md:!-mt-44 !-mb-44 sm:!-mb-56 md:!-mb-80 pointer-events-none"
             }`}
             wrapperClass="flex items-center"
             breakpoints={breakpoints}
