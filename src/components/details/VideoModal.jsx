@@ -1,10 +1,16 @@
 // src/components/details/modals/VideoModal.jsx
 "use client";
-import { LIQUID_GLASS_PANEL, LIQUID_GLASS_MODAL_HEADER, LIQUID_GLASS_MODAL_FOOTER } from "@/lib/ui/liquidGlass";
+import {
+  LIQUID_GLASS_PANEL,
+  LIQUID_GLASS_MODAL_HEADER,
+  LIQUID_GLASS_MODAL_FOOTER,
+  LIQUID_GLASS_SURFACE,
+} from "@/lib/ui/liquidGlass";
+import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import Image from "next/image";
-import { X, PlayCircle } from "lucide-react";
+import { X, PlayCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { videoEmbedUrl, videoExternalUrl } from "@/lib/details/videos";
 import useModalGuard from "@/hooks/useModalGuard";
 
@@ -65,35 +71,72 @@ export default function VideoModal({
   const skippedVideoKeysRef = useRef(new Set());
   const videoKey = getVideoIdentity(video);
 
+  // LISTA ESTABLE de los vídeos reproducibles del título, en el orden que trae
+  // quien abre el modal (ya ordenados por relevancia). El vídeo actual NO se
+  // mueve al principio: con él delante, cada paso reordenaría la lista y
+  // Anterior/Siguiente no volverían al mismo sitio. Solo se antepone si no
+  // está en ella (p. ej. un tráiler elegido aparte).
   const orderedVideos = useMemo(() => {
     const seen = new Set();
     const ordered = [];
 
-    for (const candidate of [video, ...(Array.isArray(videos) ? videos : [])]) {
+    for (const candidate of Array.isArray(videos) ? videos : []) {
       const key = getVideoIdentity(candidate);
       if (!key || seen.has(key) || !videoEmbedUrl(candidate, false)) continue;
       seen.add(key);
       ordered.push(candidate);
     }
 
-    return ordered;
-  }, [video, videos]);
+    if (videoKey && !seen.has(videoKey) && videoEmbedUrl(video, false)) {
+      ordered.unshift(video);
+    }
 
-  const showNextVideo = useCallback(() => {
-    if (!videoKey || orderedVideos.length <= 1) return false;
+    return ordered;
+  }, [video, videoKey, videos]);
+
+  const currentIndex = Math.max(
+    0,
+    orderedVideos.findIndex((candidate) => getVideoIdentity(candidate) === videoKey),
+  );
+  const total = orderedVideos.length;
+  const prevVideo = currentIndex > 0 ? orderedVideos[currentIndex - 1] : null;
+  const nextVideo = currentIndex < total - 1 ? orderedVideos[currentIndex + 1] : null;
+
+  // Sentido del último paso: si un vídeo no se puede reproducir, se salta en
+  // ese mismo sentido (retroceder a uno roto no debe mandarte hacia delante).
+  const directionRef = useRef(1);
+
+  const goToVideo = useCallback(
+    (candidate, direction) => {
+      if (!candidate) return;
+      directionRef.current = direction;
+      onVideoChange?.(candidate);
+    },
+    [onVideoChange],
+  );
+  const showPrevVideo = useCallback(
+    () => goToVideo(prevVideo, -1),
+    [goToVideo, prevVideo],
+  );
+  const showNextVideo = useCallback(
+    () => goToVideo(nextVideo, 1),
+    [goToVideo, nextVideo],
+  );
+
+  // Vídeo que YouTube no deja reproducir (retirado, privado o sin permiso de
+  // inserción): el siguiente reproducible en el sentido en que se iba.
+  const skipBrokenVideo = useCallback(() => {
+    if (!videoKey || total <= 1) return false;
 
     skippedVideoKeysRef.current.add(videoKey);
+    const direction = directionRef.current;
 
-    const currentIndex = Math.max(
-      0,
-      orderedVideos.findIndex(
-        (candidate) => getVideoIdentity(candidate) === videoKey,
-      ),
-    );
-
-    for (let offset = 1; offset < orderedVideos.length; offset += 1) {
-      const candidate =
-        orderedVideos[(currentIndex + offset) % orderedVideos.length];
+    for (
+      let index = currentIndex + direction;
+      index >= 0 && index < total;
+      index += direction
+    ) {
+      const candidate = orderedVideos[index];
       const candidateKey = getVideoIdentity(candidate);
       if (!candidateKey || skippedVideoKeysRef.current.has(candidateKey))
         continue;
@@ -103,13 +146,43 @@ export default function VideoModal({
     }
 
     return false;
-  }, [onVideoChange, orderedVideos, videoKey]);
+  }, [currentIndex, onVideoChange, orderedVideos, total, videoKey]);
+
+  // Flechas del teclado: anterior / siguiente. No cuando se escribe en un
+  // campo, ni con el foco dentro del reproductor (el iframe recibe sus teclas,
+  // que YouTube usa para avanzar dentro del propio vídeo).
+  useEffect(() => {
+    if (!open || total <= 1) return undefined;
+    const onKeyDown = (event) => {
+      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey)
+        return;
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
+      )
+        return;
+      if (event.key === "ArrowLeft" && prevVideo) {
+        event.preventDefault();
+        showPrevVideo();
+      } else if (event.key === "ArrowRight" && nextVideo) {
+        event.preventDefault();
+        showNextVideo();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, total, prevVideo, nextVideo, showPrevVideo, showNextVideo]);
 
   // Estado local para controlar la animación de montaje si es necesario,
   // pero aquí usaremos clases de Tailwind 'animate-in' para simplicidad.
 
   useEffect(() => {
-    if (!open) skippedVideoKeysRef.current.clear();
+    if (!open) {
+      skippedVideoKeysRef.current.clear();
+      directionRef.current = 1;
+    }
   }, [open]);
 
   useEffect(() => {
@@ -124,7 +197,7 @@ export default function VideoModal({
       new YT.Player(iframeRef.current, {
         events: {
           onError: () => {
-            if (!cancelled) showNextVideo();
+            if (!cancelled) skipBrokenVideo();
           },
         },
       });
@@ -133,7 +206,7 @@ export default function VideoModal({
     return () => {
       cancelled = true;
     };
-  }, [open, showNextVideo, video, videoKey]);
+  }, [open, skipBrokenVideo, video, videoKey]);
 
   useModalGuard({ open, onClose });
 
@@ -151,9 +224,33 @@ export default function VideoModal({
         aria-hidden="true"
       />
 
+      {/* ENVOLTURA del modal: en ordenador lleva Anterior / Siguiente FUERA
+          del panel, a los lados y centrados en su altura. El panel cede a cada
+          lado el hueco de los botones (`lg:max-w`) para que no se salgan de la
+          pantalla en ventanas estrechas. */}
+      <div
+        className={`relative w-full max-w-7xl ${
+          total > 1 ? "lg:max-w-[min(80rem,calc(100vw-13rem))]" : ""
+        }`}
+      >
+      {total > 1 && (
+        <>
+          <VideoSideButton
+            direction="prev"
+            target={prevVideo}
+            onClick={showPrevVideo}
+          />
+          <VideoSideButton
+            direction="next"
+            target={nextVideo}
+            onClick={showNextVideo}
+          />
+        </>
+      )}
+
       {/* MODAL CONTAINER: Liquid Glass */}
       <div
-        className={`relative w-full max-w-7xl max-h-[calc(100dvh-0.5rem)] flex flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
+        className={`relative w-full max-h-[calc(100dvh-0.5rem)] flex flex-col overflow-hidden rounded-[2rem] ${LIQUID_GLASS_PANEL} animate-in zoom-in-95 duration-300 ease-out`}
         role="dialog"
         aria-modal="true"
       >
@@ -170,6 +267,14 @@ export default function VideoModal({
               </span>
               <span>•</span>
               <span className="text-white/70">{video.site || "YouTube"}</span>
+              {total > 1 && (
+                <>
+                  <span>•</span>
+                  <span className="tabular-nums text-white/70" aria-live="polite">
+                    {currentIndex + 1} de {total}
+                  </span>
+                </>
+              )}
             </div>
           </div>
 
@@ -205,9 +310,11 @@ export default function VideoModal({
           )}
         </div>
 
-        {/* FOOTER: Información y acciones */}
-        <div className={`flex flex-wrap items-center justify-between gap-3 p-3 sm:p-6 sm:px-8 ${LIQUID_GLASS_MODAL_FOOTER}`}>
-          <div className="text-xs font-semibold text-white/50">
+        {/* FOOTER: fecha · Anterior / Siguiente · YouTube. En móvil la
+            navegación ocupa su propia fila, centrada, para no estrechar los
+            botones; en ordenador (lg) sale del panel, a los lados. */}
+        <div className={`grid grid-cols-[1fr_auto] items-center gap-3 p-3 sm:grid-cols-[1fr_auto_1fr] sm:p-6 sm:px-8 lg:grid-cols-[1fr_auto] ${LIQUID_GLASS_MODAL_FOOTER}`}>
+          <div className="min-w-0 text-xs font-semibold text-white/50">
             {video.published_at && (
               <span>
                 Publicado el{" "}
@@ -222,6 +329,28 @@ export default function VideoModal({
             )}
           </div>
 
+          {total > 1 && (
+            <nav
+              aria-label="Vídeos del título"
+              className="order-last col-span-2 flex items-center justify-center gap-2 sm:order-none sm:col-span-1 lg:hidden"
+            >
+              <VideoStepButton
+                direction="prev"
+                target={prevVideo}
+                onClick={showPrevVideo}
+              />
+              <span className="min-w-[4.5rem] text-center text-xs font-bold tabular-nums text-white/70">
+                {currentIndex + 1} / {total}
+              </span>
+              <VideoStepButton
+                direction="next"
+                target={nextVideo}
+                onClick={showNextVideo}
+              />
+            </nav>
+          )}
+
+          <div className="flex justify-end">
           {ext && (
             <a
               href={ext}
@@ -241,8 +370,72 @@ export default function VideoModal({
               />
             </a>
           )}
+          </div>
         </div>
       </div>
+      </div>
     </div>
+  );
+}
+
+// Anterior / Siguiente del ORDENADOR: redondos, de cristal y fuera del panel.
+// Entran con el modal deslizándose desde su lado; al pasar el ratón crecen y
+// el icono empuja hacia su sentido; al pulsar, se hunden. Sin vídeo al que ir
+// (primero / último) se apagan encogiendo, sin dejar de ocupar su sitio.
+function VideoSideButton({ direction, target, onClick }) {
+  const isPrev = direction === "prev";
+  const Icon = isPrev ? ChevronLeft : ChevronRight;
+  const label = isPrev ? "Vídeo anterior" : "Vídeo siguiente";
+  const hint = target?.name ? `${label}: ${target.name}` : label;
+  return (
+    <div
+      className={`absolute top-1/2 z-10 hidden -translate-y-1/2 lg:block ${
+        isPrev
+          ? "right-full mr-5 animate-in fade-in slide-in-from-right-6"
+          : "left-full ml-5 animate-in fade-in slide-in-from-left-6"
+      } duration-500 ease-out`}
+    >
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={!target}
+        aria-label={hint}
+        title={target ? `${hint} (${isPrev ? "←" : "→"})` : label}
+        className={`group/step flex h-14 w-14 items-center justify-center rounded-full text-white ${LIQUID_GLASS_SURFACE} transition-[scale,opacity,background-color] duration-300 ease-out hover:scale-110 hover:bg-white/10 active:scale-95 active:duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/70 disabled:pointer-events-none disabled:scale-75 disabled:opacity-0 motion-reduce:transition-none`}
+      >
+        <LiquidGlassOpticalLayers />
+        <Icon
+          className={`relative z-10 h-7 w-7 transition-transform duration-300 ease-out motion-reduce:transition-none ${
+            isPrev
+              ? "-translate-x-px group-hover/step:-translate-x-1"
+              : "translate-x-px group-hover/step:translate-x-1"
+          }`}
+          aria-hidden="true"
+        />
+      </button>
+    </div>
+  );
+}
+
+// Anterior / Siguiente. El título del vídeo al que lleva va en el `title`
+// (y en la etiqueta accesible), para saber qué viene sin tener que pulsar.
+function VideoStepButton({ direction, target, onClick }) {
+  const isPrev = direction === "prev";
+  const Icon = isPrev ? ChevronLeft : ChevronRight;
+  const label = isPrev ? "Vídeo anterior" : "Vídeo siguiente";
+  const hint = target?.name ? `${label}: ${target.name}` : label;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!target}
+      aria-label={hint}
+      title={target ? `${hint} (${isPrev ? "←" : "→"})` : label}
+      className="inline-flex h-11 items-center gap-1.5 rounded-full bg-white/5 px-3.5 text-sm font-bold text-white/80 shadow-sm transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70 disabled:pointer-events-none disabled:opacity-30"
+    >
+      {isPrev && <Icon className="h-5 w-5" aria-hidden="true" />}
+      <span>{isPrev ? "Anterior" : "Siguiente"}</span>
+      {!isPrev && <Icon className="h-5 w-5" aria-hidden="true" />}
+    </button>
   );
 }
