@@ -12,7 +12,10 @@ aliases: [Planning MOC, Planes de mejora]
 | [[dashboard-recommendations-improvement-plan]] | Mejora del motor de recomendaciones del dashboard. |
 | [[vercel-resource-optimization-plan]] | Optimización de recursos en Vercel. |
 
+> Estado actual de todos los planes: **[[ROADMAP]]**.
+
 ## Relacionado
+- [[ROADMAP]]
 - [[Home]]
 - [[Superpowers]] — specs y planes de diseño.
 - [[Architecture]]

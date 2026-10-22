@@ -109,7 +109,37 @@ Tamaño recomendado: 800x450px, formato GIF o WebM
       <p>Grid, List y Compact con transiciones suaves</p>
     </td>
   </tr>
+  <tr>
+    <td width="33%" align="center">
+      <h3>👥 Social</h3>
+      <p>Perfiles públicos, seguidores, feed de actividad y «Tus amigos» en cada ficha</p>
+    </td>
+    <td width="33%" align="center">
+      <h3>💬 Comunidad</h3>
+      <p>Reseñas, sentimiento, listas de la comunidad y «me gusta»</p>
+    </td>
+    <td width="33%" align="center">
+      <h3>🏆 Niveles y logros</h3>
+      <p>XP, 8 rangos, rachas y 38 logros</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" align="center">
+      <h3>🔄 Sync de streaming</h3>
+      <p>Extensión y app Android: Netflix, Prime Video, Max, Crunchyroll…</p>
+    </td>
+    <td width="33%" align="center">
+      <h3>🎉 Recap anual</h3>
+      <p>«Tu año en The Show Verse» con imagen para compartir</p>
+    </td>
+    <td width="33%" align="center">
+      <h3>📲 PWA y push</h3>
+      <p>Modo sin conexión y notificaciones en navegador y Android</p>
+    </td>
+  </tr>
 </table>
+
+> Documentación funcional detallada de cada área en [`docs/features/`](docs/features/Features.md). Cambios recientes en el [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 
@@ -322,11 +352,11 @@ _Transiciones suaves entre vistas_
 
 | Tecnología                                          | Versión | Uso                                |
 | --------------------------------------------------- | ------- | ---------------------------------- |
-| **[Next.js](https://nextjs.org/)**                  | 16.0.7  | Framework React con SSR/ISR        |
+| **[Next.js](https://nextjs.org/)**                  | 16.2    | Framework React con SSR/ISR        |
 | **[React](https://reactjs.org/)**                   | 19.2.1  | Biblioteca de UI components        |
 | **[TypeScript](https://www.typescriptlang.org/)**   | 5.0+    | Tipado estático y type safety      |
 | **[Tailwind CSS](https://tailwindcss.com/)**        | 4.0     | Framework de estilos utility-first |
-| **[Framer Motion](https://www.framer.com/motion/)** | 12.6.5  | Librería de animaciones            |
+| **[Framer Motion](https://www.framer.com/motion/)** | 12.43   | Librería de animaciones            |
 
 ### Librerías Complementarias
 
@@ -336,15 +366,25 @@ _Transiciones suaves entre vistas_
 - **[Swiper](https://swiperjs.com/)** - Carruseles táctiles
 - **[React Day Picker](https://react-day-picker.js.org/)** - Selector de fechas
 
+### Backend propio
+
+- **[Fastify](https://fastify.dev/) 5** - API `/v1` (`backend/`), ver [referencia](docs/backend/backend_api_reference.md)
+- **PostgreSQL + [Drizzle ORM](https://orm.drizzle.team/)** - Datos de usuario, comunidad, niveles y detecciones
+- **Redis** (`ioredis`) - Caché de dashboards, recap y vista neuronal
+- **web-push / FCM** - Notificaciones en navegador y Android
+
 ### APIs Externas
 
 - **[TMDb API](https://www.themoviedb.org/documentation/api)** - Base de datos de películas y series
 - **[Trakt.tv API](https://trakt.docs.apiary.io/)** - Sincronización y tracking
 - **[OMDb API](http://www.omdbapi.com/)** - Ratings complementarios
+- **Letterboxd** (RSS y exportación) e **IMDb** (exportación) - Importación y sincronización
+- **Plex, Spotify y JustWatch** - Biblioteca, bandas sonoras y plataformas
 
 ### DevOps & Tooling
 
-- **[Vercel](https://vercel.com/)** - Deployment y hosting
+- **[Vercel](https://vercel.com/)** - Deployment y hosting del frontend
+- **Docker en NAS + Cloudflare Tunnel + GitHub Actions** - Autoalojamiento (ver [infraestructura](docs/infrastructure/README.md))
 - **[ESLint](https://eslint.org/)** - Linting de código
 - **[Git](https://git-scm.com/)** - Control de versiones
 - **[npm](https://www.npmjs.com/)** - Gestión de paquetes
@@ -1127,43 +1167,29 @@ Page                                Size     First Load JS
 
 ## 🗺️ Roadmap
 
-### ✅ Versión 1.0 (Actual)
+El estado al día de lo planificado y lo pendiente está en [`docs/ROADMAP.md`](docs/ROADMAP.md), y lo ya publicado en el [`CHANGELOG.md`](CHANGELOG.md).
 
-- ✅ Core completo con todas las funcionalidades principales
-- ✅ Integración TMDb, Trakt y OMDb
-- ✅ Autenticación OAuth 2.0
-- ✅ Múltiples vistas (Grid, List, Compact)
-- ✅ Animaciones premium
-- ✅ SSR y optimizaciones
-- ✅ Responsive design completo
+### ✅ Hecho (resumen)
 
-### 🔄 Versión 1.1 (En Progreso)
+- ✅ Integración TMDb, Trakt y OMDb; autenticación propia, TMDb y Google
+- ✅ Backend propio (Fastify + PostgreSQL + Redis)
+- ✅ Múltiples vistas, animaciones y diseño responsive (móvil, tablet y escritorio)
+- ✅ Puntuaciones propias de películas, series, temporadas y episodios
+- ✅ PWA con modo sin conexión y notificaciones push
+- ✅ Exportación de datos e importación desde Trakt, TMDb, IMDb y Letterboxd
+- ✅ Social: seguir usuarios, perfiles públicos, compartir fichas y listas
+- ✅ Comentarios, reseñas y listas de la comunidad
+- ✅ Sincronización con plataformas de streaming (extensión + app Android)
+- ✅ Gamificación: niveles, rangos y logros
+- ✅ Motor de recomendaciones propio y recap anual
 
-- 🔄 Testing exhaustivo (unitario + E2E)
-- 🔄 Mejoras de accesibilidad (WCAG 2.1)
-- 🔄 Sistema de ratings personalizado
-- 🔄 Búsqueda con autocompletado
-- 🔄 Mejoras de performance
+### ⏳ Pendiente (resumen)
 
-### 📋 Versión 1.5 (Planificado)
-
-- ⏳ Notificaciones de estrenos
-- ⏳ PWA (Progressive Web App)
-- ⏳ Modo offline básico
-- ⏳ Exportación de datos
-- ⏳ Temas personalizables
-- ⏳ Atajos de teclado avanzados
-
-### 🚀 Versión 2.0 (Futuro)
-
-- ⏳ Recomendaciones con Machine Learning
-- ⏳ Social features (seguir usuarios, compartir listas)
-- ⏳ Comentarios y reviews
-- ⏳ Integración con plataformas de streaming
-- ⏳ Watch together (sincronización)
-- ⏳ Gamificación y achievements
-- ⏳ App móvil nativa (React Native)
-- ⏳ Backend propio (opcional)
+- ⏳ Terminar de retirar Trakt del frontend
+- ⏳ Publicar la app en Google Play
+- ⏳ Ampliar los tests E2E y mejorar la accesibilidad (WCAG 2.1)
+- ⏳ Temas personalizables y atajos de teclado avanzados
+- ⏳ Watch together
 
 ---
 
