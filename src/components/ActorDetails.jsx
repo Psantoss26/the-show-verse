@@ -40,6 +40,7 @@ import {
   ChevronDown,
   Calendar,
   Ruler,
+  Banknote,
   MapPin,
 } from "lucide-react";
 import {
@@ -58,6 +59,7 @@ import DetailsSectionMenu from "./DetailsSectionMenu";
 import DetailsInfoTabs from "@/components/details/DetailsInfoTabs";
 import useDetailsStickyTop from "@/hooks/useDetailsStickyTop";
 import { careerRange, formatCareerRange } from "@/lib/actor/careerRange";
+import { formatNetWorth, pickNetWorth } from "@/lib/actor/netWorth";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 import RecommendationHoverIndicator from "@/components/details/RecommendationHoverIndicator";
 import { useAuth } from "@/context/AuthContext";
@@ -1750,6 +1752,8 @@ export default function ActorDetails({
   // Data States
   const [externalIds, setExternalIds] = useState(initialExternalIds);
   const [actorHeight, setActorHeight] = useState(null);
+  // Patrimonio neto (Wikidata P2218): { amount, currency, year } o null.
+  const [actorNetWorth, setActorNetWorth] = useState(null);
   const [actorCountryCodes, setActorCountryCodes] = useState([]);
   const [externalLinksOpen, setExternalLinksOpen] = useState(false);
   const [combinedCredits, setCombinedCredits] = useState(
@@ -2389,6 +2393,10 @@ export default function ActorDetails({
   }, [socials]);
 
   const age = calcAge(actorDetails?.birthday, actorDetails?.deathday);
+  const formattedActorNetWorth = formatNetWorth(actorNetWorth);
+  const actorNetWorthTitle = formattedActorNetWorth
+    ? `Patrimonio neto estimado${actorNetWorth?.year ? ` en ${actorNetWorth.year}` : ""} · Fuente: Wikidata`
+    : "";
   const formattedActorHeight = actorHeight
     ? `${actorHeight.toLocaleString("es-ES", { maximumFractionDigits: 2 })} m`
     : null;
@@ -2442,6 +2450,18 @@ export default function ActorDetails({
             value: formattedActorHeight,
           },
           {
+            label: "Patrimonio",
+            icon: Banknote,
+            value: formattedActorNetWorth ? (
+              <span title={actorNetWorthTitle}>
+                {formattedActorNetWorth}
+                {actorNetWorth?.year ? (
+                  <span className="ml-1.5 text-zinc-400">({actorNetWorth.year})</span>
+                ) : null}
+              </span>
+            ) : null,
+          },
+          {
             label: "Lugar de nacimiento",
             icon: MapPin,
             value: actorDetails?.place_of_birth ? (
@@ -2464,6 +2484,24 @@ export default function ActorDetails({
         ],
       }
     : null;
+  // Patrimonio neto: de las mismas declaraciones de Wikidata que la altura
+  // (la petición va en caché, no se repite).
+  useEffect(() => {
+    let active = true;
+    setActorNetWorth(null);
+    if (externalIds?.wikidata_id) {
+      fetchWikidataClaims(externalIds.wikidata_id)
+        .then((claims) => {
+          if (active) setActorNetWorth(pickNetWorth(claims));
+        })
+        .catch(() => {
+          if (active) setActorNetWorth(null);
+        });
+    }
+    return () => {
+      active = false;
+    };
+  }, [externalIds?.wikidata_id]);
   useEffect(() => {
     let active = true;
     setActorHeight(null);
@@ -3185,9 +3223,22 @@ export default function ActorDetails({
                       <span>{formattedActorHeight}</span>
                     </span>
                   )}
+                  {formattedActorNetWorth && (
+                    <span
+                      className="shrink-0 flex items-center gap-1.5"
+                      title={actorNetWorthTitle}
+                    >
+                      <Banknote
+                        className="h-4 w-4 text-emerald-300 shrink-0"
+                        aria-hidden="true"
+                      />
+                      <span className="sr-only">Patrimonio neto estimado: </span>
+                      <span>{formattedActorNetWorth}</span>
+                    </span>
+                  )}
                   {actorDetails?.place_of_birth && (
                     <span className="shrink-0 flex items-center gap-1.5">
-                      {(actorDetails?.birthday || actorDetails?.deathday || formattedActorHeight) && (
+                      {(actorDetails?.birthday || actorDetails?.deathday || formattedActorHeight || formattedActorNetWorth) && (
                         <span
                           className="mr-1 h-1 w-1 rounded-full bg-zinc-300 shrink-0 shadow-[0_0_3px_rgba(0,0,0,0.95)]"
                           aria-hidden="true"
