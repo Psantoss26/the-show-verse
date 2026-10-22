@@ -25,7 +25,6 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { getLocalInProgress } from "@/lib/api/progressClient";
 import {
-  getVideos,
   getDetails,
   markAsFavorite,
   markInWatchlist,
@@ -36,15 +35,10 @@ import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
 import { getBackendItemStatus } from "@/lib/api/itemStatus";
-import {
-  uniqBy,
-  isPlayableVideo,
-  rankVideo,
-  videoEmbedUrl,
-} from "@/lib/details/videos";
 import LiquidButton from "@/components/LiquidButton";
 import OptimizedImage from "@/components/OptimizedImage";
-import useTrailerAutoDismiss from "@/hooks/useTrailerAutoDismiss";
+import usePreviewAutoTrailer from "@/hooks/usePreviewAutoTrailer";
+import { loadYouTubeIframeApi, prefetchPreviewTrailer } from "@/lib/dashboard/previewTrailer";
 import usePreviewMorph from "@/lib/dashboard/usePreviewMorph";
 import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
 import { useDashboardHoverBackdrop } from "@/components/dashboard/DashboardHoverBackdrop";
@@ -69,7 +63,6 @@ import {
   movieBackdropCache,
   getBackdropCacheKey,
   getPreviewBackdropFallback,
-  getBestTrailerCached,
   preloadImage,
   GENRES,
 } from "@/lib/dashboard/media";
@@ -266,317 +259,14 @@ const shimmer = {
 /* =================== STYLE CONSTANTS =================== */
 const CONTINUE_WATCHING_BACKDROP_SIZE = "w1280";
 const CONTINUE_WATCHING_IMAGE_QUALITY = 92;
-const CONTINUE_WATCHING_TRAILER_LANGUAGE_FILTER = "en,es,null";
-const CONTINUE_WATCHING_TRAILER_CACHE_PREFIX =
-  "showverse:dashboard:continue-watching:trailer-videos:v2:";
-const CONTINUE_WATCHING_TRAILER_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const PREVIEW_TRAILER_PREWARM_AHEAD = 4;
-const PREVIEW_TRAILER_YOUTUBE_ORIGIN = "https://www.youtube-nocookie.com";
 
-let youtubeIframeApiPromise = null;
-const previewTrailerVideosCache = new Map();
-const verifiedPreviewTrailerKeys = new Map();
 const continueWatchingBackdropPathMemory = new Map();
 const loadedContinueWatchingBackdropSrcs = new Set();
 // Extras del panel ampliado (nota TMDb, nota IMDb, premios, temporadas, año) que
 // no vienen en el item de "Continuar viendo": se cargan al hacer hover. En TV se
 // cachean por episodio para no mezclar puntuaciones de serie y episodio.
 const continueWatchingExtrasCache = new Map();
-
-function normalizePreviewVideos(rawVideos) {
-  const source = Array.isArray(rawVideos) ? rawVideos : EMPTY_ARRAY;
-  const merged = uniqBy(source, (v) => `${v?.site}:${v?.key}`).filter(
-    isPlayableVideo,
-  );
-  merged.sort((a, b) => rankVideo(a) - rankVideo(b));
-  return merged;
-}
-
-function getVideoIdentity(video) {
-  return video?.site && video?.key ? `${video.site}:${video.key}` : "";
-}
-
-function prioritizePreviewTrailer(videos, preferredKey) {
-  if (!preferredKey || !Array.isArray(videos) || videos.length < 2) {
-    return videos;
-  }
-  const preferredIndex = videos.findIndex(
-    (video) => getVideoIdentity(video) === preferredKey,
-  );
-  if (preferredIndex <= 0) return videos;
-  return [
-    videos[preferredIndex],
-    ...videos.slice(0, preferredIndex),
-    ...videos.slice(preferredIndex + 1),
-  ];
-}
-
-function readStoredPreviewTrailerVideos(tvId) {
-  if (!tvId || typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(
-      `${CONTINUE_WATCHING_TRAILER_CACHE_PREFIX}${tvId}`,
-    );
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    const savedAt = Number(parsed?.savedAt || 0);
-    if (
-      !savedAt ||
-      Date.now() - savedAt > CONTINUE_WATCHING_TRAILER_CACHE_TTL_MS ||
-      !Array.isArray(parsed?.videos)
-    ) {
-      return null;
-    }
-    const videos = normalizePreviewVideos(parsed.videos);
-    const preferredKey =
-      typeof parsed?.preferredKey === "string" ? parsed.preferredKey : "";
-    if (preferredKey) verifiedPreviewTrailerKeys.set(String(tvId), preferredKey);
-    const prioritized = prioritizePreviewTrailer(videos, preferredKey);
-    return prioritized.length ? prioritized : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeStoredPreviewTrailerVideos(tvId, videos) {
-  if (!tvId || typeof window === "undefined") return;
-  try {
-    if (!Array.isArray(videos) || videos.length === 0) return;
-    window.localStorage.setItem(
-      `${CONTINUE_WATCHING_TRAILER_CACHE_PREFIX}${tvId}`,
-      JSON.stringify({
-        savedAt: Date.now(),
-        videos,
-        preferredKey: verifiedPreviewTrailerKeys.get(String(tvId)) || null,
-      }),
-    );
-  } catch {
-    // ignorar (modo privado / cuota)
-  }
-}
-
-async function fetchPreviewTrailerVideos(tvId) {
-  if (!tvId) return EMPTY_ARRAY;
-  const cacheKey = `tv:${tvId}`;
-  const cached = previewTrailerVideosCache.get(cacheKey);
-  if (cached) return cached;
-
-  const stored = readStoredPreviewTrailerVideos(tvId);
-  if (stored) {
-    previewTrailerVideosCache.set(cacheKey, stored);
-    return stored;
-  }
-
-  const request = getVideos("tv", tvId, "en-US", {
-    includeVideoLanguage: CONTINUE_WATCHING_TRAILER_LANGUAGE_FILTER,
-  })
-    .catch(() => ({ results: EMPTY_ARRAY }))
-    .then((data) =>
-      normalizePreviewVideos(
-        Array.isArray(data?.results) ? data.results : EMPTY_ARRAY,
-      ),
-    )
-    .then((videos) => {
-      previewTrailerVideosCache.set(cacheKey, videos);
-      writeStoredPreviewTrailerVideos(tvId, videos);
-      return videos;
-    });
-
-  previewTrailerVideosCache.set(cacheKey, request);
-  return request;
-}
-
-function prewarmPreviewTrailer(tvId) {
-  if (!tvId || typeof window === "undefined") return Promise.resolve(EMPTY_ARRAY);
-  const videosPromise = resolvePreviewTrailerVideos(tvId).catch(() => EMPTY_ARRAY);
-  loadYouTubeIframeApi().catch(() => {});
-  return videosPromise;
-}
-
-/* ============== PRECALENTADO DE EMBEDS (HOVER-INTENT) ==============
- * El retardo al hacer hover viene de que el iframe de YouTube SOLO empieza a
- * cargar cuando se expande la tarjeta: hay que descargar el reproductor, abrir
- * la conexión con YouTube y bufferear, todo en frío (~1-3 s).
- *
- * Para que arranque rápido, "calentamos" el embed en cuanto el cursor se ACERCA
- * (entra en la fila / en una tarjeta y su vecina): montamos un iframe oculto y
- * silenciado que ya descarga el player JS y abre la conexión. Cuando luego se
- * monta el iframe visible de la preview, su carga es mucho más rápida porque el
- * reproductor y la conexión ya están en caché. El pool está acotado (LRU) para
- * no descargar de más, y se vacía al salir de la fila. */
-const WARM_EMBED_POOL_MAX = 3;
-const warmEmbedPool = new Map(); // videoKey -> { iframe, ts }
-
-function ensureWarmEmbedHost() {
-  if (typeof document === "undefined") return null;
-  let host = document.getElementById("cw-warm-embed-host");
-  if (!host) {
-    host = document.createElement("div");
-    host.id = "cw-warm-embed-host";
-    host.setAttribute("aria-hidden", "true");
-    // Fuera de pantalla pero RENDERIZADO (no display:none, que en algunos
-    // navegadores bloquea la carga del media). Tamaño mínimo: solo nos interesa
-    // calentar la descarga/conexión, no verlo.
-    host.style.cssText =
-      "position:fixed;left:-9999px;top:0;width:1px;height:1px;overflow:hidden;pointer-events:none;";
-    document.body.appendChild(host);
-  }
-  return host;
-}
-
-function releaseWarmEmbed(key) {
-  const entry = warmEmbedPool.get(key);
-  if (!entry) return;
-  try {
-    entry.iframe.src = "about:blank";
-    entry.iframe.remove();
-  } catch {
-    // El nodo pudo haberse retirado ya.
-  }
-  warmEmbedPool.delete(key);
-}
-
-function warmTrailerEmbed(video) {
-  if (typeof document === "undefined" || !video) return;
-  // Solo YouTube: Vimeo (background=1) arranca solo y no tiene el mismo coste.
-  if (video.site !== "YouTube") return;
-  const key = getVideoIdentity(video);
-  if (!key) return;
-
-  const existing = warmEmbedPool.get(key);
-  if (existing) {
-    existing.ts = Date.now(); // refresca posición LRU
-    return;
-  }
-
-  const src = buildPreviewTrailerSrc(video);
-  const host = ensureWarmEmbedHost();
-  if (!src || !host) return;
-
-  const iframe = document.createElement("iframe");
-  iframe.src = src;
-  iframe.tabIndex = -1;
-  iframe.setAttribute("aria-hidden", "true");
-  iframe.setAttribute("allow", "autoplay; encrypted-media");
-  iframe.width = "320";
-  iframe.height = "180";
-  iframe.style.cssText = "width:320px;height:180px;border:0;opacity:0;";
-  host.appendChild(iframe);
-  warmEmbedPool.set(key, { iframe, ts: Date.now() });
-
-  // LRU: no mantener más de N embeds calientes a la vez.
-  if (warmEmbedPool.size > WARM_EMBED_POOL_MAX) {
-    let oldestKey = null;
-    let oldestTs = Infinity;
-    for (const [k, v] of warmEmbedPool) {
-      if (v.ts < oldestTs) {
-        oldestTs = v.ts;
-        oldestKey = k;
-      }
-    }
-    if (oldestKey) releaseWarmEmbed(oldestKey);
-  }
-}
-
-// Resuelve el trailer de un show (de caché, o pidiéndolo) y calienta su embed.
-function warmPreviewTrailerEmbed(tvId) {
-  if (!tvId || typeof window === "undefined") return;
-  const cached = readCachedPreviewTrailerVideos(tvId);
-  if (cached && cached[0]) {
-    warmTrailerEmbed(cached[0]);
-    return;
-  }
-  resolvePreviewTrailerVideos(tvId)
-    .then((videos) => {
-      if (videos && videos[0]) warmTrailerEmbed(videos[0]);
-    })
-    .catch(() => {});
-}
-
-function clearWarmEmbedPool() {
-  for (const key of Array.from(warmEmbedPool.keys())) releaseWarmEmbed(key);
-}
-
-function readCachedPreviewTrailerVideos(tvId) {
-  if (!tvId) return null;
-  const cached = previewTrailerVideosCache.get(`tv:${tvId}`);
-  return Array.isArray(cached) ? cached : null;
-}
-
-async function resolvePreviewTrailerVideos(tvId) {
-  const videos = await fetchPreviewTrailerVideos(tvId);
-  previewTrailerVideosCache.set(`tv:${tvId}`, videos);
-  return videos;
-}
-
-function buildPreviewTrailerSrc(video) {
-  const embedUrl = videoEmbedUrl(video, true);
-  if (!embedUrl) return null;
-
-  if (video.site === "YouTube") {
-    const params = new URLSearchParams({
-      autoplay: "1",
-      mute: "1",
-      playsinline: "1",
-      controls: "0",
-      disablekb: "1",
-      fs: "0",
-      iv_load_policy: "3",
-      cc_load_policy: "0",
-      rel: "0",
-      loop: "1",
-      playlist: String(video.key),
-      enablejsapi: "1",
-    });
-    if (typeof window !== "undefined") {
-      params.set("origin", window.location.origin);
-    }
-    return `${PREVIEW_TRAILER_YOUTUBE_ORIGIN}/embed/${video.key}?${params}`;
-  }
-
-  if (video.site === "Vimeo") {
-    const url = new URL(embedUrl);
-    url.searchParams.set("background", "1");
-    url.searchParams.set("muted", "1");
-    url.searchParams.set("controls", "0");
-    url.searchParams.set("loop", "1");
-    url.searchParams.set("autopause", "0");
-    url.searchParams.set("dnt", "1");
-    url.searchParams.set("title", "0");
-    url.searchParams.set("byline", "0");
-    url.searchParams.set("portrait", "0");
-    return url.toString();
-  }
-
-  return embedUrl;
-}
-
-function loadYouTubeIframeApi() {
-  if (typeof window === "undefined") return Promise.resolve(null);
-  if (window.YT?.Player) return Promise.resolve(window.YT);
-  if (youtubeIframeApiPromise) return youtubeIframeApiPromise;
-
-  youtubeIframeApiPromise = new Promise((resolve) => {
-    const previousReady = window.onYouTubeIframeAPIReady;
-
-    window.onYouTubeIframeAPIReady = () => {
-      previousReady?.();
-      resolve(window.YT);
-    };
-
-    const existingScript = document.querySelector(
-      'script[src="https://www.youtube.com/iframe_api"]',
-    );
-    if (existingScript) return;
-
-    const script = document.createElement("script");
-    script.src = "https://www.youtube.com/iframe_api";
-    script.async = true;
-    document.head.appendChild(script);
-  });
-
-  return youtubeIframeApiPromise;
-}
 
 /* =================== HELPERS =================== */
 function clampPct(value) {
@@ -589,6 +279,15 @@ function clampPct(value) {
 // progreso capturadas desde streaming).
 function mediaTypeOf(show) {
   return show?.media_type === "movie" ? "movie" : "tv";
+}
+
+// Calendario: el tráiler de la TEMPORADA del episodio que se estrena (sus
+// vídeos en TMDb), no el de la serie en general. Continuar viendo, el de la
+// serie/película como siempre.
+function previewTrailerSeason(show, mode) {
+  if (mode !== "calendar" || mediaTypeOf(show) !== "tv") return null;
+  const season = Number(show?.nextEpisode?.season);
+  return Number.isInteger(season) && season >= 0 ? season : null;
 }
 
 function nextEpisodeHref(show) {
@@ -943,24 +642,33 @@ function ContinueWatchingPreviewCard({
   // Tráiler: MISMO modelo que BackdropPreviewCard. Un único tráiler resuelto con
   // `getBestTrailerCached`, autoplay ~1s tras el hover y `useTrailerAutoDismiss`
   // para ocultarlo (volver al backdrop) si está restringido o no es embebible.
-  const [showTrailer, setShowTrailer] = useState(false);
-  const [trailer, setTrailer] = useState(null);
-  const [trailerLoading, setTrailerLoading] = useState(false);
   const trailerIframeRef = useRef(null);
+  // Tráiler con autoplay al hacer hover: estado, precarga, un solo intento con
+  // el tráiler bueno y paso al siguiente si YouTube no deja reproducirlo (ver
+  // usePreviewAutoTrailer). El backdrop cubre el iframe hasta `trailerPlaying`.
+  const {
+    trailer,
+    showTrailer,
+    setShowTrailer,
+    trailerLoading,
+    trailerPlaying,
+    trailerError,
+    toggleTrailer: handleToggleTrailer,
+  } = usePreviewAutoTrailer({
+    id: show?.id,
+    mediaType: mediaType,
+    season: previewTrailerSeason(show, mode),
+    iframeRef: trailerIframeRef,
+    onBeforeOpen: () => closeSoundtrackOverlay(),
+  });
+  useEffect(() => {
+    if (trailerError) setError(trailerError);
+  }, [trailerError]);
   const {
     muted: trailerMuted,
     toggle: handleToggleTrailerAudio,
     sync: syncTrailerAudio,
   } = usePreviewTrailerAudio(trailerIframeRef, { volume: 35 });
-
-  // Hasta que `trailerPlaying` sea true, el backdrop cubre el iframe: si el vídeo
-  // no está disponible, el error de YouTube nunca llega a verse.
-  const { playing: trailerPlaying } = useTrailerAutoDismiss({
-    open: showTrailer,
-    iframeRef: trailerIframeRef,
-    videoKey: trailer?.key,
-    onUnavailable: () => setShowTrailer(false),
-  });
 
   // Soundtrack (mismo mecanismo que BackdropPreviewCard/InlinePreviewCard):
   // búsqueda de la canción con preview y reproducción en un overlay interno.
@@ -1392,53 +1100,7 @@ function ContinueWatchingPreviewCard({
     }
   };
 
-  const handleToggleTrailer = async (e) => {
-    e?.stopPropagation?.();
-    closeSoundtrackOverlay();
-    if (showTrailer) {
-      setShowTrailer(false);
-      return;
-    }
-    try {
-      setTrailerLoading(true);
-      setError("");
-      const t = await getBestTrailerCached(show.id, mediaType);
-      if (!t?.key) {
-        setTrailer(null);
-        setShowTrailer(false);
-        // Sin aviso: en la vista previa el tráiler se pide solo al hacer hover,
-        // así que no tenerlo no es un error que haya que mostrar.
-        return;
-      }
-      setTrailer(t);
-      setShowTrailer(true);
-    } catch {
-      setTrailer(null);
-      setShowTrailer(false);
-      setError("No se pudo cargar el trailer.");
-    } finally {
-      setTrailerLoading(false);
-    }
-  };
-
-  // Autoplay del tráiler ~1s tras el hover: esta tarjeta se MONTA al hacer hover,
-  // así que el temporizador al montar equivale a "poco después del hover"; el
-  // cleanup lo cancela al des-hover.
-  const autoTrailerRef = useRef(null);
-  useEffect(() => {
-    autoTrailerRef.current = {
-      showTrailer,
-      trailerLoading,
-      play: handleToggleTrailer,
-    };
-  });
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const s = autoTrailerRef.current;
-      if (s && !s.showTrailer && !s.trailerLoading) s.play();
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, []);
+  // (Autoplay y apertura del tráiler: usePreviewAutoTrailer, arriba.)
 
   const handleToggleSoundtrack = async (e) => {
     e.stopPropagation();
@@ -1714,7 +1376,10 @@ function ContinueWatchingPreviewCard({
             // T{season}·E{number} • {nombre del episodio}. Con el mismo margen
             // que el panel de abajo, para alinear con los botones.
             ep || episodeAirLabel ? (
-              <div className="pointer-events-none absolute inset-x-4 bottom-2.5 z-10 flex min-w-0 flex-col gap-1 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)] sm:inset-x-5">
+              <div
+                data-preview-media-overlay=""
+                className="pointer-events-none absolute inset-x-4 bottom-2.5 z-10 flex min-w-0 flex-col gap-1 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)] sm:inset-x-5"
+              >
                 {episodeAirLabel && (
                   <div className="flex min-w-0 items-center gap-1.5 text-xs font-bold leading-4">
                     {/* 1px abajo: centrado ÓPTICO con el texto (PT Sans asienta
@@ -1751,7 +1416,8 @@ function ContinueWatchingPreviewCard({
             // backdrop (aunque haya tráiler) para no perder la referencia visual.
             // Es el ÚNICO sitio con el texto del progreso (episodio y tiempo
             // restante): las tarjetas de la fila solo llevan la barra, debajo.
-            <div className="absolute inset-x-3 bottom-2 z-10">
+            // `data-preview-media-overlay`: se va al cerrar (usePreviewMorph).
+            <div data-preview-media-overlay="" className="absolute inset-x-3 bottom-2 z-10">
               {ep || show?.remainingLabel ? (
                 <div className="mb-1 flex items-center gap-1 truncate text-[11px] font-semibold text-white drop-shadow">
                   <Play className="h-3 w-3 shrink-0 fill-current text-white" aria-hidden="true" />
@@ -2147,13 +1813,16 @@ function ContinueWatchingSection({
 
     loadYouTubeIframeApi().catch(() => {});
     displayShows.slice(start, end).forEach((show) => {
-      prewarmPreviewTrailer(show?.id);
+      prefetchPreviewTrailer(
+        mediaTypeOf(show),
+        show?.id,
+        previewTrailerSeason(show, mode),
+      );
     });
-  }, [activeIndex, displayShows, isMobile, hydrated, perView]);
+  }, [activeIndex, displayShows, isMobile, hydrated, perView, mode]);
 
   // Al desmontar la fila, libera cualquier embed caliente que quedara (p. ej.
   // si se navega mientras el cursor seguía dentro de la fila).
-  useEffect(() => clearWarmEmbedPool, []);
 
   const clearHoverOpenTimer = () => {
     if (hoverTimeoutRef.current) {
@@ -2225,20 +1894,28 @@ function ContinueWatchingSection({
           activeIndex + visibleCount + PREVIEW_TRAILER_PREWARM_AHEAD,
         ),
       )
-      .forEach((show) => prewarmPreviewTrailer(show?.id));
+      .forEach((show) =>
+        prefetchPreviewTrailer(
+          mediaTypeOf(show),
+          show?.id,
+          previewTrailerSeason(show, mode),
+        ),
+      );
   };
 
   const handleMouseEnterItem = (itemKey, tvId, index) => {
     if (isMobile) return;
-    prewarmPreviewTrailer(tvId);
-    // Calienta el embed de ESTA tarjeta y el de la siguiente (anticipando el
-    // movimiento lateral del cursor), para que al expandir el trailer ya esté
-    // casi listo. El pool LRU acotado evita descargar de más.
-    warmPreviewTrailerEmbed(tvId);
-    if (typeof index === "number" && Array.isArray(displayShows)) {
-      const next = displayShows[index + 1];
-      if (next?.id) warmPreviewTrailerEmbed(next.id);
-    }
+    // El tráiler de esta tarjeta, ya resuelto para cuando se abra la preview.
+    // (Antes además se montaban iframes de YouTube OCULTOS reproduciéndose para
+    // «calentar» el reproductor; elegían el vídeo con otro criterio —a menudo
+    // otro distinto del que luego salía— y competían por la red con el tráiler
+    // de verdad.)
+    const hoveredShow = typeof index === "number" ? displayShows?.[index] : null;
+    prefetchPreviewTrailer(
+      mediaTypeOf(hoveredShow),
+      hoveredShow?.id ?? tvId,
+      previewTrailerSeason(hoveredShow, mode),
+    );
     clearHoverCloseTimer();
     clearHoverOpenTimer();
     prewarmHoverBackdrop(displayShows?.[index]);
@@ -2486,17 +2163,10 @@ function ContinueWatchingSection({
         onMouseEnter={() => {
           setIsHoveredRow(true);
           prewarmVisibleTrailers();
-          // Calienta ya el embed de la primera tarjeta visible: cuando el cursor
-          // llegue a ella (o a su vecina), el trailer arrancará casi al instante.
-          const firstVisible = displayShows?.[Math.max(0, activeIndex)];
-          if (firstVisible?.id) warmPreviewTrailerEmbed(firstVisible.id);
         }}
         onMouseLeave={() => {
           clearHoverOpenTimer();
           setIsHoveredRow(false);
-          // Al salir de la fila liberamos los embeds calientes: paramos cualquier
-          // reproducción de fondo y evitamos consumo innecesario.
-          clearWarmEmbedPool();
           const currentHoveredId = hoveredIdRef.current;
           if (currentHoveredId) {
             handleMouseLeaveItem(currentHoveredId);

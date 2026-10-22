@@ -17,7 +17,7 @@ import { useHoverCapable } from "@/lib/hooks/useMediaQuery";
 import usePreviewMorph from "@/lib/dashboard/usePreviewMorph";
 import DashboardPreviewGlass from "@/components/dashboard/DashboardPreviewGlass";
 import RowNavGlass, { ROW_NAV_FADE } from "@/components/dashboard/RowNavGlass";
-import useTrailerAutoDismiss from "@/hooks/useTrailerAutoDismiss";
+import usePreviewAutoTrailer from "@/hooks/usePreviewAutoTrailer";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, FreeMode } from "swiper/modules";
 import {
@@ -97,7 +97,6 @@ import {
   yearOf,
   formatRuntime,
   getMediaTypeForItem,
-  getBestTrailerCached,
   movieExtrasCache,
   preloadImage,
 } from "@/lib/dashboard/media";
@@ -358,25 +357,32 @@ export function BackdropPreviewCard({
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
 
-  const [showTrailer, setShowTrailer] = useState(false);
-  const [trailer, setTrailer] = useState(null);
-  const [trailerLoading, setTrailerLoading] = useState(false);
   const trailerIframeRef = useRef(null);
+  // Tráiler con autoplay al hacer hover: estado, precarga, un solo intento con
+  // el tráiler bueno y paso al siguiente si YouTube no deja reproducirlo (ver
+  // usePreviewAutoTrailer). El backdrop cubre el iframe hasta `trailerPlaying`.
+  const {
+    trailer,
+    showTrailer,
+    setShowTrailer,
+    trailerLoading,
+    trailerPlaying,
+    trailerError,
+    toggleTrailer: handleToggleTrailer,
+  } = usePreviewAutoTrailer({
+    id: item?.id,
+    mediaType: mediaType,
+    iframeRef: trailerIframeRef,
+    onBeforeOpen: () => closeSoundtrackOverlay(),
+  });
+  useEffect(() => {
+    if (trailerError) setError(trailerError);
+  }, [trailerError]);
   const {
     muted: trailerMuted,
     toggle: handleToggleTrailerAudio,
     sync: syncTrailerAudio,
   } = usePreviewTrailerAudio(trailerIframeRef, { volume: 30 });
-
-  // Tráiler restringido (edad/embedding) o no disponible → ocultarlo (fallback
-  // al backdrop). Hasta que `trailerPlaying` sea true el backdrop cubre el iframe,
-  // así el mensaje de "no disponible" de YouTube nunca llega a verse.
-  const { playing: trailerPlaying } = useTrailerAutoDismiss({
-    open: showTrailer,
-    iframeRef: trailerIframeRef,
-    videoKey: trailer?.key,
-    onUnavailable: () => setShowTrailer(false),
-  });
 
   // Soundtrack (mismo mecanismo que InlinePreviewCard): búsqueda de la canción
   // con preview, reproducción en un overlay dentro de la propia tarjeta.
@@ -840,51 +846,7 @@ export function BackdropPreviewCard({
     }
   };
 
-  const handleToggleTrailer = async (e) => {
-    e?.stopPropagation?.();
-    closeSoundtrackOverlay();
-    if (showTrailer) {
-      setShowTrailer(false);
-      return;
-    }
-    try {
-      setTrailerLoading(true);
-      setError("");
-      const t = await getBestTrailerCached(item.id, mediaType);
-      if (!t?.key) {
-        setTrailer(null);
-        setShowTrailer(false);
-        // Sin aviso: en la vista previa el tráiler se pide solo al hacer hover,
-        // así que no tenerlo no es un error que haya que mostrar.
-        return;
-      }
-      setTrailer(t);
-      setShowTrailer(true);
-    } catch {
-      setTrailer(null);
-      setShowTrailer(false);
-      setError("No se pudo cargar el trailer.");
-    } finally {
-      setTrailerLoading(false);
-    }
-  };
-
-  // Autoplay del tráiler ~1s tras el hover: esta tarjeta se MONTA al hacer hover
-  // (se renderiza dentro de {isActive ? …}), así que el temporizador al montar
-  // equivale a "poco después del hover"; el cleanup lo cancela al des-hover.
-  const autoTrailerRef = useRef(null);
-  autoTrailerRef.current = {
-    showTrailer,
-    trailerLoading,
-    play: handleToggleTrailer,
-  };
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const s = autoTrailerRef.current;
-      if (s && !s.showTrailer && !s.trailerLoading) s.play();
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, []);
+  // (Autoplay y apertura del tráiler: usePreviewAutoTrailer, arriba.)
 
   const handleToggleSoundtrack = async (e) => {
     e.stopPropagation();
