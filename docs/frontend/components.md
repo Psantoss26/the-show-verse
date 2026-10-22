@@ -31,7 +31,7 @@ Layout global, dashboards y páginas de detalle "grandes".
 | `SeasonDetailsClient.jsx` | Cliente de `/details/tv/[id]/season/[season]`. |
 | `EpisodeDetailsClient.jsx` | Cliente de la ficha de episodio. |
 | `EpisodeRatingsGrid.jsx` | Grid de valoraciones de episodios de una temporada (usado también dentro de `EpisodeRatingsModal`). |
-| `ActorDetails.jsx` | Ficha de actor/actriz (`/details/person/[id]`). |
+| `ActorDetails.jsx` | Ficha de actor/actriz (`/details/person/[id]`). Datos de Wikidata: altura, nacionalidades, premios y patrimonio neto estimado (`lib/actor/netWorth.js`). |
 | `FavoriteWatchlistButtons.jsx` | Botones de favorito/watchlist reutilizables sobre TMDb account states. |
 | `StarRating.jsx` | Selector de valoración por estrellas (usado en fichas y modales de Trakt). |
 | `LiquidButton.jsx` | Botón con efecto "líquido/cristal" (demo en `/demo/liquid-buttons`); ver [[LIQUID_BUTTONS]]. |
