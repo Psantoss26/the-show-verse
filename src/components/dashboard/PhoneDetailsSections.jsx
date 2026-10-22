@@ -70,6 +70,7 @@ import CommentLikeButton from "@/components/community/CommentLikeButton";
 import PosterStack from "@/components/details/PosterStack";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 import SeasonsSection from "@/components/details/SeasonsSection";
+import { buildCastDataForUI } from "@/lib/details/cast";
 import DetailsSectionSheets, { openSectionSheet } from "@/components/details/sectionSheet/DetailsSectionSheets";
 import { createValueStore } from "@/lib/details/valueStore";
 import { buildArtworkSheetTabs } from "@/lib/details/artworkSheetTabs";
@@ -1002,7 +1003,20 @@ export default function PhoneDetailsSections({
     ? data.sentiment.cons
     : [];
 
-  const cast = Array.isArray(data?.cast) ? data.cast : [];
+  // Reparto Principal: SOLO los intérpretes, en el orden de TMDb, igual que
+  // DetailsClient. `data.cast` (el del modal ancho) pone delante al director o
+  // a los creadores —y, si además actúan, los quita de los actores—; aquí se
+  // parte del reparto sin mezclar (`fullCast`). El director o los creadores
+  // siguen en la vista lateral de la sección (pestaña «Equipo»).
+  const cast = useMemo(() => {
+    const base =
+      Array.isArray(data?.fullCast) && data.fullCast.length
+        ? data.fullCast
+        : (Array.isArray(data?.cast) ? data.cast : []).filter(
+            (person) => Number(person?.order) >= 0,
+          );
+    return buildCastDataForUI({ baseCast: base, creativeCredits: [] });
+  }, [data?.fullCast, data?.cast]);
   const rawRecommendations = data?.recommendations;
   const typedRecommendations = useMemo(
     () =>
@@ -1171,7 +1185,7 @@ export default function PhoneDetailsSections({
   const sectionSheetData = {
     type,
     tmdbId: id,
-    cast: data?.fullCast || cast.filter((person) => Number(person.order) >= 0),
+    cast,
     creators: data?.tvCreators || [],
     recommendations,
     onOpenTitle,

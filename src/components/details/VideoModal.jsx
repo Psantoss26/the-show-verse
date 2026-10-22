@@ -254,27 +254,43 @@ export default function VideoModal({
         role="dialog"
         aria-modal="true"
       >
-        {/* HEADER: Glass Header */}
-        <div className={`flex w-full items-center justify-between p-6 sm:px-8 sm:pt-8 sm:pb-6 ${LIQUID_GLASS_MODAL_HEADER}`}>
-          <div className="flex flex-col gap-0.5 min-w-0 pr-4">
-            <h3 className="text-xl sm:text-2xl font-black text-white drop-shadow-md truncate">
+        {/* CABECERA, la MISMA que la del modal de soundtrack: enlace a la
+            fuente (YouTube) a la izquierda en un hueco de 44 px, título
+            centrado en mayúsculas pequeñas —entero, en varias líneas si hace
+            falta— con el tipo y la posición debajo, y cerrar a la derecha. */}
+        <div className={`flex w-full items-center justify-between gap-2 px-6 pt-6 pb-5 sm:px-8 sm:pt-8 sm:pb-6 ${LIQUID_GLASS_MODAL_HEADER}`}>
+          {ext ? (
+            <a
+              href={ext}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`Ver en ${video.site || "YouTube"}`}
+              title={`Ver en ${video.site || "YouTube"}`}
+              className="flex h-11 w-11 shrink-0 items-center justify-center transition-transform hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/70"
+            >
+              <Image
+                src="/youtube.webp"
+                alt=""
+                width={40}
+                height={28}
+                aria-hidden="true"
+                className="h-7 w-auto object-contain drop-shadow-md"
+              />
+            </a>
+          ) : (
+            <div className="h-11 w-11 shrink-0" />
+          )}
+
+          <div className="flex min-w-0 flex-1 flex-col items-center px-2">
+            <h3 className="w-full text-center text-[11px] font-bold uppercase tracking-[0.2em] text-white/80 text-balance [overflow-wrap:anywhere] drop-shadow-sm">
               {video.name || "Tráiler Oficial"}
             </h3>
-            <div className="flex items-center gap-2 text-xs font-medium text-white/50 uppercase tracking-wider mt-1">
-              <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-red-400 drop-shadow-[0_0_8px_rgba(248,113,113,0.65)]">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.85)]" />
-                {video.type || "Video"}
-              </span>
-              <span>•</span>
-              <span className="text-white/70">{video.site || "YouTube"}</span>
-              {total > 1 && (
-                <>
-                  <span>•</span>
-                  <span className="tabular-nums text-white/70" aria-live="polite">
-                    {currentIndex + 1} de {total}
-                  </span>
-                </>
-              )}
+            <div
+              className="mt-1 text-[10px] font-semibold uppercase text-white/40 tabular-nums"
+              aria-live="polite"
+            >
+              {video.type || "Vídeo"}
+              {total > 1 ? ` · ${currentIndex + 1} de ${total}` : ""}
             </div>
           </div>
 
@@ -282,9 +298,10 @@ export default function VideoModal({
             type="button"
             onClick={onClose}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/5 text-white/70 hover:bg-white/10 hover:text-white transition shadow-sm"
+            aria-label="Cerrar (Esc)"
             title="Cerrar (Esc)"
           >
-            <X className="w-5 h-5" />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
@@ -310,13 +327,28 @@ export default function VideoModal({
           )}
         </div>
 
-        {/* FOOTER: fecha · Anterior / Siguiente · YouTube. En móvil la
-            navegación ocupa su propia fila, centrada, para no estrechar los
-            botones; en ordenador (lg) sale del panel, a los lados. */}
-        <div className={`grid grid-cols-[1fr_auto] items-center gap-3 p-3 sm:grid-cols-[1fr_auto_1fr] sm:p-6 sm:px-8 lg:grid-cols-[1fr_auto] ${LIQUID_GLASS_MODAL_FOOTER}`}>
-          <div className="min-w-0 text-xs font-semibold text-white/50">
+        {/* FOOTER, en UNA fila y con el mismo margen lateral que la cabecera
+            (px-6 / sm:px-8; antes 12 px en móvil y quedaba pegado al borde).
+            Móvil y tablet: Anterior · fecha · Siguiente (en dos filas no
+            cabía: en teléfonos con poco alto útil el modal recortaba la
+            segunda). Ordenador (lg): la fecha, y la navegación fuera del panel,
+            a los lados. YouTube y la posición («1 de 8») van en la cabecera. */}
+        <div className={`flex items-center gap-3 px-6 py-3 sm:px-8 sm:py-6 ${LIQUID_GLASS_MODAL_FOOTER}`}>
+          {total > 1 && (
+            <VideoStepButton
+              direction="prev"
+              target={prevVideo}
+              onClick={showPrevVideo}
+            />
+          )}
+
+          <div
+            className={`min-w-0 flex-1 text-xs font-semibold text-white/50 ${
+              total > 1 ? "text-center lg:text-left" : ""
+            }`}
+          >
             {video.published_at && (
-              <span>
+              <div className={total > 1 ? "truncate" : ""}>
                 Publicado el{" "}
                 <span className="text-white/80">
                   {new Date(video.published_at).toLocaleDateString(undefined, {
@@ -325,52 +357,18 @@ export default function VideoModal({
                     day: "numeric",
                   })}
                 </span>
-              </span>
+              </div>
             )}
           </div>
 
           {total > 1 && (
-            <nav
-              aria-label="Vídeos del título"
-              className="order-last col-span-2 flex items-center justify-center gap-2 sm:order-none sm:col-span-1 lg:hidden"
-            >
-              <VideoStepButton
-                direction="prev"
-                target={prevVideo}
-                onClick={showPrevVideo}
-              />
-              <span className="min-w-[4.5rem] text-center text-xs font-bold tabular-nums text-white/70">
-                {currentIndex + 1} / {total}
-              </span>
-              <VideoStepButton
-                direction="next"
-                target={nextVideo}
-                onClick={showNextVideo}
-              />
-            </nav>
+            <VideoStepButton
+              direction="next"
+              target={nextVideo}
+              onClick={showNextVideo}
+            />
           )}
 
-          <div className="flex justify-end">
-          {ext && (
-            <a
-              href={ext}
-              target="_blank"
-              rel="noreferrer"
-              aria-label={`Ver en ${video.site || "YouTube"}`}
-              title={`Ver en ${video.site || "YouTube"}`}
-              className="inline-flex h-11 min-w-11 items-center justify-center p-0 transition-transform hover:scale-105 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/70"
-            >
-              <Image
-                src="/youtube.webp"
-                alt=""
-                width={40}
-                height={30}
-                aria-hidden="true"
-                className="h-8 w-auto"
-              />
-            </a>
-          )}
-          </div>
         </div>
       </div>
       </div>
@@ -417,8 +415,9 @@ function VideoSideButton({ direction, target, onClick }) {
   );
 }
 
-// Anterior / Siguiente. El título del vídeo al que lleva va en el `title`
-// (y en la etiqueta accesible), para saber qué viene sin tener que pulsar.
+// Anterior / Siguiente de MÓVIL Y TABLET: redondos, a los extremos del pie
+// (en ordenador van fuera del panel, ver VideoSideButton). El título del
+// vídeo al que llevan va en la etiqueta accesible y en el `title`.
 function VideoStepButton({ direction, target, onClick }) {
   const isPrev = direction === "prev";
   const Icon = isPrev ? ChevronLeft : ChevronRight;
@@ -431,11 +430,9 @@ function VideoStepButton({ direction, target, onClick }) {
       disabled={!target}
       aria-label={hint}
       title={target ? `${hint} (${isPrev ? "←" : "→"})` : label}
-      className="inline-flex h-11 items-center gap-1.5 rounded-full bg-white/5 px-3.5 text-sm font-bold text-white/80 shadow-sm transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70 disabled:pointer-events-none disabled:opacity-30"
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/10 text-white shadow-sm transition-[scale,opacity,background-color] duration-200 hover:bg-white/15 active:scale-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70 disabled:pointer-events-none disabled:opacity-30 lg:hidden"
     >
-      {isPrev && <Icon className="h-5 w-5" aria-hidden="true" />}
-      <span>{isPrev ? "Anterior" : "Siguiente"}</span>
-      {!isPrev && <Icon className="h-5 w-5" aria-hidden="true" />}
+      <Icon className="h-6 w-6" aria-hidden="true" />
     </button>
   );
 }
