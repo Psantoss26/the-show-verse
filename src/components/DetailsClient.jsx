@@ -10594,8 +10594,19 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 `-top-2` queda a MOBILE_HERO_FIT_GAP_PX (20px) del logo y de
                 los botones, el mismo hueco que hay entre botones, marcador y
                 navbar. La portada (`fitCover`) cede el alto que ocupa. */}
+            {/* ENTRADA: la misma que el logo y los botones (ver
+                `.sv-mobile-progress-reveal`). Hasta que ellos se muestran
+                —portada pintada y progreso comprobado— queda invisible PERO
+                en el flujo, para que la portada (`fitCover`) no cambie de
+                alto al aparecer. */}
             {inProgressPct != null && (
-              <div className="pointer-events-none relative -top-2 w-full px-4 sm:hidden">
+              <div
+                className={`pointer-events-none relative -top-2 w-full px-4 sm:hidden ${
+                  detailsEntryReady && currentLowLoaded && inProgressChecked
+                    ? "sv-mobile-progress-reveal"
+                    : "invisible"
+                }`}
+              >
                 {/* MISMO ANCHO QUE EL NAVBAR INFERIOR: su misma fórmula
                     (`min(100vw - 3rem, 21.5rem)`, centrada), para que la barra
                     y el navbar queden alineados en cualquier móvil. */}
