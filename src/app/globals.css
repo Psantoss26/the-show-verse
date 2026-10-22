@@ -2562,13 +2562,17 @@ button:focus-visible > .sv-nav-glass > .sv-nav-glass__tint {
     animation: sv-mobile-detail-logo-reveal 360ms cubic-bezier(0.16, 1, 0.3, 1) 40ms both;
   }
 
-  /* Barra «Viendo» bajo la portada (películas a medias): entra con el logo y
-     los botones, con su misma curva y su primer retardo. Antes no tenía
-     entrada: se pintaba en cuanto llegaba /api/progress, antes que la
-     portada, el logo y los botones. Solo opacidad + transform, sin escala
-     (en una barra a lo ancho se leería como un zoom). */
+  /* Barra «Viendo» bajo la portada (películas a medias): EXACTAMENTE la
+     entrada de los botones de acción, a la vez que ellos. El contenedor sube
+     con la fila (`sv-mobile-actions-rise`, solo transform) y su contenido
+     entra con el rebote del primer botón (40ms). Antes usaba la del logo
+     (360ms, sin rebote ni subida de la fila) y se leía como otra pieza. */
   .sv-mobile-progress-reveal {
-    animation: sv-mobile-detail-progress-reveal 360ms cubic-bezier(0.16, 1, 0.3, 1) 40ms both;
+    animation: sv-mobile-actions-rise 600ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+
+  .sv-mobile-progress-reveal > * {
+    animation: sv-mobile-detail-action-reveal 280ms cubic-bezier(0.16, 1, 0.3, 1) 40ms both;
   }
 
   /* Los botones entran después de que la portada esté lista. El escalonado
@@ -2653,18 +2657,6 @@ button:focus-visible > .sv-nav-glass > .sv-nav-glass__tint {
   }
 }
 
-@keyframes sv-mobile-detail-progress-reveal {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 14px, 0);
-  }
-
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
 @keyframes sv-mobile-detail-poster-reveal {
   from {
     opacity: 0;
@@ -2707,6 +2699,7 @@ button:focus-visible > .sv-nav-glass > .sv-nav-glass__tint {
   .sv-mobile-poster-reveal,
   .sv-mobile-logo-reveal,
   .sv-mobile-progress-reveal,
+  .sv-mobile-progress-reveal > *,
   .sv-mobile-actions-reveal > * > *,
   .sv-mobile-actions-rise,
   .sv-mobile-actions-scroll-reveal[data-mobile-actions-reveal="shown"],
@@ -2721,6 +2714,7 @@ button:focus-visible > .sv-nav-glass > .sv-nav-glass__tint {
 [data-details-restored] .sv-mobile-poster-reveal,
 [data-details-restored] .sv-mobile-logo-reveal,
 [data-details-restored] .sv-mobile-progress-reveal,
+[data-details-restored] .sv-mobile-progress-reveal > *,
 [data-details-restored] .sv-mobile-actions-reveal > * > *,
 [data-details-restored] .sv-mobile-actions-rise {
   animation: none;

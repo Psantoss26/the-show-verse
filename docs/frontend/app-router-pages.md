@@ -31,7 +31,7 @@ tags: [area/frontend, type/referencia]
 | `/details/tv/[id]` | `page.jsx` (mismo `DetailsPageLoader`) | Alias explícito para series. |
 | `/details/tv/[id]/season/[season]` | `SeasonDetailsClient.jsx` | Detalle de una temporada (episodios, valoraciones). |
 | `/details/tv/[id]/season/[season]/episode/[episode]` | `EpisodeDetailsClient.jsx` | Detalle de episodio (créditos, valoraciones, navegación a episodio siguiente/anterior). |
-| `/details/person/[id]` | `page.jsx` + `ActorDetails.jsx` | Ficha de actor/actriz: biografía, "known for", créditos combinados. Desde Wikidata (en el cliente): altura, nacionalidades, premios y patrimonio neto estimado (P2218, la cifra más reciente; ver `src/lib/actor/netWorth.js`). |
+| `/details/person/[id]` | `page.jsx` + `ActorDetails.jsx` | Ficha de actor/actriz: biografía, "known for", créditos combinados. |
 | `@overlay/(.)details/...` | Reexportan las páginas de `/details` | Rutas interceptoras: al navegar a una ficha desde la app se pinta encima y la página de origen queda montada y oculta (`OverlayRouteHost`). Recargar sirve la ficha completa. |
 | `/embed/details/[...segments]` | `page.jsx` | Ficha móvil incrustada para la «vista teléfono» del panel lateral de escritorio (`noindex`). |
 | `/s/movie/[id]`, `/s/tv/[id]`, `/s/person/[id]` | `route.js` (runtime `nodejs`) | Versión ligera server-only en HTML plano con metadatos OG/Twitter, pensada para bots de redes sociales (destino del rewrite del middleware), no para usuarios humanos. |

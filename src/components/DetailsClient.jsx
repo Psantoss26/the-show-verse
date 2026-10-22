@@ -10594,8 +10594,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 `-top-2` queda a MOBILE_HERO_FIT_GAP_PX (20px) del logo y de
                 los botones, el mismo hueco que hay entre botones, marcador y
                 navbar. La portada (`fitCover`) cede el alto que ocupa. */}
-            {/* ENTRADA: la misma que el logo y los botones (ver
-                `.sv-mobile-progress-reveal`). Hasta que ellos se muestran
+            {/* ENTRADA: la misma que los botones y con su misma condición,
+                así que a la vez (ver `.sv-mobile-progress-reveal`): la subida
+                de la fila aquí y el rebote del primer botón en el hijo. Hasta
+                que ellos se muestran
                 —portada pintada y progreso comprobado— queda invisible PERO
                 en el flujo, para que la portada (`fitCover`) no cambie de
                 alto al aparecer. */}
