@@ -298,23 +298,25 @@ function CreditsSheet({ meta, data, items: dedupedItems, rawItems, onClose, tab,
       }
       toolbar={
         <MobileFiltersPanel open={filtersOpen} gapClassName="pt-3">
-        <div className="grid grid-cols-2 gap-2">
-          <div className="col-span-2">
-            <CreditsFilterDropdowns
-              showRole={false}
-              sort={sort}
-              setSort={setSort}
-              menuZIndex={SHEET_MENU_Z}
-              fullWidth
-            />
-          </div>
+        {/* Ordenar · Desde · Hasta en UNA fila: cada botón parte del ancho
+            de su contenido y reparte el sobrante (o encoge) según el ancho
+            del panel (`@container`, ver `compact` en InlineDropdown). */}
+        <div className="@container flex gap-2">
+          <CreditsFilterDropdowns
+            showRole={false}
+            sort={sort}
+            setSort={setSort}
+            menuZIndex={SHEET_MENU_Z}
+            compact
+          />
           <YearFilterDropdown
             label="Desde"
             value={yearFrom}
             setValue={setYearFrom}
             options={yearOptions}
             menuZIndex={SHEET_MENU_Z}
-            fullWidth
+            compact
+            compactIcon="wide"
           />
           <YearFilterDropdown
             label="Hasta"
@@ -322,7 +324,8 @@ function CreditsSheet({ meta, data, items: dedupedItems, rawItems, onClose, tab,
             setValue={setYearTo}
             options={yearOptions}
             menuZIndex={SHEET_MENU_Z}
-            fullWidth
+            compact
+            compactIcon="wide"
           />
         </div>
         </MobileFiltersPanel>

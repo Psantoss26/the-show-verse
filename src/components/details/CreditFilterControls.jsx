@@ -46,6 +46,15 @@ export function InlineDropdown({
   menuZIndex = 1000,
   // Botón a todo el ancho también en escritorio (en el panel lateral).
   fullWidth = false,
+  // FILA COMPACTA (panel lateral de Películas/Series: Ordenar · Desde ·
+  // Hasta en una sola fila). Solo icono y valor, sin la etiqueta, en cualquier
+  // ancho, y el botón parte del ancho de su contenido (`flex: 1 1 auto`):
+  // reparte el sobrante o encoge con los demás. La fila debe ser `@container`
+  // flex; `compactIcon: "wide"` muestra el icono solo si la fila mide ≥ 28rem
+  // y, por debajo de 24rem (panel en un teléfono), la flecha se oculta: así
+  // los tres valores caben enteros («Valoración · Desde 2010 · Hasta 2017»).
+  compact = false,
+  compactIcon = "always",
   accent = "emerald",
 }) {
   const tone = ACCENTS[accent] || ACCENTS.emerald;
@@ -111,30 +120,52 @@ export function InlineDropdown({
   return (
     <div
       ref={ref}
-      className={`relative w-full lg:w-auto lg:shrink-0 ${className}`}
+      className={`relative ${
+        compact ? "min-w-0 flex-[1_1_auto]" : "w-full lg:w-auto lg:shrink-0"
+      } ${className}`}
     >
       <button
         ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`h-11 min-w-0 w-full inline-flex items-center justify-between gap-3 px-4 rounded-2xl transition text-sm lg:min-w-[140px] ${fullWidth ? "" : "lg:w-auto"} bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 focus-visible:outline focus-visible:outline-2 ${tone.focus}`}
+        className={`h-11 min-w-0 w-full inline-flex items-center justify-between rounded-2xl transition text-sm ${
+          compact
+            ? "gap-1.5 px-3"
+            : `gap-3 px-4 lg:min-w-[140px] ${fullWidth ? "" : "lg:w-auto"}`
+        } bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 focus-visible:outline focus-visible:outline-2 ${tone.focus}`}
       >
-        <div className="flex min-w-0 items-center gap-2">
-          {Icon && <Icon className={`h-4 w-4 shrink-0 ${tone.icon}`} />}
+        <div className={`flex min-w-0 items-center ${compact ? "gap-1.5" : "gap-2"}`}>
+          {Icon && (
+            <Icon
+              className={`h-4 w-4 shrink-0 ${tone.icon} ${
+                compact && compactIcon === "wide" ? "hidden @min-[28rem]:block" : ""
+              }`}
+            />
+          )}
           {/* En móvil solo icono y valor (como los desplegables compactos de
               Favoritos): con la etiqueta, en media fila el valor se cortaba. */}
-          <span className="hidden shrink-0 text-xs font-bold uppercase tracking-wider text-zinc-500 sm:inline">
-            {label}:
-          </span>
-          <span className="hidden min-w-0 truncate font-semibold text-white sm:inline">
-            {valueLabel}
-          </span>
-          <span className="min-w-0 truncate font-semibold text-white sm:hidden">
-            {mobileValueLabel || valueLabel}
-          </span>
+          {compact ? (
+            <span className="min-w-0 truncate font-semibold text-white">
+              {mobileValueLabel || valueLabel}
+            </span>
+          ) : (
+            <>
+              <span className="hidden shrink-0 text-xs font-bold uppercase tracking-wider text-zinc-500 sm:inline">
+                {label}:
+              </span>
+              <span className="hidden min-w-0 truncate font-semibold text-white sm:inline">
+                {valueLabel}
+              </span>
+              <span className="min-w-0 truncate font-semibold text-white sm:hidden">
+                {mobileValueLabel || valueLabel}
+              </span>
+            </>
+          )}
         </div>
         <ChevronDown
-          className={`h-3.5 w-3.5 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`h-3.5 w-3.5 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""} ${
+            compact ? "hidden @min-[24rem]:block" : ""
+          }`}
         />
       </button>
 
@@ -200,11 +231,15 @@ export function YearFilterDropdown({
   className = "",
   menuZIndex,
   fullWidth,
+  compact,
+  compactIcon,
 }) {
   return (
     <InlineDropdown
       menuZIndex={menuZIndex}
       fullWidth={fullWidth}
+      compact={compact}
+      compactIcon={compactIcon}
       label={label}
       valueLabel={value || "Todos"}
       mobileValueLabel={value ? `${label} ${value}` : label}
@@ -249,6 +284,7 @@ export function CreditsFilterDropdowns({
   showRole = true,
   menuZIndex,
   fullWidth,
+  compact,
 }) {
   const creditLabel =
     creditFilter === "all"
@@ -266,6 +302,8 @@ export function CreditsFilterDropdowns({
           : sort === "alpha"
             ? "A-Z"
             : "Recientes";
+  // Fila compacta del panel lateral: el valor corto, para que quepa entero.
+  const sortShortLabel = sort === "rating_desc" ? "Valoración" : sortLabel;
 
   return (
     <>
@@ -306,7 +344,15 @@ export function CreditsFilterDropdowns({
 
       ) : null}
 
-      <InlineDropdown label="Ordenar" valueLabel={sortLabel} icon={ArrowUpDown} menuZIndex={menuZIndex} fullWidth={fullWidth}>
+      <InlineDropdown
+        label="Ordenar"
+        valueLabel={sortLabel}
+        mobileValueLabel={compact ? sortShortLabel : undefined}
+        icon={ArrowUpDown}
+        menuZIndex={menuZIndex}
+        fullWidth={fullWidth}
+        compact={compact}
+      >
         {({ close }) => (
           <>
             <DropdownItem
