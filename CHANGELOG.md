@@ -8,7 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
-- Ficha móvil de películas a medias: la barra «Viendo» bajo la portada entra con el logo y los botones, con su misma animación, en lugar de aparecer antes y de golpe.
+- Ficha móvil de películas a medias: la barra «Viendo» bajo la portada entra a la vez que los botones de acción y con su misma animación (la fila sube y el contenido entra con el rebote del primer botón), en lugar de aparecer antes y de golpe.
 - Documentación puesta al día con las funcionalidades de julio a octubre de 2026: referencia completa de la API, mapa de páginas y nueva carpeta [`docs/features/`](docs/features/Features.md).
 
 ## Octubre de 2026
