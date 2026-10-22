@@ -270,7 +270,7 @@ export function AlertsMenuBoot({ variant = "desktop", heroNavMode = false }) {
   return (
     <div className="alerts-boot relative" aria-hidden="true">
       <span className={alertsButtonClass({ variant, heroNavMode })}>
-        <Bell className="h-6 w-6" strokeWidth={variant === "mobile" ? 2.2 : 2} />
+        <Bell className={`h-6 w-6${variant === "mobile" ? " sv-topbar-icon" : ""}`} strokeWidth={variant === "mobile" ? 2.2 : 2} />
       </span>
     </div>
   );
@@ -567,7 +567,7 @@ export default function AlertsMenu({
         title={label}
         className={buttonClass}
       >
-        <Bell className="h-6 w-6" strokeWidth={variant === "mobile" ? 2.2 : 2} aria-hidden="true" />
+        <Bell className={`h-6 w-6${variant === "mobile" ? " sv-topbar-icon" : ""}`} strokeWidth={variant === "mobile" ? 2.2 : 2} aria-hidden="true" />
         {unread > 0 ? (
           <span
             aria-hidden="true"

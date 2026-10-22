@@ -3148,6 +3148,9 @@ function NavbarContent() {
             // los controles no floten en una franja pensada para 390px.
             isImmersiveRoute ? "h-12 md:h-14" : "h-16"
           }`}
+          // Barra compacta: los iconos de menú, búsqueda y alertas recuperan
+          // algo de tamaño (`.sv-topbar-icon` en globals.css).
+          data-compact-controls={isImmersiveRoute || isScrolled ? "" : undefined}
         >
           {/* Izquierda: el menú lateral concentra la navegación principal en
               móvil y evita duplicar Inicio, Películas y Series en la cabecera. */}
@@ -3163,7 +3166,7 @@ function NavbarContent() {
               aria-haspopup="dialog"
               className="grid h-11 w-11 place-items-center rounded-full text-white transition-[background-color,transform] duration-200 hover:bg-white/10 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
             >
-              <Menu className="h-6 w-6" strokeWidth={2.2} aria-hidden="true" />
+              <Menu className="sv-topbar-icon h-6 w-6" strokeWidth={2.2} aria-hidden="true" />
             </button>
             {/* MÓVIL: la búsqueda abre el overlay a pantalla completa. */}
             <button
@@ -3172,7 +3175,7 @@ function NavbarContent() {
               className="grid h-11 w-11 place-items-center rounded-full text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] transition-transform duration-200 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80 md:hidden"
               aria-label="Buscar"
             >
-              <SearchIcon className="h-6 w-6" aria-hidden="true" />
+              <SearchIcon className="sv-topbar-icon h-6 w-6" aria-hidden="true" />
             </button>
             {/* TABLET: la barra se despliega EN LÍNEA, como en escritorio. El
                 ancho deja libre el grupo de la derecha (alertas y perfil); el
@@ -3196,7 +3199,7 @@ function NavbarContent() {
                   className="grid h-11 w-11 place-items-center rounded-full text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] transition-transform duration-200 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
                   aria-label="Buscar"
                 >
-                  <SearchIcon className="h-6 w-6" aria-hidden="true" />
+                  <SearchIcon className="sv-topbar-icon h-6 w-6" aria-hidden="true" />
                 </button>
               )}
             </div>
