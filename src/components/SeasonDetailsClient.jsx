@@ -73,6 +73,8 @@ import { formatRuntime } from "@/lib/details/shareStory";
 import TraktEpisodesWatchedModal from "@/components/trakt/TraktEpisodesWatchedModal";
 import { useTraktEpisodesWatched } from "@/lib/hooks/useTraktEpisodesWatched";
 import SubrouteDetailsActionRow from "@/components/details/SubrouteDetailsActionRow";
+import VideoModal from "@/components/details/VideoModal";
+import { loadSeasonVideos } from "@/lib/details/titleVideos";
 import { getAdjacentSeasonHrefs } from "@/lib/details/subrouteNavigation";
 import { useDetailsSubrouteSwipe } from "@/lib/navigation/detailsSubrouteSwipe";
 import { usePathname } from "next/navigation";
@@ -396,6 +398,28 @@ export default function SeasonDetailsClient({
   // del primer pintado; la portada además espera a que cargue su imagen).
   const { preferences } = useAuth();
   const [coverEditing, setCoverEditing] = useState(false);
+
+  // VÍDEOS DE LA TEMPORADA (TMDb /season/{n}/videos), para «Ver tráiler» y
+  // recorrerlos en el modal con Anterior / Siguiente. Sin vídeos, el botón va
+  // apagado y el modal no se abre.
+  const seasonVideosKey = `${showId}:${seasonNumber}`;
+  const [seasonVideosState, setSeasonVideosState] = useState({
+    key: null,
+    videos: [],
+  });
+  const [activeVideo, setActiveVideo] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    setActiveVideo(null);
+    loadSeasonVideos(showId, seasonNumber).then((videos) => {
+      if (!cancelled) setSeasonVideosState({ key: seasonVideosKey, videos });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [showId, seasonNumber, seasonVideosKey]);
+  const seasonVideosLoading = seasonVideosState.key !== seasonVideosKey;
+  const seasonVideos = seasonVideosLoading ? [] : seasonVideosState.videos;
   const [preferencesMounted, setPreferencesMounted] = useState(false);
   useLayoutEffect(() => setPreferencesMounted(true), []);
   const autoPosterPath = season?.poster_path || show?.poster_path || null;
@@ -1828,6 +1852,13 @@ export default function SeasonDetailsClient({
                   step: 1,
                 }}
                 onEditCover={season?.id ? () => setCoverEditing(true) : null}
+                trailer={{
+                  available: seasonVideos.length > 0,
+                  loading: seasonVideosLoading,
+                  onOpen: () => {
+                    if (seasonVideos[0]) setActiveVideo(seasonVideos[0]);
+                  },
+                }}
               />
               </div>
             </div>
@@ -2262,6 +2293,15 @@ export default function SeasonDetailsClient({
         onClose={() => setExternalLinksOpen(false)}
         links={seasonExternalLinks}
         wikipedia={showWikipediaQuery}
+      />
+
+      {/* Vídeos de la temporada: el MISMO modal que la ficha de la serie. */}
+      <VideoModal
+        open={!!activeVideo && seasonVideos.length > 0}
+        video={activeVideo}
+        videos={seasonVideos}
+        onVideoChange={setActiveVideo}
+        onClose={() => setActiveVideo(null)}
       />
 
       {coverEditing && season?.id ? (

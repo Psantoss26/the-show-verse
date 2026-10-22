@@ -148,6 +148,7 @@ import { buildShareCardPayload } from "@/lib/details/shareCard";
 import AddToListModal from "@/components/details/AddToListModal";
 import SoundtrackModal from "@/components/details/SoundtrackModal";
 import VideoModal from "@/components/details/VideoModal";
+import { loadTitleVideos } from "@/lib/details/titleVideos";
 import TraktCommentModal from "@/components/details/TraktCommentModal";
 import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
 import TraktWatchedModal from "@/components/trakt/TraktWatchedModal";
@@ -1952,9 +1953,26 @@ export default function DetailModal({
   const [showTrailer, setShowTrailer] = useState(false);
   const [trailer, setTrailer] = useState(null);
   const [trailerLoading, setTrailerLoading] = useState(false);
+  // Todos los vídeos del título, para recorrerlos desde el modal con
+  // Anterior / Siguiente. Se piden al abrir el tráiler, sin hacerle esperar:
+  // hasta que llegan, el modal tiene solo el tráiler.
+  const [titleVideos, setTitleVideos] = useState([]);
+  const titleVideosKey = `${mediaType}:${item?.id}`;
+  const [titleVideosFor, setTitleVideosFor] = useState(null);
+  const titleVideosRequestRef = useRef(null);
 
   const handleToggleTrailer = async (e) => {
     stopNestedModalOpeningEvent(e);
+    if (titleVideosRequestRef.current !== titleVideosKey) {
+      const requestedKey = titleVideosKey;
+      titleVideosRequestRef.current = requestedKey;
+      loadTitleVideos(mediaType, item?.id).then((list) => {
+        // Solo si sigue siendo el título abierto (el drawer puede cambiar).
+        if (titleVideosRequestRef.current !== requestedKey) return;
+        setTitleVideos(list);
+        setTitleVideosFor(requestedKey);
+      });
+    }
     try {
       setTrailerLoading(true);
       setError("");
@@ -3264,7 +3282,13 @@ export default function DetailModal({
         open={showTrailer}
         onClose={() => setShowTrailer(false)}
         video={trailer}
-        videos={trailer ? [trailer] : []}
+        videos={
+          titleVideosFor === titleVideosKey && titleVideos.length > 0
+            ? titleVideos
+            : trailer
+              ? [trailer]
+              : []
+        }
         onVideoChange={setTrailer}
       />
 
