@@ -51,12 +51,10 @@ export function InlineDropdown({
   // ancho, y el botón parte del ancho de su contenido (`flex: 1 1 auto`):
   // reparte el sobrante o encoge con los demás. La fila debe ser `@container`
   // flex y el botón se ajusta a SU ancho para que los tres valores quepan
-  // enteros, siempre con su icono («Valoración · Desde 2010 · Hasta 2017»):
-  //   - ≥ 28rem (panel de escritorio): icono, valor y flecha;
-  //   - < 28rem (tablet): sin la flecha;
-  //   - < 24rem (teléfono): además, relleno, huecos e icono algo menores y
-  //     texto de 13px;
-  //   - < 21rem (teléfonos estrechos, ~360px): texto de 12px y menos relleno.
+  // enteros, siempre con su icono y su flecha («Valoración · Desde 2010 ·
+  // Hasta 2017»): por debajo de 24rem (panel en un teléfono), relleno,
+  // huecos, icono y flecha algo menores y texto de 12px; por debajo de 21rem
+  // (teléfonos de ~360px), relleno, huecos e icono un poco menores aún.
   compact = false,
   accent = "emerald",
 }) {
@@ -133,15 +131,17 @@ export function InlineDropdown({
         onClick={() => setOpen((v) => !v)}
         className={`h-11 min-w-0 w-full inline-flex items-center justify-between rounded-2xl transition text-sm ${
           compact
-            ? "gap-1 px-2 text-xs @min-[21rem]:gap-1.5 @min-[21rem]:px-2.5 @min-[21rem]:text-[13px] @min-[24rem]:px-3 @min-[24rem]:text-sm"
+            ? "gap-0.5 px-1.5 text-xs @min-[21rem]:gap-1 @min-[21rem]:px-2 @min-[24rem]:gap-1.5 @min-[24rem]:px-3 @min-[24rem]:text-sm"
             : `gap-3 px-4 lg:min-w-[140px] ${fullWidth ? "" : "lg:w-auto"}`
         } bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200 hover:from-white/15 hover:to-white/10 focus-visible:outline focus-visible:outline-2 ${tone.focus}`}
       >
-        <div className={`flex min-w-0 items-center ${compact ? "gap-1 @min-[24rem]:gap-1.5" : "gap-2"}`}>
+        <div className={`flex min-w-0 items-center ${compact ? "gap-0.5 @min-[21rem]:gap-1 @min-[24rem]:gap-1.5" : "gap-2"}`}>
           {Icon && (
             <Icon
               className={`shrink-0 ${tone.icon} ${
-                compact ? "h-3.5 w-3.5 @min-[24rem]:h-4 @min-[24rem]:w-4" : "h-4 w-4"
+                compact
+                  ? "h-3 w-3 @min-[21rem]:h-3.5 @min-[21rem]:w-3.5 @min-[24rem]:h-4 @min-[24rem]:w-4"
+                  : "h-4 w-4"
               }`}
             />
           )}
@@ -166,8 +166,8 @@ export function InlineDropdown({
           )}
         </div>
         <ChevronDown
-          className={`h-3.5 w-3.5 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""} ${
-            compact ? "hidden @min-[28rem]:block" : ""
+          className={`shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""} ${
+            compact ? "h-3 w-3 @min-[24rem]:h-3.5 @min-[24rem]:w-3.5" : "h-3.5 w-3.5"
           }`}
         />
       </button>
@@ -185,8 +185,10 @@ export function InlineDropdown({
                 style={menuStyle}
                 className="flex flex-col overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl"
               >
+                {/* `pr-1.5`: aire entre las opciones (y su marca ✓) y la barra
+                    de scroll, que si no se dibujaba pegada a ellas. */}
                 <div
-                  className="min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-color:#3f3f46_transparent]"
+                  className="min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain pr-1.5 [scrollbar-color:#3f3f46_transparent]"
                   style={{ scrollbarWidth: "thin", scrollbarGutter: "stable" }}
                 >
                   <AccentContext.Provider value={tone}>
