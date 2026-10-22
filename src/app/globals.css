@@ -2407,6 +2407,20 @@ html[data-fit-viewport] [data-scroll-restoration-root] {
   --sv-topbar-bottom: 0px;
 }
 
+/* MÓVIL CON UN MODAL ABIERTO (`data-sv-modal-open`, ver useBodyScrollLock):
+   el velo del modal tapa la barra superior, así que el aviso no tiene que
+   dejarle sitio. Sube al borde superior (bajo la zona segura) y se aparta del
+   modal, que va centrado, en vez de taparle la cabecera. */
+@media (max-width: 47.99rem) {
+  /* El argumento `.sv-topbar[data-compact]` del `:has` solo sube la
+     especificidad (cuenta el más específico) para ganar a las reglas de barra
+     compacta/inmersiva de arriba; con `.sv-topbar` ya casa siempre. */
+  :root[data-sv-modal-open] .sv-toast-stack,
+  :root[data-sv-modal-open]:has(.sv-topbar, .sv-topbar[data-compact]) .sv-toast-stack {
+    --sv-topbar-bottom: 0px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sv-toast-stack {
     transition: none;
