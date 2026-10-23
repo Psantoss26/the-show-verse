@@ -60,6 +60,24 @@ test("la portada de los mosaicos usa arte SIN texto", () => {
   assert.equal(pickListArtwork({ posters: [titled], backdrops: [englishBackdrop] }).coverPoster, "/en.jpg");
 });
 
+test("sin idioma: solo los dos mejor valorados de TMDb, no el más grande de la galería", () => {
+  // Caso de El Hobbit o Top Gun: Maverick: una versión gigante con el título
+  // impreso que TMDb tiene marcada «sin idioma», más abajo en la galería.
+  const top = { file_path: "/top.jpg", iso_639_1: null, width: 1000, height: 1500 };
+  const second = { file_path: "/second.jpg", iso_639_1: "xx", width: 2000, height: 3000 };
+  const hugeMislabeled = { file_path: "/imax.jpg", iso_639_1: null, width: 4000, height: 6000 };
+  const titled = { file_path: "/en.jpg", iso_639_1: "en", width: 2000, height: 3000 };
+  const picks = pickListArtwork({ posters: [titled, top, second, hugeMislabeled], backdrops: [] });
+  // De los dos primeros sin idioma, el de más resolución; nunca el tercero.
+  assert.equal(picks.textlessPoster, "/second.jpg");
+  assert.equal(picks.coverPoster, "/second.jpg");
+  // Lo mismo con los backdrops sin idioma cuando no hay pósters sin texto.
+  const bdTop = { file_path: "/bd1.jpg", iso_639_1: null, width: 1920, height: 1080 };
+  const bdSecond = { file_path: "/bd2.jpg", iso_639_1: null, width: 1280, height: 720 };
+  const bdHuge = { file_path: "/bd-huge.jpg", iso_639_1: null, width: 3840, height: 2160 };
+  assert.equal(pickListArtwork({ posters: [titled], backdrops: [bdTop, bdSecond, bdHuge] }).coverPoster, "/bd1.jpg");
+});
+
 test("textlessPoster: solo un póster sin idioma, nunca backdrop ni póster con texto", () => {
   const withText = { file_path: "/en.jpg", iso_639_1: "en", width: 2000, height: 3000, vote_average: 9, vote_count: 50 };
   const neutralBackdrop = { file_path: "/bd.jpg", iso_639_1: null, width: 3840, height: 2160 };

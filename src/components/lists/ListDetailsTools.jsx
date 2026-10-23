@@ -332,9 +332,10 @@ function ViewSwitcher({ viewMode, setViewMode, className = "", fill = false }) {
   );
 }
 
-// Alterna el MODO BORRAR. En escritorio el botón de eliminar de cada tarjeta
-// aparece al pasar el ratón por encima; en un móvil no hay hover, así que sin
-// esto no había forma de quitar títulos de una lista desde el teléfono.
+// Alterna el MODO BORRAR, como el de Continuar viendo: solo con él activo cada
+// tarjeta muestra su papelera, y quitar un título pide confirmación (ver
+// ListItemRemoveControl). Va en la barra: junto al buscador en móvil y tras los
+// modos de vista en escritorio.
 function DeleteModeToggle({ editMode, setEditMode }) {
   return (
     <button
@@ -483,12 +484,6 @@ export default function FilterableListItems({
     setVisibleCount(INITIAL_RENDER_COUNT);
   }, [q, typeFilter, sortBy, groupBy, viewMode]);
 
-  // Salir del modo borrar al cerrar el panel: dejarlo activo sin el menú a la
-  // vista haría que un toque en una tarjeta borrara sin contexto.
-  useEffect(() => {
-    if (!mobileFiltersOpen && editMode) setEditMode(false);
-  }, [mobileFiltersOpen, editMode]);
-
   useEffect(() => {
     if (!hasMoreEntries) return;
     const node = loadMoreRef.current;
@@ -598,6 +593,9 @@ export default function FilterableListItems({
           >
             <Filter className="h-4 w-4" />
           </button>
+          {editable ? (
+            <DeleteModeToggle editMode={editMode} setEditMode={setEditMode} />
+          ) : null}
         </div>
 
         <MobileFiltersPanel
@@ -635,12 +633,6 @@ export default function FilterableListItems({
                   className="min-w-0 flex-1"
                   fill
                 />
-                {editable ? (
-                  <DeleteModeToggle
-                    editMode={editMode}
-                    setEditMode={setEditMode}
-                  />
-                ) : null}
               </div>
             </div>
           </div>
@@ -677,6 +669,9 @@ export default function FilterableListItems({
             setGroupBy={setGroupBy}
           />
           <ViewSwitcher viewMode={viewMode} setViewMode={setViewMode} />
+          {editable ? (
+            <DeleteModeToggle editMode={editMode} setEditMode={setEditMode} />
+          ) : null}
         </div>
       </motion.div>
 

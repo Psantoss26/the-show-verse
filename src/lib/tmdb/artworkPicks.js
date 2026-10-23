@@ -23,11 +23,7 @@
 //                    eligen el arte de cada tarjeta en lote, sin pedir /images
 //                    desde el navegador por cada una.
 
-import {
-  pickBestNeutralPosterByResVotes,
-  pickLadderBackdrop,
-  pickLadderPoster,
-} from "../details/tmdbImages.js";
+import { pickLadderBackdrop, pickLadderPoster } from "../details/tmdbImages.js";
 import {
   imageLanguageTiers,
   pickPreferredResolutionBackdrop,
@@ -65,8 +61,8 @@ export function pickBestBackdropByLangResVotes(list, opts = {}) {
 }
 
 // Sin idioma en TMDb: `iso_639_1` nulo, vacío o "xx". Se normaliza a null
-// porque los selectores neutros solo reconocen ese valor, y se filtra ANTES:
-// sin candidatos neutros, `pickBestNeutralPosterByResVotes` cae a cualquiera.
+// para tratarlos igual, y se filtra ANTES de elegir: así nunca se cae a una
+// imagen con idioma por no haber candidatas neutras.
 function textlessImages(list) {
   return (Array.isArray(list) ? list : [])
     .filter((image) => {
@@ -76,9 +72,24 @@ function textlessImages(list) {
     .map((image) => ({ ...image, iso_639_1: null }));
 }
 
+// La mejor imagen SIN idioma, con el criterio de la portada móvil de la ficha
+// (`pickMobileNeutralPoster`): de las sin idioma, solo las DOS primeras en el
+// orden de TMDb (las mejor valoradas) y, de ellas, la de más resolución.
+//
+// Antes se buscaba la de más resolución en TODA la galería, y en los títulos
+// con galerías enormes (El Hobbit, Top Gun: Maverick…) ganaba una versión
+// gigante (IMAX, cartelería) que TMDb tiene marcada «sin idioma» aunque lleva
+// el título impreso: la portada y el fondo de la lista salían con texto.
+function pickTopVotedTextless(list) {
+  const candidates = textlessImages(list).slice(0, 2);
+  if (!candidates.length) return null;
+  const area = (image) => (image?.width || 0) * (image?.height || 0);
+  return candidates.reduce((best, image) => (area(image) > area(best) ? image : best));
+}
+
 /** Póster SIN idioma de un título (o null), sin recurrir a otro arte. */
 export function pickTextlessPoster(posters) {
-  return pickBestNeutralPosterByResVotes(textlessImages(posters))?.file_path || null;
+  return pickTopVotedTextless(posters)?.file_path || null;
 }
 
 export function pickListArtwork(images, { originalLanguage } = {}) {
@@ -94,7 +105,7 @@ export function pickListArtwork(images, { originalLanguage } = {}) {
     textlessPoster,
     coverPoster:
       textlessPoster ||
-      pickBestNeutralPosterByResVotes(textlessImages(backdrops))?.file_path ||
+      pickTopVotedTextless(backdrops)?.file_path ||
       poster,
     dashboardBackdrop:
       pickBestBackdropByLangResVotes(backdrops, { originalLanguage })?.file_path || null,
