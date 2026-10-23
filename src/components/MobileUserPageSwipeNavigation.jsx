@@ -72,9 +72,11 @@ function getSwipeDestination(pathname, direction) {
 }
 
 function isDetailsInitialHeroVisible() {
-  const secondaryTrigger = document.querySelector(
-    "[data-details-mobile-secondary-trigger]",
-  );
+  // El de la ficha VISIBLE: las de la pila de pantallas siguen montadas y
+  // ocultas antes en el documento.
+  const secondaryTrigger = [
+    ...document.querySelectorAll("[data-details-mobile-secondary-trigger]"),
+  ].find((node) => node.getClientRects().length > 0);
   if (!secondaryTrigger) return false;
 
   // Es el mismo umbral con el que la cabecera móvil de DetailsClient

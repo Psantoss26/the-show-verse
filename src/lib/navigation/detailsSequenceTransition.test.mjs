@@ -6,7 +6,7 @@ import test from 'node:test';
 const source = (await readFile(new URL('./detailsSequenceTransition.js', import.meta.url), 'utf8'))
   .replaceAll('export ', '');
 
-function setup({ native = true, reduced = false, stalledBackground = false, castReady = true, touch = false, width = 1280, timeout = false, routeError = false } = {}) {
+function setup({ native = true, reduced = false, stalledBackground = false, castReady = true, touch = false, width = 1280, timeout = false, routeError = false, stackedScreens = false } = {}) {
   const nodes = [];
   const clones = [];
   let clock = 0;
@@ -26,6 +26,7 @@ function setup({ native = true, reduced = false, stalledBackground = false, cast
       hasAttribute(key) { return attributes.has(key); },
       removeAttribute(key) { attributes.delete(key); },
       getBoundingClientRect: () => ({ top: -100, left: 0, width: 1280 }),
+      getClientRects() { return this.hidden ? [] : [{}]; },
       cloneNode: () => { const clone = node(); clones.push(clone); return clone; },
       querySelectorAll(selector) {
         if (!selector.includes('="artwork"')) return [];
@@ -40,6 +41,7 @@ function setup({ native = true, reduced = false, stalledBackground = false, cast
   }
   const outgoing = node();
   const incoming = node();
+  const hiddenScreens = stackedScreens ? [Object.assign(node(), { hidden: true })] : [];
   let focused = false;
   const heading = { setAttribute() {}, focus() { focused = true; } };
   incoming.querySelector = (selector) => selector === 'h1' ? heading : null;
@@ -58,9 +60,13 @@ function setup({ native = true, reduced = false, stalledBackground = false, cast
     createElement() { const el = node(); nodes.push(el); return el; },
     querySelector(selector) {
       if (selector === '[data-details-error], .next-error-h1' && routeError) return node();
-      if (selector === '[data-details-root][data-details-href]') return outgoing;
-      if (selector === '[data-details-href="/details/movie/2"]') return incoming;
       return null;
+    },
+    // Las fichas ocultas de la pila de pantallas van ANTES en el documento.
+    querySelectorAll(selector) {
+      if (selector === '[data-details-root][data-details-href]') return [...hiddenScreens, outgoing];
+      if (selector === '[data-details-href="/details/movie/2"]') return [...hiddenScreens, incoming];
+      return [];
     },
   };
   if (native) document.startViewTransition = (update) => {
@@ -92,6 +98,9 @@ function setup({ native = true, reduced = false, stalledBackground = false, cast
     ready: () => { ready = true; location.pathname = '/details/movie/2'; },
     cancel: () => listeners.get('popstate')?.(),
     parts: () => ({ outgoing: outgoing.parts, snapshot: clones[0]?.parts || [], incoming: incoming.parts }),
+    hiddenScreens,
+    outgoing,
+    clones,
     state: () => ({ focused, transitions, active: html.hasAttribute('data-details-sequence-transition'),
       overlayRemoved: nodes[0]?.removed, outgoingInert: outgoing.inert, incomingInert: incoming.inert,
       listenerCount: listeners.size }),
@@ -214,4 +223,16 @@ test('en táctil la salida empieza al pulsar y la entrada no funde el cristal', 
     'La ficha nueva entra solo con transform: con opacity su cristal se ve plano hasta el final',
   );
   assert.equal(app.state().transitions, 0);
+});
+
+test('copia y espera la ficha VISIBLE aunque haya fichas ocultas de la pila antes', async () => {
+  const app = setup({ stackedScreens: true });
+  const pending = app.run(() => {});
+  await tick();
+  assert.equal(app.clones.length, 1);
+  assert.equal(app.hiddenScreens[0].inert, false, 'La ficha oculta no es la que sale');
+  assert.equal(app.state().outgoingInert, true, 'La que sale es la visible');
+  app.ready();
+  assert.equal(await pending, true);
+  assert.equal(app.state().focused, true, 'Entra la ficha visible, no la copia oculta');
 });
