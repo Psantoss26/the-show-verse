@@ -239,7 +239,7 @@ export default function CollectionDetailsClient({ collectionId }) {
         return parts.reduce((sum, movie) => sum + (movie.runtime || 0), 0)
     }, [parts])
     const averageRating = useMemo(() => summarizeListRatings(parts), [parts])
-    const { ratingsByKey: imdbRatings, summary: imdbSummary } = useListImdbRatings(parts, {
+    const { ratingsByKey: imdbRatings, summary: imdbSummary, requestRating: requestImdbRating } = useListImdbRatings(parts, {
         totalCount: parts.length,
     })
 
@@ -386,6 +386,7 @@ export default function CollectionDetailsClient({ collectionId }) {
             {parts.length > 0 ? (
                 <FilterableListItems
                     items={filterableParts}
+                    onTitleHover={requestImdbRating}
                     renderCard={(movie, meta, viewMode) => (
                         <MovieCard
                             key={`collection-${movie.id}`}
