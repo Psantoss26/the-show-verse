@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Fichas de temporada y episodio: al ir a la anterior o la siguiente (flechas o deslizar en móvil) la pantalla ya no se apaga. La ficha actual sigue a la vista mientras carga la nueva y se funde con ella al llegar. La anterior y la siguiente se precargan en segundo plano, así que el cambio llega en ~0,3 s desde el clic. → [páginas](docs/frontend/app-router-pages.md)
 - Ficha de temporada: «Ver tráiler» aparece directamente en su estado final. Antes salía activo con un spinner mientras se buscaban los vídeos y se apagaba si la temporada no tenía; ahora los vídeos llegan con la página. → [páginas](docs/frontend/app-router-pages.md)
 - Servidor (Next y backend): las peticiones a TMDb ya no fallan con `fetch failed` / `ETIMEDOUT` cuando la máquina va cargada. Node daba solo 250 ms a cada una de las 12 direcciones de TMDb y, sin IPv6, las IPv4 caducaban antes de procesarse; ahora se prueba IPv4 primero con 2,5 s por intento (`src/instrumentation.js`, `backend/src/config/outbound-network.js`). → [desarrollo local](docs/infrastructure/01-local-development.md)
 - Campana de alertas: al entrar o navegar se pide `/api/users/notifications` una vez, en lugar de una por cada barra (escritorio y móvil; en desarrollo eran 4 peticiones a la vez).
