@@ -77,6 +77,7 @@ import VideoModal from "@/components/details/VideoModal";
 import { loadSeasonVideos, primeSeasonVideos } from "@/lib/details/titleVideos";
 import { getAdjacentSeasonHrefs } from "@/lib/details/subrouteNavigation";
 import { useDetailsSubrouteSwipe } from "@/lib/navigation/detailsSubrouteSwipe";
+import useWarmSubrouteNeighbors from "@/lib/navigation/useWarmSubrouteNeighbors";
 import { usePathname } from "next/navigation";
 import {
   invalidateTraktGetCache,
@@ -446,6 +447,7 @@ export default function SeasonDetailsClient({
   // las flechas de la fila de acciones (MobileUserPageSwipeNavigation).
   const pathname = usePathname();
   useDetailsSubrouteSwipe(pathname, adjacentSeasonHrefs.previousHref, adjacentSeasonHrefs.nextHref);
+  useWarmSubrouteNeighbors(adjacentSeasonHrefs.previousHref, adjacentSeasonHrefs.nextHref);
   const heroBgPath =
     show?.backdrop_path || season?.poster_path || show?.poster_path || null;
 
@@ -1612,6 +1614,10 @@ export default function SeasonDetailsClient({
   return (
     <div
       ref={heroRootRef}
+      // Anterior/siguiente conserva esta ficha a la vista hasta que la nueva
+      // está montada (lib/navigation/subrouteHoldTransition).
+      data-subroute-root
+      data-subroute-href={pathname}
       className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30"
       style={heroRootStyle}
     >

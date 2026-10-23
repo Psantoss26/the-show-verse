@@ -5,6 +5,8 @@ import { ArrowLeft, ArrowRight, Layers, MonitorPlay, Pencil, Play } from "lucide
 import BaseLiquidButton from "@/components/LiquidButton";
 import StarRating from "@/components/StarRating";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
+import { isSubrouteHref, navigateSubrouteHolding } from "@/lib/navigation/subrouteHoldTransition";
+import { prefetchSubrouteFull } from "@/lib/navigation/useWarmSubrouteNeighbors";
 import TraktWatchedControl from "@/components/trakt/TraktWatchedControl";
 import {
   DETAIL_ACTION_DESKTOP_SIZE_CLASS,
@@ -65,6 +67,7 @@ function PrimaryNavigationAction({ href, label, children }) {
 }
 
 function NavigationAction({ href, label, primary = false, children }) {
+  const router = useRouter();
   if (primary && href) {
     return (
       <PrimaryNavigationAction href={href} label={label}>
@@ -90,6 +93,29 @@ function NavigationAction({ href, label, primary = false, children }) {
       href={href}
       title={label}
       aria-label={label}
+      // Al apuntar, la página entera (no solo hasta el loading): si la
+      // precarga en reposo no ha llegado aún, se adelanta aquí.
+      onPointerEnter={() => {
+        if (isSubrouteHref(href)) prefetchSubrouteFull(router, href);
+      }}
+      onClick={(event) => {
+        // Clic normal: la ficha actual se queda a la vista hasta que llega la
+        // nueva, sin pasar por la superficie oscura de carga. Con
+        // modificadores, lo nativo del enlace (pestaña nueva…).
+        if (
+          event.defaultPrevented ||
+          event.button !== 0 ||
+          event.metaKey ||
+          event.ctrlKey ||
+          event.shiftKey ||
+          event.altKey ||
+          !isSubrouteHref(href)
+        ) {
+          return;
+        }
+        event.preventDefault();
+        void navigateSubrouteHolding({ href, navigate: router.push }).catch(() => {});
+      }}
       data-liquid-button="true"
       className={`relative isolate flex !h-auto !w-full aspect-square items-center justify-center overflow-hidden rounded-full text-zinc-200 transition-[transform,color,background-color] duration-300 hover:scale-105 hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-yellow-400 ${LIQUID_GLASS_SURFACE_CARD} ${LIQUID_GLASS_ELEVATION}`}
     >

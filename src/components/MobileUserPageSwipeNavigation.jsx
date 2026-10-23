@@ -17,6 +17,10 @@ import {
   getDetailsSubrouteSnapshot,
   subscribeDetailsSubrouteSequence,
 } from "@/lib/navigation/detailsSubrouteSwipe";
+import {
+  isSubrouteHref,
+  navigateSubrouteHolding,
+} from "@/lib/navigation/subrouteHoldTransition";
 import { isBodyScrollLocked } from "@/hooks/useBodyScrollLock";
 
 function preservesNestedGesture(target) {
@@ -121,9 +125,19 @@ export default function MobileUserPageSwipeNavigation({ children }) {
 
       navigatingToRef.current = destination;
       router.prefetch(destination);
-      Promise.resolve(router.push(destination)).then((opened) => {
-        if (opened === false) navigatingToRef.current = null;
-      });
+      // Entre temporadas/episodios la ficha actual se queda a la vista hasta
+      // que llega la nueva (sin la superficie oscura de carga).
+      const opening = getDetailsSubrouteSequence(pathname) && isSubrouteHref(destination)
+        ? navigateSubrouteHolding({ href: destination, navigate: router.push })
+        : router.push(destination);
+      Promise.resolve(opening).then(
+        (opened) => {
+          if (opened === false) navigatingToRef.current = null;
+        },
+        () => {
+          navigatingToRef.current = null;
+        },
+      );
     },
     [pathname, router],
   );

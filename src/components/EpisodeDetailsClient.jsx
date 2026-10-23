@@ -77,6 +77,7 @@ import TraktWatchedModal from "@/components/trakt/TraktWatchedModal";
 import SubrouteDetailsActionRow from "@/components/details/SubrouteDetailsActionRow";
 import { getAdjacentEpisodeHrefs } from "@/lib/details/subrouteNavigation";
 import { useDetailsSubrouteSwipe } from "@/lib/navigation/detailsSubrouteSwipe";
+import useWarmSubrouteNeighbors from "@/lib/navigation/useWarmSubrouteNeighbors";
 import { usePathname } from "next/navigation";
 import {
   invalidateTraktGetCache,
@@ -358,6 +359,7 @@ export default function EpisodeDetailsClient({
   // las flechas de la fila de acciones (MobileUserPageSwipeNavigation).
   const pathname = usePathname();
   useDetailsSubrouteSwipe(pathname, adjacentEpisodeHrefs.previousHref, adjacentEpisodeHrefs.nextHref);
+  useWarmSubrouteNeighbors(adjacentEpisodeHrefs.previousHref, adjacentEpisodeHrefs.nextHref);
   const showPosterPath = show?.poster_path || null;
   const airDate = episode?.air_date ? formatDateEs(episode.air_date) : null;
   const runtime = Number(episode?.runtime || 0) || null;
@@ -1563,6 +1565,10 @@ export default function EpisodeDetailsClient({
   return (
     <div
       ref={heroRootRef}
+      // Anterior/siguiente conserva esta ficha a la vista hasta que la nueva
+      // está montada (lib/navigation/subrouteHoldTransition).
+      data-subroute-root
+      data-subroute-href={pathname}
       className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30"
       style={heroRootStyle}
     >
