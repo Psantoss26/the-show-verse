@@ -43,9 +43,12 @@ import { useTitleNameSearch } from "@/lib/search/useTitleNameSearch";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 
 const DETAILS_HREF_RE = /^\/details\/(movie|tv)\/(\d+)(?:[/?#]|$)/;
-// Lo que ha de pasar sin scroll para dar el hover por intencionado (los
-// pointerover de mientras son tarjetas que cruzan bajo el cursor).
-const SCROLL_SETTLE_MS = 120;
+// Lo que ha de pasar sin scroll para dar el hover por intencionado: los
+// pointerover de mientras son tarjetas que cruzan bajo el cursor. Chrome manda
+// el suyo sintético ~160-190 ms después del último evento de scroll (medido).
+const SCROLL_SETTLE_MS = 300;
+// Vecinas (a cada lado) cuya nota se precalienta con la del hover.
+const HOVER_NEARBY_TITLES = 6;
 
 const INITIAL_RENDER_COUNT = 60;
 // Tarjetas en carga mientras llegan los títulos (dos filas en escritorio).
@@ -538,11 +541,27 @@ export default function FilterableListItems({
   // sobre la parrilla cruzaban decenas de tarjetas y cada una pedía su nota):
   // al parar el scroll se pide solo la tarjeta en la que ha quedado el cursor.
   const hoverStateRef = useRef({ link: null, scrollAt: 0, x: -1, y: -1, timer: 0 });
+  const titlesRootRef = useRef(null);
   const requestTitleImdb = (link) => {
     const match = link?.getAttribute("href")?.match(DETAILS_HREF_RE);
-    if (match) onTitleHover(match[1], Number(match[2]));
+    if (!match) return;
+    // Las tarjetas de alrededor (orden de la parrilla) van en la misma
+    // petición: al pasar a la siguiente, su nota ya está.
+    const links = titlesRootRef.current
+      ? [...titlesRootRef.current.querySelectorAll('a[href^="/details/"]')]
+      : [];
+    const index = links.indexOf(link);
+    const nearby = [];
+    if (index >= 0) {
+      for (let offset = 1; offset <= HOVER_NEARBY_TITLES; offset += 1) {
+        for (const neighbour of [links[index - offset], links[index + offset]]) {
+          const near = neighbour?.getAttribute("href")?.match(DETAILS_HREF_RE);
+          if (near) nearby.push([near[1], Number(near[2])]);
+        }
+      }
+    }
+    onTitleHover(match[1], Number(match[2]), nearby);
   };
-  const titlesRootRef = useRef(null);
   useEffect(() => {
     if (!onTitleHover) return undefined;
     const state = hoverStateRef.current;
