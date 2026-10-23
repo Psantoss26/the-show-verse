@@ -47,6 +47,12 @@ export default function ListItemRemoveControl({
 
   if (!editMode && !busy) return null;
 
+  // En la tarjeta todo se escala con su ancho (container queries): en la vista
+  // compacta del móvil las tarjetas miden ~80 px y la confirmación en una fila
+  // («¿Quitar?» ✕ 🗑) no cabía, se pegaba a los bordes o sobresalía.
+  const isCard = variant !== "row";
+  const iconClass = isCard ? "h-3.5 w-3.5 @min-[7.5rem]:h-4 @min-[7.5rem]:w-4" : "h-4 w-4";
+
   const trigger = (className) => (
     <button
       type="button"
@@ -56,42 +62,41 @@ export default function ListItemRemoveControl({
       aria-label="Quitar de la lista"
       className={`flex items-center justify-center rounded-full border border-white/10 bg-black/50 text-red-400 shadow-lg backdrop-blur-md transition-colors hover:bg-red-500/30 hover:text-red-200 ${className}`}
     >
-      <Trash2 className="h-4 w-4" />
+      <Trash2 className={iconClass} />
     </button>
   );
 
+  const buttonPad = isCard ? "p-1.5 @min-[7.5rem]:p-2" : "p-2";
   const confirmButtons = (
     <>
-      <span className="text-[10px] font-bold tracking-wide text-red-200 sm:text-xs">
-        ¿Quitar?
-      </span>
       <button
         type="button"
         onClick={cancel}
-        className="flex items-center justify-center rounded-lg bg-zinc-800 p-2 text-zinc-300 transition-colors hover:bg-zinc-700"
+        className={`flex items-center justify-center rounded-lg bg-zinc-800 ${buttonPad} text-zinc-300 transition-colors hover:bg-zinc-700`}
         aria-label="Cancelar"
       >
-        <X className="h-4 w-4" />
+        <X className={iconClass} />
       </button>
       <button
         type="button"
         data-online-only="true"
         onClick={confirm}
         disabled={busy}
-        className="flex items-center justify-center rounded-lg bg-red-600 p-2 text-white transition-colors hover:bg-red-500 disabled:cursor-wait"
+        className={`flex items-center justify-center rounded-lg bg-red-600 ${buttonPad} text-white transition-colors hover:bg-red-500 disabled:cursor-wait`}
         aria-label="Quitar de la lista"
       >
-        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+        {busy ? <Loader2 className={`${iconClass} animate-spin`} /> : <Trash2 className={iconClass} />}
       </button>
     </>
   );
 
-  if (variant === "row") {
+  if (!isCard) {
     return confirming || busy ? (
       <div
         className="flex items-center gap-2 rounded-xl bg-black/90 py-1 pl-3 pr-1 shadow-lg"
         onClick={stop}
       >
+        <span className="text-xs font-bold tracking-wide text-red-200">¿Quitar?</span>
         {confirmButtons}
       </div>
     ) : (
@@ -99,16 +104,27 @@ export default function ListItemRemoveControl({
     );
   }
 
+  // Capa del tamaño de la tarjeta que hace de contenedor de las container
+  // queries; sin confirmación abierta deja pasar los clics a la tarjeta.
   return (
-    <>
-      {!confirming && !busy ? trigger("absolute right-2 top-2 z-30 h-9 w-9") : null}
+    <div
+      className={`@container absolute inset-0 z-30 ${confirming || busy ? "" : "pointer-events-none"}`}
+    >
+      {!confirming && !busy
+        ? trigger(
+            "pointer-events-auto absolute right-1.5 top-1.5 h-7 w-7 @min-[7.5rem]:right-2 @min-[7.5rem]:top-2 @min-[7.5rem]:h-9 @min-[7.5rem]:w-9",
+          )
+        : null}
       <FadePresence
         show={confirming || busy}
-        className={`absolute inset-0 z-40 flex items-center justify-center gap-2 bg-black/95 px-3 ${rounded}`}
+        className={`absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/95 p-2 ${rounded}`}
         onClick={stop}
       >
-        {confirmButtons}
+        <span className="text-center text-[10px] font-bold tracking-wide text-red-200 @min-[7.5rem]:text-xs">
+          ¿Quitar?
+        </span>
+        <div className="flex items-center gap-1.5 @min-[7.5rem]:gap-2">{confirmButtons}</div>
       </FadePresence>
-    </>
+    </div>
   );
 }
