@@ -1348,7 +1348,7 @@ function InlineDropdown({
               >
                 <div
                   className="min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-color:#3f3f46_transparent]"
-                  style={{ scrollbarWidth: "thin", scrollbarGutter: "stable" }}
+                  style={{ scrollbarWidth: "thin" }}
                 >
                   {children({ close: () => setOpen(false) })}
                 </div>
