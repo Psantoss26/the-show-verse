@@ -53,6 +53,25 @@ export async function dismissLocalProgress(id) {
   }
 }
 
+/**
+ * Marca como terminada una entrada de "Continuar viendo": sale de la lista y
+ * queda en el historial. Devuelve la entrada de historial creada o null.
+ */
+export async function completeLocalProgress(id) {
+  if (!id) return null;
+  try {
+    const res = await fetch(`/api/progress/${encodeURIComponent(id)}/complete`, {
+      method: "POST",
+      credentials: "include",
+    });
+    if (!res.ok) return null;
+    const json = await res.json().catch(() => null);
+    return json?.item || null;
+  } catch {
+    return null;
+  }
+}
+
 export function normalizeProgressSearchResults(results) {
   const seen = new Set();
   const normalized = [];
