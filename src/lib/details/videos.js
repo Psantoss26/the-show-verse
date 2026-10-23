@@ -63,11 +63,3 @@ export const pickPreferredVideo = (videos) => {
     const sorted = [...playable].sort((a, b) => rankVideo(a) - rankVideo(b))
     return sorted[0] || null
 }
-
-// Vídeos reproducibles, sin duplicados y ordenados por relevancia (`rankVideo`).
-export const playableRankedVideos = (videos) => {
-    const list = uniqBy(Array.isArray(videos) ? videos : [], (v) => `${v?.site}:${v?.key}`)
-        .filter(isPlayableVideo)
-    list.sort((a, b) => rankVideo(a) - rankVideo(b))
-    return list
-}
