@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Ficha: Anterior/Siguiente (flechas en escritorio y deslizar en móvil) sigue el orden de la página desde la que se abrió. Antes mezclaba los títulos de otras páginas visitadas (un título abierto desde Favoritas podía tomar los vecinos de Historial) y en Favoritas y Pendientes se cortaba en la última tarjeta pintada.
 - Continuar viendo: cada título se puede marcar como finalizado a mano con el nuevo botón ✓ de la barra (en móvil, entre «+» y la papelera); sale de la lista y queda en el historial.
 - Móvil: el menú lateral usa el mismo cristal líquido que la barra inferior (antes se veía como un panel oscuro plano).
 - Menús desplegables de las páginas de usuario (favoritos, pendientes, historial, en progreso, etc.) y de la ficha de actor: sin barra de scroll, la opción elegida llega al mismo margen por la derecha que por la izquierda, sin el hueco que quedaba reservado para la barra.
