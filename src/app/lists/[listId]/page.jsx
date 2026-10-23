@@ -247,7 +247,7 @@ export default function ListDetailsPage() {
     }, [isBackNav, listId])
 
     const items = Array.isArray(data?.items) ? data.items : []
-    const { ratingsByKey: imdbRatings, summary: imdbSummary } = useListImdbRatings(items, { totalCount: items.length })
+    const { ratingsByKey: imdbRatings, summary: imdbSummary, requestRating: requestImdbRating } = useListImdbRatings(items, { totalCount: items.length })
     // La edición solo se habilita cuando el backend confirma que esta lista
     // pertenece a la sesión actual. Así una caché antigua no expone controles
     // de gestión al abrir una lista desde otro perfil.
@@ -614,6 +614,7 @@ export default function ListDetailsPage() {
                 <FilterableListItems
                     items={filterableItems}
                     editable={canManage}
+                    onTitleHover={requestImdbRating}
                     renderCard={(it, meta, viewMode, editMode) => {
                         const id = it?.id
                         const posterPath = it?.poster_path || it?.backdrop_path || null
