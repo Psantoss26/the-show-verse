@@ -29,7 +29,7 @@ Capa social de The Show Verse: perfiles públicos de cada miembro, seguir y deja
 
 El feed mezcla los mismos tipos de evento en los dos modos: visto, reseña, favorito, pendiente, puntuación y lista. `/v1/users/feed/summary` va aparte porque la cabecera no cambia al paginar.
 
-Las alertas de la campana del navbar (`/v1/users/notifications`) reutilizan el feed propio. Ver [[push-notifications]].
+Las alertas de la campana del navbar (`/v1/users/notifications`) reutilizan el feed propio. Ver [[push-notifications]]. La campana está montada dos veces (barra de escritorio y de móvil); las dos comparten la petición en curso (`fetchAlertsShared` en `AlertsMenu.jsx`), así que al entrar o navegar se pide una sola vez.
 
 ## «Tus amigos» en la ficha
 

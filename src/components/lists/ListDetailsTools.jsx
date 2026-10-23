@@ -42,6 +42,14 @@ import {
 import { useTitleNameSearch } from "@/lib/search/useTitleNameSearch";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 
+const DETAILS_HREF_RE = /^\/details\/(movie|tv)\/(\d+)(?:[/?#]|$)/;
+// Lo que ha de pasar sin scroll para dar el hover por intencionado: los
+// pointerover de mientras son tarjetas que cruzan bajo el cursor. Chrome manda
+// el suyo sintético ~160-190 ms después del último evento de scroll (medido).
+const SCROLL_SETTLE_MS = 300;
+// Vecinas (a cada lado) cuya nota se precalienta con la del hover.
+const HOVER_NEARBY_TITLES = 6;
+
 const INITIAL_RENDER_COUNT = 60;
 // Tarjetas en carga mientras llegan los títulos (dos filas en escritorio).
 const LOADING_PLACEHOLDER_CARDS = 12;
@@ -371,6 +379,9 @@ export default function FilterableListItems({
   hideMissingPosters = false,
   // Los títulos aún no han llegado: tarjetas en carga, no el aviso de vacía.
   loading = false,
+  // (mediaType, tmdbId) al pasar el ratón (o el foco) por un título: la
+  // página pide ahí su nota de IMDb si no la tiene (useListImdbRatings).
+  onTitleHover,
 }) {
   const previewClick = usePreviewOpen();
   const [q, setQ] = useState("");
@@ -521,6 +532,81 @@ export default function FilterableListItems({
     }
   };
 
+  // Delegado en el contenedor: vale para las tarjetas propias y para las de
+  // `renderCard`, y para las filas de la vista lista. Solo ratón y teclado: en
+  // táctil no hay hover y el toque abre la ficha.
+  //
+  // La nota se pide EN EL MISMO hover, sin esperar. Lo único que se descarta es
+  // lo que pasa bajo el cursor mientras la página se desplaza (con la rueda
+  // sobre la parrilla cruzaban decenas de tarjetas y cada una pedía su nota):
+  // al parar el scroll se pide solo la tarjeta en la que ha quedado el cursor.
+  const hoverStateRef = useRef({ link: null, scrollAt: 0, x: -1, y: -1, timer: 0 });
+  const titlesRootRef = useRef(null);
+  const requestTitleImdb = (link) => {
+    const match = link?.getAttribute("href")?.match(DETAILS_HREF_RE);
+    if (!match) return;
+    // Las tarjetas de alrededor (orden de la parrilla) van en la misma
+    // petición: al pasar a la siguiente, su nota ya está.
+    const links = titlesRootRef.current
+      ? [...titlesRootRef.current.querySelectorAll('a[href^="/details/"]')]
+      : [];
+    const index = links.indexOf(link);
+    const nearby = [];
+    if (index >= 0) {
+      for (let offset = 1; offset <= HOVER_NEARBY_TITLES; offset += 1) {
+        for (const neighbour of [links[index - offset], links[index + offset]]) {
+          const near = neighbour?.getAttribute("href")?.match(DETAILS_HREF_RE);
+          if (near) nearby.push([near[1], Number(near[2])]);
+        }
+      }
+    }
+    onTitleHover(match[1], Number(match[2]), nearby);
+  };
+  useEffect(() => {
+    if (!onTitleHover) return undefined;
+    const state = hoverStateRef.current;
+    const onScroll = () => {
+      state.scrollAt = performance.now();
+      clearTimeout(state.timer);
+      state.timer = setTimeout(() => {
+        const root = titlesRootRef.current;
+        if (!root || state.x < 0) return;
+        const under = document.elementFromPoint(state.x, state.y);
+        const link = under?.closest?.('a[href^="/details/"]');
+        if (link && root.contains(link) && link.matches(":hover")) {
+          state.link = link;
+          requestTitleImdb(link);
+        }
+      }, SCROLL_SETTLE_MS);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      clearTimeout(state.timer);
+    };
+    // requestTitleImdb solo depende de onTitleHover.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onTitleHover]);
+  const handleTitlePointerOver = (event) => {
+    if (event.pointerType !== "mouse") return;
+    const state = hoverStateRef.current;
+    state.x = event.clientX;
+    state.y = event.clientY;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const link = target.closest('a[href^="/details/"]');
+    if (link === state.link) return;
+    state.link = link;
+    if (!link || performance.now() - state.scrollAt < SCROLL_SETTLE_MS) return;
+    requestTitleImdb(link);
+  };
+  const handleTitleFocus = (event) => {
+    const target = event.target;
+    if (target instanceof Element) {
+      requestTitleImdb(target.closest('a[href^="/details/"]'));
+    }
+  };
+
   const renderEntry = (entry) => {
     if (renderCard) return renderCard(entry.item, entry.meta, viewMode, editMode);
     return (
@@ -541,7 +627,13 @@ export default function FilterableListItems({
   };
 
   return (
-    <div className="space-y-7" onClickCapture={captureDetailsSequence}>
+    <div
+      className="space-y-7"
+      onClickCapture={captureDetailsSequence}
+      ref={titlesRootRef}
+      onPointerOver={onTitleHover ? handleTitlePointerOver : undefined}
+      onFocusCapture={onTitleHover ? handleTitleFocus : undefined}
+    >
       <motion.div
         ref={filtersRef}
         data-menu-pinned={filtersPinned}
