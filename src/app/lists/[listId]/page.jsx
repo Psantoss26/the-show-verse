@@ -11,6 +11,7 @@ import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayou
 import ListDetailsActionRow from '@/components/lists/ListDetailsActionRow'
 import ListPosterCard, { listPosterGridClass } from '@/components/lists/ListPosterCard'
 import FilterableListItems from '@/components/lists/ListDetailsTools'
+import ListItemRemoveControl from '@/components/lists/ListItemRemoveControl'
 import ListActionModal, { MODAL_FIELD_CLASS, MODAL_LABEL_CLASS, ModalButton, ModalToggleRow } from '@/components/lists/ListActionModal'
 import { formatPageTitle } from '@/lib/pageTitle'
 import {
@@ -633,25 +634,17 @@ export default function ListDetailsPage() {
                                     posterLoading={meta.posterLoading}
                                     disableHover={viewMode === 'compact'}
                                 />
-                                {canManage && <button data-online-only="true"
-                                    type="button"
-                                    disabled={busyId === id}
-                                    onClick={(e) => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
-                                        handleRemove(it)
-                                    }}
-                                    className={`absolute right-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-black/30 bg-gradient-to-br from-white/10 via-transparent to-black/40 text-zinc-300 shadow-lg backdrop-blur-[28px] transition-all hover:bg-red-500/70 hover:text-white focus:opacity-100 ${
-                                        // En móvil no hay hover: el botón solo
-                                        // se ve con el modo borrar activado
-                                        // desde el menú de filtros.
-                                        editMode
-                                            ? 'opacity-100 bg-red-500/70 text-white'
-                                            : 'opacity-0 group-hover:opacity-100'
-                                    } ${busyId === id ? 'opacity-100 cursor-wait' : ''}`}
-                                >
-                                    {busyId === id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                                </button>}
+                                {/* Modo borrar (botón de la barra), como en
+                                    Continuar viendo: papelera solo en ese
+                                    modo y confirmación antes de quitar. */}
+                                {canManage ? (
+                                    <ListItemRemoveControl
+                                        editMode={editMode}
+                                        busy={busyId === id}
+                                        onRemove={() => handleRemove(it)}
+                                        rounded="rounded-2xl"
+                                    />
+                                ) : null}
                             </div>
                         )
                     }}
@@ -659,24 +652,12 @@ export default function ListDetailsPage() {
                         if (!canManage) return null
                         const id = it?.id
                         return (
-                            <button data-online-only="true"
-                                type="button"
-                                disabled={busyId === id}
-                                onClick={(e) => {
-                                    e.preventDefault()
-                                    e.stopPropagation()
-                                    handleRemove(it)
-                                }}
-                                className={`flex h-8 w-8 items-center justify-center rounded-full bg-black/30 bg-gradient-to-br from-white/10 via-transparent to-black/40 text-zinc-300 shadow-lg backdrop-blur-[28px] transition-all hover:bg-red-500/70 hover:text-white focus:opacity-100 ${
-                                    editMode
-                                        ? 'opacity-100 bg-red-500/70 text-white'
-                                        : 'opacity-0 group-hover:opacity-100'
-                                } ${busyId === id ? 'opacity-100 cursor-wait' : ''}`}
-                                title="Quitar de la lista"
-                                aria-label="Quitar de la lista"
-                            >
-                                {busyId === id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                            </button>
+                            <ListItemRemoveControl
+                                variant="row"
+                                editMode={editMode}
+                                busy={busyId === id}
+                                onRemove={() => handleRemove(it)}
+                            />
                         )
                     }}
                     emptyTitle="Sin resultados"

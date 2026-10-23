@@ -8,6 +8,8 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Portada y fondo de las listas personales y de la comunidad: ya no salen pósters con el título impreso en títulos con galerías enormes (El Hobbit, Top Gun: Maverick…); se usa el mismo criterio sin texto que la portada móvil de la ficha.
+- Listas personales: botón de papelera en la barra (modo borrar, como en Continuar viendo); la papelera de cada título solo aparece en ese modo y pide confirmación antes de quitarlo.
 - Continuar viendo: cada título se puede marcar como finalizado a mano con el nuevo botón ✓ de la barra (en móvil, entre «+» y la papelera); sale de la lista y queda en el historial.
 - Móvil: el menú lateral usa el mismo cristal líquido que la barra inferior (antes se veía como un panel oscuro plano).
 - Menús desplegables de las páginas de usuario (favoritos, pendientes, historial, en progreso, etc.) y de la ficha de actor: sin barra de scroll, la opción elegida llega al mismo margen por la derecha que por la izquierda, sin el hueco que quedaba reservado para la barra.
