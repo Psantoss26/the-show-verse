@@ -3,7 +3,7 @@ import test from 'node:test'
 
 import {
   mergeUniqueImages,
-  pickBestNeutralPosterByResVotes,
+  pickMobileNeutralPoster,
   pickMobileHeroPosterPath
 } from './tmdbImages.js'
 
@@ -28,7 +28,7 @@ function clientMobileHeroPosterPath({ posterPath, profilePath, posters }) {
     (poster) => poster?.file_path && poster.from !== 'main'
   )
   return (
-    pickBestNeutralPosterByResVotes(galleryPosters)?.file_path ||
+    pickMobileNeutralPoster(galleryPosters)?.file_path ||
     posterPath ||
     profilePath ||
     null
@@ -75,4 +75,19 @@ test('falls back to the profile path and then to nothing', () => {
   )
   assert.equal(pickMobileHeroPosterPath({}), null)
   assert.equal(pickMobileHeroPosterPath(), null)
+})
+
+test('only the first two textless posters compete, by resolution', () => {
+  const posters = [
+    { file_path: '/es.jpg', iso_639_1: 'es', width: 2000, height: 3000 },
+    { file_path: '/neutro-1.jpg', iso_639_1: null, width: 1000, height: 1500 },
+    { file_path: '/neutro-2.jpg', iso_639_1: null, width: 1400, height: 2100 },
+    { file_path: '/neutro-3.jpg', iso_639_1: null, width: 2000, height: 3000 }
+  ]
+  // La tercera es la más grande, pero queda fuera de las dos primeras.
+  assert.equal(pickMobileHeroPosterPath({ posters }), '/neutro-2.jpg')
+  assert.equal(pickMobileHeroPosterPath({ posters }), clientMobileHeroPosterPath({ posters }))
+  // En empate de resolución gana la primera.
+  const tie = posters.map((p) => (p.file_path === '/neutro-2.jpg' ? { ...p, width: 1000, height: 1500 } : p))
+  assert.equal(pickMobileHeroPosterPath({ posters: tie }), '/neutro-1.jpg')
 })
