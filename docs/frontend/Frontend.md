@@ -29,6 +29,10 @@ Puntos clave de la configuración (`next.config.ts`):
 
 La mayoría de páginas de catálogo (`/`, `/movies`, `/series`, `/details/**`) son **Server Components** que hacen fetch a TMDb/Trakt en el servidor (con `revalidate` de minutos/horas) y delegan la interactividad a un `*Client.jsx` (`"use client"`) — patrón repetido en casi toda ruta con estado (favoritos, watchlist, filtros, modales). Las páginas fuertemente interactivas o dependientes de sesión (calendario, listas, diagnóstico Trakt) son enteramente cliente.
 
+## Menús desplegables de las barras de herramientas
+
+Los desplegables de Ordenar/Tipo/Agrupar de las páginas de usuario (favoritos, pendientes, historial, en progreso, listas, calendario, perfil…) y los filtros de créditos de `ActorDetails` (`CreditFilterControls.jsx`) miden lo que su contenido (`width: max-content`) y desplazan en vertical si no caben. No reservan el hueco de la barra de scroll (`scrollbar-gutter: stable`): sin barra, la opción elegida queda al mismo margen a ambos lados, y cuando aparece la barra el menú se ensancha lo que ocupa. Para separar las opciones de la barra solo cuando la hay, `globals.css` define `.sv-menu-scroll` (consulta `scroll-state`) y `.sv-menu-scroll-inner`.
+
 ## Autenticación e integraciones
 
 - Sesión propia (email/password + Google OAuth) vía `src/app/api/auth/**`, consumida por `AuthContext`.

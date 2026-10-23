@@ -613,7 +613,7 @@ export function ProfileMenuDropdown({ label, valueLabel, icon: Icon, options, va
             >
               <div
                 className="min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-color:#3f3f46_transparent]"
-                style={{ scrollbarWidth: "thin", scrollbarGutter: "stable" }}
+                style={{ scrollbarWidth: "thin" }}
               >
                 {options.map(([optionValue, optionLabel]) => {
                   const active = multiple ? value.includes(optionValue) : value === optionValue;

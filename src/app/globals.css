@@ -3397,3 +3397,19 @@ html[data-details-sequence-transition] .sv-topbar {
 [data-embedded-details] .sv-phone-scaled-section {
   zoom: var(--sv-phone-scale, 1);
 }
+
+/* Menús desplegables con scroll: aire entre las opciones y la barra SOLO
+   cuando el menú desplaza de verdad. Reservar el hueco siempre
+   (`scrollbar-gutter: stable` o un `pr-*` fijo) dejaba la opción elegida más
+   cerca del borde izquierdo que del derecho en los menús cortos. Al aparecer la
+   barra el menú (`width: max-content`) se ensancha lo que ocupa: las opciones
+   no se aprietan. */
+.sv-menu-scroll {
+  container-type: scroll-state;
+}
+
+@container scroll-state(scrollable: y) {
+  .sv-menu-scroll-inner {
+    padding-right: 0.375rem;
+  }
+}

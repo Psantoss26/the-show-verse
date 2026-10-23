@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Menús desplegables de las páginas de usuario (favoritos, pendientes, historial, en progreso, etc.) y de la ficha de actor: sin barra de scroll, la opción elegida llega al mismo margen por la derecha que por la izquierda, sin el hueco que quedaba reservado para la barra.
 - Ficha móvil: la portada sin idioma de la cabecera se elige entre las dos primeras de TMDb (la de más resolución), en lugar de la más grande de toda la galería. Igual en la vista teléfono del modal.
 - Ficha de actor, panel lateral de Películas y Series: Ordenar, Desde y Hasta en una sola fila, con su icono y su flecha, ajustando tamaño y espacio al ancho del panel para que ningún texto se corte. En sus menús, la barra de scroll ya no queda pegada a las opciones.
 - Móvil: con un modal abierto, los avisos emergentes salen en el borde superior (la barra queda tapada por el modal) en lugar de taparle la cabecera.
