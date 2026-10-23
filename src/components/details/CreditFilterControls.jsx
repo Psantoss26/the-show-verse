@@ -185,15 +185,19 @@ export function InlineDropdown({
                 style={menuStyle}
                 className="flex flex-col overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl"
               >
-                {/* `pr-1.5`: aire entre las opciones (y su marca ✓) y la barra
-                    de scroll, que si no se dibujaba pegada a ellas. */}
+                {/* Aire entre las opciones (y su marca ✓) y la barra de
+                    scroll, que si no se dibujaba pegada a ellas. Solo cuando
+                    HAY barra (`.sv-menu-scroll` en globals.css): sin ella, la
+                    opción elegida llega al mismo margen a ambos lados. */}
                 <div
-                  className="min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain pr-1.5 [scrollbar-color:#3f3f46_transparent]"
-                  style={{ scrollbarWidth: "thin", scrollbarGutter: "stable" }}
+                  className="sv-menu-scroll min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-color:#3f3f46_transparent]"
+                  style={{ scrollbarWidth: "thin" }}
                 >
-                  <AccentContext.Provider value={tone}>
-                    {children({ close: () => setOpen(false) })}
-                  </AccentContext.Provider>
+                  <div className="sv-menu-scroll-inner">
+                    <AccentContext.Provider value={tone}>
+                      {children({ close: () => setOpen(false) })}
+                    </AccentContext.Provider>
+                  </div>
                 </div>
               </motion.div>
             )}

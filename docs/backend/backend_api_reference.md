@@ -178,6 +178,7 @@ Las rutas `sync`/`progress` se autentican con el **token de sincronizacion** del
 | --- | --- | --- |
 | `GET` | `/v1/progress` | Entradas en curso del usuario |
 | `POST` | `/v1/progress` | Añade una entrada manual (plataforma, porcentaje < 90%, episodio opcional) |
+| `POST` | `/v1/progress/{id}/complete` | Marca la entrada como terminada: la quita y registra el visionado en el historial (en una transacción) |
 | `DELETE` | `/v1/progress/{id}` | Descarta una entrada |
 
 ### Ratings

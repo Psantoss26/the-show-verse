@@ -1,11 +1,12 @@
 // src/routes/progress.js
 // Progreso de reproducción en curso ("Continuar viendo"). Las escrituras llegan
 // por token revocable (POST /auth/netflix/progress); aquí solo se LEE con sesión
-// para pintar la fila "Continuar viendo" y se permite descartar una entrada.
+// para pintar la fila "Continuar viendo" y se permite descartar una entrada o
+// darla por terminada a mano.
 
 import { z } from 'zod';
 import { db } from '../db/client.js';
-import { watchProgress } from '../db/schema.js';
+import { watchHistory, watchProgress } from '../db/schema.js';
 import { eq, and, desc } from 'drizzle-orm';
 import { getRuntimeSeconds } from '../lib/tmdbRuntime.js';
 
@@ -144,6 +145,57 @@ export default async function progressRoutes(fastify) {
       ok: true,
       item: toProgressResult(item),
     });
+  });
+
+  // ──────────────────────────────────────────────
+  // POST /progress/:id/complete — Marcar a mano como terminada una entrada.
+  // Hace lo mismo que el progreso automático al cruzar el 90%: la saca de
+  // "Continuar viendo" y registra el visionado en el historial, en una sola
+  // transacción para que no quede a medias (fuera de la lista y sin play).
+  // ──────────────────────────────────────────────
+  fastify.post('/:id/complete', async (req, reply) => {
+    const parsed = z.object({ id: z.string().uuid() }).safeParse(req.params);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'Invalid id' });
+    }
+
+    const result = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .delete(watchProgress)
+        .where(and(
+          eq(watchProgress.id, parsed.data.id),
+          eq(watchProgress.userId, req.user.id),
+        ))
+        .returning();
+      if (!row) return null;
+
+      // watch_progress usa 0 como "sin episodio"; watch_history, null.
+      const isTv = row.mediaType === 'tv';
+      const season = isTv && row.season ? row.season : null;
+      const episode = isTv && row.episode ? row.episode : null;
+      const [item] = await tx
+        .insert(watchHistory)
+        .values({
+          userId: req.user.id,
+          tmdbId: row.tmdbId,
+          mediaType: row.mediaType,
+          season,
+          episode,
+          watchedAt: new Date(),
+          runtimeMins: row.runtimeSeconds > 0 ? Math.round(row.runtimeSeconds / 60) : null,
+          title: row.title || null,
+          posterPath: row.posterPath || null,
+          // Serie sin episodio conocido: visionado a nivel de serie, como el
+          // fallback de la sincronización.
+          confidence: isTv && episode == null ? 'low' : 'high',
+          detectionId: row.detectionId || null,
+        })
+        .returning();
+      return item;
+    });
+
+    if (!result) return reply.status(404).send({ error: 'Not found' });
+    return reply.send({ ok: true, item: result });
   });
 
   // ──────────────────────────────────────────────

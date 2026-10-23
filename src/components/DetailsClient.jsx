@@ -242,7 +242,7 @@ import {
   preloadTmdb,
   pickLadderPoster,
   pickLadderBackdrop,
-  pickBestNeutralPosterByResVotes,
+  pickMobileNeutralPoster,
   isLanguageNeutralImage,
   pickHeroBackdropPath,
   pickBestBackdropByLangResVotes,
@@ -2614,7 +2614,7 @@ export default function DetailsClient({
       (poster) => poster?.file_path && poster.from !== "main",
     );
     const bestFromGallery =
-      pickBestNeutralPosterByResVotes(galleryPosters)?.file_path || null;
+      pickMobileNeutralPoster(galleryPosters)?.file_path || null;
 
     return (
       bestFromGallery ||
@@ -3545,7 +3545,7 @@ export default function DetailsClient({
   // ¿La portada que se muestra en móvil trae el título IMPRESO?
   //
   // `mobileNeutralPosterPath` no siempre acaba siendo textless: cuando no existe
-  // ningún póster sin idioma, `pickBestNeutralPosterByResVotes` cae a uno CON
+  // ningún póster sin idioma, `pickMobileNeutralPoster` cae a uno CON
   // idioma (`pool0 = neutral.length ? neutral : list`). En ese caso la portada ya
   // lleva el título, y superponerle el logo lo duplica.
   //
