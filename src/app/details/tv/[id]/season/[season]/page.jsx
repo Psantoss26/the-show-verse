@@ -2,7 +2,6 @@ import SeasonDetailsClient from "@/components/SeasonDetailsClient";
 import { getShareData, shareMetadata } from "@/lib/share/shareMeta";
 import { pickByLanguageLadder } from "@/lib/tmdb/imageLanguageLadder";
 import { getStreamingProviders } from "@/lib/api/justwatch";
-import { playableRankedVideos } from "@/lib/details/videos";
 
 export const revalidate = 3600; // 1h
 
@@ -53,13 +52,7 @@ export default async function SeasonPage({ params }) {
   }
 
   const showPromise = tmdbFetch(`/tv/${showId}?append_to_response=external_ids`);
-  // Los VÍDEOS de la temporada van en la misma petición: «Ver tráiler» nace
-  // en su estado final (encendido o apagado) en vez de salir activo con un
-  // spinner y apagarse al ver que no hay vídeos. Mismos idiomas que pide el
-  // cliente (loadSeasonVideos).
-  const seasonPromise = tmdbFetch(
-    `/tv/${showId}/season/${seasonNumber}?append_to_response=videos&include_video_language=es,en,null`,
-  );
+  const seasonPromise = tmdbFetch(`/tv/${showId}/season/${seasonNumber}`);
   // PÓSTER con la escalera de idioma de toda la app (inglés → español →
   // idioma original de la serie → sin idioma): el PRIMERO de los que devuelve
   // TMDb en ese idioma, en su orden. Sin ninguno, se queda el `poster_path`
@@ -111,13 +104,9 @@ export default async function SeasonPage({ params }) {
       ladderPosterPromise,
       providersPromise,
     ]);
-  const { videos: seasonVideosData, ...seasonWithoutVideos } = seasonData || {};
-  const initialSeasonVideos = seasonVideosData
-    ? playableRankedVideos(seasonVideosData.results)
-    : null;
   const season = ladderPosterPath
-    ? { ...seasonWithoutVideos, poster_path: ladderPosterPath }
-    : seasonWithoutVideos;
+    ? { ...seasonData, poster_path: ladderPosterPath }
+    : seasonData;
 
   const showImdbId = show?.external_ids?.imdb_id || null;
 
@@ -137,7 +126,6 @@ export default async function SeasonPage({ params }) {
       imdb={null}
       imdbUrl={imdbUrl}
       initialShowProviders={initialShowProviders}
-      initialSeasonVideos={initialSeasonVideos}
     />
   );
 }
