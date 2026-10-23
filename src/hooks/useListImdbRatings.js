@@ -151,21 +151,39 @@ export default function useListImdbRatings(items, { totalCount, limit } = {}) {
   // a la mayoría de los títulos de las listas grandes. Sin petición si ya está
   // en memoria o en la caché persistente, si es un «sin nota» confirmado o si
   // ya hay una en curso para ese título.
-  const requestRating = useCallback((mediaType, tmdbId) => {
-    const id = Number(tmdbId)
-    if (!Number.isFinite(id) || id <= 0) return
-    const key = `${mediaType === 'tv' ? 'tv' : 'movie'}:${id}`
+  //
+  // `nearby` ([mediaType, tmdbId] de las tarjetas vecinas) va en la MISMA
+  // petición: precalienta lo que el ratón va a tocar a continuación sin
+  // añadir peticiones (el servidor resuelve los títulos en paralelo, así que
+  // unos pocos más no retrasan la nota del que tiene el cursor).
+  const requestRating = useCallback((mediaType, tmdbId, nearby = []) => {
     loadPersistentCache()
+    const items = []
+    for (const [type, rawId] of [[mediaType, tmdbId], ...nearby]) {
+      const id = Number(rawId)
+      if (!Number.isFinite(id) || id <= 0) continue
+      const normalizedType = type === 'tv' ? 'tv' : 'movie'
+      items.push({ key: `${normalizedType}:${id}`, id, mediaType: normalizedType, imdbId: null })
+    }
+    if (!items.length) return
 
     const publish = () => {
-      const rating = ratingCache.get(key)
-      if (!rating) return
-      setHoverRatings((current) => current[key] === rating ? current : { ...current, [key]: rating })
+      setHoverRatings((current) => {
+        let next = current
+        for (const { key } of items) {
+          const rating = ratingCache.get(key)
+          if (!rating || next[key] === rating) continue
+          if (next === current) next = { ...current }
+          next[key] = rating
+        }
+        return next
+      })
     }
 
     publish()
-    if (resolvedKeys.has(key)) return
-    queueHoverRating({ key, id, mediaType: key.split(':')[0], imdbId: null }).then(publish)
+    const missing = items.filter((item) => !resolvedKeys.has(item.key))
+    if (!missing.length) return
+    Promise.all(missing.map(queueHoverRating)).then(publish)
   }, [])
 
   const ratingsByKey = useMemo(
