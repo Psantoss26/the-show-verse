@@ -8,10 +8,54 @@ function normalizeDetailsHref(value) {
   return `/details/${match[1]}/${match[2]}`;
 }
 
+// Los enlaces sin caja no se ven: tarjetas de otra variante responsive o de
+// un grupo plegado. No forman parte del orden que el usuario tiene delante.
+function isRenderedLink(link) {
+  return typeof link.getClientRects !== "function" || link.getClientRects().length > 0;
+}
+
+// Las pantallas visitadas siguen montadas, ocultas, bajo el contenedor de
+// páginas (OverlayRouteHost). Un ámbito que lo abarca —el envoltorio global de
+// las páginas del navbar— mezclaba sus enlaces con los de la página activa: un
+// título que también estaba en Historial tomaba los vecinos de Historial al
+// abrirlo desde Favoritos. El ámbito se limita a la pantalla del enlace.
+function narrowToScreen(scope, link) {
+  const root = link.closest("[data-scroll-restoration-root]");
+  if (!root || !scope.contains(root)) return scope;
+  for (const screen of root.children) {
+    if (screen.contains(link)) return screen;
+  }
+  return scope;
+}
+
+// Orden completo publicado por la propia página (ver
+// useUserDetailsSequenceSource): las que pintan por tandas solo tienen en el
+// DOM una parte de sus tarjetas.
+const sequenceSources = new WeakMap();
+
+export function setUserDetailsSequenceSource(element, hrefs) {
+  if (!(element instanceof Element)) return;
+  if (Array.isArray(hrefs)) sequenceSources.set(element, hrefs);
+  else sequenceSources.delete(element);
+}
+
+function publishedSequenceFor(link, scope) {
+  for (
+    let node = link.closest("[data-user-details-sequence]");
+    node && scope.contains(node);
+    node = node.parentElement?.closest("[data-user-details-sequence]")
+  ) {
+    const hrefs = sequenceSources.get(node);
+    if (hrefs) return hrefs;
+  }
+  return null;
+}
+
 function uniqueDetailsHrefs(links) {
   const seen = new Set();
   const hrefs = [];
   for (const link of links) {
+    if (!isRenderedLink(link)) continue;
     const href = normalizeDetailsHref(link.getAttribute("href"));
     if (!href || seen.has(href)) continue;
     seen.add(href);
@@ -34,11 +78,20 @@ export function saveUserDetailsSequenceFromLink(link, sequenceScope = null) {
   const selectedHref = normalizeDetailsHref(link.getAttribute("href"));
   if (!selectedHref) return;
 
-  const scope =
-    sequenceScope instanceof Element && sequenceScope.contains(link)
+  // Un enlace fuera del ámbito pedido viene de un portal (el panel lateral de
+  // la ficha rápida): sus recomendaciones no son la secuencia de la página.
+  if (sequenceScope instanceof Element && !sequenceScope.contains(link)) return;
+  if (!link.closest("[data-scroll-restoration-root]")) return;
+
+  const baseScope =
+    sequenceScope instanceof Element
       ? sequenceScope
       : link.closest("[data-user-details-sequence]") || link.closest("section");
-  if (!scope) return;
+  if (!baseScope) return;
+  const scope = narrowToScreen(baseScope, link);
+
+  const published = publishedSequenceFor(link, scope);
+  if (published && saveUserDetailsSequence(published, selectedHref)) return;
 
   const hrefs = uniqueDetailsHrefs(scope.querySelectorAll('a[href^="/details/"]'));
   if (hrefs.length < 2 || !hrefs.includes(selectedHref)) return;

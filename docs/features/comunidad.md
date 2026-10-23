@@ -22,6 +22,7 @@ Comentarios y reseñas en las fichas, resumen de sentimiento, listas de la comun
 
 - Listas importadas de Trakt y **listas de usuario publicadas** (`userLists.js`): una lista propia y pública se copia a `community_lists` y se resincroniza al editarla. Si pasa a privada se retira; si se borra, se va con sus «me gusta».
 - Páginas: `/lists` (pestaña de comunidad), `/lists/community/[id]` (detalle) y la sección de listas de cada ficha (`/v1/community/{type}/{tmdbId}/lists`).
+- Notas de IMDb en el detalle de listas (comunidad, propias y colecciones; `useListImdbRatings`): la media del marcador sale de una muestra de 120 títulos repartida por la lista. El resto pide su nota en el mismo hover (ratón) o al recibir el foco (`onTitleHover` de `FilterableListItems`), con prioridad: tiene su propia cola y no espera al lote de muestra aunque el título vaya en él. Esa petición incluye las 6 tarjetas vecinas a cada lado (precalentado sin peticiones extra: al pasar a la siguiente, su nota ya está). Lo que cruza bajo el cursor mientras la página se desplaza no pide nada; al parar el scroll (300 ms) se pide solo la tarjeta donde quedó el cursor. Usa la misma caché persistente que Favoritos y Pendientes (`showverse:scores:imdb:v2`, `listScoreCache.js`): sus «sin nota» confirmados no se vuelven a pedir y los fallos pasajeros (`unresolved`) sí.
 
 ## «Me gusta»
 

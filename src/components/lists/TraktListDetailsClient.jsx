@@ -341,7 +341,7 @@ export default function TraktListDetailsClient({ username, listId }) {
         : state.imdbRatingItems.length > 0
             ? state.imdbRatingItems
             : items
-    const { ratingsByKey: imdbRatings, summary: imdbSummary } = useListImdbRatings(imdbRatingItems, { totalCount: listItemCount })
+    const { ratingsByKey: imdbRatings, summary: imdbSummary, requestRating: requestImdbRating } = useListImdbRatings(imdbRatingItems, { totalCount: listItemCount })
 
     const firstPoster = items.find((item) => item?.posterPath)?.posterPath
     const firstBackdrop = firstPoster
@@ -467,6 +467,7 @@ export default function TraktListDetailsClient({ username, listId }) {
                 getMeta={getTraktMeta}
                 hideMissingPosters
                 loading={itemsPending}
+                onTitleHover={requestImdbRating}
                 emptyTitle="Lista vacía"
                 emptyText="No hay títulos disponibles en esta lista."
             />

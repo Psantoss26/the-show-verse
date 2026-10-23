@@ -92,6 +92,7 @@ import {
 import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 import PageStatCard from "@/components/ui/PageStatCard";
+import useUserDetailsSequenceSource from "@/lib/navigation/useUserDetailsSequenceSource";
 
 // Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
 // el mismo escalón que `w1280` en los backdrops. Antes era `w500` y en
@@ -2468,6 +2469,20 @@ export default function WatchlistClient() {
     loadingProviders,
   ]);
 
+  // Anterior/Siguiente de la ficha recorre la página en el orden en que se
+  // ve (orden, filtros y grupos), también las tarjetas aún sin montar.
+  const detailsSequenceHrefs = useMemo(() => {
+    const hrefOf = (item) =>
+      `/details/${item.media_type || (item.title ? "movie" : "tv")}/${item.id}`;
+    if (!grouped) return sorted.map(hrefOf);
+    return grouped.flatMap((group) =>
+      group.subgroups?.length
+        ? group.subgroups.flatMap((subgroup) => subgroup.items.map(hrefOf))
+        : group.items.map(hrefOf),
+    );
+  }, [grouped, sorted]);
+  const detailsSequenceRef = useUserDetailsSequenceSource(detailsSequenceHrefs);
+
   const renderedSorted = useMemo(
     () => sorted.slice(0, renderLimit),
     [sorted, renderLimit],
@@ -2738,7 +2753,11 @@ export default function WatchlistClient() {
         <div className="absolute -bottom-[10%] left-[15%] w-[65vw] max-w-[800px] aspect-square rounded-full bg-blue-800/25 blur-[120px] sm:blur-[150px]" />
       </div>
 
-      <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+      <div
+        ref={detailsSequenceRef}
+        data-user-details-sequence
+        className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12"
+      >
         {/* Header */}
         <motion.header
           className="mb-6 sm:mb-10"
