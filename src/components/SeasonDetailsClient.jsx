@@ -74,9 +74,10 @@ import TraktEpisodesWatchedModal from "@/components/trakt/TraktEpisodesWatchedMo
 import { useTraktEpisodesWatched } from "@/lib/hooks/useTraktEpisodesWatched";
 import SubrouteDetailsActionRow from "@/components/details/SubrouteDetailsActionRow";
 import VideoModal from "@/components/details/VideoModal";
-import { loadSeasonVideos } from "@/lib/details/titleVideos";
+import { loadSeasonVideos, primeSeasonVideos } from "@/lib/details/titleVideos";
 import { getAdjacentSeasonHrefs } from "@/lib/details/subrouteNavigation";
 import { useDetailsSubrouteSwipe } from "@/lib/navigation/detailsSubrouteSwipe";
+import useWarmSubrouteNeighbors from "@/lib/navigation/useWarmSubrouteNeighbors";
 import { usePathname } from "next/navigation";
 import {
   invalidateTraktGetCache,
@@ -351,6 +352,8 @@ export default function SeasonDetailsClient({
   // Plataformas de la serie resueltas en el servidor (`null` si no llegaron
   // a tiempo): ver page.jsx de la temporada.
   initialShowProviders = null,
+  // Vídeos de la temporada resueltos en el servidor (`null` si no vinieron).
+  initialSeasonVideos = null,
 }) {
   const router = useRouter();
   const traktRequestIdRef = useRef(0);
@@ -411,15 +414,26 @@ export default function SeasonDetailsClient({
   useEffect(() => {
     let cancelled = false;
     setActiveVideo(null);
+    if (initialSeasonVideos) {
+      primeSeasonVideos(showId, seasonNumber, initialSeasonVideos);
+    }
     loadSeasonVideos(showId, seasonNumber).then((videos) => {
       if (!cancelled) setSeasonVideosState({ key: seasonVideosKey, videos });
     });
     return () => {
       cancelled = true;
     };
-  }, [showId, seasonNumber, seasonVideosKey]);
-  const seasonVideosLoading = seasonVideosState.key !== seasonVideosKey;
-  const seasonVideos = seasonVideosLoading ? [] : seasonVideosState.videos;
+  }, [showId, seasonNumber, seasonVideosKey, initialSeasonVideos]);
+  // Con los vídeos del servidor el botón nace en su estado final. Solo si no
+  // vinieron se buscan desde aquí; mientras, el botón va apagado y sin
+  // spinner: encenderse al llegar vídeos se lee bien, mientras que salir
+  // activo y apagarse después parecía un fallo.
+  const seasonVideosResolved =
+    seasonVideosState.key === seasonVideosKey || Boolean(initialSeasonVideos);
+  const seasonVideos =
+    seasonVideosState.key === seasonVideosKey
+      ? seasonVideosState.videos
+      : initialSeasonVideos || [];
   const [preferencesMounted, setPreferencesMounted] = useState(false);
   useLayoutEffect(() => setPreferencesMounted(true), []);
   const autoPosterPath = season?.poster_path || show?.poster_path || null;
@@ -433,6 +447,7 @@ export default function SeasonDetailsClient({
   // las flechas de la fila de acciones (MobileUserPageSwipeNavigation).
   const pathname = usePathname();
   useDetailsSubrouteSwipe(pathname, adjacentSeasonHrefs.previousHref, adjacentSeasonHrefs.nextHref);
+  useWarmSubrouteNeighbors(adjacentSeasonHrefs.previousHref, adjacentSeasonHrefs.nextHref);
   const heroBgPath =
     show?.backdrop_path || season?.poster_path || show?.poster_path || null;
 
@@ -1599,6 +1614,10 @@ export default function SeasonDetailsClient({
   return (
     <div
       ref={heroRootRef}
+      // Anterior/siguiente conserva esta ficha a la vista hasta que la nueva
+      // está montada (lib/navigation/subrouteHoldTransition).
+      data-subroute-root
+      data-subroute-href={pathname}
       className="relative min-h-screen bg-[#101010] text-gray-100 font-sans selection:bg-yellow-500/30"
       style={heroRootStyle}
     >
@@ -1853,8 +1872,8 @@ export default function SeasonDetailsClient({
                 }}
                 onEditCover={season?.id ? () => setCoverEditing(true) : null}
                 trailer={{
-                  available: seasonVideos.length > 0,
-                  loading: seasonVideosLoading,
+                  available: seasonVideosResolved && seasonVideos.length > 0,
+                  loading: false,
                   onOpen: () => {
                     if (seasonVideos[0]) setActiveVideo(seasonVideos[0]);
                   },

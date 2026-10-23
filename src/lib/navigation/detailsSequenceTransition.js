@@ -13,6 +13,16 @@ const EXIT_MS = 220;
 const NAVIGATION_WAIT_MS = 8000;
 const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
 
+// La ficha VISIBLE que casa con el selector. Desde la pila de pantallas
+// (OverlayRouteHost) las fichas por las que se ha pasado siguen montadas y
+// ocultas (display:none) ANTES en el documento: tomar la primera copiaba una
+// oculta, la copia salía invisible y la pantalla se quedaba en negro hasta
+// que llegaba la ficha nueva; y al volver a una ficha de la pila se esperaba
+// a su copia oculta.
+function visibleDetails(selector) {
+  return [...document.querySelectorAll(selector)].find((node) => node.getClientRects().length > 0) || null;
+}
+
 export function isDetailsSequenceTransitionActive() {
   return typeof document !== "undefined" && document.documentElement.hasAttribute(FLAG);
 }
@@ -125,7 +135,7 @@ function focusTitle(root) {
 /** Bloquea clics repetidos, pero conserva los enlaces modificados en el caller. */
 export async function navigateDetailsSequence({ href, direction, navigate }) {
   if (activeTransition) return false;
-  const source = document.querySelector("[data-details-root][data-details-href]");
+  const source = visibleDetails("[data-details-root][data-details-href]");
   if (!source || window.parent !== window) {
     return navigate(href);
   }
@@ -217,7 +227,7 @@ export async function navigateDetailsSequence({ href, direction, navigate }) {
     while (!cancelled && Date.now() < deadline) {
       const route = location.pathname;
       if (route !== from && route !== href) break;
-      incoming = document.querySelector(`[data-details-href="${href}"]`);
+      incoming = visibleDetails(`[data-details-href="${href}"]`);
       lockRoot(incoming);
       if (incoming?.getAttribute("data-details-sequence-ready") === "true") break;
       // Errores de ruta se muestran inmediatamente, sin ocultar su recuperación.

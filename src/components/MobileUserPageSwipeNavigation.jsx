@@ -17,6 +17,10 @@ import {
   getDetailsSubrouteSnapshot,
   subscribeDetailsSubrouteSequence,
 } from "@/lib/navigation/detailsSubrouteSwipe";
+import {
+  isSubrouteHref,
+  navigateSubrouteHolding,
+} from "@/lib/navigation/subrouteHoldTransition";
 import { isBodyScrollLocked } from "@/hooks/useBodyScrollLock";
 
 function preservesNestedGesture(target) {
@@ -68,9 +72,11 @@ function getSwipeDestination(pathname, direction) {
 }
 
 function isDetailsInitialHeroVisible() {
-  const secondaryTrigger = document.querySelector(
-    "[data-details-mobile-secondary-trigger]",
-  );
+  // El de la ficha VISIBLE: las de la pila de pantallas siguen montadas y
+  // ocultas antes en el documento.
+  const secondaryTrigger = [
+    ...document.querySelectorAll("[data-details-mobile-secondary-trigger]"),
+  ].find((node) => node.getClientRects().length > 0);
   if (!secondaryTrigger) return false;
 
   // Es el mismo umbral con el que la cabecera móvil de DetailsClient
@@ -121,9 +127,19 @@ export default function MobileUserPageSwipeNavigation({ children }) {
 
       navigatingToRef.current = destination;
       router.prefetch(destination);
-      Promise.resolve(router.push(destination)).then((opened) => {
-        if (opened === false) navigatingToRef.current = null;
-      });
+      // Entre temporadas/episodios la ficha actual se queda a la vista hasta
+      // que llega la nueva (sin la superficie oscura de carga).
+      const opening = getDetailsSubrouteSequence(pathname) && isSubrouteHref(destination)
+        ? navigateSubrouteHolding({ href: destination, navigate: router.push })
+        : router.push(destination);
+      Promise.resolve(opening).then(
+        (opened) => {
+          if (opened === false) navigatingToRef.current = null;
+        },
+        () => {
+          navigatingToRef.current = null;
+        },
+      );
     },
     [pathname, router],
   );
