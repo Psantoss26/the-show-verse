@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Ficha de temporada: «Ver tráiler» aparece directamente en su estado final. Antes salía activo con un spinner mientras se buscaban los vídeos y se apagaba si la temporada no tenía; ahora los vídeos llegan con la página. → [páginas](docs/frontend/app-router-pages.md)
 - Servidor (Next y backend): las peticiones a TMDb ya no fallan con `fetch failed` / `ETIMEDOUT` cuando la máquina va cargada. Node daba solo 250 ms a cada una de las 12 direcciones de TMDb y, sin IPv6, las IPv4 caducaban antes de procesarse; ahora se prueba IPv4 primero con 2,5 s por intento (`src/instrumentation.js`, `backend/src/config/outbound-network.js`). → [desarrollo local](docs/infrastructure/01-local-development.md)
 - Campana de alertas: al entrar o navegar se pide `/api/users/notifications` una vez, en lugar de una por cada barra (escritorio y móvil; en desarrollo eran 4 peticiones a la vez).
 - Detalle de listas (comunidad, propias y colecciones): al pasar el ratón por un título se pide su nota de IMDb al instante, junto con la de las tarjetas vecinas, y aparece en la tarjeta en cuanto llega (~0,25 s; las vecinas, sin espera). Hacer scroll con el cursor encima de la parrilla no lanza peticiones. Antes solo tenían nota los 120 títulos de muestra del marcador y en las listas grandes la mayoría se quedaba sin ella. Las notas se guardan en la misma caché que Favoritos y Pendientes. → [comunidad](docs/features/comunidad.md)
