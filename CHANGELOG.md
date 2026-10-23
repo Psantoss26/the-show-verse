@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Campana de alertas: al entrar o navegar se pide `/api/users/notifications` una vez, en lugar de una por cada barra (escritorio y móvil; en desarrollo eran 4 peticiones a la vez).
 - Ficha: Anterior/Siguiente (flechas en escritorio y deslizar en móvil) sigue el orden de la página desde la que se abrió. Antes mezclaba los títulos de otras páginas visitadas (un título abierto desde Favoritas podía tomar los vecinos de Historial) y en Favoritas y Pendientes se cortaba en la última tarjeta pintada.
 - Listas personales: la confirmación «¿Quitar?» del modo borrar ya no se pega a los bordes ni sobresale de la tarjeta en las vistas de cuadrícula y compacta; texto y botones se apilan y se ajustan al tamaño de la tarjeta.
 - Portada y fondo de las listas personales y de la comunidad: ya no salen pósters con el título impreso en títulos con galerías enormes (El Hobbit, Top Gun: Maverick…); se usa el mismo criterio sin texto que la portada móvil de la ficha.

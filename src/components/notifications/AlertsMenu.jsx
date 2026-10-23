@@ -72,6 +72,22 @@ const EVENTS = {
 // navegación. Abrir el desplegable siempre pide datos frescos.
 const REFRESH_THROTTLE_MS = 30_000;
 
+// La campana está montada dos veces (barra de escritorio y de móvil) y las dos
+// cargan al entrar y al navegar: comparten la petición en curso en vez de pedir
+// las alertas cada una (en desarrollo, con el doble efecto, eran 4 a la vez).
+const alertsInFlight = new Map();
+function fetchAlertsShared(accountId) {
+  if (alertsInFlight.has(accountId)) return alertsInFlight.get(accountId);
+  const request = fetch("/api/users/notifications", {
+    credentials: "include",
+    cache: "no-store",
+  })
+    .then(async (res) => ({ ok: res.ok, json: await res.json().catch(() => ({})) }))
+    .finally(() => alertsInFlight.delete(accountId));
+  alertsInFlight.set(accountId, request);
+  return request;
+}
+
 function readStorage(key, fallback) {
   try {
     const raw = window.localStorage.getItem(key);
@@ -335,13 +351,9 @@ export default function AlertsMenu({
     lastFetchAtRef.current = Date.now();
     setLoading(true);
     try {
-      const res = await fetch("/api/users/notifications", {
-        credentials: "include",
-        cache: "no-store",
-      });
-      const json = await res.json().catch(() => ({}));
+      const { ok, json } = await fetchAlertsShared(accountId);
       if (request !== requestRef.current) return;
-      if (!res.ok) {
+      if (!ok) {
         // Un fallo conserva lo que ya hubiera en vez de vaciar el panel.
         setError("No se pudieron cargar las alertas.");
         return;
