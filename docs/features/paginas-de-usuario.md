@@ -47,6 +47,13 @@ En *Ajustes* (`DetailOpenSettings`) se elige:
 - **Posición:** centrada o lateral; en lateral, superpuesta o acoplada.
 - **Contenido del panel:** la ficha o la **vista teléfono**, que incrusta la ficha móvil servida por `/embed/details/[...segments]` (con el estado de favorito/pendiente/nota adelantado en la URL, `src/lib/navigation/embeddedDetails.js`).
 
+### Anterior y siguiente en la ficha
+
+Una ficha abierta desde una página personal (Favoritas, Pendientes, Historial, En progreso, Listas, Social o el Perfil) recorre los títulos de **esa página en el orden en que se ven** (filtros, orden y grupos): con las flechas de escritorio (`DetailsSequenceNav`) y deslizando en móvil (`MobileUserPageSwipeNavigation`). Al pulsar una tarjeta se guarda la secuencia en `sessionStorage` (`src/lib/navigation/userDetailsSequence.js`), así que el mismo título tiene vecinos distintos según la página de la que se venga.
+
+- La secuencia se toma solo de la **pantalla activa**: las pantallas anteriores siguen montadas y ocultas (`OverlayRouteHost`) y sus enlaces no cuentan. Tampoco los del panel de la ficha rápida.
+- Las páginas que pintan sus tarjetas por tandas (Favoritas, Pendientes) publican su orden completo con `useUserDetailsSequenceSource`; las listas y colecciones lo pasan directamente con `saveUserDetailsSequence`.
+
 ## Barra inferior móvil
 
 Hasta seis accesos configurables entre Inicio, Películas, Series, Descubrir, Biblioteca, Social, Listas, En progreso, Historial, Favoritas, Pendientes, Calendario, Recap y Recomendaciones (`src/lib/ui/mobileBottomNav.js`).
