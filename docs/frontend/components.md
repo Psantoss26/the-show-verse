@@ -13,7 +13,7 @@ Layout global, dashboards y páginas de detalle "grandes".
 
 | Componente | Propósito |
 |---|---|
-| `Navbar.jsx` | Barra de navegación global (desktop + móvil), avatar de usuario (`UserAvatar`), buscador e i18n (`useTranslation`). |
+| `Navbar.jsx` | Barra de navegación global (desktop + móvil), avatar de usuario (`UserAvatar`), buscador e i18n (`useTranslation`). El menú lateral móvil usa el mismo cristal que la barra inferior (`LIQUID_GLASS_SURFACE` + `LiquidGlassOpticalLayers`), con el velo en una capa hermana para no apagar el desenfoque. |
 | `NoPageScroll.jsx` | Utilidad de layout: bloquea el scroll de `<html>`/`<body>` para páginas tipo pantalla completa. |
 | `ScrollRestoration.jsx` | Restaura la posición de scroll al navegar (guardado en `sessionStorage`/similar), tolerante a contenido asíncrono que crece tras el primer frame. |
 | `PwaManager.jsx` | Gestiona instalación de PWA y limpieza de cachés `showverse-*` del Service Worker. |

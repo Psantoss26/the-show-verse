@@ -3,7 +3,9 @@ import {
   LIQUID_GLASS_BAR,
   LIQUID_GLASS_BAR_FLAT,
   LIQUID_GLASS_PANEL,
+  LIQUID_GLASS_SURFACE,
 } from "@/lib/ui/liquidGlass";
+import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 import OptimizedImage from "@/components/OptimizedImage";
 import {
   useCallback,
@@ -3369,12 +3371,23 @@ function NavbarContent() {
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
-            className="fixed inset-0 z-50 bg-black/30"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50"
             onClick={() => setMobileMenuOpen(false)}
           >
+            {/* El velo va en una capa HERMANA del drawer: con la `opacity` de
+                entrada en el contenedor, el drawer se quedaba sin fondo que
+                difuminar y el cristal se veía plano (ver la búsqueda móvil). */}
+            <motion.div
+              aria-hidden
+              className="absolute inset-0 bg-black/30"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            />
+            {/* Mismo cristal que la barra inferior y el menú de secciones de
+                la ficha: `LIQUID_GLASS_SURFACE` + capas ópticas. Entra solo
+                con transform, que no apaga el `backdrop-filter`. El scroll va
+                en un hijo porque la envoltura recorta (`overflow-hidden`). */}
             <motion.aside
               id="mobile-navigation-drawer"
               role="dialog"
@@ -3384,235 +3397,237 @@ function NavbarContent() {
               animate={{ x: 0 }}
               exit={{ x: -320 }}
               transition={{ type: "spring", damping: 28, stiffness: 280 }}
-              className={`h-full w-[280px] sm:w-[300px] max-w-[85vw] ${LIQUID_GLASS_PANEL} px-4 pt-3 pb-6 flex flex-col select-none transform-gpu overflow-y-auto scrollbar-none`}
-              style={{ backgroundColor: "rgba(0, 0, 0, 0.62)" }}
+              className={`h-full w-[280px] sm:w-[300px] max-w-[85vw] rounded-r-3xl select-none ${LIQUID_GLASS_SURFACE}`}
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Header */}
-              <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-2 mb-2">
-                <Link
-                  href="/"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex-1 min-w-0 h-24"
-                >
-                  <OptimizedImage
-                    src="/logo-final-titulo-sinFondo.png"
-                    alt="The Show Verse"
-                    width={248}
-                    height={112}
-                    className="h-full w-full object-contain object-left"
-                  />
-                </Link>
-
-                <button
-                  type="button"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full bg-white/[0.06] text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-[6px] transition-[color,background-color,transform] duration-200 hover:-translate-y-0.5 hover:bg-white/[0.1] hover:text-white active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
-                  aria-label="Cerrar menú"
-                >
-                  <XIcon className="h-4 w-4" />
-                </button>
-              </div>
-
-              {/* Menu items */}
-              <div className="space-y-1 pt-1">
-                <Link
-                  href="/"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                    isActive("/")
-                      ? "bg-white/15 text-white font-bold"
-                      : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
-                  }`}
-                >
-                  <HomeIcon className="h-5 w-5 text-white" />
-                  <span>{t("nav_home", "Inicio")}</span>
-                </Link>
-
-                <Link
-                  href="/movies"
-                  onClick={() => setMobileMenuOpen(false)}
-                  onMouseEnter={() => prefetchNavRoute("/movies")}
-                  onFocus={() => prefetchNavRoute("/movies")}
-                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                    isActive("/movies")
-                      ? "bg-sky-500/20 text-sky-300 font-bold"
-                      : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
-                  }`}
-                >
-                  <FilmIcon className="h-5 w-5 text-sky-400" />
-                  <span>{t("nav_movies", "Películas")}</span>
-                </Link>
-
-                <Link
-                  href="/series"
-                  onClick={() => setMobileMenuOpen(false)}
-                  onMouseEnter={() => prefetchNavRoute("/series")}
-                  onFocus={() => prefetchNavRoute("/series")}
-                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                    isActive("/series")
-                      ? "bg-fuchsia-500/20 text-fuchsia-300 font-bold"
-                      : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
-                  }`}
-                >
-                  <TvIcon className="h-5 w-5 text-fuchsia-400" />
-                  <span>{t("nav_series", "Series")}</span>
-                </Link>
-
-                <Link
-                  href="/discover"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                    isActive("/discover")
-                      ? "bg-indigo-500/20 text-indigo-300 font-bold"
-                      : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
-                  }`}
-                >
-                  <Compass className="h-5 w-5 text-indigo-400" />
-                  <span>{t("nav_discover", "Descubrir")}</span>
-                </Link>
-
-                <Link
-                  href="/biblioteca"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                    isActive("/biblioteca")
-                      ? "bg-amber-500/20 text-amber-300 font-bold"
-                      : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
-                  }`}
-                >
-                  <FolderKanban className="h-5 w-5 text-amber-400" />
-                  <span>{t("nav_library", "Biblioteca")}</span>
-                </Link>
-
-                <div className="my-2.5 h-px bg-white/5" />
-
-                <Link
-                  href="/in-progress"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                    isActive("/in-progress")
-                      ? "bg-emerald-500/20 text-emerald-300 font-bold"
-                      : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
-                  }`}
-                >
-                  <Play className="h-5 w-5 text-emerald-400" fill="currentColor" />
-                  <span>{t("nav_in_progress", "En Progreso")}</span>
-                </Link>
-
-                <Link
-                  href="/history"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                    isActive("/history")
-                      ? "bg-emerald-500/20 text-emerald-300 font-bold"
-                      : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
-                  }`}
-                >
-                  <Eye className="h-5 w-5 text-emerald-400" />
-                  <span>{t("nav_history", "Historial")}</span>
-                </Link>
-
-                <div className="my-2.5 h-px bg-white/5" />
-
-                <Link
-                  href="/favorites"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                    isActive("/favorites")
-                      ? "bg-red-500/20 text-red-300 font-bold"
-                      : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
-                  }`}
-                >
-                  <Heart className="h-5 w-5 text-red-400" />
-                  <span>{t("nav_favorites", "Favoritas")}</span>
-                </Link>
-
-                <Link
-                  href="/watchlist"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                    isActive("/watchlist")
-                      ? "bg-sky-500/20 text-sky-300 font-bold"
-                      : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
-                  }`}
-                >
-                  <Bookmark className="h-5 w-5 text-sky-400" />
-                  <span>{t("nav_watchlist", "Pendientes")}</span>
-                </Link>
-
-                <div className="my-2.5 h-px bg-white/5" />
-
-                <Link
-                  href="/social"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                    isActive("/social")
-                      ? "bg-pink-500/20 text-pink-300 font-bold"
-                      : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
-                  }`}
-                >
-                  <Users className="h-5 w-5 text-pink-400" />
-                  <span>{t("nav_social", "Social")}</span>
-                </Link>
-
-                <Link
-                  href="/lists"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                    isActive("/lists")
-                      ? "bg-purple-500/20 text-purple-300 font-bold"
-                      : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
-                  }`}
-                >
-                  <ListVideo className="h-5 w-5 text-purple-400" />
-                  <span>{t("nav_lists", "Listas")}</span>
-                </Link>
-
-                <Link
-                  href="/calendar"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                    isActive("/calendar")
-                      ? "bg-amber-500/20 text-amber-300 font-bold"
-                      : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
-                  }`}
-                >
-                  <CalendarDaysIcon className="h-5 w-5 text-amber-400" />
-                  <span>{t("nav_calendar", "Calendario")}</span>
-                </Link>
-
-                <div className="my-2.5 h-px bg-white/5" />
-
-                <section>
+              <LiquidGlassOpticalLayers />
+              <div className="relative flex h-full flex-col overflow-y-auto no-scrollbar px-4 pt-3 pb-6">
+                {/* Header */}
+                <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-2 mb-2">
                   <Link
-                    href="/recap"
+                    href="/"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex-1 min-w-0 h-24"
+                  >
+                    <OptimizedImage
+                      src="/logo-final-titulo-sinFondo.png"
+                      alt="The Show Verse"
+                      width={248}
+                      height={112}
+                      className="h-full w-full object-contain object-left"
+                    />
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full bg-white/[0.06] text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-[6px] transition-[color,background-color,transform] duration-200 hover:-translate-y-0.5 hover:bg-white/[0.1] hover:text-white active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+                    aria-label="Cerrar menú"
+                  >
+                    <XIcon className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {/* Menu items */}
+                <div className="space-y-1 pt-1">
+                  <Link
+                    href="/"
                     onClick={() => setMobileMenuOpen(false)}
                     className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                      isActive("/recap")
-                        ? "bg-lime-500/20 text-lime-200 font-bold"
+                      isActive("/")
+                        ? "bg-white/15 text-white font-bold"
                         : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
                     }`}
                   >
-                    <PartyPopper className="h-5 w-5 text-lime-300" />
-                    <span>Recap</span>
+                    <HomeIcon className="h-5 w-5 text-white" />
+                    <span>{t("nav_home", "Inicio")}</span>
                   </Link>
 
                   <Link
-                    href="/recommendations"
+                    href="/movies"
+                    onClick={() => setMobileMenuOpen(false)}
+                    onMouseEnter={() => prefetchNavRoute("/movies")}
+                    onFocus={() => prefetchNavRoute("/movies")}
+                    className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                      isActive("/movies")
+                        ? "bg-sky-500/20 text-sky-300 font-bold"
+                        : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
+                    }`}
+                  >
+                    <FilmIcon className="h-5 w-5 text-sky-400" />
+                    <span>{t("nav_movies", "Películas")}</span>
+                  </Link>
+
+                  <Link
+                    href="/series"
+                    onClick={() => setMobileMenuOpen(false)}
+                    onMouseEnter={() => prefetchNavRoute("/series")}
+                    onFocus={() => prefetchNavRoute("/series")}
+                    className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                      isActive("/series")
+                        ? "bg-fuchsia-500/20 text-fuchsia-300 font-bold"
+                        : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
+                    }`}
+                  >
+                    <TvIcon className="h-5 w-5 text-fuchsia-400" />
+                    <span>{t("nav_series", "Series")}</span>
+                  </Link>
+
+                  <Link
+                    href="/discover"
                     onClick={() => setMobileMenuOpen(false)}
                     className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                      isActive("/recommendations")
+                      isActive("/discover")
+                        ? "bg-indigo-500/20 text-indigo-300 font-bold"
+                        : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
+                    }`}
+                  >
+                    <Compass className="h-5 w-5 text-indigo-400" />
+                    <span>{t("nav_discover", "Descubrir")}</span>
+                  </Link>
+
+                  <Link
+                    href="/biblioteca"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                      isActive("/biblioteca")
+                        ? "bg-amber-500/20 text-amber-300 font-bold"
+                        : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
+                    }`}
+                  >
+                    <FolderKanban className="h-5 w-5 text-amber-400" />
+                    <span>{t("nav_library", "Biblioteca")}</span>
+                  </Link>
+
+                  <div className="my-2.5 h-px bg-white/5" />
+
+                  <Link
+                    href="/in-progress"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                      isActive("/in-progress")
                         ? "bg-emerald-500/20 text-emerald-300 font-bold"
                         : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
                     }`}
                   >
-                    <ThumbsUp className="h-5 w-5 text-emerald-400" />
-                    <span>{t("nav_recommendations", "Recomendaciones")}</span>
+                    <Play className="h-5 w-5 text-emerald-400" fill="currentColor" />
+                    <span>{t("nav_in_progress", "En Progreso")}</span>
                   </Link>
 
-                  <WatchNextAssistant isMobile triggerVariant="drawer" />
-                </section>
+                  <Link
+                    href="/history"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                      isActive("/history")
+                        ? "bg-emerald-500/20 text-emerald-300 font-bold"
+                        : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
+                    }`}
+                  >
+                    <Eye className="h-5 w-5 text-emerald-400" />
+                    <span>{t("nav_history", "Historial")}</span>
+                  </Link>
+
+                  <div className="my-2.5 h-px bg-white/5" />
+
+                  <Link
+                    href="/favorites"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                      isActive("/favorites")
+                        ? "bg-red-500/20 text-red-300 font-bold"
+                        : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
+                    }`}
+                  >
+                    <Heart className="h-5 w-5 text-red-400" />
+                    <span>{t("nav_favorites", "Favoritas")}</span>
+                  </Link>
+
+                  <Link
+                    href="/watchlist"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                      isActive("/watchlist")
+                        ? "bg-sky-500/20 text-sky-300 font-bold"
+                        : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
+                    }`}
+                  >
+                    <Bookmark className="h-5 w-5 text-sky-400" />
+                    <span>{t("nav_watchlist", "Pendientes")}</span>
+                  </Link>
+
+                  <div className="my-2.5 h-px bg-white/5" />
+
+                  <Link
+                    href="/social"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                      isActive("/social")
+                        ? "bg-pink-500/20 text-pink-300 font-bold"
+                        : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
+                    }`}
+                  >
+                    <Users className="h-5 w-5 text-pink-400" />
+                    <span>{t("nav_social", "Social")}</span>
+                  </Link>
+
+                  <Link
+                    href="/lists"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                      isActive("/lists")
+                        ? "bg-purple-500/20 text-purple-300 font-bold"
+                        : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
+                    }`}
+                  >
+                    <ListVideo className="h-5 w-5 text-purple-400" />
+                    <span>{t("nav_lists", "Listas")}</span>
+                  </Link>
+
+                  <Link
+                    href="/calendar"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                      isActive("/calendar")
+                        ? "bg-amber-500/20 text-amber-300 font-bold"
+                        : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
+                    }`}
+                  >
+                    <CalendarDaysIcon className="h-5 w-5 text-amber-400" />
+                    <span>{t("nav_calendar", "Calendario")}</span>
+                  </Link>
+
+                  <div className="my-2.5 h-px bg-white/5" />
+
+                  <section>
+                    <Link
+                      href="/recap"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                        isActive("/recap")
+                          ? "bg-lime-500/20 text-lime-200 font-bold"
+                          : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
+                      }`}
+                    >
+                      <PartyPopper className="h-5 w-5 text-lime-300" />
+                      <span>Recap</span>
+                    </Link>
+
+                    <Link
+                      href="/recommendations"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                        isActive("/recommendations")
+                          ? "bg-emerald-500/20 text-emerald-300 font-bold"
+                          : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
+                      }`}
+                    >
+                      <ThumbsUp className="h-5 w-5 text-emerald-400" />
+                      <span>{t("nav_recommendations", "Recomendaciones")}</span>
+                    </Link>
+
+                    <WatchNextAssistant isMobile triggerVariant="drawer" />
+                  </section>
+                </div>
               </div>
             </motion.aside>
           </motion.div>
