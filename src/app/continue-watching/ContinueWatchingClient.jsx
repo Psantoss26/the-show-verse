@@ -528,8 +528,8 @@ function DeleteTrigger({ onClick, className = "" }) {
   );
 }
 
-// Botón verde de "terminado" junto a la papelera en el modo edición: da la
-// entrada por vista (sale de la lista y pasa al Historial).
+// Botón verde de "terminado" en el modo finalizar: da la entrada por vista
+// (sale de la lista y pasa al Historial).
 function CompleteTrigger({ onClick, className = "" }) {
   return (
     <button
@@ -541,6 +541,75 @@ function CompleteTrigger({ onClick, className = "" }) {
     >
       <Check className="w-4 h-4" />
     </button>
+  );
+}
+
+// Botones de modo de la barra (papelera / ✓): cada uno activa su modo y, si ya
+// está activo, lo cierra (pasa a ✕). Los dos modos son excluyentes.
+const EDIT_MODE_BUTTONS = {
+  complete: {
+    title: "Marcar títulos como finalizados",
+    Icon: Check,
+    active: "text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.3)]",
+    segmentActive: "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20",
+  },
+  remove: {
+    title: "Quitar títulos",
+    Icon: Trash2,
+    active: "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]",
+    segmentActive: "bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20",
+  },
+};
+
+function EditModeButton({ mode, editMode, setEditMode }) {
+  const config = EDIT_MODE_BUTTONS[mode];
+  const active = editMode === mode;
+  const ModeIcon = active ? X : config.Icon;
+  const label = active ? "Salir del modo edición" : config.title;
+  return (
+    <button
+      type="button"
+      onClick={() => setEditMode((current) => (current === mode ? null : mode))}
+      title={label}
+      aria-label={label}
+      aria-pressed={active}
+      className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${active
+        ? config.active
+        : "text-zinc-200 hover:bg-black/30"
+        }`}
+    >
+      <ModeIcon className="w-4 h-4" />
+    </button>
+  );
+}
+
+// Móvil: los dos modos juntos en un segmentado (como Historial/Continuar viendo
+// en la fila del buscador), para que el bloque mida lo mismo que el de arriba.
+function EditModeSegmented({ editMode, setEditMode }) {
+  return (
+    <div className="inline-flex h-11 shrink-0 items-center gap-1 rounded-2xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
+      {Object.entries(EDIT_MODE_BUTTONS).map(([mode, config]) => {
+        const active = editMode === mode;
+        const ModeIcon = active ? X : config.Icon;
+        const label = active ? "Salir del modo edición" : config.title;
+        return (
+          <button
+            key={mode}
+            type="button"
+            onClick={() => setEditMode((current) => (current === mode ? null : mode))}
+            title={label}
+            aria-label={label}
+            aria-pressed={active}
+            className={`flex h-full items-center justify-center rounded-xl px-2.5 text-sm font-bold transition-all ${active
+              ? config.segmentActive
+              : "text-zinc-400 hover:text-white hover:bg-white/10"
+              }`}
+          >
+            <ModeIcon className="w-4 h-4" />
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -637,7 +706,8 @@ const ProgressCard = memo(function ProgressCard({
   index = 0,
   viewMode = "cards",
   imageMode = "poster",
-  editMode = false,
+  // null, "remove" (papelera en cada tarjeta) o "complete" (✓ en cada tarjeta).
+  editMode = null,
   busy = false,
   onRemove,
   onComplete,
@@ -659,13 +729,13 @@ const ProgressCard = memo(function ProgressCard({
 
   // Confirmación por tarjeta. La acción ("remove" o "complete") se conserva al
   // cerrar para que el overlay no cambie de texto mientras se desvanece. Al
-  // salir del modo edición se resetea.
+  // salir del modo (o cambiar de uno a otro) se resetea.
   const [confirmDel, setConfirmDel] = useState(false);
   const [confirmAction, setConfirmAction] = useState("remove");
   useEffect(() => {
-    if (!editMode) setConfirmDel(false);
+    setConfirmDel(false);
   }, [editMode]);
-  const canDelete = editMode && Boolean(item.progressId);
+  const canDelete = Boolean(editMode) && Boolean(item.progressId);
   const askConfirm = (action) => (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -674,6 +744,12 @@ const ProgressCard = memo(function ProgressCard({
   };
   const handleTrash = askConfirm("remove");
   const handleFinish = askConfirm("complete");
+  const editTrigger = (className) =>
+    editMode === "complete" ? (
+      <CompleteTrigger onClick={handleFinish} className={className} />
+    ) : (
+      <DeleteTrigger onClick={handleTrash} className={className} />
+    );
   const handleCancel = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -735,9 +811,8 @@ const ProgressCard = memo(function ProgressCard({
               </div>
             </div>
             {canDelete && !confirmDel && (
-              <div className="absolute top-1/2 right-2 sm:right-3 -translate-y-1/2 z-30 flex flex-col gap-1.5">
-                <CompleteTrigger onClick={handleFinish} className="h-9 w-9" />
-                <DeleteTrigger onClick={handleTrash} className="h-9 w-9" />
+              <div className="absolute top-1/2 right-2 sm:right-3 -translate-y-1/2 z-30">
+                {editTrigger("h-9 w-9")}
               </div>
             )}
             <DeleteConfirm
@@ -767,18 +842,7 @@ const ProgressCard = memo(function ProgressCard({
               pct={pct}
               progressColor={colors.text}
             />
-            {canDelete && !confirmDel && (
-              <>
-                <CompleteTrigger
-                  onClick={handleFinish}
-                  className="absolute top-2 left-2 z-30 h-9 w-9"
-                />
-                <DeleteTrigger
-                  onClick={handleTrash}
-                  className="absolute top-2 right-2 z-30 h-9 w-9"
-                />
-              </>
-            )}
+            {canDelete && !confirmDel && editTrigger("absolute top-2 right-2 z-30 h-9 w-9")}
             <DeleteConfirm
               show={confirmDel}
               action={confirmAction}
@@ -829,12 +893,7 @@ const ProgressCard = memo(function ProgressCard({
             <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/15 to-transparent" />
             <div className="absolute top-3 right-3">
               {canDelete ? (
-                confirmDel ? null : (
-                  <div className="flex items-center gap-2">
-                    <CompleteTrigger onClick={handleFinish} className="h-10 w-10" />
-                    <DeleteTrigger onClick={handleTrash} className="h-10 w-10" />
-                  </div>
-                )
+                confirmDel ? null : editTrigger("h-10 w-10")
               ) : (
                 <div className="flex items-center justify-center rounded-full bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md shadow-lg border border-white/10">
                   <CircularProgress pct={pct} colors={colors} size={40} />
@@ -962,7 +1021,8 @@ export default function ContinueWatchingClient() {
   const filtersRef = useRef(null);
   const { isSticky: filtersSticky, isPinned: filtersPinned } =
     useStickyToolbarState(filtersRef);
-  const [editMode, setEditMode] = useState(false);
+  // null | "remove" | "complete" (ver EditModeButton).
+  const [editMode, setEditMode] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const [addModalOpen, setAddModalOpen] = useState(false);
 
@@ -1109,7 +1169,7 @@ export default function ContinueWatchingClient() {
   }, []);
 
   const openAddModal = useCallback(() => {
-    setEditMode(false);
+    setEditMode(null);
     setAddModalOpen(true);
   }, []);
   const closeAddModal = useCallback(() => setAddModalOpen(false), []);
@@ -1261,8 +1321,11 @@ export default function ContinueWatchingClient() {
               }`}
               gapClassName="pt-2"
             >
+              {/* El bloque de la derecha mide lo mismo (136 px) en las tres filas
+                  (buscador, Ordenar y Tipo): segmentado de 2 + botón suelto, botón
+                  suelto + segmentado de 2, y segmentado de 3 con px-3. */}
               <div className="space-y-2">
-                {/* Fila 1: Ordenar y acciones de añadir y eliminar. */}
+                {/* Fila 1: Ordenar y acciones de añadir, finalizar y eliminar. */}
                 <div className="flex gap-2">
                   <div className="flex-1 min-w-0">
                     <InlineDropdown
@@ -1298,27 +1361,7 @@ export default function ContinueWatchingClient() {
                   >
                     <Plus className="w-4 h-4" />
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditMode((v) => !v)}
-                    title={
-                      editMode ? "Salir del modo edición" : "Quitar o finalizar títulos"
-                    }
-                    aria-label={
-                      editMode ? "Salir del modo edición" : "Quitar o finalizar títulos"
-                    }
-                    aria-pressed={editMode}
-                    className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${editMode
-                      ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
-                      : "text-zinc-200 hover:bg-black/30"
-                      }`}
-                  >
-                    {editMode ? (
-                      <X className="w-4 h-4" />
-                    ) : (
-                      <Trash2 className="w-4 h-4" />
-                    )}
-                  </button>
+                  <EditModeSegmented editMode={editMode} setEditMode={setEditMode} />
                 </div>
 
                 {/* Fila 2: Tipo y modos de vista compactos. */}
@@ -1364,7 +1407,7 @@ export default function ContinueWatchingClient() {
                       title="Vista de tarjetas"
                       aria-label="Vista de tarjetas"
                       aria-pressed={viewMode === "cards"}
-                      className={`flex h-full items-center justify-center rounded-xl px-2.5 text-sm font-bold transition-all ${viewMode === "cards"
+                      className={`flex h-full items-center justify-center rounded-xl px-3 text-sm font-bold transition-all ${viewMode === "cards"
                         ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                         : "text-zinc-400 hover:text-white hover:bg-white/10"
                         }`}
@@ -1377,7 +1420,7 @@ export default function ContinueWatchingClient() {
                       title="Vista de portadas"
                       aria-label="Vista de portadas"
                       aria-pressed={viewMode === "poster"}
-                      className={`flex h-full items-center justify-center rounded-xl px-2.5 text-sm font-bold transition-all ${viewMode === "poster"
+                      className={`flex h-full items-center justify-center rounded-xl px-3 text-sm font-bold transition-all ${viewMode === "poster"
                         ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                         : "text-zinc-400 hover:text-white hover:bg-white/10"
                         }`}
@@ -1390,7 +1433,7 @@ export default function ContinueWatchingClient() {
                       title="Vista compacta"
                       aria-label="Vista compacta"
                       aria-pressed={viewMode === "compact"}
-                      className={`flex h-full items-center justify-center rounded-xl px-2.5 text-sm font-bold transition-all ${viewMode === "compact"
+                      className={`flex h-full items-center justify-center rounded-xl px-3 text-sm font-bold transition-all ${viewMode === "compact"
                         ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                         : "text-zinc-400 hover:text-white hover:bg-white/10"
                         }`}
@@ -1520,20 +1563,10 @@ export default function ContinueWatchingClient() {
               <Plus className="w-4 h-4" />
             </button>
 
-            {/* Modo borrar (mismo gesto que el Historial): revela una papelera en
-                cada tarjeta con confirmación antes de quitarla. */}
-            <button
-              onClick={() => setEditMode((v) => !v)}
-              title={editMode ? "Salir del modo edición" : "Quitar o finalizar títulos"}
-              aria-label={editMode ? "Salir del modo edición" : "Quitar o finalizar títulos"}
-              aria-pressed={editMode}
-              className={`h-11 w-11 rounded-2xl text-sm font-bold transition-all flex items-center justify-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${editMode
-                ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
-                : "text-zinc-200 hover:bg-black/30"
-                }`}
-            >
-              {editMode ? <X className="w-4 h-4" /> : <Trash2 className="w-4 h-4" />}
-            </button>
+            {/* Modos finalizar y borrar (mismo gesto que el Historial): revelan
+                un ✓ o una papelera en cada tarjeta, con confirmación. */}
+            <EditModeButton mode="complete" editMode={editMode} setEditMode={setEditMode} />
+            <EditModeButton mode="remove" editMode={editMode} setEditMode={setEditMode} />
           </div>
         </motion.div>
 
