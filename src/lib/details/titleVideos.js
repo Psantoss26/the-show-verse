@@ -5,7 +5,7 @@
 // sección «Vídeos» de la ficha (DetailsClient / vista teléfono).
 
 import { getVideos } from "@/lib/api/tmdb";
-import { isPlayableVideo, rankVideo, uniqBy } from "@/lib/details/videos";
+import { isPlayableVideo, playableRankedVideos, rankVideo, uniqBy } from "@/lib/details/videos";
 
 const cache = new Map(); // "tv:1396" -> Promise<Array>
 
@@ -59,14 +59,7 @@ export function loadSeasonVideos(showId, seasonNumber) {
   const request = getVideos("tv", `${showId}/season/${season}`, "es-ES", {
     includeVideoLanguage: "es,en,null",
   })
-    .then((result) => {
-      const list = uniqBy(
-        Array.isArray(result?.results) ? result.results : [],
-        (v) => `${v?.site}:${v?.key}`,
-      ).filter(isPlayableVideo);
-      list.sort((a, b) => rankVideo(a) - rankVideo(b));
-      return list;
-    })
+    .then((result) => playableRankedVideos(result?.results))
     .catch(() => {
       // Fallo de red: no se memoriza, se reintenta al volver.
       seasonCache.delete(key);
@@ -74,4 +67,14 @@ export function loadSeasonVideos(showId, seasonNumber) {
     });
   seasonCache.set(key, request);
   return request;
+}
+
+/**
+ * Vídeos de una temporada que ya trajo el servidor (page.jsx de la temporada):
+ * quedan en la caché y el cliente no los vuelve a pedir.
+ */
+export function primeSeasonVideos(showId, seasonNumber, videos) {
+  const season = Number(seasonNumber);
+  if (!showId || !Number.isInteger(season) || !Array.isArray(videos)) return;
+  seasonCache.set(`${showId}:${season}`, Promise.resolve(videos));
 }
