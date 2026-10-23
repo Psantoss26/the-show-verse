@@ -29,7 +29,7 @@ tags: [area/frontend, type/referencia]
 |---|---|---|
 | `/details/[type]/[id]` | `page.jsx` + `DetailsPageLoader` → `DetailsClient` | Ficha genérica de película o serie (`type` = `movie`\|`tv`); `getDetails` con `append_to_response` amplio, `revalidate: 600`. |
 | `/details/tv/[id]` | `page.jsx` (mismo `DetailsPageLoader`) | Alias explícito para series. |
-| `/details/tv/[id]/season/[season]` | `SeasonDetailsClient.jsx` | Detalle de una temporada (episodios, valoraciones). |
+| `/details/tv/[id]/season/[season]` | `SeasonDetailsClient.jsx` | Detalle de una temporada (episodios, valoraciones). El servidor trae los vídeos de la temporada en la misma petición (`append_to_response=videos`) y los pasa como `initialSeasonVideos`: «Ver tráiler» nace encendido o apagado, sin buscar vídeos en el cliente. |
 | `/details/tv/[id]/season/[season]/episode/[episode]` | `EpisodeDetailsClient.jsx` | Detalle de episodio (créditos, valoraciones, navegación a episodio siguiente/anterior). |
 | `/details/person/[id]` | `page.jsx` + `ActorDetails.jsx` | Ficha de actor/actriz: biografía, "known for", créditos combinados. |
 | `@overlay/(.)details/...` | Reexportan las páginas de `/details` | Rutas interceptoras: al navegar a una ficha desde la app se pinta encima y la página de origen queda montada y oculta (`OverlayRouteHost`). Recargar sirve la ficha completa. |
