@@ -206,7 +206,7 @@ const EMPTY_DATA = {
   heroPosterResolved: false,
   // ¿La portada del hero móvil trae el título IMPRESO? `heroPosterPath` no
   // siempre acaba siendo textless: cuando el título no tiene ningún póster sin
-  // idioma, `pickBestNeutralPosterByResVotes` cae a uno localizado. En ese caso
+  // idioma, `pickMobileNeutralPoster` cae a uno localizado. En ese caso
   // la portada ya lleva el título y superponerle el logo lo duplica, así que la
   // ficha de teléfono lo oculta -- mismo criterio que `mobilePosterHasBurnedTitle`
   // en DetailsClient.

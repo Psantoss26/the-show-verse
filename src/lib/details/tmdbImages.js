@@ -138,6 +138,24 @@ export function pickBestNeutralPosterByResVotes(list, opts = {}) {
     return sorted[0] || pool1[0] || null
 }
 
+// Portada sin idioma de la cabecera MÓVIL (DetailsClient, su precarga en el
+// servidor y la vista teléfono del DetailModal).
+//
+// De los pósteres sin idioma solo se miran los DOS primeros en el orden de
+// TMDb (los mejor valorados) y se queda el de más resolución; en empate, el
+// primero. Buscar la mayor resolución en toda la galería acababa eligiendo
+// arte poco representativo solo por ser enorme. Sin ningún póster sin idioma
+// se mantiene la caída de `pickBestNeutralPosterByResVotes` a uno localizado.
+export function pickMobileNeutralPoster(list) {
+    if (!Array.isArray(list) || list.length === 0) return null
+
+    const firstTwo = list.filter((p) => p?.file_path && !p?.iso_639_1).slice(0, 2)
+    if (!firstTwo.length) return pickBestNeutralPosterByResVotes(list)
+
+    const area = (img) => (img?.width || 0) * (img?.height || 0)
+    return firstTwo.reduce((best, p) => (area(p) > area(best) ? p : best))
+}
+
 // Portada del héroe MÓVIL calculada SOLO con lo que ya trae el SSR.
 //
 // Reproduce la política de `mobileNeutralPosterPath` (DetailsClient): se
@@ -159,7 +177,7 @@ export function pickMobileHeroPosterPath({
     )
 
     return (
-        pickBestNeutralPosterByResVotes(gallery)?.file_path ||
+        pickMobileNeutralPoster(gallery)?.file_path ||
         posterPath ||
         profilePath ||
         null
@@ -192,7 +210,7 @@ export function pickModalHeroPosterPath({
 
     return (
         mobilePosterOverride ||
-        pickBestNeutralPosterByResVotes(gallery)?.file_path ||
+        pickMobileNeutralPoster(gallery)?.file_path ||
         posterOverride ||
         mainPosterPath ||
         null
