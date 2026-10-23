@@ -18,6 +18,8 @@ Las tres comparten navegación (`WatchingSectionNav`):
 
 **Progreso manual:** se puede añadir una entrada eligiendo plataforma (Netflix, Prime Video, Max, Disney+, Apple TV, Movistar, Crunchyroll o Plex), porcentaje (como mucho 89 %) y, en series, el episodio. A partir del 90 % el progreso automático ya lo da por visto y lo saca de la fila. Backend: `/v1/progress`.
 
+**Marcar como finalizado:** en el modo edición de `/continue-watching` (botón «Quitar o finalizar títulos») cada tarjeta lleva, junto a la papelera, un botón verde ✓. Tras confirmar, la entrada sale de la fila y se apunta en el historial con el episodio que tuviera, igual que el completado automático (`POST /v1/progress/{id}/complete`).
+
 ## Recomendaciones (deslizar)
 
 `/recommendations` es una baraja de títulos:
