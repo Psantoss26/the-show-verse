@@ -1,6 +1,6 @@
 import EpisodeDetailsClient from "@/components/EpisodeDetailsClient";
 import { getShareData, shareMetadata } from "@/lib/share/shareMeta";
-import { pickEpisodeHeroStills } from "@/lib/details/episodeHeroStills";
+import { pickEpisodeBackdrop, pickEpisodeHeroStills } from "@/lib/details/episodeHeroStills";
 
 export const revalidate = 3600; // 1h
 
@@ -90,6 +90,14 @@ export default async function EpisodePage({ params }) {
     stills: episodeImages?.stills,
     showBackdrops: showImages?.backdrops,
   });
+  // Fondo de ESCRITORIO: una sola imagen, distinta de la que enmarca el hero
+  // (`still_path`) siempre que haya otra.
+  const backdropPath = pickEpisodeBackdrop({
+    stillPath: episode?.still_path || null,
+    stills: episodeImages?.stills,
+    showBackdrops: showImages?.backdrops,
+    showBackdropPath: show?.backdrop_path || null,
+  });
   const showImdbId = show?.external_ids?.imdb_id || null;
 
   const imdbUrl = showImdbId
@@ -110,6 +118,7 @@ export default async function EpisodePage({ params }) {
       imdbId={showImdbId}
       imdbUrl={imdbUrl}
       heroStillPaths={heroStillPaths}
+      backdropPath={backdropPath}
     />
   );
 }
