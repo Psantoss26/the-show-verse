@@ -73,7 +73,7 @@ Subcomponentes y modales usados por `DetailsClient`/`SeasonDetailsClient`/`Episo
 | `ScoreboardBar.jsx` | Barra de puntuaciones agregadas (TMDb/Trakt/IMDb/RT/Metacritic) + acciones (visto, lista, favorito). |
 | `StreamingHoverOverlay.jsx` | Overlay al hover sobre un póster: "Ver en" + wordmark/color de la plataforma de streaming. |
 | `SoundtrackModal.jsx` | Modal de banda sonora (Spotify) de un título. |
-| `ExternalLinksModal.jsx` | Modal de enlaces externos (JustWatch, Letterboxd, etc.), bloquea scroll vía `useBodyScrollLock`. |
+| `ExternalLinksModal.jsx` | Modal de enlaces externos (JustWatch, Letterboxd, etc.), bloquea scroll vía `useBodyScrollLock`. En la ficha de título y en DetailModal (también en su vista teléfono) no lista IMDb, TMDb ni Trakt: ya enlazan desde sus puntuaciones del marcador. |
 | `EpisodeRatingsModal.jsx` | Modal que envuelve `EpisodeRatingsGrid` para ver valoraciones por temporada. |
 | `AddToListModal.jsx` | Modal para añadir un título a una o varias listas propias. |
 | `TraktCommentModal.jsx` | Modal para crear/editar/borrar un comentario de Trakt. |
