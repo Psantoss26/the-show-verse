@@ -71,3 +71,22 @@ test("los iconos centrales de vídeo y música no dibujan aros", () => {
     /w-14 h-14 rounded-full bg-yellow-400\/(?:10|15) border/,
   );
 });
+
+test("reparto e invitados del episodio y episodios de la temporada: el hover de la ficha, sin contorno", () => {
+  const episodeClient = readFileSync(
+    new URL("../../components/EpisodeDetailsClient.jsx", import.meta.url),
+    "utf8",
+  );
+  const seasonClient = readFileSync(
+    new URL("../../components/SeasonDetailsClient.jsx", import.meta.url),
+    "utf8",
+  );
+  for (const source of [episodeClient, seasonClient]) {
+    assert.doesNotMatch(source, /hover:after:shadow-\[inset/);
+  }
+  // Mismas tarjetas de persona que «Reparto Principal» de DetailsClient.
+  const personCard =
+    'className="block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md lg:hover:shadow-yellow-900/20 transition-all duration-300"';
+  assert.ok(detailsClient.includes(personCard));
+  assert.equal(episodeClient.split(personCard).length - 1, 2);
+});

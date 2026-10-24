@@ -56,9 +56,10 @@ export function pickEpisodeHeroStills({
   return picked.slice(0, EPISODE_HERO_MAX_BANDS);
 }
 
-// Selector alternativo de un único fondo para consumidores que no usan la
-// composición completa de la portada. La portada ya empieza por la imagen
-// oficial (`still_path`); usarla de fondo repetiría la escena. Se busca otra:
+// Fondo de ESCRITORIO de la ficha de episodio: una sola imagen (en el
+// teléfono el fondo es la composición de la portada). El hero enmarca la
+// imagen oficial (`still_path`); usarla de fondo repetiría la escena. Se busca
+// otra:
 //   1. otra imagen del episodio (sin texto si las hay),
 //   2. un fondo sin texto de la serie,
 //   3. el fondo principal de la serie,

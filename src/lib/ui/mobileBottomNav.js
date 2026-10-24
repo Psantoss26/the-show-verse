@@ -7,6 +7,7 @@ export const MOBILE_BOTTOM_NAV_ITEMS = [
   { key: "series", href: "/series", labelKey: "nav_series", fallbackLabel: "Series", tone: "purple" },
   { key: "discover", href: "/discover", labelKey: "nav_discover", fallbackLabel: "Descubrir", tone: "indigo" },
   { key: "library", href: "/biblioteca", labelKey: "nav_library", fallbackLabel: "Biblioteca", tone: "gold" },
+  { key: "today", href: "/today", labelKey: "nav_today", fallbackLabel: "Hoy", tone: "pink" },
   { key: "social", href: "/social", labelKey: "nav_social", fallbackLabel: "Social", tone: "pink" },
   { key: "lists", href: "/lists", labelKey: "nav_lists", fallbackLabel: "Listas", tone: "purple" },
   { key: "in-progress", href: "/in-progress", labelKey: "nav_in_progress", fallbackLabel: "En Progreso", tone: "green" },

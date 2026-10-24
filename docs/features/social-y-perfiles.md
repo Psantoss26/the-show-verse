@@ -14,6 +14,7 @@ Capa social de The Show Verse: perfiles públicos de cada miembro, seguir y deja
 | `/u/[username]/[section]` | Pestañas del perfil (ver abajo). |
 | `/u/[username]/followers`, `/following` | Seguidores y seguidos (`FollowListClient`). |
 | `/profile` y `/profile/[section]` | El mismo perfil, para el usuario con sesión. El layout persistente cambia solo la sección activa. |
+| `/today` | Lo destacado de hoy, ayer o la semana (historias, más activos). Ver [[hoy]]. |
 | `/social` | Feed: actividad de las cuentas que sigo (`scope=following`) o la mía (`scope=me`), con cifras en la cabecera. Color propio: rosa/fucsia. |
 | `/members` | Directorio y buscador de miembros (`/api/users/search`). |
 
@@ -40,6 +41,7 @@ En cada ficha, `FollowingActivity` (`src/components/details/FollowingActivity.js
 Ver la sección *Social y perfiles* de [[backend_api_reference]]. En Next, los proxies están en `src/app/api/users/**`.
 
 ## Relacionado
+- [[hoy]]
 - [[Features]]
 - [[comunidad]]
 - [[niveles-y-logros]]

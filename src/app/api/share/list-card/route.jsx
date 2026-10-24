@@ -4,11 +4,12 @@ import { LIST_PREVIEW_MAX, sanitizeListShareCard } from "@/lib/lists/shareList";
 import {
   H,
   W,
-  loadAmbient,
   loadAmbientBase,
+  loadAmbientLayers,
   loadLocalAssets,
   loadPoster,
   loadShareFonts,
+  shareImageResponse,
 } from "@/lib/share/ogKit";
 import { ListCard, PosterCard, loadTmdbImages } from "@/lib/share/listScenes";
 
@@ -38,7 +39,24 @@ export async function POST(request) {
   }
 
   const card = sanitizeListShareCard(body);
+  // Opaca: JPEG y guardada por el cuerpo validado (ver `shareImageResponse`).
+  const response = await shareImageResponse(
+    `list-card|${JSON.stringify(card)}`,
+    () => renderListCard(card),
+    { jpeg: true },
+  );
+  return response || new Response("Render failed", { status: 500 });
+}
+
+async function renderListCard(card) {
   const posterLayout = card.layout === "poster";
+  // El fondo ambiental de la composición normal se pide A LA VEZ que lo demás.
+  // Antes esperaba a saber si había llegado el póster (solo cae a ella si no
+  // llega) y sumaba otra ronda de descargas a cada imagen. Se descarta si al
+  // final no hace falta.
+  const fallbackAmbientPath =
+    card.coverPath || card.collage[0] || card.preview.find((item) => item.posterPath)?.posterPath || null;
+  const ambientPromise = loadAmbientLayers(fallbackAmbientPath);
   // El mosaico se ve grande (hasta media imagen por póster): w780.
   const collageSize = card.collage.length >= 6 ? "w500" : "w780";
   const [fonts, assets, cover, collage, previews, coverBlur] = await Promise.all([
@@ -55,12 +73,7 @@ export async function POST(request) {
   // Fondo ambiental: solo para la composición normal (o si el póster no ha
   // llegado y se cae a ella).
   const usePosterCard = posterLayout && cover;
-  const ambientPath = usePosterCard
-    ? null
-    : card.coverPath || card.collage[0] || card.preview.find((item) => item.posterPath)?.posterPath || null;
-  const [ambient, ambientBase] = usePosterCard
-    ? [null, null]
-    : await Promise.all([loadAmbient(ambientPath), loadAmbientBase(ambientPath)]);
+  const [ambient, ambientBase] = usePosterCard ? [null, null] : await ambientPromise;
 
   const element =
     usePosterCard ? (
@@ -89,6 +102,5 @@ export async function POST(request) {
     width: W,
     height: H,
     ...(fonts ? { fonts } : {}),
-    headers: { "Cache-Control": "private, no-store" },
   });
 }

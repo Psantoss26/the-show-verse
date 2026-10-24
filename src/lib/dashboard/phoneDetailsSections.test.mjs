@@ -360,11 +360,28 @@ test("la ficha de teléfono va pegada al borde derecho", async () => {
   // que la página deja a su derecha, la dejaba descentrada. Repartir ese hueco
   // moviéndola solo cambiaba el problema de sitio: o seguía descuadrada, o se
   // metía encima de los botones del navbar.
-  assert.match(modal, /self-center rounded-l-2xl/);
+  assert.match(modal, /\? "h-full rounded-l-2xl pointer-events-auto"\s*: "h-full rounded-l-2xl/);
   assert.doesNotMatch(modal, /self-center rounded-2xl/);
   assert.doesNotMatch(modal, /paddingRight: panelRightGap/);
   assert.doesNotMatch(modal, /panelRightGap \* 2/);
   assert.doesNotMatch(css, /sv-drawer-phone-centered/);
+});
+
+test("la ficha de teléfono ocupa el alto entero y no se redimensiona", async () => {
+  const [modal, subroute] = await Promise.all([
+    read("../../components/dashboard/DetailModal.jsx"),
+    read("../../components/dashboard/SubrouteDetailsPanel.jsx"),
+  ]);
+
+  // Solo el drawer ancho lleva tirador; la vista teléfono va pegada arriba y
+  // abajo, con el ancho que da su proporción sobre el alto de la ventana.
+  assert.match(modal, /isRightPlacement && !mobileDetails && \(\s*<div\s*onPointerDown=\{beginResize\}/);
+  assert.match(subroute, /right && !phone && \(\s*<div\s*onPointerDown=\{beginResize\}/);
+  for (const source of [modal, subroute]) {
+    assert.doesNotMatch(source, /mobileDetailsWidth/);
+    assert.doesNotMatch(source, /aspectRatio: MOBILE_DETAILS_ASPECT_RATIO/);
+    assert.doesNotMatch(source, /max-h-full min-h-0 self-center/);
+  }
 });
 
 test("en tablet la barra táctil también se aparta del drawer", async () => {
@@ -460,11 +477,11 @@ test("en el teléfono el logo aguanta hasta salir por arriba", async () => {
   // El recorrido iba fijo en 300px para las dos vistas. En el modal ancho eso
   // es buena parte de su hero; en el teléfono, cuyo hero mide el panel entero,
   // la portada apenas había empezado a irse y el logo ya no estaba.
-  // Y mide el alto REAL: con el ancho mínimo en pantallas bajas el panel se
-  // para en el alto de la ventana en vez de seguir su proporción.
+  // Y mide el alto REAL del panel, que va pegado arriba y abajo: el de la
+  // ventana.
   assert.match(
     modal,
-    /phonePanelHeight = Math\.min\(\s*\n\s*panelWidth \/ MOBILE_DETAILS_ASPECT_RATIO,\s*\n\s*typeof window/,
+    /phonePanelHeight =\s*\n\s*typeof window !== "undefined"\s*\n\s*\? window\.innerHeight/,
   );
   assert.match(modal, /logoFadeFrom = mobileDetails \? .*0\.4.*: 0/);
   assert.match(modal, /logoFadeTo = mobileDetails \? .*0\.75.*: 300/);

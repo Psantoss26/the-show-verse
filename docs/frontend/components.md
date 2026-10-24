@@ -65,7 +65,7 @@ Subcomponentes y modales usados por `DetailsClient`/`SeasonDetailsClient`/`Episo
 | Componente | Propósito |
 |---|---|
 | `DetailAtoms.jsx` | Átomos visuales reutilizados en la ficha (`VisualMetaCard`, etc.). |
-| `DetailHeaderBits.jsx` | Piezas del cabecero de la ficha (badges compactos, botón compartir...). |
+| `DetailHeaderBits.jsx` | Piezas del cabecero de la ficha (badges compactos, botón compartir...). `useShareAction` devuelve `warmProps`: al pasar el ratón, enfocar o tocar el botón empieza a generarse la imagen de compartir (`prefetchShare` de `DetailsShareSheet`), y la hoja reutiliza esa petición. |
 | `AnimatedSection.jsx` | Wrapper de `framer-motion` para animar secciones al entrar en viewport. |
 | `AnimatedPosterFrame.jsx` | Marco de póster con transición/estado de error de imagen. |
 | `PosterStack.jsx` | Pila de pósters superpuestos (colecciones). |
@@ -73,7 +73,7 @@ Subcomponentes y modales usados por `DetailsClient`/`SeasonDetailsClient`/`Episo
 | `ScoreboardBar.jsx` | Barra de puntuaciones agregadas (TMDb/Trakt/IMDb/RT/Metacritic) + acciones (visto, lista, favorito). |
 | `StreamingHoverOverlay.jsx` | Overlay al hover sobre un póster: "Ver en" + wordmark/color de la plataforma de streaming. |
 | `SoundtrackModal.jsx` | Modal de banda sonora (Spotify) de un título. |
-| `ExternalLinksModal.jsx` | Modal de enlaces externos (JustWatch, Letterboxd, etc.), bloquea scroll vía `useBodyScrollLock`. |
+| `ExternalLinksModal.jsx` | Modal de enlaces externos (JustWatch, Letterboxd, etc.), bloquea scroll vía `useBodyScrollLock`. En la ficha de título y en DetailModal (también en su vista teléfono) no lista IMDb, TMDb ni Trakt: ya enlazan desde sus puntuaciones del marcador. |
 | `EpisodeRatingsModal.jsx` | Modal que envuelve `EpisodeRatingsGrid` para ver valoraciones por temporada. |
 | `AddToListModal.jsx` | Modal para añadir un título a una o varias listas propias. |
 | `TraktCommentModal.jsx` | Modal para crear/editar/borrar un comentario de Trakt. |

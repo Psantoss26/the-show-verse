@@ -51,6 +51,8 @@ export const SCORE_PANEL_W = ACTION_COUNT * BUTTON + (ACTION_COUNT - 1) * BUTTON
 // desenfoque encima: donde este pierde opacidad asoma la base, no el negro.
 export const AMBIENT_BLUR = 32;
 export const AMBIENT_FILTER = "brightness(0.62) saturate(1.15)";
+// Los mismos filtros, para aplicarlos ANTES del render (ver `toneImage`).
+export const AMBIENT_TONE = { brightness: 0.62, saturate: 1.15 };
 export const AMBIENT = { width: W, height: H, left: 0, top: 0 };
 // Marca: el ISOTIPO sin nombre (logo-TSV-sinFondo.png, 351×351). El dibujo
 // visible ocupa (107..246, 115..235) del PNG; el resto es margen transparente,
@@ -297,39 +299,303 @@ export function mimeOf(buffer) {
   return null;
 }
 
-export async function fetchImage(url, timeout) {
-  try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(timeout) });
-    if (!res.ok) return null;
-    const buffer = await res.arrayBuffer();
-    const mime = mimeOf(buffer);
-    if (!mime || buffer.byteLength > 12_000_000) return null;
-    return {
-      src: `data:${mime};base64,${Buffer.from(buffer).toString("base64")}`,
-      size: imageSize(buffer),
-    };
-  } catch {
-    return null;
+// --- Ajuste de tamaño (sharp).
+//
+// QUIÉN SE LLEVA EL TIEMPO: el render de resvg (WASM), no las descargas. Una
+// portada `original` de TMDb mide 2000×3000 y resvg la decodifica y remuestrea
+// entera aunque se pinte a 1080 de ancho: medido, ~390 ms de render frente a
+// ~190 ms con la misma imagen ya reducida a 1080. Por eso cada imagen se
+// reduce a lo que de verdad ocupa en el lienzo (`maxWidth`/`maxHeight`, sin
+// ampliar) antes de pasársela. Si sharp no estuviera (es una dependencia
+// opcional de Next), se usa la imagen tal cual: más lento, mismo resultado.
+let sharpPromise = null;
+function loadSharp() {
+  if (!sharpPromise) {
+    sharpPromise = import("sharp").then((mod) => mod.default || mod).catch(() => null);
   }
+  return sharpPromise;
+}
+
+async function fitBuffer(buffer, mime, fit) {
+  const { maxWidth, maxHeight } = fit || {};
+  const size = imageSize(buffer);
+  const tooWide = maxWidth && size?.width > maxWidth;
+  const tooTall = maxHeight && size?.height > maxHeight;
+  if (!size || (!tooWide && !tooTall)) return { buffer, mime, size };
+  const sharp = await loadSharp();
+  if (!sharp) return { buffer, mime, size };
+  try {
+    const pipeline = sharp(Buffer.from(buffer)).resize({
+      width: maxWidth || undefined,
+      height: maxHeight || undefined,
+      fit: "inside",
+      withoutEnlargement: true,
+    });
+    // Los PNG (logos) conservan el canal alfa; las fotos, JPEG casi sin
+    // pérdida: se vuelven a comprimir al final igualmente.
+    const { data, info } = await (mime === "image/png"
+      ? pipeline.png({ compressionLevel: 2 })
+      : pipeline.jpeg({ quality: 92, chromaSubsampling: "4:4:4" })
+    ).toBuffer({ resolveWithObject: true });
+    return { buffer: data, mime, size: { width: info.width, height: info.height } };
+  } catch {
+    return { buffer, mime, size };
+  }
+}
+
+// --- Filtros aplicados de antemano.
+//
+// `filter: brightness() saturate()` sobre las capas del fondo, que ocupan el
+// lienzo entero, costaba ~270 ms de cada imagen en resvg (medido). Se aplican
+// aquí, sobre la foto pequeña, y el componente pinta la imagen sin filtro.
+// resvg los aplica en RGB LINEAL (como los filtros SVG: medido con colores
+// planos, sRGB se aleja hasta 40 niveles), así que aquí también: se pasa a
+// lineal, se desenfoca en 16 bits y se aplica la matriz antes de volver a sRGB.
+// Desenfoque y matriz son lineales, así que el orden no altera el resultado.
+const SRGB_TO_LINEAR = new Uint16Array(256);
+for (let value = 0; value < 256; value += 1) {
+  const c = value / 255;
+  SRGB_TO_LINEAR[value] = Math.round(65535 * (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+}
+let linearToSrgb = null;
+function linearToSrgbTable() {
+  if (!linearToSrgb) {
+    linearToSrgb = new Uint8Array(65536);
+    for (let value = 0; value < 65536; value += 1) {
+      const c = value / 65535;
+      linearToSrgb[value] = Math.round(255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055));
+    }
+  }
+  return linearToSrgb;
+}
+
+// Matriz de `brightness(b) saturate(s)` (Filter Effects, feColorMatrix).
+function toneMatrix({ brightness = 1, saturate = 1 }) {
+  const s = saturate;
+  return [
+    [0.213 + 0.787 * s, 0.715 - 0.715 * s, 0.072 - 0.072 * s],
+    [0.213 - 0.213 * s, 0.715 + 0.285 * s, 0.072 - 0.072 * s],
+    [0.213 - 0.213 * s, 0.715 - 0.715 * s, 0.072 + 0.928 * s],
+  ].map((row) => row.map((value) => value * brightness));
+}
+
+/**
+ * `tone`: { brightness, saturate, blur, box }. `blur` va en px del LIENZO (el
+ * de `filter: blur()`) y se pasa a px de la foto con lo que se amplía al
+ * cubrir `box` ({ width, height }, `objectFit: cover`).
+ */
+async function toneImage(image, tone) {
+  const sharp = await loadSharp();
+  if (!sharp || !tone) return image;
+  try {
+    const { data, info } = await sharp(image.buffer)
+      .removeAlpha()
+      .toColourspace("srgb")
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const { width, height } = info;
+    const pixels = width * height;
+    let linear = new Uint16Array(pixels * 3);
+    for (let index = 0; index < pixels * 3; index += 1) linear[index] = SRGB_TO_LINEAR[data[index]];
+
+    if (tone.blur) {
+      const box = tone.box || { width: W, height: H };
+      const scale = Math.max(box.width / width, box.height / height);
+      const sigma = Math.max(0.3, tone.blur / scale);
+      // `rgb16` de entrada a salida: sin él, sharp pasa la imagen a 8 bits
+      // por el camino y devuelve valores ~256 veces menores (casi negro).
+      const blurred = await sharp(linear, { raw: { width, height, channels: 3 } })
+        .pipelineColourspace("rgb16")
+        .blur(sigma)
+        .toColourspace("rgb16")
+        .raw({ depth: "ushort" })
+        .toBuffer();
+      linear = new Uint16Array(blurred.buffer, blurred.byteOffset, pixels * 3);
+    }
+
+    const [r, g, b] = toneMatrix(tone);
+    const toSrgb = linearToSrgbTable();
+    const out = Buffer.alloc(pixels * 3);
+    const clamp = (value) => (value <= 0 ? 0 : value >= 65535 ? 65535 : Math.round(value));
+    for (let index = 0; index < pixels * 3; index += 3) {
+      const R = linear[index];
+      const G = linear[index + 1];
+      const B = linear[index + 2];
+      out[index] = toSrgb[clamp(r[0] * R + r[1] * G + r[2] * B)];
+      out[index + 1] = toSrgb[clamp(g[0] * R + g[1] * G + g[2] * B)];
+      out[index + 2] = toSrgb[clamp(b[0] * R + b[1] * G + b[2] * B)];
+    }
+    const buffer = await sharp(out, { raw: { width, height, channels: 3 } })
+      .jpeg({ quality: 92, chromaSubsampling: "4:4:4" })
+      .toBuffer();
+    return { buffer, mime: "image/jpeg", size: { width, height }, toned: true };
+  } catch {
+    return image;
+  }
+}
+
+// --- Caché de imágenes de TMDb por proceso.
+//
+// La imagen y el vídeo piden las mismas portadas (la del fondo, el logo…), y
+// volver a compartir el mismo título o abrir la hoja en otra pestaña las
+// repetía. Dos niveles: la descarga (por URL) y cada versión ya reducida o
+// tratada. Con tope de entradas y de tiempo: las rutas de TMDb no cambian de
+// contenido, pero no hace falta guardarlas para siempre.
+const IMAGE_CACHE_MAX = 80;
+const IMAGE_CACHE_TTL = 30 * 60_000;
+const downloadCache = new Map();
+const imageCache = new Map();
+
+function remember(cache, max, key, value) {
+  cache.delete(key);
+  cache.set(key, value);
+  while (cache.size > max) cache.delete(cache.keys().next().value);
+}
+
+// Guarda la promesa de `start()` por `key`; un resultado vacío (fallo de red,
+// tiempo agotado) no se guarda y el siguiente intento vuelve a probar.
+function cachedPromise(cache, key, start) {
+  const cached = cache.get(key);
+  if (cached && Date.now() - cached.at < IMAGE_CACHE_TTL) {
+    remember(cache, IMAGE_CACHE_MAX, key, cached);
+    return cached.promise;
+  }
+  const entry = { at: Date.now(), promise: start() };
+  remember(cache, IMAGE_CACHE_MAX, key, entry);
+  entry.promise.then((value) => {
+    if (!value && cache.get(key) === entry) cache.delete(key);
+  });
+  return entry.promise;
+}
+
+function download(url, timeout) {
+  return cachedPromise(downloadCache, url, async () => {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(timeout) });
+      if (!res.ok) return null;
+      const buffer = await res.arrayBuffer();
+      const mime = mimeOf(buffer);
+      if (!mime || buffer.byteLength > 12_000_000) return null;
+      return { buffer, mime };
+    } catch {
+      return null;
+    }
+  });
+}
+
+async function prepareImage(url, timeout, fit, tone) {
+  const raw = await download(url, timeout);
+  if (!raw) return null;
+  let image = await fitBuffer(raw.buffer, raw.mime, fit);
+  if (tone) image = await toneImage(image, tone);
+  return {
+    src: `data:${image.mime};base64,${Buffer.from(image.buffer).toString("base64")}`,
+    size: image.size,
+    toned: Boolean(image.toned),
+  };
+}
+
+/**
+ * Descarga una imagen como data URI (lo que espera Satori) con su tamaño.
+ * `fit`: `{ maxWidth, maxHeight }` del hueco que ocupa en el lienzo.
+ * `tone`: filtros que se aplican aquí en vez de en el render (ver
+ * `toneImage`); la imagen vuelve con `toned: true` si se aplicaron, y si no
+ * (sin sharp) el componente debe poner el `filter` CSS de siempre.
+ */
+export function fetchImage(url, timeout, fit = null, tone = null) {
+  const key = `${url}|${fit?.maxWidth || 0}x${fit?.maxHeight || 0}|${tone ? JSON.stringify(tone) : ""}`;
+  return cachedPromise(imageCache, key, () => prepareImage(url, timeout, fit, tone));
+}
+
+// Lo más ancho que se pinta una foto: el lienzo entero.
+const FULL_WIDTH = { maxWidth: W };
+
+// --- Salida.
+//
+// ImageResponse devuelve PNG: con una foto a sangre son ~4 MB, que en el
+// móvil tardaban más en llegar que en generarse, y el navegador aún tenía que
+// pasarlos a JPEG para compartir. Las imágenes OPACAS salen en JPEG
+// (~0,6 MB, 4:4:4 para que el texto no se emborrone); las capas
+// transparentes del vídeo siguen en PNG.
+async function encodeOutput(imageResponse, { jpeg }) {
+  const png = Buffer.from(await imageResponse.arrayBuffer());
+  if (!jpeg) return { body: png, type: "image/png" };
+  const sharp = await loadSharp();
+  if (!sharp) return { body: png, type: "image/png" };
+  try {
+    const body = await sharp(png).jpeg({ quality: 90, chromaSubsampling: "4:4:4" }).toBuffer();
+    return { body, type: "image/jpeg" };
+  } catch {
+    return { body: png, type: "image/png" };
+  }
+}
+
+// --- Caché de imágenes generadas.
+//
+// Mismo cuerpo de petición → misma imagen. La hoja de compartir puede pedirla
+// por adelantado (al pasar por el botón) y otra vez al abrirse: la segunda
+// petición se engancha a la primera en vez de pintarla de nuevo.
+const RENDER_CACHE_MAX = 24;
+const RENDER_CACHE_TTL = 10 * 60_000;
+const renderCache = new Map();
+
+/**
+ * Responde con la imagen que pinta `render()` (una ImageResponse), en JPEG si
+ * `jpeg` y guardada por `key` (la ruta y el cuerpo de la petición).
+ */
+export async function shareImageResponse(key, render, { jpeg = false } = {}) {
+  let entry = renderCache.get(key);
+  if (!entry || Date.now() - entry.at > RENDER_CACHE_TTL) {
+    entry = {
+      at: Date.now(),
+      promise: Promise.resolve()
+        .then(render)
+        .then((response) => (response ? encodeOutput(response, { jpeg }) : null)),
+    };
+    remember(renderCache, RENDER_CACHE_MAX, key, entry);
+    entry.promise.catch(() => null).then((result) => {
+      if (!result && renderCache.get(key) === entry) renderCache.delete(key);
+    });
+  } else {
+    remember(renderCache, RENDER_CACHE_MAX, key, entry);
+  }
+  const result = await entry.promise;
+  if (!result) return null;
+  return new Response(new Uint8Array(result.body), {
+    headers: { "Content-Type": result.type, "Cache-Control": "private, no-store" },
+  });
 }
 
 // Póster a la máxima calidad; si el original no llega a tiempo, w780.
 export async function loadPoster(posterPath) {
   if (!posterPath) return null;
   return (
-    (await fetchImage(`${TMDB}/original${posterPath}`, 6000)) ||
+    (await fetchImage(`${TMDB}/original${posterPath}`, 6000, FULL_WIDTH)) ||
     fetchImage(`${TMDB}/w780${posterPath}`, 4000)
   );
 }
 
 // El fondo ambiental va desenfocado: basta una versión pequeña. La base (ver
 // AMBIENT_BLUR) usa la mínima, cuya ampliación ya es un desenfoque.
-export function loadAmbient(posterPath) {
-  return posterPath ? fetchImage(`${TMDB}/w342${posterPath}`, 4000) : null;
+//
+// Con `tone`, vienen ya desenfocadas y atenuadas (ver `toneImage`):
+// `loadAmbientLayers` da las dos capas de `AmbientBackground` así. La base sin
+// tratar (`loadAmbientBase` sin `tone`) es la continuación del póster de
+// `PosterWithContinuation`, que se pinta tal cual.
+export function loadAmbient(posterPath, tone = null) {
+  return posterPath ? fetchImage(`${TMDB}/w342${posterPath}`, 4000, null, tone) : null;
 }
 
-export function loadAmbientBase(posterPath) {
-  return posterPath ? fetchImage(`${TMDB}/w92${posterPath}`, 4000) : null;
+export function loadAmbientBase(posterPath, tone = null) {
+  return posterPath ? fetchImage(`${TMDB}/w92${posterPath}`, 4000, null, tone) : null;
+}
+
+/** Las dos capas de `AmbientBackground`, ya con sus filtros. */
+export function loadAmbientLayers(posterPath) {
+  return Promise.all([
+    loadAmbient(posterPath, { ...AMBIENT_TONE, blur: AMBIENT_BLUR }),
+    loadAmbientBase(posterPath, AMBIENT_TONE),
+  ]);
 }
 
 // Bandas de la portada de un episodio (stills 16:9 a lo ancho de la imagen):
@@ -337,18 +603,18 @@ export function loadAmbientBase(posterPath) {
 export async function loadStill(stillPath) {
   if (!stillPath) return null;
   return (
-    (await fetchImage(`${TMDB}/w1280${stillPath}`, 5000)) ||
+    (await fetchImage(`${TMDB}/w1280${stillPath}`, 5000, FULL_WIDTH)) ||
     fetchImage(`${TMDB}/w780${stillPath}`, 4000)
   );
 }
 
 // Fondo de las secciones del VÍDEO: la portada RECONOCIBLE (apenas difuminada),
 // así que hace falta más resolución que para el ambiental.
-export async function loadStoryPoster(posterPath) {
+export async function loadStoryPoster(posterPath, tone = null) {
   if (!posterPath) return null;
   return (
-    (await fetchImage(`${TMDB}/w780${posterPath}`, 5000)) ||
-    fetchImage(`${TMDB}/w342${posterPath}`, 4000)
+    (await fetchImage(`${TMDB}/w780${posterPath}`, 5000, null, tone)) ||
+    fetchImage(`${TMDB}/w342${posterPath}`, 4000, null, tone)
   );
 }
 
@@ -358,7 +624,7 @@ export async function loadLogo(logoPath) {
   if (!logoPath) return null;
   const pngPath = logoPath.replace(/\.svg$/i, ".png");
   const image =
-    (await fetchImage(`${TMDB}/original${pngPath}`, 5000)) ||
+    (await fetchImage(`${TMDB}/original${pngPath}`, 5000, { maxWidth: LOGO_MAX_W, maxHeight: LOGO_MAX_H * 2 })) ||
     (await fetchImage(`${TMDB}/w500${pngPath}`, 4000));
   return image?.size?.width && image.size.height ? image : null;
 }
@@ -646,7 +912,15 @@ export function AmbientBackground({ ambient, ambientBase }) {
           width={W}
           height={H}
           alt=""
-          style={{ position: "absolute", top: 0, left: 0, width: W, height: H, objectFit: "cover", filter: AMBIENT_FILTER }}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: W,
+            height: H,
+            objectFit: "cover",
+            ...(ambientBase.toned ? {} : { filter: AMBIENT_FILTER }),
+          }}
         />
       ) : null}
       {ambient ? (
@@ -663,7 +937,7 @@ export function AmbientBackground({ ambient, ambientBase }) {
             width: AMBIENT.width,
             height: AMBIENT.height,
             objectFit: "cover",
-            filter: `blur(${AMBIENT_BLUR}px) ${AMBIENT_FILTER}`,
+            ...(ambient.toned ? {} : { filter: `blur(${AMBIENT_BLUR}px) ${AMBIENT_FILTER}` }),
           }}
         />
       ) : null}

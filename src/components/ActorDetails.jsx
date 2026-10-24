@@ -2637,6 +2637,7 @@ export default function ActorDetails({
     copied: actorLinkCopied,
     sheet: actorShareSheet,
     open: actorShareOpen,
+    warmProps: actorShareWarmProps,
   } = useShareAction({
     title: actorShare.title,
     text: `Descubre la ficha de ${actorDetails?.name || "esta persona"} en The Show Verse.`,
@@ -3251,6 +3252,7 @@ export default function ActorDetails({
 
                     <ActorActionButton
                       onClick={handleShareActor}
+                      {...actorShareWarmProps}
                       aria-haspopup="dialog"
                       activeColor="blue"
                       groupId="actor-details-actions"

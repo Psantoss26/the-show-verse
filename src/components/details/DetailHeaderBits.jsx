@@ -9,7 +9,7 @@ import { Star, Share2, Check } from "lucide-react";
 import { isAndroidApp, shareFromApp } from "@/lib/android/appBridge";
 import { useDetailsStaticMotion } from "@/components/details/AnimatedSection";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
-import DetailsShareSheet from "@/components/details/DetailsShareSheet";
+import DetailsShareSheet, { prefetchShare } from "@/components/details/DetailsShareSheet";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 import { LIQUID_GLASS_SURFACE } from "@/lib/ui/liquidGlass";
 
@@ -332,8 +332,10 @@ export function UnifiedRateButton({
  * portapapeles). La usan ActionShareButton y el botón de acción de las listas
  * (ListDetailsActionRow), que pinta su propio LiquidButton.
  *
- * Devuelve `{ handleShare, sheet, copied, buttonRef }`: `sheet` se monta junto
- * al botón. Al cerrar la hoja el foco vuelve al botón (`buttonRef`) o, si no se
+ * Devuelve `{ handleShare, sheet, copied, buttonRef, warmProps }`: `sheet` se
+ * monta junto al botón y `warmProps` se esparce en él para que la imagen
+ * empiece a generarse al acercarse (ratón encima, foco, primer toque) y no
+ * después del clic. Al cerrar la hoja el foco vuelve al botón (`buttonRef`) o, si no se
  * enganchó, al elemento que tenía el foco al abrirla.
  */
 export function useShareAction({ title, text, url, card = null, story = null, kind = "details" }) {
@@ -352,6 +354,17 @@ export function useShareAction({ title, text, url, card = null, story = null, ki
         : ""),
     [url],
   );
+
+  // Una vez por imagen: la hoja reutiliza esa misma petición (`prefetchShare`).
+  const warmedRef = useRef("");
+  const warm = useCallback(() => {
+    if (!card) return;
+    const key = JSON.stringify([kind, card, story]);
+    if (warmedRef.current === key) return;
+    warmedRef.current = key;
+    prefetchShare({ kind, card, story });
+  }, [card, story, kind]);
+  const warmProps = card ? { onPointerEnter: warm, onFocus: warm, onTouchStart: warm } : null;
 
   const closeSheet = useCallback(() => {
     setSheetOpen(false);
@@ -409,11 +422,11 @@ export function useShareAction({ title, text, url, card = null, story = null, ki
   ) : null;
 
   // `open`: la hoja está abierta (botones que se marcan activos mientras tanto).
-  return { handleShare, sheet, copied, buttonRef, open: sheetOpen };
+  return { handleShare, sheet, copied, buttonRef, warmProps, open: sheetOpen };
 }
 
 export function ActionShareButton({ title, text, url, card = null, story = null, kind = "details", iconOnly = false, animateEntrance = true, variant = "default", className = "" }) {
-  const { handleShare, sheet, copied, buttonRef } = useShareAction({ title, text, url, card, story, kind });
+  const { handleShare, sheet, copied, buttonRef, warmProps } = useShareAction({ title, text, url, card, story, kind });
   const prefersReducedMotion = useReducedMotion();
   const isStaticDetails = useDetailsStaticMotion();
 
@@ -424,6 +437,7 @@ export function ActionShareButton({ title, text, url, card = null, story = null,
           ref={buttonRef}
           type="button"
           onClick={handleShare}
+          {...warmProps}
           aria-haspopup={card ? "dialog" : undefined}
           aria-label={copied ? "¡Enlace copiado!" : "Compartir"}
           title={iconOnly ? (copied ? "Copiado" : "Compartir") : undefined}
@@ -448,6 +462,7 @@ export function ActionShareButton({ title, text, url, card = null, story = null,
         ref={buttonRef}
         type="button"
         onClick={handleShare}
+        {...warmProps}
         aria-haspopup={card ? "dialog" : undefined}
         // `w-auto` no se puede interpolar con CSS. Al alternar entre el modo
         // compacto y el que muestra etiqueta, Framer mide ambos tamaños y anima
