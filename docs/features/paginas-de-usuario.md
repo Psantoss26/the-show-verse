@@ -53,6 +53,7 @@ Una ficha abierta desde una página personal (Favoritas, Pendientes, Historial, 
 
 - La secuencia se toma solo de la **pantalla activa**: las pantallas anteriores siguen montadas y ocultas (`OverlayRouteHost`) y sus enlaces no cuentan. Tampoco los del panel de la ficha rápida.
 - Las páginas que pintan sus tarjetas por tandas (Favoritas, Pendientes) publican su orden completo con `useUserDetailsSequenceSource`; las listas y colecciones lo pasan directamente con `saveUserDetailsSequence`.
+- **FeaturedHero de los dashboards** (Inicio, Películas y Series): abrir un título del hero guarda el orden del hero (`openDetailModal(item, { sequence })` en `DetailModalProvider`), así que su ficha recorre los títulos destacados con las mismas flechas y el mismo gesto. En escritorio, con la vista previa, las flechas aparecen al pasar a la ficha completa. En los dashboards, abrir un título desde cualquier otra fila borra la secuencia (`clearUserDetailsSequence`) para no heredar los vecinos del hero.
 
 ## Barra inferior móvil
 
