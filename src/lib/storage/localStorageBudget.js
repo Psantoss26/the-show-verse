@@ -55,6 +55,9 @@ const PROTECTED_PREFIXES = [
   // vuelven a pedir todas. Además su fecha `t` inicial es la de la nota MÁS
   // ANTIGUA, así que el desalojo «por antigüedad» la tiraba de las primeras.
   "showverse:scores:",
+  // Fechas de visionado de Favoritos: fijan «Vista reciente/antigua» desde el
+  // primer pintado por la misma razón (ver watchHistoryCache).
+  "showverse:favorites:watch-history:",
 ];
 
 // Cachés por TÍTULO y por sección: todo esto se vuelve a pedir a la red la
