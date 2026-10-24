@@ -31,6 +31,7 @@ import {
   RotateCcw,
   Settings,
   Shield,
+  Globe2,
   SlidersHorizontal,
   User,
   Bell,
@@ -2565,6 +2566,21 @@ function ProfileSettingsClient() {
                         }
                       />
                     )}
+                    {/* Página Hoy · Comunidad: la actividad de cada cuenta sale ahí
+                        salvo que la quite. Se guarda como exclusión para que las
+                        cuentas sin la clave sigan incluidas. */}
+                    <ToggleRow
+                      icon={Globe2}
+                      title={t("settings_today_community", "Mostrar mi actividad en Hoy · Comunidad")}
+                      description={t("settings_today_community_desc", "Lo que ves, puntúas y reseñas aparece en la pestaña Comunidad de la página Hoy. Quien te sigue lo sigue viendo en Siguiendo.")}
+                      checked={preferences.uiSettings.hideFromCommunityToday !== true}
+                      disabled={saving}
+                      onChange={(value) =>
+                        updatePreference({
+                          uiSettings: { ...preferences.uiSettings, hideFromCommunityToday: !value },
+                        })
+                      }
+                    />
                     <ToggleRow
                       icon={Shield}
                       title={t("settings_sync_trakt", "Sincronizar acciones con Trakt")}

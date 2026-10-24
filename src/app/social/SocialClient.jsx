@@ -30,6 +30,7 @@ import {
   ChevronDown,
   Eye,
   Filter,
+  Flame,
   Heart,
   ImageOff,
   Layers3,
@@ -785,6 +786,13 @@ export default function SocialClient() {
               <p className="mt-2 hidden max-w-lg text-lg text-zinc-400 md:block">
                 La actividad de la gente a la que sigues, y la tuya.
               </p>
+              {/* Lo más destacado del día (historias, más activos) vive en /today. */}
+              <Link
+                href="/today"
+                className="mt-3 inline-flex h-9 items-center gap-2 rounded-full bg-gradient-to-br from-white/10 to-white/5 px-4 text-sm font-bold text-white shadow-lg backdrop-blur-lg transition-colors hover:text-pink-200"
+              >
+                <Flame className="h-4 w-4 text-pink-400" aria-hidden="true" /> Ver lo destacado de hoy
+              </Link>
             </div>
 
             <div className="grid w-full grid-cols-3 gap-2 sm:gap-3 lg:w-auto">

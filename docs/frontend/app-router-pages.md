@@ -71,6 +71,7 @@ tags: [area/frontend, type/referencia]
 |---|---|---|
 | `/u/[username]`, `/u/[username]/[section]` | `layout.jsx` + `ProfileClient.jsx`, `profileRoutes.js` | Perfil público de un miembro y sus pestañas. |
 | `/u/[username]/followers`, `/following` | `FollowListClient.jsx` | Seguidores y seguidos. |
+| `/today` | `page.jsx` (RSC) + `TodayClient.jsx` | Lo destacado de hoy, ayer o la semana: historias, destacada, más activos (siguiendo / comunidad). Ver [[hoy]]. |
 | `/social` | `SocialClient.jsx` | Feed de actividad (siguiendo / yo). |
 | `/members` | `MembersClient.jsx` | Directorio y buscador de miembros. |
 | `/detections`, `/detections/[id]` | `DetectionsClient.jsx`, `DetectionCorrectionClient.jsx` | Detecciones de streaming de la extensión y su corrección. Ver [[detecciones-streaming]]. |
@@ -94,7 +95,7 @@ Todas son *route handlers* (`route.js`) que actúan de BFF: normalizan/cachean r
 | `api/plex/**` | `auth/*` (start/callback/session/status/connection/disconnect), `library`, `sync`, `open` | Conexión y sincronización con servidores Plex del usuario. |
 | `api/spotify/**` | `login`, `callback`, `auth/status`, `auth/disconnect` | OAuth con Spotify (bandas sonoras / `HeroSoundtrackPlayer`). |
 | `api/netflix/**` | `connect`, `disconnect`, `pair-mobile`, `poll`, `import`, `simulate`, `extension-sync`, `extension-import`, `extension-progress`, `detection-rules` | Sincronización de visionado de Netflix vía extensión de navegador y notificaciones móviles (`NetflixSyncListener`); `extension-*` quedan públicas en el middleware por autenticarse con Bearer token propio. |
-| `api/users/**` | `search`, `feed`, `feed/summary`, `notifications`, `resolve-usernames`, `me/profile-favorites`, `[username]/{profile,follow,followers,following,[section]}` | Capa social: proxies de `/v1/users/*`. |
+| `api/users/**` | `search`, `feed`, `feed/summary`, `today`, `notifications`, `resolve-usernames`, `me/profile-favorites`, `[username]/{profile,follow,followers,following,[section]}` | Capa social: proxies de `/v1/users/*`. |
 | `api/community/**` | `[type]/[tmdbId]/{comments,sentiment,lists,...}`, `lists/[id]/like`, `collections/*`, `actors/*` | Comentarios, sentimiento, listas y «me gusta» de la comunidad. |
 | `api/recommendations/**` | `route`, `dismiss`, `dismiss/[mediaType]/[tmdbId]` | Baraja de `/recommendations` y descartes. |
 | `api/recap/**` | `route`, `card` | Datos del recap anual e imagen para compartir (1080×1920). |

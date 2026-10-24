@@ -8,6 +8,17 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Nueva página **Hoy** (`/today`, en el menú de perfil, el menú móvil y como opción de la barra inferior): lo más destacado de lo que han visto, puntuado y reseñado la gente que sigues o toda la comunidad, hoy, ayer o esta semana. Incluye:
+  - historias a pantalla completa por título, que avanzan solas y se recorren tocando, deslizando o con el teclado;
+  - una historia destacada, que prioriza finales y estrenos;
+  - una reseña y una nota destacadas;
+  - «Para ti», con episodios nuevos de lo que estás viendo y estrenos de Pendientes;
+  - un feed por título, por persona o por hora;
+  - el ranking de los más activos.
+
+  Las maratones cuentan como una sola acción y no aparecen fechas de importación. Social enlaza a la nueva página desde su cabecera. → [hoy](docs/features/hoy.md)
+- Ajustes: nuevo interruptor «Mostrar mi actividad en Hoy · Comunidad» (activado por defecto) para quitar tu actividad de la pestaña Comunidad de Hoy. → [hoy](docs/features/hoy.md)
+- Documentación: análisis de cómo sincroniza Trakt el progreso desde las plataformas de streaming frente a la sincronización propia, con los huecos pasados al roadmap. → [comparativa](docs/features/trakt-comparativa-sync.md)
 - Ficha de episodio: en ordenador el fondo es una sola imagen, distinta de la que se ve en grande arriba siempre que haya otra (otra imagen del episodio o, si no, un fondo de la serie). Antes era la composición de imágenes apiladas de la portada del móvil, que sigue igual en el teléfono. → [páginas](docs/frontend/app-router-pages.md)
 - Fichas de episodio y temporada: las tarjetas de Reparto, Invitados y Episodios (vista en cuadrícula) ya no marcan un borde amarillo al pasar el ratón; el efecto es el de Reparto en la ficha del título (la foto se amplía y el personaje se pone amarillo).
 - Compartir (ficha, ficha rápida, temporadas, episodios, listas, colecciones y actores): la imagen aparece bastante antes. En local, de ~1,3 a ~0,8 s en la ficha y de ~2,4 a ~1,1 s en una colección; si el ratón pasa por el botón antes del clic, unos 0,25 s. La imagen pesa de 4 a 7 veces menos (JPEG de 0,3-1 MB en vez de PNG de 3-4 MB), lo que en el móvil es lo que más tardaba. El vídeo se genera en menos de la mitad de tiempo (~2,6 s en vez de ~6 s para uno de 11 s). El aspecto no cambia. → [páginas](docs/frontend/app-router-pages.md)
