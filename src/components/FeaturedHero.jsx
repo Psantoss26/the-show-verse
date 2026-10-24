@@ -23,6 +23,7 @@ import LiquidButton from "@/components/LiquidButton";
 import HeroSoundtrackPlayer from "@/components/dashboard/HeroSoundtrackPlayer";
 import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
 import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
+import { dashboardDetailHref } from "@/lib/dashboard/detailHref";
 
 import { useAuth } from "@/context/AuthContext";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
@@ -493,13 +494,12 @@ function FeaturedSlide({
   soundtrackPreferenceReady,
   toggleSoundtrackVisible,
   staticEntrance = false,
+  onOpenDetails,
 }) {
   const { session, account, preferences } = useAuth();
   // Ajustes > Reproducción automática del soundtrack (desactivada por
   // defecto): sin ella, el soundtrack solo suena en el título donde se pulsa.
   const soundtrackAutoplay = isSoundtrackAutoplayOn(preferences);
-  const { openDetailModal } = useDetailModal();
-
   const mediaType = getMediaTypeForItem(movie);
 
   const [extras, setExtras] = useState({
@@ -1081,7 +1081,7 @@ function FeaturedSlide({
     return false;
   };
 
-  const openPreviewModal = () => openDetailModal?.(movie);
+  const openPreviewModal = () => onOpenDetails?.(movie);
 
   // Puntuación en Trakt para el <StarRating> de la fila compartida (optimista,
   // mismo patrón que la preview del dashboard).
@@ -2107,6 +2107,13 @@ export default function FeaturedHero({
     [items],
   );
 
+  // Abrir un título del hero guarda el orden del hero: en su ficha, Anterior y
+  // Siguiente (flechas en escritorio, deslizar en móvil) recorren esta sección.
+  const openHeroDetails = (item) =>
+    openDetailModal?.(item, {
+      sequence: list.map((entry) => dashboardDetailHref(entry)),
+    });
+
   useEffect(() => {
     assetsRef.current = assets;
   }, [assets]);
@@ -2493,7 +2500,7 @@ export default function FeaturedHero({
         // Si el navegador sí llega a emitir el click, handleClickCapture lo
         // cancelará al ver suppressClickRef activo, evitando doble navegación.
         suppressClickRef.current = true;
-        openDetailModal?.(activeMovie);
+        openHeroDetails(activeMovie);
       }
     }
   };
@@ -2596,6 +2603,7 @@ export default function FeaturedHero({
           soundtrackPreferenceReady={soundtrackPreferenceReady}
           toggleSoundtrackVisible={toggleSoundtrackVisible}
           staticEntrance={staticEntrance}
+          onOpenDetails={openHeroDetails}
         />
 
         {/* Flechas (solo desktop) */}

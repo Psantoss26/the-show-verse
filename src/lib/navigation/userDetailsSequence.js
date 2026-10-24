@@ -143,6 +143,20 @@ export function saveUserDetailsSequence(hrefList, selectedHrefValue) {
   return true;
 }
 
+/**
+ * Olvida la secuencia guardada. Los dashboards la borran al abrir un título
+ * desde cualquier sitio que no sea el FeaturedHero: si no, un título del hero
+ * abierto luego desde otra fila heredaba los vecinos del hero.
+ */
+export function clearUserDetailsSequence() {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Sin almacenamiento no hay nada que borrar.
+  }
+}
+
 export function getUserDetailsSequence(currentHref) {
   if (typeof window === "undefined") return null;
   const current = normalizeDetailsHref(currentHref);
