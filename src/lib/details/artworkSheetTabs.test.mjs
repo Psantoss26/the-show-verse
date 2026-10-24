@@ -66,3 +66,21 @@ test("la elegida aparece aunque el filtro de su pestaña la deje fuera", () => {
   assert.deepEqual(preview.images.map((img) => img.file_path), ["/texto.jpg", "/limpio.jpg"]);
   assert.equal(preview.count, 2);
 });
+
+test("logos: solo en español e inglés (con el elegido primero); si no hay ninguno, todos", () => {
+  const mixed = [
+    { file_path: "/ja.png", iso_639_1: "ja" },
+    { file_path: "/en.png", iso_639_1: "en" },
+    { file_path: "/fr.png", iso_639_1: "fr" },
+    { file_path: "/es.png", iso_639_1: "es" },
+    { file_path: "/neutral.png", iso_639_1: null },
+  ];
+  for (const mobile of [true, false]) {
+    const tabs = buildArtworkSheetTabs({ mobile, posters, backdrops, logos: mixed, active: { logo: "/es.png" } });
+    const logoTab = tabs.find((tab) => tab.id === "logos");
+    assert.deepEqual(logoTab.images.map((img) => img.file_path), ["/es.png", "/en.png"]);
+  }
+  const onlyOthers = [{ file_path: "/ja.png", iso_639_1: "ja" }, { file_path: "/fr.png", iso_639_1: "fr" }];
+  const tabs = buildArtworkSheetTabs({ posters, backdrops, logos: onlyOthers });
+  assert.equal(tabs.find((tab) => tab.id === "logos").count, 2);
+});
