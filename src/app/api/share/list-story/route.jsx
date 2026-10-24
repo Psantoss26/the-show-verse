@@ -4,10 +4,11 @@ import { sanitizeListShareCard, sanitizeListShareStory } from "@/lib/lists/share
 import {
   H,
   W,
-  loadAmbient,
   loadAmbientBase,
+  loadAmbientLayers,
   loadLocalAssets,
   loadShareFonts,
+  shareImageResponse,
   loadStoryPoster,
 } from "@/lib/share/ogKit";
 import {
@@ -18,12 +19,12 @@ import {
   TopScene,
   loadTmdbImages,
 } from "@/lib/share/listScenes";
-import { StoryBackdrop, StoryHeader } from "@/lib/share/storyScenes";
+import { STORY_BASE_TONE, STORY_POSTER_TONE, StoryBackdrop, StoryHeader } from "@/lib/share/storyScenes";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Capas del VÍDEO compartible de una lista o una colección (1080×1920, PNG).
+// Capas del VÍDEO compartible de una lista o una colección (1080×1920: PNG transparentes; el fondo, JPEG).
 // Mismo reparto que /api/share/details-story: el navegador compone y codifica
 // (lib/share/storyVideo) y aquí se pinta cada pieza en su petición:
 //   - "backdrop": la portada de la lista apenas difuminada;
@@ -47,9 +48,13 @@ function backdropPath(card, story) {
 async function renderLayer(scene, card, story) {
   if (scene === "backdrop") {
     const path = backdropPath(card, story);
-    const [poster, ambientBase] = await Promise.all([loadStoryPoster(path), loadAmbientBase(path)]);
-    const ambient = poster ? null : await loadAmbient(path);
-    return { element: <StoryBackdrop poster={poster} ambient={ambient} ambientBase={ambientBase} />, fonts: null };
+    const [poster, ambientBase] = await Promise.all([
+      loadStoryPoster(path, STORY_POSTER_TONE),
+      loadAmbientBase(path, STORY_BASE_TONE),
+    ]);
+    if (poster) return { element: <StoryBackdrop poster={poster} ambientBase={ambientBase} />, fonts: null };
+    const [ambient, ambientFallback] = await loadAmbientLayers(path);
+    return { element: <StoryBackdrop poster={null} ambient={ambient} ambientBase={ambientFallback} />, fonts: null };
   }
 
   const [fonts, assets] = await Promise.all([loadShareFonts(), loadLocalAssets()]);
@@ -100,13 +105,20 @@ export async function POST(request) {
 
   const card = sanitizeListShareCard(body?.card);
   const story = sanitizeListShareStory(body?.story);
-  const layer = await renderLayer(scene, card, story);
-  if (!layer) return new Response("Nothing to render", { status: 422 });
-
-  return new ImageResponse(layer.element, {
-    width: W,
-    height: H,
-    ...(layer.fonts ? { fonts: layer.fonts } : {}),
-    headers: { "Cache-Control": "private, no-store" },
-  });
+  // El fondo es opaco y sale en JPEG; las demás capas son transparentes y
+  // siguen en PNG. Guardadas por el cuerpo validado (ver `shareImageResponse`).
+  const response = await shareImageResponse(
+    `list-story|${scene}|${JSON.stringify([card, story])}`,
+    async () => {
+      const layer = await renderLayer(scene, card, story);
+      if (!layer) return null;
+      return new ImageResponse(layer.element, {
+        width: W,
+        height: H,
+        ...(layer.fonts ? { fonts: layer.fonts } : {}),
+      });
+    },
+    { jpeg: scene === "backdrop" },
+  );
+  return response || new Response("Nothing to render", { status: 422 });
 }

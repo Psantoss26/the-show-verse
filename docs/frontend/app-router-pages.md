@@ -98,7 +98,7 @@ Todas son *route handlers* (`route.js`) que actúan de BFF: normalizan/cachean r
 | `api/community/**` | `[type]/[tmdbId]/{comments,sentiment,lists,...}`, `lists/[id]/like`, `collections/*`, `actors/*` | Comentarios, sentimiento, listas y «me gusta» de la comunidad. |
 | `api/recommendations/**` | `route`, `dismiss`, `dismiss/[mediaType]/[tmdbId]` | Baraja de `/recommendations` y descartes. |
 | `api/recap/**` | `route`, `card` | Datos del recap anual e imagen para compartir (1080×1920). |
-| `api/share/**` | `details-card`, `details-story`, `list-card`, `list-story` | Imágenes para compartir una ficha o una lista (tarjeta y story). |
+| `api/share/**` | `details-card`, `details-story`, `list-card`, `list-story` | Imágenes para compartir una ficha o una lista (tarjeta y story). Las opacas salen en JPEG y las capas transparentes del vídeo en PNG; guardan en memoria las imágenes generadas (10 min) y las de TMDb ya reducidas y filtradas (30 min). Ver `src/lib/share/ogKit.jsx`. |
 | `api/push/**` | `config`, `subscriptions`, `test` | Notificaciones push (ver [[push-notifications]]). |
 | `api/progress` | — | «Continuar viendo» (proxy de `/v1/progress`). |
 | `api/letterboxd/**` | `connection`, `sync`, `extension-sync`, `import` | Conexión, sincronización por RSS e importación de Letterboxd. |
