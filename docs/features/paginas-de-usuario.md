@@ -46,6 +46,7 @@ En *Ajustes* (`DetailOpenSettings`) se elige:
 - **Al seleccionar un título:** ficha rápida (panel) o ficha completa.
 - **Posición:** centrada o lateral; en lateral, superpuesta o acoplada.
 - **Contenido del panel:** la ficha o la **vista teléfono**, que incrusta la ficha móvil servida por `/embed/details/[...segments]` (con el estado de favorito/pendiente/nota adelantado en la URL, `src/lib/navigation/embeddedDetails.js`).
+- **Tamaño del panel lateral:** solo la ficha ancha se redimensiona arrastrando su borde izquierdo (el ancho se guarda en `showverse:detailModalWidth`). La vista teléfono no tiene tirador: va pegada a los bordes superior e inferior y su ancho sale de la proporción de teléfono (9:19,5) sobre el alto de la ventana, acotado por `clampMobileDetailsWidth` (`src/lib/ui/detailModalSizing.js`). Igual en el panel de temporada y episodio (`SubrouteDetailsPanel`).
 
 ### Anterior y siguiente en la ficha
 

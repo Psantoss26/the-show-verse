@@ -38,10 +38,13 @@ const OPENING_CLICK_GRACE_MS = 350;
 const CONTROL_CLASS = `group flex h-10 w-10 shrink-0 select-none items-center justify-center rounded-full transition-all duration-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${DETAIL_MODAL_GLASS_CONTROL}`;
 const CONTROL_ICON_CLASS = "h-5 w-5 transition-transform duration-300 group-hover:scale-110 motion-reduce:transition-none";
 
+// La vista teléfono no se redimensiona (como en DetailModal): alto de la
+// ventana y ancho por la proporción de teléfono.
 function preferredWidth(phone) {
-  let width = phone ? window.innerHeight * MOBILE_DETAILS_ASPECT_RATIO : Math.min(Math.round(window.innerWidth * 0.95), 1080);
+  if (phone) return window.innerHeight * MOBILE_DETAILS_ASPECT_RATIO;
+  let width = Math.min(Math.round(window.innerWidth * 0.95), 1080);
   try {
-    const stored = Number(window.localStorage.getItem(phone ? "showverse:mobileDetailsWidth" : "showverse:detailModalWidth"));
+    const stored = Number(window.localStorage.getItem("showverse:detailModalWidth"));
     if (stored > 0) width = stored;
   } catch {
     // El panel funciona también sin almacenamiento.
@@ -334,7 +337,7 @@ export default function SubrouteDetailsPanel({ item, placement, contentView, dra
       writeWidth(panelWidthRef.current);
       setPanelWidth(panelWidthRef.current);
       try {
-        window.localStorage.setItem(phone ? "showverse:mobileDetailsWidth" : "showverse:detailModalWidth", String(panelWidthRef.current));
+        window.localStorage.setItem("showverse:detailModalWidth", String(panelWidthRef.current));
       } catch {
         // localStorage no disponible
       }
@@ -364,7 +367,7 @@ export default function SubrouteDetailsPanel({ item, placement, contentView, dra
     panelWidthRef.current = next;
     setPanelWidth(next);
     try {
-      window.localStorage.setItem(phone ? "showverse:mobileDetailsWidth" : "showverse:detailModalWidth", String(next));
+      window.localStorage.setItem("showverse:detailModalWidth", String(next));
     } catch {
       // localStorage no disponible
     }
@@ -460,19 +463,16 @@ export default function SubrouteDetailsPanel({ item, placement, contentView, dra
         style={{
           willChange: panelSettled ? "auto" : "transform",
           ...(right ? { width: panelWidthMotion } : null),
-          ...(phone ? { aspectRatio: MOBILE_DETAILS_ASPECT_RATIO } : null),
         }}
         className={`sv-drawer-panel relative z-10 flex flex-col overflow-hidden ${LIQUID_GLASS_DETAIL_SURFACE} ${
           right
-            ? phone
-              ? "h-auto max-h-full min-h-0 self-center rounded-l-2xl pointer-events-auto"
-              : "h-full rounded-l-2xl pointer-events-auto"
+            ? "h-full rounded-l-2xl pointer-events-auto"
             : "mt-[4vh] h-[96vh] w-[95vw] max-w-[1080px] rounded-t-2xl"
         }`}
       >
         {right && <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 backdrop-blur-md" />}
 
-        {right && (
+        {right && !phone && (
           <div
             onPointerDown={beginResize}
             onKeyDown={resizeWithKeyboard}
