@@ -775,54 +775,61 @@ function CreateListModal({ open, onClose, onCreate, creating, error }) {
   return (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/60 backdrop-blur-lg"
         onClick={onClose}
       />
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="relative bg-black/80 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl border border-white/10 rounded-[2rem] w-full max-w-md shadow-2xl overflow-hidden"
+        // Liquid glass algo más contenido que el de los modales de la ficha
+        // (LIQUID_GLASS_PANEL: 16px y saturación 140%), con dos reflejos
+        // morados muy tenues. Sobre un fondo casi negro el cristal no tiene
+        // qué refractar: lo que despega el panel sin trazar un borde es la luz
+        // del propio vidrio y el halo morado difuso de la sombra. Sin reflejo
+        // interior (`inset 0 1px`): dibujaba una línea en el canto superior.
+        className="relative w-full max-w-md overflow-hidden rounded-[2rem] bg-black/[0.32] bg-[linear-gradient(135deg,rgba(255,255,255,0.09)_0%,rgba(255,255,255,0.02)_45%,rgba(0,0,0,0.12)_100%),radial-gradient(120%_70%_at_15%_0%,rgba(168,85,247,0.16),transparent_60%),radial-gradient(90%_60%_at_100%_100%,rgba(139,92,246,0.10),transparent_65%)] backdrop-blur-[12px] backdrop-saturate-[130%] shadow-[0_24px_60px_-16px_rgba(0,0,0,0.85),0_0_44px_-10px_rgba(168,85,247,0.28)]"
       >
-        <div className="p-5 border-b border-white/10 flex justify-between items-center bg-white/5">
-          <h3 className="text-lg font-bold text-white">Nueva Lista</h3>
+        <div className="flex items-center justify-between px-6 pt-6">
+          <h3 className="text-xl font-bold text-white">Nueva lista</h3>
           <button
             onClick={onClose}
-            className="p-2 rounded-full hover:bg-white/5 transition"
+            aria-label="Cerrar"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/[0.06] text-zinc-400 transition hover:bg-white/10 hover:text-white"
           >
-            <X className="w-5 h-5 text-zinc-400" />
+            <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="p-6 space-y-4">
+        <div className="space-y-5 px-6 pb-6 pt-5">
           <div>
-            <label className="block text-xs font-bold text-zinc-500 uppercase mb-2">
+            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-zinc-400">
               Nombre
             </label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500 outline-none transition focus:ring-1 focus:ring-purple-500/50"
+              className="w-full rounded-xl bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 outline-none transition hover:bg-white/[0.08] focus:bg-white/[0.09] focus:ring-2 focus:ring-purple-500/40"
               placeholder="Mi lista de favoritos..."
               autoFocus
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-zinc-500 uppercase mb-2">
+            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-zinc-400">
               Descripción (opcional)
             </label>
             <textarea
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
-              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-purple-500 outline-none transition resize-none h-24 focus:ring-1 focus:ring-purple-500/50"
+              className="w-full rounded-xl bg-white/[0.06] px-4 py-3 text-sm text-white placeholder-zinc-500 outline-none transition hover:bg-white/[0.08] focus:bg-white/[0.09] focus:ring-2 focus:ring-purple-500/40 h-24 resize-none"
               placeholder="De qué trata esta lista..."
             />
           </div>
           {error && <p className="text-red-400 text-xs">{error}</p>}
 
-          <div className="flex gap-3 pt-2">
+          <div className="flex gap-3 pt-1">
             <button
               onClick={onClose}
-              className="flex-1 py-3 rounded-xl font-bold text-sm bg-white/5 text-zinc-300 hover:bg-white/10 transition focus:outline-none border border-white/10"
+              className="flex-1 rounded-xl bg-white/[0.06] py-3 text-sm font-bold text-zinc-300 transition hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
             >
               Cancelar
             </button>
@@ -833,7 +840,7 @@ function CreateListModal({ open, onClose, onCreate, creating, error }) {
                 setDesc("");
               }}
               disabled={creating || !name.trim()}
-              className="flex-1 py-3 rounded-xl font-bold text-sm bg-gradient-to-br from-purple-500 to-purple-600 text-white hover:from-purple-400 hover:to-purple-500 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 focus:outline-none shadow-lg shadow-purple-500/20"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 py-3 text-sm font-bold text-white shadow-lg shadow-purple-500/25 transition hover:from-purple-400 hover:to-purple-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300/60 disabled:cursor-not-allowed disabled:from-white/[0.06] disabled:to-white/[0.06] disabled:text-zinc-500 disabled:shadow-none"
             >
               {creating && <Loader2 className="w-4 h-4 animate-spin" />} Crear
             </button>

@@ -3208,6 +3208,8 @@ html[data-details-sequence-touch] [data-details-sequence-snapshot] * {
   backdrop-filter: none !important;
 }
 [data-details-sequence-snapshot] *,
+[data-subroute-snapshot],
+[data-subroute-snapshot] *,
 html[data-details-sequence-transition] [data-details-root] .sv-details-entry,
 [data-details-sequence-entered] .sv-details-entry {
   animation: none !important;
