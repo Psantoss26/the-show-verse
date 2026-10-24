@@ -55,3 +55,16 @@ test("artículo de Wikipedia: en español y, si no, en inglés", () => {
   assert.equal(pickWikipediaUrl({ sitelinks: { enwiki: { url: "https://en.wikipedia.org/wiki/X" } } }), "https://en.wikipedia.org/wiki/X");
   assert.equal(pickWikipediaUrl({}), null);
 });
+
+test("la ficha de título y DetailModal no repiten IMDb, TMDb ni Trakt en los enlaces externos", async () => {
+  const { readFile } = await import("node:fs/promises");
+  // Ya enlazan desde sus puntuaciones del marcador: en el modal de enlaces
+  // solo sumarían ruido. Sin `tmdbId`/`imdbId`, `withTitleExternalLinks` no
+  // los añade.
+  for (const file of ["../../components/DetailsClient.jsx", "../../components/dashboard/DetailModal.jsx"]) {
+    const source = await readFile(new URL(file, import.meta.url), "utf8");
+    const call = source.match(/withTitleExternalLinks\((?:items|links), \{[\s\S]*?\}\)/)?.[0];
+    assert.ok(call, `sin llamada a withTitleExternalLinks en ${file}`);
+    assert.doesNotMatch(call, /tmdbId|imdbId/);
+  }
+});

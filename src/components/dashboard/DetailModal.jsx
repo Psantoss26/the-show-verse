@@ -2815,20 +2815,16 @@ export default function DetailModal({
       });
     }
 
-    // Instagram, IMDb, TMDb y Trakt como en la ficha completa. En la preview
-    // de un episodio no: sus ids serían los del episodio, no los del título.
+    // Instagram como en la ficha completa. IMDb, TMDb y Trakt no: ya enlazan
+    // desde sus puntuaciones del marcador. En la preview de un episodio
+    // tampoco Instagram: sus ids serían los del episodio, no los del título.
     if (isEpisode) return links;
     return withTitleExternalLinks(links, {
       instagramId: titleExternalIds.instagramId,
-      type: mediaType,
-      tmdbId: item?.id,
-      imdbId: data.imdbId || titleExternalIds.imdbId,
     });
   }, [
     isEpisode,
     titleExternalIds,
-    item?.id,
-    data.imdbId,
     filmAffinitySearchUrl,
     isMovie,
     justWatchFallbackUrl,
