@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Favoritos: con el orden «Vista reciente» o «Vista antigua» los títulos aparecen ya en su orden al entrar (también al volver atrás), sin pintarse primero en otro y recolocarse con la animación. Las fechas de visionado se guardan en el navegador y, la primera vez, la lista espera al historial antes de pintarse. El resto de órdenes no cambia; Pendientes no tiene estos dos órdenes. → [caché](docs/guides/estrategia-cache.md)
 - Nueva página **Hoy** (`/today`, en el menú de perfil, el menú móvil y como opción de la barra inferior): lo más destacado de lo que han visto, puntuado y reseñado la gente que sigues o toda la comunidad, hoy, ayer o esta semana. Incluye:
   - historias a pantalla completa por título, que avanzan solas y se recorren tocando, deslizando o con el teclado;
   - una historia destacada, que prioriza finales y estrenos;

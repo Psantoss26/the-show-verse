@@ -61,6 +61,13 @@ import {
 } from "@/lib/ui/entranceFill";
 import { LIST_CHANGED_EVENT } from "@/lib/userLists/optimisticListCache";
 import { readCachedUserId } from "@/lib/auth/currentUser";
+import {
+  buildWatchHistoryMaps,
+  readWatchHistoryCache,
+  shouldWaitForWatchHistory,
+  sortByWatchDate,
+  writeWatchHistoryCache,
+} from "@/lib/userLists/watchHistoryCache";
 import { setLocalStorageItem } from "@/lib/storage/localStorageBudget";
 import {
   mergePendingTmdbListItems,
@@ -2032,6 +2039,7 @@ export default function FavoritesClient() {
   const [initialCache] = useState(() => ({
     favorites: readFavoritesCache(),
     providers: readProvidersCache(),
+    watchHistory: readWatchHistoryCache({ owner: readCachedUserId() }),
   }));
   const { hasBackNavigationSnapshot, shouldRestoreSnapshot } =
     resolveUserListInitialSnapshot(initialCache.favorites, isBackNav);
@@ -2086,8 +2094,14 @@ export default function FavoritesClient() {
   );
 
   // El historial alimenta tanto la ordenación como el indicador de visionado.
-  const [watchDates, setWatchDates] = useStableState(new Map());
-  const [watchCounts, setWatchCounts] = useStableState(new Map());
+  // Arranca de la copia local (ver watchHistoryCache) para que «Vista reciente»
+  // y «Vista antigua» entren ya ordenadas, como las notas IMDb.
+  const [watchDates, setWatchDates] = useStableState(
+    () => initialCache.watchHistory?.watchDates ?? new Map(),
+  );
+  const [watchCounts, setWatchCounts] = useStableState(
+    () => initialCache.watchHistory?.watchCounts ?? new Map(),
+  );
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
 
@@ -2629,8 +2643,10 @@ export default function FavoritesClient() {
   }, [items, needsTraktScores, freezeOrder]);
 
   // Cargar el historial una vez para mantener sincronizados ordenación e indicador.
+  // Se pide a la vez que la lista (no al llegar esta): sin copia local, el orden
+  // por visionado espera a esta respuesta para pintar.
   useEffect(() => {
-    if (items.length === 0) return;
+    if (!session || !account?.id) return;
     if (loadingHistory || historyLoaded) return;
 
     const loadWatchHistory = async () => {
@@ -2648,34 +2664,19 @@ export default function FavoritesClient() {
         }
 
         const data = await response.json();
-        if (!data.connected || !Array.isArray(data.items)) {
-          setLoadingHistory(false);
-          return;
-        }
+        // Sin Trakt conectado el historial está vacío: también se guarda, para
+        // no esperarlo en la próxima visita.
+        const history = buildWatchHistoryMaps(
+          data.connected && Array.isArray(data.items) ? data.items : [],
+        );
+        writeWatchHistoryCache(history, { owner: readCachedUserId() });
 
-        // Guardamos tanto la última fecha como el total de visionados.
-        const watchMap = new Map();
-        const countMap = new Map();
-
-        for (const entry of data.items) {
-          const key = `${entry.type}:${entry.tmdbId}`;
-          const watched_at = entry.watched_at;
-
-          if (!watched_at) continue;
-
-          countMap.set(key, (countMap.get(key) || 0) + 1);
-
-          // Keep the most recent watch date for each item
-          if (
-            !watchMap.has(key) ||
-            new Date(watched_at) > new Date(watchMap.get(key))
-          ) {
-            watchMap.set(key, watched_at);
-          }
-        }
-
-        setWatchDates(watchMap);
-        setWatchCounts(countMap);
+        // Al volver (atrás) con el orden congelado y la copia ya aplicada, la
+        // respuesta solo actualiza la caché: no se reordena lo que el usuario
+        // dejó. Sin copia, el orden aún no existe y se aplica.
+        if (freezeOrder && initialCache.watchHistory) return;
+        setWatchDates(history.watchDates);
+        setWatchCounts(history.watchCounts);
       } catch (error) {
         console.error("Error loading watch history:", error);
       } finally {
@@ -2685,7 +2686,18 @@ export default function FavoritesClient() {
     };
 
     loadWatchHistory();
-  }, [historyLoaded, items, loadingHistory]);
+    // freezeOrder/initialCache: se leen al pedir; cambiar de orden no repite la carga.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyLoaded, session, account?.id, loadingHistory]);
+
+  // Ordenar por visionado sin fechas pintaría la lista en orden de «Añadido» y
+  // la recolocaría al llegar el historial: sin copia local, se espera a él.
+  const waitingForWatchHistory = shouldWaitForWatchHistory({
+    sortBy,
+    hasCachedHistory: Boolean(initialCache.watchHistory),
+    historyLoaded,
+  });
+  const listLoading = loading || waitingForWatchHistory;
 
   // Filter and sort. También por el nombre en inglés y en español (llegan al escribir).
   const titleNamesVersion = useTitleNameSearch(items, q);
@@ -2739,46 +2751,10 @@ export default function FavoritesClient() {
       return arr.sort((a, b) => (b._addedIndex || 0) - (a._addedIndex || 0));
     }
     if (sortBy === "watched-desc") {
-      // Most recently watched first
-      return arr.sort((a, b) => {
-        const typeA = a.media_type || (a.title ? "movie" : "tv");
-        const typeB = b.media_type || (b.title ? "movie" : "tv");
-        // Normalize: Trakt uses "show" but TMDb uses "tv"
-        const normalizedTypeA = typeA === "tv" ? "show" : typeA;
-        const normalizedTypeB = typeB === "tv" ? "show" : typeB;
-        const keyA = `${normalizedTypeA}:${a.id}`;
-        const keyB = `${normalizedTypeB}:${b.id}`;
-        const dateA = watchDates.get(keyA);
-        const dateB = watchDates.get(keyB);
-
-        // Items without watch date go to the end
-        if (!dateA && !dateB) return 0;
-        if (!dateA) return 1;
-        if (!dateB) return -1;
-
-        return new Date(dateB) - new Date(dateA);
-      });
+      return sortByWatchDate(arr, watchDates, "desc");
     }
     if (sortBy === "watched-asc") {
-      // Oldest watched first
-      return arr.sort((a, b) => {
-        const typeA = a.media_type || (a.title ? "movie" : "tv");
-        const typeB = b.media_type || (b.title ? "movie" : "tv");
-        // Normalize: Trakt uses "show" but TMDb uses "tv"
-        const normalizedTypeA = typeA === "tv" ? "show" : typeA;
-        const normalizedTypeB = typeB === "tv" ? "show" : typeB;
-        const keyA = `${normalizedTypeA}:${a.id}`;
-        const keyB = `${normalizedTypeB}:${b.id}`;
-        const dateA = watchDates.get(keyA);
-        const dateB = watchDates.get(keyB);
-
-        // Items without watch date go to the end
-        if (!dateA && !dateB) return 0;
-        if (!dateA) return 1;
-        if (!dateB) return -1;
-
-        return new Date(dateA) - new Date(dateB);
-      });
+      return sortByWatchDate(arr, watchDates, "asc");
     }
     return arr;
   }, [
@@ -3028,13 +3004,13 @@ export default function FavoritesClient() {
   // shows the first cards animating in, exactly like History / In-Progress.
   const [canExpandRender, setCanExpandRender] = useState(false);
   useEffect(() => {
-    if (loading) {
+    if (listLoading) {
       setCanExpandRender(false);
       return;
     }
     const t = window.setTimeout(() => setCanExpandRender(true), 450);
     return () => window.clearTimeout(t);
-  }, [loading]);
+  }, [listLoading]);
 
   // Grow the render window up to the full list during idle time, so the rest of
   // the cards appear shortly after the (cheap, fast) first paint.
@@ -3949,7 +3925,7 @@ export default function FavoritesClient() {
         {/* Scores load silently in background - no loading indicator */}
 
         {/* Content */}
-        {loading ? null : sorted.length === 0 ? (
+        {listLoading ? null : sorted.length === 0 ? (
           <motion.div
             className="py-24 text-center border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/20"
             initial={{ opacity: 0, scale: 0.95 }}
