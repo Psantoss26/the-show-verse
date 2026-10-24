@@ -2214,7 +2214,7 @@ export default function SeasonDetailsClient({
                         onMouseEnter={() => prefetchEpisodeDetails(epNum)}
                         onFocus={() => prefetchEpisodeDetails(epNum)}
                         onTouchStart={() => prefetchEpisodeDetails(epNum)}
-                        className="block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md lg:hover:shadow-yellow-900/20 transition-all duration-300 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]"
+                        className="block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md lg:hover:shadow-yellow-900/20 transition-all duration-300"
                         title={epTitle}
                       >
                         <div className="relative aspect-video overflow-hidden">

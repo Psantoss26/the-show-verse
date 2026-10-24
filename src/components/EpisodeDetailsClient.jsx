@@ -312,6 +312,9 @@ export default function EpisodeDetailsClient({
   // Portada móvil: imágenes del episodio a apilar (resueltas en el servidor,
   // lib/details/episodeHeroStills).
   heroStillPaths = [],
+  // Fondo de escritorio: una imagen distinta de la del hero si la hay
+  // (pickEpisodeBackdrop, en el servidor).
+  backdropPath = null,
 }) {
   const router = useRouter();
   const traktRequestIdRef = useRef(0);
@@ -404,6 +407,10 @@ export default function EpisodeDetailsClient({
   // una sola imagen ampliada. Tiene su propio estado de carga porque se pinta
   // en una capa distinta a la portada fija.
   const pageBackgroundStackLoad = useEpisodeStillStackLoad(mobileStillPaths);
+  const desktopBackgroundPath = backdropPath || stillPath;
+  const desktopBackgroundStyle = desktopBackgroundPath
+    ? { backgroundImage: `url(https://image.tmdb.org/t/p/original${desktopBackgroundPath})` }
+    : null;
   const mobileCoverReady = mobileStillStackLoad.ready;
   useEffect(() => {
     if (mobileCoverReady) sendEmbeddedDetailsAction("hero-ready");
@@ -1574,17 +1581,40 @@ export default function EpisodeDetailsClient({
     >
       {/* Background */}
       <div className="fixed inset-0 z-0 overflow-hidden bg-[#0a0a0a] pointer-events-none">
-        {/* Fondo de página: reutiliza las mismas imágenes compuestas de la
-            portada, ampliadas para cubrir los bordes. En móvil aparece con el
-            scroll detrás de la portada fija. */}
+        {/* Fondo de página.
+            ESCRITORIO: UNA sola imagen, como el fondo de las temporadas (capa
+            base atenuada + capa nítida anclada arriba). Es otra imagen del
+            episodio o de la serie, no la del hero, que ya se ve enmarcada:
+            con la misma escena detrás se repetía. Los fondos CSS de un
+            elemento oculto no se descargan, así que el teléfono no la pide.
+            MÓVIL: las mismas imágenes compuestas de la portada, ampliadas para
+            cubrir los bordes; aparece con el scroll detrás de la portada fija. */}
         <div className="sv-hero-scroll-in absolute inset-0 max-sm:[opacity:var(--sv-hero-scroll,0)] sm:opacity-100">
-          {pageBackgroundStackLoad.sources.length > 0 ? (
-            <div className="absolute -inset-[4%] scale-[1.08] blur-[3px] brightness-[0.62] saturate-[1.03]">
-              <EpisodeStillStack load={pageBackgroundStackLoad} />
-            </div>
-          ) : (
-            <div className="absolute inset-0 bg-[#0a0a0a]" />
-          )}
+          <div className="absolute inset-0 max-sm:hidden">
+            {desktopBackgroundStyle ? (
+              <>
+                <div
+                  className="absolute inset-0 bg-cover bg-center"
+                  style={{ ...desktopBackgroundStyle, filter: "brightness(0.75) saturate(1.03)" }}
+                />
+                <div
+                  className="absolute inset-0 bg-cover"
+                  style={{ ...desktopBackgroundStyle, backgroundPosition: "center top" }}
+                />
+              </>
+            ) : (
+              <div className="absolute inset-0 bg-[#0a0a0a]" />
+            )}
+          </div>
+          <div className="absolute inset-0 sm:hidden">
+            {pageBackgroundStackLoad.sources.length > 0 ? (
+              <div className="absolute -inset-[4%] scale-[1.08] blur-[3px] brightness-[0.62] saturate-[1.03]">
+                <EpisodeStillStack load={pageBackgroundStackLoad} />
+              </div>
+            ) : (
+              <div className="absolute inset-0 bg-[#0a0a0a]" />
+            )}
+          </div>
         </div>
 
         <MobileHeroCover
@@ -2091,7 +2121,7 @@ export default function EpisodeDetailsClient({
                   <SwiperSlide key={actor.id}>
                     <Link
                       href={`/details/person/${actor.id}`}
-                      className="block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md lg:hover:shadow-yellow-900/20 transition-all duration-300 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]"
+                      className="block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md lg:hover:shadow-yellow-900/20 transition-all duration-300"
                     >
                       <div className="aspect-[2/3] overflow-hidden relative">
                         {actor.profile_path ? (
@@ -2145,7 +2175,7 @@ export default function EpisodeDetailsClient({
                   <SwiperSlide key={actor.id}>
                     <Link
                       href={`/details/person/${actor.id}`}
-                      className="block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md lg:hover:shadow-yellow-900/20 transition-all duration-300 after:pointer-events-none after:absolute after:inset-0 after:z-30 after:rounded-[inherit] after:content-[''] after:transition-shadow after:duration-300 hover:after:shadow-[inset_0_0_0_2.5px_rgba(234,179,8,0.95)]"
+                      className="block group relative bg-zinc-900 rounded-xl overflow-hidden shadow-md lg:hover:shadow-yellow-900/20 transition-all duration-300"
                     >
                       <div className="aspect-[2/3] overflow-hidden relative">
                         {actor.profile_path ? (
