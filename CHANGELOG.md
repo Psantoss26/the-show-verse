@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Fichas de temporada y episodio en móvil: deslizar a la anterior o la siguiente ya no parpadea. La copia de la ficha que se queda a la vista repetía sus animaciones de entrada (se apagaba y los botones volvían a aparecer uno a uno), tapaba la barra inferior y, al fundirse, los botones de la ficha nueva volvían a entrar; ahora la copia queda quieta, la barra sigue visible y la ficha nueva aparece ya completa. → [páginas](docs/frontend/app-router-pages.md)
 - Ficha: Anterior/Siguiente ya no deja la pantalla en negro ni hace la transición a medias después de haber pasado por otra ficha. La copia de la ficha que sale se tomaba de una ficha oculta de la pila de pantallas; ahora se toma la visible, que se va con su animación mientras el fondo se queda hasta que entra la nueva. → [páginas de usuario](docs/features/paginas-de-usuario.md)
 - Fichas de temporada y episodio: al ir a la anterior o la siguiente (flechas o deslizar en móvil) la pantalla ya no se apaga. La ficha actual sigue a la vista mientras carga la nueva y se funde con ella al llegar. La anterior y la siguiente se precargan en segundo plano, así que el cambio llega en ~0,3 s desde el clic. → [páginas](docs/frontend/app-router-pages.md)
 - Ficha de temporada: «Ver tráiler» aparece directamente en su estado final. Antes salía activo con un spinner mientras se buscaban los vídeos y se apagaba si la temporada no tenía; ahora los vídeos llegan con la página. → [páginas](docs/frontend/app-router-pages.md)
