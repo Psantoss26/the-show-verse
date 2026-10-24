@@ -36,6 +36,7 @@ import {
 import { getLevelSummaries } from '../level/store.js';
 import { getUserNotifications } from '../lib/notifications.js';
 import { getUserNeuralGraph } from '../lib/neuralGraph.js';
+import { getTodayActivity, invalidateTodayFollowing } from '../lib/todayActivity.js';
 import { loadUserExport } from '../lib/userExport.js';
 import { parseExportSections } from '../lib/userExportCore.js';
 
@@ -221,6 +222,25 @@ export default async function usersRoutes(fastify) {
   fastify.get('/feed/summary', async (req, reply) => {
     const summary = await getSocialSummary(db, req.user.id);
     return reply.send({ summary });
+  });
+
+  // GET /users/today?scope=following|community&day=today|yesterday|week|YYYY-MM-DD
+  //
+  // Página Hoy: vistos, notas y reseñas de la ventana elegida, de las cuentas
+  // que sigo o de toda la comunidad, más los recuentos de cada pestaña de día.
+  // Los días se cortan en la zona horaria del usuario.
+  fastify.get('/today', async (req, reply) => {
+    const [row] = await db
+      .select({ timezone: users.timezone })
+      .from(users)
+      .where(eq(users.id, req.user.id))
+      .limit(1);
+    const today = await getTodayActivity(db, { id: req.user.id, timezone: row?.timezone }, {
+      scope: req.query?.scope,
+      day: req.query?.day,
+    });
+    if (!today) return reply.status(400).send({ error: 'Día no válido' });
+    return reply.send(today);
   });
 
   // GET /users/notifications — sección de alertas del navbar: actividad propia
@@ -416,6 +436,7 @@ export default async function usersRoutes(fastify) {
       .insert(follows)
       .values({ followerId: req.user.id, followingId: target.id })
       .onConflictDoNothing();
+    await invalidateTodayFollowing(req.user.id);
     return reply.send({ following: true });
   });
 
@@ -426,6 +447,7 @@ export default async function usersRoutes(fastify) {
     await db
       .delete(follows)
       .where(and(eq(follows.followerId, req.user.id), eq(follows.followingId, target.id)));
+    await invalidateTodayFollowing(req.user.id);
     return reply.send({ following: false });
   });
 

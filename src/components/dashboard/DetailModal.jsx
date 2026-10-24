@@ -296,18 +296,12 @@ function initialDrawerWidth() {
 }
 
 // Ancho PREFERIDO del panel, antes de acotarlo a la ventana. La ficha de
-// teléfono tiene su propio ancho guardado y su propia proporción: partir del
-// ancho del modal ancho la hacía nacer mucho más grande y encoger después.
+// teléfono NO se redimensiona: ocupa el alto entero de la ventana y su ancho
+// sale de la proporción de teléfono sobre ese alto. Solo el modal ancho guarda
+// el ancho que deja el tirador.
 function preferredPanelWidth(mobileDetails) {
   if (!mobileDetails) return initialDrawerWidth();
-  let width = window.innerHeight * MOBILE_DETAILS_ASPECT_RATIO;
-  try {
-    const stored = Number(window.localStorage.getItem("showverse:mobileDetailsWidth"));
-    if (stored > 0) width = stored;
-  } catch {
-    // El panel funciona también sin almacenamiento.
-  }
-  return width;
+  return window.innerHeight * MOBILE_DETAILS_ASPECT_RATIO;
 }
 
 /* ============================== SUBCOMPONENTES ============================== */
@@ -912,15 +906,13 @@ export default function DetailModal({
   // la altura del panel entero: a los 300px la portada apenas ha empezado a
   // irse y el logo ya había desaparecido.
   //
-  // En el teléfono el recorrido se ata al alto del panel, que su proporción
-  // deja en `ancho / (9/19.5)`. Empieza a desvanecerse pasada la mitad y
+  // En el teléfono el recorrido se ata al alto del panel, que va pegado arriba
+  // y abajo: el de la ventana. Empieza a desvanecerse pasada la mitad y
   // termina justo cuando el logo sale por arriba, en vez de mucho antes.
-  // Con el ancho mínimo en pantallas bajas el panel se para en el alto de la
-  // ventana (`max-h-full`), así que el recorrido usa el alto REAL.
-  const phonePanelHeight = Math.min(
-    panelWidth / MOBILE_DETAILS_ASPECT_RATIO,
-    typeof window !== "undefined" ? window.innerHeight : Infinity,
-  );
+  const phonePanelHeight =
+    typeof window !== "undefined"
+      ? window.innerHeight
+      : panelWidth / MOBILE_DETAILS_ASPECT_RATIO;
   const logoFadeFrom = mobileDetails ? Math.round(phonePanelHeight * 0.4) : 0;
   const logoFadeTo = mobileDetails ? Math.round(phonePanelHeight * 0.75) : 300;
 
@@ -1243,7 +1235,7 @@ export default function DetailModal({
       writeWidth(panelWidthRef.current);
       setPanelWidth(panelWidthRef.current);
       try {
-        window.localStorage.setItem(mobileDetails ? "showverse:mobileDetailsWidth" : RESIZE_STORAGE_KEY, String(panelWidthRef.current));
+        window.localStorage.setItem(RESIZE_STORAGE_KEY, String(panelWidthRef.current));
       } catch {
         // localStorage no disponible
       }
@@ -2823,20 +2815,16 @@ export default function DetailModal({
       });
     }
 
-    // Instagram, IMDb, TMDb y Trakt como en la ficha completa. En la preview
-    // de un episodio no: sus ids serían los del episodio, no los del título.
+    // Instagram como en la ficha completa. IMDb, TMDb y Trakt no: ya enlazan
+    // desde sus puntuaciones del marcador. En la preview de un episodio
+    // tampoco Instagram: sus ids serían los del episodio, no los del título.
     if (isEpisode) return links;
     return withTitleExternalLinks(links, {
       instagramId: titleExternalIds.instagramId,
-      type: mediaType,
-      tmdbId: item?.id,
-      imdbId: data.imdbId || titleExternalIds.imdbId,
     });
   }, [
     isEpisode,
     titleExternalIds,
-    item?.id,
-    data.imdbId,
     filmAffinitySearchUrl,
     isMovie,
     justWatchFallbackUrl,
@@ -3551,12 +3539,6 @@ export default function DetailModal({
                 "--sv-panel-relay-end": `${phoneRelayEnd}px`,
               }
             : null),
-          // La ficha "mobile" flota separada del borde: el hueco de la derecha
-          // ya lo pone `paddingRight` en el contenedor; este margen replica el
-          // mismo valor a la izquierda para que quede centrada en su columna.
-          ...(mobileDetails
-            ? { aspectRatio: MOBILE_DETAILS_ASPECT_RATIO }
-            : null),
         }}
         // OJO: el panel NO lleva `backdrop-blur`. Su desenfoque lo pinta la capa
         // hermana de abajo. Motivo: un elemento con `backdrop-filter` crea un
@@ -3585,14 +3567,13 @@ export default function DetailModal({
               // botones del navbar. Pegada al borde no hay hueco que repartir.
               //
               // Las esquinas de la derecha no se ven, así que no se redondean.
-              // Lo único propio de esta vista es el alto, que lo fija su
-              // proporción de teléfono.
-              // de la derecha no se ven, así que no se redondean. Solo cambia
-              // el alto, que lo fija su proporción de teléfono.
-              // `max-h-full`: si el ancho mínimo no deja sitio a la proporción
-              // de teléfono (pantallas bajas), el alto se para en el de la
-              // ventana y el panel queda más ancho que 9:19.5.
-              ? "h-auto max-h-full min-h-0 self-center rounded-l-2xl pointer-events-auto"
+              //
+              // Y PEGADA ARRIBA Y ABAJO: no se redimensiona (sin tirador); el
+              // alto es el de la ventana y el ancho sale de la proporción de
+              // teléfono sobre él (`preferredPanelWidth`). Si los límites de
+              // `clampMobileDetailsWidth` lo acotan, cambia la proporción, no
+              // el alto: la portada es `object-cover`.
+              ? "h-full rounded-l-2xl pointer-events-auto"
               : "h-full rounded-l-2xl pointer-events-auto"
             : "mt-[4vh] h-[96vh] w-[95vw] max-w-[1080px] rounded-t-2xl"
         }`}
@@ -3621,8 +3602,9 @@ export default function DetailModal({
           />
         )}
 
-        {/* Tirador de redimensionado: arrastra el borde izquierdo (solo drawer). */}
-        {isRightPlacement && (
+        {/* Tirador de redimensionado: arrastra el borde izquierdo (solo el
+            drawer ancho; la ficha de teléfono tiene tamaño fijo). */}
+        {isRightPlacement && !mobileDetails && (
           <div
             onPointerDown={beginResize}
             role="separator"

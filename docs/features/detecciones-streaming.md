@@ -41,5 +41,6 @@ Sección *Detecciones de streaming* de [[backend_api_reference]]. Proxies de Nex
 
 ## Relacionado
 - [[Features]]
+- [[trakt-comparativa-sync]]
 - [[streaming-sync-reliability]]
 - [[Companion-Apps]]

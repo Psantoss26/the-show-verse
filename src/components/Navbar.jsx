@@ -56,6 +56,7 @@ import {
   Sparkles,
   Menu,
   PartyPopper,
+  Flame,
 } from "lucide-react";
 import WatchNextAssistant from "@/components/WatchNextAssistant";
 import NetflixSyncListener from "@/components/NetflixSyncListener";
@@ -99,6 +100,7 @@ const PROFILE_MENU_GROUPS = [
     { href: "/watchlist", label: "Pendientes", Icon: Bookmark, tone: "text-sky-400" },
   ],
   [
+    { href: "/today", label: "Hoy", Icon: Flame, tone: "text-pink-400" },
     { href: "/social", label: "Social", Icon: Users, tone: "text-pink-400" },
     { href: "/lists", label: "Listas", Icon: ListVideo, tone: "text-purple-400" },
     { href: "/calendar", label: "Calendario", Icon: CalendarDaysIcon, tone: "text-amber-400" },
@@ -111,6 +113,7 @@ const MOBILE_BOTTOM_NAV_ICONS = {
   series: TvIcon,
   discover: Compass,
   library: FolderKanban,
+  today: Flame,
   social: Users,
   lists: ListVideo,
   "in-progress": Play,
@@ -2363,6 +2366,7 @@ function NavbarContent() {
         prefetchNavRoute("/series");
         prefetchNavRoute("/recommendations");
         prefetchNavRoute("/lists");
+        prefetchNavRoute("/today");
         prefetchNavRoute("/social");
         prefetchNavRoute("/in-progress");
         prefetchNavRoute("/favorites");
@@ -3556,6 +3560,19 @@ function NavbarContent() {
                   </Link>
 
                   <div className="my-2.5 h-px bg-white/5" />
+
+                  <Link
+                    href="/today"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                      isActive("/today")
+                        ? "bg-pink-500/20 text-pink-300 font-bold"
+                        : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
+                    }`}
+                  >
+                    <Flame className="h-5 w-5 text-pink-400" />
+                    <span>{t("nav_today", "Hoy")}</span>
+                  </Link>
 
                   <Link
                     href="/social"

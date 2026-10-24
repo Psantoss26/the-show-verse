@@ -7438,14 +7438,11 @@ export default function DetailsClient({
       href: filmAffinitySearchUrl,
     });
 
-    // Instagram oficial (junto a la web) e IMDb, TMDb y Trakt al final, de los
-    // ids que ya trae la ficha. Wikipedia la añaden quienes pintan los enlaces
-    // (ver `wikipediaQuery`).
+    // Instagram oficial (junto a la web). IMDb, TMDb y Trakt no: ya enlazan
+    // desde sus puntuaciones del marcador. Wikipedia la añaden quienes pintan
+    // los enlaces (ver `wikipediaQuery`).
     return withTitleExternalLinks(items, {
       instagramId: titleExternalIds.instagramId,
-      type,
-      tmdbId: id,
-      imdbId: resolvedImdbId || titleExternalIds.imdbId,
     });
   }, [
     officialSiteUrl,
@@ -7456,8 +7453,6 @@ export default function DetailsClient({
     seriesGraphUrl,
     filmAffinitySearchUrl,
     titleExternalIds,
-    id,
-    resolvedImdbId,
   ]);
 
   const scoreboardExternalLinks = useMemo(

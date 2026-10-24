@@ -71,7 +71,7 @@ function ActionLink({ href, label }) {
 function ShareActionButton({ share }) {
   const title = share.title || "Lista";
   const text = share.text || `Echa un vistazo a ${title} en The Show Verse`;
-  const { handleShare, sheet, copied } = useShareAction({
+  const { handleShare, sheet, copied, warmProps } = useShareAction({
     title,
     text,
     url: share.url,
@@ -91,6 +91,7 @@ function ShareActionButton({ share }) {
         aria-haspopup={share.card ? "dialog" : undefined}
         activeColor="blue"
         onClick={handleShare}
+        {...warmProps}
         className="!w-full !h-auto aspect-square"
       >
         {copied ? <Check /> : <Share2 />}
