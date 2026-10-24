@@ -22,44 +22,11 @@ import {
   watchlist,
 } from '../db/schema.js';
 import { getMediaMetadataMap } from '../utils/mediaMetadata.js';
+import { countByInstant, isRealInstant, time } from './realActivityInstant.js';
 
 // Cota defensiva: con más cuentas seguidas, las más recientes.
 export const FOLLOWING_TITLE_MAX = 500;
 const REVIEW_SNIPPET = 280;
-// Filas con el mismo instante a partir de las cuales es una importación.
-const BULK_GROUP_MIN = 3;
-
-function time(value) {
-  const t = new Date(value).getTime();
-  return Number.isFinite(t) ? t : 0;
-}
-
-/**
- * ¿La fecha es real? Las importaciones guardan solo el día (medianoche o
- * mediodía UTC exactos) o muchas filas con el mismo instante. Esas fechas no se
- * enseñan como "hace 3 días"; el estado (visto, favorito…) sí vale.
- */
-function isRealInstant(value, sameInstantCount = 1) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return false;
-  if (sameInstantCount >= BULK_GROUP_MIN) return false;
-  return !(date.getUTCMinutes() === 0 && date.getUTCSeconds() === 0 && date.getUTCMilliseconds() === 0);
-}
-
-// Cuántas filas de esa persona comparten el instante. La consulta lo trae en
-// (OJO: en esas subconsultas las columnas de fuera van CUALIFICADAS a mano;
-// Drizzle las escribe sin tabla y "user_id" se resolvería a la de dentro.)
-// `same` contando en TODA la tabla (una importación pone la misma fecha a cientos
-// de títulos, y aquí solo llegan las filas de este); sin `same`, se cuenta en
-// las filas recibidas.
-function countByInstant(rows, key = 'at') {
-  const counts = new Map();
-  for (const row of rows) {
-    const t = time(row[key]);
-    counts.set(`${row.userId}|${t}`, (counts.get(`${row.userId}|${t}`) || 0) + 1);
-  }
-  return (row) => Math.max(Number(row.same) || 0, counts.get(`${row.userId}|${time(row[key])}`) || 1);
-}
 
 /** Episodios emitidos por temporada (sin especiales) a partir de la ficha de TMDb. */
 export function airedEpisodeCounts(metadata) {

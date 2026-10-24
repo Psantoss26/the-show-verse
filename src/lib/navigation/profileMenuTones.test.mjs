@@ -10,6 +10,7 @@ const navbarPath = new URL("../../components/Navbar.jsx", import.meta.url);
 // exactamente el tipo de deriva que nadie nota hasta que chirría.
 const TONOS = {
   "/recommendations": "emerald",
+  "/today": "pink",
   "/social": "pink",
   "/lists": "purple",
   "/calendar": "amber",
