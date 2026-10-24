@@ -5,12 +5,13 @@ import { sanitizeShareStory } from "@/lib/details/shareStory";
 import {
   H,
   W,
-  loadAmbient,
   loadAmbientBase,
+  loadAmbientLayers,
   loadStoryPoster,
   loadLocalAssets,
   loadLogo,
   loadShareFonts,
+  shareImageResponse,
 } from "@/lib/share/ogKit";
 import {
   DetailsScene,
@@ -18,6 +19,8 @@ import {
   PlaysScene,
   ProductionScene,
   ReviewScene,
+  STORY_BASE_TONE,
+  STORY_POSTER_TONE,
   StoryBackdrop,
   StoryHeader,
 } from "@/lib/share/storyScenes";
@@ -25,7 +28,7 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Capas del VÍDEO compartible de una ficha (1080×1920, PNG).
+// Capas del VÍDEO compartible de una ficha (1080×1920: PNG transparentes; el fondo, JPEG).
 //
 // El vídeo lo compone y codifica el navegador (ver lib/share/storyVideo): aquí
 // solo se pintan sus piezas, cada una en una petición para que se generen en
@@ -45,12 +48,13 @@ const SCENES = new Set(["backdrop", "header", "plays", "episodes", "review", "de
 async function renderLayer(scene, card, story) {
   if (scene === "backdrop") {
     const [poster, ambientBase] = await Promise.all([
-      loadStoryPoster(card.posterPath),
-      loadAmbientBase(card.posterPath),
+      loadStoryPoster(card.posterPath, STORY_POSTER_TONE),
+      loadAmbientBase(card.posterPath, STORY_BASE_TONE),
     ]);
-    // El ambiental (w342) solo hace falta si la portada no ha llegado.
-    const ambient = poster ? null : await loadAmbient(card.posterPath);
-    return { element: <StoryBackdrop poster={poster} ambient={ambient} ambientBase={ambientBase} />, fonts: null };
+    if (poster) return { element: <StoryBackdrop poster={poster} ambientBase={ambientBase} />, fonts: null };
+    // Sin portada a tiempo, el fondo ambiental de siempre (sus dos capas).
+    const [ambient, ambientFallback] = await loadAmbientLayers(card.posterPath);
+    return { element: <StoryBackdrop poster={null} ambient={ambient} ambientBase={ambientFallback} />, fonts: null };
   }
 
   const [fonts, assets, logo] = await Promise.all([
@@ -106,13 +110,20 @@ export async function POST(request) {
   // título se escribe siempre, la portada impresa no está detrás.
   const card = { ...sanitizeShareCard(body?.card), showTitle: true };
   const story = sanitizeShareStory(body?.story);
-  const layer = await renderLayer(scene, card, story);
-  if (!layer) return new Response("Nothing to render", { status: 422 });
-
-  return new ImageResponse(layer.element, {
-    width: W,
-    height: H,
-    ...(layer.fonts ? { fonts: layer.fonts } : {}),
-    headers: { "Cache-Control": "private, no-store" },
-  });
+  // El fondo es opaco y sale en JPEG; las demás capas son transparentes y
+  // siguen en PNG. Guardadas por el cuerpo validado (ver `shareImageResponse`).
+  const response = await shareImageResponse(
+    `details-story|${scene}|${JSON.stringify([card, story])}`,
+    async () => {
+      const layer = await renderLayer(scene, card, story);
+      if (!layer) return null;
+      return new ImageResponse(layer.element, {
+        width: W,
+        height: H,
+        ...(layer.fonts ? { fonts: layer.fonts } : {}),
+      });
+    },
+    { jpeg: scene === "backdrop" },
+  );
+  return response || new Response("Nothing to render", { status: 422 });
 }

@@ -8,8 +8,10 @@
 //     (ver lib/details/shareStory y lib/share/storyVideo). Solo se ofrece si el
 //     navegador sabe codificar vídeo.
 //
-// Imagen y vídeo se generan al pedirlos y se guardan mientras el botón siga
-// montado: volver a abrir la hoja con los mismos estados no los regenera.
+// La imagen se pide en cuanto el usuario se acerca al botón (`prefetchShare`)
+// y el vídeo al elegirlo. Se guardan mientras el botón siga montado (la imagen,
+// también en memoria de la pestaña y en el servidor): volver a abrir la hoja
+// con los mismos estados no los regenera.
 //
 // La misma hoja comparte LISTAS y COLECCIONES (`kind="list"`): cambia de dónde
 // salen la imagen y las capas del vídeo (lib/lists/shareList) y la historia
@@ -67,11 +69,12 @@ const SHARE_KINDS = {
   },
 };
 
-// La ruta devuelve PNG (~3 MB por el póster a sangre). Para compartir se pasa a
-// JPEG, que con el fondo opaco queda igual a la vista y pesa una fracción: se
-// envía antes y las apps no lo recomprimen tanto. La PNG se conserva para
-// copiar al portapapeles, que solo admite ese formato.
+// La ruta devuelve ya JPEG (~0,3-1 MB). Si llegase PNG (servidor sin sharp,
+// ~3-4 MB por el póster a sangre) se pasa aquí a JPEG, que con el fondo opaco
+// queda igual a la vista y pesa una fracción: se envía antes y las apps no lo
+// recomprimen tanto.
 async function toJpeg(blob) {
+  if (blob.type === "image/jpeg") return blob;
   try {
     const bitmap = await createImageBitmap(blob);
     const canvas = document.createElement("canvas");
@@ -84,6 +87,73 @@ async function toJpeg(blob) {
   } catch {
     return blob;
   }
+}
+
+// El portapapeles solo admite PNG: se convierte al copiar, no al generar.
+async function toPng(blob) {
+  if (blob.type === "image/png") return blob;
+  const bitmap = await createImageBitmap(blob);
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  canvas.getContext("2d").drawImage(bitmap, 0, 0);
+  bitmap.close?.();
+  const png = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!png) throw new Error("png");
+  return png;
+}
+
+// --- Peticiones compartidas entre la hoja y el botón.
+//
+// El botón de compartir llama a `prefetchShare` en cuanto el usuario se acerca
+// (ratón encima, foco, primer toque): la imagen empieza a generarse antes del
+// clic y, al abrir la hoja, esta se engancha a la misma petición en vez de
+// lanzar otra. También sirve al reabrir: lo ya pedido no se repite.
+const SHARE_REQUESTS_MAX = 12;
+const shareRequests = new Map();
+
+function sharedRequest(key, start) {
+  let promise = shareRequests.get(key);
+  if (!promise) {
+    promise = start();
+    shareRequests.set(key, promise);
+    while (shareRequests.size > SHARE_REQUESTS_MAX) shareRequests.delete(shareRequests.keys().next().value);
+    // Un fallo no se guarda: «Reintentar» vuelve a pedirla.
+    promise.catch(() => {
+      if (shareRequests.get(key) === promise) shareRequests.delete(key);
+    });
+  }
+  return promise;
+}
+
+function prepareShare(config, card, story) {
+  const key = `prepare|${JSON.stringify([card, story])}`;
+  return sharedRequest(key, () =>
+    config.prepare(card, story).catch(() => ({ card, story })),
+  );
+}
+
+// La imagen de portada ya lista para compartir: `{ blob }` (JPEG).
+function requestShareImage(config, cardKey) {
+  return sharedRequest(`${config.cardEndpoint}|${cardKey}`, async () => {
+    const res = await fetch(config.cardEndpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: cardKey,
+    });
+    if (!res.ok) throw new Error(`card ${res.status}`);
+    return { blob: await toJpeg(await res.blob()) };
+  });
+}
+
+/** Empieza a preparar la imagen de compartir antes de abrir la hoja. */
+export function prefetchShare({ kind = "details", card, story = null }) {
+  if (!card || typeof window === "undefined") return;
+  const config = SHARE_KINDS[kind] || SHARE_KINDS.details;
+  const prepared = config.prepare
+    ? prepareShare(config, card, story).then((result) => result.card)
+    : Promise.resolve(card);
+  prepared.then((nextCard) => requestShareImage(config, JSON.stringify(nextCard))).catch(() => {});
 }
 
 function blobToBase64(blob) {
@@ -233,9 +303,7 @@ export default function DetailsShareSheet({
   useEffect(() => {
     if (!open || !prepareKey || prepared?.key === prepareKey) return undefined;
     let cancelled = false;
-    config
-      .prepare(sourceCard, sourceStory)
-      .catch(() => ({ card: sourceCard, story: sourceStory }))
+    prepareShare(config, sourceCard, sourceStory)
       .then((result) => {
         if (!cancelled) setPrepared({ key: prepareKey, ...result });
       });
@@ -252,7 +320,7 @@ export default function DetailsShareSheet({
   const titleId = useId();
   const closeRef = useRef(null);
   const [portalReady, setPortalReady] = useState(false);
-  // { key, png, file, objectUrl } de la última imagen generada.
+  // { key, blob, file, objectUrl } de la última imagen generada.
   const [image, setImage] = useState(null);
   const [status, setStatus] = useState("idle"); // idle | loading | ready | error
   const [attempt, setAttempt] = useState(0);
@@ -349,30 +417,26 @@ export default function DetailsShareSheet({
       setStatus("ready");
       return undefined;
     }
-    const controller = new AbortController();
+    // Sin cancelar al cerrar: la petición es compartida (ver `sharedRequest`)
+    // y su resultado sirve al volver a abrir.
+    let cancelled = false;
     setStatus("loading");
-    (async () => {
-      try {
-        const res = await fetch(config.cardEndpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: cardKey,
-          signal: controller.signal,
+    requestShareImage(config, cardKey).then(
+      ({ blob }) => {
+        if (cancelled) return;
+        const file = new File([blob], shareCardFileName(title, extensionOf(blob)), {
+          type: blob.type || "image/png",
         });
-        if (!res.ok) throw new Error(`card ${res.status}`);
-        const png = await res.blob();
-        const shareBlob = await toJpeg(png);
-        if (controller.signal.aborted) return;
-        const file = new File([shareBlob], shareCardFileName(title, extensionOf(shareBlob)), {
-          type: shareBlob.type || "image/png",
-        });
-        setImage({ key: cardKey, png, file, objectUrl: URL.createObjectURL(shareBlob) });
+        setImage({ key: cardKey, blob, file, objectUrl: URL.createObjectURL(blob) });
         setStatus("ready");
-      } catch (error) {
-        if (error?.name !== "AbortError") setStatus("error");
-      }
-    })();
-    return () => controller.abort();
+      },
+      () => {
+        if (!cancelled) setStatus("error");
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
     // `image` se lee solo para no regenerar: no debe relanzar la petición.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, cardKey, attempt]);
@@ -406,7 +470,7 @@ export default function DetailsShareSheet({
           card,
           story: storyPayload,
           sceneIds,
-          cover: image.png,
+          cover: image.blob,
           format: videoFormat,
           endpoint: config.storyEndpoint,
           onProgress: setVideoProgress,
@@ -514,7 +578,9 @@ export default function DetailsShareSheet({
   const onCopyImage = async () => {
     if (!imageReady) return;
     try {
-      await navigator.clipboard.write([new window.ClipboardItem({ "image/png": image.png })]);
+      // La conversión va DENTRO del ClipboardItem (una promesa): así la
+      // escritura sigue ligada al clic aunque tarde un momento.
+      await navigator.clipboard.write([new window.ClipboardItem({ "image/png": toPng(image.blob) })]);
       flashDone("copyImage", "Imagen copiada al portapapeles.");
     } catch {
       setMessage("No se pudo copiar la imagen.");

@@ -65,7 +65,7 @@ Subcomponentes y modales usados por `DetailsClient`/`SeasonDetailsClient`/`Episo
 | Componente | Propósito |
 |---|---|
 | `DetailAtoms.jsx` | Átomos visuales reutilizados en la ficha (`VisualMetaCard`, etc.). |
-| `DetailHeaderBits.jsx` | Piezas del cabecero de la ficha (badges compactos, botón compartir...). |
+| `DetailHeaderBits.jsx` | Piezas del cabecero de la ficha (badges compactos, botón compartir...). `useShareAction` devuelve `warmProps`: al pasar el ratón, enfocar o tocar el botón empieza a generarse la imagen de compartir (`prefetchShare` de `DetailsShareSheet`), y la hoja reutiliza esa petición. |
 | `AnimatedSection.jsx` | Wrapper de `framer-motion` para animar secciones al entrar en viewport. |
 | `AnimatedPosterFrame.jsx` | Marco de póster con transición/estado de error de imagen. |
 | `PosterStack.jsx` | Pila de pósters superpuestos (colecciones). |

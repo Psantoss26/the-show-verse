@@ -24,14 +24,15 @@ import {
   TitleArt,
   W,
   actionButtonWidth,
-  loadAmbient,
   loadAmbientBase,
+  loadAmbientLayers,
   loadLocalAssets,
   loadLogo,
   loadPoster,
   loadShareFonts,
   loadStill,
   posterFit,
+  shareImageResponse,
   px,
   rgba,
 } from "@/lib/share/ogKit";
@@ -123,7 +124,7 @@ function StillStack({ stills }) {
   );
 }
 
-function Card({ card, poster, stills, ambient, ambientBase, logo, assets, fonts }) {
+function Card({ card, poster, stills, ambient, ambientBase, coverBlur, logo, assets, fonts }) {
   const buttons = shareCardActionButtons(card);
   const scores = ["tmdb", "trakt", "imdb"].filter((key) => card.scores[key]);
   const rowWidth =
@@ -151,7 +152,7 @@ function Card({ card, poster, stills, ambient, ambientBase, logo, assets, fonts 
       }}
     >
       {burnedTitle ? (
-        <PosterWithContinuation cover={poster} coverBlur={ambientBase} fit={fit} />
+        <PosterWithContinuation cover={poster} coverBlur={coverBlur} fit={fit} />
       ) : (
         <>
         <AmbientBackground ambient={ambient} ambientBase={ambientBase} />
@@ -287,24 +288,36 @@ export async function POST(request) {
   }
 
   const card = sanitizeShareCard(body);
-  const [fonts, assets, poster, stills, ambient, ambientBase, logo] = await Promise.all([
+  // Opaca: sale en JPEG (ver `shareImageResponse`). Guardada por el cuerpo ya
+  // validado, así la petición adelantada de la hoja y la de abrirla son una.
+  const response = await shareImageResponse(
+    `details-card|${JSON.stringify(card)}`,
+    () => renderCard(card),
+    { jpeg: true },
+  );
+  return response || new Response("Render failed", { status: 500 });
+}
+
+async function renderCard(card) {
+  const [fonts, assets, poster, stills, [ambient, ambientBase], coverBlur, logo] = await Promise.all([
     loadShareFonts(),
     loadLocalAssets(),
     // Con portada de bandas (episodio), el póster no se pinta: no se pide.
     card.stillPaths.length ? null : loadPoster(card.posterPath),
     Promise.all(card.stillPaths.map(loadStill)).then((list) => list.filter(Boolean)),
-    loadAmbient(card.posterPath),
+    // Fondo ambiental ya filtrado; la base sin tratar es la continuación del
+    // póster con el título impreso (`PosterWithContinuation`).
+    loadAmbientLayers(card.posterPath),
     loadAmbientBase(card.posterPath),
     loadLogo(card.logoPath),
   ]);
 
   return new ImageResponse(
-    <Card card={card} poster={poster} stills={stills} ambient={ambient} ambientBase={ambientBase} logo={logo} assets={assets} fonts={Boolean(fonts)} />,
+    <Card card={card} poster={poster} stills={stills} ambient={ambient} ambientBase={ambientBase} coverBlur={coverBlur} logo={logo} assets={assets} fonts={Boolean(fonts)} />,
     {
       width: W,
       height: H,
       ...(fonts ? { fonts } : {}),
-      headers: { "Cache-Control": "private, no-store" },
     },
   );
 }

@@ -174,7 +174,12 @@ export function Caption({ children, style }) {
 // Fondo de las secciones: la PORTADA del título, reconocible. Antes era la
 // misma portada difuminada a 32px y atenuada al 62%, con un velo encima: un
 // fondo oscuro casi liso en el que no se distinguía la imagen.
-const STORY_POSTER_FILTER = "blur(3px) brightness(0.72) saturate(1.1)";
+const STORY_BASE_FILTER = "brightness(0.72) saturate(1.1)";
+const STORY_POSTER_FILTER = `blur(3px) ${STORY_BASE_FILTER}`;
+// Los mismos filtros para aplicarlos antes del render (ver `toneImage` en
+// ogKit): la portada y su base ocupan el lienzo entero.
+export const STORY_BASE_TONE = { brightness: 0.72, saturate: 1.1 };
+export const STORY_POSTER_TONE = { ...STORY_BASE_TONE, blur: 3 };
 // Más oscuro arriba (marca y título) y abajo, y más claro en el centro, donde
 // los paneles de cristal ya dan contraste y la portada luce.
 const STORY_SCRIM = `linear-gradient(180deg, rgba(0,0,0,0.74) 0%, rgba(0,0,0,0.42) 20%, ${rgba(SHADE, 0.3)} 48%, ${rgba(SHADE, 0.42)} 76%, rgba(0,0,0,0.72) 100%)`;
@@ -195,7 +200,7 @@ export function StoryBackdrop({ poster, ambient, ambientBase }) {
               width={W}
               height={H}
               alt=""
-              style={{ position: "absolute", top: 0, left: 0, width: W, height: H, objectFit: "cover", filter: "brightness(0.72) saturate(1.1)" }}
+              style={{ position: "absolute", top: 0, left: 0, width: W, height: H, objectFit: "cover", ...(ambientBase.toned ? {} : { filter: STORY_BASE_FILTER }) }}
             />
           ) : null}
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -204,7 +209,7 @@ export function StoryBackdrop({ poster, ambient, ambientBase }) {
             width={W}
             height={H}
             alt=""
-            style={{ position: "absolute", top: 0, left: 0, width: W, height: H, objectFit: "cover", filter: STORY_POSTER_FILTER }}
+            style={{ position: "absolute", top: 0, left: 0, width: W, height: H, objectFit: "cover", ...(poster.toned ? {} : { filter: STORY_POSTER_FILTER }) }}
           />
         </>
       ) : (

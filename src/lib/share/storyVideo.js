@@ -79,7 +79,8 @@ function drawLayer(ctx, bitmap, { alpha = 1, scale = 1, offsetY = 0 } = {}) {
 }
 
 /**
- * Genera el vídeo. `cover` es el PNG de la portada (ya generado para la imagen).
+ * Genera el vídeo. `cover` es la imagen de la portada (ya generada para la
+ * imagen compartible).
  * `endpoint` es la ruta que pinta las capas (la de la ficha o la de las listas).
  * `onProgress(fracción 0..1)` informa de capas y codificación.
  */
@@ -121,7 +122,12 @@ export async function createStoryVideo({
   const canvas =
     typeof OffscreenCanvas === "function" ? new OffscreenCanvas(W, H) : Object.assign(document.createElement("canvas"), { width: W, height: H });
   const ctx = canvas.getContext("2d", { alpha: false });
-  ctx.imageSmoothingQuality = "high";
+  // Suavizado BILINEAL, no "high". Las capas ya tienen el tamaño del vídeo y
+  // solo se escalan un 3-8% (acercamientos) o se desplazan: medido en Chrome,
+  // "high" costaba ~22 ms por fotograma frente a ~7 ms, y la diferencia en
+  // píxeles (0,9/255 de media sobre texto) no sobrevive a la compresión H.264.
+  // Con 300-450 fotogramas, eran 3-6 s de más en cada vídeo.
+  ctx.imageSmoothingQuality = "low";
 
   const output = new Output({
     format: format.container === "mp4" ? new Mp4OutputFormat({ fastStart: "in-memory" }) : new WebMOutputFormat(),
