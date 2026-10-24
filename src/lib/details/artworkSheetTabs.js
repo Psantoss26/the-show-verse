@@ -1,6 +1,7 @@
 // Pestañas de la vista lateral «Portadas y fondos»: las MISMAS categorías que
 // la galería de la ficha (DetailsClient → artworkSelection), con todas sus
-// imágenes (sin los filtros de resolución/idioma de la galería).
+// imágenes (sin el filtro de resolución de la galería; los logos, solo en
+// español e inglés como en ella).
 //
 //   - Escritorio: Portada, Vista previa, Fondo y Logo.
 //   - Móvil: Portada, Con idioma y Logo. La portada móvil va sin idioma con el
@@ -16,6 +17,10 @@ const withPath = (list) => (Array.isArray(list) ? list : []).filter((img) => img
 // Como en la galería: si el filtro de la categoría deja la lista vacía, se
 // usa la lista completa.
 const orAll = (subset, all) => (subset.length ? subset : all);
+
+const SPANISH_OR_ENGLISH = new Set(["es", "es-es", "en", "en-us"]);
+const isSpanishOrEnglishImage = (img) =>
+  SPANISH_OR_ENGLISH.has(String(img?.iso_639_1 || "").trim().toLowerCase());
 
 // La elegida va primero. Como en la galería, aparece aunque el filtro de la
 // categoría la dejara fuera (p. ej. la vista previa por defecto con texto).
@@ -39,6 +44,8 @@ export function buildArtworkSheetTabs({ mobile = false, posters, backdrops, logo
   );
 
   const allLogos = withPath(logos);
+  // Como el filtro ES/EN de la galería: solo logos en español e inglés.
+  const languageLogos = orAll(allLogos.filter(isSpanishOrEnglishImage), allLogos);
   const sources = { poster: allPosters, mobilePoster: allPosters, preview: allBackdrops, background: allBackdrops, logo: allLogos };
 
   const tabs = mobile
@@ -63,7 +70,7 @@ export function buildArtworkSheetTabs({ mobile = false, posters, backdrops, logo
           activePath: active.mobilePoster,
           injectActive: false,
         },
-        { id: "logos", label: "Logo", kind: "logo", aspect: "logo", images: allLogos, activePath: active.logo },
+        { id: "logos", label: "Logo", kind: "logo", aspect: "logo", images: languageLogos, activePath: active.logo },
       ]
     : [
         { id: "posters", label: "Portada", kind: "poster", aspect: "poster", images: allPosters, activePath: active.poster },
@@ -83,7 +90,7 @@ export function buildArtworkSheetTabs({ mobile = false, posters, backdrops, logo
           images: neutralBackdrops,
           activePath: active.background,
         },
-        { id: "logos", label: "Logo", kind: "logo", aspect: "logo", images: allLogos, activePath: active.logo },
+        { id: "logos", label: "Logo", kind: "logo", aspect: "logo", images: languageLogos, activePath: active.logo },
       ];
 
   return tabs

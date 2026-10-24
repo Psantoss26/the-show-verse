@@ -39,6 +39,10 @@ import { dashboardDetailHref } from "@/lib/dashboard/detailHref";
 import SubrouteDetailsPanel from "@/components/dashboard/SubrouteDetailsPanel";
 import { detailPreviewFromHref, panelDetailsHref } from "@/lib/navigation/detailPreview";
 import { createSubrouteLinkIntent } from "@/lib/navigation/subroutePrefetch";
+import {
+  clearUserDetailsSequence,
+  saveUserDetailsSequence,
+} from "@/lib/navigation/userDetailsSequence";
 import DetailModal from "@/components/dashboard/DetailModal";
 import { useAuth } from "@/context/AuthContext";
 import { readDetailOpen, withDetailOpen } from "@/lib/ui/detailOpenPreferences";
@@ -463,9 +467,21 @@ export default function DetailModalProvider({
   //   sin drill, con ficha abierta -> reemplaza el nivel actual (cambio de título).
   //   sin ficha abierta -> primer nivel.
   //   opts.push = false  -> deep-link: no tocamos el historial (la URL ya existe).
+  //   opts.sequence = [href…] -> orden de la sección desde la que se abre
+  //     (FeaturedHero): la ficha completa recorre Anterior/Siguiente en ese
+  //     orden (flechas en escritorio, deslizar en móvil).
   const openDetailModal = useCallback(
     (item, opts = {}) => {
       if (!item || item.id == null || typeof window === "undefined") return;
+
+      if (Array.isArray(opts.sequence)) {
+        saveUserDetailsSequence(opts.sequence, dashboardDetailHref(item));
+      } else if (placementSwitchable && opts.push !== false && !opts.drill) {
+        // Dashboards: solo el hero tiene secuencia; abrir desde otra fila no
+        // debe heredar la de un título del hero abierto antes. (En las páginas
+        // de usuario la guarda el clic en la tarjeta, antes de llegar aquí.)
+        clearUserDetailsSequence();
+      }
 
       // MÓVIL: se navega siempre a la ficha completa; la preview es de escritorio.
       // También en escritorio si el usuario prefiere abrir directamente la
@@ -539,7 +555,7 @@ export default function DetailModalProvider({
         commit([item]);
       }
     },
-    [commit, effectivePlacement, isMobile, preferredContentView, router, savedOpen.target],
+    [commit, effectivePlacement, isMobile, placementSwitchable, preferredContentView, router, savedOpen.target],
   );
 
   const closeDetailModal = useCallback(() => {

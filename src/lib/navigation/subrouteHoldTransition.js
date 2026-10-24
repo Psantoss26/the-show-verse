@@ -9,9 +9,11 @@
 // secuencia de títulos de DetailsClient (detailsSequenceTransition.js).
 const ROOT = "data-subroute-root";
 const HREF = "data-subroute-href";
+const FROZEN = "data-subroute-frozen";
 const NAVIGATION_WAIT_MS = 8000;
 const IMAGE_WAIT_MS = 150;
 const FADE_MS = 140;
+const ENTRANCE_GRACE_MS = 600;
 
 let active = false;
 
@@ -28,11 +30,43 @@ function findRoot(href = null) {
   return [...document.querySelectorAll(selector)].find(isVisible) || null;
 }
 
+// Un nodo clonado arranca de cero sus animaciones CSS: la copia repetía las
+// entradas de la ficha (se apagaba entera y los botones volvían a aparecer uno
+// a uno) justo al tocar, el parpadeo del gesto. La copia va sin animaciones
+// (globals.css) y lo que estaba animándose se queda en su valor de ese
+// instante (por ejemplo el fundido por scroll de la cabecera).
+const FROZEN_PROPERTIES = ["opacity", "transform", "translate", "scale", "rotate", "filter", "clip-path"];
+
+function markAnimatedNodes(root) {
+  const frozen = [];
+  for (const animation of document.getAnimations()) {
+    const effect = animation.effect;
+    const target = effect?.target;
+    if (effect?.pseudoElement || !(target instanceof Element) || !root.contains(target)) continue;
+    if (target.hasAttribute(FROZEN)) continue;
+    const computed = getComputedStyle(target);
+    target.setAttribute(FROZEN, String(frozen.length));
+    frozen.push({ node: target, values: FROZEN_PROPERTIES.map((name) => [name, computed.getPropertyValue(name)]) });
+  }
+  return frozen;
+}
+
 function captureScreen(root) {
   const bounds = root.getBoundingClientRect();
+  const frozen = markAnimatedNodes(root);
   const snapshot = root.cloneNode(true);
+  frozen.forEach(({ node }) => node.removeAttribute(FROZEN));
+  const frozenClones = snapshot.hasAttribute(FROZEN) ? [snapshot] : [];
+  frozenClones.push(...snapshot.querySelectorAll(`[${FROZEN}]`));
+  frozenClones.forEach((node) => {
+    frozen[Number(node.getAttribute(FROZEN))]?.values.forEach(([name, value]) => {
+      node.style.setProperty(name, value);
+    });
+    node.removeAttribute(FROZEN);
+  });
   snapshot.removeAttribute(ROOT);
   snapshot.removeAttribute(HREF);
+  snapshot.setAttribute("data-subroute-snapshot", "");
   snapshot.setAttribute("aria-hidden", "true");
   snapshot.inert = true;
   Object.assign(snapshot.style, {
@@ -48,8 +82,11 @@ function captureScreen(root) {
     node.querySelectorAll("source").forEach((source) => source.remove());
   });
   const overlay = document.createElement("div");
-  // Misma capa que la copia de la secuencia de títulos: por debajo del navbar.
+  // Misma capa que la copia de la secuencia de títulos (por debajo del navbar),
+  // pero un nivel más abajo: la barra inferior del móvil también es z-30 y,
+  // al añadirse después, la copia la tapaba y la barra parpadeaba.
   overlay.className = "sv-sequence-snapshot";
+  overlay.style.zIndex = "29";
   overlay.setAttribute("aria-hidden", "true");
   overlay.inert = true;
   overlay.append(snapshot);
@@ -67,6 +104,28 @@ async function waitForVisibleImages(root) {
     })
     .map((image) => (image.complete ? Promise.resolve() : image.decode().catch(() => {})));
   await Promise.race([Promise.allSettled(tasks), delay(IMAGE_WAIT_MS)]);
+}
+
+// La ficha nueva monta debajo de la copia con sus entradas de primera apertura
+// (póster, logo, cascada de botones) a medias, o las arranca justo después
+// (en episodios esperan a la portada): al fundirse la copia, los botones
+// desaparecían y volvían a entrar uno a uno. Mientras dura el relevo y un
+// margen corto después se dan por terminadas; las ligadas al scroll y las
+// infinitas (brillo del cristal) siguen igual. Con setInterval y no rAF, que
+// en segundo plano no corre.
+function finishEntranceAnimations(root, duration) {
+  const finish = () => {
+    for (const animation of root.getAnimations({ subtree: true })) {
+      if (animation.timeline !== document.timeline) continue;
+      if (!Number.isFinite(animation.effect?.getComputedTiming().endTime)) continue;
+      animation.finish();
+    }
+  };
+  finish();
+  const timer = setInterval(() => {
+    if (root.isConnected) finish();
+  }, 16);
+  setTimeout(() => clearInterval(timer), duration);
 }
 
 export function isSubrouteHref(href) {
@@ -103,6 +162,7 @@ export async function navigateSubrouteHolding({ href, navigate }) {
       await nextFrame();
     }
     if (incoming && !cancelled) {
+      finishEntranceAnimations(incoming, IMAGE_WAIT_MS + FADE_MS + ENTRANCE_GRACE_MS);
       await waitForVisibleImages(incoming);
       window.scrollTo({ top: 0, behavior: "instant" });
       await nextFrame();
