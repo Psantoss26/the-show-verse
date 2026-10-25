@@ -82,6 +82,22 @@ Los valores por defecto (`following`, `today`, `title`) no se escriben en la URL
   - Las historias, la destacada, los destacados, las agrupaciones y el ranking se calculan en el cliente, en `src/lib/today/stories.js` (tests en `stories.test.mjs`). Cambiar de agrupación no vuelve a pedir nada.
 - **Acceso:** la píldora del navbar y Social (menú de perfil, menú móvil y barra inferior). La entrada propia «Hoy» de los menús se quitó al fusionar; quien la tenía en la barra inferior la conserva como Social (`LEGACY_KEYS` en `mobileBottomNav.js`).
 
+## Datos de prueba
+
+`npm run demo:social -- --viewer <usuario>` (en `backend/`, solo contra la base
+local) crea estas cuentas. Ver [[01-local-development]].
+
+| Cuenta | Qué cubre |
+|---|---|
+| `demo_lucia` | Maratón de Peaky Blinders T6E3–E6 con final de serie, nota de la serie, reseña, favorito y pendiente. |
+| `demo_marcos` | Final de Peaky Blinders con reseña con spoiler, Dune 2 vista, puntuada y reseñada. Una lista pública y una privada, que no debe salir. |
+| `demo_sara` | Estreno de Separación (T1E1 con nota del episodio pegada al visionado, más E2–E3) y Parásitos. Stranger Things T4E1 (estreno de temporada) hace 4 días. |
+| `demo_dani` | Oppenheimer ayer, The Bear T1E8 (final de temporada) con nota de temporada, una lista y The Last of Us. |
+| `demo_elena` | Nadie de la demo la sigue, así que solo sale en Comunidad. Final de Breaking Bad e Interstellar, más un bloque importado (5 películas en el mismo instante en punto) que Hoy no debe contar. |
+| `demo_oculto` | Tiene activado `hideFromCommunityToday`: no debe salir ni en Comunidad. |
+
+Con `--viewer`, esa cuenta sigue a Lucía, Marcos, Sara y Dani, y Dani la sigue a ella.
+
 ## Endpoints
 
 `GET /v1/users/today`, en la sección *Social y perfiles* de [[backend_api_reference]]. Proxy de Next en `src/app/api/users/today/route.js`.
