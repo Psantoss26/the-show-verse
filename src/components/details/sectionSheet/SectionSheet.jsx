@@ -22,7 +22,8 @@ import { LIQUID_GLASS_MODAL_HEADER, LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGl
 export const SHEET_CONTROL =
   "rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg";
 
-// Acento del panel: amarillo en las fichas de títulos, verde en la de un actor.
+// Acento del panel: amarillo en las fichas de títulos, verde en la de un actor
+// y rosa en Social (el panel de una persona en Hoy).
 const SHEET_ACCENTS = {
   yellow: {
     iconBox: "bg-yellow-500/10 text-yellow-400",
@@ -36,6 +37,12 @@ const SHEET_ACCENTS = {
     focus: "focus-visible:outline-emerald-400",
     searchRing: "focus-within:ring-emerald-400/50",
   },
+  pink: {
+    iconBox: "bg-pink-500/10 text-pink-400",
+    count: "text-pink-400",
+    focus: "focus-visible:outline-pink-400",
+    searchRing: "focus-within:ring-pink-400/50",
+  },
 };
 
 export default function SectionSheet({
@@ -44,6 +51,9 @@ export default function SectionSheet({
   title,
   subtitle = null,
   icon: Icon = null,
+  // En lugar del icono, un elemento propio a la izquierda del título (p. ej.
+  // la foto de perfil de una persona).
+  leading = null,
   // [{ id, label, count? }]
   tabs = null,
   activeTab = null,
@@ -105,7 +115,9 @@ export default function SectionSheet({
       >
         <header className={`shrink-0 ${LIQUID_GLASS_MODAL_HEADER} px-5 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-6 sm:pt-6`}>
           <div className="flex items-start gap-3">
-            {Icon ? (
+            {leading ? (
+              <span className="mt-0.5 shrink-0">{leading}</span>
+            ) : Icon ? (
               <span className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tone.iconBox}`}>
                 <Icon className="h-5 w-5" aria-hidden="true" />
               </span>

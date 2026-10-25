@@ -194,6 +194,11 @@ Archivos principales:
   - TTL: 24 horas
 - Score cache persistente en `localStorage`
   - TTL: 30 días
+- Fechas de visionado (`showverse:favorites:watch-history:v1`, `src/lib/userLists/watchHistoryCache.js`)
+  - Última fecha y número de visionados por título, sacados de `/api/trakt/history`, de la cuenta actual (`owner`).
+  - Fijan «Vista reciente» y «Vista antigua» desde el primer pintado; la respuesta de la red se pide a la vez que la lista y reescribe la copia (al volver atrás con el orden congelado, solo la copia).
+  - Sin copia válida (primera visita o más de 30 días), esos dos órdenes esperan al historial antes de pintar la lista, en vez de pintarla en orden de «Añadido» y recolocarla.
+  - Protegida del desalojo por cuota (`localStorageBudget.js`).
 - Preferencias de UI
   - `localStorage`, sin TTL
 

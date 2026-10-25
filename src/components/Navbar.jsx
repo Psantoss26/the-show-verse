@@ -56,11 +56,11 @@ import {
   Sparkles,
   Menu,
   PartyPopper,
-  Flame,
 } from "lucide-react";
 import WatchNextAssistant from "@/components/WatchNextAssistant";
 import NetflixSyncListener from "@/components/NetflixSyncListener";
 import AlertsMenu, { AlertsMenuBoot } from "@/components/notifications/AlertsMenu";
+import TodayNavbarEntry from "@/components/today/TodayNavbarEntry";
 import OfflineBanner from "@/components/OfflineBanner";
 import useBodyScrollLock from "@/hooks/useBodyScrollLock";
 import { useAppPullToRefreshLock } from "@/lib/android/appBridge";
@@ -100,7 +100,6 @@ const PROFILE_MENU_GROUPS = [
     { href: "/watchlist", label: "Pendientes", Icon: Bookmark, tone: "text-sky-400" },
   ],
   [
-    { href: "/today", label: "Hoy", Icon: Flame, tone: "text-pink-400" },
     { href: "/social", label: "Social", Icon: Users, tone: "text-pink-400" },
     { href: "/lists", label: "Listas", Icon: ListVideo, tone: "text-purple-400" },
     { href: "/calendar", label: "Calendario", Icon: CalendarDaysIcon, tone: "text-amber-400" },
@@ -113,7 +112,6 @@ const MOBILE_BOTTOM_NAV_ICONS = {
   series: TvIcon,
   discover: Compass,
   library: FolderKanban,
-  today: Flame,
   social: Users,
   lists: ListVideo,
   "in-progress": Play,
@@ -2366,7 +2364,6 @@ function NavbarContent() {
         prefetchNavRoute("/series");
         prefetchNavRoute("/recommendations");
         prefetchNavRoute("/lists");
-        prefetchNavRoute("/today");
         prefetchNavRoute("/social");
         prefetchNavRoute("/in-progress");
         prefetchNavRoute("/favorites");
@@ -2913,6 +2910,10 @@ function NavbarContent() {
             {/* Buscar va PRIMERO en esta zona: es la acción más frecuente y así
                 queda pegada al contenido, no escondida entre los extremos.
                 El ancho es lo único que se anima, así que la barra no salta. */}
+            {/* «HOY», como en Trakt: caras de quien tiene historias y cuántas
+                quedan sin ver. Lleva a la vista «Hoy» de Social. */}
+            {account ? <TodayNavbarEntry /> : null}
+
             <div
               ref={desktopSearchRef}
               // `rounded-full` EN EL RECORTE. Este contenedor lleva
@@ -3249,6 +3250,7 @@ function NavbarContent() {
             ref={mobileRightRef}
             className={`flex flex-shrink-0 origin-right items-center gap-2 pr-1 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${mobileTopControlScaleClass}`}
           >
+            {account ? <TodayNavbarEntry variant="mobile" /> : null}
             {profileAuthLoading ? (
               <AlertsMenuBoot variant="mobile" />
             ) : account ? (
@@ -3560,19 +3562,6 @@ function NavbarContent() {
                   </Link>
 
                   <div className="my-2.5 h-px bg-white/5" />
-
-                  <Link
-                    href="/today"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                      isActive("/today")
-                        ? "bg-pink-500/20 text-pink-300 font-bold"
-                        : "text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] hover:bg-white/10"
-                    }`}
-                  >
-                    <Flame className="h-5 w-5 text-pink-400" />
-                    <span>{t("nav_today", "Hoy")}</span>
-                  </Link>
 
                   <Link
                     href="/social"

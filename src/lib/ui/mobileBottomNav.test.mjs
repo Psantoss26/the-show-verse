@@ -18,3 +18,8 @@ test("mobile bottom nav falls back safely for malformed or unknown preferences",
   assert.deepEqual(sanitizeMobileBottomNav(["social", "unknown"]), DEFAULT_MOBILE_BOTTOM_NAV);
   assert.deepEqual(sanitizeMobileBottomNav(null), DEFAULT_MOBILE_BOTTOM_NAV);
 });
+
+test("la clave antigua «today» se convierte en Social sin perder la barra", () => {
+  assert.deepEqual(sanitizeMobileBottomNav(["today", "lists"]), ["social", "lists"]);
+  assert.deepEqual(sanitizeMobileBottomNav(["today", "social", "lists"]), ["social", "lists"]);
+});
