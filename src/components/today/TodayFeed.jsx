@@ -2,10 +2,10 @@
 
 // src/components/today/TodayFeed.jsx
 // Columna central de Hoy: lo que ha hecho la gente, agrupado por título (por
-// defecto), por persona o por franja horaria. El selector es un control
-// segmentado y no un desplegable: tres opciones caben siempre a la vista.
+// defecto), por persona o por franja horaria. La agrupación se elige en el
+// desplegable «Agrupar» de la barra de Social.
 
-import { Clock3, Film, MessageSquare, Play, Star, Users } from "lucide-react";
+import { MessageSquare, Play, Star } from "lucide-react";
 
 import Stars from "@/components/social/Stars";
 import { relativeTime } from "@/lib/notifications/alerts";
@@ -17,47 +17,13 @@ import {
   UserAvatar,
 } from "./TodayParts";
 import {
-  ACTIVE_PILL,
   CARD_GLASS,
-  CONTROL_GLASS,
   actionPhrase,
   clockTime,
   dayHeading,
   displayName,
   milestoneLabel,
 } from "./todayUi";
-
-export const GROUP_OPTIONS = [
-  { value: "title", label: "Por título", icon: Film },
-  { value: "person", label: "Por persona", icon: Users },
-  { value: "time", label: "Por hora", icon: Clock3 },
-];
-
-export function GroupSelector({ value, onChange }) {
-  return (
-    <div role="tablist" aria-label="Agrupar" className={`flex h-10 items-center rounded-2xl p-1 ${CONTROL_GLASS}`}>
-      {GROUP_OPTIONS.map(({ value: option, label, icon: Icon }) => {
-        const active = option === value;
-        return (
-          <button
-            key={option}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            onClick={() => onChange(option)}
-            title={label}
-            className={`flex h-full flex-1 items-center justify-center gap-1.5 rounded-xl px-3 text-xs font-bold transition-colors ${
-              active ? ACTIVE_PILL : "text-zinc-400 hover:bg-white/10 hover:text-white"
-            }`}
-          >
-            <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            <span className="hidden whitespace-nowrap sm:inline">{label}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
 
 function ActionIcon({ action }) {
   if (action.kind === "comment") return <MessageSquare className="h-3.5 w-3.5 shrink-0 text-orange-400" aria-hidden="true" />;

@@ -54,15 +54,15 @@ export default async function SocialPage({ searchParams }) {
   const [params, cookieStore, headerList] = await Promise.all([searchParams, cookies(), headers()]);
   const view = normalizeSocialView(params);
   const { scope, day, group } = normalizeTodayParams(params);
-  // Los datos de «Hoy» van en el RSC solo si se abre en esa vista; «Actividad»
-  // los pide el cliente como siempre.
+  // Los datos de «Hoy» van en el RSC solo si se abre en esa opción; Siguiendo y
+  // Yo los pide el cliente como siempre.
   const data = view === "today"
     ? await loadInitialToday({ scope, day, cookieStore, headerList })
     : null;
 
   return (
     <DetailModalProvider placement="right">
-      <SocialHub initialToday={{ scope, day, group, data }} />
+      <SocialHub initialView={view} initialToday={{ scope, day, group, data }} />
     </DetailModalProvider>
   );
 }
