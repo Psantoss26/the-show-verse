@@ -506,31 +506,8 @@ function DetailPeekLayout({
     return undefined;
   }, [cardRef, isPresent, safeToRemove, fromCss, reduceMotion]);
 
-  // IR A LA FICHA SIN DEJAR RASTRO. Chrome en Android guarda una captura de
-  // la página al navegar (también en las navegaciones de Next, dentro del
-  // mismo documento) y es la que enseña al volver atrás con el gesto. Cerrar
-  // con la animación y navegar a la vez dejaba la vista previa a medio irse
-  // en esa captura: al volver se veía encima de la página. Se oculta de
-  // golpe y se navega cuando ya hay un fotograma pintado sin ella (el segundo
-  // rAF corre después de ese fotograma).
-  const rootRef = useRef(null);
-  const leavingRef = useRef(false);
-  const handleOpenFull = () => {
-    if (leavingRef.current) return;
-    leavingRef.current = true;
-    const root = rootRef.current;
-    if (root) {
-      root.style.visibility = "hidden";
-      root.style.pointerEvents = "none";
-    }
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => onOpenFull?.());
-    });
-  };
-
   return (
     <div
-      ref={rootRef}
       className="fixed inset-0 z-[9999]"
       role="dialog"
       aria-modal="true"
@@ -567,7 +544,7 @@ function DetailPeekLayout({
           {/* Portada con su logo. Tocarla abre la ficha completa. */}
           <button
             type="button"
-            onClick={handleOpenFull}
+            onClick={onOpenFull}
             aria-label={title ? `Abrir la ficha de ${title}` : "Abrir la ficha"}
             className="relative block w-full overflow-hidden bg-transparent text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-yellow-400"
             style={{ height: geometry.posterHeight }}
@@ -855,6 +832,9 @@ export default function DetailModal({
   // que crece al abrirse y al que vuelve al cerrarse.
   peek = false,
   peekOrigin = null,
+  // Ir a la ficha completa desde la vista previa: lo resuelve MobileTitlePeek,
+  // que la mantiene encima hasta que la ficha está en pantalla.
+  onPeekOpenFull,
 }) {
   const isRightPlacement = placement === "right";
   const isDocked = isRightPlacement && drawerView === "docked";
@@ -3918,6 +3898,10 @@ export default function DetailModal({
           const href = isEpisode
             ? `/details/tv/${episodeMeta?.showId ?? item?.showId ?? item?.id}/season/${episodeMeta?.seasonNumber ?? item?.seasonNumber}/episode/${episodeMeta?.episodeNumber ?? item?.episodeNumber}`
             : dashboardDetailHref(item, mediaType);
+          if (onPeekOpenFull) {
+            onPeekOpenFull(href);
+            return;
+          }
           onClose?.();
           router.push(href);
         }}

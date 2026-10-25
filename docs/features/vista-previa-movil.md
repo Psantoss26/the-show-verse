@@ -18,7 +18,7 @@ En el móvil, mantener el dedo sobre la tarjeta de una película, una serie o un
   2. la fila de botones de la ficha (tráiler, banda sonora, visto, puntuar, favorito, pendiente, listas, reseñas), con sus mismos modales. Sin sesión, reseñas lleva al login, como en la ficha;
   3. el marcador de puntuaciones (TMDb, Trakt, IMDb y estadísticas).
 - La fila de botones y el marcador se ven exactamente como en la ficha móvil: dejan 10 px a cada lado dentro de la tarjeta, así que miden lo mismo que allí (ancho de pantalla menos 32 px), con los mismos botones, el mismo tamaño de letra, 4 px entre botones y 20 px entre la fila y el marcador.
-- Tocar la portada lleva a la ficha completa. La vista previa desaparece en el acto y la navegación espera a que se haya pintado un fotograma sin ella: Chrome en Android guarda una captura de la página al navegar y la enseña al volver atrás con el gesto, así que ahí la página sale limpia, sin restos de la vista previa.
+- Tocar la portada lleva a la ficha completa. La vista previa no se cierra: se queda encima, tal cual, mientras la ficha carga (también durante su pantalla de carga). Cuando la ficha ya está en pantalla se retira de golpe, sin animación de salida, y ya no vuelve a verse, tampoco al volver atrás. Si la ficha no llega en 10 s, se retira igualmente.
 - Tocar fuera, o la tecla Escape, cierra la vista previa y la tarjeta vuelve a su sitio.
 - Al soltar el dedo no se abre la ficha ni sale el menú del sistema para enlaces o imágenes.
 - Si el dedo se mueve más de 10 px (desplazar la página o un carrusel), no se abre nada.
@@ -29,7 +29,7 @@ En el móvil, mantener el dedo sobre la tarjeta de una película, una serie o un
 
 | Pieza | Qué hace |
 |---|---|
-| `src/components/preview/MobileTitlePeek.jsx` | Se monta una vez en `src/app/layout.jsx`. Escucha los toques en el documento, detecta la pulsación larga, anula el clic al soltar y pinta la vista previa. Descarga la ficha rápida solo cuando empieza una pulsación sobre un título. |
+| `src/components/preview/MobileTitlePeek.jsx` | Se monta una vez en `src/app/layout.jsx`. Escucha los toques en el documento, detecta la pulsación larga, anula el clic al soltar y pinta la vista previa. Descarga la ficha rápida solo cuando empieza una pulsación sobre un título. Al ir a la ficha (`onPeekOpenFull`) navega y retira la vista previa cuando la ruta de la ficha está en pantalla sin `[data-details-root][aria-busy="true"]`. |
 | `src/lib/navigation/titlePeek.mjs` | Lógica pura: qué título corresponde a un enlace `/details/...` o a un atributo `data-sv-peek`, y los márgenes del gesto. Con tests (`titlePeek.test.mjs`). |
 | `src/components/dashboard/DetailModal.jsx` | La ficha rápida con la prop `peek`: reutiliza su portada, su fila de botones y su marcador en la tarjeta flotante (`DetailPeekLayout`). |
 

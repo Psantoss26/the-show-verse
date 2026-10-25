@@ -24,12 +24,19 @@
 //     es la propia señal de pulsación larga y la vista previa se abre ya.
 //   - Al soltar no se sigue el enlace ni se abre la ficha: el clic que el
 //     navegador sintetiza se descarta.
+//
+// Ir a la ficha (tocar la portada): la vista previa NO se cierra. Se navega y
+// se queda tal cual encima mientras la ficha carga; cuando la ficha está en
+// pantalla (ya sin su pantalla de carga) se retira de golpe, sin animación de
+// salida, y ya no vuelve a verse: tampoco al volver atrás.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
+
+import { useRouter } from "@/lib/offline/useOfflineRouter";
 
 import { useMediaQuery } from "@/lib/hooks/useMediaQuery";
 import useModalGuard from "@/hooks/useModalGuard";
@@ -49,6 +56,24 @@ const DetailModal = dynamic(loadDetailModal, { ssr: false });
 
 // Tras soltar el dedo, cuánto dura el descarte del clic sintetizado (ms).
 const CLICK_SUPPRESS_MS = 700;
+// Si la ficha no llega a abrirse en este tiempo, la vista previa se retira
+// igualmente (ms).
+const LEAVE_MAX_WAIT_MS = 10000;
+
+// ¿Está ya la ficha de `href` en pantalla? Su ruta es la de la URL y no queda a
+// la vista ninguna pantalla de carga de ficha (`details/loading.jsx`). Las
+// pantallas ocultas de la pila de navegación (OverlayRouteHost) no cuentan:
+// están en `display: none` y no tienen cajas.
+function detailsShown(href) {
+  if (window.location.pathname !== new URL(href, window.location.origin).pathname) {
+    return false;
+  }
+  const loading = document.querySelectorAll('[data-details-root][aria-busy="true"]');
+  for (const node of loading) {
+    if (node.getClientRects().length > 0) return false;
+  }
+  return true;
+}
 
 function resolvePeekTarget(node) {
   const target = node?.closest?.(TITLE_PEEK_SELECTOR);
@@ -65,20 +90,85 @@ export default function MobileTitlePeek() {
   );
   const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const pathname = usePathname();
+  const router = useRouter();
   const [peek, setPeek] = useState(null);
   const [portalReady, setPortalReady] = useState(false);
+  // Cambiarla monta un AnimatePresence nuevo: la vista previa desaparece al
+  // instante, sin su animación de salida.
+  const [presenceKey, setPresenceKey] = useState(0);
 
   const close = useCallback(() => setPeek(null), []);
-  useModalGuard({ open: !!peek, onClose: close });
+  const removeInstantly = useCallback(() => {
+    setPresenceKey((key) => key + 1);
+    setPeek(null);
+  }, []);
+  // Mientras se va a la ficha la página ya no es de la vista previa: ni
+  // bloqueo del scroll ni Escape.
+  useModalGuard({ open: !!peek && !peek.leavingTo, onClose: close });
 
   useEffect(() => {
     setPortalReady(true);
   }, []);
 
-  // Cambiar de página (p. ej. al tocar la portada para ir a la ficha) la cierra.
+  const leavingRef = useRef(null);
+  const openFull = useCallback(
+    (href) => {
+      // Un segundo toque en la portada mientras se navega no hace nada.
+      if (leavingRef.current) return;
+      leavingRef.current = href;
+      setPeek((current) =>
+        current && !current.leavingTo ? { ...current, leavingTo: href } : current,
+      );
+      router.push(href);
+    },
+    [router],
+  );
+
+  // Cambiar de página la cierra, salvo cuando es la ida a la ficha desde la
+  // propia vista previa: entonces la ruta cambia ya con la pantalla de carga y
+  // la vista previa tiene que seguir encima hasta que llegue la ficha.
   useEffect(() => {
+    leavingRef.current = peek?.leavingTo || null;
+  }, [peek]);
+  useEffect(() => {
+    if (
+      leavingRef.current &&
+      new URL(leavingRef.current, window.location.origin).pathname === pathname
+    ) {
+      return;
+    }
     setPeek(null);
   }, [pathname]);
+
+  // Ida a la ficha: se retira cuando la ficha ya está en pantalla y se ha
+  // pintado al menos un fotograma con ella debajo.
+  const leavingTo = peek?.leavingTo || null;
+  useEffect(() => {
+    if (!leavingTo) return undefined;
+    let frame = 0;
+    let cancelled = false;
+    const startedAt = performance.now();
+    const check = () => {
+      if (cancelled) return;
+      if (
+        detailsShown(leavingTo) ||
+        performance.now() - startedAt > LEAVE_MAX_WAIT_MS
+      ) {
+        frame = window.requestAnimationFrame(() => {
+          frame = window.requestAnimationFrame(() => {
+            if (!cancelled) removeInstantly();
+          });
+        });
+        return;
+      }
+      frame = window.requestAnimationFrame(check);
+    };
+    frame = window.requestAnimationFrame(check);
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
+    };
+  }, [leavingTo, removeInstantly]);
 
   // Estado del gesto en curso. En un ref: cambia en cada `touchmove` y no debe
   // re-renderizar nada.
@@ -264,12 +354,13 @@ export default function MobileTitlePeek() {
 
   return createPortal(
     <div data-sv-no-peek="">
-      <AnimatePresence>
+      <AnimatePresence key={presenceKey}>
         {peek && (
           <DetailModal
             key={peek.key}
             item={peek.item}
             onClose={close}
+            onPeekOpenFull={openFull}
             peek
             peekOrigin={peek.origin}
           />
