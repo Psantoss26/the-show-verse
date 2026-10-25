@@ -305,18 +305,18 @@ function preferredPanelWidth(mobileDetails) {
 }
 
 /* ======================= VISTA PREVIA (PULSACIÓN LARGA) ======================= */
-// Ancho de la tarjeta: lo que da el teléfono menos 8px por lado, sin pasar de
-// 420px. La fila de botones (8px de relleno a cada lado) queda así igual de
-// ancha que en la ficha móvil y los botones salen igual de grandes; alrededor
-// se sigue viendo la página difuminada. La portada se queda en 2:3 mientras quepa y, en pantallas
+// Ancho de la tarjeta: lo que da el teléfono menos 6px por lado, sin pasar de
+// 440px. La fila de botones solo deja 4px a cada lado (los `px-1` de la ficha
+// móvil), así que es más ancha que en la ficha y los botones salen al menos
+// igual de grandes; alrededor se sigue viendo la página difuminada. La portada se queda en 2:3 mientras quepa y, en pantallas
 // bajas, se recorta por arriba y por abajo para dejar sitio a botones y
 // marcador: la tarjeta nunca ocupa la pantalla entera.
-const PEEK_MAX_WIDTH = 420;
-const PEEK_SIDE_GUTTER = 8;
+const PEEK_MAX_WIDTH = 440;
+const PEEK_SIDE_GUTTER = 6;
 // Alto que se reserva para la fila de botones, el marcador y el aire de arriba
 // y abajo.
 const PEEK_CHROME_HEIGHT = 300;
-const PEEK_SCOREBOARD_STYLE = { zoom: 0.82 };
+const PEEK_SCOREBOARD_STYLE = { zoom: 0.7 };
 
 function peekGeometry() {
   const vw = window.innerWidth;
@@ -448,13 +448,13 @@ function DetailPeekLayout({
             )}
           </button>
 
-          <div className="px-2 pb-4 pt-3">
+          <div className="px-1 pb-3 pt-3">
             {actions}
             {/* El marcador de teléfono está pensado para el ancho entero de
                 la ficha: aquí, a su tamaño, pesaba más que la portada. Se
                 reduce con `zoom` y no con `transform` para que ocupe también
                 menos alto y no deje hueco debajo. */}
-            <div className="mt-3" style={PEEK_SCOREBOARD_STYLE}>
+            <div className="mx-2 mt-3" style={PEEK_SCOREBOARD_STYLE}>
               {scoreboard}
             </div>
           </div>
