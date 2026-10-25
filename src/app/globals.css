@@ -3418,7 +3418,8 @@ html[data-details-sequence-transition] .sv-topbar {
 
 /* Píldora «Hoy» del navbar (TodayNavbarEntry): mientras quedan historias sin
    ver, un destello recorre el borde una vez por minuto, como en Trakt. El
-   degradado cónico gira detrás y la máscara deja ver solo el anillo de 1px. */
+   degradado cónico gira detrás y la máscara deja ver solo el anillo de 1px.
+   Luz blanca tenue, no rosa: no debe leerse como un contorno marcado. */
 .sv-today-shine {
   mask:
     linear-gradient(#000 0 0) content-box,
@@ -3434,9 +3435,9 @@ html[data-details-sequence-transition] .sv-topbar {
   aspect-ratio: 1;
   background: conic-gradient(
     transparent 0deg,
-    rgba(244, 114, 182, 0.75) 22deg,
-    rgba(255, 255, 255, 0.95) 32deg,
-    rgba(244, 114, 182, 0.75) 42deg,
+    rgba(255, 255, 255, 0.18) 22deg,
+    rgba(255, 255, 255, 0.45) 32deg,
+    rgba(255, 255, 255, 0.18) 42deg,
     transparent 66deg
   );
   opacity: 0;

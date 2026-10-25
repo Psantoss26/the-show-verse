@@ -42,7 +42,7 @@ Los valores por defecto (`following`, `today`, `title`) no se escriben en la URL
 
 ## Qué se ve
 
-Maqueta como la Today de Trakt. En escritorio hay tres columnas con su título alineado arriba (`ColumnHeading`, con la misma letra que «Películas favoritas» del perfil: 12 px en negrita, versalitas espaciadas, gris y una raya fina debajo): **Historia destacada** (con «Reproducir todo»), **De la gente que sigues** o **De la comunidad** (con el número de títulos) y **Más activos**. Por debajo de `xl`, Más activos baja bajo las otras dos; en móvil todo va en una columna. El texto va a 12 px como mínimo y los iconos a 14–16 px, para que se lean nítidos. Las tarjetas son superficies lisas, sin desenfoque.
+Maqueta como la Today de Trakt. En escritorio hay tres columnas con su título alineado arriba (`ColumnHeading`, con la misma letra que «Películas favoritas» del perfil: 12 px en negrita, versalitas espaciadas y gris, sin raya debajo): **Historia destacada** (con «Reproducir todo»), **De la gente que sigues** o **De la comunidad** (con el número de títulos) y **Más activos**. Por debajo de `xl`, Más activos baja bajo las otras dos; en móvil todo va en una columna. El texto va a 12 px como mínimo y los iconos a 14–16 px, para que se lean nítidos. Las tarjetas son superficies lisas, sin desenfoque y sin bordes: en Hoy nada va contorneado. Las caras apiladas se recortan una sobre otra con una máscara, sin aro.
 
 - **Controles:** los desplegables Quién, Día y Agrupar de la barra (ver arriba). Encima del contenido, la línea «N actividades de M personas».
 - **Historias:** en móvil, carril de círculos, uno por título más uno de «Para ti»; el aro es de color mientras quede algo sin ver. En escritorio se abren desde la destacada, desde «Reproducir todo» o desde cada cartel. Todas abren el **reproductor a pantalla completa** (`TodayStoryViewer`):
@@ -51,6 +51,16 @@ Maqueta como la Today de Trakt. En escritorio hay tres columnas con su título a
   - Deslizar en horizontal cambia de título y hacia abajo cierra.
   - Teclado: ← y → cambian de fotograma, espacio pausa y Esc cierra.
   - Los fotogramas vistos se guardan en `localStorage` (`today-seen-stories`) durante 24 h.
+  - El cartel ocupa casi todo el reproductor, con lo que pasó debajo.
+  - En la cabecera, junto a pausa y cerrar, el botón de cuadrícula («Ver todo Hoy») cierra las historias y lleva a la vista Hoy de `/social`, como el de Trakt.
+  - **Ficha del título** (`TodayStoryDetails`). En ordenador (con ratón), al pasar por el cartel este se convierte en la ficha y la historia se pausa mientras dure; al salir vuelve el cartel. En táctil se abre al **tocar la portada** y se cierra con otro toque (también al cambiar de fotograma); tocar fuera de la portada sigue yendo atrás o adelante. La ficha muestra:
+    - backdrop con idioma, con el criterio de DetailsClient (`pickLadderBackdrop`: inglés → español → original → sin idioma);
+    - título y fila de año · temporadas y episodios o duración · estado · géneros;
+    - marcador compacto de la ficha móvil (`DetailsScoreboardPanel` con `mobileScoresOnly`: TMDb, Trakt, IMDb y stats de Trakt);
+    - sinopsis en 3 líneas;
+    - «Opinión», con lo positivo y lo negativo de la comunidad.
+
+    Los datos salen de `useDetailModalData` (los de la ficha rápida) y solo se piden al pasar el ratón.
 - **Historia destacada:** la más reciente con un **hito** (estreno o final de temporada o de serie). Si ninguna tiene hito, la que ha juntado a más gente. Tarjeta con:
   - quién la protagoniza y la etiqueta del hito (o «Serie» / «Película»);
   - el cartel centrado sobre el fondo del título;

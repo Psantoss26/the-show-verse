@@ -39,7 +39,7 @@ function PosterTile({ media, users, actions, latestAt, tz, onOpen }) {
         aria-label={`${media.title}: ${line}`}
         className="group block w-full text-left focus-visible:outline-none"
       >
-        <span className="relative block overflow-hidden rounded-lg ring-1 ring-inset ring-white/[0.06] transition-transform duration-200 group-hover:-translate-y-0.5 group-focus-visible:ring-2 group-focus-visible:ring-pink-400">
+        <span className="relative block overflow-hidden rounded-lg transition-transform duration-200 group-hover:-translate-y-0.5 group-focus-visible:ring-2 group-focus-visible:ring-pink-400">
           <Poster media={media} size="w342" className="aspect-[2/3] w-full" />
           <span className="absolute right-1.5 top-1.5">
             <AvatarStack users={users} max={2} size="h-7 w-7" />
@@ -71,7 +71,7 @@ function ListRow({ media, users, actions, rating, milestone, latestAt, tz, onOpe
         aria-label={`${media.title}: ${line}`}
         className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors xl:gap-4 xl:px-4 xl:py-3 2xl:py-3.5 hover:bg-white/[0.04] focus-visible:bg-white/[0.06] focus-visible:outline-none"
       >
-        <Poster media={media} size="w154" className="aspect-[2/3] w-11 shrink-0 rounded-md ring-1 ring-inset ring-white/[0.06] xl:w-14 2xl:w-16" />
+        <Poster media={media} size="w154" className="aspect-[2/3] w-11 shrink-0 rounded-md xl:w-14 2xl:w-16" />
         <span className="min-w-0 flex-1">
           <span className="flex min-w-0 items-center gap-2">
             <span className="truncate text-sm font-bold text-white 2xl:text-base">{media.title}</span>

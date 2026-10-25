@@ -47,16 +47,25 @@ export function UserAvatar({ user, className = "h-8 w-8", ring = "" }) {
   );
 }
 
+// Caras montadas una sobre otra SIN aro: cada una recorta con una máscara el
+// hueco donde se apoya la siguiente (el AvatarStack «cutout» de Trakt, como la
+// píldora del navbar). El solape es el de `-space-x-2` (8 px) y el hueco, 2 px;
+// la máscara va en porcentajes para servir a cualquier tamaño de cara.
+const STACK_CUTOUT = "radial-gradient(calc(50% + 2px) calc(50% + 2px) at calc(150% - 8px) 50%, transparent 98%, #000 100%)";
+const stackCutoutStyle = (last) => (last ? undefined : { WebkitMaskImage: STACK_CUTOUT, maskImage: STACK_CUTOUT });
+
 export function AvatarStack({ users, max = 4, size = "h-7 w-7" }) {
   const shown = users.slice(0, max);
   const rest = users.length - shown.length;
   return (
     <span className="flex items-center -space-x-2">
-      {shown.map((user) => (
-        <UserAvatar key={user.id} user={user} className={size} ring="ring-2 ring-black" />
+      {shown.map((user, index) => (
+        <span key={user.id} className="inline-flex" style={stackCutoutStyle(index === shown.length - 1 && rest <= 0)}>
+          <UserAvatar user={user} className={size} />
+        </span>
       ))}
       {rest > 0 ? (
-        <span className={`inline-flex items-center justify-center rounded-full bg-zinc-800 text-xs font-bold text-zinc-300 ring-2 ring-black ${size}`}>
+        <span className={`inline-flex items-center justify-center rounded-full bg-zinc-800 text-xs font-bold text-zinc-300 ${size}`}>
           +{rest}
         </span>
       ) : null}
@@ -160,12 +169,13 @@ export function StoryRail({ groups, seen, onOpen }) {
 /**
  * Título de cada columna de Hoy (Historia destacada · feed · Más activos), con
  * la misma letra que «Películas favoritas» del perfil (SectionHeader en
- * ProfileClient): 12 px en negrita, versalitas espaciadas, gris, y una raya
- * fina debajo. Las tres tienen la misma altura para quedar alineadas arriba.
+ * ProfileClient): 12 px en negrita, versalitas espaciadas y gris, sin la raya
+ * de debajo (en Hoy no va nada contorneado). Las tres tienen la misma altura
+ * para quedar alineadas arriba.
  */
 export function ColumnHeading({ id, children, count, action }) {
   return (
-    <div className="mb-4 flex h-8 items-center justify-between gap-3 border-b border-white/10 pb-2">
+    <div className="mb-4 flex h-8 items-center justify-between gap-3">
       <h2 id={id} className="flex min-w-0 items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-400">
         <span className="truncate">{children}</span>
         {typeof count === "number" ? (
@@ -207,7 +217,7 @@ export function TodayHero({ story, tz, onPlay, onOpenPerson }) {
   const lead = story.actions.find((a) => story.milestone && a.milestone === story.milestone) || story.actions[0];
   const chip = story.milestone ? milestoneLabel(story.milestone) : mediaKind(story.media);
   return (
-    <article className="relative overflow-hidden rounded-2xl bg-zinc-950 ring-1 ring-inset ring-white/[0.06]">
+    <article className="relative overflow-hidden rounded-2xl bg-zinc-950">
       {backdrop ? (
         <OptimizedImage src={backdrop} alt="" className="absolute inset-0 h-full w-full object-cover opacity-40" />
       ) : null}
@@ -235,7 +245,7 @@ export function TodayHero({ story, tz, onPlay, onOpenPerson }) {
           aria-label={`Reproducir la historia de ${story.media.title}`}
           className="mx-auto my-5 block w-[38%] max-w-[170px] transition-transform duration-300 hover:scale-[1.03] focus-visible:outline-none"
         >
-          <Poster media={story.media} size="w342" className="aspect-[2/3] w-full rounded-xl shadow-2xl ring-1 ring-white/10" />
+          <Poster media={story.media} size="w342" className="aspect-[2/3] w-full rounded-xl shadow-2xl" />
         </button>
 
         <TitleLink media={story.media} className="block truncate text-xl font-bold text-white hover:underline">
@@ -250,7 +260,7 @@ export function TodayHero({ story, tz, onPlay, onOpenPerson }) {
         <button
           type="button"
           onClick={onPlay}
-          className="mt-4 inline-flex h-10 w-fit items-center gap-2 rounded-full px-4 text-sm font-bold text-pink-200 ring-1 ring-inset ring-pink-400/60 transition-colors hover:bg-pink-500/15"
+          className="mt-4 inline-flex h-10 w-fit items-center gap-2 rounded-full bg-white/10 px-4 text-sm font-bold text-white transition-colors hover:bg-white/15"
         >
           Reproducir historia
           <Play className="h-4 w-4" aria-hidden="true" />
