@@ -62,30 +62,20 @@ En plena era del streaming lo que ves está repartido entre Netflix, Max, Disney
 
 ## 🎬 Tour visual
 
-> Capturas reales de [theshowverse.com](https://theshowverse.com).
+> Capturas reales de la app con una cuenta con sesión iniciada.
 
 ### 🏠 Inicio
 
-Un hero a pantalla completa con tráiler, logo del título y acciones rápidas, seguido de filas de contenido curado.
+Un hero a pantalla completa con tráiler, logo del título y acciones rápidas, seguido de tus filas personales («Continuar viendo», recomendaciones…) y de contenido curado.
 
 <img src="docs/assets/readme/home.jpg" alt="Inicio con hero a pantalla completa" width="100%">
 
-<table>
-<tr>
-<td width="50%">
-<img src="docs/assets/readme/home-rows.jpg" alt="Filas del dashboard">
-<p align="center"><sub><b>Filas curadas</b>: mejor valoradas, populares, próximos episodios…</sub></p>
-</td>
-<td width="50%">
-<img src="docs/assets/readme/home-hover.jpg" alt="Vista previa al pasar el ratón">
-<p align="center"><sub><b>Vista previa al pasar el ratón</b>: la tarjeta crece, reproduce el tráiler y muestra acciones y notas</sub></p>
-</td>
-</tr>
-</table>
+<img src="docs/assets/readme/home-rows.jpg" alt="Filas del dashboard con Continuar viendo" width="100%">
+<p align="center"><sub><b>Filas del dashboard</b>: mejor valoradas, continuar viendo, populares, próximos episodios…</sub></p>
 
 ### 🎞️ Fichas de películas y series
 
-Todo sobre un título en una sola página: marcador de puntuaciones (TMDb, Trakt, IMDb, Rotten Tomatoes, Metacritic…), acciones de seguimiento, reparto, temporadas, recomendaciones, premios, galería de portadas y fondos, opiniones de la comunidad y listas que lo incluyen.
+Todo sobre un título en una sola página: marcador de puntuaciones (TMDb, Trakt, IMDb, Rotten Tomatoes, Metacritic…), tu estado (visto, nota, favorito, pendiente), reparto, temporadas, recomendaciones, premios, galería de arte, opiniones de la comunidad y listas que lo incluyen.
 
 <table>
 <tr>
@@ -95,7 +85,7 @@ Todo sobre un título en una sola página: marcador de puntuaciones (TMDb, Trakt
 </td>
 <td width="50%">
 <img src="docs/assets/readme/tv.jpg" alt="Ficha de serie">
-<p align="center"><sub><b>Ficha de serie</b> con progreso y temporadas</sub></p>
+<p align="center"><sub><b>Ficha de serie</b> con tu nota, visto y favorito</sub></p>
 </td>
 </tr>
 <tr>
@@ -112,6 +102,106 @@ Todo sobre un título en una sola página: marcador de puntuaciones (TMDb, Trakt
 
 <img src="docs/assets/readme/movie-scroll2.jpg" alt="Colección, premios y galería de portadas" width="100%">
 <p align="center"><sub><b>Colección, premios y galería de arte</b>: elige portada, fondo y logo por idioma</sub></p>
+
+### 📚 Tu biblioteca
+
+Cada página personal con su vista predeterminada, buscador, filtros, orden, agrupación y contadores.
+
+<table>
+<tr>
+<td width="50%">
+<img src="docs/assets/readme/favorites.jpg" alt="Favoritos">
+<p align="center"><sub><b>Favoritos</b></sub></p>
+</td>
+<td width="50%">
+<img src="docs/assets/readme/watchlist.jpg" alt="Pendientes">
+<p align="center"><sub><b>Pendientes</b></sub></p>
+</td>
+</tr>
+<tr>
+<td width="50%">
+<img src="docs/assets/readme/history.jpg" alt="Historial">
+<p align="center"><sub><b>Historial</b> agrupado por mes, con calendario</sub></p>
+</td>
+<td width="50%">
+<img src="docs/assets/readme/continue.jpg" alt="Continuar viendo">
+<p align="center"><sub><b>Continuar viendo</b>: lo detectado en tus plataformas y lo añadido a mano</sub></p>
+</td>
+</tr>
+<tr>
+<td width="50%">
+<img src="docs/assets/readme/inprogress.jpg" alt="En progreso">
+<p align="center"><sub><b>En progreso</b>: avance por temporada y episodio</sub></p>
+</td>
+<td width="50%">
+<img src="docs/assets/readme/completed.jpg" alt="Completadas">
+<p align="center"><sub><b>Completadas</b></sub></p>
+</td>
+</tr>
+<tr>
+<td width="50%">
+<img src="docs/assets/readme/biblio.jpg" alt="Biblioteca de Plex">
+<p align="center"><sub><b>Biblioteca</b>: tu servidor Plex</sub></p>
+</td>
+<td width="50%">
+<img src="docs/assets/readme/recs.jpg" alt="Recomendaciones">
+<p align="center"><sub><b>Recomendaciones</b>: desliza para descartar, guardar o marcar favorito</sub></p>
+</td>
+</tr>
+</table>
+
+### 📲 Ficha rápida lateral en vista teléfono
+
+Desde cualquier página personal, pulsar un título abre su ficha en un **panel lateral acoplado** sin salir de la página. En **vista teléfono** el panel reproduce la ficha móvil: portada con logo, botones, marcador y todas las secciones al desplazar. Se puede pasar de un título a otro sin cerrarlo.
+
+<table>
+<tr>
+<td width="50%">
+<img src="docs/assets/readme/drawer-watch.jpg" alt="Panel lateral en vista teléfono desde Pendientes">
+<p align="center"><sub><b>Abierto desde Pendientes</b></sub></p>
+</td>
+<td width="50%">
+<img src="docs/assets/readme/drawer-fav-scroll.jpg" alt="Panel lateral desplazado con marcador y detalles">
+<p align="center"><sub><b>Al desplazar</b>: marcador, estadísticas y detalles</sub></p>
+</td>
+</tr>
+</table>
+
+### 👤 Perfil
+
+Perfil público en `/u/[usuario]` con pestañas para nivel, estadísticas, vista neuronal, actividad, diario, reseñas, favoritos, pendientes, puntuaciones, listas y social.
+
+<img src="docs/assets/readme/profile.jpg" alt="Perfil con películas y series favoritas, nivel y actividad" width="100%">
+<p align="center"><sub><b>Perfil</b>: películas y series favoritas, nivel, resumen del año y actividad</sub></p>
+
+<table>
+<tr>
+<td width="50%">
+<img src="docs/assets/readme/stats.jpg" alt="Estadísticas">
+<p align="center"><sub><b>Estadísticas</b>: actividad mensual, horas vistas, rachas, hora y día favoritos</sub></p>
+</td>
+<td width="50%">
+<img src="docs/assets/readme/level.jpg" alt="Nivel">
+<p align="center"><sub><b>Nivel</b>: rango, XP, logros y de dónde sale la experiencia</sub></p>
+</td>
+</tr>
+</table>
+
+<img src="docs/assets/readme/neuronal.jpg" alt="Vista neuronal" width="100%">
+<p align="center"><sub><b>Vista neuronal</b>: grafo de todo lo que has visto, unido por géneros y sagas</sub></p>
+
+### 💬 Social · Hoy
+
+Lo más destacado de lo que han visto, puntuado y reseñado la gente que sigues (o toda la comunidad) hoy, ayer o esta semana.
+
+<img src="docs/assets/readme/social.jpg" alt="Social, vista Hoy" width="100%">
+<p align="center"><sub><b>Hoy</b>: historia destacada, lo que ha visto la gente que sigues y los más activos</sub></p>
+
+<p align="center">
+<img src="docs/assets/readme/stories-hover.jpg" alt="Historias de Hoy con la ficha del título" width="60%">
+<br>
+<sub><b>Historias</b> por título; al pasar el ratón, la portada se gira y muestra la ficha</sub>
+</p>
 
 ### 🧭 Explorar
 
@@ -150,22 +240,9 @@ Todo sobre un título en una sola página: marcador de puntuaciones (TMDb, Trakt
 
 ### 📱 En el móvil
 
-Diseño propio para móvil (no una versión encogida): cabeceras inmersivas, barra inferior de acciones, gestos para pasar de título, vista previa al mantener pulsada una tarjeta y PWA instalable.
+Diseño propio para móvil (no una versión encogida): cabeceras inmersivas, barra inferior configurable, gestos para pasar de título, vista previa al mantener pulsada una tarjeta y PWA instalable.
 
-<img src="docs/assets/readme/mobile-showcase.jpg" alt="Pantallas de la app en móvil" width="100%">
-
-<table>
-<tr>
-<td width="50%">
-<img src="docs/assets/readme/recap.jpg" alt="Recap anual">
-<p align="center"><sub><b>Tu año en The Show Verse</b>: resumen anual con imagen para compartir</sub></p>
-</td>
-<td width="50%">
-<img src="docs/assets/readme/login.jpg" alt="Inicio de sesión">
-<p align="center"><sub><b>Cuenta propia</b> con correo o Google</sub></p>
-</td>
-</tr>
-</table>
+<img src="docs/assets/readme/mobile-showcase.jpg" alt="Inicio, ficha, Favoritos, En progreso, Perfil y Social en móvil" width="100%">
 
 ---
 
