@@ -169,13 +169,13 @@ export function StoryRail({ groups, seen, onOpen }) {
 /**
  * Título de cada columna de Hoy (Historia destacada · feed · Más activos), con
  * la misma letra que «Películas favoritas» del perfil (SectionHeader en
- * ProfileClient): 12 px en negrita, versalitas espaciadas y gris, sin la raya
- * de debajo (en Hoy no va nada contorneado). Las tres tienen la misma altura
- * para quedar alineadas arriba.
+ * ProfileClient): 12 px en negrita, versalitas espaciadas y gris, con una
+ * línea horizontal fina debajo. Las tres tienen la misma altura para quedar
+ * alineadas arriba, y sus líneas también.
  */
 export function ColumnHeading({ id, children, count, action }) {
   return (
-    <div className="mb-4 flex h-8 items-center justify-between gap-3">
+    <div className="mb-4 flex h-9 items-center justify-between gap-3 border-b border-white/10 pb-2">
       <h2 id={id} className="flex min-w-0 items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-400">
         <span className="truncate">{children}</span>
         {typeof count === "number" ? (

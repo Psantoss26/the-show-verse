@@ -14,7 +14,7 @@ Capa social de The Show Verse: perfiles públicos de cada miembro, seguir y deja
 | `/u/[username]/[section]` | Pestañas del perfil (ver abajo). |
 | `/u/[username]/followers`, `/following` | Seguidores y seguidos (`FollowListClient`). |
 | `/profile` y `/profile/[section]` | El mismo perfil, para el usuario con sesión. El layout persistente cambia solo la sección activa. |
-| `/social` | Sección Social. Su barra elige entre **Hoy / Siguiendo / Yo**. Hoy (por defecto) es lo destacado de hoy, ayer o la semana, con historias y más activos, y sus filtros Quién, Día y Agrupar van en la misma barra (ver [[hoy]]). Siguiendo (`?view=activity`) y Yo (`?view=mine`) son el feed de las cuentas que sigo o el mío. Color propio: rosa/fucsia. |
+| `/social` | Sección Social. Su barra elige entre **Hoy / Siguiendo / Yo**. Hoy (por defecto) es lo destacado de hoy, ayer o la semana, con historias y más activos, y sus filtros Quién, Día y Agrupar van en la misma barra (ver [[hoy]]). Siguiendo (`?view=activity`) y Yo (`?view=mine`) son el feed de las cuentas que sigo o el mío. Las cifras de la cabecera son Actividades y Personas de Hoy y Activos de la semana. Color propio: rosa/fucsia. |
 | `/today` | Redirige a la vista Hoy de `/social`. |
 | `/members` | Directorio y buscador de miembros (`/api/users/search`). |
 

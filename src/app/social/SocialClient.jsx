@@ -470,7 +470,7 @@ function ListaEventos({ eventos, vista, mostrarAutor, yo }) {
 const VISTA_DE_ALCANCE = { following: "activity", me: "mine" };
 const ALCANCE_DE_VISTA = { activity: "following", mine: "me" };
 
-export default function SocialClient({ initialView = "today", initialToday = {} }) {
+export default function SocialClient({ initialView = "today", initialToday = {}, onTodaySummary }) {
   const { session, account, hydrated } = useAuth();
   const isBackNav = useIsHistoryNavigation();
 
@@ -1029,6 +1029,7 @@ export default function SocialClient({ initialView = "today", initialToday = {} 
               onScopeChange={setHoyQuien}
               onDayChange={setHoyDia}
               onDaysChange={setHoyDias}
+              onSummaryChange={onTodaySummary}
               initialScope={initialToday.scope}
               initialDay={initialToday.day}
               initialData={initialToday.data}

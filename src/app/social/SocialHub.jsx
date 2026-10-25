@@ -7,12 +7,14 @@
 // otra página (/today) con su propia cabecera y entradas de menú; ahora es una
 // opción más de esa barra y lleva sus filtros en el mismo menú.
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Activity, UserRoundCheck, Users } from "lucide-react";
+import { Activity, Flame, Users } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
 import PageStatCard from "@/components/ui/PageStatCard";
+import { summarize } from "@/lib/today/stories";
+import { fetchTodayFeed } from "@/lib/today/todayFeedClient";
 import SocialClient from "./SocialClient";
 
 // Tarjeta de cifra de la cabecera: la compartida de todas las cabeceras
@@ -59,6 +61,28 @@ export default function SocialHub({ initialView, initialToday }) {
     };
   }, [session, account?.id]);
 
+  // Actividades y personas de Hoy (con lo elegido en Quién y Día): las manda
+  // TodayClient al cargar cada ventana. Hasta entonces, las del RSC o, si se
+  // entró por Siguiendo o Yo, las de la petición compartida de Hoy.
+  const [todaySummary, setTodaySummary] = useState(() =>
+    initialToday?.data ? summarize(initialToday.data.actions || []) : null,
+  );
+  const handleTodaySummary = useCallback((next) => setTodaySummary(next), []);
+  useEffect(() => {
+    if (!session || !account?.id || todaySummary) return undefined;
+    let vigente = true;
+    fetchTodayFeed(initialToday?.scope || "following", initialToday?.day || "today")
+      .then((json) => {
+        if (vigente) setTodaySummary((prev) => prev || summarize(json.actions || []));
+      })
+      .catch(() => {});
+    return () => {
+      vigente = false;
+    };
+    // Solo al entrar: después lo mantiene TodayClient.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, account?.id]);
+
   if (!hydrated) return <div className="min-h-screen bg-black" />;
 
   if (!session || !account?.id) {
@@ -81,8 +105,6 @@ export default function SocialHub({ initialView, initialToday }) {
       </div>
     );
   }
-
-  const perfilHref = account?.username ? `/u/${encodeURIComponent(account.username)}` : null;
 
   return (
     <div className="min-h-screen bg-black font-sans text-zinc-100 selection:bg-pink-500/30">
@@ -110,19 +132,22 @@ export default function SocialHub({ initialView, initialToday }) {
             </div>
 
             <div className="grid w-full grid-cols-3 gap-2 sm:gap-3 lg:w-auto">
+              {/* Las tres cifras de Hoy: cuántas actividades y de cuántas
+                  personas (en la ventana y el ámbito elegidos en la barra), y
+                  cuántas cuentas que sigues se han movido esta semana. */}
               <TarjetaCifra
-                value={summary?.following}
-                label="Siguiendo"
-                icon={UserRoundCheck}
+                value={todaySummary?.actions}
+                label="Actividades"
+                icon={Flame}
                 iconClassName="text-pink-400"
-                href={perfilHref ? `${perfilHref}/following` : undefined}
+                title="Actividades de Hoy con lo elegido en Quién y Día"
               />
               <TarjetaCifra
-                value={summary?.followers}
-                label="Seguidores"
+                value={todaySummary?.people}
+                label="Personas"
                 icon={Users}
                 iconClassName="text-fuchsia-400"
-                href={perfilHref ? `${perfilHref}/followers` : undefined}
+                title="Personas con actividad en Hoy con lo elegido en Quién y Día"
               />
               {/* De toda la gente a la que sigues, cuánta se ha movido esta
                   semana: dice si va a haber algo nuevo que enseñar. */}
@@ -137,7 +162,7 @@ export default function SocialHub({ initialView, initialToday }) {
           </div>
         </header>
 
-        <SocialClient initialView={initialView} initialToday={initialToday} />
+        <SocialClient initialView={initialView} initialToday={initialToday} onTodaySummary={handleTodaySummary} />
       </div>
     </div>
   );

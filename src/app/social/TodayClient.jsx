@@ -66,6 +66,7 @@ export default function TodayClient({
   onScopeChange,
   onDayChange,
   onDaysChange,
+  onSummaryChange,
   initialScope,
   initialDay,
   initialData,
@@ -142,6 +143,12 @@ export default function TodayClient({
   useEffect(() => {
     if (data?.days) onDaysChange?.(data.days);
   }, [data, onDaysChange]);
+
+  // Actividades y personas de la ventana (sin el filtro del buscador) para las
+  // tarjetas de la cabecera de Social.
+  useEffect(() => {
+    if (data) onSummaryChange?.(summarize(data.actions || []));
+  }, [data, onSummaryChange]);
 
   const tz = data?.range?.tz;
   const text = query.trim().toLowerCase();
@@ -225,15 +232,12 @@ export default function TodayClient({
   return (
     <div>
       <div>
-        <p className="mb-4 min-h-[1.5rem] text-sm text-zinc-400" aria-live="polite">
-          {loading
-            ? "\u00a0"
-            : derived.summary.actions
-              ? `${derived.summary.actions} ${derived.summary.actions === 1 ? "actividad" : "actividades"} de ${derived.summary.people} ${derived.summary.people === 1 ? "persona" : "personas"}`
-              : text
-                ? "Nada coincide con la búsqueda."
-                : null}
-        </p>
+        {/* Los recuentos (actividades y personas) van en las tarjetas de la
+            cabecera de Social; aquí solo queda el aviso de búsqueda sin
+            resultados. */}
+        {text && data && !derived.summary.actions ? (
+          <p className="mb-4 text-sm text-zinc-400" aria-live="polite">Nada coincide con la búsqueda.</p>
+        ) : null}
 
         {error && !data ? (
           <div className="flex flex-col items-center gap-3 py-24 text-center">
