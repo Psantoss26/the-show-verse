@@ -311,8 +311,8 @@ function AutorDelMeGusta({ evento }) {
 }
 
 // La MISMA fila que la Actividad del perfil (`ActivityRow`): sin fondo propio,
-// avatar o cartel según la vista, icono (o la nota) de 32px, la frase y la
-// hora a la derecha.
+// cartel o backdrop según la vista, el avatar de quien actúa (en las tres),
+// icono (o la nota) de 32px, la frase y la hora a la derecha.
 function EventoFila({ evento, actor, mostrarAutor, conPoster, conBackdrop }) {
   const { Icono, tono, relleno } = accionDe(evento);
   const objetivo =
@@ -328,9 +328,10 @@ function EventoFila({ evento, actor, mostrarAutor, conPoster, conBackdrop }) {
         <CartelEvento evento={evento} backdrop className={BACKDROP_FILA} />
       ) : conPoster ? (
         <CartelEvento evento={evento} className={POSTER_FILA} />
-      ) : (
-        <AvatarEvento actor={actor} />
-      )}
+      ) : null}
+      {/* El avatar de quien actúa va en las tres vistas: con cartel o backdrop
+          también hay que ver de quién es cada evento. */}
+      <AvatarEvento actor={actor} />
       {evento.type === "rating" ? (
         <span
           className={`flex h-8 w-8 shrink-0 items-center justify-center text-xl font-black leading-none tabular-nums [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.65))] ${tono}`}
@@ -379,16 +380,23 @@ function EventoFila({ evento, actor, mostrarAutor, conPoster, conBackdrop }) {
 
 // Reseña: la tarjeta de `ActivityReview` del perfil, con el texto (tapado si
 // tiene spoilers) y la nota en estrellas. En la lista lleva el avatar y, con
-// sitio, el cartel; en la lista con póster, solo el cartel grande.
+// sitio, el cartel; en la lista con póster o backdrop, la imagen grande y el
+// avatar.
 function EventoResena({ evento, actor, mostrarAutor, conPoster, conBackdrop }) {
   const [verSpoiler, setVerSpoiler] = useState(false);
   return (
     <article className="rounded-xl bg-white/[0.04] px-3 py-4 sm:px-4">
       <div className="flex items-start gap-3">
         {conBackdrop ? (
-          <CartelEvento evento={evento} backdrop className={`${BACKDROP_FILA} self-start`} />
+          <>
+            <CartelEvento evento={evento} backdrop className={`${BACKDROP_FILA} self-start`} />
+            <AvatarEvento actor={actor} />
+          </>
         ) : conPoster ? (
-          <CartelEvento evento={evento} size="w342" className={`${POSTER_RESENA} self-start`} />
+          <>
+            <CartelEvento evento={evento} size="w342" className={`${POSTER_RESENA} self-start`} />
+            <AvatarEvento actor={actor} />
+          </>
         ) : (
           <>
             <AvatarEvento actor={actor} />
