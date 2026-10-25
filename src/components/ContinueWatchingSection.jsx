@@ -40,6 +40,7 @@ import usePreviewAutoTrailer from "@/hooks/usePreviewAutoTrailer";
 import { loadYouTubeIframeApi, prefetchPreviewTrailer } from "@/lib/dashboard/previewTrailer";
 import usePreviewMorph from "@/lib/dashboard/usePreviewMorph";
 import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
+import { titlePeekAttrs } from "@/lib/navigation/titlePeek.mjs";
 import { useDashboardHoverBackdrop } from "@/components/dashboard/DashboardHoverBackdrop";
 import PreviewTrailerAudioButton, {
   usePreviewTrailerAudio,
@@ -2254,6 +2255,7 @@ function ContinueWatchingSection({
                       data-preview-tile-art=""
                       className="h-full w-full cursor-pointer"
                       onClick={() => openDetailModal?.(show)}
+                      {...titlePeekAttrs(show, mediaTypeOf(show))}
                     >
                       {isMobile ? (
                         <ContinueWatchingMobilePosterCard show={show} mode={mode} />

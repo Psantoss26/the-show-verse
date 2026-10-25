@@ -158,9 +158,12 @@ test("nada se recorta contra los bordes del panel", async () => {
   // la barra (Plataformas, Actividad, Enlaces y Compartir van debajo, en una
   // fila de iconos) y con las
   // puntuaciones escaladas al ancho del panel para que nunca se salgan. Con
-  // `phoneLayout` se aplica aunque la ventana sea de escritorio.
-  assert.match(modal, /mobileScoresOnly=\{mobileDetails\}/);
-  assert.match(modal, /phoneLayout=\{mobileDetails\}/);
+  // `phoneLayout` se aplica aunque la ventana sea de escritorio. La variable
+  // `phoneLayout` vale para la ficha de teléfono y para la vista previa de
+  // pulsación larga.
+  assert.match(modal, /const phoneLayout = mobileDetails \|\| peek;/);
+  assert.match(modal, /mobileScoresOnly=\{phoneLayout\}/);
+  assert.match(modal, /phoneLayout=\{phoneLayout\}/);
 });
 
 test("el marcador del teléfono deja fuera Rotten Tomatoes y Metacritic", async () => {
