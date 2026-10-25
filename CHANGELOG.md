@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Móvil, vista previa al mantener pulsado: la tarjeta es más ancha (8 px de margen a cada lado) y los botones de acción más grandes, con la misma separación que en la ficha móvil. El marcador de puntuaciones y estadísticas se ve más pequeño. → [vista previa móvil](docs/features/vista-previa-movil.md)
 - Móvil: mantener pulsada la tarjeta de una película, serie o episodio, en cualquier página o dashboard, abre su vista previa. La tarjeta crece hasta el centro con una transición, sin ocupar toda la pantalla y con la página difuminada detrás. Muestra solo la portada con el logo, la fila de botones y las puntuaciones. Tocar la portada abre la ficha completa y tocar fuera la cierra. Al soltar no se abre la ficha ni sale el menú del sistema. → [vista previa móvil](docs/features/vista-previa-movil.md)
 - Social · Hoy, historias: en la ficha del título, el borde inferior del fondo se funde suavemente con los datos sin oscurecer la imagen, y la opinión va en dos filas (positivo arriba y negativo debajo) en lugar de en dos columnas. → [hoy](docs/features/hoy.md)
 - Social · Hoy, historias: lo positivo y lo negativo de la ficha del título se ve igual que en la ficha completa, en tarjetas verde y rosa con su icono y un punto de color por frase. La ficha se ajusta a lo que mide cada título, así que siempre cabe entera sin desplazar. → [hoy](docs/features/hoy.md)
