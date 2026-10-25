@@ -17,6 +17,30 @@ Para una fuente PostgreSQL accesible directamente, el script admite
 `backend/.env`: el origen debe elegirse de forma explícita. El destino siempre
 es el PostgreSQL del Compose local y nunca se obtiene de esa URL.
 
+## Usuarios de demostración para Social
+
+La copia local apenas tiene actividad reciente, así que «Hoy» suele salir vacía.
+Para probarla, `backend/src/scripts/seed-social-demo.js` crea seis cuentas
+`demo_*` (correo `demo+…@theshowverse.test`) con actividad de hoy, ayer y la
+semana: visionados de películas y episodios, maratones, puntuaciones de
+película, serie, temporada y episodio, reseñas, listas, pendientes y favoritos.
+Desde `backend/`:
+
+```bash
+npm run demo:social -- --viewer <tu_usuario>
+```
+
+`--viewer` hace que esa cuenta siga a cuatro de ellas. Para quitarlas con todo lo
+suyo:
+
+```bash
+npm run demo:social -- --remove
+```
+
+Las fechas son relativas al momento de lanzarlo; otro día hay que volver a
+ejecutarlo (rehace las cuentas). Se niega a escribir si `DATABASE_URL` no apunta
+a `localhost`. Qué comprueba cada cuenta: ver [Hoy](../features/hoy.md#datos-de-prueba).
+
 ## `fetch failed` con `ETIMEDOUT` hacia TMDb
 
 Síntoma: en la consola de `next dev` aparece `TypeError: fetch failed` con un
