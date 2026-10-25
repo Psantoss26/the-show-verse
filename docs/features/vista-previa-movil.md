@@ -9,11 +9,11 @@ En el móvil, mantener el dedo sobre la tarjeta de una película, una serie o un
 ## Qué ve el usuario
 
 - Al mantener el dedo (~0,4 s) la tarjeta se hunde un poco y, al cumplirse el tiempo, la vista previa crece desde ella hasta el centro de la pantalla con una transición. En Android, una vibración corta lo marca.
-- La vista previa es una tarjeta flotante que no ocupa toda la pantalla (como mucho 340 px de ancho). La página se queda detrás, difuminada.
+- La vista previa es una tarjeta flotante que no ocupa toda la pantalla: deja 8 px a cada lado (como mucho 420 px de ancho) y no llega arriba ni abajo. La página se queda detrás, difuminada.
 - Solo enseña tres cosas:
   1. la portada del título con su logo (sin logo si la portada ya trae el título impreso);
-  2. la fila de botones de la ficha (tráiler, banda sonora, visto, puntuar, favorito, pendiente, listas…), con sus mismos modales;
-  3. el marcador de puntuaciones (TMDb, Trakt, IMDb y estadísticas).
+  2. la fila de botones de la ficha (tráiler, banda sonora, visto, puntuar, favorito, pendiente, listas…), con sus mismos modales. Ocupan casi todo el ancho de la tarjeta, con 4 px entre ellos, como en la ficha móvil;
+  3. el marcador de puntuaciones (TMDb, Trakt, IMDb y estadísticas), reducido al 82 % para que no pese más que la portada.
 - Tocar la portada lleva a la ficha completa. Tocar fuera, o la tecla Escape, cierra la vista previa y la tarjeta vuelve a su sitio.
 - Al soltar el dedo no se abre la ficha ni sale el menú del sistema para enlaces o imágenes.
 - Si el dedo se mueve más de 10 px (desplazar la página o un carrusel), no se abre nada.

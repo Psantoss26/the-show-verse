@@ -305,16 +305,18 @@ function preferredPanelWidth(mobileDetails) {
 }
 
 /* ======================= VISTA PREVIA (PULSACIÓN LARGA) ======================= */
-// Ancho de la tarjeta: lo que da el teléfono menos 28px por lado, sin pasar de
-// 340px, para que alrededor se siga viendo la página difuminada. La portada se
-// queda en 2:3 mientras quepa y, en pantallas bajas, se recorta por arriba y
-// por abajo para dejar sitio a botones y marcador: la tarjeta nunca ocupa la
-// pantalla entera.
-const PEEK_MAX_WIDTH = 340;
-const PEEK_SIDE_GUTTER = 28;
+// Ancho de la tarjeta: lo que da el teléfono menos 8px por lado, sin pasar de
+// 420px. La fila de botones (8px de relleno a cada lado) queda así igual de
+// ancha que en la ficha móvil y los botones salen igual de grandes; alrededor
+// se sigue viendo la página difuminada. La portada se queda en 2:3 mientras quepa y, en pantallas
+// bajas, se recorta por arriba y por abajo para dejar sitio a botones y
+// marcador: la tarjeta nunca ocupa la pantalla entera.
+const PEEK_MAX_WIDTH = 420;
+const PEEK_SIDE_GUTTER = 8;
 // Alto que se reserva para la fila de botones, el marcador y el aire de arriba
 // y abajo.
-const PEEK_CHROME_HEIGHT = 320;
+const PEEK_CHROME_HEIGHT = 300;
+const PEEK_SCOREBOARD_STYLE = { zoom: 0.82 };
 
 function peekGeometry() {
   const vw = window.innerWidth;
@@ -446,9 +448,15 @@ function DetailPeekLayout({
             )}
           </button>
 
-          <div className="px-4 pb-4 pt-3">
+          <div className="px-2 pb-4 pt-3">
             {actions}
-            <div className="mt-4">{scoreboard}</div>
+            {/* El marcador de teléfono está pensado para el ancho entero de
+                la ficha: aquí, a su tamaño, pesaba más que la portada. Se
+                reduce con `zoom` y no con `transform` para que ocupe también
+                menos alto y no deje hueco debajo. */}
+            <div className="mt-3" style={PEEK_SCOREBOARD_STYLE}>
+              {scoreboard}
+            </div>
           </div>
         </motion.div>
       </div>
@@ -3300,7 +3308,8 @@ export default function DetailModal({
         }
       >
         <DetailActionsRow
-          mobileGapClass="gap-1.5"
+          // Vista previa: la separación de la ficha móvil (DetailsClient).
+          mobileGapClass={peek ? "gap-1" : "gap-1.5"}
           forceMobile={phoneLayout}
           onTrailer={handleToggleTrailer}
           trailerAvailable
@@ -3392,7 +3401,7 @@ export default function DetailModal({
           }
         >
           <DetailActionsRow
-            mobileGapClass="gap-1.5"
+            mobileGapClass={peek ? "gap-1" : "gap-1.5"}
             forceMobile={phoneLayout}
             onTrailer={handleToggleTrailer}
             trailerAvailable
