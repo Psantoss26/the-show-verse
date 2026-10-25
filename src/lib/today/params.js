@@ -1,6 +1,7 @@
 // src/lib/today/params.js
-// Parámetros de la URL de /today (?scope=&day=&group=), compartidos por el RSC
-// y el cliente para que los dos lean lo mismo de un enlace pegado a mano.
+// Parámetros de la vista «Hoy» de /social (?scope=&day=&group=), compartidos por
+// el RSC y el cliente para que los dos lean lo mismo de un enlace pegado a mano.
+// La vista «Actividad» es ?view=activity; «Hoy» es la vista por defecto.
 
 export const TODAY_SCOPES = ["following", "community"];
 export const TODAY_GROUPS = ["title", "person", "time"];
@@ -21,12 +22,18 @@ export function normalizeTodayParams(params) {
   };
 }
 
-/** URL de /today sin los valores por defecto, para que el enlace quede limpio. */
+export const SOCIAL_VIEWS = ["today", "activity"];
+
+export function normalizeSocialView(params) {
+  return first(params?.view) === "activity" ? "activity" : "today";
+}
+
+/** URL de la vista «Hoy» sin los valores por defecto, para que el enlace quede limpio. */
 export function todayHref({ scope, day, group }) {
   const search = new URLSearchParams();
   if (scope && scope !== "following") search.set("scope", scope);
   if (day && day !== "today") search.set("day", day);
   if (group && group !== "title") search.set("group", group);
   const query = search.toString();
-  return query ? `/today?${query}` : "/today";
+  return query ? `/social?${query}` : "/social";
 }

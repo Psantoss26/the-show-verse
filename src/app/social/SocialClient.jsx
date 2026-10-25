@@ -2,7 +2,10 @@
 
 // src/app/social/SocialClient.jsx
 //
-// SECCIÓN SOCIAL: la actividad de las cuentas que sigo y la mía.
+// SECCIÓN SOCIAL, vista «Actividad»: la actividad de las cuentas que sigo y la
+// mía, completa y paginada. La otra vista de la sección es «Hoy» (lo destacado
+// del día, TodayClient); las dos cuelgan de SocialHub, que pone el fondo, la
+// cabecera y las cifras.
 //
 // Comparte la maqueta de las páginas de usuario (Favoritos, Pendientes,
 // Historial…): fondo con manchas difuminadas del color de la sección, cabecera
@@ -24,13 +27,11 @@ import Link from "next/link";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  Activity,
   ArrowUpDown,
   CheckCircle2,
   ChevronDown,
   Eye,
   Filter,
-  Flame,
   Heart,
   ImageOff,
   Layers3,
@@ -45,7 +46,6 @@ import {
   ThumbsUp,
   User,
   Users,
-  UserRoundCheck,
   BookmarkPlus,
   X,
 } from "lucide-react";
@@ -77,7 +77,6 @@ import Stars from "@/components/social/Stars";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 import ActivityBackdropImage from "@/components/social/ActivityBackdropImage";
 import { hasActivityBackdropArtwork, isPortraitActivity } from "@/lib/profile/activityBackdrops";
-import PageStatCard from "@/components/ui/PageStatCard";
 
 const PAGE_SIZE = 30;
 const FEED_VACIO = { items: [], hasMore: false, offset: 0, loaded: false, error: "" };
@@ -446,26 +445,6 @@ function ListaEventos({ eventos, vista, mostrarAutor, yo }) {
   );
 }
 
-// Tarjeta de cifra de la cabecera: la compartida de todas las cabeceras
-// (`PageStatCard`, mini tarjeta en móvil), como `CountStat` en Perfil, con el
-// mismo enlace a las listas de seguidores/seguidos.
-function TarjetaCifra({ value, label, href, title, icon, iconClassName = "text-pink-400" }) {
-  // Mientras no ha llegado el resumen se muestra un guion, no un 0: un cero
-  // es una cifra real y sería mentira.
-  return (
-    <PageStatCard
-      value={typeof value === "number" ? value : "—"}
-      label={label}
-      href={href}
-      prefetch={false}
-      title={title}
-      icon={icon}
-      colorClass={iconClassName}
-      focusRingClass="focus-visible:ring-pink-400/70"
-    />
-  );
-}
-
 export default function SocialClient() {
   const { session, account, hydrated } = useAuth();
   const isBackNav = useIsHistoryNavigation();
@@ -482,9 +461,6 @@ export default function SocialClient() {
   const { items, hasMore, offset, error } = feedActual;
   const loading = !feedActual.loaded;
 
-  // Cifras de la cabecera. Van aparte del feed: no cambian al paginar ni al
-  // alternar entre "siguiendo" y "yo", así que se piden una sola vez.
-  const [summary, setSummary] = useState(null);
 
   const [q, setQ] = useState("");
   const [filtro, setFiltro] = useState("all");
@@ -647,26 +623,6 @@ export default function SocialClient() {
     }
   }, [actualCargado, scope, cargar]);
 
-  useEffect(() => {
-    if (!session || !account?.id) return undefined;
-    let vigente = true;
-    (async () => {
-      try {
-        const res = await fetch("/api/users/feed/summary", {
-          credentials: "include",
-          cache: "no-store",
-        });
-        if (!res.ok) return; // Un fallo conserva las cifras previas, no las pone a cero.
-        const json = await res.json().catch(() => null);
-        if (vigente && json?.summary) setSummary(json.summary);
-      } catch {
-        /* la cabecera se queda con lo que ya tuviera */
-      }
-    })();
-    return () => {
-      vigente = false;
-    };
-  }, [session, account?.id]);
 
   // Los cuatro valores del menú solo cambian pulsándolo, así que basta con
   // observarlos para saber que hay que reanclar.
@@ -726,103 +682,18 @@ export default function SocialClient() {
     [visibles, agrupar, orden],
   );
 
-  if (!hydrated) return <div className="min-h-screen bg-black" />;
+  // Sin sesión lo resuelve SocialHub.
+  if (!hydrated || !session || !account?.id) return null;
 
-  if (!session || !account?.id) {
-    return (
-      <div className="min-h-screen bg-black text-zinc-100 font-sans">
-        <div className="relative z-10 mx-auto max-w-[1600px] px-4 py-24 text-center sm:px-6 lg:px-8">
-          <h1 className="text-4xl font-black tracking-tighter text-white">
-            Social<span className="text-pink-500">.</span>
-          </h1>
-          <p className="mt-3 text-zinc-400">
-            Inicia sesión para ver la actividad de la gente a la que sigues.
-          </p>
-          <Link
-            href="/login?next=/social"
-            className="mt-6 inline-block rounded-2xl bg-gradient-to-br from-pink-500 to-fuchsia-600 px-6 py-3 text-sm font-bold text-white shadow-lg"
-          >
-            INICIAR SESIÓN
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  const perfilHref = account?.username
-    ? `/u/${encodeURIComponent(account.username)}`
-    : null;
   const controlGlass =
     "bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg";
   const activo = "bg-gradient-to-br from-pink-500 to-fuchsia-600 text-white shadow-lg shadow-pink-500/20";
 
+  // Vista «Actividad» de la sección Social (SocialHub pone fondo, cabecera y
+  // cifras, compartidos con la vista «Hoy»).
   return (
-    <div className="min-h-screen bg-black font-sans text-zinc-100 selection:bg-pink-500/30">
-      {/* Manchas de color de la sección, igual que en las demás páginas */}
-      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-[10%] -left-[5%] aspect-square w-[60vw] max-w-[800px] rounded-full bg-pink-600/15 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute top-[15%] -right-[5%] aspect-square w-[55vw] max-w-[700px] rounded-full bg-fuchsia-700/20 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute -bottom-[10%] left-[15%] aspect-square w-[65vw] max-w-[800px] rounded-full bg-pink-800/25 blur-[120px] sm:blur-[150px]" />
-      </div>
-
-      <div className="relative z-10 mx-auto max-w-[1600px] px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
-        <motion.header
-          className="mb-8"
-          initial={isBackNav ? false : { opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={isBackNav ? { duration: 0 } : { duration: 0.5, ease: "easeOut" }}
-        >
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <div className="mb-2 flex items-center gap-3">
-                <div className="h-px w-12 bg-pink-500" />
-                <span className="text-xs font-bold uppercase tracking-widest text-pink-400">
-                  COMUNIDAD
-                </span>
-              </div>
-              <h1 className="text-4xl font-black tracking-tighter text-white md:text-6xl">
-                Social<span className="text-pink-500">.</span>
-              </h1>
-              <p className="mt-2 hidden max-w-lg text-lg text-zinc-400 md:block">
-                La actividad de la gente a la que sigues, y la tuya.
-              </p>
-              {/* Lo más destacado del día (historias, más activos) vive en /today. */}
-              <Link
-                href="/today"
-                className="mt-3 inline-flex h-9 items-center gap-2 rounded-full bg-gradient-to-br from-white/10 to-white/5 px-4 text-sm font-bold text-white shadow-lg backdrop-blur-lg transition-colors hover:text-pink-200"
-              >
-                <Flame className="h-4 w-4 text-pink-400" aria-hidden="true" /> Ver lo destacado de hoy
-              </Link>
-            </div>
-
-            <div className="grid w-full grid-cols-3 gap-2 sm:gap-3 lg:w-auto">
-              <TarjetaCifra
-                value={summary?.following}
-                label="Siguiendo"
-                icon={UserRoundCheck}
-                iconClassName="text-pink-400"
-                href={perfilHref ? `${perfilHref}/following` : undefined}
-              />
-              <TarjetaCifra
-                value={summary?.followers}
-                label="Seguidores"
-                icon={Users}
-                iconClassName="text-fuchsia-400"
-                href={perfilHref ? `${perfilHref}/followers` : undefined}
-              />
-              {/* Tercera cifra propia de esta página: de toda la gente a la que
-                  sigues, cuánta se ha movido esta semana. Es lo que dice si el
-                  feed va a tener algo nuevo que enseñar. */}
-              <TarjetaCifra
-                value={summary?.activeWeek}
-                label="Activos"
-                icon={Activity}
-                iconClassName="text-rose-400"
-                title={`Cuentas que sigues con actividad en los últimos ${summary?.windowDays || 7} días`}
-              />
-            </div>
-          </div>
-        </motion.header>
+    <div>
+      <div className="relative">
 
         {/* BARRA DE FILTROS (sticky, con el cristal del navbar al fijarse) */}
         <motion.div
