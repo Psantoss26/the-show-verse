@@ -259,6 +259,10 @@ const EMPTY_DATA = {
   recommendations: [],
   production: EMPTY_PRODUCTION,
   sentiment: EMPTY_SENTIMENT,
+  // ¿Ha terminado ya la consulta de sentimientos (haya o no)? Misma convención
+  // que `scoreboardResolved`: lo usa quien necesita pintar la ficha de una vez,
+  // sin que «Opinión» aparezca después (la ficha de las historias de Hoy).
+  sentimentResolved: false,
   scoreboard: null,
   scoreboardResolved: false,
   providers: [],
@@ -1069,14 +1073,17 @@ export function useDetailModalData(item, { phoneView = false } = {}) {
     (async () => {
       try {
         const s = await traktGetSentiments({ type: mediaType, tmdbId: id });
-        if (cancelled || !s) return;
+        if (cancelled) return;
         const pros = formatSentimentList(s?.good, 4);
         const cons = formatSentimentList(s?.bad, 4);
-        if (pros.length || cons.length) {
-          setData((prev) => ({ ...prev, sentiment: { pros, cons } }));
-        }
+        setData((prev) => ({
+          ...prev,
+          ...(pros.length || cons.length ? { sentiment: { pros, cons } } : null),
+          sentimentResolved: true,
+        }));
       } catch {
         // sin sentimientos: se omite la sección
+        if (!cancelled) setData((prev) => ({ ...prev, sentimentResolved: true }));
       }
     })();
 

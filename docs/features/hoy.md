@@ -42,25 +42,34 @@ Los valores por defecto (`following`, `today`, `title`) no se escriben en la URL
 
 ## Qué se ve
 
-Maqueta como la Today de Trakt. En escritorio hay tres columnas con su título alineado arriba (`ColumnHeading`, con la misma letra que «Películas favoritas» del perfil: 12 px en negrita, versalitas espaciadas y gris, sin raya debajo): **Historia destacada** (con «Reproducir todo»), **De la gente que sigues** o **De la comunidad** (con el número de títulos) y **Más activos**. Por debajo de `xl`, Más activos baja bajo las otras dos; en móvil todo va en una columna. El texto va a 12 px como mínimo y los iconos a 14–16 px, para que se lean nítidos. Las tarjetas son superficies lisas, sin desenfoque y sin bordes: en Hoy nada va contorneado. Las caras apiladas se recortan una sobre otra con una máscara, sin aro.
+Maqueta como la Today de Trakt. En escritorio hay tres columnas con su título alineado arriba (`ColumnHeading`, con la misma letra que «Películas favoritas» del perfil: 12 px en negrita, versalitas espaciadas y gris, con una línea horizontal fina debajo, alineada en las tres): **Historia destacada** (con «Reproducir todo»), **De la gente que sigues** o **De la comunidad** (con el número de títulos) y **Más activos**. Por debajo de `xl`, Más activos baja bajo las otras dos; en móvil todo va en una columna. El texto va a 12 px como mínimo y los iconos a 14–16 px, para que se lean nítidos. Las tarjetas son superficies lisas, sin desenfoque y sin bordes: en Hoy nada va contorneado. Las caras apiladas se recortan una sobre otra con una máscara, sin aro.
 
-- **Controles:** los desplegables Quién, Día y Agrupar de la barra (ver arriba). Encima del contenido, la línea «N actividades de M personas».
+- **Controles:** los desplegables Quién, Día y Agrupar de la barra (ver arriba).
+- **Cifras de la cabecera** (`SocialHub`):
+  - **Actividades** y **Personas** de Hoy, con lo elegido en Quién y Día. Las manda `TodayClient` (`onSummaryChange`) al cargar cada ventana; al entrar por Siguiendo o Yo salen de la petición compartida de Hoy.
+  - **Activos**: cuentas que sigues con actividad en los últimos 7 días.
+
+  Sustituyen a Siguiendo y Seguidores, y a la antigua línea «N actividades de M personas».
 - **Historias:** en móvil, carril de círculos, uno por título más uno de «Para ti»; el aro es de color mientras quede algo sin ver. En escritorio se abren desde la destacada, desde «Reproducir todo» o desde cada cartel. Todas abren el **reproductor a pantalla completa** (`TodayStoryViewer`):
   - Cada fotograma dura 5 s. En un título con dos o más personas, el primero es un resumen.
   - Tocar el tercio izquierdo vuelve atrás y el resto avanza. Mantener pulsado pausa.
   - Deslizar en horizontal cambia de título y hacia abajo cierra.
   - Teclado: ← y → cambian de fotograma, espacio pausa y Esc cierra.
   - Los fotogramas vistos se guardan en `localStorage` (`today-seen-stories`) durante 24 h.
-  - El cartel ocupa casi todo el reproductor, con lo que pasó debajo.
+  - El reproductor se dimensiona con la pantalla: en ordenador ocupa hasta el 96 % del alto (1100 px como mucho) y el ancho justo para que el cartel lo llene. En 2K el cartel mide unos 571 × 856 px y en Full HD unos 452 × 678.
+  - El cartel va **siempre a 2:3, entero y sin recortar**: su ancho es el menor entre el ancho del hueco y dos tercios de su alto (`container-type: size` y `min(100cqw, 66.6667cqh)`).
+  - Debajo, un pie de alto fijo (116 px) en una fila compacta: cara, nombre, acción, hito, hora y nota. Una reseña va a dos líneas y un spoiler, tras un botón. El texto nunca cambia el tamaño del cartel.
   - En la cabecera, junto a pausa y cerrar, el botón de cuadrícula («Ver todo Hoy») cierra las historias y lleva a la vista Hoy de `/social`, como el de Trakt.
-  - **Ficha del título** (`TodayStoryDetails`). En ordenador (con ratón), al pasar por el cartel este se convierte en la ficha y la historia se pausa mientras dure; al salir vuelve el cartel. En táctil se abre al **tocar la portada** y se cierra con otro toque (también al cambiar de fotograma); tocar fuera de la portada sigue yendo atrás o adelante. La ficha muestra:
-    - backdrop con idioma, con el criterio de DetailsClient (`pickLadderBackdrop`: inglés → español → original → sin idioma);
-    - título y fila de año · temporadas y episodios o duración · estado · géneros;
+  - **Ficha del título** (`TodayStoryDetails`). En ordenador (con ratón), al pasar por el cartel este se convierte en la ficha y la historia se pausa mientras dure; al salir vuelve el cartel. Para que el giro no haga idas y vueltas cerca de los bordes, no se usan `mouseenter`/`mouseleave` de la tarjeta (sus caras en 3D cambian de forma bajo el ratón mientras gira). Se compara la posición del ratón con el rectángulo fijo del hueco de la tarjeta, con un margen de 90 ms para entrar y 160 ms para salir. En táctil se abre al **tocar la portada** y se cierra con otro toque (también al cambiar de fotograma); tocar fuera de la portada sigue yendo atrás o adelante. La ficha muestra:
+    - backdrop con idioma, con el criterio de DetailsClient (`pickLadderBackdrop`: inglés → español → original → sin idioma). Solo el último cuarto se funde con el fondo de la ficha, para que no se vea el corte sin oscurecer la imagen;
+    - fila de año · temporadas y episodios o duración · estado · géneros, sin título en texto: ya va en el fondo con idioma (queda para lectores de pantalla);
     - marcador compacto de la ficha móvil (`DetailsScoreboardPanel` con `mobileScoresOnly`: TMDb, Trakt, IMDb y stats de Trakt);
     - sinopsis en 3 líneas;
-    - «Opinión», con lo positivo y lo negativo de la comunidad.
+    - lo positivo y lo negativo de la comunidad, con las mismas tarjetas que DetailsClient («Análisis de sentimientos»): tinte esmeralda o rosa, cuadradito del icono en color y un punto luminoso por frase. Una fila para lo positivo y otra para lo negativo, con hasta dos frases por lado a dos líneas.
 
-    Los datos salen de `useDetailModalData` (los de la ficha rápida) y solo se piden al pasar el ratón.
+    La ficha **cabe entera sin desplazar** y va a su **tamaño natural** (letra de 13 px, el marcador de la ficha móvil) mientras quepa; en una tarjeta grande no se agranda nada, solo sobra aire abajo. Si no cabe, se reduce con `zoom` lo justo. El alto necesario se **mide** por título (cada uno trae textos de distinta longitud) y el ajuste solo baja, así no oscila. `zoom` vuelve a maquetar, así el texto sigue nítido. Incluye la sinopsis en 3 líneas y hasta dos frases positivas y dos negativas, a dos líneas cada una.
+    Los datos salen de `useDetailModalData`, los de la ficha rápida. Se **precargan** mientras se ve el cartel de la historia, y la tarjeta solo **da la vuelta** (giro 3D `rotateY` de 0,7 s, con cartel delante y ficha detrás) cuando está todo: detalles, notas, stats, opinión (`sentimentResolved`, nuevo en el hook) y el fondo ya descargado. Así la ficha aparece completa, sin datos que lleguen después.
+  - Las flechas de título anterior y siguiente van pegadas a la tarjeta, no en los bordes de la pantalla.
 - **Historia destacada:** la más reciente con un **hito** (estreno o final de temporada o de serie). Si ninguna tiene hito, la que ha juntado a más gente. Tarjeta con:
   - quién la protagoniza y la etiqueta del hito (o «Serie» / «Película»);
   - el cartel centrado sobre el fondo del título;
@@ -75,7 +84,13 @@ Maqueta como la Today de Trakt. En escritorio hay tres columnas con su título a
   - por persona, con un bloque por persona;
   - por hora, en franjas mañana 5–12, tarde 12–18, noche 18–23 y madrugada. La madrugada cuenta como el final del día anterior.
 - **Más activos:** las 5 personas con más acciones en la ventana: puesto, cara, nombre, «N historias» y una barra fina proporcional al primero.
-- **Panel de persona** (`TodayPersonDrawer`): todo lo suyo de la ventana, con enlace al perfil y botón Seguir.
+- **Panel de persona** (`TodayPersonDrawer`): el mismo panel lateral que las secciones de DetailsClient (`SectionSheet`, acento `pink` y la foto en `leading`). Tiene:
+  - pestañas Todo / Vistos / Notas / Reseñas con recuento;
+  - buscador si hay más de 4 títulos;
+  - filas `TitleRow` con lo que hizo («Ha puntuado · 8,5/10 · hace 1 h»), y la reseña si la hay;
+  - botón Seguir y enlace al perfil.
+
+  Pulsar un título abre su ficha rápida.
 - Al pulsar un título en la destacada, los destacados o «Para ti» se abre la ficha rápida (`DetailModalProvider placement="right"`).
 
 ### Reglas
