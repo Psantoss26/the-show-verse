@@ -10,11 +10,16 @@ Vista por defecto de la sección Social (`/social`): lo más destacado de lo que
 
 | Ruta | Qué muestra |
 |---|---|
-| `/social` | Vista «Hoy»: historias, historia destacada, destacados, «Para ti», feed agrupado y más activos. |
-| `/social?view=activity` | Vista «Actividad»: el feed completo de siempre (ver [[social-y-perfiles]]). |
+| `/social` | Opción «Hoy» de la barra: historias, historia destacada, destacados, «Para ti», feed agrupado y más activos. |
+| `/social?view=activity`, `?view=mine` | Opciones «Siguiendo» y «Yo»: el feed completo de siempre (ver [[social-y-perfiles]]). |
 | `/today` | Redirige a `/social` conservando `scope`, `day`, `group` y `story`. |
 
-Las dos vistas cuelgan de `SocialHub` (`src/app/social/SocialHub.jsx`), que pone el fondo, la cabecera «Social.» con las cifras (Siguiendo, Seguidores, Activos) y el selector Hoy / Actividad. Cambiar de vista solo reescribe la URL; la vista sale de `useSearchParams`.
+Hoy es una opción más de la barra sticky de Social (`SocialClient`), junto a Siguiendo y Yo: **Hoy / Siguiendo / Yo**. La barra es la misma en las tres opciones; con Hoy sus desplegables pasan a ser:
+- **Quién:** Siguiendo o Comunidad.
+- **Día:** Hoy, Ayer, cada día de la semana y Semana, con su recuento.
+- **Agrupar:** por título, por persona o por hora.
+
+El buscador filtra lo de Hoy por título o persona. En móvil, como el resto de menús, van dentro de `MobileFiltersPanel`. `TodayClient` es controlado: recibe esos valores como props y devuelve los recuentos de los días (`onDaysChange`). `SocialHub` (`src/app/social/SocialHub.jsx`) pone el fondo y la cabecera «Social.» con las cifras (Siguiendo, Seguidores, Activos). Cambiar de opción solo reescribe la URL, sin volver a pedir el RSC.
 
 Parámetros de URL (`src/lib/today/params.js`):
 - `scope=following|community`
@@ -36,7 +41,7 @@ Los valores por defecto (`following`, `today`, `title`) no se escriben en la URL
 
 ## Qué se ve
 
-- **Controles:** pestañas Siguiendo / Comunidad y Hoy / Ayer / Semana, cada una con su recuento. Debajo, los otros cinco días de la semana como chips, y la línea «N actividades de M personas».
+- **Controles:** los desplegables Quién, Día y Agrupar de la barra (ver arriba). Encima del contenido, la línea «N actividades de M personas».
 - **Historias:** carril de círculos, uno por título más uno de «Para ti». El aro es de color mientras quede algo sin ver. Al pulsar se abre el **reproductor a pantalla completa** (`TodayStoryViewer`):
   - Cada fotograma dura 5 s. En un título con dos o más personas, el primero es un resumen.
   - Tocar el tercio izquierdo vuelve atrás y el resto avanza. Mantener pulsado pausa.

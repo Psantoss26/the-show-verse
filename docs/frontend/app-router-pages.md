@@ -71,7 +71,7 @@ tags: [area/frontend, type/referencia]
 |---|---|---|
 | `/u/[username]`, `/u/[username]/[section]` | `layout.jsx` + `ProfileClient.jsx`, `profileRoutes.js` | Perfil público de un miembro y sus pestañas. |
 | `/u/[username]/followers`, `/following` | `FollowListClient.jsx` | Seguidores y seguidos. |
-| `/social` | `page.jsx` (RSC) + `SocialHub.jsx`, `TodayClient.jsx` (vista Hoy), `SocialClient.jsx` (vista Actividad, `?view=activity`) | Sección Social: lo destacado de hoy (historias, destacada, más activos; siguiendo / comunidad) y el feed de actividad (siguiendo / yo). Ver [[hoy]]. |
+| `/social` | `page.jsx` (RSC) + `SocialHub.jsx`, `SocialClient.jsx` (barra Hoy / Siguiendo / Yo y feed; `?view=activity\|mine`), `TodayClient.jsx` (contenido de Hoy) | Sección Social: lo destacado de hoy (historias, destacada, más activos; siguiendo / comunidad) y el feed de actividad (siguiendo / yo). Ver [[hoy]]. |
 | `/today` | `page.jsx` | Redirige a `/social` conservando los parámetros. |
 | `/members` | `MembersClient.jsx` | Directorio y buscador de miembros. |
 | `/detections`, `/detections/[id]` | `DetectionsClient.jsx`, `DetectionCorrectionClient.jsx` | Detecciones de streaming de la extensión y su corrección. Ver [[detecciones-streaming]]. |

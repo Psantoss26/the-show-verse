@@ -2,10 +2,11 @@
 
 // src/app/social/TodayClient.jsx
 //
-// SECCIÓN SOCIAL, vista «Hoy»: lo más destacado de lo que ha hecho la gente
-// hoy, ayer o esta semana, de las cuentas que sigues o de toda la comunidad.
-// La otra vista es «Actividad» (SocialClient); fondo, cabecera y cifras los pone
-// SocialHub. Inspirada en la de
+// SECCIÓN SOCIAL, contenido de «Hoy»: lo más destacado de lo que ha hecho la
+// gente hoy, ayer o esta semana, de las cuentas que sigues o de toda la
+// comunidad. Es la tercera opción del selector Hoy / Siguiendo / Yo de la barra
+// de Social (SocialClient), y esa misma barra lleva sus controles: quién, día,
+// agrupar y el buscador llegan aquí como props. Inspirada en la de
 // Trakt (trakt-lite, sections/today), con la misma división del trabajo: el
 // backend entrega acciones planas (visto · nota · reseña) y aquí se arman las
 // historias (src/lib/today/stories.js).
@@ -20,7 +21,7 @@ import { useSearchParams } from "next/navigation";
 import { Coffee, Loader2, RefreshCw, UserPlus } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
-import TodayFeed, { GroupSelector } from "@/components/today/TodayFeed";
+import TodayFeed from "@/components/today/TodayFeed";
 import TodayPersonDrawer from "@/components/today/TodayPersonDrawer";
 import TodayStoryViewer from "@/components/today/TodayStoryViewer";
 import {
@@ -28,10 +29,8 @@ import {
   TodayForYouRow,
   TodayHero,
   TodayHighlightCard,
-  TodayMasthead,
   TodayMostActive,
 } from "@/components/today/TodayParts";
-import { todayHref } from "@/lib/today/params";
 import { hasUnseenFrames, readSeenStories, writeSeenStories } from "@/lib/today/seenStories";
 import { fetchTodayFeed, peekTodayFeed, rememberTodayFeed } from "@/lib/today/todayFeedClient";
 import {
@@ -49,12 +48,28 @@ import {
 
 const cacheKey = (scope, day) => `${scope}|${day}`;
 
-export default function TodayClient({ initialScope, initialDay, initialGroup, initialData }) {
+// Lo que busca el buscador de la barra: el título o el nombre de la persona.
+function matchesQuery(action, text) {
+  if (!text) return true;
+  const title = (action.media?.title || "").toLowerCase();
+  const name = `${action.user?.displayName || ""} ${action.user?.username || ""}`.toLowerCase();
+  return title.includes(text) || name.includes(text);
+}
+
+export default function TodayClient({
+  scope,
+  day,
+  group,
+  query = "",
+  onScopeChange,
+  onDayChange,
+  onDaysChange,
+  initialScope,
+  initialDay,
+  initialData,
+}) {
   const { session, account, hydrated } = useAuth();
 
-  const [scope, setScope] = useState(initialScope);
-  const [day, setDay] = useState(initialDay);
-  const [group, setGroup] = useState(initialGroup);
   // Una respuesta por (ámbito, día): volver a una pestaña ya vista es instantáneo.
   const [cache, setCache] = useState(() => {
     const seeded = initialData || peekTodayFeed(initialScope, initialDay);
@@ -86,16 +101,6 @@ export default function TodayClient({ initialScope, initialDay, initialGroup, in
     if (initialData) rememberTodayFeed(initialScope, initialDay, initialData);
   }, [initialData, initialScope, initialDay]);
 
-  // URL compartible sin volver a pedir el RSC. Con ?story= pendiente se espera
-  // a que el reproductor la consuma (lo hace el efecto de más abajo).
-  useEffect(() => {
-    if (storyParam) return;
-    const href = todayHref({ scope, day, group });
-    if (`${window.location.pathname}${window.location.search}` !== href) {
-      window.history.replaceState(window.history.state, "", href);
-    }
-  }, [scope, day, group, storyParam]);
-
   const load = useCallback(async (nextScope, nextDay, { force = false } = {}) => {
     const k = cacheKey(nextScope, nextDay);
     if (inFlight.current.has(k)) return;
@@ -113,8 +118,12 @@ export default function TodayClient({ initialScope, initialDay, initialGroup, in
   }, []);
 
   useEffect(() => {
-    if (!hydrated || !session) return;
-    if (!cache[key]) load(scope, day);
+    if (!hydrated || !session || cache[key]) return;
+    // Al volver a Hoy desde Siguiendo o Yo este componente se monta de nuevo:
+    // lo pedido hace poco sale de la copia compartida sin volver a la red.
+    const fresh = peekTodayFeed(scope, day);
+    if (fresh) setCache((prev) => ({ ...prev, [key]: fresh }));
+    else load(scope, day);
     // `cache` fuera a propósito: se pide al cambiar de pestaña, no al llegar datos.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, session, scope, day, load]);
@@ -127,9 +136,16 @@ export default function TodayClient({ initialScope, initialDay, initialGroup, in
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, session, data, scope, day]);
 
+  // Los recuentos de las pestañas de día van al desplegable «Día» de la barra.
+  useEffect(() => {
+    if (data?.days) onDaysChange?.(data.days);
+  }, [data, onDaysChange]);
+
   const tz = data?.range?.tz;
+  const text = query.trim().toLowerCase();
   const derived = useMemo(() => {
-    const prepared = prepareActions(data?.actions || []);
+    const actions = (data?.actions || []).filter((action) => matchesQuery(action, text));
+    const prepared = prepareActions(actions);
     const stories = toTitleStories(prepared);
     const hero = pickHeroStory(stories);
     const people = toPersonGroups(prepared);
@@ -142,9 +158,9 @@ export default function TodayClient({ initialScope, initialDay, initialGroup, in
       ranking: toMostActive(people),
       sections: toFeedSections(prepared, tz),
       storyGroups: toStoryGroups(stories, data?.forYou || []),
-      summary: summarize(data?.actions || []),
+      summary: summarize(actions),
     };
-  }, [data, tz]);
+  }, [data, tz, text]);
 
   // En Siguiendo todos los que salen son gente que sigues; en Comunidad lo dice
   // el backend aparte (la respuesta común va cacheada).
@@ -186,16 +202,15 @@ export default function TodayClient({ initialScope, initialDay, initialGroup, in
       setSeen(current);
       setStoryStart(index);
     }
-    window.history.replaceState(window.history.state, "", todayHref({ scope, day, group }));
+    const url = new URL(window.location.href);
+    url.searchParams.delete("story");
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}`);
     // Solo cuando llega una clave nueva o los datos para resolverla.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storyParam, data]);
 
   const yesterdayKey = data?.days?.[1]?.key || null;
-  const changeDay = useCallback(
-    (value) => setDay(value === "yesterday" ? yesterdayKey || "yesterday" : value),
-    [yesterdayKey],
-  );
+  const changeDay = (value) => onDayChange?.(value === "yesterday" ? yesterdayKey || "yesterday" : value);
 
   // Sin sesión lo resuelve SocialHub.
   if (!hydrated || !session || !account?.id) return null;
@@ -208,15 +223,15 @@ export default function TodayClient({ initialScope, initialDay, initialGroup, in
   return (
     <div>
       <div>
-        <TodayMasthead
-          scope={scope}
-          onScope={setScope}
-          day={day}
-          onDay={changeDay}
-          days={data?.days}
-          summary={derived.summary}
-          loading={loading}
-        />
+        <p className="mb-4 min-h-[1.5rem] text-sm text-zinc-400" aria-live="polite">
+          {loading
+            ? "\u00a0"
+            : derived.summary.actions
+              ? `${derived.summary.actions} ${derived.summary.actions === 1 ? "actividad" : "actividades"} de ${derived.summary.people} ${derived.summary.people === 1 ? "persona" : "personas"}`
+              : text
+                ? "Nada coincide con la búsqueda."
+                : null}
+        </p>
 
         {error && !data ? (
           <div className="flex flex-col items-center gap-3 py-24 text-center">
@@ -241,12 +256,12 @@ export default function TodayClient({ initialScope, initialDay, initialGroup, in
               <Link href="/members" className="rounded-full bg-gradient-to-br from-pink-500 to-fuchsia-600 px-4 py-2 text-sm font-bold text-white">
                 Buscar miembros
               </Link>
-              <button type="button" onClick={() => setScope("community")} className="rounded-full bg-white/10 px-4 py-2 text-sm font-bold text-white hover:bg-white/15">
+              <button type="button" onClick={() => onScopeChange?.("community")} className="rounded-full bg-white/10 px-4 py-2 text-sm font-bold text-white hover:bg-white/15">
                 Ver comunidad
               </button>
             </div>
           </div>
-        ) : empty ? (
+        ) : empty && text ? null : empty ? (
           <div className="flex flex-col items-center gap-3 py-20 text-center">
             <Coffee className="h-8 w-8 text-pink-400" aria-hidden="true" />
             <p className="max-w-sm text-zinc-300">
@@ -295,14 +310,9 @@ export default function TodayClient({ initialScope, initialDay, initialGroup, in
 
               {/* Centro: el feed */}
               <section aria-labelledby="today-feed" className="min-w-0">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <h2 id="today-feed" className="text-sm font-bold uppercase tracking-wider text-zinc-300">
-                    {scope === "community" ? "De la comunidad" : "De la gente que sigues"}
-                  </h2>
-                  <div className="w-[132px] sm:w-auto">
-                    <GroupSelector value={group} onChange={setGroup} />
-                  </div>
-                </div>
+                <h2 id="today-feed" className="mb-3 text-sm font-bold uppercase tracking-wider text-zinc-300">
+                  {scope === "community" ? "De la comunidad" : "De la gente que sigues"}
+                </h2>
                 <TodayFeed
                   group={group}
                   stories={derived.stories}

@@ -2,38 +2,18 @@
 
 // src/app/social/SocialHub.jsx
 //
-// SECCIÓN SOCIAL: una sola página con dos vistas.
-//   - «Hoy» (por defecto, TodayClient): lo destacado de hoy, ayer o la semana,
-//     con historias, destacada, «Para ti» y los más activos. Siguiendo o
-//     Comunidad.
-//   - «Actividad» (?view=activity, SocialClient): todo lo que ha hecho la gente
-//     que sigues, o tú, paginado y con filtros.
-// Antes eran dos páginas (/social y /today) con cabeceras y entradas de menú
-// repetidas; aquí comparten el fondo, la cabecera con las cifras y la URL.
-// La vista sale de la URL (useSearchParams): la píldora «Hoy» del navbar
-// enlaza a /social?story=… y eso basta para volver a «Hoy» desde «Actividad».
+// SECCIÓN SOCIAL: fondo, cabecera con las cifras y, debajo, la barra con el
+// selector Hoy / Siguiendo / Yo y su contenido (SocialClient). Antes Hoy era
+// otra página (/today) con su propia cabecera y entradas de menú; ahora es una
+// opción más de esa barra y lleva sus filtros en el mismo menú.
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { Activity, Flame, UserRoundCheck, Users } from "lucide-react";
+import { Activity, UserRoundCheck, Users } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
 import PageStatCard from "@/components/ui/PageStatCard";
-import { Segmented } from "@/components/today/TodayParts";
-import { normalizeSocialView } from "@/lib/today/params";
 import SocialClient from "./SocialClient";
-import TodayClient from "./TodayClient";
-
-const VIEW_OPTIONS = [
-  { value: "today", label: "Hoy", icon: Flame },
-  { value: "activity", label: "Actividad", icon: Activity },
-];
-
-const SUBTITLES = {
-  today: "Lo más destacado de lo que ha visto y opinado la gente.",
-  activity: "La actividad de la gente a la que sigues, y la tuya.",
-};
 
 // Tarjeta de cifra de la cabecera: la compartida de todas las cabeceras
 // (`PageStatCard`, mini tarjeta en móvil), como `CountStat` en Perfil, con el
@@ -55,10 +35,8 @@ function TarjetaCifra({ value, label, href, title, icon, iconClassName = "text-p
   );
 }
 
-export default function SocialHub({ initialToday }) {
+export default function SocialHub({ initialView, initialToday }) {
   const { session, account, hydrated } = useAuth();
-  const searchParams = useSearchParams();
-  const view = normalizeSocialView({ view: searchParams.get("view") });
 
   // Cifras de la cabecera: no cambian al pasar de vista, así que se piden una
   // sola vez.
@@ -80,12 +58,6 @@ export default function SocialHub({ initialToday }) {
       vigente = false;
     };
   }, [session, account?.id]);
-
-  // Cambiar de vista solo reescribe la URL (sin pedir otra vez el RSC);
-  // useSearchParams lo recoge y repinta.
-  const setView = useCallback((next) => {
-    window.history.pushState(window.history.state, "", next === "activity" ? "/social?view=activity" : "/social");
-  }, []);
 
   if (!hydrated) return <div className="min-h-screen bg-black" />;
 
@@ -132,7 +104,9 @@ export default function SocialHub({ initialToday }) {
               <h1 className="text-4xl font-bold tracking-tighter text-white md:text-6xl">
                 Social<span className="text-pink-500">.</span>
               </h1>
-              <p className="mt-2 hidden max-w-lg text-lg text-zinc-400 md:block">{SUBTITLES[view]}</p>
+              <p className="mt-2 hidden max-w-lg text-lg text-zinc-400 md:block">
+                Lo destacado de hoy y la actividad de la gente a la que sigues, y la tuya.
+              </p>
             </div>
 
             <div className="grid w-full grid-cols-3 gap-2 sm:gap-3 lg:w-auto">
@@ -161,21 +135,9 @@ export default function SocialHub({ initialToday }) {
               />
             </div>
           </div>
-          <div className="mt-6 sm:w-[300px]">
-            <Segmented label="Vista" options={VIEW_OPTIONS} value={view} onChange={setView} />
-          </div>
         </header>
 
-        {view === "activity" ? (
-          <SocialClient />
-        ) : (
-          <TodayClient
-            initialScope={initialToday.scope}
-            initialDay={initialToday.day}
-            initialGroup={initialToday.group}
-            initialData={initialToday.data}
-          />
-        )}
+        <SocialClient initialView={initialView} initialToday={initialToday} />
       </div>
     </div>
   );

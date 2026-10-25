@@ -1,21 +1,19 @@
 "use client";
 
 // src/components/today/TodayParts.jsx
-// Bloques de la página Hoy: cabecera con pestañas, carril de historias,
+// Bloques de Hoy (Social): carril de historias,
 // historia destacada, destacados, «Para ti» y los más activos. La agrupación
 // del feed vive en TodayFeed y el reproductor en TodayStoryViewer.
 
 import Link from "next/link";
 import {
   Flame,
-  Globe2,
   ImageOff,
   MessageSquare,
   Play,
   Sparkles,
   Star,
   Trophy,
-  Users,
 } from "lucide-react";
 
 import OptimizedImage from "@/components/OptimizedImage";
@@ -26,11 +24,8 @@ import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import { hasUnseenFrames } from "@/lib/today/seenStories";
 import { relativeTime } from "@/lib/notifications/alerts";
 import {
-  ACTIVE_PILL,
   CARD_GLASS,
-  CONTROL_GLASS,
   actionPhrase,
-  dayTabLabel,
   displayName,
   episodeLabel,
   milestoneLabel,
@@ -120,103 +115,6 @@ function PersonName({ user, onOpenPerson }) {
     >
       {displayName(user)}
     </button>
-  );
-}
-
-// ─────────────────────────────────────────────
-// Cabecera
-// ─────────────────────────────────────────────
-
-export function Segmented({ options, value, onChange, label }) {
-  return (
-    <div role="tablist" aria-label={label} className={`flex h-11 items-center rounded-2xl p-1 ${CONTROL_GLASS}`}>
-      {options.map((option) => {
-        const Icon = option.icon;
-        const active = option.value === value;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            onClick={() => onChange(option.value)}
-            className={`flex h-full min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl px-3 text-sm font-bold transition-colors ${
-              active ? ACTIVE_PILL : "text-zinc-400 hover:bg-white/10 hover:text-white"
-            }`}
-          >
-            {Icon ? <Icon className="h-4 w-4 shrink-0" aria-hidden="true" /> : null}
-            <span className="truncate">{option.label}</span>
-            {typeof option.count === "number" ? (
-              <span className={`text-xs tabular-nums ${active ? "text-white/80" : "text-zinc-500"}`}>
-                {option.count}
-              </span>
-            ) : null}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-export const SCOPE_OPTIONS = [
-  { value: "following", label: "Siguiendo", icon: Users },
-  { value: "community", label: "Comunidad", icon: Globe2 },
-];
-
-export function TodayMasthead({ scope, onScope, day, onDay, days, summary, loading }) {
-  const count = (key) => days?.find((d) => d.key === key)?.count;
-  const yesterdayKey = days?.[1]?.key;
-  const dayOptions = [
-    { value: "today", label: "Hoy", count: count("today") },
-    { value: "yesterday", label: "Ayer", count: yesterdayKey ? count(yesterdayKey) : undefined },
-    { value: "week", label: "Semana", count: count("week") },
-  ];
-  // Un día suelto de la semana (?day=YYYY-MM-DD) se marca como «Ayer» si lo es.
-  const dayValue = day === yesterdayKey ? "yesterday" : day;
-
-  return (
-    <div className="mb-6">
-      {/* El título es el de la sección (SocialHub); aquí van los controles de
-          la vista «Hoy» y su resumen. */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="order-2 lg:order-1">
-          <p className="min-h-[1.5rem] text-sm text-zinc-400 md:text-base" aria-live="polite">
-            {loading
-              ? " "
-              : summary.actions
-                ? `${summary.actions} ${summary.actions === 1 ? "actividad" : "actividades"} de ${summary.people} ${summary.people === 1 ? "persona" : "personas"}`
-                : scope === "community"
-                  ? "Nadie de la comunidad se ha movido todavía."
-                  : "La gente a la que sigues aún no ha hecho nada."}
-          </p>
-        </div>
-        <div className="order-1 flex w-full flex-col gap-2 sm:flex-row lg:order-2 lg:w-auto">
-          <div className="sm:w-[260px]">
-            <Segmented label="Ámbito" options={SCOPE_OPTIONS} value={scope} onChange={onScope} />
-          </div>
-          <div className="sm:w-[330px]">
-            <Segmented label="Día" options={dayOptions} value={dayValue} onChange={onDay} />
-          </div>
-        </div>
-      </div>
-      {days?.length > 2 ? (
-        <nav aria-label="Días de la semana" className="mt-3 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
-          {days.slice(2, 7).map((d, i) => (
-            <button
-              key={d.key}
-              type="button"
-              onClick={() => onDay(d.key)}
-              aria-pressed={day === d.key}
-              className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold transition-colors ${
-                day === d.key ? ACTIVE_PILL : `${CONTROL_GLASS} text-zinc-400 hover:text-white`
-              }`}
-            >
-              {dayTabLabel(d.key, i + 2)} <span className="tabular-nums opacity-70">{d.count}</span>
-            </button>
-          ))}
-        </nav>
-      ) : null}
-    </div>
   );
 }
 
