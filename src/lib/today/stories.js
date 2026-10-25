@@ -295,6 +295,25 @@ export function toStoryGroups(stories, forYou = []) {
   return groups;
 }
 
+/**
+ * Lo que dice la línea de debajo de un título (rejilla, destacada), como en
+ * Trakt: «Visto T1 · E2», «Vistos 3 episodios», «Visto y calificado»,
+ * «Calificado», «Reseñado». Con varias personas: «3 personas».
+ */
+export function summarizeActions(actions, { people = 1 } = {}) {
+  if (people > 1) return `${people} personas`;
+  const list = Array.isArray(actions) ? actions : [];
+  const watch = list.find((a) => a.kind === "watch");
+  const rated = list.some((a) => a.kind === "rating" || (a.kind === "watch" && a.rating != null));
+  const reviewed = list.some((a) => a.kind === "comment");
+  const extras = [rated && "calificado", reviewed && "reseñado"].filter(Boolean).join(" y ");
+  if (!watch) return extras ? extras.charAt(0).toUpperCase() + extras.slice(1) : "";
+  const count = watch.episodeCount || (watch.target === "episode" ? 1 : 0);
+  if (count > 1) return extras ? `Vistos ${count} episodios y ${extras}` : `Vistos ${count} episodios`;
+  if (watch.target === "episode" && !extras) return `Visto T${watch.season} · E${watch.episode}`;
+  return extras ? `Visto y ${extras}` : "Visto";
+}
+
 /** «N actividades de M personas» de la cabecera. */
 export function summarize(actions) {
   const list = Array.isArray(actions) ? actions : [];

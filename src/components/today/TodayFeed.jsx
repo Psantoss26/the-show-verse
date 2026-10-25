@@ -1,175 +1,193 @@
 "use client";
 
 // src/components/today/TodayFeed.jsx
-// Columna central de Hoy: lo que ha hecho la gente, agrupado por título (por
-// defecto), por persona o por franja horaria. La agrupación se elige en el
-// desplegable «Agrupar» de la barra de Social.
+// Columna central de Hoy, como la de Trakt: una rejilla de carteles con solo la
+// foto de quien lo vio arriba a la derecha y, debajo, el título con una línea
+// («Visto T1 · E2 · 22:03»). Al pulsar un cartel se abre su historia.
+// La agrupación (título, persona o franja horaria) y la vista (rejilla o lista,
+// ListRow) se eligen en la barra de Social.
 
-import { MessageSquare, Play, Star } from "lucide-react";
+import { mediaKey, summarizeActions } from "@/lib/today/stories";
+import { AvatarStack, Poster, RatingBadge, UserAvatar } from "./TodayParts";
+import { CARD_SURFACE, dayHeading, displayName, milestoneLabel, whenLabel } from "./todayUi";
 
-import Stars from "@/components/social/Stars";
-import { relativeTime } from "@/lib/notifications/alerts";
-import {
-  AvatarStack,
-  PersonName,
-  Poster,
-  TitleLink,
-  UserAvatar,
-} from "./TodayParts";
-import {
-  CARD_GLASS,
-  actionPhrase,
-  clockTime,
-  dayHeading,
-  displayName,
-  milestoneLabel,
-} from "./todayUi";
+const GRID = "grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-x-3 gap-y-5 sm:grid-cols-[repeat(auto-fill,minmax(124px,1fr))] sm:gap-x-4";
+// Vista lista: una fila por título, con el cartel pequeño a la izquierda; cabe
+// mucho más a lo alto que la rejilla.
+const LIST = `divide-y divide-white/[0.06] overflow-hidden rounded-2xl ${CARD_SURFACE}`;
 
-function ActionIcon({ action }) {
-  if (action.kind === "comment") return <MessageSquare className="h-3.5 w-3.5 shrink-0 text-orange-400" aria-hidden="true" />;
-  if (action.kind === "rating") return <Star className="h-3.5 w-3.5 shrink-0 text-amber-400" aria-hidden="true" />;
-  return <Play className="h-3.5 w-3.5 shrink-0 text-emerald-400" aria-hidden="true" />;
+function averageOf(actions) {
+  const values = actions
+    .map((a) => (a.kind === "rating" || a.kind === "watch" ? a.rating : null))
+    .filter((v) => typeof v === "number");
+  if (!values.length) return null;
+  return values.reduce((sum, v) => sum + v, 0) / values.length;
 }
 
-function ActionLine({ action, onOpenPerson, withTitle = false }) {
+/**
+ * Un cartel de la rejilla. Encima solo va la foto de quien lo vio (`users`):
+ * la nota, el hito y el tipo se quedan para la lista y la historia, para no
+ * llenar la portada de indicadores. `actions` resume la línea de debajo.
+ */
+function PosterTile({ media, users, actions, latestAt, tz, onOpen }) {
+  const line = summarizeActions(actions, { people: users.length });
   return (
-    <li className="flex items-start gap-2 text-sm">
-      <span className="mt-0.5"><ActionIcon action={action} /></span>
-      <span className="min-w-0 flex-1 text-zinc-300">
-        <PersonName user={action.user} onOpenPerson={onOpenPerson} /> {actionPhrase(action)}
-        {withTitle ? (
-          <>
-            {" "}
-            <TitleLink media={action.media} className="font-bold text-white hover:underline">{action.media.title}</TitleLink>
-          </>
-        ) : null}
-        {action.rating != null ? (
-          <span className="ml-1.5 inline-flex translate-y-[2px] items-center gap-1">
-            <Stars rating={action.rating} iconClassName="h-3 w-3" />
+    <li className="min-w-0">
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={`${media.title}: ${line}`}
+        className="group block w-full text-left focus-visible:outline-none"
+      >
+        <span className="relative block overflow-hidden rounded-lg ring-1 ring-inset ring-white/[0.06] transition-transform duration-200 group-hover:-translate-y-0.5 group-focus-visible:ring-2 group-focus-visible:ring-pink-400">
+          <Poster media={media} size="w342" className="aspect-[2/3] w-full" />
+          <span className="absolute right-1.5 top-1.5">
+            <AvatarStack users={users} max={2} size="h-7 w-7" />
           </span>
-        ) : null}
-        {action.kind === "comment" ? (
-          <span className={`mt-0.5 block line-clamp-2 text-zinc-400 ${action.comment.spoiler ? "blur-[3px] hover:blur-none" : ""}`}>
-            “{action.comment.body}”
-          </span>
-        ) : null}
-        <span className="ml-1 text-xs text-zinc-500">· {relativeTime(action.activityAt)}</span>
-      </span>
+        </span>
+        <span className="mt-2 block truncate text-sm text-white">{media.title}</span>
+        <span className="block truncate text-xs text-zinc-400">
+          {line}
+          {line ? " · " : ""}
+          <span className="tabular-nums">{whenLabel(latestAt, tz)}</span>
+        </span>
+      </button>
     </li>
   );
 }
 
-function TitleTile({ story, onOpenStory, onOpenPerson }) {
-  const visible = story.actions.slice(0, 3);
-  const rest = story.actions.length - visible.length;
+/**
+ * Lo mismo que PosterTile, en fila: cartel, título, línea y hora, caras y nota.
+ * En pantallas grandes (xl, y más en 2xl: monitores 2K) crece el cartel, el
+ * texto y las caras, para que la fila no se quede pequeña en tanto ancho.
+ */
+function ListRow({ media, users, actions, rating, milestone, latestAt, tz, onOpen }) {
+  const line = summarizeActions(actions, { people: users.length });
   return (
-    <article className={`flex gap-3 rounded-2xl p-3 ${CARD_GLASS}`}>
-      <TitleLink media={story.media} className="shrink-0">
-        <Poster media={story.media} className="h-[120px] w-[80px] rounded-xl" />
-      </TitleLink>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-start gap-2">
-          <div className="min-w-0 flex-1">
-            {story.milestone ? (
-              <span className="text-[11px] font-bold uppercase tracking-wider text-pink-300">{milestoneLabel(story.milestone)}</span>
-            ) : null}
-            <TitleLink media={story.media} className="block truncate text-base font-bold text-white hover:underline">
-              {story.media.title}
-            </TitleLink>
-          </div>
-          <button
-            type="button"
-            onClick={onOpenStory}
-            aria-label={`Ver historia de ${story.media.title}`}
-            className="shrink-0 rounded-full p-[2px] bg-gradient-to-tr from-amber-400 via-pink-500 to-fuchsia-600"
-          >
-            <span className="block rounded-full bg-black p-[2px]">
-              <AvatarStack users={story.users} max={1} size="h-7 w-7" />
-            </span>
-          </button>
-        </div>
-        <div className="mt-1 flex items-center gap-2 text-xs text-zinc-500">
-          <span>{story.users.length} {story.users.length === 1 ? "persona" : "personas"}</span>
-          {story.averageRating != null ? (
-            <span className="inline-flex items-center gap-1 text-amber-300">
-              <Star className="h-3 w-3 fill-current" aria-hidden="true" /> {story.averageRating}
-            </span>
-          ) : null}
-        </div>
-        <ul className="mt-2 space-y-1.5">
-          {visible.map((action) => (
-            <ActionLine key={action.key} action={action} onOpenPerson={onOpenPerson} />
-          ))}
-        </ul>
-        {rest > 0 ? (
-          <button type="button" onClick={onOpenStory} className="mt-1.5 text-xs font-bold text-pink-300 hover:text-pink-200">
-            y {rest} más
-          </button>
-        ) : null}
-      </div>
-    </article>
-  );
-}
-
-function PersonTile({ group, onOpenPerson }) {
-  const titles = [...new Map(group.actions.map((a) => [`${a.media.type}:${a.media.tmdbId}`, a.media])).values()];
-  return (
-    <article className={`rounded-2xl p-3 ${CARD_GLASS}`}>
+    <li>
       <button
         type="button"
-        onClick={() => onOpenPerson(group.user)}
-        className="flex w-full items-center gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/70 rounded-xl"
+        onClick={onOpen}
+        aria-label={`${media.title}: ${line}`}
+        className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors xl:gap-4 xl:px-4 xl:py-3 2xl:py-3.5 hover:bg-white/[0.04] focus-visible:bg-white/[0.06] focus-visible:outline-none"
       >
-        <UserAvatar user={group.user} className="h-10 w-10" />
+        <Poster media={media} size="w154" className="aspect-[2/3] w-11 shrink-0 rounded-md ring-1 ring-inset ring-white/[0.06] xl:w-14 2xl:w-16" />
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-bold text-white">{displayName(group.user)}</span>
-          <span className="block text-xs text-zinc-500">
-            {group.actions.length} {group.actions.length === 1 ? "historia" : "historias"} · {relativeTime(group.latestAt)}
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="truncate text-sm font-bold text-white 2xl:text-base">{media.title}</span>
+            {milestone ? (
+              <span className="shrink-0 rounded-md bg-pink-500/15 px-1.5 py-0.5 text-xs font-bold leading-none text-pink-300">
+                {milestoneLabel(milestone)}
+              </span>
+            ) : null}
+          </span>
+          <span className="mt-1 block truncate text-xs text-zinc-400 2xl:mt-1.5 2xl:text-sm">
+            {line}
+            {line ? " · " : ""}
+            <span className="tabular-nums">{whenLabel(latestAt, tz)}</span>
           </span>
         </span>
+        {typeof rating === "number" ? <RatingBadge rating={rating} className="shrink-0 2xl:text-sm" /> : null}
+        <span className="shrink-0">
+          <AvatarStack users={users} max={3} size="h-7 w-7 2xl:h-9 2xl:w-9" />
+        </span>
       </button>
-      <ol className="mt-3 flex gap-2 overflow-x-auto [scrollbar-width:none]" data-mobile-page-swipe-ignore>
-        {titles.slice(0, 8).map((media) => (
-          <li key={`${media.type}:${media.tmdbId}`} className="shrink-0">
-            <TitleLink media={media} title={media.title}>
-              <Poster media={media} size="w154" className="h-[84px] w-[56px] rounded-lg" />
-            </TitleLink>
-          </li>
-        ))}
-      </ol>
-      <ul className="mt-3 space-y-1.5">
-        {group.actions.slice(0, 3).map((action) => (
-          <ActionLine key={action.key} action={{ ...action, user: group.user }} onOpenPerson={onOpenPerson} withTitle />
-        ))}
-      </ul>
-    </article>
+    </li>
   );
 }
 
-function Timeline({ sections, tz, onOpenPerson }) {
+function TitleGrid({ stories, tz, onOpenStory, layout }) {
+  const Item = layout === "list" ? ListRow : PosterTile;
   return (
-    <div className="space-y-6">
+    <ol className={layout === "list" ? LIST : GRID}>
+      {stories.map((story) => (
+        <Item
+          key={story.key}
+          media={story.media}
+          users={story.users}
+          actions={story.actions}
+          rating={story.averageRating ?? averageOf(story.actions)}
+          milestone={story.milestone}
+          latestAt={story.latestAt}
+          tz={tz}
+          onOpen={() => onOpenStory(story.key)}
+        />
+      ))}
+    </ol>
+  );
+}
+
+// Por persona: cabecera con la cara y, debajo, sus títulos en la misma rejilla.
+function PersonSections({ people, tz, onOpenStory, onOpenPerson, layout }) {
+  const Item = layout === "list" ? ListRow : PosterTile;
+  return (
+    <div className="space-y-8">
+      {people.map((group) => {
+        const byTitle = new Map();
+        for (const action of group.actions) {
+          const key = mediaKey(action.media);
+          if (!byTitle.has(key)) byTitle.set(key, []);
+          byTitle.get(key).push(action);
+        }
+        return (
+          <section key={group.key} aria-label={displayName(group.user)}>
+            <button
+              type="button"
+              onClick={() => onOpenPerson(group.user)}
+              className="mb-3 flex items-center gap-3 rounded-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/70"
+            >
+              <UserAvatar user={group.user} className="h-8 w-8" />
+              <span className="text-base font-bold text-white">{displayName(group.user)}</span>
+              <span className="text-sm tabular-nums text-zinc-400">
+                {group.actions.length} {group.actions.length === 1 ? "historia" : "historias"}
+              </span>
+            </button>
+            <ol className={layout === "list" ? LIST : GRID}>
+              {[...byTitle.entries()].map(([key, actions]) => (
+                <Item
+                  key={key}
+                  media={actions[0].media}
+                  users={[group.user]}
+                  actions={actions}
+                  rating={averageOf(actions)}
+                  milestone={actions.find((a) => a.milestone)?.milestone || null}
+                  latestAt={actions[0].activityAt}
+                  tz={tz}
+                  onOpen={() => onOpenStory(key)}
+                />
+              ))}
+            </ol>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+// Por hora: una sección por franja (y por día si la ventana abarca varios).
+function TimeSections({ sections, tz, onOpenStory, layout }) {
+  const Item = layout === "list" ? ListRow : PosterTile;
+  return (
+    <div className="space-y-8">
       {sections.map((section) => (
         <section key={section.key} aria-label={section.label}>
-          <h3 className="mb-2 flex items-baseline gap-2 text-xs font-bold uppercase tracking-wider text-zinc-400">
+          <h3 className="mb-3 flex items-baseline gap-2 text-base font-bold text-white">
             {section.label}
-            {section.showDay ? <span className="normal-case tracking-normal text-zinc-500">{dayHeading(section.day)}</span> : null}
-            <span className="text-zinc-600">· {section.actions.length}</span>
+            {section.showDay ? <span className="text-sm font-normal text-zinc-400">{dayHeading(section.day)}</span> : null}
           </h3>
-          <ol className={`divide-y divide-white/5 rounded-2xl ${CARD_GLASS}`}>
+          <ol className={layout === "list" ? LIST : GRID}>
             {section.actions.map((action) => (
-              <li key={action.key} className="flex items-center gap-3 p-3">
-                <span className="w-11 shrink-0 text-xs tabular-nums text-zinc-500">{clockTime(action.activityAt, tz)}</span>
-                <UserAvatar user={action.user} className="h-8 w-8" />
-                <span className="min-w-0 flex-1 text-sm text-zinc-300">
-                  <PersonName user={action.user} onOpenPerson={onOpenPerson} /> {actionPhrase(action)}{" "}
-                  <TitleLink media={action.media} className="font-bold text-white hover:underline">{action.media.title}</TitleLink>
-                  {action.rating != null ? <span className="ml-1 text-amber-300">· {action.rating}/10</span> : null}
-                </span>
-                <TitleLink media={action.media} className="shrink-0">
-                  <Poster media={action.media} size="w92" className="h-[54px] w-[36px] rounded-md" />
-                </TitleLink>
-              </li>
+              <Item
+                key={action.key}
+                media={action.media}
+                users={[action.user]}
+                actions={[action]}
+                rating={averageOf([action])}
+                milestone={action.milestone}
+                latestAt={action.activityAt}
+                tz={tz}
+                onOpen={() => onOpenStory(mediaKey(action.media))}
+              />
             ))}
           </ol>
         </section>
@@ -178,27 +196,10 @@ function Timeline({ sections, tz, onOpenPerson }) {
   );
 }
 
-export default function TodayFeed({ group, stories, people, sections, tz, onOpenStory, onOpenPerson }) {
+export default function TodayFeed({ group, layout = "grid", stories, people, sections, tz, onOpenStory, onOpenPerson }) {
   if (group === "person") {
-    return (
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-        {people.map((entry) => (
-          <PersonTile key={entry.key} group={entry} onOpenPerson={onOpenPerson} />
-        ))}
-      </div>
-    );
+    return <PersonSections people={people} tz={tz} layout={layout} onOpenStory={onOpenStory} onOpenPerson={onOpenPerson} />;
   }
-  if (group === "time") return <Timeline sections={sections} tz={tz} onOpenPerson={onOpenPerson} />;
-  return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-      {stories.map((story) => (
-        <TitleTile
-          key={story.key}
-          story={story}
-          onOpenStory={() => onOpenStory(story.key)}
-          onOpenPerson={onOpenPerson}
-        />
-      ))}
-    </div>
-  );
+  if (group === "time") return <TimeSections sections={sections} tz={tz} layout={layout} onOpenStory={onOpenStory} />;
+  return <TitleGrid stories={stories} tz={tz} layout={layout} onOpenStory={onOpenStory} />;
 }

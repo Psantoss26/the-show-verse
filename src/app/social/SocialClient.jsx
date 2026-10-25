@@ -40,6 +40,7 @@ import {
   ImageOff,
   Layers3,
   Image as ImageIcon,
+  LayoutGrid,
   List,
   ListPlus,
   MessageSquare,
@@ -152,6 +153,18 @@ const CLAVE_AGRUPADO = "showverse:social:groupBy";
 // grande). Un valor antiguo guardado ("compact", "grid") ya no existe y vuelve
 // a la lista.
 const VISTAS = new Set(["list", "poster-list", "backdrop-list"]);
+// Vistas de Hoy: rejilla de carteles (la de Trakt) o lista, que aprovecha el
+// alto. Se recuerda aparte de la vista de Siguiendo / Yo.
+const CLAVE_VISTA_HOY = "showverse:social:todayLayout";
+const VISTAS_HOY = [
+  ["grid", LayoutGrid, "Cuadrícula"],
+  ["list", List, "Lista"],
+];
+const VISTAS_FEED = [
+  ["list", List, "Lista"],
+  ["poster-list", ImageIcon, "Lista con póster"],
+  ["backdrop-list", MonitorPlay, "Lista con backdrop"],
+];
 
 function leerVistaGuardada() {
   if (typeof window === "undefined") return "list";
@@ -470,6 +483,25 @@ export default function SocialClient({ initialView = "today", initialToday = {} 
   const [hoyDia, setHoyDia] = useState(initialToday.day || "today");
   const [hoyAgrupar, setHoyAgrupar] = useState(initialToday.group || "title");
   const [hoyDias, setHoyDias] = useState(initialToday.data?.days || null);
+  // Se lee tras montar (no en el estado inicial) para que el HTML del servidor y
+  // el primer render del cliente coincidan.
+  const [hoyVista, setHoyVistaState] = useState("grid");
+  useEffect(() => {
+    try {
+      const guardada = window.localStorage.getItem(CLAVE_VISTA_HOY);
+      if (VISTAS_HOY.some(([v]) => v === guardada)) setHoyVistaState(guardada);
+    } catch {
+      // Sin almacenamiento: rejilla.
+    }
+  }, []);
+  const setHoyVista = useCallback((modo) => {
+    setHoyVistaState(modo);
+    try {
+      window.localStorage.setItem(CLAVE_VISTA_HOY, modo);
+    } catch {
+      // Se queda solo para esta visita.
+    }
+  }, []);
 
   // La píldora «Hoy» del navbar enlaza a /social?story=…: estando en Siguiendo
   // o Yo, vuelve a Hoy para que el reproductor se abra.
@@ -850,6 +882,13 @@ export default function SocialClient({ initialView = "today", initialToday = {} 
                 </div>
                 <div className="flex gap-2">
                   <div className="min-w-0 flex-1">{selectorAgruparHoy()}</div>
+                  <SelectorVista
+                    vista={hoyVista}
+                    setVista={setHoyVista}
+                    opciones={VISTAS_HOY}
+                    controlGlass={controlGlass}
+                    activo={activo}
+                  />
                 </div>
               </>
             ) : (
@@ -931,6 +970,13 @@ export default function SocialClient({ initialView = "today", initialToday = {} 
                 {selectorQuien({ compact: desktopSearchFocused })}
                 {selectorDia({ compact: desktopSearchFocused })}
                 {selectorAgruparHoy({ compact: desktopSearchFocused })}
+                <SelectorVista
+                  vista={hoyVista}
+                  setVista={setHoyVista}
+                  opciones={VISTAS_HOY}
+                  controlGlass={controlGlass}
+                  activo={activo}
+                />
               </>
             ) : (
               <>
@@ -978,6 +1024,7 @@ export default function SocialClient({ initialView = "today", initialToday = {} 
               scope={hoyQuien}
               day={hoyDia}
               group={hoyAgrupar}
+              layout={hoyVista}
               query={q}
               onScopeChange={setHoyQuien}
               onDayChange={setHoyDia}
@@ -1352,16 +1399,12 @@ function GrupoDivisor({ titulo, cuenta, total, primero, isBackNav }) {
   );
 }
 
-function SelectorVista({ vista, setVista, controlGlass, activo, fill = false }) {
+function SelectorVista({ vista, setVista, controlGlass, activo, fill = false, opciones = VISTAS_FEED }) {
   return (
     <div
       className={`flex h-11 items-center rounded-2xl p-1 ${fill ? "min-w-0 flex-1" : "shrink-0"} ${controlGlass}`}
     >
-      {[
-        ["list", List, "Lista"],
-        ["poster-list", ImageIcon, "Lista con póster"],
-        ["backdrop-list", MonitorPlay, "Lista con backdrop"],
-      ].map(([valor, Icono, etiqueta]) => (
+      {opciones.map(([valor, Icono, etiqueta]) => (
         <button
           key={valor}
           type="button"

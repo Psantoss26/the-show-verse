@@ -17,12 +17,11 @@ import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, Pause, Play, Sparkles, Star, X } from "lucide-react";
 
 import OptimizedImage from "@/components/OptimizedImage";
-import Stars from "@/components/social/Stars";
 import useModalGuard from "@/hooks/useModalGuard";
 import { relativeTime } from "@/lib/notifications/alerts";
 import { firstUnseenIndex } from "@/lib/today/seenStories";
 import { AvatarStack, Poster, TitleLink, UserAvatar } from "./TodayParts";
-import { actionPhrase, displayName, episodeLabel, milestoneLabel, tmdbImage } from "./todayUi";
+import { actionPhrase, displayName, episodeLabel, milestoneLabel, ratingTen, tmdbImage } from "./todayUi";
 
 export const STORY_MS = 5000;
 const HOLD_MS = 220;
@@ -67,7 +66,7 @@ function FrameBody({ frame }) {
         </p>
         {story.averageRating != null ? (
           <p className="mt-1 inline-flex items-center gap-2 text-sm text-zinc-200">
-            <Star className="h-4 w-4 fill-current text-amber-400" aria-hidden="true" /> Media {story.averageRating}/10
+            <Star className="h-4 w-4 fill-current text-amber-400" aria-hidden="true" /> Media {ratingTen(story.averageRating)}/10
           </p>
         ) : null}
         {story.milestone ? (
@@ -86,9 +85,9 @@ function FrameBody({ frame }) {
       </p>
       {action.milestone ? <p className="mt-1 text-sm font-bold text-pink-300">{milestoneLabel(action.milestone)}</p> : null}
       {action.rating != null ? (
-        <div className="mt-2 flex items-center gap-2">
-          <Stars rating={action.rating} iconClassName="h-5 w-5" />
-          <span className="text-lg font-bold tabular-nums text-white">{action.rating}/10</span>
+        <div className="mt-2 flex items-center gap-1.5 text-lg font-bold tabular-nums text-white">
+          <Star className="h-5 w-5 fill-current text-amber-400" aria-hidden="true" />
+          {ratingTen(action.rating)}/10
         </div>
       ) : null}
       {action.kind === "comment" ? (
@@ -305,7 +304,7 @@ export default function TodayStoryViewer({ groups, startIndex, seen, onSeen, onC
             <Poster media={media} size="w92" className="h-10 w-7 rounded" />
             <span className="min-w-0">
               <span className="block truncate text-sm font-bold text-white">{media?.title}</span>
-              <span className="block text-[11px] text-zinc-400">
+              <span className="block text-xs text-zinc-400">
                 {groupIndex + 1} de {groups.length}
               </span>
             </span>

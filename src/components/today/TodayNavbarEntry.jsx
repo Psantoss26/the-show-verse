@@ -3,8 +3,8 @@
 // src/components/today/TodayNavbarEntry.jsx
 //
 // Píldora «Hoy» del navbar, como la de Trakt (trakt-lite, TodayNavbarEntry):
-//   - Escritorio: caras de hasta 3 personas con historias, «Hoy» y un contador
-//     con las historias sin ver. Mientras quede alguna, un brillo recorre el
+//   - Escritorio: píldora de cristal líquido (la de la casa) con las caras de
+//     hasta 3 personas con historias, «Hoy» y un contador con las sin ver. Mientras quede alguna, un brillo recorre el
 //     borde de vez en cuando (sv-today-shine en globals.css).
 //   - Móvil: un círculo con dos carteles inclinados y el contador en la esquina.
 // Lleva a la vista «Hoy» de Social abriendo el reproductor en la primera
@@ -19,8 +19,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import OptimizedImage from "@/components/OptimizedImage";
+import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 import Avatar from "@/components/ui/Avatar";
 import { useAuth } from "@/context/AuthContext";
+import { LIQUID_GLASS_BAR } from "@/lib/ui/liquidGlass";
 import { SEEN_STORIES_EVENT, hasUnseenFrames, readSeenStories } from "@/lib/today/seenStories";
 import { prepareActions, toStoryGroups, toTitleStories } from "@/lib/today/stories";
 import { fetchTodayFeed, peekTodayFeed } from "@/lib/today/todayFeedClient";
@@ -102,13 +104,48 @@ function Shine() {
   );
 }
 
+// Contador de historias sin ver: el rosa de la sección Social, con un aro fino
+// para que se despegue del cristal sin dibujar un contorno.
 function Badge({ count, className = "" }) {
   if (!count) return null;
   return (
     <span
-      className={`flex h-5 min-w-5 items-center justify-center rounded-full bg-indigo-950 px-1.5 text-[11px] font-bold tabular-nums text-indigo-100 ring-1 ring-inset ring-indigo-400/40 ${className}`}
+      className={`flex h-5 min-w-5 items-center justify-center rounded-full bg-pink-500 px-1.5 text-xs font-bold leading-none tabular-nums text-white shadow-[0_2px_8px_-2px_rgba(236,72,153,0.7)] ${className}`}
     >
       {count}
+    </span>
+  );
+}
+
+// Caras «recortadas», como el AvatarStack «cutout» de Trakt: en vez de un aro
+// del color del fondo (que sobre el cristal se ve como un círculo oscuro), cada
+// cara recorta con una máscara el hueco donde se monta la siguiente.
+const FACE_PX = 30;
+const FACE_OVERLAP_PX = 10;
+const FACE_GAP_PX = 2;
+const FACE_CUTOUT_MASK = `radial-gradient(circle ${FACE_PX / 2 + FACE_GAP_PX}px at calc(100% + ${FACE_PX / 2 - FACE_OVERLAP_PX}px) 50%, transparent 98%, #000 100%)`;
+
+function Faces({ users }) {
+  return (
+    <span className="flex items-center" style={{ gap: 0 }}>
+      {users.map((user, index) => {
+        const last = index === users.length - 1;
+        return (
+          <span
+            key={user.id}
+            className="relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-zinc-600 to-zinc-800 text-xs font-bold text-white"
+            style={{
+              width: FACE_PX,
+              height: FACE_PX,
+              marginLeft: index ? -FACE_OVERLAP_PX : 0,
+              WebkitMaskImage: last ? undefined : FACE_CUTOUT_MASK,
+              maskImage: last ? undefined : FACE_CUTOUT_MASK,
+            }}
+          >
+            <Avatar src={user.avatarUrl} name={displayName(user)} alt="" />
+          </span>
+        );
+      })}
     </span>
   );
 }
@@ -121,8 +158,9 @@ export default function TodayNavbarEntry({ variant = "desktop" }) {
   const label = entry.unseen
     ? `Hoy: ${entry.unseen} ${entry.unseen === 1 ? "historia sin ver" : "historias sin ver"}`
     : "Hoy: historias de la gente que sigues";
-  const pillSurface =
-    "bg-[linear-gradient(135deg,rgba(236,72,153,0.18),rgba(99,102,241,0.12))] bg-black/55 backdrop-blur-md shadow-[0_6px_20px_-8px_rgba(236,72,153,0.45),inset_0_0_0_1px_rgba(255,255,255,0.08)] hover:shadow-[0_8px_26px_-8px_rgba(236,72,153,0.7),inset_0_0_0_1px_rgba(255,255,255,0.14)] transition-shadow";
+  // El cristal de la casa (LIQUID_GLASS_BAR + capas ópticas), el mismo de las
+  // flechas y los menús de cristal: relieve sin contorno dibujado.
+  const pillSurface = `${LIQUID_GLASS_BAR} transition-[filter] hover:brightness-110`;
 
   if (variant === "mobile") {
     return (
@@ -132,6 +170,7 @@ export default function TodayNavbarEntry({ variant = "desktop" }) {
         aria-label={label}
         className={`relative grid h-10 w-10 shrink-0 place-items-center rounded-full text-white ${pillSurface}`}
       >
+        <LiquidGlassOpticalLayers />
         {entry.unseen ? <Shine /> : null}
         {entry.posters.map((media, index) => (
           <span
@@ -147,7 +186,7 @@ export default function TodayNavbarEntry({ variant = "desktop" }) {
             <OptimizedImage src={tmdbImage(media.posterPath, "w92")} alt="" className="h-full w-full object-cover" />
           </span>
         ))}
-        <Badge count={entry.unseen} className="absolute -right-1.5 -top-1.5 h-[18px] min-w-[18px] px-1 ring-2 ring-black" />
+        <Badge count={entry.unseen} className="absolute -right-1.5 -top-1.5 h-[18px] min-w-[18px] px-1" />
       </Link>
     );
   }
@@ -158,24 +197,18 @@ export default function TodayNavbarEntry({ variant = "desktop" }) {
       prefetch={false}
       aria-label={label}
       className={`relative inline-flex h-10 shrink-0 items-center gap-2 rounded-full text-sm text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/70 ${
-        entry.faces.length ? "pl-[3px]" : "pl-3"
-      } ${entry.unseen ? "pr-2.5" : "pr-3"} ${pillSurface}`}
+        entry.faces.length ? "pl-[5px]" : "pl-3.5"
+      } ${entry.unseen ? "pr-2.5" : "pr-3.5"} ${pillSurface}`}
     >
+      <LiquidGlassOpticalLayers />
       {entry.unseen ? <Shine /> : null}
       {entry.faces.length ? (
-        <span className="flex items-center -space-x-2">
-          {entry.faces.map((user) => (
-            <span
-              key={user.id}
-              className="inline-flex h-[34px] w-[34px] items-center justify-center overflow-hidden rounded-full bg-zinc-800 text-xs font-bold text-zinc-200 ring-2 ring-black/80"
-            >
-              <Avatar src={user.avatarUrl} name={displayName(user)} alt="" />
-            </span>
-          ))}
+        <span className="relative">
+          <Faces users={entry.faces} />
         </span>
       ) : null}
-      <span className="font-bold">Hoy</span>
-      <Badge count={entry.unseen} />
+      <span className="relative font-bold [text-shadow:0_1px_3px_rgba(0,0,0,0.6)]">Hoy</span>
+      <Badge count={entry.unseen} className="relative" />
     </Link>
   );
 }

@@ -22,6 +22,7 @@
 //   - Actividad repartida por la semana para los recuentos de Hoy/Ayer/días.
 //   - Un bloque importado (mismo instante en punto) que Hoy debe ignorar.
 //   - Una cuenta que se excluye de Hoy · Comunidad.
+//   - Fotos de perfil generadas (degradado con iniciales, no caras reales).
 //
 // Solo escribe en una base local: se niega si DATABASE_URL no apunta a
 // localhost (ver backend-env-local: sin NODE_ENV=test, .env.local la fija a la
@@ -93,15 +94,15 @@ const T = {
   dragon: { tmdbId: 94997, mediaType: 'tv', title: 'La casa del dragón' },
 };
 
-// handle, nombre y bio (sin foto: el avatar pinta la inicial); `hideFromCommunityToday`
-// marca la cuenta que se excluye de Comunidad.
+// handle, nombre, bio y los dos colores de su foto de perfil (ver demoAvatar);
+// `hideFromCommunityToday` marca la cuenta que se excluye de Comunidad.
 const PEOPLE = [
-  { handle: 'lucia', displayName: 'Lucía Ferrer', bio: 'Maratones de fin de semana.' },
-  { handle: 'marcos', displayName: 'Marcos Ruiz', bio: 'Ciencia ficción y poco más.' },
-  { handle: 'sara', displayName: 'Sara Gil', bio: 'Series de oficina raras.' },
-  { handle: 'dani', displayName: 'Dani Ortega', bio: 'Cine en versión original.' },
-  { handle: 'elena', displayName: 'Elena Navarro', bio: 'Solo en Comunidad: nadie de la demo la sigue.' },
-  { handle: 'oculto', displayName: 'Cuenta oculta', bio: 'Se excluye de Hoy · Comunidad.', hideFromCommunityToday: true },
+  { handle: 'lucia', displayName: 'Lucía Ferrer', colors: ['#f472b6', '#7c3aed'], bio: 'Maratones de fin de semana.' },
+  { handle: 'marcos', displayName: 'Marcos Ruiz', colors: ['#38bdf8', '#1e3a8a'], bio: 'Ciencia ficción y poco más.' },
+  { handle: 'sara', displayName: 'Sara Gil', colors: ['#34d399', '#065f46'], bio: 'Series de oficina raras.' },
+  { handle: 'dani', displayName: 'Dani Ortega', colors: ['#fbbf24', '#b45309'], bio: 'Cine en versión original.' },
+  { handle: 'elena', displayName: 'Elena Navarro', colors: ['#fb7185', '#9f1239'], bio: 'Solo en Comunidad: nadie de la demo la sigue.' },
+  { handle: 'oculto', displayName: 'Cuenta oculta', colors: ['#a1a1aa', '#3f3f46'], bio: 'Se excluye de Hoy · Comunidad.', hideFromCommunityToday: true },
 ];
 
 /** Actividad de cada persona: [tipo, título, minutos atrás, extra]. */
@@ -207,6 +208,29 @@ async function clearTodayCache() {
   }
 }
 
+// Foto de perfil de la cuenta demo: degradado con sus iniciales, en WebP como
+// data URL (el mismo formato que una foto subida desde Ajustes). Ninguna es la
+// cara de una persona real. Usa sharp, que llega con Next en la raíz del repo;
+// si no está, la cuenta se queda sin foto y el avatar pinta la inicial.
+async function demoAvatar(person) {
+  let sharp;
+  try {
+    sharp = (await import('sharp')).default;
+  } catch {
+    return null;
+  }
+  const initials = person.displayName.split(/\s+/).map((word) => word[0]).join('').slice(0, 2).toUpperCase();
+  const [from, to] = person.colors;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+    <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${from}"/><stop offset="1" stop-color="${to}"/></linearGradient></defs>
+    <rect width="192" height="192" fill="url(#g)"/>
+    <circle cx="150" cy="40" r="70" fill="#fff" fill-opacity="0.12"/>
+    <text x="96" y="96" dy="0.35em" text-anchor="middle" font-family="DejaVu Sans, Arial, sans-serif" font-size="76" font-weight="700" fill="#fff">${initials}</text>
+  </svg>`;
+  const webp = await sharp(Buffer.from(svg)).webp({ quality: 82 }).toBuffer();
+  return `data:image/webp;base64,${webp.toString('base64')}`;
+}
+
 async function seedPerson(person) {
   const [user] = await db
     .insert(users)
@@ -215,6 +239,7 @@ async function seedPerson(person) {
       username: `demo_${person.handle}`,
       displayName: person.displayName,
       bio: person.bio,
+      avatarUrl: await demoAvatar(person),
       emailVerified: true,
     })
     .returning({ id: users.id, username: users.username });
