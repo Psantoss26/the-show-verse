@@ -18,13 +18,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Coffee, Loader2, RefreshCw, UserPlus } from "lucide-react";
+import { Coffee, Loader2, Play, RefreshCw, UserPlus } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
 import TodayFeed from "@/components/today/TodayFeed";
 import TodayPersonDrawer from "@/components/today/TodayPersonDrawer";
 import TodayStoryViewer from "@/components/today/TodayStoryViewer";
 import {
+  ColumnHeading,
   StoryRail,
   TodayForYouRow,
   TodayHero,
@@ -60,6 +61,7 @@ export default function TodayClient({
   scope,
   day,
   group,
+  layout = "grid",
   query = "",
   onScopeChange,
   onDayChange,
@@ -276,26 +278,40 @@ export default function TodayClient({
           </div>
         ) : (
           <>
+            {/* Historias en círculos solo en móvil; en escritorio, como en
+                Trakt, se abren desde la destacada o desde cada cartel. */}
             <div className="lg:hidden">
               <StoryRail groups={derived.storyGroups} seen={seen} onOpen={setStoryStart} />
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)_320px]">
-              {/* Columna izquierda: lo destacado */}
-              <div className="min-w-0 space-y-4">
-                <div className="hidden lg:block">
-                  <StoryRail groups={derived.storyGroups} seen={seen} onOpen={setStoryStart} />
-                </div>
-                <TodayHero story={derived.hero} onPlay={() => openStory(derived.hero?.key)} onOpenPerson={setPerson} />
+            {/* Tres columnas con sus títulos alineados arriba (ColumnHeading). */}
+            <div className="grid gap-x-8 gap-y-10 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)_300px]">
+              <section aria-labelledby="today-hero" className="min-w-0">
+                <ColumnHeading
+                  id="today-hero"
+                  action={
+                    <button
+                      type="button"
+                      onClick={() => setStoryStart(0)}
+                      className="-my-1 inline-flex shrink-0 items-center gap-1 rounded-md px-1 py-1 text-xs font-bold uppercase tracking-widest text-zinc-400 transition-colors hover:text-pink-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/70"
+                    >
+                      Reproducir todo
+                      <Play className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  }
+                >
+                  Historia destacada
+                </ColumnHeading>
+                <TodayHero story={derived.hero} tz={tz} onPlay={() => openStory(derived.hero?.key)} onOpenPerson={setPerson} />
                 {derived.highlights.length ? (
-                  <div className="hidden gap-3 sm:grid">
+                  <div className="mt-3 grid gap-2">
                     {derived.highlights.map((action) => (
-                      <TodayHighlightCard key={action.key} action={action} onOpenPerson={setPerson} />
+                      <TodayHighlightCard key={action.key} action={action} tz={tz} onOpenPerson={setPerson} />
                     ))}
                   </div>
                 ) : null}
                 {quiet ? (
-                  <div className="flex items-center gap-3 rounded-2xl bg-white/[0.04] p-4 text-sm text-zinc-300">
+                  <div className="mt-3 flex items-center gap-3 rounded-2xl bg-white/[0.04] p-4 text-sm text-zinc-300">
                     <Coffee className="h-5 w-5 shrink-0 text-pink-400" aria-hidden="true" />
                     <span className="flex-1">Ya estás al día. Hoy ha sido tranquilo.</span>
                     {yesterdayKey ? (
@@ -306,15 +322,15 @@ export default function TodayClient({
                   </div>
                 ) : null}
                 <TodayForYouRow items={data.forYou} />
-              </div>
+              </section>
 
-              {/* Centro: el feed */}
               <section aria-labelledby="today-feed" className="min-w-0">
-                <h2 id="today-feed" className="mb-3 text-sm font-bold uppercase tracking-wider text-zinc-300">
+                <ColumnHeading id="today-feed" count={derived.stories.length}>
                   {scope === "community" ? "De la comunidad" : "De la gente que sigues"}
-                </h2>
+                </ColumnHeading>
                 <TodayFeed
                   group={group}
+                  layout={layout}
                   stories={derived.stories}
                   people={derived.people}
                   sections={derived.sections}
@@ -327,16 +343,11 @@ export default function TodayClient({
                 ) : null}
               </section>
 
-              {/* Derecha: más activos (debajo del feed en pantallas medianas) */}
-              <aside className="min-w-0 lg:col-span-2 xl:col-span-1">
-                <div className="xl:sticky xl:top-24">
-                  <TodayMostActive
-                    ranking={derived.ranking}
-                    scope={scope}
-                    viewerId={account.id}
-                    followingSet={followingSet}
-                    onOpenPerson={setPerson}
-                  />
+              {/* Más activos: tercera columna en pantallas anchas; debajo, en las medianas. */}
+              <aside aria-labelledby="today-most-active" className="min-w-0 lg:col-span-2 xl:col-span-1">
+                <div className="xl:sticky xl:top-40">
+                  <ColumnHeading id="today-most-active">Más activos</ColumnHeading>
+                  <TodayMostActive ranking={derived.ranking} onOpenPerson={setPerson} />
                 </div>
               </aside>
             </div>

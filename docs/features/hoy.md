@@ -18,6 +18,7 @@ Hoy es una opción más de la barra sticky de Social (`SocialClient`), junto a S
 - **Quién:** Siguiendo o Comunidad.
 - **Día:** Hoy, Ayer, cada día de la semana y Semana, con su recuento.
 - **Agrupar:** por título, por persona o por hora.
+- **Vista** (botones de icono): rejilla de carteles o lista. Se recuerda en `localStorage` (`showverse:social:todayLayout`), aparte de la vista de Siguiendo / Yo.
 
 El buscador filtra lo de Hoy por título o persona. En móvil, como el resto de menús, van dentro de `MobileFiltersPanel`. `TodayClient` es controlado: recibe esos valores como props y devuelve los recuentos de los días (`onDaysChange`). `SocialHub` (`src/app/social/SocialHub.jsx`) pone el fondo y la cabecera «Social.» con las cifras (Siguiendo, Seguidores, Activos). Cambiar de opción solo reescribe la URL, sin volver a pedir el RSC.
 
@@ -31,7 +32,7 @@ Los valores por defecto (`following`, `today`, `title`) no se escriben en la URL
 
 ## Píldora «Hoy» del navbar
 
-`TodayNavbarEntry` (`src/components/today/`), como `TodayNavbarEntry.svelte` de trakt-lite. Solo aparece con sesión y si hay historias.
+`TodayNavbarEntry` (`src/components/today/`), como `TodayNavbarEntry.svelte` de trakt-lite. Solo aparece con sesión y si hay historias. Es de cristal líquido, el de la casa (`LIQUID_GLASS_BAR` + `LiquidGlassOpticalLayers`). Las caras van «recortadas» como el AvatarStack *cutout* de Trakt: cada una vacía con una máscara el hueco de la siguiente, en vez de llevar un aro oscuro. El contador es rosa.
 - **Escritorio** (junto a Buscar): caras de hasta 3 personas con historias, «Hoy» y un contador de historias sin ver.
 - **Móvil** (junto a la campana): un círculo con dos carteles inclinados y el contador en la esquina.
 - **Brillo:** mientras queda algo sin ver, un destello cónico recorre el borde una vez por minuto (`.sv-today-shine` en `globals.css`; sin animación con reduced-motion).
@@ -41,23 +42,31 @@ Los valores por defecto (`following`, `today`, `title`) no se escriben en la URL
 
 ## Qué se ve
 
+Maqueta como la Today de Trakt. En escritorio hay tres columnas con su título alineado arriba (`ColumnHeading`, con la misma letra que «Películas favoritas» del perfil: 12 px en negrita, versalitas espaciadas, gris y una raya fina debajo): **Historia destacada** (con «Reproducir todo»), **De la gente que sigues** o **De la comunidad** (con el número de títulos) y **Más activos**. Por debajo de `xl`, Más activos baja bajo las otras dos; en móvil todo va en una columna. El texto va a 12 px como mínimo y los iconos a 14–16 px, para que se lean nítidos. Las tarjetas son superficies lisas, sin desenfoque.
+
 - **Controles:** los desplegables Quién, Día y Agrupar de la barra (ver arriba). Encima del contenido, la línea «N actividades de M personas».
-- **Historias:** carril de círculos, uno por título más uno de «Para ti». El aro es de color mientras quede algo sin ver. Al pulsar se abre el **reproductor a pantalla completa** (`TodayStoryViewer`):
+- **Historias:** en móvil, carril de círculos, uno por título más uno de «Para ti»; el aro es de color mientras quede algo sin ver. En escritorio se abren desde la destacada, desde «Reproducir todo» o desde cada cartel. Todas abren el **reproductor a pantalla completa** (`TodayStoryViewer`):
   - Cada fotograma dura 5 s. En un título con dos o más personas, el primero es un resumen.
   - Tocar el tercio izquierdo vuelve atrás y el resto avanza. Mantener pulsado pausa.
   - Deslizar en horizontal cambia de título y hacia abajo cierra.
   - Teclado: ← y → cambian de fotograma, espacio pausa y Esc cierra.
   - Los fotogramas vistos se guardan en `localStorage` (`today-seen-stories`) durante 24 h.
-- **Historia destacada:** la más reciente con un **hito** (estreno o final de temporada o de serie). Si ninguna tiene hito, la que ha juntado a más gente.
-- **Destacados** (solo desde `sm`): la primera reseña sin spoiler y la primera nota de una película o serie entera, sin repetir el título destacado.
+- **Historia destacada:** la más reciente con un **hito** (estreno o final de temporada o de serie). Si ninguna tiene hito, la que ha juntado a más gente. Tarjeta con:
+  - quién la protagoniza y la etiqueta del hito (o «Serie» / «Película»);
+  - el cartel centrado sobre el fondo del título;
+  - el título, la línea de resumen y la hora;
+  - la nota media y el botón «Reproducir historia».
+- **Destacados:** filas compactas con la primera reseña sin spoiler y la primera nota de una película o serie entera, sin repetir el título destacado.
 - **«Para ti»:** episodios estrenados en la ventana de series que estás viendo y estrenos de tu lista de Pendientes.
-- **Feed** con tres agrupaciones:
+- **Feed:** rejilla de carteles. Encima de cada cartel solo va la foto de perfil de quien lo vio (o las de dos personas), arriba a la derecha: la nota y el hito se ven en la vista lista y en la historia. Debajo de cada cartel, el título y una línea como en Trakt: «Visto T1 · E2», «Vistos 3 episodios», «Visto y calificado», «2 personas» (`summarizeActions`), con la hora («22:03», «ayer, 22:03», «jue, 20:14»).
+
+  En **vista lista** (`ListRow`), cada título es una fila con el cartel pequeño, el título (y el hito), la línea con la hora, la nota y las caras: cabe mucho más a lo alto. Desde `xl`, y más en `2xl` (monitores 2K), las filas crecen: cartel de 64 px, título a 16 px y caras de 36 px. Al pulsar un cartel o una fila se abre su historia. Tres agrupaciones, en cualquiera de las dos vistas:
   - por título (por defecto);
-  - por persona;
+  - por persona, con un bloque por persona;
   - por hora, en franjas mañana 5–12, tarde 12–18, noche 18–23 y madrugada. La madrugada cuenta como el final del día anterior.
-- **Más activos:** las 5 personas con más acciones en la ventana, con una barra proporcional al primero. En Comunidad llevan botón Seguir.
-- **Panel de persona** (`TodayPersonDrawer`): todo lo suyo de la ventana, con enlace al perfil.
-- Al pulsar un título se abre la ficha rápida (`DetailModalProvider placement="right"`).
+- **Más activos:** las 5 personas con más acciones en la ventana: puesto, cara, nombre, «N historias» y una barra fina proporcional al primero.
+- **Panel de persona** (`TodayPersonDrawer`): todo lo suyo de la ventana, con enlace al perfil y botón Seguir.
+- Al pulsar un título en la destacada, los destacados o «Para ti» se abre la ficha rápida (`DetailModalProvider placement="right"`).
 
 ### Reglas
 
@@ -95,6 +104,8 @@ local) crea estas cuentas. Ver [[01-local-development]].
 | `demo_dani` | Oppenheimer ayer, The Bear T1E8 (final de temporada) con nota de temporada, una lista y The Last of Us. |
 | `demo_elena` | Nadie de la demo la sigue, así que solo sale en Comunidad. Final de Breaking Bad e Interstellar, más un bloque importado (5 películas en el mismo instante en punto) que Hoy no debe contar. |
 | `demo_oculto` | Tiene activado `hideFromCommunityToday`: no debe salir ni en Comunidad. |
+
+Cada cuenta lleva una foto de perfil generada: un degradado con sus iniciales, en WebP como data URL, igual que una foto subida desde Ajustes. Ninguna es la cara de una persona real. La genera `sharp`, que llega con Next; si no está, la cuenta se queda sin foto.
 
 Con `--viewer`, esa cuenta sigue a Lucía, Marcos, Sara y Dani, y Dani la sigue a ella.
 

@@ -14,7 +14,7 @@ import FollowButton from "@/components/social/FollowButton";
 import useModalGuard from "@/hooks/useModalGuard";
 import { relativeTime } from "@/lib/notifications/alerts";
 import { Poster, TitleLink, UserAvatar } from "./TodayParts";
-import { actionPhrase, displayName, profileHref } from "./todayUi";
+import { actionPhrase, displayName, profileHref, ratingTen } from "./todayUi";
 
 const EXIT_MS = 260;
 
@@ -93,7 +93,7 @@ export default function TodayPersonDrawer({ person, actions, following, viewerId
                 ) : null}
                 <p className="text-xs text-zinc-500">
                   {relativeTime(action.activityAt)}
-                  {action.rating != null ? ` · ${action.rating}/10` : ""}
+                  {action.rating != null ? ` · ${ratingTen(action.rating)}/10` : ""}
                 </p>
               </div>
             </li>
