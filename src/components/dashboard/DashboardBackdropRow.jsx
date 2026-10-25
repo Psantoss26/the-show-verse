@@ -81,6 +81,7 @@ import { DetailsRatingsBadges } from "@/components/details/DetailsScoreboardPane
 import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
 import { useDashboardHoverBackdrop } from "@/components/dashboard/DashboardHoverBackdrop";
 import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
+import { titlePeekAttrs } from "@/lib/navigation/titlePeek.mjs";
 import PreviewTrailerAudioButton, {
   usePreviewTrailerAudio,
 } from "@/components/dashboard/PreviewTrailerAudioControl";
@@ -1708,6 +1709,7 @@ export default function DashboardBackdropRow({
                       data-preview-tile-art=""
                       className="h-full w-full cursor-pointer"
                       onClick={() => openDetailModal?.(item)}
+                      {...titlePeekAttrs(item)}
                     >
                       <BackdropBaseCard
                         item={item}
