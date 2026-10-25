@@ -4,19 +4,39 @@ aliases: [Hoy, Today, Actividad destacada]
 ---
 # Hoy
 
-Página `/today`: lo más destacado de lo que han visto, puntuado y reseñado hoy, ayer o esta semana las cuentas que sigues, o toda la comunidad. La idea viene de la página Today de Trakt (cliente abierto `trakt/trakt-lite`, `projects/client/src/lib/sections/today/`). Comparte el rosa/fucsia de Social.
+Vista por defecto de la sección Social (`/social`): lo más destacado de lo que han visto, puntuado y reseñado hoy, ayer o esta semana las cuentas que sigues, o toda la comunidad. La idea viene de la página Today de Trakt (cliente abierto `trakt/trakt-lite`, `projects/client/src/lib/sections/today/`). Comparte el rosa/fucsia de Social.
 
 ## Páginas
 
 | Ruta | Qué muestra |
 |---|---|
-| `/today` | Historias, historia destacada, destacados, «Para ti», feed agrupado y más activos. |
+| `/social` | Vista «Hoy»: historias, historia destacada, destacados, «Para ti», feed agrupado y más activos. |
+| `/social?view=activity` | Vista «Actividad»: el feed completo de siempre (ver [[social-y-perfiles]]). |
+| `/today` | Redirige a `/social` conservando `scope`, `day`, `group` y `story`. |
 
-Parámetros de URL (`src/lib/today/params.js`): `scope=following|community`, `day=today|yesterday|week|YYYY-MM-DD` y `group=title|person|time`. Los valores por defecto (`following`, `today`, `title`) no se escriben en la URL.
+Las dos vistas cuelgan de `SocialHub` (`src/app/social/SocialHub.jsx`), que pone el fondo, la cabecera «Social.» con las cifras (Siguiendo, Seguidores, Activos) y el selector Hoy / Actividad. Cambiar de vista solo reescribe la URL; la vista sale de `useSearchParams`.
+
+Parámetros de URL (`src/lib/today/params.js`):
+- `scope=following|community`
+- `day=today|yesterday|week|YYYY-MM-DD`
+- `group=title|person|time`
+- `story=<título>`: abre el reproductor en esa historia y se quita de la URL al consumirse.
+
+Los valores por defecto (`following`, `today`, `title`) no se escriben en la URL.
+
+## Píldora «Hoy» del navbar
+
+`TodayNavbarEntry` (`src/components/today/`), como `TodayNavbarEntry.svelte` de trakt-lite. Solo aparece con sesión y si hay historias.
+- **Escritorio** (junto a Buscar): caras de hasta 3 personas con historias, «Hoy» y un contador de historias sin ver.
+- **Móvil** (junto a la campana): un círculo con dos carteles inclinados y el contador en la esquina.
+- **Brillo:** mientras queda algo sin ver, un destello cónico recorre el borde una vez por minuto (`.sv-today-shine` en `globals.css`; sin animación con reduced-motion).
+- **Destino:** `/social?story=<primera sin ver>`.
+- **Datos:** usa la misma petición que la vista (`src/lib/today/todayFeedClient.js`: petición en curso compartida y copia de 60 s). Se actualiza al navegar.
+- **Contador:** baja al momento al ver historias, porque `writeSeenStories` emite `today-seen-stories-change`.
 
 ## Qué se ve
 
-- **Cabecera:** pestañas Siguiendo / Comunidad y Hoy / Ayer / Semana, cada una con su recuento. Debajo, los otros cinco días de la semana como chips, y la línea «N actividades de M personas».
+- **Controles:** pestañas Siguiendo / Comunidad y Hoy / Ayer / Semana, cada una con su recuento. Debajo, los otros cinco días de la semana como chips, y la línea «N actividades de M personas».
 - **Historias:** carril de círculos, uno por título más uno de «Para ti». El aro es de color mientras quede algo sin ver. Al pulsar se abre el **reproductor a pantalla completa** (`TodayStoryViewer`):
   - Cada fotograma dura 5 s. En un título con dos o más personas, el primero es un resumen.
   - Tocar el tercio izquierdo vuelve atrás y el resto avanza. Mantener pulsado pausa.
@@ -52,10 +72,10 @@ Parámetros de URL (`src/lib/today/params.js`): `scope=following|community`, `da
   - Tope de 2000 filas por tabla (`truncated`).
   - Caché en Redis: 30 s por usuario en Siguiendo, que se invalida al seguir o dejar de seguir; 60 s compartidos en Comunidad. «Para ti» y `viewerFollows` se calculan aparte para quien mira.
 - **Frontend:**
-  - `src/app/today/page.jsx` (RSC con presupuesto de 2,5 s y solo con el token de acceso, como `/calendar`) y `TodayClient.jsx`.
+  - `src/app/social/page.jsx` (RSC: con la vista «Hoy» carga sus datos con presupuesto de 2,5 s y solo con el token de acceso, como `/calendar`), `SocialHub.jsx` y `TodayClient.jsx`.
   - Componentes en `src/components/today/`.
   - Las historias, la destacada, los destacados, las agrupaciones y el ranking se calculan en el cliente, en `src/lib/today/stories.js` (tests en `stories.test.mjs`). Cambiar de agrupación no vuelve a pedir nada.
-- **Acceso:** «Hoy» en el menú de perfil y el menú móvil, y como opción de la barra inferior móvil (`mobileBottomNav.js`). Social enlaza a esta página desde su cabecera.
+- **Acceso:** la píldora del navbar y Social (menú de perfil, menú móvil y barra inferior). La entrada propia «Hoy» de los menús se quitó al fusionar; quien la tenía en la barra inferior la conserva como Social (`LEGACY_KEYS` en `mobileBottomNav.js`).
 
 ## Endpoints
 

@@ -9,7 +9,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 ## Sin publicar
 
 - Favoritos: con el orden «Vista reciente» o «Vista antigua» los títulos aparecen ya en su orden al entrar (también al volver atrás), sin pintarse primero en otro y recolocarse con la animación. Las fechas de visionado se guardan en el navegador y, la primera vez, la lista espera al historial antes de pintarse. El resto de órdenes no cambia; Pendientes no tiene estos dos órdenes. → [caché](docs/guides/estrategia-cache.md)
-- Nueva página **Hoy** (`/today`, en el menú de perfil, el menú móvil y como opción de la barra inferior): lo más destacado de lo que han visto, puntuado y reseñado la gente que sigues o toda la comunidad, hoy, ayer o esta semana. Incluye:
+- Social pasa a tener dos vistas en una sola página: **Hoy** (por defecto) y **Actividad** (el feed completo de siempre, en `?view=activity`), con la misma cabecera y cifras. Hoy enseña lo más destacado de lo que han visto, puntuado y reseñado la gente que sigues o toda la comunidad, hoy, ayer o esta semana. Incluye:
   - historias a pantalla completa por título, que avanzan solas y se recorren tocando, deslizando o con el teclado;
   - una historia destacada, que prioriza finales y estrenos;
   - una reseña y una nota destacadas;
@@ -17,7 +17,8 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
   - un feed por título, por persona o por hora;
   - el ranking de los más activos.
 
-  Las maratones cuentan como una sola acción y no aparecen fechas de importación. Social enlaza a la nueva página desde su cabecera. → [hoy](docs/features/hoy.md)
+  Las maratones cuentan como una sola acción y no aparecen fechas de importación. Los enlaces a `/today` llevan a la vista Hoy. → [hoy](docs/features/hoy.md)
+- Navbar: píldora **Hoy** como la de Trakt, con las caras de quien tiene historias hoy y cuántas te quedan por ver; en móvil, un círculo con dos carteles y el contador. Un brillo recorre su borde de vez en cuando mientras queden historias sin ver, y al pulsarla se abre la primera sin ver. → [hoy](docs/features/hoy.md)
 - Ajustes: nuevo interruptor «Mostrar mi actividad en Hoy · Comunidad» (activado por defecto) para quitar tu actividad de la pestaña Comunidad de Hoy. → [hoy](docs/features/hoy.md)
 - Documentación: análisis de cómo sincroniza Trakt el progreso desde las plataformas de streaming frente a la sincronización propia, con los huecos pasados al roadmap. → [comparativa](docs/features/trakt-comparativa-sync.md)
 - Ficha de episodio: en ordenador el fondo es una sola imagen, distinta de la que se ve en grande arriba siempre que haya otra (otra imagen del episodio o, si no, un fondo de la serie). Antes era la composición de imágenes apiladas de la portada del móvil, que sigue igual en el teléfono. → [páginas](docs/frontend/app-router-pages.md)

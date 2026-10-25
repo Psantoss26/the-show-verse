@@ -127,7 +127,7 @@ function PersonName({ user, onOpenPerson }) {
 // Cabecera
 // ─────────────────────────────────────────────
 
-function Segmented({ options, value, onChange, label }) {
+export function Segmented({ options, value, onChange, label }) {
   return (
     <div role="tablist" aria-label={label} className={`flex h-11 items-center rounded-2xl p-1 ${CONTROL_GLASS}`}>
       {options.map((option) => {
@@ -175,17 +175,12 @@ export function TodayMasthead({ scope, onScope, day, onDay, days, summary, loadi
   const dayValue = day === yesterdayKey ? "yesterday" : day;
 
   return (
-    <header className="mb-6 lg:mb-8">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <div className="mb-2 flex items-center gap-3">
-            <div className="h-px w-12 bg-pink-500" />
-            <span className="text-xs font-bold uppercase tracking-widest text-pink-400">COMUNIDAD</span>
-          </div>
-          <h1 className="text-4xl font-bold tracking-tighter text-white md:text-6xl">
-            Hoy<span className="text-pink-500">.</span>
-          </h1>
-          <p className="mt-2 min-h-[1.5rem] text-sm text-zinc-400 md:text-base" aria-live="polite">
+    <div className="mb-6">
+      {/* El título es el de la sección (SocialHub); aquí van los controles de
+          la vista «Hoy» y su resumen. */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="order-2 lg:order-1">
+          <p className="min-h-[1.5rem] text-sm text-zinc-400 md:text-base" aria-live="polite">
             {loading
               ? " "
               : summary.actions
@@ -195,7 +190,7 @@ export function TodayMasthead({ scope, onScope, day, onDay, days, summary, loadi
                   : "La gente a la que sigues aún no ha hecho nada."}
           </p>
         </div>
-        <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
+        <div className="order-1 flex w-full flex-col gap-2 sm:flex-row lg:order-2 lg:w-auto">
           <div className="sm:w-[260px]">
             <Segmented label="Ámbito" options={SCOPE_OPTIONS} value={scope} onChange={onScope} />
           </div>
@@ -221,7 +216,7 @@ export function TodayMasthead({ scope, onScope, day, onDay, days, summary, loadi
           ))}
         </nav>
       ) : null}
-    </header>
+    </div>
   );
 }
 

@@ -1,9 +1,11 @@
 "use client";
 
-// src/app/today/TodayClient.jsx
+// src/app/social/TodayClient.jsx
 //
-// PÁGINA HOY: lo más destacado de lo que ha hecho la gente hoy, ayer o esta
-// semana, de las cuentas que sigues o de toda la comunidad. Inspirada en la de
+// SECCIÓN SOCIAL, vista «Hoy»: lo más destacado de lo que ha hecho la gente
+// hoy, ayer o esta semana, de las cuentas que sigues o de toda la comunidad.
+// La otra vista es «Actividad» (SocialClient); fondo, cabecera y cifras los pone
+// SocialHub. Inspirada en la de
 // Trakt (trakt-lite, sections/today), con la misma división del trabajo: el
 // backend entrega acciones planas (visto · nota · reseña) y aquí se arman las
 // historias (src/lib/today/stories.js).
@@ -14,6 +16,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Coffee, Loader2, RefreshCw, UserPlus } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
@@ -29,7 +32,8 @@ import {
   TodayMostActive,
 } from "@/components/today/TodayParts";
 import { todayHref } from "@/lib/today/params";
-import { readSeenStories, writeSeenStories } from "@/lib/today/seenStories";
+import { hasUnseenFrames, readSeenStories, writeSeenStories } from "@/lib/today/seenStories";
+import { fetchTodayFeed, peekTodayFeed, rememberTodayFeed } from "@/lib/today/todayFeedClient";
 import {
   isQuietDay,
   pickHeroStory,
@@ -52,39 +56,52 @@ export default function TodayClient({ initialScope, initialDay, initialGroup, in
   const [day, setDay] = useState(initialDay);
   const [group, setGroup] = useState(initialGroup);
   // Una respuesta por (ámbito, día): volver a una pestaña ya vista es instantáneo.
-  const [cache, setCache] = useState(() =>
-    initialData ? { [cacheKey(initialScope, initialDay)]: initialData } : {},
-  );
+  const [cache, setCache] = useState(() => {
+    const seeded = initialData || peekTodayFeed(initialScope, initialDay);
+    return seeded ? { [cacheKey(initialScope, initialDay)]: seeded } : {};
+  });
   const [errors, setErrors] = useState({});
   const [seen, setSeen] = useState({});
   const [storyStart, setStoryStart] = useState(null);
   const [person, setPerson] = useState(null);
   const inFlight = useRef(new Set());
 
+  const searchParams = useSearchParams();
+  const storyParam = searchParams.get("story");
+
   const key = cacheKey(scope, day);
   const data = cache[key] || null;
   const error = errors[key] || "";
 
-  useEffect(() => setSeen(readSeenStories()), []);
-
-  // URL compartible sin volver a pedir el RSC.
   useEffect(() => {
+    setSeen(readSeenStories());
+    // Lo visto desde otra pestaña también apaga los aros.
+    const sync = () => setSeen(readSeenStories());
+    window.addEventListener("storage", sync);
+    return () => window.removeEventListener("storage", sync);
+  }, []);
+
+  // Lo que llegó del RSC sirve también a la píldora «Hoy» del navbar.
+  useEffect(() => {
+    if (initialData) rememberTodayFeed(initialScope, initialDay, initialData);
+  }, [initialData, initialScope, initialDay]);
+
+  // URL compartible sin volver a pedir el RSC. Con ?story= pendiente se espera
+  // a que el reproductor la consuma (lo hace el efecto de más abajo).
+  useEffect(() => {
+    if (storyParam) return;
     const href = todayHref({ scope, day, group });
     if (`${window.location.pathname}${window.location.search}` !== href) {
       window.history.replaceState(window.history.state, "", href);
     }
-  }, [scope, day, group]);
+  }, [scope, day, group, storyParam]);
 
   const load = useCallback(async (nextScope, nextDay, { force = false } = {}) => {
     const k = cacheKey(nextScope, nextDay);
     if (inFlight.current.has(k)) return;
     inFlight.current.add(k);
     try {
-      const res = await fetch(`/api/users/today?scope=${nextScope}&day=${encodeURIComponent(nextDay)}`, {
-        cache: "no-store",
-      });
-      const json = await res.json().catch(() => null);
-      if (!res.ok || !Array.isArray(json?.actions)) throw new Error(json?.error || `HTTP ${res.status}`);
+      const json = await fetchTodayFeed(nextScope, nextDay);
       setCache((prev) => ({ ...prev, [k]: json }));
       setErrors((prev) => ({ ...prev, [k]: "" }));
     } catch (err) {
@@ -136,8 +153,16 @@ export default function TodayClient({ initialScope, initialDay, initialGroup, in
     [scope, derived.people, data?.viewerFollows],
   );
 
+  // Se escribe FUERA del actualizador de estado: writeSeenStories avisa a la
+  // píldora del navbar, y hacerlo dentro sería actualizarla en mitad de este
+  // render.
+  const seenRef = useRef(seen);
+  seenRef.current = seen;
   const markSeen = useCallback((frameKey) => {
-    setSeen((prev) => (prev[frameKey] ? prev : writeSeenStories({ ...prev, [frameKey]: Date.now() })));
+    if (seenRef.current[frameKey]) return;
+    const next = writeSeenStories({ ...seenRef.current, [frameKey]: Date.now() });
+    seenRef.current = next;
+    setSeen(next);
   }, []);
 
   const openStory = useCallback(
@@ -148,32 +173,32 @@ export default function TodayClient({ initialScope, initialDay, initialGroup, in
     [derived.storyGroups],
   );
 
+  // ?story=<título> (la píldora «Hoy» del navbar) abre el reproductor en esa
+  // historia; sin clave válida, en la primera con algo sin ver. Después se quita
+  // de la URL para que recargar no la vuelva a abrir.
+  useEffect(() => {
+    if (!storyParam || !data) return;
+    const groups = derived.storyGroups;
+    if (groups.length) {
+      const current = readSeenStories();
+      let index = groups.findIndex((g) => g.key === storyParam);
+      if (index < 0) index = Math.max(0, groups.findIndex((g) => hasUnseenFrames(g, current)));
+      setSeen(current);
+      setStoryStart(index);
+    }
+    window.history.replaceState(window.history.state, "", todayHref({ scope, day, group }));
+    // Solo cuando llega una clave nueva o los datos para resolverla.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storyParam, data]);
+
   const yesterdayKey = data?.days?.[1]?.key || null;
   const changeDay = useCallback(
     (value) => setDay(value === "yesterday" ? yesterdayKey || "yesterday" : value),
     [yesterdayKey],
   );
 
-  if (!hydrated) return <div className="min-h-screen bg-black" />;
-
-  if (!session || !account?.id) {
-    return (
-      <div className="min-h-screen bg-black font-sans text-zinc-100">
-        <div className="relative z-10 mx-auto max-w-[1600px] px-4 py-24 text-center sm:px-6 lg:px-8">
-          <h1 className="text-4xl font-bold tracking-tighter text-white">
-            Hoy<span className="text-pink-500">.</span>
-          </h1>
-          <p className="mt-3 text-zinc-400">Inicia sesión para ver qué está viendo la gente hoy.</p>
-          <Link
-            href="/login?next=/today"
-            className="mt-6 inline-block rounded-2xl bg-gradient-to-br from-pink-500 to-fuchsia-600 px-6 py-3 text-sm font-bold text-white shadow-lg"
-          >
-            INICIAR SESIÓN
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  // Sin sesión lo resuelve SocialHub.
+  if (!hydrated || !session || !account?.id) return null;
 
   const loading = !data && !error;
   const empty = data && !derived.prepared.length;
@@ -181,14 +206,8 @@ export default function TodayClient({ initialScope, initialDay, initialGroup, in
   const noFollowing = scope === "following" && data && data.following === 0;
 
   return (
-    <div className="min-h-screen bg-black font-sans text-zinc-100 selection:bg-pink-500/30">
-      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        <div className="absolute -left-[5%] -top-[10%] aspect-square w-[60vw] max-w-[800px] rounded-full bg-pink-600/15 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute -right-[5%] top-[15%] aspect-square w-[55vw] max-w-[700px] rounded-full bg-fuchsia-700/20 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute -bottom-[10%] left-[15%] aspect-square w-[65vw] max-w-[800px] rounded-full bg-rose-800/20 blur-[120px] sm:blur-[150px]" />
-      </div>
-
-      <div className="relative z-10 mx-auto max-w-[1600px] px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+    <div>
+      <div>
         <TodayMasthead
           scope={scope}
           onScope={setScope}

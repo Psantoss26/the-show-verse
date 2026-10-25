@@ -3415,3 +3415,54 @@ html[data-details-sequence-transition] .sv-topbar {
     padding-right: 0.375rem;
   }
 }
+
+/* Píldora «Hoy» del navbar (TodayNavbarEntry): mientras quedan historias sin
+   ver, un destello recorre el borde una vez por minuto, como en Trakt. El
+   degradado cónico gira detrás y la máscara deja ver solo el anillo de 1px. */
+.sv-today-shine {
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+.sv-today-shine::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 150%;
+  aspect-ratio: 1;
+  background: conic-gradient(
+    transparent 0deg,
+    rgba(244, 114, 182, 0.75) 22deg,
+    rgba(255, 255, 255, 0.95) 32deg,
+    rgba(244, 114, 182, 0.75) 42deg,
+    transparent 66deg
+  );
+  opacity: 0;
+  transform: translate(-50%, -50%) rotate(-40deg);
+  animation: sv-today-shine 60s linear 3s infinite;
+}
+@keyframes sv-today-shine {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(-40deg);
+  }
+  0.6%,
+  4% {
+    opacity: 1;
+  }
+  4.6% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(320deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(320deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sv-today-shine::before {
+    animation: none;
+  }
+}
