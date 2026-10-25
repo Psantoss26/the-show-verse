@@ -74,6 +74,7 @@ Subcomponentes y modales usados por `DetailsClient`/`SeasonDetailsClient`/`Episo
 | `StreamingHoverOverlay.jsx` | Overlay al hover sobre un póster: "Ver en" + wordmark/color de la plataforma de streaming. |
 | `SoundtrackModal.jsx` | Modal de banda sonora (Spotify) de un título. |
 | `ExternalLinksModal.jsx` | Modal de enlaces externos (JustWatch, Letterboxd, etc.), bloquea scroll vía `useBodyScrollLock`. En la ficha de título y en DetailModal (también en su vista teléfono) no lista IMDb, TMDb ni Trakt: ya enlazan desde sus puntuaciones del marcador. |
+| `dashboard/DetailModal.jsx` | Ficha rápida de un título (centrada o en panel lateral). Su acabado es `LIQUID_GLASS_DETAIL_SURFACE` (`src/lib/ui/liquidGlass.js`): tinte oscuro y sombra exterior, sin borde ni brillo interior en el canto, así que el panel no tiene contorno marcado en ningún lado. Las vistas previa de los dashboards (`LIQUID_GLASS_DETAIL_TINT`) y el panel de temporada/episodio usan el mismo acabado. |
 | `EpisodeRatingsModal.jsx` | Modal que envuelve `EpisodeRatingsGrid` para ver valoraciones por temporada. |
 | `AddToListModal.jsx` | Modal para añadir un título a una o varias listas propias. |
 | `TraktCommentModal.jsx` | Modal para crear/editar/borrar un comentario de Trakt. |

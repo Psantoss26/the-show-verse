@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Ficha rápida (DetailModal), centrada o en panel lateral: el panel ya no tiene el canto marcado con una línea clara; se separa de la página solo por el tinte y la sombra. Igual en las vistas previa de los dashboards y el panel de temporada/episodio. → [componentes](docs/frontend/components.md)
 - Social · Siguiendo y Yo: en las vistas de lista con póster y lista con backdrop, cada evento sigue mostrando la foto de perfil de quien lo hizo, junto a la imagen del título. → [social y perfiles](docs/features/social-y-perfiles.md)
 - Móvil: al tocar la portada de la vista previa, esta se mantiene en pantalla hasta que se abre la ficha y entonces desaparece; ya no se cierra antes ni vuelve a asomar al volver atrás. → [vista previa móvil](docs/features/vista-previa-movil.md)
 - Móvil, vista previa al mantener pulsado: la transición al abrirla y al cerrarla ya no se ralentiza a mitad; va fluida aunque la ficha esté cargando sus datos. → [vista previa móvil](docs/features/vista-previa-movil.md)

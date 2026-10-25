@@ -157,8 +157,11 @@ export const LIQUID_GLASS_SURFACE_CARD = `relative isolate overflow-hidden trans
 // Acabado de DetailModal y previews con controles de cristal encima.
 // El blur va en una capa hermana del contenido, nunca en esta superficie:
 // así los filtros de los controles siguen viendo el fondo de la página.
+// Sin brillo interior en el canto (`inset … rgba(255,255,255,…)`): marcaba el
+// borde del panel como una línea clara; el panel se separa de la página solo
+// por el tinte y la sombra exterior.
 export const LIQUID_GLASS_DETAIL_SURFACE =
-  "bg-black/[0.47] bg-gradient-to-br from-white/[0.12] via-transparent to-white/[0.04] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15),0_25px_50px_-12px_rgba(0,0,0,0.85)]";
+  "bg-black/[0.47] bg-gradient-to-br from-white/[0.12] via-transparent to-white/[0.04] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.85)]";
 
 // El mismo acabado PARTIDO en dos capas, para las vistas previa de los
 // dashboards que se despliegan desde la tarjeta (ver `usePreviewMorph`). La
@@ -168,7 +171,7 @@ export const LIQUID_GLASS_DETAIL_SURFACE =
 // cristal, que conserva el desenfoque en cada fotograma. La sombra exterior va
 // aparte porque `clip-path` la cortaría.
 export const LIQUID_GLASS_DETAIL_TINT =
-  "bg-black/[0.47] bg-gradient-to-br from-white/[0.12] via-transparent to-white/[0.04] shadow-[inset_0_1.5px_2px_rgba(255,255,255,0.15)]";
+  "bg-black/[0.47] bg-gradient-to-br from-white/[0.12] via-transparent to-white/[0.04]";
 export const LIQUID_GLASS_DETAIL_SHADOW =
   "shadow-[0_25px_50px_-12px_rgba(0,0,0,0.85)]";
 
