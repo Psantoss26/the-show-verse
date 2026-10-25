@@ -8,6 +8,8 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Móvil: al abrir la ficha desde la vista previa y volver atrás, la vista previa ya no asoma durante la transición de vuelta a la página. → [vista previa móvil](docs/features/vista-previa-movil.md)
+- Móvil, vista previa al mantener pulsado: la transición al abrirla y al cerrarla ya no se ralentiza a mitad; va fluida aunque la ficha esté cargando sus datos. → [vista previa móvil](docs/features/vista-previa-movil.md)
 - Móvil, vista previa al mantener pulsado: ya no aparece primero la imagen de la tarjeta pulsada para cambiarse después por la portada; la vista previa se abre cuando su portada está cargada. El pie de la portada se funde con la tarjeta sin que se vea el corte. → [vista previa móvil](docs/features/vista-previa-movil.md)
 - Móvil, vista previa al mantener pulsado: la fila de botones y el marcador de puntuaciones y estadísticas son iguales que en la ficha móvil: mismo ancho, mismos botones (también el de reseñas, que sin sesión lleva al login), mismas letras y la misma separación entre ellos. La tarjeta sigue dejando 6 px a cada lado de la pantalla. → [vista previa móvil](docs/features/vista-previa-movil.md)
 - Móvil: mantener pulsada la tarjeta de una película, serie o episodio, en cualquier página o dashboard, abre su vista previa. La tarjeta crece hasta el centro con una transición, sin ocupar toda la pantalla y con la página difuminada detrás. Muestra solo la portada con el logo, la fila de botones y las puntuaciones. Tocar la portada abre la ficha completa y tocar fuera la cierra. Al soltar no se abre la ficha ni sale el menú del sistema. → [vista previa móvil](docs/features/vista-previa-movil.md)

@@ -25,6 +25,7 @@ import {
   AnimatePresence,
   useReducedMotion,
   useIsPresent,
+  usePresence,
   useMotionValue,
   useScroll,
   useTransform,
@@ -344,6 +345,60 @@ function peekOriginTransform(origin, geometry) {
   };
 }
 
+// ANIMACIÓN DE LA TARJETA EN EL COMPOSITOR. Con framer, el muelle de `x`,
+// `y` y `scale` se calcula en el hilo principal fotograma a fotograma, y la
+// ficha rápida renderiza justo entonces (llegan sus datos: ~12 renders en
+// los 700 ms de la apertura medidos con la CPU a ×4): la tarjeta se frenaba
+// a mitad al abrir y al cerrar. Con la API de animaciones y solo `transform`
+// y `opacity`, el navegador la mueve en el compositor aunque React esté
+// ocupado. El muelle es el de antes (rigidez 380, amortiguación 32, masa
+// 0,9), muestreado en una curva `linear()`.
+const PEEK_SPRING = { stiffness: 380, damping: 32, mass: 0.9 };
+const PEEK_OPACITY_IN_MS = 140;
+const PEEK_EXIT_MS = 220;
+const PEEK_EXIT_EASING = "cubic-bezier(0.4, 0, 1, 1)";
+const PEEK_FALLBACK_EASING = "cubic-bezier(0.2, 0.9, 0.25, 1)";
+
+function sampleSpring({ stiffness, damping, mass }) {
+  const dt = 1 / 120;
+  let x = 0;
+  let v = 0;
+  const points = [0];
+  let t = 0;
+  while (t < 2) {
+    const a = (stiffness * (1 - x) - damping * v) / mass;
+    v += a * dt;
+    x += v * dt;
+    t += dt;
+    points.push(x);
+    if (Math.abs(1 - x) < 0.0005 && Math.abs(v) < 0.01) break;
+  }
+  points[points.length - 1] = 1;
+  // Uno de cada dos puntos (60 por segundo) basta para que no se note el
+  // tramo recto entre ellos.
+  const stops = points.filter((_, index) => index % 2 === 0 || index === points.length - 1);
+  return {
+    duration: Math.round(t * 1000),
+    easing: `linear(${stops.map((value) => value.toFixed(4)).join(", ")})`,
+  };
+}
+
+let peekSpringCache = null;
+function peekSpring() {
+  if (peekSpringCache) return peekSpringCache;
+  const spring = sampleSpring(PEEK_SPRING);
+  const supported =
+    typeof CSS !== "undefined" &&
+    CSS.supports?.("transition-timing-function", "linear(0, 1)");
+  peekSpringCache = supported
+    ? spring
+    : { duration: spring.duration, easing: PEEK_FALLBACK_EASING };
+  return peekSpringCache;
+}
+
+const peekTransformCss = ({ x, y, scale }) =>
+  `translate(${x}px, ${y}px) scale(${scale})`;
+
 function DetailPeekLayout({
   title,
   origin,
@@ -392,8 +447,90 @@ function DetailPeekLayout({
     else done();
   };
 
+  // La tarjeta nace invisible en el sitio de la pulsada (estilo en línea) y
+  // crece con la API de animaciones cuando `shown`, en el mismo commit que
+  // le pone el estilo final. Al cerrarse, AnimatePresence
+  // espera (`usePresence`) a que vuelva a la tarjeta pulsada. `cardRef` es
+  // el contenedor de scroll de la ficha (ver `ref` de la tarjeta).
+  const cardRef = scrollRef;
+  const fromCss = peekTransformCss(from);
+  const openedRef = useRef(false);
+  useLayoutEffect(() => {
+    const card = cardRef.current;
+    if (!shown || openedRef.current || !card) return;
+    openedRef.current = true;
+    if (typeof card.animate !== "function") return;
+    const spring = reduceMotion
+      ? { duration: 150, easing: "ease-out" }
+      : peekSpring();
+    card.animate([{ transform: fromCss }, { transform: "none" }], {
+      duration: spring.duration,
+      easing: spring.easing,
+    });
+    card.animate([{ opacity: 0 }, { opacity: 1 }], {
+      duration: reduceMotion ? 150 : PEEK_OPACITY_IN_MS,
+      easing: "linear",
+    });
+  }, [cardRef, shown, fromCss, reduceMotion]);
+
+  const [isPresent, safeToRemove] = usePresence();
+  useEffect(() => {
+    if (isPresent) return undefined;
+    const card = cardRef.current;
+    if (!card || !openedRef.current || typeof card.animate !== "function") {
+      safeToRemove?.();
+      return undefined;
+    }
+    card.style.pointerEvents = "none";
+    // Desde donde esté ahora (también si se cierra a mitad de la apertura).
+    const current = window.getComputedStyle(card);
+    card.getAnimations().forEach((animation) => animation.cancel());
+    const exit = card.animate(
+      [
+        { transform: current.transform, opacity: current.opacity },
+        { transform: fromCss, opacity: 0 },
+      ],
+      {
+        duration: reduceMotion ? 120 : PEEK_EXIT_MS,
+        easing: PEEK_EXIT_EASING,
+        fill: "forwards",
+      },
+    );
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      safeToRemove?.();
+    };
+    exit.finished.then(finish, finish);
+    return undefined;
+  }, [cardRef, isPresent, safeToRemove, fromCss, reduceMotion]);
+
+  // IR A LA FICHA SIN DEJAR RASTRO. Chrome en Android guarda una captura de
+  // la página al navegar (también en las navegaciones de Next, dentro del
+  // mismo documento) y es la que enseña al volver atrás con el gesto. Cerrar
+  // con la animación y navegar a la vez dejaba la vista previa a medio irse
+  // en esa captura: al volver se veía encima de la página. Se oculta de
+  // golpe y se navega cuando ya hay un fotograma pintado sin ella (el segundo
+  // rAF corre después de ese fotograma).
+  const rootRef = useRef(null);
+  const leavingRef = useRef(false);
+  const handleOpenFull = () => {
+    if (leavingRef.current) return;
+    leavingRef.current = true;
+    const root = rootRef.current;
+    if (root) {
+      root.style.visibility = "hidden";
+      root.style.pointerEvents = "none";
+    }
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => onOpenFull?.());
+    });
+  };
+
   return (
     <div
+      ref={rootRef}
       className="fixed inset-0 z-[9999]"
       role="dialog"
       aria-modal="true"
@@ -412,36 +549,25 @@ function DetailPeekLayout({
       />
 
       <div className="pointer-events-none fixed inset-0 flex items-center justify-center">
-        <motion.div
+        <div
           // El `useScroll` de la ficha necesita su contenedor montado: aquí
           // es la tarjeta, que es lo que se desplaza en pantallas bajas.
-          ref={scrollRef}
+          ref={cardRef}
           className={`pointer-events-auto relative max-h-[calc(100svh-2rem)] overflow-y-auto overflow-x-hidden overscroll-contain rounded-[1.75rem] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${LIQUID_GLASS_DETAIL_SURFACE}`}
-          style={{ width: geometry.width, transformOrigin: "50% 50%" }}
-          initial={{ ...from, opacity: 0 }}
-          animate={shown ? { x: 0, y: 0, scale: 1, opacity: 1 } : { ...from, opacity: 0 }}
-          exit={{
-            ...from,
-            opacity: 0,
-            transition: { duration: reduceMotion ? 0.12 : 0.22, ease: [0.4, 0, 1, 1] },
+          style={{
+            width: geometry.width,
+            transformOrigin: "50% 50%",
+            // Estado final en cuanto se muestra: la animación de entrada
+            // (ver el efecto de arriba) parte de la tarjeta pulsada.
+            transform: shown ? "none" : fromCss,
+            opacity: shown ? 1 : 0,
           }}
-          transition={
-            reduceMotion
-              ? { duration: 0.15 }
-              : {
-                  type: "spring",
-                  stiffness: 380,
-                  damping: 32,
-                  mass: 0.9,
-                  opacity: { duration: 0.14 },
-                }
-          }
           onClick={(event) => event.stopPropagation()}
         >
           {/* Portada con su logo. Tocarla abre la ficha completa. */}
           <button
             type="button"
-            onClick={onOpenFull}
+            onClick={handleOpenFull}
             aria-label={title ? `Abrir la ficha de ${title}` : "Abrir la ficha"}
             className="relative block w-full overflow-hidden bg-transparent text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-yellow-400"
             style={{ height: geometry.posterHeight }}
@@ -501,7 +627,7 @@ function DetailPeekLayout({
             {actions}
             <div className="mt-5">{scoreboard}</div>
           </div>
-        </motion.div>
+        </div>
       </div>
 
       {children}

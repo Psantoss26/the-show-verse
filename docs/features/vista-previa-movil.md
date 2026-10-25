@@ -10,6 +10,7 @@ En el móvil, mantener el dedo sobre la tarjeta de una película, una serie o un
 
 - Al mantener el dedo (~0,4 s) la tarjeta se hunde un poco y, al cumplirse el tiempo, la vista previa crece desde ella hasta el centro de la pantalla con una transición. En Android, una vibración corta lo marca.
 - La vista previa no enseña la imagen de la tarjeta pulsada (suele ser otra: una backdrop u otro póster). La página se difumina en cuanto se cumple el tiempo y la tarjeta flotante crece cuando su portada ya está descargada, así que aparece directamente con ella. Primero entra la portada ligera (w342) y la nítida (w780) encima, sin que se note el cambio. Si la portada tarda más de 1,5 s, se abre con un esqueleto.
+- La transición de apertura y cierre va en el compositor del navegador (Web Animations API, solo `transform` y `opacity`, con el muelle de antes muestreado en una curva `linear()`). Así no se frena aunque la ficha rápida esté renderizando los datos que van llegando; antes iba con framer en el hilo principal y daba tirones. El cierre empieza en el mismo fotograma del toque y vuelve a la tarjeta pulsada desde donde esté, también si se cierra a mitad de la apertura.
 - El pie de la portada se funde con el cristal de la tarjeta con una máscara (la misma curva que el hero de la ficha rápida), sin velo negro ni corte visible.
 - La vista previa es una tarjeta flotante que no ocupa toda la pantalla: deja 6 px a cada lado (como mucho 440 px de ancho) y no llega arriba ni abajo. La página se queda detrás, difuminada.
 - Solo enseña tres cosas:
@@ -17,7 +18,8 @@ En el móvil, mantener el dedo sobre la tarjeta de una película, una serie o un
   2. la fila de botones de la ficha (tráiler, banda sonora, visto, puntuar, favorito, pendiente, listas, reseñas), con sus mismos modales. Sin sesión, reseñas lleva al login, como en la ficha;
   3. el marcador de puntuaciones (TMDb, Trakt, IMDb y estadísticas).
 - La fila de botones y el marcador se ven exactamente como en la ficha móvil: dejan 10 px a cada lado dentro de la tarjeta, así que miden lo mismo que allí (ancho de pantalla menos 32 px), con los mismos botones, el mismo tamaño de letra, 4 px entre botones y 20 px entre la fila y el marcador.
-- Tocar la portada lleva a la ficha completa. Tocar fuera, o la tecla Escape, cierra la vista previa y la tarjeta vuelve a su sitio.
+- Tocar la portada lleva a la ficha completa. La vista previa desaparece en el acto y la navegación espera a que se haya pintado un fotograma sin ella: Chrome en Android guarda una captura de la página al navegar y la enseña al volver atrás con el gesto, así que ahí la página sale limpia, sin restos de la vista previa.
+- Tocar fuera, o la tecla Escape, cierra la vista previa y la tarjeta vuelve a su sitio.
 - Al soltar el dedo no se abre la ficha ni sale el menú del sistema para enlaces o imágenes.
 - Si el dedo se mueve más de 10 px (desplazar la página o un carrusel), no se abre nada.
 - Personas, temporadas, listas y colecciones no tienen vista previa.
