@@ -7,7 +7,6 @@ export const MOBILE_BOTTOM_NAV_ITEMS = [
   { key: "series", href: "/series", labelKey: "nav_series", fallbackLabel: "Series", tone: "purple" },
   { key: "discover", href: "/discover", labelKey: "nav_discover", fallbackLabel: "Descubrir", tone: "indigo" },
   { key: "library", href: "/biblioteca", labelKey: "nav_library", fallbackLabel: "Biblioteca", tone: "gold" },
-  { key: "today", href: "/today", labelKey: "nav_today", fallbackLabel: "Hoy", tone: "pink" },
   { key: "social", href: "/social", labelKey: "nav_social", fallbackLabel: "Social", tone: "pink" },
   { key: "lists", href: "/lists", labelKey: "nav_lists", fallbackLabel: "Listas", tone: "purple" },
   { key: "in-progress", href: "/in-progress", labelKey: "nav_in_progress", fallbackLabel: "En Progreso", tone: "green" },
@@ -24,11 +23,20 @@ export const MOBILE_BOTTOM_NAV_MAX_ITEMS = DEFAULT_MOBILE_BOTTOM_NAV.length;
 
 const itemByKey = new Map(MOBILE_BOTTOM_NAV_ITEMS.map((item) => [item.key, item]));
 
+// «Hoy» tuvo acceso propio y ahora es la vista por defecto de Social: quien lo
+// había puesto en la barra conserva su configuración con Social en su lugar.
+const LEGACY_KEYS = { today: "social" };
+
 export function sanitizeMobileBottomNav(value) {
   if (!Array.isArray(value)) return DEFAULT_MOBILE_BOTTOM_NAV;
 
-  const keys = [...new Set(value.filter((key) => typeof key === "string" && itemByKey.has(key)))];
-  return keys.length === value.length && keys.length <= MOBILE_BOTTOM_NAV_MAX_ITEMS
+  const hadLegacy = value.some((key) => LEGACY_KEYS[key]);
+  const mapped = value.map((key) => LEGACY_KEYS[key] || key);
+  const keys = [...new Set(mapped.filter((key) => typeof key === "string" && itemByKey.has(key)))];
+  // Una clave antigua puede coincidir con una que ya estaba (Hoy + Social):
+  // ese duplicado se funde; cualquier otra rareza vuelve a la barra por defecto.
+  const expected = hadLegacy ? new Set(mapped).size : value.length;
+  return keys.length === expected && keys.length <= MOBILE_BOTTOM_NAV_MAX_ITEMS
     ? keys
     : DEFAULT_MOBILE_BOTTOM_NAV;
 }

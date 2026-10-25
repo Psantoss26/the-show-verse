@@ -7,6 +7,7 @@ import {
   pickHeroStory,
   prepareActions,
   summarize,
+  summarizeActions,
   toFeedSections,
   toHighlights,
   toMostActive,
@@ -153,4 +154,15 @@ test("resumen y día tranquilo", () => {
   assert.equal(isQuietDay("today", 2), true);
   assert.equal(isQuietDay("today", 0), false);
   assert.equal(isQuietDay("week", 2), false);
+});
+
+test("línea de cada título, como en Trakt", () => {
+  const ep = { kind: "watch", target: "episode", season: 1, episode: 2, episodeCount: 1 };
+  assert.equal(summarizeActions([ep]), "Visto T1 · E2");
+  assert.equal(summarizeActions([{ ...ep, episodeCount: 3 }]), "Vistos 3 episodios");
+  assert.equal(summarizeActions([{ kind: "watch", target: "movie" }, { kind: "rating", rating: 8 }]), "Visto y calificado");
+  assert.equal(summarizeActions([{ ...ep, rating: 7 }]), "Visto y calificado");
+  assert.equal(summarizeActions([{ kind: "rating", rating: 8 }]), "Calificado");
+  assert.equal(summarizeActions([{ kind: "comment" }, { kind: "rating" }]), "Calificado y reseñado");
+  assert.equal(summarizeActions([ep], { people: 3 }), "3 personas");
 });

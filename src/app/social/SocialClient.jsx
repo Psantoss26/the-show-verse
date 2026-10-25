@@ -2,7 +2,11 @@
 
 // src/app/social/SocialClient.jsx
 //
-// SECCIÓN SOCIAL: la actividad de las cuentas que sigo y la mía.
+// SECCIÓN SOCIAL: la barra con el selector Hoy / Siguiendo / Yo y lo que se ve
+// debajo. «Siguiendo» y «Yo» son la actividad completa y paginada de las cuentas
+// que sigo y la mía; «Hoy» es lo destacado del día (TodayClient). La barra es la
+// misma en los tres: con «Hoy» sus desplegables pasan a ser Quién, Día y
+// Agrupar. SocialHub pone el fondo, la cabecera y las cifras.
 //
 // Comparte la maqueta de las páginas de usuario (Favoritos, Pendientes,
 // Historial…): fondo con manchas difuminadas del color de la sección, cabecera
@@ -24,17 +28,19 @@ import Link from "next/link";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  Activity,
   ArrowUpDown,
+  CalendarDays,
+  Flame,
+  Globe2,
   CheckCircle2,
   ChevronDown,
   Eye,
   Filter,
-  Flame,
   Heart,
   ImageOff,
   Layers3,
   Image as ImageIcon,
+  LayoutGrid,
   List,
   ListPlus,
   MessageSquare,
@@ -45,7 +51,6 @@ import {
   ThumbsUp,
   User,
   Users,
-  UserRoundCheck,
   BookmarkPlus,
   X,
 } from "lucide-react";
@@ -55,6 +60,10 @@ import Avatar from "@/components/ui/Avatar";
 import { useAuth } from "@/context/AuthContext";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import { useSearchParams } from "next/navigation";
+import { todayHref } from "@/lib/today/params";
+import { dayTabLabel } from "@/components/today/todayUi";
+import TodayClient from "./TodayClient";
 import {
   SOCIAL_GROUP_OPTIONS,
   SOCIAL_GROUP_SHORT_LABELS,
@@ -77,7 +86,6 @@ import Stars from "@/components/social/Stars";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 import ActivityBackdropImage from "@/components/social/ActivityBackdropImage";
 import { hasActivityBackdropArtwork, isPortraitActivity } from "@/lib/profile/activityBackdrops";
-import PageStatCard from "@/components/ui/PageStatCard";
 
 const PAGE_SIZE = 30;
 const FEED_VACIO = { items: [], hasMore: false, offset: 0, loaded: false, error: "" };
@@ -145,6 +153,18 @@ const CLAVE_AGRUPADO = "showverse:social:groupBy";
 // grande). Un valor antiguo guardado ("compact", "grid") ya no existe y vuelve
 // a la lista.
 const VISTAS = new Set(["list", "poster-list", "backdrop-list"]);
+// Vistas de Hoy: rejilla de carteles (la de Trakt) o lista, que aprovecha el
+// alto. Se recuerda aparte de la vista de Siguiendo / Yo.
+const CLAVE_VISTA_HOY = "showverse:social:todayLayout";
+const VISTAS_HOY = [
+  ["grid", LayoutGrid, "Cuadrícula"],
+  ["list", List, "Lista"],
+];
+const VISTAS_FEED = [
+  ["list", List, "Lista"],
+  ["poster-list", ImageIcon, "Lista con póster"],
+  ["backdrop-list", MonitorPlay, "Lista con backdrop"],
+];
 
 function leerVistaGuardada() {
   if (typeof window === "undefined") return "list";
@@ -446,31 +466,62 @@ function ListaEventos({ eventos, vista, mostrarAutor, yo }) {
   );
 }
 
-// Tarjeta de cifra de la cabecera: la compartida de todas las cabeceras
-// (`PageStatCard`, mini tarjeta en móvil), como `CountStat` en Perfil, con el
-// mismo enlace a las listas de seguidores/seguidos.
-function TarjetaCifra({ value, label, href, title, icon, iconClassName = "text-pink-400" }) {
-  // Mientras no ha llegado el resumen se muestra un guion, no un 0: un cero
-  // es una cifra real y sería mentira.
-  return (
-    <PageStatCard
-      value={typeof value === "number" ? value : "—"}
-      label={label}
-      href={href}
-      prefetch={false}
-      title={title}
-      icon={icon}
-      colorClass={iconClassName}
-      focusRingClass="focus-visible:ring-pink-400/70"
-    />
-  );
-}
+// Valor de ?view= de cada opción del selector (la de «Hoy» no lo lleva).
+const VISTA_DE_ALCANCE = { following: "activity", me: "mine" };
+const ALCANCE_DE_VISTA = { activity: "following", mine: "me" };
 
-export default function SocialClient() {
+export default function SocialClient({ initialView = "today", initialToday = {}, onTodaySummary }) {
   const { session, account, hydrated } = useAuth();
   const isBackNav = useIsHistoryNavigation();
 
-  const [scope, setScope] = useState("following");
+  // «today» | «following» | «me». Con «today» la barra lleva los controles de
+  // Hoy y debajo se pinta TodayClient.
+  const [scope, setScope] = useState(ALCANCE_DE_VISTA[initialView] || "today");
+  const esHoy = scope === "today";
+  // Controles de Hoy, en la misma barra (Quién · Día · Agrupar).
+  const [hoyQuien, setHoyQuien] = useState(initialToday.scope || "following");
+  const [hoyDia, setHoyDia] = useState(initialToday.day || "today");
+  const [hoyAgrupar, setHoyAgrupar] = useState(initialToday.group || "title");
+  const [hoyDias, setHoyDias] = useState(initialToday.data?.days || null);
+  // Se lee tras montar (no en el estado inicial) para que el HTML del servidor y
+  // el primer render del cliente coincidan.
+  const [hoyVista, setHoyVistaState] = useState("grid");
+  useEffect(() => {
+    try {
+      const guardada = window.localStorage.getItem(CLAVE_VISTA_HOY);
+      if (VISTAS_HOY.some(([v]) => v === guardada)) setHoyVistaState(guardada);
+    } catch {
+      // Sin almacenamiento: rejilla.
+    }
+  }, []);
+  const setHoyVista = useCallback((modo) => {
+    setHoyVistaState(modo);
+    try {
+      window.localStorage.setItem(CLAVE_VISTA_HOY, modo);
+    } catch {
+      // Se queda solo para esta visita.
+    }
+  }, []);
+
+  // La píldora «Hoy» del navbar enlaza a /social?story=…: estando en Siguiendo
+  // o Yo, vuelve a Hoy para que el reproductor se abra.
+  const searchParams = useSearchParams();
+  const storyParam = searchParams.get("story");
+  useEffect(() => {
+    if (storyParam) setScope("today");
+  }, [storyParam]);
+
+  // URL compartible sin volver a pedir el RSC. Con ?story= pendiente se espera
+  // a que TodayClient la consuma.
+  useEffect(() => {
+    if (storyParam) return;
+    const href = esHoy
+      ? todayHref({ scope: hoyQuien, day: hoyDia, group: hoyAgrupar })
+      : `/social?view=${VISTA_DE_ALCANCE[scope]}`;
+    if (`${window.location.pathname}${window.location.search}` !== href) {
+      window.history.replaceState(window.history.state, "", href);
+    }
+  }, [esHoy, scope, hoyQuien, hoyDia, hoyAgrupar, storyParam]);
   // Un feed POR ALCANCE ("siguiendo" y "yo"). Antes había uno solo que se
   // vaciaba y se volvía a pedir en cada cambio: hasta que respondía la red se
   // seguía viendo la lista del otro alcance (y ya redactada como la nueva, con
@@ -482,9 +533,6 @@ export default function SocialClient() {
   const { items, hasMore, offset, error } = feedActual;
   const loading = !feedActual.loaded;
 
-  // Cifras de la cabecera. Van aparte del feed: no cambian al paginar ni al
-  // alternar entre "siguiendo" y "yo", así que se piden una sola vez.
-  const [summary, setSummary] = useState(null);
 
   const [q, setQ] = useState("");
   const [filtro, setFiltro] = useState("all");
@@ -630,6 +678,7 @@ export default function SocialClient() {
   // primera página tiraría lo que el usuario ya cargó con "Cargar más"). Si no
   // estaba, se pide.
   useEffect(() => {
+    if (scope === "today") return;
     const previo = feedsRef.current[scope];
     if (!previo?.loaded || previo.offset <= PAGE_SIZE) {
       cargar({ scope, offset: 0 });
@@ -640,33 +689,13 @@ export default function SocialClient() {
   // primer cambio de pestaña ya encuentre su lista.
   const actualCargado = feedActual.loaded;
   useEffect(() => {
-    if (!actualCargado) return;
+    if (!actualCargado || scope === "today") return;
     const otro = scope === "following" ? "me" : "following";
     if (!feedsRef.current[otro] && !peticionRef.current[otro]) {
       cargar({ scope: otro, offset: 0 });
     }
   }, [actualCargado, scope, cargar]);
 
-  useEffect(() => {
-    if (!session || !account?.id) return undefined;
-    let vigente = true;
-    (async () => {
-      try {
-        const res = await fetch("/api/users/feed/summary", {
-          credentials: "include",
-          cache: "no-store",
-        });
-        if (!res.ok) return; // Un fallo conserva las cifras previas, no las pone a cero.
-        const json = await res.json().catch(() => null);
-        if (vigente && json?.summary) setSummary(json.summary);
-      } catch {
-        /* la cabecera se queda con lo que ya tuviera */
-      }
-    })();
-    return () => {
-      vigente = false;
-    };
-  }, [session, account?.id]);
 
   // Los cuatro valores del menú solo cambian pulsándolo, así que basta con
   // observarlos para saber que hay que reanclar.
@@ -678,7 +707,7 @@ export default function SocialClient() {
       return;
     }
     reanclajePendiente.current = true;
-  }, [vista, agrupar, filtro, orden, scope]);
+  }, [vista, agrupar, filtro, orden, scope, hoyQuien, hoyDia, hoyAgrupar]);
 
   // Se reancla en cuanto hay lista que reanclar. Sin lista de dependencias a
   // propósito: al cambiar de alcance el feed se recarga y en ese commit todavía
@@ -726,103 +755,51 @@ export default function SocialClient() {
     [visibles, agrupar, orden],
   );
 
-  if (!hydrated) return <div className="min-h-screen bg-black" />;
+  // Sin sesión lo resuelve SocialHub.
+  if (!hydrated || !session || !account?.id) return null;
 
-  if (!session || !account?.id) {
-    return (
-      <div className="min-h-screen bg-black text-zinc-100 font-sans">
-        <div className="relative z-10 mx-auto max-w-[1600px] px-4 py-24 text-center sm:px-6 lg:px-8">
-          <h1 className="text-4xl font-black tracking-tighter text-white">
-            Social<span className="text-pink-500">.</span>
-          </h1>
-          <p className="mt-3 text-zinc-400">
-            Inicia sesión para ver la actividad de la gente a la que sigues.
-          </p>
-          <Link
-            href="/login?next=/social"
-            className="mt-6 inline-block rounded-2xl bg-gradient-to-br from-pink-500 to-fuchsia-600 px-6 py-3 text-sm font-bold text-white shadow-lg"
-          >
-            INICIAR SESIÓN
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  const perfilHref = account?.username
-    ? `/u/${encodeURIComponent(account.username)}`
-    : null;
   const controlGlass =
     "bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg";
   const activo = "bg-gradient-to-br from-pink-500 to-fuchsia-600 text-white shadow-lg shadow-pink-500/20";
 
+  // Desplegables de Hoy. El día lleva el recuento de su pestaña; «Ayer» es el
+  // primer día anterior y el resto de la semana va por su nombre.
+  const cuenta = (key) => hoyDias?.find((d) => d.key === key)?.count;
+  const conCuenta = (etiqueta, n) => (typeof n === "number" ? `${etiqueta} · ${n}` : etiqueta);
+  const diaValor = hoyDia === "yesterday" ? hoyDias?.[1]?.key || "yesterday" : hoyDia;
+  const opcionesDia = [
+    ["today", conCuenta("Hoy", cuenta("today"))],
+    ...(hoyDias || [])
+      .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d.key))
+      .map((d, i) => [d.key, conCuenta(dayTabLabel(d.key, i + 1), d.count)]),
+    ["week", conCuenta("Semana", cuenta("week"))],
+  ];
+  if (!opcionesDia.some(([v]) => v === diaValor)) {
+    opcionesDia.splice(1, 0, [diaValor, diaValor === "yesterday" ? "Ayer" : diaValor]);
+  }
+  const OPCIONES_QUIEN = [
+    ["following", "Siguiendo"],
+    ["community", "Comunidad"],
+  ];
+  const OPCIONES_AGRUPAR_HOY = [
+    ["title", "Por título"],
+    ["person", "Por persona"],
+    ["time", "Por hora"],
+  ];
+  const selectorQuien = (props = {}) => (
+    <SelectorSimple icon={Globe2} label="Quién" opciones={OPCIONES_QUIEN} valor={hoyQuien} onChange={setHoyQuien} {...props} />
+  );
+  const selectorDia = (props = {}) => (
+    <SelectorSimple icon={CalendarDays} label="Día" opciones={opcionesDia} valor={diaValor} onChange={setHoyDia} {...props} />
+  );
+  const selectorAgruparHoy = (props = {}) => (
+    <SelectorSimple icon={Layers3} label="Agrupar" opciones={OPCIONES_AGRUPAR_HOY} valor={hoyAgrupar} onChange={setHoyAgrupar} {...props} />
+  );
+  const placeholder = esHoy ? "Buscar en Hoy..." : "Buscar en la actividad...";
+
   return (
-    <div className="min-h-screen bg-black font-sans text-zinc-100 selection:bg-pink-500/30">
-      {/* Manchas de color de la sección, igual que en las demás páginas */}
-      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-[10%] -left-[5%] aspect-square w-[60vw] max-w-[800px] rounded-full bg-pink-600/15 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute top-[15%] -right-[5%] aspect-square w-[55vw] max-w-[700px] rounded-full bg-fuchsia-700/20 blur-[120px] sm:blur-[150px]" />
-        <div className="absolute -bottom-[10%] left-[15%] aspect-square w-[65vw] max-w-[800px] rounded-full bg-pink-800/25 blur-[120px] sm:blur-[150px]" />
-      </div>
-
-      <div className="relative z-10 mx-auto max-w-[1600px] px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
-        <motion.header
-          className="mb-8"
-          initial={isBackNav ? false : { opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={isBackNav ? { duration: 0 } : { duration: 0.5, ease: "easeOut" }}
-        >
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <div className="mb-2 flex items-center gap-3">
-                <div className="h-px w-12 bg-pink-500" />
-                <span className="text-xs font-bold uppercase tracking-widest text-pink-400">
-                  COMUNIDAD
-                </span>
-              </div>
-              <h1 className="text-4xl font-black tracking-tighter text-white md:text-6xl">
-                Social<span className="text-pink-500">.</span>
-              </h1>
-              <p className="mt-2 hidden max-w-lg text-lg text-zinc-400 md:block">
-                La actividad de la gente a la que sigues, y la tuya.
-              </p>
-              {/* Lo más destacado del día (historias, más activos) vive en /today. */}
-              <Link
-                href="/today"
-                className="mt-3 inline-flex h-9 items-center gap-2 rounded-full bg-gradient-to-br from-white/10 to-white/5 px-4 text-sm font-bold text-white shadow-lg backdrop-blur-lg transition-colors hover:text-pink-200"
-              >
-                <Flame className="h-4 w-4 text-pink-400" aria-hidden="true" /> Ver lo destacado de hoy
-              </Link>
-            </div>
-
-            <div className="grid w-full grid-cols-3 gap-2 sm:gap-3 lg:w-auto">
-              <TarjetaCifra
-                value={summary?.following}
-                label="Siguiendo"
-                icon={UserRoundCheck}
-                iconClassName="text-pink-400"
-                href={perfilHref ? `${perfilHref}/following` : undefined}
-              />
-              <TarjetaCifra
-                value={summary?.followers}
-                label="Seguidores"
-                icon={Users}
-                iconClassName="text-fuchsia-400"
-                href={perfilHref ? `${perfilHref}/followers` : undefined}
-              />
-              {/* Tercera cifra propia de esta página: de toda la gente a la que
-                  sigues, cuánta se ha movido esta semana. Es lo que dice si el
-                  feed va a tener algo nuevo que enseñar. */}
-              <TarjetaCifra
-                value={summary?.activeWeek}
-                label="Activos"
-                icon={Activity}
-                iconClassName="text-rose-400"
-                title={`Cuentas que sigues con actividad en los últimos ${summary?.windowDays || 7} días`}
-              />
-            </div>
-          </div>
-        </motion.header>
+    <div>
+      <div className="relative">
 
         {/* BARRA DE FILTROS (sticky, con el cristal del navbar al fijarse) */}
         <motion.div
@@ -840,7 +817,7 @@ export default function SocialClient() {
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Buscar en la actividad..."
+                placeholder={placeholder}
                 className={`h-11 w-full rounded-2xl py-2.5 pl-10 pr-10 text-sm text-white transition-all placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-pink-500/50 ${controlGlass}`}
               />
               {q ? (
@@ -896,53 +873,75 @@ export default function SocialClient() {
             gapClassName="pt-2"
             contentClassName="space-y-2"
           >
-            {/* Dos controles por fila, como en las páginas de usuario. */}
-            <div className="flex gap-2">
-              <div className="min-w-0 flex-1">
-                <SelectorSimple
-                  icon={Filter}
-                  label="Acción"
-                  opciones={FILTROS}
-                  valor={filtro}
-                  onChange={setFiltro}
-                />
-              </div>
-              <div className="min-w-0 flex-1">
-                <SelectorSimple
-                  icon={Layers3}
-                  label="Agrupar"
-                  opciones={SOCIAL_GROUP_OPTIONS}
-                  etiquetasCortas={SOCIAL_GROUP_SHORT_LABELS}
-                  valor={agrupar}
-                  onChange={setAgrupar}
-                  compactMobile
-                />
-              </div>
-            </div>
+            {esHoy ? (
+              <>
+                {/* Hoy: quién y día en una fila, agrupar en la siguiente. */}
+                <div className="flex gap-2">
+                  <div className="min-w-0 flex-1">{selectorQuien({ compactMobile: true })}</div>
+                  <div className="min-w-0 flex-1">{selectorDia({ compactMobile: true })}</div>
+                </div>
+                <div className="flex gap-2">
+                  <div className="min-w-0 flex-1">{selectorAgruparHoy()}</div>
+                  <SelectorVista
+                    vista={hoyVista}
+                    setVista={setHoyVista}
+                    opciones={VISTAS_HOY}
+                    controlGlass={controlGlass}
+                    activo={activo}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Dos controles por fila, como en las páginas de usuario. */}
+                <div className="flex gap-2">
+                  <div className="min-w-0 flex-1">
+                    <SelectorSimple
+                      icon={Filter}
+                      label="Acción"
+                      opciones={FILTROS}
+                      valor={filtro}
+                      onChange={setFiltro}
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <SelectorSimple
+                      icon={Layers3}
+                      label="Agrupar"
+                      opciones={SOCIAL_GROUP_OPTIONS}
+                      etiquetasCortas={SOCIAL_GROUP_SHORT_LABELS}
+                      valor={agrupar}
+                      onChange={setAgrupar}
+                      compactMobile
+                    />
+                  </div>
+                </div>
 
-            {/* Segunda fila: orden y vistas, para que el menú quede en dos
-                filas de dos como en las demás páginas. */}
-            <div className="flex gap-2">
-              <div className="min-w-0 flex-1">
-                <SelectorSimple
-                  icon={ArrowUpDown}
-                  label="Orden"
-                  opciones={[
-                    ["recent", "Reciente"],
-                    ["oldest", "Antiguo"],
-                  ]}
-                  valor={orden}
-                  onChange={setOrden}
-                />
-              </div>
-              <SelectorVista
-                vista={vista}
-                setVista={setVista}
-                controlGlass={controlGlass}
-                activo={activo}
-                fill
-              />
-            </div>
+                {/* Segunda fila: orden y vistas, para que el menú quede en dos
+                    filas de dos como en las demás páginas. */}
+                <div className="flex gap-2">
+                  <div className="min-w-0 flex-1">
+                    <SelectorSimple
+                      icon={ArrowUpDown}
+                      label="Orden"
+                      opciones={[
+                        ["recent", "Reciente"],
+                        ["oldest", "Antiguo"],
+                      ]}
+                      valor={orden}
+                      onChange={setOrden}
+                    />
+                  </div>
+                  <SelectorVista
+                    vista={vista}
+                    setVista={setVista}
+                    controlGlass={controlGlass}
+                    activo={activo}
+                    fill
+                  />
+                </div>
+              </>
+            )}
           </MobileFiltersPanel>
 
           {/* Escritorio: todo en una fila */}
@@ -962,51 +961,87 @@ export default function SocialClient() {
                 onChange={(e) => setQ(e.target.value)}
                 onFocus={() => setDesktopSearchFocused(true)}
                 onBlur={() => setDesktopSearchFocused(false)}
-                placeholder="Buscar en la actividad..."
+                placeholder={placeholder}
                 className={`h-11 w-full rounded-2xl py-2.5 pl-10 pr-10 text-sm text-white transition-all placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-pink-500/50 ${controlGlass}`}
               />
             </div>
-            <SelectorSimple
-              icon={Filter}
-              label="Acción"
-              opciones={FILTROS}
-              valor={filtro}
-              onChange={setFiltro}
-              compact={desktopSearchFocused}
-            />
-            <SelectorSimple
-              icon={Layers3}
-              label="Agrupar"
-              opciones={SOCIAL_GROUP_OPTIONS}
-              valor={agrupar}
-              onChange={setAgrupar}
-              compact={desktopSearchFocused}
-            />
-            <SelectorSimple
-              icon={ArrowUpDown}
-              label="Orden"
-              opciones={[
-                ["recent", "Reciente"],
-                ["oldest", "Antiguo"],
-              ]}
-              valor={orden}
-              onChange={setOrden}
-              compact={desktopSearchFocused}
-            />
-            <SelectorVista
-              vista={vista}
-              setVista={setVista}
-              controlGlass={controlGlass}
-              activo={activo}
-            />
+            {esHoy ? (
+              <>
+                {selectorQuien({ compact: desktopSearchFocused })}
+                {selectorDia({ compact: desktopSearchFocused })}
+                {selectorAgruparHoy({ compact: desktopSearchFocused })}
+                <SelectorVista
+                  vista={hoyVista}
+                  setVista={setHoyVista}
+                  opciones={VISTAS_HOY}
+                  controlGlass={controlGlass}
+                  activo={activo}
+                />
+              </>
+            ) : (
+              <>
+                <SelectorSimple
+                  icon={Filter}
+                  label="Acción"
+                  opciones={FILTROS}
+                  valor={filtro}
+                  onChange={setFiltro}
+                  compact={desktopSearchFocused}
+                />
+                <SelectorSimple
+                  icon={Layers3}
+                  label="Agrupar"
+                  opciones={SOCIAL_GROUP_OPTIONS}
+                  valor={agrupar}
+                  onChange={setAgrupar}
+                  compact={desktopSearchFocused}
+                />
+                <SelectorSimple
+                  icon={ArrowUpDown}
+                  label="Orden"
+                  opciones={[
+                    ["recent", "Reciente"],
+                    ["oldest", "Antiguo"],
+                  ]}
+                  valor={orden}
+                  onChange={setOrden}
+                  compact={desktopSearchFocused}
+                />
+                <SelectorVista
+                  vista={vista}
+                  setVista={setVista}
+                  controlGlass={controlGlass}
+                  activo={activo}
+                />
+              </>
+            )}
           </div>
         </motion.div>
 
-        {error ? (
+        {esHoy ? (
+          <div ref={listaRef}>
+            <TodayClient
+              scope={hoyQuien}
+              day={hoyDia}
+              group={hoyAgrupar}
+              layout={hoyVista}
+              query={q}
+              onScopeChange={setHoyQuien}
+              onDayChange={setHoyDia}
+              onDaysChange={setHoyDias}
+              onSummaryChange={onTodaySummary}
+              initialScope={initialToday.scope}
+              initialDay={initialToday.day}
+              initialData={initialToday.data}
+            />
+          </div>
+        ) : null}
+
+        {!esHoy && error ? (
           <p className="mb-4 text-sm text-pink-300">{error}</p>
         ) : null}
 
-        {loading && items.length === 0 ? null : visibles.length === 0 ? (
+        {esHoy ? null : loading && items.length === 0 ? null : visibles.length === 0 ? (
           <motion.div
             className="rounded-3xl border border-dashed border-zinc-800 bg-zinc-900/20 py-24 text-center"
             initial={{ opacity: 0, scale: 0.95 }}
@@ -1083,7 +1118,7 @@ export default function SocialClient() {
   );
 }
 
-// Botón Siguiendo / Yo: el control que pide la sección.
+// Botón Hoy / Siguiendo / Yo: el control que pide la sección.
 function SelectorAlcance({
   scope,
   setScope,
@@ -1099,6 +1134,7 @@ function SelectorAlcance({
       } ${controlGlass}`}
     >
       {[
+        ["today", "Hoy", Flame],
         ["following", "Siguiendo", Users],
         ["me", "Yo", User],
       ].map(([valor, etiqueta, Icono]) => (
@@ -1364,16 +1400,12 @@ function GrupoDivisor({ titulo, cuenta, total, primero, isBackNav }) {
   );
 }
 
-function SelectorVista({ vista, setVista, controlGlass, activo, fill = false }) {
+function SelectorVista({ vista, setVista, controlGlass, activo, fill = false, opciones = VISTAS_FEED }) {
   return (
     <div
       className={`flex h-11 items-center rounded-2xl p-1 ${fill ? "min-w-0 flex-1" : "shrink-0"} ${controlGlass}`}
     >
-      {[
-        ["list", List, "Lista"],
-        ["poster-list", ImageIcon, "Lista con póster"],
-        ["backdrop-list", MonitorPlay, "Lista con backdrop"],
-      ].map(([valor, Icono, etiqueta]) => (
+      {opciones.map(([valor, Icono, etiqueta]) => (
         <button
           key={valor}
           type="button"

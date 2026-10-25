@@ -7,6 +7,9 @@
 
 export const SEEN_STORIES_KEY = "today-seen-stories";
 export const SEEN_STORIES_TTL_MS = 24 * 60 * 60 * 1000;
+// Aviso en la misma pestaña al marcar algo como visto: la píldora «Hoy» del
+// navbar baja su contador sin esperar a la siguiente navegación.
+export const SEEN_STORIES_EVENT = "today-seen-stories-change";
 
 /** Quita las marcas de más de 24 h. Puro. */
 export function pruneSeen(map, now = Date.now()) {
@@ -32,6 +35,11 @@ export function writeSeenStories(map, now = Date.now()) {
     window.localStorage.setItem(SEEN_STORIES_KEY, JSON.stringify(pruned));
   } catch {
     // Sin almacenamiento (ventana privada, cuota): se queda solo en memoria.
+  }
+  try {
+    window.dispatchEvent(new CustomEvent(SEEN_STORIES_EVENT, { detail: pruned }));
+  } catch {
+    // Fuera del navegador no hay nadie escuchando.
   }
   return pruned;
 }
