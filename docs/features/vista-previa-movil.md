@@ -9,11 +9,14 @@ En el móvil, mantener el dedo sobre la tarjeta de una película, una serie o un
 ## Qué ve el usuario
 
 - Al mantener el dedo (~0,4 s) la tarjeta se hunde un poco y, al cumplirse el tiempo, la vista previa crece desde ella hasta el centro de la pantalla con una transición. En Android, una vibración corta lo marca.
+- La vista previa no enseña la imagen de la tarjeta pulsada (suele ser otra: una backdrop u otro póster). La página se difumina en cuanto se cumple el tiempo y la tarjeta flotante crece cuando su portada ya está descargada, así que aparece directamente con ella. Primero entra la portada ligera (w342) y la nítida (w780) encima, sin que se note el cambio. Si la portada tarda más de 1,5 s, se abre con un esqueleto.
+- El pie de la portada se funde con el cristal de la tarjeta con una máscara (la misma curva que el hero de la ficha rápida), sin velo negro ni corte visible.
 - La vista previa es una tarjeta flotante que no ocupa toda la pantalla: deja 6 px a cada lado (como mucho 440 px de ancho) y no llega arriba ni abajo. La página se queda detrás, difuminada.
 - Solo enseña tres cosas:
   1. la portada del título con su logo (sin logo si la portada ya trae el título impreso);
-  2. la fila de botones de la ficha (tráiler, banda sonora, visto, puntuar, favorito, pendiente, listas…), con sus mismos modales. Ocupan casi todo el ancho de la tarjeta (4 px de margen), con 4 px entre ellos como en la ficha móvil, así que salen al menos igual de grandes que allí;
-  3. el marcador de puntuaciones (TMDb, Trakt, IMDb y estadísticas), reducido al 70 % para que no pese más que la portada.
+  2. la fila de botones de la ficha (tráiler, banda sonora, visto, puntuar, favorito, pendiente, listas, reseñas), con sus mismos modales. Sin sesión, reseñas lleva al login, como en la ficha;
+  3. el marcador de puntuaciones (TMDb, Trakt, IMDb y estadísticas).
+- La fila de botones y el marcador se ven exactamente como en la ficha móvil: dejan 10 px a cada lado dentro de la tarjeta, así que miden lo mismo que allí (ancho de pantalla menos 32 px), con los mismos botones, el mismo tamaño de letra, 4 px entre botones y 20 px entre la fila y el marcador.
 - Tocar la portada lleva a la ficha completa. Tocar fuera, o la tecla Escape, cierra la vista previa y la tarjeta vuelve a su sitio.
 - Al soltar el dedo no se abre la ficha ni sale el menú del sistema para enlaces o imágenes.
 - Si el dedo se mueve más de 10 px (desplazar la página o un carrusel), no se abre nada.

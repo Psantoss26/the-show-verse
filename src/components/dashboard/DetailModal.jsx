@@ -306,9 +306,10 @@ function preferredPanelWidth(mobileDetails) {
 
 /* ======================= VISTA PREVIA (PULSACIÓN LARGA) ======================= */
 // Ancho de la tarjeta: lo que da el teléfono menos 6px por lado, sin pasar de
-// 440px. La fila de botones solo deja 4px a cada lado (los `px-1` de la ficha
-// móvil), así que es más ancha que en la ficha y los botones salen al menos
-// igual de grandes; alrededor se sigue viendo la página difuminada. La portada se queda en 2:3 mientras quepa y, en pantallas
+// 440px; alrededor se sigue viendo la página difuminada. Dentro, la fila de
+// botones y el marcador dejan 10px a cada lado: así miden lo mismo que en la
+// ficha móvil (DetailsClient, ancho de pantalla menos 32px) y se ven iguales,
+// con los mismos botones, letras y separaciones. La portada se queda en 2:3 mientras quepa y, en pantallas
 // bajas, se recorta por arriba y por abajo para dejar sitio a botones y
 // marcador: la tarjeta nunca ocupa la pantalla entera.
 const PEEK_MAX_WIDTH = 440;
@@ -316,7 +317,9 @@ const PEEK_SIDE_GUTTER = 6;
 // Alto que se reserva para la fila de botones, el marcador y el aire de arriba
 // y abajo.
 const PEEK_CHROME_HEIGHT = 300;
-const PEEK_SCOREBOARD_STYLE = { zoom: 0.7 };
+// La tarjeta no crece hasta tener la portada cargada (ver DetailPeekLayout);
+// si tarda más que esto, se abre igualmente con el esqueleto.
+const PEEK_ART_MAX_WAIT_MS = 1500;
 
 function peekGeometry() {
   const vw = window.innerWidth;
@@ -344,7 +347,7 @@ function peekOriginTransform(origin, geometry) {
 function DetailPeekLayout({
   title,
   origin,
-  seedSrc,
+  posterLowSrc,
   posterSrc,
   logo,
   actions,
@@ -353,6 +356,7 @@ function DetailPeekLayout({
   onBackdropPointerCancel,
   onBackdropClick,
   onOpenFull,
+  scrollRef,
   children,
 }) {
   const reduceMotion = useReducedMotion();
@@ -360,7 +364,33 @@ function DetailPeekLayout({
   const from = reduceMotion
     ? { x: 0, y: 0, scale: 0.96 }
     : peekOriginTransform(origin, geometry);
+  // PORTADA ANTES QUE TARJETA. La tarjeta pulsada suele enseñar otra imagen
+  // (una backdrop, otro póster), así que no se usa de relleno: enseñarla y
+  // cambiarla después se veía como dos imágenes seguidas. La tarjeta flotante
+  // espera, transparente y en el sitio de la pulsada, a que la portada esté
+  // descargada y decodificada, y entonces crece ya con ella. Primero la w342
+  // (la que precarga useDetailModalData) y la w780 entra encima al llegar:
+  // es la misma imagen, solo cambia la nitidez.
+  const [lowReady, setLowReady] = useState(null);
   const [posterLoaded, setPosterLoaded] = useState(null);
+  const [waitedTooLong, setWaitedTooLong] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => setWaitedTooLong(true),
+      PEEK_ART_MAX_WAIT_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, []);
+  const artReady =
+    (posterLowSrc && lowReady === posterLowSrc) ||
+    (posterSrc && posterLoaded === posterSrc);
+  const shown = artReady || waitedTooLong;
+  const markLoaded = (setter, src) => (event) => {
+    const img = event.currentTarget;
+    const done = () => setter(src);
+    if (typeof img.decode === "function") img.decode().then(done, done);
+    else done();
+  };
 
   return (
     <div
@@ -383,10 +413,13 @@ function DetailPeekLayout({
 
       <div className="pointer-events-none fixed inset-0 flex items-center justify-center">
         <motion.div
+          // El `useScroll` de la ficha necesita su contenedor montado: aquí
+          // es la tarjeta, que es lo que se desplaza en pantallas bajas.
+          ref={scrollRef}
           className={`pointer-events-auto relative max-h-[calc(100svh-2rem)] overflow-y-auto overflow-x-hidden overscroll-contain rounded-[1.75rem] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${LIQUID_GLASS_DETAIL_SURFACE}`}
           style={{ width: geometry.width, transformOrigin: "50% 50%" }}
           initial={{ ...from, opacity: 0 }}
-          animate={{ x: 0, y: 0, scale: 1, opacity: 1 }}
+          animate={shown ? { x: 0, y: 0, scale: 1, opacity: 1 } : { ...from, opacity: 0 }}
           exit={{
             ...from,
             opacity: 0,
@@ -410,37 +443,51 @@ function DetailPeekLayout({
             type="button"
             onClick={onOpenFull}
             aria-label={title ? `Abrir la ficha de ${title}` : "Abrir la ficha"}
-            className="relative block w-full overflow-hidden bg-neutral-900 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-yellow-400"
+            className="relative block w-full overflow-hidden bg-transparent text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-yellow-400"
             style={{ height: geometry.posterHeight }}
           >
-            {seedSrc ? (
-              <img
-                src={seedSrc}
-                alt=""
-                aria-hidden="true"
-                className="absolute inset-0 h-full w-full object-cover"
-                draggable={false}
-              />
-            ) : (
-              <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900" />
-            )}
-            {posterSrc && (
-              <img
-                key={posterSrc}
-                src={posterSrc}
-                alt={title}
-                className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 motion-reduce:transition-none ${
-                  posterLoaded === posterSrc || !seedSrc ? "opacity-100" : "opacity-0"
-                }`}
-                onLoad={() => setPosterLoaded(posterSrc)}
-                draggable={false}
-                loading="eager"
-                fetchPriority="high"
-              />
-            )}
-            {/* Solo el pie: el logo necesita contraste y la portada se funde
-                con el cristal de la tarjeta, sin un corte en seco. */}
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+            {/* El pie se funde con el cristal de la tarjeta con una máscara
+                (`sv-preview-fade`, la curva del hero de la ficha rápida), no
+                con un velo negro: el velo acababa en negro sobre un cristal
+                que no lo es y el corte se veía. La máscara va en cada capa
+                (esqueleto, imágenes y velo del logo), no en un envoltorio: en
+                un envoltorio dentro de esta tarjeta Chrome no la pintaba y la
+                imagen llegaba nítida hasta el borde. */}
+            <div className="absolute inset-0">
+              {!artReady && (
+                <div className="sv-preview-fade absolute inset-0 animate-pulse bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900" />
+              )}
+              {posterLowSrc && (
+                <img
+                  key={posterLowSrc}
+                  src={posterLowSrc}
+                  alt=""
+                  aria-hidden="true"
+                  className="sv-preview-fade absolute inset-0 h-full w-full object-cover"
+                  onLoad={markLoaded(setLowReady, posterLowSrc)}
+                  draggable={false}
+                  loading="eager"
+                  fetchPriority="high"
+                />
+              )}
+              {posterSrc && (
+                <img
+                  key={posterSrc}
+                  src={posterSrc}
+                  alt={title}
+                  className={`sv-preview-fade absolute inset-0 h-full w-full object-cover transition-opacity duration-300 motion-reduce:transition-none ${
+                    posterLoaded === posterSrc ? "opacity-100" : "opacity-0"
+                  }`}
+                  onLoad={markLoaded(setPosterLoaded, posterSrc)}
+                  draggable={false}
+                  loading="eager"
+                  fetchPriority="high"
+                />
+              )}
+              {logo && (
+                <div className="sv-preview-fade pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.6),rgba(0,0,0,0.25)_20%,transparent_40%)]" />
+              )}
+            </div>
             {logo && (
               <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center px-5 pb-3 text-center">
                 {logo}
@@ -448,15 +495,11 @@ function DetailPeekLayout({
             )}
           </button>
 
-          <div className="px-1 pb-3 pt-3">
+          {/* Fila y marcador como en la ficha móvil: mismo ancho y 20px
+              entre los dos. */}
+          <div className="px-2.5 pb-2.5 pt-3">
             {actions}
-            {/* El marcador de teléfono está pensado para el ancho entero de
-                la ficha: aquí, a su tamaño, pesaba más que la portada. Se
-                reduce con `zoom` y no con `transform` para que ocupe también
-                menos alto y no deje hueco debajo. */}
-            <div className="mx-2 mt-3" style={PEEK_SCOREBOARD_STYLE}>
-              {scoreboard}
-            </div>
+            <div className="mt-5">{scoreboard}</div>
           </div>
         </motion.div>
       </div>
@@ -683,11 +726,9 @@ export default function DetailModal({
   // VISTA PREVIA DE PULSACIÓN LARGA (móvil, ver MobileTitlePeek): en vez de la
   // ficha, una tarjeta flotante con la portada y su logo, la fila de botones y
   // el marcador. `peekOrigin` es el rectángulo de la tarjeta pulsada, desde el
-  // que crece al abrirse y al que vuelve al cerrarse; `peekSeedSrc`, la imagen
-  // que ya enseñaba esa tarjeta, para no abrir en blanco.
+  // que crece al abrirse y al que vuelve al cerrarse.
   peek = false,
   peekOrigin = null,
-  peekSeedSrc = null,
 }) {
   const isRightPlacement = placement === "right";
   const isDocked = isRightPlacement && drawerView === "docked";
@@ -3372,10 +3413,13 @@ export default function DetailModal({
           onAddToList={openListsModal}
           listBusy={listsLoadingHook || listsPresenceLoading}
           listActive={Object.values(membershipMap || {}).some(Boolean)}
-          showComments={ratingActionConnected}
+          // La vista previa enseña siempre las reseñas, como la ficha móvil
+          // (DetailsClient): sin sesión, pulsar lleva al login.
+          showComments={peek || ratingActionConnected}
           commentsActive={myComments.length > 0}
           onComments={(event) => {
             stopNestedModalOpeningEvent(event);
+            if (!ratingActionConnected && requireLogin()) return;
             setCommentModalOpen(true);
           }}
         />
@@ -3706,6 +3750,11 @@ export default function DetailModal({
     // backdrop solo cuando se SABE que no hay portada (ver `mobileHeroSrc`).
     const peekPosterSrc =
       heroPosterSrc || (data.heroPosterResolved ? heroBackdropSrc : null);
+    // La w342 ya está descargada cuando llega `heroPosterPath`: con ella la
+    // tarjeta puede abrirse sin esperar a la nítida.
+    const peekPosterLowSrc = data.heroPosterPath
+      ? buildImg(data.heroPosterPath, "w342")
+      : null;
     // Sin logo cuando la portada ya trae el título impreso (mismo criterio).
     const peekLogo =
       data.heroPosterHasBurnedTitle && peekPosterSrc ? null : data.logoPath ? (
@@ -3730,7 +3779,7 @@ export default function DetailModal({
       <DetailPeekLayout
         title={title}
         origin={peekOrigin}
-        seedSrc={peekSeedSrc}
+        posterLowSrc={peekPosterLowSrc}
         posterSrc={peekPosterSrc}
         logo={peekLogo}
         actions={actionsNode}
@@ -3738,6 +3787,7 @@ export default function DetailModal({
         onBackdropPointerDown={handleBackdropPointerDown}
         onBackdropPointerCancel={handleBackdropPointerCancel}
         onBackdropClick={handleBackdropClick}
+        scrollRef={scrollContainerRef}
         onOpenFull={() => {
           const href = isEpisode
             ? `/details/tv/${episodeMeta?.showId ?? item?.showId ?? item?.id}/season/${episodeMeta?.seasonNumber ?? item?.seasonNumber}/episode/${episodeMeta?.episodeNumber ?? item?.episodeNumber}`

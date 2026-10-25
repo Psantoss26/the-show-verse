@@ -59,14 +59,6 @@ function resolvePeekTarget(node) {
   return item ? { target, item } : null;
 }
 
-// La imagen que ya enseña la tarjeta: la vista previa arranca con ella en vez
-// de en blanco mientras llega la portada buena.
-function seedImageOf(target) {
-  const img = target.querySelector("img");
-  const src = img?.currentSrc || img?.src || null;
-  return src && !src.startsWith("data:") ? src : null;
-}
-
 export default function MobileTitlePeek() {
   const canPeek = useMediaQuery(
     "(max-width: 767px) and (hover: none) and (pointer: coarse)",
@@ -150,7 +142,6 @@ export default function MobileTitlePeek() {
           width: rect.width,
           height: rect.height,
         },
-        seedSrc: seedImageOf(gesture.target),
       });
     };
 
@@ -281,7 +272,6 @@ export default function MobileTitlePeek() {
             onClose={close}
             peek
             peekOrigin={peek.origin}
-            peekSeedSrc={peek.seedSrc}
           />
         )}
       </AnimatePresence>
