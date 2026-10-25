@@ -10,17 +10,22 @@
 //   - Toque en el tercio izquierdo: atrás; en el resto: adelante. Mantener
 //     pulsado pausa. Deslizar en horizontal cambia de título; hacia abajo cierra.
 //   - Teclado: ← → cambian de fotograma, espacio pausa, Esc cierra.
+//   - En ordenador, pasar el ratón por el cartel enseña la ficha del título
+//     (TodayStoryDetails) y pausa la historia mientras está encima; en táctil,
+//     tocar la portada la abre y otro toque la cierra.
 //   - Cada fotograma mostrado se marca como visto (seenStories).
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, ChevronRight, Pause, Play, Sparkles, Star, X } from "lucide-react";
+import Link from "next/link";
+import { ChevronLeft, ChevronRight, LayoutGrid, Pause, Play, Sparkles, Star, X } from "lucide-react";
 
 import OptimizedImage from "@/components/OptimizedImage";
 import useModalGuard from "@/hooks/useModalGuard";
 import { relativeTime } from "@/lib/notifications/alerts";
 import { firstUnseenIndex } from "@/lib/today/seenStories";
 import { AvatarStack, Poster, TitleLink, UserAvatar } from "./TodayParts";
+import TodayStoryDetails from "./TodayStoryDetails";
 import { actionPhrase, displayName, episodeLabel, milestoneLabel, ratingTen, tmdbImage } from "./todayUi";
 
 export const STORY_MS = 5000;
@@ -79,7 +84,7 @@ function FrameBody({ frame }) {
   const { action } = frame;
   return (
     <div className="flex flex-col items-center text-center">
-      <UserAvatar user={action.user} className="h-14 w-14" ring="ring-2 ring-white/20" />
+      <UserAvatar user={action.user} className="h-14 w-14" />
       <p className="mt-3 text-base text-zinc-200">
         <span className="font-bold text-white">{displayName(action.user)}</span> {actionPhrase(action)}
       </p>
@@ -116,6 +121,28 @@ export default function TodayStoryViewer({ groups, startIndex, seen, onSeen, onC
   const [groupIndex, setGroupIndex] = useState(startIndex ?? 0);
   const [frameIndex, setFrameIndex] = useState(0);
   const [paused, setPaused] = useState(false);
+  // Ratón encima del cartel (solo en dispositivos con ratón): enseña la ficha y
+  // pausa, sin tocar la pausa que elija el usuario con el botón o el espacio.
+  const [hovering, setHovering] = useState(false);
+  const [canHover, setCanHover] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return undefined;
+    const query = window.matchMedia("(hover: hover) and (pointer: fine)");
+    const sync = () => setCanHover(query.matches);
+    sync();
+    query.addEventListener?.("change", sync);
+    return () => query.removeEventListener?.("change", sync);
+  }, []);
+  const stopped = paused || hovering;
+  const cardRef = useRef(null);
+  // El clic del mismo toque que abre la ficha cae ya sobre ella: sin esto la
+  // cerraría en el acto.
+  const openedAtRef = useRef(0);
+  // En táctil la ficha se cierra al cambiar de fotograma (deslizar, botones).
+  const frameKey = open ? groups[groupIndex]?.frames[frameIndex]?.key : null;
+  useEffect(() => {
+    if (!canHover) setHovering(false);
+  }, [frameKey, canHover]);
 
   const barRef = useRef(null);
   const elapsedRef = useRef(0);
@@ -129,6 +156,7 @@ export default function TodayStoryViewer({ groups, startIndex, seen, onSeen, onC
     setGroupIndex(startIndex);
     setFrameIndex(firstUnseenIndex(groups[startIndex], seen));
     setPaused(false);
+    setHovering(false);
     // Solo al abrir: `seen` cambia con cada fotograma visto.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startIndex]);
@@ -179,7 +207,7 @@ export default function TodayStoryViewer({ groups, startIndex, seen, onSeen, onC
   }, [frame]);
 
   useEffect(() => {
-    if (!frame || paused) return undefined;
+    if (!frame || stopped) return undefined;
     let raf = 0;
     let last = performance.now();
     const tick = (now) => {
@@ -195,7 +223,7 @@ export default function TodayStoryViewer({ groups, startIndex, seen, onSeen, onC
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [frame, paused, goFrame]);
+  }, [frame, stopped, goFrame]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -238,6 +266,14 @@ export default function TodayStoryViewer({ groups, startIndex, seen, onSeen, onC
     }
     if (Math.abs(dx) > SWIPE_PX && Math.abs(dx) > Math.abs(dy)) {
       goGroup(dx < 0 ? 1 : -1);
+      return;
+    }
+    // Táctil: tocar la portada abre la ficha del título (lo que en ordenador
+    // hace el ratón al pasar por encima). Fuera de la portada siguen las zonas
+    // de toque para ir atrás y adelante.
+    if (!canHover && cardRef.current?.contains(event.target)) {
+      openedAtRef.current = performance.now();
+      setHovering(true);
       return;
     }
     const rect = event.currentTarget.getBoundingClientRect();
@@ -318,14 +354,59 @@ export default function TodayStoryViewer({ groups, startIndex, seen, onSeen, onC
           >
             {paused ? <Play className="h-5 w-5 fill-current" /> : <Pause className="h-5 w-5 fill-current" />}
           </button>
+          {/* Página completa de Hoy (como el botón de cuadrícula de Trakt):
+              cierra las historias y deja ver la vista Hoy de Social. */}
+          <Link
+            href="/social"
+            prefetch={false}
+            data-story-control
+            onClick={onClose}
+            className="rounded-full p-2 text-white hover:bg-white/10"
+            aria-label="Ver todo Hoy"
+            title="Ver todo Hoy"
+          >
+            <LayoutGrid className="h-5 w-5" />
+          </Link>
           <button type="button" data-story-control onClick={onClose} className="rounded-full p-2 text-white hover:bg-white/10" aria-label="Cerrar">
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="relative z-10 flex flex-1 flex-col items-center justify-center gap-6 px-6 pb-[max(2rem,env(safe-area-inset-bottom))]">
-          <Poster media={media} size="w342" className="aspect-[2/3] w-[46%] max-w-[190px] rounded-2xl shadow-2xl ring-1 ring-white/10" />
-          <FrameBody frame={frame} />
+        <div className="relative z-10 flex min-h-0 flex-1 flex-col gap-5 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4">
+          {/* CARTEL GRANDE. En ordenador, al pasar el ratón se convierte en la
+              ficha del título (TodayStoryDetails) y la historia se pausa, como
+              en Trakt; al salir vuelve el cartel y sigue. En táctil se abre al
+              tocar la portada y se cierra con otro toque. */}
+          <div
+            ref={cardRef}
+            className="relative mx-auto min-h-0 w-full flex-1 overflow-hidden rounded-2xl bg-zinc-900 shadow-2xl"
+            onMouseEnter={() => {
+              if (canHover) setHovering(true);
+            }}
+            onMouseLeave={() => setHovering(false)}
+          >
+            <Poster media={media} size="w500" className="absolute inset-0 h-full w-full" />
+            {hovering ? (
+              <div
+                className="absolute inset-0"
+                data-story-control
+                // Táctil: otro toque en la ficha vuelve a la portada y sigue la
+                // historia (desplazar dentro no cuenta como toque).
+                onClick={
+                  canHover
+                    ? undefined
+                    : () => {
+                        if (performance.now() - openedAtRef.current > 350) setHovering(false);
+                      }
+                }
+              >
+                <TodayStoryDetails media={media} active={hovering} />
+              </div>
+            ) : null}
+          </div>
+          <div className="shrink-0">
+            <FrameBody frame={frame} />
+          </div>
         </div>
       </div>
     </div>,

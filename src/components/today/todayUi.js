@@ -10,8 +10,9 @@ export const CONTROL_GLASS =
 export const CARD_GLASS =
   "bg-gradient-to-br from-white/[0.07] to-white/[0.03] backdrop-blur-md shadow-lg";
 // Superficie lisa de las tarjetas de Hoy: sin desenfoque (un backdrop-filter
-// en cada tarjeta de una rejilla larga emborrona el texto al desplazar).
-export const CARD_SURFACE = "bg-white/[0.04] ring-1 ring-inset ring-white/[0.06]";
+// en cada tarjeta de una rejilla larga emborrona el texto al desplazar) y sin
+// borde: en Hoy nada va contorneado, la tarjeta se distingue por su relleno.
+export const CARD_SURFACE = "bg-white/[0.04]";
 export const ACTIVE_PILL =
   "bg-gradient-to-br from-pink-500 to-fuchsia-600 text-white shadow-lg shadow-pink-500/20";
 
