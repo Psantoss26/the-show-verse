@@ -2917,6 +2917,20 @@ button:focus-visible > .sv-nav-glass > .sv-nav-glass__tint {
   }
 }
 
+/* VISTA PREVIA DE PULSACIÓN LARGA (MobileTitlePeek): en el móvil, mantener el
+   dedo sobre una tarjeta de título abre su vista previa. Para que el gesto sea
+   solo eso, en esas tarjetas no se selecciona texto ni sale el menú del enlace
+   o de la imagen de iOS (en Android lo corta el propio componente cancelando
+   `contextmenu`). */
+@media (max-width: 767px) and (hover: none) and (pointer: coarse) {
+  a[href*="/details/"],
+  [data-sv-peek] {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
 /* =============================================================================
    Recharts - Eliminar recuadro de enfoque blanco al hacer click o tap en gráficas
    ========================================================================== */

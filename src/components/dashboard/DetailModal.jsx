@@ -304,6 +304,160 @@ function preferredPanelWidth(mobileDetails) {
   return window.innerHeight * MOBILE_DETAILS_ASPECT_RATIO;
 }
 
+/* ======================= VISTA PREVIA (PULSACIÓN LARGA) ======================= */
+// Ancho de la tarjeta: lo que da el teléfono menos 28px por lado, sin pasar de
+// 340px, para que alrededor se siga viendo la página difuminada. La portada se
+// queda en 2:3 mientras quepa y, en pantallas bajas, se recorta por arriba y
+// por abajo para dejar sitio a botones y marcador: la tarjeta nunca ocupa la
+// pantalla entera.
+const PEEK_MAX_WIDTH = 340;
+const PEEK_SIDE_GUTTER = 28;
+// Alto que se reserva para la fila de botones, el marcador y el aire de arriba
+// y abajo.
+const PEEK_CHROME_HEIGHT = 320;
+
+function peekGeometry() {
+  const vw = window.innerWidth;
+  const vh = window.visualViewport?.height || window.innerHeight;
+  const width = Math.min(PEEK_MAX_WIDTH, vw - PEEK_SIDE_GUTTER * 2);
+  const posterHeight = Math.max(
+    180,
+    Math.min(Math.round(width * 1.5), vh - PEEK_CHROME_HEIGHT),
+  );
+  return { vw, vh, width, posterHeight };
+}
+
+// La tarjeta crece desde la tarjeta pulsada y vuelve a ella al cerrarse. Como
+// queda centrada en la pantalla, basta con el desplazamiento entre los dos
+// centros y la proporción entre los dos anchos.
+function peekOriginTransform(origin, geometry) {
+  if (!origin || !geometry) return { x: 0, y: 24, scale: 0.9 };
+  return {
+    x: origin.left + origin.width / 2 - geometry.vw / 2,
+    y: origin.top + origin.height / 2 - geometry.vh / 2,
+    scale: Math.max(0.2, Math.min(1, origin.width / geometry.width)),
+  };
+}
+
+function DetailPeekLayout({
+  title,
+  origin,
+  seedSrc,
+  posterSrc,
+  logo,
+  actions,
+  scoreboard,
+  onBackdropPointerDown,
+  onBackdropPointerCancel,
+  onBackdropClick,
+  onOpenFull,
+  children,
+}) {
+  const reduceMotion = useReducedMotion();
+  const [geometry] = useState(peekGeometry);
+  const from = reduceMotion
+    ? { x: 0, y: 0, scale: 0.96 }
+    : peekOriginTransform(origin, geometry);
+  const [posterLoaded, setPosterLoaded] = useState(null);
+
+  return (
+    <div
+      className="fixed inset-0 z-[9999]"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title ? `Vista previa de ${title}` : "Vista previa"}
+    >
+      {/* Fondo: la página se queda a la vista, difuminada y algo apagada. */}
+      <motion.div
+        className="fixed inset-0 bg-black/35 backdrop-blur-xl"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: reduceMotion ? 0.12 : 0.24, ease: "easeOut" }}
+        onPointerDown={onBackdropPointerDown}
+        onPointerCancel={onBackdropPointerCancel}
+        onClick={onBackdropClick}
+      />
+
+      <div className="pointer-events-none fixed inset-0 flex items-center justify-center">
+        <motion.div
+          className={`pointer-events-auto relative max-h-[calc(100svh-2rem)] overflow-y-auto overflow-x-hidden overscroll-contain rounded-[1.75rem] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${LIQUID_GLASS_DETAIL_SURFACE}`}
+          style={{ width: geometry.width, transformOrigin: "50% 50%" }}
+          initial={{ ...from, opacity: 0 }}
+          animate={{ x: 0, y: 0, scale: 1, opacity: 1 }}
+          exit={{
+            ...from,
+            opacity: 0,
+            transition: { duration: reduceMotion ? 0.12 : 0.22, ease: [0.4, 0, 1, 1] },
+          }}
+          transition={
+            reduceMotion
+              ? { duration: 0.15 }
+              : {
+                  type: "spring",
+                  stiffness: 380,
+                  damping: 32,
+                  mass: 0.9,
+                  opacity: { duration: 0.14 },
+                }
+          }
+          onClick={(event) => event.stopPropagation()}
+        >
+          {/* Portada con su logo. Tocarla abre la ficha completa. */}
+          <button
+            type="button"
+            onClick={onOpenFull}
+            aria-label={title ? `Abrir la ficha de ${title}` : "Abrir la ficha"}
+            className="relative block w-full overflow-hidden bg-neutral-900 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-yellow-400"
+            style={{ height: geometry.posterHeight }}
+          >
+            {seedSrc ? (
+              <img
+                src={seedSrc}
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 h-full w-full object-cover"
+                draggable={false}
+              />
+            ) : (
+              <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900" />
+            )}
+            {posterSrc && (
+              <img
+                key={posterSrc}
+                src={posterSrc}
+                alt={title}
+                className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 motion-reduce:transition-none ${
+                  posterLoaded === posterSrc || !seedSrc ? "opacity-100" : "opacity-0"
+                }`}
+                onLoad={() => setPosterLoaded(posterSrc)}
+                draggable={false}
+                loading="eager"
+                fetchPriority="high"
+              />
+            )}
+            {/* Solo el pie: el logo necesita contraste y la portada se funde
+                con el cristal de la tarjeta, sin un corte en seco. */}
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+            {logo && (
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center px-5 pb-3 text-center">
+                {logo}
+              </div>
+            )}
+          </button>
+
+          <div className="px-4 pb-4 pt-3">
+            {actions}
+            <div className="mt-4">{scoreboard}</div>
+          </div>
+        </motion.div>
+      </div>
+
+      {children}
+    </div>
+  );
+}
+
 /* ============================== SUBCOMPONENTES ============================== */
 function SkeletonBar({ className = "" }) {
   return (
@@ -518,10 +672,21 @@ export default function DetailModal({
   onDrawerWidthChange,
   // Solo en los dashboards: alterna entre modal centrado y panel lateral.
   onPlacementChange,
+  // VISTA PREVIA DE PULSACIÓN LARGA (móvil, ver MobileTitlePeek): en vez de la
+  // ficha, una tarjeta flotante con la portada y su logo, la fila de botones y
+  // el marcador. `peekOrigin` es el rectángulo de la tarjeta pulsada, desde el
+  // que crece al abrirse y al que vuelve al cerrarse; `peekSeedSrc`, la imagen
+  // que ya enseñaba esa tarjeta, para no abrir en blanco.
+  peek = false,
+  peekOrigin = null,
+  peekSeedSrc = null,
 }) {
   const isRightPlacement = placement === "right";
   const isDocked = isRightPlacement && drawerView === "docked";
   const mobileDetails = isRightPlacement && contentView === "mobile";
+  // Disposición de teléfono de la fila de botones y del marcador: la ficha de
+  // teléfono del drawer y la vista previa de pulsación larga.
+  const phoneLayout = mobileDetails || peek;
   const clampPanelWidth = useCallback(
     (width, viewportWidth) => mobileDetails
       ? clampMobileDetailsWidth(width, viewportWidth, window.innerHeight)
@@ -538,7 +703,7 @@ export default function DetailModal({
   const { session, account, preferences } = useAuth();
   const { openDetailModal } = useDetailModal();
   const { loading, data, applyArtworkSelection } = useDetailModalData(item, {
-    phoneView: mobileDetails,
+    phoneView: phoneLayout,
   });
   useOfflineTitle(item?.media_type || item?.mediaType || (item?.first_air_date ? "tv" : "movie"), item?.id || item?.tmdbId, data);
 
@@ -654,7 +819,7 @@ export default function DetailModal({
     // Fuera de la ficha de teléfono: cinco insignias no caben en ese ancho y
     // empujaban los botones de la derecha fuera del panel. Las tres que se
     // conservan (TMDb, Trakt e IMDb) son las que llevan votos.
-    if (mobileDetails) return null;
+    if (phoneLayout) return null;
     if (value != null) return { value: Math.round(value), href };
     return data.imdbRatingResolved ? null : { pending: true };
   };
@@ -3120,14 +3285,14 @@ export default function DetailModal({
     {!isEpisode && (
     <DetailModalActionsReveal
       className={`flex items-center gap-4 ${
-        mobileDetails
+        phoneLayout
           ? "w-full justify-center text-center"
           : "flex-col text-center sm:flex-row sm:items-center sm:justify-between sm:text-left"
       }`}
     >
       <div
         className={
-          mobileDetails
+          phoneLayout
             // `sv-phone-actions-reveal` escalona a sus NIETOS, así que tiene que
             // ir en el elemento que envuelve la fila: `este > fila > botón`.
             ? "sv-phone-actions-reveal w-full min-w-0"
@@ -3136,7 +3301,7 @@ export default function DetailModal({
       >
         <DetailActionsRow
           mobileGapClass="gap-1.5"
-          forceMobile={mobileDetails}
+          forceMobile={phoneLayout}
           onTrailer={handleToggleTrailer}
           trailerAvailable
           trailerLoading={trailerLoading}
@@ -3214,21 +3379,21 @@ export default function DetailModal({
     {isEpisode && (
       <DetailModalActionsReveal
         className={`flex items-center gap-4 ${
-          mobileDetails
+          phoneLayout
             ? "w-full justify-center text-center"
             : "flex-col text-center sm:flex-row sm:items-center sm:justify-between sm:text-left"
         }`}
       >
         <div
           className={
-            mobileDetails
+            phoneLayout
               ? "sv-phone-actions-reveal w-full min-w-0"
               : "w-[calc(100%_+_1rem)] min-w-0 sm:w-auto sm:flex-1"
           }
         >
           <DetailActionsRow
             mobileGapClass="gap-1.5"
-            forceMobile={mobileDetails}
+            forceMobile={phoneLayout}
             onTrailer={handleToggleTrailer}
             trailerAvailable
             trailerLoading={trailerLoading}
@@ -3261,6 +3426,70 @@ export default function DetailModal({
       </DetailModalActionsReveal>
     )}
     </>
+  );
+
+  // Marcador de puntuaciones. Función y no constante porque lo pintan dos
+  // diseños: la ficha (normal o de teléfono) y la vista previa de pulsación
+  // larga, cada uno con su propia clase.
+  const renderScoreboardPanel = (className) => (
+    <DetailsScoreboardPanel
+      loading={loading}
+      // El pie de estadísticas de Trakt llega en su propia consulta
+      // y, al montarse, hacía crecer el panel y empujaba hacia
+      // abajo las pestañas. Con esto el panel nace ya con su alto
+      // final. `scoreboardResolved` se marca en TODAS las salidas
+      // de esa consulta —incluida "este título no está en
+      // Trakt"—, así que el hueco siempre acaba liberándose.
+      statsPending={!data.scoreboardResolved}
+      tmdb={scoreboardTmdb}
+      trakt={scoreboardTrakt}
+      traktPublic={null}
+      imdb={scoreboardImdb}
+      // Ver `optionalScoreBadge`: fuera de la ficha de teléfono, y con
+      // hueco reservado mientras la respuesta de OMDb está en vuelo.
+      rt={optionalScoreBadge(data.rtScore, ratingLinks.rt)}
+      mc={optionalScoreBadge(data.mcScore, ratingLinks.mc)}
+      mobileScoresOnly={phoneLayout}
+      // En tablet la ventana supera `sm` aunque el drawer sea
+      // estrecho: sin esto el marcador salía con la disposición
+      // ancha y puntuaciones y stats se partían en dos filas.
+      phoneLayout={phoneLayout}
+      externalLinks={externalLinks}
+      externalLinksWikipedia={wikipediaQuery}
+      onMorePlatforms={(event) => {
+        stopNestedModalOpeningEvent(event);
+        setPlatformsOpen(true);
+      }}
+      platformsMenuOnly
+      onMoreLinks={(event) => {
+        stopNestedModalOpeningEvent(event);
+        setExternalLinksOpen(true);
+      }}
+      externalLinksMenuOnly
+      showExternalLinksLabel
+      share={{
+        title,
+        text: `Echa un vistazo a ${title} en The Show Verse`,
+        url:
+          typeof window !== "undefined" && item?.id
+            ? `${window.location.origin}/details/${mediaType}/${item.id}`
+            : undefined,
+        card: shareCard,
+        story: shareStory,
+      }}
+      stats={scoreStats}
+      statsTrailing={
+        showFollowingActivity ? (
+          <FollowingActivityAvatars
+            data={followingActivity}
+            mediaType={mediaType}
+            onOpen={openFollowingActivity}
+          />
+        ) : null
+      }
+      showFavoritedStat={!isEpisode}
+      className={className}
+    />
   );
 
   const modalLayer = (
@@ -3440,6 +3669,78 @@ export default function DetailModal({
       )}
     </>
   );
+
+  // Capa de los modales que abren los botones (tráiler, listas, plataformas…).
+  // `data-detail-modal-layer` marca esta capa para que el cierre por clic
+  // fuera del drawer la reconozca como "dentro". Al ir portada a
+  // document.body queda fuera del panel, y sin esta marca un clic en
+  // cualquiera de estos modales cerraría el drawer que hay debajo.
+  // El div envoltorio es inerte: no crea contexto de apilamiento (sin
+  // transform/opacity/z-index) y todos sus hijos son `fixed`, así que no
+  // altera su posicionamiento.
+  const portaledModalLayer = modalHostReady
+    ? createPortal(
+        <div
+          data-detail-modal-layer=""
+          onPointerDown={stopNestedModalEvent}
+          onMouseDown={stopNestedModalEvent}
+          onClick={stopNestedModalEvent}
+        >
+          {modalLayer}
+        </div>,
+        document.body,
+      )
+    : modalLayer;
+
+  if (peek) {
+    // Portada de teléfono, la misma que la ficha de teléfono del drawer: la
+    // backdrop solo cuando se SABE que no hay portada (ver `mobileHeroSrc`).
+    const peekPosterSrc =
+      heroPosterSrc || (data.heroPosterResolved ? heroBackdropSrc : null);
+    // Sin logo cuando la portada ya trae el título impreso (mismo criterio).
+    const peekLogo =
+      data.heroPosterHasBurnedTitle && peekPosterSrc ? null : data.logoPath ? (
+        <NextImage
+          key={data.logoPath}
+          src={buildImg(data.logoPath, "w500")}
+          alt={title}
+          width={500}
+          height={200}
+          sizes="320px"
+          className="sv-hero-art-in h-auto max-h-24 w-auto max-w-[80%] object-contain object-center drop-shadow-[0_3px_14px_rgba(0,0,0,0.85)]"
+          loading="eager"
+          priority
+        />
+      ) : data.logoResolved && title ? (
+        <h2 className="mx-auto max-w-[85%] text-2xl font-black leading-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]">
+          {title}
+        </h2>
+      ) : null;
+
+    return (
+      <DetailPeekLayout
+        title={title}
+        origin={peekOrigin}
+        seedSrc={peekSeedSrc}
+        posterSrc={peekPosterSrc}
+        logo={peekLogo}
+        actions={actionsNode}
+        scoreboard={renderScoreboardPanel("")}
+        onBackdropPointerDown={handleBackdropPointerDown}
+        onBackdropPointerCancel={handleBackdropPointerCancel}
+        onBackdropClick={handleBackdropClick}
+        onOpenFull={() => {
+          const href = isEpisode
+            ? `/details/tv/${episodeMeta?.showId ?? item?.showId ?? item?.id}/season/${episodeMeta?.seasonNumber ?? item?.seasonNumber}/episode/${episodeMeta?.episodeNumber ?? item?.episodeNumber}`
+            : dashboardDetailHref(item, mediaType);
+          onClose?.();
+          router.push(href);
+        }}
+      >
+        {portaledModalLayer}
+      </DetailPeekLayout>
+    );
+  }
 
   return (
     <div
@@ -4209,64 +4510,7 @@ export default function DetailModal({
               className={mobileDetails ? `mb-3 grid grid-cols-2 gap-x-3 ${PANEL_STATS_REVEAL_BASE}` : undefined}
               {...(mobileDetails ? { [PANEL_STATS_REVEAL_ATTR]: "hidden" } : null)}
             >
-              <DetailsScoreboardPanel
-                loading={loading}
-                // El pie de estadísticas de Trakt llega en su propia consulta
-                // y, al montarse, hacía crecer el panel y empujaba hacia
-                // abajo las pestañas. Con esto el panel nace ya con su alto
-                // final. `scoreboardResolved` se marca en TODAS las salidas
-                // de esa consulta —incluida "este título no está en
-                // Trakt"—, así que el hueco siempre acaba liberándose.
-                statsPending={!data.scoreboardResolved}
-                tmdb={scoreboardTmdb}
-                trakt={scoreboardTrakt}
-                traktPublic={null}
-                imdb={scoreboardImdb}
-                // Ver `optionalScoreBadge`: fuera de la ficha de teléfono, y con
-                // hueco reservado mientras la respuesta de OMDb está en vuelo.
-                rt={optionalScoreBadge(data.rtScore, ratingLinks.rt)}
-                mc={optionalScoreBadge(data.mcScore, ratingLinks.mc)}
-                mobileScoresOnly={mobileDetails}
-                // En tablet la ventana supera `sm` aunque el drawer sea
-                // estrecho: sin esto el marcador salía con la disposición
-                // ancha y puntuaciones y stats se partían en dos filas.
-                phoneLayout={mobileDetails}
-                externalLinks={externalLinks}
-                externalLinksWikipedia={wikipediaQuery}
-                onMorePlatforms={(event) => {
-                  stopNestedModalOpeningEvent(event);
-                  setPlatformsOpen(true);
-                }}
-                platformsMenuOnly
-                onMoreLinks={(event) => {
-                  stopNestedModalOpeningEvent(event);
-                  setExternalLinksOpen(true);
-                }}
-                externalLinksMenuOnly
-                showExternalLinksLabel
-                share={{
-                  title,
-                  text: `Echa un vistazo a ${title} en The Show Verse`,
-                  url:
-                    typeof window !== "undefined" && item?.id
-                      ? `${window.location.origin}/details/${mediaType}/${item.id}`
-                      : undefined,
-                  card: shareCard,
-                  story: shareStory,
-                }}
-                stats={scoreStats}
-                statsTrailing={
-                  showFollowingActivity ? (
-                    <FollowingActivityAvatars
-                      data={followingActivity}
-                      mediaType={mediaType}
-                      onOpen={openFollowingActivity}
-                    />
-                  ) : null
-                }
-                showFavoritedStat={!isEpisode}
-                className={mobileDetails ? "col-span-2" : "max-sm:-mx-2 max-sm:w-[calc(100%+1rem)]"}
-              />
+              {renderScoreboardPanel(mobileDetails ? "col-span-2" : "max-sm:-mx-2 max-sm:w-[calc(100%+1rem)]")}
               {/* TELÉFONO: Plataformas, Actividad (si tus amigos han tocado
                   el título), Enlaces y Compartir en una fila de iconos bajo
                   el marcador, como en la ficha móvil. Cada uno abre su modal. */}
@@ -4891,26 +5135,7 @@ export default function DetailModal({
         </div>
       </motion.div>
 
-      {/* `data-detail-modal-layer` marca esta capa para que el cierre por clic
-          fuera del drawer la reconozca como "dentro". Al ir portada a
-          document.body queda fuera del panel, y sin esta marca un clic en
-          cualquiera de estos modales cerraría el drawer que hay debajo.
-          El div envoltorio es inerte: no crea contexto de apilamiento (sin
-          transform/opacity/z-index) y todos sus hijos son `fixed`, así que no
-          altera su posicionamiento. */}
-      {modalHostReady
-        ? createPortal(
-            <div
-              data-detail-modal-layer=""
-              onPointerDown={stopNestedModalEvent}
-              onMouseDown={stopNestedModalEvent}
-              onClick={stopNestedModalEvent}
-            >
-              {modalLayer}
-            </div>,
-            document.body,
-          )
-        : modalLayer}
+      {portaledModalLayer}
     </div>
   );
 }

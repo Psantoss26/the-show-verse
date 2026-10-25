@@ -99,6 +99,7 @@ import {
 import DetailModalProvider, {
   useDetailModal,
 } from "@/components/dashboard/DetailModalProvider";
+import { titlePeekAttrs } from "@/lib/navigation/titlePeek.mjs";
 import PreviewTrailerAudioButton, {
   usePreviewTrailerAudio,
 } from "@/components/dashboard/PreviewTrailerAudioControl";
@@ -3056,6 +3057,7 @@ export function Row({
                   type="button"
                   className="block h-full w-full cursor-pointer text-left"
                   onClick={() => openDetailModal?.(m)}
+                  {...titlePeekAttrs(m)}
                   aria-label={`Abrir vista previa de ${m.title || m.name || "este título"}`}
                 >
                   <PosterImage
@@ -3322,6 +3324,7 @@ function TraktMixedRow({ title, items, isMobile, hydrated }) {
                       type="button"
                       className="block h-full w-full cursor-pointer text-left"
                       onClick={() => openDetailModal?.(m)}
+                      {...titlePeekAttrs(m, type)}
                       aria-label={`Abrir vista previa de ${m.title || m.name || "este título"}`}
                     >
                       <div className="w-full h-full">
@@ -3842,6 +3845,7 @@ function TopRatedHero({
                           onFocus={() => handleTopRatedCardEnter(movie)}
                           onBlur={() => handleTopRatedCardLeave(movie)}
                           onClick={() => openDetailModal?.(movie)}
+                          {...titlePeekAttrs(movie, mediaType)}
                           aria-label={`Abrir vista previa de ${movie.title || movie.name || "este título"}`}
                         >
                           <div className="relative rounded-xl bg-neutral-900 aspect-[16/9]" />
@@ -3860,6 +3864,7 @@ function TopRatedHero({
                         onFocus={() => handleTopRatedCardEnter(movie)}
                         onBlur={() => handleTopRatedCardLeave(movie)}
                         onClick={() => openDetailModal?.(movie)}
+                        {...titlePeekAttrs(movie, mediaType)}
                         aria-label={`Abrir vista previa de ${movie.title || movie.name || "este título"}`}
                       >
                         <motion.div className="relative cursor-pointer overflow-hidden rounded-xl aspect-[16/9] bg-neutral-900 group/hero">
