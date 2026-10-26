@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import OptimizedImage from "@/components/OptimizedImage";
-import { Search, Trash2, Plus, Loader2, ImageOff, Check, Film, Tv } from "lucide-react";
+import Link from "next/link";
+import { Search, Trash2, Plus, Loader2, ImageOff, Check, Film, Tv, Lock } from "lucide-react";
+import useEntitlements from "@/hooks/useEntitlements";
 import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
 
 const MAX_PER_TYPE = 5;
@@ -37,7 +39,7 @@ function payloadItem(item) {
   };
 }
 
-function FavoriteRow({ type, items, loaded, onRemove, onReorder, onAddRequest }) {
+function FavoriteRow({ type, items, loaded, maxAllowed, onRemove, onReorder, onAddRequest }) {
   const label = type === "movie" ? "Películas favoritas" : "Series favoritas";
   const RowIcon = type === "movie" ? Film : Tv;
   const posterItems = useEnglishPosterItems(items);
@@ -129,7 +131,7 @@ function FavoriteRow({ type, items, loaded, onRemove, onReorder, onAddRequest })
           <RowIcon className="h-3.5 w-3.5 text-emerald-400/80" aria-hidden="true" />
           {label}
         </h4>
-        <span className="text-xs tabular-nums text-zinc-500">{items.length}/{MAX_PER_TYPE}</span>
+        <span className="text-xs tabular-nums text-zinc-500">{items.length}/{maxAllowed}</span>
       </div>
       <div className="grid grid-cols-5 gap-2.5 sm:gap-4">
         {Array.from({ length: MAX_PER_TYPE }).map((_, index) => {
@@ -199,6 +201,20 @@ function FavoriteRow({ type, items, loaded, onRemove, onReorder, onAddRequest })
               </div>
             );
           }
+          // Hueco por encima del límite del plan: lleva a /planes.
+          if (index >= maxAllowed) {
+            return (
+              <Link
+                key={`locked-${type}-${index}`}
+                href="/planes"
+                aria-label="Más favoritos destacados con Pro"
+                className="flex aspect-[2/3] flex-col items-center justify-center gap-1 rounded-md border border-dashed border-emerald-400/20 bg-emerald-500/[0.03] text-emerald-400/60 transition-colors hover:bg-emerald-500/[0.08] hover:text-emerald-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+              >
+                <Lock className="h-4 w-4" aria-hidden="true" />
+                <span className="text-[10px] font-bold uppercase tracking-wider">Pro</span>
+              </Link>
+            );
+          }
           // Hueco libre: lleva al buscador, que es donde se añade.
           return (
             <button
@@ -249,6 +265,10 @@ function FavoriteRow({ type, items, loaded, onRemove, onReorder, onAddRequest })
 // Editor de favoritos destacados: cinco películas y cinco series, guardadas
 // por separado para que una categoría nunca desplace a la otra.
 export default function ProfileFavoritesEditor({ panelClassName = "" }) {
+  // El plan limita cuántos se pueden AÑADIR (gratis: 3 por tipo); los que ya
+  // estaban guardados por encima del límite se conservan.
+  const { limits } = useEntitlements();
+  const maxPerType = Math.min(MAX_PER_TYPE, limits?.profileFavoritesPerType ?? MAX_PER_TYPE);
   const [itemsByType, setItemsByType] = useState(EMPTY_FAVORITES);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -350,7 +370,7 @@ export default function ProfileFavoritesEditor({ panelClassName = "" }) {
     const type = candidate?.mediaType;
     if (type !== "movie" && type !== "tv") return;
     const currentItems = itemsByType[type];
-    if (currentItems.length >= MAX_PER_TYPE || currentItems.some((item) => keyOf(item) === keyOf(candidate))) return;
+    if (currentItems.length >= maxPerType || currentItems.some((item) => keyOf(item) === keyOf(candidate))) return;
     const next = {
       ...itemsByType,
       [type]: [...currentItems, payloadItem(candidate)],
@@ -386,7 +406,7 @@ export default function ProfileFavoritesEditor({ panelClassName = "" }) {
     persist(next);
   };
 
-  const completelyFull = itemsByType.movie.length >= MAX_PER_TYPE && itemsByType.tv.length >= MAX_PER_TYPE;
+  const completelyFull = itemsByType.movie.length >= maxPerType && itemsByType.tv.length >= maxPerType;
 
   const focusSearch = () => {
     searchInputRef.current?.focus();
@@ -409,7 +429,7 @@ export default function ProfileFavoritesEditor({ panelClassName = "" }) {
           <span className="flex shrink-0 items-center gap-1.5 text-xs tabular-nums text-zinc-500" aria-live="polite">
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-label="Guardando" /> : null}
             {!saving && savedTick ? <Check className="h-3.5 w-3.5 text-emerald-400" aria-label="Guardado" /> : null}
-            {itemsByType.movie.length + itemsByType.tv.length}/{MAX_PER_TYPE * 2}
+            {itemsByType.movie.length + itemsByType.tv.length}/{maxPerType * 2}
           </span>
         </div>
         <p className="mt-2 text-xs sm:text-sm text-zinc-400 leading-relaxed">
@@ -474,8 +494,8 @@ export default function ProfileFavoritesEditor({ panelClassName = "" }) {
       )}
 
       <div className="space-y-7">
-        <FavoriteRow type="movie" items={itemsByType.movie} loaded={loaded} onRemove={remove} onReorder={reorder} onAddRequest={focusSearch} />
-        <FavoriteRow type="tv" items={itemsByType.tv} loaded={loaded} onRemove={remove} onReorder={reorder} onAddRequest={focusSearch} />
+        <FavoriteRow type="movie" items={itemsByType.movie} loaded={loaded} maxAllowed={maxPerType} onRemove={remove} onReorder={reorder} onAddRequest={focusSearch} />
+        <FavoriteRow type="tv" items={itemsByType.tv} loaded={loaded} maxAllowed={maxPerType} onRemove={remove} onReorder={reorder} onAddRequest={focusSearch} />
       </div>
     </section>
   );

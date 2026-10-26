@@ -38,6 +38,7 @@ async function authPlugin(fastify) {
           plan: users.plan,
           planExpiresAt: users.planExpiresAt,
           isActive: users.isActive,
+          createdAt: users.createdAt,
         })
         .from(users)
         .where(eq(users.id, payload.sub))

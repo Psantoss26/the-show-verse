@@ -824,7 +824,20 @@ function CreateListModal({ open, onClose, onCreate, creating, error }) {
               placeholder="De qué trata esta lista..."
             />
           </div>
-          {error && <p className="text-red-400 text-xs">{error}</p>}
+          {error && (
+            <p className="text-red-400 text-xs">
+              {error}
+              {/* Límite de listas del plan (ver backendLists.js). */}
+              {/Con Pro/.test(String(error)) ? (
+                <>
+                  {" "}
+                  <Link href="/planes" className="font-bold text-emerald-400 underline-offset-2 hover:underline">
+                    Ver planes
+                  </Link>
+                </>
+              ) : null}
+            </p>
+          )}
 
           <div className="flex gap-3 pt-1">
             <button

@@ -17,7 +17,15 @@ async function api(path, init = {}) {
   });
   let json = null;
   try { json = await res.json(); } catch { json = null; }
-  if (!res.ok) throw new Error(json?.error || json?.message || 'Error en la operación de listas');
+  if (!res.ok) {
+    // Límite de listas del plan (402 plan_limit): mensaje que lleva a /planes.
+    if (json?.code === 'plan_limit') {
+      const error = new Error(`Tu plan permite hasta ${json.limit} listas. Con Pro son ilimitadas.`);
+      error.code = 'plan_limit';
+      throw error;
+    }
+    throw new Error(json?.error || json?.message || 'Error en la operación de listas');
+  }
   return json || {};
 }
 

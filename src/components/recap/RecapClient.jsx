@@ -9,11 +9,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import { useCallback, useEffect, useState } from "react";
-import { LogIn, RefreshCw, X } from "lucide-react";
+import { LogIn, RefreshCw, Sparkles, X } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
 import { fetchRecap, getCachedRecap } from "@/lib/recap/recapCache";
 import useBodyScrollLock from "@/hooks/useBodyScrollLock";
+import useEntitlements from "@/hooks/useEntitlements";
 import RecapStory from "./RecapStory";
 import { ANTON } from "./recapUi";
 
@@ -92,6 +93,7 @@ function Message({ title, children, onClose }) {
 export default function RecapClient({ year = null }) {
   const router = useRouter();
   const { authenticated, hydrated, account, user } = useAuth();
+  const { has, ready: entitlementsReady } = useEntitlements();
   // Si la vista previa del Perfil ya lo pidió, se abre al instante.
   const [state, setState] = useState(() => {
     const cached = getCachedRecap(year);
@@ -135,6 +137,22 @@ export default function RecapClient({ year = null }) {
     username: account?.username || user?.username || "",
     name: account?.displayName || user?.name || "",
   };
+
+  // Recap es de Pro. Se decide con los derechos ya cargados: mientras tanto
+  // sigue su curso normal (nunca un bloqueo por un instante).
+  if (authenticated && entitlementsReady && !has("recap")) {
+    return (
+      <Message title="Tu año es Pro" onClose={close}>
+        <p>El resumen anual forma parte de Pro: tu serie y película del año, tu banda sonora y tu perfil de espectador, listos para compartir.</p>
+        <Link
+          href="/planes"
+          className="inline-flex items-center gap-2 rounded-full bg-[#c6f432] px-6 py-3 font-bold text-black transition-transform hover:scale-[1.03] focus:outline-none focus-visible:ring-4 focus-visible:ring-white/70"
+        >
+          <Sparkles aria-hidden="true" className="h-5 w-5" /> Ver planes
+        </Link>
+      </Message>
+    );
+  }
 
   if (state.status === "ready") {
     return <RecapStory key={state.data.year} recap={state.data} user={recapUser} onClose={close} />;

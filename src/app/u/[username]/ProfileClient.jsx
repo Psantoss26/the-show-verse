@@ -39,6 +39,7 @@ import {
 import { prefetchNeuralGraph } from "@/lib/profile/neuralGraphData";
 import NeuralGraphSkeleton from "@/components/profile/neural/NeuralGraphSkeleton";
 import NeuralPreviewCard from "@/components/profile/neural/NeuralPreviewCard";
+import ProGate from "@/components/billing/ProGate";
 import PageStatCard from "@/components/ui/PageStatCard";
 import {
   Activity,
@@ -1222,6 +1223,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
           </div>
         ) : tab === "statistics" ? (
           <div className={`${entry} sv-profile-entry--content mt-8`}>
+            <ProGate feature="stats">
             {isSelf ? <RecapPromoBanner className="mb-6" /> : null}
             {resolvedAnalytics ? (
               <ProfileAnalytics analytics={resolvedAnalytics} />
@@ -1234,18 +1236,21 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
                 </p>
               </section>
             )}
+            </ProGate>
           </div>
         ) : tab === "neuronal" ? (
           <div className={`${entry} sv-profile-entry--content mt-3 @[640px]/detail-page:mt-6`}>
-            <NeuralGraphView
-              username={user.username}
-              headerCollapsed={neuralHeaderCollapsed}
-              onToggleHeader={() => {
-                const next = !neuralHeaderCollapsed;
-                setNeuralHeaderCollapsed(next);
-                saveNeuralPreferences(viewerId, { headerCollapsed: next });
-              }}
-            />
+            <ProGate feature="neural">
+              <NeuralGraphView
+                username={user.username}
+                headerCollapsed={neuralHeaderCollapsed}
+                onToggleHeader={() => {
+                  const next = !neuralHeaderCollapsed;
+                  setNeuralHeaderCollapsed(next);
+                  saveNeuralPreferences(viewerId, { headerCollapsed: next });
+                }}
+              />
+            </ProGate>
           </div>
         ) : tab !== "profile" ? (
           <div className={`${entry} sv-profile-entry--content mt-5 @[640px]/detail-page:mt-6`}>

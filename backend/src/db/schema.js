@@ -282,8 +282,10 @@ export const subscriptions = pgTable('subscriptions', {
   userId: uuid('user_id').notNull().references(() => users.id),
   stripeCustomerId: text('stripe_customer_id').unique(),
   stripeSubscriptionId: text('stripe_subscription_id').unique(),
-  plan: text('plan').notNull(),                           // 'pro' | 'family'
-  status: text('status').notNull(),                       // 'active' | 'cancelled' | 'past_due'
+  plan: text('plan').notNull(),                           // 'adfree' | 'pro'
+  status: text('status').notNull(),                       // estado de Stripe: 'trialing' | 'active' | 'past_due' | 'canceled' | …
+  billingInterval: text('billing_interval'),              // 'month' | 'year'
+  cancelAtPeriodEnd: boolean('cancel_at_period_end').default(false).notNull(),
   currentPeriodStart: timestamp('current_period_start', { withTimezone: true }),
   currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }),
   cancelledAt: timestamp('cancelled_at', { withTimezone: true }),

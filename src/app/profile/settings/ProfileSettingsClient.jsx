@@ -52,6 +52,7 @@ import {
   Tv,
   ThumbsUp,
   Users,
+  Sparkles,
 } from "lucide-react";
 import {
   DEFAULT_MOBILE_BOTTOM_NAV,
@@ -67,6 +68,9 @@ import AndroidSyncPanel from "@/components/settings/AndroidSyncPanel";
 import LetterboxdImportPanel from "@/components/settings/LetterboxdImportPanel";
 import ImdbImportPanel from "@/components/settings/ImdbImportPanel";
 import DataExportPanel from "@/components/settings/DataExportPanel";
+import SubscriptionPanel from "@/components/settings/SubscriptionPanel";
+import useEntitlements from "@/hooks/useEntitlements";
+import { planName } from "@/lib/billing/plans";
 import LetterboxdConnectionCard from "@/components/settings/LetterboxdConnectionCard";
 import { pairDevice, pairSyncApp, readSyncStatus, useSyncStatus } from "@/lib/android/appBridge";
 import { buildSyncPairLinks } from "@/lib/android/syncPairLink";
@@ -1626,6 +1630,8 @@ function ProfileSettingsClient() {
   } = useAuth();
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState("user");
+  const { has: hasFeature, plan: effectivePlan, billingEnabled } = useEntitlements();
+  const plexLocked = !hasFeature("plex");
   const settingsSwipe = useRef(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -1913,6 +1919,13 @@ function ProfileSettingsClient() {
     // se vea el estado actualizado y limpia el parámetro de la URL.
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
+      // Vuelta del portal de Stripe (?tab=subscription).
+      if (params.get("tab") === "subscription") {
+        setActiveTab("subscription");
+        params.delete("tab");
+        const qs = params.toString();
+        window.history.replaceState({}, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
+      }
       if (params.has("spotify") || params.has("plex")) {
         setActiveTab("connections");
         params.delete("spotify");
@@ -2237,6 +2250,7 @@ function ProfileSettingsClient() {
     { id: "preferences", label: t("settings_personal", "Preferencias"), icon: Settings },
     { id: "imports", label: t("settings_imports", "Datos"), icon: DownloadCloud },
     { id: "connections", label: t("settings_connections", "Conexiones"), icon: Link2 },
+    { id: "subscription", label: t("settings_subscription", "Suscripción"), icon: Sparkles },
   ];
 
   // Deslizar en móvil pasa a la sección contigua, como en el Perfil. El gesto
@@ -2349,9 +2363,13 @@ function ProfileSettingsClient() {
             </div>
           </div>
           <div className="shrink-0 flex items-center ml-auto">
-            <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full shadow-sm whitespace-nowrap">
-              Plan {user?.plan || "free"}
-            </span>
+            <button
+              type="button"
+              onClick={() => setActiveTab("subscription")}
+              className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 px-3 py-1 rounded-full shadow-sm whitespace-nowrap transition"
+            >
+              {billingEnabled ? `Plan ${planName(effectivePlan)}` : "Planes"}
+            </button>
           </div>
         </div>
 
@@ -2659,6 +2677,19 @@ function ProfileSettingsClient() {
                 </motion.div>
               )}
 
+              {activeTab === "subscription" && (
+                <motion.div
+                  key="subscription"
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  transition={{ duration: 0.25 }}
+                  className="space-y-6"
+                >
+                  <SubscriptionPanel panelClassName={GLASS_PANEL} />
+                </motion.div>
+              )}
+
               {activeTab === "connections" && (
                 <motion.div
                   key="connections"
@@ -2876,7 +2907,9 @@ function ProfileSettingsClient() {
                         <p className="mt-1 text-xs sm:text-sm text-zinc-400 leading-relaxed">
                           {plex.connected
                             ? `Conectado${plex.account?.username ? ` como ${plex.account.username}` : ""}${plex.server?.name ? "" : " · No se detectó ningún servidor"}.`
-                            : "Conecta tu cuenta de Plex (inicio de sesión en plex.tv) y detectaremos tu servidor local automáticamente, sin tokens ni configuración manual."}
+                            : plexLocked
+                              ? "La sincronización con tu servidor Plex está incluida en Pro."
+                              : "Conecta tu cuenta de Plex (inicio de sesión en plex.tv) y detectaremos tu servidor local automáticamente, sin tokens ni configuración manual."}
                         </p>
                         {plex.connected && plex.server && (
                           <p className="mt-1.5 text-xs sm:text-sm font-bold leading-relaxed">
@@ -2904,6 +2937,16 @@ function ProfileSettingsClient() {
                     </div>
                     {plex.connected ? (
                       <div className="flex flex-col gap-2 self-start sm:self-auto shrink-0">
+                        {plexLocked ? (
+                          <Link
+                            href="/planes"
+                            aria-label="Plex es una función Pro: ver planes"
+                            className="min-h-10 px-3 sm:px-5 rounded-xl bg-emerald-400/10 hover:bg-emerald-400/20 text-xs sm:text-sm font-bold text-emerald-300 transition flex items-center justify-center gap-2 self-start sm:self-auto shrink-0"
+                          >
+                            <Sparkles className="h-4 w-4" aria-hidden="true" />
+                            <span className="hidden sm:inline">Pro</span>
+                          </Link>
+                        ) : (
                         <button data-online-only="true"
                           type="button"
                           onClick={handleSyncPlex}
@@ -2919,6 +2962,7 @@ function ProfileSettingsClient() {
                           )}
                           <span className="hidden sm:inline">{plexSync.running ? "Sincronizando…" : "Sincronizar"}</span>
                         </button>
+                        )}
                         <button data-online-only="true"
                           type="button"
                           onClick={handleDisconnectPlex}
@@ -2930,6 +2974,15 @@ function ProfileSettingsClient() {
                           <span className="hidden sm:inline">Desconectar</span>
                         </button>
                       </div>
+                    ) : plexLocked ? (
+                      <Link
+                        href="/planes"
+                        aria-label="Plex es una función Pro: ver planes"
+                        className="min-h-10 px-3 sm:px-5 rounded-xl bg-emerald-400/10 hover:bg-emerald-400/20 text-xs sm:text-sm font-bold text-emerald-300 transition flex items-center justify-center gap-2 self-start sm:self-auto shrink-0"
+                      >
+                        <Sparkles className="h-4 w-4" aria-hidden="true" />
+                        <span className="hidden sm:inline">Pro</span>
+                      </Link>
                     ) : (
                       <button data-online-only="true"
                         type="button"

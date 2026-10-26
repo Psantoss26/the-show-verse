@@ -1,6 +1,7 @@
 // /src/components/MainDashboardClient.jsx
 "use client";
 
+import AdSlot from "@/components/billing/AdSlot";
 import { useRef, useEffect, useState, useMemo, useCallback, memo } from "react";
 import DashboardPreviewGlass from "@/components/dashboard/DashboardPreviewGlass";
 import RowNavGlass, { ROW_NAV_FADE } from "@/components/dashboard/RowNavGlass";
@@ -4350,11 +4351,24 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
                 />
               );
             };
+            let genericRowCount = 0;
             for (const row of visibleEngineRows) {
               // "Más esperadas" y "Tendencias" se pintan tras el bloque superior,
               // no en su sitio.
               if (row.key === "anticipated" || row.key === "trending") continue;
               nodes.push(renderGenericRow(row));
+              // Un hueco de anuncio cada 4 filas (no ocupa sitio si el plan no
+              // lleva anuncios o no hay red configurada: ver AdSlot).
+              genericRowCount += 1;
+              if (genericRowCount % 4 === 0) {
+                nodes.push(
+                  <AdSlot
+                    key={`ad-${genericRowCount}`}
+                    slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_DASHBOARD}
+                    className="my-6 px-4 sm:px-8"
+                  />,
+                );
+              }
               // Justo tras la 1ª fila (Recomendaciones de hoy para ti) va el
               // bloque, seguido de "Tendencias ahora mismo".
               if (!blockInserted) {

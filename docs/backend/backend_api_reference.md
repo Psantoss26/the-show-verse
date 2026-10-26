@@ -317,6 +317,20 @@ Ver [social-y-perfiles](../features/social-y-perfiles.md).
 | `GET` | `/v1/streaming/detections/{id}` | Si | Una deteccion |
 | `POST` | `/v1/streaming/detections/{id}/correction` | Si | «No habia ficha» / «es otro titulo» |
 
+## Planes y facturacion
+
+`backend/src/routes/billing.js`. Ver [planes y suscripciones](../features/planes-y-suscripciones.md).
+
+| Metodo | Ruta | Auth | Descripcion |
+| --- | --- | --- | --- |
+| `GET` | `/v1/billing/plans` | No | Catalogo de planes y `billingEnabled` |
+| `GET` | `/v1/billing/me` | Si | `entitlements` (plan efectivo, anuncios, funciones, limites, origen), `subscription` y `portalAvailable` |
+| `POST` | `/v1/billing/checkout` | Si | `{ plan: 'adfree'\|'pro', interval: 'month'\|'year' }` → `{ url }` de Stripe Checkout; 503 `billing_unavailable` si la facturacion esta apagada |
+| `POST` | `/v1/billing/portal` | Si | `{ url }` del portal de cliente; 404 `no_customer` sin suscripcion previa |
+| `POST` | `/v1/billing/webhook` | Firma Stripe | Eventos de Stripe sobre el cuerpo crudo; sincroniza `subscriptions` y `users.plan` |
+
+`POST /v1/lists` responde 402 `plan_limit` (con `limit`) cuando el plan no permite mas listas.
+
 ## TMDb cache/proxy
 
 | Metodo | Ruta | Descripcion |

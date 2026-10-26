@@ -6,6 +6,7 @@ import { db } from '../db/client.js';
 import { userLists, userListItems } from '../db/schema.js';
 import { eq, and, asc, desc, sql } from 'drizzle-orm';
 import { getMediaMetadataMap, metadataFor } from '../utils/mediaMetadata.js';
+import { getEntitlements } from '../lib/billing/plans.js';
 import { buildRatingSummary, hydrateListRatings, isMissingVoteAverageColumn } from '../utils/listRatings.js';
 import {
   getUserListCommunityId,
@@ -122,6 +123,23 @@ export default async function listsRoutes(fastify) {
     const parsed = listSchema.safeParse(req.body);
     if (!parsed.success) {
       return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
+    }
+
+    // Límite de listas propias del plan (Pro no tiene).
+    const maxLists = getEntitlements(req.user).limits.lists;
+    if (maxLists != null) {
+      const [{ count }] = await db
+        .select({ count: sql`count(*)::int` })
+        .from(userLists)
+        .where(eq(userLists.userId, req.user.id));
+      if (count >= maxLists) {
+        return reply.status(402).send({
+          error: `Your plan allows up to ${maxLists} lists`,
+          code: 'plan_limit',
+          limit: maxLists,
+          feature: 'unlimitedLists',
+        });
+      }
     }
 
     const [list] = await db

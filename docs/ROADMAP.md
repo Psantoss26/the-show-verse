@@ -18,12 +18,13 @@ Estado de lo planificado y lo que queda por hacer. Revisado el 22-10-2026 contra
 | [[2026-07-08-community-content-migration]] | ✅ Hecho | `backend/src/community/`. Ver [[comunidad]]. |
 | [[2026-06-23-featured-hero-inicio-design]] | ✅ Hecho | `FeaturedHero` implementado; hoy se usa en Películas y Series. |
 | [[dashboard-recommendations-improvement-plan]] | 🟡 Parcial | Mejoras de criterio aplicadas en octubre; sin medición formal. |
+| [[2026-10-26-planes-de-pago-design]] | 🟡 Parcial | Planes, Stripe, `/planes`, Ajustes → Suscripción y bloqueos Pro hechos y apagados (`BILLING_ENABLED`). Falta: acuerdo comercial con TMDB, configurar Stripe, conectar una red de anuncios con su consentimiento (CMP) y aplicar en el backend los bloqueos de estadísticas, recap y vista neuronal. Ver [[planes-y-suscripciones]]. |
 | [[vercel-resource-optimization-plan]] | 🟡 Parcial | Muchas rutas ya pasan por el backend (dashboards, historial, progreso, ratings, estados). Falta medir en Vercel y revisar `middleware.js` e imágenes. |
 
 ## Pendiente
 
 - **Terminar de retirar Trakt del frontend:** 26 ficheros de `src/` (fuera de `src/app/api`) siguen llamando a `/api/trakt/*` (historial, estadísticas, temporadas, scoreboard…). Ver *Gaps conocidos* en [[backend_api_reference]].
-- **Sincronización de streaming al nivel de Trakt** (ver [[trakt-comparativa-sync]]): panel de conexiones por servicio con estado y «última sincronización», Plex/Jellyfin por webhook desde el backend, escritura hacia Trakt (scrobble) con OAuth en el backend, número de episodio absoluto para anime y marcas `last_activities` para sincronizaciones delta.
+- **Sincronización de streaming al nivel de Trakt** (ver [[trakt-comparativa-sync]]): panel de conexiones por servicio con estado y «última sincronización», registro de sincronizaciones con deshacer y elementos omitidos visibles, Plex/Jellyfin por webhook desde el backend, escritura hacia Trakt (scrobble) con OAuth en el backend, número de episodio absoluto para anime y marcas `last_activities` para sincronizaciones delta.
 - **Sentimiento con LLM:** `generateSentiment` (Ollama) existe en `backend/src/community/sentiment.js` pero no se usa; hoy se usan los temas de Trakt o la heurística.
 - **Publicar la app en Google Play:** pasos pendientes (firma, permisos sensibles…) en [[android-play-store]].
 - **Medir el consumo de Vercel** antes y después del plan de optimización.

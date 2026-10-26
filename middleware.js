@@ -25,6 +25,8 @@ const PUBLIC_API_ROUTES = new Set([
     '/api/netflix/extension-import',
     '/api/netflix/extension-progress',
     '/api/netflix/detection-rules',
+    // Stripe: autenticado por la firma del evento, que el backend verifica.
+    '/api/billing/webhook',
 ])
 // Registro de detecciones de la app Android (también The Show Verse Sync, que no
 // tiene WebView ni cookie de dispositivo): mismo caso que las rutas de arriba,

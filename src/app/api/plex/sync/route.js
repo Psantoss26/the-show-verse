@@ -110,6 +110,17 @@ export async function POST(request) {
     return NextResponse.json({ error: "items array is required" }, { status: 400 });
   }
 
+  // La sincronización con Plex es de Pro. Solo se bloquea con una respuesta
+  // clara del backend: si no contesta, la importación sigue como antes.
+  const billing = await backendFetchJson(request, "/v1/billing/me");
+  const features = billing.ok ? billing.json?.entitlements?.features : null;
+  if (Array.isArray(features) && !features.includes("plex")) {
+    return NextResponse.json(
+      { error: "Plex sync is a Pro feature", code: "plan_required", feature: "plex" },
+      { status: 402 },
+    );
+  }
+
   // Limitamos por seguridad para no abusar del backend en una sola llamada.
   const slice = items.slice(0, 200);
   let added = 0;

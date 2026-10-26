@@ -38,6 +38,7 @@ import communityRoutes from './routes/community.js';
 import pushRoutes from './routes/push.js';
 import levelRoutes from './routes/level.js';
 import streamingDetectionsRoutes from './routes/streamingDetections.js';
+import billingRoutes from './routes/billing.js';
 import { refreshAllPools } from './dashboard/pools.js';
 import { syncAllLetterboxdAccounts } from './lib/letterboxdSync.js';
 
@@ -272,6 +273,7 @@ const apiV1 = async (app) => {
   app.register(communityRoutes, { prefix: '/community' });
   app.register(pushRoutes, { prefix: '/push' });
   app.register(streamingDetectionsRoutes, { prefix: '/streaming' });
+  app.register(billingRoutes, { prefix: '/billing' });
 };
 
 await fastify.register(apiV1, { prefix: '/v1' });

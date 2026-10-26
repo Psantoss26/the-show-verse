@@ -8,6 +8,7 @@
 // ---------------------------------------------------------------------------
 "use client";
 
+import AdSlot from "@/components/billing/AdSlot";
 import OptimizedImage from "@/components/OptimizedImage";
 import { CoverLayer, ProgressiveCover } from "@/components/details/CoverCrossfade";
 // Premios y encabezados de sección viven en `@/components/details`: la ficha de
@@ -13067,6 +13068,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 </section>
               </>
             )}
+            {/* Hueco de anuncio al final de la ficha (nada si el plan no los
+                lleva o no hay red configurada: ver AdSlot). */}
+            <AdSlot slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_DETAILS} className="mt-12" />
           </div>
         </div>
       </div>
