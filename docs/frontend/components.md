@@ -71,6 +71,7 @@ Subcomponentes y modales usados por `DetailsClient`/`SeasonDetailsClient`/`Episo
 | `PosterStack.jsx` | Pila de pósters superpuestos (colecciones). |
 | `LoadingSkeleton.jsx` | Esqueletos de carga (`PosterSkeleton`, etc.) para estados pendientes. |
 | `ScoreboardBar.jsx` | Barra de puntuaciones agregadas (TMDb/Trakt/IMDb/RT/Metacritic) + acciones (visto, lista, favorito). |
+| `MobileDetailsHero.jsx` | Cabecera móvil inmersiva (`useMobileDetailsHero`) de la ficha, temporadas, episodios, listas y colecciones: portada, botones y marcador; con el scroll despliega la barra de stats del marcador compacto y revela lo que va debajo (píldoras, pestañas, buscador). Un bloque revelado mientras la barra crece lleva una animación aditiva (`composite: 'add'`) sincronizada con la transición de la barra que anula su empuje: entra subiendo hasta su sitio sin pasarse ni volver a bajar. |
 | `StreamingHoverOverlay.jsx` | Overlay al hover sobre un póster: "Ver en" + wordmark/color de la plataforma de streaming. |
 | `SoundtrackModal.jsx` | Modal de banda sonora (Spotify) de un título. |
 | `ExternalLinksModal.jsx` | Modal de enlaces externos (JustWatch, Letterboxd, etc.), bloquea scroll vía `useBodyScrollLock`. En la ficha de título y en DetailModal (también en su vista teléfono) no lista IMDb, TMDb ni Trakt: ya enlazan desde sus puntuaciones del marcador. |

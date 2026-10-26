@@ -94,6 +94,49 @@ function readStatsPendingGrowth(target) {
     }
     return pending
 }
+// Un bloque revelado MIENTRAS se despliega la barra de stats queda debajo de
+// ella: su entrada lo sube y, a la vez, la barra lo empuja hacia abajo lo que
+// le falta por crecer. Con curvas y duraciones distintas (320ms frente a
+// 420ms) la suma subía de más y luego volvía a bajar unos píxeles al parar el
+// dedo. Se le añade (`composite: 'add'`, encima de su entrada) lo que aún le
+// falta por bajar, sincronizado con la transición de la barra (mismo
+// `currentTime`): así el bloque está quieto en su sitio final y solo se ve su
+// propia entrada.
+const statsHoldAnimations = new WeakMap()
+function holdBelowGrowingStats(el, statsTargets) {
+    statsHoldAnimations.get(el)?.cancel()
+    statsHoldAnimations.delete(el)
+    if (typeof el.animate !== 'function') return
+    let top = null
+    for (const target of statsTargets) {
+        for (const row of target.querySelectorAll('[data-scoreboard-stats]')) {
+            // Debajo en PANTALLA, no en el DOM: en la ficha las pestañas van
+            // antes del marcador en el código y detrás con `order`.
+            if (row.contains(el) || el.contains(row)) continue
+            top ??= el.getBoundingClientRect().top
+            if (top < row.getBoundingClientRect().top) continue
+            const transition = row
+                .getAnimations()
+                .find((animation) => animation.transitionProperty === 'grid-template-rows' && animation.playState === 'running')
+            if (!transition) continue
+            // Alto que tendrá la fila desplegada: la transición de la pista
+            // (0fr → 1fr) crece en proporción a su progreso.
+            const growth = Math.max(0, ...[...row.children].map((child) => child.scrollHeight))
+            if (!growth) continue
+            const { duration, easing } = transition.effect.getTiming()
+            const hold = el.animate(
+                [{ transform: `translateY(${growth}px)` }, { transform: 'none' }],
+                { duration, easing, composite: 'add' },
+            )
+            hold.currentTime = transition.currentTime ?? 0
+            statsHoldAnimations.set(el, hold)
+            hold.finished.then(() => {
+                if (statsHoldAnimations.get(el) === hold) statsHoldAnimations.delete(el)
+            }, () => {})
+            return
+        }
+    }
+}
 // Envoltorio del marcador ESTRECHO (listas y colecciones, `--mobile-actions-w`)
 // en modo 'compact': al desplegarse la barra de stats crece también a los
 // lados hasta todo el ancho, a la vez y con la misma curva. La transición solo
@@ -632,7 +675,10 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
             statsApplied = statsVisible
             settled = atTop || (statsVisible && updates.every(({ visible }) => visible))
             updates.forEach(({ el, current, value, visible }) => {
-                if (current !== value) el.setAttribute(MOBILE_REVEAL_ATTR, value)
+                if (current !== value) {
+                    el.setAttribute(MOBILE_REVEAL_ATTR, value)
+                    if (value === 'shown' && statsVisible) holdBelowGrowingStats(el, statsTargets)
+                }
                 if (el.inert === visible) el.inert = !visible
             })
         }
