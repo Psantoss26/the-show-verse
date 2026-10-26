@@ -26,11 +26,13 @@
 //     navegador sintetiza se descarta.
 //
 // Ir a la ficha (tocar la portada): la vista previa NO se cierra. Se navega y
-// se queda tal cual encima mientras la ficha carga; cuando la ficha está en
-// pantalla (ya sin su pantalla de carga) se retira de golpe, sin animación de
-// salida, y ya no vuelve a verse: tampoco al volver atrás.
+// se queda encima mientras la ficha carga, con la página de detrás fundiéndose
+// a oscuro (el color de la ficha) para que no se vea el cambio de página ni su
+// pantalla de carga. Cuando la ficha está en pantalla con su imagen principal
+// cargada, la vista previa se desvanece sobre ella (en el compositor) y ya no
+// vuelve a verse: tampoco al volver atrás.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
@@ -63,6 +65,15 @@ const CLICK_SUPPRESS_MS = 700;
 // Si la ficha no llega a abrirse en este tiempo, la vista previa se retira
 // igualmente (ms).
 const LEAVE_MAX_WAIT_MS = 10000;
+// Con la ficha ya en pantalla, cuánto se espera además a su imagen principal
+// antes de desvanecer la vista previa (ms): sin ella se vería el hero vacío.
+const LEAVE_ART_MAX_WAIT_MS = 1200;
+// Fundido a oscuro de la página de detrás al ir a la ficha y desvanecido de la
+// vista previa cuando la ficha ya está (ms).
+const LEAVE_SCRIM_MS = 220;
+const LEAVE_FADE_MS = 280;
+// Fondo de la ficha (DetailsClient y `details/loading.jsx`).
+const DETAILS_SURFACE = "#101010";
 
 // ¿Está ya la ficha de `href` en pantalla? Su ruta es la de la URL y no queda a
 // la vista ninguna pantalla de carga de ficha (`details/loading.jsx`). Las
@@ -75,6 +86,18 @@ function detailsShown(href) {
   const loading = document.querySelectorAll('[data-details-root][aria-busy="true"]');
   for (const node of loading) {
     if (node.getClientRects().length > 0) return false;
+  }
+  return true;
+}
+
+// ¿Tiene ya la ficha a la vista su imagen principal? (`data-details-sequence-
+// ready`, ver DetailsClient). Una ficha que no lo marca cuenta como lista.
+function detailsArtReady() {
+  const roots = document.querySelectorAll("[data-details-root]");
+  for (const node of roots) {
+    if (node.getClientRects().length === 0) continue;
+    const ready = node.getAttribute("data-details-sequence-ready");
+    if (ready !== null && ready !== "true") return false;
   }
   return true;
 }
@@ -144,23 +167,60 @@ export default function MobileTitlePeek() {
     setPeek(null);
   }, [pathname]);
 
-  // Ida a la ficha: se retira cuando la ficha ya está en pantalla y se ha
-  // pintado al menos un fotograma con ella debajo.
+  // Ida a la ficha: la página de detrás se funde a oscuro (`scrimRef`) y,
+  // cuando la ficha ya está en pantalla con su imagen y se ha pintado al
+  // menos un fotograma con ella debajo, la vista previa entera (`layerRef`) se
+  // desvanece sobre la ficha y se retira. Todo con la API de animaciones y
+  // solo `opacity`: la ficha monta justo entonces y el hilo principal va
+  // cargado, pero el compositor no se frena.
+  const layerRef = useRef(null);
+  const scrimRef = useRef(null);
+  const leaveFadeRef = useRef(null);
   const leavingTo = peek?.leavingTo || null;
+  useLayoutEffect(() => {
+    const scrim = scrimRef.current;
+    if (!leavingTo || !scrim || typeof scrim.animate !== "function") return;
+    scrim.animate([{ opacity: 0 }, { opacity: 1 }], {
+      duration: reduceMotion ? 120 : LEAVE_SCRIM_MS,
+      easing: "ease-out",
+    });
+  }, [leavingTo, reduceMotion]);
   useEffect(() => {
     if (!leavingTo) return undefined;
     let frame = 0;
     let cancelled = false;
     const startedAt = performance.now();
+    let shownAt = 0;
+    const fadeOut = () => {
+      const layer = layerRef.current;
+      if (!layer || typeof layer.animate !== "function") {
+        removeInstantly();
+        return;
+      }
+      layer.style.pointerEvents = "none";
+      const fade = layer.animate([{ opacity: 1 }, { opacity: 0 }], {
+        duration: reduceMotion ? 120 : LEAVE_FADE_MS,
+        easing: "cubic-bezier(0.33, 0, 0.2, 1)",
+        fill: "forwards",
+      });
+      leaveFadeRef.current = fade;
+      const done = () => {
+        if (!cancelled) removeInstantly();
+      };
+      fade.finished.then(done, done);
+    };
     const check = () => {
       if (cancelled) return;
+      const now = performance.now();
+      if (!shownAt && detailsShown(leavingTo)) shownAt = now;
       if (
-        detailsShown(leavingTo) ||
-        performance.now() - startedAt > LEAVE_MAX_WAIT_MS
+        (shownAt &&
+          (detailsArtReady() || now - shownAt > LEAVE_ART_MAX_WAIT_MS)) ||
+        now - startedAt > LEAVE_MAX_WAIT_MS
       ) {
         frame = window.requestAnimationFrame(() => {
           frame = window.requestAnimationFrame(() => {
-            if (!cancelled) removeInstantly();
+            if (!cancelled) fadeOut();
           });
         });
         return;
@@ -172,7 +232,15 @@ export default function MobileTitlePeek() {
       cancelled = true;
       window.cancelAnimationFrame(frame);
     };
-  }, [leavingTo, removeInstantly]);
+  }, [leavingTo, removeInstantly, reduceMotion]);
+  // Retirada ya la vista previa, la capa vuelve a estar visible para la
+  // siguiente (antes de pintar: no hay fotograma intermedio).
+  useLayoutEffect(() => {
+    if (peek || !leaveFadeRef.current) return;
+    leaveFadeRef.current.cancel();
+    leaveFadeRef.current = null;
+    if (layerRef.current) layerRef.current.style.pointerEvents = "";
+  }, [peek]);
 
   // Estado del gesto en curso. En un ref: cambia en cada `touchmove` y no debe
   // re-renderizar nada.
@@ -358,7 +426,17 @@ export default function MobileTitlePeek() {
   if (!portalReady) return null;
 
   return createPortal(
-    <div data-sv-no-peek="">
+    <div data-sv-no-peek="" ref={layerRef}>
+      {/* Detrás de la vista previa mientras se va a la ficha: tapa la página
+          que se deja y la pantalla de carga con el fondo de la ficha. */}
+      {leavingTo && (
+        <div
+          ref={scrimRef}
+          aria-hidden="true"
+          className="fixed inset-0 z-[9998]"
+          style={{ backgroundColor: DETAILS_SURFACE }}
+        />
+      )}
       <AnimatePresence key={presenceKey}>
         {peek?.item.media_type === "season" ? (
           <SeasonPeek
