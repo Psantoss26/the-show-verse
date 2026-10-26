@@ -84,6 +84,10 @@ y el año (`releaseYear`), marcada con `identitySource: "netflix_metadata"`:
   la detección no cambie de identidad a mitad. Si no llegan o fallan, se sigue con
   el DOM como antes y se reintenta al cabo de un minuto.
 - **Solo en el reproductor.** Fuera de `/watch/` (avances del catálogo) no se usa.
+- **Numeración de Netflix.** `seq` es la de Netflix: temporadas partidas («Parte 2»
+  es otra temporada) y, en anime, episodios absolutos. El servidor los pasa a la
+  numeración de TMDb (ver *Numeración de la plataforma frente a TMDb* en
+  `docs/streaming-sync-reliability.md`).
 
 ## Flujo de datos hacia The Show Verse
 

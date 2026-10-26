@@ -11,6 +11,7 @@ import {
   matchEpisodeByName,
   matchEpisodeCandidates,
   isGenericEpisodeName,
+  reconcileEpisodeNumbers,
 } from "@/lib/netflix/streamingResolve";
 import { normalizeText } from "@/lib/netflix/resolve";
 import { createRequestCache } from "@/lib/netflix/requestCache";
@@ -133,8 +134,8 @@ function tmdbJson(url) {
 //   3) Nombre por inclusión fiable (endurecida) único.
 //   4) `episodeNumber` conocido y UNA SOLA temporada tiene ≥N episodios.
 // Devuelve {season, episode} o null.
-// Temporadas reales de la serie y TODOS sus episodios (es-ES + en-US, cacheados).
-async function loadShowEpisodes(tmdbId) {
+// Temporadas reales de la serie (sin «Especiales»), con su número de episodios.
+async function loadShowSeasons(tmdbId) {
   const showData = await tmdbJson(
     `${TMDB_API}/tv/${tmdbId}?api_key=${TMDB_API_KEY}&language=es-ES`,
   );
@@ -142,6 +143,12 @@ async function loadShowEpisodes(tmdbId) {
     .filter((s) => s && Number(s.season_number) > 0)
     .sort((a, b) => Number(a.season_number) - Number(b.season_number))
     .slice(0, 30); // cota de seguridad para series con muchas temporadas
+  return { realSeasons };
+}
+
+// Temporadas reales de la serie y TODOS sus episodios (es-ES + en-US, cacheados).
+async function loadShowEpisodes(tmdbId) {
+  const { realSeasons } = await loadShowSeasons(tmdbId);
   const seasonNums = realSeasons.map((s) => Number(s.season_number));
   if (!seasonNums.length) return { realSeasons, allEpisodes: [] };
 
@@ -536,6 +543,7 @@ export async function POST(request) {
       seriesEvidence: Boolean(showName) || Boolean(episodeName) || seasonFromEvidence != null,
       season: playerNumbers.season,
       episode: playerNumbers.episode,
+      trustedId: payload.identitySource === "netflix_metadata",
     });
     const correctedContent = contentMatch?.scope === "user" && contentMatch.source === "correction";
     if (rules?.decision?.rule === "not_a_title" && !correctedContent) {
@@ -757,6 +765,35 @@ export async function POST(request) {
       if (episode == null) {
         // Nivel serie puro: sin temporada/episodio concretos.
         season = null;
+      }
+    }
+
+    // Temporada y episodio en la numeración de la PLATAFORMA, que no siempre es la
+    // de TMDb (Netflix parte temporadas y numera el anime de forma absoluta: su
+    // «T6:E82» de «Ataque a los Titanes» es el S4E23). Si el par no existe en
+    // TMDb se reparte como número absoluto o, si no, se busca por el nombre del
+    // episodio; sin ninguna de las dos, se queda a nivel serie antes que guardar
+    // un episodio inexistente. Ver reconcileEpisodeNumbers.
+    if (isTv && tmdbId && season != null && episode != null && TMDB_API_KEY) {
+      const { realSeasons } = await loadShowSeasons(tmdbId);
+      if (realSeasons.length) {
+        const fixed = reconcileEpisodeNumbers({ season, episode }, realSeasons);
+        if (fixed?.via === "absolute") {
+          console.log(
+            `[Extension Sync] T${season}:E${episode} no existe en TMDb; como número absoluto → T${fixed.season}:E${fixed.episode}`,
+          );
+          season = fixed.season;
+          episode = fixed.episode;
+          if (confidence === "high") confidence = "medium";
+        } else if (!fixed) {
+          const hit = episodeName ? await findSeasonByEpisodeName(tmdbId, episodeName) : null;
+          console.warn(
+            `[Extension Sync] T${season}:E${episode} no existe en TMDb; ${hit ? `por nombre → T${hit.season}:E${hit.episode}` : "se registra a nivel serie"}.`,
+          );
+          season = hit ? hit.season : null;
+          episode = hit ? hit.episode : null;
+          confidence = hit ? "medium" : "low";
+        }
       }
     }
 

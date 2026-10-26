@@ -45,3 +45,12 @@ test("la corrección del propio usuario para ese id manda siempre", () => {
 test("una serie sin episodio concreto no se acepta nunca", () => {
   assert.equal(pickContentMatch({ ...episode, episode: null, source: "correction" }, {}), null);
 });
+
+test("un id que da el propio reproductor no se descarta por la numeración de la plataforma", () => {
+  const tmdb = { ...episode, season: 4, episode: 23 };
+  // Netflix dice T6:E82 para el S4E23 de TMDb.
+  assert.equal(pickContentMatch(tmdb, { season: 6, episode: 82 }), null);
+  assert.equal(pickContentMatch(tmdb, { season: 6, episode: 82, trustedId: true }), tmdb);
+  // El tipo sí cuenta.
+  assert.equal(pickContentMatch(tmdb, { clientSaysMovie: true, trustedId: true }), null);
+});

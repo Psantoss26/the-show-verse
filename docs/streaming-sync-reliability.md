@@ -60,6 +60,28 @@ ningún nombre de película trae. Y cuando el reproductor da los dos números, m
 sobre el rastreo genérico del DOM, que recorre toda la página y puede haber cogido
 el badge de una fila de recomendaciones.
 
+## Numeración de la plataforma frente a TMDb
+
+La temporada y el episodio que da una plataforma no siempre existen en TMDb.
+Netflix parte temporadas (su «Temporada 4 Parte 2» de *Ataque a los Titanes* es
+su temporada 6) y numera muchos animes de forma absoluta: su T6:E82 es el S4E23 de
+TMDb. Antes se guardaba tal cual, un episodio inexistente.
+
+Ahora el resolutor comprueba el par contra las temporadas de TMDb
+(`reconcileEpisodeNumbers` en `src/lib/netflix/streamingResolve.js`):
+
+- **Existe:** se queda.
+- **El número no cabe en esa temporada** (o la temporada no existe y el número es
+  mayor que cualquier temporada) **pero sí en la serie entera:** es absoluto y se
+  reparte por temporadas. Confianza media.
+- **Si no:** se busca el episodio por su nombre en todas las temporadas y, si
+  tampoco aparece, se guarda a nivel serie. Un número pequeño en una temporada
+  inexistente es ambiguo y no se adivina.
+
+Vale para cualquier plataforma y para lo que llega del mapa de ids. Cuando el id
+lo da el propio reproductor (Netflix con metadatos), el mapa no se descarta porque
+sus números no coincidan: van en la numeración de Netflix.
+
 ## Prime Video y Crunchyroll en la app Android
 
 Estas dos apps no publican en su MediaSession de qué serie es el episodio (a veces

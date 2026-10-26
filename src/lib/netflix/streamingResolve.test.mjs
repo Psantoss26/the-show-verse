@@ -7,6 +7,7 @@ import {
   matchEpisodeByName,
   scoreConfidence,
   isPlausibleMatch,
+  reconcileEpisodeNumbers,
 } from "./streamingResolve.js";
 
 const peakyShow = {
@@ -305,4 +306,36 @@ test("isPlausibleMatch no acepta un título corto metido dentro de una frase", (
     isPlausibleMatch({ name: "The Office", popularity: 90, vote_count: 3000 }, "The Office (US)", "tv"),
     true,
   );
+});
+
+// Temporadas de «Ataque a los Titanes» en TMDb (sin Especiales).
+const AOT_SEASONS = [
+  { season_number: 1, episode_count: 25 },
+  { season_number: 2, episode_count: 12 },
+  { season_number: 3, episode_count: 22 },
+  { season_number: 4, episode_count: 28 },
+];
+
+test("reconcileEpisodeNumbers: el par que existe en TMDb se queda", () => {
+  assert.deepEqual(reconcileEpisodeNumbers({ season: 4, episode: 23 }, AOT_SEASONS), { season: 4, episode: 23, via: "as_is" });
+  assert.deepEqual(reconcileEpisodeNumbers({ season: 1, episode: 25 }, AOT_SEASONS), { season: 1, episode: 25, via: "as_is" });
+});
+
+test("reconcileEpisodeNumbers: la numeración absoluta de Netflix se reparte por temporadas", () => {
+  // «Temporada 4 Parte 2» es la temporada 6 de Netflix; el 82 es el S4E23 («Atardecer»).
+  assert.deepEqual(reconcileEpisodeNumbers({ season: 6, episode: 82 }, AOT_SEASONS), { season: 4, episode: 23, via: "absolute" });
+  // El 76 («El juicio») es el S4E17.
+  assert.deepEqual(reconcileEpisodeNumbers({ season: 6, episode: 76 }, AOT_SEASONS), { season: 4, episode: 17, via: "absolute" });
+  // Temporada que SÍ existe pero con un número que no le cabe: también absoluto.
+  assert.deepEqual(reconcileEpisodeNumbers({ season: 2, episode: 26 }, AOT_SEASONS), { season: 2, episode: 1, via: "absolute" });
+  assert.deepEqual(reconcileEpisodeNumbers({ season: 4, episode: 50 }, AOT_SEASONS), { season: 3, episode: 13, via: "absolute" });
+});
+
+test("reconcileEpisodeNumbers: lo ambiguo o imposible no se adivina", () => {
+  // Temporada inexistente con un número que cabría en cualquier temporada.
+  assert.equal(reconcileEpisodeNumbers({ season: 6, episode: 7 }, AOT_SEASONS), null);
+  // Más episodios que toda la serie.
+  assert.equal(reconcileEpisodeNumbers({ season: 6, episode: 120 }, AOT_SEASONS), null);
+  assert.equal(reconcileEpisodeNumbers({ season: 1, episode: 3 }, []), null);
+  assert.equal(reconcileEpisodeNumbers({ season: null, episode: 3 }, AOT_SEASONS), null);
 });

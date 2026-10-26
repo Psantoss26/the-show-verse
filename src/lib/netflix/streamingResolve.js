@@ -356,3 +356,44 @@ export async function resolveStreamingEntity({
   if (showPlausible) return showLevel(show);
   return null;
 }
+
+/**
+ * Ajusta la temporada y el episodio que da una plataforma a la numeración de
+ * TMDb. Hay plataformas que numeran a su manera: Netflix parte las temporadas
+ * («Temporada 4 Parte 2» es su temporada 6) y en muchas series de anime numera
+ * los episodios de forma absoluta (el 82 de «Ataque a los Titanes» es el S4E23 de
+ * TMDb). Tomarlos tal cual guardaba un episodio que no existe.
+ *
+ * - El par existe en TMDb → se queda (`via: 'as_is'`).
+ * - El episodio no cabe en esa temporada (o la temporada no existe y el número
+ *   es mayor que cualquier temporada) pero sí en la suma de todas → es un número
+ *   absoluto y se reparte por temporadas (`via: 'absolute'`).
+ * - Si no → null: el llamador prueba por el nombre del episodio o lo deja a nivel
+ *   serie. Un número pequeño en una temporada inexistente es ambiguo (¿relativo a
+ *   qué parte?) y no se adivina.
+ *
+ * @param {{season:number, episode:number}} numbers
+ * @param {Array<{season_number:number, episode_count:number}>} realSeasons temporadas > 0
+ */
+export function reconcileEpisodeNumbers({ season, episode }, realSeasons) {
+  const seasons = (Array.isArray(realSeasons) ? realSeasons : [])
+    .map((s) => ({ season: Number(s?.season_number), count: Number(s?.episode_count) || 0 }))
+    .filter((s) => Number.isInteger(s.season) && s.season > 0)
+    .sort((a, b) => a.season - b.season);
+  if (!seasons.length || !(season > 0) || !(episode > 0)) return null;
+
+  const claimed = seasons.find((s) => s.season === season);
+  if (claimed && episode <= claimed.count) return { season, episode, via: "as_is" };
+
+  const total = seasons.reduce((sum, s) => sum + s.count, 0);
+  const largest = Math.max(...seasons.map((s) => s.count));
+  const cannotBeRelative = claimed ? episode > claimed.count : episode > largest;
+  if (!cannotBeRelative || episode > total) return null;
+
+  let before = 0;
+  for (const s of seasons) {
+    if (episode <= before + s.count) return { season: s.season, episode: episode - before, via: "absolute" };
+    before += s.count;
+  }
+  return null;
+}

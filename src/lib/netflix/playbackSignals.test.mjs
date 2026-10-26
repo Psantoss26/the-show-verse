@@ -78,12 +78,36 @@ const SHOWS = [
     popularity: 300,
     vote_count: 13000,
     seasons: [
+      { season_number: 1, episode_count: 7 },
+      { season_number: 2, episode_count: 13 },
       { season_number: 3, episode_count: 13 },
+      { season_number: 4, episode_count: 13 },
       { season_number: 5, episode_count: 16 },
     ],
     episodes: {
       3: [{ episode_number: 7, name: "One Minute" }],
       5: [{ episode_number: 14, name: "Ozymandias" }],
+    },
+  },
+  // Anime con la numeración partida en Netflix: su «Temporada 4 Parte 2» es la
+  // temporada 6 y numera los episodios de forma absoluta (76, 77…). Temporadas
+  // reales de TMDb; el S4E23 se llama distinto que en Netflix («Crepúsculo»).
+  {
+    id: 1429,
+    name: "Ataque a los Titanes",
+    popularity: 250,
+    vote_count: 7000,
+    seasons: [
+      { season_number: 1, episode_count: 25 },
+      { season_number: 2, episode_count: 12 },
+      { season_number: 3, episode_count: 22 },
+      { season_number: 4, episode_count: 28 },
+    ],
+    episodes: {
+      4: [
+        { episode_number: 17, name: "Juicio" },
+        { episode_number: 23, name: "Atardecer" },
+      ],
     },
   },
   // Serie REAL cuyo nombre aparece DENTRO del nombre de un episodio de otra
@@ -828,4 +852,50 @@ test("Netflix con metadatos: una película por su título original", async () =>
   }, learned());
   assert.equal(synced(result).tmdbId, 398978);
   assert.equal(synced(result).mediaType, "movie");
+});
+
+// ── Numeración de la plataforma frente a la de TMDb ──────────────────────────
+
+// La señal tal cual la mandó la extensión 3.3 al reproducir el episodio 82 de
+// «Ataque a los Titanes» en Netflix (se guardaba como T6:E82, que no existe).
+const AOT_NETFLIX = {
+  platform: "netflix",
+  contentId: "81551284",
+  mainTitle: "Ataque a los Titanes",
+  showName: "Ataque a los Titanes",
+  episodeName: "Crepúsculo",
+  subTitle: "Crepúsculo",
+  season: 6,
+  episode: 82,
+  seasonEpisodeText: "T6:E82",
+  identitySource: "netflix_metadata",
+  durationSec: 1442,
+  positionSec: 90,
+  detectionKind: "playback",
+};
+
+test("Netflix con episodios absolutos: el T6:E82 se guarda como el S4E23 de TMDb", async () => {
+  const result = await sync(AOT_NETFLIX, learned());
+  assert.deepEqual([synced(result).tmdbId, synced(result).season, synced(result).episode], [1429, 4, 23]);
+  assert.equal(synced(result).confidence, "medium");
+  assert.deepEqual([result.detections.recorded[0].season, result.detections.recorded[0].episode], [4, 23]);
+});
+
+test("Un id ya aprendido con la numeración de TMDb vale aunque Netflix numere distinto", async () => {
+  const result = await sync(AOT_NETFLIX, learned({ decision: null, rejects: [],
+    content: { scope: "user", source: "auto", tmdbId: 1429, mediaType: "tv", season: 4, episode: 23, title: "Ataque a los Titanes" } }));
+  assert.deepEqual([synced(result).season, synced(result).episode, synced(result).confidence], [4, 23, "high"]);
+  assert.equal(result.detections.recorded[0].source, "content_id");
+});
+
+test("Un id guardado con la numeración de Netflix se corrige igual al usarlo", async () => {
+  const result = await sync(AOT_NETFLIX, learned({ decision: null, rejects: [],
+    content: { scope: "user", source: "auto", tmdbId: 1429, mediaType: "tv", season: 6, episode: 82, title: "Ataque a los Titanes" } }));
+  assert.deepEqual([synced(result).season, synced(result).episode], [4, 23]);
+});
+
+test("Un par inexistente sin número absoluto posible ni nombre conocido queda a nivel serie", async () => {
+  const result = await sync({ ...AOT_NETFLIX, season: 6, episode: 7, seasonEpisodeText: "T6:E7", episodeName: "Nada parecido" }, learned());
+  assert.equal(synced(result).tmdbId, 1429);
+  assert.deepEqual([synced(result).season, synced(result).episode, synced(result).confidence], [null, null, "low"]);
 });
