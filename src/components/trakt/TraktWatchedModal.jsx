@@ -6,6 +6,15 @@ import { useEffect, useMemo, useState } from "react";
 import useModalGuard from "@/hooks/useModalGuard";
 import CalendarPickerModal from "@/components/trakt/CalendarPickerModal";
 import {
+  completeLocalProgress,
+  dismissLocalProgress,
+  findLocalProgress,
+  forgetContinueWatchingEntry,
+  getLocalInProgress,
+} from "@/lib/api/progressClient";
+import { detectionPlatformLabel } from "@/lib/api/detectionsClient";
+import { cacheAddHistory, clearWatchDerivedCaches } from "@/lib/userLists/optimisticListCache";
+import {
   X,
   Plus,
   Pencil,
@@ -17,6 +26,7 @@ import {
   Clock,
   History,
   Eye,
+  MonitorPlay,
 } from "lucide-react";
 
 // --- Helpers de Fecha (Mismos que tenías) ---
@@ -70,6 +80,96 @@ const formatFullWatched = (iso) => {
   return { date, time, full: `${date} · ${time}` };
 };
 
+const RELATIVE = new Intl.RelativeTimeFormat("es", { numeric: "auto" });
+const relativeTime = (iso) => {
+  const diffMs = new Date(iso).getTime() - Date.now();
+  if (!Number.isFinite(diffMs)) return "";
+  const minutes = Math.round(diffMs / 60_000);
+  if (Math.abs(minutes) < 60) return RELATIVE.format(minutes, "minute");
+  const hours = Math.round(minutes / 60);
+  if (Math.abs(hours) < 24) return RELATIVE.format(hours, "hour");
+  return RELATIVE.format(Math.round(hours / 24), "day");
+};
+
+const remainingLabel = (runtimeSeconds, positionSeconds) => {
+  const left = Math.round((Number(runtimeSeconds) - Number(positionSeconds)) / 60);
+  if (!Number.isFinite(left) || left <= 0 || !(Number(runtimeSeconds) > 0)) return "";
+  if (left < 60) return `Quedan ${left} min`;
+  const hours = Math.floor(left / 60);
+  const mins = left % 60;
+  return mins ? `Quedan ${hours} h ${mins} min` : `Quedan ${hours} h`;
+};
+
+// Entrada de "Continuar viendo" del título: lo que se está viendo y aún no cuenta
+// como visto. Se puede dar por visto (pasa al historial, como al llegar al 90 %)
+// o quitar, sin ir a la página "Continuar viendo".
+function ProgressEntry({ progress, busy, disabled, error, onComplete, onRemove }) {
+  const pct = Math.round(Math.min(1, Math.max(0, Number(progress.percent) || 0)) * 100);
+  const details = [
+    progress.platform ? detectionPlatformLabel({ platform: progress.platform }) : null,
+    remainingLabel(progress.runtimeSeconds, progress.positionSeconds),
+    progress.updatedAt ? relativeTime(progress.updatedAt) : null,
+  ].filter(Boolean);
+  return (
+    <div className="rounded-3xl bg-sky-500/10 p-4 shadow-md backdrop-blur-xl">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-sky-400/15 text-sky-200 backdrop-blur-md">
+            <MonitorPlay className="h-5 w-5" aria-hidden="true" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-base font-extrabold leading-tight tracking-tight text-white sm:text-lg">
+              En curso · {pct} %
+            </div>
+            {details.length > 0 && (
+              <div className="mt-0.5 truncate text-xs text-white/55">{details.join(" · ")}</div>
+            )}
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            data-online-only="true"
+            type="button"
+            onClick={onComplete}
+            disabled={disabled}
+            className="rounded-full p-2 text-white/55 transition hover:bg-emerald-500/15 hover:text-emerald-300 disabled:opacity-50"
+            aria-label="Marcar como visto"
+            title="Marcar como visto"
+          >
+            {busy === "complete" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+          </button>
+          <button
+            data-online-only="true"
+            type="button"
+            onClick={onRemove}
+            disabled={disabled}
+            className="rounded-full p-2 text-white/55 transition hover:bg-red-500/15 hover:text-red-300 disabled:opacity-50"
+            aria-label="Quitar de Continuar viendo"
+            title="Quitar de Continuar viendo"
+          >
+            {busy === "remove" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+          </button>
+        </div>
+      </div>
+      <div
+        className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={pct}
+        aria-label="Progreso de reproducción"
+      >
+        <div className="h-full rounded-full bg-sky-400" style={{ width: `${pct}%` }} />
+      </div>
+      {error && (
+        <p role="alert" className="mt-2 text-xs text-red-300">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 const pickHistoryId = (h) => h?.id ?? h?.historyId ?? h?.history_id ?? null;
 const pickWatchedAt = (h) =>
   h?.watched_at ?? h?.watchedAt ?? h?.watchedAtIso ?? null;
@@ -88,9 +188,76 @@ export default function TraktWatchedModal({
   onRemovePlay,
   busy,
   busyKey,
+  // Título cuya entrada de "Continuar viendo" se muestra y gestiona aquí:
+  // { tmdbId, mediaType: 'movie' | 'tv', season?, episode? } (episodio concreto).
+  progressTarget = null,
+  // Aviso a la ficha: { type: 'completed', historyItem } | { type: 'removed' }.
+  onProgressChange,
 }) {
   const serverOnline = useServerOnline();
   const isBusy = !!(busy || busyKey);
+
+  const [progress, setProgress] = useState(null);
+  const [progressBusy, setProgressBusy] = useState(""); // "" | "complete" | "remove"
+  const [progressError, setProgressError] = useState("");
+  const targetTmdbId = progressTarget?.tmdbId ?? null;
+  const targetMediaType = progressTarget?.mediaType ?? null;
+  const targetSeason = progressTarget?.season ?? null;
+  const targetEpisode = progressTarget?.episode ?? null;
+
+  useEffect(() => {
+    setProgressError("");
+    if (!open || !targetTmdbId || !targetMediaType) {
+      setProgress(null);
+      return undefined;
+    }
+    let abort = false;
+    getLocalInProgress().then((rows) => {
+      if (abort) return;
+      setProgress(findLocalProgress(rows, {
+        tmdbId: targetTmdbId,
+        mediaType: targetMediaType,
+        season: targetSeason,
+        episode: targetEpisode,
+      }));
+    });
+    return () => {
+      abort = true;
+    };
+  }, [open, targetTmdbId, targetMediaType, targetSeason, targetEpisode]);
+
+  const runProgressAction = async (action) => {
+    const id = progress?.id;
+    if (!id || progressBusy || !serverOnline) return;
+    setProgressBusy(action);
+    setProgressError("");
+    const result = action === "complete" ? await completeLocalProgress(id) : await dismissLocalProgress(id);
+    setProgressBusy("");
+    if (!result) {
+      setProgressError(
+        action === "complete"
+          ? "No se pudo marcar como visto. Inténtalo de nuevo."
+          : "No se pudo quitar de Continuar viendo. Inténtalo de nuevo.",
+      );
+      return;
+    }
+    forgetContinueWatchingEntry(id);
+    clearWatchDerivedCaches();
+    // Igual que en "Continuar viendo": el alta optimista del Historial solo sabe
+    // de títulos, así que los episodios se verán al recargar el Historial.
+    if (action === "complete" && progress.mediaType === "movie") {
+      cacheAddHistory({
+        type: "movie",
+        tmdbId: progress.tmdbId,
+        watchedAt: result.watchedAt,
+        title: progress.title,
+        posterPath: progress.posterPath,
+        historyId: result.id,
+      });
+    }
+    setProgress(null);
+    onProgressChange?.(action === "complete" ? { type: "completed", historyItem: result } : { type: "removed" });
+  };
 
   // Hooks y lógica (igual que antes)
   const items = useMemo(() => {
@@ -195,6 +362,12 @@ export default function TraktWatchedModal({
                 <Check className="w-3 h-3" />
                 {plays ? `${plays} Vistas` : "Sin ver"}
               </span>
+              {progress && (
+                <span className="flex items-center gap-1.5 rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-sky-200 backdrop-blur-md">
+                  <MonitorPlay className="h-3 w-3" aria-hidden="true" />
+                  En curso
+                </span>
+              )}
               {traktUrl && (
                 <a
                   href={traktUrl}
@@ -271,7 +444,18 @@ export default function TraktWatchedModal({
               </h4>
             </div>
 
-            {!items.length ? (
+            {progress && (
+              <ProgressEntry
+                progress={progress}
+                busy={progressBusy}
+                disabled={Boolean(progressBusy) || isBusy || !serverOnline}
+                error={progressError}
+                onComplete={() => runProgressAction("complete")}
+                onRemove={() => runProgressAction("remove")}
+              />
+            )}
+
+            {!items.length && progress ? null : !items.length ? (
               <div className="flex flex-col items-center justify-center rounded-3xl bg-white/5 py-8 text-center backdrop-blur-xl">
                 <Clock className="mb-2 w-8 h-8 text-white/25" />
                 <p className="text-sm text-white/45">

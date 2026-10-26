@@ -3535,6 +3535,12 @@ export default function DetailModal({
         onAddPlay={handleTraktAddPlay}
         onUpdatePlay={handleTraktUpdatePlay}
         onRemovePlay={handleTraktRemovePlay}
+        // Su entrada de "Continuar viendo", si la hay; al darla por vista entra
+        // en el historial y se refresca el estado.
+        progressTarget={mediaType === "movie" && item?.id ? { tmdbId: Number(item.id), mediaType: "movie" } : null}
+        onProgressChange={(event) => {
+          if (event?.type === "completed") void refreshTraktStatus(true);
+        }}
       />
 
       {/* Historial de visionados del episodio: el mismo gestor que usa
@@ -3551,6 +3557,19 @@ export default function DetailModal({
         onAddPlay={handleEpisodeAddPlay}
         onUpdatePlay={handleEpisodeUpdatePlay}
         onRemovePlay={handleEpisodeRemovePlay}
+        progressTarget={
+          isEpisode && (item?.showId ?? item?.id) != null && item?.seasonNumber != null && item?.episodeNumber != null
+            ? {
+                tmdbId: Number(item.showId ?? item.id),
+                mediaType: "tv",
+                season: Number(item.seasonNumber),
+                episode: Number(item.episodeNumber),
+              }
+            : null
+        }
+        onProgressChange={(event) => {
+          if (event?.type === "completed") void refreshEpisodePlays().catch(() => {});
+        }}
       />
 
       {/* Visto en Trakt (SERIES) — modal de EPISODIOS vistos: temporadas,

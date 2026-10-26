@@ -39,6 +39,42 @@ export async function getLocalInProgress({ throwOnError = false } = {}) {
   }
 }
 
+// Caché de la página "Continuar viendo" (pintado instantáneo; la escribe
+// ContinueWatchingClient). Quien quite una entrada desde otro sitio la poda aquí
+// para que la página no la vuelva a pintar antes de recargar.
+export const CONTINUE_WATCHING_CACHE_KEY = "showverse:continue-watching:page:v2";
+
+/** Quita una entrada (por id de watch_progress) de la caché de "Continuar viendo". */
+export function forgetContinueWatchingEntry(progressId) {
+  if (typeof window === "undefined" || !progressId) return;
+  try {
+    const raw = window.localStorage.getItem(CONTINUE_WATCHING_CACHE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    const items = (Array.isArray(parsed?.items) ? parsed.items : [])
+      .filter((item) => String(item?.progressId) !== String(progressId));
+    if (items.length) {
+      window.localStorage.setItem(CONTINUE_WATCHING_CACHE_KEY, JSON.stringify({ ...parsed, items }));
+    } else {
+      window.localStorage.removeItem(CONTINUE_WATCHING_CACHE_KEY);
+    }
+  } catch {
+    /* modo privado / cuota */
+  }
+}
+
+/**
+ * Fila de "Continuar viendo" de UN título: la película, o el episodio concreto
+ * de una serie. null si no está en curso (o no se pudo preguntar).
+ */
+export function findLocalProgress(rows, { tmdbId, mediaType, season = null, episode = null } = {}) {
+  return (Array.isArray(rows) ? rows : []).find((row) => {
+    if (Number(row?.tmdbId) !== Number(tmdbId) || row?.mediaType !== mediaType) return false;
+    if (mediaType !== "tv") return true;
+    return Number(row?.season) === Number(season) && Number(row?.episode) === Number(episode);
+  }) || null;
+}
+
 /** Descarta una entrada de "Continuar viendo" (progreso local) por su id. */
 export async function dismissLocalProgress(id) {
   if (!id) return false;

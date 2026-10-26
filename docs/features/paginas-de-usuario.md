@@ -20,6 +20,8 @@ Las tres comparten navegación (`WatchingSectionNav`):
 
 **Marcar como finalizado:** la barra de `/continue-watching` tiene dos modos excluyentes junto a «+»: el ✓ («Marcar títulos como finalizados») y la papelera («Quitar títulos»); en móvil van en la primera fila del desplegable, en el orden «+», ✓, papelera (✓ y papelera juntos en un segmentado, para que el bloque mida lo mismo que los de las otras filas). En el modo ✓ cada tarjeta lleva un botón verde ✓ en el sitio de la papelera. Tras confirmar, la entrada sale de la fila y se apunta en el historial con el episodio que tuviera, igual que el completado automático (`POST /v1/progress/{id}/complete`).
 
+**Desde la ficha:** si la película o el episodio está en curso, el modal de historial de visionado (`TraktWatchedModal`, en la ficha de película, la de episodio y la vista previa) lo muestra como primera entrada de la actividad: «En curso · N %», con plataforma, tiempo restante, la última vez que se vio y una etiqueta «En curso» en la cabecera. Desde ahí se puede **marcar como visto** (✓, mismo `complete`: sale de la fila y entra en el historial, que se actualiza en el propio modal) o **quitar** (papelera, `DELETE /v1/progress/{id}`), sin ir a `/continue-watching`. La ficha recibe el cambio (`onProgressChange`) para quitar su indicador de progreso y la entrada se poda de la caché de la página.
+
 ## Recomendaciones (deslizar)
 
 `/recommendations` es una baraja de títulos:

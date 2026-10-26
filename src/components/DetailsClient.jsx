@@ -6261,6 +6261,36 @@ export default function DetailsClient({
     }
   };
 
+  // La entrada de "Continuar viendo" se gestionó desde el modal de historial:
+  // fuera el indicador de progreso y, si se dio por vista, el visionado nuevo
+  // entra en el historial igual que al añadirlo a mano.
+  const handleMovieProgressChange = (event) => {
+    setInProgressPct(null);
+    if (event?.type !== "completed") return;
+    const watchedAtIso = event.historyItem?.watchedAt || new Date().toISOString();
+    const prevHistoryLength = normalizeTraktHistoryEntries(trakt.history).length;
+    invalidateTraktGetCache({
+      tmdbId: id,
+      traktId: traktResolvedIdRef.current ?? undefined,
+    });
+    setTrakt((prev) =>
+      buildTraktStateFromHistory({
+        ...prev,
+        watched: true,
+        plays: prevHistoryLength + 1,
+        lastWatchedAt: watchedAtIso,
+        history: [
+          { id: event.historyItem?.id ?? `temp-${Date.now()}`, watched_at: watchedAtIso },
+          ...(Array.isArray(prev.history) ? prev.history : []),
+        ],
+      }),
+    );
+    confirmMovieTraktStatusInBackground({
+      expectedWatched: true,
+      expectedHistoryEntries: prevHistoryLength + 1,
+    });
+  };
+
   // Actualiza la fecha de un visionado existente en el historial de Trakt
   const handleTraktUpdatePlay = async (historyId, yyyyMmDd) => {
     if (!trakt.connected || traktBusy) return;
@@ -9725,6 +9755,8 @@ export default function DetailsClient({
         onAddPlay={handleTraktAddPlay}
         onUpdatePlay={handleTraktUpdatePlay}
         onRemovePlay={handleTraktRemovePlay}
+        progressTarget={endpointType === "movie" && id ? { tmdbId: Number(id), mediaType: "movie" } : null}
+        onProgressChange={handleMovieProgressChange}
       />
 
       {/* Modal de episodios de Trakt - Para marcar episodios de series como vistos */}

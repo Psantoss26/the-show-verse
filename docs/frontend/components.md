@@ -103,7 +103,7 @@ Integración de UI con Trakt (auth, estado de visto, modales de historial).
 | `TraktConnectModal.jsx` | Modal compacto que muestra el código de activación y espera autorización. |
 | `TraktActions.jsx` | Acciones rápidas sobre un título (marcar visto, puntuar) usando el token válido de `useTraktAuth`. |
 | `TraktWatchedControl.jsx` | Control visual (ojo abierto/cerrado + badge de plays) para marcar visto/no visto. |
-| `TraktWatchedModal.jsx` | Modal de gestión de reproducciones (fechas, notas) de un título. |
+| `TraktWatchedModal.jsx` | Modal de gestión de reproducciones (fechas, notas) de un título. Con `progressTarget` muestra también su entrada de «Continuar viendo» para marcarla como vista o quitarla (`onProgressChange`). |
 | `TraktEpisodesWatchedModal.jsx` | Modal de progreso de episodios vistos de una serie/temporada. |
 | `TraktContinueWatching.jsx` | Variante ligera de "continuar viendo" basada solo en Trakt. |
 

@@ -1316,6 +1316,31 @@ export default function EpisodeDetailsClient({
     [showId, seasonNumber, episodeNumber, showName],
   );
 
+  // La entrada de "Continuar viendo" del episodio se gestionó desde el modal de
+  // historial: fuera el indicador y, si se dio por visto, se recargan sus plays.
+  const handleEpisodeProgressChange = useCallback(
+    async (event) => {
+      setInProgressPct(null);
+      if (event?.type !== "completed") return;
+      try {
+        const json = await traktGetEpisodePlays({
+          tmdbId: Number(showId),
+          season: Number(seasonNumber),
+          episode: Number(episodeNumber),
+        });
+        setEpisodePlays({
+          plays: json?.plays ?? 0,
+          history: Array.isArray(json?.history) ? json.history : [],
+          lastWatchedAt: json?.lastWatchedAt ?? null,
+        });
+        setEpisodePlaysLoaded(true);
+      } catch (e) {
+        console.error("Error reloading episode plays:", e);
+      }
+    },
+    [showId, seasonNumber, episodeNumber],
+  );
+
   const handleEpisodeUpdatePlay = useCallback(
     async (historyId, watchedAt) => {
       setWatchedBusy(true);
@@ -2226,6 +2251,12 @@ export default function EpisodeDetailsClient({
           onUpdatePlay={handleEpisodeUpdatePlay}
           onRemovePlay={handleEpisodeRemovePlay}
           busy={watchedBusy}
+          progressTarget={
+            showId && seasonNumber && episodeNumber
+              ? { tmdbId: Number(showId), mediaType: "tv", season: Number(seasonNumber), episode: Number(episodeNumber) }
+              : null
+          }
+          onProgressChange={handleEpisodeProgressChange}
         />
 
         <ExternalLinksModal

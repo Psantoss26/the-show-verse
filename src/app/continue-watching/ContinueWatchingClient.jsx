@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 
 import {
+  CONTINUE_WATCHING_CACHE_KEY,
   addManualProgress,
   completeLocalProgress,
   dismissLocalProgress,
@@ -971,7 +972,7 @@ const ProgressCard = memo(function ProgressCard({
 // ----------------------------
 // CACHÉ LOCAL (pintado instantáneo)
 // ----------------------------
-const CACHE_KEY = "showverse:continue-watching:page:v2";
+const CACHE_KEY = CONTINUE_WATCHING_CACHE_KEY;
 // Solo se pinta la caché AL INSTANTE si es RECIENTE (< 10 min). Si es más vieja
 // (p. ej. añadiste algo desde otro dispositivo: tu caché es de la última visita,
 // sin lo nuevo) NO se pinta: se muestra carga y el fetch trae la lista correcta de
