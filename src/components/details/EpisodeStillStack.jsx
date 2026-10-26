@@ -124,7 +124,41 @@ export function useEpisodeStillStackLoad(paths = []) {
   };
 }
 
-function StillBand({ src, index, count, loaded, late, imgProps }) {
+// Máscara de una banda. Con `fade`, la ÚLTIMA lleva además el fundido inferior
+// de la portada (`--sv-hero-fade`, el de la vista previa), dimensionado al alto
+// de la portada entera y anclado abajo: cae completo en esa banda y se cruza
+// con la unión (intersección). Va en la banda y no en un envoltorio común: en
+// la tarjeta de la vista previa, Chrome no pintaba un envoltorio enmascarado.
+function bandMask({ first, last, count, fade }) {
+  if (!fade || !last) {
+    return first ? {} : { WebkitMaskImage: SEAM_MASK, maskImage: SEAM_MASK };
+  }
+  if (first) {
+    return {
+      WebkitMaskImage: "var(--sv-hero-fade)",
+      maskImage: "var(--sv-hero-fade)",
+      WebkitMaskSize: "100% 100%",
+      maskSize: "100% 100%",
+      WebkitMaskRepeat: "no-repeat",
+      maskRepeat: "no-repeat",
+    };
+  }
+  const coverHeight = `calc(${count * 100}% - ${count * EPISODE_STILL_SEAM_PX}px)`;
+  return {
+    WebkitMaskImage: `${SEAM_MASK}, var(--sv-hero-fade)`,
+    maskImage: `${SEAM_MASK}, var(--sv-hero-fade)`,
+    WebkitMaskSize: `100% 100%, 100% ${coverHeight}`,
+    maskSize: `100% 100%, 100% ${coverHeight}`,
+    WebkitMaskPosition: "0 0, 0 100%",
+    maskPosition: "0 0, 0 100%",
+    WebkitMaskRepeat: "no-repeat",
+    maskRepeat: "no-repeat",
+    WebkitMaskComposite: "source-in",
+    maskComposite: "intersect",
+  };
+}
+
+function StillBand({ src, index, count, loaded, late, fade, imgProps }) {
   const first = index === 0;
   const seam = first ? 0 : EPISODE_STILL_SEAM_PX;
 
@@ -134,7 +168,7 @@ function StillBand({ src, index, count, loaded, late, imgProps }) {
       style={{
         top: `calc(${index} * 100% / ${count} - ${seam}px)`,
         height: `calc(100% / ${count} + ${seam}px)`,
-        ...(first ? {} : { WebkitMaskImage: SEAM_MASK, maskImage: SEAM_MASK }),
+        ...bandMask({ first, last: index === count - 1, count, fade }),
       }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -156,12 +190,17 @@ function StillBand({ src, index, count, loaded, late, imgProps }) {
   );
 }
 
-export default function EpisodeStillStack({ load }) {
+// `fade`: el pie se funde con lo que haya debajo (la tarjeta de la vista
+// previa), sin el fondo oscuro de la cabecera.
+export default function EpisodeStillStack({ load, fade = false }) {
   const { sources, settled, isLate, bandProps } = load;
   if (!sources.length) return null;
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-neutral-950" aria-hidden="true">
+    <div
+      className={`relative h-full w-full overflow-hidden ${fade ? "" : "bg-neutral-950"}`}
+      aria-hidden="true"
+    >
       {sources.map((src, index) => (
         <StillBand
           key={src}
@@ -170,6 +209,7 @@ export default function EpisodeStillStack({ load }) {
           count={sources.length}
           loaded={settled.get(src) === "ok"}
           late={isLate(src)}
+          fade={fade}
           imgProps={bandProps(src)}
         />
       ))}

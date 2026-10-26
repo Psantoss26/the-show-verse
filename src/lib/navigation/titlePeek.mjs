@@ -10,8 +10,10 @@
 //     las filas de los dashboards. Esas declaran el título con el atributo
 //     `data-sv-peek` (ver `titlePeekAttrs`).
 //
-// Solo cuentan títulos: películas, series y episodios. Personas, temporadas,
-// colecciones o listas siguen con su comportamiento de siempre.
+// Cuentan películas, series y episodios, y las temporadas de la sección
+// Temporadas de la ficha de una serie (solo por el atributo: un enlace a una
+// temporada sigue con su comportamiento de siempre). Personas, colecciones o
+// listas no tienen vista previa.
 
 import { getMediaTypeForItem } from "../dashboard/mediaType.mjs";
 
@@ -64,10 +66,25 @@ export function titlePeekItemFromHref(href, base = "https://showverse.local") {
   return { id, media_type: type, detailsHref: url.pathname };
 }
 
-// Valor de `data-sv-peek`: «movie:603», «tv:1399» o «tv:1399:1:2» (episodio).
+// Valor de `data-sv-peek`: «movie:603», «tv:1399», «tv:1399:1:2» (episodio)
+// o «season:1399:1» (temporada).
 export function titlePeekItemFromAttr(value) {
   if (typeof value !== "string" || !value) return null;
   const [type, rawId, rawSeason, rawEpisode] = value.split(":");
+  if (type === "season") {
+    const showId = toId(rawId);
+    const seasonNumber = Number(rawSeason);
+    if (showId == null || rawSeason === "" || !Number.isInteger(seasonNumber) || seasonNumber < 0) {
+      return null;
+    }
+    return {
+      media_type: "season",
+      id: showId,
+      showId,
+      seasonNumber,
+      detailsHref: `/details/tv/${showId}/season/${seasonNumber}`,
+    };
+  }
   if (type !== "movie" && type !== "tv") return null;
   const id = toId(rawId);
   if (id == null) return null;
@@ -86,6 +103,14 @@ export function titlePeekAttrs(item, mediaType) {
   const type = mediaType ?? getMediaTypeForItem(item);
   if (id == null || (type !== "movie" && type !== "tv")) return {};
   return { [TITLE_PEEK_ATTR]: `${type}:${id}` };
+}
+
+// Atributos para la tarjeta de una temporada (sección Temporadas de la ficha).
+export function titlePeekSeasonAttrs(showId, seasonNumber) {
+  const id = toId(showId);
+  const season = Number(seasonNumber);
+  if (id == null || !Number.isInteger(season) || season < 0) return {};
+  return { [TITLE_PEEK_ATTR]: `season:${id}:${season}` };
 }
 
 // Movimiento del dedo a partir del cual la pulsación es un desplazamiento y no

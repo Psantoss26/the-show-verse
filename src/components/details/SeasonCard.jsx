@@ -19,6 +19,7 @@ import { readSeasonCustomPoster } from "@/lib/details/seasonArtwork";
 import { useSeasonLadderPoster } from "@/lib/tmdb/useSeasonLadderPoster";
 import { LIQUID_GLASS_CARD } from "@/lib/ui/liquidGlass";
 import { DETAILS_POSTER_ROW_SIZES, tmdbSrcSet } from "@/lib/tmdb/imageSrcSet";
+import { titlePeekSeasonAttrs } from "@/lib/navigation/titlePeek.mjs";
 
 /**
  * Póster de la temporada: el elegido en «Editar portada», el de la escalera de
@@ -109,6 +110,8 @@ export default function SeasonCard({
       onMouseEnter={onPrefetch}
       onFocus={onPrefetch}
       onTouchStart={onPrefetch}
+      // Mantener pulsado en el móvil abre su vista previa (MobileTitlePeek).
+      {...titlePeekSeasonAttrs(showId, seasonNumber)}
       // Cristal de TARJETA compartido: van en rejilla, así que sin sombra propia
       // (varias sombras juntas forman una banda oscura detrás del grupo).
       className={`group relative isolate flex w-full transform-gpu gap-4 overflow-hidden rounded-2xl p-3 text-left ${LIQUID_GLASS_CARD} transition-all ${
@@ -280,6 +283,7 @@ export function SeasonPosterCard({
         onMouseEnter={onPrefetch}
         onFocus={onPrefetch}
         onTouchStart={onPrefetch}
+        {...titlePeekSeasonAttrs(showId, seasonNumber)}
         aria-label={`Ver ${title}${subtitle ? `: ${subtitle}` : ""}`}
         title={title}
         className={`group relative block aspect-[2/3] w-full overflow-hidden rounded-xl bg-zinc-900 shadow-md transition-shadow duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 ${enableHover ? "lg:hover:shadow-yellow-900/20" : ""}`}

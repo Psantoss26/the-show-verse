@@ -6,6 +6,7 @@ import {
   titlePeekAttrs,
   titlePeekItemFromAttr,
   titlePeekItemFromHref,
+  titlePeekSeasonAttrs,
 } from "./titlePeek.mjs";
 
 test("reconoce los enlaces a fichas de películas, series y episodios", () => {
@@ -61,6 +62,23 @@ test("lee y escribe el atributo de las tarjetas sin enlace", () => {
   assert.equal(titlePeekItemFromAttr("tv:1399:1:2")?.media_type, "episode");
   assert.equal(titlePeekItemFromAttr("person:287"), null);
   assert.equal(titlePeekItemFromAttr("movie:"), null);
+});
+
+test("las temporadas solo se reconocen por el atributo", () => {
+  assert.deepEqual(titlePeekSeasonAttrs(1399, 0), {
+    "data-sv-peek": "season:1399:0",
+  });
+  assert.deepEqual(titlePeekSeasonAttrs(null, 1), {});
+  assert.deepEqual(titlePeekItemFromAttr("season:1399:2"), {
+    media_type: "season",
+    id: 1399,
+    showId: 1399,
+    seasonNumber: 2,
+    detailsHref: "/details/tv/1399/season/2",
+  });
+  assert.equal(titlePeekItemFromAttr("season:1399"), null);
+  assert.equal(titlePeekItemFromAttr("season:1399:-1"), null);
+  assert.equal(titlePeekItemFromAttr("season:abc:1"), null);
 });
 
 test("un desplazamiento de más de 10 px cancela la pulsación larga", () => {

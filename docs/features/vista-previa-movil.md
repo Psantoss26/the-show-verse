@@ -4,7 +4,7 @@ aliases: [Vista previa móvil, Pulsación larga, Peek]
 ---
 # Vista previa al mantener pulsado (móvil)
 
-En el móvil, mantener el dedo sobre la tarjeta de una película, una serie o un episodio abre su vista previa sin salir de la página. Funciona en todas las páginas y en los dashboards (Inicio, Películas, Series y sus secciones).
+En el móvil, mantener el dedo sobre la tarjeta de una película, una serie o un episodio abre su vista previa sin salir de la página. Funciona en todas las páginas y en los dashboards (Inicio, Películas, Series y sus secciones). También las tarjetas de la sección Temporadas de la ficha de una serie (y de su vista lateral) tienen la suya.
 
 ## Qué ve el usuario
 
@@ -22,7 +22,9 @@ En el móvil, mantener el dedo sobre la tarjeta de una película, una serie o un
 - Tocar fuera, o la tecla Escape, cierra la vista previa y la tarjeta vuelve a su sitio.
 - Al soltar el dedo no se abre la ficha ni sale el menú del sistema para enlaces o imágenes.
 - Si el dedo se mueve más de 10 px (desplazar la página o un carrusel), no se abre nada.
-- Personas, temporadas, listas y colecciones no tienen vista previa.
+- **Episodios:** la vista previa enseña lo de arriba de la ficha móvil del episodio, no la portada de la serie: sus dos imágenes apiladas con la unión fundida (las mismas que la ficha, de `hero-stills`), «Episodio N · Temporada M» y su nombre al pie, y la fila de botones de esa ficha (serie, temporada, vistos y puntuar, con sus mismos modales) sin Anterior / Siguiente.
+- **Temporadas** (sección Temporadas de la ficha de una serie): la portada de la temporada (la misma que la tarjeta y la ficha: la elegida por el usuario o la de la escalera de idioma), «Temporada N» sobre la fila de botones de su ficha (tráiler de la temporada, serie, vistos —el modal de episodios vistos con solo esa temporada— y puntuar) y su marcador (TMDb, Trakt, IMDb y estadísticas). Tocar la portada lleva a la ficha de la temporada. Un enlace a una temporada en otro sitio (las flechas de la propia ficha, por ejemplo) no abre vista previa.
+- Personas, listas y colecciones no tienen vista previa.
 - Solo en pantallas de móvil táctiles (menos de 768 px de ancho y puntero táctil). En ordenador y tablet todo sigue igual.
 
 ## Código
@@ -31,7 +33,9 @@ En el móvil, mantener el dedo sobre la tarjeta de una película, una serie o un
 |---|---|
 | `src/components/preview/MobileTitlePeek.jsx` | Se monta una vez en `src/app/layout.jsx`. Escucha los toques en el documento, detecta la pulsación larga, anula el clic al soltar y pinta la vista previa. Descarga la ficha rápida solo cuando empieza una pulsación sobre un título. Al ir a la ficha (`onPeekOpenFull`) navega y retira la vista previa cuando la ruta de la ficha está en pantalla sin `[data-details-root][aria-busy="true"]`. |
 | `src/lib/navigation/titlePeek.mjs` | Lógica pura: qué título corresponde a un enlace `/details/...` o a un atributo `data-sv-peek`, y los márgenes del gesto. Con tests (`titlePeek.test.mjs`). |
-| `src/components/dashboard/DetailModal.jsx` | La ficha rápida con la prop `peek`: reutiliza su portada, su fila de botones y su marcador en la tarjeta flotante (`DetailPeekLayout`). |
+| `src/components/preview/DetailPeekLayout.jsx` | La tarjeta flotante: portada (una imagen o una compuesta con `cover`/`coverReady`), fila de botones y marcador, animación de apertura y cierre. |
+| `src/components/dashboard/DetailModal.jsx` | La ficha rápida con la prop `peek`: reutiliza su portada, su fila de botones y su marcador en la tarjeta flotante. En episodios, la portada es `EpisodeStillStack` con `fade` (el fundido inferior va en la última banda: en un envoltorio Chrome no lo pinta) y la fila es `SubrouteDetailsActionRow` con `sequence={false}`. |
+| `src/components/preview/SeasonPeek.jsx` | La vista previa de una temporada (`data-sv-peek="season:ID:N"`, ver `titlePeekSeasonAttrs` en `SeasonCard`). Comparte con la ficha de temporada las consultas de puntuaciones (`lib/details/seasonScores.js`), el póster (`useSeasonPoster`) y el modal de vistos (`useTraktEpisodesWatched`). |
 
 Las tarjetas que son un enlace a `/details/movie/:id`, `/details/tv/:id` o `/details/tv/:id/season/:s/episode/:e` ya funcionan sin tocarlas. Las tarjetas de los dashboards que abren la ficha con un botón llevan `{...titlePeekAttrs(item)}`. Un bloque con `data-sv-no-peek` queda excluido.
 

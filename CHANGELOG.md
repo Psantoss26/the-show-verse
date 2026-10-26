@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Móvil, vista previa al mantener pulsado: la de un episodio enseña ahora la portada de su ficha (sus dos imágenes apiladas, «Episodio N · Temporada M» y su nombre) y la fila de botones de la ficha del episodio, en vez del póster de la serie. Y mantener pulsada una temporada en la sección Temporadas de la ficha de una serie abre su vista previa: su portada, la fila de botones de la temporada (tráiler, serie, vistos y puntuar) y su marcador; tocar la portada abre la temporada. → [vista previa móvil](docs/features/vista-previa-movil.md)
 - Móvil, ficha de película o serie: al hacer scroll, el marcador pasa de compacto a completo con sus estadísticas y la fila de Plataformas, Actividad, Enlaces y Compartir (y las pestañas de debajo) entra subiendo hasta su sitio de forma continua, sin pasarse y volver a bajar unos píxeles al parar el dedo. Igual en temporadas, episodios, listas y colecciones. → [componentes](docs/frontend/components.md)
 - Ficha rápida (DetailModal), centrada o en panel lateral: el panel ya no tiene el canto marcado con una línea clara; se separa de la página solo por el tinte y la sombra. Igual en las vistas previa de los dashboards y el panel de temporada/episodio. → [componentes](docs/frontend/components.md)
 - Social · Siguiendo y Yo: en las vistas de lista con póster y lista con backdrop, cada evento sigue mostrando la foto de perfil de quien lo hizo, junto a la imagen del título. → [social y perfiles](docs/features/social-y-perfiles.md)

@@ -5,7 +5,7 @@
 //
 // Mantener el dedo sobre la tarjeta de un título (cualquier enlace a su ficha o
 // cualquier tarjeta de un dashboard marcada con `data-sv-peek`, ver
-// lib/navigation/titlePeek) abre encima de la página, con el fondo difuminado,
+// lib/navigation/titlePeek) o de una temporada (preview/SeasonPeek) abre encima de la página, con el fondo difuminado,
 // una tarjeta flotante con la portada y su logo, la fila de botones y el
 // marcador. La tarjeta crece desde la que se ha pulsado y vuelve a ella al
 // cerrarse. Es la ficha rápida (DetailModal) en su modo `peek`: los botones
@@ -53,6 +53,10 @@ const loadDetailModal = () => import("@/components/dashboard/DetailModal");
 // La ficha rápida es grande: solo se descarga cuando alguien empieza una
 // pulsación sobre un título (ver `onTouchStart`), no con cada página.
 const DetailModal = dynamic(loadDetailModal, { ssr: false });
+// Las temporadas (sección Temporadas de la ficha de una serie) tienen su
+// propia vista previa, con lo de arriba de la ficha de la temporada.
+const loadSeasonPeek = () => import("@/components/preview/SeasonPeek");
+const SeasonPeek = dynamic(loadSeasonPeek, { ssr: false });
 
 // Tras soltar el dedo, cuánto dura el descarte del clic sintetizado (ms).
 const CLICK_SUPPRESS_MS = 700;
@@ -240,7 +244,8 @@ export default function MobileTitlePeek() {
       if (peekOpenRef.current || event.touches.length !== 1) return;
       const resolved = resolvePeekTarget(event.target);
       if (!resolved) return;
-      loadDetailModal();
+      if (resolved.item.media_type === "season") loadSeasonPeek();
+      else loadDetailModal();
       const touch = event.touches[0];
       const gesture = {
         ...resolved,
@@ -355,7 +360,15 @@ export default function MobileTitlePeek() {
   return createPortal(
     <div data-sv-no-peek="">
       <AnimatePresence key={presenceKey}>
-        {peek && (
+        {peek?.item.media_type === "season" ? (
+          <SeasonPeek
+            key={peek.key}
+            item={peek.item}
+            origin={peek.origin}
+            onClose={close}
+            onOpenFull={openFull}
+          />
+        ) : peek ? (
           <DetailModal
             key={peek.key}
             item={peek.item}
@@ -364,7 +377,7 @@ export default function MobileTitlePeek() {
             peek
             peekOrigin={peek.origin}
           />
-        )}
+        ) : null}
       </AnimatePresence>
     </div>,
     document.body,

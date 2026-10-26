@@ -76,6 +76,13 @@ import SubrouteDetailsActionRow from "@/components/details/SubrouteDetailsAction
 import VideoModal from "@/components/details/VideoModal";
 import { loadSeasonVideos, primeSeasonVideos } from "@/lib/details/titleVideos";
 import { getAdjacentSeasonHrefs } from "@/lib/details/subrouteNavigation";
+import {
+  fetchSeasonImdbCached,
+  fetchSeasonScoreboardCached,
+  fetchSeasonStatsCached,
+  primeSeasonImdb,
+  primeSeasonScoreboard,
+} from "@/lib/details/seasonScores";
 import { useDetailsSubrouteSwipe } from "@/lib/navigation/detailsSubrouteSwipe";
 import useWarmSubrouteNeighbors from "@/lib/navigation/useWarmSubrouteNeighbors";
 import { usePathname } from "next/navigation";
@@ -85,13 +92,6 @@ import {
   traktSetSeasonWatched,
   traktSetEpisodeWatched,
 } from "@/lib/api/traktClient";
-
-const seasonScoreboardCache = new Map();
-const seasonScoreboardInflight = new Map();
-const seasonStatsCache = new Map();
-const seasonStatsInflight = new Map();
-const seasonImdbCache = new Map();
-const seasonImdbInflight = new Map();
 
 // Pósters SIN idioma (`iso_639_1` nulo, vacío o "xx"), normalizados a null
 // porque el selector neutro solo reconoce ese valor.
@@ -186,126 +186,6 @@ function scheduleAfterFirstPaint(task, delay = 0) {
       window.cancelIdleCallback(idleId);
     }
   };
-}
-
-async function fetchSeasonScoreboardCached({ showId, seasonNumber, signal }) {
-  const key = `${showId}:${seasonNumber}`;
-  if (seasonScoreboardCache.has(key)) {
-    return seasonScoreboardCache.get(key);
-  }
-  if (seasonScoreboardInflight.has(key)) {
-    return seasonScoreboardInflight.get(key);
-  }
-
-  const promise = fetch(
-    `/api/scoreboard/public?type=season&id=${encodeURIComponent(showId)}&season=${encodeURIComponent(seasonNumber)}`,
-    {
-      cache: "force-cache",
-      signal,
-    },
-  )
-    .then(async (res) => {
-      const json = await res.json().catch(() => null);
-      const value = res.ok && json?.found ? json : null;
-      if (value) {
-        seasonScoreboardCache.set(key, value);
-      }
-      return value;
-    })
-    .catch((error) => {
-      if (error?.name === "AbortError") throw error;
-      return null;
-    })
-    .finally(() => {
-      seasonScoreboardInflight.delete(key);
-    });
-
-  seasonScoreboardInflight.set(key, promise);
-  return promise;
-}
-
-async function fetchSeasonStatsCached({ showId, seasonNumber, signal }) {
-  const key = `${showId}:${seasonNumber}`;
-  if (seasonStatsCache.has(key)) {
-    return seasonStatsCache.get(key);
-  }
-  if (seasonStatsInflight.has(key)) {
-    return seasonStatsInflight.get(key);
-  }
-
-  const promise = fetch(
-    `/api/trakt/stats?type=season&tmdbId=${encodeURIComponent(showId)}&season=${encodeURIComponent(seasonNumber)}`,
-    {
-      cache: "force-cache",
-      signal,
-    },
-  )
-    .then(async (res) => {
-      const json = await res.json().catch(() => null);
-      const hasNumericStats = Object.values(json?.stats || {}).some(
-        (value) => typeof value === "number",
-      );
-      const value = res.ok && json?.found && hasNumericStats ? json : null;
-      if (value) {
-        seasonStatsCache.set(key, value);
-      }
-      return value;
-    })
-    .catch((error) => {
-      if (error?.name === "AbortError") throw error;
-      return null;
-    })
-    .finally(() => {
-      seasonStatsInflight.delete(key);
-    });
-
-  seasonStatsInflight.set(key, promise);
-  return promise;
-}
-
-async function fetchSeasonImdbCached({
-  showId,
-  showImdbId,
-  seasonNumber,
-  signal,
-}) {
-  const key = `${showId}:${showImdbId}:${seasonNumber}`;
-  if (seasonImdbCache.has(key)) {
-    return seasonImdbCache.get(key);
-  }
-  if (seasonImdbInflight.has(key)) {
-    return seasonImdbInflight.get(key);
-  }
-
-  const promise = fetch(
-    `/api/ratings/season?showId=${encodeURIComponent(showId)}&imdbId=${encodeURIComponent(showImdbId)}&season=${encodeURIComponent(seasonNumber)}`,
-    {
-      cache: "force-cache",
-      signal,
-    },
-  )
-    .then(async (res) => {
-      const json = await res.json().catch(() => null);
-      const value =
-        res.ok &&
-        (typeof json?.rating === "number" || typeof json?.votes === "number")
-          ? json
-          : null;
-      if (value) {
-        seasonImdbCache.set(key, value);
-      }
-      return value;
-    })
-    .catch((error) => {
-      if (error?.name === "AbortError") throw error;
-      return null;
-    })
-    .finally(() => {
-      seasonImdbInflight.delete(key);
-    });
-
-  seasonImdbInflight.set(key, promise);
-  return promise;
 }
 
 // Caché de plataformas de la serie en sessionStorage, la MISMA clave y forma
@@ -787,7 +667,7 @@ export default function SeasonDetailsClient({
   useEffect(() => {
     const key = `${showId}:${seasonNumber}`;
     if (parsedInitialScoreboard && initialScoreboardHasStats) {
-      seasonScoreboardCache.set(key, initialScoreboard);
+      primeSeasonScoreboard(key, initialScoreboard);
     }
   }, [
     showId,
@@ -1029,7 +909,7 @@ export default function SeasonDetailsClient({
   useEffect(() => {
     const key = `${showId}:${showImdbId}:${seasonNumber}`;
     if (imdb && showImdbId) {
-      seasonImdbCache.set(key, imdb);
+      primeSeasonImdb(key, imdb);
     }
   }, [showId, showImdbId, seasonNumber, imdb]);
 

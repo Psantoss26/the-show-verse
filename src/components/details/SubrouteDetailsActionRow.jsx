@@ -177,12 +177,16 @@ export default function SubrouteDetailsActionRow({
   rate = null,
   onEditCover = null,
   trailer = null,
+  // Sin Anterior / Siguiente (la vista previa de pulsación larga).
+  sequence = true,
 }) {
   return (
     <div className={ROW_CLASS}>
-      <NavigationAction href={previousHref} label="Anterior">
-        <ArrowLeft />
-      </NavigationAction>
+      {sequence ? (
+        <NavigationAction href={previousHref} label="Anterior">
+          <ArrowLeft />
+        </NavigationAction>
+      ) : null}
 
       {trailer ? (
         <TrailerAction
@@ -237,9 +241,11 @@ export default function SubrouteDetailsActionRow({
         </ButtonAction>
       ) : null}
 
-      <NavigationAction href={nextHref} label="Siguiente">
-        <ArrowRight />
-      </NavigationAction>
+      {sequence ? (
+        <NavigationAction href={nextHref} label="Siguiente">
+          <ArrowRight />
+        </NavigationAction>
+      ) : null}
     </div>
   );
 }
