@@ -267,6 +267,15 @@ Los cambios de la app Android (`SignalBuilder`) llevan sus pruebas JVM en
 hicieron no tiene JDK, Gradle ni Android SDK. Antes de publicar el APK hay que
 ejecutar el comando de arriba.
 
+## Capturas de diagnóstico
+
+Para arreglar una plataforma con datos reales, la extensión guarda lo que lee la
+detección en la pestaña (**Capturar diagnóstico**, en su ventana). Cada captura,
+con lo que debería detectarse (`expected`), se copia a
+`netflix-extension/diagnostics/` y pasa a ser una prueba de
+`netflix-extension/diagnostic.test.js`. Detalle en `netflix-extension/README.md`
+→ *Diagnóstico*.
+
 ## Matriz de comprobación con cuentas reales
 
 Repetir estos casos en cada servicio habilitado en navegador y Android. Estas

@@ -201,6 +201,17 @@
     <div id="custom-sites" class="logs-list" style="max-height: 80px; margin-top: 4px;"></div>
   </div>
 
+  <div class="status-card" id="diag-card" style="margin-top: 12px;">
+    <div class="logs-header" style="border: none; padding: 0; margin: 0;">Diagnóstico</div>
+    <div class="user-info">
+      Guarda lo que lee la detección en esta pestaña (título, datos del reproductor y de la página)
+      para revisar fallos. Úsalo mientras se reproduce o en la ficha del título. No incluye cookies
+      ni datos de tu cuenta, pero sí texto de la página: revísalo antes de compartirlo.
+    </div>
+    <button type="button" id="diag-btn" class="btn btn-secondary">Capturar diagnóstico</button>
+    <div id="diag-status" class="user-info" style="margin-top: 6px;" role="status"></div>
+  </div>
+
   <div class="logs-container">
     <div class="logs-header">Actividad Reciente</div>
     <div id="logs-list" class="logs-list">

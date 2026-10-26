@@ -73,9 +73,11 @@
       .filter((chain) => chain.length > 0);
   }
 
+  // Los «#text» (textos sueltos de una captura de diagnóstico) no son elementos:
+  // ningún selector los devuelve, igual que en el DOM real.
   function descendants(node, out) {
     for (const child of node.children) {
-      out.push(child);
+      if (child.tagName !== "#TEXT") out.push(child);
       descendants(child, out);
     }
     return out;
@@ -101,6 +103,26 @@
     getAttribute(name) {
       const value = this._attrs[name];
       return value == null ? null : String(value);
+    }
+
+    // Lo mínimo del DOM real que recorre diagnostic-capture.js.
+    get nodeType() {
+      return this.tagName === "#TEXT" ? 3 : 1;
+    }
+
+    get nodeValue() {
+      return this.tagName === "#TEXT" ? this._text : null;
+    }
+
+    get childNodes() {
+      if (this.children.length || !this._text) return this.children;
+      return [{ nodeType: 3, nodeValue: this._text }];
+    }
+
+    get attributes() {
+      return Object.entries(this._attrs)
+        .filter(([, value]) => value != null && value !== false)
+        .map(([name, value]) => ({ name, value: value === true ? "" : String(value) }));
     }
 
     // Concatena sin separador, igual que el DOM real: es precisamente lo que

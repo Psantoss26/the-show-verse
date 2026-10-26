@@ -296,6 +296,7 @@
           detectionKind: "detail",
         },
         (response) => {
+          noteResolve("detail", sig, response);
           if (!extensionAlive()) return;
           if (chrome.runtime.lastError) {
             lastBrowseKey = null; // transitorio: permitir reintento
@@ -844,6 +845,79 @@
     return entry;
   }
 
+  // ---- Diagnóstico (ver diagnostic-capture.js) ----
+  // La ventana de la extensión ejecuta self.__tsvDiagnostic() en cada marco de la
+  // pestaña («Capturar diagnóstico») y descarga el resultado. Aquí se guarda la
+  // última respuesta del servidor para que la captura diga qué se resolvió.
+  let lastResolve = null;
+  function noteResolve(kind, request, response) {
+    let transportError = null;
+    try {
+      transportError = chrome.runtime.lastError?.message || null;
+    } catch {
+      transportError = null;
+    }
+    lastResolve = {
+      at: new Date().toISOString(),
+      kind,
+      request: request || null,
+      success: Boolean(response?.success),
+      status: response?.status ?? null,
+      error: response?.error || transportError,
+      synced: response?.synced || null,
+    };
+  }
+
+  self.__tsvDiagnostic = () => {
+    const DX = self.TSVDiagnostic;
+    if (!DX) return { error: "diagnostic-capture.js no está cargado" };
+    const safe = (fn) => {
+      try {
+        return fn();
+      } catch (e) {
+        return { error: String(e?.message || e) };
+      }
+    };
+    const video = safe(() => getMainVideo());
+    const mediaSession = safe(() => mediaSessionRaw());
+    if (mediaSession && Array.isArray(mediaSession.artwork)) {
+      mediaSession.artwork = mediaSession.artwork.map((a) => ({ src: DX.sanitizeUrl(a.src), sizes: a.sizes }));
+    }
+    const netflixEntry = isNetflix && netflixPlayer?.videoId ? netflixMeta.get(netflixPlayer.videoId) : null;
+    return {
+      captureVersion: DX.CAPTURE_VERSION,
+      extensionVersion: safe(() => chrome.runtime.getManifest().version),
+      capturedAt: new Date().toISOString(),
+      userAgent: navigator.userAgent,
+      frame: { top: !isSubframe, reporterOnly },
+      platform: { id: platformId, name: platformName },
+      page: {
+        host: location.hostname,
+        url: DX.sanitizeUrl(location.href),
+        tabTitle: document.title,
+        mediaSession,
+        video: DX.describeVideo(video && !video.error ? video : null),
+        videoCount: safe(() => document.querySelectorAll("video").length),
+        dom: safe(() => DX.serializeDom(document.documentElement)),
+      },
+      detection: {
+        // La señal se construye ahora mismo, con el mismo código del sondeo.
+        signal: safe(() => buildSignal()),
+        lastPlaybackSignal,
+        lastGood,
+        browse: safe(() => detectBrowsingSignal()),
+        lastResolve,
+        currentSynced,
+        resolved,
+        attempts,
+        syncPaused,
+      },
+      netflix: isNetflix
+        ? { player: netflixPlayer, metadataStatus: netflixEntry?.status || null, metadata: netflixEntry?.meta || null }
+        : null,
+    };
+  };
+
   // Comprueba que el contexto de la extensión siga vivo. Tras recargar/actualizar
   // la extensión, el content script antiguo queda huérfano y `chrome.runtime`
   // pasa a ser undefined: acceder a él lanza y rompería cada tick.
@@ -1163,6 +1237,7 @@
           detectionKind: "playback",
         },
         (response) => {
+          noteResolve("playback", signal, response);
           if (!extensionAlive() || syncPaused || requestGeneration !== generation || key !== lastKey) return;
           resolving = false;
           if (chrome.runtime.lastError || !response?.success || !response?.synced?.tmdbId) {

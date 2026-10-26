@@ -253,4 +253,63 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   refreshSites();
+
+  // ── Diagnóstico: captura de lo que lee la detección (diagnostic-capture.js) ──
+  const diagBtn = document.getElementById("diag-btn");
+  const diagStatus = document.getElementById("diag-status");
+
+  // Ejecuta la captura de content.js en los marcos de la pestaña. Si algún marco
+  // de otro origen no admite la inyección, se queda con el principal.
+  async function runDiagnostic(tabId) {
+    const func = () => (typeof self.__tsvDiagnostic === "function" ? self.__tsvDiagnostic() : null);
+    try {
+      return await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, func });
+    } catch {
+      return chrome.scripting.executeScript({ target: { tabId, frameIds: [0] }, func });
+    }
+  }
+
+  function downloadJson(name, data) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  }
+
+  diagBtn.addEventListener("click", async () => {
+    diagBtn.disabled = true;
+    diagStatus.textContent = "Capturando…";
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) throw new Error("No hay ninguna pestaña activa.");
+      const results = await runDiagnostic(tab.id);
+      const frames = (results || [])
+        .filter((r) => r && r.result)
+        .map((r) => ({ frameId: r.frameId, capture: r.result }));
+      if (!frames.length) {
+        diagStatus.textContent = "La detección no está activa en esta pestaña. Recárgala y vuelve a probar.";
+        return;
+      }
+      const top = frames.find((f) => f.frameId === 0) || frames[0];
+      const capture = {
+        ...top.capture,
+        // Otros marcos con la detección (el reproductor de Crunchyroll va en un iframe).
+        frames: frames.filter((f) => f !== top).map((f) => ({ frameId: f.frameId, ...f.capture })),
+      };
+      const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\..+/, "").replace("T", "-");
+      const platform = String(capture.platform?.id || "sitio").replace(/[^a-z0-9.-]+/gi, "_");
+      downloadJson(`tsv-diagnostico-${platform}-${stamp}.json`, capture);
+      const nodes = capture.page?.dom?.nodes ?? 0;
+      diagStatus.textContent = `Guardado (${nodes} elementos${capture.page?.dom?.truncated ? ", recortado" : ""}).`;
+    } catch (e) {
+      diagStatus.textContent = `No se pudo capturar: ${e?.message || e}`;
+    } finally {
+      diagBtn.disabled = false;
+    }
+  });
 });

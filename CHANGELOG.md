@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Extensión del navegador: nuevo botón **Capturar diagnóstico** en su ventana. Guarda en un fichero lo que lee la detección en la pestaña (título, datos del reproductor y de la página, y lo que respondió el servidor), sin cookies ni datos de la cuenta, para poder revisar y arreglar la detección de cada plataforma con casos reales. → [extensión](netflix-extension/README.md)
 - Sincronización de streaming: cuando Netflix numera los episodios contando especiales que TMDb no tiene (p. ej. el episodio 93 de *My Hero Academia*, que es el T5·E1), se guarda el episodio correcto y no uno desplazado (antes, T5·E5). → [fiabilidad](docs/streaming-sync-reliability.md)
 - Fichas: si una película o un episodio está en «Continuar viendo», el historial de visionado de su ficha (y de la vista previa) lo muestra como «En curso · N %», con la plataforma y el tiempo que queda, y permite marcarlo como visto o quitarlo desde ahí, sin ir a la página Continuar viendo. → [páginas de usuario](docs/features/paginas-de-usuario.md)
 - Sincronización de streaming: el anime que TMDb tiene en una sola temporada y Netflix parte en varias (p. ej. *Jujutsu Kaisen*, cuyo «T2·E32» es el T1·E32) se guarda con el episodio correcto. Con la extensión 3.3 se calcula con exactitud a partir de los datos de Netflix, también cuando Netflix empieza cada parte en el episodio 1. → [fiabilidad](docs/streaming-sync-reliability.md)

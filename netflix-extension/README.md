@@ -37,6 +37,9 @@ tags: [area/integracion, type/referencia, plataforma/navegador]
 | `players.test.js` | La detección reproductor a reproductor, con película y con episodio: reconstruye el DOM real de Netflix, Prime Video, Max, Disney+, Crunchyroll y Plex y comprueba la señal completa. Su contraparte en el servidor es `src/lib/netflix/playbackSignals.test.mjs`. |
 | `netflix-source.js` | Netflix desde su reproductor y sus metadatos (`self.TSVNetflix`, puro y testeable): lectura de `playerApp.getState()`, validación del mensaje de la página, URLs de metadatos (`memberapi/release`, versionadas con `BUILD_IDENTIFIER`, `shakti/mre`), análisis de la respuesta y fusión con la señal. Pruebas en `netflix-source.test.js`. |
 | `netflix-page.js` | Único script en el **mundo de la página** (`"world": "MAIN"`, solo `www.netflix.com`): cada segundo, en `/watch/`, publica por `postMessage` el id del vídeo que suena, si está en pausa y el `BUILD_IDENTIFIER`. No hace peticiones. |
+| `diagnostic-capture.js` | Captura de diagnóstico (`self.TSVDiagnostic`): URL sin parámetros de sesión, DOM con texto en un formato que `fake-dom.js` rehace, JSON-LD y metas públicas, sin cookies, tokens ni scripts. La usa `self.__tsvDiagnostic()` de `content.js`. |
+| `diagnostic-replay.js` | Solo pruebas y análisis: rehace la señal a partir de una captura con el código actual (`node netflix-extension/diagnostic-replay.js captura.json`). |
+| `diagnostics/` | Capturas reales con su `expected`: cada una es una prueba de `diagnostic.test.js`. Ver su `README.md`. |
 | `platform-enhancers.js` | Refinadores opcionales por plataforma (`self.TSVEnhancers`). Uno por sitio (Netflix, Prime, Max, Disney+, Plex, Crunchyroll) que solo *afina* campos concretos (contentId desde la URL, selectores de título/subtítulo propios) sobre la señal base; nunca lanzan y si un selector cambia la señal genérica se mantiene intacta. |
 | `popup.html` / `popup.js` | UI del icono de la extensión: estado de la sincronización (activa/pausada/no vinculada), email y perfil de Netflix vinculado, botón de pausa/reanudación, interruptor del indicador de acceso rápido, registro de actividad reciente (`chrome.storage.local.logs`) y gestión de "sitios de streaming" añadidos manualmente (solicita permiso de host y registra el content script en caliente). |
 
@@ -90,6 +93,21 @@ y el año (`releaseYear`), marcada con `identitySource: "netflix_metadata"`:
   temporadas de Netflix en orden, y `seasonEpisodeIndex`, la posición dentro de
   su temporada; el servidor elige con cuál pasar a la numeración de TMDb (ver *Numeración de la plataforma frente a TMDb* en
   `docs/streaming-sync-reliability.md`).
+
+## Diagnóstico (desde la 3.3)
+
+En la ventana de la extensión, **Capturar diagnóstico** guarda un JSON con lo que lee
+la detección en la pestaña activa, en todos sus marcos (el reproductor de
+Crunchyroll va en un iframe): URL sin parámetros de sesión, título de la pestaña,
+Media Session, JSON-LD, metas públicas, el `<video>`, el DOM con texto, la señal que
+se envía y la última respuesta del servidor; en Netflix, además, el estado del
+reproductor y sus metadatos. No incluye cookies ni tokens, pero sí texto de la
+página (el aviso de la ventana lo dice).
+
+El DOM se guarda en un formato que `fake-dom.js` rehace tal cual, así que una
+captura real, con su `expected`, pasa a ser una prueba que ejecuta la misma cadena
+de detección que el navegador (`diagnostics/README.md`). Se comprobó cargando la
+extensión en Chromium con Playwright sobre una ficha pública de Netflix.
 
 ## Flujo de datos hacia The Show Verse
 

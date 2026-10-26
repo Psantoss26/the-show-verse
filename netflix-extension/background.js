@@ -314,7 +314,7 @@ function ensureActivityAlarm() {
 }
 
 // ── Sitios de streaming añadidos por el usuario (content scripts dinámicos) ──
-const CUSTOM_SITE_JS = ["sync-reliability.js", "detection-core.js", "platform-enhancers.js", "content.js"];
+const CUSTOM_SITE_JS = ["sync-reliability.js", "detection-core.js", "platform-enhancers.js", "diagnostic-capture.js", "content.js"];
 
 function customSiteScriptId(origin) {
   let host = origin;
