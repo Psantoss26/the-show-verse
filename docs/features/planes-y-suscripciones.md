@@ -30,10 +30,11 @@ desde el lanzamiento.
 - `/planes`: selector mensual/anual y tres tarjetas (precio, botón y la misma
   lista de características en el mismo orden, para comparar de un vistazo). Los botones abren Stripe Checkout; con una suscripción
   activa, el portal de cliente. Vuelve con `?checkout=success|cancel`.
-- Ajustes → **Suscripción** (`?tab=subscription`): plan actual, renovación,
-  cancelación programada o cobro pendiente, y botones «Gestionar» (portal de
-  Stripe) y «Mejorar plan». La píldora de la cabecera de Ajustes abre esta
-  pestaña.
+- Ajustes → **Suscripción** (`?tab=subscription`): plan actual («Acceso
+  completo» con los pagos apagados), renovación, cancelación programada o cobro
+  pendiente, botón «Gestionar» (portal de Stripe) y debajo los tres planes
+  disponibles, con las mismas tarjetas que `/planes` (`PlanPicker`). La
+  píldora de la cabecera de Ajustes abre esta pestaña.
 - Bloqueos Pro (`ProGate` / `ProUpsell`): pestañas Estadísticas y Neuronal del
   perfil (cuenta el plan de quien **mira**), `/recap` (pantalla «Tu año es
   Pro»), Plex en Ajustes → Conexiones, huecos «Pro» en el editor de favoritos
@@ -55,7 +56,7 @@ por un instante a quien sí tiene acceso).
   periodo + 2 días de margen); `getEntitlements` solo lee esos dos campos.
 - Rutas: `backend/src/routes/billing.js` y proxies `src/app/api/billing/*`.
 - Cliente: `src/hooks/useEntitlements.js` (una petición por sesión, compartida),
-  `src/components/billing/*`, `src/components/settings/SubscriptionPanel.jsx`.
+  `src/components/billing/*` (`PlanPicker`: selector y tarjetas de planes), `src/components/settings/SubscriptionPanel.jsx`.
 - Límites aplicados en el servidor: creación de listas (402 `plan_limit`) y
   `/api/plex/sync` (402 `plan_required`). Estadísticas, recap y vista neuronal
   solo se bloquean en el cliente.

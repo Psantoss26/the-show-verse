@@ -1,12 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect } from "react";
-import { AlertTriangle, ArrowRight, Check, CreditCard, Loader2, Sparkles } from "lucide-react";
+import { AlertTriangle, CreditCard, Loader2, Sparkles } from "lucide-react";
 
 import useEntitlements from "@/hooks/useEntitlements";
 import useBillingActions from "@/components/billing/useBillingActions";
-import { INTERVAL_LABELS, PLANS, PRO_FEATURES, formatPrice, planName } from "@/lib/billing/plans";
+import PlanPicker from "@/components/billing/PlanPicker";
+import { INTERVAL_LABELS, PLANS, formatPrice, planName } from "@/lib/billing/plans";
 
 const ACTIVE_STATUSES = new Set(["trialing", "active", "past_due"]);
 
@@ -40,6 +40,8 @@ export default function SubscriptionPanel({ panelClassName = "" }) {
 
   const plan = entitlements.plan;
   const isPro = plan === "pro";
+  // Con los pagos apagados nadie ha contratado nada: todo está abierto.
+  const currentLabel = entitlements.billingEnabled ? planName(plan) : "Acceso completo";
   const hasSubscription = Boolean(subscription && ACTIVE_STATUSES.has(subscription.status));
   const pastDue = subscription?.status === "past_due";
 
@@ -61,7 +63,7 @@ export default function SubscriptionPanel({ panelClassName = "" }) {
             <div className="min-w-0">
               <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Tu plan</p>
               <h3 id="subscription-current" className="text-xl font-bold text-white">
-                {ready ? planName(plan) : <span className="text-zinc-500">Cargando…</span>}
+                {ready ? currentLabel : <span className="text-zinc-500">Cargando…</span>}
               </h3>
               <p className="mt-1 text-xs leading-relaxed text-zinc-400 sm:text-sm">{statusLine(subscription, entitlements)}</p>
             </div>
@@ -80,15 +82,6 @@ export default function SubscriptionPanel({ panelClassName = "" }) {
                 Gestionar
               </button>
             ) : null}
-            {!isPro || entitlements.source === "grace" ? (
-              <Link
-                href="/planes"
-                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-5 text-sm font-bold text-black transition hover:bg-emerald-300"
-              >
-                {entitlements.billingEnabled ? "Mejorar plan" : "Ver planes"}
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </Link>
-            ) : null}
           </div>
         </div>
 
@@ -105,30 +98,11 @@ export default function SubscriptionPanel({ panelClassName = "" }) {
         ) : null}
       </section>
 
-      <section aria-labelledby="subscription-features" className={`${panelClassName} rounded-3xl p-5 sm:p-6`}>
-        <h3 id="subscription-features" className="text-xs font-bold uppercase tracking-widest text-emerald-400/80">
-          Funciones Pro
+      <section aria-labelledby="subscription-plans" className="pt-2">
+        <h3 id="subscription-plans" className="mb-5 text-xs font-bold uppercase tracking-widest text-emerald-400/80">
+          Planes disponibles
         </h3>
-        <ul className="mt-4 grid gap-3 sm:grid-cols-2">
-          {Object.entries(PRO_FEATURES).map(([id, feature]) => {
-            const included = entitlements.features?.includes(id);
-            return (
-              <li key={id} className="flex items-start gap-3">
-                <span
-                  className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
-                    included ? "bg-emerald-400/15 text-emerald-300" : "bg-white/5 text-zinc-600"
-                  }`}
-                >
-                  <Check className="h-3 w-3" aria-hidden="true" />
-                </span>
-                <span className="min-w-0">
-                  <span className={`block text-sm font-bold ${included ? "text-white" : "text-zinc-400"}`}>{feature.title}</span>
-                  <span className="block text-xs text-zinc-500">{feature.description}</span>
-                </span>
-              </li>
-            );
-          })}
-        </ul>
+        <PlanPicker loginNext="/profile/settings?tab=subscription" />
       </section>
 
       <p className="px-1 text-xs leading-relaxed text-zinc-600">
