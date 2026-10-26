@@ -57,6 +57,9 @@ specs/
 # Capturas/volcados de Playwright MCP (solo locales)
 .playwright-mcp/
 
+# Grafo de graphify (se regenera en local con `graphify update .`; graph.json pesa ~12 MB)
+graphify-out/
+
 # Obsidian (configuración local del editor, no versionar)
 .obsidian/
 
