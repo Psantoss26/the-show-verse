@@ -21,6 +21,7 @@ import {
   EyeOff,
   RotateCcw,
   Undo2,
+  MoreHorizontal,
 } from "lucide-react";
 import useModalGuard from "@/hooks/useModalGuard";
 import { useServerOnline } from "@/context/ServerStatusContext";
@@ -155,6 +156,10 @@ export default function SoundtrackModal({
   const [isMuted, setIsMuted] = useState(false);
   const showAutoplaySwitch = typeof onAutoplayChange === "function";
   const showFeedback = typeof onFeedback === "function";
+  const hasOptions = showAutoplaySwitch || showFeedback;
+  // Reproducción automática y valoración van plegadas tras el botón de tres
+  // puntos de la fila del volumen, para que el modal no sea tan alto.
+  const [optionsOpen, setOptionsOpen] = useState(false);
   const canUndo = showFeedback && rejectionCount > 0;
   const busy = Boolean(pendingAction);
 
@@ -167,6 +172,7 @@ export default function SoundtrackModal({
     setProgress(0);
     // Silenciar vale solo para esa vez: al volver a abrir, suena.
     setIsMuted(false);
+    setOptionsOpen(false);
   }, [initialTrackId, open, trackQueue]);
 
   useModalGuard({ open, onClose });
@@ -488,39 +494,59 @@ export default function SoundtrackModal({
               </button>
             </div>
 
-            {/* --- VOLUMEN --- */}
-            {selectedHasPreview && (
+            {/* --- VOLUMEN (y botón de más opciones) --- */}
+            {(selectedHasPreview || hasOptions) && (
               <div className="w-full flex items-center justify-center gap-4 px-8">
-                <button
-                  type="button"
-                  onClick={toggleMute}
-                  className="text-white/60 hover:text-white transition"
-                  aria-pressed={isMuted}
-                  aria-label={isMuted ? "Activar el sonido" : "Silenciar"}
-                >
-                  {isMuted || volume === 0 ? (
-                    <VolumeX className="w-5 h-5" />
-                  ) : (
-                    <Volume2 className="w-5 h-5" />
-                  )}
-                </button>
-                <div className="relative flex items-center w-28 h-5 group">
-                  <div className="absolute inset-x-0 h-1.5 bg-black/40 backdrop-blur-md rounded-full overflow-hidden pointer-events-none">
-                    <div
-                      className="h-full bg-white/70 group-hover:bg-white rounded-full transition-all duration-75"
-                      style={{ width: `${(isMuted ? 0 : volume) * 100}%` }}
-                    />
-                  </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={isMuted ? 0 : volume}
-                    onChange={handleVolumeChange}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  />
-                </div>
+                {selectedHasPreview && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={toggleMute}
+                      className="text-white/60 hover:text-white transition"
+                      aria-pressed={isMuted}
+                      aria-label={isMuted ? "Activar el sonido" : "Silenciar"}
+                    >
+                      {isMuted || volume === 0 ? (
+                        <VolumeX className="w-5 h-5" />
+                      ) : (
+                        <Volume2 className="w-5 h-5" />
+                      )}
+                    </button>
+                    <div className="relative flex items-center w-28 h-5 group">
+                      <div className="absolute inset-x-0 h-1.5 bg-black/40 backdrop-blur-md rounded-full overflow-hidden pointer-events-none">
+                        <div
+                          className="h-full bg-white/70 group-hover:bg-white rounded-full transition-all duration-75"
+                          style={{ width: `${(isMuted ? 0 : volume) * 100}%` }}
+                        />
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={isMuted ? 0 : volume}
+                        onChange={handleVolumeChange}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      />
+                    </div>
+                  </>
+                )}
+                {hasOptions && (
+                  <button
+                    type="button"
+                    onClick={() => setOptionsOpen((v) => !v)}
+                    className={`flex h-8 w-8 items-center justify-center rounded-full transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70 ${
+                      optionsOpen
+                        ? "bg-white/15 text-white"
+                        : "text-white/60 hover:bg-white/10 hover:text-white"
+                    }`}
+                    aria-expanded={optionsOpen}
+                    aria-controls="soundtrack-modal-options"
+                    aria-label={optionsOpen ? "Ocultar opciones" : "Más opciones"}
+                  >
+                    <MoreHorizontal className="w-5 h-5" aria-hidden="true" />
+                  </button>
+                )}
               </div>
             )}
 
@@ -531,8 +557,11 @@ export default function SoundtrackModal({
                 ficha. Fuera del bloque de volumen: se pueden usar aunque la
                 pista elegida no tenga preview. Sin servidor no se pueden
                 guardar, así que se desactivan (como en Ajustes). */}
-            {(showAutoplaySwitch || showFeedback) && (
-              <div className={`${selectedHasPreview ? "mt-6" : ""} flex w-full items-center justify-center gap-4`}>
+            {hasOptions && optionsOpen && (
+              <div
+                id="soundtrack-modal-options"
+                className="mt-5 flex w-full items-center justify-center gap-4 animate-in fade-in slide-in-from-top-1 duration-200"
+              >
                 {showAutoplaySwitch && (
                   <AutoplaySwitch
                     checked={autoplay}
