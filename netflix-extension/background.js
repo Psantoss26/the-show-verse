@@ -726,6 +726,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       identitySource,
       releaseYear,
       absoluteEpisode,
+      seasonEpisodeIndex,
     } = message;
     if (!resolveOnly) {
       addLog(`Reproducción detectada en ${platformName || platform || "streaming"}: "${mainTitle}"`, "info");
@@ -778,6 +779,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           releaseYear: releaseYear || undefined,
           // Posición del episodio contando todas las temporadas de la plataforma.
           absoluteEpisode: absoluteEpisode || undefined,
+          // Posición dentro de su temporada en la plataforma.
+          seasonEpisodeIndex: seasonEpisodeIndex || undefined,
         }),
         credentials: "omit"
       })
@@ -810,7 +813,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const config = await getStored(["showVerseOrigin", "netflixSyncToken", SYNC_PAUSED_KEY]);
       if (config[SYNC_PAUSED_KEY]) return { success: false, paused: true };
       if (!config.netflixSyncToken || !config.showVerseOrigin) return { success: false, status: 401, error: "Vuelve a vincular la extensión." };
-      const fields = ["recordProgress", "mainTitle", "subTitle", "showName", "episodeName", "movieTitle", "seasonEpisodeText", "tabTitle", "durationSec", "positionSec", "seriesFromHint", "queueTitle", "albumArtist", "notifTitle", "notifText", "notifSubText", "tmdbId", "mediaType", "season", "episode", "title", "posterPath", "platform", "positionSeconds", "runtimeSeconds", "confidence", "estimated", "detectionId", "contentId", "identitySource", "releaseYear", "absoluteEpisode"];
+      const fields = ["recordProgress", "mainTitle", "subTitle", "showName", "episodeName", "movieTitle", "seasonEpisodeText", "tabTitle", "durationSec", "positionSec", "seriesFromHint", "queueTitle", "albumArtist", "notifTitle", "notifText", "notifSubText", "tmdbId", "mediaType", "season", "episode", "title", "posterPath", "platform", "positionSeconds", "runtimeSeconds", "confidence", "estimated", "detectionId", "contentId", "identitySource", "releaseYear", "absoluteEpisode", "seasonEpisodeIndex"];
       const payload = Object.fromEntries(fields.filter(k => message[k] != null).map(k => [k, message[k]]));
       if (message.action === "queuePlayback") payload.recordProgress = true;
       payload.eventId = crypto.randomUUID();

@@ -85,6 +85,8 @@ test("metadatos de un episodio: serie, temporada y episodio numerados", () => {
     episode: 5,
     // Posición contando las temporadas de Netflix en orden: 1 + 2.
     absoluteEpisode: 3,
+    // Posición dentro de su temporada.
+    seasonEpisodeIndex: 2,
     episodeTitle: "Chapter Five: The Nina Project",
     hiddenEpisodeNumbers: false,
   });
@@ -110,6 +112,7 @@ test("posición absoluta: igual si Netflix sigue la numeración o empieza cada p
   assert.deepEqual([continued.season, continued.episode, continued.absoluteEpisode], [2, 32, 32]);
   const restarted = N.parseMetadata(jujutsuKaisen({ secondStartsAt: 1 }), "900007");
   assert.deepEqual([restarted.season, restarted.episode, restarted.absoluteEpisode], [2, 8, 32]);
+  assert.equal(continued.seasonEpisodeIndex, 8);
   assert.equal(N.applyMetadata({}, restarted).absoluteEpisode, 32);
   // En una colección no hay numeración que valga.
   const hidden = N.parseMetadata({ video: { ...jujutsuKaisen({ secondStartsAt: 1 }).video, hiddenEpisodeNumbers: true } }, "900007");

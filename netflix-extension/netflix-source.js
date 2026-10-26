@@ -94,7 +94,7 @@
   /**
    * Metadatos de un vídeo, o null si la respuesta no sirve.
    * Serie: { type:'show', videoId, showTitle, year, season, episode, absoluteEpisode,
-   *   episodeTitle, hiddenEpisodeNumbers }
+   *   seasonEpisodeIndex, episodeTitle, hiddenEpisodeNumbers }
    * Película: { type:'movie', videoId, title, year }
    * En las colecciones (`hiddenEpisodeNumbers`) la numeración de Netflix no es la
    * de TMDb: temporada y episodio quedan null y vale el nombre del episodio.
@@ -104,6 +104,11 @@
    * Kaisen»: su T2:E32 es el S1E32 de TMDb, que tiene una sola temporada) y a
    * veces numera de forma absoluta y a veces no; la posición vale en los dos
    * casos y el servidor la reparte por las temporadas de TMDb.
+   *
+   * `seasonEpisodeIndex` es la posición dentro de SU temporada de Netflix. Cuando
+   * las temporadas de Netflix y de TMDb coinciden pero Netflix cuenta episodios
+   * de más antes (especiales: el «93» de «My Hero Academia» es el T5·E1), es la
+   * única que acierta.
    */
   function parseMetadata(json, videoId) {
     const video = json?.video;
@@ -135,6 +140,7 @@
         season: hidden ? null : positiveInt(season.seq),
         episode: hidden ? null : positiveInt(episode.seq),
         absoluteEpisode: hidden ? null : before + index + 1,
+        seasonEpisodeIndex: hidden ? null : index + 1,
         episodeTitle: cleanText(episode.title) || null,
         hiddenEpisodeNumbers: hidden,
       };
@@ -166,6 +172,8 @@
     out.episode = meta.episode;
     if (meta.absoluteEpisode) out.absoluteEpisode = meta.absoluteEpisode;
     else delete out.absoluteEpisode;
+    if (meta.seasonEpisodeIndex) out.seasonEpisodeIndex = meta.seasonEpisodeIndex;
+    else delete out.seasonEpisodeIndex;
     // El badge del DOM no puede contradecir los números de los metadatos (ni
     // aportar los de Netflix en una colección, que no son los de TMDb).
     if (meta.season && meta.episode) out.seasonEpisodeText = `T${meta.season}:E${meta.episode}`;

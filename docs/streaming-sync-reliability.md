@@ -78,6 +78,12 @@ Ahora el resolutor comprueba el par contra las temporadas de TMDb
 - **El número no cabe en esa temporada** (o la temporada no existe y el número es
   mayor que cualquier temporada) **pero sí en la serie entera:** es absoluto y se
   reparte por temporadas. Confianza media.
+- **Ese reparto cae en la misma temporada que dice la plataforma:** las temporadas
+  coinciden y lo que no cuadra es la cuenta de antes (Netflix suma especiales que
+  TMDb no tiene: el 93 de *My Hero Academia* es el T5·E1, no el T5·E5). Vale la
+  posición del episodio dentro de su temporada (`seasonEpisodeIndex`, desde los
+  metadatos). Sin ella se prueba el nombre del episodio y, si no casa, el reparto
+  con confianza baja.
 - **La temporada no existe y TMDb tiene una sola temporada** (anime que la
   plataforma parte y TMDb junta: el T2:E32 de *Jujutsu Kaisen* es el S1E32): se
   prueba el nombre del episodio y, si no casa, se supone numeración absoluta con

@@ -372,6 +372,13 @@ export async function resolveStreamingEntity({
  * - El episodio no cabe en esa temporada (o la temporada no existe y el número
  *   es mayor que cualquier temporada) pero sí en la suma de todas → es un número
  *   absoluto y se reparte por temporadas (`via: 'absolute'`).
+ * - Pero si ese reparto cae en la MISMA temporada que dice la plataforma, sus
+ *   temporadas coinciden con las de TMDb y lo que no cuadra es la cuenta: la
+ *   plataforma suma episodios que TMDb no tiene en las temporadas anteriores
+ *   (especiales; el «93» de «My Hero Academia» es el T5·E1, no el T5·E5). Ahí
+ *   vale la posición dentro de la temporada (`seasonEpisodeIndex`,
+ *   `via: 'season_index'`); sin ella el reparto es dudoso
+ *   (`via: 'absolute_same_season'`: el llamador prueba antes el nombre).
  * - La temporada no existe, el número cabe y TMDb tiene UNA sola temporada (el
  *   anime que la plataforma parte y TMDb junta, como «Jujutsu Kaisen») → lo más
  *   probable es la numeración absoluta, pero no es seguro (`via: 'absolute_guess'`:
@@ -380,10 +387,14 @@ export async function resolveStreamingEntity({
  *   serie. Un número pequeño en una temporada inexistente de una serie con varias
  *   temporadas es ambiguo (¿relativo a qué parte?) y no se adivina.
  *
- * @param {{season:number, episode:number, absoluteEpisode?:number|null}} numbers
+ * @param {{season:number, episode:number, absoluteEpisode?:number|null,
+ *   seasonEpisodeIndex?:number|null}} numbers
  * @param {Array<{season_number:number, episode_count:number}>} realSeasons temporadas > 0
  */
-export function reconcileEpisodeNumbers({ season, episode, absoluteEpisode = null }, realSeasons) {
+export function reconcileEpisodeNumbers(
+  { season, episode, absoluteEpisode = null, seasonEpisodeIndex = null },
+  realSeasons,
+) {
   const seasons = (Array.isArray(realSeasons) ? realSeasons : [])
     .map((s) => ({ season: Number(s?.season_number), count: Number(s?.episode_count) || 0 }))
     .filter((s) => Number.isInteger(s.season) && s.season > 0)
@@ -404,11 +415,23 @@ export function reconcileEpisodeNumbers({ season, episode, absoluteEpisode = nul
     return null;
   };
 
-  if (Number.isInteger(absoluteEpisode) && absoluteEpisode > 0) return distribute(absoluteEpisode, "absolute");
-
   const largest = Math.max(...seasons.map((s) => s.count));
-  const cannotBeRelative = claimed ? episode > claimed.count : episode > largest;
-  if (cannotBeRelative) return distribute(episode, "absolute");
-  if (!claimed && seasons.length === 1) return distribute(episode, "absolute_guess");
-  return null;
+  let absolute = null;
+  if (Number.isInteger(absoluteEpisode) && absoluteEpisode > 0) {
+    absolute = distribute(absoluteEpisode, "absolute");
+  } else if (claimed ? episode > claimed.count : episode > largest) {
+    absolute = distribute(episode, "absolute");
+  } else if (!claimed && seasons.length === 1) {
+    return distribute(episode, "absolute_guess");
+  }
+
+  // La temporada de la plataforma existe en TMDb y el reparto cae en ella: lo
+  // que falla es la cuenta de antes, no las temporadas.
+  if (claimed && (!absolute || absolute.season === claimed.season)) {
+    if (Number.isInteger(seasonEpisodeIndex) && seasonEpisodeIndex > 0 && seasonEpisodeIndex <= claimed.count) {
+      return { season, episode: seasonEpisodeIndex, via: "season_index" };
+    }
+    if (absolute) return { ...absolute, via: "absolute_same_season" };
+  }
+  return absolute;
 }

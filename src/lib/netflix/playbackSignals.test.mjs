@@ -120,6 +120,26 @@ const SHOWS = [
     seasons: [{ season_number: 1, episode_count: 59 }],
     episodes: { 1: [{ episode_number: 32, name: "El incidente de Shibuya" }] },
   },
+  // Netflix cuenta especiales que TMDb no tiene: su episodio 93 es el T5·E1.
+  {
+    id: 65930,
+    name: "My Hero Academia",
+    popularity: 240,
+    vote_count: 5000,
+    seasons: [
+      { season_number: 1, episode_count: 13 },
+      { season_number: 2, episode_count: 25 },
+      { season_number: 3, episode_count: 25 },
+      { season_number: 4, episode_count: 25 },
+      { season_number: 5, episode_count: 25 },
+    ],
+    episodes: {
+      5: [
+        { episode_number: 1, name: "¡Todos a la acción! Clase 1-A" },
+        { episode_number: 5, name: "Operación improvisación con nuevas técnicas" },
+      ],
+    },
+  },
   // Serie REAL cuyo nombre aparece DENTRO del nombre de un episodio de otra
   // serie ("Capítulo cinco: La Nina"). Es el caso que registraba títulos sin
   // ninguna relación cuando el reproductor no decía de qué serie era el episodio.
@@ -942,4 +962,32 @@ test("Serie de una sola temporada en TMDb: el T2:E32 de Netflix es el S1E32", as
 test("Sin posición, el nombre del episodio manda sobre la suposición", async () => {
   const result = await sync({ ...JJK_NETFLIX, episode: 8, seasonEpisodeText: "T2:E8", episodeName: "El incidente de Shibuya" }, learned());
   assert.deepEqual([synced(result).season, synced(result).episode, synced(result).confidence], [1, 32, "medium"]);
+});
+
+const MHA_NETFLIX = {
+  platform: "netflix",
+  contentId: "81447461",
+  mainTitle: "My Hero Academia",
+  showName: "My Hero Academia",
+  episodeName: "¡Todos a la acción! Clase 1-A",
+  season: 5,
+  episode: 93,
+  seasonEpisodeText: "T5:E93",
+  durationSec: 1380,
+  positionSec: 90,
+  detectionKind: "playback",
+};
+
+test("Netflix cuenta especiales de más: su T5·E93 es el T5·E1 de TMDb, no el T5·E5", async () => {
+  // Extensión 3.3: posición dentro de la temporada.
+  const withIndex = await sync({ ...MHA_NETFLIX, identitySource: "netflix_metadata", absoluteEpisode: 93, seasonEpisodeIndex: 1 }, learned());
+  assert.deepEqual([synced(withIndex).season, synced(withIndex).episode, synced(withIndex).confidence], [5, 1, "medium"]);
+
+  // Sin posición, el nombre del episodio lo encuentra.
+  const byName = await sync(MHA_NETFLIX, learned());
+  assert.deepEqual([synced(byName).season, synced(byName).episode], [5, 1]);
+
+  // Sin posición ni nombre que case: el reparto, con confianza baja.
+  const guessed = await sync({ ...MHA_NETFLIX, episodeName: "Otro nombre" }, learned());
+  assert.deepEqual([synced(guessed).season, synced(guessed).episode, synced(guessed).confidence], [5, 5, "low"]);
 });

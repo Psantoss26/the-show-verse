@@ -326,9 +326,11 @@ test("reconcileEpisodeNumbers: la numeración absoluta de Netflix se reparte por
   assert.deepEqual(reconcileEpisodeNumbers({ season: 6, episode: 82 }, AOT_SEASONS), { season: 4, episode: 23, via: "absolute" });
   // El 76 («El juicio») es el S4E17.
   assert.deepEqual(reconcileEpisodeNumbers({ season: 6, episode: 76 }, AOT_SEASONS), { season: 4, episode: 17, via: "absolute" });
-  // Temporada que SÍ existe pero con un número que no le cabe: también absoluto.
-  assert.deepEqual(reconcileEpisodeNumbers({ season: 2, episode: 26 }, AOT_SEASONS), { season: 2, episode: 1, via: "absolute" });
+  // Temporada que SÍ existe pero con un número que no le cabe y que, repartido,
+  // cae en OTRA temporada (la «Temporada 3 Parte 2» es la 4 de Netflix): absoluto.
   assert.deepEqual(reconcileEpisodeNumbers({ season: 4, episode: 50 }, AOT_SEASONS), { season: 3, episode: 13, via: "absolute" });
+  // Si cae en la MISMA temporada, la cuenta de antes puede no cuadrar: dudoso.
+  assert.deepEqual(reconcileEpisodeNumbers({ season: 2, episode: 26 }, AOT_SEASONS), { season: 2, episode: 1, via: "absolute_same_season" });
 });
 
 test("reconcileEpisodeNumbers: lo ambiguo o imposible no se adivina", () => {
@@ -359,4 +361,44 @@ test("reconcileEpisodeNumbers: con la posición absoluta del cliente, sin dudas"
 test("reconcileEpisodeNumbers: sin posición, una serie de una sola temporada se supone absoluta", () => {
   assert.deepEqual(reconcileEpisodeNumbers({ season: 2, episode: 32 }, JJK_SEASONS), { season: 1, episode: 32, via: "absolute_guess" });
   assert.equal(reconcileEpisodeNumbers({ season: 2, episode: 70 }, JJK_SEASONS), null);
+});
+
+// «My Hero Academia» en TMDb: 13 + 25 + 25 + 25 antes de la T5. Netflix numera el
+// T5·E1 como 93: cuenta 4 episodios más (especiales) en las temporadas anteriores.
+const MHA_SEASONS = [
+  { season_number: 1, episode_count: 13 },
+  { season_number: 2, episode_count: 25 },
+  { season_number: 3, episode_count: 25 },
+  { season_number: 4, episode_count: 25 },
+  { season_number: 5, episode_count: 25 },
+  { season_number: 6, episode_count: 25 },
+  { season_number: 7, episode_count: 21 },
+  { season_number: 8, episode_count: 11 },
+];
+
+test("reconcileEpisodeNumbers: misma temporada en las dos, cuenta distinta → posición en la temporada", () => {
+  // Con la posición dentro de la temporada (extensión 3.3): T5·E1, no T5·E5.
+  assert.deepEqual(
+    reconcileEpisodeNumbers({ season: 5, episode: 93, absoluteEpisode: 93, seasonEpisodeIndex: 1 }, MHA_SEASONS),
+    { season: 5, episode: 1, via: "season_index" },
+  );
+  assert.deepEqual(
+    reconcileEpisodeNumbers({ season: 5, episode: 97, seasonEpisodeIndex: 5 }, MHA_SEASONS),
+    { season: 5, episode: 5, via: "season_index" },
+  );
+  // Sin ella, el reparto absoluto queda como dudoso (el llamador prueba el nombre).
+  assert.deepEqual(reconcileEpisodeNumbers({ season: 5, episode: 93 }, MHA_SEASONS), { season: 5, episode: 5, via: "absolute_same_season" });
+  // Una posición que no cabe en la temporada no se usa.
+  assert.deepEqual(
+    reconcileEpisodeNumbers({ season: 5, episode: 93, seasonEpisodeIndex: 40 }, MHA_SEASONS),
+    { season: 5, episode: 5, via: "absolute_same_season" },
+  );
+});
+
+test("reconcileEpisodeNumbers: temporadas partidas siguen yendo por el reparto absoluto", () => {
+  // «Ataque a los Titanes»: Netflix T4 = «Temporada 3 Parte 2»; su 1.er episodio es el 50.
+  assert.deepEqual(
+    reconcileEpisodeNumbers({ season: 4, episode: 50, absoluteEpisode: 50, seasonEpisodeIndex: 1 }, AOT_SEASONS),
+    { season: 3, episode: 13, via: "absolute" },
+  );
 });

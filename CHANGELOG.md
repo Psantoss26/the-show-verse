@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Sincronización de streaming: cuando Netflix numera los episodios contando especiales que TMDb no tiene (p. ej. el episodio 93 de *My Hero Academia*, que es el T5·E1), se guarda el episodio correcto y no uno desplazado (antes, T5·E5). → [fiabilidad](docs/streaming-sync-reliability.md)
 - Fichas: si una película o un episodio está en «Continuar viendo», el historial de visionado de su ficha (y de la vista previa) lo muestra como «En curso · N %», con la plataforma y el tiempo que queda, y permite marcarlo como visto o quitarlo desde ahí, sin ir a la página Continuar viendo. → [páginas de usuario](docs/features/paginas-de-usuario.md)
 - Sincronización de streaming: el anime que TMDb tiene en una sola temporada y Netflix parte en varias (p. ej. *Jujutsu Kaisen*, cuyo «T2·E32» es el T1·E32) se guarda con el episodio correcto. Con la extensión 3.3 se calcula con exactitud a partir de los datos de Netflix, también cuando Netflix empieza cada parte en el episodio 1. → [fiabilidad](docs/streaming-sync-reliability.md)
 - Sincronización de streaming: los episodios de series con temporadas partidas o numeración absoluta (p. ej. *Ataque a los Titanes* en Netflix, donde la «Temporada 4 Parte 2» aparece como temporada 6 y el episodio 82) se guardan ahora con la temporada y el episodio de TMDb (T4·E23) en vez de un episodio que no existe. Si no se puede saber con seguridad, se guarda a nivel serie. → [fiabilidad](docs/streaming-sync-reliability.md)

@@ -87,7 +87,8 @@ y el año (`releaseYear`), marcada con `identitySource: "netflix_metadata"`:
 - **Numeración de Netflix.** `seq` es la de Netflix: temporadas partidas («Parte 2»
   es otra temporada) y, en anime, episodios absolutos. Por eso la señal lleva
   también `absoluteEpisode`, la posición del episodio contando todas las
-  temporadas de Netflix en orden, y el servidor la pasa a la numeración de TMDb (ver *Numeración de la plataforma frente a TMDb* en
+  temporadas de Netflix en orden, y `seasonEpisodeIndex`, la posición dentro de
+  su temporada; el servidor elige con cuál pasar a la numeración de TMDb (ver *Numeración de la plataforma frente a TMDb* en
   `docs/streaming-sync-reliability.md`).
 
 ## Flujo de datos hacia The Show Verse

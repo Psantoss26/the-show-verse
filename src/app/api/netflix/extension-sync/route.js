@@ -287,7 +287,7 @@ const DETECTION_SIGNAL_FIELDS = [
   "tabTitle", "queueTitle", "albumArtist", "notifTitle", "notifText", "notifSubText",
   "season", "episode", "durationSec", "seriesFromHint", "screenTitles",
   // De dónde salió la identidad (p. ej. "netflix_metadata") y el año que la acompaña.
-  "identitySource", "releaseYear", "absoluteEpisode",
+  "identitySource", "releaseYear", "absoluteEpisode", "seasonEpisodeIndex",
 ];
 function detectionSignal(body) {
   const signal = {};
@@ -777,15 +777,21 @@ export async function POST(request) {
     if (isTv && tmdbId && season != null && episode != null && TMDB_API_KEY) {
       const { realSeasons } = await loadShowSeasons(tmdbId);
       if (realSeasons.length) {
-        const absoluteEpisode = Number(payload.absoluteEpisode);
+        const positive = (value) => {
+          const n = Number(value);
+          return Number.isInteger(n) && n > 0 ? n : null;
+        };
         const fixed = reconcileEpisodeNumbers({
           season,
           episode,
-          absoluteEpisode: Number.isInteger(absoluteEpisode) && absoluteEpisode > 0 ? absoluteEpisode : null,
+          absoluteEpisode: positive(payload.absoluteEpisode),
+          seasonEpisodeIndex: positive(payload.seasonEpisodeIndex),
         }, realSeasons);
-        // Suposición (serie de una sola temporada en TMDb): el nombre del
-        // episodio, si casa, manda sobre ella.
-        const byName = fixed?.via === "absolute_guess" && episodeName
+        // Suposiciones (serie de una sola temporada en TMDb, o reparto que cae en
+        // la misma temporada sin saber la posición dentro de ella): el nombre del
+        // episodio, si casa, manda sobre ellas.
+        const doubtful = fixed?.via === "absolute_guess" || fixed?.via === "absolute_same_season";
+        const byName = doubtful && episodeName
           ? await findSeasonByEpisodeName(tmdbId, episodeName)
           : null;
         if (byName) {
@@ -793,16 +799,16 @@ export async function POST(request) {
           season = byName.season;
           episode = byName.episode;
           if (confidence === "high") confidence = "medium";
-        } else if (fixed?.via === "absolute_guess") {
+        } else if (doubtful) {
           console.log(
-            `[Extension Sync] T${season}:E${episode} no existe en TMDb (una sola temporada); se supone absoluto → T${fixed.season}:E${fixed.episode}`,
+            `[Extension Sync] T${season}:E${episode} no existe en TMDb; se supone absoluto → T${fixed.season}:E${fixed.episode}`,
           );
           season = fixed.season;
           episode = fixed.episode;
           confidence = "low";
-        } else if (fixed?.via === "absolute") {
+        } else if (fixed?.via === "absolute" || fixed?.via === "season_index") {
           console.log(
-            `[Extension Sync] T${season}:E${episode} no existe en TMDb; como número absoluto → T${fixed.season}:E${fixed.episode}`,
+            `[Extension Sync] T${season}:E${episode} no existe en TMDb; ${fixed.via === "season_index" ? "por su posición en la temporada" : "como número absoluto"} → T${fixed.season}:E${fixed.episode}`,
           );
           season = fixed.season;
           episode = fixed.episode;
