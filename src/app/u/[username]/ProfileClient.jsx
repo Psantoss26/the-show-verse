@@ -40,6 +40,7 @@ import { prefetchNeuralGraph } from "@/lib/profile/neuralGraphData";
 import NeuralGraphSkeleton from "@/components/profile/neural/NeuralGraphSkeleton";
 import NeuralPreviewCard from "@/components/profile/neural/NeuralPreviewCard";
 import ProGate from "@/components/billing/ProGate";
+import PlanBadge from "@/components/billing/PlanBadge";
 import PageStatCard from "@/components/ui/PageStatCard";
 import {
   Activity,
@@ -1174,7 +1175,10 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
                 />
               )}
             </div>
-            <p className="mt-0.5 truncate text-xs font-semibold tracking-tight text-zinc-500 @[640px]/detail-page:mt-2 @[640px]/detail-page:text-sm">@{user.username}</p>
+            <div className="mt-0.5 flex min-w-0 items-center gap-2 @[640px]/detail-page:mt-2">
+              <p className="min-w-0 truncate text-xs font-semibold tracking-tight text-zinc-500 @[640px]/detail-page:text-sm">@{user.username}</p>
+              <PlanBadge plan={user.plan} />
+            </div>
             {user.bio && (
               <p className="mt-3 max-w-xl text-sm leading-relaxed text-zinc-400">
                 {user.bio}

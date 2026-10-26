@@ -107,6 +107,14 @@ export function getEntitlements(user, { now = new Date(), env = process.env } = 
   return describe('free', { billingEnabled: true, source: 'free', graceEndsAt: null });
 }
 
+// Plan que se enseña de otro usuario (perfil, seguidores, miembros): solo el
+// que paga de verdad. Ni el plan gratis ni la gracia de lanzamiento llevan
+// insignia, y con la facturación apagada no la lleva nadie.
+export function publicPlanBadge(user, { now = new Date(), env = process.env } = {}) {
+  if (!isBillingEnabled(env)) return null;
+  return paidPlanOf(user, now);
+}
+
 export function hasFeature(entitlements, feature) {
   return Boolean(entitlements?.features?.includes(feature));
 }

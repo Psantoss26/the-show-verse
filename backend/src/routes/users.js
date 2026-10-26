@@ -3,6 +3,7 @@
 // búsqueda de usuarios, seguir/dejar de seguir, perfil público y favoritos
 // curados del perfil.
 
+import { publicPlanBadge } from '../lib/billing/plans.js';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/client.js';
@@ -471,6 +472,8 @@ export default async function usersRoutes(fastify) {
         username: users.username,
         displayName: users.displayName,
         avatarUrl: users.avatarUrl,
+        plan: users.plan,
+        planExpiresAt: users.planExpiresAt,
         createdAt: follows.createdAt,
       })
       .from(follows)
@@ -509,6 +512,7 @@ export default async function usersRoutes(fastify) {
         isFollowing: followingSet.has(r.id),
         isSelf: r.id === viewerId,
         level: levels.get(r.id) || null,
+        plan: publicPlanBadge(r),
       })),
       hasMore,
       offset: offset + page.length,

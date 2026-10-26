@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { getEntitlements, hasFeature, planForStripePrice, stripePriceId } from './plans.js';
+import { getEntitlements, hasFeature, planForStripePrice, publicPlanBadge, stripePriceId } from './plans.js';
 
 const now = new Date('2027-02-01T00:00:00Z');
 const on = { BILLING_ENABLED: '1' };
@@ -55,4 +55,16 @@ test('los precios de Stripe se buscan en ambos sentidos', () => {
   assert.equal(stripePriceId('free', 'year', env), null);
   assert.deepEqual(planForStripePrice('price_af_m', env), { plan: 'adfree', interval: 'month' });
   assert.equal(planForStripePrice('price_desconocido', env), null);
+});
+
+test('la insignia pública solo la lleva quien paga', () => {
+  const env = { ...on, BILLING_LAUNCH_AT: '2027-01-20T00:00:00Z' };
+  assert.equal(publicPlanBadge({ plan: 'pro', planExpiresAt: '2027-03-01' }, { now, env }), 'pro');
+  assert.equal(publicPlanBadge({ plan: 'adfree', planExpiresAt: null }, { now, env }), 'adfree');
+  assert.equal(publicPlanBadge({ plan: 'free' }, { now, env }), null);
+  // Caducada o en la gracia de lanzamiento: sin insignia.
+  assert.equal(publicPlanBadge({ plan: 'pro', planExpiresAt: '2027-01-01' }, { now, env }), null);
+  assert.equal(publicPlanBadge({ plan: 'free', createdAt: '2026-01-01' }, { now, env }), null);
+  // Con la facturación apagada no la lleva nadie.
+  assert.equal(publicPlanBadge({ plan: 'pro', planExpiresAt: '2027-03-01' }, { now, env: {} }), null);
 });

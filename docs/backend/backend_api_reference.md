@@ -234,11 +234,11 @@ Ver [social-y-perfiles](../features/social-y-perfiles.md).
 | `GET` | `/v1/users/today?scope=following\|community&day=today\|yesterday\|week\|YYYY-MM-DD` | Si | Pagina Hoy: vistos, notas y resenas de la ventana (zona horaria del usuario, sin fechas de importacion), recuentos por dia (`days`), `forYou` y, en Comunidad, `viewerFollows`. 400 si `day` no es valido. Ver [hoy](../features/hoy.md) |
 | `GET` | `/v1/users/me/profile-favorites` | Si | 5 peliculas y 5 series destacadas del perfil |
 | `PUT` | `/v1/users/me/profile-favorites` | Si | Guarda los destacados |
-| `GET` | `/v1/users/{username}/profile` | Si | Perfil (con `isSelf`/`isFollowing`) |
+| `GET` | `/v1/users/{username}/profile` | Si | Perfil (con `isSelf`/`isFollowing`; `user.plan` es el plan de pago visible o `null`) |
 | `POST` | `/v1/users/{username}/follow` | Si | Seguir |
 | `DELETE` | `/v1/users/{username}/follow` | Si | Dejar de seguir |
-| `GET` | `/v1/users/{username}/followers` | Si | Seguidores |
-| `GET` | `/v1/users/{username}/following` | Si | Seguidos |
+| `GET` | `/v1/users/{username}/followers` | Si | Seguidores (cada uno con `plan`: `pro`, `adfree` o `null`) |
+| `GET` | `/v1/users/{username}/following` | Si | Seguidos (cada uno con `plan`) |
 | `GET` | `/v1/users/{username}/{reviews\|watched\|watchlist\|favorites\|ratings\|lists\|activity}` | Si | Secciones del perfil |
 | `GET` | `/v1/users/{username}/neural?v=` | Si | Vista neuronal (grafo de titulos, generos y sagas). Con la firma `v` ya vigente responde `{ unchanged: true }` |
 | `GET` | `/v1/users/public/resolve-usernames?usernames=a,b` | No | Que handles son miembros reales (para enlazar autores de comentarios) |

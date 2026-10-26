@@ -3,6 +3,7 @@
 // exportan aparte para poder testearlas con node:test; `buildUserProfile` y los
 // lectores de sección (`getUser*`) hacen las consultas que consume /u/[username].
 
+import { publicPlanBadge } from './billing/plans.js';
 import { and, asc, count, desc, eq, gte, ilike, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
 import {
   users,
@@ -502,6 +503,9 @@ const PUBLIC_USER_COLUMNS = {
   avatarUrl: users.avatarUrl,
   bio: users.bio,
   createdAt: users.createdAt,
+  // Solo para calcular la insignia de plan (publicPlanBadge); no se envían.
+  plan: users.plan,
+  planExpiresAt: users.planExpiresAt,
 };
 
 // Resuelve un usuario por username (case-insensitive) a sus columnas públicas.
@@ -736,6 +740,7 @@ export async function buildUserProfile(db, targetUser, viewerId = null) {
       avatarUrl: targetUser.avatarUrl || null,
       bio: targetUser.bio || null,
       memberSince: targetUser.createdAt || null,
+      plan: publicPlanBadge(targetUser),
     },
     isSelf: Boolean(viewerId && viewerId === targetId),
     isFollowing: Boolean(followingState),
@@ -1778,6 +1783,8 @@ export async function searchUsers(db, { query, viewerId, limit = 20 }) {
       displayName: users.displayName,
       avatarUrl: users.avatarUrl,
       bio: users.bio,
+      plan: users.plan,
+      planExpiresAt: users.planExpiresAt,
     })
     .from(users)
     .where(
@@ -1821,5 +1828,6 @@ export async function searchUsers(db, { query, viewerId, limit = 20 }) {
     followerCount: countByuser.get(r.id) || 0,
     isFollowing: followingSet.has(r.id),
     level: levels.get(r.id) || null,
+    plan: publicPlanBadge(r),
   }));
 }

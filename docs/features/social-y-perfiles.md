@@ -24,6 +24,7 @@ Capa social de The Show Verse: perfiles públicos de cada miembro, seguir y deja
 
 - **Destacados del perfil:** 5 películas y 5 series elegidas por el usuario (`/v1/users/me/profile-favorites`).
 - **Vista neuronal:** grafo de todos los títulos del usuario con sus géneros, sagas, meses de visionado y listas. El backend responde `{ unchanged: true }` si el cliente ya tiene la versión vigente (`?v=<firma>`), y guarda el grafo en Redis por firma (`backend/src/lib/neuralGraph.js`, colores en `src/lib/profile/neuralGraph.js`).
+- **Insignia de plan:** junto al `@usuario` de la cabecera y al nombre en las filas de miembros (seguidores, seguidos, pestaña Social y `/members`), una píldora «Pro» (verde) o «Sin anuncios» (azul) para quien paga (`PlanBadge`). En el móvil, en las filas, solo el icono. El plan gratis, la gracia de lanzamiento y la facturación apagada no llevan insignia. Ver [[planes-y-suscripciones]].
 - **Tarjetas ajenas decoradas:** al ver el perfil de otro, `POST /v1/items/states` marca qué títulos están también en la biblioteca del visitante, sin revelar nada más de él.
 
 ## Feed y actividad
