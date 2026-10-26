@@ -429,6 +429,7 @@ export default function SeasonPeek({ item, origin, onClose, onOpenFull }) {
       scoreboard={scoreboard}
       onBackdropClick={onClose}
       scrollRef={scrollRef}
+      prefetchHref={seasonHref}
       onOpenFull={() => {
         if (onOpenFull) {
           onOpenFull(seasonHref);

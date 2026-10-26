@@ -25,12 +25,15 @@
 //   - Al soltar no se sigue el enlace ni se abre la ficha: el clic que el
 //     navegador sintetiza se descarta.
 //
-// Ir a la ficha (tocar la portada): la vista previa NO se cierra. Se navega y
-// se queda encima mientras la ficha carga, con la página de detrás fundiéndose
-// a oscuro (el color de la ficha) para que no se vea el cambio de página ni su
-// pantalla de carga. Cuando la ficha está en pantalla con su imagen principal
-// cargada, la vista previa se desvanece sobre ella (en el compositor) y ya no
-// vuelve a verse: tampoco al volver atrás.
+// Ir a la ficha (tocar la portada): la vista previa NO se cierra. En el mismo
+// fotograma del toque la tarjeta se convierte en la cabecera de la ficha (su
+// portada crece a todo el ancho, pegada arriba, y lo demás se desvanece; ver
+// lib/navigation/peekHandoff) mientras la página de detrás se funde a oscuro
+// (el color de la ficha), y se navega. Cuando la ficha está en pantalla con su
+// imagen principal cargada, la tarjeta se ajusta al píxel a la portada de la
+// ficha y se desvanece sobre ella (en el compositor): es la misma imagen en el
+// mismo sitio, así que solo se ven entrar el logo, los botones y el marcador
+// de la ficha. Ya no vuelve a verse: tampoco al volver atrás.
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -39,6 +42,12 @@ import { usePathname } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
 
 import { useRouter } from "@/lib/offline/useOfflineRouter";
+import {
+  beginPeekHandoff,
+  endPeekHandoff,
+  findPeekHandoffTarget,
+  settlePeekCard,
+} from "@/lib/navigation/peekHandoff";
 
 import { useMediaQuery } from "@/lib/hooks/useMediaQuery";
 import useModalGuard from "@/hooks/useModalGuard";
@@ -55,6 +64,13 @@ const loadDetailModal = () => import("@/components/dashboard/DetailModal");
 // La ficha rápida es grande: solo se descarga cuando alguien empieza una
 // pulsación sobre un título (ver `onTouchStart`), no con cada página.
 const DetailModal = dynamic(loadDetailModal, { ssr: false });
+// La portada de la tarjeta flotante se pide al apoyar el dedo, no al cumplirse
+// la pulsación: así suele estar descargada cuando la tarjeta tiene que crecer
+// (ver `requestModalHeroPoster`). Va en el mismo trozo que la ficha rápida.
+const prewarmPeekPoster = (item) =>
+  import("@/components/dashboard/useDetailModalData")
+    .then((module) => module.prewarmModalHeroPoster(item))
+    .catch(() => {});
 // Las temporadas (sección Temporadas de la ficha de una serie) tienen su
 // propia vista previa, con lo de arriba de la ficha de la temporada.
 const loadSeasonPeek = () => import("@/components/preview/SeasonPeek");
@@ -70,8 +86,8 @@ const LEAVE_MAX_WAIT_MS = 10000;
 const LEAVE_ART_MAX_WAIT_MS = 1200;
 // Fundido a oscuro de la página de detrás al ir a la ficha y desvanecido de la
 // vista previa cuando la ficha ya está (ms).
-const LEAVE_SCRIM_MS = 220;
-const LEAVE_FADE_MS = 280;
+const LEAVE_SCRIM_MS = 260;
+const LEAVE_FADE_MS = 300;
 // Fondo de la ficha (DetailsClient y `details/loading.jsx`).
 const DETAILS_SURFACE = "#101010";
 
@@ -143,6 +159,7 @@ export default function MobileTitlePeek() {
       // Un segundo toque en la portada mientras se navega no hace nada.
       if (leavingRef.current) return;
       leavingRef.current = href;
+      beginPeekHandoff(href);
       setPeek((current) =>
         current && !current.leavingTo ? { ...current, leavingTo: href } : current,
       );
@@ -194,10 +211,19 @@ export default function MobileTitlePeek() {
     const fadeOut = () => {
       const layer = layerRef.current;
       if (!layer || typeof layer.animate !== "function") {
+        endPeekHandoff();
         removeInstantly();
         return;
       }
       layer.style.pointerEvents = "none";
+      // La tarjeta, ya convertida en cabecera, se ajusta a la portada real de
+      // la ficha mientras se desvanece.
+      const card = layer.querySelector("[data-peek-card]");
+      const cover = layer.querySelector("[data-peek-cover]");
+      settlePeekCard(card, cover, findPeekHandoffTarget(), {
+        fullPoster: cover?.hasAttribute("data-peek-full-poster"),
+        reduceMotion,
+      });
       const fade = layer.animate([{ opacity: 1 }, { opacity: 0 }], {
         duration: reduceMotion ? 120 : LEAVE_FADE_MS,
         easing: "cubic-bezier(0.33, 0, 0.2, 1)",
@@ -205,6 +231,7 @@ export default function MobileTitlePeek() {
       });
       leaveFadeRef.current = fade;
       const done = () => {
+        endPeekHandoff();
         if (!cancelled) removeInstantly();
       };
       fade.finished.then(done, done);
@@ -236,6 +263,7 @@ export default function MobileTitlePeek() {
   // Retirada ya la vista previa, la capa vuelve a estar visible para la
   // siguiente (antes de pintar: no hay fotograma intermedio).
   useLayoutEffect(() => {
+    if (!peek) endPeekHandoff();
     if (peek || !leaveFadeRef.current) return;
     leaveFadeRef.current.cancel();
     leaveFadeRef.current = null;
@@ -313,7 +341,10 @@ export default function MobileTitlePeek() {
       const resolved = resolvePeekTarget(event.target);
       if (!resolved) return;
       if (resolved.item.media_type === "season") loadSeasonPeek();
-      else loadDetailModal();
+      else {
+        loadDetailModal();
+        prewarmPeekPoster(resolved.item);
+      }
       const touch = event.touches[0];
       const gesture = {
         ...resolved,

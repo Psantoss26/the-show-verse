@@ -354,6 +354,65 @@ function normalizeProviders(list, max = 6) {
   return out;
 }
 
+// PORTADA DEL HERO DE TELÉFONO, COMPARTIDA. La vista previa de pulsación larga
+// (MobileTitlePeek) la pide en cuanto el dedo se apoya (`prewarmModalHeroPoster`)
+// y la ficha rápida, que monta ~0,4 s después, se engancha a la misma petición
+// en vuelo en vez de empezar de cero: así la tarjeta flotante puede crecer en
+// cuanto se cumple la pulsación, ya con su portada. Vale poco tiempo: la
+// selección del usuario puede cambiar.
+const HERO_POSTER_SHARE_MS = 30000;
+const heroPosterRequests = new Map();
+
+// La elección es la de `mobileNeutralPosterPath` (DetailsClient), ver la
+// carga en `useDetailModalData`. `finalPoster` a null: ni selección ni galería
+// (la ficha cae entonces al póster de los detalles).
+function requestModalHeroPoster(item) {
+  const mediaType = getMediaTypeForItem(item);
+  const id = item.id;
+  const key = `${mediaType}:${id}`;
+  const cached = heroPosterRequests.get(key);
+  if (cached && Date.now() - cached.at < HERO_POSTER_SHARE_MS) {
+    return cached.promise;
+  }
+  const artworkPreference = getArtworkPreference(id, mediaType);
+  const overrideType = mediaType === "tv" ? "tv" : "movie";
+  const persistedOverride = readPersistedArtworkOverride({
+    type: overrideType,
+    id,
+  });
+  const overrideFrom = (overrides, kind) =>
+    overrides ? overrides[kind] || null : artworkPreference[kind] || null;
+  const promise = (async () => {
+    const [images, artworkOverrides] = await Promise.all([
+      getMovieImages(id, mediaType).catch(() => null),
+      persistedOverride
+        ? persistedOverride
+        : fetchArtworkOverride({ type: overrideType, id }).catch(() => null),
+    ]);
+    const finalPoster = pickModalHeroPosterPath({
+      mobilePosterOverride: overrideFrom(artworkOverrides, "mobilePoster"),
+      posterOverride: overrideFrom(artworkOverrides, "poster"),
+      mainPosterPath: item?.poster_path || null,
+      posters: images?.posters,
+    });
+    // La ligera (w342) es la que pinta primero la tarjeta flotante y la ficha
+    // de teléfono.
+    if (finalPoster) {
+      await preloadImage(buildImg(finalPoster, "w342")).catch(() => {});
+    }
+    return { images, finalPoster };
+  })();
+  heroPosterRequests.set(key, { at: Date.now(), promise });
+  promise.catch(() => heroPosterRequests.delete(key));
+  return promise;
+}
+
+export function prewarmModalHeroPoster(item) {
+  if (!item || item.id == null || item.media_type === "episode") return;
+  if (item.media_type === "season") return;
+  requestModalHeroPoster(item).catch(() => {});
+}
+
 // `phoneView`: la ficha se muestra en la vista de TELÉFONO del drawer, que
 // pinta la portada y no el backdrop (ver la carga del backdrop del hero).
 export function useDetailModalData(item, { phoneView = false } = {}) {
@@ -1184,19 +1243,12 @@ export function useDetailModalData(item, { phoneView = false } = {}) {
         setData((prev) => ({ ...prev, ...extra, heroPosterResolved: true }));
       };
       try {
-        const [images, artworkOverrides] = await Promise.all([
-          getMovieImages(id, mediaType).catch(() => null),
-          artworkOverridesPromise,
-        ]);
+        // La misma petición que haya empezado la vista previa al apoyar el
+        // dedo, si la hay (ver `requestModalHeroPoster`).
+        const picked = await requestModalHeroPoster(item);
         if (cancelled) return;
-
-        const mainPosterPath = item?.poster_path || null;
-        let finalPoster = pickModalHeroPosterPath({
-          mobilePosterOverride: overrideFrom(artworkOverrides, "mobilePoster"),
-          posterOverride: overrideFrom(artworkOverrides, "poster"),
-          mainPosterPath,
-          posters: images?.posters,
-        });
+        const { images } = picked;
+        let finalPoster = picked.finalPoster;
 
         // Solo se espera a `detailsPromise` cuando de verdad hace falta (la
         // tarjeta pulsada no traía portada y no hay nada en la galería), en vez

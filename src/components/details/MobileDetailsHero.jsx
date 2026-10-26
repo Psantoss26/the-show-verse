@@ -37,6 +37,9 @@
 // hay que cambiarlas aquí.
 
 import { createContext, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { usePathname } from 'next/navigation'
+
+import { PEEK_HANDOFF_TARGET_ATTR, isPeekHandoffTarget } from '@/lib/navigation/peekHandoff'
 
 // Modo 'compact': la barra de stats del marcador se oculta hasta el scroll
 // (con el mismo disparador que lo secundario). No con `display: none`: se
@@ -1042,6 +1045,12 @@ export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, 
     const hasHigh = hasImage && Boolean(src && src !== firstSrc)
     const contrastScrim = useCoverContrastScrim(hasImage ? firstSrc : null, adaptiveContrast)
     const highReady = hasHigh && highSrc === src
+    // Llegada desde la vista previa de pulsación larga (MobileTitlePeek): la
+    // tarjeta flotante ya está enseñando esta portada encima, en este mismo
+    // sitio, y se desvanece sobre ella. Sin entrada ni fundido propios: si
+    // no, durante el relevo se vería la portada a medio entrar debajo.
+    const pathname = usePathname()
+    const [peekHandoff] = useState(() => !inPanel && isPeekHandoffTarget(pathname))
 
     useLayoutEffect(() => {
         const img = highRef.current
@@ -1085,12 +1094,16 @@ export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, 
                     // solo existe en la media query de teléfono: aquí, un
                     // fundido (o nada si ya estaba en caché, `animate`).
                     ? `${animate ? 'transition-opacity duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none' : ''} ${ready ? 'opacity-100' : 'opacity-0'}`
-                    : `sv-mobile-poster-entry ${ready ? (animate ? 'sv-mobile-poster-reveal' : '') : 'opacity-0'}`
+                    : `sv-mobile-poster-entry ${ready ? (animate && !peekHandoff ? 'sv-mobile-poster-reveal' : '') : 'opacity-0'}`
             }`}
             // Sobrebarrido escalando DESDE ARRIBA: el borde superior se queda
             // en su sitio y no se pierde la franja de arriba del póster (en la
             // temporada, bajo el navbar, se cortaba el título).
-            style={{ transform: `scale(${MOBILE_POSTER_OVERSCAN})`, transformOrigin: 'top center' }}
+            style={{
+                transform: `scale(${MOBILE_POSTER_OVERSCAN})`,
+                transformOrigin: 'top center',
+                ...(peekHandoff ? { transition: 'none' } : null),
+            }}
         >
             {/* Con mosaico (listas): lo que va DETRÁS de la portada y asoma
                 por su fundido inferior (la prolongación difuminada del
@@ -1125,6 +1138,7 @@ export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, 
             <div
                 className="relative overflow-hidden"
                 style={{ height: 'var(--mobile-cover-h)', WebkitMaskImage: mask, maskImage: mask }}
+                {...(inPanel ? null : { [PEEK_HANDOFF_TARGET_ATTR]: '' })}
             >
                 {hasImage ? (
                     <>

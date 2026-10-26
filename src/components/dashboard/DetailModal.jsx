@@ -3673,6 +3673,10 @@ export default function DetailModal({
       </div>
     ) : null;
 
+    const peekHref = isEpisode
+      ? `/details/tv/${episodeMeta?.showId ?? item?.showId ?? item?.id}/season/${episodeMeta?.seasonNumber ?? item?.seasonNumber}/episode/${episodeMeta?.episodeNumber ?? item?.episodeNumber}`
+      : dashboardDetailHref(item, mediaType);
+
     return (
       <DetailPeekLayout
         title={title}
@@ -3696,10 +3700,9 @@ export default function DetailModal({
         onBackdropPointerCancel={handleBackdropPointerCancel}
         onBackdropClick={handleBackdropClick}
         scrollRef={scrollContainerRef}
+        prefetchHref={peekHref}
         onOpenFull={() => {
-          const href = isEpisode
-            ? `/details/tv/${episodeMeta?.showId ?? item?.showId ?? item?.id}/season/${episodeMeta?.seasonNumber ?? item?.seasonNumber}/episode/${episodeMeta?.episodeNumber ?? item?.episodeNumber}`
-            : dashboardDetailHref(item, mediaType);
+          const href = peekHref;
           if (onPeekOpenFull) {
             onPeekOpenFull(href);
             return;

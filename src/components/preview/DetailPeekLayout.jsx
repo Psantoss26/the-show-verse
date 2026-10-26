@@ -10,6 +10,9 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { motion, usePresence, useReducedMotion } from "framer-motion";
 
 import { LIQUID_GLASS_DETAIL_SURFACE } from "@/lib/ui/liquidGlass";
+import { MOBILE_POSTER_OVERSCAN } from "@/components/details/MobileDetailsHero";
+import { morphPeekCard } from "@/lib/navigation/peekHandoff";
+import { useRouter } from "@/lib/offline/useOfflineRouter";
 
 /* ======================= VISTA PREVIA (PULSACIÓN LARGA) ======================= */
 // Ancho de la tarjeta: lo que da el teléfono menos 6px por lado, sin pasar de
@@ -25,8 +28,11 @@ const PEEK_SIDE_GUTTER = 6;
 // y abajo.
 const PEEK_CHROME_HEIGHT = 300;
 // La tarjeta no crece hasta tener la portada cargada (ver DetailPeekLayout);
-// si tarda más que esto, se abre igualmente con el esqueleto.
-const PEEK_ART_MAX_WAIT_MS = 1500;
+// si tarda más que esto, se abre igualmente con el esqueleto. La portada se
+// pide ya al apoyar el dedo (`prewarmModalHeroPoster`), así que casi siempre
+// está al cumplirse la pulsación y esto es solo el tope: más espera se lee
+// como que la pulsación no ha funcionado.
+const PEEK_ART_MAX_WAIT_MS = 450;
 
 function peekGeometry() {
   const vw = window.innerWidth;
@@ -61,8 +67,14 @@ function peekOriginTransform(origin, geometry) {
 // 0,9), muestreado en una curva `linear()`.
 const PEEK_SPRING = { stiffness: 380, damping: 32, mass: 0.9 };
 const PEEK_OPACITY_IN_MS = 140;
-const PEEK_EXIT_MS = 220;
-const PEEK_EXIT_EASING = "cubic-bezier(0.4, 0, 1, 1)";
+// Cierre: vuelve a la tarjeta pulsada frenando al llegar (sale rápido del
+// centro y se posa en su sitio), y se desvanece en la segunda mitad del
+// recorrido, ya cerca de ella. Antes aceleraba hasta el final (`ease-in`) y se
+// fundía desde el primer fotograma: parecía que se esfumaba a mitad de camino
+// y llegaba de golpe.
+const PEEK_EXIT_MS = 320;
+const PEEK_EXIT_EASING = "cubic-bezier(0.3, 0.7, 0.1, 1)";
+const PEEK_EXIT_FADE_DELAY_MS = 110;
 const PEEK_FALLBACK_EASING = "cubic-bezier(0.2, 0.9, 0.25, 1)";
 
 function sampleSpring({ stiffness, damping, mass }) {
@@ -123,11 +135,18 @@ export default function DetailPeekLayout({
   onBackdropPointerCancel,
   onBackdropClick,
   onOpenFull,
+  // Ficha a la que lleva la portada: se precarga al abrirse la vista previa
+  // para que, al tocarla, la navegación entre ya sin esperar al servidor.
+  prefetchHref = null,
   scrollRef,
   children,
 }) {
   const reduceMotion = useReducedMotion();
+  const router = useRouter();
   const [geometry] = useState(peekGeometry);
+  useEffect(() => {
+    if (prefetchHref) router.prefetch(prefetchHref);
+  }, [router, prefetchHref]);
   const from = reduceMotion
     ? { x: 0, y: 0, scale: 0.96 }
     : peekOriginTransform(origin, geometry);
@@ -198,15 +217,19 @@ export default function DetailPeekLayout({
     // Desde donde esté ahora (también si se cierra a mitad de la apertura).
     const current = window.getComputedStyle(card);
     card.getAnimations().forEach((animation) => animation.cancel());
+    const exitMs = reduceMotion ? 120 : PEEK_EXIT_MS;
+    const fadeDelay = reduceMotion ? 0 : PEEK_EXIT_FADE_DELAY_MS;
+    card.animate(
+      [{ transform: current.transform }, { transform: fromCss }],
+      { duration: exitMs, easing: PEEK_EXIT_EASING, fill: "forwards" },
+    );
     const exit = card.animate(
-      [
-        { transform: current.transform, opacity: current.opacity },
-        { transform: fromCss, opacity: 0 },
-      ],
+      [{ opacity: current.opacity }, { opacity: 0 }],
       {
-        duration: reduceMotion ? 120 : PEEK_EXIT_MS,
-        easing: PEEK_EXIT_EASING,
-        fill: "forwards",
+        duration: exitMs - fadeDelay,
+        delay: fadeDelay,
+        easing: "cubic-bezier(0.4, 0, 0.6, 1)",
+        fill: "both",
       },
     );
     let done = false;
@@ -218,6 +241,24 @@ export default function DetailPeekLayout({
     exit.finished.then(finish, finish);
     return undefined;
   }, [cardRef, isPresent, safeToRemove, fromCss, reduceMotion]);
+
+  // IR A LA FICHA: en el mismo fotograma del toque la tarjeta empieza a
+  // convertirse en la cabecera de la ficha (ver lib/navigation/peekHandoff) y
+  // luego se navega. Lo que no es portada se desvanece: la ficha trae su
+  // propia fila de botones y su marcador, que entran con su animación.
+  const coverRef = useRef(null);
+  const logoRef = useRef(null);
+  const logoShadeRef = useRef(null);
+  const chromeRef = useRef(null);
+  const handleOpenFull = () => {
+    morphPeekCard(cardRef.current, coverRef.current, {
+      fadeNodes: [logoRef.current, logoShadeRef.current, chromeRef.current],
+      overscan: MOBILE_POSTER_OVERSCAN,
+      fullPoster: !cover,
+      reduceMotion,
+    });
+    onOpenFull?.();
+  };
 
   return (
     <div
@@ -243,6 +284,7 @@ export default function DetailPeekLayout({
           // El `useScroll` de la ficha necesita su contenedor montado: aquí
           // es la tarjeta, que es lo que se desplaza en pantallas bajas.
           ref={cardRef}
+          data-peek-card=""
           className={`pointer-events-auto relative max-h-[calc(100svh-2rem)] overflow-y-auto overflow-x-hidden overscroll-contain rounded-[1.75rem] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${LIQUID_GLASS_DETAIL_SURFACE}`}
           style={{
             width: geometry.width,
@@ -256,8 +298,11 @@ export default function DetailPeekLayout({
         >
           {/* Portada con su logo. Tocarla abre la ficha completa. */}
           <button
+            ref={coverRef}
+            data-peek-cover=""
+            data-peek-full-poster={cover ? undefined : ""}
             type="button"
-            onClick={onOpenFull}
+            onClick={handleOpenFull}
             aria-label={title ? `Abrir la ficha de ${title}` : "Abrir la ficha"}
             className="relative block w-full overflow-hidden bg-transparent text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-yellow-400"
             style={{ height: geometry.posterHeight }}
@@ -304,11 +349,17 @@ export default function DetailPeekLayout({
                 />
               )}
               {logo && (
-                <div className="sv-preview-fade pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.6),rgba(0,0,0,0.25)_20%,transparent_40%)]" />
+                <div
+                  ref={logoShadeRef}
+                  className="sv-preview-fade pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.6),rgba(0,0,0,0.25)_20%,transparent_40%)]"
+                />
               )}
             </div>
             {logo && (
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center px-5 pb-3 text-center">
+              <div
+                ref={logoRef}
+                className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center px-5 pb-3 text-center"
+              >
                 {logo}
               </div>
             )}
@@ -316,7 +367,7 @@ export default function DetailPeekLayout({
 
           {/* Fila y marcador como en la ficha móvil: mismo ancho y 20px
               entre los dos. */}
-          <div className="px-2.5 pb-2.5 pt-3">
+          <div ref={chromeRef} className="px-2.5 pb-2.5 pt-3">
             {actions}
             <div className="mt-5">{scoreboard}</div>
           </div>
