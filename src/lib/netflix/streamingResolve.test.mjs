@@ -332,10 +332,31 @@ test("reconcileEpisodeNumbers: la numeración absoluta de Netflix se reparte por
 });
 
 test("reconcileEpisodeNumbers: lo ambiguo o imposible no se adivina", () => {
-  // Temporada inexistente con un número que cabría en cualquier temporada.
+  // Temporada inexistente con un número que cabría en cualquier temporada de una
+  // serie con varias: ¿relativo a qué parte?
   assert.equal(reconcileEpisodeNumbers({ season: 6, episode: 7 }, AOT_SEASONS), null);
   // Más episodios que toda la serie.
   assert.equal(reconcileEpisodeNumbers({ season: 6, episode: 120 }, AOT_SEASONS), null);
   assert.equal(reconcileEpisodeNumbers({ season: 1, episode: 3 }, []), null);
   assert.equal(reconcileEpisodeNumbers({ season: null, episode: 3 }, AOT_SEASONS), null);
+});
+
+// «Jujutsu Kaisen» en TMDb: una sola temporada de 59 episodios. Netflix la parte en
+// dos y su T2:E32 es el S1E32 («El incidente de Shibuya»).
+const JJK_SEASONS = [{ season_number: 1, episode_count: 59 }];
+
+test("reconcileEpisodeNumbers: con la posición absoluta del cliente, sin dudas", () => {
+  assert.deepEqual(reconcileEpisodeNumbers({ season: 2, episode: 32, absoluteEpisode: 32 }, JJK_SEASONS), { season: 1, episode: 32, via: "absolute" });
+  // Netflix empezando la segunda parte en 1: su T2:E8 es la posición 32.
+  assert.deepEqual(reconcileEpisodeNumbers({ season: 2, episode: 8, absoluteEpisode: 32 }, JJK_SEASONS), { season: 1, episode: 32, via: "absolute" });
+  // En una serie con varias temporadas, igual.
+  assert.deepEqual(reconcileEpisodeNumbers({ season: 6, episode: 7, absoluteEpisode: 82 }, AOT_SEASONS), { season: 4, episode: 23, via: "absolute" });
+  // Si el par existe en TMDb, manda el par.
+  assert.deepEqual(reconcileEpisodeNumbers({ season: 1, episode: 32, absoluteEpisode: 32 }, JJK_SEASONS), { season: 1, episode: 32, via: "as_is" });
+  assert.equal(reconcileEpisodeNumbers({ season: 2, episode: 8, absoluteEpisode: 80 }, JJK_SEASONS), null);
+});
+
+test("reconcileEpisodeNumbers: sin posición, una serie de una sola temporada se supone absoluta", () => {
+  assert.deepEqual(reconcileEpisodeNumbers({ season: 2, episode: 32 }, JJK_SEASONS), { season: 1, episode: 32, via: "absolute_guess" });
+  assert.equal(reconcileEpisodeNumbers({ season: 2, episode: 70 }, JJK_SEASONS), null);
 });

@@ -287,7 +287,7 @@ const DETECTION_SIGNAL_FIELDS = [
   "tabTitle", "queueTitle", "albumArtist", "notifTitle", "notifText", "notifSubText",
   "season", "episode", "durationSec", "seriesFromHint", "screenTitles",
   // De dónde salió la identidad (p. ej. "netflix_metadata") y el año que la acompaña.
-  "identitySource", "releaseYear",
+  "identitySource", "releaseYear", "absoluteEpisode",
 ];
 function detectionSignal(body) {
   const signal = {};
@@ -777,8 +777,30 @@ export async function POST(request) {
     if (isTv && tmdbId && season != null && episode != null && TMDB_API_KEY) {
       const { realSeasons } = await loadShowSeasons(tmdbId);
       if (realSeasons.length) {
-        const fixed = reconcileEpisodeNumbers({ season, episode }, realSeasons);
-        if (fixed?.via === "absolute") {
+        const absoluteEpisode = Number(payload.absoluteEpisode);
+        const fixed = reconcileEpisodeNumbers({
+          season,
+          episode,
+          absoluteEpisode: Number.isInteger(absoluteEpisode) && absoluteEpisode > 0 ? absoluteEpisode : null,
+        }, realSeasons);
+        // Suposición (serie de una sola temporada en TMDb): el nombre del
+        // episodio, si casa, manda sobre ella.
+        const byName = fixed?.via === "absolute_guess" && episodeName
+          ? await findSeasonByEpisodeName(tmdbId, episodeName)
+          : null;
+        if (byName) {
+          console.log(`[Extension Sync] T${season}:E${episode} no existe en TMDb; por nombre → T${byName.season}:E${byName.episode}`);
+          season = byName.season;
+          episode = byName.episode;
+          if (confidence === "high") confidence = "medium";
+        } else if (fixed?.via === "absolute_guess") {
+          console.log(
+            `[Extension Sync] T${season}:E${episode} no existe en TMDb (una sola temporada); se supone absoluto → T${fixed.season}:E${fixed.episode}`,
+          );
+          season = fixed.season;
+          episode = fixed.episode;
+          confidence = "low";
+        } else if (fixed?.via === "absolute") {
           console.log(
             `[Extension Sync] T${season}:E${episode} no existe en TMDb; como número absoluto → T${fixed.season}:E${fixed.episode}`,
           );

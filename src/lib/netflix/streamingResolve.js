@@ -365,17 +365,25 @@ export async function resolveStreamingEntity({
  * TMDb). Tomarlos tal cual guardaba un episodio que no existe.
  *
  * - El par existe en TMDb → se queda (`via: 'as_is'`).
+ * - El cliente sabe la posición del episodio contando todas las temporadas de
+ *   la plataforma (`absoluteEpisode`, Netflix con metadatos) → se reparte esa
+ *   posición por las temporadas de TMDb (`via: 'absolute'`). Vale tanto si la
+ *   plataforma numera de forma absoluta como si empieza cada parte en 1.
  * - El episodio no cabe en esa temporada (o la temporada no existe y el número
  *   es mayor que cualquier temporada) pero sí en la suma de todas → es un número
  *   absoluto y se reparte por temporadas (`via: 'absolute'`).
+ * - La temporada no existe, el número cabe y TMDb tiene UNA sola temporada (el
+ *   anime que la plataforma parte y TMDb junta, como «Jujutsu Kaisen») → lo más
+ *   probable es la numeración absoluta, pero no es seguro (`via: 'absolute_guess'`:
+ *   el llamador prueba antes el nombre del episodio).
  * - Si no → null: el llamador prueba por el nombre del episodio o lo deja a nivel
- *   serie. Un número pequeño en una temporada inexistente es ambiguo (¿relativo a
- *   qué parte?) y no se adivina.
+ *   serie. Un número pequeño en una temporada inexistente de una serie con varias
+ *   temporadas es ambiguo (¿relativo a qué parte?) y no se adivina.
  *
- * @param {{season:number, episode:number}} numbers
+ * @param {{season:number, episode:number, absoluteEpisode?:number|null}} numbers
  * @param {Array<{season_number:number, episode_count:number}>} realSeasons temporadas > 0
  */
-export function reconcileEpisodeNumbers({ season, episode }, realSeasons) {
+export function reconcileEpisodeNumbers({ season, episode, absoluteEpisode = null }, realSeasons) {
   const seasons = (Array.isArray(realSeasons) ? realSeasons : [])
     .map((s) => ({ season: Number(s?.season_number), count: Number(s?.episode_count) || 0 }))
     .filter((s) => Number.isInteger(s.season) && s.season > 0)
@@ -386,14 +394,21 @@ export function reconcileEpisodeNumbers({ season, episode }, realSeasons) {
   if (claimed && episode <= claimed.count) return { season, episode, via: "as_is" };
 
   const total = seasons.reduce((sum, s) => sum + s.count, 0);
+  const distribute = (position, via) => {
+    if (!(position > 0) || position > total) return null;
+    let before = 0;
+    for (const s of seasons) {
+      if (position <= before + s.count) return { season: s.season, episode: position - before, via };
+      before += s.count;
+    }
+    return null;
+  };
+
+  if (Number.isInteger(absoluteEpisode) && absoluteEpisode > 0) return distribute(absoluteEpisode, "absolute");
+
   const largest = Math.max(...seasons.map((s) => s.count));
   const cannotBeRelative = claimed ? episode > claimed.count : episode > largest;
-  if (!cannotBeRelative || episode > total) return null;
-
-  let before = 0;
-  for (const s of seasons) {
-    if (episode <= before + s.count) return { season: s.season, episode: episode - before, via: "absolute" };
-    before += s.count;
-  }
+  if (cannotBeRelative) return distribute(episode, "absolute");
+  if (!claimed && seasons.length === 1) return distribute(episode, "absolute_guess");
   return null;
 }

@@ -110,6 +110,16 @@ const SHOWS = [
       ],
     },
   },
+  // Anime que TMDb junta en UNA temporada y Netflix parte en dos: su T2:E32 es el
+  // S1E32 de TMDb.
+  {
+    id: 95479,
+    name: "Jujutsu Kaisen",
+    popularity: 260,
+    vote_count: 3500,
+    seasons: [{ season_number: 1, episode_count: 59 }],
+    episodes: { 1: [{ episode_number: 32, name: "El incidente de Shibuya" }] },
+  },
   // Serie REAL cuyo nombre aparece DENTRO del nombre de un episodio de otra
   // serie ("Capítulo cinco: La Nina"). Es el caso que registraba títulos sin
   // ninguna relación cuando el reproductor no decía de qué serie era el episodio.
@@ -898,4 +908,38 @@ test("Un par inexistente sin número absoluto posible ni nombre conocido queda a
   const result = await sync({ ...AOT_NETFLIX, season: 6, episode: 7, seasonEpisodeText: "T6:E7", episodeName: "Nada parecido" }, learned());
   assert.equal(synced(result).tmdbId, 1429);
   assert.deepEqual([synced(result).season, synced(result).episode, synced(result).confidence], [null, null, "low"]);
+});
+
+const JJK_NETFLIX = {
+  platform: "netflix",
+  contentId: "81442271",
+  mainTitle: "Jujutsu Kaisen",
+  showName: "Jujutsu Kaisen",
+  episodeName: "Otro nombre en Netflix",
+  season: 2,
+  episode: 32,
+  seasonEpisodeText: "T2:E32",
+  durationSec: 1440,
+  positionSec: 90,
+  detectionKind: "playback",
+};
+
+test("Serie de una sola temporada en TMDb: el T2:E32 de Netflix es el S1E32", async () => {
+  // Con la posición que calcula la extensión 3.3, sin dudas.
+  const withPosition = await sync({ ...JJK_NETFLIX, identitySource: "netflix_metadata", absoluteEpisode: 32 }, learned());
+  assert.deepEqual([synced(withPosition).tmdbId, synced(withPosition).season, synced(withPosition).episode], [95479, 1, 32]);
+  assert.equal(synced(withPosition).confidence, "medium");
+
+  // Netflix empezando la segunda parte en 1 (T2:E8): la posición sigue siendo 32.
+  const restarted = await sync({ ...JJK_NETFLIX, episode: 8, seasonEpisodeText: "T2:E8", identitySource: "netflix_metadata", absoluteEpisode: 32 }, learned());
+  assert.deepEqual([synced(restarted).season, synced(restarted).episode], [1, 32]);
+
+  // Cliente antiguo, sin posición: se supone absoluta, con confianza baja.
+  const guessed = await sync(JJK_NETFLIX, learned());
+  assert.deepEqual([synced(guessed).season, synced(guessed).episode, synced(guessed).confidence], [1, 32, "low"]);
+});
+
+test("Sin posición, el nombre del episodio manda sobre la suposición", async () => {
+  const result = await sync({ ...JJK_NETFLIX, episode: 8, seasonEpisodeText: "T2:E8", episodeName: "El incidente de Shibuya" }, learned());
+  assert.deepEqual([synced(result).season, synced(result).episode, synced(result).confidence], [1, 32, "medium"]);
 });

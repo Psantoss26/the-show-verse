@@ -83,9 +83,38 @@ test("metadatos de un episodio: serie, temporada y episodio numerados", () => {
     year: 2016,
     season: 4,
     episode: 5,
+    // Posición contando las temporadas de Netflix en orden: 1 + 2.
+    absoluteEpisode: 3,
     episodeTitle: "Chapter Five: The Nina Project",
     hiddenEpisodeNumbers: false,
   });
+});
+
+// «Jujutsu Kaisen»: Netflix tiene dos temporadas (24 + 23) y TMDb, una de 59.
+function jujutsuKaisen({ secondStartsAt }) {
+  const episodes = (count, firstSeq, firstId) =>
+    Array.from({ length: count }, (_, i) => ({ id: firstId + i, seq: firstSeq + i, title: `Ep ${firstSeq + i}` }));
+  return {
+    video: {
+      type: "show", id: 81278456, title: "Jujutsu Kaisen", year: 2020, currentEpisode: 900007, hiddenEpisodeNumbers: false,
+      seasons: [
+        { seq: 1, episodes: episodes(24, 1, 800000) },
+        { seq: 2, episodes: episodes(23, secondStartsAt, 900000) },
+      ],
+    },
+  };
+}
+
+test("posición absoluta: igual si Netflix sigue la numeración o empieza cada parte en 1", () => {
+  const continued = N.parseMetadata(jujutsuKaisen({ secondStartsAt: 25 }), "900007");
+  assert.deepEqual([continued.season, continued.episode, continued.absoluteEpisode], [2, 32, 32]);
+  const restarted = N.parseMetadata(jujutsuKaisen({ secondStartsAt: 1 }), "900007");
+  assert.deepEqual([restarted.season, restarted.episode, restarted.absoluteEpisode], [2, 8, 32]);
+  assert.equal(N.applyMetadata({}, restarted).absoluteEpisode, 32);
+  // En una colección no hay numeración que valga.
+  const hidden = N.parseMetadata({ video: { ...jujutsuKaisen({ secondStartsAt: 1 }).video, hiddenEpisodeNumbers: true } }, "900007");
+  assert.equal(hidden.absoluteEpisode, null);
+  assert.equal("absoluteEpisode" in N.applyMetadata({ absoluteEpisode: 3 }, hidden), false);
 });
 
 test("una colección no usa los números de Netflix, solo el nombre del episodio", () => {

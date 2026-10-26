@@ -71,12 +71,20 @@ Ahora el resolutor comprueba el par contra las temporadas de TMDb
 (`reconcileEpisodeNumbers` en `src/lib/netflix/streamingResolve.js`):
 
 - **Existe:** se queda.
+- **La extensión sabe la posición del episodio** (`absoluteEpisode`, contando
+  todas las temporadas de Netflix en orden, desde los metadatos): se reparte esa
+  posición por las temporadas de TMDb. Vale tanto si Netflix numera de forma
+  absoluta como si empieza cada parte en 1. Confianza media.
 - **El número no cabe en esa temporada** (o la temporada no existe y el número es
   mayor que cualquier temporada) **pero sí en la serie entera:** es absoluto y se
   reparte por temporadas. Confianza media.
+- **La temporada no existe y TMDb tiene una sola temporada** (anime que la
+  plataforma parte y TMDb junta: el T2:E32 de *Jujutsu Kaisen* es el S1E32): se
+  prueba el nombre del episodio y, si no casa, se supone numeración absoluta con
+  confianza baja.
 - **Si no:** se busca el episodio por su nombre en todas las temporadas y, si
   tampoco aparece, se guarda a nivel serie. Un número pequeño en una temporada
-  inexistente es ambiguo y no se adivina.
+  inexistente de una serie con varias temporadas es ambiguo y no se adivina.
 
 Vale para cualquier plataforma y para lo que llega del mapa de ids. Cuando el id
 lo da el propio reproductor (Netflix con metadatos), el mapa no se descarta porque

@@ -93,10 +93,17 @@
 
   /**
    * Metadatos de un vídeo, o null si la respuesta no sirve.
-   * Serie: { type:'show', videoId, showTitle, year, season, episode, episodeTitle, hiddenEpisodeNumbers }
+   * Serie: { type:'show', videoId, showTitle, year, season, episode, absoluteEpisode,
+   *   episodeTitle, hiddenEpisodeNumbers }
    * Película: { type:'movie', videoId, title, year }
    * En las colecciones (`hiddenEpisodeNumbers`) la numeración de Netflix no es la
    * de TMDb: temporada y episodio quedan null y vale el nombre del episodio.
+   *
+   * `absoluteEpisode` es la posición del episodio contando todas las temporadas
+   * de Netflix en orden. Netflix parte temporadas que TMDb junta («Jujutsu
+   * Kaisen»: su T2:E32 es el S1E32 de TMDb, que tiene una sola temporada) y a
+   * veces numera de forma absoluta y a veces no; la posición vale en los dos
+   * casos y el servidor la reparte por las temporadas de TMDb.
    */
   function parseMetadata(json, videoId) {
     const video = json?.video;
@@ -110,21 +117,27 @@
     const showTitle = cleanText(video.title);
     if (!showTitle) return null;
     const wanted = idString(video.currentEpisode) || idString(videoId);
+    let before = 0;
     for (const season of Array.isArray(video.seasons) ? video.seasons : []) {
-      for (const episode of Array.isArray(season?.episodes) ? season.episodes : []) {
-        if (idString(episode?.id) !== wanted) continue;
-        const hidden = Boolean(video.hiddenEpisodeNumbers);
-        return {
-          type: "show",
-          videoId: wanted,
-          showTitle,
-          year,
-          season: hidden ? null : positiveInt(season.seq),
-          episode: hidden ? null : positiveInt(episode.seq),
-          episodeTitle: cleanText(episode.title) || null,
-          hiddenEpisodeNumbers: hidden,
-        };
+      const episodes = Array.isArray(season?.episodes) ? season.episodes : [];
+      const index = episodes.findIndex((episode) => idString(episode?.id) === wanted);
+      if (index < 0) {
+        before += episodes.length;
+        continue;
       }
+      const episode = episodes[index];
+      const hidden = Boolean(video.hiddenEpisodeNumbers);
+      return {
+        type: "show",
+        videoId: wanted,
+        showTitle,
+        year,
+        season: hidden ? null : positiveInt(season.seq),
+        episode: hidden ? null : positiveInt(episode.seq),
+        absoluteEpisode: hidden ? null : before + index + 1,
+        episodeTitle: cleanText(episode.title) || null,
+        hiddenEpisodeNumbers: hidden,
+      };
     }
     return null;
   }
@@ -151,6 +164,8 @@
     if (meta.episodeTitle) out.episodeName = meta.episodeTitle;
     out.season = meta.season;
     out.episode = meta.episode;
+    if (meta.absoluteEpisode) out.absoluteEpisode = meta.absoluteEpisode;
+    else delete out.absoluteEpisode;
     // El badge del DOM no puede contradecir los números de los metadatos (ni
     // aportar los de Netflix en una colección, que no son los de TMDb).
     if (meta.season && meta.episode) out.seasonEpisodeText = `T${meta.season}:E${meta.episode}`;
