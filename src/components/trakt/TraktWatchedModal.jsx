@@ -111,10 +111,10 @@ function ProgressEntry({ progress, busy, disabled, error, onComplete, onRemove }
     progress.updatedAt ? relativeTime(progress.updatedAt) : null,
   ].filter(Boolean);
   return (
-    <div className="rounded-3xl bg-sky-500/10 p-4 shadow-md backdrop-blur-xl">
+    <div className="rounded-3xl bg-amber-500/10 p-4 shadow-md backdrop-blur-xl">
       <div className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-4">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-sky-400/15 text-sky-200 backdrop-blur-md">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-200 backdrop-blur-md">
             <MonitorPlay className="h-5 w-5" aria-hidden="true" />
           </div>
           <div className="min-w-0">
@@ -159,7 +159,7 @@ function ProgressEntry({ progress, busy, disabled, error, onComplete, onRemove }
         aria-valuenow={pct}
         aria-label="Progreso de reproducción"
       >
-        <div className="h-full rounded-full bg-sky-400" style={{ width: `${pct}%` }} />
+        <div className="h-full rounded-full bg-amber-500" style={{ width: `${pct}%` }} />
       </div>
       {error && (
         <p role="alert" className="mt-2 text-xs text-red-300">
@@ -363,7 +363,7 @@ export default function TraktWatchedModal({
                 {plays ? `${plays} Vistas` : "Sin ver"}
               </span>
               {progress && (
-                <span className="flex items-center gap-1.5 rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-sky-200 backdrop-blur-md">
+                <span className="flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-200 backdrop-blur-md">
                   <MonitorPlay className="h-3 w-3" aria-hidden="true" />
                   En curso
                 </span>
