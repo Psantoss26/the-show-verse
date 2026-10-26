@@ -55,25 +55,30 @@ if (backend) {
 function runBackendWithReload() {
   const cwd = resolve(root, 'backend');
   const srcDir = join(cwd, 'src');
+  const migrationsDir = join(cwd, 'drizzle');
   const args = ['src/server.js', ...process.argv.slice(3)];
   let child = null;
   let stopping = false;
 
-  const signature = () => {
+  const signature = (dir, pattern) => {
     const parts = [];
-    const walk = (dir) => {
-      for (const entry of readdirSync(dir, { withFileTypes: true })) {
-        const path = join(dir, entry.name);
+    const walk = (current) => {
+      for (const entry of readdirSync(current, { withFileTypes: true })) {
+        const path = join(current, entry.name);
         if (entry.isDirectory()) walk(path);
-        else if (/\.(?:m?js|json)$/.test(entry.name)) {
+        else if (pattern.test(entry.name)) {
           const stats = statSync(path);
           parts.push(`${path}:${stats.mtimeMs}:${stats.size}:${stats.ino}`);
         }
       }
     };
-    walk(srcDir);
+    walk(dir);
     return parts.sort().join('|');
   };
+  const codeSignature = () => signature(srcDir, /\.(?:m?js|json)$/);
+  // Las migraciones nuevas también se aplican al recargar: si no, el código
+  // que ya usa una columna nueva llegaba antes que la columna (500 en local).
+  const migrationsSignature = () => signature(migrationsDir, /\.sql$/);
 
   const start = () => {
     child = spawn(process.execPath, args, { cwd, env, stdio: 'inherit' });
@@ -86,13 +91,23 @@ function runBackendWithReload() {
 
   const alive = () => child && child.exitCode === null && child.signalCode === null;
 
-  let last = signature();
+  let last = codeSignature();
+  let lastMigrations = migrationsSignature();
   const timer = setInterval(() => {
     let next;
-    try { next = signature(); } catch { return; } // a mitad de un checkout
-    if (next === last) return;
+    let nextMigrations;
+    try {
+      next = codeSignature();
+      nextMigrations = migrationsSignature();
+    } catch { return; } // a mitad de un checkout
+    if (next === last && nextMigrations === lastMigrations) return;
     last = next;
-    console.log('[dev] Cambios en backend/src: reiniciando el backend…');
+    if (nextMigrations !== lastMigrations) {
+      lastMigrations = nextMigrations;
+      console.log('[dev] Migraciones nuevas: aplicándolas…');
+      spawnSync(process.execPath, ['src/db/migrate.js'], { cwd, env, stdio: 'inherit' });
+    }
+    console.log('[dev] Cambios en el backend: reiniciando el backend…');
     if (alive()) {
       child.once('exit', start);
       child.kill('SIGTERM');
