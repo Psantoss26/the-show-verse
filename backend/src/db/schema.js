@@ -632,6 +632,9 @@ export const streamingDetections = pgTable('streaming_detections', {
   // Cliente que la envió: 'android' (app) | 'browser' (extensión) | null (filas
   // anteriores al campo). Ver lib/detectionOrigin.js.
   origin: text('origin'),
+  // Id del contenido en la plataforma (Netflix /watch/<id>…), si el cliente lo
+  // dio: la corrección lo lleva al mapa de ids (streaming_content_ids).
+  contentId: text('content_id'),
   // Destino tras corregir (null si no había título): los pings que sigan
   // llegando con este id se aplican aquí.
   correctedTmdbId: integer('corrected_tmdb_id'),
@@ -707,6 +710,66 @@ export const detectionRules = pgTable('detection_rules', {
   lookupIdx: index('idx_detection_rules_lookup').on(t.platform, t.fingerprint),
   ownerPlatformIdx: index('idx_detection_rules_owner_platform').on(t.owner, t.platform, t.rule),
   ruleCheck: check('chk_detection_rules_rule', sql`rule IN ('override', 'not_a_title', 'reject')`),
+}));
+
+// Observaciones de streaming que el resolutor NO pudo convertir en un título, con
+// su motivo. Es la otra mitad de streaming_detections para medir cada plataforma
+// (ver lib/streamingStats.js). La misma observación repetida en poco tiempo
+// (reintentos de la cola, cada ping de la reproducción) suma `attempts`.
+//   - unresolved:    no se encontró en TMDb (404 del resolutor);
+//   - not_a_title:   una regla dice que ese texto no es un título;
+//   - hint_mismatch: la serie de la pista no tiene ese episodio;
+//   - empty_title:   no quedaba ningún texto utilizable.
+export const streamingDiscards = pgTable('streaming_discards', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  platform: text('platform').notNull(),
+  kind: text('kind').notNull(),                            // 'detail' | 'playback'
+  reason: text('reason').notNull(),
+  origin: text('origin'),                                  // como streaming_detections.origin
+  triggerText: text('trigger_text').notNull(),
+  fingerprint: text('fingerprint').default('').notNull(),
+  contentId: text('content_id'),
+  signal: jsonb('signal').notNull(),
+  attempts: integer('attempts').default(1).notNull(),
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  userCreated: index('idx_streaming_discards_user_created').on(t.userId, t.createdAt),
+  platformCreated: index('idx_streaming_discards_platform_created').on(t.platform, t.createdAt),
+  kindCheck: check('chk_streaming_discards_kind', sql`kind IN ('detail', 'playback')`),
+  reasonCheck: check('chk_streaming_discards_reason',
+    sql`reason IN ('unresolved', 'not_a_title', 'hint_mismatch', 'empty_title')`),
+  originCheck: check('chk_streaming_discards_origin', sql`origin IS NULL OR origin IN ('android', 'browser')`),
+}));
+
+// Qué título es cada id de contenido de una plataforma, según cada usuario (una
+// fila por usuario e id). Se consulta ANTES de buscar por texto. Ver
+// lib/contentIdMap.js.
+//   - auto:       resolución propia de confianza alta durante una reproducción;
+//   - correction: lo eligió el usuario al corregir una detección (manda siempre).
+// Para los demás vale cuando lo respaldan suficientes usuarios distintos.
+export const streamingContentIds = pgTable('streaming_content_ids', {
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  platform: text('platform').notNull(),
+  contentId: text('content_id').notNull(),
+  tmdbId: integer('tmdb_id').notNull(),
+  mediaType: text('media_type').notNull(),
+  season: integer('season'),
+  episode: integer('episode'),
+  title: text('title'),
+  posterPath: text('poster_path'),
+  source: text('source').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.userId, t.platform, t.contentId] }),
+  contentIdx: index('idx_streaming_content_ids_content').on(t.platform, t.contentId),
+  sourceCheck: check('chk_streaming_content_ids_source', sql`source IN ('auto', 'correction')`),
+  mediaTypeCheck: check('chk_streaming_content_ids_media_type', sql`media_type IN ('movie', 'tv')`),
+  // Un id de reproducción es un episodio concreto, nunca la serie entera.
+  episodeCheck: check('chk_streaming_content_ids_episode',
+    sql`(media_type = 'movie' AND season IS NULL AND episode IS NULL) OR (media_type = 'tv' AND season IS NOT NULL AND episode IS NOT NULL)`),
 }));
 
 // ─────────────────────────────────────────────

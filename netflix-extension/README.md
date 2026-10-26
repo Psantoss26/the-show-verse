@@ -35,6 +35,8 @@ tags: [area/integracion, type/referencia, plataforma/navegador]
 | `detection-core.test.js` | Tests unitarios de `detection-core.js` (`node:test`), sin navegador. |
 | `fake-dom.js` | DOM mínimo **solo para pruebas** (no está en el manifest, así que nunca se carga en el navegador). Soporta el subconjunto de CSS que usan la detección y los refinadores, y su `textContent` concatena los hijos sin separación igual que el DOM real. |
 | `players.test.js` | La detección reproductor a reproductor, con película y con episodio: reconstruye el DOM real de Netflix, Prime Video, Max, Disney+, Crunchyroll y Plex y comprueba la señal completa. Su contraparte en el servidor es `src/lib/netflix/playbackSignals.test.mjs`. |
+| `netflix-source.js` | Netflix desde su reproductor y sus metadatos (`self.TSVNetflix`, puro y testeable): lectura de `playerApp.getState()`, validación del mensaje de la página, URLs de metadatos (`memberapi/release`, versionadas con `BUILD_IDENTIFIER`, `shakti/mre`), análisis de la respuesta y fusión con la señal. Pruebas en `netflix-source.test.js`. |
+| `netflix-page.js` | Único script en el **mundo de la página** (`"world": "MAIN"`, solo `www.netflix.com`): cada segundo, en `/watch/`, publica por `postMessage` el id del vídeo que suena, si está en pausa y el `BUILD_IDENTIFIER`. No hace peticiones. |
 | `platform-enhancers.js` | Refinadores opcionales por plataforma (`self.TSVEnhancers`). Uno por sitio (Netflix, Prime, Max, Disney+, Plex, Crunchyroll) que solo *afina* campos concretos (contentId desde la URL, selectores de título/subtítulo propios) sobre la señal base; nunca lanzan y si un selector cambia la señal genérica se mantiene intacta. |
 | `popup.html` / `popup.js` | UI del icono de la extensión: estado de la sincronización (activa/pausada/no vinculada), email y perfil de Netflix vinculado, botón de pausa/reanudación, interruptor del indicador de acceso rápido, registro de actividad reciente (`chrome.storage.local.logs`) y gestión de "sitios de streaming" añadidos manualmente (solicita permiso de host y registra el content script en caliente). |
 
@@ -65,6 +67,23 @@ principal (≥320×180px, para descartar miniaturas/anuncios en iframes) con
 puede mostrarse el indicador de ficha (`resolveOnly`, ver más abajo). Cachea el
 último título bueno detectado por vídeo (`lastGood`) porque en Netflix el overlay de
 título desaparece del DOM durante la reproducción.
+
+### Netflix: reproductor y metadatos (desde la 3.3)
+
+En Netflix la identidad ya no sale del DOM. `netflix-page.js` dice qué vídeo suena
+según el propio reproductor (si calla, vale el id de `/watch/<id>`), y `content.js`
+pide con ese id los metadatos a Netflix (`/metadata?languages=en-US&movieid=<id>`,
+con las cookies de la sesión, una vez por vídeo). Con ellos la señal lleva la serie,
+el nombre del episodio, la temporada y el episodio numerados (`seq`), o la película,
+y el año (`releaseYear`), marcada con `identitySource: "netflix_metadata"`:
+
+- **Mandan sobre el DOM.** Un badge o un título de otra fila no los contradice.
+- **Colecciones** (`hiddenEpisodeNumbers`): la numeración de Netflix no es la de
+  TMDb, así que van sin números y el servidor localiza el episodio por su nombre.
+- **Espera corta.** Mientras llegan (hasta 6 s) no se resuelve con el DOM, para que
+  la detección no cambie de identidad a mitad. Si no llegan o fallan, se sigue con
+  el DOM como antes y se reintenta al cabo de un minuto.
+- **Solo en el reproductor.** Fuera de `/watch/` (avances del catálogo) no se usa.
 
 ## Flujo de datos hacia The Show Verse
 

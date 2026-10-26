@@ -2,8 +2,11 @@
 // Detecciones de streaming (extensión + app Android) y su corrección.
 //
 // Con el TOKEN de sincronización (los clientes y el endpoint de resolución):
-//   POST /streaming/detections/lookup   → reglas aprendidas para una huella
+//   POST /streaming/detections/lookup   → reglas aprendidas para una huella y
+//                                         título conocido del id de contenido
 //   POST /streaming/detections          → registra una detección notificada
+//   POST /streaming/discards            → registra una observación que no se
+//                                         pudo resolver, con su motivo
 //   GET  /streaming/rules/not-a-title   → textos que no son títulos (por plataforma)
 //
 // Con el TOKEN del MÓVIL (registro de detecciones nativo de la app Android y de
@@ -18,6 +21,9 @@
 //                                             salvo las del móvil (esas, en la app)
 //   GET  /streaming/detections/:id          → una detección
 //   POST /streaming/detections/:id/correction → «no había ficha» / «es otro título»
+//   GET  /streaming/discards                → observaciones sin resolver recientes
+//   GET  /streaming/stats                   → resumen por plataforma (resueltas,
+//                                             corregidas, descartadas)
 //
 // Ver lib/detectionRules.js para cómo una corrección se convierte en reglas.
 
@@ -29,7 +35,9 @@ import {
   connectedAccounts,
   detectionCorrections,
   detectionRules,
+  streamingContentIds,
   streamingDetections,
+  streamingDiscards,
   watchHistory,
   watchProgress,
 } from '../db/schema.js';
@@ -44,6 +52,8 @@ import {
   globalRuleMinSupporters,
   userRulesFromCorrection,
 } from '../lib/detectionRules.js';
+import { summarizeStreaming } from '../lib/streamingStats.js';
+import { contentTarget, decideContent, learnsFromDetection, mapContentId } from '../lib/contentIdMap.js';
 
 const DETECTION_RETENTION_DAYS = 30;
 // La misma detección repetida en poco tiempo (recargar la ficha, reanudar tras
@@ -53,10 +63,14 @@ const DETECTION_REUSE_MS = 10 * 60 * 1000;
 const platformSchema = z.string().trim().min(1).max(40);
 const fingerprintSchema = z.string().max(400);
 
+const contentIdSchema = z.string().trim().max(200).nullable().optional();
+
 const lookupSchema = z.object({
   platform: platformSchema,
-  fingerprint: fingerprintSchema.min(1),
-});
+  // Vacía si el texto no sirve para aprender; basta entonces con el id.
+  fingerprint: fingerprintSchema.default(''),
+  contentId: contentIdSchema,
+}).refine((v) => v.fingerprint || v.contentId, { message: 'fingerprint or contentId is required' });
 
 const recordSchema = z.object({
   platform: platformSchema,
@@ -72,7 +86,8 @@ const recordSchema = z.object({
   title: z.string().max(300).nullable().optional(),
   posterPath: z.string().max(300).nullable().optional(),
   confidence: z.enum(['high', 'medium', 'low']).nullable().optional(),
-  source: z.enum(['search', 'user_rule', 'global_rule']).default('search'),
+  source: z.enum(['search', 'user_rule', 'global_rule', 'content_id']).default('search'),
+  contentId: contentIdSchema,
 });
 
 const correctionSchema = z.object({
@@ -94,6 +109,30 @@ const correctionSchema = z.object({
     issue('season/episode only apply to series');
   }
   if (v.episode != null && v.season == null) issue('episode requires season');
+});
+
+const discardSchema = z.object({
+  platform: platformSchema,
+  kind: z.enum(['detail', 'playback']),
+  reason: z.enum(['unresolved', 'not_a_title', 'hint_mismatch', 'empty_title']),
+  triggerText: z.string().max(300).default(''),
+  fingerprint: fingerprintSchema.default(''),
+  contentId: contentIdSchema,
+  signal: z.record(z.unknown()).default({}),
+});
+
+// 'browser' incluye las filas sin origen (anteriores al campo), como el listado web.
+const originQuerySchema = z.enum(['all', 'browser', 'android']).default('all');
+
+const statsQuerySchema = z.object({
+  days: z.coerce.number().int().min(1).max(DETECTION_RETENTION_DAYS).default(7),
+  origin: originQuerySchema,
+});
+
+const discardListQuerySchema = z.object({
+  days: z.coerce.number().int().min(1).max(DETECTION_RETENTION_DAYS).default(7),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  origin: originQuerySchema,
 });
 
 const listQuerySchema = z.object({
@@ -208,6 +247,74 @@ export async function lookupRules(executor, userId, platform, fingerprint) {
       or(eq(detectionRules.owner, userId), eq(detectionRules.owner, GLOBAL_OWNER)),
     ));
   return decideFromRules(rows, userId);
+}
+
+/** Título conocido de un id de contenido para este usuario (ver lib/contentIdMap.js). */
+export async function lookupContentId(executor, userId, platform, rawContentId) {
+  const contentId = mapContentId(platform, rawContentId);
+  if (!contentId) return null;
+  const [own] = await executor
+    .select()
+    .from(streamingContentIds)
+    .where(and(
+      eq(streamingContentIds.userId, userId),
+      eq(streamingContentIds.platform, platform),
+      eq(streamingContentIds.contentId, contentId),
+    ))
+    .limit(1);
+  if (own) return decideContent(own, [], globalRuleMinSupporters());
+  const supporters = sql`count(*)::int`;
+  const ranked = await executor
+    .select({
+      tmdbId: streamingContentIds.tmdbId,
+      mediaType: streamingContentIds.mediaType,
+      season: streamingContentIds.season,
+      episode: streamingContentIds.episode,
+      title: sql`max(${streamingContentIds.title})`,
+      posterPath: sql`max(${streamingContentIds.posterPath})`,
+      supporters,
+    })
+    .from(streamingContentIds)
+    .where(and(
+      eq(streamingContentIds.platform, platform),
+      eq(streamingContentIds.contentId, contentId),
+    ))
+    .groupBy(
+      streamingContentIds.tmdbId,
+      streamingContentIds.mediaType,
+      streamingContentIds.season,
+      streamingContentIds.episode,
+    )
+    .orderBy(desc(supporters))
+    .limit(2);
+  return decideContent(null, ranked, globalRuleMinSupporters());
+}
+
+/**
+ * Guarda lo que este usuario sabe de un id. Una fila automática nunca pisa una
+ * corrección; `target` null borra la fila (el id ya no se sabe qué es).
+ */
+async function saveContentId(executor, userId, platform, rawContentId, target, source) {
+  const contentId = mapContentId(platform, rawContentId);
+  if (!contentId) return;
+  const key = and(
+    eq(streamingContentIds.userId, userId),
+    eq(streamingContentIds.platform, platform),
+    eq(streamingContentIds.contentId, contentId),
+  );
+  const row = target && contentTarget(target);
+  if (!row) {
+    // Lo automático sin episodio concreto no enseña nada, pero tampoco borra.
+    if (source === 'correction') await executor.delete(streamingContentIds).where(key);
+    return;
+  }
+  await executor.insert(streamingContentIds).values({
+    userId, platform, contentId, ...row, source,
+  }).onConflictDoUpdate({
+    target: [streamingContentIds.userId, streamingContentIds.platform, streamingContentIds.contentId],
+    set: { ...row, source, updatedAt: new Date() },
+    ...(source === 'auto' ? { setWhere: sql`${streamingContentIds.source} <> 'correction'` } : {}),
+  });
 }
 
 /**
@@ -407,6 +514,56 @@ async function listDetections(userId, { days, limit }, originFilter) {
 const NOT_FROM_ANDROID = or(isNull(streamingDetections.origin), ne(streamingDetections.origin, ANDROID));
 const FROM_ANDROID = eq(streamingDetections.origin, ANDROID);
 
+/** Filtro por cliente de una tabla con columna `origin`, o undefined para todos. */
+function originFilter(table, origin) {
+  if (origin === 'android') return eq(table.origin, ANDROID);
+  if (origin === 'browser') return or(isNull(table.origin), ne(table.origin, ANDROID));
+  return undefined;
+}
+
+/**
+ * Resumen por plataforma (ver lib/streamingStats.js). Sin `userId`, de todos los
+ * usuarios (scripts/streaming-stats.js).
+ */
+export async function streamingStats(executor, { userId = null, since, origin = 'all' }) {
+  const d = streamingDetections;
+  const x = streamingDiscards;
+  const count = sql`count(*)::int`;
+  const detectionRows = await executor
+    .select({
+      platform: d.platform, origin: d.origin, status: d.status, source: d.source,
+      confidence: d.confidence, count,
+    })
+    .from(d)
+    .where(and(userId ? eq(d.userId, userId) : undefined, gt(d.createdAt, since), originFilter(d, origin)))
+    .groupBy(d.platform, d.origin, d.status, d.source, d.confidence);
+  const discardRows = await executor
+    .select({
+      platform: x.platform, origin: x.origin, reason: x.reason, count,
+      attempts: sql`sum(${x.attempts})::int`,
+    })
+    .from(x)
+    .where(and(userId ? eq(x.userId, userId) : undefined, gt(x.createdAt, since), originFilter(x, origin)))
+    .groupBy(x.platform, x.origin, x.reason);
+  return summarizeStreaming({ detectionRows, discardRows });
+}
+
+function toDiscardResult(row) {
+  return {
+    id: row.id,
+    platform: row.platform,
+    kind: row.kind,
+    reason: row.reason,
+    origin: row.origin,
+    triggerText: row.triggerText,
+    contentId: row.contentId,
+    signal: row.signal,
+    attempts: row.attempts,
+    createdAt: row.createdAt,
+    lastSeenAt: row.lastSeenAt,
+  };
+}
+
 async function findDetection(userId, rawId) {
   const id = z.string().uuid().safeParse(rawId);
   if (!id.success) return null;
@@ -490,6 +647,12 @@ async function correctDetection(userId, detectionId, body) {
 
     const data = await reassignDetectionData(tx, userId, detection.id, target);
 
+    // El id de contenido pasa a ser lo que dijo el usuario. Sin título concreto
+    // (o a nivel serie) deja de saberse qué es y la fila cae.
+    if (detection.contentId) {
+      await saveContentId(tx, userId, detection.platform, detection.contentId, target, 'correction');
+    }
+
     // Solo se aprende de huellas útiles, y nunca de «era el mismo título» (solo
     // se cambió el episodio: el título no estaba mal).
     if (detection.fingerprint && !sameAsDetected) {
@@ -530,7 +693,12 @@ export default async function streamingDetectionsRoutes(fastify) {
     if (!parsed.success) {
       return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
     }
-    return lookupRules(db, userId, parsed.data.platform, parsed.data.fingerprint);
+    const { platform, fingerprint, contentId } = parsed.data;
+    const rules = fingerprint
+      ? await lookupRules(db, userId, platform, fingerprint)
+      : { decision: null, rejects: [] };
+    const content = contentId ? await lookupContentId(db, userId, platform, contentId) : null;
+    return { ...rules, content };
   });
 
   fastify.post('/detections', async (req, reply) => {
@@ -545,6 +713,16 @@ export default async function streamingDetectionsRoutes(fastify) {
     const isTv = d.mediaType === 'tv';
     const season = isTv ? (d.season ?? null) : null;
     const episode = isTv ? (d.episode ?? null) : null;
+    const contentId = mapContentId(d.platform, d.contentId);
+
+    // Una reproducción resuelta con seguridad enseña al mapa de ids, aunque la
+    // detección se reutilice.
+    if (contentId && learnsFromDetection(d)) {
+      await saveContentId(db, userId, d.platform, contentId, {
+        tmdbId: d.tmdbId, mediaType: d.mediaType, season, episode,
+        title: d.title ?? null, posterPath: d.posterPath ?? null,
+      }, 'auto');
+    }
 
     const [recent] = await db
       .select({ id: streamingDetections.id })
@@ -581,6 +759,7 @@ export default async function streamingDetectionsRoutes(fastify) {
       confidence: d.confidence ?? null,
       source: d.source,
       origin: account.origin,
+      contentId,
     }).returning({ id: streamingDetections.id });
 
     // Purga de lo antiguo de este usuario (barata: va por su índice).
@@ -590,6 +769,62 @@ export default async function streamingDetectionsRoutes(fastify) {
     ));
 
     return reply.status(201).send({ detectionId: row.id });
+  });
+
+  fastify.post('/discards', async (req, reply) => {
+    const account = await syncAccountForToken(req);
+    if (!account) return reply.status(401).send({ error: 'Sync token is invalid or missing' });
+    const { userId } = account;
+    const parsed = discardSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
+    }
+    const d = parsed.data;
+    const contentId = d.contentId || null;
+
+    // La misma observación repetida (cola que reintenta, un ping cada 30 s
+    // mientras dura la reproducción) es UN descarte con varios intentos.
+    const [recent] = await db
+      .select({ id: streamingDiscards.id })
+      .from(streamingDiscards)
+      .where(and(
+        eq(streamingDiscards.userId, userId),
+        eq(streamingDiscards.platform, d.platform),
+        eq(streamingDiscards.kind, d.kind),
+        eq(streamingDiscards.reason, d.reason),
+        eq(streamingDiscards.triggerText, d.triggerText),
+        contentId == null ? isNull(streamingDiscards.contentId) : eq(streamingDiscards.contentId, contentId),
+        gt(streamingDiscards.lastSeenAt, new Date(Date.now() - DETECTION_REUSE_MS)),
+      ))
+      .orderBy(desc(streamingDiscards.lastSeenAt))
+      .limit(1);
+    if (recent) {
+      await db.update(streamingDiscards).set({
+        attempts: sql`${streamingDiscards.attempts} + 1`,
+        lastSeenAt: new Date(),
+        signal: d.signal,
+      }).where(eq(streamingDiscards.id, recent.id));
+      return { discardId: recent.id, reused: true };
+    }
+
+    const [row] = await db.insert(streamingDiscards).values({
+      userId,
+      platform: d.platform,
+      kind: d.kind,
+      reason: d.reason,
+      origin: account.origin,
+      triggerText: d.triggerText,
+      fingerprint: d.fingerprint,
+      contentId,
+      signal: d.signal,
+    }).returning({ id: streamingDiscards.id });
+
+    await db.delete(streamingDiscards).where(and(
+      eq(streamingDiscards.userId, userId),
+      lt(streamingDiscards.createdAt, new Date(Date.now() - DETECTION_RETENTION_DAYS * 86_400_000)),
+    ));
+
+    return reply.status(201).send({ discardId: row.id });
   });
 
   fastify.get('/rules/not-a-title', async (req, reply) => {
@@ -698,4 +933,35 @@ export default async function streamingDetectionsRoutes(fastify) {
 
   fastify.post('/detections/:id/correction', { preHandler: fastify.requireAuth }, async (req, reply) =>
     handleCorrection(req.user.id, req, reply));
+
+  fastify.get('/discards', { preHandler: fastify.requireAuth }, async (req, reply) => {
+    const parsed = discardListQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
+    }
+    const { days, limit, origin } = parsed.data;
+    const rows = await db
+      .select()
+      .from(streamingDiscards)
+      .where(and(
+        eq(streamingDiscards.userId, req.user.id),
+        gt(streamingDiscards.createdAt, new Date(Date.now() - days * 86_400_000)),
+        originFilter(streamingDiscards, origin),
+      ))
+      .orderBy(desc(streamingDiscards.lastSeenAt))
+      .limit(limit);
+    return { results: rows.map(toDiscardResult) };
+  });
+
+  fastify.get('/stats', { preHandler: fastify.requireAuth }, async (req, reply) => {
+    const parsed = statsQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'Validation error', issues: parsed.error.issues });
+    }
+    const { days, origin } = parsed.data;
+    const summary = await streamingStats(db, {
+      userId: req.user.id, since: new Date(Date.now() - days * 86_400_000), origin,
+    });
+    return { days, origin, ...summary };
+  });
 }

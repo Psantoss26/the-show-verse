@@ -12,6 +12,7 @@
     "db:migrate": "node src/db/migrate.js",
     "activity:group-legacy-show": "node src/scripts/group-legacy-show-activity.js",
     "level:backfill": "node src/scripts/backfill-level-state.js",
+    "streaming:stats": "node src/scripts/streaming-stats.js",
     "community:prune-posterless": "node src/scripts/prune-posterless-community-items.js",
     "user:restore": "node src/scripts/restore-user-data.js",
     "demo:social": "node src/scripts/seed-social-demo.js",

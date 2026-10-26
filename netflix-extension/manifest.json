@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "The Show Verse - Streaming Sync",
-  "version": "3.2",
+  "version": "3.3",
   "description": "Sincroniza la reproducción de servicios compatibles y tu historial de Letterboxd con The Show Verse. Incluye recuperación de envíos y seguimiento de progreso.",
   "permissions": [
     "cookies",
@@ -65,9 +65,21 @@
         "sync-reliability.js",
         "detection-core.js",
         "platform-enhancers.js",
+        "netflix-source.js",
         "content.js"
       ],
       "all_frames": true
+    },
+    {
+      "matches": [
+        "https://www.netflix.com/*"
+      ],
+      "js": [
+        "netflix-source.js",
+        "netflix-page.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_idle"
     },
     {
       "matches": [

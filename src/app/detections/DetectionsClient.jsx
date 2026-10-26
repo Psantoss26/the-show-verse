@@ -10,6 +10,7 @@ import Link from "next/link";
 import { AlertCircle, ChevronRight, Film, Loader2, Radar, Tv } from "lucide-react";
 
 import OptimizedImage from "@/components/OptimizedImage";
+import DetectionSummary from "./DetectionSummary";
 import { useAuth } from "@/context/AuthContext";
 import { detectionPlatformLabel, fetchRecentDetections } from "@/lib/api/detectionsClient";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
@@ -160,6 +161,7 @@ export default function DetectionsClient() {
           correcta, corrígela: se arregla lo guardado y la sincronización aprende de ello. Las
           detecciones del móvil se revisan en la app The Show Verse Sync.
         </p>
+        {hydrated && authenticated && <DetectionSummary days={7} />}
         {body}
       </section>
     </main>

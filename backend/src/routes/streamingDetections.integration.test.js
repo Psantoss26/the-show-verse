@@ -214,4 +214,143 @@ test('streaming detections: corrections fix stored data and teach the resolver',
       token: stranger.token, payload: { verdict: 'not_a_title' },
     })).status, 404);
   });
+
+  // ── Mapa de ids de contenido ───────────────────────────────────────────────
+  const cid = () => String(Math.floor(Math.random() * 1e12));
+  const lookupId = (u, contentId, platform = 'netflix') => call('POST', '/v1/streaming/detections/lookup', {
+    token: u.token, payload: { platform, fingerprint: '', contentId },
+  });
+  const recordId = (u, contentId, extra = {}) => record(u, {
+    contentId, confidence: 'high', tmdbId: 66732, title: 'Stranger Things', season: 4, episode: 5, ...extra,
+  });
+
+  await t.test('a confident playback teaches its content id to the user, and to others by consensus', async () => {
+    const id = cid();
+    const [a, b, c] = [await user(), await user(), await user()];
+    assert.equal((await lookupId(a, id)).json.content, null);
+
+    await recordId(a, id);
+    const own = await lookupId(a, id);
+    assert.equal(own.status, 200, JSON.stringify(own.json));
+    assert.deepEqual(
+      [own.json.content.scope, own.json.content.source, own.json.content.tmdbId, own.json.content.season, own.json.content.episode],
+      ['user', 'auto', 66732, 4, 5],
+    );
+    // Uno solo no basta para los demás (mínimo 2 en esta prueba).
+    assert.equal((await lookupId(c, id)).json.content, null);
+    await recordId(b, id);
+    const global = await lookupId(c, id);
+    assert.deepEqual([global.json.content.scope, global.json.content.supporters], ['global', 2]);
+    // La huella sigue funcionando a la vez que el id.
+    const both = await call('POST', '/v1/streaming/detections/lookup', {
+      token: c.token, payload: { platform: 'netflix', fingerprint: FP, contentId: id },
+    });
+    assert.ok(Array.isArray(both.json.rejects));
+    assert.equal(both.json.content.tmdbId, 66732);
+  });
+
+  await t.test('only confident playback of an item-level id is learned', async () => {
+    const u = await user();
+    const [low, detail, prime, showLevel, fromMap] = [cid(), cid(), cid(), cid(), cid()];
+    await recordId(u, low, { confidence: 'medium' });
+    await recordId(u, detail, { kind: 'detail' });
+    await recordId(u, prime, { platform: 'primevideo' });
+    await recordId(u, showLevel, { episode: null });
+    await recordId(u, fromMap, { source: 'content_id' });
+    for (const id of [low, detail, showLevel, fromMap]) {
+      assert.equal((await lookupId(u, id)).json.content, null, id);
+    }
+    assert.equal((await lookupId(u, prime, 'primevideo')).json.content, null);
+    assert.equal((await call('POST', '/v1/streaming/detections/lookup', {
+      token: u.token, payload: { platform: 'netflix', fingerprint: '' },
+    })).status, 400);
+  });
+
+  await t.test('a correction pins the content id and later automatic resolutions do not undo it', async () => {
+    const u = await user();
+    const id = cid();
+    const { json: { detectionId } } = await recordId(u, id);
+    const res = await call('POST', `/v1/streaming/detections/${detectionId}/correction`, {
+      userId: u.id,
+      payload: { verdict: 'wrong_title', tmdbId: 1396, mediaType: 'tv', season: 2, episode: 1, title: 'Breaking Bad' },
+    });
+    assert.equal(res.status, 200, JSON.stringify(res.json));
+    let content = (await lookupId(u, id)).json.content;
+    assert.deepEqual([content.source, content.tmdbId, content.season, content.episode], ['correction', 1396, 2, 1]);
+
+    await recordId(u, id, { tmdbId: 500, title: 'Otra' });
+    content = (await lookupId(u, id)).json.content;
+    assert.deepEqual([content.source, content.tmdbId], ['correction', 1396]);
+
+    // «No era ningún título»: el id deja de saberse qué es.
+    const again = await recordId(u, id, { tmdbId: 1396, season: 2, episode: 1, source: 'content_id', fingerprint: 'netflix|otra cosa' });
+    await call('POST', `/v1/streaming/detections/${again.json.detectionId}/correction`, {
+      userId: u.id, payload: { verdict: 'not_a_title' },
+    });
+    assert.equal((await lookupId(u, id)).json.content, null);
+  });
+
+  // ── Descartes y resumen por plataforma ─────────────────────────────────────
+  const discard = (u, extra = {}) => call('POST', '/v1/streaming/discards', {
+    token: u.token,
+    payload: {
+      platform: 'movistar', kind: 'playback', reason: 'unresolved', triggerText: 'Serie rara',
+      fingerprint: 'movistar|serie rara', signal: { mainTitle: 'Serie rara' }, ...extra,
+    },
+  });
+
+  await t.test('a discarded observation is stored once per burst, with its reason and client', async () => {
+    const phone = await user('mobile:');
+    assert.equal((await discard({ token: 'nope' })).status, 401);
+    assert.equal((await discard(phone, { reason: 'whatever' })).status, 400);
+
+    const first = await discard(phone);
+    assert.equal(first.status, 201, JSON.stringify(first.json));
+    const again = await discard(phone, { signal: { mainTitle: 'Serie rara', episode: 2 } });
+    assert.deepEqual([again.json.discardId, again.json.reused], [first.json.discardId, true]);
+    // Otro motivo u otro id de contenido es otra observación.
+    assert.notEqual((await discard(phone, { reason: 'empty_title' })).json.discardId, first.json.discardId);
+    assert.notEqual((await discard(phone, { contentId: '42' })).json.discardId, first.json.discardId);
+
+    const all = await call('GET', '/v1/streaming/discards', { userId: phone.id });
+    assert.equal(all.status, 200);
+    assert.equal(all.json.results.length, 3);
+    const merged = all.json.results.find((r) => r.id === first.json.discardId);
+    assert.deepEqual([merged.attempts, merged.origin, merged.signal.episode], [2, 'android', 2]);
+    // La web (origin=browser) no enseña lo del móvil.
+    assert.equal((await call('GET', '/v1/streaming/discards?origin=browser', { userId: phone.id })).json.results.length, 0);
+    assert.equal((await call('GET', '/v1/streaming/discards', {})).status, 401);
+  });
+
+  await t.test('stats summarize detections, corrections and discards per platform and client', async () => {
+    const u = await user('browser:');
+    const phone = await addDevice(u, 'mobile:');
+    const a = await record(u, { fingerprint: 'netflix|uno', confidence: 'high' });
+    await record(u, { fingerprint: 'netflix|dos', confidence: 'high', source: 'content_id' });
+    await record(phone, { fingerprint: 'netflix|tres' });
+    await call('POST', `/v1/streaming/detections/${a.json.detectionId}/correction`, {
+      userId: u.id, payload: { verdict: 'not_a_title' },
+    });
+    await discard(u, { platform: 'netflix', reason: 'unresolved' });
+    await discard(u, { platform: 'netflix', reason: 'unresolved' });
+    await discard(phone, { platform: 'movistar', reason: 'empty_title', triggerText: '' });
+
+    const all = await call('GET', '/v1/streaming/stats?days=7', { userId: u.id });
+    assert.equal(all.status, 200, JSON.stringify(all.json));
+    assert.deepEqual(all.json.platforms.map((p) => p.platform), ['netflix', 'movistar']);
+    const netflix = all.json.platforms[0];
+    assert.deepEqual(
+      [netflix.detected, netflix.corrected, netflix.discarded, netflix.discardedAttempts],
+      [3, 1, 1, 2],
+    );
+    assert.deepEqual(netflix.bySource, { search: 2, content_id: 1 });
+    assert.deepEqual(netflix.byOrigin.android, { detected: 1, corrected: 0, discarded: 0 });
+    assert.equal(netflix.successRate, 0.5);
+    assert.deepEqual(all.json.totals.byReason, { unresolved: 1, empty_title: 1 });
+
+    const browser = await call('GET', '/v1/streaming/stats?origin=browser', { userId: u.id });
+    assert.deepEqual(browser.json.platforms.map((p) => [p.platform, p.detected, p.discarded]), [['netflix', 2, 1]]);
+    assert.equal((await call('GET', '/v1/streaming/stats?days=99', { userId: u.id })).status, 400);
+    assert.equal((await call('GET', '/v1/streaming/stats', {})).status, 401);
+  });
 });

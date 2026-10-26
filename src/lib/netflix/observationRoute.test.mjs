@@ -7,6 +7,7 @@ import * as resolve from './resolve.js';
 import * as variants from './queryVariants.js';
 import * as cache from './requestCache.js';
 import * as fingerprint from './detectionFingerprint.js';
+import * as contentIdMatch from './contentIdMatch.js';
 
 const source = await readFile(new URL('../../app/api/netflix/extension-sync/route.js', import.meta.url), 'utf8');
 // Con el target por defecto (ES5) TypeScript degrada los spreads de iteradores del
@@ -26,6 +27,7 @@ function handler() {
     '@/lib/netflix/queryVariants': variants,
     '@/lib/netflix/requestCache': cache,
     '@/lib/netflix/detectionFingerprint': fingerprint,
+    '@/lib/netflix/contentIdMatch': contentIdMatch,
   };
   const cjsModule = { exports: {} };
   new Function('require', 'module', 'exports', compiled)(name => {

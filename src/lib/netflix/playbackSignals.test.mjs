@@ -17,6 +17,7 @@ import * as resolve from "./resolve.js";
 import * as variants from "./queryVariants.js";
 import * as cache from "./requestCache.js";
 import * as fingerprint from "./detectionFingerprint.js";
+import * as contentIdMatch from "./contentIdMatch.js";
 
 const { normalizeText } = resolve;
 
@@ -211,6 +212,10 @@ function installFakeNetwork(sent, detections = null) {
       detections.lookups.push(JSON.parse(init.body));
       return json(detections.rules || { decision: null, rejects: [] });
     }
+    if (detections && url.endsWith("/v1/streaming/discards")) {
+      detections.discarded.push(JSON.parse(init.body));
+      return json({ discardId: "0c2f4b0e-9d1f-4a2b-8a1a-2f3c4d5e6f00" }, 201);
+    }
     if (detections && url.endsWith("/v1/streaming/detections")) {
       detections.recorded.push(JSON.parse(init.body));
       return json({ detectionId: "9b1f4b0e-9d1f-4a2b-8a1a-2f3c4d5e6f99" }, 201);
@@ -256,6 +261,7 @@ function handler() {
     "@/lib/netflix/queryVariants": variants,
     "@/lib/netflix/requestCache": cache,
     "@/lib/netflix/detectionFingerprint": fingerprint,
+    "@/lib/netflix/contentIdMatch": contentIdMatch,
   };
   const cjs = { exports: {} };
   new Function("require", "module", "exports", compiled)(
@@ -637,7 +643,7 @@ test("El progreso de una película llega sin temporada ni episodio", async () =>
 });
 
 // ── Aprendizaje de las correcciones ──────────────────────────────────────────
-const learned = (rules = null) => ({ rules, lookups: [], recorded: [] });
+const learned = (rules = null) => ({ rules, lookups: [], recorded: [], discarded: [] });
 
 test("Una regla del usuario resuelve el título sin buscar y conserva el episodio", async () => {
   const result = await sync({
@@ -689,4 +695,137 @@ test("Sin backend de detecciones se sincroniza igual que antes", async () => {
   const result = await sync({ platform: "netflix", mainTitle: "El Irlandés", movieTitle: "El Irlandés" });
   assert.equal(synced(result).tmdbId, 398978);
   assert.equal("detectionId" in synced(result), false);
+});
+
+// ── Mapa de ids de contenido (ver contentIdMatch.js) ─────────────────────────
+
+const knownId = (content, decision = null) => learned({ decision, rejects: [], content });
+
+test("Un id de contenido ya conocido resuelve sin buscar, aunque el texto sea genérico", async () => {
+  const result = await sync({
+    platform: "netflix",
+    contentId: "81234567",
+    mainTitle: "Capítulo 3",
+    episodeName: "Capítulo 3",
+  }, knownId({ scope: "global", source: null, tmdbId: 66732, mediaType: "tv", season: 4, episode: 3, title: "Stranger Things" }));
+  assert.equal(synced(result).tmdbId, 66732);
+  assert.equal(synced(result).season, 4);
+  assert.equal(synced(result).episode, 3);
+  assert.equal(synced(result).confidence, "high");
+  // Sin huella (el texto es genérico) la consulta va igual, solo con el id.
+  assert.equal(result.detections.lookups[0].fingerprint, "");
+  assert.equal(result.detections.lookups[0].contentId, "81234567");
+  assert.equal(result.detections.recorded[0].source, "content_id");
+  assert.equal(result.detections.recorded[0].contentId, "81234567");
+});
+
+test("Si el reproductor da otro episodio, el id conocido no se usa", async () => {
+  const result = await sync({
+    platform: "netflix",
+    contentId: "81234567",
+    mainTitle: "Stranger Things",
+    showName: "Stranger Things",
+    season: 4,
+    episode: 5,
+  }, knownId({ scope: "user", source: "auto", tmdbId: 1396, mediaType: "tv", season: 1, episode: 1, title: "Breaking Bad" }));
+  assert.equal(synced(result).tmdbId, 66732);
+  assert.equal(synced(result).episode, 5);
+  // La resolución nueva va con el id, para que el backend rehaga su fila.
+  assert.equal(result.detections.recorded[0].source, "search");
+  assert.equal(result.detections.recorded[0].contentId, "81234567");
+});
+
+test("La corrección del usuario para un id gana a «no es un título»", async () => {
+  const result = await sync({ platform: "netflix", contentId: "70000001", mainTitle: "Top 10 en España", movieTitle: "Top 10 en España" },
+    knownId(
+      { scope: "user", source: "correction", tmdbId: 398978, mediaType: "movie", season: null, episode: null, title: "El Irlandés" },
+      { rule: "not_a_title", scope: "global" },
+    ));
+  assert.equal(result.status, 200);
+  assert.equal(synced(result).tmdbId, 398978);
+});
+
+test("Sin id de contenido ni huella no se consulta nada", async () => {
+  const result = await sync({ platform: "netflix", mainTitle: "Capítulo 3", episodeName: "Capítulo 3" }, learned());
+  assert.equal(result.detections.lookups.length, 0);
+});
+
+// ── Observaciones descartadas (medición por plataforma) ──────────────────────
+
+test("Un título que no se encuentra queda registrado como descartado, con su señal", async () => {
+  const result = await sync({
+    platform: "com.netflix.mediaclient",
+    mainTitle: "Capítulo cinco: La Nina",
+    movieTitle: "Capítulo cinco: La Nina",
+    seasonEpisodeText: "T4:E5 - Capítulo cinco: La Nina",
+    season: 4,
+    episode: 5,
+    durationSec: 4200,
+  }, learned());
+  assert.equal(result.status, 404);
+  assert.equal(result.detections.recorded.length, 0);
+  const [discard] = result.detections.discarded;
+  assert.equal(discard.reason, "unresolved");
+  assert.equal(discard.kind, "playback");
+  assert.equal(discard.triggerText, "Capítulo cinco: La Nina");
+  assert.equal(discard.signal.seasonEpisodeText, "T4:E5 - Capítulo cinco: La Nina");
+});
+
+test("Cada salida sin título lleva su motivo", async () => {
+  const notATitle = await sync({ platform: "netflix", mainTitle: "Top 10 en España", movieTitle: "Top 10 en España" },
+    learned({ decision: { rule: "not_a_title", scope: "global" }, rejects: [] }));
+  assert.deepEqual(notATitle.detections.discarded.map((d) => d.reason), ["not_a_title"]);
+
+  const platformOnly = await sync({ platform: "netflix", mainTitle: "Netflix", tabTitle: "Netflix", contentId: "8101" }, learned());
+  assert.equal(platformOnly.status, 422);
+  assert.deepEqual(platformOnly.detections.discarded.map((d) => [d.reason, d.kind, d.contentId]), [["empty_title", "detail", "8101"]]);
+
+  const noTitle = await sync({ platform: "primevideo", subTitle: "T1 E3" }, learned());
+  assert.equal(noTitle.status, 400);
+  assert.deepEqual(noTitle.detections.discarded.map((d) => [d.platform, d.reason, d.triggerText]), [["primevideo", "empty_title", "T1 E3"]]);
+});
+
+test("Lo que se resuelve no se registra como descartado", async () => {
+  const result = await sync({ platform: "netflix", mainTitle: "El Irlandés", movieTitle: "El Irlandés" }, learned());
+  assert.equal(synced(result).tmdbId, 398978);
+  assert.equal(result.detections.discarded.length, 0);
+});
+
+// ── Netflix desde sus metadatos (netflix-extension/netflix-source.js) ────────
+
+test("Netflix con metadatos: serie y episodio en inglés, números exactos", async () => {
+  const result = await sync({
+    platform: "netflix",
+    contentId: "81091417",
+    mainTitle: "Stranger Things",
+    showName: "Stranger Things",
+    episodeName: "Chapter Five: The Nina Project",
+    season: 4,
+    episode: 5,
+    seasonEpisodeText: "T4:E5",
+    identitySource: "netflix_metadata",
+    releaseYear: 2016,
+    durationSec: 3100,
+    positionSec: 600,
+    detectionKind: "playback",
+  }, learned());
+  assert.deepEqual([synced(result).tmdbId, synced(result).season, synced(result).episode], [66732, 4, 5]);
+  assert.equal(synced(result).confidence, "high");
+  // Queda constancia de que la identidad salió de los metadatos.
+  assert.equal(result.detections.recorded[0].signal.identitySource, "netflix_metadata");
+  assert.equal(result.detections.recorded[0].signal.releaseYear, 2016);
+});
+
+test("Netflix con metadatos: una película por su título original", async () => {
+  const result = await sync({
+    platform: "netflix",
+    contentId: "80175798",
+    mainTitle: "The Irishman",
+    movieTitle: "The Irishman",
+    identitySource: "netflix_metadata",
+    releaseYear: 2019,
+    durationSec: 12600,
+  }, learned());
+  assert.equal(synced(result).tmdbId, 398978);
+  assert.equal(synced(result).mediaType, "movie");
 });

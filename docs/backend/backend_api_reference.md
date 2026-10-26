@@ -306,8 +306,9 @@ Ver [social-y-perfiles](../features/social-y-perfiles.md).
 
 | Metodo | Ruta | Auth | Descripcion |
 | --- | --- | --- | --- |
-| `POST` | `/v1/streaming/detections/lookup` | Token sync | Reglas aprendidas para una huella |
-| `POST` | `/v1/streaming/detections` | Token sync | Registra una deteccion notificada |
+| `POST` | `/v1/streaming/detections/lookup` | Token sync | Reglas aprendidas para una huella (`fingerprint`) y título conocido del id de contenido (`contentId` → `content`); basta uno de los dos |
+| `POST` | `/v1/streaming/detections` | Token sync | Registra una deteccion notificada; con `contentId` y confianza alta en reproduccion, ensena el id al mapa |
+| `POST` | `/v1/streaming/discards` | Token sync | Registra una observacion que no se pudo resolver (`reason`: `unresolved`, `not_a_title`, `hint_mismatch`, `empty_title`); repetida en 10 min suma `attempts` |
 | `GET` | `/v1/streaming/rules/not-a-title` | Token sync | Textos que no son titulos, por plataforma |
 | `GET` | `/v1/streaming/device/detections` | Token movil | Detecciones de la app Android |
 | `GET` | `/v1/streaming/device/detections/{id}` | Token movil | Una deteccion |
@@ -316,6 +317,8 @@ Ver [social-y-perfiles](../features/social-y-perfiles.md).
 | `GET` | `/v1/streaming/detections` | Si | Detecciones recientes (salvo las del movil) |
 | `GET` | `/v1/streaming/detections/{id}` | Si | Una deteccion |
 | `POST` | `/v1/streaming/detections/{id}/correction` | Si | «No habia ficha» / «es otro titulo» |
+| `GET` | `/v1/streaming/discards?days=&origin=` | Si | Observaciones sin resolver recientes (`origin`: `all`, `browser`, `android`) |
+| `GET` | `/v1/streaming/stats?days=&origin=` | Si | Resumen por plataforma: resueltas, corregidas, descartadas por motivo y acierto |
 
 ## Planes y facturacion
 

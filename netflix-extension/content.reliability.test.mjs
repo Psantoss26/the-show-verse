@@ -128,3 +128,104 @@ test('Crunchyroll top page ignores messages from other origins and stale state',
   p.tick();
   assert.equal(p.sent.filter(x => x.message.action === 'syncWatch').length, 0);
 });
+
+// Netflix desde el reproductor y sus metadatos (netflix-source.js): content.js
+// real, con el módulo real, el mensaje de netflix-page.js y fetch simulado.
+const netflixSource = (await import('./netflix-source.js')).default;
+const STRANGER_THINGS = {
+  video: {
+    type: 'show', id: 80057281, title: 'Stranger Things', year: 2016, currentEpisode: 81091417,
+    hiddenEpisodeNumbers: false,
+    seasons: [{ seq: 4, episodes: [{ id: 81091417, seq: 5, title: 'Chapter Five: The Nina Project' }] }],
+  },
+};
+
+function netflixWatch({ metadata = STRANGER_THINGS, hang = false } = {}) {
+  let tick, clock = 100_000;
+  const sent = [], fetched = [], listeners = {};
+  const video = { readyState: 4, duration: 3100, currentTime: 600, clientWidth: 1280, clientHeight: 720, addEventListener() {} };
+  const win = { addEventListener: (name, fn) => { listeners[name] = fn; } };
+  const context = {
+    console: { log() {}, warn() {} },
+    Date: class extends Date { static now() { return clock; } },
+    setInterval: fn => { tick = fn; return 1; }, clearInterval() {},
+    setTimeout, clearTimeout,
+    location: { hostname: 'www.netflix.com', href: 'https://www.netflix.com/watch/81091417', pathname: '/watch/81091417' },
+    navigator: {},
+    document: { title: 'Netflix', querySelectorAll: selector => selector === 'video' ? [video] : [], getElementById: () => null, addEventListener() {} },
+    window: win,
+    fetch: (url) => {
+      fetched.push(url);
+      if (hang) return new Promise(() => {});
+      return Promise.resolve(metadata
+        ? { ok: true, json: async () => metadata }
+        : { ok: false, status: 404, json: async () => ({}) });
+    },
+    self: { TSVSyncReliability: reliability, TSVNetflix: netflixSource, TSVDetection: {
+      isBarePlatformName: () => false,
+      // Lo que queda en el DOM con el overlay oculto: una fila del catálogo.
+      composePlaybackSignal: (i) => ({ contentId: '81091417', showName: 'Top 10 en España', episodeName: 'Fila', season: 1, episode: 1,
+        durationSec: i.durationSec, positionSec: i.positionSec }),
+      fillMissingTitles: signal => signal,
+      pickProgressPoint: (live, cached) => live || cached,
+    } },
+    chrome: { runtime: { id: 'test', sendMessage: (message, callback) => { sent.push({ message, callback }); } },
+      storage: { local: { get: (_keys, callback) => callback({ indicatorEnabled: false }) }, onChanged: { addListener() {} } } },
+  };
+  vm.runInNewContext(source, context);
+  const player = (data) => listeners.message({ data: { source: 'tsv-netflix-player', ...data }, source: win });
+  const settle = () => new Promise((resolve) => setImmediate(resolve));
+  const watches = () => sent.filter(x => x.message.action === 'syncWatch');
+  return { tick: () => tick(), sent, fetched, player, settle, watches, advance: ms => { clock += ms; } };
+}
+
+test('Netflix resolves with the metadata of the video the player reports, not the DOM', async () => {
+  const p = netflixWatch();
+  p.player({ videoId: '81091417', paused: false, buildId: 'v1' });
+  p.tick();
+  // Mientras llegan los metadatos no se resuelve con el DOM.
+  assert.equal(p.watches().length, 0);
+  assert.match(p.fetched[0], /memberapi\/release\/metadata\?languages=en-US&movieid=81091417$/);
+  await p.settle();
+  p.tick();
+  const [watch] = p.watches();
+  assert.equal(watch.message.showName, 'Stranger Things');
+  assert.equal(watch.message.mainTitle, 'Stranger Things');
+  assert.equal(watch.message.subTitle, 'Chapter Five: The Nina Project');
+  assert.deepEqual([watch.message.season, watch.message.episode], [4, 5]);
+  assert.equal(watch.message.contentId, '81091417');
+  assert.equal(watch.message.identitySource, 'netflix_metadata');
+  assert.equal(watch.message.releaseYear, 2016);
+});
+
+test('Netflix falls back to the DOM when there is no metadata', async () => {
+  const p = netflixWatch({ metadata: null });
+  p.tick();
+  await p.settle();
+  // Probó todas las variantes sin BUILD_IDENTIFIER y no reintenta en cada ciclo.
+  assert.equal(p.fetched.length, 2);
+  p.tick();
+  const [watch] = p.watches();
+  assert.equal(watch.message.showName, 'Top 10 en España');
+  assert.equal(watch.message.identitySource, undefined);
+  assert.equal(p.fetched.length, 2);
+});
+
+test('Netflix does not wait forever for metadata that never arrives', () => {
+  const p = netflixWatch({ hang: true });
+  p.tick();
+  assert.equal(p.watches().length, 0);
+  p.advance(7000); p.tick();
+  assert.equal(p.watches().length, 1);
+});
+
+test('the video the player reports wins over the URL', async () => {
+  const p = netflixWatch({ metadata: { video: { ...STRANGER_THINGS.video, currentEpisode: 81091418,
+    seasons: [{ seq: 4, episodes: [{ id: 81091418, seq: 6, title: 'Chapter Six: The Dive' }] }] } } });
+  p.player({ videoId: '81091418', paused: false });
+  p.tick();
+  assert.match(p.fetched[0], /movieid=81091418$/);
+  await p.settle();
+  p.tick();
+  assert.deepEqual([p.watches()[0].message.contentId, p.watches()[0].message.episode], ['81091418', 6]);
+});

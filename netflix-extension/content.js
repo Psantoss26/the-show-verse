@@ -777,6 +777,73 @@
   // punto exacto al salir sin duplicar listeners).
   let listenedVideo = null;
 
+  // ---- Netflix desde su reproductor y sus metadatos (ver netflix-source.js) ----
+  // netflix-page.js (mundo de la página) publica qué vídeo suena; con su id se
+  // piden los metadatos (serie, temporada y episodio numerados, o película con
+  // año), que mandan sobre lo que se lee del DOM. Sin ellos, todo sigue como antes.
+  const NX = self.TSVNetflix;
+  const isNetflix = Boolean(NX && NX.HOST_RE.test(location.hostname) && !isSubframe);
+  const NETFLIX_PLAYER_TTL_MS = 5000;
+  // Cuánto se espera a los metadatos antes de resolver con el DOM.
+  const NETFLIX_META_WAIT_MS = 6000;
+  const NETFLIX_META_RETRY_MS = 60000;
+  let netflixPlayer = null;
+  // id de vídeo → { status: 'pending' | 'ok' | 'failed', meta, at }
+  const netflixMeta = new Map();
+
+  if (isNetflix) {
+    try {
+      window.addEventListener("message", (event) => {
+        if (event.source !== window) return;
+        const state = NX.parsePlayerMessage(event.data);
+        if (state) netflixPlayer = { ...state, at: Date.now() };
+      });
+    } catch {
+      /* entorno sin window: ignoramos */
+    }
+  }
+
+  // Vídeo que suena según el reproductor; la URL si el reproductor no ha hablado.
+  // Fuera de /watch/ no hay vídeo (los avances del catálogo no cuentan).
+  function netflixVideoId() {
+    const fromUrl = NX.watchIdFromPath(location.pathname);
+    if (!fromUrl) return null;
+    const fresh = netflixPlayer && Date.now() - netflixPlayer.at < NETFLIX_PLAYER_TTL_MS;
+    return fresh ? netflixPlayer.videoId : fromUrl;
+  }
+
+  async function fetchNetflixMetadata(videoId, buildId) {
+    for (const url of NX.metadataUrls(videoId, buildId)) {
+      try {
+        const res = await fetch(url, { credentials: "include", cache: "no-store" });
+        if (!res.ok) continue;
+        const meta = NX.parseMetadata(await res.json(), videoId);
+        if (meta) return meta;
+      } catch {
+        /* siguiente variante de la URL */
+      }
+    }
+    return null;
+  }
+
+  // Entrada de metadatos del vídeo; la primera vez (o tras un fallo antiguo) los pide.
+  function netflixMetadataEntry(videoId) {
+    const now = Date.now();
+    let entry = netflixMeta.get(videoId);
+    if (!entry || (entry.status === "failed" && now - entry.at > NETFLIX_META_RETRY_MS)) {
+      entry = { status: "pending", meta: null, at: now };
+      netflixMeta.set(videoId, entry);
+      const pending = entry;
+      fetchNetflixMetadata(videoId, netflixPlayer?.buildId || null).then((meta) => {
+        pending.status = meta ? "ok" : "failed";
+        pending.meta = meta;
+        pending.at = Date.now();
+        if (!meta) console.log(`[The Show Verse] Netflix: sin metadatos para ${videoId}; se usa el reproductor.`);
+      });
+    }
+    return entry;
+  }
+
   // Comprueba que el contexto de la extensión siga vivo. Tras recargar/actualizar
   // la extensión, el content script antiguo queda huérfano y `chrome.runtime`
   // pasa a ser undefined: acceder a él lanza y rompería cada tick.
@@ -809,7 +876,7 @@
     const video = getMainVideo();
     if (!video || video.currentTime < MIN_WATCH_SECONDS) return null;
 
-    const signal = D.composePlaybackSignal({
+    let signal = D.composePlaybackSignal({
       host: location.hostname,
       url: location.href,
       contentId: null,
@@ -821,6 +888,15 @@
       doc: document,
       enhance: E ? E.enhance : null,
     });
+
+    if (isNetflix) {
+      const videoId = netflixVideoId();
+      if (videoId) {
+        signal.contentId = videoId;
+        const entry = netflixMetadataEntry(videoId);
+        if (entry.meta) signal = NX.applyMetadata(signal, entry.meta);
+      }
+    }
 
     // Cache del último título bueno para ESTE vídeo: si ahora tenemos serie/peli
     // (overlay visible) lo guardamos; si no (overlay oculto, elemento fuera del
@@ -1013,6 +1089,13 @@
       // resolveOnly, SIN añadir nada al historial.
       maybeShowBrowsingIndicator();
       return;
+    }
+    // Netflix: mientras llegan los metadatos del vídeo (unos segundos como mucho)
+    // no se resuelve con el DOM, para que la detección no cambie de identidad a
+    // mitad. Si no llegan, se sigue con lo que da el reproductor.
+    if (isNetflix && signal.contentId && signal.identitySource !== "netflix_metadata") {
+      const entry = netflixMeta.get(signal.contentId);
+      if (entry?.status === "pending" && Date.now() - entry.at < NETFLIX_META_WAIT_MS) return;
     }
     const rawMain =
       signal && (signal.showName || signal.movieTitle || signal.tabTitle);

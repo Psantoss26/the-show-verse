@@ -19,6 +19,7 @@ import {
   detectionFingerprint,
   detectionTriggerText,
 } from "@/lib/netflix/detectionFingerprint";
+import { pickContentMatch } from "@/lib/netflix/contentIdMatch";
 import {
   buildRankedQueryVariants,
   cleanSearchTitle,
@@ -278,6 +279,8 @@ const DETECTION_SIGNAL_FIELDS = [
   "platformName", "mainTitle", "subTitle", "showName", "episodeName", "movieTitle", "seasonEpisodeText",
   "tabTitle", "queueTitle", "albumArtist", "notifTitle", "notifText", "notifSubText",
   "season", "episode", "durationSec", "seriesFromHint", "screenTitles",
+  // De dónde salió la identidad (p. ej. "netflix_metadata") y el año que la acompaña.
+  "identitySource", "releaseYear",
 ];
 function detectionSignal(body) {
   const signal = {};
@@ -370,11 +373,34 @@ export async function POST(request) {
     const syncToken = authHeader.toLowerCase().startsWith("bearer ")
       ? authHeader.slice(7).trim()
       : "";
+    const detectionPlatform = canonicalPlatformId(platform) || "netflix";
+    const triggerText = detectionTriggerText({ showName, movieTitle, mainTitle });
+    const fingerprint = detectionFingerprint(detectionPlatform, triggerText);
+    const platformContentId = typeof resolvedVideoId === "string" || typeof resolvedVideoId === "number"
+      ? String(resolvedVideoId).slice(0, 200)
+      : null;
+    // 'detail' (ficha navegando) | 'playback'. Sin el campo (clientes antiguos),
+    // se deduce de si hay posición/duración de reproducción.
+    const kind = detectionKind === "detail" || detectionKind === "playback"
+      ? detectionKind
+      : (Number(positionSec) > 0 || safeDurationSec != null || recordProgress ? "playback" : "detail");
+    // Lo que no se pudo convertir en un título queda medido en el backend, con su
+    // motivo, para saber qué falla en cada plataforma (GET /streaming/stats).
+    const reportDiscard = (reason) => detectionBackend("/discards", syncToken, {
+      platform: detectionPlatform,
+      kind,
+      reason,
+      triggerText: (triggerText || subTitle || episodeName || tabTitle || "").slice(0, 300),
+      fingerprint,
+      contentId: platformContentId,
+      signal: detectionSignal(payload),
+    }, 2000);
 
     if (recordProgress && (!syncToken || !eventId || !observedAt)) {
       return respond({ error: "Authenticated eventId and observedAt are required" }, { status: syncToken ? 400 : 401 });
     }
     if (!mainTitle && !showName && !movieTitle) {
+      await reportDiscard("empty_title");
       return respond({ error: "mainTitle is required" }, { status: 400 });
     }
 
@@ -483,39 +509,51 @@ export async function POST(request) {
       isSeries: isTv,
     });
     if (!rankedVariants.length) {
+      await reportDiscard("empty_title");
       return respond({ error: "Empty title after cleanup" }, { status: 422 });
     }
 
     // 2b. Lo aprendido de las correcciones del usuario (y las globales con
-    // consenso) para lo que identifica este contenido.
-    const detectionPlatform = canonicalPlatformId(platform) || "netflix";
-    const triggerText = detectionTriggerText({ showName, movieTitle, mainTitle });
-    const fingerprint = detectionFingerprint(detectionPlatform, triggerText);
-    const rules = fingerprint
+    // consenso) para lo que identifica este contenido, y el título que ya se
+    // conoce para su id en la plataforma (ver contentIdMatch.js). El id vale
+    // aunque el texto no sirva para aprender (un «Capítulo 3» genérico).
+    const rules = fingerprint || platformContentId
       ? await detectionBackend(
           "/detections/lookup",
           syncToken,
-          { platform: detectionPlatform, fingerprint },
+          { platform: detectionPlatform, fingerprint, contentId: platformContentId },
           3000,
         )
       : null;
-    if (rules?.decision?.rule === "not_a_title") {
-      console.log(`[Extension Sync] "${triggerText}" no es un título (${rules.decision.scope}).`);
-      return respond({ error: "Not a title", reason: "not_a_title" }, { status: 422 });
-    }
     const rejected = new Set(
       (Array.isArray(rules?.rejects) ? rules.rejects : []).map((r) => `${r.mediaType}:${r.tmdbId}`),
     );
+    const override = rules?.decision?.rule === "override" ? rules.decision : null;
+    const contentMatch = pickContentMatch(rules?.content, {
+      override,
+      rejected,
+      clientSaysMovie,
+      seriesEvidence: Boolean(showName) || Boolean(episodeName) || seasonFromEvidence != null,
+      season: playerNumbers.season,
+      episode: playerNumbers.episode,
+    });
+    const correctedContent = contentMatch?.scope === "user" && contentMatch.source === "correction";
+    if (rules?.decision?.rule === "not_a_title" && !correctedContent) {
+      console.log(`[Extension Sync] "${triggerText}" no es un título (${rules.decision.scope}).`);
+      await reportDiscard("not_a_title");
+      return respond({ error: "Not a title", reason: "not_a_title" }, { status: 422 });
+    }
     // Búsqueda sin los títulos que el usuario ya dijo que NO son este.
     const searchCandidates = async (searchQuery, type) => {
       const results = await searchTmdbCandidates(backendRequest, searchQuery, type);
       if (!rejected.size) return results;
       return results.filter((item) => !rejected.has(`${item?.media_type || type}:${item?.id}`));
     };
-    const override = rules?.decision?.rule === "override" ? rules.decision : null;
-    const detectionSource = override
-      ? (override.scope === "global" ? "global_rule" : "user_rule")
-      : "search";
+    const detectionSource = contentMatch
+      ? "content_id"
+      : override
+        ? (override.scope === "global" ? "global_rule" : "user_rule")
+        : "search";
 
     let tmdbId = null;
     let mediaType = isTv ? "tv" : "movie";
@@ -558,7 +596,26 @@ export async function POST(request) {
     const requireExactMatch = !showName && (isTv || hasEpisodeNumber);
     let resolution = null;
     let fallback = null;
-    if (override) {
+    if (contentMatch) {
+      // El id ya se resolvió antes (o lo corrigió el usuario): mismo título y
+      // mismo episodio, sin buscar.
+      const contentIsTv = contentMatch.mediaType === "tv";
+      const fallbackName = contentMatch.title || query;
+      resolution = {
+        kind: "resolved",
+        entity: contentIsTv
+          ? { id: contentMatch.tmdbId, name: fallbackName, poster_path: contentMatch.posterPath || null }
+          : { id: contentMatch.tmdbId, title: fallbackName, poster_path: contentMatch.posterPath || null },
+        mediaType: contentMatch.mediaType,
+        confidence: "high",
+        exact: true,
+      };
+      season = contentIsTv ? contentMatch.season : null;
+      episode = contentIsTv ? contentMatch.episode : null;
+      console.log(
+        `[Extension Sync] Id ${detectionPlatform}:${platformContentId} ya conocido (${contentMatch.scope}) → ${contentMatch.mediaType}:${contentMatch.tmdbId}`,
+      );
+    } else if (override) {
       // El usuario ya dijo qué título es: no se busca. Un episodio con número va
       // como resuelto; sin él, como serie (la temporada/episodio se intentan
       // fijar por nombre más abajo, igual que en una búsqueda normal).
@@ -574,7 +631,7 @@ export async function POST(request) {
         exact: true,
       };
     }
-    for (const variant of override ? [] : rankedVariants) {
+    for (const variant of resolution ? [] : rankedVariants) {
       const candidate = await resolveStreamingEntity({
         query: variant.query,
         expectedMediaType: episode != null ? "tv" : null,
@@ -770,10 +827,11 @@ export async function POST(request) {
     // Serie tomada de una ficha ajena a la reproducción: por buena que fuera la
     // coincidencia en TMDb, el dato de partida no lo dio el reproductor. Nunca
     // "high", para que el historial distinga lo seguro de lo deducido.
-    if ((seriesFromHint || seriesFromScreen) && confidence === "high") confidence = "medium";
+    if ((seriesFromHint || seriesFromScreen) && confidence === "high" && !contentMatch) confidence = "medium";
 
     if (!tmdbId) {
       console.error("[Extension Sync] Could not resolve TMDb entity for:", query);
+      await reportDiscard("unresolved");
       return respond({ error: `Could not resolve TMDb entity for: ${query}` }, { status: 404 });
     }
 
@@ -782,13 +840,14 @@ export async function POST(request) {
     // episodeBelongsToShow), la pista era de otro título y no se registra nada: un
     // episodio ajeno en Continuar viendo o en el historial es peor que una
     // sincronización perdida.
-    if (seriesFromHint && isTv) {
+    if (seriesFromHint && isTv && !contentMatch) {
       const belongs = await episodeBelongsToShow(tmdbId, episodeName || subTitle, playerNumbers)
         .catch(() => null);
       if (belongs === false) {
         console.warn(
           `[Extension Sync] Pista descartada: "${episodeName || subTitle}" no es un episodio de "${resolvedTitle}".`,
         );
+        await reportDiscard("hint_mismatch");
         return respond(
           { error: "Series hint does not match the episode being played", reason: "hint_mismatch" },
           { status: 422 },
@@ -800,9 +859,6 @@ export async function POST(request) {
     // Registro de la detección: es lo que el usuario puede corregir desde la
     // notificación. Su id viaja al cliente y vuelve en los pings de progreso, para
     // que el backend sepa qué guardó cada detección.
-    const kind = detectionKind === "detail" || detectionKind === "playback"
-      ? detectionKind
-      : (Number(positionSec) > 0 || safeDurationSec != null || recordProgress ? "playback" : "detail");
     const recorded = await detectionBackend("/detections", syncToken, {
       platform: detectionPlatform,
       kind,
@@ -817,6 +873,7 @@ export async function POST(request) {
       posterPath: posterPath || null,
       confidence,
       source: detectionSource,
+      contentId: platformContentId,
     }, 3000);
     // Solo si existe: los clientes antiguos y las pruebas comparan `synced` tal cual.
     const detectionFields = recorded?.detectionId ? { detectionId: recorded.detectionId } : {};

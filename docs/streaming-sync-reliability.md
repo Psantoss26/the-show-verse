@@ -40,6 +40,13 @@ ninguna otra consulta da una exacta.
 
 ## Lectura del título en el navegador
 
+**Netflix (extensión 3.3):** la identidad sale del reproductor y de los metadatos de
+Netflix, no del DOM: el vídeo que suena según `playerApp.getState()` y, con su id, la
+serie, la temporada y el episodio numerados, o la película con su año. Lo de abajo
+queda como respaldo cuando los metadatos no llegan. Detalle en
+`netflix-extension/README.md` → *Netflix: reproductor y metadatos*.
+
+
 El título del reproductor de Netflix son elementos hermanos: `<h4>` con la serie y
 sendos `<span>` con «T4:E5» y el nombre del episodio. `textContent` los pega sin
 separación («Stranger ThingsT4:E5»), y ahí el patrón de temporada no casa porque
@@ -125,7 +132,9 @@ usuarios distintos (`DETECTION_GLOBAL_MIN_SUPPORTERS`). Diseño completo:
 Las respuestas de resolución de un episodio anterior no pueden modificar el nuevo.
 Los fallos de resolución se reintentan con espera creciente. Las observaciones
 que siguen sin resolverse tras tres respuestas 404/422 se descartan con diagnóstico
-para no bloquear toda la cola. Los fallos de red y servidor se conservan.
+para no bloquear toda la cola. Los fallos de red y servidor se conservan. Cada
+respuesta 404/422 del resolutor queda además medida en el backend
+(`streaming_discards`, ver [[detecciones-streaming]] → *Medición por plataforma*).
 
 Cada dispositivo tiene una vinculación independiente, asociada al usuario de
 The Show Verse. Compartir un correo de Netflix no transfiere la vinculación entre
@@ -140,7 +149,8 @@ La desconexión global de ajustes revoca todos los dispositivos.
    No se cambiaron las credenciales ni se migró producción.
 2. Aplicar `npm --prefix backend run db:migrate` en el entorno de destino. La
    migración aditiva `0016_calm_hannibal_king.sql` crea `streaming_events`, y
-   `0018_streaming_detections.sql`, las tablas de detecciones y su aprendizaje. El comando
+   `0018_streaming_detections.sql`, las tablas de detecciones y su aprendizaje. `0026_streaming_content_ids.sql`
+   añade el mapa de ids de contenido y `0027_streaming_discards.sql`, los descartes. El comando
    de arranque actual del backend también aplica las migraciones pendientes.
 3. Desplegar backend y frontend antes de actualizar los clientes.
 4. En Chrome, actualizar la extensión o descomprimir el ZIP y cargar la carpeta

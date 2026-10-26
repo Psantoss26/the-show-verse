@@ -49,6 +49,35 @@ export async function fetchRecentDetections({ days = 7, signal } = {}) {
   return Array.isArray(json?.results) ? json.results : [];
 }
 
+/** Motivo legible de una observación que no se pudo convertir en un título. */
+export const DISCARD_REASON_LABELS = {
+  unresolved: "No se encontró el título",
+  not_a_title: "Marcado como «no es un título»",
+  hint_mismatch: "El episodio no es de la serie de la ficha",
+  empty_title: "Sin texto que buscar",
+};
+
+// Resumen por plataforma de la extensión del navegador (el de la app Android va
+// en la app). Ver backend GET /streaming/stats.
+export async function fetchDetectionStats({ days = 7, origin = "browser", signal } = {}) {
+  const res = await fetch(`/api/streaming/stats?days=${days}&origin=${origin}`, {
+    cache: "no-store",
+    credentials: "include",
+    signal,
+  });
+  return readJson(res, "No se pudo cargar el resumen");
+}
+
+export async function fetchRecentDiscards({ days = 7, origin = "browser", signal } = {}) {
+  const res = await fetch(`/api/streaming/discards?days=${days}&origin=${origin}`, {
+    cache: "no-store",
+    credentials: "include",
+    signal,
+  });
+  const json = await readJson(res, "No se pudieron cargar las observaciones sin reconocer");
+  return Array.isArray(json?.results) ? json.results : [];
+}
+
 export async function fetchDetection(id, { signal } = {}) {
   const res = await fetch(`/api/streaming/detections/${encodeURIComponent(id)}`, {
     cache: "no-store",
