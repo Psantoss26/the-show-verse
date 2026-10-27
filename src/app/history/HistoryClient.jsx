@@ -193,11 +193,75 @@ function writeHistoryCache(items, { hasMore = false, nextPage } = {}) {
   } catch {}
 }
 
+// Totales de todo el historial (el backend los da con la página 1). La lista se
+// carga de 200 en 200, así que la cabecera no puede contarlos con lo cargado.
+const HISTORY_TOTALS_KEY = "showverse:history:totals:v1";
+const HISTORY_TOTALS_FIELDS = ["plays", "titles", "movies", "episodes", "movieTitles", "showTitles"];
+
+function normalizeHistoryTotals(totals) {
+  if (!totals || typeof totals !== "object") return null;
+  const out = {};
+  for (const field of HISTORY_TOTALS_FIELDS) {
+    const n = Number(totals[field]);
+    if (!Number.isFinite(n) || n < 0) return null;
+    out[field] = n;
+  }
+  return out;
+}
+
+function readHistoryTotals() {
+  if (typeof window === "undefined") return null;
+  try {
+    return normalizeHistoryTotals(
+      JSON.parse(window.localStorage.getItem(HISTORY_TOTALS_KEY) || "null"),
+    );
+  } catch {
+    return null;
+  }
+}
+
+function writeHistoryTotals(totals) {
+  if (typeof window === "undefined") return;
+  try {
+    if (totals) {
+      setLocalStorageItem(HISTORY_TOTALS_KEY, JSON.stringify(totals));
+    } else {
+      window.localStorage.removeItem(HISTORY_TOTALS_KEY);
+    }
+  } catch {}
+}
+
+// Resta de los totales las entradas quitadas de la lista cargada. Las vistas
+// son exactas; un título solo baja cuando se ha borrado entero (`wholeTitle`),
+// porque una reproducción suelta puede tener otras sin cargar.
+function subtractRemovedFromTotals(totals, removed, { wholeTitle = false } = {}) {
+  if (!totals || !removed.length) return totals;
+  const next = { ...totals };
+  const removedTitles = new Set();
+  for (const item of removed) {
+    const type = getItemType(item);
+    next.plays -= 1;
+    if (type === "movie") next.movies -= 1;
+    if (type === "show") next.episodes -= 1;
+    removedTitles.add(`${type}:${getTmdbId(item)}`);
+  }
+  if (wholeTitle) {
+    for (const key of removedTitles) {
+      if (key.startsWith("movie:")) next.movieTitles -= 1;
+      if (key.startsWith("show:")) next.showTitles -= 1;
+    }
+  }
+  for (const field of HISTORY_TOTALS_FIELDS) next[field] = Math.max(0, next[field]);
+  next.titles = next.movieTitles + next.showTitles;
+  return next;
+}
+
 function clearHistoryCache() {
   if (typeof window === "undefined") return;
   historySessionCache = null;
   try {
     window.localStorage.removeItem(HISTORY_CACHE_KEY);
+    window.localStorage.removeItem(HISTORY_TOTALS_KEY);
   } catch {}
 }
 
@@ -2921,6 +2985,7 @@ export default function HistoryClient() {
     const srt = ls("showverse:history:sortBy");
     return {
       items: cache?.items?.length ? cache.items : null,
+      totals: cache?.items?.length ? readHistoryTotals() : null,
       hasMore: !!cache?.hasMore,
       nextPage: cache?.nextPage || 1,
       viewMode:
@@ -2959,6 +3024,9 @@ export default function HistoryClient() {
   const [raw, setRaw] = useState(() => backNavInit?.items || []);
   const [hasMoreHistory, setHasMoreHistory] = useState(
     () => !!backNavInit?.hasMore,
+  );
+  const [historyTotals, setHistoryTotals] = useState(
+    () => backNavInit?.totals || null,
   );
   const [historyError, setHistoryError] = useState("");
   const [mutatingId, setMutatingId] = useState("");
@@ -3129,6 +3197,7 @@ export default function HistoryClient() {
       // hay contenido nuevo que parpadee.)
       if (cached?.fresh && cached.items?.length) {
         setRaw(cached.items);
+        setHistoryTotals(readHistoryTotals());
         setHistoryLoaded(true);
         setHasMoreHistory(cached.hasMore);
         hasMoreHistoryRef.current = cached.hasMore;
@@ -3283,6 +3352,12 @@ export default function HistoryClient() {
         const sorted = [...items].sort(
           (a, b) => new Date(b?.watched_at) - new Date(a?.watched_at),
         );
+        if (pageToLoad === 1) {
+          // Sin totales (respaldo de Trakt) la cabecera cuenta lo cargado.
+          const totals = normalizeHistoryTotals(json?.totals);
+          setHistoryTotals(totals);
+          writeHistoryTotals(totals);
+        }
 
         if (refreshTop) {
           const freshHasMore =
@@ -3415,12 +3490,15 @@ export default function HistoryClient() {
         return;
       }
 
+      const removed = [];
       setRaw((previous) => {
         const nextItems = (previous || []).filter((item) => {
-          if (detail.historyId != null) {
-            return String(getHistoryId(item)) !== String(detail.historyId);
-          }
-          return !historyEntryMatchesTarget(item, detail);
+          const keep =
+            detail.historyId != null
+              ? String(getHistoryId(item)) !== String(detail.historyId)
+              : !historyEntryMatchesTarget(item, detail);
+          if (!keep) removed.push(item);
+          return keep;
         });
         if (nextItems.length === previous.length) return previous;
         writeHistoryCache(nextItems, {
@@ -3429,6 +3507,15 @@ export default function HistoryClient() {
         });
         return nextItems;
       });
+      if (removed.length) {
+        setHistoryTotals((totals) => {
+          const next = subtractRemovedFromTotals(totals, removed, {
+            wholeTitle: detail.historyId == null,
+          });
+          writeHistoryTotals(next);
+          return next;
+        });
+      }
     };
 
     window.addEventListener(LIST_CHANGED_EVENT, onHistoryChange);
@@ -3500,16 +3587,26 @@ export default function HistoryClient() {
     setMutatingId(`del:${historyId}`);
     try {
       await apiPost("/api/trakt/history/remove", { ids: [historyId] });
+      const removed = [];
       setRaw((prev) => {
-        const nextItems = (prev || []).filter(
-          (x) => String(getHistoryId(x)) !== String(historyId),
-        );
+        const nextItems = (prev || []).filter((x) => {
+          const keep = String(getHistoryId(x)) !== String(historyId);
+          if (!keep) removed.push(x);
+          return keep;
+        });
         writeHistoryCache(nextItems, {
           hasMore: hasMoreHistoryRef.current,
           nextPage: nextHistoryPageRef.current,
         });
         return nextItems;
       });
+      if (removed.length) {
+        setHistoryTotals((totals) => {
+          const next = subtractRemovedFromTotals(totals, removed);
+          writeHistoryTotals(next);
+          return next;
+        });
+      }
     } catch {
       // noop
     } finally {
@@ -3570,6 +3667,32 @@ export default function HistoryClient() {
   }, [filtered, sortBy]);
 
   const stats = useMemo(() => {
+    // Con páginas sin cargar, la cabecera usa los totales del backend; con todo
+    // cargado (o con búsqueda o día elegido) cuenta la lista.
+    if (historyTotals && hasMoreHistory && !normalizeSearchText(q) && !selectedDay) {
+      if (typeFilter === "movies") {
+        return {
+          plays: historyTotals.movies,
+          unique: historyTotals.movieTitles,
+          movies: historyTotals.movies,
+          shows: 0,
+        };
+      }
+      if (typeFilter === "shows") {
+        return {
+          plays: historyTotals.episodes,
+          unique: historyTotals.showTitles,
+          movies: 0,
+          shows: historyTotals.episodes,
+        };
+      }
+      return {
+        plays: historyTotals.plays,
+        unique: historyTotals.titles,
+        movies: historyTotals.movies,
+        shows: historyTotals.episodes,
+      };
+    }
     const plays = filtered.length;
     const uniqSet = new Set();
     let movies = 0;
@@ -3582,7 +3705,7 @@ export default function HistoryClient() {
       uniqSet.add(String(id));
     }
     return { plays, unique: uniqSet.size, movies, shows };
-  }, [filtered]);
+  }, [filtered, historyTotals, hasMoreHistory, q, selectedDay, typeFilter]);
 
   const countsByDay = useMemo(() => {
     const m = {};
@@ -3849,7 +3972,7 @@ export default function HistoryClient() {
                   className="w-full min-w-0"
                 >
                   <StatCard
-                    label="Cargados"
+                    label="Vistos"
                     value={stats.plays}
                     loading={false}
                     icon={CheckCircle2}

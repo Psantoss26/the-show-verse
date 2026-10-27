@@ -159,7 +159,7 @@ Las rutas `sync`/`progress` se autentican con el **token de sincronizacion** del
 
 | Metodo | Ruta | Descripcion |
 | --- | --- | --- |
-| `GET` | `/v1/history` | Historial paginado |
+| `GET` | `/v1/history` | Historial paginado. La página 1 añade `totals` (`plays`, `titles`, `movies`, `episodes`, `movieTitles`, `showTitles`) de todo el historial con los mismos filtros |
 | `POST` | `/v1/history` | Anade entrada de historial |
 | `DELETE` | `/v1/history/{id}` | Elimina entrada por UUID |
 | `DELETE` | `/v1/history/bulk` | Elimina varias entradas |

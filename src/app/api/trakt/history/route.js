@@ -222,6 +222,7 @@ export async function GET(request) {
     let lastPageSize = 0;
     let lastBackend = null;
     let backendFailure = null;
+    let firstBackendTotals = null;
 
     while (currentPage < page + 100) {
       const qs = new URLSearchParams();
@@ -240,6 +241,9 @@ export async function GET(request) {
       }
 
       lastBackend = backend;
+      if (currentPage === 1 && backend.json?.totals) {
+        firstBackendTotals = backend.json.totals;
+      }
       const pageRows = Array.isArray(backend.json?.results)
         ? backend.json.results
         : [];
@@ -269,6 +273,8 @@ export async function GET(request) {
         connected: true,
         items: enriched,
         stats: { plays, uniques, movies, shows },
+        // Totales de todo el historial (solo cuando se pide desde la página 1).
+        totals: page === 1 ? firstBackendTotals : null,
         pagination: {
           page,
           limit: perPage,

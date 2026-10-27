@@ -4,7 +4,7 @@
 import { z } from 'zod';
 import { db } from '../db/client.js';
 import { watchHistory } from '../db/schema.js';
-import { eq, and, desc, gte, lte, inArray, isNotNull } from 'drizzle-orm';
+import { eq, and, desc, gte, lte, inArray, isNotNull, sql } from 'drizzle-orm';
 import { getMediaMetadataMap, hydrateMediaRow } from '../utils/mediaMetadata.js';
 
 const addHistorySchema = z.object({
@@ -66,7 +66,32 @@ export default async function historyRoutes(fastify) {
     const metadataByKey = await getMediaMetadataMap(items);
     const results = items.map((item) => hydrateMediaRow(item, metadataByKey));
 
-    return reply.send({ results, page: safePage, limit: safeLimit });
+    // Totales de todo el historial (con los mismos filtros), no de la página:
+    // la página Historial carga de 200 en 200 y su cabecera los necesita. Solo
+    // en la página 1, que es la que se pide al entrar y al revalidar.
+    if (safePage !== 1) {
+      return reply.send({ results, page: safePage, limit: safeLimit });
+    }
+    const [counts] = await db
+      .select({
+        plays: sql`count(*)::int`,
+        movies: sql`count(*) filter (where ${watchHistory.mediaType} = 'movie')::int`,
+        episodes: sql`count(*) filter (where ${watchHistory.mediaType} = 'tv')::int`,
+        movieTitles: sql`count(distinct ${watchHistory.tmdbId}) filter (where ${watchHistory.mediaType} = 'movie')::int`,
+        showTitles: sql`count(distinct ${watchHistory.tmdbId}) filter (where ${watchHistory.mediaType} = 'tv')::int`,
+      })
+      .from(watchHistory)
+      .where(and(...conditions));
+    const totals = {
+      plays: Number(counts?.plays) || 0,
+      movies: Number(counts?.movies) || 0,
+      episodes: Number(counts?.episodes) || 0,
+      movieTitles: Number(counts?.movieTitles) || 0,
+      showTitles: Number(counts?.showTitles) || 0,
+    };
+    totals.titles = totals.movieTitles + totals.showTitles;
+
+    return reply.send({ results, page: safePage, limit: safeLimit, totals });
   });
 
   // ──────────────────────────────────────────────

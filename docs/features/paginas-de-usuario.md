@@ -22,6 +22,10 @@ Las tres comparten navegación (`WatchingSectionNav`):
 
 **Desde la ficha:** si la película o el episodio está en curso, el modal de historial de visionado (`TraktWatchedModal`, en la ficha de película, la de episodio y la vista previa) lo muestra como primera entrada de la actividad: «En curso · N %», con plataforma, tiempo restante, la última vez que se vio y una etiqueta «En curso» en la cabecera. Desde ahí se puede **marcar como visto** (✓, mismo `complete`: sale de la fila y entra en el historial, que se actualiza en el propio modal) o **quitar** (papelera, `DELETE /v1/progress/{id}`), sin ir a `/continue-watching`. La ficha recibe el cambio (`onProgressChange`) para quitar su indicador de progreso y la entrada se poda de la caché de la página.
 
+## Historial (`/history`)
+
+La lista se carga de 200 en 200 al hacer scroll, pero la cabecera (Vistos, Títulos, Películas, Episodios) muestra los totales de **todo** el historial: `GET /v1/history` los devuelve en `totals` con la página 1, `/api/trakt/history` los pasa tal cual y la página los guarda en `localStorage` (`showverse:history:totals:v1`) para pintarlos al volver. Con el filtro Películas o Series se usan los totales de ese tipo. Con una búsqueda o un día elegido, o cuando ya está todo cargado, se cuenta la lista. Al borrar entradas se restan al momento; la revalidación de la página 1 los corrige. Sin backend (respaldo de Trakt) no hay totales y se cuenta lo cargado.
+
 ## Recomendaciones (deslizar)
 
 `/recommendations` es una baraja de títulos:
