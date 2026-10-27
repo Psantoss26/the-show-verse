@@ -625,11 +625,16 @@ function ImagesSheet({ meta, data, onClose, tab, setTab }) {
                     </span>
                   ) : null}
                 </button>
+                {/* Sin `backdrop-blur`: eran una capa con desenfoque por
+                    tarjeta (44 en «Con idioma») y, al desplegar la fila de
+                    filtros, la galería se movía y sus tarjetas se convertían en
+                    capas y dejaban de serlo en cada fotograma: parpadeaban las
+                    portadas en el móvil. A este tamaño basta el fondo opaco. */}
                 <a
                   href={`https://image.tmdb.org/t/p/original${image.file_path}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white/85 backdrop-blur-sm transition hover:bg-black/75 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-yellow-400"
+                  className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white/85 transition-colors hover:bg-black/75 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-yellow-400"
                   aria-label={`Abrir imagen original${resolution ? ` (${resolution})` : ""}`}
                   title="Abrir original"
                 >

@@ -496,7 +496,9 @@ function TaggedSheet({ meta, data, onClose }) {
                       decoding="async"
                     />
                   </span>
-                  <span className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white/85 backdrop-blur-sm">
+                  {/* Sin `backdrop-blur`, como en «Portadas y fondos»: una capa
+                      con desenfoque por foto hacía parpadear la galería. */}
+                  <span className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white/85">
                     <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
                   </span>
                 </a>
