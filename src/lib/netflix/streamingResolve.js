@@ -18,6 +18,13 @@ function validYear(year) {
   return Number.isInteger(n) && n >= 1880 && n <= 2100 ? n : null;
 }
 
+// Lo que va tras «: » en un título («Suits: la clave del éxito» → «la clave del
+// éxito»), normalizado; "" si no hay.
+const subtitleOf = (title) => {
+  const i = String(title || "").indexOf(": ");
+  return i > 0 ? normalizeText(String(title).slice(i + 2)) : "";
+};
+
 const sameYear = (item, year) => year != null && yearOf(item) != null && Math.abs(yearOf(item) - year) <= 1;
 
 // Título sin un paréntesis final: TMDb en español titula «Incontrolable (I
@@ -345,6 +352,20 @@ export async function resolveStreamingEntity({
       }
     }
     return showLevel(exactShow);
+  }
+
+  // Título localizado «Original: subtítulo»: la plataforma muestra solo el
+  // subtítulo («La clave del éxito») y TMDb tiene la serie como «Suits: la clave
+  // del éxito» y además una película poco conocida que se llama justo así. Sin
+  // pista de tipo, gana la serie si su subtítulo es EXACTAMENTE lo buscado y es
+  // mucho más popular (≥ 10×) que la película.
+  if (exactMovie && !preferTv) {
+    const bySubtitle = (Array.isArray(tvResults) ? tvResults : []).find(
+      (item) => item?.id && subtitleOf(titleFor(item, "tv")) === normalizeText(query),
+    );
+    const showPop = Number(bySubtitle?.popularity) || 0;
+    const moviePop = Number(exactMovie.popularity) || 0;
+    if (bySubtitle && showPop >= Math.max(1, moviePop) * 10) return showLevel(bySubtitle);
   }
 
   if (exactMovie) {

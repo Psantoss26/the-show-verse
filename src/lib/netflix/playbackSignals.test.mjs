@@ -154,6 +154,35 @@ const SHOWS = [
       ],
     },
   },
+  // Título localizado «Original: subtítulo»: Prime Video muestra «La clave del
+  // éxito» y existe además una película poco conocida con ese nombre exacto.
+  {
+    id: 37680,
+    name: "Suits: la clave del éxito",
+    original_name: "Suits",
+    popularity: 131,
+    vote_count: 3000,
+    seasons: [12, 16, 16, 16, 16, 16, 16, 16, 10].map((episode_count, i) => ({ season_number: i + 1, episode_count })),
+    episodes: { 6: [{ episode_number: 9, name: "Vuelta al trabajo" }] },
+  },
+  // Netflix en Android solo da el nombre del episodio («Marco», el T1:E10 de
+  // «Better Call Saul») y existe una serie que se llama así.
+  {
+    id: 60059,
+    name: "Better Call Saul",
+    popularity: 90,
+    vote_count: 5000,
+    seasons: [10, 10, 10, 10, 10, 13].map((episode_count, i) => ({ season_number: i + 1, episode_count })),
+    episodes: { 1: [{ episode_number: 10, name: "Marco" }] },
+  },
+  {
+    id: 324168,
+    name: "Marco",
+    popularity: 3,
+    vote_count: 5,
+    seasons: [{ season_number: 1, episode_count: 12 }],
+    episodes: { 1: [{ episode_number: 10, name: "Episodio 10" }] },
+  },
   // Serie REAL cuyo nombre aparece DENTRO del nombre de un episodio de otra
   // serie ("Capítulo cinco: La Nina"). Es el caso que registraba títulos sin
   // ninguna relación cuando el reproductor no decía de qué serie era el episodio.
@@ -200,6 +229,7 @@ const MOVIES = [
   { id: 398978, title: "El Irlandés", original_title: "The Irishman", popularity: 60, vote_count: 5000 },
   { id: 693134, title: "Dune: Parte Dos", original_title: "Dune: Part Two", popularity: 300, vote_count: 8000 },
   { id: 264660, title: "El Aviador", original_title: "The Aviator", popularity: 40, vote_count: 3000 },
+  { id: 18172, title: "La clave del éxito", original_title: "All the Right Moves", release_date: "1983-10-21", popularity: 4, vote_count: 200 },
 ];
 
 // TMDb, ante una consulta cualquiera, casi nunca devuelve vacío: ordena por
@@ -1081,4 +1111,70 @@ test("App Android (sin posiciones): un par que existe en TMDb pero es otro episo
     detectionKind: "playback",
   }, learned());
   assert.deepEqual([synced(unchanged).season, synced(unchanged).episode], [2, 1]);
+});
+
+// ── App Android en Prime Video con «Suits» ───────────────────────────────────
+
+const SUITS_FICHA = {
+  platform: "primevideo",
+  platformName: "Prime Video",
+  mainTitle: "La clave del éxito",
+  tabTitle: "La clave del éxito",
+  resolveOnly: true,
+  detectionKind: "detail",
+};
+
+test("Ficha de Android con temporadas a la vista: «La clave del éxito» es la serie Suits", async () => {
+  const result = await sync({ ...SUITS_FICHA, showName: "La clave del éxito", mediaTypeHint: "tv" }, learned());
+  assert.deepEqual([synced(result).tmdbId, synced(result).mediaType], [37680, "tv"]);
+});
+
+test("Ficha sin tipo: el subtítulo exacto de una serie mucho más popular gana a la película", async () => {
+  const result = await sync(SUITS_FICHA, learned());
+  assert.deepEqual([synced(result).tmdbId, synced(result).mediaType], [37680, "tv"]);
+  // La película de verdad se sigue resolviendo como película cuando el cliente lo dice.
+  const movie = await sync({ ...SUITS_FICHA, movieTitle: "La clave del éxito", mediaTypeHint: "movie" }, learned());
+  assert.deepEqual([synced(movie).tmdbId, synced(movie).mediaType], [18172, "movie"]);
+});
+
+test("Reproducción de Android en Prime Video: T6·E9 de «La clave del éxito» es el S6E9 de Suits", async () => {
+  const result = await sync({
+    platform: "com.amazon.avod.thirdpartyclient",
+    platformName: "Prime Video",
+    mainTitle: "La clave del éxito",
+    showName: "La clave del éxito",
+    episodeName: "Vuelta al trabajo",
+    subTitle: "Vuelta al trabajo",
+    season: 6,
+    episode: 9,
+    seasonEpisodeText: "T6 E9 Vuelta al trabajo",
+    durationSec: 2580,
+    positionSec: 300,
+    detectionKind: "playback",
+  }, learned());
+  assert.deepEqual([synced(result).tmdbId, synced(result).season, synced(result).episode], [37680, 6, 9]);
+});
+
+// ── App Android en Netflix: el episodio se llama como otra serie ─────────────
+const marcoSignal = {
+  platformName: "Netflix",
+  mainTitle: "Marco",
+  subTitle: "Marco",
+  tabTitle: "Marco",
+  episodeName: "Marco",
+  season: 1,
+  episode: 10,
+  seasonEpisodeText: "T1:E10 - Marco",
+  durationSec: 2962,
+};
+
+test("Android, Netflix sin serie: el episodio «Marco» no se registra como la serie «Marco»", async () => {
+  const result = await sync(marcoSignal);
+  assert.notEqual(synced(result).tmdbId, 324168);
+  assert.equal(result.status, 404);
+});
+
+test("Android, Netflix con la serie de la ficha: «Marco» es el T1:E10 de Better Call Saul", async () => {
+  const result = await sync({ ...marcoSignal, showName: "Better Call Saul", seriesFromHint: true });
+  assert.deepEqual([synced(result).tmdbId, synced(result).season, synced(result).episode], [60059, 1, 10]);
 });

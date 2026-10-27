@@ -103,13 +103,16 @@ async function searchTmdbCandidates(backendRequest, query, mediaType) {
 }
 
 // Limpia el nombre del episodio quitando marcadores del principio ("E5", "T4:E5",
-// "Episodio 5:", "Capítulo 5 -") para poder casarlo con el título en TMDb.
+// "Episodio 5:", "Capítulo 5 -") y el paréntesis final que algunas plataformas
+// añaden ("Iván (N.° 88)" en «The Blacklist» de Netflix; en TMDb es "Ivan") para
+// poder casarlo con el título en TMDb.
 function cleanEpisodeName(name) {
   return String(name || "")
     .replace(
       /^\s*(?:T\s*\d+\s*[:x]?\s*)?(?:E|Ep|Episodio|Episode|Cap[ií]tulo|Chapter|Folge)\.?\s*\d+\s*[:.\-–·]?\s*/i,
       "",
     )
+    .replace(/\s*\([^()]*\)\s*$/, "")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -611,6 +614,10 @@ export async function POST(request) {
       ? releaseYearNum
       : null;
     const movieHint = payload.mediaTypeHint === "movie" && clientSaysMovie;
+    // Y con «serie» segura (ficha con temporadas o episodios, app Android) no se
+    // busca entre películas: «La clave del éxito» es la serie «Suits: la clave del
+    // éxito», no la película de ese nombre.
+    const tvHint = payload.mediaTypeHint === "tv" && isTv;
     const requireExactMatch = !showName && (isTv || hasEpisodeNumber);
     let resolution = null;
     let fallback = null;
@@ -652,13 +659,27 @@ export async function POST(request) {
     for (const variant of resolution ? [] : rankedVariants) {
       const candidate = await resolveStreamingEntity({
         query: variant.query,
-        expectedMediaType: episode != null ? "tv" : movieHint ? "movie" : null,
+        expectedMediaType: episode != null || tvHint ? "tv" : movieHint ? "movie" : null,
         preferTv: isTv,
         durationSec: safeDurationSec,
         year: releaseYear,
         search: (type) => searchCandidates(variant.query, type),
       });
       if (!candidate) continue;
+      // Sin serie, el nombre del EPISODIO también entra como consulta (Netflix en
+      // Android: la sesión solo da «Marco», el T1:E10 de «Better Call Saul»). Que
+      // coincida exacto con una serie («Marco») no prueba nada: solo vale si ese
+      // episodio existe en ella con ese nombre.
+      if (
+        !showName && episodeName && candidate.mediaType === "tv" &&
+        normalizeText(variant.query) === normalizeText(cleanEpisodeName(episodeName))
+      ) {
+        const belongs = await episodeBelongsToShow(candidate.entity.id, episodeName).catch(() => null);
+        if (belongs !== true) {
+          console.warn(`[Extension Sync] "${variant.query}" es el nombre del episodio, no de la serie ${candidate.entity.id}.`);
+          continue;
+        }
+      }
       if (candidate.exact) {
         resolution = candidate;
         query = variant.query;
