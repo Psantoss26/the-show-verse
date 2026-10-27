@@ -56,12 +56,16 @@ object Platforms {
 
     /**
      * Apps cuyo REPRODUCTOR se lee en pantalla (ver PlayerScreen) porque su
-     * MediaSession no dice de qué serie es el episodio ni, a veces, por dónde va.
-     * El resto sigue exactamente como estaba.
+     * MediaSession no dice de qué serie es el episodio ni, a veces, por dónde va,
+     * o porque no publican ninguna.
      */
-    private val PLAYER_SCREEN_PLATFORMS = setOf("Prime Video", "Crunchyroll")
+    //
+    // Todas menos Netflix y Plex, que siempre publican una MediaSession completa:
+    // Prime Video y Disney+ casi nunca la publican, y entonces su reproductor en
+    // pantalla es lo único que dice que se está viendo algo (ver ScreenPlayback).
+    private val SESSION_ONLY_PLATFORMS = setOf("Netflix", "Plex")
 
-    fun readsPlayerScreen(pkg: String): Boolean = KNOWN[pkg] in PLAYER_SCREEN_PLATFORMS
+    fun readsPlayerScreen(pkg: String): Boolean = KNOWN[pkg]?.let { it !in SESSION_ONLY_PLATFORMS } == true
 
     /** Id de plataforma corto para logs/UI. */
     fun idFor(pkg: String): String {

@@ -217,4 +217,22 @@ class ScreenHeuristicsTest {
         assertTrue(ScreenHeuristics.isLikelyTitle("Better Call Saul"))
         assertTrue(ScreenHeuristics.isLikelyTitle("The Blacklist"))
     }
+
+    @Test
+    fun `pestanas y controles de Prime Video y Disney+ no son titulos`() {
+        for (t in listOf("Mi espacio", "Para ti", "Búsqueda", "Comparte", "Velocidad, 1x",
+            "Enviar; desconectado", "conectar al dispositivo de envío", "Rick Hoffman portrays Louis Litt",
+            "Retroceder 10 s")) {
+            assertFalse(t, ScreenHeuristics.isLikelyTitle(t))
+        }
+        assertTrue(ScreenHeuristics.isPlayerControl("Velocidad, 1x"))
+        assertTrue(ScreenHeuristics.isLikelyTitle("Suits"))
+    }
+
+    @Test
+    fun `el reproductor en pausa muestra reproducir y no pausa`() {
+        assertTrue(ScreenHeuristics.playerPaused(listOf("Suits", "Reproducir", "Retroceder 10 s")))
+        assertFalse(ScreenHeuristics.playerPaused(listOf("Suits", "Pausa", "Retroceder 10 s")))
+        assertFalse(ScreenHeuristics.playerPaused(listOf("Suits")))
+    }
 }

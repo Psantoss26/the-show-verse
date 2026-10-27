@@ -84,6 +84,19 @@ object RecentDetail {
     }
 
     /**
+     * La última ficha de [pkg] (serie o película) si sigue valiendo para la sesión
+     * que empezó en [playbackStartedAt]. Es lo único que identifica lo que suena en
+     * las apps sin MediaSession cuyo reproductor no pinta el título (ScreenSignal).
+     */
+    @Synchronized
+    fun detailFor(pkg: String, playbackStartedAt: Long): SyncedInfo? {
+        if (pkg != this.pkg) return null
+        val now = SystemClock.elapsedRealtime()
+        if (!HintFreshness.usable(source, atMs, playbackStartedAt, now)) return null
+        return synced
+    }
+
+    /**
      * Nombre de la serie para lo que suena en [pkg]: la del mismo episodio ya
      * confirmado ([episodeKey]) o la de la última ficha, si sigue siendo válida
      * para la sesión que empezó en [playbackStartedAt] (elapsedRealtime) y es una

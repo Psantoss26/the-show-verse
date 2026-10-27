@@ -89,10 +89,37 @@ object ScreenHeuristics {
         "calificación", "calificacion", "me encanta", "no es para mí", "no es para mi",
         "desplazarse hacia arriba", "desplazarse hacia abajo", "scroll up",
         "love this", "not for me", "rating",
+        // Pestañas de Prime Video y Disney+ que se leían como el título de la ficha.
+        "mi espacio", "my stuff", "para ti", "for you", "búsqueda", "busqueda",
+        "comparte", "audiencia juvenil", "audiencia general", "originals", "originales",
     ) + PLAYER_CONTROLS + VIDEO_CONTROLS
 
+    // Los mismos controles con otra cifra o forma («Retroceder 10 s», «Velocidad,
+    // 1x» de Prime Video, «Skip back 15 seconds»).
+    private val PLAYER_CONTROL_RE = Regex(
+        "^(?:(?:adelantar|avanzar|retroceder|retrasar|saltar)(?: hacia (?:atr[aá]s|adelante))? \\d{1,3} ?(?:segundos|seg|s)\\b" +
+            "|(?:skip |jump )?(?:forward|back|backward|rewind|ahead)s? \\d{1,3} ?(?:seconds|sec|s)\\b" +
+            "|(?:velocidad|speed|velocidad de reproducci[oó]n)\\b)",
+    )
+
     /** ¿El texto es un control del reproductor? (ver [PLAYER_CONTROLS]). */
-    fun isPlayerControl(text: String?): Boolean = text != null && PLAYER_CONTROLS.contains(norm(text))
+    fun isPlayerControl(text: String?): Boolean {
+        val n = text?.let { norm(it) } ?: return false
+        return PLAYER_CONTROLS.contains(n) || PLAYER_CONTROL_RE.containsMatchIn(n)
+    }
+
+    private val PLAY_BUTTON = setOf("reproducir", "play", "reanudar", "resume", "reanudar reproducción")
+    private val PAUSE_BUTTON = setOf("pausa", "pausar", "pause")
+
+    /**
+     * ¿El reproductor está en PAUSA? Su botón principal dice «Reproducir» y no hay
+     * ninguno de pausa. Sin esto, una pausa larga con la app abierta seguía
+     * contando como reproducción (ScreenPlayback).
+     */
+    fun playerPaused(texts: List<String>): Boolean {
+        val n = texts.map { norm(it) }
+        return n.any { it in PLAY_BUTTON } && n.none { it in PAUSE_BUTTON }
+    }
 
     /** Nº de controles del reproductor a partir del cual la pantalla ES el reproductor. */
     const val MIN_PLAYER_CONTROLS = 2
@@ -102,7 +129,12 @@ object ScreenHeuristics {
     private val NOT_TITLE_RE = Regex(
         "^(?:porque has visto|because you watched|porque viste|ya que viste)\\b" +
             "|\\bnotificaci[oó]n|\\bnotification" +
-            "|\\d+\\s*(?:premios?|nominaci[oó]n(?:es)?|awards?|nominations?)\\b",
+            "|\\d+\\s*(?:premios?|nominaci[oó]n(?:es)?|awards?|nominations?)\\b" +
+            // Estado del envío a otro dispositivo («Enviar; desconectado»).
+            "|^(?:enviar|transmitir|cast)\\b.*\\b(?:desconectado|conectado|disconnected|connected)\\b" +
+            "|\\bdispositivo de env[ií]o\\b" +
+            // X-Ray de Prime Video: «Rick Hoffman portrays Louis Litt».
+            "|\\s(?:portrays|interpreta a|da vida a)\\s",
     )
 
     // Fila de la lista de episodios de Netflix: el número y un punto delante
@@ -295,6 +327,7 @@ object ScreenHeuristics {
         if (EPISODE_ROW_RE.containsMatchIn(l)) return false // fila de episodio
         if (NUMBERED_ROW_RE.containsMatchIn(l)) return false // «5. Pastorcito alpino»
         if (NOT_TITLE_RE.containsMatchIn(l)) return false    // «Porque has visto X»
+        if (isPlayerControl(t)) return false                  // «Velocidad, 1x»
         if (isGenreList(t)) return false                     // «Acción, Aventura»
         return true
     }

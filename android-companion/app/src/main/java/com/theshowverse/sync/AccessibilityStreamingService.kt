@@ -37,6 +37,14 @@ class AccessibilityStreamingService : AccessibilityService() {
         prefs = Prefs(this)
         prefs?.addLog("Accesibilidad conectada (detección de ficha)")
         prefs?.let { NotATitleList.refreshIfStale(it) }
+        // Para ScreenPlayback: si otra app pasa a primer plano, el reproductor ya
+        // no se está viendo.
+        ScreenPlayback.foreground = { rootInActiveWindow?.packageName?.toString() }
+    }
+
+    override fun onDestroy() {
+        ScreenPlayback.foreground = null
+        super.onDestroy()
     }
 
     override fun onInterrupt() { /* noop */ }
@@ -121,7 +129,10 @@ class AccessibilityStreamingService : AccessibilityService() {
         // El reproductor no es una ficha (Netflix): lo que resolviera —«Brillo»
         // era una película— se recordaría como la serie que se está viendo y el
         // episodio que suena se quedaría sin la suya.
-        if (analysis.playerControls >= ScreenHeuristics.MIN_PLAYER_CONTROLS) return
+        if (analysis.playerControls >= ScreenHeuristics.MIN_PLAYER_CONTROLS) {
+            ScreenPlayback.playerSeen(pkg, SystemClock.elapsedRealtime(), ScreenHeuristics.playerPaused(analysis.uiLabels))
+            return
+        }
 
         // Solo actuamos si la pantalla PARECE una ficha (botón de reproducir
         // reconocido O suficientes señales de detalle) y hay algún candidato.
@@ -142,6 +153,10 @@ class AccessibilityStreamingService : AccessibilityService() {
             }
             return
         }
+
+        // Una ficha de esta app: ya no está en su reproductor (salvo que asome algún
+        // control suyo, como el X-Ray de Prime Video sobre el vídeo).
+        if (analysis.playerControls == 0) ScreenPlayback.playerLeft(pkg)
 
         // Textos que el usuario corrigió como «no había ninguna ficha»: fuera, para
         // que el siguiente candidato (el título de verdad, si lo hay) sea el
@@ -323,6 +338,7 @@ class AccessibilityStreamingService : AccessibilityService() {
             val (texts, seek) = playerTexts(root)
             val reading = PlayerScreen.parse(texts, seek, now) ?: continue
             PlayerScreenCache.record(pkg, reading)
+            ScreenPlayback.playerSeen(pkg, now, ScreenHeuristics.playerPaused(texts))
             // Los títulos del reproductor siguen sirviendo de último recurso (ScreenTexts).
             ScreenTexts.record(pkg, texts.filter { ScreenHeuristics.isLikelyTitle(it) }.take(MAX_CANDIDATES))
             if (reading.hasIdentity) {

@@ -9,6 +9,7 @@ import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.os.SystemClock
 import android.service.notification.NotificationListenerService
 import android.util.Log
@@ -73,6 +74,9 @@ class MediaListenerService : NotificationListenerService() {
     override fun onListenerConnected() {
         prefs = Prefs(this)
         if (prefs.isPaired()) ProgressOutbox.schedule(this)
+        // Apps sin MediaSession: el servicio de accesibilidad avisa al ver su
+        // reproductor, y desde entonces se sondea igual que una sesión.
+        ScreenPlayback.onPlayerSeen = { handler.post { startPolling() } }
         val manager = getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
         msm = manager
         try {
@@ -183,6 +187,20 @@ class MediaListenerService : NotificationListenerService() {
             evaluate(controller, pkg)
         }
 
+        // Apps que no publican MediaSession (Prime Video y Disney+ casi nunca lo
+        // hacen): lo que suena se ve en su reproductor en pantalla. Ver ScreenPlayback.
+        val conSesion = sessions.map { it.packageName }.toSet()
+        val interactive = (getSystemService(Context.POWER_SERVICE) as? PowerManager)?.isInteractive ?: true
+        for (pkg in ScreenPlayback.playing(SystemClock.elapsedRealtime(), interactive)) {
+            if (pkg in conSesion || !prefs.isEnabled(pkg)) continue
+            playingNow.add(pkg)
+            noteOnce(
+                "screen:$pkg",
+                "Reproduciendo en ${Platforms.nameFor(pkg)} (visto en pantalla; la app no publica sesión multimedia)",
+            )
+            evaluate(null, pkg)
+        }
+
         val stopped = playingSince.keys - playingNow
         for (pkg in stopped) {
             // Volcado del punto EXACTO al salir (pausa/stop) ANTES de olvidar la
@@ -206,10 +224,10 @@ class MediaListenerService : NotificationListenerService() {
             lastKeyByPackage.remove(pkg)
         }
 
-        if (sessions.isEmpty()) stopPolling()
+        if (sessions.isEmpty() && playingSince.isEmpty() && ScreenPlayback.isEmpty()) stopPolling()
     }
 
-    private fun evaluate(controller: MediaController, pkg: String) {
+    private fun evaluate(controller: MediaController?, pkg: String) {
         if (!prefs.isPaired()) {
             noteOnce("unpaired:$pkg", "No vinculado: abre la web y pulsa Vincular app Android")
             return
@@ -234,7 +252,7 @@ class MediaListenerService : NotificationListenerService() {
         val session = sessionStart[pkg] ?: since
         if (now - since < MIN_WATCH_MS) return // aún no lleva 15s reproduciendo
 
-        val md = controller.metadata
+        val md = controller?.metadata
         val notif = notifExtrasFor(pkg)
         val rawSesion = RawMetadata(
             packageName = pkg,
@@ -245,7 +263,7 @@ class MediaListenerService : NotificationListenerService() {
             displayTitle = md?.getString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE),
             displaySubtitle = md?.getString(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE),
             displayDescription = md?.getString(MediaMetadata.METADATA_KEY_DISPLAY_DESCRIPTION),
-            queueTitle = controller.queueTitle?.toString(),
+            queueTitle = controller?.queueTitle?.toString(),
             notifTitle = notif.first,
             notifText = notif.second,
             notifSubText = notif.third,
@@ -262,7 +280,7 @@ class MediaListenerService : NotificationListenerService() {
         // visto ni para pisar una posición mejor (ver `estimatedPosition`). La del
         // reproductor no es una estimación: es lo que marcaba su barra, avanzado con
         // el tiempo que lleva sonando.
-        val realPosMs = livePositionMs(controller)
+        val realPosMs = controller?.let { livePositionMs(it) }
         val pantallaPosMs = if (lectura != null) playerClock.positionMs(pkg, lectura, now, since) else null
         val posMs = realPosMs ?: pantallaPosMs ?: (now - since).coerceAtLeast(0L)
         val posicionEstimada = realPosMs == null && pantallaPosMs == null
@@ -314,7 +332,7 @@ class MediaListenerService : NotificationListenerService() {
         noteOnce(
             "play:$pkg:${raw.title}",
             "Reproducción ${Platforms.nameFor(pkg)}: pos=${raw.positionMs / 1000}s " +
-                "dur=${raw.durationMs / 1000}s estado=${controller.playbackState?.state}",
+                "dur=${raw.durationMs / 1000}s estado=${controller?.playbackState?.state ?: "en pantalla"}",
         )
 
         // Pista de la serie desde la última ficha abierta (misma app, reciente):
@@ -327,7 +345,15 @@ class MediaListenerService : NotificationListenerService() {
         // Lo que muestra el reproductor (Prime Video, Crunchyroll) describe lo que
         // suena AHORA: completa la serie y los números que la sesión no da, y gana a
         // la pista de una ficha vista antes. Ver PlayerScreen.merge.
-        val built = PlayerScreen.merge(conPista, lectura)
+        // Sin sesión, lo que suena sale solo de la pantalla: el reproductor y, si no
+        // pinta el título, la ficha abierta justo antes. Ver ScreenSignal.
+        val built = if (controller == null) {
+            ScreenSignal.build(pkg, Platforms.nameFor(pkg), lectura, RecentDetail.detailFor(pkg, session))
+                ?.copy(durationSec = sinPista.durationSec, positionSec = sinPista.positionSec)
+                ?: sinPista
+        } else {
+            PlayerScreen.merge(conPista, lectura)
+        }
         if (built !== conPista && built.showName != conPista.showName) {
             noteOnce(
                 "screenid:$pkg:${built.showName}:${built.season}:${built.episode}",

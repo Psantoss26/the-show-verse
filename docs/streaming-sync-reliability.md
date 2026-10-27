@@ -188,6 +188,37 @@ serie («Marco») solo la acepta cuando ese episodio existe en ella con ese nomb
 Netflix a algunos episodios («Iván (N.° 88)» en *The Blacklist*) se quita antes de
 compararlo con TMDb.
 
+## Apps sin sesión multimedia (Prime Video, Disney+)
+
+La sincronización del móvil se apoya en la MediaSession que publica cada app.
+Netflix la publica siempre; Prime Video y Disney+, en la mayoría de móviles y
+tablets, no (solo al enviar a otro dispositivo o en imagen en imagen). Sin ella no
+aparecía ni «Detectado reproduciendo» y no llegaba nada al servidor.
+
+Ahora el servicio de accesibilidad avisa cuando ve el reproductor de una app
+(`ScreenPlayback`): por `PlayerScreen` (barra de avance o tiempos) o por dos o más
+controles suyos. Desde entonces `MediaListenerService` la trata como una
+reproducción, igual que una sesión, hasta que:
+
+- se ve otra pantalla de esa app (una ficha),
+- otra app pasa a primer plano,
+- el reproductor se ve en pausa (botón «Reproducir» y ninguno de pausa),
+- se apaga la pantalla (cuenta como pausa), o
+- pasan 4 horas sin volver a verlo.
+
+No se exige volver a ver los controles: se ocultan a los pocos segundos.
+
+Lo que suena sale de la pantalla (`ScreenSignal`): la serie y el episodio del
+reproductor y, si no los pinta, la ficha abierta justo antes de reproducir (la misma
+regla de frescura que la pista de serie). La posición es la del reproductor cuando
+se ha visto, y si no, estimada por reloj. Las apps que sí publican sesión (Netflix,
+Plex) siguen solo por ella.
+
+El reproductor se lee en todas las plataformas salvo Netflix y Plex. Además, ya no
+se toman por títulos las pestañas «Mi espacio», «Para ti» y «Búsqueda», el estado
+del envío a otro dispositivo, los controles como «Velocidad, 1x» ni las notas de
+X-Ray («Rick Hoffman portrays Louis Litt»).
+
 ## Prime Video y Crunchyroll en la app Android
 
 Estas dos apps no publican en su MediaSession de qué serie es el episodio (a veces
