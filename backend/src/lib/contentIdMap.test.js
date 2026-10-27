@@ -19,6 +19,9 @@ test('mapContentId: only platforms whose playback id names the item', () => {
   assert.equal(mapContentId('netflix', 'a b'), null);
   assert.equal(mapContentId('netflix', 'x'.repeat(201)), null);
   assert.equal(mapContentId('netflix', null), null);
+  // Un tramo genérico de la URL no identifica nada.
+  assert.equal(mapContentId('max', 'urn'), null);
+  assert.equal(mapContentId('max', 'urn:hbo:episode:GXkRjxwjR68PDwwEAABKJ'), 'urn:hbo:episode:GXkRjxwjR68PDwwEAABKJ');
 });
 
 test('contentTarget: a movie, or a concrete episode; never a bare series', () => {

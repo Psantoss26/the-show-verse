@@ -338,3 +338,78 @@ test("El badge de otra fila del catálogo no pisa lo que dice el reproductor", (
   assert.equal(signal.episode, 14);
   assert.equal(signal.episodeName, "Ozymandias");
 });
+
+// ── Lo que mantiene Universal Trakt Scrobbler de cada reproductor ─────────────
+
+test("Prime Video, episodio en `episode-info` con «Season 1, Ep. 3»", () => {
+  const signal = detect({
+    host: "www.primevideo.com",
+    url: "https://www.primevideo.com/detail/0QN9ZXJ4G/",
+    mediaSession: { title: "The Name" },
+    tabTitle: "Prime Video: The Boys",
+    nodes: [
+      h("h1", { class: "atvwebplayersdk-title-text" }, "The Boys"),
+      h("div", { class: "atvwebplayersdk-episode-info" }, "Season 1, Ep. 3 The Name"),
+    ],
+    platformName: "Prime Video",
+    durationSec: 3600,
+  });
+  assert.deepEqual([signal.showName, signal.season, signal.episode], ["The Boys", 1, 3]);
+});
+
+test("Prime Video, título de colección: la serie va sin «Season 2» y esa es la temporada", () => {
+  const signal = detect({
+    host: "www.primevideo.com",
+    url: "https://www.primevideo.com/detail/0ABCDEF/",
+    mediaSession: { title: "Guerrero" },
+    tabTitle: "Prime Video: Attack on Titan",
+    nodes: [
+      h("h1", { class: "atvwebplayersdk-title-text" }, "Attack on Titan Season 2"),
+      h("div", { class: "atvwebplayersdk-subtitle-text" }, "Ep. 5 Guerrero"),
+    ],
+    platformName: "Prime Video",
+    durationSec: 1440,
+  });
+  assert.equal(signal.showName, "Attack on Titan");
+  assert.equal(signal.season, 2);
+  assert.equal(signal.episode, 5);
+});
+
+test("Max: el id de /player/urn:hbo:episode:… es el urn entero, no «urn»", () => {
+  const signal = detect({
+    host: "play.hbomax.com",
+    url: "https://play.hbomax.com/player/urn:hbo:episode:GXkRjxwjR68PDwwEAABKJ",
+    mediaSession: { title: "Ep. 1", artist: "La casa del dragón" },
+    tabTitle: "HBO Max",
+    nodes: [],
+    platformName: "HBO Max",
+    durationSec: 3600,
+  });
+  assert.equal(signal.contentId, "urn:hbo:episode:GXkRjxwjR68PDwwEAABKJ");
+});
+
+test("Apple TV+, episodio: serie y números del reproductor (`player-metadata-*`)", () => {
+  const signal = detect({
+    host: "tv.apple.com",
+    url: "https://tv.apple.com/es/episode/half-loop/umc.cmc.23qox5n6larygqgg6u74fvyj?showId=umc.cmc.1srk2goyh2q2zdxcx605w8vtx",
+    mediaSession: { title: "Half Loop" },
+    tabTitle: "Ver Half Loop - Separación (Temporada 1, Episodio 2) - Apple TV (ES)",
+    nodes: [
+      h("div", { "data-testid": "video-player" }, [
+        h("div", { "data-testid": "player-metadata-title" }, "Separación"),
+        h("div", { "data-testid": "player-metadata-subtitle" }, "T1, E2 · Half Loop"),
+      ]),
+    ],
+    platformName: "Apple TV+",
+    durationSec: 3300,
+  });
+  assert.deepEqual([signal.showName, signal.season, signal.episode], ["Separación", 1, 2]);
+  assert.equal(signal.contentId, "umc.cmc.23qox5n6larygqgg6u74fvyj");
+});
+
+test("Apple TV+: en la ruta de la serie no hay id de lo que suena", () => {
+  const E2 = require("./platform-enhancers.js");
+  const apple = E2.REFINERS.find((r) => r.id === "appletv");
+  assert.equal(apple.contentId("https://tv.apple.com/es/show/separacion/umc.cmc.1srk2goyh2q2zdxcx605w8vtx"), null);
+  assert.equal(apple.contentId("https://tv.apple.com/es/movie/f1-la-pelicula/umc.cmc.3t6dvnnr87zwd4wmvpdx5came"), "umc.cmc.3t6dvnnr87zwd4wmvpdx5came");
+});

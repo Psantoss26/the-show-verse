@@ -27,6 +27,8 @@ const PLATFORM_ALIASES = {
   disneyplus: "disney",
   movistarplus: "movistar",
   appletvplus: "appletv",
+  // La extensión nombra Apple TV+ por su host (tv.apple.com → «tv»).
+  tv: "appletv",
 };
 
 /** Id de plataforma canónico ("Prime" → "primevideo"). */

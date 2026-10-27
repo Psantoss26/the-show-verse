@@ -709,9 +709,13 @@
     return remoteVideoProxy();
   }
 
+  // Vídeos que nunca son lo que se está viendo: el avance que Prime Video
+  // reproduce solo en la ficha (lo excluye igual Universal Trakt Scrobbler).
+  const PREVIEW_VIDEO_SELECTOR = ".tst-video-overlay-player-html5";
   function getLocalMainVideo() {
     const videos = Array.from(document.querySelectorAll("video")).filter(
       (v) =>
+        !(v.matches && v.matches(PREVIEW_VIDEO_SELECTOR)) &&
         v.readyState > 0 &&
         isFinite(v.duration) &&
         v.duration > 0 &&

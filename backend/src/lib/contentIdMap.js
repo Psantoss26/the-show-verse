@@ -10,11 +10,13 @@
 //     en el mismo título y episodio, y ninguno otro empata en cabeza.
 
 // Plataformas cuyo id de reproducción identifica el EPISODIO o la película que
-// suena. Prime Video no: su /detail/<id> es la ficha de la serie o temporada. Plex
+// suena (en Apple TV+ la extensión solo lo da en rutas de episodio o película). Prime Video no: su /detail/<id> es la ficha de la serie o temporada. Plex
 // tampoco: la URL sigue en la ficha anterior mientras se reproduce.
-const ITEM_LEVEL_PLATFORMS = new Set(['netflix', 'max', 'disney', 'crunchyroll']);
+const ITEM_LEVEL_PLATFORMS = new Set(['netflix', 'max', 'disney', 'crunchyroll', 'appletv']);
 
-const CONTENT_ID_RE = /^[\w.:-]{1,200}$/;
+// Al menos 6 caracteres: un id más corto no identifica nada (un tramo genérico
+// de la URL como «urn» acabaría asignando el mismo título a todo).
+const CONTENT_ID_RE = /^[\w.:-]{6,200}$/;
 
 /** Id utilizable para el mapa, o null. */
 export function mapContentId(platform, contentId) {

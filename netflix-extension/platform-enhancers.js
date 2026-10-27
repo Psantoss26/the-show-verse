@@ -123,14 +123,27 @@
         (url.match(/\/detail\/([A-Za-z0-9]+)/) || [])[1] ||
         (url.match(/[?&]gti=([A-Za-z0-9.]+)/) || [])[1] ||
         null,
-      subSel: ['.atvwebplayersdk-subtitle-text', '[data-testid="player-subtitle"]'],
+      // El episodio puede ir en `episode-info` («T1 E3 Nombre», «Season 1, Ep. 3
+      // Nombre») o en el subtítulo: los dos que lee Universal Trakt Scrobbler.
+      subSel: ['.atvwebplayersdk-episode-info', '.atvwebplayersdk-subtitle-text', '[data-testid="player-subtitle"]'],
       titleSel: ['.atvwebplayersdk-title-text', '[data-testid="player-title"]'],
+      // El reproductor puede titular una temporada con licencia propia como una
+      // colección («Attack on Titan Season 2»): la serie es sin ese sufijo.
+      collectionSuffix: true,
     },
     {
       id: "max",
       match: /(^|\.)max\.com$|(^|\.)hbomax\.com$/,
-      contentId: (url) =>
-        (url.match(/\/(?:video\/watch|player)\/([\w-]+)/) || [])[1] || null,
+      // Dos formatos: /player/urn:hbo:episode:<id> (lo documenta Universal Trakt
+      // Scrobbler) y /video/watch/<a>/<b>, donde lo que suena es la PAREJA. Antes
+      // se cortaba en los «:» y todo lo de /player/ tenía el mismo id: «urn».
+      contentId: (url) => {
+        const urn = (url.match(/\/player\/(urn:[^/?#]+)/) || [])[1];
+        if (urn) return urn;
+        const watch = url.match(/\/video\/watch\/([\w-]+)(?:\/([\w-]+))?/);
+        if (watch) return watch[2] ? `${watch[1]}:${watch[2]}` : watch[1];
+        return null;
+      },
       subSel: ['[data-testid="player-ux-asset-subtitle"]', '[class*="AssetSubtitle"]'],
       titleSel: ['[data-testid="player-ux-asset-title"]', '[class*="AssetTitle"]'],
     },
@@ -144,6 +157,16 @@
         '[data-testid="player-title-content"]',
         ".title-field",
       ],
+    },
+    {
+      // Apple TV+ en el navegador: lo que lee Universal Trakt Scrobbler de su
+      // reproductor. El id (umc.cmc.…) solo identifica lo que suena en las rutas
+      // de episodio o película; en la de la serie es la serie.
+      id: "appletv",
+      match: /(^|\.)tv\.apple\.com$/,
+      contentId: (url) => (url.match(/\/(?:episode|movie)\/[^/?#]+\/(umc\.cmc\.[a-z0-9]+)/i) || [])[1] || null,
+      subSel: ['[data-testid="player-metadata-subtitle"]'],
+      titleSel: ['[data-testid="player-metadata-title"]'],
     },
     {
       id: "plex",
@@ -289,6 +312,20 @@
           out.episodeName = out.episodeName || out.movieTitle;
           out.showName = domShow;
           out.movieTitle = undefined;
+        }
+      }
+    } catch (e) {
+      /* ignoramos */
+    }
+
+    // Título de colección («Serie Season 2», «Serie - Temporada 2»): la serie va
+    // sin el sufijo, y su número es la temporada si no se sabía.
+    try {
+      if (r.collectionSuffix && out.showName) {
+        const m = clean(out.showName).match(/^(.+?)\s+(?:-\s*)?(?:Season|Temporada|Staffel|Saison)\s+(\d{1,3})\s*$/i);
+        if (m) {
+          out.showName = m[1];
+          if (out.season == null) out.season = Number(m[2]);
         }
       }
     } catch (e) {
