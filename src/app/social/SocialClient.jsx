@@ -560,8 +560,8 @@ export default function SocialClient({ initialView = "today", initialToday = {},
   const filtersRef = useRef(null);
   const listaRef = useRef(null);
   const panelRef = useRef(null);
-  const { isSticky: filtersSticky, isPinned: filtersPinned } =
-    useStickyToolbarState(filtersRef);
+  const { panelOverlay: filtersSticky, isPinned: filtersPinned } =
+    useStickyToolbarState(filtersRef, mobileFiltersOpen);
 
   const setVista = useCallback((modo) => {
     setVistaState(modo);
@@ -864,9 +864,9 @@ export default function SocialClient({ initialView = "today", initialToday = {},
 
           {/* MISMO DESPLEGABLE QUE LAS PÁGINAS DE USUARIO (Favoritos, Pendientes,
               Historial): despliegue por alto con la misma curva, y sin fondo
-              propio —cada control lleva su cristal—. Antes de fijarse forma
-              parte del flujo y empuja el contenido; al fijarse pasa a overlay
-              para no desplazar nada. */}
+              propio —cada control lleva su cristal—. Abierto antes de fijarse
+              forma parte del flujo (y sigue en él al fijarse); abierto ya fijado
+              va como overlay (ver useStickyToolbarState). */}
           {/* El MISMO desplegable que Favoritos y Pendientes: sin superficie
               propia, cada control con su cristal (y el del navbar al fijarse,
               `data-menu-pinned`). La caja negra con desenfoque que llevaba al

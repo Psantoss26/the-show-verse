@@ -43,6 +43,13 @@ El backend entrega la baraja ya filtrada (sin descartados, pendientes ni favorit
 
 Páginas «Ver todos» de *Tendencias*, *Populares*, *Recomendados* y *Más esperadas* (`src/lib/dashboard/sectionItems.js`). La lista llega ya en el RSC, sin esqueletos, y es la misma (mismo orden) que la fila de Inicio. Tienen botón de recargar junto al de volver. Backend: `/v1/dashboard/sections/{key}`. Ver [[dashboards-implementation]].
 
+## Menú desplegable móvil al fijarse
+
+En el móvil, la barra de búsqueda y filtros de Favoritos, Pendientes, Historial, Biblioteca, Calendario, Continuar viendo, En progreso, Listas, Social, las secciones del dashboard y el detalle de lista se fija bajo la barra superior al hacer scroll. Dónde va su desplegable (`MobileFiltersPanel`) se decide al abrirlo y no cambia mientras siga abierto (`panelOverlay` de `useStickyToolbarState`):
+
+- **Abierto antes de fijarse:** va en el flujo y sigue así al fijarse; el contenido pasa por detrás con el scroll normal. Antes pasaba a overlay justo al fijarse y el contenido subía de golpe la altura del panel (y bajaba de golpe al volver arriba).
+- **Abierto con la barra ya fijada:** va como overlay bajo la barra y no empuja el contenido.
+
 ## Fichas superpuestas (rutas interceptoras)
 
 Al abrir una ficha (`/details/...`) desde dentro de la app, Next la pinta en el slot `src/app/@overlay/(.)details/...` y **deja montada la página de origen**, que `OverlayRouteHost` oculta con `<Activity mode="hidden">`. Al volver atrás reaparece igual que estaba, sin volver a cargar ni animar. Recargar la URL o entrar por un enlace externo sirve la ficha completa de siempre.

@@ -1081,8 +1081,8 @@ export default function CalendarClient({
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [mobileCalendarOpen, setMobileCalendarOpen] = useState(false);
   const filtersRef = useRef(null);
-  const { isSticky: filtersSticky, isPinned: filtersPinned } =
-    useStickyToolbarState(filtersRef);
+  const { panelOverlay: filtersSticky, isPinned: filtersPinned } =
+    useStickyToolbarState(filtersRef, mobileFiltersOpen);
 
   // Mes que enseña el calendario lateral, y cuántas cosas cae cada día de ese
   // mes. Es un rango distinto del que se está viendo (el panel siempre muestra
@@ -1535,9 +1535,10 @@ export default function CalendarClient({
                 isBackNav ? "" : " sv-section-toolbar-in"
               }`}
             >
-              {/* Móvil: fila principal + panel de controles. Antes de fijarse el
-                  panel va en el flujo y empuja el contenido; una vez fijada la barra
-                  (filtersSticky) pasa a overlay para no desplazar nada. */}
+              {/* Móvil: fila principal + panel de controles. Abierto antes de
+                  fijarse, el panel va en el flujo y sigue en él al fijarse; abierto
+                  con la barra ya fijada (filtersSticky) va como overlay. Ver
+                  useStickyToolbarState. */}
               <div className="relative z-10 lg:hidden">
                 <div className="relative flex gap-2">
                   <div className="relative min-w-0 flex-1">

@@ -878,8 +878,8 @@ export default function DashboardSectionClient({
   const router = useRouter();
   const toolbarSearchFitRef = usePageToolbarSearchFit();
   const filtersRef = useRef(null);
-  const { isSticky: filtersSticky, isPinned: filtersPinned } =
-    useStickyToolbarState(filtersRef);
+  const { panelOverlay: filtersSticky, isPinned: filtersPinned } =
+    useStickyToolbarState(filtersRef, mobileFiltersOpen);
   const [previewBackdropsByItem, setPreviewBackdropsByItem] = useState(
     () => initialBackdrops || {},
   );

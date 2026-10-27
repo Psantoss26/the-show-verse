@@ -1278,8 +1278,8 @@ export default function InProgressClient({
   const [isMobile, setIsMobile] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
-  const { isSticky: filtersSticky, isPinned: filtersPinned } =
-    useStickyToolbarState(filtersRef);
+  const { panelOverlay: filtersSticky, isPinned: filtersPinned } =
+    useStickyToolbarState(filtersRef, mobileFiltersOpen);
   const [uiReady, setUiReady] = useState(false);
 
   // Al volver desde una ficha, restauramos la caché antes del primer paint. Así

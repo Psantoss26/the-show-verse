@@ -1005,8 +1005,8 @@ export default function BibliotecaClient() {
   const loadMoreRef = useRef(null);
   const deferredQuery = useDeferredValue(query);
   const filtersRef = useRef(null);
-  const { isSticky: filtersSticky, isPinned: filtersPinned } =
-    useStickyToolbarState(filtersRef);
+  const { panelOverlay: filtersSticky, isPinned: filtersPinned } =
+    useStickyToolbarState(filtersRef, mobileFiltersOpen);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -2087,8 +2087,8 @@ export default function BibliotecaClient() {
             </button>
           </div>
 
-          {/* En flujo antes de fijarse y como overlay cuando la barra ya está
-              adherida al navbar móvil. */}
+          {/* En flujo si se abre antes de fijarse (y sigue así al fijarse) y
+              como overlay si se abre con la barra ya adherida al navbar móvil. */}
           <MobileFiltersPanel
             open={mobileFiltersOpen}
             className={`z-[80] lg:hidden ${

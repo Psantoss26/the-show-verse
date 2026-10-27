@@ -392,8 +392,8 @@ export default function FilterableListItems({
   const [editMode, setEditMode] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
-  const { isSticky: filtersSticky, isPinned: filtersPinned } =
-    useStickyToolbarState(filtersRef);
+  const { panelOverlay: filtersSticky, isPinned: filtersPinned } =
+    useStickyToolbarState(filtersRef, mobileFiltersOpen);
   // Al VOLVER (atrás/adelante) se renderizan todos los items de golpe para que la
   // altura del documento sea correcta al instante y el scroll se restaure sin saltos.
   const isBackNav = useIsHistoryNavigation();

@@ -3099,8 +3099,8 @@ export default function HistoryClient() {
   });
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
-  const { isSticky: filtersSticky, isPinned: filtersPinned } =
-    useStickyToolbarState(filtersRef);
+  const { panelOverlay: filtersSticky, isPinned: filtersPinned } =
+    useStickyToolbarState(filtersRef, mobileFiltersOpen);
   // Móvil: las filas del desplegable reparten sus columnas como la barra de
   // arriba (buscador | secciones + calendario + filtros), no a mitades: la
   // columna derecha mide lo mismo que esos botones. Se mide el grupo y se
@@ -4063,10 +4063,10 @@ export default function HistoryClient() {
                   isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.5 }
                 }
               >
-                {/* Mobile: búsqueda + panel de filtros. Antes de fijarse (sticky),
-                    el panel forma parte del flujo y empuja el contenido de abajo.
-                    Al alcanzar el sticky (filtersSticky) se convierte en overlay
-                    absoluto para no desplazar nada. El wrapper `relative` es el
+                {/* Mobile: búsqueda + panel de filtros. Abierto antes de fijarse
+                    (sticky), el panel forma parte del flujo y sigue en él al
+                    fijarse; abierto con la barra ya fijada (filtersSticky) va como
+                    overlay absoluto (ver useStickyToolbarState). El wrapper `relative` es el
                     contexto de posicionamiento del overlay. */}
                 <div data-history-mobile-toolbar="" className="relative z-10 lg:hidden">
                   <div className="relative flex gap-2">

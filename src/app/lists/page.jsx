@@ -1975,8 +1975,8 @@ export default function ListsPage() {
     "[data-lists-mobile-toolbar]",
   );
   const filtersRef = useRef(null);
-  const { isSticky: filtersSticky, isPinned: filtersPinned } =
-    useStickyToolbarState(filtersRef);
+  const { panelOverlay: filtersSticky, isPinned: filtersPinned } =
+    useStickyToolbarState(filtersRef, mobileFiltersOpen);
   const [viewMode, setViewMode] = useState("rows"); // ✅ por defecto como “Dashboard”
 
   // ✅ NUEVO: selector de fuente

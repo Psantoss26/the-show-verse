@@ -1020,8 +1020,8 @@ export default function ContinueWatchingClient() {
   const [imageModeHydrated, setImageModeHydrated] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
-  const { isSticky: filtersSticky, isPinned: filtersPinned } =
-    useStickyToolbarState(filtersRef);
+  const { panelOverlay: filtersSticky, isPinned: filtersPinned } =
+    useStickyToolbarState(filtersRef, mobileFiltersOpen);
   // null | "remove" | "complete" (ver EditModeButton).
   const [editMode, setEditMode] = useState(null);
   const [busyId, setBusyId] = useState(null);
@@ -1274,9 +1274,9 @@ export default function ContinueWatchingClient() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
         >
-          {/* Móvil: antes de alcanzar el sticky el panel pertenece al flujo y
-              desplaza el contenido. Una vez fijado se convierte en overlay, igual
-              que en Historial, para conservar estable la lista que queda debajo. */}
+          {/* Móvil: abierto antes de alcanzar el sticky el panel pertenece al
+              flujo (y sigue en él al fijarse); abierto ya fijado va como overlay,
+              igual que en Historial (ver useStickyToolbarState). */}
           <div className="relative z-10 lg:hidden">
             <div className="relative flex gap-2">
               <div className="relative min-w-0 flex-1">

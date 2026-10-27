@@ -2185,8 +2185,8 @@ export default function FavoritesClient() {
   const [q, setQ] = useState("");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
-  const { isSticky: filtersSticky, isPinned: filtersPinned } =
-    useStickyToolbarState(filtersRef);
+  const { panelOverlay: filtersSticky, isPinned: filtersPinned } =
+    useStickyToolbarState(filtersRef, mobileFiltersOpen);
   const tmdbLogoutInFlightRef = useRef(false);
 
   // Cierre de sesión con confirmación (común a las páginas de usuario, ver
@@ -3440,8 +3440,9 @@ export default function FavoritesClient() {
             </button>
           </div>
 
-          {/* Antes de fijarse, el panel forma parte del flujo. Al alcanzar el
-              sticky se convierte en overlay para no desplazar el contenido. */}
+          {/* Abierto antes de fijarse, el panel forma parte del flujo y sigue
+              en él al fijarse; abierto ya fijado va como overlay para no
+              desplazar el contenido (ver useStickyToolbarState). */}
           <MobileFiltersPanel
             open={mobileFiltersOpen}
             className={`z-[80] lg:hidden ${

@@ -10,12 +10,26 @@ const NOT_STUCK = { isSticky: false, isPinned: false };
  * - `isPinned`: está fijada, en CUALQUIER tamaño de pantalla. Es lo que activa
  *   el cristal del navbar sobre las superficies del menú (ver la regla
  *   `[data-menu-pinned="true"]` en globals.css).
- * - `isSticky`: está fijada Y la ventana es de móvil. Con eso la barra mantiene
- *   sus controles desplegables en el flujo normal antes de fijarse, y los pasa a
- *   overlay una vez fijada bajo el navbar móvil.
+ * - `isSticky`: está fijada Y la ventana es de móvil.
+ * - `panelOverlay`: si el panel desplegable móvil (`MobileFiltersPanel`) va como
+ *   overlay bajo la barra (`absolute top-full`) o en el flujo. Se decide AL
+ *   ABRIRLO y no cambia mientras siga abierto o cerrándose: abierto con la barra
+ *   ya fijada no empuja el contenido; abierto antes de fijarse sigue en el flujo
+ *   al fijarse y el contenido pasa por debajo con el scroll normal. Antes se
+ *   cambiaba a overlay justo al fijarse y el contenido de debajo subía de golpe
+ *   la altura del panel (y bajaba de golpe al desfijarse).
  */
-export default function useStickyToolbarState(toolbarRef) {
+export default function useStickyToolbarState(toolbarRef, panelOpen = false) {
   const [state, setState] = useState(NOT_STUCK);
+  const [panelOverlay, setPanelOverlay] = useState(false);
+  const [panelWasOpen, setPanelWasOpen] = useState(panelOpen);
+
+  // Ajuste durante el render (patrón de React para estado derivado de un
+  // cambio de props): solo se toma la colocación en el instante de abrir.
+  if (panelOpen !== panelWasOpen) {
+    setPanelWasOpen(panelOpen);
+    if (panelOpen && panelOverlay !== state.isSticky) setPanelOverlay(state.isSticky);
+  }
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -72,5 +86,5 @@ export default function useStickyToolbarState(toolbarRef) {
     };
   }, [toolbarRef]);
 
-  return state;
+  return { ...state, panelOverlay };
 }
