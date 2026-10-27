@@ -2,7 +2,9 @@
 
 // Fila del NOMBRE de la cabecera del perfil con sus botones de acción:
 // Configuración, Compartir, Sincronizar y Cerrar sesión en el propio; Compartir
-// y Seguir en el de otro.
+// y Seguir en el de otro. En el de otro, en móvil, Seguir es un botón redondo
+// de solo icono como Compartir (la píldora con texto queda para escritorio), y
+// los dos se quedan siempre a la vista: no se recogen en el menú.
 //
 // EN MÓVIL, si los botones no dejan sitio al nombre (se recortaría con «…»),
 // se recogen en un botón de tres puntos que despliega el resto como un menú.
@@ -19,12 +21,12 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { LogOut, MoreHorizontal, RotateCcw, Settings, Share2 } from "lucide-react";
+import { LogOut, MoreHorizontal, RotateCcw, Settings, Share2, UserCheck, UserPlus } from "lucide-react";
 
 import LogoutConfirmModal from "@/components/auth/LogoutConfirmModal";
 import { useShareAction } from "@/components/details/DetailHeaderBits";
 import LiquidButton from "@/components/LiquidButton";
-import FollowButton from "@/components/social/FollowButton";
+import FollowButton, { useFollowToggle } from "@/components/social/FollowButton";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { buildProfileShareCard } from "@/lib/profile/shareProfile";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
@@ -61,9 +63,9 @@ function useProfileShare(profile) {
 const ACTIONS_EXPANDED = 0;
 const ACTIONS_SETTINGS = 1;
 const ACTIONS_MENU = 2;
-// En el perfil ajeno no hay Configuración: de todos a la vista, al menú.
 const SELF_LEVELS = [ACTIONS_EXPANDED, ACTIONS_SETTINGS, ACTIONS_MENU];
-const OTHER_LEVELS = [ACTIONS_EXPANDED, ACTIONS_MENU];
+// En el perfil ajeno solo hay dos botones redondos en móvil: no se recogen.
+const OTHER_LEVELS = [ACTIONS_EXPANDED];
 
 /**
  * ¿Cuánto hay que recoger los botones? Solo en móvil: se recoge un nivel cada
@@ -256,9 +258,11 @@ export default function ProfileTitleRow({ profile, isSelf, syncing, onSync }) {
   const actionsRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  // Seguir se monta y desmonta al recoger los botones: el estado vive aquí.
+  // Seguir tiene dos caras (botón redondo en móvil, píldora en escritorio):
+  // el estado vive aquí y lo comparten.
   const [following, setFollowing] = useState(Boolean(profile.isFollowing));
   useEffect(() => setFollowing(Boolean(profile.isFollowing)), [profile.isFollowing]);
+  const follow = useFollowToggle({ username: user.username, following, setFollowing });
 
   const share = useProfileShare(profile);
   const levels = isSelf ? SELF_LEVELS : OTHER_LEVELS;
@@ -321,29 +325,12 @@ export default function ProfileTitleRow({ profile, isSelf, syncing, onSync }) {
                 intermedio); el resto va al menú. */}
             {level === ACTIONS_SETTINGS ? settingsButton : null}
             <ActionsMenu open={menuOpen} onOpenChange={setMenuOpen} buttonProps={share.warmProps}>
-              {isSelf ? (
-                <>
-                  {level === ACTIONS_MENU ? (
-                    <MenuItem icon={Settings} tone="text-teal-300" label="Configuración" onClick={fromMenu(openSettings)} disabled={syncing} />
-                  ) : null}
-                  <MenuItem icon={RotateCcw} tone="text-emerald-300" label="Sincronizar" onClick={fromMenu(onSync)} disabled={syncing} />
-                  <MenuItem icon={Share2} tone="text-sky-300" label="Compartir perfil" onClick={fromMenu(share.handleShare)} disabled={syncing} />
-                  <MenuItem icon={LogOut} tone="text-red-400" label="Cerrar sesión" onClick={fromMenu(() => setShowLogoutModal(true))} disabled={syncing} />
-                </>
-              ) : (
-                <>
-                  <MenuItem icon={Share2} tone="text-sky-300" label="Compartir perfil" onClick={fromMenu(share.handleShare)} />
-                  <div className="my-1.5 h-px bg-white/5" />
-                  <div className="px-1 pb-1 pt-0.5">
-                    <FollowButton
-                      username={user.username}
-                      initialFollowing={following}
-                      onChange={setFollowing}
-                      className="w-full"
-                    />
-                  </div>
-                </>
-              )}
+              {level === ACTIONS_MENU ? (
+                <MenuItem icon={Settings} tone="text-teal-300" label="Configuración" onClick={fromMenu(openSettings)} disabled={syncing} />
+              ) : null}
+              <MenuItem icon={RotateCcw} tone="text-emerald-300" label="Sincronizar" onClick={fromMenu(onSync)} disabled={syncing} />
+              <MenuItem icon={Share2} tone="text-sky-300" label="Compartir perfil" onClick={fromMenu(share.handleShare)} disabled={syncing} />
+              <MenuItem icon={LogOut} tone="text-red-400" label="Cerrar sesión" onClick={fromMenu(() => setShowLogoutModal(true))} disabled={syncing} />
             </ActionsMenu>
           </>
         ) : isSelf ? (
@@ -399,7 +386,27 @@ export default function ProfileTitleRow({ profile, isSelf, syncing, onSync }) {
             >
               <Share2 className={HEADER_ICON_CLASS} />
             </LiquidButton>
-            <FollowButton username={user.username} initialFollowing={following} onChange={setFollowing} />
+            {/* Móvil: Seguir como botón de acción redondo, solo icono. */}
+            <LiquidButton
+              onClick={follow.toggle}
+              disabled={follow.disabled}
+              loading={follow.busy}
+              active={following}
+              activeColor="green"
+              groupId="profile-header-actions"
+              title={following ? "Siguiendo" : "Seguir"}
+              aria-label={following ? "Dejar de seguir" : "Seguir"}
+              aria-pressed={following}
+              className={`${HEADER_BUTTON_CLASS} sm:!hidden ${following ? "!text-emerald-300" : ""}`}
+            >
+              {following ? <UserCheck className={HEADER_ICON_CLASS} /> : <UserPlus className={HEADER_ICON_CLASS} />}
+            </LiquidButton>
+            <FollowButton
+              username={user.username}
+              initialFollowing={following}
+              onChange={setFollowing}
+              className="max-sm:!hidden"
+            />
           </>
         )}
       </div>
