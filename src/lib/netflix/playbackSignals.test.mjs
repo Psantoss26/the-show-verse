@@ -183,6 +183,8 @@ const SHOWS = [
     seasons: [{ season_number: 1, episode_count: 12 }],
     episodes: { 1: [{ episode_number: 10, name: "Episodio 10" }] },
   },
+  // Serie que se llama como el botón «Volver a empezar» de Prime Video.
+  { id: 229017, name: "Volver a empezar", popularity: 12, vote_count: 80, seasons: [{ season_number: 1, episode_count: 10 }] },
   // Serie casi desconocida que empieza como una película muy conocida.
   { id: 212171, name: "Interstellar Ella", popularity: 4.7, vote_count: 2, seasons: [{ season_number: 1, episode_count: 8 }] },
   // Serie REAL cuyo nombre aparece DENTRO del nombre de un episodio de otra
@@ -235,6 +237,7 @@ const MOVIES = [
   { id: 1556555, title: "Todos", original_title: "Todos", popularity: 0.5, vote_count: 0 },
   { id: 812002, title: "Brillo", original_title: "Brillo", popularity: 0.9, vote_count: 0 },
   { id: 372058, title: "Your Name.", original_title: "君の名は。", release_date: "2016-08-26", popularity: 35, vote_count: 13145 },
+  { id: 11324, title: "Shutter Island", original_title: "Shutter Island", release_date: "2010-02-14", popularity: 30, vote_count: 25000 },
   { id: 157336, title: "Interstellar", original_title: "Interstellar", release_date: "2014-11-05", popularity: 76, vote_count: 41664 },
   { id: 18172, title: "La clave del éxito", original_title: "All the Right Moves", release_date: "1983-10-21", popularity: 4, vote_count: 200 },
 ];
@@ -1228,4 +1231,18 @@ test("Ficha de Netflix con solo controles del reproductor: «Brillo» no se resu
     notifTitle: "Pausar",
   });
   assert.notEqual(synced(result).tmdbId, 812002);
+});
+
+test("Ficha de Prime marcada como serie por error: «Shutter Island» es la película, no el botón «Volver a empezar»", async () => {
+  const result = await sync({
+    detectionKind: "detail",
+    platformName: "Prime Video",
+    showName: "Shutter Island",
+    mainTitle: "Shutter Island",
+    notifTitle: "Volver a empezar",
+    notifText: "El Mentalista: Primera Temporada Completa. Prime Video",
+    notifSubText: "Fringe (Al límite), Season 1. Prime Video",
+    mediaTypeHint: "tv",
+  });
+  assert.deepEqual([synced(result).tmdbId, synced(result).mediaType], [11324, "movie"]);
 });

@@ -687,14 +687,27 @@ export async function POST(request) {
     const skipObscure = kind === "detail" && episode == null && screenTextCount > 1;
     for (const variant of resolution ? [] : rankedVariants) {
       const variantIsHinted = Boolean(hintedShow) && hintedShow.includes(normalizeText(variant.query));
-      const candidate = await resolveStreamingEntity({
+      const resolveAs = (expectedMediaType) => resolveStreamingEntity({
         query: variant.query,
-        expectedMediaType: episode != null || variantIsHinted ? "tv" : movieHint ? "movie" : null,
+        expectedMediaType,
         preferTv: isTv,
         durationSec: safeDurationSec,
         year: releaseYear,
         search: (type) => searchCandidates(variant.query, type),
       });
+      let candidate = await resolveAs(episode != null || variantIsHinted ? "tv" : movieHint ? "movie" : null);
+      // La pista «serie» de la ficha falla a veces (los carruseles de Prime Video
+      // traen «Temporada 1» de otros títulos): si el título principal no existe
+      // como serie, se prueba sin tipo ANTES que el resto de textos. Si no, en la
+      // ficha de «Shutter Island» ganaba «Volver a empezar», el botón de la ficha.
+      // Una serie cuyo título contiene el texto sí vale («La clave del éxito» →
+      // «Suits: la clave del éxito», no la película de ese nombre).
+      const seriesCoversQuery = Boolean(candidate) && normalizeText(candidate.entity?.name || candidate.entity?.title || "")
+        .includes(normalizeText(variant.query));
+      if (!candidate?.exact && !seriesCoversQuery && variantIsHinted && episode == null) {
+        const anyType = await resolveAs(null);
+        if (anyType?.exact) candidate = anyType;
+      }
       if (!candidate) continue;
       // Sin serie, el nombre del EPISODIO también entra como consulta (Netflix en
       // Android: la sesión solo da «Marco», el T1:E10 de «Better Call Saul»). Que
