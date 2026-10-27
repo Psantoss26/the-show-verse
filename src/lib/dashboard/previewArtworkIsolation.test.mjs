@@ -49,3 +49,16 @@ test("el dashboard no sincroniza overrides remotos de tipo backdrop", async () =
   assert.doesNotMatch(dashboard, /kind:\s*"backdrop"/);
   assert.match(dashboard, /const backdropOverrides = EMPTY_OBJECT/);
 });
+
+test("la portada de DetailsClient no usa el backdrop de la vista previa", async () => {
+  const detailsClient = await readFile(detailsClientPath, "utf8");
+
+  assert.match(
+    detailsClient,
+    /const previewBackdropPath = asTmdbPath\(posterBackdropFallback\) \|\| null;/,
+  );
+  assert.doesNotMatch(
+    detailsClient,
+    /asTmdbPath\(selectedPreviewBackdropPath\)/,
+  );
+});

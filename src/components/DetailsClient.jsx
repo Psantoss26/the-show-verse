@@ -3515,11 +3515,10 @@ export default function DetailsClient({
       : null) ||
     null;
 
-  // Backdrop para modo preview: seleccion manual > fallback inteligente
-  const previewBackdropPath =
-    asTmdbPath(selectedPreviewBackdropPath) ||
-    asTmdbPath(posterBackdropFallback) ||
-    null;
+  // Backdrop de la portada en modo preview. La selección de la pestaña «Vista
+  // previa» de «Portadas y fondos» es SOLO para DetailModal: no entra aquí, o
+  // elegirla cambiaba también la portada de la ficha.
+  const previewBackdropPath = asTmdbPath(posterBackdropFallback) || null;
 
   // Imagen principal del poster: en modo preview muestra backdrop, si no el poster
   const displayPosterPath =
@@ -7097,10 +7096,9 @@ export default function DetailsClient({
       asTmdbPath(data?.profile_path) ||
       null;
 
-    const previewPath =
-      asTmdbPath(selectedPreviewBackdropPath) ||
-      asTmdbPath(posterBackdropFallback) ||
-      null;
+    // Igual que `previewBackdropPath`: la selección de «Vista previa» es solo
+    // para DetailModal.
+    const previewPath = asTmdbPath(posterBackdropFallback) || null;
 
     if (!posterPath || !previewPath) return;
 
@@ -7127,7 +7125,6 @@ export default function DetailsClient({
     selectedPosterPath,
     basePosterPath,
     data?.profile_path,
-    selectedPreviewBackdropPath,
     posterBackdropFallback,
     posterViewMode,
     id,
