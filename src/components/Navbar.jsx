@@ -1803,40 +1803,21 @@ function SearchBar({
 /* ====================================================================
  * Navbar principal
  * ==================================================================== */
-// Capas de cristal de la barra SUPERIOR, con el mismo lenguaje que la inferior
-// pero adaptadas a su forma: aquí la pieza es un rectángulo a todo lo ancho, así
-// que la luz entra por el borde de ARRIBA.
-//
-// SIN CANTO DE REFRACCIÓN ABAJO. Había una capa con `backdrop-saturate-[240%]` y
-// `backdrop-brightness-[1.16]` cuyo máximo quedaba justo encima del borde
-// inferior: sobre el fondo casi negro de las páginas de usuario (con un tinte
-// rojo, azul… apenas visible) lo saturaba hasta una franja de color que dibujaba
-// precisamente el borde que el difuminado de `.sv-topbar-glass` quiere borrar.
-function TopBarGlassLayers({ className = "", dataScrolled }) {
-  return (
-    <>
-      {/* Especular: el reflejo que recorre el borde superior y se apaga hacia
-          dentro, sin trazar ninguna línea.
-          Solo en MÓVIL (`desktop:hidden`): allí la barra flota sobre el contenido y
-          ese reflejo le da cuerpo, pero en escritorio queda pegada al borde de
-          la ventana y el brillo se lee como una franja clara en lo alto de la
-          página, no como el canto de una pieza de vidrio. */}
-      <span
-        aria-hidden="true"
-        data-scrolled={dataScrolled ? "" : undefined}
-        className={`pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(255,255,255,0.11)_0%,rgba(255,255,255,0.03)_16%,transparent_46%)] desktop:hidden ${className}`}
-      />
-    </>
-  );
-}
+// SIN CANTO DE REFRACCIÓN ABAJO NI REFLEJO ARRIBA. Había una capa con
+// `backdrop-saturate-[240%]` y `backdrop-brightness-[1.16]` cuyo máximo quedaba
+// justo encima del borde inferior: sobre el fondo casi negro de las páginas de
+// usuario lo saturaba hasta una franja de color. Y en móvil/tablet un reflejo
+// blanco recorría el borde superior: al compactarse la barra y pasar contenido
+// por detrás, lo alto de la barra se veía más claro que el resto. Ahora el
+// cristal es uniforme de arriba abajo y solo se funde por su borde inferior.
 
-// CRISTAL DE LA BARRA SUPERIOR: el cristal plano, el relevo de desenfoque leve
-// que suaviza su borde inferior (ver `.sv-topbar-glass` en globals.css) y, en
-// móvil/tablet, el reflejo. Todas son HERMANAS, cada una con su
-// propia máscara y su propia opacidad: un contenedor con máscara u opacidad
-// apagaría el `backdrop-filter` de las de dentro. `className` se aplica a cada
-// capa (z-index, visibilidad por tamaño, la opacidad por scroll de la ficha).
-function TopBarGlass({ className = "", dataScrolled, layers = true }) {
+// CRISTAL DE LA BARRA SUPERIOR: el cristal plano y el relevo de desenfoque leve
+// que suaviza su borde inferior (ver `.sv-topbar-glass` en globals.css). Son
+// HERMANAS, cada una con su propia máscara y su propia opacidad: un contenedor
+// con máscara u opacidad apagaría el `backdrop-filter` de las de dentro.
+// `className` se aplica a cada capa (z-index, visibilidad por tamaño, la
+// opacidad por scroll de la ficha).
+function TopBarGlass({ className = "", dataScrolled }) {
   const scrolled = dataScrolled ? "" : undefined;
   return (
     <>
@@ -1846,9 +1827,6 @@ function TopBarGlass({ className = "", dataScrolled, layers = true }) {
         className={`sv-topbar-glass ${LIQUID_GLASS_BAR_FLAT} ${className}`}
       />
       <div aria-hidden data-scrolled={scrolled} className={`sv-topbar-glass-soft ${className}`} />
-      {layers ? (
-        <TopBarGlassLayers className={`desktop:hidden ${className}`} dataScrolled={dataScrolled} />
-      ) : null}
     </>
   );
 }
@@ -2774,7 +2752,7 @@ function NavbarContent() {
         )}
         {/* Ficha / recomendaciones en escritorio, tras el scroll. */}
         {isImmersiveRoute && !desktopDetailsNavMode && (
-          <TopBarGlass className="-z-10 hidden desktop:block" layers={false} />
+          <TopBarGlass className="-z-10 hidden desktop:block" />
         )}
 
         {isDetailsRoute && (
