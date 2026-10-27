@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- App Android, Prime Video: a **Continuar viendo** llega el episodio que se reproduce, no la serie entera. La app recuerda el episodio que se pulsa en la ficha («Reanudar episodio 9» o la fila del episodio, con la temporada del selector) cuando el reproductor no deja leerlo. → [fiabilidad](docs/streaming-sync-reliability.md)
 - App Android: mientras arranca un vídeo, la app lee el reproductor mucho menos a menudo. Leerlo entero cada pocos segundos competía con el propio reproductor de Prime Video, que podía quedarse en negro cargando. La detección sigue igual. → [fiabilidad](docs/streaming-sync-reliability.md)
 - Perfil propio en el móvil: al recoger los botones de la cabecera, el que se queda a la vista junto al de tres puntos es **Configuración** (antes, Cerrar sesión). El menú lleva Sincronizar, Compartir perfil y Cerrar sesión, seguidas y sin línea divisoria. → [social y perfiles](docs/features/social-y-perfiles.md)
 - The Show Verse Sync: tocar el aviso de una ficha ya no muestra «No se encuentra la app web» con la PWA instalada. La busca también donde algunos móviles guardan sus datos y, si aun así no la encuentra, abre la ficha con el navegador, que la pasa a la PWA. → [app de Android](android-companion/README.md)

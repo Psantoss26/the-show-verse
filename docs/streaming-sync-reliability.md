@@ -276,6 +276,33 @@ aun así no hay título, la app manda una vez por sesión los textos de la panta
 al servidor, que los guarda como descarte `empty_title`. Sin el Registro del móvil
 es la forma de ver qué muestra el reproductor de cada app.
 
+### El episodio pulsado en la ficha
+
+En Prime Video los controles se ocultan enseguida y casi nunca se llega a leer la
+línea «T6 E9 …» del reproductor. Lo único que se sabía de lo que sonaba era la
+serie de la ficha, y a Continuar viendo llegaba la serie entera en vez del
+episodio (las tres reproducciones de Prime registradas iban sin temporada ni
+episodio).
+
+El servicio de accesibilidad escucha ahora también las pulsaciones
+(`typeViewClicked`). Si lo pulsado es un episodio, lo recuerda (`EpisodeChoice`,
+`RecentDetail.rememberEpisode`):
+
+- un botón de la ficha («Reanudar episodio 9», «Volver a ver episodio 9»,
+  «Reproducir T2 E3»);
+- una fila de la lista de episodios («2. Cuentas a Pagar»).
+
+La temporada, si el texto no la trae, sale del selector de la ficha («Temporada 6»,
+«Descargar T6»). Pulsar el botón de descarga de una fila no cuenta.
+
+`ScreenSignal` añade ese episodio a la serie de la ficha cuando el reproductor no
+dice nada. Solo vale para esa ficha y con la misma regla de frescura que la propia
+ficha. Lo que se lea en el reproductor sigue ganando.
+
+**Límite conocido:** si Prime pasa solo al siguiente episodio y no se llega a ver la
+línea del reproductor (tocando la pantalla), se sigue atribuyendo al episodio
+pulsado.
+
 ### Sin estorbar al reproductor
 
 Leer la pantalla de otra app con accesibilidad es una llamada a SU hilo principal

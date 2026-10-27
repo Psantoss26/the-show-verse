@@ -42,6 +42,36 @@ object RecentDetail {
     @Volatile private var confirmedTitle: String? = null
     @Volatile private var confirmedAtMs: Long = 0L
 
+    // Episodio pulsado en la ficha (ver EpisodeChoice) y cuándo.
+    @Volatile private var choicePkg: String? = null
+    @Volatile private var choice: EpisodeChoice.Choice? = null
+    @Volatile private var choiceAtMs: Long = 0L
+
+    /** El usuario pulsó en la ficha de [pkg] algo que reproduce [choice]. */
+    @Synchronized
+    fun rememberEpisode(pkg: String, choice: EpisodeChoice.Choice) {
+        choicePkg = pkg
+        this.choice = choice
+        choiceAtMs = SystemClock.elapsedRealtime()
+    }
+
+    /**
+     * El episodio pulsado en la ficha de la serie recordada, si vale para la sesión
+     * que empezó en [playbackStartedAt]: pulsado en esa ficha (no antes de abrirla;
+     * con margen, porque la ficha se resuelve en segundo plano y se puede pulsar
+     * antes) y poco antes de empezar a reproducir, como la propia ficha.
+     */
+    @Synchronized
+    fun episodeFor(pkg: String, playbackStartedAt: Long): EpisodeChoice.Choice? {
+        if (pkg != choicePkg || pkg != this.pkg) return null
+        val now = SystemClock.elapsedRealtime()
+        if (choiceAtMs < atMs - CHOICE_BEFORE_DETAIL_MS) return null
+        if (!HintFreshness.usable(Source.DETAIL, choiceAtMs, playbackStartedAt, now)) return null
+        return choice
+    }
+
+    private const val CHOICE_BEFORE_DETAIL_MS = 30_000L
+
     /** Registra la última ficha resuelta (o la serie confirmada al reproducir). */
     @Synchronized
     fun remember(pkg: String, synced: SyncedInfo, source: Source = Source.DETAIL) {
@@ -66,6 +96,9 @@ object RecentDetail {
         confirmedEpisode = null
         confirmedTitle = null
         confirmedAtMs = 0L
+        choicePkg = null
+        choice = null
+        choiceAtMs = 0L
     }
 
     /**

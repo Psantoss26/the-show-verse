@@ -67,7 +67,8 @@ class AccessibilityStreamingService : AccessibilityService() {
         val e = event ?: return
         val type = e.eventType
         if (type != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
-            type != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
+            type != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED &&
+            type != AccessibilityEvent.TYPE_VIEW_CLICKED
         ) return
         val pkg = e.packageName?.toString() ?: return
         if (!Platforms.KNOWN.containsKey(pkg)) return
@@ -80,6 +81,10 @@ class AccessibilityStreamingService : AccessibilityService() {
         // comprueba antes de notificar nada.
         if (!p.indicatorEnabled && !Platforms.readsPlayerScreen(pkg)) return
         if (!p.isEnabled(pkg)) return
+        if (type == AccessibilityEvent.TYPE_VIEW_CLICKED) {
+            onClick(p, pkg, e)
+            return
+        }
 
         // Debounce: procesa la pantalla ESTABLE tras un breve silencio (evita
         // resolver en cada micro-cambio mientras se compone la ficha). Con tope: el
@@ -106,6 +111,44 @@ class AccessibilityStreamingService : AccessibilityService() {
         } else {
             handler.postDelayed(resolveRunnable, DEBOUNCE_MS)
         }
+    }
+
+    // Temporada que muestra la ficha de cada app (su selector), para el episodio
+    // que se pulse en ella. Ver EpisodeChoice.
+    private val fichaSeason = HashMap<String, Int>()
+
+    /**
+     * Lo pulsado en la app: si es un episodio («Reanudar episodio 9», la fila
+     * «9. Nombre», «T6 E9»), se recuerda para la reproducción que empieza. Prime
+     * Video no deja leer el episodio en su reproductor y sin esto a Continuar
+     * viendo llegaba la serie entera.
+     */
+    private fun onClick(p: Prefs, pkg: String, e: AccessibilityEvent) {
+        val texts = ArrayList<String>()
+        e.contentDescription?.toString()?.let { texts.add(it) }
+        e.text?.forEach { t -> t?.toString()?.let { texts.add(it) } }
+        try {
+            e.source?.let { source ->
+                val queue = ArrayDeque<AccessibilityNodeInfo>()
+                queue.add(source)
+                var visited = 0
+                while (queue.isNotEmpty() && visited < MAX_CLICK_NODES) {
+                    val node = queue.removeFirst()
+                    visited++
+                    (node.text ?: node.contentDescription)?.toString()?.trim()
+                        ?.takeIf { it.isNotEmpty() && it !in texts }?.let { texts.add(it) }
+                    for (i in 0 until node.childCount) node.getChild(i)?.let { queue.add(it) }
+                }
+            }
+        } catch (_: Exception) {
+            /* el nodo puede desaparecer con la pulsación */
+        }
+        val choice = EpisodeChoice.parse(texts, fichaSeason[pkg]) ?: return
+        RecentDetail.rememberEpisode(pkg, choice)
+        p.addLog(
+            "Episodio elegido en ${Platforms.nameFor(pkg)}: T${choice.season ?: "?"}:E${choice.episode}" +
+                (choice.name?.let { " «$it»" } ?: ""),
+        )
     }
 
     private fun processCurrent() {
@@ -174,6 +217,7 @@ class AccessibilityStreamingService : AccessibilityService() {
             spacedUntil[pkg] = readAt + SPACED_WINDOW_MS
         } else if (analysis.looksLikeDetail) {
             spacedUntil.remove(pkg)
+            analysis.season?.let { fichaSeason[pkg] = it }
         }
         if (!analysis.looksLikeDetail || analysis.candidates.isEmpty()) {
             // Diagnóstico (una vez por texto): candidatos, etiquetas de UI y, en Prime,
@@ -297,6 +341,8 @@ class AccessibilityStreamingService : AccessibilityService() {
         val seriesSignals: Int = 0,
         // Controles del reproductor a la vista (ver ScreenHeuristics.isPlayerControl).
         val playerControls: Int = 0,
+        // Temporada que muestra el selector de la ficha (ver EpisodeChoice.seasonFrom).
+        val season: Int? = null,
     )
 
     // Recorre el árbol (acotado): recoge candidatos de título (encabezados primero,
@@ -313,6 +359,7 @@ class AccessibilityStreamingService : AccessibilityService() {
         var detailSignals = 0
         var seriesSignals = 0
         var playerControls = 0
+        var season: Int? = null
         val detailSeen = HashSet<String>()
         val queue = ArrayDeque<AccessibilityNodeInfo>()
         queue.add(root)
@@ -334,6 +381,7 @@ class AccessibilityStreamingService : AccessibilityService() {
                 }
                 if (ScreenHeuristics.isSeriesSignal(raw)) seriesSignals++
                 playerControls += ScreenHeuristics.playerWeight(raw)
+                if (season == null) season = EpisodeChoice.seasonFrom(raw)
                 if (ScreenHeuristics.isLikelyTitle(raw) && seen.add(raw.lowercase())) {
                     val isHeading =
                         Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && node.isHeading
@@ -362,6 +410,7 @@ class AccessibilityStreamingService : AccessibilityService() {
             uiLabels = labels,
             seriesSignals = seriesSignals,
             playerControls = playerControls,
+            season = season,
         )
     }
 
@@ -476,6 +525,7 @@ class AccessibilityStreamingService : AccessibilityService() {
         private const val MAX_LABELS = 8
         private const val MAX_WINDOWS = 6
         private const val MAX_PLAYER_NODES = 600
+        private const val MAX_CLICK_NODES = 25
         // Lecturas espaciadas (ver spacedUntil): una cada SPACED_READ_MS, durante
         // SPACED_WINDOW_MS desde la última vez que se vio el reproductor.
         private const val SPACED_READ_MS = 5_000L

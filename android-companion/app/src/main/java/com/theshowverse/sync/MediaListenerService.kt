@@ -348,7 +348,9 @@ class MediaListenerService : NotificationListenerService() {
         // Sin sesión, lo que suena sale solo de la pantalla: el reproductor y, si no
         // pinta el título, la ficha abierta justo antes. Ver ScreenSignal.
         val built = if (controller == null) {
-            ScreenSignal.build(pkg, Platforms.nameFor(pkg), lectura, RecentDetail.detailFor(pkg, session))
+            ScreenSignal.build(
+                pkg, Platforms.nameFor(pkg), lectura, RecentDetail.detailFor(pkg, session), RecentDetail.episodeFor(pkg, session),
+            )
                 ?.copy(durationSec = sinPista.durationSec, positionSec = sinPista.positionSec)
                 ?: sinPista
         } else {
@@ -358,7 +360,9 @@ class MediaListenerService : NotificationListenerService() {
             if (!merged.mainTitle.isNullOrBlank()) {
                 merged
             } else {
-                ScreenSignal.build(pkg, Platforms.nameFor(pkg), lectura, RecentDetail.detailFor(pkg, session))
+                ScreenSignal.build(
+                    pkg, Platforms.nameFor(pkg), lectura, RecentDetail.detailFor(pkg, session), RecentDetail.episodeFor(pkg, session),
+                )
                     ?.copy(durationSec = merged.durationSec, positionSec = merged.positionSec)
                     ?: merged
             }

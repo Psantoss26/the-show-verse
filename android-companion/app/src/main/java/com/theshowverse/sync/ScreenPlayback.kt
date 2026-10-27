@@ -108,11 +108,18 @@ object ScreenSignal {
         platformName: String,
         reading: PlayerReading?,
         recent: SyncedInfo?,
+        chosen: EpisodeChoice.Choice? = null,
     ): PlaybackSignal? {
         val base = PlaybackSignal(host = pkg, platformId = pkg, platformName = platformName)
         val recentTitle = recent?.title?.trim()?.ifEmpty { null }
         val recentIsTv = recent?.mediaType == "tv"
         val series = reading?.seriesTitle?.trim()?.ifEmpty { null }
+        // El episodio pulsado en la ficha (EpisodeChoice) solo vale para la serie de
+        // esa ficha.
+        val pick = chosen?.takeIf { recentIsTv }
+        fun withPick(signal: PlaybackSignal): PlaybackSignal =
+            if (pick == null) signal
+            else signal.copy(season = pick.season, episode = pick.episode, episodeName = pick.name)
 
         // Episodio: números o nombre leídos en el reproductor. La serie, la del
         // reproductor o, si no la pinta, la de la ficha (si era una serie).
@@ -131,16 +138,16 @@ object ScreenSignal {
         if (series != null) {
             val sameAsRecent = recentTitle != null && TitleMatch.similar(series, recentTitle)
             return when {
-                sameAsRecent && recentIsTv -> base.copy(showName = series, mediaTypeHint = "tv")
+                sameAsRecent && recentIsTv -> withPick(base.copy(showName = series, mediaTypeHint = "tv"))
                 sameAsRecent && recent?.mediaType == "movie" -> base.copy(movieTitle = series, mediaTypeHint = "movie")
                 else -> base.copy(tabTitle = series)
             }
         }
-        // Nada legible en el reproductor (Disney+): la ficha abierta antes de darle
-        // a reproducir.
+        // Nada legible en el reproductor (Disney+, Prime con los controles
+        // ocultos): la ficha abierta antes y el episodio que se pulsó en ella.
         if (recentTitle == null) return null
         return if (recentIsTv) {
-            base.copy(showName = recentTitle, mediaTypeHint = "tv")
+            withPick(base.copy(showName = recentTitle, mediaTypeHint = "tv"))
         } else {
             base.copy(movieTitle = recentTitle, mediaTypeHint = recent?.mediaType?.takeIf { it == "movie" })
         }

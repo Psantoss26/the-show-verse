@@ -62,4 +62,19 @@ class ScreenPlaybackTest {
         assertNull(s.showName)
         assertNull(s.movieTitle)
     }
+
+    @Test
+    fun `sin nada en el reproductor vale el episodio pulsado en la ficha de la serie`() {
+        val suits = SyncedInfo(37680, "tv", title = "Suits: la clave del éxito")
+        val s = ScreenSignal.build(prime, "Prime Video", null, suits, EpisodeChoice.Choice(6, 9))!!
+        assertEquals("Suits: la clave del éxito", s.showName)
+        assertEquals(6, s.season)
+        assertEquals(9, s.episode)
+        // En una película no se aplica.
+        val movie = ScreenSignal.build(prime, "Prime Video", null, SyncedInfo(1, "movie", title = "Dune"), EpisodeChoice.Choice(6, 9))!!
+        assertNull(movie.episode)
+        // Lo que lee el reproductor gana al episodio pulsado.
+        val read = ScreenSignal.build(prime, "Prime Video", PlayerReading(seriesTitle = "Suits", season = 6, episode = 10), suits, EpisodeChoice.Choice(6, 9))!!
+        assertEquals(10, read.episode)
+    }
 }

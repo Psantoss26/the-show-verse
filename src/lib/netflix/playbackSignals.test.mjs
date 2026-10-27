@@ -1246,3 +1246,17 @@ test("Ficha de Prime marcada como serie por error: «Shutter Island» es la pel�
   });
   assert.deepEqual([synced(result).tmdbId, synced(result).mediaType], [11324, "movie"]);
 });
+
+test("Prime en Android sin reproductor legible: la serie de la ficha y el episodio pulsado (T6·E9)", async () => {
+  const result = await sync({
+    detectionKind: "playback",
+    platformName: "Prime Video",
+    showName: "Suits: la clave del éxito",
+    mainTitle: "Suits: la clave del éxito",
+    season: 6,
+    episode: 9,
+    mediaTypeHint: "tv",
+    positionSec: 120,
+  });
+  assert.deepEqual([synced(result).tmdbId, synced(result).season, synced(result).episode], [37680, 6, 9]);
+});
