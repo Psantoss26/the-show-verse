@@ -10,7 +10,7 @@
 //     de lo que ya tiene cargado;
 //   - /api/share/profile-card lo valida con `sanitizeProfileShareCard` (la ruta
 //     la puede llamar cualquiera: textos cortos, números finitos, solo rutas de
-//     TMDb y la foto solo por https).
+//     TMDb y la foto solo por https o como imagen en base64).
 
 import { tmdbImagePath } from "../details/shareCard.js";
 import { LEVEL_TIER_VISUALS } from "../level/tiers.mjs";
@@ -30,9 +30,15 @@ function count(value) {
   return Number.isFinite(number) && number > 0 ? Math.min(Math.round(number), 9_999_999) : 0;
 }
 
-// Foto de perfil: una URL que el usuario puede haber pegado a mano. Solo https y
-// sin credenciales; la ruta, además, la descarga con sus propias protecciones
-// (ver `loadAvatar`).
+// Foto de perfil. Dos formas, las mismas que guarda Ajustes:
+//   - una URL que el usuario puede haber pegado a mano: solo https y sin
+//     credenciales; la ruta, además, la descarga con sus propias protecciones
+//     (ver `loadAvatar`);
+//   - la imagen subida desde un archivo, que Ajustes guarda ya reducida como
+//     `data:image/…;base64` (hasta 320 KB). No se descarga: se decodifica.
+export const AVATAR_DATA_URL_MAX_CHARS = 600_000;
+const AVATAR_DATA_URL = /^data:image\/(?:png|jpeg|webp|gif|avif);base64,[A-Za-z0-9+/]+={0,2}$/;
+
 export function avatarHttpsUrl(value) {
   const raw = String(value ?? "").trim();
   if (!raw || raw.length > 1000) return null;
@@ -43,6 +49,16 @@ export function avatarHttpsUrl(value) {
   } catch {
     return null;
   }
+}
+
+export function avatarDataUrl(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw || raw.length > AVATAR_DATA_URL_MAX_CHARS) return null;
+  return AVATAR_DATA_URL.test(raw) ? raw : null;
+}
+
+export function avatarSource(value) {
+  return avatarDataUrl(value) || avatarHttpsUrl(value);
 }
 
 function favorites(items) {
@@ -103,7 +119,7 @@ export function sanitizeProfileShareCard(body) {
   return {
     username,
     displayName: text(body?.displayName, 60) || username,
-    avatarUrl: avatarHttpsUrl(body?.avatarUrl),
+    avatarUrl: avatarSource(body?.avatarUrl),
     level: level(body?.level),
     stats: {
       films: count(body?.stats?.films),
