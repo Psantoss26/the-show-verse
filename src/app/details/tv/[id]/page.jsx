@@ -3,6 +3,7 @@ import DetailsPageLoader from "@/components/DetailsPageLoader";
 import MobilePosterPreload from "@/components/details/MobilePosterPreload";
 import { getDetails } from "@/lib/api/tmdb";
 import { getShareData, shareMetadata } from "@/lib/share/shareMeta";
+import { fetchCommunityArtwork } from "@/lib/community/server";
 export const revalidate = 600;
 
 const DETAILS_APPEND_TO_RESPONSE =
@@ -31,12 +32,17 @@ export default async function TvDetailsPage({ params }) {
   // devolver `null`. Así `notFound()` (permanente) solo se dispara ante un 404
   // real; una caída temporal propaga el error al límite de error de la ruta,
   // que ofrece "reintentar" en lugar de un falso "página no encontrada".
-  const data = await getDetails("tv", id, {
-    appendToResponse: DETAILS_APPEND_TO_RESPONSE,
-    language: "es-ES",
-    include_video_language: "en,es,null",
-    throwOnUnavailable: true,
-  });
+  // En paralelo, las imágenes más votadas («Portadas y fondos»): son la
+  // imagen por defecto del título y la portada tiene que nacer ya con ellas.
+  const [data, communityArtwork] = await Promise.all([
+    getDetails("tv", id, {
+      appendToResponse: DETAILS_APPEND_TO_RESPONSE,
+      language: "es-ES",
+      include_video_language: "en,es,null",
+      throwOnUnavailable: true,
+    }),
+    fetchCommunityArtwork({ type: "tv", id }).catch(() => null),
+  ]);
 
   if (!data) {
     notFound();
@@ -53,13 +59,14 @@ export default async function TvDetailsPage({ params }) {
     <>
       {/* Va antes que la ficha: el navegador empieza a bajar la portada móvil
           mientras todavía está leyendo el HTML, sin esperar a hidratar. */}
-      <MobilePosterPreload data={data} />
+      <MobilePosterPreload data={data} communityArtwork={communityArtwork} />
       <DetailsPageLoader
         type="tv"
         id={id}
         data={data}
         initialCastData={initialCastData}
         initialRecommendations={initialRecommendations}
+        initialCommunityArtwork={communityArtwork}
       />
     </>
   );

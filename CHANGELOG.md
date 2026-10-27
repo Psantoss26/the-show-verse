@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Fichas: las imágenes de «Portadas y fondos» se votan entre todos. Cada portada, portada móvil, vista previa, fondo o logo que eliges cuenta como un voto (uno por persona: si cambias de imagen, el voto se mueve; si restableces, se retira), y la más votada pasa a ser la imagen por defecto de ese título para cualquiera que lo abra, con o sin sesión. Tu propia selección sigue mandando para ti. Las selecciones que ya existían cuentan desde el principio. → [páginas](docs/frontend/app-router-pages.md)
 - Perfil de otro usuario en el móvil: la cabecera muestra solo dos botones redondos iguales, **Compartir** y **Seguir/Siguiendo** (este último con solo el icono, en verde cuando ya le sigues), siempre a la vista y sin menú de tres puntos. En escritorio, Seguir sigue siendo la píldora con texto. → [social y perfiles](docs/features/social-y-perfiles.md)
 - Ficha, «Portadas y fondos»: elegir una imagen en la pestaña **Vista previa** solo cambia la vista previa (DetailModal). Antes cambiaba también la portada de la ficha cuando estaba en modo backdrop. → [páginas](docs/frontend/app-router-pages.md)
 - App Android, Prime Video: a **Continuar viendo** llega el episodio que se reproduce, no la serie entera. La app recuerda el episodio que se pulsa en la ficha («Reanudar episodio 9» o la fila del episodio, con la temporada del selector) cuando el reproductor no deja leerlo. → [fiabilidad](docs/streaming-sync-reliability.md)

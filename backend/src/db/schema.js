@@ -275,6 +275,27 @@ export const userPreferences = pgTable('user_preferences', {
 });
 
 // ─────────────────────────────────────────────
+// ARTWORK VOTES (selecciones de «Portadas y fondos» contadas entre usuarios)
+// Una fila = la selección ACTUAL de un usuario para un título y tipo de imagen,
+// así que cada usuario vale un voto: cambiar de imagen mueve el voto y
+// restablecer lo retira. Se mantiene en la misma transacción que
+// `user_preferences.ui_settings.artworkOverrides`, que sigue siendo la fuente
+// de verdad de la selección propia. La más votada es la imagen por defecto
+// para todo el mundo (ver lib/artworkVotes.js).
+// ─────────────────────────────────────────────
+export const artworkVotes = pgTable('artwork_votes', {
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  mediaType: text('media_type').notNull(),                 // 'movie' | 'tv' | 'collection' | 'season'
+  tmdbId: integer('tmdb_id').notNull(),
+  kind: text('kind').notNull(),                            // 'poster' | 'mobilePoster' | 'backdrop' | 'background' | 'logo'
+  filePath: text('file_path').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.userId, t.mediaType, t.tmdbId, t.kind] }),
+  titleIdx: index('idx_artwork_votes_title').on(t.mediaType, t.tmdbId, t.kind, t.filePath),
+}));
+
+// ─────────────────────────────────────────────
 // SUBSCRIPTIONS (Stripe billing)
 // ─────────────────────────────────────────────
 export const subscriptions = pgTable('subscriptions', {

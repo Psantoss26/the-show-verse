@@ -218,7 +218,7 @@ Prefijo `/v1/users` (`backend/src/routes/users.js`), todo con sesion.
 | Metodo | Ruta | Descripcion |
 | --- | --- | --- |
 | `GET` | `/v1/users/preferences` | Lee preferencias personales del usuario autenticado |
-| `PATCH` | `/v1/users/preferences` | Actualiza preferencias personales: vista por defecto, idioma, contenido adulto, notificaciones y ajustes UI |
+| `PATCH` | `/v1/users/preferences` | Actualiza preferencias personales: vista por defecto, idioma, contenido adulto, notificaciones y ajustes UI. Con `artworkChanges`, guarda las selecciones de «Portadas y fondos» y, en la misma transaccion, mueve o retira el voto del usuario en `artwork_votes` |
 | `GET` | `/v1/users/me/export?include=favorites,watchlist,ratings` | Exportacion completa de la biblioteca (el navegador la convierte en CSV, JSON o formato Letterboxd). Limite 10/min |
 | `GET` | `/v1/users/notifications` | Alertas de la campana del navbar: actividad propia, recordatorios de puntuar/reseñar y novedades (ver [push-notifications](../push-notifications.md)) |
 
@@ -266,7 +266,8 @@ Ver [social-y-perfiles](../features/social-y-perfiles.md).
 | `DELETE` | `/v1/community/{type}/{tmdbId}/comments/{id}` | Si | Borra un comentario propio |
 | `POST`/`DELETE` | `/v1/community/{type}/{tmdbId}/comments/{id}/like` | Si | Me gusta en un comentario (idempotente) |
 | `GET` | `/v1/community/{type}/{tmdbId}/sentiment` | No | Resumen de sentimiento (temas a favor/en contra) |
-| `GET` | `/v1/community/{type}/{tmdbId}/summary` | Opcional | Resumen de comunidad del titulo |
+| `GET` | `/v1/community/{type}/{tmdbId}/summary` | Opcional | Resumen de comunidad del titulo (incluye `artwork`, las imagenes mas votadas) |
+| `GET` | `/v1/community/{type}/{tmdbId}/artwork` | No | Imagen mas votada de cada tipo (`poster`, `mobilePoster`, `backdrop`, `background`, `logo`); solo los tipos con algun voto. Cada usuario vale un voto: su seleccion actual en «Portadas y fondos» (tabla `artwork_votes`). Empate: la elegida mas recientemente |
 | `GET` | `/v1/community/{type}/{tmdbId}/lists` | Opcional | Listas de la comunidad que contienen el titulo |
 | `GET` | `/v1/community/{type}/{tmdbId}/following` | Si | "Tus amigos": que han hecho con este titulo las cuentas que sigues |
 | `GET` | `/v1/community/lists/discover` | Opcional | Descubrir listas de la comunidad |

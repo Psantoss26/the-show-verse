@@ -29,8 +29,9 @@ const MOBILE_POSTER_WIDTH = "w500";
  * despreciable, y evita tener que leer cabeceras aquí, lo que volvería dinámica
  * una página que hoy se cachea 10 minutos.
  */
-export default function MobilePosterPreload({ data }) {
-  const path = pickMobileHeroPosterPath({
+export default function MobilePosterPreload({ data, communityArtwork = null }) {
+  // La portada móvil más votada es la que pinta la ficha sin selección propia.
+  const path = communityArtwork?.mobilePoster || pickMobileHeroPosterPath({
     posterPath: data?.poster_path,
     profilePath: data?.profile_path,
     posters: data?.images?.posters,

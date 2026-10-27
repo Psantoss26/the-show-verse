@@ -90,7 +90,7 @@ export default async function DetailsPage({ params, searchParams, embedded = fal
     <>
       {/* Va antes que la ficha: el navegador empieza a bajar la portada móvil
           mientras todavía está leyendo el HTML, sin esperar a hidratar. */}
-      <MobilePosterPreload data={data} />
+      <MobilePosterPreload data={data} communityArtwork={community?.artwork} />
       <DetailsPageLoader
         type={type}
         id={id}
@@ -100,6 +100,7 @@ export default async function DetailsPage({ params, searchParams, embedded = fal
         initialSentiment={community?.sentiment || null}
         initialComments={community?.comments || null}
         initialLists={community?.lists?.items || null}
+        initialCommunityArtwork={community ? community.artwork || {} : null}
         initialTraktStatus={initialTraktStatus}
       />
     </>

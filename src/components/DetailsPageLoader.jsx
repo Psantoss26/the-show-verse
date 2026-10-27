@@ -38,6 +38,7 @@ export default function DetailsPageLoader(props) {
     initialSentiment = null,
     initialComments = null,
     initialLists = null,
+    initialCommunityArtwork = null,
   } = props;
 
   // Al volver atrás a esta ficha, lo diferido ya cargado se recupera tal cual
@@ -188,6 +189,7 @@ export default function DetailsPageLoader(props) {
       }
       initialTraktStatus={initialTraktStatus}
       initialShowWatched={initialShowWatched}
+      initialCommunityArtwork={initialCommunityArtwork}
       initialScoreboard={deferredData.initialScoreboard ?? initialScoreboard}
       providers={
         deferredData.providers !== EMPTY_ARRAY

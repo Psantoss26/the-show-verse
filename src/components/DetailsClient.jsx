@@ -59,6 +59,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
 import {
   fetchArtworkOverride,
+  fetchCommunityArtwork,
   readArtworkPreference,
   readPersistedArtworkOverride,
   resolveCachedArtworkOverride,
@@ -1035,6 +1036,7 @@ export default function DetailsClient({
   initialSentiment,
   initialComments,
   initialLists,
+  initialCommunityArtwork = null,
 }) {
   useOfflineTitle(type, id, data);
   // Al VOLVER a esta ficha (atrás/adelante) se recupera el estado con el que se
@@ -1254,6 +1256,38 @@ export default function DetailsClient({
   // qué tienes elegido, así que al acercarse a pantalla se hace la consulta que
   // nos habíamos ahorrado. Para entonces la portada lleva rato pintada.
   const [artworkGalleryReached, setArtworkGalleryReached] = useState(() => restoredValue(backSnapshot, "artworkGalleryReached", false));
+
+  // Imágenes MÁS VOTADAS del título («Portadas y fondos»): cada selección de
+  // un usuario es un voto, y la ganadora de cada tipo es la imagen por defecto
+  // para todo el mundo (backend/src/lib/artworkVotes.js). Llegan en el SSR;
+  // solo si allí no se pudieron leer (`null`) se piden desde el cliente.
+  // La selección PROPIA (`selected*Path`) sigue mandando sobre ellas, y se
+  // aplican detrás de la misma puerta (`remoteArtworkChecked`) para no pintar
+  // la de la comunidad y saltar luego a la del usuario.
+  const [communityArtwork, setCommunityArtwork] = useState(
+    () => initialCommunityArtwork,
+  );
+  useEffect(() => {
+    if (initialCommunityArtwork) {
+      setCommunityArtwork(initialCommunityArtwork);
+      return;
+    }
+    let cancelled = false;
+    setCommunityArtwork(null);
+    fetchCommunityArtwork({ type: endpointType, id }).then((artwork) => {
+      if (!cancelled && artwork) setCommunityArtwork(artwork);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [initialCommunityArtwork, endpointType, id]);
+  const communityArtworkFor = (kind) =>
+    remoteArtworkChecked ? communityArtwork?.[kind] || null : null;
+  const communityPosterPath = communityArtworkFor("poster");
+  const communityMobilePosterPath = communityArtworkFor("mobilePoster");
+  const communityPreviewBackdropPath = communityArtworkFor("backdrop");
+  const communityBackgroundPath = communityArtworkFor("background");
+  const communityLogoPath = communityArtworkFor("logo");
 
   // -- Estados de carga progresiva del poster --
   // Se usan para mostrar primero una version de baja calidad y luego la alta
@@ -2578,11 +2612,12 @@ export default function DetailsClient({
     return pickHeroBackdropPath({
       backdropPath: data?.backdrop_path,
       backdrops: imagesState?.backdrops,
-      preferredPaths: [selectedBackgroundPath],
+      preferredPaths: [selectedBackgroundPath, communityBackgroundPath],
     });
   }, [
     imagesState?.backdrops,
     selectedBackgroundPath,
+    communityBackgroundPath,
     data?.backdrop_path,
     remoteArtworkChecked,
   ]);
@@ -2625,6 +2660,7 @@ export default function DetailsClient({
     // Aún no se sabe si hay un póster móvil personalizado remoto: no calcular
     // el "por defecto" todavía, o parpadearía al llegar el override.
     if (!remoteArtworkChecked) return null;
+    if (communityMobilePosterPath) return communityMobilePosterPath;
 
     // La imagen principal carece de metadatos de idioma, así que no puede
     // considerarse neutra. Se excluye hasta el fallback final para preservar la
@@ -2645,6 +2681,7 @@ export default function DetailsClient({
   }, [
     imagesState?.posters,
     selectedMobilePosterPath,
+    communityMobilePosterPath,
     remoteArtworkChecked,
     basePosterPath,
     data?.poster_path,
@@ -2654,7 +2691,10 @@ export default function DetailsClient({
   // `heroLogoPath` es el logo "recomendado" (calculado de TMDb): no se muestra
   // hasta saber si hay un logo personalizado remoto, para no parpadear.
   const displayHeroLogoPath =
-    selectedLogoPath || (remoteArtworkChecked ? heroLogoPath : null) || null;
+    selectedLogoPath ||
+    communityLogoPath ||
+    (remoteArtworkChecked ? heroLogoPath : null) ||
+    null;
 
   /**
    * Procesa y filtra la galeria de artwork segun la pestana activa (posters/backdrops/background),
@@ -2683,14 +2723,15 @@ export default function DetailsClient({
     const size = isPoster ? "w342" : isLogoTab ? "w500" : "w780";
 
     const currentPosterActive =
-      (selectedPosterPath || basePosterPath || data?.profile_path) ?? null;
+      (selectedPosterPath || communityPosterPath || basePosterPath || data?.profile_path) ?? null;
     const currentMobilePosterActive =
       selectedMobilePosterPath || mobileNeutralPosterPath || null;
 
     // Vista previa de la galería: mismo backdrop neutro que DetailModal.
     const previewFallback = detailModalPreviewBackdropFallback;
 
-    const currentPreviewActive = selectedPreviewBackdropPath || previewFallback;
+    const currentPreviewActive =
+      selectedPreviewBackdropPath || communityPreviewBackdropPath || previewFallback;
 
     // Fondo: la MISMA ruta que pinta el hero de escritorio (ver
     // `displayBackdropPath` y `heroBackgroundPath`). Antes se marcaba
@@ -2823,6 +2864,8 @@ export default function DetailsClient({
     };
   }, [
     activeImagesTab,
+    communityPosterPath,
+    communityPreviewBackdropPath,
     isMobileViewport,
     imagesState?.posters,
     imagesState?.backdrops,
@@ -3507,6 +3550,7 @@ export default function DetailsClient({
   // nuevas sin caché local.
   const basePosterDisplayPath =
     asTmdbPath(selectedPosterPath) ||
+    communityPosterPath ||
     (remoteArtworkChecked
       ? asTmdbPath(basePosterPath) ||
         (artworkInitialized
@@ -3631,7 +3675,7 @@ export default function DetailsClient({
         allowMainFallback: false,
         // Si ya se conoce una selección del usuario, manda ella (la
         // instantánea de overrides la resuelve en el primer efecto de layout).
-        preferredPaths: [selectedBackgroundPath],
+        preferredPaths: [selectedBackgroundPath, communityBackgroundPath],
       });
     }
 
@@ -7092,6 +7136,7 @@ export default function DetailsClient({
   const handleCyclePoster = useCallback(() => {
     const posterPath =
       asTmdbPath(selectedPosterPath) ||
+      communityPosterPath ||
       asTmdbPath(basePosterPath) ||
       asTmdbPath(data?.profile_path) ||
       null;
@@ -7123,6 +7168,7 @@ export default function DetailsClient({
     setPosterModeToggledId(id);
   }, [
     selectedPosterPath,
+    communityPosterPath,
     basePosterPath,
     data?.profile_path,
     posterBackdropFallback,
@@ -7893,9 +7939,9 @@ export default function DetailsClient({
 
   // Portadas y fondos de la vista lateral: las mismas pestañas que la galería
   // de la ficha (en móvil, Portada y Logo) con la imagen elegida marcada.
-  const sheetPosterActive = (selectedPosterPath || basePosterPath || data?.profile_path) ?? null;
+  const sheetPosterActive = (selectedPosterPath || communityPosterPath || basePosterPath || data?.profile_path) ?? null;
   const sheetMobilePosterActive = selectedMobilePosterPath || mobileNeutralPosterPath || null;
-  const sheetPreviewActive = selectedPreviewBackdropPath || detailModalPreviewBackdropFallback || null;
+  const sheetPreviewActive = selectedPreviewBackdropPath || communityPreviewBackdropPath || detailModalPreviewBackdropFallback || null;
   const sheetBackgroundActive = displayBackdropPath || data?.backdrop_path || null;
   const sheetArtworkTabs = useMemo(
     () =>

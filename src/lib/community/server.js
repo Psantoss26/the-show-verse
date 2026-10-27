@@ -29,3 +29,26 @@ export async function fetchCommunitySummary({ type, id }) {
     clearTimeout(timer);
   }
 }
+
+// Solo las imágenes más votadas (para las rutas de ficha que no piden el
+// resumen completo). `null` = no se sabe; `{}` = ningún voto todavía.
+export async function fetchCommunityArtwork({ type, id }) {
+  if (!BASE) return null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 1200);
+  try {
+    const ip = clientIpFromHeaders(await headers().catch(() => null));
+    const res = await fetch(`${BASE}/v1/community/${type}/${id}/artwork`, {
+      cache: "no-store",
+      signal: controller.signal,
+      headers: ip ? { "X-Forwarded-For": ip } : {},
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json?.artwork && typeof json.artwork === "object" ? json.artwork : {};
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}

@@ -16,6 +16,7 @@ import {
 import { db } from '../db/client.js';
 import { invalidateLevelState } from '../level/store.js';
 import { getFollowingTitleActivity } from '../lib/followingTitleActivity.js';
+import { getCommunityArtwork } from '../lib/artworkVotes.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -201,13 +202,26 @@ export default async function communityRoutes(fastify) {
     const t = parseTarget(req, reply); if (!t) return;
     const viewerId = req.user?.id || null;
     const seed = await ensureSeeded({ tmdbId: t.tmdbId, mediaType: t.type });
-    const [sentiment, comments, lists] = await Promise.all([
+    const [sentiment, comments, lists, artwork] = await Promise.all([
       getSentiment({ tmdbId: t.tmdbId, mediaType: t.type }),
       getCommentsPage({ tmdbId: t.tmdbId, mediaType: t.type, tab: 'top', page: 1, limit: 5, viewerId }),
       getListsForTitle({ tmdbId: t.tmdbId, mediaType: t.type, limit: 12, viewerId }),
+      // Imágenes más votadas: van aquí para que la ficha las tenga en el SSR
+      // sin otra ida y vuelta. Un fallo no tumba el resto del resumen.
+      getCommunityArtwork({ mediaType: t.type, tmdbId: t.tmdbId }).catch(() => ({})),
     ]);
     setCommunityCache(reply, viewerId, 'public, s-maxage=60, stale-while-revalidate=600');
-    return { sentiment, comments, lists: { items: lists }, state: seed.status };
+    return { sentiment, comments, lists: { items: lists }, artwork, state: seed.status };
+  });
+
+  // GET /:type/:tmdbId/artwork — imagen más votada de cada tipo (poster,
+  // mobilePoster, backdrop, background, logo). Pública: la usa DetailModal,
+  // que no pasa por el SSR de la ficha.
+  fastify.get('/:type/:tmdbId/artwork', async (req, reply) => {
+    const t = parseTarget(req, reply); if (!t) return;
+    const artwork = await getCommunityArtwork({ mediaType: t.type, tmdbId: t.tmdbId });
+    reply.header('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=600');
+    return { artwork };
   });
 
   // Surface B: lists containing this title.

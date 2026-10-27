@@ -40,6 +40,7 @@ import { getUserNeuralGraph } from '../lib/neuralGraph.js';
 import { getTodayActivity, invalidateTodayFollowing } from '../lib/todayActivity.js';
 import { loadUserExport } from '../lib/userExport.js';
 import { parseExportSections } from '../lib/userExportCore.js';
+import { applyArtworkVoteChanges } from '../lib/artworkVotes.js';
 
 const ARTWORK_KINDS = ['poster', 'mobilePoster', 'backdrop', 'background', 'logo'];
 export const artworkChangeSchema = z.object({
@@ -190,6 +191,9 @@ async function updateArtworkPreferences(userId, changes) {
       })
       .where(eq(userPreferences.userId, userId))
       .returning();
+
+    // Cada selección es también un voto para la imagen por defecto de todos.
+    await applyArtworkVoteChanges(tx, userId, changes);
 
     return preferences;
   });

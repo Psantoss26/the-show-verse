@@ -303,3 +303,49 @@ export async function fetchArtworkOverrides({ type, kind, ids }) {
         })
     )
 }
+
+// Imágenes MÁS VOTADAS de un título: { poster, mobilePoster, backdrop,
+// background, logo }, solo los tipos con algún voto. Cada selección de un
+// usuario cuenta como un voto (ver backend/src/lib/artworkVotes.js) y la
+// ganadora es la imagen por defecto para todo el mundo, siempre por detrás de
+// la selección propia. `null` = no se pudo saber.
+const communityArtworkRequests = new Map()
+const COMMUNITY_ARTWORK_TTL_MS = 60000
+
+export function fetchCommunityArtwork({ type, id }) {
+    const normalizedType = type === 'show' ? 'tv' : type || 'movie'
+    if (normalizedType !== 'movie' && normalizedType !== 'tv') return Promise.resolve(null)
+    if (id == null || id === '') return Promise.resolve(null)
+
+    const key = `${normalizedType}:${Number(id)}`
+    const cached = communityArtworkRequests.get(key)
+    if (cached && Date.now() - cached.at < COMMUNITY_ARTWORK_TTL_MS) return cached.promise
+
+    const promise = fetch(`/api/community/${normalizedType}/${Number(id)}/artwork`, {
+        cache: 'no-store'
+    })
+        .then((response) => (response.ok ? response.json() : null))
+        .then((json) =>
+            json?.artwork && typeof json.artwork === 'object' ? json.artwork : null
+        )
+        .catch(() => null)
+    communityArtworkRequests.set(key, { at: Date.now(), promise })
+    promise.then((artwork) => {
+        if (!artwork) communityArtworkRequests.delete(key)
+    })
+    return promise
+}
+
+// Selección propia por encima de la más votada, tipo a tipo. Mismo contrato que
+// `fetchArtworkOverride`: `overrides` null = «no se sabe» y entonces vale la
+// copia local por título (`localPreference`). Sin votos devuelve `overrides`
+// tal cual, así que quien no tenga comunidad se comporta exactamente igual.
+export function withCommunityArtwork(overrides, community, localPreference = null) {
+    if (!community || typeof community !== 'object') return overrides
+    const own = overrides ?? localPreference ?? {}
+    const merged = { ...community }
+    for (const [kind, filePath] of Object.entries(own)) {
+        if (filePath) merged[kind] = filePath
+    }
+    return merged
+}

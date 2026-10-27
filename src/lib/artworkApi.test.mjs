@@ -10,6 +10,7 @@ import {
   resolveCachedArtworkOverride,
   saveArtworkOverride,
   shouldSkipRemoteArtwork,
+  withCommunityArtwork,
   writeArtworkPreference
 } from './artworkApi.js'
 
@@ -244,4 +245,30 @@ test('a rejected artwork save (4xx) is not retried', async (t) => {
 
   assert.equal(saved, false)
   assert.equal(calls.length, 1)
+})
+
+test('withCommunityArtwork: la más votada rellena solo los tipos sin selección propia', () => {
+    assert.deepEqual(
+        withCommunityArtwork(
+            { poster: '/mia.jpg' },
+            { poster: '/votada.jpg', mobilePoster: '/votada-movil.jpg' }
+        ),
+        { poster: '/mia.jpg', mobilePoster: '/votada-movil.jpg' }
+    )
+})
+
+test('withCommunityArtwork: sin votos devuelve los overrides tal cual', () => {
+    assert.equal(withCommunityArtwork(null, null), null)
+    const own = { logo: '/logo.png' }
+    assert.equal(withCommunityArtwork(own, null), own)
+})
+
+test('withCommunityArtwork: sin overrides remotos vale la copia local por título', () => {
+    assert.deepEqual(
+        withCommunityArtwork(null, { backdrop: '/votado.jpg', logo: '/logo-votado.png' }, {
+            backdrop: '/local.jpg',
+            logo: null
+        }),
+        { backdrop: '/local.jpg', logo: '/logo-votado.png' }
+    )
 })

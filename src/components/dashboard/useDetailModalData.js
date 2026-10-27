@@ -51,7 +51,9 @@ import {
 import { pickModalHeroPosterPath } from "@/lib/details/tmdbImages";
 import {
   fetchArtworkOverride,
+  fetchCommunityArtwork,
   readPersistedArtworkOverride,
+  withCommunityArtwork,
 } from "@/lib/artworkApi";
 import { dedupeStreamingProviders } from "@/lib/streaming/providers";
 
@@ -383,12 +385,19 @@ function requestModalHeroPoster(item) {
   const overrideFrom = (overrides, kind) =>
     overrides ? overrides[kind] || null : artworkPreference[kind] || null;
   const promise = (async () => {
-    const [images, artworkOverrides] = await Promise.all([
+    const [images, ownOverrides, communityArtwork] = await Promise.all([
       getMovieImages(id, mediaType).catch(() => null),
       persistedOverride
         ? persistedOverride
         : fetchArtworkOverride({ type: overrideType, id }).catch(() => null),
+      fetchCommunityArtwork({ type: overrideType, id }),
     ]);
+    // Sin selección propia, la imagen más votada (igual que en la ficha).
+    const artworkOverrides = withCommunityArtwork(
+      ownOverrides,
+      communityArtwork,
+      artworkPreference,
+    );
     const finalPoster = pickModalHeroPosterPath({
       mobilePosterOverride: overrideFrom(artworkOverrides, "mobilePoster"),
       posterOverride: overrideFrom(artworkOverrides, "poster"),
@@ -780,9 +789,18 @@ export function useDetailModalData(item, { phoneView = false } = {}) {
       type: overrideType,
       id,
     });
-    const artworkOverridesPromise = persistedOverride
-      ? Promise.resolve(persistedOverride)
-      : fetchArtworkOverride({ type: overrideType, id }).catch(() => null);
+    // Sin selección propia de un tipo, manda la imagen MÁS VOTADA de ese tipo
+    // (cada selección de un usuario es un voto; ver artworkVotes.js en el
+    // backend), igual que en DetailsClient. Solo se espera junto a cargas que
+    // ya eran de red (galería, logo, fondo), así que no añade espera propia.
+    const artworkOverridesPromise = Promise.all([
+      persistedOverride
+        ? persistedOverride
+        : fetchArtworkOverride({ type: overrideType, id }).catch(() => null),
+      fetchCommunityArtwork({ type: overrideType, id }),
+    ]).then(([ownOverrides, communityArtwork]) =>
+      withCommunityArtwork(ownOverrides, communityArtwork, artworkPreference),
+    );
     // Cuando la instantánea confirma los overrides, MANDA sobre la copia local
     // por título: esa clave queda obsoleta si el usuario reseteó la portada
     // desde otro dispositivo. Es el mismo criterio que `initialFor` en
