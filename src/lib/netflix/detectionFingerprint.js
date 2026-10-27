@@ -29,6 +29,30 @@ const PLATFORM_ALIASES = {
   appletvplus: "appletv",
   // La extensión nombra Apple TV+ por su host (tv.apple.com → «tv»).
   tv: "appletv",
+  pluto: "plutotv",
+  rakuten: "rakutentv",
+  // La app Android manda el PAQUETE de la app (com.netflix.mediaclient): sin
+  // esto, nada de lo aprendido en el navegador valía en el móvil ni al revés, y
+  // «Continuar viendo» mostraba el paquete como plataforma.
+  comnetflixmediaclient: "netflix",
+  comamazonavodthirdpartyclient: "primevideo",
+  comamazonavod: "primevideo",
+  comamazonamazonvideolivingroom: "primevideo",
+  comwbdstream: "max",
+  comhbohbonow: "max",
+  comdisneydisneyplus: "disney",
+  comcrunchyrollcrunchyroid: "crunchyroll",
+  comtelefonicagvp: "movistar",
+  esplusyomvi: "movistar",
+  comappleatveandroidtvappletv: "appletv",
+  comfilmin: "filmin",
+  comskyshowtimeskyshowtime: "skyshowtime",
+  tvplutoandroid: "plutotv",
+  comrakutentv: "rakutentv",
+  comatresmediaatresplayer: "atresplayer",
+  esrtvertveplay: "rtve",
+  appplexandroid: "plex",
+  complexappandroid: "plex",
 };
 
 /** Id de plataforma canónico ("Prime" → "primevideo"). */

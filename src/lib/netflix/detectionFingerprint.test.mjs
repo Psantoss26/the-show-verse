@@ -36,3 +36,15 @@ test("la extensión y Android comparten huella aunque nombren distinto la plataf
   assert.equal(canonicalPlatformId("Disney+"), "disney");
   assert.equal(detectionFingerprint("prime", "The Boys"), detectionFingerprint("primevideo", "The Boys"));
 });
+
+test("los paquetes de la app Android son la misma plataforma que en el navegador", () => {
+  assert.equal(canonicalPlatformId("com.netflix.mediaclient"), "netflix");
+  assert.equal(canonicalPlatformId("com.amazon.avod.thirdpartyclient"), "primevideo");
+  assert.equal(canonicalPlatformId("com.wbd.stream"), "max");
+  assert.equal(canonicalPlatformId("com.disney.disneyplus"), "disney");
+  assert.equal(canonicalPlatformId("com.crunchyroll.crunchyroid"), "crunchyroll");
+  assert.equal(canonicalPlatformId("es.rtve.rtvePlay"), "rtve");
+  assert.equal(canonicalPlatformId("com.plexapp.android"), "plex");
+  // Un paquete desconocido se queda como está (sin puntos).
+  assert.equal(canonicalPlatformId("org.ejemplo.app"), "orgejemploapp");
+});

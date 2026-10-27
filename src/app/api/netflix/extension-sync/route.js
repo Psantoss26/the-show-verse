@@ -973,7 +973,7 @@ export async function POST(request) {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${syncToken}` },
         body: JSON.stringify({
           tmdbId, mediaType, season: season ?? 0, episode: episode ?? 0,
-          title: resolvedTitle, posterPath: posterPath || null, platform, confidence,
+          title: resolvedTitle, posterPath: posterPath || null, platform: detectionPlatform, confidence,
           positionSeconds: Math.max(0, Math.round(Number(positionSec) || 0)),
           runtimeSeconds: Math.max(0, Math.round(safeDurationSec || 0)),
           estimated: estimated === true, eventId, observedAt,
@@ -1045,7 +1045,7 @@ export async function POST(request) {
         signal: AbortSignal.timeout(15_000),
         body: JSON.stringify({
           ...body,
-          platform,
+          platform: detectionPlatform,
           netflixVideoId: resolvedVideoId || undefined,
           netflixTitle: mainTitle || showName || resolvedTitle,
           ...detectionFields,

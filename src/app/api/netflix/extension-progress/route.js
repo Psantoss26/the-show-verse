@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getBackendBaseUrl } from "@/lib/backend/server";
+import { canonicalPlatformId } from "@/lib/netflix/detectionFingerprint";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,7 +41,9 @@ export async function POST(request) {
       },
       cache: "no-store",
       signal: AbortSignal.timeout(15_000),
-      body: JSON.stringify(body),
+      // Mismo id de plataforma venga del navegador o de la app Android (que manda
+      // el paquete): es el que muestra «Continuar viendo».
+      body: JSON.stringify(body.platform ? { ...body, platform: canonicalPlatformId(body.platform) || body.platform } : body),
     }).catch(() => null);
 
     if (!res) {
