@@ -31,7 +31,7 @@ import {
   shouldRecordCompletion,
   REWATCH_COMPLETION_COOLDOWN_MS,
 } from '../lib/rewatchCompletion.js';
-import { getRuntimeSeconds } from '../lib/tmdbRuntime.js';
+import { getRuntimeSeconds, isPlausibleRuntime } from '../lib/tmdbRuntime.js';
 import { eq, and, gt, lt, isNull, sql, desc } from 'drizzle-orm';
 
 const BCRYPT_ROUNDS = 12;
@@ -1411,6 +1411,20 @@ export default async function authRoutes(fastify) {
     // Duración efectiva: la que reporta el cliente o, si no la trae (Plex y algunos
     // episodios de Netflix no exponen duración en la MediaSession), la de TMDb. Sin
     // ella no se puede calcular el % y el título no entraba en "Continuar viendo".
+    // Un vídeo mucho más corto que el título (anuncio, tráiler, avance) no es el
+    // contenido: ni completa ni entra en "Continuar viendo". Ver isPlausibleRuntime.
+    if (runtimeSeconds > 0) {
+      const episodeKnown = !isTv || (season > 0 && episode > 0);
+      const reference = await getRuntimeSeconds({
+        tmdbId,
+        mediaType,
+        season: isTv ? season : 0,
+        episode: isTv ? episode : 0,
+      }).catch(() => 0);
+      if (!isPlausibleRuntime(runtimeSeconds, reference, { exactReference: episodeKnown })) {
+        return reply.send({ ok: true, completed: false, ignored: 'runtime_mismatch' });
+      }
+    }
     let effectiveRuntime = runtimeSeconds > 0 ? runtimeSeconds : 0;
     if (effectiveRuntime <= 0) {
       effectiveRuntime = await getRuntimeSeconds({

@@ -10,6 +10,11 @@ test('streaming delivery is atomic, idempotent and ordered across devices', {
   process.env.NODE_ENV = 'test';
   process.env.DATABASE_URL = process.env.STREAMING_TEST_DATABASE_URL;
   process.env.DATABASE_URL_UNPOOLED = process.env.STREAMING_TEST_DATABASE_URL;
+  // Sin TMDb de verdad: las duraciones de estas pruebas son inventadas, y la
+  // comprobación de duración (isPlausibleRuntime) no debe salir a la red. dotenv
+  // no pisa una variable ya definida, aunque esté vacía.
+  process.env.TMDB_API_KEY = '';
+  process.env.NEXT_PUBLIC_TMDB_API_KEY = '';
   const { default: Fastify } = await import('fastify');
   const { db, closeDb } = await import('../db/client.js');
   const { users, connectedAccounts, watchHistory, watchProgress } = await import('../db/schema.js');
@@ -119,6 +124,34 @@ test('streaming delivery is atomic, idempotent and ordered across devices', {
       }
     } finally { await db.delete(users).where(eq(users.id, otherUser)); }
   });
+  await t.test('a pre-roll ad much shorter than the title neither completes nor enters continue watching', async () => {
+    // TMDb simulado: la película dura 90 min. El reproductor da 95 s (el anuncio).
+    const realFetch = globalThis.fetch;
+    process.env.TMDB_API_KEY = 'test';
+    globalThis.fetch = async (url, init) => (String(url).includes('api.themoviedb.org/3/movie/777001')
+      ? new Response(JSON.stringify({ id: 777001, runtime: 90 }), { status: 200, headers: { 'content-type': 'application/json' } })
+      : realFetch(url, init));
+    try {
+      const ad = { tmdbId: 777001, mediaType: 'movie', title: 'Cries In The Dark', platform: 'pluto', confidence: 'high' };
+      const send = (positionSeconds, runtimeSeconds) => app.inject({
+        method: 'POST', url: '/v1/auth/netflix/progress', headers: { authorization: `Bearer ${token}` },
+        payload: { ...ad, positionSeconds, runtimeSeconds, eventId: randomUUID(), observedAt: new Date().toISOString() },
+      });
+      const late = await send(94, 95);
+      assert.equal(late.json().ignored, 'runtime_mismatch');
+      const rows = (table) => db.select().from(table).where(and(eq(table.userId, uid), eq(table.tmdbId, 777001)));
+      assert.equal((await rows(watchHistory)).length, 0);
+      assert.equal((await rows(watchProgress)).length, 0);
+      // La película de verdad sí cuenta.
+      const real = await send(30 * 60, 90 * 60);
+      assert.equal(real.json().ignored, undefined);
+      assert.equal((await rows(watchProgress)).length, 1);
+    } finally {
+      globalThis.fetch = realFetch;
+      process.env.TMDB_API_KEY = '';
+    }
+  });
+
   await t.test('revoked tokens are rejected', async () => {
     await db.delete(connectedAccounts).where(eq(connectedAccounts.userId, uid));
     const response = await app.inject({ method: 'POST', url: '/v1/auth/netflix/progress', headers: { authorization: `Bearer ${token}` }, payload: event(500, 5000) });

@@ -57,3 +57,21 @@ export async function getRuntimeSeconds({ tmdbId, mediaType, season = 0, episode
   if (runtimeSec > 0) cache.set(key, runtimeSec);
   return runtimeSec;
 }
+
+/**
+ * ¿La duración del vídeo que suena puede ser la del título? Un anuncio previo, un
+ * tráiler o un avance duran segundos o pocos minutos: con su posición (94 de 95
+ * s) el progreso llega al 90 % y el título se daba por visto (Pluto TV pone un
+ * anuncio de 95 s antes de una película de 90 min). Si dura menos de la mitad
+ * que en TMDb, no es el contenido.
+ *
+ * Solo se compara con la duración del propio título o del episodio concreto: la
+ * media de una serie no sirve (hay episodios mucho más cortos que otros).
+ * @param {number} clientSeconds duración que da el reproductor
+ * @param {number} referenceSeconds duración en TMDb (0 si no se sabe)
+ * @param {{ exactReference?: boolean }} options false si la referencia es la media de la serie
+ */
+export function isPlausibleRuntime(clientSeconds, referenceSeconds, { exactReference = true } = {}) {
+  if (!(clientSeconds > 0) || !(referenceSeconds > 0) || !exactReference) return true;
+  return clientSeconds >= referenceSeconds * 0.5;
+}
