@@ -294,7 +294,7 @@ class AccessibilityStreamingService : AccessibilityService() {
                     detailSignals++
                 }
                 if (ScreenHeuristics.isSeriesSignal(raw)) seriesSignals++
-                if (ScreenHeuristics.isPlayerControl(raw)) playerControls++
+                playerControls += ScreenHeuristics.playerWeight(raw)
                 if (ScreenHeuristics.isLikelyTitle(raw) && seen.add(raw.lowercase())) {
                     val isHeading =
                         Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && node.isHeading
@@ -336,9 +336,21 @@ class AccessibilityStreamingService : AccessibilityService() {
         val now = SystemClock.elapsedRealtime()
         for (root in roots) {
             val (texts, seek) = playerTexts(root)
-            val reading = PlayerScreen.parse(texts, seek, now) ?: continue
+            val ad = texts.any { ScreenHeuristics.isAdText(it) }
+            val known = ScreenHeuristics.isPlayerScreen(texts)
+            val reading = PlayerScreen.parse(texts, seek, now, knownPlayer = known) ?: continue
+            ScreenPlayback.playerSeen(pkg, now, !ad && ScreenHeuristics.playerPaused(texts))
+            // Durante el anuncio (Prime Video lo pone antes del título) se sabe que
+            // se está reproduciendo, pero su tiempo y su título son los del anuncio:
+            // no se guardan como lectura del contenido.
+            if (ad) {
+                if (lastPlayerLog != "ad") {
+                    lastPlayerLog = "ad"
+                    p.addLog("Anuncio en ${Platforms.nameFor(pkg)}: se espera al título")
+                }
+                return true
+            }
             PlayerScreenCache.record(pkg, reading)
-            ScreenPlayback.playerSeen(pkg, now, ScreenHeuristics.playerPaused(texts))
             // Los títulos del reproductor siguen sirviendo de último recurso (ScreenTexts).
             ScreenTexts.record(pkg, texts.filter { ScreenHeuristics.isLikelyTitle(it) }.take(MAX_CANDIDATES))
             if (reading.hasIdentity) {

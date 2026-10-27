@@ -352,7 +352,16 @@ class MediaListenerService : NotificationListenerService() {
                 ?.copy(durationSec = sinPista.durationSec, positionSec = sinPista.positionSec)
                 ?: sinPista
         } else {
-            PlayerScreen.merge(conPista, lectura)
+            // Hay sesión pero sin título (Prime Video la publica vacía a veces):
+            // se identifica igual que sin sesión.
+            val merged = PlayerScreen.merge(conPista, lectura)
+            if (!merged.mainTitle.isNullOrBlank()) {
+                merged
+            } else {
+                ScreenSignal.build(pkg, Platforms.nameFor(pkg), lectura, RecentDetail.detailFor(pkg, session))
+                    ?.copy(durationSec = merged.durationSec, positionSec = merged.positionSec)
+                    ?: merged
+            }
         }
         if (built !== conPista && built.showName != conPista.showName) {
             noteOnce(
@@ -375,6 +384,15 @@ class MediaListenerService : NotificationListenerService() {
         }
         if (signal.mainTitle.isNullOrBlank()) {
             noteOnce("notitle:$pkg", "Reproduciendo en ${Platforms.nameFor(pkg)} pero sin título legible")
+            // Una vez por sesión, al servidor (se guarda como descarte «empty_title»
+            // con los textos de la pantalla): sin el Registro del móvil es la única
+            // forma de ver qué muestra el reproductor de cada app.
+            val token = prefs.token
+            val origin = prefs.origin
+            if (token != null && origin != null && loggedNotes.add("emptyreport:$pkg")) {
+                val diag = signal.copy(screenTitles = ScreenTexts.recent(pkg, since - SCREEN_TEXTS_BEFORE_PLAY_MS))
+                SyncClient.send(origin, token, diag, resolveOnly = true, detectionKind = "playback") { _, _, _, _ -> }
+            }
             return
         }
 

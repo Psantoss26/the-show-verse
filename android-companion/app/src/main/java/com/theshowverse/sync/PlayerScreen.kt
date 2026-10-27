@@ -117,7 +117,7 @@ object PlayerScreen {
      * [seekFraction] es el avance de la barra (0..1) si la pantalla la expone.
      * Devuelve null si la pantalla no es un reproductor.
      */
-    fun parse(texts: List<String>, seekFraction: Double?, atMs: Long): PlayerReading? {
+    fun parse(texts: List<String>, seekFraction: Double?, atMs: Long, knownPlayer: Boolean = false): PlayerReading? {
         val clean = texts.map { it.trim() }.filter { it.isNotEmpty() }
 
         val elapsed = ArrayList<Long>()
@@ -130,7 +130,10 @@ object PlayerScreen {
         val fraction = seekFraction?.takeIf { it in 0.0..1.0 }
         // Un reproductor tiene barra de avance, o al menos dos tiempos (transcurrido
         // y total/restante). Un único "12:34" suelto no basta: puede ser cualquier cosa.
-        val isPlayer = fraction != null || elapsed.size + remaining.size >= 2 || remaining.isNotEmpty()
+        // [knownPlayer]: otros textos ya demuestran que es el reproductor (sus
+        // controles, ver ScreenHeuristics.isPlayerScreen). Prime Video no expone
+        // su barra como SeekBar, y sin tiempos visibles su línea «T6 E9 …» se perdía.
+        val isPlayer = knownPlayer || fraction != null || elapsed.size + remaining.size >= 2 || remaining.isNotEmpty()
         if (!isPlayer) return null
 
         var pos: Long? = null

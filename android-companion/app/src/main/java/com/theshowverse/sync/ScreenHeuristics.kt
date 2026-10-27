@@ -98,6 +98,9 @@ object ScreenHeuristics {
         "estreno", "nueva serie", "nueva temporada", "nuevo episodio", "nuevos episodios",
         "se incluye con prime", "se aplican términos", "se aplican terminos",
         "todos", "todo", "all", "lanzamientos", "top 10", "tendencias", "trending",
+        "nueva película", "nueva pelicula", "mejor valorado", "mejor valorada", "el mejor anime",
+        "más opciones para disfrutar", "mas opciones para disfrutar", "títulos europeos populares",
+        "titulos europeos populares", "tv en directo", "amazon originals y exclusivos",
     ) + PLAYER_CONTROLS + VIDEO_CONTROLS
 
     // Los mismos controles con otra cifra o forma («Retroceder 10 s», «Velocidad,
@@ -107,6 +110,42 @@ object ScreenHeuristics {
             "|(?:skip |jump )?(?:forward|back|backward|rewind|ahead)s? \\d{1,3} ?(?:seconds|sec|s)\\b" +
             "|(?:velocidad|speed|velocidad de reproducci[oó]n)\\b)",
     )
+
+    // Textos que SOLO salen en el reproductor: la velocidad con su valor
+    // («Velocidad, 1x») y las notas de X-Ray de Prime Video («Rick Hoffman
+    // portrays Louis Litt»). Uno basta para saber que es el reproductor.
+    private val CONCLUSIVE_PLAYER_RE = Regex(
+        "^(?:velocidad|speed)(?: de reproducci[oó]n)?,?\\s*\\d+(?:[.,]\\d+)?\\s*x$" +
+            "|\\s(?:portrays|interpreta a|da vida a)\\s",
+    )
+
+    // Anuncios del reproductor (Prime Video los pone antes del título). También
+    // prueban que es el reproductor, pero su tiempo es el del anuncio.
+    private val AD_RE = Regex(
+        // Sin «AD» a secas: en la ficha es la insignia de audiodescripción.
+        "^(?:anuncio|anuncios|publicidad|patrocinado|sponsored)\\b|^ads?\\s*\\d+\\s*(?:de|of)\\s*\\d+" +
+            "|\\b(?:saltar|omitir) (?:el )?anuncio|\\bskip ads?\\b" +
+            "|\\b(?:el|tu) (?:v[ií]deo|contenido|t[ií]tulo) (?:comenzar[aá]|empezar[aá]|se reanudar[aá])" +
+            "|\\byour (?:video|title) will (?:begin|start|resume)",
+    )
+
+    /** ¿El texto delata un anuncio en el reproductor? */
+    fun isAdText(text: String?): Boolean = text != null && AD_RE.containsMatchIn(norm(text))
+
+    /**
+     * Peso de [text] como prueba de que la pantalla es el reproductor: 0 nada, 1 un
+     * control, [MIN_PLAYER_CONTROLS] si por sí solo lo demuestra (velocidad con su
+     * valor, X-Ray, un anuncio).
+     */
+    fun playerWeight(text: String?): Int {
+        val n = text?.let { norm(it) } ?: return 0
+        if (CONCLUSIVE_PLAYER_RE.containsMatchIn(n) || AD_RE.containsMatchIn(n)) return MIN_PLAYER_CONTROLS
+        return if (isPlayerControl(text)) 1 else 0
+    }
+
+    /** ¿Los textos de la pantalla demuestran que es el reproductor? */
+    fun isPlayerScreen(texts: List<String>): Boolean =
+        texts.sumOf { playerWeight(it) } >= MIN_PLAYER_CONTROLS
 
     /** ¿El texto es un control del reproductor? (ver [PLAYER_CONTROLS]). */
     fun isPlayerControl(text: String?): Boolean {
@@ -146,7 +185,18 @@ object ScreenHeuristics {
             "|^#\\d" +
             "|^calificad[ao]\\b|^rated\\b" +
             "|^(?:volver a ver|descargar|download|ver de nuevo|rewatch)\\s+(?:episodio|episode|t\\d|s\\d|temporada|season)" +
-            "|^(?:pel[ií]culas|series|documentales)\\s+[\\p{L}]+(?:\\s+[\\p{L}]+)?$",
+            "|^(?:pel[ií]culas|series|documentales)\\s+[\\p{L}]+(?:\\s+[\\p{L}]+)?$" +
+            // Tarjetas de carrusel de Prime Video («Carrie (2013). Prime Video»),
+            // «Descargar 2. Nombre a tu dispositivo», «Estuvo 8 semanas en el Top 10»,
+            // «N.º 4 en películas de anime», «Ganadora de 6 OSCAR®», fechas
+            // («17 agosto a. m.») y «Amazon Originals…».
+            "|\\.\\s*prime video$" +
+            "|^descargar\\b.*\\ba tu dispositivo$" +
+            "|\\btop\\s*10\\b" +
+            "|^n\\s*\\.?\\s*[ºo°]\\s*\\d" +
+            "|^ganador[ao]?s? de\\b|^winner of\\b" +
+            "|\\b[ap]\\.\\s?m\\.$" +
+            "|^amazon originals\\b",
     )
 
     // Fila de la lista de episodios de Netflix: el número y un punto delante
@@ -198,6 +248,9 @@ object ScreenHeuristics {
         "empezar de nuevo", "reproduzir", "assistir", "assistir agora",
         "comenzar a ver", "empezar a ver", "start watching", "ver desde el principio",
         "watch from the beginning",
+        // Prime Video: «Volver a empezar» (existe una serie con ese nombre en TMDb).
+        "volver a empezar", "empezar desde el principio", "ver desde el inicio",
+        "start from beginning", "watch from start",
     )
     private val PLAY_PREFIXES = setOf(
         "reproducir", "reanudar", "ver t", "ver s", "ver ep", "ver ahora",

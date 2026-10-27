@@ -216,4 +216,15 @@ class PlayerScreenTest {
         assertNull(PlayerScreenCache.latest(pkg, sinceMs = 5_001L, nowMs = 6_000L))
         PlayerScreenCache.forget(pkg)
     }
+
+    @Test
+    fun readsPrimeVideoPlayerWithoutTimesWhenItsControlsProveIt() {
+        val texts = listOf("Suits", "T6 E9 Vuelta al trabajo", "Velocidad, 1x", "Rick Hoffman portrays Louis Litt")
+        assertNull(PlayerScreen.parse(texts, seekFraction = null, atMs = 1_000L))
+        val r = PlayerScreen.parse(texts, seekFraction = null, atMs = 1_000L, knownPlayer = ScreenHeuristics.isPlayerScreen(texts))!!
+        assertEquals("Suits", r.seriesTitle)
+        assertEquals(6, r.season)
+        assertEquals(9, r.episode)
+        assertNull(r.positionSec)
+    }
 }

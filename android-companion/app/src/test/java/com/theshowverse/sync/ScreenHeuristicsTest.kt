@@ -249,4 +249,30 @@ class ScreenHeuristicsTest {
             assertTrue(t, ScreenHeuristics.isLikelyTitle(t))
         }
     }
+
+    @Test
+    fun `botones y tarjetas de la ficha de Prime Video no son titulos`() {
+        for (t in listOf("Volver a empezar", "NUEVA PELÍCULA", "MEJOR VALORADO", "EL MEJOR ANIME",
+            "Más opciones para disfrutar", "Carrie (2013). Prime Video", "Viernes 13. Prime Video",
+            "Descargar 2. Cuentas a Pagar a tu dispositivo", "Estuvo 8 semanas en el Top 10",
+            "N .º 4 en películas de anime", "Ganadora de 6 OSCAR®", "17 agosto a. m.",
+            "Amazon Originals y Exclusivos", "Títulos europeos populares", "TV en directo")) {
+            assertFalse(t, ScreenHeuristics.isLikelyTitle(t))
+        }
+        for (t in listOf("Shutter Island", "LA ASISTENTA", "Hereditary", "Your name", "Dune")) {
+            assertTrue(t, ScreenHeuristics.isLikelyTitle(t))
+        }
+    }
+
+    @Test
+    fun `el reproductor de Prime se reconoce por la velocidad, X-Ray o un anuncio`() {
+        assertTrue(ScreenHeuristics.isPlayerScreen(listOf("Suits", "Velocidad, 1x")))
+        assertTrue(ScreenHeuristics.isPlayerScreen(listOf("Rick Hoffman portrays Louis Litt")))
+        assertTrue(ScreenHeuristics.isPlayerScreen(listOf("Anuncio", "0:25")))
+        assertTrue(ScreenHeuristics.isPlayerScreen(listOf("Retroceder 10 segundos", "Avanzar 10 segundos")))
+        assertFalse(ScreenHeuristics.isPlayerScreen(listOf("Suits", "Reproducir", "Descargar T6", "AD", "Volver a empezar")))
+        assertTrue(ScreenHeuristics.isAdText("Anuncio 1 de 2"))
+        assertTrue(ScreenHeuristics.isAdText("Ad 1 of 2"))
+        assertFalse(ScreenHeuristics.isAdText("AD"))
+    }
 }

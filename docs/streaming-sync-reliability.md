@@ -255,6 +255,41 @@ Una novedad recién estrenada tiene pocos votos pero mucha popularidad, así que
 sigue resolviendo. Una ficha con un solo texto (el encabezado de la ficha en el
 navegador) no se toca: una película poco conocida de Filmin se sigue resolviendo.
 
+### Reconocer el reproductor y los anuncios
+
+Prime Video no expone su barra de avance como `SeekBar` y, con los controles a la
+vista, no siempre pinta tiempos: `PlayerScreen` no lo reconocía y la reproducción no
+empezaba nunca. Ahora basta con que la pantalla demuestre que es el reproductor
+(`ScreenHeuristics.isPlayerScreen`): dos controles, o un texto que solo sale en él,
+como la velocidad con su valor («Velocidad, 1x») o una nota de X-Ray («Rick
+Hoffman portrays Louis Litt»). Entonces su línea «T6 E9 Nombre» se lee aunque no
+haya tiempos.
+
+Prime pone un **anuncio** antes del título. Mientras se ve («Anuncio», «Anuncio 1 de
+2», «Saltar anuncio»…), cuenta como reproducción, pero su tiempo y su texto no se
+guardan como lectura del contenido: si no, la duración del anuncio se tomaba por la
+del título y el servidor lo descartaba (`runtime_mismatch`). «AD» a secas no cuenta:
+en la ficha es la insignia de audiodescripción.
+
+Si la sesión existe pero llega sin título, se identifica igual que sin sesión. Si
+aun así no hay título, la app manda una vez por sesión los textos de la pantalla
+al servidor, que los guarda como descarte `empty_title`. Sin el Registro del móvil
+es la forma de ver qué muestra el reproductor de cada app.
+
+### Botones de la ficha y pista «serie» equivocada
+
+«Volver a empezar» es un botón de reproducir de la ficha de Prime Video (y una
+serie de TMDb). Tampoco son títulos las tarjetas de carrusel («Carrie (2013). Prime
+Video»), «Descargar 2. Nombre a tu dispositivo», «Estuvo 8 semanas en el Top 10»,
+«N.º 4 en películas de anime», «Ganadora de 6 OSCAR®», «NUEVA PELÍCULA», «MEJOR
+VALORADO» ni las fechas.
+
+Los carruseles traen textos de temporada de otros títulos, así que una película
+puede llegar marcada como serie. Si el título principal no existe como serie, el
+servidor lo prueba sin tipo antes de pasar al resto de textos: la ficha de
+*Shutter Island* resolvía el botón «Volver a empezar». Una serie cuyo título
+contiene el texto sigue ganando («La clave del éxito» → *Suits*).
+
 ## Prime Video y Crunchyroll en la app Android
 
 Estas dos apps no publican en su MediaSession de qué serie es el episodio (a veces
