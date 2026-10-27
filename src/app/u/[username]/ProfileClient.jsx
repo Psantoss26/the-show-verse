@@ -1,7 +1,6 @@
 "use client";
 
 import { loadProfileCharts } from "@/lib/profile/loadProfileCharts";
-import LogoutConfirmModal from "@/components/auth/LogoutConfirmModal";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -12,11 +11,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import OptimizedImage from "@/components/OptimizedImage";
 import Avatar from "@/components/ui/Avatar";
-import LiquidButton from "@/components/LiquidButton";
 import { useAuth } from "@/context/AuthContext";
-import FollowButton from "@/components/social/FollowButton";
-import { useShareAction } from "@/components/details/DetailHeaderBits";
-import { buildProfileShareCard } from "@/lib/profile/shareProfile";
 import PosterTile from "@/components/social/PosterTile";
 import { titleStateKey, useViewerTitleStates } from "@/components/social/useViewerTitleStates";
 import { LIQUID_GLASS_PANEL, LIQUID_GLASS_TOOLTIP } from "@/lib/ui/liquidGlass";
@@ -28,6 +23,7 @@ import { formatXp } from "@/lib/level/tiers.mjs";
 import RecapPromoBanner from "@/components/recap/RecapPromoBanner";
 import RecapPreviewCard from "@/components/recap/RecapPreviewCard";
 import ProfileSection from "./ProfileSection";
+import ProfileTitleRow from "./ProfileTitleRow";
 import { PROFILE_TAB_IDS, profileTabHref } from "./profileRoutes";
 import { translateGenreName } from "@/lib/dashboard/media";
 import { getActivityDetailsHref } from "@/lib/profile/activityRatingTarget";
@@ -57,57 +53,12 @@ import {
   Flame,
   Heart,
   Loader2,
-  LogOut,
   PieChart,
-  RotateCcw,
-  Settings,
-  Share2,
   Star,
   Target,
   UserRoundCheck,
   Users,
 } from "lucide-react";
-
-const PROFILE_HEADER_BUTTON_CLASS =
-  "!h-11 !w-11 @[640px]/detail-page:!h-12 @[640px]/detail-page:!w-12 !border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent shadow-lg backdrop-blur-md hover:!bg-white/15";
-
-// Compartir el PERFIL: abre la hoja de compartir (la de fichas y listas) con
-// la imagen del perfil —foto, nombre, nivel, cifras y favoritos, ver
-// lib/profile/shareProfile— y el enlace a /u/<usuario> (aunque se esté en una
-// sección como /u/<usuario>/stats). Al cerrarla, el foco vuelve al botón.
-function ProfileShareButton({ profile, disabled = false }) {
-  const { user } = profile;
-  const url =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/u/${encodeURIComponent(user.username)}`
-      : undefined;
-  const card = useMemo(() => buildProfileShareCard(profile), [profile]);
-  const { handleShare, sheet, warmProps } = useShareAction({
-    title: `${user.displayName} (@${user.username})`,
-    text: `Mira el perfil de ${user.displayName} en The Show Verse`,
-    url,
-    card,
-    kind: "profile",
-  });
-  return (
-    <>
-      <LiquidButton
-        onClick={handleShare}
-        {...warmProps}
-        disabled={disabled}
-        activeColor="blue"
-        groupId="profile-header-actions"
-        title="Compartir perfil"
-        aria-label="Compartir perfil"
-        aria-haspopup="dialog"
-        className={PROFILE_HEADER_BUTTON_CLASS}
-      >
-        <Share2 className="h-[1.375rem] w-[1.375rem] @[640px]/detail-page:h-5 @[640px]/detail-page:w-5" />
-      </LiquidButton>
-      {sheet}
-    </>
-  );
-}
 
 const ChartLoading = ({ className = "h-[280px]" }) => (
   <div className={`${className} w-full animate-pulse rounded-2xl bg-white/[0.035]`} />
@@ -795,7 +746,6 @@ function buildAnalyticsFromPrivateProfile(payload) {
 export default function ProfileClient({ username, initialTab = "profile", routeBase = null }) {
   const { user: viewer } = useAuth();
   // Cerrar sesión pide confirmación, igual que en el resto de páginas de usuario.
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
   // Cabecera compacta: solo en la vista neuronal, para que el lienzo gane alto.
   // Por defecto compacta; la preferencia guardada se aplica antes de pintar.
   const [neuralHeaderCollapsed, setNeuralHeaderCollapsed] = useState(NEURAL_DEFAULTS.headerCollapsed);
@@ -1169,60 +1119,12 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
         <header className={`${entry} sv-profile-entry--header flex flex-wrap items-center gap-3 @[1024px]/detail-page:flex-nowrap @[1024px]/detail-page:justify-between @[1024px]/detail-page:gap-6`}>
           <ProfileAvatar user={user} size="h-16 w-16 shrink-0 @[640px]/detail-page:h-26 @[640px]/detail-page:w-26" />
           <div className="min-w-0 flex-1 text-left">
-            <div className="flex min-w-0 items-center justify-between gap-2 @[1024px]/detail-page:justify-start @[1024px]/detail-page:gap-4">
-              <h1 className="min-w-0 flex-1 truncate text-[clamp(1.35rem,6vw,2rem)] font-black leading-[0.95] tracking-[-0.06em] text-white @[1024px]/detail-page:flex-none @[640px]/detail-page:text-[clamp(2.25rem,4.1vw,3.5rem)]">
-                {user.displayName}<span className="text-emerald-400">.</span>
-              </h1>
-              {isSelf ? (
-                <div className="flex shrink-0 items-center gap-1 @[640px]/detail-page:gap-2" aria-label="Acciones de perfil">
-                  <LiquidButton
-                    onClick={() => window.location.assign("/profile/settings")}
-                    disabled={syncing}
-                    activeColor="teal"
-                    groupId="profile-header-actions"
-                    title="Configuración"
-                    className="!h-11 !w-11 @[640px]/detail-page:!h-12 @[640px]/detail-page:!w-12 !border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent shadow-lg backdrop-blur-md hover:!bg-white/15"
-                  >
-                    <Settings className="h-[1.375rem] w-[1.375rem] @[640px]/detail-page:h-5 @[640px]/detail-page:w-5" />
-                  </LiquidButton>
-                  <ProfileShareButton profile={profile} disabled={syncing} />
-                  <LiquidButton
-                    onClick={() => setRefreshToken((value) => value + 1)}
-                    disabled={syncing}
-                    loading={syncing}
-                    activeColor="green"
-                    groupId="profile-header-actions"
-                    title="Sincronizar"
-                    className="!h-11 !w-11 @[640px]/detail-page:!h-12 @[640px]/detail-page:!w-12 !border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent shadow-lg backdrop-blur-md hover:!bg-white/15"
-                  >
-                    <RotateCcw className={`h-[1.375rem] w-[1.375rem] @[640px]/detail-page:h-5 @[640px]/detail-page:w-5 ${syncing ? "animate-spin" : ""}`} />
-                  </LiquidButton>
-                  <LiquidButton
-                    onClick={() => setShowLogoutModal(true)}
-                    disabled={syncing}
-                    activeColor="red"
-                    groupId="profile-header-actions"
-                    title="Cerrar sesión"
-                    aria-label="Cerrar sesión"
-                    className="!h-11 !w-11 @[640px]/detail-page:!h-12 @[640px]/detail-page:!w-12 !border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent !text-red-400 shadow-lg backdrop-blur-md hover:!bg-white/15 hover:!text-red-300"
-                  >
-                    <LogOut className="h-[1.375rem] w-[1.375rem] @[640px]/detail-page:h-5 @[640px]/detail-page:w-5" />
-                  </LiquidButton>
-                  <LogoutConfirmModal
-                    open={showLogoutModal}
-                    onClose={() => setShowLogoutModal(false)}
-                  />
-                </div>
-              ) : (
-                <div className="flex shrink-0 items-center gap-1 @[640px]/detail-page:gap-2" aria-label="Acciones de perfil">
-                  <ProfileShareButton profile={profile} />
-                  <FollowButton
-                    username={user.username}
-                    initialFollowing={profile.isFollowing}
-                  />
-                </div>
-              )}
-            </div>
+            <ProfileTitleRow
+              profile={profile}
+              isSelf={isSelf}
+              syncing={syncing}
+              onSync={() => setRefreshToken((value) => value + 1)}
+            />
             <div className="mt-0.5 flex min-w-0 items-center gap-2 @[640px]/detail-page:mt-2">
               <p className="min-w-0 truncate text-xs font-semibold tracking-tight text-zinc-500 @[640px]/detail-page:text-sm">@{user.username}</p>
               <PlanBadge plan={user.plan} />
