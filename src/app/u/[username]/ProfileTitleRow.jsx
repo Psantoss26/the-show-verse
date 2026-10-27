@@ -25,6 +25,7 @@ import LogoutConfirmModal from "@/components/auth/LogoutConfirmModal";
 import { useShareAction } from "@/components/details/DetailHeaderBits";
 import LiquidButton from "@/components/LiquidButton";
 import FollowButton from "@/components/social/FollowButton";
+import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { buildProfileShareCard } from "@/lib/profile/shareProfile";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 
@@ -277,7 +278,10 @@ export default function ProfileTitleRow({ profile, isSelf, syncing, onSync }) {
     setMenuOpen(false);
     action();
   };
-  const openSettings = () => window.location.assign("/profile/settings");
+  const router = useRouter();
+  // Navegación del cliente, no recarga: una carga completa enseña la barra de
+  // progreso del navegador mientras llega la página.
+  const openSettings = () => router.push("/profile/settings");
 
   const logoutButton = (
     <LiquidButton

@@ -54,6 +54,7 @@ import "swiper/swiper-bundle.css";
 import LiquidButton from "@/components/LiquidButton";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { COLORS } from "./chartConstants";
 
 const PROFILE_STATS_CACHE_KEY = "showverse:profile:stats:v8";
@@ -933,6 +934,7 @@ function ProfileCardScrollerItem({ children }) {
 }
 
 function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
+  const router = useRouter();
   if (!user) {
     return null;
   }
@@ -948,7 +950,7 @@ function ProfileHero({ user, onSync, onDisconnect, syncing = false }) {
         transition={{ duration: 0.4, delay: 0.25 }}
       >
         <LiquidButton
-          onClick={() => window.location.assign("/profile/settings")}
+          onClick={() => router.push("/profile/settings")}
           disabled={syncing}
           activeColor="teal"
           groupId="profile-header-actions"
