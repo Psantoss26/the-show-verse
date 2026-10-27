@@ -17,12 +17,13 @@
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.TSVFakeDom = api;
 })(typeof self !== "undefined" ? self : this, function () {
-  const ATTR_RE = /\[([\w:-]+)(?:([*^$|~]?=)"([^"]*)")?\]/g;
+  // Admite la marca « i» (sin distinguir mayúsculas), como el DOM real.
+  const ATTR_RE = /\[([\w:-]+)(?:([*^$|~]?=)"([^"]*)"(\s+[iI])?)?\]/g;
 
   function parseSimple(part) {
     const attrs = [];
-    let rest = part.replace(ATTR_RE, (_m, name, op, value) => {
-      attrs.push({ name, op: op || null, value: value ?? null });
+    let rest = part.replace(ATTR_RE, (_m, name, op, value, flag) => {
+      attrs.push({ name, op: op || null, value: value ?? null, insensitive: Boolean(flag) });
       return "";
     });
     const classes = [];
@@ -42,9 +43,13 @@
     const classList = String(node.getAttribute("class") || "").split(/\s+/);
     for (const c of simple.classes) if (!classList.includes(c)) return false;
     for (const a of simple.attrs) {
-      const actual = node.getAttribute(a.name);
+      let actual = node.getAttribute(a.name);
       if (actual == null) return false;
       if (!a.op) continue;
+      if (a.insensitive) {
+        actual = actual.toLowerCase();
+        a.value = String(a.value).toLowerCase();
+      }
       if (a.op === "=" && actual !== a.value) return false;
       if (a.op === "*=" && !actual.includes(a.value)) return false;
       if (a.op === "^=" && !actual.startsWith(a.value)) return false;
@@ -66,10 +71,30 @@
     return index < 0;
   }
 
+  // Separa por espacios (descendencia) salvo dentro de [ ]: `[class*="title" i]`
+  // es UN selector simple.
+  function splitChain(group) {
+    const parts = [];
+    let current = "";
+    let depth = 0;
+    for (const ch of group.trim()) {
+      if (ch === "[") depth += 1;
+      if (ch === "]") depth -= 1;
+      if (/\s/.test(ch) && depth === 0) {
+        if (current) parts.push(current);
+        current = "";
+      } else {
+        current += ch;
+      }
+    }
+    if (current) parts.push(current);
+    return parts;
+  }
+
   function parseSelector(selector) {
     return String(selector)
       .split(",")
-      .map((group) => group.trim().split(/\s+/).filter(Boolean).map(parseSimple))
+      .map((group) => splitChain(group).map(parseSimple))
       .filter((chain) => chain.length > 0);
   }
 

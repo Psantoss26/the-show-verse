@@ -6,28 +6,50 @@ function titleFor(result, mediaType) {
     : result?.title || result?.original_title;
 }
 
-export function pickTmdbResult(results, query, mediaType, { exactOnly = false } = {}) {
+// Año de estreno de un resultado de TMDb, o null.
+function yearOf(item) {
+  const year = Number(String(item?.release_date || item?.first_air_date || "").slice(0, 4));
+  return Number.isInteger(year) && year > 1800 ? year : null;
+}
+
+// Año que da la plataforma (ficha o metadatos), o null si no es creíble.
+function validYear(year) {
+  const n = Number(year);
+  return Number.isInteger(n) && n >= 1880 && n <= 2100 ? n : null;
+}
+
+const sameYear = (item, year) => year != null && yearOf(item) != null && Math.abs(yearOf(item) - year) <= 1;
+
+// Título sin un paréntesis final: TMDb en español titula «Incontrolable (I
+// Swear)» lo que la plataforma llama «Incontrolable».
+const withoutTrailingParenthetical = (title) => String(title || "").replace(/\s*\([^)]*\)\s*$/, "");
+
+/**
+ * ¿Es este resultado EXACTAMENTE el título buscado? Con `year` (el que da la
+ * plataforma) cuenta también el título sin un paréntesis final si el año casa.
+ */
+export function isExactTitle(entity, query, mediaType, { year = null } = {}) {
+  if (!entity) return false;
+  const q = normalizeText(query);
+  const names = [titleFor(entity, mediaType), entity?.original_title || entity?.original_name];
+  if (names.some((name) => normalizeText(name) === q)) return true;
+  return sameYear(entity, validYear(year))
+    && names.some((name) => normalizeText(withoutTrailingParenthetical(name)) === q);
+}
+
+/**
+ * El resultado exacto (y, si hay año, el exacto de ese año antes que otro del
+ * mismo título: «Incontrolable» de 2025 y no la de 2006), o el primero si no
+ * se exige exactitud.
+ */
+export function pickTmdbResult(results, query, mediaType, { exactOnly = false, year = null } = {}) {
   const candidates = Array.isArray(results) ? results.filter((item) => item?.id) : [];
   if (!candidates.length) return null;
 
-  const normalizedQuery = normalizeText(query);
-  const exact = candidates.find(
-    (item) =>
-      normalizeText(titleFor(item, mediaType)) === normalizedQuery ||
-      normalizeText(item?.original_title || item?.original_name) ===
-        normalizedQuery,
-  );
-
-  return exact || (exactOnly ? null : candidates[0]);
-}
-
-export function isExactTitle(entity, query, mediaType) {
-  if (!entity) return false;
-  const q = normalizeText(query);
-  return (
-    normalizeText(titleFor(entity, mediaType)) === q ||
-    normalizeText(entity?.original_title || entity?.original_name) === q
-  );
+  const y = validYear(year);
+  const exact = candidates.filter((item) => isExactTitle(item, query, mediaType, { year: y }));
+  const exactOfYear = y != null ? exact.find((item) => sameYear(item, y)) : null;
+  return exactOfYear || exact[0] || (exactOnly ? null : candidates[0]);
 }
 
 // Umbrales de "plausibilidad" para no confiar ciegamente en un candidato de
@@ -78,9 +100,9 @@ function hasTextualOverlap(entityTitle, query) {
 // (popularidad o votos): un texto de UI mal filtrado puede "casar" con algo en
 // TMDb por relevancia de búsqueda libre, pero rara vez con algo popular Y
 // relacionado textualmente a la vez.
-export function isPlausibleMatch(entity, query, mediaType) {
+export function isPlausibleMatch(entity, query, mediaType, { year = null } = {}) {
   if (!entity) return false;
-  if (isExactTitle(entity, query, mediaType)) return true;
+  if (isExactTitle(entity, query, mediaType, { year })) return true;
   if (!hasTextualOverlap(titleFor(entity, mediaType), query)) return false;
   const popularity = Number(entity.popularity) || 0;
   const voteCount = Number(entity.vote_count) || 0;
@@ -213,8 +235,12 @@ export async function resolveStreamingEntity({
   // al navegar una ficha (resolveOnly): ahí queda `null` y el desempate cae al
   // criterio de popularidad de siempre.
   durationSec = null,
+  // Año de estreno que da la plataforma, si lo da: desempata títulos iguales y
+  // admite «Título (subtítulo)» de TMDb cuando casa.
+  year = null,
   search,
 }) {
+  const opts = { year };
   // Nivel serie (sin episodio conocido): confianza baja, pero SÍ se registra
   // (fallback show-level) en vez de descartarse.
   //
@@ -228,15 +254,25 @@ export async function resolveStreamingEntity({
     mediaType: "tv",
     entity,
     confidence: "low",
-    exact: isExactTitle(entity, query, "tv"),
+    exact: isExactTitle(entity, query, "tv", opts),
   });
+
+  // La plataforma dice con seguridad que es una PELÍCULA (JSON-LD, ruta de la
+  // ficha o metadatos): no se busca entre series.
+  if (expectedMediaType === "movie") {
+    const results = await search("movie");
+    const entity = pickTmdbResult(results, query, "movie", opts);
+    if (!isPlausibleMatch(entity, query, "movie", opts)) return null;
+    const exact = isExactTitle(entity, query, "movie", opts);
+    return { kind: "resolved", mediaType: "movie", entity, exact, confidence: exact ? "high" : "medium" };
+  }
 
   if (expectedMediaType === "tv") {
     const results = await search("tv");
-    const entity = pickTmdbResult(results, query, "tv");
-    if (!isPlausibleMatch(entity, query, "tv")) return null;
+    const entity = pickTmdbResult(results, query, "tv", opts);
+    if (!isPlausibleMatch(entity, query, "tv", opts)) return null;
     // El episodio viene por número (el llamador ya lo parseó) → alta si exacto.
-    const exact = isExactTitle(entity, query, "tv");
+    const exact = isExactTitle(entity, query, "tv", opts);
     return {
       kind: "resolved",
       mediaType: "tv",
@@ -252,17 +288,19 @@ export async function resolveStreamingEntity({
   ]);
   const exactMovie = pickTmdbResult(movieResults, query, "movie", {
     exactOnly: true,
+    year,
   });
   const exactShow = pickTmdbResult(tvResults, query, "tv", {
     exactOnly: true,
+    year,
   });
 
   if (preferTv && (exactShow || (!exactMovie && tvResults.length > 0))) {
-    const candidate = exactShow || pickTmdbResult(tvResults, query, "tv");
+    const candidate = exactShow || pickTmdbResult(tvResults, query, "tv", opts);
     // Con pista de serie (episodio/subtítulo) el candidato EXACTO siempre vale;
     // el candidato SIN exactitud (fallback) solo si es plausible -- si no, cae
     // al resto de la función en vez de forzar una serie sin relación real.
-    if (isPlausibleMatch(candidate, query, "tv")) {
+    if (isPlausibleMatch(candidate, query, "tv", opts)) {
       return showLevel(candidate);
     }
   }
@@ -295,8 +333,8 @@ export async function resolveStreamingEntity({
     // y existe una serie que se llama justo como el título detectado. Con pista de
     // serie (`preferTv`) no se aplica: un episodio largo seguiría siendo episodio.
     if (!preferTv && decideByDuration(durationSec) === "movie") {
-      const movie = pickTmdbResult(movieResults, query, "movie");
-      if (isPlausibleMatch(movie, query, "movie")) {
+      const movie = pickTmdbResult(movieResults, query, "movie", opts);
+      if (isPlausibleMatch(movie, query, "movie", opts)) {
         return {
           kind: "resolved",
           mediaType: "movie",
@@ -323,21 +361,21 @@ export async function resolveStreamingEntity({
     return showLevel(exactShow);
   }
 
-  const movie = pickTmdbResult(movieResults, query, "movie");
-  const show = pickTmdbResult(tvResults, query, "tv");
+  const movie = pickTmdbResult(movieResults, query, "movie", opts);
+  const show = pickTmdbResult(tvResults, query, "tv", opts);
   // Sin título exacto en ningún lado: exigimos que el candidato tenga relación
   // textual real con la consulta Y un mínimo reconocimiento en TMDb. Sin esto,
   // `pickTmdbResult` sin `exactOnly` devuelve el primer resultado de búsqueda
   // libre de TMDb aunque no tenga nada que ver con el texto detectado --causa
   // de notificaciones de ficha sobre títulos irrelevantes.
-  const moviePlausible = isPlausibleMatch(movie, query, "movie");
-  const showPlausible = isPlausibleMatch(show, query, "tv");
+  const moviePlausible = isPlausibleMatch(movie, query, "movie", opts);
+  const showPlausible = isPlausibleMatch(show, query, "tv", opts);
   const asMovie = () => ({
     kind: "resolved",
     mediaType: "movie",
     entity: movie,
-    confidence: isExactTitle(movie, query, "movie") ? "high" : "medium",
-    exact: isExactTitle(movie, query, "movie"),
+    confidence: isExactTitle(movie, query, "movie", opts) ? "high" : "medium",
+    exact: isExactTitle(movie, query, "movie", opts),
   });
 
   // Candidato plausible de película Y de serie: mismo desempate que arriba

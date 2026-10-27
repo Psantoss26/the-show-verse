@@ -154,7 +154,12 @@
    */
   function applyMetadata(signal, meta) {
     if (!signal || !meta) return signal;
-    const out = { ...signal, contentId: meta.videoId || signal.contentId, identitySource: "netflix_metadata" };
+    const out = {
+      ...signal,
+      contentId: meta.videoId || signal.contentId,
+      identitySource: "netflix_metadata",
+      mediaTypeHint: meta.type === "movie" ? "movie" : "tv",
+    };
     if (meta.year) out.releaseYear = meta.year;
     if (meta.type === "movie") {
       out.movieTitle = meta.title;

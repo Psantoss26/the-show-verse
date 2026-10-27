@@ -67,6 +67,7 @@
         "platform-enhancers.js",
         "netflix-source.js",
         "diagnostic-capture.js",
+        "browse-detection.js",
         "content.js"
       ],
       "all_frames": true

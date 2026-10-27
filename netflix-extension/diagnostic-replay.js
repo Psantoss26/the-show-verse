@@ -9,6 +9,7 @@
 const D = require("./detection-core.js");
 const E = require("./platform-enhancers.js");
 const N = require("./netflix-source.js");
+const B = require("./browse-detection.js");
 const { h, doc } = require("./fake-dom.js");
 
 // Árbol de la captura → nodos de fake-dom. Los textos sueltos de un elemento con
@@ -57,15 +58,42 @@ function replaySignal(capture) {
   if (netflixMeta) {
     signal = N.applyMetadata({ ...signal, contentId: netflixMeta.videoId || signal.contentId }, netflixMeta);
   }
-  return D.fillMissingTitles(signal, {
+  const filled = D.fillMissingTitles(signal, {
     doc: document,
     tabTitle: page.tabTitle || "",
     platformName: capture?.platform?.name || "",
   });
+  return B.enrichPlaybackSignal(filled, replayBrowse(capture));
+}
+
+/**
+ * La señal de FICHA que produce el código ACTUAL con lo que vio el navegador
+ * (browse-detection.js), con la medida de cada candidato a título guardada en la
+ * captura.
+ */
+function replayBrowse(capture) {
+  const page = capture?.page || {};
+  const num = (node, name, fallback) => {
+    const value = Number(node.getAttribute(name));
+    return Number.isFinite(value) && node.getAttribute(name) != null ? value : fallback;
+  };
+  return B.detectBrowsingSignal({
+    doc: captureToDoc(capture),
+    href: page.url || "",
+    platformId: capture?.platform?.id || "",
+    platformName: capture?.platform?.name || "",
+    viewportHeight: page.viewport?.height || 1080,
+    measure: (node) => ({
+      top: num(node, "data-tsv-top", 80),
+      width: num(node, "data-tsv-w", 400),
+      height: num(node, "data-tsv-h", 40),
+      fontSize: num(node, "data-tsv-fs", 0),
+    }),
+  });
 }
 
 // Campos de la señal que deciden la identidad (lo que se compara en las pruebas).
-const IDENTITY_FIELDS = ["showName", "movieTitle", "episodeName", "season", "episode", "contentId", "absoluteEpisode", "seasonEpisodeIndex"];
+const IDENTITY_FIELDS = ["mainTitle", "showName", "movieTitle", "episodeName", "season", "episode", "contentId", "absoluteEpisode", "seasonEpisodeIndex", "mediaTypeHint", "releaseYear"];
 
 function identity(signal) {
   const out = {};
@@ -75,7 +103,101 @@ function identity(signal) {
   return out;
 }
 
-module.exports = { toFake, captureToDoc, replaySignal, identity, IDENTITY_FIELDS };
+// Lo que lee la detección de una página: si una captura conserva estos nodos (y
+// sus antepasados, con sus atributos), la reproducción da la misma señal.
+function relevantSelectors(platformId) {
+  const refiner = (E.REFINERS || []).flatMap((r) => [...(r.titleSel || []), ...(r.subSel || []), ...(r.seSel || [])]);
+  return [
+    'script[type="application/ld+json"]',
+    "meta",
+    "video",
+    "h1, h2, [data-testid*=\"title\" i], [class*=\"title\" i]",
+    '[id^="av-ep-episode-"]',
+    ...(B.TITLE_SELECTORS[platformId] || []),
+    ...refiner,
+  ];
+}
+
+/**
+ * Versión reducida de una captura para guardarla como prueba: solo los campos
+ * que usa la reproducción y, del DOM, lo que lee la detección (resto de textos
+ * fuera). Así no se guarda texto ajeno de la página que no hace falta.
+ */
+function slimCapture(capture, expected) {
+  const page = capture?.page || {};
+  const document = captureToDoc(capture);
+  const keep = new Set();
+  for (const selector of relevantSelectors(capture?.platform?.id)) {
+    let nodes = [];
+    try {
+      nodes = document.querySelectorAll(selector);
+    } catch {
+      continue;
+    }
+    for (const node of nodes) {
+      keep.add(node);
+      const stack = [...node.children];
+      while (stack.length) {
+        const child = stack.pop();
+        keep.add(child);
+        stack.push(...child.children);
+      }
+      for (let up = node.parentNode; up; up = up.parentNode) keep.add(up);
+    }
+  }
+  // fake-dom → árbol de la captura, solo con los nodos que se conservan. Un
+  // antepasado conserva sus atributos pero no sus textos sueltos.
+  const toTree = (node) => {
+    if (node.tagName === "#TEXT") return keep.has(node.parentNode) && keepsText(node.parentNode) ? { x: node.textContent } : null;
+    if (!keep.has(node)) return null;
+    const attrs = { ...node._attrs };
+    if (attrs.hidden === true) {
+      delete attrs.hidden;
+      attrs["data-tsv-hidden"] = "1";
+    }
+    const own = node.children.length ? node.children.map(toTree).filter(Boolean) : (keepsText(node) && node._text ? [{ x: node._text }] : []);
+    return { t: node.tagName.toLowerCase(), a: attrs, c: own };
+  };
+  // Un nodo guarda su texto solo si es él mismo (o un descendiente) de lo leído.
+  const leaves = new Set();
+  for (const selector of relevantSelectors(capture?.platform?.id)) {
+    try {
+      for (const node of document.querySelectorAll(selector)) {
+        const stack = [node];
+        while (stack.length) {
+          const n = stack.pop();
+          leaves.add(n);
+          stack.push(...n.children);
+        }
+      }
+    } catch {
+      /* selector no soportado */
+    }
+  }
+  function keepsText(node) {
+    return leaves.has(node);
+  }
+  const root = document.children[0];
+  const out = {
+    captureVersion: capture?.captureVersion,
+    platform: capture?.platform,
+    page: {
+      host: page.host,
+      url: page.url,
+      tabTitle: page.tabTitle,
+      mediaSession: page.mediaSession || null,
+      video: page.video || null,
+      viewport: page.viewport || null,
+      dom: { tree: root ? toTree(root) : null },
+    },
+    detection: { browse: capture?.detection?.browse || null, signal: capture?.detection?.signal || null },
+  };
+  if (capture?.netflix?.metadata) out.netflix = { metadata: capture.netflix.metadata };
+  if (expected) out.expected = expected;
+  return out;
+}
+
+module.exports = { toFake, captureToDoc, replaySignal, replayBrowse, slimCapture, identity, IDENTITY_FIELDS };
 
 if (require.main === module) {
   const fs = require("node:fs");
@@ -85,10 +207,9 @@ if (require.main === module) {
     process.exit(1);
   }
   const capture = JSON.parse(fs.readFileSync(file, "utf8"));
-  const replayed = identity(replaySignal(capture));
-  // Sin reproducción, lo que se envió fue la señal de la FICHA (content.js →
-  // detectBrowsingSignal), que no se reproduce aquí.
+  // Sin reproducción, lo que se envió fue la señal de la FICHA.
   const playing = Boolean(capture?.detection?.signal);
+  const replayed = identity(playing ? replaySignal(capture) : replayBrowse(capture));
   const captured = identity(playing ? capture.detection.signal : capture?.detection?.browse);
   console.log(`${capture?.platform?.name || "?"} · ${capture?.page?.url || ""}`);
   console.log(playing ? "Detectado en el navegador (reproducción):" : "Detectado en el navegador (ficha):", captured);

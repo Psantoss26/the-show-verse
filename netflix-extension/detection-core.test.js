@@ -159,13 +159,29 @@ test("detectFromJsonLd soporta @graph, TVSeries y Movie", () => {
       { textContent: JSON.stringify({ "@graph": [{ "@type": "TVSeries", name: "The Boys" }] }) },
     ],
   };
-  assert.deepEqual(D.detectFromJsonLd(series), { mediaType: "tv", showName: "The Boys" });
+  assert.deepEqual(D.detectFromJsonLd(series), { mediaType: "tv", showName: "The Boys", year: null });
   const movie = {
     querySelectorAll: () => [
       { textContent: JSON.stringify([{ "@type": "Movie", name: "Napoleón" }]) },
     ],
   };
-  assert.deepEqual(D.detectFromJsonLd(movie), { mediaType: "movie", movieTitle: "Napoleón" });
+  assert.deepEqual(D.detectFromJsonLd(movie), { mediaType: "movie", movieTitle: "Napoleón", year: null });
+});
+
+test("detectFromJsonLd: año de estreno y temporada en el nombre (RTVE Play)", () => {
+  const ld = (data) => ({ querySelectorAll: () => [{ textContent: JSON.stringify(data) }] });
+  // Movistar+: datePublished «2025»; RTVE: «2025-12-20».
+  assert.equal(D.detectFromJsonLd(ld({ "@type": "Movie", name: "Incontrolable", datePublished: "2025" })).year, 2025);
+  assert.equal(D.detectFromJsonLd(ld({ "@type": "Movie", name: "Cafarnaúm", datePublished: "2025-12-20" })).year, 2025);
+  // RTVE Play da la temporada solo en su nombre, sin seasonNumber.
+  const episode = D.detectFromJsonLd(ld({
+    "@type": "TVEpisode", name: "Al cielo con Paloma del Río", episodeNumber: 4,
+    partOfSeason: { "@type": "TVSeason", name: "Temporada 4" }, partOfSeries: { name: "Al cielo con ella" },
+  }));
+  assert.deepEqual([episode.showName, episode.season, episode.episode], ["Al cielo con ella", 4, 4]);
+  // Un seasonNumber ausente no es la temporada 0.
+  const noSeason = D.detectFromJsonLd(ld({ "@type": "TVEpisode", name: "X", episodeNumber: 2, partOfSeries: { name: "Y" } }));
+  assert.equal(noSeason.season, null);
 });
 
 test("detectFromJsonLd es tolerante (null sin datos / JSON inválido)", () => {

@@ -193,6 +193,12 @@
         if (!it || typeof it !== "object") continue;
         const type = String(it["@type"] || "").toLowerCase();
         const name = clean(it.name);
+        // Año de estreno (datePublished «2025» o «2025-12-20»…), si lo hay.
+        const yearOf = (v) => {
+          const y = Number(String(v == null ? "" : v).slice(0, 4));
+          return Number.isInteger(y) && y >= 1880 && y <= 2100 ? y : null;
+        };
+        const year = yearOf(it.datePublished) ?? yearOf(it.dateCreated) ?? yearOf(it.startDate);
         if (type.includes("tvepisode")) {
           const series =
             clean(it.partOfSeries && it.partOfSeries.name) ||
@@ -201,25 +207,33 @@
                 it.partOfSeason.partOfSeries &&
                 it.partOfSeason.partOfSeries.name,
             );
-          const seasonNum = Number(
-            (it.partOfSeason && it.partOfSeason.seasonNumber) ??
-              it.seasonNumber,
-          );
-          const episodeNum = Number(it.episodeNumber);
+          const positive = (v) => {
+            const n = Number(v);
+            return Number.isInteger(n) && n > 0 ? n : null;
+          };
+          // Algunas plataformas (RTVE Play) solo dan la temporada en su NOMBRE
+          // («Temporada 4»), sin seasonNumber.
+          const seasonName = clean(it.partOfSeason && it.partOfSeason.name);
+          const seasonNum =
+            positive(it.partOfSeason && it.partOfSeason.seasonNumber) ??
+            positive(it.seasonNumber) ??
+            positive((seasonName.match(/^(?:temporada|season|staffel|saison|stagione)\s+(\d+)$/i) || [])[1]);
+          const episodeNum = positive(it.episodeNumber);
           if (!series && !name) continue;
           return {
             mediaType: "tv",
             showName: series || undefined,
             episodeName: name || undefined,
-            season: Number.isFinite(seasonNum) ? seasonNum : null,
-            episode: Number.isFinite(episodeNum) ? episodeNum : null,
+            season: seasonNum,
+            episode: episodeNum,
+            year: yearOf(it.partOfSeries && it.partOfSeries.datePublished),
           };
         }
         if ((type.includes("tvseries") || type.includes("tvseason")) && name) {
-          return { mediaType: "tv", showName: name };
+          return { mediaType: "tv", showName: name, year };
         }
         if ((type.includes("movie") || type === "videoobject") && name) {
-          return { mediaType: "movie", movieTitle: name };
+          return { mediaType: "movie", movieTitle: name, year };
         }
       }
     }

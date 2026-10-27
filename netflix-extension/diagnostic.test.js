@@ -14,6 +14,7 @@ const D = require("./detection-core.js");
 const E = require("./platform-enhancers.js");
 const X = require("./diagnostic-capture.js");
 const R = require("./diagnostic-replay.js");
+const B = require("./browse-detection.js");
 const { h, doc } = require("./fake-dom.js");
 
 test("la URL guarda la ruta y solo los parámetros que identifican el contenido", () => {
@@ -82,7 +83,10 @@ function direct({ host, url, tabTitle, nodes, mediaSession = null, duration = 36
   const signal = D.composePlaybackSignal({
     host, url, mediaSession, tabTitle, durationSec: duration, positionSec: 600, doc: document, enhance: E.enhance,
   });
-  return D.fillMissingTitles(signal, { doc: document, tabTitle, platformName: name });
+  const filled = D.fillMissingTitles(signal, { doc: document, tabTitle, platformName: name });
+  // Igual que content.js: completada con la ficha de la misma página.
+  const platformId = host.split(".").slice(-2, -1)[0];
+  return B.enrichPlaybackSignal(filled, B.detectBrowsingSignal({ doc: document, href: url, platformId, platformName: name }));
 }
 
 const CASES = [
@@ -138,18 +142,73 @@ test("los textos sueltos entre elementos se conservan al reproducir", () => {
 });
 
 // ── Capturas reales ──────────────────────────────────────────────────────────
-// Cada fichero de diagnostics/ es una captura hecha con «Capturar diagnóstico».
-// Con `expected` (lo que DEBERÍA detectarse: showName/movieTitle, season, episode…)
-// se comprueba que el código actual lo detecta.
+// Cada fichero de diagnostics/ es una captura real (reducida con slimCapture) con
+// `expected`, lo que DEBE detectarse:
+//   - kind "none": no es una ficha (portada, listado): ninguna señal;
+//   - kind "detail": ficha; cada campo indicado (mainTitle, showName/movieTitle,
+//     season, episode, mediaTypeHint, releaseYear) debe salir igual;
+//   - kind "playback": reproducción; ídem con la señal de reproducción.
 const dir = path.join(__dirname, "diagnostics");
-const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith(".json")) : [];
+const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith(".json")).sort() : [];
 for (const file of files) {
   const capture = JSON.parse(fs.readFileSync(path.join(dir, file), "utf8"));
   if (!capture.expected) continue;
-  test(`captura real ${file}: ${capture.platform?.name || "?"}`, () => {
-    const got = R.identity(R.replaySignal(capture));
-    for (const [key, value] of Object.entries(capture.expected)) {
+  const { kind = "detail", ...fields } = capture.expected;
+  test(`captura real ${file}: ${capture.platform?.name || "?"} (${kind})`, () => {
+    const got = kind === "playback" ? R.replaySignal(capture) : R.replayBrowse(capture);
+    if (kind === "none") {
+      assert.equal(got, null, `no es una ficha, pero se detectó ${JSON.stringify(got)}`);
+      return;
+    }
+    assert.ok(got, "no se detectó nada");
+    for (const [key, value] of Object.entries(fields)) {
       assert.deepEqual(got[key], value, `${key}: ${JSON.stringify(got)}`);
+    }
+    // Lo que no se espera tampoco debe aparecer (p. ej. una serie que pasa a película).
+    for (const key of ["showName", "movieTitle", "season", "episode", "mediaTypeHint"]) {
+      if (!(key in fields)) assert.ok(got[key] == null || got[key] === "", `${key} inesperado: ${JSON.stringify(got)}`);
     }
   });
 }
+
+// ── Reproducción en la propia ficha (browse-detection.enrichPlaybackSignal) ────
+// Fichas REALES de episodio con un vídeo sonando: la Media Session solo dice el
+// nombre del episodio, como hacen estos reproductores.
+function playingOn(file, mediaSession) {
+  const capture = JSON.parse(fs.readFileSync(path.join(dir, file), "utf8"));
+  return { ...capture, page: { ...capture.page, mediaSession, video: { currentTime: 600, duration: 2700 } } };
+}
+
+test("reproducción en una ficha de episodio real: serie, temporada y episodio salen de la ficha (RTVE Play)", () => {
+  const signal = R.replaySignal(playingOn("ficha-rtve-episodio-al-cielo-con-ella-t4e4.json", { title: "Al cielo con Paloma del Río, Ana Torrent, María León y Javier Giner" }));
+  assert.deepEqual(
+    [signal.showName, signal.season, signal.episode, signal.mediaTypeHint, signal.movieTitle],
+    ["Al cielo con ella", 4, 4, "tv", undefined],
+  );
+});
+
+test("reproducción en una ficha de episodio real: Atresplayer", () => {
+  const signal = R.replaySignal(playingOn("ficha-atresplayer-episodio-a-la-deriva-t1e6.json", { title: "Capítulo 6" }));
+  assert.deepEqual([signal.showName, signal.season, signal.episode, signal.mediaTypeHint], ["A la deriva", 1, 6, "tv"]);
+});
+
+test("reproducción en una ficha de película real: título limpio, tipo y año (Rakuten TV)", () => {
+  const signal = R.replaySignal(playingOn("ficha-rakuten-pelicula-insidious.json", null));
+  assert.deepEqual([signal.movieTitle, signal.mediaTypeHint, signal.releaseYear], ["Insidious", "movie", 2010]);
+});
+
+test("enrichPlaybackSignal no pisa al reproductor ni a los metadatos de Netflix", () => {
+  const browseMovie = { mainTitle: "Dune", movieTitle: "Dune", mediaTypeHint: "movie", releaseYear: 2021 };
+  // El reproductor dice serie: la ficha de película no la convierte.
+  const series = B.enrichPlaybackSignal({ showName: "Dune: La profecía", episode: 1 }, browseMovie);
+  assert.deepEqual([series.showName, series.movieTitle, series.mediaTypeHint], ["Dune: La profecía", undefined, undefined]);
+  // Título de la pestaña con relleno → el limpio de la ficha.
+  assert.equal(B.enrichPlaybackSignal({ movieTitle: "Ver Dune gratis en línea" }, browseMovie).movieTitle, "Dune");
+  // Otra película distinta: no se toca.
+  assert.equal(B.enrichPlaybackSignal({ movieTitle: "Arrival" }, browseMovie).movieTitle, "Arrival");
+  assert.equal(B.enrichPlaybackSignal({ movieTitle: "Arrival" }, browseMovie).mediaTypeHint, undefined);
+  // Netflix con metadatos: intacta.
+  const netflix = { showName: "Dark", identitySource: "netflix_metadata" };
+  assert.equal(B.enrichPlaybackSignal(netflix, { mainTitle: "X", showName: "X", mediaTypeHint: "tv" }), netflix);
+  assert.equal(B.enrichPlaybackSignal({ movieTitle: "Dune" }, null).movieTitle, "Dune");
+});

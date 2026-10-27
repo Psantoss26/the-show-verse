@@ -287,7 +287,7 @@ const DETECTION_SIGNAL_FIELDS = [
   "tabTitle", "queueTitle", "albumArtist", "notifTitle", "notifText", "notifSubText",
   "season", "episode", "durationSec", "seriesFromHint", "screenTitles",
   // De dónde salió la identidad (p. ej. "netflix_metadata") y el año que la acompaña.
-  "identitySource", "releaseYear", "absoluteEpisode", "seasonEpisodeIndex",
+  "identitySource", "releaseYear", "absoluteEpisode", "seasonEpisodeIndex", "mediaTypeHint",
 ];
 function detectionSignal(body) {
   const signal = {};
@@ -601,6 +601,14 @@ export async function POST(request) {
     // no traen ningún número de episodio.
     const hasEpisodeNumber =
       episodeFromEvidence != null || (Number.isInteger(episodeIn) && episodeIn > 0);
+    // Año de estreno y tipo SEGURO que da la plataforma (JSON-LD o ruta de la
+    // ficha, metadatos de Netflix). Con «película» no se busca entre series; el
+    // año desempata títulos iguales («Incontrolable» de 2025, no la de 2006).
+    const releaseYearNum = Number(payload.releaseYear);
+    const releaseYear = Number.isInteger(releaseYearNum) && releaseYearNum >= 1880 && releaseYearNum <= 2100
+      ? releaseYearNum
+      : null;
+    const movieHint = payload.mediaTypeHint === "movie" && clientSaysMovie;
     const requireExactMatch = !showName && (isTv || hasEpisodeNumber);
     let resolution = null;
     let fallback = null;
@@ -642,9 +650,10 @@ export async function POST(request) {
     for (const variant of resolution ? [] : rankedVariants) {
       const candidate = await resolveStreamingEntity({
         query: variant.query,
-        expectedMediaType: episode != null ? "tv" : null,
+        expectedMediaType: episode != null ? "tv" : movieHint ? "movie" : null,
         preferTv: isTv,
         durationSec: safeDurationSec,
+        year: releaseYear,
         search: (type) => searchCandidates(variant.query, type),
       });
       if (!candidate) continue;
@@ -683,6 +692,7 @@ export async function POST(request) {
           expectedMediaType: episode != null ? "tv" : null,
           preferTv: true,
           durationSec: safeDurationSec,
+          year: releaseYear,
           search: (type) => searchCandidates(screenQuery, type),
         });
         if (!candidate?.exact || candidate.mediaType !== "tv") continue;

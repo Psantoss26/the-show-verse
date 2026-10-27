@@ -87,184 +87,35 @@
   // Textos marcados como «no había ninguna ficha» (ver background.js).
   let learnedNotATitle = null;
 
-  // Páginas genéricas del catálogo (no son la ficha de un título): no resolver.
-  const GENERIC_TITLES = new Set(
-    [
-      "inicio", "home", "browse", "explorar", "explora", "mi lista", "my list",
-      "películas", "peliculas", "movies", "series", "tv shows", "programas de tv",
-      "novedades", "new", "buscar", "search", "mi netflix", "próximamente",
-      "proximamente", "descargas", "downloads", "categorías", "categorias",
-      "originales", "populares", "tendencias", "trending", "watch", "ver",
-      "prime video", "index",
-    ].map((s) => s.toLowerCase()),
-  );
-
-  // Patrones de URL que indican que estás en la FICHA de un título (no en el home
-  // ni buscando). Evita falsos positivos con títulos destacados del catálogo. Si
-  // no hay patrón para la plataforma, no se filtra por URL.
-  const DETAILS_URL_RE = {
-    netflix: /\/title\/\d+|[?&#]jbv=\d+/i,
-    primevideo: /\/detail\//i,
-    amazon: /\/detail\//i,
-    max: /\/(show|movie|series|video|episode|feature)\//i,
-    hbomax: /\/(show|movie|series|video|episode|feature)\//i,
-    disney: /\/(movies|series|browse\/entity|play)\//i,
-    crunchyroll: /\/series\/|\/watch\//i,
-    disneyplus: /\/(movies|series|browse\/entity|play)\//i,
-  };
-
-  // Selectores del título en la FICHA por plataforma. Se lee del DOM VISIBLE (que
-  // refleja el título ACTUAL), no de og:title (que queda obsoleto en los SPA y
-  // provocaba resultados sin relación, p. ej. "PFL Europa 1"). Se lee el texto o
-  // el alt de una imagen-logo. Se añade <h1> como respaldo universal.
-  const DETAILS_TITLE_SELECTORS = {
-    netflix: [
-      '[data-uia="previewModal--player-titleTreatment-logo"]',
-      '[data-uia="title-card-title"]',
-      ".title-info-metadata-item--title",
-      ".previewModal--section-header strong",
-    ],
-    primevideo: [
-      'h1[data-automation-id="title"]',
-      '[data-automation-id="title"]',
-      ".dv-node-dp-title",
-    ],
-    amazon: [
-      'h1[data-automation-id="title"]',
-      '[data-automation-id="title"]',
-      ".dv-node-dp-title",
-    ],
-    max: [
-      '[data-testid="dragonfly-title"]',
-      '[data-testid="detail-page-title"]',
-    ],
-    hbomax: ['[data-testid="dragonfly-title"]'],
-    disney: ['[data-testid="hero-title"]', ".title-field"],
-    disneyplus: ['[data-testid="hero-title"]', ".title-field"],
-    crunchyroll: ["h1.erc-series-title", "h1.title", ".hero-heading"],
-  };
-
-  function cleanTitleCandidate(t) {
-    return D.stripPlatformPrefix(t || "", [platformName]);
-  }
-  function isValidBrowseTitle(t) {
-    if (!t || t.length < 2 || t.length > 120) return false;
-    if (isBarePlatformName(t)) return false;
-    if (GENERIC_TITLES.has(t.toLowerCase())) return false;
-    return true;
-  }
-  // Texto del nodo o, si es un logo, el alt de la imagen (el propio nodo o hija).
-  function textOrAlt(node) {
-    let txt = (node.textContent || "").replace(/\s+/g, " ").trim();
-    if (!txt && node.getAttribute) txt = (node.getAttribute("alt") || "").trim();
-    if (!txt && node.querySelector) {
-      const img = node.querySelector("img[alt]");
-      if (img) txt = (img.getAttribute("alt") || "").trim();
-    }
-    return txt;
-  }
-
-  // Encabezado más prominente y VISIBLE cerca de la parte superior. Agnóstico a la
-  // plataforma: cubre HBO Max y cualquier web sin selector propio. Elige el
-  // candidato válido con mayor tamaño de fuente y más arriba (el título de la ficha).
-  function detectTitleFromHeadings() {
-    let best = "";
-    let bestScore = -1;
-    let nodes;
-    try {
-      nodes = document.querySelectorAll(
-        'h1, h2, [data-testid*="title" i], [class*="title" i]',
-      );
-    } catch (e) {
-      return "";
-    }
-    const limit = Math.min(nodes.length, 500);
-    const vh = self.innerHeight || 1080;
-    for (let i = 0; i < limit; i += 1) {
-      const node = nodes[i];
-      if (node.getClientRects().length === 0) continue; // no renderizado/oculto
-      const rect = node.getBoundingClientRect();
-      if (rect.width < 40 || rect.height < 14) continue;
-      if (rect.top > vh * 0.9 || rect.top < -200) continue; // fuera de zona útil
-      const t = cleanTitleCandidate(textOrAlt(node));
-      if (!isValidBrowseTitle(t)) continue;
-      let fontSize = 0;
+  // Señal de la FICHA que se está viendo (navegando, sin reproducir): título y,
+  // si la página lo dice, tipo, serie y temporada/episodio. Ver browse-detection.js.
+  const B = self.TSVBrowse;
+  // Durante la reproducción se usa cada 2 s para completar la señal: se recalcula
+  // como mucho cada 10 s o al cambiar de página (recorre el DOM).
+  let browseCache = null;
+  function cachedBrowsingSignal() {
+    const now = Date.now();
+    if (!browseCache || browseCache.href !== location.href || now - browseCache.at > 10000) {
+      let value = null;
       try {
-        fontSize = parseFloat(getComputedStyle(node).fontSize) || 0;
-      } catch (e) {
-        fontSize = 0;
+        value = detectBrowsingSignal();
+      } catch {
+        value = null;
       }
-      const score = fontSize * 2 - rect.top / 60;
-      if (score > bestScore) {
-        bestScore = score;
-        best = t;
-      }
+      browseCache = { href: location.href, at: now, value };
     }
-    return best;
+    return browseCache.value;
   }
-
-  // Título de la FICHA que se está viendo (navegando, SIN reproducir). Criterio
-  // sólido: solo en URLs de ficha; (1) selector propio de la plataforma, (2)
-  // encabezado más prominente del DOM, (3) título de pestaña. Nunca og:title.
-  function detectBrowsingTitle() {
-    const urlRe = DETAILS_URL_RE[platformId];
-    if (urlRe && !urlRe.test(location.href)) return "";
-
-    // 1. Selectores específicos de la plataforma (precisos cuando existen).
-    const selectors = DETAILS_TITLE_SELECTORS[platformId] || [];
-    for (const sel of selectors) {
-      let nodes;
-      try {
-        nodes = document.querySelectorAll(sel);
-      } catch (e) {
-        continue;
-      }
-      for (const node of nodes) {
-        const t = cleanTitleCandidate(textOrAlt(node));
-        if (isValidBrowseTitle(t)) return t;
-      }
-    }
-
-    // 2. Encabezado más prominente (universal; robusto para HBO Max y otros).
-    const heading = detectTitleFromHeadings();
-    if (heading) return heading;
-
-    // 3. Último recurso: título de la pestaña (NUNCA og:title: queda obsoleto).
-    const fromTab = cleanTitleCandidate(document.title);
-    return isValidBrowseTitle(fromTab) ? fromTab : "";
-  }
-
-  // Señal RICA de la ficha: además del título, intenta obtener el nombre de la
-  // SERIE + temporada/episodio de los datos estructurados JSON-LD (Prime/Max los
-  // exponen), lo que permite resolver el EPISODIO correcto (no solo la serie) sin
-  // reproducir. Cae al título por selector/encabezado/pestaña y, en último recurso,
-  // a og:title. Solo actúa en URLs de ficha (evita falsos positivos en la home).
   function detectBrowsingSignal() {
-    const urlRe = DETAILS_URL_RE[platformId];
-    if (urlRe && !urlRe.test(location.href)) return null;
-
-    // 1. JSON-LD (schema.org): fiable y estructurado (serie + T/E).
-    const ld = D.detectFromJsonLd(document);
-    if (ld) {
-      const main = cleanTitleCandidate(ld.showName || ld.movieTitle || ld.episodeName);
-      if (isValidBrowseTitle(main)) {
-        return {
-          mainTitle: main,
-          showName: ld.showName ? cleanTitleCandidate(ld.showName) : "",
-          episodeName: ld.episodeName || "",
-          season: ld.season != null ? ld.season : undefined,
-          episode: ld.episode != null ? ld.episode : undefined,
-        };
-      }
-    }
-
-    // 2. Título por selector propio / encabezado / pestaña (lógica existente).
-    const title = detectBrowsingTitle();
-    if (title) return { mainTitle: title };
-
-    // 3. Último recurso: og:title (mejor que nada para Prime/Max si todo lo demás falla).
-    const og = cleanTitleCandidate(D.detectFromMeta(document));
-    return isValidBrowseTitle(og) ? { mainTitle: og } : null;
+    if (!B) return null;
+    return B.detectBrowsingSignal({
+      doc: document,
+      href: location.href,
+      platformId,
+      platformName,
+      isBareName: isBarePlatformName,
+      viewportHeight: self.innerHeight || 1080,
+    });
   }
 
   // Muestra el indicador de acceso rápido para la FICHA actual, resolviendo el
@@ -287,6 +138,10 @@
           platformName,
           mainTitle: title,
           showName: sig.showName || "",
+          // Película según la ficha (JSON-LD o ruta): el servidor no la busca como serie.
+          movieTitle: sig.movieTitle || "",
+          releaseYear: sig.releaseYear || undefined,
+          mediaTypeHint: sig.mediaTypeHint || undefined,
           episodeName: sig.episodeName || "",
           season: sig.season,
           episode: sig.episode,
@@ -902,7 +757,13 @@
         mediaSession,
         video: DX.describeVideo(video && !video.error ? video : null),
         videoCount: safe(() => document.querySelectorAll("video").length),
-        dom: safe(() => DX.serializeDom(document.documentElement)),
+        viewport: { width: self.innerWidth, height: self.innerHeight },
+        dom: safe(() => DX.serializeDom(document.documentElement, {
+          measure: (node) => {
+            const rect = node.getBoundingClientRect();
+            return { top: rect.top, width: rect.width, height: rect.height, fontSize: parseFloat(getComputedStyle(node).fontSize) || 0 };
+          },
+        })),
       },
       detection: {
         // La señal se construye ahora mismo, con el mismo código del sondeo.
@@ -998,11 +859,13 @@
     }
 
     // Completa por JSON-LD y, en último recurso, por el título de la pestaña.
-    return D.fillMissingTitles(signal, {
+    const filled = D.fillMissingTitles(signal, {
       doc: document,
       tabTitle: document.title,
       platformName,
     });
+    // Y con la ficha de la misma página (tipo, año, serie y números), si la hay.
+    return B ? B.enrichPlaybackSignal(filled, cachedBrowsingSignal()) : filled;
   }
 
   // Envía el progreso (posición/duración) del contenido ya resuelto, como mucho

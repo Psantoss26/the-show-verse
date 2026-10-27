@@ -27,13 +27,14 @@
 
   // Parámetros de URL que identifican el contenido (el resto puede llevar ids de
   // sesión o de seguimiento y se sustituye por «…»).
-  const URL_PARAM_ALLOW = new Set(["gti", "key", "autoplay", "t", "episode", "season", "trackId"]);
+  const URL_PARAM_ALLOW = new Set(["gti", "key", "autoplay", "t", "episode", "season", "trackId", "jbv", "content_type", "content_id", "id", "tipo"]);
 
   // Atributos que sirven para leer el título: clases, ids, roles, etiquetas
   // accesibles y data-* (data-uia, data-testid…). Nada de src, style ni eventos.
   const ATTR_ALLOW = new Set(["class", "id", "role", "aria-label", "aria-hidden", "title", "alt", "lang", "datetime", "type", "property", "name", "content", "href"]);
 
-  const SKIP_TAGS = new Set(["style", "noscript", "svg", "path", "link", "template", "canvas", "iframe", "source", "track", "picture"]);
+  // <picture> NO: dentro va el <img> con el alt del logo-título (Apple TV+, Prime).
+  const SKIP_TAGS = new Set(["style", "noscript", "svg", "path", "link", "template", "canvas", "iframe", "source", "track"]);
 
   // Metas públicas que leen la detección o que ayudan a diagnosticar.
   const META_RE = /^(og:|twitter:|apple:|video:|al:|title$|description$)/i;
@@ -82,7 +83,12 @@
    * elementos y { x: texto } para los textos. Se descartan las ramas sin texto ni
    * etiquetas accesibles. `stats.truncated` avisa si se llegó a algún límite.
    */
-  function serializeDom(rootEl, { maxNodes = MAX_NODES, shadow = true } = {}) {
+  // Candidatos a título de una ficha (los mismos que mira browse-detection.js):
+  // de ellos se guarda su medida para reproducir la elección del encabezado.
+  const isTitleCandidate = (tag, attrs) =>
+    tag === "h1" || tag === "h2" || /title/i.test(`${attrs.class || ""} ${attrs["data-testid"] || ""}`);
+
+  function serializeDom(rootEl, { maxNodes = MAX_NODES, shadow = true, measure = null } = {}) {
     const stats = { nodes: 0, truncated: false };
 
     const walk = (node, depth) => {
@@ -124,6 +130,17 @@
       stats.nodes += 1;
       // Marca propia (no el atributo `hidden` de la página): sin cajas visibles.
       if (!isVisible(node)) attrs["data-tsv-hidden"] = "1";
+      else if (measure && isTitleCandidate(tag, attrs)) {
+        try {
+          const m = measure(node);
+          attrs["data-tsv-top"] = String(Math.round(m.top));
+          attrs["data-tsv-w"] = String(Math.round(m.width));
+          attrs["data-tsv-h"] = String(Math.round(m.height));
+          attrs["data-tsv-fs"] = String(Math.round(m.fontSize * 10) / 10);
+        } catch {
+          /* sin medida: la reproducción usa la de fake-dom */
+        }
+      }
       const children = [];
       for (const child of Array.from(node.childNodes || [])) {
         const out = walk(child, depth + 1);

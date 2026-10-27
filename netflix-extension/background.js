@@ -314,7 +314,7 @@ function ensureActivityAlarm() {
 }
 
 // ── Sitios de streaming añadidos por el usuario (content scripts dinámicos) ──
-const CUSTOM_SITE_JS = ["sync-reliability.js", "detection-core.js", "platform-enhancers.js", "diagnostic-capture.js", "content.js"];
+const CUSTOM_SITE_JS = ["sync-reliability.js", "detection-core.js", "platform-enhancers.js", "browse-detection.js", "diagnostic-capture.js", "content.js"];
 
 function customSiteScriptId(origin) {
   let host = origin;
@@ -727,6 +727,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       releaseYear,
       absoluteEpisode,
       seasonEpisodeIndex,
+      mediaTypeHint,
     } = message;
     if (!resolveOnly) {
       addLog(`Reproducción detectada en ${platformName || platform || "streaming"}: "${mainTitle}"`, "info");
@@ -781,6 +782,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           absoluteEpisode: absoluteEpisode || undefined,
           // Posición dentro de su temporada en la plataforma.
           seasonEpisodeIndex: seasonEpisodeIndex || undefined,
+          // Tipo seguro según la plataforma ("movie" | "tv").
+          mediaTypeHint: mediaTypeHint || undefined,
         }),
         credentials: "omit"
       })
@@ -813,7 +816,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const config = await getStored(["showVerseOrigin", "netflixSyncToken", SYNC_PAUSED_KEY]);
       if (config[SYNC_PAUSED_KEY]) return { success: false, paused: true };
       if (!config.netflixSyncToken || !config.showVerseOrigin) return { success: false, status: 401, error: "Vuelve a vincular la extensión." };
-      const fields = ["recordProgress", "mainTitle", "subTitle", "showName", "episodeName", "movieTitle", "seasonEpisodeText", "tabTitle", "durationSec", "positionSec", "seriesFromHint", "queueTitle", "albumArtist", "notifTitle", "notifText", "notifSubText", "tmdbId", "mediaType", "season", "episode", "title", "posterPath", "platform", "positionSeconds", "runtimeSeconds", "confidence", "estimated", "detectionId", "contentId", "identitySource", "releaseYear", "absoluteEpisode", "seasonEpisodeIndex"];
+      const fields = ["recordProgress", "mainTitle", "subTitle", "showName", "episodeName", "movieTitle", "seasonEpisodeText", "tabTitle", "durationSec", "positionSec", "seriesFromHint", "queueTitle", "albumArtist", "notifTitle", "notifText", "notifSubText", "tmdbId", "mediaType", "season", "episode", "title", "posterPath", "platform", "positionSeconds", "runtimeSeconds", "confidence", "estimated", "detectionId", "contentId", "identitySource", "releaseYear", "absoluteEpisode", "seasonEpisodeIndex", "mediaTypeHint"];
       const payload = Object.fromEntries(fields.filter(k => message[k] != null).map(k => [k, message[k]]));
       if (message.action === "queuePlayback") payload.recordProgress = true;
       payload.eventId = crypto.randomUUID();
