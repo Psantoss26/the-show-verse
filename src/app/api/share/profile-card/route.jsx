@@ -157,11 +157,20 @@ async function squareAvatar(buffer) {
   }
 }
 
+// Las fotos de las cuentas de Google llegan a 96 px (`=s96-c`): se pide la de
+// AVATAR_SIZE, que el mismo servidor sirve cambiando el sufijo.
+function largerAvatar(url) {
+  if (url.hostname.endsWith(".googleusercontent.com")) {
+    url.pathname = url.pathname.replace(/=s\d+(-c)?$/, `=s${AVATAR_SIZE}-c`);
+  }
+  return url;
+}
+
 async function loadAvatar(value) {
   const href = avatarHttpsUrl(value);
   if (!href) return null;
   try {
-    const url = new URL(href);
+    const url = largerAvatar(new URL(href));
     if (!(await hostIsPublic(url.hostname))) return null;
     const response = await fetch(url, {
       redirect: "error",
