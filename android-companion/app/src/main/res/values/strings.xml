@@ -107,5 +107,5 @@
     <string name="delegated_open">Abrir The Show Verse Sync</string>
     <string name="open_web">Abrir The Show Verse</string>
     <string name="pwa_unavailable_title">No se encuentra la app web</string>
-    <string name="pwa_unavailable_message">Instala The Show Verse desde Chrome con «Instalar aplicación» en este dispositivo y comprueba que usa la misma dirección que tienes vinculada en Sync. Después vuelve a detectar la ficha para generar un nuevo aviso.</string>
+    <string name="pwa_unavailable_message">No hay ninguna app ni navegador que pueda abrir la ficha. Instala The Show Verse desde Chrome con «Instalar aplicación» en este dispositivo y vuelve a detectar la ficha para generar un nuevo aviso.</string>
 </resources>

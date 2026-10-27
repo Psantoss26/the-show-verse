@@ -10,7 +10,8 @@ import java.net.URI
 /**
  * Lo que cambia entre las dos apps en el código compartido. Esta es la de THE
  * SHOW VERSE SYNC: la notificación apunta al componente de la PWA instalada.
- * Un ACTION_VIEW implícito pasa primero por el navegador predeterminado.
+ * Un ACTION_VIEW implícito pasa primero por el navegador predeterminado, así que
+ * solo se usa cuando la PWA no se puede localizar.
  */
 object AppVariante {
 
@@ -28,13 +29,14 @@ object AppVariante {
             if (!activity.exported || !activity.enabled || !activity.applicationInfo.enabled) {
                 return@mapNotNull null
             }
-            val metadata = activity.applicationInfo.metaData ?: return@mapNotNull null
             // Metadatos de Chromium WebAPK: no se elige por nombre visible ni
-            // se fija el paquete, que cambia en cada instalación de la PWA.
-            if (!metadata.containsKey("org.chromium.webapk.shell_apk.shellApkVersion")) {
-                return@mapNotNull null
-            }
-            val scope = metadata.getString("org.chromium.webapk.shell_apk.scope")
+            // se fija el paquete, que cambia en cada instalación de la PWA. Según
+            // el dispositivo vienen en la actividad o solo en la aplicación, y la
+            // consulta de actividades no siempre rellena los de la aplicación: si
+            // faltan, se piden aparte.
+            val scope = webApkScope(activity.metaData)
+                ?: webApkScope(activity.applicationInfo.metaData)
+                ?: webApkScope(appMetaData(context, activity.packageName))
                 ?: return@mapNotNull null
             PwaTarget(activity.packageName, activity.name, scope)
         }
@@ -42,12 +44,31 @@ object AppVariante {
         if (target != null) {
             return intent.setComponent(ComponentName(target.packageName, target.activityName))
         }
-        // Sin una PWA resoluble no enviamos al usuario al navegador a escondidas.
+        // Sin WebAPK localizable (PWA instalada como acceso directo: Samsung
+        // Internet, Firefox, Chrome sin Google Play, o una dirección vinculada
+        // distinta de la de la PWA), el enlace va al navegador: Chrome lo pasa
+        // él mismo a la PWA instalada si está en su ámbito, y si no abre la ficha.
+        // Antes se mostraba «No se encuentra la app web» aunque estuviera instalada.
+        if (intent.resolveActivity(context.packageManager) != null) return intent
         return Intent(context, MainActivity::class.java)
             .setData(Uri.parse(url))
             .putExtra(MainActivity.EXTRA_PWA_UNAVAILABLE, true)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
+
+    private fun webApkScope(metadata: android.os.Bundle?): String? {
+        if (metadata == null || !metadata.containsKey(WEBAPK_VERSION_KEY)) return null
+        return metadata.getString(WEBAPK_SCOPE_KEY)?.takeIf { it.isNotBlank() }
+    }
+
+    private fun appMetaData(context: Context, pkg: String): android.os.Bundle? = try {
+        context.packageManager.getApplicationInfo(pkg, PackageManager.GET_META_DATA).metaData
+    } catch (_: Exception) {
+        null
+    }
+
+    private const val WEBAPK_VERSION_KEY = "org.chromium.webapk.shell_apk.shellApkVersion"
+    private const val WEBAPK_SCOPE_KEY = "org.chromium.webapk.shell_apk.scope"
 
     fun rendimiento(context: Context): Intent? = null
 }

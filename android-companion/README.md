@@ -36,6 +36,15 @@ AppVariante (en full y en sync) ── dónde se abre la ficha: en el WebView
                                    (completa) o en la PWA/navegador (Sync)
 ```
 
+En Sync, «Abrir ficha» busca la PWA instalada como WebAPK de Chrome (por sus
+metadatos, en la actividad o en la aplicación) cuyo ámbito contenga la ficha, y la
+abre directamente. Si no la encuentra (PWA instalada como acceso directo en
+Samsung Internet o Firefox, Chrome sin Google Play, o vinculada con otra
+dirección), abre el enlace en el navegador, que lo pasa a la PWA si está en su
+ámbito. Antes mostraba «No se encuentra la app web» aunque la PWA estuviera
+instalada. Ese aviso solo queda para cuando no hay nada que pueda abrir el
+enlace.
+
 El registro de detecciones del móvil es **nativo**. Va con el token de
 vinculación contra `/api/streaming/device/*`, porque Sync no tiene sesión web.
 La web (`/detections`) solo enseña las de la extensión del navegador: el
