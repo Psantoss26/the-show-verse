@@ -15,6 +15,8 @@ import Avatar from "@/components/ui/Avatar";
 import LiquidButton from "@/components/LiquidButton";
 import { useAuth } from "@/context/AuthContext";
 import FollowButton from "@/components/social/FollowButton";
+import { useShareAction } from "@/components/details/DetailHeaderBits";
+import { buildProfileShareCard } from "@/lib/profile/shareProfile";
 import PosterTile from "@/components/social/PosterTile";
 import { titleStateKey, useViewerTitleStates } from "@/components/social/useViewerTitleStates";
 import { LIQUID_GLASS_PANEL, LIQUID_GLASS_TOOLTIP } from "@/lib/ui/liquidGlass";
@@ -59,11 +61,53 @@ import {
   PieChart,
   RotateCcw,
   Settings,
+  Share2,
   Star,
   Target,
   UserRoundCheck,
   Users,
 } from "lucide-react";
+
+const PROFILE_HEADER_BUTTON_CLASS =
+  "!h-11 !w-11 @[640px]/detail-page:!h-12 @[640px]/detail-page:!w-12 !border-0 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent shadow-lg backdrop-blur-md hover:!bg-white/15";
+
+// Compartir el PERFIL: abre la hoja de compartir (la de fichas y listas) con
+// la imagen del perfil —foto, nombre, nivel, cifras y favoritos, ver
+// lib/profile/shareProfile— y el enlace a /u/<usuario> (aunque se esté en una
+// sección como /u/<usuario>/stats). Al cerrarla, el foco vuelve al botón.
+function ProfileShareButton({ profile, disabled = false }) {
+  const { user } = profile;
+  const url =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/u/${encodeURIComponent(user.username)}`
+      : undefined;
+  const card = useMemo(() => buildProfileShareCard(profile), [profile]);
+  const { handleShare, sheet, warmProps } = useShareAction({
+    title: `${user.displayName} (@${user.username})`,
+    text: `Mira el perfil de ${user.displayName} en The Show Verse`,
+    url,
+    card,
+    kind: "profile",
+  });
+  return (
+    <>
+      <LiquidButton
+        onClick={handleShare}
+        {...warmProps}
+        disabled={disabled}
+        activeColor="blue"
+        groupId="profile-header-actions"
+        title="Compartir perfil"
+        aria-label="Compartir perfil"
+        aria-haspopup="dialog"
+        className={PROFILE_HEADER_BUTTON_CLASS}
+      >
+        <Share2 className="h-[1.375rem] w-[1.375rem] @[640px]/detail-page:h-5 @[640px]/detail-page:w-5" />
+      </LiquidButton>
+      {sheet}
+    </>
+  );
+}
 
 const ChartLoading = ({ className = "h-[280px]" }) => (
   <div className={`${className} w-full animate-pulse rounded-2xl bg-white/[0.035]`} />
@@ -1141,6 +1185,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
                   >
                     <Settings className="h-[1.375rem] w-[1.375rem] @[640px]/detail-page:h-5 @[640px]/detail-page:w-5" />
                   </LiquidButton>
+                  <ProfileShareButton profile={profile} disabled={syncing} />
                   <LiquidButton
                     onClick={() => setRefreshToken((value) => value + 1)}
                     disabled={syncing}
@@ -1169,10 +1214,13 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
                   />
                 </div>
               ) : (
-                <FollowButton
-                  username={user.username}
-                  initialFollowing={profile.isFollowing}
-                />
+                <div className="flex shrink-0 items-center gap-1 @[640px]/detail-page:gap-2" aria-label="Acciones de perfil">
+                  <ProfileShareButton profile={profile} />
+                  <FollowButton
+                    username={user.username}
+                    initialFollowing={profile.isFollowing}
+                  />
+                </div>
               )}
             </div>
             <div className="mt-0.5 flex min-w-0 items-center gap-2 @[640px]/detail-page:mt-2">

@@ -67,6 +67,10 @@ const SHARE_KINDS = {
     // Antes de pedir nada: los pósters de las tarjetas de la página.
     prepare: prepareListShare,
   },
+  // Perfiles: solo imagen (lib/profile/shareProfile), sin vídeo.
+  profile: {
+    cardEndpoint: "/api/share/profile-card",
+  },
 };
 
 // La ruta devuelve ya JPEG (~0,3-1 MB). Si llegase PNG (servidor sin sharp,
