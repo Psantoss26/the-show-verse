@@ -235,4 +235,18 @@ class ScreenHeuristicsTest {
         assertFalse(ScreenHeuristics.playerPaused(listOf("Suits", "Pausa", "Retroceder 10 s")))
         assertFalse(ScreenHeuristics.playerPaused(listOf("Suits")))
     }
+
+    @Test
+    fun `carruseles y etiquetas de la ficha de Prime Video no son titulos`() {
+        for (t in listOf("Otros clientes también vieron", "Películas dramáticas", "TODOS", "( 23 episodios)",
+            "( 16 episodios)", "Estreno", "Relacionado", "NUEVA SERIE", "#1 en España", "Se incluye con Prime",
+            "Se aplican términos", "Lanzamientos", "Calificada 16+", "Volver a ver episodio 9",
+            "Descargar episodio 9", "Descargar T1", "Descargar T6")) {
+            assertFalse(t, ScreenHeuristics.isLikelyTitle(t))
+        }
+        assertTrue(ScreenHeuristics.isSeriesSignal("( 16 episodios)"))
+        for (t in listOf("Suits", "La clave del éxito", "The Mentalist", "El Hobbit: Un viaje inesperado", "Interstellar")) {
+            assertTrue(t, ScreenHeuristics.isLikelyTitle(t))
+        }
+    }
 }

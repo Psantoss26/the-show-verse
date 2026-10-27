@@ -97,7 +97,21 @@ object TitleMatch {
      */
     fun corroborates(resolved: String?, screenTexts: List<String?>): Boolean {
         if (normalize(resolved).isEmpty()) return false
-        return screenTexts.any { similar(resolved, it) }
+        // Título localizado «Original: subtítulo»: la plataforma puede pintar solo
+        // una de las dos partes. Prime Video titula la ficha de «Suits: la clave
+        // del éxito» como «Suits» (o como «La clave del éxito»), y solo con el
+        // título entero esa ficha se descartaba aunque TMDb hubiera acertado.
+        val parts = listOf(resolved) + titleParts(resolved)
+        return screenTexts.any { text -> parts.any { similar(it, text) } }
+    }
+
+    private val PART_SEPARATOR = Regex("\\s*[:：]\\s+|\\s+[-–—]\\s+")
+
+    /** Las partes de «Original: subtítulo» con cuerpo suficiente (≥ 4 letras). */
+    private fun titleParts(title: String?): List<String> {
+        val parts = title?.split(PART_SEPARATOR).orEmpty()
+        if (parts.size < 2) return emptyList()
+        return parts.filter { normalize(it).length >= MIN_CONTAINED }
     }
 
     /**

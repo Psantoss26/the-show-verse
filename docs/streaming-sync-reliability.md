@@ -219,6 +219,18 @@ se toman por títulos las pestañas «Mi espacio», «Para ti» y «Búsqueda»,
 del envío a otro dispositivo, los controles como «Velocidad, 1x» ni las notas de
 X-Ray («Rick Hoffman portrays Louis Litt»).
 
+En la ficha de Prime Video tampoco son títulos los carruseles y etiquetas: «Otros
+clientes también vieron», «Películas dramáticas», «Estreno», «Relacionado», «#1 en
+España», «Calificada 16+», «Descargar T1», «Volver a ver episodio 9» o el recuento
+«( 16 episodios)», que sí delata una serie. El primero de ellos iba como título
+principal: «Otros clientes también vieron» acababa resolviendo una película del
+carrusel.
+
+La comprobación de que lo que devolvió TMDb está en pantalla
+(`TitleMatch.corroborates`) acepta también cada parte de un título «Original:
+subtítulo» con al menos 4 letras. Prime Video pinta «Suits» en la ficha de «Suits:
+la clave del éxito», y la resolución correcta se descartaba sin notificar.
+
 ## Prime Video y Crunchyroll en la app Android
 
 Estas dos apps no publican en su MediaSession de qué serie es el episodio (a veces

@@ -55,4 +55,13 @@ class TitleMatchTest {
         assertFalse(TitleMatch.hintIsUsable("Bart el temerario", "Bart el temerario", null))
         assertFalse(TitleMatch.hintIsUsable(null, "Bart el temerario", null))
     }
+
+    @Test
+    fun corroboratesAcceptsEitherPartOfALocalizedTitle() {
+        assertTrue(TitleMatch.corroborates("Suits: la clave del éxito", listOf("( 16 episodios)", "Suits")))
+        assertTrue(TitleMatch.corroborates("Suits: la clave del éxito", listOf("La clave del éxito")))
+        assertFalse(TitleMatch.corroborates("Suits: la clave del éxito", listOf("Descargar T6", "Lanzamientos")))
+        // Una parte demasiado corta no basta («Up» no respalda «Up: Una aventura…»).
+        assertFalse(TitleMatch.corroborates("Up: Una aventura de altura", listOf("Up")))
+    }
 }

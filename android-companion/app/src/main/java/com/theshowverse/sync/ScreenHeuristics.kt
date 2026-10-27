@@ -92,6 +92,12 @@ object ScreenHeuristics {
         // Pestañas de Prime Video y Disney+ que se leían como el título de la ficha.
         "mi espacio", "my stuff", "para ti", "for you", "búsqueda", "busqueda",
         "comparte", "audiencia juvenil", "audiencia general", "originals", "originales",
+        // Carruseles y etiquetas de las fichas de Prime Video.
+        "otros clientes también vieron", "otros clientes tambien vieron",
+        "customers also watched", "relacionado", "relacionados", "related",
+        "estreno", "nueva serie", "nueva temporada", "nuevo episodio", "nuevos episodios",
+        "se incluye con prime", "se aplican términos", "se aplican terminos",
+        "todos", "todo", "all", "lanzamientos", "top 10", "tendencias", "trending",
     ) + PLAYER_CONTROLS + VIDEO_CONTROLS
 
     // Los mismos controles con otra cifra o forma («Retroceder 10 s», «Velocidad,
@@ -134,7 +140,13 @@ object ScreenHeuristics {
             "|^(?:enviar|transmitir|cast)\\b.*\\b(?:desconectado|conectado|disconnected|connected)\\b" +
             "|\\bdispositivo de env[ií]o\\b" +
             // X-Ray de Prime Video: «Rick Hoffman portrays Louis Litt».
-            "|\\s(?:portrays|interpreta a|da vida a)\\s",
+            "|\\s(?:portrays|interpreta a|da vida a)\\s" +
+            // «#1 en España», «Calificada 16+», «Volver a ver episodio 9»,
+            // «Descargar T1», «Películas dramáticas» (carrusel por género).
+            "|^#\\d" +
+            "|^calificad[ao]\\b|^rated\\b" +
+            "|^(?:volver a ver|descargar|download|ver de nuevo|rewatch)\\s+(?:episodio|episode|t\\d|s\\d|temporada|season)" +
+            "|^(?:pel[ií]culas|series|documentales)\\s+[\\p{L}]+(?:\\s+[\\p{L}]+)?$",
     )
 
     // Fila de la lista de episodios de Netflix: el número y un punto delante
@@ -245,7 +257,8 @@ object ScreenHeuristics {
         "año ", "duración", "duracion", "género", "genero", "clasificación",
     )
 
-    private val SERIES_COUNT_RE = Regex("^\\d{1,3}\\s+(?:episodios|episodes|temporadas|seasons|cap[ií]tulos)\\b")
+    // También entre paréntesis, como lo pinta Prime Video: «( 16 episodios)».
+    private val SERIES_COUNT_RE = Regex("^\\(?\\s*\\d{1,3}\\s+(?:episodios|episodes|temporadas|seasons|cap[ií]tulos)\\b")
     private val SEASON_LABEL_RE = Regex("^(?:temporada|season|staffel|saison|stagione)\\s*\\d{1,3}\\b")
     private val SERIES_EXACT = setOf(
         "episodios", "episodes", "temporadas", "seasons", "todos los episodios",
@@ -326,6 +339,7 @@ object ScreenHeuristics {
         if (isPlayLabel(t) || isDetailSignal(t)) return false
         if (EPISODE_ROW_RE.containsMatchIn(l)) return false // fila de episodio
         if (NUMBERED_ROW_RE.containsMatchIn(l)) return false // «5. Pastorcito alpino»
+        if (SERIES_COUNT_RE.containsMatchIn(l)) return false // «( 16 episodios)»
         if (NOT_TITLE_RE.containsMatchIn(l)) return false    // «Porque has visto X»
         if (isPlayerControl(t)) return false                  // «Velocidad, 1x»
         if (isGenreList(t)) return false                     // «Acción, Aventura»
