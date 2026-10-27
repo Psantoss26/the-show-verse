@@ -22,6 +22,7 @@
         <activity
             android:name=".WebAppActivity"
             android:exported="true"
+            android:icon="@mipmap/ic_launcher"
             android:launchMode="singleTask"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|uiMode|density|navigation|fontScale|layoutDirection|locale"
             android:windowSoftInputMode="adjustResize"
