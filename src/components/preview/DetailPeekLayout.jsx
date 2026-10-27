@@ -11,7 +11,7 @@ import { motion, usePresence, useReducedMotion } from "framer-motion";
 
 import { LIQUID_GLASS_DETAIL_SURFACE } from "@/lib/ui/liquidGlass";
 import { MOBILE_POSTER_OVERSCAN } from "@/components/details/MobileDetailsHero";
-import { morphPeekCard } from "@/lib/navigation/peekHandoff";
+import { morphPeekCard, peekHrefKeepsParts } from "@/lib/navigation/peekHandoff";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
 
 /* ======================= VISTA PREVIA (PULSACIÓN LARGA) ======================= */
@@ -244,15 +244,22 @@ export default function DetailPeekLayout({
 
   // IR A LA FICHA: en el mismo fotograma del toque la tarjeta empieza a
   // convertirse en la cabecera de la ficha (ver lib/navigation/peekHandoff) y
-  // luego se navega. Lo que no es portada se desvanece: la ficha trae su
-  // propia fila de botones y su marcador, que entran con su animación.
+  // luego se navega. Si la ficha es la de una película o serie, logo, fila de
+  // botones y marcador no se desvanecen: vuelan a los suyos de la ficha, que
+  // los pinta iguales y sin animación de entrada. Las demás (temporadas,
+  // episodios) traen otros, que entran con su animación: los de aquí se
+  // desvanecen.
   const coverRef = useRef(null);
   const logoRef = useRef(null);
   const logoShadeRef = useRef(null);
-  const chromeRef = useRef(null);
+  const actionsRef = useRef(null);
+  const scoreboardRef = useRef(null);
   const handleOpenFull = () => {
+    const pieces = [logoRef.current, actionsRef.current, scoreboardRef.current];
+    const keepParts = peekHrefKeepsParts(prefetchHref);
     morphPeekCard(cardRef.current, coverRef.current, {
-      fadeNodes: [logoRef.current, logoShadeRef.current, chromeRef.current],
+      parts: keepParts ? pieces : [],
+      fadeNodes: keepParts ? [logoShadeRef.current] : [logoShadeRef.current, ...pieces],
       overscan: MOBILE_POSTER_OVERSCAN,
       fullPoster: !cover,
       reduceMotion,
@@ -358,6 +365,7 @@ export default function DetailPeekLayout({
             {logo && (
               <div
                 ref={logoRef}
+                data-peek-part="logo"
                 className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center px-5 pb-3 text-center"
               >
                 {logo}
@@ -367,9 +375,13 @@ export default function DetailPeekLayout({
 
           {/* Fila y marcador como en la ficha móvil: mismo ancho y 20px
               entre los dos. */}
-          <div ref={chromeRef} className="px-2.5 pb-2.5 pt-3">
-            {actions}
-            <div className="mt-5">{scoreboard}</div>
+          <div className="px-2.5 pb-2.5 pt-3">
+            <div ref={actionsRef} data-peek-part="actions">
+              {actions}
+            </div>
+            <div ref={scoreboardRef} data-peek-part="scoreboard" className="mt-5">
+              {scoreboard}
+            </div>
           </div>
         </div>
       </div>

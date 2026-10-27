@@ -69,6 +69,12 @@ import {
 } from "@/lib/artworkApi";
 import Link from "next/link";
 import { isDetailsSequenceTransitionActive } from "@/lib/navigation/detailsSequenceTransition";
+import {
+  PEEK_HANDOFF_PART_ATTR,
+  PEEK_HANDOFF_PENDING_ATTR,
+  PEEK_HANDOFF_READY_ATTR,
+  isPeekHandoffTarget,
+} from "@/lib/navigation/peekHandoff";
 import DetailsSequenceNav from "@/components/details/DetailsSequenceNav";
 
 // Componentes de animacion reutilizables para secciones con entrada animada
@@ -927,6 +933,9 @@ function ProgressiveHeroLogo({ path, title, onReady, onFailed }) {
 // (medido con CPU x4: saltos de 33-83 ms). Espera a que el logo esté
 // decodificado; el estado vive aquí para no re-renderizar la ficha entera a
 // mitad de la entrada.
+//
+// Es pieza del relevo desde la vista previa (`PEEK_HANDOFF_PART_ATTR`): hasta
+// estar decodificado, pendiente, para que la vista previa lo espere.
 function MobileHeroLogoReveal({ path, title, showTitle, animate }) {
   const [readyPath, setReadyPath] = useState(null);
   const [failedPath, setFailedPath] = useState(null);
@@ -934,6 +943,8 @@ function MobileHeroLogoReveal({ path, title, showTitle, animate }) {
   const ready = !path || failed || readyPath === path;
   return (
     <div
+      {...{ [PEEK_HANDOFF_PART_ATTR]: "logo" }}
+      {...(ready ? null : { [PEEK_HANDOFF_PENDING_ATTR]: "" })}
       className={`pointer-events-none absolute inset-x-0 bottom-0 z-[16] flex items-end justify-center px-4 pt-4 pb-2 sm:p-4 ${
         ready ? (animate ? "sv-mobile-logo-reveal" : "") : "opacity-0"
       }`}
@@ -1049,6 +1060,13 @@ export default function DetailsClient({
   const title = data.title || data.name; // Peliculas usan "title", series usan "name"
   const originalTitle = data.original_title || data.original_name || ""; // Titulo original para mejorar busquedas musicales
   const endpointType = type === "tv" ? "tv" : "movie"; // Tipo normalizado para endpoints de API
+  // Llegada desde la vista previa de pulsación larga (MobileTitlePeek): su
+  // logo, su fila de botones y su marcador vuelan a los de aquí (ver
+  // lib/navigation/peekHandoff), así que estos se pintan sin animación de
+  // entrada. Si no, se verían desaparecer y volver a entrar.
+  const [peekHandoffEntry] = useState(
+    () => typeof window !== "undefined" && isPeekHandoffTarget(`/details/${endpointType}/${id}`),
+  );
   const yearIso = (data.release_date || data.first_air_date || "")?.slice(0, 4); // Año de estreno
   const filmAffinitySearchUrl = `https://www.filmaffinity.com/es/search.php?stext=${encodeURIComponent((title || "").trim())}&stype=title`;
   const initialVideos = useMemo(
@@ -9828,6 +9846,9 @@ export default function DetailsClient({
       // lo espera un instante para que entre junto al hero y no aparezca tarde.
       data-details-cast-ready={!castSectionLoading}
       data-details-entry={detailsEntryReady ? "ready" : "loading"}
+      {...(peekHandoffEntry
+        ? { [PEEK_HANDOFF_READY_ATTR]: String(mobileHeroCoverReady && inProgressChecked) }
+        : null)}
       // Vuelta atrás con la instantánea recuperada: sin entradas CSS (ver
       // globals.css) ni de Framer (DetailsStaticMotionProvider).
       data-details-restored={detailsRestored ? "" : undefined}
@@ -10464,7 +10485,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         path={displayHeroLogoPath}
                         title={title}
                         showTitle={heroLogoResolved}
-                        animate={!prefersReducedMotion && !detailsRestored}
+                        animate={!prefersReducedMotion && !detailsRestored && !peekHandoffEntry}
                       />
                     )}
 
@@ -10787,7 +10808,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           // cascada que sin progreso (ver
                           // MOBILE_ACTIONS_REVEAL_ATTR).
                           MOBILE_ACTIONS_REVEAL_BASE
-                        : detailsEntryReady && currentLowLoaded && inProgressChecked
+                        : detailsEntryReady && currentLowLoaded && inProgressChecked && !peekHandoffEntry
                           ? "sv-mobile-actions-reveal sv-mobile-actions-rise"
                           : ""
                     }
@@ -10795,7 +10816,9 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                       ? {
                           [MOBILE_ACTIONS_REVEAL_ATTR]: "hidden",
                         }
-                      : {})}
+                      : detailsEntryReady && currentLowLoaded && inProgressChecked
+                        ? { [PEEK_HANDOFF_PART_ATTR]: "actions" }
+                        : {})}
                     inert={
                       isMobileViewport &&
                       mobileActionsWaitForScroll
@@ -10961,12 +10984,15 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                     ? `${MOBILE_REVEAL_BASE} ${detailsRestored ? "" : MOBILE_SCOREBOARD_REVEAL_ANIMATION}`
                     : !(mobileHeroCoverReady && inProgressChecked)
                       ? "max-sm:invisible"
-                      : detailsRestored || sequenceTransitionActive
+                      : detailsRestored || sequenceTransitionActive || peekHandoffEntry
                         ? ""
                         : `${MOBILE_SCOREBOARD_ENTRY_ANIMATION} max-sm:*:[animation-duration:280ms]`
                 }`}
                 {...(mobileScoreboardMode === "compact" ? heroStatsRevealProps : {})}
                 {...(mobileActionsWaitForScroll ? heroRevealProps : {})}
+                {...(!mobileActionsWaitForScroll && mobileHeroCoverReady && inProgressChecked
+                  ? { [PEEK_HANDOFF_PART_ATTR]: "scoreboard" }
+                  : null)}
               >
                 <DetailsScoreboardPanel
                 // Móvil: solo puntuaciones y stats, centradas y a todo el ancho

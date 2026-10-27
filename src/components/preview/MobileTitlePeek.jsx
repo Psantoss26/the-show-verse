@@ -32,8 +32,10 @@
 // (el color de la ficha), y se navega. Cuando la ficha está en pantalla con su
 // imagen principal cargada, la tarjeta se ajusta al píxel a la portada de la
 // ficha y se desvanece sobre ella (en el compositor): es la misma imagen en el
-// mismo sitio, así que solo se ven entrar el logo, los botones y el marcador
-// de la ficha. Ya no vuelve a verse: tampoco al volver atrás.
+// mismo sitio. En la ficha de una película o serie, el logo, los botones y el
+// marcador de la tarjeta vuelan antes a los de la ficha, que ya están pintados
+// sin animación de entrada: no se ven desaparecer ni volver a entrar. Ya no
+// vuelve a verse: tampoco al volver atrás.
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -46,6 +48,7 @@ import {
   beginPeekHandoff,
   endPeekHandoff,
   findPeekHandoffTarget,
+  peekHandoffPartsReady,
   settlePeekCard,
 } from "@/lib/navigation/peekHandoff";
 
@@ -82,7 +85,8 @@ const CLICK_SUPPRESS_MS = 700;
 // igualmente (ms).
 const LEAVE_MAX_WAIT_MS = 10000;
 // Con la ficha ya en pantalla, cuánto se espera además a su imagen principal
-// antes de desvanecer la vista previa (ms): sin ella se vería el hero vacío.
+// y a sus piezas (logo, botones, marcador) antes de desvanecer la vista previa
+// (ms): sin ellas se vería el hero vacío.
 const LEAVE_ART_MAX_WAIT_MS = 1200;
 // Fundido a oscuro de la página de detrás al ir a la ficha y desvanecido de la
 // vista previa cuando la ficha ya está (ms).
@@ -217,15 +221,18 @@ export default function MobileTitlePeek() {
       }
       layer.style.pointerEvents = "none";
       // La tarjeta, ya convertida en cabecera, se ajusta a la portada real de
-      // la ficha mientras se desvanece.
+      // la ficha mientras se desvanece. Si sus piezas vuelan a las de la
+      // ficha, el desvanecido espera a que lleguen: con las dos a la vez se
+      // verían dobles a medio camino.
       const card = layer.querySelector("[data-peek-card]");
       const cover = layer.querySelector("[data-peek-cover]");
-      settlePeekCard(card, cover, findPeekHandoffTarget(), {
+      const flightMs = settlePeekCard(card, cover, findPeekHandoffTarget(), {
         fullPoster: cover?.hasAttribute("data-peek-full-poster"),
         reduceMotion,
       });
       const fade = layer.animate([{ opacity: 1 }, { opacity: 0 }], {
         duration: reduceMotion ? 120 : LEAVE_FADE_MS,
+        delay: flightMs,
         easing: "cubic-bezier(0.33, 0, 0.2, 1)",
         fill: "forwards",
       });
@@ -242,7 +249,8 @@ export default function MobileTitlePeek() {
       if (!shownAt && detailsShown(leavingTo)) shownAt = now;
       if (
         (shownAt &&
-          (detailsArtReady() || now - shownAt > LEAVE_ART_MAX_WAIT_MS)) ||
+          ((detailsArtReady() && peekHandoffPartsReady()) ||
+            now - shownAt > LEAVE_ART_MAX_WAIT_MS)) ||
         now - startedAt > LEAVE_MAX_WAIT_MS
       ) {
         frame = window.requestAnimationFrame(() => {
