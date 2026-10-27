@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Vista previa en el móvil: en la fila **Continuar viendo** del dashboard, mantener pulsada una serie a medias abre la vista previa del episodio que toca (su imagen, «Episodio N · Temporada M», su título, sus botones y sus puntuaciones), no la de la serie. → [vista previa móvil](docs/features/vista-previa-movil.md)
 - Vista previa en el móvil: el paso a la ficha de una película o serie es un solo movimiento continuo. El logo, la fila de botones y el marcador viajan a su sitio de la ficha a la vez que crece la portada (antes esperaban quietos a la ficha y luego se movían), ya no se ven duplicados a través de la tarjeta mientras carga la ficha, y al llegar se cambian por los de la ficha en el mismo fotograma, sin fundido. → [vista previa móvil](docs/features/vista-previa-movil.md)
 - Historial en el móvil: en el desplegable de filtros, la papelera pasa a la fila de Agrupar y el botón de póster/backdrop a la de la vista. → [páginas de usuario](docs/features/paginas-de-usuario.md)
 - Perfil y Estadísticas: el botón **Configuración** abre Ajustes sin recargar la página, así que ya no aparece la barra de carga del navegador mientras llega. → [social y perfiles](docs/features/social-y-perfiles.md)

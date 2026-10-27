@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   exceedsPeekMoveTolerance,
   titlePeekAttrs,
+  titlePeekEpisodeAttrs,
   titlePeekItemFromAttr,
   titlePeekItemFromHref,
   titlePeekSeasonAttrs,
@@ -62,6 +63,23 @@ test("lee y escribe el atributo de las tarjetas sin enlace", () => {
   assert.equal(titlePeekItemFromAttr("tv:1399:1:2")?.media_type, "episode");
   assert.equal(titlePeekItemFromAttr("person:287"), null);
   assert.equal(titlePeekItemFromAttr("movie:"), null);
+});
+
+test("los episodios sin enlace llevan su propio atributo", () => {
+  const attrs = titlePeekEpisodeAttrs(1399, 1, 2);
+  assert.deepEqual(attrs, { "data-sv-peek": "tv:1399:1:2" });
+  assert.deepEqual(titlePeekItemFromAttr(attrs["data-sv-peek"]), {
+    media_type: "episode",
+    id: 1399,
+    showId: 1399,
+    seasonNumber: 1,
+    episodeNumber: 2,
+    detailsHref: "/details/tv/1399/season/1/episode/2",
+  });
+  assert.deepEqual(titlePeekEpisodeAttrs(1399, 0, 3)["data-sv-peek"], "tv:1399:0:3");
+  assert.deepEqual(titlePeekEpisodeAttrs(1399, null, 2), {});
+  assert.deepEqual(titlePeekEpisodeAttrs(1399, 1, 0), {});
+  assert.deepEqual(titlePeekEpisodeAttrs(null, 1, 2), {});
 });
 
 test("las temporadas solo se reconocen por el atributo", () => {

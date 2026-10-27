@@ -40,7 +40,11 @@ import usePreviewAutoTrailer from "@/hooks/usePreviewAutoTrailer";
 import { loadYouTubeIframeApi, prefetchPreviewTrailer } from "@/lib/dashboard/previewTrailer";
 import usePreviewMorph from "@/lib/dashboard/usePreviewMorph";
 import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
-import { titlePeekAttrs } from "@/lib/navigation/titlePeek.mjs";
+import {
+  TITLE_PEEK_ATTR,
+  titlePeekAttrs,
+  titlePeekEpisodeAttrs,
+} from "@/lib/navigation/titlePeek.mjs";
 import { useDashboardHoverBackdrop } from "@/components/dashboard/DashboardHoverBackdrop";
 import PreviewTrailerAudioButton, {
   usePreviewTrailerAudio,
@@ -288,6 +292,19 @@ function previewTrailerSeason(show, mode) {
   if (mode !== "calendar" || mediaTypeOf(show) !== "tv") return null;
   const season = Number(show?.nextEpisode?.season);
   return Number.isInteger(season) && season >= 0 ? season : null;
+}
+
+// Pulsación larga en el móvil (MobileTitlePeek): en Continuar viendo, una
+// serie a medias enseña la vista previa de SU episodio (la de EpisodeDetails),
+// no la de la serie. El Calendario sigue con la de la serie, con el episodio
+// y la fecha encima de las acciones.
+function titlePeekCardAttrs(show, mode) {
+  const ep = show?.nextEpisode;
+  if (mode !== "calendar" && mediaTypeOf(show) === "tv" && ep) {
+    const attrs = titlePeekEpisodeAttrs(show.id, ep.season, ep.number);
+    if (attrs[TITLE_PEEK_ATTR]) return attrs;
+  }
+  return titlePeekAttrs(show, mediaTypeOf(show));
 }
 
 function nextEpisodeHref(show) {
@@ -2255,7 +2272,7 @@ function ContinueWatchingSection({
                       data-preview-tile-art=""
                       className="h-full w-full cursor-pointer"
                       onClick={() => openDetailModal?.(show)}
-                      {...titlePeekAttrs(show, mediaTypeOf(show))}
+                      {...titlePeekCardAttrs(show, mode)}
                     >
                       {isMobile ? (
                         <ContinueWatchingMobilePosterCard show={show} mode={mode} />

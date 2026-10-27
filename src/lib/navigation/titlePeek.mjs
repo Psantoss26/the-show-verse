@@ -105,6 +105,25 @@ export function titlePeekAttrs(item, mediaType) {
   return { [TITLE_PEEK_ATTR]: `${type}:${id}` };
 }
 
+// Atributos para la tarjeta de un episodio sin enlace (Continuar viendo del
+// dashboard): su vista previa es la del episodio, no la de la serie.
+export function titlePeekEpisodeAttrs(showId, seasonNumber, episodeNumber) {
+  const id = toId(showId);
+  // `Number(null)` es 0: sin temporada no hay episodio.
+  const season = seasonNumber == null || seasonNumber === "" ? NaN : Number(seasonNumber);
+  const episode = Number(episodeNumber);
+  if (
+    id == null ||
+    !Number.isInteger(season) ||
+    season < 0 ||
+    !Number.isInteger(episode) ||
+    episode <= 0
+  ) {
+    return {};
+  }
+  return { [TITLE_PEEK_ATTR]: `tv:${id}:${season}:${episode}` };
+}
+
 // Atributos para la tarjeta de una temporada (sección Temporadas de la ficha).
 export function titlePeekSeasonAttrs(showId, seasonNumber) {
   const id = toId(showId);

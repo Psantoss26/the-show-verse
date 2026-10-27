@@ -39,7 +39,7 @@ En el móvil, mantener el dedo sobre la tarjeta de una película, una serie o un
 | `src/components/dashboard/DetailModal.jsx` | La ficha rápida con la prop `peek`: reutiliza su portada, su fila de botones y su marcador en la tarjeta flotante. En episodios, la portada es `EpisodeStillStack` con `fade` (el fundido inferior va en la última banda: en un envoltorio Chrome no lo pinta) y la fila es `SubrouteDetailsActionRow` con `sequence={false}`. |
 | `src/components/preview/SeasonPeek.jsx` | La vista previa de una temporada (`data-sv-peek="season:ID:N"`, ver `titlePeekSeasonAttrs` en `SeasonCard`). Comparte con la ficha de temporada las consultas de puntuaciones (`lib/details/seasonScores.js`), el póster (`useSeasonPoster`) y el modal de vistos (`useTraktEpisodesWatched`). |
 
-Las tarjetas que son un enlace a `/details/movie/:id`, `/details/tv/:id` o `/details/tv/:id/season/:s/episode/:e` ya funcionan sin tocarlas. Las tarjetas de los dashboards que abren la ficha con un botón llevan `{...titlePeekAttrs(item)}`. Un bloque con `data-sv-no-peek` queda excluido.
+Las tarjetas que son un enlace a `/details/movie/:id`, `/details/tv/:id` o `/details/tv/:id/season/:s/episode/:e` ya funcionan sin tocarlas. Las tarjetas de los dashboards que abren la ficha con un botón llevan `{...titlePeekAttrs(item)}`. Las de **Continuar viendo** del dashboard que son una serie a medias llevan `{...titlePeekEpisodeAttrs(id, temporada, episodio)}` (`data-sv-peek="tv:ID:S:E"`): mantenerlas pulsadas abre la vista previa de ese episodio (la de EpisodeDetails), no la de la serie. Las películas y el Calendario siguen con la del título. Un bloque con `data-sv-no-peek` queda excluido.
 
 ## Relacionado
 - [[Features]]
