@@ -118,6 +118,11 @@ class AccessibilityStreamingService : AccessibilityService() {
         // la barra del reproductor, que suele nombrar la serie. Ver ScreenTexts.
         ScreenTexts.record(pkg, analysis.candidates)
 
+        // El reproductor no es una ficha (Netflix): lo que resolviera —«Brillo»
+        // era una película— se recordaría como la serie que se está viendo y el
+        // episodio que suena se quedaría sin la suya.
+        if (analysis.playerControls >= ScreenHeuristics.MIN_PLAYER_CONTROLS) return
+
         // Solo actuamos si la pantalla PARECE una ficha (botón de reproducir
         // reconocido O suficientes señales de detalle) y hay algún candidato.
         if (!analysis.looksLikeDetail || analysis.candidates.isEmpty()) {
@@ -167,11 +172,20 @@ class AccessibilityStreamingService : AccessibilityService() {
         val origin = p.origin ?: return
         // Enviamos varios candidatos: el servidor prueba todas las variantes contra
         // TMDb y descarta lo que no sea un título real.
+        //
+        // El TIPO solo se dice cuando la pantalla lo demuestra: con temporadas o
+        // episodios a la vista es una serie (el servidor la busca solo entre
+        // series). Si no, va sin tipo y decide el servidor: antes se mandaba siempre
+        // como película, y un título parcial («La clave del éxito», que en TMDb es
+        // «Suits: la clave del éxito») resolvía la película de ese nombre.
+        val esSerie = analysis.seriesSignals > 0
         val signal = PlaybackSignal(
             host = pkg,
             platformId = Platforms.idFor(pkg),
             platformName = Platforms.nameFor(pkg),
-            movieTitle = primary,
+            showName = if (esSerie) primary else null,
+            tabTitle = if (esSerie) null else primary,
+            mediaTypeHint = if (esSerie) "tv" else null,
             notifTitle = candidates.getOrNull(1),
             notifText = candidates.getOrNull(2),
             notifSubText = candidates.getOrNull(3),
@@ -224,6 +238,11 @@ class AccessibilityStreamingService : AccessibilityService() {
         // Etiquetas de UI cortas (no-título) de la pantalla: solo para diagnóstico,
         // para descubrir qué botones/estados expone cada plataforma en su ficha.
         val uiLabels: List<String> = emptyList(),
+        // Textos que delatan una SERIE (temporada, episodios…; ver
+        // ScreenHeuristics.isSeriesSignal).
+        val seriesSignals: Int = 0,
+        // Controles del reproductor a la vista (ver ScreenHeuristics.isPlayerControl).
+        val playerControls: Int = 0,
     )
 
     // Recorre el árbol (acotado): recoge candidatos de título (encabezados primero,
@@ -238,6 +257,8 @@ class AccessibilityStreamingService : AccessibilityService() {
         val labelSeen = HashSet<String>()
         var sawPlay = false
         var detailSignals = 0
+        var seriesSignals = 0
+        var playerControls = 0
         val detailSeen = HashSet<String>()
         val queue = ArrayDeque<AccessibilityNodeInfo>()
         queue.add(root)
@@ -257,6 +278,8 @@ class AccessibilityStreamingService : AccessibilityService() {
                 if (ScreenHeuristics.isDetailSignal(raw) && detailSeen.add(raw.lowercase())) {
                     detailSignals++
                 }
+                if (ScreenHeuristics.isSeriesSignal(raw)) seriesSignals++
+                if (ScreenHeuristics.isPlayerControl(raw)) playerControls++
                 if (ScreenHeuristics.isLikelyTitle(raw) && seen.add(raw.lowercase())) {
                     val isHeading =
                         Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && node.isHeading
@@ -283,6 +306,8 @@ class AccessibilityStreamingService : AccessibilityService() {
             detailSignals = detailSignals,
             headingCount = headings.size,
             uiLabels = labels,
+            seriesSignals = seriesSignals,
+            playerControls = playerControls,
         )
     }
 
@@ -354,7 +379,11 @@ class AccessibilityStreamingService : AccessibilityService() {
     // ventana activa/superior no siempre es la ficha; luego processCurrent elige la
     // que más parece una ficha. Requiere `flagRetrieveInteractiveWindows` en la config.
     private fun candidateRoots(pkg: String): List<AccessibilityNodeInfo> {
-        val active = rootInActiveWindow
+        // La ventana activa solo vale si es DE la plataforma: en una tablet con dos
+        // apps a la vez (o con The Show Verse delante) era la de otra app, y su texto
+        // —p. ej. el aviso «Solo lectura · servidor no disponible…»— se mandaba
+        // como si fuera la ficha de Prime Video.
+        val active = rootInActiveWindow?.takeIf { it.packageName?.toString() == pkg }
         if (!Platforms.readsPlayerScreen(pkg)) return listOfNotNull(active)
         val wins = try { windows } catch (e: Exception) { null } ?: return listOfNotNull(active)
         val primeRoots = wins.asSequence()

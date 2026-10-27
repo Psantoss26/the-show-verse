@@ -34,6 +34,9 @@ data class PlaybackSignal(
     // ScreenTexts). Solo se rellenan cuando no se sabe la serie; no forman parte
     // de la identidad del contenido (dedupKey).
     val screenTitles: List<String> = emptyList(),
+    // Tipo SEGURO, cuando la pantalla lo demuestra ("tv": ficha con temporadas o
+    // episodios). El servidor no busca entonces entre películas.
+    val mediaTypeHint: String? = null,
 ) {
     /** Título principal (para retrocompat con el endpoint: mainTitle). */
     val mainTitle: String?

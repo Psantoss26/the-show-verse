@@ -39,6 +39,26 @@ object ScreenHeuristics {
     private fun norm(text: String): String =
         text.trim().trimEnd('.', '…', '·', ' ').replace(WHITESPACE, " ").lowercase().trim()
 
+    // Controles del REPRODUCTOR (Netflix los expone como texto al tocar la
+    // pantalla). Dos o más a la vista = es el reproductor, no una ficha: «Brillo»
+    // y «Adelantar 10 segundos» se resolvían como títulos y esa «ficha» pisaba la
+    // serie recordada, con lo que el episodio sonando se quedaba sin serie.
+    private val PLAYER_CONTROLS = setOf(
+        "adelantar 10 segundos", "retrasar 10 segundos", "avanzar 10 segundos",
+        "retroceder 10 segundos", "forward 10 seconds", "rewind 10 seconds",
+        "skip forward 10 seconds", "skip back 10 seconds", "brillo", "brightness",
+        "bloquear", "bloquear pantalla", "lock screen", "desbloquear",
+        "velocidad", "playback speed", "salir de la pantalla completa",
+    )
+    // Del vídeo, pero también en la vista previa de la ficha (el tráiler que se
+    // reproduce solo lleva «Mostrar controles» y «Sin sonido»): no son títulos,
+    // pero tampoco prueban que la pantalla sea el reproductor.
+    private val VIDEO_CONTROLS = setOf(
+        "pausar", "reanudar reproducción", "mostrar controles", "show controls",
+        "ocultar controles", "hide controls", "sin sonido", "con sonido", "silenciar",
+        "activar sonido", "mute", "unmute", "volumen", "volume", "pantalla completa", "full screen",
+    )
+
     // Cromo de navegación/sistema que el árbol de accesibilidad expone como texto o
     // contentDescription y que NO es un título: botones de barra, estados de carga,
     // el reproductor… Prime Video, sobre todo, los emitía como candidatos ("Back",
@@ -65,7 +85,29 @@ object ScreenHeuristics {
         "show more", "leer más", "leer mas", "read more", "ver menos", "show less",
         "premium", "hazte premium", "prueba gratis", "prueba gratuita",
         "free trial", "suscribirse", "subscribe", "mi perfil", "my profile",
+        // Netflix: valoraciones y avisos de la portada y la ficha.
+        "calificación", "calificacion", "me encanta", "no es para mí", "no es para mi",
+        "desplazarse hacia arriba", "desplazarse hacia abajo", "scroll up",
+        "love this", "not for me", "rating",
+    ) + PLAYER_CONTROLS + VIDEO_CONTROLS
+
+    /** ¿El texto es un control del reproductor? (ver [PLAYER_CONTROLS]). */
+    fun isPlayerControl(text: String?): Boolean = text != null && PLAYER_CONTROLS.contains(norm(text))
+
+    /** Nº de controles del reproductor a partir del cual la pantalla ES el reproductor. */
+    const val MIN_PLAYER_CONTROLS = 2
+
+    // Filas de recomendaciones y avisos que no son títulos: «Porque has visto X»,
+    // «1 notificación nueva…», premios («2 Emmy · 86 premios»).
+    private val NOT_TITLE_RE = Regex(
+        "^(?:porque has visto|because you watched|porque viste|ya que viste)\\b" +
+            "|\\bnotificaci[oó]n|\\bnotification" +
+            "|\\d+\\s*(?:premios?|nominaci[oó]n(?:es)?|awards?|nominations?)\\b",
     )
+
+    // Fila de la lista de episodios de Netflix: el número y un punto delante
+    // («5. Pastorcito alpino»). Es un episodio, y delata que la ficha es de serie.
+    private val NUMBERED_ROW_RE = Regex("^\\d{1,3}\\.\\s+\\S")
 
     // Géneros y etiquetas de idioma que las fichas pintan como texto suelto o en
     // lista («Acción, Aventura, Fantasía», «Sub | Dob»). Buscarlos en TMDb devuelve
@@ -163,11 +205,37 @@ object ScreenHeuristics {
         "agregar a la lista de seguimiento", "quitar de la lista de seguimiento",
         "más detalles", "mas detalles", "more details",
         "versiones", "versions", "más episodios", "mas episodios",
+        // Pestañas de Prime Video que se leían como el título de la ficha.
+        "prime", "suscripciones", "subscriptions", "mis suscripciones", "canales prime",
     )
     private val DETAIL_PREFIXES = setOf(
         "temporada", "season", "episodio", "episode", "capítulo", "capitulo",
         "año ", "duración", "duracion", "género", "genero", "clasificación",
     )
+
+    private val SERIES_COUNT_RE = Regex("^\\d{1,3}\\s+(?:episodios|episodes|temporadas|seasons|cap[ií]tulos)\\b")
+    private val SEASON_LABEL_RE = Regex("^(?:temporada|season|staffel|saison|stagione)\\s*\\d{1,3}\\b")
+    private val SERIES_EXACT = setOf(
+        "episodios", "episodes", "temporadas", "seasons", "todos los episodios",
+        "all episodes", "más episodios", "mas episodios", "siguiente episodio", "next episode",
+    )
+
+    /**
+     * ¿El texto delata que la ficha es de una SERIE? Selector o etiqueta de
+     * temporada («Temporada 6»), pestaña de episodios, recuento («8 episodios») o
+     * una fila de la lista de episodios («T1 E3 …»). Sin esto, la ficha se enviaba
+     * siempre como película y un título parcial —Prime Video muestra «La clave del
+     * éxito» para «Suits: la clave del éxito»— resolvía la película de ese nombre.
+     */
+    fun isSeriesSignal(text: String?): Boolean {
+        val l = text?.trim()?.lowercase() ?: return false
+        if (l.isEmpty()) return false
+        return SERIES_EXACT.contains(norm(l)) ||
+            SEASON_LABEL_RE.containsMatchIn(l) ||
+            SERIES_COUNT_RE.containsMatchIn(l) ||
+            EPISODE_ROW_RE.containsMatchIn(l) ||
+            NUMBERED_ROW_RE.containsMatchIn(l)
+    }
 
     /** ¿El texto es una señal típica de una pantalla de FICHA (no home/grid)? */
     fun isDetailSignal(text: String?): Boolean {
@@ -225,6 +293,8 @@ object ScreenHeuristics {
         if (!t.any { it.isLetter() }) return false
         if (isPlayLabel(t) || isDetailSignal(t)) return false
         if (EPISODE_ROW_RE.containsMatchIn(l)) return false // fila de episodio
+        if (NUMBERED_ROW_RE.containsMatchIn(l)) return false // «5. Pastorcito alpino»
+        if (NOT_TITLE_RE.containsMatchIn(l)) return false    // «Porque has visto X»
         if (isGenreList(t)) return false                     // «Acción, Aventura»
         return true
     }

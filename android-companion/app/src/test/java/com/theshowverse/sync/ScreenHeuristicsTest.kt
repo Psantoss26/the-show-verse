@@ -170,4 +170,51 @@ class ScreenHeuristicsTest {
         assertTrue(ScreenHeuristics.isLikelyTitle("T2 Trainspotting"))
         assertTrue(ScreenHeuristics.isLikelyTitle("Dan Da Dan"))
     }
+
+    @Test
+    fun `las temporadas y los episodios delatan una serie`() {
+        assertTrue(ScreenHeuristics.isSeriesSignal("Temporada 6"))
+        assertTrue(ScreenHeuristics.isSeriesSignal("Season 2"))
+        assertTrue(ScreenHeuristics.isSeriesSignal("Episodios"))
+        assertTrue(ScreenHeuristics.isSeriesSignal("16 episodios"))
+        assertTrue(ScreenHeuristics.isSeriesSignal("T6 E9 - Vuelta al trabajo"))
+        // Una película no trae nada de esto, aunque lleve números en el nombre.
+        assertFalse(ScreenHeuristics.isSeriesSignal("La clave del éxito"))
+        assertFalse(ScreenHeuristics.isSeriesSignal("John Wick: Capítulo 2"))
+        assertFalse(ScreenHeuristics.isSeriesSignal("1 h 58 min"))
+        assertFalse(ScreenHeuristics.isSeriesSignal(null))
+    }
+
+    @Test
+    fun `las pestanas de Prime Video no son titulos`() {
+        assertFalse(ScreenHeuristics.isLikelyTitle("Suscripciones"))
+        assertFalse(ScreenHeuristics.isLikelyTitle("Prime"))
+        assertTrue(ScreenHeuristics.isLikelyTitle("La clave del éxito"))
+    }
+
+    @Test
+    fun `los controles del reproductor de Netflix no son titulos`() {
+        for (t in listOf("Brillo", "Adelantar 10 segundos", "Retrasar 10 segundos", "Pausar",
+            "Calificación", "Desplazarse hacia arriba", "Mostrar controles", "Sin sonido",
+            "Me encanta", "No es para mí")) {
+            assertFalse(t, ScreenHeuristics.isLikelyTitle(t))
+        }
+        val reproductor = listOf("Retrasar 10 segundos", "Adelantar 10 segundos", "Brillo", "Pausar")
+        assertTrue(reproductor.count { ScreenHeuristics.isPlayerControl(it) } >= ScreenHeuristics.MIN_PLAYER_CONTROLS)
+        // La vista previa de una ficha (tráiler) no es el reproductor.
+        val ficha = listOf("Mostrar controles", "Sin sonido", "The Blacklist")
+        assertTrue(ficha.count { ScreenHeuristics.isPlayerControl(it) } < ScreenHeuristics.MIN_PLAYER_CONTROLS)
+    }
+
+    @Test
+    fun `filas de episodios y recomendaciones de Netflix no son titulos`() {
+        for (t in listOf("5. Pastorcito alpino", "17. Iván (N.° 88)", "Porque has visto Jujutsu Kaisen",
+            "1 notificación nueva. Visualiza y administra las notificaciones.",
+            "2 Emmy · 86 premios · 237 nominaciones")) {
+            assertFalse(t, ScreenHeuristics.isLikelyTitle(t))
+        }
+        assertTrue(ScreenHeuristics.isSeriesSignal("5. Pastorcito alpino"))
+        assertTrue(ScreenHeuristics.isLikelyTitle("Better Call Saul"))
+        assertTrue(ScreenHeuristics.isLikelyTitle("The Blacklist"))
+    }
 }

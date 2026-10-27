@@ -150,6 +150,44 @@ el vídeo suena en la propia ficha y su Media Session solo da un título; la fic
 aporta la serie, la temporada y el episodio, o el tipo y el año de la película.
 Nunca pisa lo que dijo el reproductor, y con los metadatos de Netflix no actúa.
 
+## Fichas en la app Android
+
+La ficha se lee del árbol de accesibilidad (`AccessibilityStreamingService`):
+
+- **Solo ventanas de la plataforma.** Si no había ninguna, se leía la ventana
+  activa, fuera de la app que fuera: en una tablet con dos apps a la vez (o con The
+  Show Verse delante) llegaba como ficha de Prime Video el aviso «Solo lectura ·
+  servidor no disponible…».
+- **Tipo.** Antes la ficha se mandaba siempre como película. Ahora, si la pantalla
+  muestra temporadas o episodios (`ScreenHeuristics.isSeriesSignal`), va como serie
+  con `mediaTypeHint: "tv"` y el resolutor solo busca series; si no, va sin tipo.
+  Prime Video titula *Suits* como «La clave del éxito», y como película resolvía
+  la de 1983 con ese nombre.
+- **Sin tipo**, el resolutor prefiere una serie mucho más popular (≥ 10×) cuyo
+  subtítulo («Suits: **la clave del éxito**») es exactamente el texto, frente a una
+  película que se llama así.
+- «Suscripciones» y «Prime» (pestañas de Prime Video) no se toman por títulos.
+- **El reproductor no es una ficha.** Netflix expone sus controles como texto
+  («Adelantar 10 segundos», «Brillo», «Pausar»). Con dos o más controles propios
+  del reproductor a la vista (`ScreenHeuristics.isPlayerControl`) la pantalla no se
+  trata como ficha: «Brillo» resolvía una película, esa «ficha» se recordaba como lo
+  último visto (`RecentDetail`) y el episodio que sonaba se quedaba sin la serie de
+  la ficha de verdad. «Mostrar controles» y «Sin sonido» no cuentan: también salen
+  en el tráiler de la ficha.
+- Tampoco son títulos las filas numeradas de episodios de Netflix («5. Pastorcito
+  alpino», que sí delatan una serie), «Porque has visto…», los avisos de
+  notificaciones, los premios («2 Emmy · 86 premios») ni «Calificación», «Me
+  encanta» o «No es para mí».
+
+### Episodio sin serie
+
+Sin la serie de la ficha, Netflix en Android solo da el nombre del episodio
+(«Marco», T1:E10). El servidor lo prueba como consulta, pero si coincide con una
+serie («Marco») solo la acepta cuando ese episodio existe en ella con ese nombre
+(`episodeBelongsToShow`); si no, no registra nada. El paréntesis final que añade
+Netflix a algunos episodios («Iván (N.° 88)» en *The Blacklist*) se quita antes de
+compararlo con TMDb.
+
 ## Prime Video y Crunchyroll en la app Android
 
 Estas dos apps no publican en su MediaSession de qué serie es el episodio (a veces

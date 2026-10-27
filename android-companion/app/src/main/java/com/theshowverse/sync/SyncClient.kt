@@ -59,6 +59,7 @@ object SyncClient {
             if (signal.screenTitles.isNotEmpty()) {
                 put("screenTitles", org.json.JSONArray(signal.screenTitles))
             }
+            putOpt("mediaTypeHint", signal.mediaTypeHint)
             if (resolveOnly) put("resolveOnly", true)
             // "detail" (ficha navegando) | "playback": lo guarda la detección corregible.
             putOpt("detectionKind", detectionKind)
