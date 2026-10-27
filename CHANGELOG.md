@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Historial en el móvil: en el desplegable de filtros, la papelera pasa a la fila de Agrupar y el botón de póster/backdrop a la de la vista. → [páginas de usuario](docs/features/paginas-de-usuario.md)
 - Perfil y Estadísticas: el botón **Configuración** abre Ajustes sin recargar la página, así que ya no aparece la barra de carga del navegador mientras llega. → [social y perfiles](docs/features/social-y-perfiles.md)
 - Compartir perfil: la imagen lleva tu foto de perfil también si la subiste desde un archivo; antes solo salía si era un enlace y, si no, aparecía la inicial. → [social y perfiles](docs/features/social-y-perfiles.md)
 - Perfil: el @usuario queda más pegado al nombre. Los botones de la cabecera, más altos que el nombre, ya no estiran su fila. → [social y perfiles](docs/features/social-y-perfiles.md)

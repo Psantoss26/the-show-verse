@@ -26,6 +26,8 @@ Las tres comparten navegación (`WatchingSectionNav`):
 
 La lista se carga de 200 en 200 al hacer scroll, pero la cabecera (Vistos, Títulos, Películas, Episodios) muestra los totales de **todo** el historial: `GET /v1/history` los devuelve en `totals` con la página 1, `/api/trakt/history` los pasa tal cual y la página los guarda en `localStorage` (`showverse:history:totals:v1`) para pintarlos al volver. Con el filtro Películas o Series se usan los totales de ese tipo. Con una búsqueda o un día elegido, o cuando ya está todo cargado, se cuenta la lista. Al borrar entradas se restan al momento; la revalidación de la página 1 los corrige. Sin backend (respaldo de Trakt) no hay totales y se cuenta lo cargado.
 
+**Desplegable móvil:** la primera fila lleva Tipo, Agrupar (solo icono y valor) y la papelera del modo borrar; la segunda, Ordenar, los tres modos de vista y, en las vistas de tarjetas y compacta, el botón que alterna póster y backdrop.
+
 ## Recomendaciones (deslizar)
 
 `/recommendations` es una baraja de títulos:

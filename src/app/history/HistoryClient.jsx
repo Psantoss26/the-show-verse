@@ -4122,7 +4122,7 @@ export default function HistoryClient() {
                   gapClassName="pt-2"
                 >
                   <div className="space-y-2">
-                    {/* Fila 1 - Tipo y Agrupar */}
+                    {/* Fila 1 - Tipo, Agrupar y Borrar */}
                     <div className="flex gap-2">
                       <div className="flex-1 min-w-0">
                         <InlineDropdown
@@ -4177,9 +4177,9 @@ export default function HistoryClient() {
                         <div className="min-w-0 flex-1">
                         <InlineDropdown
                           label="Agrupar"
-                          // Con el botón de imagen al lado no cabe el rótulo:
+                          // Con el botón de borrar al lado no cabe el rótulo:
                           // icono y valor, como en la barra de escritorio.
-                          compact={viewMode === "grid" || viewMode === "compact"}
+                          compact
                           valueLabel={
                             groupBy === "day"
                               ? "Día"
@@ -4222,19 +4222,28 @@ export default function HistoryClient() {
                           )}
                         </InlineDropdown>
                         </div>
-                        {/* Imagen de las tarjetas: el botón que alterna de
-                            Favoritos (vistas de tarjetas y compacta). En esta
-                            fila porque la de la vista ya lleva el de borrar. */}
-                        {(viewMode === "grid" || viewMode === "compact") && (
-                          <ImageModeToggleButton
-                            value={gridImageMode}
-                            onChange={setGridImageMode}
-                          />
-                        )}
+                        {/* Modo borrar, en la fila de Agrupar. */}
+                        <button
+                          onClick={() => setEditMode(!editMode)}
+                          title={editMode ? "Salir del modo borrar" : "Borrar registros"}
+                          aria-label={editMode ? "Salir del modo borrar" : "Borrar registros"}
+                          aria-pressed={editMode}
+                          className={`h-11 w-11 rounded-2xl text-sm font-bold transition-all flex items-center justify-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
+                            editMode
+                              ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
+                              : "text-zinc-200 hover:bg-black/30"
+                          }`}
+                        >
+                          {editMode ? (
+                            <X className="w-4 h-4" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </button>
                       </div>
                     </div>
 
-                    {/* Fila 2 - Ordenar, Vista y Editar */}
+                    {/* Fila 2 - Ordenar, Vista e Imagen */}
                     <div className="flex gap-2">
                       <div className="flex-1 min-w-0">
                         <InlineDropdown
@@ -4330,23 +4339,15 @@ export default function HistoryClient() {
                           </button>
                         </div>
 
-                        <button
-                          onClick={() => setEditMode(!editMode)}
-                          title={editMode ? "Salir del modo borrar" : "Borrar registros"}
-                          aria-label={editMode ? "Salir del modo borrar" : "Borrar registros"}
-                          aria-pressed={editMode}
-                          className={`h-11 w-11 rounded-2xl text-sm font-bold transition-all flex items-center justify-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
-                            editMode
-                              ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
-                              : "text-zinc-200 hover:bg-black/30"
-                          }`}
-                        >
-                          {editMode ? (
-                            <X className="w-4 h-4" />
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
-                          )}
-                        </button>
+                        {/* Imagen de las tarjetas: el botón que alterna de
+                            Favoritos (vistas de tarjetas y compacta), junto a
+                            los botones de la vista. */}
+                        {(viewMode === "grid" || viewMode === "compact") && (
+                          <ImageModeToggleButton
+                            value={gridImageMode}
+                            onChange={setGridImageMode}
+                          />
+                        )}
                       </div>
                     </div>
                   </div>
