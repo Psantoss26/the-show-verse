@@ -2,9 +2,9 @@
 
 // Fila del NOMBRE de la cabecera del perfil con sus botones de acción:
 // Configuración, Compartir, Sincronizar y Cerrar sesión en el propio; Compartir
-// y Seguir en el de otro. En el de otro, en móvil, Seguir es un botón redondo
-// de solo icono como Compartir (la píldora con texto queda para escritorio), y
-// los dos se quedan siempre a la vista: no se recogen en el menú.
+// y Seguir en el de otro. En el de otro, Seguir es un botón redondo de solo
+// icono como Compartir, y los dos se quedan siempre a la vista: no se recogen
+// en el menú.
 //
 // EN MÓVIL, si los botones no dejan sitio al nombre (se recortaría con «…»),
 // se recogen en un botón de tres puntos que despliega el resto como un menú.
@@ -26,7 +26,7 @@ import { LogOut, MoreHorizontal, RotateCcw, Settings, Share2, UserCheck, UserPlu
 import LogoutConfirmModal from "@/components/auth/LogoutConfirmModal";
 import { useShareAction } from "@/components/details/DetailHeaderBits";
 import LiquidButton from "@/components/LiquidButton";
-import FollowButton, { useFollowToggle } from "@/components/social/FollowButton";
+import { useFollowToggle } from "@/components/social/FollowButton";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { buildProfileShareCard } from "@/lib/profile/shareProfile";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
@@ -258,8 +258,7 @@ export default function ProfileTitleRow({ profile, isSelf, syncing, onSync }) {
   const actionsRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  // Seguir tiene dos caras (botón redondo en móvil, píldora en escritorio):
-  // el estado vive aquí y lo comparten.
+  // Estado de Seguir: el botón redondo lo cambia con `useFollowToggle`.
   const [following, setFollowing] = useState(Boolean(profile.isFollowing));
   useEffect(() => setFollowing(Boolean(profile.isFollowing)), [profile.isFollowing]);
   const follow = useFollowToggle({ username: user.username, following, setFollowing });
@@ -386,7 +385,7 @@ export default function ProfileTitleRow({ profile, isSelf, syncing, onSync }) {
             >
               <Share2 className={HEADER_ICON_CLASS} />
             </LiquidButton>
-            {/* Móvil: Seguir como botón de acción redondo, solo icono. */}
+            {/* Seguir como botón de acción redondo, solo icono. */}
             <LiquidButton
               onClick={follow.toggle}
               disabled={follow.disabled}
@@ -397,16 +396,10 @@ export default function ProfileTitleRow({ profile, isSelf, syncing, onSync }) {
               title={following ? "Siguiendo" : "Seguir"}
               aria-label={following ? "Dejar de seguir" : "Seguir"}
               aria-pressed={following}
-              className={`${HEADER_BUTTON_CLASS} sm:!hidden ${following ? "!text-emerald-300" : ""}`}
+              className={`${HEADER_BUTTON_CLASS} ${following ? "!text-emerald-300" : ""}`}
             >
               {following ? <UserCheck className={HEADER_ICON_CLASS} /> : <UserPlus className={HEADER_ICON_CLASS} />}
             </LiquidButton>
-            <FollowButton
-              username={user.username}
-              initialFollowing={following}
-              onChange={setFollowing}
-              className="max-sm:!hidden"
-            />
           </>
         )}
       </div>
