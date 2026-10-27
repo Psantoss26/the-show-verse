@@ -5,10 +5,12 @@
 // y Seguir en el de otro.
 //
 // EN MÓVIL, si los botones no dejan sitio al nombre (se recortaría con «…»),
-// se recogen en un único botón de tres puntos que despliega el resto como un
-// menú. Se mide con el nombre ENTERO (`scrollWidth`) frente al hueco que le
-// dejarían los botones desplegados (su ancho se guarda mientras se ven), así
-// que al recogerlos no vuelven a salir solo porque ahora el nombre sí cabe.
+// se recogen en un botón de tres puntos que despliega el resto como un menú.
+// En el perfil propio, Cerrar sesión se queda a la vista junto a los tres
+// puntos si así cabe el nombre; si tampoco, va también al menú. Se mide con el
+// nombre ENTERO frente al hueco que le dejaría cada nivel (su ancho se guarda
+// mientras se ve), así que al recoger no se vuelve a desplegar solo porque
+// ahora el nombre sí cabe.
 //
 // La hoja de compartir, el aviso de cerrar sesión y el estado de Seguir viven
 // aquí, fuera de los botones: siguen abiertos (y al día) aunque los botones se
@@ -53,19 +55,31 @@ function useProfileShare(profile) {
   });
 }
 
+// Cuánto se recogen los botones: todos a la vista, Cerrar sesión + tres
+// puntos (solo en el perfil propio) o solo los tres puntos.
+const ACTIONS_EXPANDED = 0;
+const ACTIONS_LOGOUT = 1;
+const ACTIONS_MENU = 2;
+// En el perfil ajeno no hay Cerrar sesión: de todos a la vista, al menú.
+const SELF_LEVELS = [ACTIONS_EXPANDED, ACTIONS_LOGOUT, ACTIONS_MENU];
+const OTHER_LEVELS = [ACTIONS_EXPANDED, ACTIONS_MENU];
+
 /**
- * ¿Hay que recoger los botones? Solo en móvil y solo si, desplegados, el
- * nombre no cabe entero. `actionsRef` apunta a los botones desplegados (no
- * existe mientras están recogidos).
+ * ¿Cuánto hay que recoger los botones? Solo en móvil: se recoge un nivel cada
+ * vez que el nombre no cabe entero, y se despliega uno cuando, con los botones
+ * de ese nivel, cabría. El ancho de cada nivel se guarda mientras se ve; el del
+ * intermedio, si aún no se ha visto, son dos botones redondos y su hueco.
+ * `actionsRef` es el contenedor de los botones que haya en cada momento.
  */
-function useCollapsedActions({ rowRef, nameRef, actionsRef, watch }) {
-  const [collapsed, setCollapsed] = useState(false);
-  const expandedWidth = useRef(0);
+function useCollapsedActions({ rowRef, nameRef, actionsRef, levels, watch }) {
+  const [level, setLevel] = useState(ACTIONS_EXPANDED);
+  const widths = useRef({});
 
   useLayoutEffect(() => {
     const row = rowRef.current;
     const name = nameRef.current;
-    if (!row || !name) return undefined;
+    const actions = actionsRef.current;
+    if (!row || !name || !actions) return undefined;
     const mobile = window.matchMedia(MOBILE_QUERY);
     // Ancho del nombre ENTERO, con decimales: `scrollWidth` redondea y un
     // nombre que se pasa 1,7 px (ya con «…») no se detectaba.
@@ -74,39 +88,58 @@ function useCollapsedActions({ rowRef, nameRef, actionsRef, watch }) {
       range.selectNodeContents(name);
       return range.getBoundingClientRect().width;
     };
+    const index = levels.indexOf(level);
 
+    const widthOf = (target) => {
+      if (widths.current[target]) return widths.current[target];
+      if (target !== ACTIONS_LOGOUT) return 0;
+      const button = actions.querySelector("button");
+      const gap = Number.parseFloat(getComputedStyle(actions).columnGap) || 0;
+      return button ? button.getBoundingClientRect().width * 2 + gap : 0;
+    };
+
+    // Una medida que llega tarde (la tipografía) con el nivel anterior leería
+    // los botones del nuevo y guardaría un ancho falso: entonces se desplegaba
+    // y recogía sin fin.
+    let active = true;
     const check = () => {
+      if (!active) return;
       if (!mobile.matches) {
-        setCollapsed(false);
+        setLevel(ACTIONS_EXPANDED);
         return;
       }
-      const actions = actionsRef.current;
-      if (actions) {
-        expandedWidth.current = actions.getBoundingClientRect().width;
-        if (nameWidth() > name.getBoundingClientRect().width + 0.5) setCollapsed(true);
+      // Oculta (pantalla guardada al navegar): nada que medir.
+      if (!row.getBoundingClientRect().width) return;
+      widths.current[level] = actions.getBoundingClientRect().width;
+      if (nameWidth() > name.getBoundingClientRect().width + 0.5) {
+        if (index < levels.length - 1) setLevel(levels[index + 1]);
         return;
       }
+      if (index <= 0) return;
+      const target = levels[index - 1];
+      const needed = widthOf(target);
       const gap = Number.parseFloat(getComputedStyle(row).columnGap) || 0;
-      const room = row.getBoundingClientRect().width - expandedWidth.current - gap;
-      if (expandedWidth.current && nameWidth() <= room - 0.5) setCollapsed(false);
+      const room = row.getBoundingClientRect().width - needed - gap;
+      if (needed && nameWidth() <= room - 0.5) setLevel(target);
     };
 
     check();
     const observer = new ResizeObserver(check);
     observer.observe(row);
     observer.observe(name);
-    if (actionsRef.current) observer.observe(actionsRef.current);
+    observer.observe(actions);
     mobile.addEventListener("change", check);
     // La tipografía puede llegar después del primer pintado y cambia el ancho.
     document.fonts?.ready.then(check).catch(() => {});
     return () => {
+      active = false;
       observer.disconnect();
       mobile.removeEventListener("change", check);
     };
     // `watch`: lo que cambia el ancho del nombre o de los botones.
-  }, [rowRef, nameRef, actionsRef, collapsed, watch]);
+  }, [rowRef, nameRef, actionsRef, level, levels, watch]);
 
-  return collapsed;
+  return levels.includes(level) ? level : ACTIONS_EXPANDED;
 }
 
 function MenuItem({ icon: Icon, tone, label, onClick, disabled = false }) {
@@ -227,15 +260,17 @@ export default function ProfileTitleRow({ profile, isSelf, syncing, onSync }) {
   useEffect(() => setFollowing(Boolean(profile.isFollowing)), [profile.isFollowing]);
 
   const share = useProfileShare(profile);
-  const collapsed = useCollapsedActions({
+  const levels = isSelf ? SELF_LEVELS : OTHER_LEVELS;
+  const level = useCollapsedActions({
     rowRef,
     nameRef,
     actionsRef,
+    levels,
     watch: `${user.displayName}|${isSelf}|${following}`,
   });
   useEffect(() => {
-    if (!collapsed) setMenuOpen(false);
-  }, [collapsed]);
+    if (level === ACTIONS_EXPANDED) setMenuOpen(false);
+  }, [level]);
 
   // Cada acción del menú lo cierra antes de hacer lo suyo.
   const fromMenu = (action) => () => {
@@ -243,6 +278,20 @@ export default function ProfileTitleRow({ profile, isSelf, syncing, onSync }) {
     action();
   };
   const openSettings = () => window.location.assign("/profile/settings");
+
+  const logoutButton = (
+    <LiquidButton
+      onClick={() => setShowLogoutModal(true)}
+      disabled={syncing}
+      activeColor="red"
+      groupId="profile-header-actions"
+      title="Cerrar sesión"
+      aria-label="Cerrar sesión"
+      className={`${HEADER_BUTTON_CLASS} !text-red-400 hover:!text-red-300`}
+    >
+      <LogOut className={HEADER_ICON_CLASS} />
+    </LiquidButton>
+  );
 
   return (
     <div
@@ -256,104 +305,101 @@ export default function ProfileTitleRow({ profile, isSelf, syncing, onSync }) {
         {user.displayName}<span className="text-emerald-400">.</span>
       </h1>
 
-      {collapsed ? (
-        <ActionsMenu open={menuOpen} onOpenChange={setMenuOpen} buttonProps={share.warmProps}>
-          {isSelf ? (
-            <>
-              <MenuItem icon={Settings} tone="text-teal-300" label="Configuración" onClick={fromMenu(openSettings)} disabled={syncing} />
-              <MenuItem icon={Share2} tone="text-sky-300" label="Compartir perfil" onClick={fromMenu(share.handleShare)} disabled={syncing} />
-              <MenuItem icon={RotateCcw} tone="text-emerald-300" label="Sincronizar" onClick={fromMenu(onSync)} disabled={syncing} />
-              <div className="my-1.5 h-px bg-white/5" />
-              <MenuItem icon={LogOut} tone="text-red-400" label="Cerrar sesión" onClick={fromMenu(() => setShowLogoutModal(true))} disabled={syncing} />
-            </>
-          ) : (
-            <>
-              <MenuItem icon={Share2} tone="text-sky-300" label="Compartir perfil" onClick={fromMenu(share.handleShare)} />
-              <div className="my-1.5 h-px bg-white/5" />
-              <div className="px-1 pb-1 pt-0.5">
-                <FollowButton
-                  username={user.username}
-                  initialFollowing={following}
-                  onChange={setFollowing}
-                  className="w-full"
-                />
-              </div>
-            </>
-          )}
-        </ActionsMenu>
-      ) : (
-        <div
-          ref={actionsRef}
-          className="flex shrink-0 items-center gap-1 @[640px]/detail-page:gap-2"
-          aria-label="Acciones de perfil"
-        >
-          {isSelf ? (
-            <>
-              <LiquidButton
-                onClick={openSettings}
-                disabled={syncing}
-                activeColor="teal"
-                groupId="profile-header-actions"
-                title="Configuración"
-                className={HEADER_BUTTON_CLASS}
-              >
-                <Settings className={HEADER_ICON_CLASS} />
-              </LiquidButton>
-              <LiquidButton
-                onClick={share.handleShare}
-                {...share.warmProps}
-                disabled={syncing}
-                activeColor="blue"
-                groupId="profile-header-actions"
-                title="Compartir perfil"
-                aria-label="Compartir perfil"
-                aria-haspopup="dialog"
-                className={HEADER_BUTTON_CLASS}
-              >
-                <Share2 className={HEADER_ICON_CLASS} />
-              </LiquidButton>
-              <LiquidButton
-                onClick={onSync}
-                disabled={syncing}
-                loading={syncing}
-                activeColor="green"
-                groupId="profile-header-actions"
-                title="Sincronizar"
-                className={HEADER_BUTTON_CLASS}
-              >
-                <RotateCcw className={`${HEADER_ICON_CLASS} ${syncing ? "animate-spin" : ""}`} />
-              </LiquidButton>
-              <LiquidButton
-                onClick={() => setShowLogoutModal(true)}
-                disabled={syncing}
-                activeColor="red"
-                groupId="profile-header-actions"
-                title="Cerrar sesión"
-                aria-label="Cerrar sesión"
-                className={`${HEADER_BUTTON_CLASS} !text-red-400 hover:!text-red-300`}
-              >
-                <LogOut className={HEADER_ICON_CLASS} />
-              </LiquidButton>
-            </>
-          ) : (
-            <>
-              <LiquidButton
-                onClick={share.handleShare}
-                {...share.warmProps}
-                activeColor="blue"
-                groupId="profile-header-actions"
-                title="Compartir perfil"
-                aria-label="Compartir perfil"
-                aria-haspopup="dialog"
-                className={HEADER_BUTTON_CLASS}
-              >
-                <Share2 className={HEADER_ICON_CLASS} />
-              </LiquidButton>
-              <FollowButton username={user.username} initialFollowing={following} onChange={setFollowing} />
-            </>
-          )}
-        </div>
-      )}
+      <div
+        ref={actionsRef}
+        className="flex shrink-0 items-center gap-1 @[640px]/detail-page:gap-2"
+        aria-label="Acciones de perfil"
+      >
+        {level !== ACTIONS_EXPANDED ? (
+          <>
+            {/* Cerrar sesión se queda a la vista mientras quepa (nivel
+                intermedio); el resto va al menú. */}
+            {level === ACTIONS_LOGOUT ? logoutButton : null}
+            <ActionsMenu open={menuOpen} onOpenChange={setMenuOpen} buttonProps={share.warmProps}>
+              {isSelf ? (
+                <>
+                  <MenuItem icon={Settings} tone="text-teal-300" label="Configuración" onClick={fromMenu(openSettings)} disabled={syncing} />
+                  <MenuItem icon={Share2} tone="text-sky-300" label="Compartir perfil" onClick={fromMenu(share.handleShare)} disabled={syncing} />
+                  <MenuItem icon={RotateCcw} tone="text-emerald-300" label="Sincronizar" onClick={fromMenu(onSync)} disabled={syncing} />
+                  {level === ACTIONS_MENU ? (
+                    <>
+                      <div className="my-1.5 h-px bg-white/5" />
+                      <MenuItem icon={LogOut} tone="text-red-400" label="Cerrar sesión" onClick={fromMenu(() => setShowLogoutModal(true))} disabled={syncing} />
+                    </>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  <MenuItem icon={Share2} tone="text-sky-300" label="Compartir perfil" onClick={fromMenu(share.handleShare)} />
+                  <div className="my-1.5 h-px bg-white/5" />
+                  <div className="px-1 pb-1 pt-0.5">
+                    <FollowButton
+                      username={user.username}
+                      initialFollowing={following}
+                      onChange={setFollowing}
+                      className="w-full"
+                    />
+                  </div>
+                </>
+              )}
+            </ActionsMenu>
+          </>
+        ) : isSelf ? (
+          <>
+            <LiquidButton
+              onClick={openSettings}
+              disabled={syncing}
+              activeColor="teal"
+              groupId="profile-header-actions"
+              title="Configuración"
+              className={HEADER_BUTTON_CLASS}
+            >
+              <Settings className={HEADER_ICON_CLASS} />
+            </LiquidButton>
+            <LiquidButton
+              onClick={share.handleShare}
+              {...share.warmProps}
+              disabled={syncing}
+              activeColor="blue"
+              groupId="profile-header-actions"
+              title="Compartir perfil"
+              aria-label="Compartir perfil"
+              aria-haspopup="dialog"
+              className={HEADER_BUTTON_CLASS}
+            >
+              <Share2 className={HEADER_ICON_CLASS} />
+            </LiquidButton>
+            <LiquidButton
+              onClick={onSync}
+              disabled={syncing}
+              loading={syncing}
+              activeColor="green"
+              groupId="profile-header-actions"
+              title="Sincronizar"
+              className={HEADER_BUTTON_CLASS}
+            >
+              <RotateCcw className={`${HEADER_ICON_CLASS} ${syncing ? "animate-spin" : ""}`} />
+            </LiquidButton>
+            {logoutButton}
+          </>
+        ) : (
+          <>
+            <LiquidButton
+              onClick={share.handleShare}
+              {...share.warmProps}
+              activeColor="blue"
+              groupId="profile-header-actions"
+              title="Compartir perfil"
+              aria-label="Compartir perfil"
+              aria-haspopup="dialog"
+              className={HEADER_BUTTON_CLASS}
+            >
+              <Share2 className={HEADER_ICON_CLASS} />
+            </LiquidButton>
+            <FollowButton username={user.username} initialFollowing={following} onChange={setFollowing} />
+          </>
+        )}
+      </div>
 
       {share.sheet}
       {isSelf ? (

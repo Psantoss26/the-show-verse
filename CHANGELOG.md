@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Perfil propio en el móvil: al recoger los botones de la cabecera en el menú de tres puntos, **Cerrar sesión** se queda a la vista junto a él si así cabe el nombre entero; si ni así cabe, pasa también al menú. → [social y perfiles](docs/features/social-y-perfiles.md)
 - Vista previa en el móvil: al tocar la portada para ir a la ficha de una película o serie, el logo, la fila de botones y el marcador ya no desaparecen para volver a cargarse en la ficha: se quedan en pantalla mientras crece la portada y se colocan en su sitio de la ficha, que los muestra sin volver a animarlos. → [vista previa móvil](docs/features/vista-previa-movil.md)
 - Perfil en el móvil: si los botones de la cabecera no dejan ver el nombre entero, se recogen en un único botón de tres puntos que despliega un menú con las mismas acciones (en tu perfil, Configuración, Compartir perfil, Sincronizar y Cerrar sesión; en el de otros, Compartir perfil y Seguir). Si el nombre cabe, los botones se ven como siempre. → [social y perfiles](docs/features/social-y-perfiles.md)
 - Móvil y tablet, barra superior: el cristal es igual de arriba abajo. Se quita el reflejo claro que marcaba su borde superior, que al compactarse la barra y pasar contenido por detrás hacía que la parte de arriba destacara sobre el resto.
