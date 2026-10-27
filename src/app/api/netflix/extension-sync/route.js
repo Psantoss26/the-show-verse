@@ -102,6 +102,16 @@ async function searchTmdbCandidates(backendRequest, query, mediaType) {
   });
 }
 
+// Título que casi nadie conoce en TMDb: pocos votos Y poca popularidad. Una
+// novedad recién estrenada tiene pocos votos pero mucha popularidad, así que no
+// cuenta como desconocida.
+const OBSCURE_MAX_VOTES = 5;
+const OBSCURE_MAX_POPULARITY = 5;
+function isObscureEntity(entity) {
+  return (Number(entity?.vote_count) || 0) < OBSCURE_MAX_VOTES
+    && (Number(entity?.popularity) || 0) < OBSCURE_MAX_POPULARITY;
+}
+
 // Limpia el nombre del episodio quitando marcadores del principio ("E5", "T4:E5",
 // "Episodio 5:", "Capítulo 5 -") y el paréntesis final que algunas plataformas
 // añaden ("Iván (N.° 88)" en «The Blacklist» de Netflix; en TMDb es "Ivan") para
@@ -656,10 +666,30 @@ export async function POST(request) {
         exact: true,
       };
     }
+    // El tipo «serie» de una ficha de Android lo demuestra la pantalla, pero solo
+    // para su título principal (`showName`). Los demás textos que acompañan a la
+    // señal pueden ser de un carrusel: en la ficha de Prime Video «Otros clientes
+    // también vieron» iba como título y la película «Interstellar» del carrusel,
+    // buscada solo entre series, resolvía «Interstellar Ella» (2 votos).
+    const hintedShow = tvHint && showName ? normalizeText(showName) : "";
+    // Ficha con VARIOS textos candidatos (la app Android manda los cuatro primeros
+    // que lee en la pantalla, y el título no siempre es el primero): casi cualquier
+    // palabra de la interfaz coincide EXACTA con algún título de TMDb que nadie ha
+    // visto («Todos», «Brillo», «Búsqueda», con 0 votos). Ese título se salta y se
+    // prueba el texto siguiente («Your name» → «Your Name.», 13 000 votos). Con un
+    // solo texto (el encabezado de la ficha en el navegador) no se toca: una
+    // película poco conocida de Filmin sigue resolviéndose.
+    const screenTextCount = new Set(
+      [showName, movieTitle, tabTitle, notifTitle, notifText, notifSubText]
+        .filter((t) => typeof t === "string" && t.trim())
+        .map((t) => normalizeText(t)),
+    ).size;
+    const skipObscure = kind === "detail" && episode == null && screenTextCount > 1;
     for (const variant of resolution ? [] : rankedVariants) {
+      const variantIsHinted = Boolean(hintedShow) && hintedShow.includes(normalizeText(variant.query));
       const candidate = await resolveStreamingEntity({
         query: variant.query,
-        expectedMediaType: episode != null || tvHint ? "tv" : movieHint ? "movie" : null,
+        expectedMediaType: episode != null || variantIsHinted ? "tv" : movieHint ? "movie" : null,
         preferTv: isTv,
         durationSec: safeDurationSec,
         year: releaseYear,
@@ -679,6 +709,10 @@ export async function POST(request) {
           console.warn(`[Extension Sync] "${variant.query}" es el nombre del episodio, no de la serie ${candidate.entity.id}.`);
           continue;
         }
+      }
+      if (skipObscure && isObscureEntity(candidate.entity)) {
+        console.warn(`[Extension Sync] "${variant.query}" solo coincide con un título desconocido (${candidate.mediaType}:${candidate.entity?.id}): se prueba el siguiente texto.`);
+        continue;
       }
       if (candidate.exact) {
         resolution = candidate;

@@ -229,7 +229,31 @@ carrusel.
 La comprobación de que lo que devolvió TMDb está en pantalla
 (`TitleMatch.corroborates`) acepta también cada parte de un título «Original:
 subtítulo» con al menos 4 letras. Prime Video pinta «Suits» en la ficha de «Suits:
-la clave del éxito», y la resolución correcta se descartaba sin notificar.
+la clave del éxito», y la resolución correcta se descartaba sin notificar. Lo
+contrario no vale: TMDb no puede devolver más palabras que las leídas
+(«Interstellar» en pantalla no respalda la serie «Interstellar Ella»), salvo
+artículos y conectores.
+
+En el servidor, el tipo «serie» de una ficha de Android (`mediaTypeHint: "tv"`)
+solo se aplica a su título principal (`showName`). Los demás textos de la señal
+pueden ser de un carrusel y se buscan sin tipo: en la ficha de *Interstellar* el
+título leído era «Otros clientes también vieron», y «Interstellar», buscado solo
+entre series, resolvía «Interstellar Ella» (2 votos) en vez de la película.
+
+### Títulos desconocidos en fichas con varios textos
+
+La app Android manda los cuatro primeros textos que lee en la ficha, y el título no
+siempre es el primero. Casi cualquier palabra de la interfaz coincide exacta con
+algún título de TMDb que nadie ha visto: «Todos», «Brillo» o «Búsqueda», con 0
+votos. Por eso, en una ficha (`detectionKind: "detail"`) con más de un texto
+distinto, el servidor salta los títulos con menos de 5 votos y menos de 5 de
+popularidad, y prueba el texto siguiente. En la ficha de *Your Name* de Prime
+Video, «TODOS» iba primero y resolvía la película «Todos»; ahora resuelve «Your
+Name.» con el tercer texto.
+
+Una novedad recién estrenada tiene pocos votos pero mucha popularidad, así que se
+sigue resolviendo. Una ficha con un solo texto (el encabezado de la ficha en el
+navegador) no se toca: una película poco conocida de Filmin se sigue resolviendo.
 
 ## Prime Video y Crunchyroll en la app Android
 

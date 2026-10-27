@@ -183,6 +183,8 @@ const SHOWS = [
     seasons: [{ season_number: 1, episode_count: 12 }],
     episodes: { 1: [{ episode_number: 10, name: "Episodio 10" }] },
   },
+  // Serie casi desconocida que empieza como una película muy conocida.
+  { id: 212171, name: "Interstellar Ella", popularity: 4.7, vote_count: 2, seasons: [{ season_number: 1, episode_count: 8 }] },
   // Serie REAL cuyo nombre aparece DENTRO del nombre de un episodio de otra
   // serie ("Capítulo cinco: La Nina"). Es el caso que registraba títulos sin
   // ninguna relación cuando el reproductor no decía de qué serie era el episodio.
@@ -229,6 +231,11 @@ const MOVIES = [
   { id: 398978, title: "El Irlandés", original_title: "The Irishman", popularity: 60, vote_count: 5000 },
   { id: 693134, title: "Dune: Parte Dos", original_title: "Dune: Part Two", popularity: 300, vote_count: 8000 },
   { id: 264660, title: "El Aviador", original_title: "The Aviator", popularity: 40, vote_count: 3000 },
+  // Palabras de la interfaz que coinciden con películas que casi nadie ha visto.
+  { id: 1556555, title: "Todos", original_title: "Todos", popularity: 0.5, vote_count: 0 },
+  { id: 812002, title: "Brillo", original_title: "Brillo", popularity: 0.9, vote_count: 0 },
+  { id: 372058, title: "Your Name.", original_title: "君の名は。", release_date: "2016-08-26", popularity: 35, vote_count: 13145 },
+  { id: 157336, title: "Interstellar", original_title: "Interstellar", release_date: "2014-11-05", popularity: 76, vote_count: 41664 },
   { id: 18172, title: "La clave del éxito", original_title: "All the Right Moves", release_date: "1983-10-21", popularity: 4, vote_count: 200 },
 ];
 
@@ -1177,4 +1184,48 @@ test("Android, Netflix sin serie: el episodio «Marco» no se registra como la s
 test("Android, Netflix con la serie de la ficha: «Marco» es el T1:E10 de Better Call Saul", async () => {
   const result = await sync({ ...marcoSignal, showName: "Better Call Saul", seriesFromHint: true });
   assert.deepEqual([synced(result).tmdbId, synced(result).season, synced(result).episode], [60059, 1, 10]);
+});
+
+// ── App Android en Prime Video: un carrusel como título de la ficha ──────────
+test("Ficha de Prime con un carrusel como título: «Interstellar» no se busca solo entre series", async () => {
+  const result = await sync({
+    platformName: "Prime Video",
+    showName: "Otros clientes también vieron",
+    mainTitle: "Otros clientes también vieron",
+    notifTitle: "Interstellar",
+    notifText: "Estreno",
+    notifSubText: "Relacionado",
+    mediaTypeHint: "tv",
+  });
+  assert.deepEqual([synced(result).tmdbId, synced(result).mediaType], [157336, "movie"]);
+});
+
+// ── Fichas con varios textos: una palabra de la interfaz no es el título ─────
+test("Ficha de Prime con «TODOS» primero: la película es «Your Name.», no «Todos»", async () => {
+  const result = await sync({
+    detectionKind: "detail",
+    platformName: "Prime Video",
+    tabTitle: "TODOS",
+    mainTitle: "TODOS",
+    notifTitle: "Otros clientes también vieron",
+    notifText: "Your name",
+    notifSubText: "Estreno",
+  });
+  assert.deepEqual([synced(result).tmdbId, synced(result).mediaType], [372058, "movie"]);
+});
+
+test("Ficha con un solo texto: un título poco conocido se sigue resolviendo", async () => {
+  const result = await sync({ detectionKind: "detail", platformName: "Filmin", movieTitle: "Brillo", mainTitle: "Brillo" });
+  assert.equal(synced(result).tmdbId, 812002);
+});
+
+test("Ficha de Netflix con solo controles del reproductor: «Brillo» no se resuelve", async () => {
+  const result = await sync({
+    detectionKind: "detail",
+    platformName: "Netflix",
+    tabTitle: "Brillo",
+    mainTitle: "Brillo",
+    notifTitle: "Pausar",
+  });
+  assert.notEqual(synced(result).tmdbId, 812002);
 });
