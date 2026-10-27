@@ -1125,7 +1125,7 @@ export default function ProfileClient({ username, initialTab = "profile", routeB
               syncing={syncing}
               onSync={() => setRefreshToken((value) => value + 1)}
             />
-            <div className="mt-0.5 flex min-w-0 items-center gap-2 @[640px]/detail-page:mt-2">
+            <div className="mt-1 flex min-w-0 items-center gap-2 @[640px]/detail-page:mt-1.5">
               <p className="min-w-0 truncate text-xs font-semibold tracking-tight text-zinc-500 @[640px]/detail-page:text-sm">@{user.username}</p>
               <PlanBadge plan={user.plan} />
             </div>

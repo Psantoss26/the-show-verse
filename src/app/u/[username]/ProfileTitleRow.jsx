@@ -305,9 +305,11 @@ export default function ProfileTitleRow({ profile, isSelf, syncing, onSync }) {
         {user.displayName}<span className="text-emerald-400">.</span>
       </h1>
 
+      {/* Margen vertical negativo: los botones (44-48 px) son más altos que
+          el nombre y, sin él, alargan la fila y separan el @usuario de debajo. */}
       <div
         ref={actionsRef}
-        className="flex shrink-0 items-center gap-1 @[640px]/detail-page:gap-2"
+        className="-my-2 flex shrink-0 items-center gap-1 @[640px]/detail-page:gap-2"
         aria-label="Acciones de perfil"
       >
         {level !== ACTIONS_EXPANDED ? (
