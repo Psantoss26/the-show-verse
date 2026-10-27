@@ -276,6 +276,23 @@ aun así no hay título, la app manda una vez por sesión los textos de la panta
 al servidor, que los guarda como descarte `empty_title`. Sin el Registro del móvil
 es la forma de ver qué muestra el reproductor de cada app.
 
+### Sin estorbar al reproductor
+
+Leer la pantalla de otra app con accesibilidad es una llamada a SU hilo principal
+por cada nodo. Mientras arranca el vídeo, el reproductor de Prime Video cambia sin
+parar (la rueda de carga, el anuncio) y se releía entero cada 2,5 s en todas sus
+ventanas: miles de llamadas compitiendo con el propio reproductor, que podía
+quedarse en negro cargando. Ahora:
+
+- **Lecturas espaciadas.** En el reproductor, o en una pantalla sin nada que leer
+  (la de carga), los cambios de contenido se leen como mucho cada 5 s durante el
+  minuto siguiente. Un cambio de pantalla se lee al momento, y una ficha vuelve a
+  hacer inmediatas las lecturas.
+- **Menos nodos.** El recorrido del reproductor se corta a 600 nodos (la ficha
+  sigue en 1600).
+- **Menos consultas.** La ventana en primer plano (`ScreenPlayback`) se consulta
+  como mucho cada 10 s.
+
 ### Botones de la ficha y pista «serie» equivocada
 
 «Volver a empezar» es un botón de reproducir de la ficha de Prime Video (y una

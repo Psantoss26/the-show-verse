@@ -30,8 +30,21 @@ class AccessibilityStreamingService : AccessibilityService() {
     private var lastPlayerLog: String? = null
     private val resolveRunnable = Runnable {
         pendingSince = 0L
+        spacedPending = false
         processCurrent()
     }
+
+    // ESPACIADO EN EL REPRODUCTOR. Leer el árbol de accesibilidad de otra app es
+    // una llamada a SU hilo principal por cada nodo. Mientras arranca el vídeo, el
+    // reproductor de Prime Video cambia sin parar (la rueda de carga, el anuncio) y
+    // se releía entero cada 2,5 s en todas sus ventanas, miles de llamadas que
+    // competían con el propio reproductor: se quedaba en negro cargando. En el
+    // reproductor (o en una pantalla sin nada que leer, como la de carga) las
+    // lecturas por cambios de contenido se espacian; un cambio de pantalla se lee
+    // al momento, como siempre.
+    private val lastReadAt = HashMap<String, Long>()
+    private val spacedUntil = HashMap<String, Long>()
+    private var spacedPending = false
 
     override fun onServiceConnected() {
         prefs = Prefs(this)
@@ -73,6 +86,17 @@ class AccessibilityStreamingService : AccessibilityService() {
         // reproductor cambia sin parar (el tiempo, la barra de avance) y, sin él, el
         // silencio no llegaba nunca y su pantalla no se leía.
         val now = SystemClock.elapsedRealtime()
+        if (type == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED && (spacedUntil[pkg] ?: 0L) > now) {
+            if (spacedPending && pendingPkg == pkg) return
+            handler.removeCallbacks(resolveRunnable)
+            pendingPkg = pkg
+            pendingSince = 0L
+            spacedPending = true
+            val wait = maxOf(DEBOUNCE_MS, (lastReadAt[pkg] ?: 0L) + SPACED_READ_MS - now)
+            handler.postDelayed(resolveRunnable, wait)
+            return
+        }
+        spacedPending = false
         if (pendingPkg != pkg) pendingSince = 0L
         pendingPkg = pkg
         if (pendingSince == 0L) pendingSince = now
@@ -99,7 +123,12 @@ class AccessibilityStreamingService : AccessibilityService() {
         // Prime Video y Crunchyroll: si la pantalla es su REPRODUCTOR, se lee (serie,
         // episodio, tiempo) para la sincronización y no se trata como una ficha: el
         // botón de reproducir de los controles en pausa la hacía pasar por una.
-        if (Platforms.readsPlayerScreen(pkg) && readPlayerScreen(p, pkg, roots)) return
+        val readAt = SystemClock.elapsedRealtime()
+        lastReadAt[pkg] = readAt
+        if (Platforms.readsPlayerScreen(pkg) && readPlayerScreen(p, pkg, roots)) {
+            spacedUntil[pkg] = readAt + SPACED_WINDOW_MS
+            return
+        }
 
         var best: ScreenAnalysis? = null
         val scan = if (isPrime(pkg)) StringBuilder() else null
@@ -136,6 +165,16 @@ class AccessibilityStreamingService : AccessibilityService() {
 
         // Solo actuamos si la pantalla PARECE una ficha (botón de reproducir
         // reconocido O suficientes señales de detalle) y hay algún candidato.
+        // Ni ficha ni nada que leer (la pantalla de carga del vídeo, el reproductor
+        // sin controles): mientras siga así, lecturas espaciadas. Una ficha las
+        // vuelve a hacer inmediatas.
+        if (analysis.playerControls >= ScreenHeuristics.MIN_PLAYER_CONTROLS ||
+            (!analysis.looksLikeDetail && analysis.candidates.isEmpty())
+        ) {
+            spacedUntil[pkg] = readAt + SPACED_WINDOW_MS
+        } else if (analysis.looksLikeDetail) {
+            spacedUntil.remove(pkg)
+        }
         if (!analysis.looksLikeDetail || analysis.candidates.isEmpty()) {
             // Diagnóstico (una vez por texto): candidatos, etiquetas de UI y, en Prime,
             // el barrido de ventanas, para afinar si no se reconoce una ficha.
@@ -377,7 +416,9 @@ class AccessibilityStreamingService : AccessibilityService() {
         val stack = ArrayDeque<AccessibilityNodeInfo>()
         stack.addLast(root)
         var visited = 0
-        while (stack.isNotEmpty() && visited < MAX_NODES) {
+        // El reproductor tiene pocos nodos de verdad; el tope es más bajo que el de
+        // la ficha para no recorrer de más mientras el vídeo arranca.
+        while (stack.isNotEmpty() && visited < MAX_PLAYER_NODES) {
             val node = stack.removeLast()
             visited++
             val isSeekBar = node.className?.toString()?.endsWith("SeekBar") == true
@@ -434,5 +475,10 @@ class AccessibilityStreamingService : AccessibilityService() {
         private const val MAX_CANDIDATES = 4
         private const val MAX_LABELS = 8
         private const val MAX_WINDOWS = 6
+        private const val MAX_PLAYER_NODES = 600
+        // Lecturas espaciadas (ver spacedUntil): una cada SPACED_READ_MS, durante
+        // SPACED_WINDOW_MS desde la última vez que se vio el reproductor.
+        private const val SPACED_READ_MS = 5_000L
+        private const val SPACED_WINDOW_MS = 60_000L
     }
 }

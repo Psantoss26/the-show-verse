@@ -26,6 +26,12 @@ object ScreenPlayback {
 
     private val states = HashMap<String, State>()
 
+    // La ventana en primer plano se pregunta a la app que la muestra; con el vídeo
+    // arrancando, cuantas menos preguntas mejor: se reutiliza unos segundos.
+    private const val FOREGROUND_TTL_MS = 10_000L
+    private var foregroundCache: String? = null
+    private var foregroundAt = 0L
+
     /** Paquete de la ventana en primer plano (lo da el servicio de accesibilidad). */
     @Volatile var foreground: (() -> String?)? = null
 
@@ -52,7 +58,11 @@ object ScreenPlayback {
     @Synchronized
     fun playing(nowMs: Long, interactive: Boolean): Set<String> {
         if (states.isEmpty()) return emptySet()
-        val fg = try { foreground?.invoke() } catch (e: Exception) { null }
+        if (foregroundAt == 0L || nowMs - foregroundAt >= FOREGROUND_TTL_MS) {
+            foregroundCache = try { foreground?.invoke() } catch (e: Exception) { null }
+            foregroundAt = nowMs
+        }
+        val fg = foregroundCache
         val out = HashSet<String>()
         val it = states.entries.iterator()
         while (it.hasNext()) {
