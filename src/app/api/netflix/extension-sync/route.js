@@ -12,6 +12,8 @@ import {
   matchEpisodeCandidates,
   isGenericEpisodeName,
   reconcileEpisodeNumbers,
+  anchorEpisodeByName,
+  episodeElsewhereByName,
 } from "@/lib/netflix/streamingResolve";
 import { normalizeText } from "@/lib/netflix/resolve";
 import { createRequestCache } from "@/lib/netflix/requestCache";
@@ -779,11 +781,13 @@ export async function POST(request) {
     }
 
     // Temporada y episodio en la numeración de la PLATAFORMA, que no siempre es la
-    // de TMDb (Netflix parte temporadas y numera el anime de forma absoluta: su
-    // «T6:E82» de «Ataque a los Titanes» es el S4E23). Si el par no existe en
-    // TMDb se reparte como número absoluto o, si no, se busca por el nombre del
-    // episodio; sin ninguna de las dos, se queda a nivel serie antes que guardar
-    // un episodio inexistente. Ver reconcileEpisodeNumbers.
+    // de TMDb: las plataformas agrupan y parten temporadas y cuentan episodios que
+    // TMDb no tiene. reconcileEpisodeNumbers los pasa a TMDb (alineando por inicios
+    // de temporada con la posición que da la extensión, o repartiendo la posición
+    // absoluta); el nombre del episodio, si casa sin ambigüedad cerca del
+    // resultado, lo confirma o corrige. Sin ningún par posible, se busca por nombre
+    // en toda la serie y, si tampoco, se queda a nivel serie antes que guardar un
+    // episodio que no es.
     if (isTv && tmdbId && season != null && episode != null && TMDB_API_KEY) {
       const { realSeasons } = await loadShowSeasons(tmdbId);
       if (realSeasons.length) {
@@ -791,42 +795,47 @@ export async function POST(request) {
           const n = Number(value);
           return Number.isInteger(n) && n > 0 ? n : null;
         };
+        const from = `T${season}:E${episode}`;
         const fixed = reconcileEpisodeNumbers({
           season,
           episode,
           absoluteEpisode: positive(payload.absoluteEpisode),
           seasonEpisodeIndex: positive(payload.seasonEpisodeIndex),
         }, realSeasons);
-        // Suposiciones (serie de una sola temporada en TMDb, o reparto que cae en
-        // la misma temporada sin saber la posición dentro de ella): el nombre del
-        // episodio, si casa, manda sobre ellas.
-        const doubtful = fixed?.via === "absolute_guess" || fixed?.via === "absolute_same_season";
-        const byName = doubtful && episodeName
-          ? await findSeasonByEpisodeName(tmdbId, episodeName)
-          : null;
-        if (byName) {
-          console.log(`[Extension Sync] T${season}:E${episode} no existe en TMDb; por nombre → T${byName.season}:E${byName.episode}`);
-          season = byName.season;
-          episode = byName.episode;
-          if (confidence === "high") confidence = "medium";
-        } else if (doubtful) {
+        if (fixed && fixed.via !== "as_is") {
+          const doubtful = fixed.via === "absolute_guess" || fixed.via === "absolute_same_season";
+          // Cerca del resultado; si era una suposición, también en toda la serie.
+          const named = episodeName
+            ? anchorEpisodeByName(episodeName, (await loadShowEpisodes(tmdbId)).allEpisodes, realSeasons, fixed)
+              || (doubtful ? await findSeasonByEpisodeName(tmdbId, episodeName) : null)
+            : null;
+          const target = named || fixed;
           console.log(
-            `[Extension Sync] T${season}:E${episode} no existe en TMDb; se supone absoluto → T${fixed.season}:E${fixed.episode}`,
+            `[Extension Sync] ${from} en TMDb → T${target.season}:E${target.episode} (${named ? "por nombre" : fixed.via})`,
           );
-          season = fixed.season;
-          episode = fixed.episode;
-          confidence = "low";
-        } else if (fixed?.via === "absolute" || fixed?.via === "season_index") {
-          console.log(
-            `[Extension Sync] T${season}:E${episode} no existe en TMDb; ${fixed.via === "season_index" ? "por su posición en la temporada" : "como número absoluto"} → T${fixed.season}:E${fixed.episode}`,
-          );
-          season = fixed.season;
-          episode = fixed.episode;
-          if (confidence === "high") confidence = "medium";
+          season = target.season;
+          episode = target.episode;
+          if (named) {
+            if (confidence === "high") confidence = "medium";
+          } else if (doubtful) {
+            confidence = "low";
+          } else if (confidence === "high") {
+            confidence = "medium";
+          }
+        } else if (fixed && !positive(payload.absoluteEpisode) && episodeName) {
+          // El par existe en TMDb, pero sin posiciones de la plataforma no se sabe
+          // si es el mismo episodio: el nombre, si casa exacto con otro único, manda.
+          const elsewhere = episodeElsewhereByName(episodeName, (await loadShowEpisodes(tmdbId)).allEpisodes, fixed);
+          if (elsewhere) {
+            console.log(`[Extension Sync] ${from} existe en TMDb, pero por el nombre del episodio es T${elsewhere.season}:E${elsewhere.episode}`);
+            season = elsewhere.season;
+            episode = elsewhere.episode;
+            if (confidence === "high") confidence = "medium";
+          }
         } else if (!fixed) {
           const hit = episodeName ? await findSeasonByEpisodeName(tmdbId, episodeName) : null;
           console.warn(
-            `[Extension Sync] T${season}:E${episode} no existe en TMDb; ${hit ? `por nombre → T${hit.season}:E${hit.episode}` : "se registra a nivel serie"}.`,
+            `[Extension Sync] ${from} no existe en TMDb; ${hit ? `por nombre → T${hit.season}:E${hit.episode}` : "se registra a nivel serie"}.`,
           );
           season = hit ? hit.season : null;
           episode = hit ? hit.episode : null;

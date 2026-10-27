@@ -397,33 +397,36 @@ export async function resolveStreamingEntity({
 
 /**
  * Ajusta la temporada y el episodio que da una plataforma a la numeración de
- * TMDb. Hay plataformas que numeran a su manera: Netflix parte las temporadas
- * («Temporada 4 Parte 2» es su temporada 6) y en muchas series de anime numera
- * los episodios de forma absoluta (el 82 de «Ataque a los Titanes» es el S4E23 de
- * TMDb). Tomarlos tal cual guardaba un episodio que no existe.
+ * TMDb. Las plataformas agrupan y parten temporadas a su manera y cuentan
+ * episodios que TMDb no tiene (especiales, recapitulaciones), así que su par no
+ * siempre existe en TMDb, o existe pero es otro episodio:
  *
- * - El par existe en TMDb → se queda (`via: 'as_is'`).
- * - El cliente sabe la posición del episodio contando todas las temporadas de
- *   la plataforma (`absoluteEpisode`, Netflix con metadatos) → se reparte esa
- *   posición por las temporadas de TMDb (`via: 'absolute'`). Vale tanto si la
- *   plataforma numera de forma absoluta como si empieza cada parte en 1.
- * - El episodio no cabe en esa temporada (o la temporada no existe y el número
- *   es mayor que cualquier temporada) pero sí en la suma de todas → es un número
- *   absoluto y se reparte por temporadas (`via: 'absolute'`).
- * - Pero si ese reparto cae en la MISMA temporada que dice la plataforma, sus
- *   temporadas coinciden con las de TMDb y lo que no cuadra es la cuenta: la
- *   plataforma suma episodios que TMDb no tiene en las temporadas anteriores
- *   (especiales; el «93» de «My Hero Academia» es el T5·E1, no el T5·E5). Ahí
- *   vale la posición dentro de la temporada (`seasonEpisodeIndex`,
- *   `via: 'season_index'`); sin ella el reparto es dudoso
- *   (`via: 'absolute_same_season'`: el llamador prueba antes el nombre).
- * - La temporada no existe, el número cabe y TMDb tiene UNA sola temporada (el
- *   anime que la plataforma parte y TMDb junta, como «Jujutsu Kaisen») → lo más
- *   probable es la numeración absoluta, pero no es seguro (`via: 'absolute_guess'`:
- *   el llamador prueba antes el nombre del episodio).
- * - Si no → null: el llamador prueba por el nombre del episodio o lo deja a nivel
- *   serie. Un número pequeño en una temporada inexistente de una serie con varias
- *   temporadas es ambiguo (¿relativo a qué parte?) y no se adivina.
+ *   - «Ataque a los Titanes»: la «Temporada 4 Parte 2» es la 6 de Netflix y su
+ *     episodio 82 (numeración absoluta) es el S4E23 de TMDb;
+ *   - «Jujutsu Kaisen»: TMDb la tiene en una temporada; el T2:E32 es el S1E32;
+ *   - «My Hero Academia»: Netflix suma especiales y su «93» es el S5E1, no el S5E5;
+ *   - «Dragon Ball Z Kai»: Netflix la tiene en 2 temporadas y TMDb en 6; el T2:E1
+ *     de Netflix es el S5E1 de TMDb.
+ *
+ * Con la POSICIÓN del episodio en la plataforma (`absoluteEpisode`, contando
+ * todas sus temporadas, y `seasonEpisodeIndex`, dentro de la suya: la extensión
+ * las saca de los metadatos de Netflix), lo general es ALINEAR por inicios de
+ * temporada: cuando una plataforma agrupa o parte temporadas, las suyas empiezan
+ * casi siempre donde empieza alguna de TMDb, y lo que se desvía es la cuenta de
+ * antes. Si el inicio de la temporada de la plataforma cae cerca (≤ 6 %) del de
+ * una temporada de TMDb, el episodio se cuenta desde ahí (`via: 'aligned'`); si
+ * no (la plataforma parte una temporada de TMDb por la mitad), se reparte la
+ * posición absoluta (`via: 'absolute'`).
+ *
+ * Sin esas posiciones (clientes antiguos, otras plataformas) se deduce lo que se
+ * puede del par: si existe se queda; si el número no cabe en esa temporada es
+ * absoluto; si cae en la misma temporada que dice la plataforma, la cuenta de
+ * antes es dudosa (`absolute_same_season`); en una serie de una sola temporada se
+ * supone absoluto (`absolute_guess`). Lo dudoso lo confirma o corrige el nombre
+ * del episodio en el llamador.
+ *
+ * Devuelve { season, episode, via, candidates } (candidates: los pares
+ * alternativos, para comprobarlos por nombre) o null si no hay forma de saberlo.
  *
  * @param {{season:number, episode:number, absoluteEpisode?:number|null,
  *   seasonEpisodeIndex?:number|null}} numbers
@@ -439,37 +442,144 @@ export function reconcileEpisodeNumbers(
     .sort((a, b) => a.season - b.season);
   if (!seasons.length || !(season > 0) || !(episode > 0)) return null;
 
-  const claimed = seasons.find((s) => s.season === season);
-  if (claimed && episode <= claimed.count) return { season, episode, via: "as_is" };
-
-  const total = seasons.reduce((sum, s) => sum + s.count, 0);
-  const distribute = (position, via) => {
-    if (!(position > 0) || position > total) return null;
-    let before = 0;
-    for (const s of seasons) {
-      if (position <= before + s.count) return { season: s.season, episode: position - before, via };
-      before += s.count;
+  // Posición de inicio de cada temporada de TMDb (1 = primer episodio de la T1).
+  let cursor = 1;
+  for (const s of seasons) {
+    s.start = cursor;
+    cursor += s.count;
+  }
+  const total = cursor - 1;
+  const positionOf = (pair) => {
+    const s = seasons.find((x) => x.season === pair.season);
+    return s && pair.episode <= s.count ? s.start + pair.episode - 1 : null;
+  };
+  // Cuenta `n` episodios desde el inicio de la temporada `from` (índice).
+  const countFrom = (from, n, via) => {
+    let left = n;
+    for (let i = from; i < seasons.length; i += 1) {
+      if (left <= seasons[i].count) return { season: seasons[i].season, episode: left, via };
+      left -= seasons[i].count;
     }
     return null;
   };
+  const distribute = (position, via) => (position > 0 && position <= total ? countFrom(0, position, via) : null);
+  const positive = (v) => (Number.isInteger(v) && v > 0 ? v : null);
+  const tolerance = (position) => Math.max(3, Math.ceil(position * 0.06));
 
-  const largest = Math.max(...seasons.map((s) => s.count));
-  let absolute = null;
-  if (Number.isInteger(absoluteEpisode) && absoluteEpisode > 0) {
-    absolute = distribute(absoluteEpisode, "absolute");
-  } else if (claimed ? episode > claimed.count : episode > largest) {
-    absolute = distribute(episode, "absolute");
-  } else if (!claimed && seasons.length === 1) {
-    return distribute(episode, "absolute_guess");
-  }
+  const claimed = seasons.find((s) => s.season === season);
+  const asIs = claimed && episode <= claimed.count ? { season, episode, via: "as_is" } : null;
+  const finish = (best, others) => {
+    if (!best) return null;
+    const seen = new Set([`${best.season}:${best.episode}`]);
+    const candidates = others.filter((c) => {
+      if (!c) return false;
+      const key = `${c.season}:${c.episode}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    return { ...best, candidates };
+  };
 
-  // La temporada de la plataforma existe en TMDb y el reparto cae en ella: lo
-  // que falla es la cuenta de antes, no las temporadas.
-  if (claimed && (!absolute || absolute.season === claimed.season)) {
-    if (Number.isInteger(seasonEpisodeIndex) && seasonEpisodeIndex > 0 && seasonEpisodeIndex <= claimed.count) {
-      return { season, episode: seasonEpisodeIndex, via: "season_index" };
+  const position = positive(absoluteEpisode);
+  const index = positive(seasonEpisodeIndex);
+  if (position) {
+    // El par vale tal cual solo si su posición en TMDb cuadra con la de la
+    // plataforma: en una serie reagrupada, el T2:E1 de Netflix NO es el de TMDb.
+    if (asIs && Math.abs(positionOf(asIs) - position) <= tolerance(position)) {
+      return finish(asIs, []);
     }
-    if (absolute) return { ...absolute, via: "absolute_same_season" };
+    const absolute = distribute(position, "absolute");
+    let aligned = null;
+    if (index && index <= position) {
+      const platformStart = position - index + 1;
+      let best = null;
+      seasons.forEach((s, i) => {
+        const gap = Math.abs(s.start - platformStart);
+        if (gap <= tolerance(platformStart) && (!best || gap < best.gap)) best = { i, gap };
+      });
+      if (best) aligned = countFrom(best.i, index, "aligned");
+    }
+    return finish(aligned || absolute, [absolute, asIs]);
   }
-  return absolute;
+
+  // Sin posiciones: lo que se pueda deducir del par.
+  if (asIs) return finish(asIs, []);
+  const largest = Math.max(...seasons.map((s) => s.count));
+  if (!claimed && seasons.length === 1) {
+    const guess = distribute(episode, "absolute_guess");
+    return finish(guess, []);
+  }
+  const cannotBeRelative = claimed ? episode > claimed.count : episode > largest;
+  if (!cannotBeRelative) return null;
+  const absolute = distribute(episode, "absolute");
+  if (absolute && claimed && absolute.season === claimed.season) {
+    // Misma temporada en las dos: lo que no cuadra es la cuenta de antes, y la
+    // posición dentro de la temporada (si se sabe) es la buena.
+    if (index && index <= claimed.count) {
+      return finish({ season, episode: index, via: "season_index" }, [absolute]);
+    }
+    return finish({ ...absolute, via: "absolute_same_season" }, []);
+  }
+  return finish(absolute, []);
+}
+
+/**
+ * El episodio de TMDb cuyo NOMBRE casa con el de la plataforma, buscando cerca
+ * (±`window` episodios) de la posición calculada. Corrige un desfase que quede
+ * tras alinear (especiales repartidos de otra forma). Solo un candidato único:
+ * exacto, o si no hay exactos, por inclusión fiable (ver matchEpisodeCandidates).
+ *
+ * @param {string} episodeName nombre que da la plataforma
+ * @param {Array<{season_number, episode_number, name}>} allEpisodes de TMDb (es + en)
+ * @param {Array<{season_number, episode_count}>} realSeasons
+ * @param {{season:number, episode:number}} around posición calculada
+ * @returns {{season:number, episode:number}|null}
+ */
+export function anchorEpisodeByName(episodeName, allEpisodes, realSeasons, around, window = 12) {
+  if (!episodeName || isGenericEpisodeName(episodeName) || !around) return null;
+  const seasons = (Array.isArray(realSeasons) ? realSeasons : [])
+    .map((s) => ({ season: Number(s?.season_number), count: Number(s?.episode_count) || 0 }))
+    .filter((s) => Number.isInteger(s.season) && s.season > 0)
+    .sort((a, b) => a.season - b.season);
+  let cursor = 1;
+  const startOf = new Map();
+  for (const s of seasons) {
+    startOf.set(s.season, cursor);
+    cursor += s.count;
+  }
+  const pos = (season, ep) => (startOf.has(season) ? startOf.get(season) + ep - 1 : null);
+  const center = pos(around.season, around.episode);
+  if (center == null) return null;
+  const nearby = (Array.isArray(allEpisodes) ? allEpisodes : []).filter((e) => {
+    const p = pos(Number(e?.season_number), Number(e?.episode_number));
+    return p != null && Math.abs(p - center) <= window;
+  });
+  const { exact, partial } = matchEpisodeCandidates({ episodeName, seasonEpisodes: nearby });
+  const unique = (list) => {
+    const keys = [...new Set(list.map((c) => `${c.season}:${c.episode}`))];
+    return keys.length === 1 ? list[0] : null;
+  };
+  return unique(exact) || (exact.length === 0 ? unique(partial) : null);
+}
+
+/**
+ * Un par que existe en TMDb no es por fuerza el episodio que suena: sin las
+ * posiciones de la plataforma (app Android, otras plataformas), el «T2:E1» de una
+ * serie que la plataforma reagrupa («Dragon Ball Z Kai»: 2 temporadas frente a
+ * 6) existe en TMDb pero es otro. Si el NOMBRE del episodio no es el de ese par
+ * pero casa EXACTO con un único episodio de la serie, ese es el bueno.
+ *
+ * Conservador: un nombre genérico, traducido distinto (sin coincidencia exacta)
+ * o repetido entre temporadas no cambia nada; tampoco si casa con el propio par.
+ * @returns {{season:number, episode:number}|null} el episodio por nombre, o null
+ */
+export function episodeElsewhereByName(episodeName, allEpisodes, pair) {
+  if (!episodeName || isGenericEpisodeName(episodeName) || !pair) return null;
+  const { exact } = matchEpisodeCandidates({ episodeName, seasonEpisodes: allEpisodes });
+  const keys = [...new Set(exact.map((c) => `${Number(c.season)}:${Number(c.episode)}`))];
+  if (keys.length !== 1) return null;
+  const [season, episode] = keys[0].split(":").map(Number);
+  if (season === Number(pair.season) && episode === Number(pair.episode)) return null;
+  return { season, episode };
 }

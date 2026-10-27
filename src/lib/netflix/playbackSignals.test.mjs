@@ -140,6 +140,20 @@ const SHOWS = [
       ],
     },
   },
+  // TMDb la tiene en 6 temporadas y Netflix en 2: el T2:E1 de Netflix es el S5E1.
+  {
+    id: 61709,
+    name: "Dragon Ball Z Kai",
+    popularity: 120,
+    vote_count: 900,
+    seasons: [26, 26, 25, 20, 35, 26].map((episode_count, i) => ({ season_number: i + 1, episode_count })),
+    episodes: {
+      5: [
+        { episode_number: 1, name: "¡Han transcurrido siete años! El primer día de Gohan en la escuela secundaria" },
+        { episode_number: 5, name: "¡Volvamos al mundo de los vivos! Goku participará en el Torneo de Artes Marciales" },
+      ],
+    },
+  },
   // Serie REAL cuyo nombre aparece DENTRO del nombre de un episodio de otra
   // serie ("Capítulo cinco: La Nina"). Es el caso que registraba títulos sin
   // ninguna relación cuando el reproductor no decía de qué serie era el episodio.
@@ -990,4 +1004,81 @@ test("Netflix cuenta especiales de más: su T5·E93 es el T5·E1 de TMDb, no el 
   // Sin posición ni nombre que case: el reparto, con confianza baja.
   const guessed = await sync({ ...MHA_NETFLIX, episodeName: "Otro nombre" }, learned());
   assert.deepEqual([synced(guessed).season, synced(guessed).episode, synced(guessed).confidence], [5, 5, "low"]);
+});
+
+// La extensión en Netflix con «Dragon Ball Z Kai»: su T2 empieza en la posición
+// 102 (Netflix cuenta episodios de más) y el episodio es el 1.º de esa temporada.
+const DBZK_NETFLIX = {
+  platform: "netflix",
+  contentId: "80244799",
+  mainTitle: "Dragon Ball Z Kai",
+  showName: "Dragon Ball Z Kai",
+  episodeName: "Siete años después",
+  season: 2,
+  episode: 102,
+  seasonEpisodeText: "T2:E102",
+  identitySource: "netflix_metadata",
+  mediaTypeHint: "tv",
+  absoluteEpisode: 102,
+  seasonEpisodeIndex: 1,
+  durationSec: 1380,
+  positionSec: 90,
+  detectionKind: "playback",
+};
+
+test("Temporadas reagrupadas: el T2:E1 de Netflix de «Dragon Ball Z Kai» es el S5E1, no el S5E5", async () => {
+  const absolute = await sync(DBZK_NETFLIX, learned());
+  assert.deepEqual([synced(absolute).tmdbId, synced(absolute).season, synced(absolute).episode], [61709, 5, 1]);
+
+  // Netflix con numeración relativa (T2:E1): ese par existe en TMDb, pero es otro.
+  const relative = await sync({ ...DBZK_NETFLIX, episode: 1, seasonEpisodeText: "T2:E1" }, learned());
+  assert.deepEqual([synced(relative).season, synced(relative).episode], [5, 1]);
+
+  // Con el nombre de TMDb del episodio, el nombre lo confirma.
+  const named = await sync({ ...DBZK_NETFLIX, episodeName: "¡Han transcurrido siete años! El primer día de Gohan en la escuela secundaria" }, learned());
+  assert.deepEqual([synced(named).season, synced(named).episode], [5, 1]);
+});
+
+test("El nombre del episodio corrige un desfase que quede tras alinear", async () => {
+  // Posición que no alinea con ningún inicio (desfase de 4 dentro de la T5).
+  const result = await sync({
+    ...DBZK_NETFLIX,
+    season: 5,
+    episode: 106,
+    absoluteEpisode: 106,
+    seasonEpisodeIndex: 9,
+    episodeName: "¡Volvamos al mundo de los vivos! Goku participará en el Torneo de Artes Marciales",
+  }, learned());
+  assert.deepEqual([synced(result).season, synced(result).episode], [5, 5]);
+});
+
+test("App Android (sin posiciones): un par que existe en TMDb pero es otro episodio se corrige por su nombre", async () => {
+  // La app de Netflix muestra «T2:E1» (numeración relativa) y el nombre del
+  // episodio; en TMDb ese nombre es el S5E1.
+  const result = await sync({
+    platform: "com.netflix.mediaclient",
+    mainTitle: "Dragon Ball Z Kai",
+    showName: "Dragon Ball Z Kai",
+    episodeName: "¡Han transcurrido siete años! El primer día de Gohan en la escuela secundaria",
+    season: 2,
+    episode: 1,
+    seasonEpisodeText: "T2:E1",
+    durationSec: 1380,
+    detectionKind: "playback",
+  }, learned());
+  assert.deepEqual([synced(result).season, synced(result).episode], [5, 1]);
+
+  // Sin nombre que case exacto, el par se queda (no se inventa nada).
+  const unchanged = await sync({
+    platform: "com.netflix.mediaclient",
+    mainTitle: "Dragon Ball Z Kai",
+    showName: "Dragon Ball Z Kai",
+    episodeName: "Siete años después",
+    season: 2,
+    episode: 1,
+    seasonEpisodeText: "T2:E1",
+    durationSec: 1380,
+    detectionKind: "playback",
+  }, learned());
+  assert.deepEqual([synced(unchanged).season, synced(unchanged).episode], [2, 1]);
 });
