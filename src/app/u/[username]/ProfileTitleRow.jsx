@@ -6,7 +6,7 @@
 //
 // EN MÓVIL, si los botones no dejan sitio al nombre (se recortaría con «…»),
 // se recogen en un botón de tres puntos que despliega el resto como un menú.
-// En el perfil propio, Cerrar sesión se queda a la vista junto a los tres
+// En el perfil propio, Configuración se queda a la vista junto a los tres
 // puntos si así cabe el nombre; si tampoco, va también al menú. Se mide con el
 // nombre ENTERO frente al hueco que le dejaría cada nivel (su ancho se guarda
 // mientras se ve), así que al recoger no se vuelve a desplegar solo porque
@@ -56,13 +56,13 @@ function useProfileShare(profile) {
   });
 }
 
-// Cuánto se recogen los botones: todos a la vista, Cerrar sesión + tres
+// Cuánto se recogen los botones: todos a la vista, Configuración + tres
 // puntos (solo en el perfil propio) o solo los tres puntos.
 const ACTIONS_EXPANDED = 0;
-const ACTIONS_LOGOUT = 1;
+const ACTIONS_SETTINGS = 1;
 const ACTIONS_MENU = 2;
-// En el perfil ajeno no hay Cerrar sesión: de todos a la vista, al menú.
-const SELF_LEVELS = [ACTIONS_EXPANDED, ACTIONS_LOGOUT, ACTIONS_MENU];
+// En el perfil ajeno no hay Configuración: de todos a la vista, al menú.
+const SELF_LEVELS = [ACTIONS_EXPANDED, ACTIONS_SETTINGS, ACTIONS_MENU];
 const OTHER_LEVELS = [ACTIONS_EXPANDED, ACTIONS_MENU];
 
 /**
@@ -93,7 +93,7 @@ function useCollapsedActions({ rowRef, nameRef, actionsRef, levels, watch }) {
 
     const widthOf = (target) => {
       if (widths.current[target]) return widths.current[target];
-      if (target !== ACTIONS_LOGOUT) return 0;
+      if (target !== ACTIONS_SETTINGS) return 0;
       const button = actions.querySelector("button");
       const gap = Number.parseFloat(getComputedStyle(actions).columnGap) || 0;
       return button ? button.getBoundingClientRect().width * 2 + gap : 0;
@@ -283,17 +283,16 @@ export default function ProfileTitleRow({ profile, isSelf, syncing, onSync }) {
   // progreso del navegador mientras llega la página.
   const openSettings = () => router.push("/profile/settings");
 
-  const logoutButton = (
+  const settingsButton = (
     <LiquidButton
-      onClick={() => setShowLogoutModal(true)}
+      onClick={openSettings}
       disabled={syncing}
-      activeColor="red"
+      activeColor="teal"
       groupId="profile-header-actions"
-      title="Cerrar sesión"
-      aria-label="Cerrar sesión"
-      className={`${HEADER_BUTTON_CLASS} !text-red-400 hover:!text-red-300`}
+      title="Configuración"
+      className={HEADER_BUTTON_CLASS}
     >
-      <LogOut className={HEADER_ICON_CLASS} />
+      <Settings className={HEADER_ICON_CLASS} />
     </LiquidButton>
   );
 
@@ -318,21 +317,18 @@ export default function ProfileTitleRow({ profile, isSelf, syncing, onSync }) {
       >
         {level !== ACTIONS_EXPANDED ? (
           <>
-            {/* Cerrar sesión se queda a la vista mientras quepa (nivel
+            {/* Configuración se queda a la vista mientras quepa (nivel
                 intermedio); el resto va al menú. */}
-            {level === ACTIONS_LOGOUT ? logoutButton : null}
+            {level === ACTIONS_SETTINGS ? settingsButton : null}
             <ActionsMenu open={menuOpen} onOpenChange={setMenuOpen} buttonProps={share.warmProps}>
               {isSelf ? (
                 <>
-                  <MenuItem icon={Settings} tone="text-teal-300" label="Configuración" onClick={fromMenu(openSettings)} disabled={syncing} />
-                  <MenuItem icon={Share2} tone="text-sky-300" label="Compartir perfil" onClick={fromMenu(share.handleShare)} disabled={syncing} />
-                  <MenuItem icon={RotateCcw} tone="text-emerald-300" label="Sincronizar" onClick={fromMenu(onSync)} disabled={syncing} />
                   {level === ACTIONS_MENU ? (
-                    <>
-                      <div className="my-1.5 h-px bg-white/5" />
-                      <MenuItem icon={LogOut} tone="text-red-400" label="Cerrar sesión" onClick={fromMenu(() => setShowLogoutModal(true))} disabled={syncing} />
-                    </>
+                    <MenuItem icon={Settings} tone="text-teal-300" label="Configuración" onClick={fromMenu(openSettings)} disabled={syncing} />
                   ) : null}
+                  <MenuItem icon={RotateCcw} tone="text-emerald-300" label="Sincronizar" onClick={fromMenu(onSync)} disabled={syncing} />
+                  <MenuItem icon={Share2} tone="text-sky-300" label="Compartir perfil" onClick={fromMenu(share.handleShare)} disabled={syncing} />
+                  <MenuItem icon={LogOut} tone="text-red-400" label="Cerrar sesión" onClick={fromMenu(() => setShowLogoutModal(true))} disabled={syncing} />
                 </>
               ) : (
                 <>
@@ -352,16 +348,7 @@ export default function ProfileTitleRow({ profile, isSelf, syncing, onSync }) {
           </>
         ) : isSelf ? (
           <>
-            <LiquidButton
-              onClick={openSettings}
-              disabled={syncing}
-              activeColor="teal"
-              groupId="profile-header-actions"
-              title="Configuración"
-              className={HEADER_BUTTON_CLASS}
-            >
-              <Settings className={HEADER_ICON_CLASS} />
-            </LiquidButton>
+            {settingsButton}
             <LiquidButton
               onClick={share.handleShare}
               {...share.warmProps}
@@ -386,7 +373,17 @@ export default function ProfileTitleRow({ profile, isSelf, syncing, onSync }) {
             >
               <RotateCcw className={`${HEADER_ICON_CLASS} ${syncing ? "animate-spin" : ""}`} />
             </LiquidButton>
-            {logoutButton}
+            <LiquidButton
+              onClick={() => setShowLogoutModal(true)}
+              disabled={syncing}
+              activeColor="red"
+              groupId="profile-header-actions"
+              title="Cerrar sesión"
+              aria-label="Cerrar sesión"
+              className={`${HEADER_BUTTON_CLASS} !text-red-400 hover:!text-red-300`}
+            >
+              <LogOut className={HEADER_ICON_CLASS} />
+            </LiquidButton>
           </>
         ) : (
           <>
