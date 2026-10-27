@@ -206,7 +206,13 @@ export default function SectionSheet({
           {toolbar}
         </header>
 
-        <div className="details-sheet-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-1 sm:px-6">
+        {/* `will-change-transform`: al desplegar la fila de filtros de la
+            cabecera (MobileFiltersPanel anima su altura) esta zona baja en cada
+            fotograma. Sin capa propia se volvía a pintar entera en cada uno
+            (~2.200 imágenes pintadas por despliegue en «Portadas y fondos») y
+            en el móvil las tarjetas parpadeaban; con ella solo se desplaza.
+            No aplana el cristal: eso lo hace `opacity`, no `transform`. */}
+        <div className="details-sheet-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-1 will-change-transform sm:px-6">
           {children}
         </div>
 
