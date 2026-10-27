@@ -12,11 +12,19 @@
 //
 // Logo, fila de botones y marcador (las PIEZAS, `parts`) NO se desvanecen
 // cuando la ficha de destino es DetailsClient, que pinta los mismos: mientras
-// crece la portada se quedan quietas en pantalla y, con la ficha lista, vuelan
-// a la caja de su pareja en la ficha (`PEEK_HANDOFF_PART_ATTR`). La ficha las
-// pinta ya sin su animación de entrada, así que al desvanecerse la vista
-// previa no se ven desaparecer ni volver a entrar. Si una pieza no tiene
-// pareja (temporadas, episodios), se desvanece al tocar, como antes.
+// crece la portada viajan ya a donde los pintará la ficha (la última caja
+// medida para este tamaño de pantalla, `rememberPartTargets`; la primera vez,
+// se quedan quietas) y, con la ficha lista, se ajustan a la caja real de su
+// pareja (`PEEK_HANDOFF_PART_ATTR`). Al llegar, en el mismo fotograma, se
+// ocultan y aparecen las de la ficha (`revealPeekHandoffParts`), que hasta
+// entonces estaban ocultas debajo (`PEEK_HANDOFF_ACTIVE_ATTR`) y se pintan sin
+// animación de entrada: un relevo al píxel, sin verse dobles ni volver a
+// entrar. Después solo se desvanece la portada, idéntica a la de la ficha. Si
+// una pieza no tiene pareja (temporadas, episodios), se desvanece al tocar.
+//
+// Las piezas viven dentro de la tarjeta, que también se transforma: su
+// trayectoria en pantalla se muestrea en fotogramas clave (`flightKeyframes`)
+// para que vaya en línea recta con la curva de la tarjeta y no haga un arco.
 //
 // Solo `transform` y `opacity` con la API de animaciones: la navegación y el
 // montaje de la ficha cargan el hilo principal justo entonces, y el
@@ -37,10 +45,19 @@ export function beginPeekHandoff(href) {
   } catch {
     pending = null;
   }
+  if (pending && peekHrefKeepsParts(href)) {
+    document.documentElement.setAttribute(PEEK_HANDOFF_ACTIVE_ATTR, "");
+  }
 }
 
 export function endPeekHandoff() {
   pending = null;
+  revealPeekHandoffParts();
+}
+
+// Las piezas de la ficha dejan de estar ocultas (ver globals.css).
+export function revealPeekHandoffParts() {
+  document.documentElement.removeAttribute(PEEK_HANDOFF_ACTIVE_ATTR);
 }
 
 export function isPeekHandoffTarget(pathname) {
@@ -62,6 +79,10 @@ export const PEEK_HANDOFF_PART_ATTR = "data-peek-handoff-part";
 export const PEEK_HANDOFF_READY_ATTR = "data-peek-handoff-ready";
 // En una pieza de la ficha que aún no está lista (el logo, hasta decodificarse).
 export const PEEK_HANDOFF_PENDING_ATTR = "data-peek-handoff-pending";
+// En <html> mientras las piezas de la vista previa van a las de la ficha: las
+// de la ficha están ocultas (`visibility`, no `opacity`, que mataría el
+// cristal de los botones) para no verse dobles a través de la tarjeta.
+export const PEEK_HANDOFF_ACTIVE_ATTR = "data-peek-handoff-active";
 
 // ¿Lleva `href` a una ficha de película o serie (DetailsClient), que tiene
 // pareja para cada pieza?
@@ -75,9 +96,32 @@ export function peekHrefKeepsParts(href) {
   }
 }
 
-export const PEEK_MORPH_MS = 420;
-export const PEEK_MORPH_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
+const PEEK_MORPH_MS = 420;
+const PEEK_MORPH_CURVE = [0.22, 1, 0.36, 1];
+const PEEK_MORPH_EASING = `cubic-bezier(${PEEK_MORPH_CURVE.join(", ")})`;
 const PEEK_SETTLE_MS = 260;
+// Fotogramas clave por trayectoria de pieza (ver `flightKeyframes`).
+const FLIGHT_STEPS = 24;
+
+// La curva de la tarjeta evaluada aquí, para muestrear las piezas con ella.
+function cubicBezier([x1, y1, x2, y2]) {
+  const coord = (p1, p2, t) =>
+    3 * (1 - t) * (1 - t) * t * p1 + 3 * (1 - t) * t * t * p2 + t * t * t;
+  return (x) => {
+    let lo = 0;
+    let hi = 1;
+    let t = x;
+    for (let i = 0; i < 30; i += 1) {
+      const value = coord(x1, x2, t);
+      if (Math.abs(value - x) < 1e-5) break;
+      if (value < x) lo = t;
+      else hi = t;
+      t = (lo + hi) / 2;
+    }
+    return coord(y1, y2, t);
+  };
+}
+const morphEase = cubicBezier(PEEK_MORPH_CURVE);
 
 // Caja de la IMAGEN entera de la portada de la tarjeta, sin transformar. La
 // portada simple es un póster 2:3 en `object-cover` centrado en una caja algo
@@ -111,34 +155,55 @@ function cardTransformTo(box, { left, top, width }) {
   return { scale, tx, ty, css: `translate(${tx}px, ${ty}px) scale(${scale})` };
 }
 
+// La transformación actual de la tarjeta, siempre traslación + escala.
+function currentCardTransform(card) {
+  const raw = window.getComputedStyle(card).transform;
+  const m = raw && raw !== "none" ? new DOMMatrixReadOnly(raw) : null;
+  const scale = m?.a || 1;
+  const tx = m?.e || 0;
+  const ty = m?.f || 0;
+  return { scale, tx, ty, css: `translate(${tx}px, ${ty}px) scale(${scale})` };
+}
+
 /* ---------------------------- Piezas ---------------------------- */
-// Caja de cada pieza SIN transformar (ni la tarjeta ni ella), en pantalla.
-// Se toma al tocar y se reutiliza al final: entonces todo está transformado.
-const partRects = new WeakMap();
+// Piezas que viajan en el relevo en curso.
+const flyingParts = new WeakSet();
 
 // Lo que se mide de una pieza: el logo es una franja a todo el ancho con el
 // logo centrado; cuenta la imagen (o el título), no la franja.
 const partMeasureNode = (node, name) =>
   name === "logo" ? node.firstElementChild || node : node;
 
-// Caja de `node` en la tarjeta sin transformar. La transformación de la
-// tarjeta es siempre traslación + escala con origen en su centro (`box`).
-function untransformedRect(node, card, box) {
-  const rect = node.getBoundingClientRect();
-  const raw = window.getComputedStyle(card).transform;
-  const m = raw && raw !== "none" ? new DOMMatrixReadOnly(raw) : null;
-  const a = m?.a || 1;
-  const e = m?.e || 0;
-  const f = m?.f || 0;
-  const left = box.cx + (rect.left - box.cx - e) / a;
-  const top = box.cy + (rect.top - box.cy - f) / a;
-  return { left, top, width: rect.width / a, height: rect.height / a };
+// El marcador de la ficha es más bajo (compacto, sin la barra de stats): se
+// alinea por arriba; lo demás, por el centro.
+const partAlign = (name) => (name === "scoreboard" ? "top" : "center");
+
+// Caja de `node` en pantalla con la tarjeta y él sin transformar, sacada del
+// layout (desplazamientos hasta la tarjeta), no deshaciendo transformaciones:
+// así sirve igual al tocar que al final, con todo a medio animar, y sigue a
+// la tarjeta si su contenido cambia de alto entre medias.
+function untransformedRect(node, card) {
+  let x = 0;
+  let y = 0;
+  let current = node;
+  while (current && current !== card) {
+    x += current.offsetLeft;
+    y += current.offsetTop;
+    current = current.offsetParent;
+  }
+  if (current !== card) return null;
+  const vh = window.visualViewport?.height || window.innerHeight;
+  return {
+    left: (window.innerWidth - card.offsetWidth) / 2 + x,
+    top: (vh - card.offsetHeight) / 2 + y - card.scrollTop,
+    width: node.offsetWidth,
+    height: node.offsetHeight,
+  };
 }
 
 // Transformación de la pieza (origen en su centro) que, dentro de la tarjeta
 // transformada con `cardT`, la deja en pantalla en `to`: centrada en ella y
-// con su ancho. `align: "top"` alinea el borde de arriba en vez del centro
-// (el marcador de la ficha es más bajo: compacto, sin la barra de stats).
+// con su ancho. `align: "top"` alinea el borde de arriba en vez del centro.
 function partTransformTo(rect, to, box, cardT, { align = "center" } = {}) {
   const k = to.width / (rect.width * cardT.scale);
   const cx = rect.left + rect.width / 2;
@@ -153,6 +218,35 @@ function partTransformTo(rect, to, box, cardT, { align = "center" } = {}) {
   return `translate(${dx}px, ${dy}px) scale(${k})`;
 }
 
+// Fotogramas clave de una pieza que va en pantalla de `from` a `to` mientras
+// la tarjeta va de `cardFrom` a `cardTo`, las dos con la curva del relevo. Con
+// solo dos fotogramas la pieza se interpola dentro de una tarjeta que también
+// se interpola y la suma hace un arco (se desvía y vuelve); muestreada, va
+// recta. Entre muestras, lineal (`easing: "linear"` en la animación).
+function flightKeyframes(layout, from, to, box, cardFrom, cardTo, options) {
+  const frames = [];
+  for (let i = 0; i <= FLIGHT_STEPS; i += 1) {
+    const p = morphEase(i / FLIGHT_STEPS);
+    const lerp = (a, b) => a + (b - a) * p;
+    const cardT = {
+      scale: lerp(cardFrom.scale, cardTo.scale),
+      tx: lerp(cardFrom.tx, cardTo.tx),
+      ty: lerp(cardFrom.ty, cardTo.ty),
+    };
+    const screen = {
+      left: lerp(from.left, to.left),
+      top: lerp(from.top, to.top),
+      width: lerp(from.width, to.width),
+      height: lerp(from.height, to.height),
+    };
+    frames.push({
+      offset: i / FLIGHT_STEPS,
+      transform: partTransformTo(layout, screen, box, cardT, options),
+    });
+  }
+  return frames;
+}
+
 function cancelTransformAnimations(node) {
   node.getAnimations().forEach((animation) => {
     if (animation.effect?.getKeyframes?.().some((frame) => frame.transform)) {
@@ -161,25 +255,101 @@ function cancelTransformAnimations(node) {
   });
 }
 
+// Dónde pinta la ficha cada pieza, por tamaño de pantalla: logo, botones y
+// marcador van a la misma distancia del navbar inferior en cualquier ficha
+// (ver useMobileDetailsHero con `fitCover`). Del logo se guarda el pie, el
+// centro y sus límites, porque su tamaño depende de su proporción.
+const PART_TARGETS_KEY = "sv:peek-handoff-parts:v1";
+const viewportKey = () =>
+  `${window.innerWidth}x${Math.round(window.visualViewport?.height || window.innerHeight)}`;
+
+function readPartTargets() {
+  try {
+    const all = JSON.parse(window.sessionStorage.getItem(PART_TARGETS_KEY) || "{}");
+    return all[viewportKey()] || null;
+  } catch {
+    return null;
+  }
+}
+
+function rememberPartTargets(targets) {
+  try {
+    const all = JSON.parse(window.sessionStorage.getItem(PART_TARGETS_KEY) || "{}");
+    all[viewportKey()] = targets;
+    window.sessionStorage.setItem(PART_TARGETS_KEY, JSON.stringify(all));
+  } catch {
+    // Sin almacenamiento: la próxima vez las piezas esperan quietas.
+  }
+}
+
+// Límite de tamaño (`max-width`/`max-height`) en px; los porcentajes, sobre
+// `base`.
+function cssLimit(value, base) {
+  if (!value || value === "none") return Infinity;
+  const n = parseFloat(value);
+  if (!Number.isFinite(n)) return Infinity;
+  return value.endsWith("%") ? (n / 100) * base : n;
+}
+
+function measurePartTarget(name, pair) {
+  const measured = partMeasureNode(pair, name);
+  const rect = measured.getBoundingClientRect();
+  const box = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+  if (name !== "logo" || measured.tagName !== "IMG") return box;
+  const style = window.getComputedStyle(measured);
+  const strip = window.getComputedStyle(pair);
+  const inner =
+    pair.clientWidth - parseFloat(strip.paddingLeft) - parseFloat(strip.paddingRight);
+  return {
+    ...box,
+    image: {
+      bottom: rect.bottom,
+      cx: rect.left + rect.width / 2,
+      maxWidth: cssLimit(style.maxWidth, inner),
+      maxHeight: cssLimit(style.maxHeight, 0),
+    },
+  };
+}
+
+// Caja prevista para la pieza `name`, que en la tarjeta mide `screen`.
+function predictPartTarget(name, screen, measured, targets) {
+  const target = targets?.[name];
+  if (!target) return null;
+  if (name !== "logo") return target;
+  // El logo: imagen en las dos, con su proporción y los límites de la ficha.
+  if (!target.image || measured.tagName !== "IMG" || !screen.height) return null;
+  const ratio = screen.width / screen.height;
+  const width = Math.min(target.image.maxWidth, target.image.maxHeight * ratio);
+  if (!Number.isFinite(width) || width <= 0) return null;
+  const height = width / ratio;
+  return {
+    left: target.image.cx - width / 2,
+    top: target.image.bottom - height,
+    width,
+    height,
+  };
+}
+
 // Primer tramo, en el fotograma del toque: la portada crece a la cabecera de
 // la ficha (todo el ancho con su sobrebarrido, pegada arriba), las esquinas se
-// enderezan, las piezas (`parts`) se quedan quietas en pantalla y lo demás de
-// la tarjeta (`fadeNodes`) se desvanece.
+// enderezan, las piezas (`parts`) van a donde las pintará la ficha (o se
+// quedan quietas si aún no se sabe) y lo demás de la tarjeta (`fadeNodes`) se
+// desvanece.
 export function morphPeekCard(card, cover, { parts = [], fadeNodes = [], overscan = 1, fullPoster = true, reduceMotion = false } = {}) {
   if (!card || !cover || typeof card.animate !== "function") return;
   const current = window.getComputedStyle(card);
-  const from = current.transform === "none" ? "none" : current.transform;
+  const fromCard = currentCardTransform(card);
   const fromOpacity = current.opacity;
   const box = peekImageBox(card, cover, { fullPoster });
-  const liveParts = reduceMotion ? [] : parts.filter(Boolean);
   // Medidas antes de cancelar nada: la tarjeta puede estar aún entrando.
-  for (const node of liveParts) {
-    const measured = partMeasureNode(node, node.getAttribute("data-peek-part"));
-    partRects.set(node, {
-      layout: untransformedRect(measured, card, box),
-      screen: measured.getBoundingClientRect(),
-    });
-  }
+  const liveParts = (reduceMotion ? [] : parts.filter(Boolean)).flatMap((node) => {
+    const name = node.getAttribute("data-peek-part");
+    const animated = partMeasureNode(node, name);
+    const layout = untransformedRect(animated, card);
+    if (!layout) return [];
+    flyingParts.add(node);
+    return [{ name, animated, layout, screen: animated.getBoundingClientRect() }];
+  });
   card.getAnimations().forEach((animation) => animation.cancel());
   card.style.pointerEvents = "none";
   const fading = reduceMotion ? [...fadeNodes, ...parts] : fadeNodes;
@@ -202,73 +372,89 @@ export function morphPeekCard(card, cover, { parts = [], fadeNodes = [], oversca
   const to = cardTransformTo(box, { left: (box.vw - width) / 2, top: 0, width });
   card.animate(
     [
-      { transform: from, opacity: fromOpacity, borderRadius: current.borderRadius },
+      { transform: fromCard.css, opacity: fromOpacity, borderRadius: current.borderRadius },
       { transform: to.css, opacity: 1, borderRadius: "0px" },
     ],
     { duration: PEEK_MORPH_MS, easing: PEEK_MORPH_EASING, fill: "forwards" },
   );
-  for (const node of liveParts) {
-    const { layout, screen } = partRects.get(node);
-    const animated = partMeasureNode(node, node.getAttribute("data-peek-part"));
+  const targets = readPartTargets();
+  for (const { name, animated, layout, screen } of liveParts) {
+    const goal = predictPartTarget(name, screen, animated, targets) || screen;
     cancelTransformAnimations(animated);
     animated.animate(
-      [{ transform: "none" }, { transform: partTransformTo(layout, screen, box, to) }],
-      { duration: PEEK_MORPH_MS, easing: PEEK_MORPH_EASING, fill: "forwards" },
+      flightKeyframes(layout, screen, goal, box, fromCard, to, { align: partAlign(name) }),
+      { duration: PEEK_MORPH_MS, easing: "linear", fill: "forwards" },
     );
   }
 }
 
 // Último tramo, con la ficha ya en pantalla: la tarjeta se ajusta a la caja
 // real de su portada (en temporadas y episodios va bajo el navbar, y la
-// estimación del primer tramo no lo sabe) y cada pieza vuela a la de su
-// pareja en la ficha. Devuelve cuánto dura (ms) si alguna pieza vuela: la
-// vista previa no debe desvanecerse hasta que lleguen, o se verían dobles.
+// estimación del primer tramo no lo sabe) y cada pieza, a la de su pareja en
+// la ficha. Devuelve una promesa que se cumple cuando han llegado (al
+// instante si ninguna vuela): hasta entonces la vista previa no debe
+// desvanecerse ni la ficha enseñar las suyas, o se verían dobles. Trae las
+// piezas que han quedado exactamente encima de su pareja: el marcador de la
+// ficha puede ser más bajo (compacto) y entonces no se cambia de golpe, se
+// desvanece con la vista previa.
 export function settlePeekCard(card, cover, target, { fullPoster = true, reduceMotion = false } = {}) {
-  if (!card || !cover || reduceMotion) return 0;
-  if (typeof card.animate !== "function") return 0;
+  if (!card || !cover || reduceMotion) return Promise.resolve([]);
+  if (typeof card.animate !== "function") return Promise.resolve([]);
   const box = peekImageBox(card, cover, { fullPoster });
   const rect = target?.getBoundingClientRect();
-  const fromCard = window.getComputedStyle(card).transform;
-  const raw = fromCard && fromCard !== "none" ? new DOMMatrixReadOnly(fromCard) : null;
+  const fromCard = currentCardTransform(card);
   const cardT = rect?.width
     ? cardTransformTo(box, { left: rect.left, top: rect.top, width: rect.width })
-    : { scale: raw?.a || 1, tx: raw?.e || 0, ty: raw?.f || 0, css: fromCard };
+    : fromCard;
   // Las piezas, desde donde estén (el primer tramo puede no haber acabado).
   const flights = [];
+  const targets = {};
   for (const node of card.querySelectorAll("[data-peek-part]")) {
-    const measured = partRects.get(node);
     const name = node.getAttribute("data-peek-part");
-    const pair = measured && findPeekHandoffPart(name);
+    const pair = flyingParts.has(node) && findPeekHandoffPart(name);
     const pairRect = pair && partMeasureNode(pair, name).getBoundingClientRect();
     if (!pairRect?.width) continue;
     const animated = partMeasureNode(node, name);
+    const layout = untransformedRect(animated, card);
+    if (!layout) continue;
+    targets[name] = measurePartTarget(name, pair);
+    const from = animated.getBoundingClientRect();
+    const landedHeight = (from.height / from.width) * pairRect.width;
     flights.push({
+      node,
       animated,
-      from: window.getComputedStyle(animated).transform,
-      to: partTransformTo(measured.layout, pairRect, box, cardT, {
-        align: name === "scoreboard" ? "top" : "center",
+      exact: Math.abs(landedHeight - pairRect.height) < 2,
+      frames: flightKeyframes(layout, from, pairRect, box, fromCard, cardT, {
+        align: partAlign(name),
       }),
     });
   }
+  if (flights.length) rememberPartTargets({ ...readPartTargets(), ...targets });
   if (rect?.width) {
     cancelTransformAnimations(card);
     card.animate(
       [
-        { transform: fromCard, borderRadius: "0px" },
+        { transform: fromCard.css, borderRadius: "0px" },
         { transform: cardT.css, borderRadius: "0px" },
       ],
       { duration: PEEK_SETTLE_MS, easing: PEEK_MORPH_EASING, fill: "forwards" },
     );
   }
-  for (const { animated, from, to } of flights) {
+  const landings = flights.map(({ animated, frames }) => {
     cancelTransformAnimations(animated);
-    animated.animate([{ transform: from }, { transform: to }], {
-      duration: PEEK_SETTLE_MS,
-      easing: PEEK_MORPH_EASING,
-      fill: "forwards",
-    });
-  }
-  return flights.length ? PEEK_SETTLE_MS : 0;
+    return animated
+      .animate(frames, { duration: PEEK_SETTLE_MS, easing: "linear", fill: "forwards" })
+      .finished.catch(() => {});
+  });
+  const exact = flights.filter((flight) => flight.exact).map((flight) => flight.node);
+  return Promise.all(landings).then(() => exact);
+}
+
+// Relevo de las piezas, en un mismo fotograma: las de la vista previa que han
+// llegado (`nodes`) se ocultan y aparecen las de la ficha, justo debajo.
+export function handOffPeekParts(nodes = []) {
+  for (const node of nodes) node.style.visibility = "hidden";
+  revealPeekHandoffParts();
 }
 
 // Primer nodo a la vista que cumple `selector`, fuera de la vista previa (que

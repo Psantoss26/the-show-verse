@@ -48,6 +48,7 @@ import {
   beginPeekHandoff,
   endPeekHandoff,
   findPeekHandoffTarget,
+  handOffPeekParts,
   peekHandoffPartsReady,
   settlePeekCard,
 } from "@/lib/navigation/peekHandoff";
@@ -221,27 +222,29 @@ export default function MobileTitlePeek() {
       }
       layer.style.pointerEvents = "none";
       // La tarjeta, ya convertida en cabecera, se ajusta a la portada real de
-      // la ficha mientras se desvanece. Si sus piezas vuelan a las de la
-      // ficha, el desvanecido espera a que lleguen: con las dos a la vez se
-      // verían dobles a medio camino.
+      // la ficha y sus piezas, a las de la ficha. Al llegar, en el mismo
+      // fotograma, se cambian por las de la ficha (que estaban ocultas debajo)
+      // y solo entonces se desvanece lo que queda: la portada, idéntica.
       const card = layer.querySelector("[data-peek-card]");
       const cover = layer.querySelector("[data-peek-cover]");
-      const flightMs = settlePeekCard(card, cover, findPeekHandoffTarget(), {
+      settlePeekCard(card, cover, findPeekHandoffTarget(), {
         fullPoster: cover?.hasAttribute("data-peek-full-poster"),
         reduceMotion,
+      }).then((landed) => {
+        if (cancelled) return;
+        handOffPeekParts(landed);
+        const fade = layer.animate([{ opacity: 1 }, { opacity: 0 }], {
+          duration: reduceMotion ? 120 : LEAVE_FADE_MS,
+          easing: "cubic-bezier(0.33, 0, 0.2, 1)",
+          fill: "forwards",
+        });
+        leaveFadeRef.current = fade;
+        const done = () => {
+          endPeekHandoff();
+          if (!cancelled) removeInstantly();
+        };
+        fade.finished.then(done, done);
       });
-      const fade = layer.animate([{ opacity: 1 }, { opacity: 0 }], {
-        duration: reduceMotion ? 120 : LEAVE_FADE_MS,
-        delay: flightMs,
-        easing: "cubic-bezier(0.33, 0, 0.2, 1)",
-        fill: "forwards",
-      });
-      leaveFadeRef.current = fade;
-      const done = () => {
-        endPeekHandoff();
-        if (!cancelled) removeInstantly();
-      };
-      fade.finished.then(done, done);
     };
     const check = () => {
       if (cancelled) return;

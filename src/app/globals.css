@@ -2931,6 +2931,14 @@ button:focus-visible > .sv-nav-glass > .sv-nav-glass__tint {
   }
 }
 
+/* Ida de la vista previa a la ficha (lib/navigation/peekHandoff): mientras
+   logo, botones y marcador de la vista previa viajan a los de la ficha, los de
+   la ficha esperan ocultos debajo y aparecen en el fotograma en que llegan.
+   `visibility` y no `opacity`, que mataría el cristal de los botones. */
+html[data-peek-handoff-active] [data-peek-handoff-part] {
+  visibility: hidden;
+}
+
 /* =============================================================================
    Recharts - Eliminar recuadro de enfoque blanco al hacer click o tap en gráficas
    ========================================================================== */
