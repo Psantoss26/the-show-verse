@@ -37,9 +37,10 @@ tags: [area/integracion, type/referencia, plataforma/navegador]
 | `players.test.js` | La detección reproductor a reproductor, con película y con episodio: reconstruye el DOM real de Netflix, Prime Video, Max, Disney+, Crunchyroll y Plex y comprueba la señal completa. Su contraparte en el servidor es `src/lib/netflix/playbackSignals.test.mjs`. |
 | `netflix-source.js` | Netflix desde su reproductor y sus metadatos (`self.TSVNetflix`, puro y testeable): lectura de `playerApp.getState()`, validación del mensaje de la página, URLs de metadatos (`memberapi/release`, versionadas con `BUILD_IDENTIFIER`, `shakti/mre`), análisis de la respuesta y fusión con la señal. Pruebas en `netflix-source.test.js`. |
 | `netflix-page.js` | Único script en el **mundo de la página** (`"world": "MAIN"`, solo `www.netflix.com`): cada segundo, en `/watch/`, publica por `postMessage` el id del vídeo que suena, si está en pausa y el `BUILD_IDENTIFIER`. No hace peticiones. |
+| `browse-detection.js` | Detección de la FICHA (navegando, sin reproducir), pura y testeable (`self.TSVBrowse`): rutas de ficha por plataforma con su tipo, selectores de título, encabezado más visible, pestaña limpia, JSON-LD, año y tipo seguro (`mediaTypeHint`). Ver *Fichas en todas las plataformas* en `docs/streaming-sync-reliability.md`. |
 | `diagnostic-capture.js` | Captura de diagnóstico (`self.TSVDiagnostic`): URL sin parámetros de sesión, DOM con texto en un formato que `fake-dom.js` rehace, JSON-LD y metas públicas, sin cookies, tokens ni scripts. La usa `self.__tsvDiagnostic()` de `content.js`. |
 | `diagnostic-replay.js` | Solo pruebas y análisis: rehace la señal a partir de una captura con el código actual (`node netflix-extension/diagnostic-replay.js captura.json`). |
-| `diagnostics/` | Capturas reales con su `expected`: cada una es una prueba de `diagnostic.test.js`. Ver su `README.md`. |
+| `diagnostics/` | Capturas reales reducidas (`slimCapture`) de fichas, portadas y reproducción de plataformas con páginas públicas, con su `expected`: cada una es una prueba de `diagnostic.test.js`. Ver su `README.md`. |
 | `platform-enhancers.js` | Refinadores opcionales por plataforma (`self.TSVEnhancers`). Uno por sitio (Netflix, Prime, Max, Disney+, Plex, Crunchyroll) que solo *afina* campos concretos (contentId desde la URL, selectores de título/subtítulo propios) sobre la señal base; nunca lanzan y si un selector cambia la señal genérica se mantiene intacta. |
 | `popup.html` / `popup.js` | UI del icono de la extensión: estado de la sincronización (activa/pausada/no vinculada), email y perfil de Netflix vinculado, botón de pausa/reanudación, interruptor del indicador de acceso rápido, registro de actividad reciente (`chrome.storage.local.logs`) y gestión de "sitios de streaming" añadidos manualmente (solicita permiso de host y registra el content script en caliente). |
 
@@ -62,7 +63,11 @@ pestaña) sobre cualquier selector CSS específico de plataforma. `detection-cor
 4. `platform-enhancers.js` afina después, si aplica, el `contentId` (parseado de la
    URL: `/watch/<id>` en Netflix, `gti=`/`/detail/` en Prime, etc.) y los selectores
    de título/subtítulo propios de cada plataforma (`REFINERS`: netflix, prime, max,
-   disney, plex, crunchyroll).
+   disney, appletv, plex, crunchyroll). Max lee el id entero de
+   `/player/urn:hbo:episode:…` (antes quedaba «urn» para todo); Prime Video lee también
+   `.atvwebplayersdk-episode-info` y quita el sufijo de colección («Serie Season 2»);
+   Apple TV+ lee `player-metadata-title`/`-subtitle`, lo mismo que Universal Trakt
+   Scrobbler.
 
 `content.js` solo considera que hay reproducción real cuando existe un `<video>`
 principal (≥320×180px, para descartar miniaturas/anuncios en iframes) con

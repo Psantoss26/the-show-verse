@@ -62,39 +62,93 @@ el badge de una fila de recomendaciones.
 
 ## Numeración de la plataforma frente a TMDb
 
-La temporada y el episodio que da una plataforma no siempre existen en TMDb.
-Netflix parte temporadas (su «Temporada 4 Parte 2» de *Ataque a los Titanes* es
-su temporada 6) y numera muchos animes de forma absoluta: su T6:E82 es el S4E23 de
-TMDb. Antes se guardaba tal cual, un episodio inexistente.
+Las plataformas agrupan y parten temporadas a su manera y cuentan episodios que
+TMDb no tiene (especiales, recapitulaciones). Su temporada y episodio no siempre
+existen en TMDb, o existen pero son otro episodio:
 
-Ahora el resolutor comprueba el par contra las temporadas de TMDb
-(`reconcileEpisodeNumbers` en `src/lib/netflix/streamingResolve.js`):
+| Serie | Plataforma | TMDb |
+| --- | --- | --- |
+| *Ataque a los Titanes* | T6 («Temporada 4 Parte 2»), E82 | S4E23 |
+| *Jujutsu Kaisen* | T2:E32 | S1E32 (una sola temporada) |
+| *My Hero Academia* | T5:E93 (suma especiales) | S5E1 |
+| *Dragon Ball Z Kai* | T2:E1 (2 temporadas) | S5E1 (6 temporadas) |
 
-- **Existe:** se queda.
-- **La extensión sabe la posición del episodio** (`absoluteEpisode`, contando
-  todas las temporadas de Netflix en orden, desde los metadatos): se reparte esa
-  posición por las temporadas de TMDb. Vale tanto si Netflix numera de forma
-  absoluta como si empieza cada parte en 1. Confianza media.
-- **El número no cabe en esa temporada** (o la temporada no existe y el número es
-  mayor que cualquier temporada) **pero sí en la serie entera:** es absoluto y se
-  reparte por temporadas. Confianza media.
-- **Ese reparto cae en la misma temporada que dice la plataforma:** las temporadas
-  coinciden y lo que no cuadra es la cuenta de antes (Netflix suma especiales que
-  TMDb no tiene: el 93 de *My Hero Academia* es el T5·E1, no el T5·E5). Vale la
-  posición del episodio dentro de su temporada (`seasonEpisodeIndex`, desde los
-  metadatos). Sin ella se prueba el nombre del episodio y, si no casa, el reparto
-  con confianza baja.
-- **La temporada no existe y TMDb tiene una sola temporada** (anime que la
-  plataforma parte y TMDb junta: el T2:E32 de *Jujutsu Kaisen* es el S1E32): se
-  prueba el nombre del episodio y, si no casa, se supone numeración absoluta con
-  confianza baja.
-- **Si no:** se busca el episodio por su nombre en todas las temporadas y, si
-  tampoco aparece, se guarda a nivel serie. Un número pequeño en una temporada
-  inexistente de una serie con varias temporadas es ambiguo y no se adivina.
+El resolutor lo pasa a TMDb (`reconcileEpisodeNumbers` en
+`src/lib/netflix/streamingResolve.js`). La solución general es **alinear por
+inicios de temporada**. La extensión da la posición del episodio en la
+plataforma (`absoluteEpisode`, contando todas sus temporadas) y dentro de su
+temporada (`seasonEpisodeIndex`), sacadas de los metadatos de Netflix. Cuando
+una plataforma agrupa o parte temporadas, las suyas empiezan casi siempre donde
+empieza alguna de TMDb; lo que se desvía es la cuenta de antes. Por eso:
+
+1. **El par existe y su posición en TMDb cuadra** con la de la plataforma: se
+   queda. Si no cuadra (en *Dragon Ball Z Kai* el T2:E1 de TMDb existe, pero es
+   otro episodio), no se acepta.
+2. **El inicio de la temporada de la plataforma cae cerca** (≤ 6 %) del de una
+   temporada de TMDb: el episodio se cuenta desde ahí. Cubre *My Hero Academia* y
+   *Dragon Ball Z Kai*, sea cual sea el desfase de la cuenta.
+3. **Si no**, la plataforma parte una temporada de TMDb por la mitad: se reparte
+   la posición absoluta (*Ataque a los Titanes*, *Jujutsu Kaisen*).
+4. **El nombre del episodio**, si casa sin ambigüedad con un episodio de TMDb a
+   ±12 del resultado, lo confirma o corrige (`anchorEpisodeByName`). Corrige un
+   desfase que quede dentro de una temporada.
+
+Sin esas posiciones (app Android, clientes antiguos, otras plataformas), un par
+que existe en TMDb se comprueba por el **nombre del episodio**: si casa EXACTO con
+un único episodio distinto de la serie, ese es el bueno (`episodeElsewhereByName`;
+la app de Netflix para Android muestra el «T2:E1» relativo de *Dragon Ball Z Kai*,
+que en TMDb es otro episodio). Un nombre traducido distinto, genérico o repetido
+no cambia nada. Por lo demás se deduce lo que se puede del par: si existe se queda; si el número no cabe en esa temporada es
+absoluto; si cae en la misma temporada se usa la posición dentro de ella o, sin
+ella, se prueba el nombre en toda la serie (confianza baja); en una serie de una
+sola temporada en TMDb se supone absoluto salvo que el nombre diga otra cosa. Sin
+ningún par posible se busca por nombre y, si tampoco, se guarda a nivel serie.
 
 Vale para cualquier plataforma y para lo que llega del mapa de ids. Cuando el id
 lo da el propio reproductor (Netflix con metadatos), el mapa no se descarta porque
 sus números no coincidan: van en la numeración de Netflix.
+
+## Anuncios, tráileres y avances
+
+Un vídeo mucho más corto que el título no es el título: un anuncio previo (Pluto
+TV pone 95 s y luego 259 s antes de una película de 90 min), un tráiler o el
+avance de la ficha. Con su posición (94 de 95 s) el progreso llegaba al 90 % y la
+película se daba por vista. El backend compara la duración del reproductor con la
+de TMDb (`isPlausibleRuntime` en `backend/src/lib/tmdbRuntime.js`): si es menos de
+la mitad, el punto se ignora (`ignored: 'runtime_mismatch'`), sin «Continuar
+viendo» ni historial. Solo se compara con la duración de la película o del
+episodio concreto; la media de una serie no sirve. La extensión, además, nunca
+toma por el vídeo principal el avance de la ficha de Prime Video.
+
+## Fichas en todas las plataformas
+
+La detección de la FICHA (navegando, sin reproducir) está en
+`netflix-extension/browse-detection.js`, comprobada con fichas, portadas y
+listados públicos reales de Prime Video, Movistar Plus+, Filmin, SkyShowtime,
+Rakuten TV, Atresplayer, RTVE Play, Pluto TV y Apple TV+
+(`netflix-extension/diagnostics/`).
+
+- **Solo en rutas de ficha.** En las portadas y los listados el encabezado más
+  grande era un titular o el aviso de cookies («Consentimiento de cookies», «We
+  value your privacy»…) y se mandaba a resolver como un título.
+- **Tipo seguro.** JSON-LD (`Movie`, `TVSeries`, `TVEpisode`), pistas de la
+  plataforma (lista de episodios de Prime Video) o la ruta (`/pelicula/` frente a
+  `/serie/`…). Con él la señal lleva `movieTitle` o `showName` y `mediaTypeHint`;
+  con «película» el resolutor no busca entre series.
+- **Año.** JSON-LD (`datePublished`) o «(2020)» en la pestaña: el resolutor
+  prefiere el título de ese año y acepta «Título (subtítulo)» de TMDb si el año
+  casa («Incontrolable» de 2025, no «Incontrôlable» de 2006).
+- **Temporada y episodio** del JSON-LD (también del nombre «Temporada 4» si falta
+  `seasonNumber`, como en RTVE) o de la pestaña («(Temporada 1, Episodio 2)» en
+  Apple TV+).
+- **Título de la pestaña limpio** como último recurso: sin «Ver …», «online»,
+  «gratis en línea», el año, ni el nombre de la plataforma.
+
+**Durante la reproducción** la señal se completa con la ficha de la misma página
+(`enrichPlaybackSignal`): en RTVE Play, Atresplayer, Pluto TV, Rakuten TV o Filmin
+el vídeo suena en la propia ficha y su Media Session solo da un título; la ficha
+aporta la serie, la temporada y el episodio, o el tipo y el año de la película.
+Nunca pisa lo que dijo el reproductor, y con los metadatos de Netflix no actúa.
 
 ## Prime Video y Crunchyroll en la app Android
 
