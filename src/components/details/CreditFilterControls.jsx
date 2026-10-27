@@ -16,7 +16,6 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowUpDown,
   Briefcase,
@@ -166,7 +165,9 @@ export function InlineDropdown({
           )}
         </div>
         <ChevronDown
-          className={`shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""} ${
+          // Sin `transition-transform`: la transición creaba y destruía una
+          // capa de composición en cada toque (ver `data-sv-sheet-open`).
+          className={`shrink-0 text-zinc-500 ${open ? "rotate-180" : ""} ${
             compact ? "h-3 w-3 @min-[24rem]:h-3.5 @min-[24rem]:w-3.5" : "h-3.5 w-3.5"
           }`}
         />
@@ -174,34 +175,31 @@ export function InlineDropdown({
 
       {typeof document !== "undefined" &&
         createPortal(
-          <AnimatePresence>
-            {open && menuStyle && (
-              <motion.div
-                ref={menuRef}
-                initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                transition={{ duration: 0.16, ease: "easeOut" }}
-                style={menuStyle}
-                className="flex flex-col overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl"
+          // Entrada en CSS (`.sv-inline-menu`, globals.css) y cierre al
+          // instante, como un menú nativo: la salida animada retrasaba el
+          // cambio de filtro que se acababa de elegir.
+          open && menuStyle ? (
+            <div
+              ref={menuRef}
+              style={menuStyle}
+              className="sv-inline-menu flex flex-col overflow-hidden rounded-2xl bg-black/40 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl p-2 shadow-2xl"
+            >
+              {/* Aire entre las opciones (y su marca ✓) y la barra de
+                  scroll, que si no se dibujaba pegada a ellas. Solo cuando
+                  HAY barra (`.sv-menu-scroll` en globals.css): sin ella, la
+                  opción elegida llega al mismo margen a ambos lados. */}
+              <div
+                className="sv-menu-scroll min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-color:#3f3f46_transparent]"
+                style={{ scrollbarWidth: "thin" }}
               >
-                {/* Aire entre las opciones (y su marca ✓) y la barra de
-                    scroll, que si no se dibujaba pegada a ellas. Solo cuando
-                    HAY barra (`.sv-menu-scroll` en globals.css): sin ella, la
-                    opción elegida llega al mismo margen a ambos lados. */}
-                <div
-                  className="sv-menu-scroll min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-color:#3f3f46_transparent]"
-                  style={{ scrollbarWidth: "thin" }}
-                >
-                  <div className="sv-menu-scroll-inner">
-                    <AccentContext.Provider value={tone}>
-                      {children({ close: () => setOpen(false) })}
-                    </AccentContext.Provider>
-                  </div>
+                <div className="sv-menu-scroll-inner">
+                  <AccentContext.Provider value={tone}>
+                    {children({ close: () => setOpen(false) })}
+                  </AccentContext.Provider>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>,
+              </div>
+            </div>
+          ) : null,
           document.body,
         )}
     </div>

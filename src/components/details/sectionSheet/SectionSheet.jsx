@@ -91,6 +91,16 @@ export default function SectionSheet({
   };
   // Bloquea el scroll de la ficha y cierra con Escape.
   useModalGuard({ open, onClose: close });
+  // Marca la vista lateral abierta: en móvil, mientras tapa toda la pantalla,
+  // la ficha de debajo deja de componer su cristal (`data-sv-sheet-open` en
+  // globals.css). Sin esto, cada toque dentro del panel reorganizaba ~300
+  // capas de la página tapada y en el móvil parpadeaba la pantalla entera.
+  useEffect(() => {
+    if (!open) return;
+    const root = document.documentElement;
+    root.setAttribute("data-sv-sheet-open", "");
+    return () => root.removeAttribute("data-sv-sheet-open");
+  }, [open]);
 
   if (!open || !portalReady) return null;
 

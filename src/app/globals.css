@@ -3438,6 +3438,59 @@ html[data-details-sequence-transition] .sv-topbar {
   }
 }
 
+/* VISTA LATERAL ABIERTA EN MÓVIL (`data-sv-sheet-open`, SectionSheet): el
+   panel ocupa toda la pantalla y la ficha de debajo solo se ve a través de su
+   propio desenfoque. Aun así seguía componiendo ~300 capas (128 de ellas con
+   `backdrop-filter`), y cada toque dentro del panel —abrir un desplegable,
+   elegir una opción, girar su flecha— obligaba a reorganizar ese árbol entero:
+   en el móvil parpadeaba toda la pantalla. Mientras el panel está abierto, la
+   página tapada no desenfoca ni promueve capas, y sus animaciones se pausan (no
+   se anulan: al cerrar no vuelven a empezar). Bajo 16px de desenfoque no se
+   nota la diferencia. Solo a los hijos de <body> que no son capas de modal ni
+   menús (`.sv-inline-menu` va en un portal propio). */
+@media (max-width: 639.98px) {
+  :root[data-sv-sheet-open] body > :not([data-detail-modal-layer], .sv-inline-menu),
+  :root[data-sv-sheet-open] body > :not([data-detail-modal-layer], .sv-inline-menu) * {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    will-change: auto !important;
+    animation-play-state: paused !important;
+  }
+  /* `transform-gpu` solo fuerza una capa con un translateZ(0) vacío: en
+     Tailwind v4 translate/rotate/scale van en sus propias propiedades, así que
+     anular `transform` no mueve nada. */
+  :root[data-sv-sheet-open] body > :not([data-detail-modal-layer], .sv-inline-menu) .transform-gpu {
+    transform: none !important;
+  }
+}
+
+/* Menú de los desplegables de filtros (CreditFilterControls: «Portadas y
+   fondos» de la ficha, créditos de ActorDetails). La caja de cristal entra
+   solo con `transform`, que corre en el compositor: con framer (opacity + y +
+   scale fotograma a fotograma desde JS) cada fotograma reescribía su estilo y
+   obligaba a recomponer el árbol de capas entero, con ~160 piezas de cristal
+   debajo en la ficha móvil. Sin `opacity` en la caja, que la deja sin cristal
+   mientras dura (ver «backdrop root»), y sin escala, que además volvía a
+   muestrear el desenfoque en cada fotograma. Lo que se funde es el contenido. */
+.sv-inline-menu {
+  animation: sv-inline-menu-in 160ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.sv-inline-menu > * {
+  animation: sv-inline-menu-content-in 140ms ease-out backwards;
+}
+@keyframes sv-inline-menu-in {
+  from { transform: translate3d(0, 6px, 0); }
+}
+@keyframes sv-inline-menu-content-in {
+  from { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sv-inline-menu,
+  .sv-inline-menu > * {
+    animation: none;
+  }
+}
+
 /* Píldora «Hoy» del navbar (TodayNavbarEntry): mientras quedan historias sin
    ver, un destello recorre el borde una vez por minuto, como en Trakt. El
    degradado cónico gira detrás y la máscara deja ver solo el anillo de 1px.

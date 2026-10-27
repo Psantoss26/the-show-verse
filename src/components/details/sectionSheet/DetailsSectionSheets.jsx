@@ -10,7 +10,7 @@
 // ficha, que ya los tiene cargados; el equipo técnico y las notas de IMDb de
 // recomendaciones se piden aquí al abrir su vista, con caché compartida.
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import {
   Check,
@@ -447,6 +447,9 @@ function ImagesSheet({ meta, data, onClose, tab, setTab }) {
     setLanguage("all");
     setTab(id);
   };
+  // Al elegir un filtro, el menú se cierra en el mismo toque y la galería se
+  // reordena justo después (transición): si iban juntos, el cierre esperaba a
+  // volver a pintar todas las imágenes.
   // Los filtros se despliegan con su botón, junto a las pestañas.
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersChanged = sort !== "default" || language !== "all";
@@ -512,8 +515,8 @@ function ImagesSheet({ meta, data, onClose, tab, setTab }) {
                     key={option.id}
                     active={sort === option.id}
                     onClick={() => {
-                      setSort(option.id);
                       close();
+                      startTransition(() => setSort(option.id));
                     }}
                   >
                     {option.label}
@@ -534,8 +537,8 @@ function ImagesSheet({ meta, data, onClose, tab, setTab }) {
                   <DropdownItem
                     active={language === "all"}
                     onClick={() => {
-                      setLanguage("all");
                       close();
+                      startTransition(() => setLanguage("all"));
                     }}
                   >
                     Todos ({tabImages.length})
@@ -545,8 +548,8 @@ function ImagesSheet({ meta, data, onClose, tab, setTab }) {
                       key={option.code}
                       active={language === option.code}
                       onClick={() => {
-                        setLanguage(option.code);
                         close();
+                        startTransition(() => setLanguage(option.code));
                       }}
                     >
                       {option.label} ({option.count})
