@@ -64,4 +64,11 @@ class TitleMatchTest {
         // Una parte demasiado corta no basta («Up» no respalda «Up: Una aventura…»).
         assertFalse(TitleMatch.corroborates("Up: Una aventura de altura", listOf("Up")))
     }
+
+    @Test
+    fun corroboratesRejectsALongerTitleThanTheScreenShows() {
+        assertFalse(TitleMatch.corroborates("Interstellar Ella", listOf("Otros clientes también vieron", "Interstellar")))
+        assertTrue(TitleMatch.corroborates("Interstellar", listOf("Interstellar")))
+        assertTrue(TitleMatch.corroborates("La casa del dragón", listOf("Casa del dragón")))
+    }
 }

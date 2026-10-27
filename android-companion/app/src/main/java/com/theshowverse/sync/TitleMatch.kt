@@ -102,7 +102,20 @@ object TitleMatch {
         // del éxito» como «Suits» (o como «La clave del éxito»), y solo con el
         // título entero esa ficha se descartaba aunque TMDb hubiera acertado.
         val parts = listOf(resolved) + titleParts(resolved)
-        return screenTexts.any { text -> parts.any { similar(it, text) } }
+        return screenTexts.any { text -> parts.any { backs(it, text) } }
+    }
+
+    /**
+     * ¿[screen] respalda el título [resolved]? Como [similar], pero TMDb no puede
+     * devolver MÁS palabras que las leídas: «Interstellar» en pantalla no respalda
+     * la serie «Interstellar Ella». Un subtítulo de más ya lo cubren las partes
+     * («Suits: la clave del éxito»); solo se toleran artículos y conectores.
+     */
+    private fun backs(resolved: String?, screen: String?): Boolean {
+        if (!similar(resolved, screen)) return false
+        val r = normalize(resolved)
+        val sc = normalize(screen)
+        return !(r.length > sc.length && r.contains(sc) && tokens(resolved) != tokens(screen))
     }
 
     private val PART_SEPARATOR = Regex("\\s*[:：]\\s+|\\s+[-–—]\\s+")
