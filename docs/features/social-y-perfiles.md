@@ -33,7 +33,7 @@ Capa social de The Show Verse: perfiles públicos de cada miembro, seguir y deja
 
 El feed mezcla los mismos tipos de evento en los dos modos: visto, reseña, favorito, pendiente, puntuación y lista. En Siguiendo y Yo se ve como lista, lista con póster o lista con backdrop; en las tres, cada evento lleva la foto de perfil de quien lo hizo (con póster o backdrop, junto a la imagen del título). `/v1/users/feed/summary` va aparte porque la cabecera no cambia al paginar.
 
-Las alertas de la campana del navbar (`/v1/users/notifications`) reutilizan el feed propio. Ver [[push-notifications]]. La campana está montada dos veces (barra de escritorio y de móvil); las dos comparten la petición en curso (`fetchAlertsShared` en `AlertsMenu.jsx`), así que al entrar o navegar se pide una sola vez.
+Las alertas de la campana del navbar (`/v1/users/notifications`) reutilizan el feed propio. Ver [[push-notifications]]. La campana está montada dos veces (barra de escritorio y de móvil); las dos comparten la petición en curso (`fetchAlertsShared` en `AlertsMenu.jsx`), así que al entrar o navegar se pide una sola vez. En móvil el panel no tiene alto fijo: mide la barra inferior (`nav.sv-navbar-bottom-shift`) y llega hasta 12 px por encima de ella; en escritorio la lista sigue limitada a `65vh`.
 
 ## «Tus amigos» en la ficha
 

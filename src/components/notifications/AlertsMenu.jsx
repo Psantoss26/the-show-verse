@@ -518,9 +518,27 @@ export default function AlertsMenu({
       );
       // Mismo aire respecto a la barra que el desplegable de Perfil.
       const top = (alignRect || rect).bottom + 20;
-      const next = { top, left, width };
+      // MÓVIL: el panel baja hasta la barra inferior, con el mismo aire que
+      // deja arriba respecto a la superior en vez de cortarse a una altura
+      // fija. Se mide la barra real (cambia de alto en tablet y respeta la
+      // zona segura); si no está, se llega al borde de la pantalla.
+      let maxHeight;
+      if (variant === "mobile") {
+        const bottomNav = document.querySelector("nav.sv-navbar-bottom-shift");
+        const navRect = bottomNav?.getBoundingClientRect();
+        const floor =
+          navRect && navRect.height > 0
+            ? Math.min(navRect.top, window.innerHeight)
+            : window.innerHeight - padding;
+        maxHeight = Math.max(160, Math.round(floor - 12 - top));
+      }
+      const next = { top, left, width, maxHeight };
       setPosition((current) =>
-        current && current.top === top && current.left === left && current.width === width
+        current &&
+        current.top === top &&
+        current.left === left &&
+        current.width === width &&
+        current.maxHeight === maxHeight
           ? current
           : next,
       );
@@ -536,7 +554,7 @@ export default function AlertsMenu({
       window.removeEventListener("resize", schedule);
       window.removeEventListener("scroll", schedule, true);
     };
-  }, [open, alignRef]);
+  }, [open, alignRef, variant]);
 
   const computedUnread = alerts && lastSeenAt ? countUnread(alerts, lastSeenAt) : null;
   useEffect(() => {
@@ -606,10 +624,14 @@ export default function AlertsMenu({
                 transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
                 // MISMO CRISTAL, FORMA Y RELLENO que el desplegable de secciones
                 // de Perfil (Navbar): LIQUID_GLASS_PANEL, rounded-2xl y p-2.
-                className={`fixed z-[99999] overflow-hidden rounded-2xl p-2 text-white ${LIQUID_GLASS_PANEL}`}
+                className={`fixed z-[99999] flex flex-col overflow-hidden rounded-2xl p-2 text-white ${LIQUID_GLASS_PANEL}`}
               >
-                <div className="flex flex-col">
-                  <div className="max-h-[65vh] overflow-y-auto overscroll-contain no-scrollbar">
+                <div className="flex min-h-0 flex-col">
+                  <div
+                    className={`min-h-0 overflow-y-auto overscroll-contain no-scrollbar ${
+                      variant === "mobile" ? "" : "max-h-[65vh]"
+                    }`}
+                  >
                     {!alerts ? (
                       <div className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-zinc-300 ${READABLE}`}>
                         {loading ? (
