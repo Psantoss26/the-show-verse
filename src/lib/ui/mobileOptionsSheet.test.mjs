@@ -32,6 +32,7 @@ const PAGES = [
 const SECTION_SHEETS = [
   "components/details/sectionSheet/ActorSectionSheets.jsx",
   "components/details/sectionSheet/DetailsSectionSheets.jsx",
+  "components/details/sectionSheet/FilmographySheet.jsx",
 ];
 
 // Páginas con desplegables propios: dentro de la hoja se pintan como grupos de
@@ -69,6 +70,12 @@ test("las vistas laterales abren sus filtros en la hoja, dentro del ancho del pa
     assert.match(source, /<MobileOptionsSheet\s+open={filtersOpen}\s+onClose={\(\) => setFiltersOpen\(false\)}[\s\S]*?placement="sectionSheet"/, page);
     assert.doesNotMatch(source, /<MobileFiltersPanel\b/, page);
   }
+  // Filmografía: el rol y el tipo de título, solo en la hoja (sin pestañas
+  // ni selector en la cabecera del panel).
+  const filmography = read("components/details/sectionSheet/FilmographySheet.jsx");
+  assert.match(filmography, /<SheetOptionGroup label="Rol"/);
+  assert.match(filmography, /<SheetOptionGroup label="Tipo de título"/);
+  assert.doesNotMatch(filmography, /tabs=\{|role="radiogroup"/);
   assert.match(sheet, /placement === "sectionSheet" \? "sm:ml-auto sm:w-\[30rem\]/);
   // La vista lateral de debajo marca `data-sv-sheet-open`: la hoja no se lo quita.
   assert.match(sheet, /if \(root\.hasAttribute\("data-sv-sheet-open"\)\) return undefined;/);

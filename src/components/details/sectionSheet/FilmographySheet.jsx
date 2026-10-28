@@ -6,11 +6,14 @@
 // que aún no tiene fecha y después del más reciente al más antiguo. Cada
 // título lleva su póster, tipo, episodios y papel, y un círculo que marca si
 // el visitante ya lo ha visto. Se abre con el botón de acción de filmografía.
+// El rol (departamento) y el tipo de título se eligen en la hoja de ajustes
+// (MobileOptionsSheet), que abre el botón junto al buscador.
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Check, Film, ImageOff, Tv as TvIcon } from "lucide-react";
+import { Briefcase, Check, Film, ImageOff, Layers3, RotateCcw, SlidersHorizontal, Tv as TvIcon } from "lucide-react";
 import OptimizedImage from "@/components/OptimizedImage";
+import MobileOptionsSheet, { SheetAction, SheetOption, SheetOptionGroup } from "@/components/ui/MobileOptionsSheet";
 import SectionSheet, { SHEET_CONTROL, SectionSheetEmpty } from "./SectionSheet";
 import { buildFilmography, filmographyRoleLabel } from "@/lib/actor/filmography";
 
@@ -114,103 +117,163 @@ export default function FilmographySheet({ meta, data, onClose, tab, setTab, que
     : allDepartments[0]?.key;
   const current = departments.find((department) => department.key === activeKey) || null;
 
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  // Fuera de lo de partida (el primer rol y todos los tipos): un punto en el
+  // botón, también con la hoja cerrada.
+  const defaultKey = allDepartments[0]?.key;
+  const filtersChanged = (activeKey && activeKey !== defaultKey) || media !== "all";
+  const showMedia = mediaCounts.movie > 0 && mediaCounts.tv > 0;
+  const showRoles = allDepartments.length > 1;
+
   const years = allDepartments
     .flatMap((department) => department.years.map((group) => group.year))
     .filter(Boolean);
   const span = years.length ? `${Math.min(...years)}–${Math.max(...years)}` : null;
 
   return (
-    <SectionSheet
-      open
-      accent="emerald"
-      onClose={onClose}
-      title={meta.title}
-      icon={meta.icon}
-      subtitle={[plural(mediaCounts.all, "título", "títulos"), span].filter(Boolean).join(" · ")}
-      tabs={allDepartments.map((department) => ({
-        id: department.key,
-        label: department.label,
-        count: department.count,
-      }))}
-      activeTab={activeKey}
-      onTabChange={setTab}
-      search={{ value: query, onChange: setQuery, placeholder: "Buscar título o papel…" }}
-      toolbar={
-        mediaCounts.movie && mediaCounts.tv ? (
-          <div role="radiogroup" aria-label="Tipo" className={`mt-3 flex gap-1 p-1 ${SHEET_CONTROL}`}>
-            {MEDIA_OPTIONS.map((option) => {
-              const active = media === option.id;
-              return (
-                <button
-                  key={option.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={active}
-                  onClick={() => setMedia(option.id)}
-                  className={`flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-xl px-3 text-xs font-bold transition ${
-                    active ? "bg-white/15 text-white" : "text-zinc-400 hover:bg-white/5 hover:text-white"
-                  }`}
-                >
-                  {option.label}
-                  <span className={active ? "text-emerald-400" : "text-zinc-500"}>{mediaCounts[option.id]}</span>
-                </button>
-              );
-            })}
-          </div>
-        ) : null
-      }
-    >
-      {current ? (
-        // Cerca del borde izquierdo, con algo de aire: en móvil el relleno
-        // del panel (20px hasta el año); en escritorio, 4px menos que él.
-        <ol className="pt-3 sm:-ml-1" aria-label={`Filmografía: ${current.label}`}>
-          {current.years.map((group) => (
-            <li
-              key={group.year ?? "undated"}
-              // Columna del año justa para «2028» y poco hueco hasta la línea.
-              className="grid grid-cols-[2.25rem_minmax(0,1fr)] gap-x-2.5"
+    <>
+      <SectionSheet
+        open
+        accent="emerald"
+        onClose={onClose}
+        title={meta.title}
+        icon={meta.icon}
+        // Sin pestañas: el rol elegido va en el subtítulo.
+        subtitle={[
+          showRoles ? current?.label || allDepartments.find((d) => d.key === activeKey)?.label : null,
+          plural(mediaCounts.all, "título", "títulos"),
+          span,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+        search={{ value: query, onChange: setQuery, placeholder: "Buscar título o papel…" }}
+        searchAccessory={
+          showRoles || showMedia ? (
+            <button
+              type="button"
+              onClick={() => setFiltersOpen(true)}
+              aria-haspopup="dialog"
+              aria-expanded={filtersOpen}
+              aria-label="Ajustes: rol y tipo de título"
+              title="Rol y tipo de título"
+              className={`relative flex h-11 w-11 shrink-0 items-center justify-center transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 ${SHEET_CONTROL} ${
+                filtersOpen
+                  ? "text-emerald-400 !shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                  : "text-zinc-200 hover:from-white/15 hover:to-white/10 hover:text-white"
+              }`}
             >
-              {/* Año, a la altura de su hito: el centro del póster de la
-                  primera fila (8px de relleno + 42px, medio póster de 84px),
-                  descontando la mitad de su línea de texto. */}
-              <div className="pt-[38px] text-right">
-                <span className="text-sm font-black tabular-nums leading-none text-white">
-                  {group.year ?? "—"}
-                </span>
-                {group.year == null ? <span className="sr-only">Sin fecha</span> : null}
-              </div>
-              {/* El camino: una línea continua (el borde de cada año, sin
-                  huecos entre ellos) con un hito por año. */}
-              <div className="relative border-l border-white/10 pb-4 pl-3">
+              <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+              {filtersChanged ? (
                 <span
                   aria-hidden="true"
-                  className={`absolute -left-[5px] top-[46px] h-[9px] w-[9px] rounded-full ${
-                    group.year == null
-                      ? "bg-zinc-500 ring-4 ring-zinc-500/15"
-                      : "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.6)] ring-4 ring-emerald-400/15"
-                  }`}
+                  className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]"
                 />
-                <ul className="space-y-0.5">
-                  {group.items.map((item) => (
-                    <li key={item.key}>
-                      <FilmographyRow
-                        item={item}
-                        department={current.key}
-                        watched={watchedKeys.has(item.key)}
-                        onNavigate={onClose}
-                      />
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </li>
-          ))}
-        </ol>
-      ) : (
-        <SectionSheetEmpty>
-          {query || media !== "all" ? "Ningún título coincide." : "No hay créditos."}
-        </SectionSheetEmpty>
-      )}
-    </SectionSheet>
+              ) : null}
+            </button>
+          ) : null
+        }
+      >
+        {current ? (
+          // Cerca del borde izquierdo, con algo de aire: en móvil el relleno
+          // del panel (20px hasta el año); en escritorio, 4px menos que él.
+          <ol className="pt-3 sm:-ml-1" aria-label={`Filmografía: ${current.label}`}>
+            {current.years.map((group) => (
+              <li
+                key={group.year ?? "undated"}
+                // Columna del año justa para «2028» y poco hueco hasta la línea.
+                className="grid grid-cols-[2.25rem_minmax(0,1fr)] gap-x-2.5"
+              >
+                {/* Año, a la altura de su hito: el centro del póster de la
+                    primera fila (8px de relleno + 42px, medio póster de 84px),
+                    descontando la mitad de su línea de texto. */}
+                <div className="pt-[38px] text-right">
+                  <span className="text-sm font-black tabular-nums leading-none text-white">
+                    {group.year ?? "—"}
+                  </span>
+                  {group.year == null ? <span className="sr-only">Sin fecha</span> : null}
+                </div>
+                {/* El camino: una línea continua (el borde de cada año, sin
+                    huecos entre ellos) con un hito por año. */}
+                <div className="relative border-l border-white/10 pb-4 pl-3">
+                  <span
+                    aria-hidden="true"
+                    className={`absolute -left-[5px] top-[46px] h-[9px] w-[9px] rounded-full ${
+                      group.year == null
+                        ? "bg-zinc-500 ring-4 ring-zinc-500/15"
+                        : "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.6)] ring-4 ring-emerald-400/15"
+                    }`}
+                  />
+                  <ul className="space-y-0.5">
+                    {group.items.map((item) => (
+                      <li key={item.key}>
+                        <FilmographyRow
+                          item={item}
+                          department={current.key}
+                          watched={watchedKeys.has(item.key)}
+                          onNavigate={onClose}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <SectionSheetEmpty>
+            {query || media !== "all" ? "Ningún título coincide." : "No hay créditos."}
+          </SectionSheetEmpty>
+        )}
+      </SectionSheet>
+      <MobileOptionsSheet
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        title="Ajustes"
+        subtitle={meta.title}
+        accent="emerald"
+        placement="sectionSheet"
+      >
+        {showRoles ? (
+          <SheetOptionGroup label="Rol" icon={Briefcase}>
+            {allDepartments.map((department) => (
+              <SheetOption
+                key={department.key}
+                active={department.key === activeKey}
+                onClick={() => setTab(department.key)}
+              >
+                {department.label} · {department.count}
+              </SheetOption>
+            ))}
+          </SheetOptionGroup>
+        ) : null}
+        {showMedia ? (
+          <SheetOptionGroup label="Tipo de título" icon={Layers3}>
+            {MEDIA_OPTIONS.map((option) => (
+              <SheetOption
+                key={option.id}
+                icon={option.id === "movie" ? Film : option.id === "tv" ? TvIcon : null}
+                active={media === option.id}
+                onClick={() => setMedia(option.id)}
+              >
+                {option.label} · {mediaCounts[option.id]}
+              </SheetOption>
+            ))}
+          </SheetOptionGroup>
+        ) : null}
+        <SheetOptionGroup label="Acciones" layout="stack">
+          <SheetAction
+            icon={RotateCcw}
+            disabled={!filtersChanged}
+            onClick={() => {
+              setFiltersOpen(false);
+              setTab(defaultKey);
+              setMedia("all");
+            }}
+          >
+            Limpiar filtros
+          </SheetAction>
+        </SheetOptionGroup>
+      </MobileOptionsSheet>
+    </>
   );
 }
