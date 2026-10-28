@@ -1279,11 +1279,12 @@ export default function ContinueWatchingClient() {
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         <Header cards={headerStatCards} staticEntry={fromSibling} onRefresh={load} refreshing={loading} />
 
-        {/* Filtros */}
+        {/* Filtros. Separación con la primera fila de tarjetas: la misma que
+            En progreso sin agrupar (`mb-6`, 24 px), en móvil y en ordenador. */}
         <motion.div
           ref={filtersRef}
           data-menu-pinned={filtersPinned}
-          className="sticky top-[calc(3.5rem+var(--sv-safe-top,0px))] z-[70] space-y-3 mb-3 transition-all duration-300 sm:top-[calc(5rem+var(--sv-safe-top,0px))] lg:mb-6"
+          className="sticky top-[calc(3.5rem+var(--sv-safe-top,0px))] z-[70] space-y-3 mb-6 transition-all duration-300 sm:top-[calc(5rem+var(--sv-safe-top,0px))]"
           initial={fromSibling ? false : { opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
