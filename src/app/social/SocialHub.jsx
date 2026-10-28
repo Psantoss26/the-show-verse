@@ -118,7 +118,7 @@ export default function SocialHub({ initialView, initialToday }) {
               <h1 className="text-4xl font-bold tracking-tighter text-white md:text-6xl">
                 Social<span className="text-pink-500">.</span>
               </h1>
-              <p className="mt-2 hidden max-w-lg text-lg text-zinc-400 md:block">
+              <p className="mt-2 hidden whitespace-nowrap text-lg text-zinc-400 md:block">
                 Lo destacado de hoy y la actividad de la gente a la que sigues, y la tuya.
               </p>
             </div>
@@ -132,14 +132,14 @@ export default function SocialHub({ initialView, initialToday }) {
                 label="Actividades"
                 icon={Flame}
                 iconClassName="text-pink-400"
-                title="Actividades de Hoy con lo elegido en Quién y Día"
+                title="Actividades en Actividad, con lo elegido en Quién y Día"
               />
               <TarjetaCifra
                 value={todaySummary?.people}
                 label="Personas"
                 icon={Users}
                 iconClassName="text-fuchsia-400"
-                title="Personas con actividad en Hoy con lo elegido en Quién y Día"
+                title="Personas que salen en Actividad, con lo elegido en Quién y Día"
               />
               {/* De toda la gente a la que sigues, cuánta se ha movido esta
                   semana: dice si va a haber algo nuevo que enseñar. */}

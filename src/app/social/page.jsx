@@ -6,7 +6,12 @@ import {
   backendFetchPublicJson,
   getBackendAccessToken,
 } from "@/lib/backend/server";
-import { normalizeSocialView, normalizeTodayParams } from "@/lib/today/params";
+import {
+  defaultSocialLanding,
+  implicitSocialEntry,
+  normalizeSocialView,
+  normalizeTodayParams,
+} from "@/lib/today/params";
 
 export const metadata = {
   title: "Social",
@@ -52,17 +57,35 @@ async function loadInitialToday({ scope, day, cookieStore, headerList }) {
 
 export default async function SocialPage({ searchParams }) {
   const [params, cookieStore, headerList] = await Promise.all([searchParams, cookies(), headers()]);
-  const view = normalizeSocialView(params);
-  const { scope, day, group } = normalizeTodayParams(params);
+  let view = normalizeSocialView(params);
+  let { scope, day, group } = normalizeTodayParams(params);
   // Los datos de «Hoy» van en el RSC solo si se abre en esa opción; Siguiendo y
   // Yo los pide el cliente como siempre.
-  const data = view === "today"
+  let data = view === "today"
     ? await loadInitialToday({ scope, day, cookieStore, headerList })
     : null;
 
+  // Entrando sin elegir nada, un «Hoy» vacío salta a la Semana, y una semana
+  // vacía a Siguiendo. Sin datos del servidor lo decide el cliente al llegar
+  // los recuentos (autoLanding).
+  const implicit = implicitSocialEntry(params);
+  let autoLanding = null;
+  if (view === "today" && implicit.day) {
+    const landing = data ? defaultSocialLanding(data.days) : null;
+    if (landing === "activity" && implicit.view) {
+      view = "activity";
+      data = null;
+    } else if (landing === "week" || landing === "activity") {
+      day = "week";
+      data = await loadInitialToday({ scope, day, cookieStore, headerList });
+    } else if (!data) {
+      autoLanding = implicit;
+    }
+  }
+
   return (
     <DetailModalProvider placement="right">
-      <SocialHub initialView={view} initialToday={{ scope, day, group, data }} />
+      <SocialHub initialView={view} initialToday={{ scope, day, group, data, autoLanding }} />
     </DetailModalProvider>
   );
 }

@@ -61,7 +61,7 @@ import { useAuth } from "@/context/AuthContext";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import { useSearchParams } from "next/navigation";
-import { todayHref } from "@/lib/today/params";
+import { defaultSocialLanding, todayHref } from "@/lib/today/params";
 import { dayTabLabel } from "@/components/today/todayUi";
 import TodayClient from "./TodayClient";
 import {
@@ -491,6 +491,22 @@ export default function SocialClient({ initialView = "today", initialToday = {},
   const [hoyDia, setHoyDia] = useState(initialToday.day || "today");
   const [hoyAgrupar, setHoyAgrupar] = useState(initialToday.group || "title");
   const [hoyDias, setHoyDias] = useState(initialToday.data?.days || null);
+  // Entrada sin elegir nada y sin datos del servidor: con los primeros
+  // recuentos, un «Hoy» vacío pasa a la Semana y una semana vacía a Siguiendo
+  // (lo mismo que decide page.jsx cuando sí los tiene). Solo una vez y solo si
+  // no se ha tocado nada todavía.
+  const autoLandingRef = useRef(initialToday.autoLanding || null);
+  useEffect(() => {
+    const auto = autoLandingRef.current;
+    if (!auto || !hoyDias) return;
+    autoLandingRef.current = null;
+    if (scope !== "today" || hoyDia !== "today") return;
+    const landing = defaultSocialLanding(hoyDias);
+    if (landing === "activity" && auto.view) setScope("following");
+    else if (landing !== "today") setHoyDia("week");
+    // Solo reacciona a la llegada de los recuentos.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hoyDias]);
   // Se lee tras montar (no en el estado inicial) para que el HTML del servidor y
   // el primer render del cliente coincidan.
   const [hoyVista, setHoyVistaState] = useState("grid");
@@ -1097,7 +1113,7 @@ function SelectorAlcance({
       } ${controlGlass}`}
     >
       {[
-        ["today", "Hoy", Flame],
+        ["today", "Actividad", Flame],
         ["following", "Siguiendo", Users],
         ["me", "Yo", User],
       ].map(([valor, etiqueta, Icono]) => (

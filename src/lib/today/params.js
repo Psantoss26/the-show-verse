@@ -38,3 +38,29 @@ export function todayHref({ scope, day, group }) {
   const query = search.toString();
   return query ? `/social?${query}` : "/social";
 }
+
+/**
+ * ¿Se ha entrado en Social sin elegir día (ni historia)? Solo entonces se puede
+ * saltar de un «Hoy» vacío a la Semana. Pasar a Siguiendo exige además que no
+ * venga nada de Actividad en la URL: un enlace con ?scope= o ?group= es a ella.
+ */
+export function implicitSocialEntry(params) {
+  const has = (key) => Boolean(first(params?.[key]));
+  if (has("view") || has("day") || has("story")) return { day: false, view: false };
+  return { day: true, view: !has("scope") && !has("group") };
+}
+
+/**
+ * Adónde lleva la entrada por defecto según los recuentos de días: «today» si
+ * hay algo en las últimas 24 h, «week» si solo hay en la semana y «activity»
+ * (Siguiendo) si la semana tampoco tiene nada. Sin recuentos no se mueve.
+ */
+export function defaultSocialLanding(days) {
+  if (!Array.isArray(days)) return "today";
+  const count = (key) => days.find((d) => d?.key === key)?.count;
+  const today = count("today");
+  const week = count("week");
+  if (typeof today !== "number" || today > 0) return "today";
+  if (typeof week !== "number" || week > 0) return "week";
+  return "activity";
+}

@@ -8,6 +8,9 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Social: el subtítulo de la cabecera («Lo destacado de hoy y la actividad de la gente a la que sigues, y la tuya.») va en una sola línea en tablet y ordenador; antes se partía en dos. → [Hoy](docs/features/hoy.md)
+- Social: al entrar, si en Actividad no hay nada de hoy se abre la Semana, y si la semana también está vacía se abre Siguiendo. Si se elige un día a mano, se respeta. → [Hoy](docs/features/hoy.md)
+- Social: la primera opción de la barra (antes «Hoy») se llama ahora «Actividad»: **Actividad / Siguiendo / Yo**. La píldora del navbar con las historias también pone «Actividad», y el botón de cuadrícula de las historias se llama «Ver toda la actividad». El desplegable Día sigue empezando por «Hoy». → [Hoy](docs/features/hoy.md)
 - Ficha de película o serie, sección Listas: el pie de cada tarjeta lleva las mismas píldoras de cristal líquido que /lists, morada con los items y roja con el corazón y los me gusta (solo si hay alguno), en el móvil y en el ordenador. En las tarjetas estrechas se ve solo el avatar del autor. → [páginas](docs/frontend/app-router-pages.md)
 - Listas, vista de rejilla (Mis listas, Comunidad y Colecciones): el pie de cada tarjeta lleva las mismas píldoras de cristal líquido que la vista de filas, morada con los items y roja con el corazón y los me gusta (solo si hay alguno). En las tarjetas estrechas de 4 columnas se ve solo el avatar del autor; su nombre ya no se quedaba en «T…». En las píldoras, el número y el icono quedan ahora centrados entre sí y en la píldora; antes el número salía un poco más arriba. → [páginas](docs/frontend/app-router-pages.md)
 - Listas, vista de lista (Mis listas, Comunidad y Colecciones): la tira de pósters ya no tiene fondo negro ni borde detrás; cuando la lista tiene menos de cinco títulos, solo se ven los pósters. → [páginas](docs/frontend/app-router-pages.md)

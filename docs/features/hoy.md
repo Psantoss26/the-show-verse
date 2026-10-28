@@ -10,11 +10,11 @@ Vista por defecto de la sección Social (`/social`): lo más destacado de lo que
 
 | Ruta | Qué muestra |
 |---|---|
-| `/social` | Opción «Hoy» de la barra: historias, historia destacada, destacados, «Para ti», feed agrupado y más activos. |
+| `/social` | Opción «Actividad» de la barra: historias, historia destacada, destacados, «Para ti», feed agrupado y más activos. |
 | `/social?view=activity`, `?view=mine` | Opciones «Siguiendo» y «Yo»: el feed completo de siempre (ver [[social-y-perfiles]]). |
 | `/today` | Redirige a `/social` conservando `scope`, `day`, `group` y `story`. |
 
-Hoy es una opción más de la barra sticky de Social (`SocialClient`), junto a Siguiendo y Yo: **Hoy / Siguiendo / Yo**. La barra es la misma en las tres opciones; con Hoy sus desplegables pasan a ser:
+Hoy es una opción más de la barra sticky de Social (`SocialClient`), junto a Siguiendo y Yo; en la barra se rotula «Actividad»: **Actividad / Siguiendo / Yo**. La barra es la misma en las tres opciones; con Actividad sus desplegables pasan a ser:
 - **Quién:** Siguiendo o Comunidad.
 - **Día:** Hoy, Ayer, cada día de la semana y Semana, con su recuento.
 - **Agrupar:** por título, por persona o por hora.
@@ -30,10 +30,12 @@ Parámetros de URL (`src/lib/today/params.js`):
 
 Los valores por defecto (`following`, `today`, `title`) no se escriben en la URL.
 
-## Píldora «Hoy» del navbar
+**Entrada por defecto.** Al abrir `/social` sin `view`, `day` ni `story`, si en las últimas 24 h no hay nada se abre la Semana (`day=week`), y si la semana también está vacía se abre Siguiendo (`view=activity`). Para pasar a Siguiendo tampoco puede haber `scope` ni `group` en la URL (un enlace con esos parámetros es a Actividad; en ese caso se queda en la Semana). Un día elegido a mano, también `?day=today`, se respeta. Lo decide `page.jsx` con los recuentos del RSC (`implicitSocialEntry` y `defaultSocialLanding` de `src/lib/today/params.js`); si el RSC llega sin datos, `SocialClient` aplica la misma regla una sola vez, con los primeros recuentos y si todavía no se ha tocado nada (`initialToday.autoLanding`).
+
+## Píldora «Actividad» del navbar
 
 `TodayNavbarEntry` (`src/components/today/`), como `TodayNavbarEntry.svelte` de trakt-lite. Solo aparece con sesión y si hay historias. Es de cristal líquido, el de la casa (`LIQUID_GLASS_BAR` + `LiquidGlassOpticalLayers`). Las caras van «recortadas» como el AvatarStack *cutout* de Trakt: cada una vacía con una máscara el hueco de la siguiente, en vez de llevar un aro oscuro. El contador es rosa.
-- **Escritorio** (junto a Buscar): caras de hasta 3 personas con historias, «Hoy» y un contador de historias sin ver.
+- **Escritorio** (junto a Buscar): caras de hasta 3 personas con historias, «Actividad» y un contador de historias sin ver.
 - **Móvil** (junto a la campana): un círculo con dos carteles inclinados y el contador en la esquina.
 - **Brillo:** mientras queda algo sin ver, un destello cónico recorre el borde una vez por minuto (`.sv-today-shine` en `globals.css`; sin animación con reduced-motion).
 - **Destino:** `/social?story=<primera sin ver>`.
@@ -59,7 +61,7 @@ Maqueta como la Today de Trakt. En escritorio hay tres columnas con su título a
   - El reproductor se dimensiona con la pantalla: en ordenador ocupa hasta el 96 % del alto (1100 px como mucho) y el ancho justo para que el cartel lo llene. En 2K el cartel mide unos 571 × 856 px y en Full HD unos 452 × 678.
   - El cartel va **siempre a 2:3, entero y sin recortar**: su ancho es el menor entre el ancho del hueco y dos tercios de su alto (`container-type: size` y `min(100cqw, 66.6667cqh)`).
   - Debajo, un pie de alto fijo (116 px) en una fila compacta: cara, nombre, acción, hito, hora y nota. Una reseña va a dos líneas y un spoiler, tras un botón. El texto nunca cambia el tamaño del cartel.
-  - En la cabecera, junto a pausa y cerrar, el botón de cuadrícula («Ver todo Hoy») cierra las historias y lleva a la vista Hoy de `/social`, como el de Trakt.
+  - En la cabecera, junto a pausa y cerrar, el botón de cuadrícula («Ver toda la actividad») cierra las historias y lleva a la vista Actividad de `/social`, como el de Trakt.
   - **Ficha del título** (`TodayStoryDetails`). En ordenador (con ratón), al pasar por el cartel este se convierte en la ficha y la historia se pausa mientras dure; al salir vuelve el cartel. Para que el giro no haga idas y vueltas cerca de los bordes, no se usan `mouseenter`/`mouseleave` de la tarjeta (sus caras en 3D cambian de forma bajo el ratón mientras gira). Se compara la posición del ratón con el rectángulo fijo del hueco de la tarjeta, con un margen de 90 ms para entrar y 160 ms para salir. En táctil se abre al **tocar la portada** y se cierra con otro toque (también al cambiar de fotograma); tocar fuera de la portada sigue yendo atrás o adelante. La ficha muestra:
     - backdrop con idioma, con el criterio de DetailsClient (`pickLadderBackdrop`: inglés → español → original → sin idioma). Solo el último cuarto se funde con el fondo de la ficha, para que no se vea el corte sin oscurecer la imagen;
     - fila de año · temporadas y episodios o duración · estado · géneros, sin título en texto: ya va en el fondo con idioma (queda para lectores de pantalla);
