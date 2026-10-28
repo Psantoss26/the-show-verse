@@ -27,24 +27,21 @@ export default function HistorySectionNav({ className = "" }) {
             aria-current={active ? "page" : undefined}
             aria-label={label}
             title={label}
-            className={`flex items-center gap-1.5 whitespace-nowrap rounded-xl py-2 text-sm font-bold transition-all ${
-              active ? "px-2.5 lg:px-3.5" : "px-2.5"
-            } ${
+            className={`flex items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-2 text-sm font-bold transition-all lg:px-3.5 ${
               active
                 ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                 : "text-zinc-400 hover:bg-white/10 hover:text-white"
             }`}
           >
             <Icon className="h-4 w-4 shrink-0" />
-            {/* `sv-page-toolbar-label`: el `lg:` mira el VIEWPORT y en una
-                página estrechada por el drawer seguía mostrando el rótulo. Con
-                el marcador, lo retira el mismo container query que a los demás
-                rótulos de la barra. */}
-            {active && (
-              <span className="sv-page-toolbar-label hidden lg:inline">
-                {label}
-              </span>
-            )}
+            {/* Cada sección muestra su título en escritorio, no solo la activa.
+                `sv-page-toolbar-section-label`: el `lg:` mira el VIEWPORT, y en
+                una página estrechada por el drawer la barra se quedaba sin
+                sitio. Los filtros ceden antes; el título solo se retira como
+                último recurso (globals.css). */}
+            <span className="sv-page-toolbar-section-label hidden lg:inline">
+              {label}
+            </span>
           </Link>
         );
       })}

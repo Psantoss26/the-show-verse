@@ -2136,6 +2136,34 @@ body {
   }
 }
 
+/* COMPACTACIÓN MEDIDA (usePageToolbarSearchFit). Los umbrales de arriba miran
+   solo el ancho de la barra; el hook mide lo que piden sus piezas (los títulos
+   del selector de secciones, el buscador abierto para escribir) y, si la fila
+   no cabe, la compacta un paso más con `data-fit`:
+     no-labels  sin rótulos
+     icons      desplegables en icono y flecha
+     bare       además, el selector de secciones sin títulos */
+.sv-page-toolbar[data-fit] .sv-page-toolbar-label {
+  display: none;
+}
+
+.sv-page-toolbar:is([data-fit="icons"], [data-fit="bare"]) .sv-page-toolbar-value {
+  display: none;
+}
+
+.sv-page-toolbar:is([data-fit="icons"], [data-fit="bare"]) .sv-page-toolbar-trigger {
+  min-width: 0 !important;
+}
+
+.sv-page-toolbar[data-fit="bare"] .sv-page-toolbar-section-label {
+  display: none;
+}
+
+/* Mientras el hook prueba pasos, nada se anima: se mediría a medio camino. */
+.sv-page-toolbar[data-fit-measuring] * {
+  transition: none !important;
+}
+
 /* EL BUSCADOR TAMBIÉN CEDE, PERO SIN DEJAR HUECO. Ocupa el hueco sobrante de
    la fila, así que es lo primero que aprieta a los demás cuando el sitio falta.
 

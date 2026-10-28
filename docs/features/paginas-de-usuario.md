@@ -8,7 +8,7 @@ Funcionalidades de las páginas personales añadidas o rehechas desde julio de 2
 
 ## Continuar viendo, En progreso y Completadas
 
-Las tres comparten navegación (`WatchingSectionNav`):
+Las tres comparten navegación (`WatchingSectionNav` en En progreso y Completadas, `HistorySectionNav` en Historial y Continuar viendo; también la usa `/lists` con su `ListsSourceSelector`). En escritorio cada sección muestra icono y título, esté activa o no; en el móvil son solo iconos. Para dejarles sitio, la barra de filtros se compacta midiendo lo que piden sus piezas (`usePageToolbarSearchFit`, también en Favoritos, Pendientes y el dashboard): prueba de menos a más hasta que la fila cabe y lo marca en `data-fit` (`no-labels` quita los rótulos, `icons` deja los desplegables en icono y flecha, `bare` quita además los títulos de las secciones). Sin foco, el buscador cuenta como cuadrado; con foco, a su ancho de escritura, así que al abrirlo los desplegables se compactan en vez de montarse unos sobre otros. Los desplegables nunca se estrechan por debajo de su botón y, con el buscador en cuadrado, se estiran para que la fila ocupe todo el ancho. Al abrir o cerrar el buscador el cambio se anima (260 ms, WAAPI: cada pieza va de su ancho anterior al nuevo, el relleno del campo también, y los textos que reaparecen entran con un fundido); al redimensionar la ventana es inmediato y con «reducir movimiento» no se anima.
 
 | Ruta | Qué muestra |
 |---|---|

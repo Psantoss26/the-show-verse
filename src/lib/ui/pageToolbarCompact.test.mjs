@@ -201,7 +201,40 @@ test("el buscador y el selector de sección también ceden", async () => {
   assert.doesNotMatch(css, /flex: 0 0 2\.75rem/);
   assert.match(css, /\.sv-page-toolbar-search:focus-within \{\s*\n\s*flex: 1 1 10rem;/);
 
-  // Y el rótulo de Historial / Continuar viendo se retira con el mismo
-  // marcador que los demás rótulos de la barra.
-  assert.match(nav, /className="sv-page-toolbar-label hidden lg:inline"/);
+  // El título de cada sección (Historial / Continuar viendo) se ve siempre;
+  // solo se retira como último paso de la compactación medida.
+  assert.match(nav, /className="sv-page-toolbar-section-label hidden lg:inline"/);
+  assert.doesNotMatch(nav, /\{active && \(/);
+});
+
+test("la barra se compacta midiendo lo que piden sus piezas", async () => {
+  const [css, hook] = await Promise.all([
+    read("../../app/globals.css"),
+    read("../../hooks/usePageToolbarSearchFit.js"),
+  ]);
+
+  // Pasos, de menos a más: rótulos, valores, títulos de sección.
+  assert.match(hook, /const STAGES = \["", "no-labels", "icons", "bare"\];/);
+  assert.match(css, /\.sv-page-toolbar\[data-fit\] \.sv-page-toolbar-label \{\s*\n\s*display: none;/);
+  assert.match(css, /\[data-fit="icons"\], \[data-fit="bare"\]\) \.sv-page-toolbar-value \{\s*\n\s*display: none;/);
+  assert.match(css, /\.sv-page-toolbar\[data-fit="bare"\] \.sv-page-toolbar-section-label \{\s*\n\s*display: none;/);
+
+  // Con el buscador abierto para escribir, se compacta para SU ancho: antes
+  // se ensanchaba y los desplegables del Historial se montaban unos encima
+  // de otros.
+  assert.match(hook, /if \(focused\) \{[\s\S]*?fitStage\(labelPx\)/);
+
+  // Los desplegables se encuentran por su valor (los del Historial, siempre
+  // compactos, no llevan `sv-page-toolbar-trigger`) y no se encogen por
+  // debajo de su botón.
+  assert.match(hook, /:scope > button \.sv-page-toolbar-value/);
+  assert.match(hook, /wrapper\.style\.flexShrink = "0";/);
+
+  // Al abrir o cerrar el buscador el cambio se ANIMA (antes era instantáneo):
+  // se atiende en el acto, cada pieza va de su ancho al nuevo con WAAPI y los
+  // anchos finales se leen todos antes de arrancar ninguna animación.
+  assert.match(hook, /animateNext = true;\s*\n\s*updateNow\(\);/);
+  assert.match(hook, /const targets = children\.map\(/);
+  assert.match(hook, /child\.animate\(\[keyframe\(from\), keyframe\(to\)\], options\)/);
+  assert.match(hook, /prefers-reduced-motion: reduce/);
 });
