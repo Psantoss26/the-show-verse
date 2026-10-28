@@ -1683,7 +1683,7 @@ export default function EpisodeDetailsClient({
           // MÓVIL: sube hasta el borde superior (los 2rem del `py-8` + los
           // 3rem del navbar compacto) para que el hueco de la portada coincida
           // con la portada fija, como en las temporadas.
-          className="-mt-[5rem] flex flex-col items-start gap-5 sm:mt-0 sm:gap-8 lg:flex-row lg:gap-12 transform-gpu"
+          className="-mt-[calc(5rem+env(safe-area-inset-top))] flex flex-col items-start gap-5 sm:mt-0 sm:gap-8 lg:flex-row lg:gap-12 transform-gpu"
         >
           {/* MÓVIL: hueco del alto de la portada fija (que va en el fondo de
               la página) y, al pie, el título del episodio, donde las

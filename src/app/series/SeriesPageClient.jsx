@@ -1897,7 +1897,7 @@ export default function SeriesPageClient({
       <DashboardHoverBackdropProvider>
         <motion.div
           className={`relative min-h-screen [overflow-x:clip] bg-black text-white selection:bg-amber-500/30 ${
-            hasFeaturedHero ? "-mt-16" : "px-4 py-6 sm:px-6"
+            hasFeaturedHero ? "-mt-[calc(4rem+env(safe-area-inset-top))]" : "px-4 py-6 sm:px-6"
           }`}
           initial="hidden"
           animate="visible"

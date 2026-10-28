@@ -819,7 +819,7 @@ export default function SocialClient({ initialView = "today", initialToday = {},
         <motion.div
           ref={filtersRef}
           data-menu-pinned={filtersPinned}
-          className="relative sticky top-14 z-[70] mb-6 space-y-1 transition-all duration-300 sm:top-20 sm:mb-5 lg:mb-6"
+          className="relative sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-[70] mb-6 space-y-1 transition-all duration-300 sm:top-[calc(5rem+env(safe-area-inset-top))] sm:mb-5 lg:mb-6"
           initial={isBackNav ? false : { opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.3 }}

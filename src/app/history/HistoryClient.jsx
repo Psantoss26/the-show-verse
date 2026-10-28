@@ -4056,7 +4056,7 @@ export default function HistoryClient() {
               <motion.div
                 ref={filtersRef}
                 data-menu-pinned={filtersPinned}
-                className={`sticky top-14 z-[70] space-y-3 mb-3 sm:top-20 lg:mb-6 ${
+                className={`sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-[70] space-y-3 mb-3 sm:top-[calc(5rem+env(safe-area-inset-top))] lg:mb-6 ${
                   isBackNav ? "transition-none" : "transition-all duration-300"
                 }`}
                 initial={isBackNav ? false : { opacity: 0, y: 10 }}

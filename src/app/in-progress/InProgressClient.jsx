@@ -2150,7 +2150,7 @@ export default function InProgressClient({
           ref={filtersRef}
           data-menu-pinned={filtersPinned}
           data-grouped={groupBy !== "none" ? "" : undefined}
-          className={`${isBackNav ? "" : "sv-toolbar-rise "}sticky top-14 z-[70] space-y-3 transition-all duration-300 sm:top-20 sm:mb-6 ${
+          className={`${isBackNav ? "" : "sv-toolbar-rise "}sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-[70] space-y-3 transition-all duration-300 sm:top-[calc(5rem+env(safe-area-inset-top))] sm:mb-6 ${
             groupBy === "none" ? "mb-6" : "mb-2"
           }`}
           // Solo el fundido: la subida va en CSS (`.sv-toolbar-rise`), que

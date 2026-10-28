@@ -51,8 +51,8 @@ export default function LoginClient({ next }) {
         <div className="absolute top-[30%] right-[10%] w-[40%] h-[40%] rounded-full bg-purple-500/5 blur-[120px] animate-pulse duration-[12s]" />
       </div>
 
-      {/* Contenedor fijo centrado — navbar top (4rem) + bottom nav móvil (calc(4.5rem + safe-area)) */}
-      <main className="fixed top-16 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-0 right-0 z-10 overflow-hidden overscroll-none text-white flex items-center justify-center lg:inset-0 lg:overflow-y-auto">
+      {/* Contenedor fijo centrado — navbar top (4rem + recorte de la cámara) + bottom nav móvil (calc(4.5rem + safe-area)) */}
+      <main className="fixed top-[calc(4rem+env(safe-area-inset-top))] bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-0 right-0 z-10 overflow-hidden overscroll-none text-white flex items-center justify-center lg:inset-0 lg:overflow-y-auto">
         <div className="w-full flex items-center justify-center px-4 py-0 lg:min-h-full lg:pt-8 lg:pb-8">
           <LoginForm next={next} />
         </div>

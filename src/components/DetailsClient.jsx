@@ -10167,7 +10167,7 @@ export default function DetailsClient({
           initial={false}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-          className="-mt-[4.5rem] sm:mt-0 flex flex-col lg:flex-row gap-5 lg:gap-12 mb-6 sm:mb-12 items-start"
+          className="-mt-[calc(4.5rem+env(safe-area-inset-top))] sm:mt-0 flex flex-col lg:flex-row gap-5 lg:gap-12 mb-6 sm:mb-12 items-start"
         >
           {/* --- COLUMNA IZQUIERDA: POSTER + PROVIDERS + ENLACES (cuando es backdrop) --- */}
           <div

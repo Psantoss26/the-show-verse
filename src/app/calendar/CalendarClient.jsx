@@ -1547,7 +1547,7 @@ export default function CalendarClient({
             <div
               ref={filtersRef}
               data-menu-pinned={filtersPinned}
-              className={`sticky top-14 z-[70] space-y-3 mb-6 transition-all duration-300 sm:top-20${
+              className={`sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-[70] space-y-3 mb-6 transition-all duration-300 sm:top-[calc(5rem+env(safe-area-inset-top))]${
                 isBackNav ? "" : " sv-section-toolbar-in"
               }`}
             >
