@@ -50,6 +50,7 @@ import {
 import LiquidButton from "@/components/LiquidButton";
 import HistorySectionNav from "@/components/HistorySectionNav";
 import { useSiblingArrival } from "@/lib/hooks/useSiblingArrival";
+import { useStatCardsHandoff } from "@/lib/hooks/useStatCardsHandoff";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import { useAuth } from "@/context/AuthContext";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
@@ -368,7 +369,7 @@ function CircularProgress({ pct, colors, size = 40 }) {
 // Tarjeta de la cabecera: la compartida (mini tarjeta en móvil, la grande
 // desde md). Aquí solo se añaden las medidas de escritorio de esta página.
 function StatCard(props) {
-  return <PageStatCard {...props} className="md:min-h-[112px] lg:min-h-[120px] lg:w-[132px] lg:flex-none" />;
+  return <PageStatCard {...props} animateChanges className="md:min-h-[112px] lg:min-h-[120px] lg:w-[132px] lg:flex-none" />;
 }
 
 // ----------------------------
@@ -1218,6 +1219,17 @@ export default function ContinueWatchingClient() {
     return { total: list.length, movies, series, avg };
   }, [currentItems]);
 
+  // Tarjetas de la cabecera. Llegando desde Historial, su primer pintado son
+  // las de allí y se relevan, animadas, por estas (useStatCardsHandoff +
+  // `animateChanges` de StatCard).
+  const statsLoading = !authenticated || !dataLoaded;
+  const headerStatCards = useStatCardsHandoff("history-sections", "continue-watching", [
+    { label: "Títulos", value: stats.total, loading: statsLoading, icon: Play, iconKey: "play", colorClass: "text-emerald-400" },
+    { label: "Progreso Medio", shortLabel: "Progreso", value: `${stats.avg}%`, loading: statsLoading, icon: TrendingUp, iconKey: "trending-up", colorClass: "text-purple-400" },
+    { label: "Películas", value: stats.movies, loading: statsLoading, icon: Film, iconKey: "film", colorClass: "text-sky-400" },
+    { label: "Series", value: stats.series, loading: statsLoading, icon: Tv, iconKey: "tv", colorClass: "text-emerald-400" },
+  ]);
+
   const sortLabels = {
     recent: "Recientes",
     oldest: "Más antiguos",
@@ -1236,7 +1248,7 @@ export default function ContinueWatchingClient() {
       <div className="min-h-screen bg-black text-zinc-100 font-sans">
         <Blobs />
         <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-          <Header stats={stats} loading />
+          <Header cards={headerStatCards} />
           <div className="mb-8">
             <HistorySectionNav />
           </div>
@@ -1265,7 +1277,7 @@ export default function ContinueWatchingClient() {
     <div className="min-h-screen bg-black text-zinc-100 font-sans">
       <Blobs />
       <div className="relative z-10 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-        <Header stats={stats} loading={!dataLoaded} onRefresh={load} refreshing={loading} />
+        <Header cards={headerStatCards} staticEntry={fromSibling} onRefresh={load} refreshing={loading} />
 
         {/* Filtros */}
         <motion.div
@@ -2261,9 +2273,11 @@ function Blobs() {
   );
 }
 
-function Header({ stats, loading, onRefresh, refreshing }) {
+// `staticEntry`: llegando desde Historial la cabecera no repite su entrada
+// (useSiblingArrival); solo se relevan los datos de las tarjetas.
+function Header({ cards, staticEntry = false, onRefresh, refreshing }) {
   return (
-    <motion.header className="mb-6 lg:mb-10" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }}>
+    <motion.header className="mb-6 lg:mb-10" initial={staticEntry ? false : { opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }}>
       <div className="flex flex-col lg:flex-row lg:flex-wrap lg:items-center lg:justify-between gap-6">
         <div className="shrink-0 min-w-0">
           <div className="flex items-center gap-3 mb-2">
@@ -2275,7 +2289,7 @@ function Header({ stats, loading, onRefresh, refreshing }) {
               Continuar viendo<span className="text-emerald-500">.</span>
             </h1>
             {onRefresh && (
-              <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4, delay: 0.3 }}>
+              <motion.div initial={staticEntry ? false : { opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4, delay: 0.3 }}>
                 <LiquidButton onClick={onRefresh} disabled={refreshing} loading={refreshing} activeColor="green" groupId="cw-header-actions" title="Actualizar" className="!bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent !border-0 shadow-lg backdrop-blur-md hover:!bg-white/15">
                   <RotateCcw className={`w-5 h-5 ${refreshing ? "animate-spin" : ""}`} />
                 </LiquidButton>
@@ -2286,11 +2300,10 @@ function Header({ stats, loading, onRefresh, refreshing }) {
             Películas y episodios que estás viendo.
           </p>
         </div>
-        <motion.div className="grid grid-cols-4 gap-2 md:gap-4 w-full lg:w-auto lg:flex lg:justify-end shrink-0" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}>
-          <StatCard label="Títulos" value={stats.total} loading={loading} icon={Play} colorClass="text-emerald-400" />
-          <StatCard label="Progreso Medio" shortLabel="Progreso" value={`${stats.avg}%`} loading={loading} icon={TrendingUp} colorClass="text-purple-400" />
-          <StatCard label="Películas" value={stats.movies} loading={loading} icon={Film} colorClass="text-sky-400" />
-          <StatCard label="Series" value={stats.series} loading={loading} icon={Tv} colorClass="text-emerald-400" />
+        <motion.div className="grid grid-cols-4 gap-2 md:gap-4 w-full lg:w-auto lg:flex lg:justify-end shrink-0" initial={staticEntry ? false : { opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}>
+          {cards.map((card, index) => (
+            <StatCard key={index} {...card} />
+          ))}
         </motion.div>
       </div>
     </motion.header>

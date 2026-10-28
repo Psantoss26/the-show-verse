@@ -48,6 +48,7 @@ import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import useModalGuard from "@/hooks/useModalGuard";
 import HistorySectionNav from "@/components/HistorySectionNav";
 import { useSiblingArrival } from "@/lib/hooks/useSiblingArrival";
+import { useStatCardsHandoff } from "@/lib/hooks/useStatCardsHandoff";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/lib/i18n";
@@ -887,8 +888,10 @@ async function apiPost(url, body) {
 // ----------------------------
 // Tarjeta de la cabecera: la compartida (mini tarjeta en móvil, la grande
 // desde md). Aquí solo se añaden las medidas de escritorio de esta página.
+// Mismo ancho de escritorio que las de Continuar viendo: al pasar de una página
+// a otra las tarjetas se quedan en su sitio y solo cambia lo de dentro.
 function StatCard(props) {
-  return <PageStatCard {...props} className="md:min-h-[112px] lg:min-h-[120px] lg:flex-none" />;
+  return <PageStatCard {...props} animateChanges className="md:min-h-[112px] lg:min-h-[120px] lg:w-[132px] lg:flex-none" />;
 }
 
 // Dentro de la hoja de filtros móvil (MobileOptionsSheet) el desplegable se
@@ -3727,6 +3730,16 @@ export default function HistoryClient() {
     return { plays, unique: uniqSet.size, movies, shows };
   }, [filtered, historyTotals, hasMoreHistory, q, selectedDay, typeFilter]);
 
+  // Tarjetas de la cabecera. Llegando desde Continuar viendo, su primer
+  // pintado son las de allí y se relevan, animadas, por estas
+  // (useStatCardsHandoff + `animateChanges` de StatCard).
+  const headerStatCards = useStatCardsHandoff("history-sections", "history", [
+    { label: "Vistos", value: stats.plays, loading: !historyLoaded, icon: CheckCircle2, iconKey: "check", colorClass: "text-emerald-400" },
+    { label: "Títulos", value: stats.unique, loading: !historyLoaded, icon: LayoutList, iconKey: "layout-list", colorClass: "text-purple-400" },
+    { label: "Películas", value: stats.movies, loading: !historyLoaded, icon: Film, iconKey: "film", colorClass: "text-sky-400" },
+    { label: "Episodios", value: stats.shows, loading: !historyLoaded, icon: Tv, iconKey: "tv", colorClass: "text-pink-400" },
+  ]);
+
   const countsByDay = useMemo(() => {
     const m = {};
     for (const e of raw || []) {
@@ -3910,7 +3923,7 @@ export default function HistoryClient() {
         {/* Header */}
         <motion.header
           className="mb-6 lg:mb-10"
-          initial={isBackNav ? false : { opacity: 0, y: -20 }}
+          initial={staticChrome ? false : { opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
         >
@@ -3985,62 +3998,17 @@ export default function HistoryClient() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.3 }}
               >
-                <motion.div
-                  initial={staticChrome ? false : { opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={staticChrome ? { duration: 0 } : { duration: 0.4, delay: 0.5 }}
-                  className="w-full min-w-0"
-                >
-                  <StatCard
-                    label="Vistos"
-                    value={stats.plays}
-                    loading={!historyLoaded}
-                    icon={CheckCircle2}
-                    colorClass="text-emerald-400"
-                  />
-                </motion.div>
-                <motion.div
-                  initial={staticChrome ? false : { opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={staticChrome ? { duration: 0 } : { duration: 0.4, delay: 0.6 }}
-                  className="w-full min-w-0"
-                >
-                  <StatCard
-                    label="Títulos"
-                    value={stats.unique}
-                    loading={!historyLoaded}
-                    icon={LayoutList}
-                    colorClass="text-purple-400"
-                  />
-                </motion.div>
-                <motion.div
-                  initial={staticChrome ? false : { opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={staticChrome ? { duration: 0 } : { duration: 0.4, delay: 0.7 }}
-                  className="w-full min-w-0"
-                >
-                  <StatCard
-                    label="Películas"
-                    value={stats.movies}
-                    loading={!historyLoaded}
-                    icon={Film}
-                    colorClass="text-sky-400"
-                  />
-                </motion.div>
-                <motion.div
-                  initial={staticChrome ? false : { opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={staticChrome ? { duration: 0 } : { duration: 0.4, delay: 0.8 }}
-                  className="w-full min-w-0"
-                >
-                  <StatCard
-                    label="Episodios"
-                    value={stats.shows}
-                    loading={!historyLoaded}
-                    icon={Tv}
-                    colorClass="text-pink-400"
-                  />
-                </motion.div>
+                {headerStatCards.map((card, index) => (
+                  <motion.div
+                    key={index}
+                    initial={staticChrome ? false : { opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={staticChrome ? { duration: 0 } : { duration: 0.4, delay: 0.5 + index * 0.1 }}
+                    className="w-full min-w-0"
+                  >
+                    <StatCard {...card} />
+                  </motion.div>
+                ))}
               </motion.div>
             )}
           </div>
