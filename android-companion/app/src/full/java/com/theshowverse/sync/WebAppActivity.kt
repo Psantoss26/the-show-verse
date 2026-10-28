@@ -6,6 +6,7 @@ import android.app.DownloadManager
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -124,8 +125,8 @@ class WebAppActivity : AppCompatActivity() {
         configurarWebView()
         configurarRefresco()
         configurarBotonAtras()
+        configurarVentana()
         configurarInsets()
-        pantallaCompleta()
 
         binding.retryButton.setOnClickListener {
             ocultarError()
@@ -244,6 +245,7 @@ class WebAppActivity : AppCompatActivity() {
                 ::bloquearRecarga,
                 ::pedirPermisoPush,
                 ::abrirSoloEnNavegador,
+                { altoBarraEstadoCss },
             ),
             WebAppBridge.NAME,
         )
@@ -354,6 +356,7 @@ class WebAppActivity : AppCompatActivity() {
             )
             binding.videoContainer.visibility = View.VISIBLE
             binding.refresh.visibility = View.GONE
+            pantallaCompleta(true)
         }
 
         override fun onHideCustomView() {
@@ -364,6 +367,7 @@ class WebAppActivity : AppCompatActivity() {
             customView = null
             customViewCallback?.onCustomViewHidden()
             customViewCallback = null
+            pantallaCompleta(false)
         }
 
         /** Selector de ficheros (avatar, importaciones). */
@@ -459,42 +463,71 @@ class WebAppActivity : AppCompatActivity() {
     }
 
     /**
-     * Huecos de las barras y de la cámara. La app va siempre a pantalla completa
-     * (ver `pantallaCompleta`).
+     * Huecos de las barras y de la cámara. La app dibuja EDGE-TO-EDGE (ver
+     * `configurarVentana`) con las dos barras del sistema visibles.
      *
-     * La WEB NO SE RELLENA NUNCA, ni con las barras ni con la cámara: llega
-     * hasta el borde. Rellenarla con el hueco de la cámara lo dejaba en una
-     * franja negra. Y con el de las barras se movía al salir de la app: en
-     * recientes el sistema vuelve a mostrarlas, el relleno encogía y bajaba el
-     * WebView justo mientras se capturaba la miniatura, y en ella salía la
-     * barra superior DUPLICADA en el hueco de la barra de estado (y lo mismo
-     * abajo). Las barras, cuando aparecen, van por encima del contenido. La web reconoce la
-     * app por el user agent (`data-android-app`) y deja su barra superior
-     * arriba del todo, sin el logo central que taparía la cámara y con más
-     * margen a los lados por las esquinas redondeadas. El círculo de recargar
-     * y el medidor de fotogramas sí bajan, porque son vistas nativas.
+     * ARRIBA la web NO se rellena: pasa por detrás de la barra de estado, que es
+     * transparente, y la propia web baja su barra superior ese alto
+     * (`--sv-android-top`, que se le pasa aquí y por `statusBarHeight()` del
+     * puente). Así la franja de la barra de estado muestra el cristal
+     * difuminado de la barra superior, o la portada en las fichas, en vez de
+     * negro. ABAJO y a los lados sí se rellena, como siempre: el navbar inferior
+     * de la web queda encima de los botones de navegación.
      *
-     * El panel de error, nativo, sí esquiva barras y cámara con relleno.
+     * Los huecos se leen IGNORANDO SI LAS BARRAS SE VEN: al salir a recientes o
+     * al ocultarlas un vídeo cambia su visibilidad, y un relleno que siguiera
+     * ese cambio movía el WebView justo mientras el sistema capturaba la
+     * miniatura (salía con la barra superior duplicada).
+     *
+     * El panel de error, nativo, esquiva barras y cámara con relleno.
      */
     private fun configurarInsets() {
-        ViewCompat.setOnApplyWindowInsetsListener(binding.refresh) { _, insets ->
-            // Para las vistas nativas, el hueco de la barra de estado AUNQUE
-            // esté oculta: así no se mueven cuando aparece y desaparece.
-            val estado = insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.statusBars())
+        ViewCompat.setOnApplyWindowInsetsListener(binding.refresh) { view, insets ->
+            val barras = insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.systemBars())
             val camara = insets.getInsets(WindowInsetsCompat.Type.displayCutout())
-            val arriba = maxOf(estado.top, camara.top)
+            view.setPadding(
+                maxOf(barras.left, camara.left),
+                0,
+                maxOf(barras.right, camara.right),
+                maxOf(barras.bottom, camara.bottom),
+            )
+            val arriba = maxOf(barras.top, camara.top)
             bajarIndicadorDeRecarga(arriba)
             binding.frameMeter.translationY = arriba.toFloat()
+            pasarAltoBarraEstado(arriba)
             insets
         }
         ViewCompat.setOnApplyWindowInsetsListener(binding.errorPanel) { view, insets ->
-            val huecos = insets.getInsets(
-                WindowInsetsCompat.Type.systemBars() or
-                    WindowInsetsCompat.Type.displayCutout(),
+            val huecos = insets.getInsetsIgnoringVisibility(
+                WindowInsetsCompat.Type.systemBars(),
             )
-            view.setPadding(huecos.left, huecos.top, huecos.right, huecos.bottom)
+            val camara = insets.getInsets(WindowInsetsCompat.Type.displayCutout())
+            view.setPadding(
+                maxOf(huecos.left, camara.left),
+                maxOf(huecos.top, camara.top),
+                maxOf(huecos.right, camara.right),
+                maxOf(huecos.bottom, camara.bottom),
+            )
             insets
         }
+    }
+
+    /**
+     * Alto de la barra de estado en píxeles CSS, para la web. Lo lee el script
+     * de arranque del <head> por el puente (`statusBarHeight()`), antes del
+     * primer pintado, y si cambia con la página ya cargada (girar la pantalla)
+     * se le escribe directamente.
+     */
+    @Volatile
+    private var altoBarraEstadoCss = 0.0
+
+    private fun pasarAltoBarraEstado(px: Int) {
+        val css = px / resources.displayMetrics.density.toDouble()
+        if (css == altoBarraEstadoCss) return
+        altoBarraEstadoCss = css
+        evaluarJs(
+            "document.documentElement.style.setProperty('--sv-android-top','${css}px')",
+        )
     }
 
     /**
@@ -647,38 +680,39 @@ class WebAppActivity : AppCompatActivity() {
     }
 
     /**
-     * PANTALLA COMPLETA SIEMPRE, no solo con vídeo. Es lo que la PWA no puede
-     * hacer bien: en la app instalada desde Chrome, el gesto de retroceder
-     * desde el lateral quita la pantalla completa y Chrome la repone a los
-     * pocos segundos, con la barra de estado y la franja inferior negras
-     * mientras tanto.
-     *
-     * Aquí la ventana es nuestra. Con `BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE`
-     * el gesto de retroceder no saca las barras; solo salen deslizando desde
-     * arriba o desde abajo, POR ENCIMA del contenido (sin moverlo) y se ocultan
-     * solas. La ventana se dibuja también dentro del recorte de la cámara.
-     *
-     * Se vuelve a pedir al recuperar el foco: un diálogo del sistema (permisos,
-     * selector de ficheros, el teclado en algunas versiones) puede devolver las
-     * barras.
+     * Ventana EDGE-TO-EDGE con la barra de estado VISIBLE y TRANSPARENTE: se ve
+     * la hora y los iconos, y detrás la web (el cristal de su barra superior o
+     * la portada), no una franja negra. Desde Android 15 (API 35) el sistema ya
+     * la dibuja así; en versiones anteriores hay que pedirlo. Sin el contraste
+     * forzado, que pondría un velo sobre ella.
      */
-    private fun pantallaCompleta() {
+    @Suppress("DEPRECATION")
+    private fun configurarVentana() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            window.statusBarColor = Color.TRANSPARENT
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isStatusBarContrastEnforced = false
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             window.attributes = window.attributes.apply {
                 layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
             }
         }
-        val controller = WindowCompat.getInsetsController(window, window.decorView)
-        controller.systemBarsBehavior =
-            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        controller.hide(WindowInsetsCompat.Type.systemBars())
     }
 
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) pantallaCompleta()
+    /** Solo para el vídeo a pantalla completa: oculta y devuelve las barras. */
+    private fun pantallaCompleta(activa: Boolean) {
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        if (activa) {
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+            controller.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        } else {
+            controller.show(WindowInsetsCompat.Type.systemBars())
+        }
     }
 
     // ------------------------------------------------- diagnóstico (Rendimiento)

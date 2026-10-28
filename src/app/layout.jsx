@@ -64,7 +64,7 @@ export const viewport = {
 };
 
 const ANDROID_APP_BOOT_SCRIPT =
-  'if(navigator.userAgent.indexOf("TheShowVerseApp/")!==-1)document.documentElement.setAttribute("data-android-app","")';
+  'if(navigator.userAgent.indexOf("TheShowVerseApp/")!==-1){var d=document.documentElement;d.setAttribute("data-android-app","");try{var h=window.TSVAndroidBridge&&window.TSVAndroidBridge.statusBarHeight&&window.TSVAndroidBridge.statusBarHeight();if(h>0)d.style.setProperty("--sv-android-top",h+"px")}catch(e){}}';
 
 export default function RootLayout({ children, overlay }) {
   return (
@@ -87,9 +87,10 @@ export default function RootLayout({ children, overlay }) {
           dangerouslySetInnerHTML={{ __html: AVATAR_BOOT_SCRIPT }}
         />
         {/* App nativa de Android (su WebView añade `TheShowVerseApp/` al user
-            agent): `data-android-app` en <html> ANTES del primer pintado, para
-            que la barra superior nazca ya sin el hueco de la cámara y sin el
-            logo central (ver `--sv-safe-top` en globals.css). */}
+            agent): `data-android-app` en <html> y el alto de la barra de
+            estado, que pasa por el puente, ANTES del primer pintado. Así la
+            barra superior nace ya bajada, sin saltar al cargar (ver
+            `--sv-safe-top` en globals.css). */}
         <script
           id="android-app-boot"
           dangerouslySetInnerHTML={{ __html: ANDROID_APP_BOOT_SCRIPT }}

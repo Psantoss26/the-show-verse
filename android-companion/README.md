@@ -81,7 +81,7 @@ Lo que la carcasa resuelve y un WebView "pelado" no:
 |---|---|
 | Sesión que sobrevive a cerrar la app | cookies persistentes + `flush()` al pausar |
 | Tráileres a pantalla completa | `onShowCustomView` en `WebAppActivity` |
-| Pantalla completa siempre, sin barras del sistema: retroceder desde el lateral no las saca (en la PWA de Chrome sí); solo deslizar desde arriba o abajo, por encima y unos segundos | `pantallaCompleta()` en `WebAppActivity` (también al recuperar el foco); en la web, la barra superior se queda arriba del todo sin logo central y con más margen lateral (`data-android-app`, ver `docs/frontend/app-router-pages.md`) |
+| Barra de estado visible y TRANSPARENTE, con la web por detrás (su barra superior baja ese alto: `statusBarHeight()` del puente); abajo, relleno sobre los botones de navegación. Huecos leídos ignorando la visibilidad de las barras, para que la miniatura de recientes no salga duplicada | `configurarVentana()` y `configurarInsets()` en `WebAppActivity` |
 | Subir foto de perfil (`<input type=file>`) | `onShowFileChooser` |
 | Enlaces a TMDb, YouTube… | pestaña personalizada del navegador |
 | `market://`, `mailto:`… | los resuelve el sistema |

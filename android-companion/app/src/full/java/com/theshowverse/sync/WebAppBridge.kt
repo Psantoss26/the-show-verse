@@ -43,6 +43,7 @@ class WebAppBridge(
     private val bloquearRecarga: (Boolean) -> Unit = {},
     private val pedirPermisoPush: () -> Unit = {},
     private val abrirSoloEnNavegador: (String) -> Unit = abrirEnNavegador,
+    private val altoBarraEstado: () -> Double = { 0.0 },
 ) {
 
     /**
@@ -61,6 +62,14 @@ class WebAppBridge(
 
     @JavascriptInterface
     fun appVersion(): String = BuildConfig.UA_SUFFIX.substringAfter('/')
+
+    /**
+     * Alto de la barra de estado en píxeles CSS. La web pasa por detrás de ella
+     * (transparente) y baja su barra superior esto; lo lee al arrancar, antes
+     * del primer pintado. 0 si aún no se conoce.
+     */
+    @JavascriptInterface
+    fun statusBarHeight(): Double = altoBarraEstado()
 
     /**
      * Estado completo de la sincronización, en JSON, para que Ajustes lo pinte
