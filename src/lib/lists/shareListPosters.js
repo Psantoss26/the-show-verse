@@ -6,16 +6,52 @@
 // español → original → sin idioma), y ninguno si el título no tiene ninguno
 // (la tarjeta tampoco pinta entonces el póster guardado).
 //
+// El MOSAICO de fondo, en cambio, es el de la página de la lista: arte SIN
+// TEXTO (`resolveCoverArt`, el lote y la caché de su portada), con la misma
+// selección de títulos y el mismo muestreo de la portada.
+//
 // La hoja de compartir lo llama al abrirse, antes de pedir nada al servidor.
-// Comparte caché con la parrilla: los títulos ya pintados no se piden otra vez.
+// Comparte caché con la parrilla y la portada: los títulos ya pintados no se
+// piden otra vez.
 
-import { LIST_COLLAGE_MAX } from "@/lib/lists/shareList";
+import { resolveCoverArt } from "@/components/lists/listCoverArt";
+import { LIST_COLLAGE_EXTRA_MAX } from "@/lib/lists/shareList";
+import { buildPosterCollageTiles } from "@/lib/lists/posterCollage";
 import { englishPosterKey, resolveEnglishPosterPath } from "@/lib/tmdb/englishPosters";
 
+// Arte sin texto de cada título (`ref`: { id, mediaType }), sin los que no tienen.
+async function resolveCollageArt(refs) {
+  const paths = await Promise.all(
+    refs.map((item) => {
+      const key = englishPosterKey(item);
+      if (!key) return null;
+      const [mediaType, id] = key.split(":");
+      return resolveCoverArt({ key, mediaType, tmdbId: Number(id) }, "high");
+    }),
+  );
+  return paths.filter(Boolean);
+}
+
+/**
+ * Mosaico de la imagen: las celdas de la portada de la página (sus títulos,
+ * muestreados igual) y, detrás, los siguientes de su fondo móvil sin repetir.
+ */
+export async function prepareListCollage(card) {
+  if (card?.coverPath) return { collage: [], collageExtra: [] };
+  const [cover, background] = await Promise.all([
+    resolveCollageArt(card?.collageRefs || []),
+    resolveCollageArt(card?.collageExtraRefs || []),
+  ]);
+  const collage = buildPosterCollageTiles(cover);
+  const used = new Set(collage);
+  const collageExtra = [...new Set(background)].filter((path) => !used.has(path)).slice(0, LIST_COLLAGE_EXTRA_MAX);
+  return { collage, collageExtra };
+}
+
 export async function prepareListShare(card, story) {
+  const collagePromise = prepareListCollage(card);
   const refs = [
     ...(card?.preview || []),
-    ...(card?.collageRefs || []),
     ...(story?.items || []),
     ...(story?.top || []),
   ];
@@ -34,13 +70,12 @@ export async function prepareListShare(card, story) {
     return key ? { ...item, posterPath: resolved.get(key) || null } : item;
   };
 
-  const { collageRefs = [], ...rest } = card || {};
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { collageRefs, collageExtraRefs, ...rest } = card || {};
   const nextCard = {
     ...rest,
     preview: (card?.preview || []).map(withPoster),
-    collage: card?.coverPath
-      ? []
-      : collageRefs.map(withPoster).map((item) => item.posterPath).filter(Boolean).slice(0, LIST_COLLAGE_MAX),
+    ...(await collagePromise),
   };
   const nextStory = story
     ? { ...story, items: (story.items || []).map(withPoster), top: (story.top || []).map(withPoster) }

@@ -2,6 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  LIST_ART_SOURCE_ITEMS,
+  MAX_BACKGROUND_TILE_COUNT,
+  buildBackgroundCollageTargets,
+  buildPosterCollageTargets,
+} from "./posterCollage.js";
+import {
+  LIST_COLLAGE_MAX,
   LIST_GRID_MAX,
   LIST_PREVIEW_MAX,
   buildListShareCard,
@@ -94,10 +101,33 @@ test("la tarjeta lleva la vista previa, las medias y el mosaico solo sin portada
   assert.deepEqual(withCover.collageRefs, []);
 
   const noCover = buildListShareCard({ title: "Mi lista", items, tmdb: null });
-  assert.equal(noCover.collage.length, 6);
+  // El mosaico NO usa los pósters guardados (llevan el título impreso): solo
+  // las identidades, que el cliente resuelve al arte sin texto de la página.
+  assert.deepEqual(noCover.collage, []);
   assert.equal(noCover.collageRefs.length, items.length);
   assert.equal(noCover.scores.tmdb, null);
   assert.equal(noCover.count, items.length);
+});
+
+test("el mosaico de la imagen elige los mismos títulos que la portada y el fondo de la página", () => {
+  const raw = Array.from({ length: 120 }, (_, index) => ({
+    id: index + 1,
+    media_type: index % 7 ? "movie" : "tv",
+    poster_path: `/p${index}.jpg`,
+  }));
+  const items = raw.map((item) => normalizeListShareItem(item));
+  const card = buildListShareCard({ title: "Top 1500", items });
+  const asRef = (target) => ({ id: target.tmdbId, mediaType: target.mediaType });
+  // Página: de los primeros LIST_ART_SOURCE_ITEMS, la portada muestrea hasta 20
+  // y el fondo toma los primeros 40 (UnifiedListDetailsLayout).
+  const pageItems = raw.slice(0, LIST_ART_SOURCE_ITEMS);
+  assert.deepEqual(card.collageRefs, buildPosterCollageTargets(pageItems).map(asRef));
+  assert.deepEqual(
+    card.collageExtraRefs,
+    buildBackgroundCollageTargets(pageItems, MAX_BACKGROUND_TILE_COUNT).map(asRef),
+  );
+  assert.equal(card.collageRefs.length, 20);
+  assert.equal(card.collageRefs.at(-1).id, LIST_ART_SOURCE_ITEMS);
 });
 
 test("saneado de la tarjeta: nada que no se reconozca pasa", () => {
@@ -105,7 +135,8 @@ test("saneado de la tarjeta: nada que no se reconozca pasa", () => {
     kind: "otra",
     title: "  Mi   lista  ",
     coverPath: "/../../etc/passwd",
-    collage: ["/a.jpg", "javascript:alert(1)", "/b.png"],
+    collage: ["/a.jpg", "javascript:alert(1)", "/b.png", ...Array.from({ length: 30 }, (_, index) => `/c${index}.jpg`)],
+    collageExtra: ["/x.jpg", "../y.jpg"],
     count: "1e9",
     noun: "__proto__",
     meta: ["@pablo", "x", "y"],
@@ -115,7 +146,9 @@ test("saneado de la tarjeta: nada que no se reconozca pasa", () => {
   assert.equal(card.kind, "list");
   assert.equal(card.title, "Mi lista");
   assert.equal(card.coverPath, null);
-  assert.deepEqual(card.collage, ["/a.jpg", "/b.png"]);
+  assert.deepEqual(card.collage.slice(0, 2), ["/a.jpg", "/b.png"]);
+  assert.equal(card.collage.length, LIST_COLLAGE_MAX);
+  assert.deepEqual(card.collageExtra, ["/x.jpg"]);
   assert.equal(card.count, 100_000);
   assert.equal(card.noun, "title");
   assert.equal(card.meta.length, 2);
@@ -127,6 +160,7 @@ test("saneado de la tarjeta: nada que no se reconozca pasa", () => {
   assert.equal(empty.title, "Lista");
   // La identidad de los títulos no llega a la imagen.
   assert.equal("collageRefs" in empty, false);
+  assert.equal("collageExtraRefs" in empty, false);
   assert.deepEqual(empty.preview, []);
 });
 

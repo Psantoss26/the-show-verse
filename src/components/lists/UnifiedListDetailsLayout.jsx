@@ -11,6 +11,7 @@ import DetailsScoreboardPanel from '@/components/details/DetailsScoreboardPanel'
 import DetailsInfoTabs from '@/components/details/DetailsInfoTabs'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
+    LIST_ART_SOURCE_ITEMS,
     MAX_BACKGROUND_TILE_COUNT,
     buildBackgroundCollageTargets,
     buildBackgroundCollageTiles,
@@ -424,11 +425,6 @@ function MobileCollageExtension({ tiles, cols, rows }) {
 // los tintes de siempre. Aparece de una vez cuando sus imágenes han llegado
 // (o pasado un tope), no celda a celda; al volver atrás, sin fundido.
 const DESKTOP_COLLAGE_REVEAL_CAP_MS = 2500
-
-// Títulos de los que salen la portada y el fondo: la primera página de una
-// lista de la comunidad (TraktListDetailsClient pide de 48 en 48). Las listas
-// propias y las colecciones llegan enteras; también se toman sus primeros.
-const LIST_ART_SOURCE_ITEMS = 48
 
 function DesktopCollageBackground({ tiles, cols, tileWidth, animate }) {
     const unique = useMemo(() => [...new Set(tiles)], [tiles])

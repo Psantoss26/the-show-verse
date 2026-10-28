@@ -309,7 +309,7 @@ export function mimeOf(buffer) {
 // ampliar) antes de pasársela. Si sharp no estuviera (es una dependencia
 // opcional de Next), se usa la imagen tal cual: más lento, mismo resultado.
 let sharpPromise = null;
-function loadSharp() {
+export function loadSharp() {
   if (!sharpPromise) {
     sharpPromise = import("sharp").then((mod) => mod.default || mod).catch(() => null);
   }
@@ -468,7 +468,8 @@ function cachedPromise(cache, key, start) {
   return entry.promise;
 }
 
-function download(url, timeout) {
+/** Descarga una imagen tal cual (`{ buffer, mime }`), con la caché de las demás. */
+export function download(url, timeout) {
   return cachedPromise(downloadCache, url, async () => {
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(timeout) });

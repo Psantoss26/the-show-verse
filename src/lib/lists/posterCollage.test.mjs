@@ -10,6 +10,7 @@ import {
     buildPosterCollageTiles,
     getCompletePosterCollageTileCount,
     getPosterCollageLayout,
+    getPosterCollagePlacement,
 } from './posterCollage.js'
 
 const listDetailsLayoutUrl = new URL('../../components/lists/UnifiedListDetailsLayout.jsx', import.meta.url)
@@ -153,4 +154,25 @@ test("fondo de escritorio: celdas 2:3 que llenan la ventana sin pasar del tope d
     const tall = getDesktopBackgroundGrid(700, 4000)
     assert.equal(tall.cols, 3)
     assert.ok(tall.count <= MAX_BACKGROUND_TILE_COUNT)
+})
+
+test('getPosterCollagePlacement coloca las celdas como el grid de la portada', () => {
+    // Uno alto a la izquierda y dos apilados (row-span-2 en 2×2).
+    assert.deepEqual(getPosterCollagePlacement(3), {
+        cols: 2,
+        rows: 2,
+        cells: [
+            { col: 0, row: 0, colSpan: 1, rowSpan: 2 },
+            { col: 1, row: 0, colSpan: 1, rowSpan: 1 },
+            { col: 1, row: 1, colSpan: 1, rowSpan: 1 },
+        ],
+    })
+    // col-span-2 row-span-3 en 4×3: los otros seis llenan las dos columnas de la derecha.
+    const seven = getPosterCollagePlacement(7)
+    assert.deepEqual(seven.cells[0], { col: 0, row: 0, colSpan: 2, rowSpan: 3 })
+    assert.deepEqual(seven.cells.slice(1).map(({ col, row }) => [col, row]), [[2, 0], [3, 0], [2, 1], [3, 1], [2, 2], [3, 2]])
+    // Rejilla uniforme 4×5: cada celda una vez, sin huecos.
+    const twenty = getPosterCollagePlacement(20)
+    assert.equal(new Set(twenty.cells.map(({ col, row }) => `${col}:${row}`)).size, 20)
+    assert.deepEqual(twenty.cells.at(-1), { col: 3, row: 4, colSpan: 1, rowSpan: 1 })
 })

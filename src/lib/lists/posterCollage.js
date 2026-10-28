@@ -228,3 +228,44 @@ export function getDesktopBackgroundGrid(width, height, maxTiles = MAX_BACKGROUN
     const rows = Math.max(1, Math.floor(limit / cols))
     return { cols, rows, count: cols * rows, tileWidth: w / cols }
 }
+
+// Títulos de los que salen la portada y el fondo de una lista: la primera
+// página de una lista de la comunidad (TraktListDetailsClient pide de 48 en
+// 48). Las listas propias y las colecciones llegan enteras; también se toman
+// sus primeros. Lo usan la página (UnifiedListDetailsLayout) y su imagen
+// compartible (lib/lists/shareList), para que salgan los mismos títulos.
+export const LIST_ART_SOURCE_ITEMS = 48
+
+/**
+ * Celdas de la portada como posiciones de rejilla (columna, fila y tramos,
+ * desde 0), con la colocación automática de CSS grid (`grid-auto-flow: row`)
+ * sobre las clases de `getPosterCollageLayout`. Para pintar la misma portada
+ * fuera del navegador (la imagen compartible, lib/share/listCollage).
+ */
+export function getPosterCollagePlacement(tileCount) {
+    const { tileClassNames } = getPosterCollageLayout(tileCount)
+    const { cols, rows } = getPosterCollageGrid(tileCount)
+    const taken = new Set()
+    const cells = []
+    let cursor = 0
+    for (const className of tileClassNames) {
+        const colSpan = Math.min(cols, Number(className.match(/col-span-(\d+)/)?.[1]) || 1)
+        const rowSpan = Number(className.match(/row-span-(\d+)/)?.[1]) || 1
+        const fits = (col, row) => {
+            if (col + colSpan > cols) return false
+            for (let r = row; r < row + rowSpan; r += 1) {
+                for (let c = col; c < col + colSpan; c += 1) if (taken.has(`${c}:${r}`)) return false
+            }
+            return true
+        }
+        while (!fits(cursor % cols, Math.floor(cursor / cols))) cursor += 1
+        const col = cursor % cols
+        const row = Math.floor(cursor / cols)
+        for (let r = row; r < row + rowSpan; r += 1) {
+            for (let c = col; c < col + colSpan; c += 1) taken.add(`${c}:${r}`)
+        }
+        cells.push({ col, row, colSpan, rowSpan })
+        cursor += colSpan
+    }
+    return { cols, rows, cells }
+}

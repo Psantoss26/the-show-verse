@@ -49,8 +49,6 @@ const TITLE_GAP = 48;
 // la acompaña: antes bajaba solo 120 px y quedaban ~190 px vacíos debajo.
 const NO_SCORES_BOTTOM_MARGIN = 72;
 const NO_SCORES_SHIFT = H - NO_SCORES_BOTTOM_MARGIN - (PREVIEW_TOP + PREVIEW_H);
-// Separación entre las piezas del mosaico (la `gap-px` sobre negro de la página).
-const COLLAGE_GAP = 4;
 
 // Misma máscara que la portada de la ficha: se vuelve transparente hacia abajo
 // y deja ver el fondo ambiental, sin corte.
@@ -89,43 +87,8 @@ function Fill({ style }) {
   return <div style={{ position: "absolute", top: 0, left: 0, width: W, height: H, display: "flex", ...style }} />;
 }
 
-// Rectángulos del mosaico de portada según cuántos pósters haya: uno a sangre,
-// dos columnas, uno alto y dos apilados, 2×2 o 3×2.
-function collageRects(count) {
-  const g = COLLAGE_GAP;
-  const half = (W - g) / 2;
-  const halfH = (COVER_H - g) / 2;
-  if (count <= 1) return [{ left: 0, top: 0, width: W, height: COVER_H }];
-  if (count === 2) {
-    return [
-      { left: 0, top: 0, width: half, height: COVER_H },
-      { left: half + g, top: 0, width: half, height: COVER_H },
-    ];
-  }
-  if (count === 3) {
-    return [
-      { left: 0, top: 0, width: half, height: COVER_H },
-      { left: half + g, top: 0, width: half, height: halfH },
-      { left: half + g, top: halfH + g, width: half, height: halfH },
-    ];
-  }
-  if (count < 6) {
-    return [0, 1, 2, 3].map((index) => ({
-      left: (index % 2) * (half + g),
-      top: Math.floor(index / 2) * (halfH + g),
-      width: half,
-      height: halfH,
-    }));
-  }
-  const third = (W - g * 2) / 3;
-  return [0, 1, 2, 3, 4, 5].map((index) => ({
-    left: (index % 3) * (third + g),
-    top: Math.floor(index / 3) * (halfH + g),
-    width: third,
-    height: halfH,
-  }));
-}
-
+// Portada de la imagen: el póster propio, o el fondo de la página de la lista
+// ya compuesto (mosaico sin texto y su prolongación, ver lib/share/listCollage).
 function Cover({ cover, collage }) {
   if (cover) {
     return (
@@ -148,45 +111,16 @@ function Cover({ cover, collage }) {
       />
     );
   }
-  const tiles = collage.filter(Boolean);
-  if (!tiles.length) return null;
-  const rects = collageRects(tiles.length);
+  if (!collage) return null;
   return (
-    <div
-      style={{
-        position: "absolute",
-        top: 0,
-        left: 0,
-        width: W,
-        height: COVER_H,
-        display: "flex",
-        backgroundColor: "rgba(0,0,0,0.7)",
-        maskImage: COVER_MASK,
-      }}
-    >
-      {rects.map((rect, index) => (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          key={index}
-          src={tiles[index].src}
-          width={Math.round(rect.width)}
-          height={Math.round(rect.height)}
-          alt=""
-          style={{
-            position: "absolute",
-            left: Math.round(rect.left),
-            top: Math.round(rect.top),
-            width: Math.round(rect.width),
-            height: Math.round(rect.height),
-            objectFit: "cover",
-            objectPosition: "50% 20%",
-            // Varios pósters con su propio título impreso compiten con el
-            // nombre de la lista: un punto más apagados que una portada única.
-            filter: "brightness(0.8) saturate(1.05)",
-          }}
-        />
-      ))}
-    </div>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={collage.src}
+      width={W}
+      height={H}
+      alt=""
+      style={{ position: "absolute", top: 0, left: 0, width: W, height: H }}
+    />
   );
 }
 

@@ -17,12 +17,21 @@
 
 import { tmdbImagePath } from "../details/shareCard.js";
 import { truncateText } from "../details/shareStory.js";
+import {
+  LIST_ART_SOURCE_ITEMS,
+  MAX_BACKGROUND_TILE_COUNT,
+  buildBackgroundCollageTargets,
+  buildPosterCollageTargets,
+} from "./posterCollage.js";
 
 // Pósters de la vista previa de la imagen (el último se convierte en «+N» si
 // la lista tiene más).
 export const LIST_PREVIEW_MAX = 5;
-// Pósters del mosaico de portada de una lista sin portada propia.
-export const LIST_COLLAGE_MAX = 6;
+// Celdas del mosaico de una lista sin portada propia: las MISMAS que la
+// portada de su página (lib/lists/posterCollage, hasta 20) y, para llenar el
+// resto de la imagen, los títulos siguientes de su fondo móvil.
+export const LIST_COLLAGE_MAX = 20;
+export const LIST_COLLAGE_EXTRA_MAX = 12;
 // Títulos de la sección «Contenido» del vídeo (4 columnas × 3 filas).
 export const LIST_GRID_MAX = 12;
 // Filas de «Mejor valoradas».
@@ -31,10 +40,6 @@ export const LIST_TOP_MAX = 5;
 export const LIST_CAST_MAX = 6;
 // Celdas de «En cifras».
 export const LIST_FACTS_MAX = 8;
-// Candidatos del mosaico: algunos títulos pueden no tener póster inglés y se
-// saltan (ver lib/lists/shareListPosters).
-export const LIST_COLLAGE_CANDIDATES = LIST_COLLAGE_MAX + 4;
-
 export const LIST_SCENES = ["titles", "top", "cast", "stats", "about"];
 
 // Iconos de ogKit que pueden pedir las celdas de «En cifras».
@@ -140,6 +145,11 @@ function summaryScore(summary) {
   return { value: average.toFixed(1), votes: null };
 }
 
+// Títulos del mosaico como los elige la página: de los primeros
+// LIST_ART_SOURCE_ITEMS, en la forma de `ref`.
+const collageTargets = (pick, items) =>
+  pick(items.slice(0, LIST_ART_SOURCE_ITEMS)).map((target) => ({ id: target.tmdbId, mediaType: target.mediaType }));
+
 /**
  * Payload de la IMAGEN. `items` ya normalizados (normalizeListShareItem);
  * `tmdb` / `imdb` son los resúmenes de lib/lists/ratingSummary e
@@ -164,7 +174,6 @@ export function buildListShareCard({
   tmdb = null,
   imdb = null,
 }) {
-  const withPoster = items.filter((item) => item?.posterPath);
   return {
     kind,
     title,
@@ -172,11 +181,16 @@ export function buildListShareCard({
     coverPath: coverPath || null,
     backdropPath: backdropPath || null,
     layout: layout === "poster" && coverPath ? "poster" : "cover",
-    // Sin portada propia, el mosaico de los primeros pósters. `collageRefs`
-    // son los candidatos con los que el cliente lo rehace con los pósters
-    // ingleses (prepareListShare) antes de pedir la imagen.
-    collage: coverPath ? [] : withPoster.slice(0, LIST_COLLAGE_MAX).map((item) => item.posterPath),
-    collageRefs: coverPath ? [] : items.slice(0, LIST_COLLAGE_CANDIDATES).map(ref),
+    // Sin portada propia, el mosaico de la página: arte SIN TEXTO de los
+    // mismos títulos (los de su portada y, después, los de su fondo móvil).
+    // Solo van sus identidades; el cliente resuelve el arte con la misma caché
+    // que la página (prepareListShare) antes de pedir la imagen.
+    collage: [],
+    collageExtra: [],
+    collageRefs: coverPath ? [] : collageTargets(buildPosterCollageTargets, items),
+    collageExtraRefs: coverPath
+      ? []
+      : collageTargets((list) => buildBackgroundCollageTargets(list, MAX_BACKGROUND_TILE_COUNT), items),
     count: Number.isFinite(Number(count)) ? Number(count) : items.length,
     noun: noun || listNoun(items),
     meta: meta.filter(Boolean),
@@ -247,6 +261,8 @@ function sanitizeScores(raw) {
   return { tmdb: one(scores.tmdb), imdb: one(scores.imdb) };
 }
 
+const tmdbPaths = (value, max) => (Array.isArray(value) ? value : []).map(tmdbImagePath).filter(Boolean).slice(0, max);
+
 /** Valida el cuerpo de /api/share/list-card. Siempre devuelve una tarjeta pintable. */
 export function sanitizeListShareCard(body) {
   const count = finite(body?.count, 0, 100_000);
@@ -258,10 +274,8 @@ export function sanitizeListShareCard(body) {
     backdropPath: tmdbImagePath(body?.backdropPath),
     // El póster entero solo tiene sentido con póster.
     layout: body?.layout === "poster" && tmdbImagePath(body?.coverPath) ? "poster" : "cover",
-    collage: (Array.isArray(body?.collage) ? body.collage : [])
-      .map(tmdbImagePath)
-      .filter(Boolean)
-      .slice(0, LIST_COLLAGE_MAX),
+    collage: tmdbPaths(body?.collage, LIST_COLLAGE_MAX),
+    collageExtra: tmdbPaths(body?.collageExtra, LIST_COLLAGE_EXTRA_MAX),
     count: count == null ? 0 : Math.round(count),
     noun: Object.hasOwn(NOUNS, body?.noun) ? body.noun : "title",
     meta: (Array.isArray(body?.meta) ? body.meta : [])
