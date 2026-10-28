@@ -75,6 +75,7 @@ import {
   Globe,
 } from "lucide-react";
 import PageStatCard from "@/components/ui/PageStatCard";
+import { useSlidingSectionIndicator } from "@/components/ui/useSlidingSectionIndicator";
 import { listsHeaderStats } from "@/lib/lists/headerStats";
 import { FEATURED_COLLECTION_IDS } from "@/lib/tmdb/featuredCollections";
 import useTraktLists from "@/lib/hooks/useTraktLists";
@@ -635,25 +636,39 @@ function DropdownMenuItem({ active, onClick, children }) {
   );
 }
 
+// La pastilla de la sección activa se desliza entre botones
+// (useSlidingSectionIndicator).
+const LIST_SOURCE_ACTIVE_PILL = "bg-gradient-to-br from-purple-500 to-purple-600 shadow-lg shadow-purple-500/20";
+
 function ListsSourceSelector({ source, onChange, className = "" }) {
+  const navRef = useRef(null);
+  const { ready, indicator } = useSlidingSectionIndicator({
+    navRef,
+    activeKey: source,
+    groupId: "lists-source",
+    className: LIST_SOURCE_ACTIVE_PILL,
+  });
   return (
     <nav
+      ref={navRef}
       aria-label="Fuente de listas"
-      className={`inline-flex h-11 max-w-full shrink-0 gap-1 overflow-x-auto rounded-2xl bg-gradient-to-br from-white/10 to-white/5 p-1 shadow-lg backdrop-blur-lg [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${className}`}
+      className={`relative inline-flex h-11 max-w-full shrink-0 gap-1 overflow-x-auto rounded-2xl bg-gradient-to-br from-white/10 to-white/5 p-1 shadow-lg backdrop-blur-lg [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${className}`}
     >
+      {indicator}
       {LIST_SOURCE_OPTIONS.map(({ value, label, Icon }) => {
         const active = source === value;
         return (
           <button
             key={value}
             type="button"
+            data-section-key={value}
             onClick={() => onChange(value)}
             aria-pressed={active}
             aria-label={label}
             title={label}
-            className={`flex h-full items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-2 text-sm font-bold transition-all lg:px-3.5 ${
+            className={`relative z-10 flex h-full items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-2 text-sm font-bold transition-all lg:px-3.5 ${
               active
-                ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
+                ? `text-white ${ready ? "" : LIST_SOURCE_ACTIVE_PILL}`
                 : "text-zinc-400 hover:bg-white/10 hover:text-white"
             }`}
           >

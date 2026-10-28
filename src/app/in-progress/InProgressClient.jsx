@@ -1351,7 +1351,9 @@ export default function InProgressClient({
   }, []);
 
   // Cifras de la página hermana para el primer pintado (ver
-  // takeSiblingStatsHandoff). Con ellas la cabecera no vuelve a entrar.
+  // takeSiblingStatsHandoff). Con ellas la cabecera no vuelve a entrar, ni
+  // la barra del buscador: en la barra solo se desliza la pastilla de la
+  // sección (WatchingSectionNav).
   const [statsHandoff, setStatsHandoff] = useState(() => takeSiblingStatsHandoff(activeTab));
   const [fromSibling] = useState(() => statsHandoff !== null);
   const staticHeader = isBackNav || fromSibling;
@@ -2165,14 +2167,14 @@ export default function InProgressClient({
           ref={filtersRef}
           data-menu-pinned={filtersPinned}
           data-grouped={groupBy !== "none" ? "" : undefined}
-          className={`${isBackNav ? "" : "sv-toolbar-rise "}sticky top-[calc(3.5rem+var(--sv-safe-top,0px))] z-[70] space-y-3 transition-all duration-300 sm:top-[calc(5rem+var(--sv-safe-top,0px))] sm:mb-6 ${
+          className={`${staticHeader ? "" : "sv-toolbar-rise "}sticky top-[calc(3.5rem+var(--sv-safe-top,0px))] z-[70] space-y-3 transition-all duration-300 sm:top-[calc(5rem+var(--sv-safe-top,0px))] sm:mb-6 ${
             groupBy === "none" ? "mb-6" : "mb-2"
           }`}
           // Solo el fundido: la subida va en CSS (`.sv-toolbar-rise`), que
           // en móvil la quita si hay agrupación.
-          initial={isBackNav ? false : { opacity: 0 }}
+          initial={staticHeader ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.5 }}
+          transition={staticHeader ? { duration: 0 } : { duration: 0.4, delay: 0.5 }}
         >
           {/* El panel desplaza la lista antes de que la barra se fije; una vez
               adherida, conserva el comportamiento de overlay. */}

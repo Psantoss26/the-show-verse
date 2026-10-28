@@ -10,8 +10,10 @@
 // no. En móvil son solo icono (incluida la activa), para que quepan en la misma
 // fila que el buscador.
 
+import { useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSlidingSectionIndicator } from "@/components/ui/useSlidingSectionIndicator";
 import { Play, CheckCircle2 } from "lucide-react";
 
 const SECTIONS = [
@@ -19,26 +21,41 @@ const SECTIONS = [
   { href: "/completed", label: "Completadas", Icon: CheckCircle2, fillWhenActive: false },
 ];
 
+// La pastilla de la activa se desliza: al pasar a la ruta hermana, el
+// selector nuevo la recoge donde la dejó el anterior
+// (useSlidingSectionIndicator).
+const ACTIVE_PILL = "bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-lg shadow-emerald-500/20";
+
 export default function WatchingSectionNav({ className = "" }) {
   const pathname = usePathname();
+  const navRef = useRef(null);
+  const { ready, indicator } = useSlidingSectionIndicator({
+    navRef,
+    activeKey: pathname,
+    groupId: "watching-sections",
+    className: ACTIVE_PILL,
+  });
   return (
     <nav
+      ref={navRef}
       aria-label="Secciones de seguimiento"
-      className={`inline-flex max-w-full gap-1 overflow-x-auto rounded-2xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${className}`}
+      className={`relative inline-flex max-w-full gap-1 overflow-x-auto rounded-2xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${className}`}
     >
+      {indicator}
       {SECTIONS.map(({ href, label, Icon, fillWhenActive }) => {
         const active = pathname === href;
         return (
           <Link
             key={href}
             href={href}
+            data-section-key={href}
             prefetch={false}
             aria-current={active ? "page" : undefined}
             aria-label={label}
             title={label}
-            className={`flex items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-2 text-sm font-bold transition-all lg:px-3.5 ${
+            className={`relative z-10 flex items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-2 text-sm font-bold transition-all lg:px-3.5 ${
               active
-                ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
+                ? `text-white ${ready ? "" : ACTIVE_PILL}`
                 : "text-zinc-400 hover:bg-white/10 hover:text-white"
             }`}
           >
