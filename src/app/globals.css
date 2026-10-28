@@ -2305,6 +2305,23 @@ html[data-android-app] {
   --sv-safe-bottom: var(--sv-android-bottom, env(safe-area-inset-bottom, 0px));
 }
 
+/* APP NATIVA DE ANDROID: SIN `backdrop-filter`. En el WebView cada zona con
+   desenfoque de fondo se vuelve a calcular en CADA fotograma del scroll (lo
+   que tiene detrás se ha movido), y las fichas, listas, colecciones y
+   temporadas llevan muchas: barras, marcador, botones, paneles. Chrome/PWA lo
+   aguanta; el WebView no, y el scroll iba a tirones (ver la pantalla de
+   Rendimiento de android-companion, cuyo «Sin desenfoques» hace esto mismo).
+   Los tintes de cada superficie se quedan, así que se ven como cristal
+   esmerilado sin desenfoque. Los `filter` de las imágenes (portadas
+   difuminadas de fondo) no se tocan: se rasterizan una vez y no cuestan al
+   desplazar. Se salva solo la franja de la barra de estado
+   (`data-sv-keep-blur`, layout.jsx): pequeña y pedida expresamente. */
+html[data-android-app] *:not([data-sv-keep-blur]),
+html[data-android-app] *::before,
+html[data-android-app] *::after {
+  backdrop-filter: none !important;
+}
+
 .sv-topbar {
   transition:
     background-color 300ms,

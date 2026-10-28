@@ -121,6 +121,7 @@ export default function RootLayout({ children, overlay }) {
             ancestros con opacidad o filtros que le quitarían el desenfoque. */}
         <div
           aria-hidden
+          data-sv-keep-blur
           className="pointer-events-none fixed inset-x-0 top-0 z-[90] hidden h-[calc(var(--sv-safe-top,0px)+0.5rem)] [mask-image:linear-gradient(to_bottom,black_calc(100%_-_0.75rem),transparent)] [html[data-android-app]_&]:block bg-black/15 backdrop-blur-[16px] backdrop-saturate-[180%]"
         />
         <AuthProvider>
