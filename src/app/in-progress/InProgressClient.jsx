@@ -569,7 +569,23 @@ function CircularProgress({ pct, colors, size = 52, customText }) {
 // Tarjeta de la cabecera: la compartida (mini tarjeta en móvil, la grande
 // desde md). Aquí solo se añaden las medidas de escritorio de esta página.
 function StatCard(props) {
-  return <PageStatCard {...props} className="md:min-h-[112px] lg:min-h-[120px] lg:flex-none" />;
+  return <PageStatCard {...props} animateChanges className="md:min-h-[112px] lg:min-h-[120px] lg:flex-none" />;
+}
+
+// Relevo de las tarjetas entre En progreso y Completadas. Son dos rutas, así
+// que al pasar de una a otra la página se monta de nuevo; para que las
+// tarjetas no vuelvan a entrar, cada página deja aquí lo último que mostraron.
+// Si la nueva llega desde la hermana (aún montada o desmontada hace un
+// instante), su cabecera sale quieta con esas cifras y en el siguiente
+// fotograma las releva, animadas, por las suyas (`animateChanges`).
+const STATS_HANDOFF_MAX_AGE_MS = 1500;
+let lastStatsCards = null; // { tab, cards: [{ value, loading }], leftAt }
+
+function takeSiblingStatsHandoff(tab) {
+  const last = lastStatsCards;
+  if (!last || last.tab === tab) return null;
+  if (last.leftAt != null && Date.now() - last.leftAt > STATS_HANDOFF_MAX_AGE_MS) return null;
+  return last.cards;
 }
 
 // ----------------------------
@@ -1334,6 +1350,17 @@ export default function InProgressClient({
     setUiReady(true);
   }, []);
 
+  // Cifras de la página hermana para el primer pintado (ver
+  // takeSiblingStatsHandoff). Con ellas la cabecera no vuelve a entrar.
+  const [statsHandoff, setStatsHandoff] = useState(() => takeSiblingStatsHandoff(activeTab));
+  const [fromSibling] = useState(() => statsHandoff !== null);
+  const staticHeader = isBackNav || fromSibling;
+  useEffect(() => {
+    if (!fromSibling) return undefined;
+    const frame = requestAnimationFrame(() => setStatsHandoff(null));
+    return () => cancelAnimationFrame(frame);
+  }, [fromSibling]);
+
   // Persist
   useEffect(() => {
     if (!uiReady) return;
@@ -1660,6 +1687,40 @@ export default function InProgressClient({
       totalEpisodesRemaining,
     };
   }, [currentItems, currentStats]);
+
+  // Tarjetas de la cabecera: las cuatro, con lo que se pinta (las cifras de la
+  // página hermana durante el relevo).
+  const statCards = [
+    { label: "Series", value: displayStats?.total ?? 0, icon: Tv, colorClass: "text-emerald-400" },
+    {
+      label: "Progreso Medio",
+      shortLabel: "Progreso",
+      value: `${displayStats?.avgProgress ?? 0}%`,
+      icon: TrendingUp,
+      colorClass: "text-purple-400",
+    },
+    { label: "Eps. Vistos", value: displayStats?.totalEpisodesWatched ?? 0, icon: Eye, colorClass: "text-sky-400" },
+    { label: "Eps. Restantes", value: displayStats?.totalEpisodesRemaining ?? 0, icon: Layers, colorClass: "text-amber-400" },
+  ].map((card, index) => ({
+    ...card,
+    value: statsHandoff ? statsHandoff[index].value : card.value,
+    loading: statsHandoff ? statsHandoff[index].loading : !currentDataLoaded,
+  }));
+  const statCardsSignature = statCards.map((card) => `${card.loading ? "" : card.value}`).join("|");
+  useEffect(() => {
+    if (statsHandoff) return;
+    lastStatsCards = {
+      tab: activeTab,
+      cards: statCardsSignature.split("|").map((value) => ({ value, loading: value === "" })),
+      leftAt: null,
+    };
+  }, [activeTab, statsHandoff, statCardsSignature]);
+  useEffect(
+    () => () => {
+      if (lastStatsCards?.tab === activeTab) lastStatsCards = { ...lastStatsCards, leftAt: Date.now() };
+    },
+    [activeTab],
+  );
 
   // Filter + Sort. La búsqueda mira también el nombre en inglés y en español.
   const titleNamesVersion = useTitleNameSearch(currentItems, q);
@@ -2008,9 +2069,9 @@ export default function InProgressClient({
         {/* ========== HEADER (same pattern as History, Favorites, Watchlist, Calendar) ========== */}
         <motion.header
           className="mb-6 lg:mb-10"
-          initial={isBackNav ? false : { opacity: 0, y: -20 }}
+          initial={staticHeader ? false : { opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={isBackNav ? { duration: 0 } : { duration: 0.5, ease: "easeOut" }}
+          transition={staticHeader ? { duration: 0 } : { duration: 0.5, ease: "easeOut" }}
         >
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div>
@@ -2029,9 +2090,9 @@ export default function InProgressClient({
                 {/* Action buttons next to title */}
                 <div className="flex items-center gap-2">
                   <motion.div
-                    initial={isBackNav ? false : { opacity: 0, scale: 0.8 }}
+                    initial={staticHeader ? false : { opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.3 }}
+                    transition={staticHeader ? { duration: 0 } : { duration: 0.4, delay: 0.3 }}
                   >
                     <LiquidButton
                       onClick={() =>
@@ -2051,9 +2112,9 @@ export default function InProgressClient({
                   </motion.div>
 
                   <motion.div
-                    initial={isBackNav ? false : { opacity: 0, scale: 0.8 }}
+                    initial={staticHeader ? false : { opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.4 }}
+                    transition={staticHeader ? { duration: 0 } : { duration: 0.4, delay: 0.4 }}
                   >
                     <LiquidButton
                       onClick={() => setShowDisconnectModal(true)}
@@ -2080,67 +2141,21 @@ export default function InProgressClient({
             {/* Stats cards on the right (same as History) */}
             <motion.div
               className="grid grid-cols-4 gap-2 md:gap-4 w-full lg:w-auto lg:flex lg:justify-end"
-              initial={isBackNav ? false : { opacity: 0, y: 20 }}
+              initial={staticHeader ? false : { opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={isBackNav ? { duration: 0 } : { duration: 0.5, delay: 0.3 }}
+              transition={staticHeader ? { duration: 0 } : { duration: 0.5, delay: 0.3 }}
             >
-              <motion.div
-                className="w-full min-w-0"
-                initial={isBackNav ? false : { opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.5 }}
-              >
-                <StatCard
-                  label="Series"
-                  value={displayStats?.total ?? 0}
-                  loading={!currentDataLoaded}
-                  icon={Tv}
-                  colorClass="text-emerald-400"
-                />
-              </motion.div>
-              <motion.div
-                className="w-full min-w-0"
-                initial={isBackNav ? false : { opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.6 }}
-              >
-                <StatCard
-                  label="Progreso Medio"
-                  shortLabel="Progreso"
-                  value={`${displayStats?.avgProgress ?? 0}%`}
-                  loading={!currentDataLoaded}
-                  icon={TrendingUp}
-                  colorClass="text-purple-400"
-                />
-              </motion.div>
-              <motion.div
-                className="w-full min-w-0"
-                initial={isBackNav ? false : { opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.7 }}
-              >
-                <StatCard
-                  label="Eps. Vistos"
-                  value={displayStats?.totalEpisodesWatched ?? 0}
-                  loading={!currentDataLoaded}
-                  icon={Eye}
-                  colorClass="text-sky-400"
-                />
-              </motion.div>
-              <motion.div
-                className="w-full min-w-0"
-                initial={isBackNav ? false : { opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.8 }}
-              >
-                <StatCard
-                  label="Eps. Restantes"
-                  value={displayStats?.totalEpisodesRemaining ?? 0}
-                  loading={!currentDataLoaded}
-                  icon={Layers}
-                  colorClass="text-amber-400"
-                />
-              </motion.div>
+              {statCards.map((card, index) => (
+                <motion.div
+                  key={card.label}
+                  className="w-full min-w-0"
+                  initial={staticHeader ? false : { opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={staticHeader ? { duration: 0 } : { duration: 0.4, delay: 0.5 + index * 0.1 }}
+                >
+                  <StatCard {...card} />
+                </motion.div>
+              ))}
             </motion.div>
           </div>
         </motion.header>
