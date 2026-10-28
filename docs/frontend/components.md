@@ -89,7 +89,7 @@ Componentes de listas propias, colecciones TMDb y listas públicas de Trakt.
 | Componente | Propósito |
 |---|---|
 | `UnifiedListDetailsLayout.jsx` | Layout común (cabecera, metadatos, acciones) compartido por detalle de lista propia, colección y lista de Trakt. |
-| `ListDetailsTools.jsx` | Barra de herramientas de una lista (orden, filtro, vista grid/lista) — `FilterableListItems`. Buscador, botón de filtros, desplegables, selector de vista y modo borrar llevan el cristal líquido de la sinopsis y el marcador (`LIQUID_GLASS_SURFACE` + `LiquidGlassOpticalLayers`); el input va transparente dentro de su cristal, que marca el foco. |
+| `ListDetailsTools.jsx` | Barra de herramientas de una lista (orden, filtro, vista grid/lista) — `FilterableListItems`. Buscador, botón de filtros, desplegables, selector de vista y modo borrar llevan el cristal líquido de la sinopsis y el marcador (`LIQUID_GLASS_SURFACE` + `LiquidGlassOpticalLayers`); el input va transparente dentro de su cristal, que marca el foco. Tipo, orden, agrupación y vista se guardan en localStorage (`showverse:<prefsKey>Details:*`, leídos tras montar para no romper la hidratación), como en las páginas de usuario: `prefsKey` «list» para listas propias, de la comunidad y de Trakt, «collection» para colecciones (solo películas). La búsqueda no se guarda. |
 | `ListPosterCard.jsx` | Tarjeta de póster usada en grids de listas (con estado de carga/error de imagen). |
 | `CollectionDetailsClient.jsx` | Cliente de `/lists/collection/[collectionId]` (saga/colección TMDb). |
 | `TraktListDetailsClient.jsx` | Cliente de `/lists/trakt/[username]/[listId]` (lista pública de Trakt, paginada). |

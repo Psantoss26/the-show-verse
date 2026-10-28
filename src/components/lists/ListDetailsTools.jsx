@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { setLocalStorageItem } from "@/lib/storage/localStorageBudget";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 import { LIQUID_GLASS_SURFACE } from "@/lib/ui/liquidGlass";
 import { AnimatePresence, motion } from "framer-motion";
@@ -404,6 +405,50 @@ function DeleteModeToggle({ editMode, setEditMode }) {
   );
 }
 
+// AJUSTES GUARDADOS, como en las páginas de usuario (Favoritos, Pendientes…):
+// tipo, orden, agrupación y modo de vista se recuerdan en localStorage, uno
+// por cada clase de página (`prefsKey`: listas o colecciones), y valen para
+// todas las de esa clase. La búsqueda no se guarda.
+//
+// Se leen tras montar (en un layout effect, antes de pintar) y no en el
+// `useState` inicial: estas páginas se pintan en el servidor, que no ve
+// localStorage, y React no corrige al hidratar lo que no coincide.
+const useClientLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+const LIST_PREF_VIEW_MODES = new Set(VIEW_SWITCHER_OPTIONS.map(({ id }) => id));
+
+function readListPref(key, valid) {
+  try {
+    const saved = window.localStorage.getItem(key);
+    return saved && valid(saved) ? saved : null;
+  } catch {
+    return null;
+  }
+}
+
+function useListPref(prefsKey, name, fallback, valid) {
+  const [value, setValue] = useState(fallback);
+  const key = `showverse:${prefsKey}Details:${name}`;
+  const restoredRef = useRef(false);
+  useClientLayoutEffect(() => {
+    const saved = readListPref(key, valid);
+    restoredRef.current = true;
+    if (saved != null) setValue(saved);
+  }, [key]);
+  const update = useCallback(
+    (next) => {
+      setValue(next);
+      if (restoredRef.current) setLocalStorageItem(key, next);
+    },
+    [key],
+  );
+  return [value, update];
+}
+
+const isTypeFilter = (value) => Object.hasOwn(typeLabel, value);
+const isSortBy = (value) => Object.hasOwn(sortLabel, value);
+const isGroupBy = (value) => Object.hasOwn(groupLabel, value);
+const isViewMode = (value) => LIST_PREF_VIEW_MODES.has(value);
+
 export default function FilterableListItems({
   items,
   getMeta = getListItemMeta,
@@ -423,13 +468,15 @@ export default function FilterableListItems({
   // (mediaType, tmdbId) al pasar el ratón (o el foco) por un título: la
   // página pide ahí su nota de IMDb si no la tiene (useListImdbRatings).
   onTitleHover,
+  // Con qué ajustes guardados va esta página (ver useListPref).
+  prefsKey = "list",
 }) {
   const previewClick = usePreviewOpen();
   const [q, setQ] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [sortBy, setSortBy] = useState("list-order");
-  const [groupBy, setGroupBy] = useState("none");
-  const [viewMode, setViewMode] = useState("grid");
+  const [typeFilter, setTypeFilter] = useListPref(prefsKey, "typeFilter", "all", isTypeFilter);
+  const [sortBy, setSortBy] = useListPref(prefsKey, "sortBy", "list-order", isSortBy);
+  const [groupBy, setGroupBy] = useListPref(prefsKey, "groupBy", "none", isGroupBy);
+  const [viewMode, setViewMode] = useListPref(prefsKey, "viewMode", "grid", isViewMode);
   const [editMode, setEditMode] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const filtersRef = useRef(null);

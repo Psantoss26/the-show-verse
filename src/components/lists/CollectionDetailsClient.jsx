@@ -424,6 +424,9 @@ export default function CollectionDetailsClient({ collectionId }) {
             {parts.length > 0 ? (
                 <FilterableListItems
                     items={filterableParts}
+                    // Ajustes propios: solo películas, el filtro de tipo de
+                    // una lista («Series») las dejaría vacías.
+                    prefsKey="collection"
                     onTitleHover={requestImdbRating}
                     renderCard={(movie, meta, viewMode) => (
                         <MovieCard
