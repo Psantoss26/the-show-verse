@@ -31,7 +31,7 @@ Layout global, dashboards y páginas de detalle "grandes".
 | `SeasonDetailsClient.jsx` | Cliente de `/details/tv/[id]/season/[season]`. |
 | `EpisodeDetailsClient.jsx` | Cliente de la ficha de episodio. |
 | `EpisodeRatingsGrid.jsx` | Grid de valoraciones de episodios de una temporada (usado también dentro de `EpisodeRatingsModal`). |
-| `ActorDetails.jsx` | Ficha de actor/actriz (`/details/person/[id]`). |
+| `ActorDetails.jsx` | Ficha de actor/actriz (`/details/person/[id]`). La trayectoria (`lib/actor/careerRange.js`) y la vista lateral Filmografía (`lib/actor/filmography.js`, con `birthday`) no cuentan los créditos fechados antes del nacimiento: TMDb fecha la TV con el estreno de la serie, y una gala o un programa con décadas de emisión (Oscars, Globos de Oro) movía el inicio décadas atrás. En Filmografía esos títulos van al final, sin año. |
 | `FavoriteWatchlistButtons.jsx` | Botones de favorito/watchlist reutilizables sobre TMDb account states. |
 | `StarRating.jsx` | Selector de valoración por estrellas (usado en fichas y modales de Trakt). |
 | `LiquidButton.jsx` | Botón con efecto "líquido/cristal" (demo en `/demo/liquid-buttons`); ver [[LIQUID_BUTTONS]]. |

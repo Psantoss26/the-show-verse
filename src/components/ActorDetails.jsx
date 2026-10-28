@@ -2864,10 +2864,12 @@ export default function ActorDetails({
       }),
       photos,
       tagged: taggedImages?.results || [],
-      // Todos los créditos (actuación y equipo) para el camino por años.
+      // Todos los créditos (actuación y equipo) para el camino por años, y el
+      // nacimiento para no fechar galas antes de él (como la trayectoria).
       filmography: creditsAll,
+      birthday: actorDetails?.birthday || null,
     }),
-    [popularItems, watchedCredits, movieCreditsAll, seriesCreditsAll, movieCredits, seriesCredits, awards, photos, taggedImages, creditsAll],
+    [popularItems, watchedCredits, movieCreditsAll, seriesCreditsAll, movieCredits, seriesCredits, awards, photos, taggedImages, creditsAll, actorDetails?.birthday],
   );
 
   const sectionItems = useMemo(() => {

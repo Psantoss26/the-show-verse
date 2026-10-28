@@ -39,3 +39,22 @@ test("filtra por tipo y busca en título y papel", () => {
   assert.equal(only.years[0].items[0].title, "The Devil Wears Prada 2");
   assert.deepEqual(buildFilmography(credits, { query: "zzz" }), []);
 });
+
+test("con el nacimiento, lo fechado antes (galas) va al final sin año", () => {
+  const murphy = [
+    { id: 10, media_type: "movie", kind: "acting", title: "Oppenheimer", release_date: "2023-07-19" },
+    { id: 11, media_type: "movie", kind: "acting", title: "Disco Pigs", release_date: "2001-04-01" },
+    { id: 12, media_type: "tv", kind: "acting", name: "The Oscars", episode_count: 2, first_air_date: "1953-03-18" },
+    { id: 13, media_type: "tv", kind: "acting", name: "Golden Globe Awards", episode_count: 1, first_air_date: "1944-01-20" },
+    { id: 14, media_type: "movie", kind: "acting", title: "Sin anunciar" },
+  ];
+  const [acting] = buildFilmography(murphy, { birthday: "1976-05-25" });
+  assert.deepEqual(acting.years.map((group) => group.year ?? group.undated), ["upcoming", 2023, 2001, "unknown"]);
+  assert.deepEqual(acting.years.at(-1).items.map((item) => item.title).sort(), ["Golden Globe Awards", "The Oscars"]);
+  // Sin nacimiento, o con datos rotos (nada posterior a él), todo en su año.
+  assert.deepEqual(buildFilmography(murphy)[0].years.map((group) => group.year), [null, 2023, 2001, 1953, 1944]);
+  assert.deepEqual(
+    buildFilmography(murphy.slice(2, 4), { birthday: "1976-05-25" })[0].years.map((group) => group.year),
+    [1953, 1944],
+  );
+});

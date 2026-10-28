@@ -3,6 +3,12 @@
 // proyectos sin fecha primero (suelen ser los anunciados) y después del más
 // reciente al más antiguo. La pinta la vista lateral «Filmografía» de
 // ActorDetails (details/sectionSheet/FilmographySheet).
+//
+// Con `birthday`, un crédito fechado ANTES del nacimiento no se coloca en ese
+// año: es una gala o un programa con décadas de emisión (TMDb fecha la TV con
+// el estreno de la serie, no con el episodio) y la persona salió mucho
+// después. Va al final, en un grupo sin año (`undated: "unknown"`). La misma
+// regla que la trayectoria de la ficha (careerRange.js, con los casos medidos).
 
 const DEPARTMENT_LABELS = {
   Acting: "Actuación",
@@ -40,6 +46,11 @@ function creditYear(credit) {
   return Number.isInteger(year) && year > 0 ? year : null;
 }
 
+function birthYearOf(birthday) {
+  const year = Number(String(birthday || "").slice(0, 4));
+  return Number.isInteger(year) && year > 0 ? year : null;
+}
+
 function uniqueJoin(values) {
   return [...new Set(values.map((value) => String(value || "").trim()).filter(Boolean))];
 }
@@ -50,11 +61,17 @@ function uniqueJoin(values) {
  * episodios se juntan. `media`: "all" | "movie" | "tv"; `query`: busca en el
  * título y en el papel.
  */
-export function buildFilmography(credits, { media = "all", query = "" } = {}) {
+export function buildFilmography(credits, { media = "all", query = "", birthday = null } = {}) {
   const needle = String(query || "").trim().toLocaleLowerCase("es-ES");
   const departments = new Map();
+  const list = Array.isArray(credits) ? credits : [];
+  // Como careerRange: si NINGÚN crédito es posterior al nacimiento (datos
+  // rotos), no se descarta nada.
+  const bornYear = birthYearOf(birthday);
+  const birthYear =
+    bornYear && list.some((credit) => (creditYear(credit) ?? -Infinity) >= bornYear) ? bornYear : null;
 
-  for (const credit of Array.isArray(credits) ? credits : []) {
+  for (const credit of list) {
     if (!credit?.id) continue;
     const mediaType = credit.media_type === "tv" ? "tv" : "movie";
     if (media !== "all" && mediaType !== media) continue;
@@ -92,15 +109,19 @@ export function buildFilmography(credits, { media = "all", query = "" } = {}) {
     if (!items.length) continue;
     const byYear = new Map();
     for (const item of items) {
-      const year = item.year ?? null;
-      if (!byYear.has(year)) byYear.set(year, []);
-      byYear.get(year).push(item);
+      const group =
+        item.year == null ? "upcoming" : birthYear && item.year < birthYear ? "unknown" : item.year;
+      if (!byYear.has(group)) byYear.set(group, []);
+      byYear.get(group).push(item);
     }
+    const rank = (group) => (group === "upcoming" ? Infinity : group === "unknown" ? -Infinity : group);
     const years = [...byYear.entries()]
-      // Sin fecha primero; luego del más reciente al más antiguo.
-      .sort(([a], [b]) => (a === null ? -1 : b === null ? 1 : b - a))
-      .map(([year, list]) => ({
-        year,
+      // Sin fecha primero; luego del más reciente al más antiguo; lo anterior
+      // al nacimiento, al final.
+      .sort(([a], [b]) => rank(b) - rank(a))
+      .map(([group, list]) => ({
+        year: typeof group === "number" ? group : null,
+        ...(typeof group === "number" ? {} : { undated: group }),
         items: list.sort(
           (a, b) =>
             String(b.date || "").localeCompare(String(a.date || "")) ||

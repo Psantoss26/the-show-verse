@@ -16,6 +16,7 @@ import OptimizedImage from "@/components/OptimizedImage";
 import MobileOptionsSheet, { SheetAction, SheetOption, SheetOptionGroup } from "@/components/ui/MobileOptionsSheet";
 import SectionSheet, { SHEET_CONTROL, SectionSheetEmpty } from "./SectionSheet";
 import { buildFilmography, filmographyRoleLabel } from "@/lib/actor/filmography";
+import { careerRange } from "@/lib/actor/careerRange";
 
 const MEDIA_OPTIONS = [
   { id: "all", label: "Todo" },
@@ -98,7 +99,10 @@ export default function FilmographySheet({ meta, data, onClose, tab, setTab, que
     [data.watched],
   );
   // Pestañas y recuentos con todo; la lista, con el tipo y la búsqueda.
-  const allDepartments = useMemo(() => buildFilmography(credits), [credits]);
+  // Con el nacimiento: lo fechado antes (galas, programas con décadas de
+  // emisión) no marca hitos de años en los que la persona no había nacido.
+  const birthday = data.birthday || null;
+  const allDepartments = useMemo(() => buildFilmography(credits, { birthday }), [credits, birthday]);
   const mediaCounts = useMemo(() => {
     const keys = { movie: new Set(), tv: new Set() };
     allDepartments.forEach((department) =>
@@ -109,8 +113,8 @@ export default function FilmographySheet({ meta, data, onClose, tab, setTab, que
     return { all: keys.movie.size + keys.tv.size, movie: keys.movie.size, tv: keys.tv.size };
   }, [allDepartments]);
   const departments = useMemo(
-    () => buildFilmography(credits, { media, query }),
-    [credits, media, query],
+    () => buildFilmography(credits, { media, query, birthday }),
+    [credits, media, query, birthday],
   );
   const activeKey = allDepartments.some((department) => department.key === tab)
     ? tab
@@ -125,10 +129,18 @@ export default function FilmographySheet({ meta, data, onClose, tab, setTab, que
   const showMedia = mediaCounts.movie > 0 && mediaCounts.tv > 0;
   const showRoles = allDepartments.length > 1;
 
-  const years = allDepartments
-    .flatMap((department) => department.years.map((group) => group.year))
-    .filter(Boolean);
-  const span = years.length ? `${Math.min(...years)}–${Math.max(...years)}` : null;
+  // El mismo rango que la trayectoria de la ficha (careerRange.js).
+  const range = useMemo(
+    () =>
+      careerRange(
+        allDepartments.flatMap((department) =>
+          department.years.flatMap((group) => group.items.map((item) => ({ year: item.year }))),
+        ),
+        birthday,
+      ),
+    [allDepartments, birthday],
+  );
+  const span = range ? (range.start === range.end ? String(range.start) : `${range.start}–${range.end}`) : null;
 
   return (
     <>
@@ -179,7 +191,7 @@ export default function FilmographySheet({ meta, data, onClose, tab, setTab, que
           <ol className="pt-3 sm:-ml-1" aria-label={`Filmografía: ${current.label}`}>
             {current.years.map((group) => (
               <li
-                key={group.year ?? "undated"}
+                key={group.year ?? group.undated}
                 // Columna del año justa para «2028» y poco hueco hasta la línea.
                 className="grid grid-cols-[2.25rem_minmax(0,1fr)] gap-x-2.5"
               >
@@ -190,7 +202,11 @@ export default function FilmographySheet({ meta, data, onClose, tab, setTab, que
                   <span className="text-sm font-black tabular-nums leading-none text-white">
                     {group.year ?? "—"}
                   </span>
-                  {group.year == null ? <span className="sr-only">Sin fecha</span> : null}
+                  {group.year == null ? (
+                    <span className="sr-only">
+                      {group.undated === "unknown" ? "Fecha de la aparición desconocida" : "Sin fecha"}
+                    </span>
+                  ) : null}
                 </div>
                 {/* El camino: una línea continua (el borde de cada año, sin
                     huecos entre ellos) con un hito por año. */}
