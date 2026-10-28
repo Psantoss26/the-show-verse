@@ -63,10 +63,14 @@ export const viewport = {
   viewportFit: "cover",
 };
 
+const ANDROID_APP_BOOT_SCRIPT =
+  'if(navigator.userAgent.indexOf("TheShowVerseApp/")!==-1)document.documentElement.setAttribute("data-android-app","")';
+
 export default function RootLayout({ children, overlay }) {
   return (
-    // `suppressHydrationWarning`: AvatarBootScript marca <html> antes de
-    // hidratar, y React no debe leer ese atributo como una discrepancia.
+    // `suppressHydrationWarning`: AvatarBootScript y el script de la app nativa
+    // marcan <html> antes de hidratar, y React no debe leer esos atributos
+    // como una discrepancia.
     <html lang="es" data-scroll-behavior="smooth" suppressHydrationWarning>
       {/* <script> PLANO en el <head> del layout raíz (componente de servidor),
           no `next/script` con `beforeInteractive`.
@@ -81,6 +85,14 @@ export default function RootLayout({ children, overlay }) {
         <script
           id="avatar-boot"
           dangerouslySetInnerHTML={{ __html: AVATAR_BOOT_SCRIPT }}
+        />
+        {/* App nativa de Android (su WebView añade `TheShowVerseApp/` al user
+            agent): `data-android-app` en <html> ANTES del primer pintado, para
+            que la barra superior nazca ya sin el hueco de la cámara y sin el
+            logo central (ver `--sv-safe-top` en globals.css). */}
+        <script
+          id="android-app-boot"
+          dangerouslySetInnerHTML={{ __html: ANDROID_APP_BOOT_SCRIPT }}
         />
       </head>
       <body

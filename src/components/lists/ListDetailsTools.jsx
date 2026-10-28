@@ -728,7 +728,7 @@ export default function FilterableListItems({
         // al pasar el navbar inferior, como la sinopsis, y entra y sale
         // animada como el marcador (en sus piezas de cristal: `revealPiece`).
         {...(heroReveal ? { ...heroReveal, ...MOBILE_REVEAL_ANIMATED_PROPS } : {})}
-        className={`relative sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-[70] mb-4 space-y-1 transition-all duration-300 sm:top-[calc(5rem+env(safe-area-inset-top))] ${
+        className={`relative sticky top-[calc(3.5rem+var(--sv-safe-top))] z-[70] mb-4 space-y-1 transition-all duration-300 sm:top-[calc(5rem+var(--sv-safe-top))] ${
           heroReveal ? `${MOBILE_REVEAL_BASE} ${MOBILE_REVEAL_ANIMATED}` : ""
         }`}
         initial={isBackNav ? false : { opacity: 0, y: 10 }}

@@ -2904,7 +2904,7 @@ export default function ListsPage() {
         <motion.div
           ref={filtersRef}
           data-menu-pinned={filtersPinned}
-          className="relative sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-[60] space-y-3 mb-6 transition-all duration-300 sm:top-[calc(5rem+env(safe-area-inset-top))]"
+          className="relative sticky top-[calc(3.5rem+var(--sv-safe-top))] z-[60] space-y-3 mb-6 transition-all duration-300 sm:top-[calc(5rem+var(--sv-safe-top))]"
           initial={isBackNav ? false : { opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}

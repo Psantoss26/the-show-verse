@@ -1624,7 +1624,7 @@ export default function SeasonDetailsClient({
           // 3rem del navbar compacto) para que el hueco de la portada coincida
           // con la portada fija, pegada arriba y a los lados como la de las
           // colecciones, con la navbar transparente encima.
-          className="-mt-[calc(5rem+env(safe-area-inset-top))] flex flex-col gap-5 sm:mt-0 sm:gap-8 lg:flex-row lg:gap-12 mb-10 items-start transform-gpu"
+          className="-mt-[calc(5rem+var(--sv-safe-top))] flex flex-col gap-5 sm:mt-0 sm:gap-8 lg:flex-row lg:gap-12 mb-10 items-start transform-gpu"
         >
           {/* MÓVIL: hueco del alto de la portada fija, que va en el fondo de
               la página y se coloca donde cae este hueco. */}

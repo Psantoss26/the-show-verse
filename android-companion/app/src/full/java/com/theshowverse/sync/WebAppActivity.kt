@@ -463,12 +463,12 @@ class WebAppActivity : AppCompatActivity() {
      * (ver `pantallaCompleta`), así que las barras del sistema, ocultas, dan
      * insets 0 y solo queda el recorte de la cámara.
      *
-     * La WEB no se rellena: llega hasta el borde y la cámara la esquiva ella
-     * misma con `env(safe-area-inset-top)` (la barra superior y las portadas
-     * ya lo usan, igual que en la PWA). El WebView le pasa ese valor porque la
-     * ventana se dibuja dentro del recorte. Si aquí se rellenara, el hueco de
-     * la cámara volvería a ser una franja negra. El círculo de recargar y el
-     * medidor de fotogramas sí bajan, porque son vistas nativas.
+     * La WEB no se rellena: llega hasta el borde, y si aquí se rellenara el
+     * hueco de la cámara volvería a ser una franja negra. La web reconoce la
+     * app por el user agent (`data-android-app`) y deja su barra superior
+     * arriba del todo, sin el logo central que taparía la cámara y con más
+     * margen a los lados por las esquinas redondeadas. El círculo de recargar
+     * y el medidor de fotogramas sí bajan, porque son vistas nativas.
      *
      * El panel de error, nativo, sí esquiva barras y cámara con relleno.
      */

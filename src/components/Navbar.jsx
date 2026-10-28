@@ -2833,12 +2833,12 @@ function NavbarContent() {
         // Ficha / recomendaciones: nacen ya con el alto compacto (ver la fila
         // móvil). Lo leen los avisos emergentes para colocarse justo debajo.
         data-immersive={isImmersiveRoute ? "" : undefined}
-        // `pt-[env(safe-area-inset-top)]`: en la app nativa de Android, a
-        // pantalla completa, la página llega al borde superior y la cámara
-        // queda encima.
+        // `pt-[var(--sv-safe-top)]`: donde la página llega bajo la cámara, la
+        // barra baja ese hueco (ver `--sv-safe-top` en globals.css; en la app
+        // nativa vale 0 y la barra se queda arriba, sin el logo central).
         // La barra gana ese alto por arriba (su cristal y su velo lo cubren) y
         // sus controles quedan debajo del recorte. En el navegador vale 0.
-        className={`sv-topbar sticky top-0 z-40 w-full pt-[env(safe-area-inset-top)] transition-[background-color,backdrop-filter,box-shadow] duration-300 ${
+        className={`sv-topbar sticky top-0 z-40 w-full pt-[var(--sv-safe-top)] transition-[background-color,backdrop-filter,box-shadow] duration-300 ${
           heroNavMode || desktopDetailsNavMode
             ? ""
             : isImmersiveRoute
@@ -3328,7 +3328,7 @@ function NavbarContent() {
             prefetch
             {...navPrefetchHandlers("/")}
             aria-label={t("nav_home", "Inicio")}
-            className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none active:scale-95 ${mobileTopControlScaleClass} ${
+            className={`sv-topbar-logo absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none active:scale-95 ${mobileTopControlScaleClass} ${
               tabletSearchOpen ? "md:pointer-events-none md:opacity-0" : ""
             }`}
             aria-hidden={tabletSearchOpen || undefined}

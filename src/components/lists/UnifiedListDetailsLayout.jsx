@@ -894,7 +894,7 @@ export default function UnifiedListDetailsLayout({
                     // ya trae su `mb-6`: solo faltan 8 px.
                     className={`${isBackdropCover && hasInfoTabs ? 'mb-6' : 'mb-12'} flex flex-col items-start lg:flex-row lg:gap-12 ${
                         mobileHero
-                            ? `-mt-[calc(5rem+env(safe-area-inset-top))] gap-5 sm:mt-0 sm:gap-8 max-sm:![transform:none] max-sm:!opacity-100 ${infoTabs && !isBackdropCover ? 'max-sm:mb-8' : 'max-sm:mb-2'}`
+                            ? `-mt-[calc(5rem+var(--sv-safe-top))] gap-5 sm:mt-0 sm:gap-8 max-sm:![transform:none] max-sm:!opacity-100 ${infoTabs && !isBackdropCover ? 'max-sm:mb-8' : 'max-sm:mb-2'}`
                             : 'gap-8'
                     }`}
                 >
