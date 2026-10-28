@@ -110,6 +110,19 @@ export default function RootLayout({ children, overlay }) {
         <link rel="dns-prefetch" href="https://www.youtube.com" />
         <link rel="dns-prefetch" href="https://www.youtube-nocookie.com" />
         <link rel="dns-prefetch" href="https://player.vimeo.com" />
+        {/* APP NATIVA DE ANDROID: franja de cristal bajo la barra de estado,
+            que es transparente. Difumina lo que pasa por detrás (la portada,
+            el contenido al desplazarse) en vez de dejarlo nítido bajo la hora
+            y los iconos, y no ocupa sitio: mide lo que la barra de estado
+            (`--sv-safe-top`) más 0,5rem, en los que se desvanece con una
+            máscara para no dibujar un corte seco contra lo nítido. Solo se ve
+            con `data-android-app` en <html>.
+            Directamente en <body>, sin
+            ancestros con opacidad o filtros que le quitarían el desenfoque. */}
+        <div
+          aria-hidden
+          className="pointer-events-none fixed inset-x-0 top-0 z-[90] hidden h-[calc(var(--sv-safe-top,0px)+0.5rem)] [mask-image:linear-gradient(to_bottom,black_calc(100%_-_0.75rem),transparent)] [html[data-android-app]_&]:block bg-black/15 backdrop-blur-[16px] backdrop-saturate-[180%]"
+        />
         <AuthProvider>
           <ServerStatusProvider>
             <ScrollRestoration />
