@@ -1588,6 +1588,8 @@ function profileGridColumnCount(view) {
 // Tamaño de página del backend (máximo permitido). Igual que el Historial, se
 // piden lotes grandes para llenar la pantalla de una vez y minimizar reflows.
 const PROFILE_SECTION_PAGE_SIZE = 60;
+// Páginas pedidas a la vez al cargar el resto de una sección para el buscador.
+const PROFILE_SEARCH_PARALLEL_PAGES = 6;
 // Límite duro de lotes encadenados al llenar la primera pantalla (evita bucles).
 const PROFILE_FILL_MAX_PAGES = 6;
 
@@ -2014,6 +2016,62 @@ function ProfileContentSection({ username, section, actor }) {
     }
   }, [cacheKey, hasMore, offset, section, username]);
 
+  // Con texto en el buscador se carga todo lo que falte: la búsqueda filtra lo
+  // ya cargado y, sin esto, un título antiguo no aparecería hasta desplazarse
+  // (en Actividad, nunca: su carga exige volver a desplazarse). Páginas en
+  // paralelo por tandas y UN solo commit: página a página, cada una volvía a
+  // pintar la sección y pedir estados, y Actividad tardaba minutos.
+  const searching = menuEnabled && Boolean(controls.query.trim());
+  const loadAll = useCallback(async () => {
+    if (loadingMoreRef.current || !hasMore) return;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    setLoadMoreError(false);
+    try {
+      const fetched = [];
+      let nextOffset = offset;
+      let more = true;
+      while (more) {
+        const starts = Array.from(
+          { length: PROFILE_SEARCH_PARALLEL_PAGES },
+          (_, index) => nextOffset + index * PROFILE_SECTION_PAGE_SIZE,
+        );
+        const pages = await Promise.all(starts.map(async (start) => {
+          const res = await fetch(
+            `/api/users/${encodeURIComponent(username)}/${section}?limit=${PROFILE_SECTION_PAGE_SIZE}&offset=${start}`,
+            { cache: "no-store" },
+          );
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        }));
+        for (const data of pages) {
+          const pageItems = Array.isArray(data.items) ? data.items : [];
+          fetched.push(...pageItems);
+          nextOffset = Number(data.offset) || nextOffset + pageItems.length;
+          more = Boolean(data.hasMore) && pageItems.length > 0;
+          if (!more) break;
+        }
+      }
+      setItems((currentItems) => {
+        const mergedItems = section === "activity"
+          ? dedupeActivityItems([...currentItems, ...fetched])
+          : [...currentItems, ...fetched];
+        cacheProfileSection(cacheKey, { items: mergedItems, hasMore: false, offset: nextOffset });
+        return mergedItems;
+      });
+      setHasMore(false);
+      setOffset(nextOffset);
+    } catch {
+      setLoadMoreError(true);
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    }
+  }, [cacheKey, hasMore, offset, section, username]);
+  useEffect(() => {
+    if (searching && status === "ready" && hasMore && !loadingMore && !loadMoreError) loadAll();
+  }, [hasMore, loadAll, loadMoreError, loadingMore, searching, status]);
+
   // El historial carga al acercarse al final; las secciones paginadas del
   // perfil usan el mismo patrón y conservan un botón solo para reintentar un
   // fallo de red.
@@ -2098,7 +2156,7 @@ function ProfileContentSection({ username, section, actor }) {
     <div>
       {menuEnabled ? <ProfileSectionToolbar section={section} controls={controls} onChange={updateControls} /> : null}
 
-      {displayItems.length === 0 ? (
+      {displayItems.length === 0 && searching && hasMore && !loadMoreError ? null : displayItems.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-14 text-center">
           <Search className="h-8 w-8 text-zinc-700" aria-hidden="true" />
           <p className="text-sm text-zinc-500">
