@@ -15,12 +15,14 @@
 // crece la portada viajan ya a donde los pintará la ficha (la última caja
 // medida para este tamaño de pantalla, `rememberPartTargets`; la primera vez,
 // se quedan quietas) y, con la ficha lista, se ajustan a la caja real de su
-// pareja (`PEEK_HANDOFF_PART_ATTR`). Al llegar, en el mismo fotograma, se
-// ocultan y aparecen las de la ficha (`revealPeekHandoffParts`), que hasta
-// entonces estaban ocultas debajo (`PEEK_HANDOFF_ACTIVE_ATTR`) y se pintan sin
-// animación de entrada: un relevo al píxel, sin verse dobles ni volver a
-// entrar. Después solo se desvanece la portada, idéntica a la de la ficha. Si
-// una pieza no tiene pareja (temporadas, episodios), se desvanece al tocar.
+// pareja (`PEEK_HANDOFF_PART_ATTR`). Entonces aparecen debajo las de la
+// ficha (`revealPeekHandoffParts`), que hasta ese momento estaban ocultas
+// (`PEEK_HANDOFF_ACTIVE_ATTR`) y se pintan sin animación de entrada, y al
+// llegar la vista previa entera se desvanece encima: portada y piezas son las mismas en
+// el mismo sitio, así que el fundido no se ve. Las de la vista previa NO se
+// ocultan antes: la capa de la vista previa va por encima de la ficha y se
+// vería el hueco. Si una pieza no tiene pareja (temporadas, episodios), se
+// desvanece al tocar.
 //
 // Las piezas viven dentro de la tarjeta, que también se transforma: su
 // trayectoria en pantalla se muestrea en fotogramas clave (`flightKeyframes`)
@@ -391,15 +393,12 @@ export function morphPeekCard(card, cover, { parts = [], fadeNodes = [], oversca
 // Último tramo, con la ficha ya en pantalla: la tarjeta se ajusta a la caja
 // real de su portada (en temporadas y episodios va bajo el navbar, y la
 // estimación del primer tramo no lo sabe) y cada pieza, a la de su pareja en
-// la ficha. Devuelve una promesa que se cumple cuando han llegado (al
-// instante si ninguna vuela): hasta entonces la vista previa no debe
-// desvanecerse ni la ficha enseñar las suyas, o se verían dobles. Trae las
-// piezas que han quedado exactamente encima de su pareja: el marcador de la
-// ficha puede ser más bajo (compacto) y entonces no se cambia de golpe, se
-// desvanece con la vista previa.
+// la ficha. Devuelve cuánto tardan en llegar (ms; 0 si nada se mueve): la
+// vista previa programa su desvanecido con ese retardo en el compositor, sin
+// esperar al hilo principal, que la ficha recién montada tiene ocupado.
 export function settlePeekCard(card, cover, target, { fullPoster = true, reduceMotion = false } = {}) {
-  if (!card || !cover || reduceMotion) return Promise.resolve([]);
-  if (typeof card.animate !== "function") return Promise.resolve([]);
+  if (!card || !cover || reduceMotion) return 0;
+  if (typeof card.animate !== "function") return 0;
   const box = peekImageBox(card, cover, { fullPoster });
   const rect = target?.getBoundingClientRect();
   const fromCard = currentCardTransform(card);
@@ -419,11 +418,8 @@ export function settlePeekCard(card, cover, target, { fullPoster = true, reduceM
     if (!layout) continue;
     targets[name] = measurePartTarget(name, pair);
     const from = animated.getBoundingClientRect();
-    const landedHeight = (from.height / from.width) * pairRect.width;
     flights.push({
-      node,
       animated,
-      exact: Math.abs(landedHeight - pairRect.height) < 2,
       frames: flightKeyframes(layout, from, pairRect, box, fromCard, cardT, {
         align: partAlign(name),
       }),
@@ -440,21 +436,11 @@ export function settlePeekCard(card, cover, target, { fullPoster = true, reduceM
       { duration: PEEK_SETTLE_MS, easing: PEEK_MORPH_EASING, fill: "forwards" },
     );
   }
-  const landings = flights.map(({ animated, frames }) => {
+  for (const { animated, frames } of flights) {
     cancelTransformAnimations(animated);
-    return animated
-      .animate(frames, { duration: PEEK_SETTLE_MS, easing: "linear", fill: "forwards" })
-      .finished.catch(() => {});
-  });
-  const exact = flights.filter((flight) => flight.exact).map((flight) => flight.node);
-  return Promise.all(landings).then(() => exact);
-}
-
-// Relevo de las piezas, en un mismo fotograma: las de la vista previa que han
-// llegado (`nodes`) se ocultan y aparecen las de la ficha, justo debajo.
-export function handOffPeekParts(nodes = []) {
-  for (const node of nodes) node.style.visibility = "hidden";
-  revealPeekHandoffParts();
+    animated.animate(frames, { duration: PEEK_SETTLE_MS, easing: "linear", fill: "forwards" });
+  }
+  return rect?.width || flights.length ? PEEK_SETTLE_MS : 0;
 }
 
 // Primer nodo a la vista que cumple `selector`, fuera de la vista previa (que
