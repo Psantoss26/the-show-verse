@@ -47,6 +47,7 @@ import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import useModalGuard from "@/hooks/useModalGuard";
 import HistorySectionNav from "@/components/HistorySectionNav";
+import { useSiblingArrival } from "@/lib/hooks/useSiblingArrival";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/lib/i18n";
@@ -2961,6 +2962,10 @@ function MobileCalendarOverlay({
 // ----------------------------
 // MAIN PAGE
 // ----------------------------
+// Hueco del botón del calendario de la barra móvil al llegar desde Continuar
+// viendo: mismo ritmo que la pastilla de la sección.
+const CALENDAR_SLOT_TRANSITION = { type: "spring", stiffness: 420, damping: 38, mass: 0.9 };
+
 export default function HistoryClient() {
   // Buscador de la barra: con texto si cabe, o solo icono (ver el hook).
   const toolbarSearchFitRef = usePageToolbarSearchFit();
@@ -2974,6 +2979,13 @@ export default function HistoryClient() {
   // CLIENTE (sin SSR), y en cargas frescas isBackNav=false → mismos valores por
   // defecto que en el servidor (el contenido va oculto tras `hydrated` de todos modos).
   const isBackNav = useIsHistoryNavigation();
+  // Llegando desde Continuar viendo la barra no repite su entrada ni se mueve:
+  // solo se desliza la pastilla de la sección (HistorySectionNav) y aparece el
+  // botón del calendario, que allí no está. Las tarjetas de la cabecera salen
+  // quietas desde el primer pintado (en carga hasta tener el historial) para
+  // que no empujen la barra al aparecer.
+  const fromSibling = useSiblingArrival("history-sections", "history");
+  const staticChrome = isBackNav || fromSibling;
   // Durante la vuelta bloqueamos el cargador infinito solo hasta que el
   // restaurador global ha fijado el scroll. Después se reactiva para que el
   // usuario pueda seguir recorriendo el historial desde ese mismo punto.
@@ -3015,7 +3027,9 @@ export default function HistoryClient() {
 
   // En back-nav renderizamos el contenido desde el primer pintado (no hay SSR con el
   // que chocar). En carga fresca sigue oculto hasta el efecto de montaje.
-  const [hydrated, setHydrated] = useState(() => !!backNavInit);
+  // Llegando desde Continuar viendo también es una navegación de cliente: se
+  // pinta desde el primer render para que la barra no desaparezca un instante.
+  const [hydrated, setHydrated] = useState(() => !!backNavInit || fromSibling);
   // BACK-NAV con historial cacheado: sembramos `connected` para que las
   // estadísticas y el resto del layout dependiente de `auth` se pinten YA en el
   // primer frame, con la MISMA altura que al guardar. Sin esto, `auth.connected`
@@ -3024,8 +3038,12 @@ export default function HistoryClient() {
   // <ScrollRestoration> quedaba desalineado (peor cuanto más abajo se estaba, por
   // eso fallaba con la carga progresiva). `loadAuth` revalida igual y corrige si
   // el usuario ya no está conectado.
+  // Llegando desde Continuar viendo con la sesión propia, `connected` se siembra
+  // igual que lo resolvería `loadAuth` (sin red): así la barra y las tarjetas
+  // están desde el primer pintado.
   const [auth, setAuth] = useState(() =>
-    backNavInit?.items
+    backNavInit?.items ||
+    (fromSibling && (session === "showverse" || account?.provider === "showverse"))
       ? { loading: false, connected: true }
       : { loading: true, connected: false },
   );
@@ -3911,10 +3929,10 @@ export default function HistoryClient() {
                 </h1>
 
                 {/* Botones redondos junto al título */}
-                {auth.connected && historyLoaded && (
+                {auth.connected && (historyLoaded || fromSibling) && (
                   <div className="flex items-center gap-2">
                     <motion.div
-                      initial={isBackNav ? false : { opacity: 0, scale: 0.8 }}
+                      initial={staticChrome ? false : { opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ duration: 0.4, delay: 0.3 }}
                     >
@@ -3934,7 +3952,7 @@ export default function HistoryClient() {
                     </motion.div>
 
                     <motion.div
-                      initial={isBackNav ? false : { opacity: 0, scale: 0.8 }}
+                      initial={staticChrome ? false : { opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ duration: 0.4, delay: 0.4 }}
                     >
@@ -3960,65 +3978,65 @@ export default function HistoryClient() {
             </div>
 
             {/* Solo estadísticas a la derecha */}
-            {auth.connected && historyLoaded && (
+            {auth.connected && (historyLoaded || fromSibling) && (
               <motion.div
                 className="grid grid-cols-4 gap-2 md:gap-4 w-full lg:w-auto lg:flex lg:justify-end"
-                initial={isBackNav ? false : { opacity: 0, y: 20 }}
+                initial={staticChrome ? false : { opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.3 }}
               >
                 <motion.div
-                  initial={isBackNav ? false : { opacity: 0, scale: 0.9 }}
+                  initial={staticChrome ? false : { opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.5 }}
+                  transition={staticChrome ? { duration: 0 } : { duration: 0.4, delay: 0.5 }}
                   className="w-full min-w-0"
                 >
                   <StatCard
                     label="Vistos"
                     value={stats.plays}
-                    loading={false}
+                    loading={!historyLoaded}
                     icon={CheckCircle2}
                     colorClass="text-emerald-400"
                   />
                 </motion.div>
                 <motion.div
-                  initial={isBackNav ? false : { opacity: 0, scale: 0.9 }}
+                  initial={staticChrome ? false : { opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.6 }}
+                  transition={staticChrome ? { duration: 0 } : { duration: 0.4, delay: 0.6 }}
                   className="w-full min-w-0"
                 >
                   <StatCard
                     label="Títulos"
                     value={stats.unique}
-                    loading={false}
+                    loading={!historyLoaded}
                     icon={LayoutList}
                     colorClass="text-purple-400"
                   />
                 </motion.div>
                 <motion.div
-                  initial={isBackNav ? false : { opacity: 0, scale: 0.9 }}
+                  initial={staticChrome ? false : { opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.7 }}
+                  transition={staticChrome ? { duration: 0 } : { duration: 0.4, delay: 0.7 }}
                   className="w-full min-w-0"
                 >
                   <StatCard
                     label="Películas"
                     value={stats.movies}
-                    loading={false}
+                    loading={!historyLoaded}
                     icon={Film}
                     colorClass="text-sky-400"
                   />
                 </motion.div>
                 <motion.div
-                  initial={isBackNav ? false : { opacity: 0, scale: 0.9 }}
+                  initial={staticChrome ? false : { opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  transition={isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.8 }}
+                  transition={staticChrome ? { duration: 0 } : { duration: 0.4, delay: 0.8 }}
                   className="w-full min-w-0"
                 >
                   <StatCard
                     label="Episodios"
                     value={stats.shows}
-                    loading={false}
+                    loading={!historyLoaded}
                     icon={Tv}
                     colorClass="text-pink-400"
                   />
@@ -4046,10 +4064,10 @@ export default function HistoryClient() {
           {/* Izquierda */}
           <motion.div
             className="space-y-6 min-w-0"
-            initial={isBackNav ? false : { opacity: 0, x: -20 }}
+            initial={staticChrome ? false : { opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={
-              isBackNav ? { duration: 0 } : { duration: 0.5, delay: 0.3 }
+              staticChrome ? { duration: 0 } : { duration: 0.5, delay: 0.3 }
             }
           >
             {auth.connected && (
@@ -4057,12 +4075,12 @@ export default function HistoryClient() {
                 ref={filtersRef}
                 data-menu-pinned={filtersPinned}
                 className={`sticky top-[calc(3.5rem+var(--sv-safe-top,0px))] z-[70] space-y-3 mb-3 sm:top-[calc(5rem+var(--sv-safe-top,0px))] lg:mb-6 ${
-                  isBackNav ? "transition-none" : "transition-all duration-300"
+                  staticChrome ? "transition-none" : "transition-all duration-300"
                 }`}
-                initial={isBackNav ? false : { opacity: 0, y: 10 }}
+                initial={staticChrome ? false : { opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={
-                  isBackNav ? { duration: 0 } : { duration: 0.4, delay: 0.5 }
+                  staticChrome ? { duration: 0 } : { duration: 0.4, delay: 0.5 }
                 }
               >
                 {/* Mobile: búsqueda + botón de la hoja de filtros
@@ -4088,6 +4106,14 @@ export default function HistoryClient() {
                   </div>
                   <div className="flex shrink-0 gap-2">
                   <HistorySectionNav className="h-11 shrink-0" />
+                  {/* Llegando desde Continuar viendo (que no lo tiene) el botón
+                      se abre desde ancho 0 y el buscador cede su sitio. */}
+                  <motion.div
+                    className="h-11 shrink-0 overflow-hidden"
+                    initial={fromSibling ? { width: 0, marginLeft: -8, opacity: 0 } : false}
+                    animate={{ width: 44, marginLeft: 0, opacity: 1 }}
+                    transition={CALENDAR_SLOT_TRANSITION}
+                  >
                   <button
                     type="button"
                     onClick={() => setMobileCalendarOpen(true)}
@@ -4096,6 +4122,7 @@ export default function HistoryClient() {
                   >
                     <CalendarDays className="w-4 h-4" />
                   </button>
+                  </motion.div>
                   <button
                     type="button"
                     onClick={() => setMobileFiltersOpen((v) => !v)}

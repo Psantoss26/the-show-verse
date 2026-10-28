@@ -51,24 +51,26 @@ test("no reutiliza la referencia de temporada y episodio como titulo provisional
 test("restaura el contenido principal y filtros sin animacion al volver atras", async () => {
   const source = await readFile(componentPath, "utf8");
 
+  // `staticChrome` = volver atrás o llegar desde Continuar viendo.
+  assert.match(source, /const staticChrome = isBackNav \|\| fromSibling;/);
   assert.match(
     source,
-    /className="space-y-6 min-w-0"\s+initial=\{isBackNav \? false : \{ opacity: 0, x: -20 \}\}/,
+    /className="space-y-6 min-w-0"\s+initial=\{staticChrome \? false : \{ opacity: 0, x: -20 \}\}/,
   );
   assert.match(
     source,
-    /isBackNav \? \{ duration: 0 \} : \{ duration: 0\.5, delay: 0\.3 \}/,
+    /staticChrome \? \{ duration: 0 \} : \{ duration: 0\.5, delay: 0\.3 \}/,
   );
   assert.match(
     source,
-    /isBackNav \? "transition-none" : "transition-all duration-300"/,
+    /staticChrome \? "transition-none" : "transition-all duration-300"/,
   );
   assert.match(
     source,
-    /initial=\{isBackNav \? false : \{ opacity: 0, y: 10 \}\}/,
+    /initial=\{staticChrome \? false : \{ opacity: 0, y: 10 \}\}/,
   );
   assert.match(
     source,
-    /isBackNav \? \{ duration: 0 \} : \{ duration: 0\.4, delay: 0\.5 \}/,
+    /staticChrome \? \{ duration: 0 \} : \{ duration: 0\.4, delay: 0\.5 \}/,
   );
 });

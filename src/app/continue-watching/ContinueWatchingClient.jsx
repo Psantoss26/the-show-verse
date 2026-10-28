@@ -30,6 +30,7 @@ import {
   ChevronLeft,
   Minus,
   MonitorPlay,
+  CalendarDays,
 } from "lucide-react";
 
 import {
@@ -48,6 +49,7 @@ import {
 } from "@/lib/userLists/optimisticListCache";
 import LiquidButton from "@/components/LiquidButton";
 import HistorySectionNav from "@/components/HistorySectionNav";
+import { useSiblingArrival } from "@/lib/hooks/useSiblingArrival";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import { useAuth } from "@/context/AuthContext";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
@@ -994,7 +996,16 @@ function writeCache(items) {
 // ----------------------------
 const VIEW_MODES = new Set(["cards", "poster", "compact"]);
 
+// Hueco del botón del calendario de Historial que se cierra al llegar desde
+// allí: mismo ritmo que la pastilla de la sección.
+const CALENDAR_SLOT_TRANSITION = { type: "spring", stiffness: 420, damping: 38, mass: 0.9 };
+
 export default function ContinueWatchingClient() {
+  // Llegando desde Historial la barra no repite su entrada: solo se desliza
+  // la pastilla de la sección (HistorySectionNav) y se cierra el hueco del
+  // botón del calendario, que aquí no hay.
+  const fromSibling = useSiblingArrival("history-sections", "continue-watching");
+  const [calendarSlotClosing, setCalendarSlotClosing] = useState(fromSibling);
   // Buscador de la barra: con texto si cabe, o solo icono (ver el hook).
   const toolbarSearchFitRef = usePageToolbarSearchFit();
   const { authenticated, hydrated } = useAuth();
@@ -1261,7 +1272,7 @@ export default function ContinueWatchingClient() {
           ref={filtersRef}
           data-menu-pinned={filtersPinned}
           className="sticky top-[calc(3.5rem+var(--sv-safe-top,0px))] z-[70] space-y-3 mb-3 transition-all duration-300 sm:top-[calc(5rem+var(--sv-safe-top,0px))] lg:mb-6"
-          initial={{ opacity: 0, y: 10 }}
+          initial={fromSibling ? false : { opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
         >
@@ -1288,6 +1299,20 @@ export default function ContinueWatchingClient() {
                 )}
               </div>
               <HistorySectionNav className="h-11 shrink-0" />
+              {calendarSlotClosing && (
+                <motion.div
+                  aria-hidden="true"
+                  className="h-11 shrink-0 overflow-hidden"
+                  initial={{ width: 44, marginLeft: 0, opacity: 1 }}
+                  animate={{ width: 0, marginLeft: -8, opacity: 0 }}
+                  transition={CALENDAR_SLOT_TRANSITION}
+                  onAnimationComplete={() => setCalendarSlotClosing(false)}
+                >
+                  <div className="h-11 w-11 flex items-center justify-center rounded-2xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-zinc-200">
+                    <CalendarDays className="w-4 h-4" />
+                  </div>
+                </motion.div>
+              )}
               <button
                 type="button"
                 onClick={() => setMobileFiltersOpen((v) => !v)}
@@ -2238,7 +2263,7 @@ function Blobs() {
 
 function Header({ stats, loading, onRefresh, refreshing }) {
   return (
-    <motion.header className="mb-4 sm:mb-6 lg:mb-10" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }}>
+    <motion.header className="mb-6 lg:mb-10" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }}>
       <div className="flex flex-col lg:flex-row lg:flex-wrap lg:items-center lg:justify-between gap-6">
         <div className="shrink-0 min-w-0">
           <div className="flex items-center gap-3 mb-2">
