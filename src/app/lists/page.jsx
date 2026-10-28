@@ -85,8 +85,7 @@ import FlipReorder from "@/components/ui/FlipReorder";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import { TmdbImg } from "@/components/lists/ListCoverBackdropCollage";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
-import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
-import useWidthVariable from "@/hooks/useWidthVariable";
+import MobileOptionsSheet, { SheetAction, SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
 
 // ================== UTILS & CACHE ==================
 const OMDB_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -584,7 +583,15 @@ function Dropdown({ valueLabel, icon: Icon, children, className = "" }) {
   );
 }
 
-function DropdownItem({ active, onClick, children }) {
+// Dentro de la hoja de filtros móvil, cada opción es una píldora.
+function DropdownItem(props) {
+  if (useInOptionsSheet()) {
+    return <SheetOption active={props.active} onClick={props.onClick}>{props.children}</SheetOption>;
+  }
+  return <DropdownMenuItem {...props} />;
+}
+
+function DropdownMenuItem({ active, onClick, children }) {
   return (
     <button
       type="button"
@@ -638,7 +645,16 @@ function ListsSourceSelector({ source, onChange, className = "" }) {
   );
 }
 
-function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
+// Dentro de la hoja de filtros móvil (MobileOptionsSheet) el desplegable se
+// pinta como un grupo con todas sus opciones a la vista.
+function InlineDropdown(props) {
+  if (useInOptionsSheet()) {
+    return <SheetOptionGroup label={props.label} icon={props.icon}>{props.children}</SheetOptionGroup>;
+  }
+  return <InlineDropdownMenu {...props} />;
+}
+
+function InlineDropdownMenu({ label, valueLabel, icon: Icon, children }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const buttonRef = useRef(null);
@@ -1968,16 +1984,8 @@ export default function ListsPage() {
   const deferredQuery = useDeferredValue(query);
   const [sortMode, setSortMode] = useState("items_desc");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-  // Móvil: la fila del desplegable reparte sus columnas como la barra de
-  // arriba (buscador | secciones + botón del menú), aunque no sea a mitades:
-  // la columna derecha mide lo mismo que esos botones.
-  const mobileToolbarRightRef = useWidthVariable(
-    "--lists-mobile-right",
-    "[data-lists-mobile-toolbar]",
-  );
   const filtersRef = useRef(null);
-  const { panelOverlay: filtersSticky, isPinned: filtersPinned } =
-    useStickyToolbarState(filtersRef, mobileFiltersOpen);
+  const { isPinned: filtersPinned } = useStickyToolbarState(filtersRef);
   const [viewMode, setViewMode] = useState("rows"); // ✅ por defecto como “Dashboard”
 
   // ✅ NUEVO: selector de fuente
@@ -2889,9 +2897,8 @@ export default function ListsPage() {
                 </button>
               )}
             </div>
-            {/* Las secciones, entre el buscador y el botón del desplegable. Su
-                ancho marca la columna derecha del desplegable. */}
-            <div ref={mobileToolbarRightRef} className="flex shrink-0 gap-2">
+            {/* Las secciones, entre el buscador y el botón de la hoja. */}
+            <div className="flex shrink-0 gap-2">
             <ListsSourceSelector
               source={source}
               onChange={(nextSource) =>
@@ -2901,8 +2908,8 @@ export default function ListsPage() {
             <button
               type="button"
               onClick={() => setMobileFiltersOpen((v) => !v)}
+              aria-haspopup="dialog"
               aria-expanded={mobileFiltersOpen}
-              aria-controls="lists-mobile-filters"
               aria-label={
                 mobileFiltersOpen ? "Cerrar filtros" : "Abrir filtros"
               }
@@ -2917,108 +2924,72 @@ export default function ListsPage() {
             </div>
           </div>
 
-          {/* Mobile: collapsible filters */}
-          <MobileFiltersPanel
+          {/* Mobile: hoja de filtros y vista */}
+          <MobileOptionsSheet
             open={mobileFiltersOpen}
+            onClose={() => setMobileFiltersOpen(false)}
             id="lists-mobile-filters"
-            className={`z-[80] lg:hidden ${
-              filtersSticky ? "absolute left-0 right-0 top-full" : "relative"
-            }`}
-            gapClassName="pt-2"
-            contentClassName="space-y-2"
+            accent="purple"
           >
-            <div className="space-y-3">
-              <div
-                data-lists-mobile-order-view="true"
-                className="flex gap-2"
+            <InlineDropdown
+              label="Ordenar"
+              valueLabel={activeSortLabel}
+              icon={ArrowUpDown}
+            >
+              {({ close }) => (
+                <>
+                  {sortOptions.map((option) => (
+                    <DropdownItem
+                      key={option.id}
+                      active={activeSortMode === option.id}
+                      onClick={() => {
+                        startTransition(() => setSortMode(option.id));
+                        close();
+                      }}
+                    >
+                      {option.label}
+                    </DropdownItem>
+                  ))}
+                </>
+              )}
+            </InlineDropdown>
+            <SheetOptionGroup label="Vista" icon={LayoutGrid}>
+              <SheetOption
+                icon={LayoutGrid}
+                active={viewMode === "grid"}
+                onClick={() => startTransition(() => setViewMode("grid"))}
               >
-                <div className="min-w-0 flex-1">
-                  <InlineDropdown
-                    label="Ordenar"
-                    valueLabel={activeSortLabel}
-                    icon={ArrowUpDown}
-                  >
-                    {({ close }) => (
-                      <>
-                        {sortOptions.map((option) => (
-                          <DropdownItem
-                            key={option.id}
-                            active={activeSortMode === option.id}
-                            onClick={() => {
-                              startTransition(() => setSortMode(option.id));
-                              close();
-                            }}
-                          >
-                            {option.label}
-                          </DropdownItem>
-                        ))}
-                      </>
-                    )}
-                  </InlineDropdown>
-                </div>
-
-                <div
-                  data-lists-view-selector="true"
-                  className="flex h-11 min-w-0 items-center rounded-2xl bg-gradient-to-br from-white/10 to-white/5 p-1 shadow-lg backdrop-blur-lg"
-                  style={{
-                    flex: "0 0 var(--lists-mobile-right, calc(50% - 4px))",
+                Rejilla
+              </SheetOption>
+              <SheetOption
+                icon={Rows}
+                active={viewMode === "rows"}
+                onClick={() => startTransition(() => setViewMode("rows"))}
+              >
+                Filas
+              </SheetOption>
+              <SheetOption
+                icon={StretchHorizontal}
+                active={viewMode === "list"}
+                onClick={() => startTransition(() => setViewMode("list"))}
+              >
+                Lista
+              </SheetOption>
+            </SheetOptionGroup>
+            {canEdit && (
+              <SheetOptionGroup label="Acciones" layout="stack">
+                <SheetAction
+                  icon={Plus}
+                  onClick={() => {
+                    setMobileFiltersOpen(false);
+                    setCreateOpen(true);
                   }}
                 >
-                  {/* Botones `rounded-xl` (12px) dentro de un contenedor
-                      `rounded-2xl` (16px) con 4px de relleno: esquinas
-                      concéntricas, como el selector de secciones. */}
-                  <button
-                    onClick={() =>
-                      startTransition(() => setViewMode("grid"))
-                    }
-                    className={`flex h-full flex-1 items-center justify-center rounded-xl px-2.5 text-sm font-bold transition-all focus:outline-none ${
-                      viewMode === "grid"
-                        ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
-                        : "text-zinc-400 hover:bg-white/10 hover:text-white"
-                    }`}
-                  >
-                    <LayoutGrid className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() =>
-                      startTransition(() => setViewMode("rows"))
-                    }
-                    className={`flex h-full flex-1 items-center justify-center rounded-xl px-2.5 text-sm font-bold transition-all focus:outline-none ${
-                      viewMode === "rows"
-                        ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
-                        : "text-zinc-400 hover:bg-white/10 hover:text-white"
-                    }`}
-                  >
-                    <Rows className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      startTransition(() => setViewMode("list"))
-                    }
-                    className={`flex h-full flex-1 items-center justify-center rounded-xl px-2.5 text-sm font-bold transition-all focus:outline-none ${
-                      viewMode === "list"
-                        ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
-                        : "text-zinc-400 hover:bg-white/10 hover:text-white"
-                    }`}
-                  >
-                    <StretchHorizontal className="h-4 w-4" />
-                  </button>
-                  {canEdit && (
-                    <button
-                      type="button"
-                      onClick={() => setCreateOpen(true)}
-                      aria-label="Crear lista"
-                      title="Crear lista"
-                      className="flex h-full flex-1 items-center justify-center rounded-xl px-2.5 text-purple-400 transition-all hover:bg-purple-500/15 hover:text-purple-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-purple-400"
-                    >
-                      <Plus className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </MobileFiltersPanel>
+                  Crear lista
+                </SheetAction>
+              </SheetOptionGroup>
+            )}
+          </MobileOptionsSheet>
           </div>
 
           {/* Desktop */}

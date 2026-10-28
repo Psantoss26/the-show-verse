@@ -91,7 +91,8 @@ import {
   writeScoreCache,
 } from "@/lib/userLists/listScoreCache";
 import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
-import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
+import { ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
+import MobileOptionsSheet, { SheetOption, SheetOptionBreak, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
 import PageStatCard from "@/components/ui/PageStatCard";
 import useUserDetailsSequenceSource from "@/lib/navigation/useUserDetailsSequenceSource";
 
@@ -1222,7 +1223,16 @@ function GroupDivider({
 }
 
 // ================== UI COMPONENTS ==================
-function InlineDropdown({
+// Dentro de la hoja de filtros móvil (MobileOptionsSheet) el desplegable se
+// pinta como un grupo con todas sus opciones a la vista.
+function InlineDropdown(props) {
+  if (useInOptionsSheet()) {
+    return <SheetOptionGroup label={props.label} icon={props.icon}>{props.children}</SheetOptionGroup>;
+  }
+  return <InlineDropdownMenu {...props} />;
+}
+
+function InlineDropdownMenu({
   label,
   valueLabel,
   mobileValueLabel,
@@ -1363,7 +1373,15 @@ function InlineDropdown({
   );
 }
 
-function DropdownItem({ active, onClick, children }) {
+// Dentro de la hoja de filtros móvil, cada opción es una píldora.
+function DropdownItem(props) {
+  if (useInOptionsSheet()) {
+    return <SheetOption active={props.active} onClick={props.onClick}>{props.children}</SheetOption>;
+  }
+  return <DropdownMenuItem {...props} />;
+}
+
+function DropdownMenuItem({ active, onClick, children }) {
   return (
     <button
       type="button"
@@ -1395,11 +1413,16 @@ function GroupingDropdownContent({
     (option) => option.key !== "none" && option.key !== groupBy,
   );
 
+  // En la hoja móvil el grupo ya lleva su título («Agrupar»).
+  const inSheet = useInOptionsSheet();
+
   return (
     <>
-      <div className="px-3 pb-1 pt-2 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500">
-        Agrupación
-      </div>
+      {inSheet ? null : (
+        <div className="px-3 pb-1 pt-2 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500">
+          Agrupación
+        </div>
+      )}
       {WATCHLIST_GROUP_OPTIONS.map((option) => (
         <DropdownItem
           key={option.key}
@@ -1415,10 +1438,16 @@ function GroupingDropdownContent({
 
       {groupBy !== "none" && (
         <>
-          <div className="mx-2 my-2 h-px bg-white/10" />
-          <div className="px-3 pb-1 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500">
-            Subagrupación
-          </div>
+          {inSheet ? (
+            <SheetOptionBreak label="Subagrupación" />
+          ) : (
+            <>
+              <div className="mx-2 my-2 h-px bg-white/10" />
+              <div className="px-3 pb-1 text-[10px] font-black uppercase tracking-[0.18em] text-zinc-500">
+                Subagrupación
+              </div>
+            </>
+          )}
           <DropdownItem
             active={!subGroupBy || subGroupBy === "none"}
             onClick={() => {
@@ -1887,8 +1916,7 @@ export default function WatchlistClient() {
   const [q, setQ] = useState("");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
-  const { panelOverlay: filtersSticky, isPinned: filtersPinned } =
-    useStickyToolbarState(filtersRef, mobileFiltersOpen);
+  const { isPinned: filtersPinned } = useStickyToolbarState(filtersRef);
   const tmdbLogoutInFlightRef = useRef(false);
 
   // Limpieza única al montar: descarta las versiones antiguas de la caché de
@@ -2894,222 +2922,165 @@ export default function WatchlistClient() {
             </button>
           </div>
 
-          {/* Abierto antes de fijarse, el panel forma parte del flujo y sigue
-              en él al fijarse; abierto ya fijado va como overlay para no
-              desplazar el contenido (ver useStickyToolbarState). */}
-          <MobileFiltersPanel
+          <MobileOptionsSheet
             open={mobileFiltersOpen}
-            className={`z-[80] lg:hidden ${
-              filtersSticky ? "absolute left-0 right-0 top-full" : "relative"
-            }`}
-            gapClassName="pt-2"
-            contentClassName="space-y-2"
+            onClose={() => setMobileFiltersOpen(false)}
+            accent="blue"
           >
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <InlineDropdown
-                  label="Tipo"
-                  valueLabel={
-                    typeFilter === "all"
-                      ? "Todo"
-                      : typeFilter === "movies"
-                        ? "Películas"
-                        : "Series"
-                  }
-                  icon={Filter}
-                >
-                  {({ close }) => (
-                    <>
-                      <DropdownItem
-                        active={typeFilter === "all"}
-                        onClick={() => {
-                          setTypeFilter("all");
-                          close();
-                        }}
-                      >
-                        Todo
-                      </DropdownItem>
-                      <DropdownItem
-                        active={typeFilter === "movies"}
-                        onClick={() => {
-                          setTypeFilter("movies");
-                          close();
-                        }}
-                      >
-                        Películas
-                      </DropdownItem>
-                      <DropdownItem
-                        active={typeFilter === "shows"}
-                        onClick={() => {
-                          setTypeFilter("shows");
-                          close();
-                        }}
-                      >
-                        Series
-                      </DropdownItem>
-                    </>
-                  )}
-                </InlineDropdown>
-              </div>
-              <div className="flex-1">
-                <InlineDropdown
-                  label="Agrupar"
-                  valueLabel={getGroupingValueLabel(groupBy, subGroupBy)}
-                  mobileValueLabel={getCompactGroupingValueLabel(
-                    groupBy,
-                    subGroupBy,
-                  )}
-                  compactMobile
-                  icon={Layers3}
-                >
-                  {({ close }) => (
-                    <GroupingDropdownContent
-                      groupBy={groupBy}
-                      subGroupBy={subGroupBy}
-                      onGroupChange={handleGroupChange}
-                      onSubGroupChange={handleSubGroupChange}
-                      close={close}
-                    />
-                  )}
-                </InlineDropdown>
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <InlineDropdown
-                  label="Orden"
-                  valueLabel={
-                    sortBy === "title-asc"
-                      ? "A-Z"
-                      : sortBy === "title-desc"
-                        ? "Z-A"
-                        : sortBy === "rating-desc"
-                          ? "Mejor"
-                          : sortBy === "rating-asc"
-                            ? "Peor"
-                            : sortBy === "added-desc"
-                              ? "Reciente"
-                              : sortBy === "added-asc"
-                                ? "Antiguo"
-                                : "A-Z"
-                  }
-                  icon={ArrowUpDown}
-                >
-                  {({ close }) => (
-                    <>
-                      <DropdownItem
-                        active={sortBy === "title-asc"}
-                        onClick={() => {
-                          setSortBy("title-asc");
-                          close();
-                        }}
-                      >
-                        Título A-Z
-                      </DropdownItem>
-                      <DropdownItem
-                        active={sortBy === "title-desc"}
-                        onClick={() => {
-                          setSortBy("title-desc");
-                          close();
-                        }}
-                      >
-                        Título Z-A
-                      </DropdownItem>
-                      <DropdownItem
-                        active={sortBy === "rating-desc"}
-                        onClick={() => {
-                          setSortBy("rating-desc");
-                          close();
-                        }}
-                      >
-                        Valoración ↓
-                      </DropdownItem>
-                      <DropdownItem
-                        active={sortBy === "rating-asc"}
-                        onClick={() => {
-                          setSortBy("rating-asc");
-                          close();
-                        }}
-                      >
-                        Valoración ↑
-                      </DropdownItem>
-                      <DropdownItem
-                        active={sortBy === "added-desc"}
-                        onClick={() => {
-                          setSortBy("added-desc");
-                          close();
-                        }}
-                      >
-                        Añadido reciente
-                      </DropdownItem>
-                      <DropdownItem
-                        active={sortBy === "added-asc"}
-                        onClick={() => {
-                          setSortBy("added-asc");
-                          close();
-                        }}
-                      >
-                        Añadido antiguo
-                      </DropdownItem>
-                    </>
-                  )}
-                </InlineDropdown>
-              </div>
-              <div className="flex-1 flex gap-2">
-                <div className="flex rounded-2xl p-1 h-11 items-center flex-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-                  <button
-                    onClick={() => setViewMode("list")}
-                    className={`flex-1 h-full px-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center ${
-                      viewMode === "list"
-                        ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/20"
-                        : "text-zinc-400 hover:text-white hover:bg-white/10"
-                    }`}
+            <InlineDropdown
+              label="Tipo"
+              valueLabel={
+                typeFilter === "all"
+                  ? "Todo"
+                  : typeFilter === "movies"
+                    ? "Películas"
+                    : "Series"
+              }
+              icon={Filter}
+            >
+              {({ close }) => (
+                <>
+                  <DropdownItem
+                    active={typeFilter === "all"}
+                    onClick={() => {
+                      setTypeFilter("all");
+                      close();
+                    }}
                   >
-                    <List className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setViewMode("compact")}
-                    className={`flex-1 h-full px-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center ${
-                      viewMode === "compact"
-                        ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/20"
-                        : "text-zinc-400 hover:text-white hover:bg-white/10"
-                    }`}
+                    Todo
+                  </DropdownItem>
+                  <DropdownItem
+                    active={typeFilter === "movies"}
+                    onClick={() => {
+                      setTypeFilter("movies");
+                      close();
+                    }}
                   >
-                    <Grid2X2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setViewMode("grid")}
-                    className={`flex-1 h-full px-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center ${
-                      viewMode === "grid"
-                        ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/20"
-                        : "text-zinc-400 hover:text-white hover:bg-white/10"
-                    }`}
+                    Películas
+                  </DropdownItem>
+                  <DropdownItem
+                    active={typeFilter === "shows"}
+                    onClick={() => {
+                      setTypeFilter("shows");
+                      close();
+                    }}
                   >
-                    <LayoutGrid className="w-4 h-4" />
-                  </button>
-                </div>
-                <button
-                  onClick={() =>
-                    setImageMode(
-                      imageMode === "poster" ? "backdrop" : "poster",
-                    )
-                  }
-                  className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
-                    imageMode === "backdrop"
-                      ? "text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.3)]"
-                      : "text-zinc-200 hover:bg-black/30"
-                  }`}
-                >
-                  {imageMode === "poster" ? (
-                    <Film className="w-4 h-4" />
-                  ) : (
-                    <MonitorPlay className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
-            </div>
-          </MobileFiltersPanel>
+                    Series
+                  </DropdownItem>
+                </>
+              )}
+            </InlineDropdown>
+            <InlineDropdown
+              label="Orden"
+              valueLabel={
+                sortBy === "title-asc"
+                  ? "A-Z"
+                  : sortBy === "title-desc"
+                    ? "Z-A"
+                    : sortBy === "rating-desc"
+                      ? "Mejor"
+                      : sortBy === "rating-asc"
+                        ? "Peor"
+                        : sortBy === "added-desc"
+                          ? "Reciente"
+                          : sortBy === "added-asc"
+                            ? "Antiguo"
+                            : "A-Z"
+              }
+              icon={ArrowUpDown}
+            >
+              {({ close }) => (
+                <>
+                  <DropdownItem
+                    active={sortBy === "title-asc"}
+                    onClick={() => {
+                      setSortBy("title-asc");
+                      close();
+                    }}
+                  >
+                    Título A-Z
+                  </DropdownItem>
+                  <DropdownItem
+                    active={sortBy === "title-desc"}
+                    onClick={() => {
+                      setSortBy("title-desc");
+                      close();
+                    }}
+                  >
+                    Título Z-A
+                  </DropdownItem>
+                  <DropdownItem
+                    active={sortBy === "rating-desc"}
+                    onClick={() => {
+                      setSortBy("rating-desc");
+                      close();
+                    }}
+                  >
+                    Valoración ↓
+                  </DropdownItem>
+                  <DropdownItem
+                    active={sortBy === "rating-asc"}
+                    onClick={() => {
+                      setSortBy("rating-asc");
+                      close();
+                    }}
+                  >
+                    Valoración ↑
+                  </DropdownItem>
+                  <DropdownItem
+                    active={sortBy === "added-desc"}
+                    onClick={() => {
+                      setSortBy("added-desc");
+                      close();
+                    }}
+                  >
+                    Añadido reciente
+                  </DropdownItem>
+                  <DropdownItem
+                    active={sortBy === "added-asc"}
+                    onClick={() => {
+                      setSortBy("added-asc");
+                      close();
+                    }}
+                  >
+                    Añadido antiguo
+                  </DropdownItem>
+                </>
+              )}
+            </InlineDropdown>
+            <InlineDropdown
+              label="Agrupar"
+              valueLabel={getGroupingValueLabel(groupBy, subGroupBy)}
+              mobileValueLabel={getCompactGroupingValueLabel(
+                groupBy,
+                subGroupBy,
+              )}
+              compactMobile
+              icon={Layers3}
+            >
+              {({ close }) => (
+                <GroupingDropdownContent
+                  groupBy={groupBy}
+                  subGroupBy={subGroupBy}
+                  onGroupChange={handleGroupChange}
+                  onSubGroupChange={handleSubGroupChange}
+                  close={close}
+                />
+              )}
+            </InlineDropdown>
+            <SheetOptionGroup label="Vista" icon={LayoutGrid}>
+              <SheetOption icon={List} active={viewMode === "list"} onClick={() => setViewMode("list")}>
+                Lista
+              </SheetOption>
+              <SheetOption icon={Grid2X2} active={viewMode === "compact"} onClick={() => setViewMode("compact")}>
+                Compacta
+              </SheetOption>
+              <SheetOption icon={LayoutGrid} active={viewMode === "grid"} onClick={() => setViewMode("grid")}>
+                Cuadrícula
+              </SheetOption>
+            </SheetOptionGroup>
+            <ImageModeSheetGroup value={imageMode} onChange={setImageMode} />
+          </MobileOptionsSheet>
 
           {/* Desktop: Single row */}
           <div ref={toolbarSearchFitRef} className="sv-page-toolbar relative z-10 hidden lg:flex gap-3">

@@ -21,28 +21,19 @@ test("sincronizar se muestra como acción liquid glass junto al título", () => 
   );
 });
 
-test("en móvil Ordenar y los modos de vista comparten la fila por mitades", () => {
+test("en móvil la hoja ordena Ordenar, Vista y la acción de crear", () => {
   const mobileFilters = listsPage.slice(
-    listsPage.indexOf("{/* Mobile: collapsible filters */}"),
+    listsPage.indexOf("{/* Mobile: hoja de filtros y vista */}"),
     listsPage.indexOf("{/* Desktop */}"),
   );
 
-  assert.match(
-    mobileFilters,
-    /data-lists-mobile-order-view="true"[\s\S]*?<InlineDropdown[\s\S]*?label="Ordenar"[\s\S]*?data-lists-view-selector="true"/,
-  );
-  assert.match(
-    mobileFilters,
-    /data-lists-mobile-order-view="true"[^>]*className="flex gap-2"/,
-  );
-  const viewSelector = mobileFilters.slice(
-    mobileFilters.indexOf('data-lists-view-selector="true"'),
-    mobileFilters.indexOf("</div>", mobileFilters.indexOf('data-lists-view-selector="true"')),
-  );
-  assert.match(viewSelector, /aria-label="Crear lista"[\s\S]*?<Plus/);
+  const sort = mobileFilters.indexOf('label="Ordenar"');
+  const view = mobileFilters.indexOf('label="Vista"');
+  const create = mobileFilters.indexOf("Crear lista");
+  assert.ok(sort >= 0 && sort < view && view < create);
+  assert.match(mobileFilters, /\{canEdit && \(\s*<SheetOptionGroup label="Acciones"/);
   // Las listas solo se borran desde su ficha: aquí no hay modo borrar.
-  assert.doesNotMatch(viewSelector, /Borrar listas|mobileDeleteMode/);
-  assert.doesNotMatch(mobileFilters, />Crear<\/span>/);
+  assert.doesNotMatch(mobileFilters, /Borrar listas|mobileDeleteMode/);
 });
 
 test("las tarjetas del índice no permiten borrar listas (solo desde su ficha)", () => {

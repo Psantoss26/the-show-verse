@@ -70,7 +70,7 @@ import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import useModalGuard from "@/hooks/useModalGuard";
 import { useAuth } from "@/context/AuthContext";
 import HoverExpandCard from "@/components/ui/HoverExpandCard";
-import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
+import MobileOptionsSheet, { SheetAction, SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
 
 const TYPE_FILTERS = [
   { id: "all", label: "Todo" },
@@ -655,7 +655,16 @@ function formatGroupHeader(date, mode) {
 // el botón. Así no lo recorta el stacking context de la barra (el
 // `backdrop-blur` crea uno que ocultaba el `absolute` anterior); el menú queda
 // siempre visible por encima de todo.
-function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
+// Dentro de la hoja de filtros móvil (MobileOptionsSheet) el desplegable se
+// pinta como un grupo con todas sus opciones a la vista.
+function InlineDropdown(props) {
+  if (useInOptionsSheet()) {
+    return <SheetOptionGroup label={props.label} icon={props.icon}>{props.children}</SheetOptionGroup>;
+  }
+  return <InlineDropdownMenu {...props} />;
+}
+
+function InlineDropdownMenu({ label, valueLabel, icon: Icon, children }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const buttonRef = useRef(null);
@@ -765,7 +774,15 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
   );
 }
 
-function DropdownItem({ active, onClick, children }) {
+// Dentro de la hoja de filtros móvil, cada opción es una píldora.
+function DropdownItem(props) {
+  if (useInOptionsSheet()) {
+    return <SheetOption active={props.active} onClick={props.onClick}>{props.children}</SheetOption>;
+  }
+  return <DropdownMenuItem {...props} />;
+}
+
+function DropdownMenuItem({ active, onClick, children }) {
   return (
     <button
       type="button"
@@ -1081,8 +1098,7 @@ export default function CalendarClient({
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [mobileCalendarOpen, setMobileCalendarOpen] = useState(false);
   const filtersRef = useRef(null);
-  const { panelOverlay: filtersSticky, isPinned: filtersPinned } =
-    useStickyToolbarState(filtersRef, mobileFiltersOpen);
+  const { isPinned: filtersPinned } = useStickyToolbarState(filtersRef);
 
   // Mes que enseña el calendario lateral, y cuántas cosas cae cada día de ese
   // mes. Es un rango distinto del que se está viendo (el panel siempre muestra
@@ -1535,10 +1551,8 @@ export default function CalendarClient({
                 isBackNav ? "" : " sv-section-toolbar-in"
               }`}
             >
-              {/* Móvil: fila principal + panel de controles. Abierto antes de
-                  fijarse, el panel va en el flujo y sigue en él al fijarse; abierto
-                  con la barra ya fijada (filtersSticky) va como overlay. Ver
-                  useStickyToolbarState. */}
+              {/* Móvil: fila principal; los controles van en la hoja de
+                  filtros (MobileOptionsSheet). */}
               <div className="relative z-10 lg:hidden">
                 <div className="relative flex gap-2">
                   <div className="relative min-w-0 flex-1">
@@ -1584,116 +1598,91 @@ export default function CalendarClient({
                   </button>
                 </div>
 
-                <MobileFiltersPanel
+                <MobileOptionsSheet
                   open={mobileFiltersOpen}
-                  className={`z-[80] ${
-                    filtersSticky ? "absolute left-0 right-0 top-full" : "relative"
-                  }`}
-                  gapClassName="pt-2"
+                  onClose={() => setMobileFiltersOpen(false)}
+                  accent="yellow"
                 >
-                  <div className="space-y-2">
-                    {/* Fila 1 - Tipo y Agrupar */}
-                    <div className="flex gap-2">
-                      <div className="min-w-0 flex-1">
-                        <InlineDropdown
-                          label="Tipo"
-                          valueLabel={typeLabel}
-                          icon={Filter}
+                  <InlineDropdown
+                    label="Tipo"
+                    valueLabel={typeLabel}
+                    icon={Filter}
+                  >
+                    {({ close }) =>
+                      TYPE_FILTERS.map(({ id, label }) => (
+                        <DropdownItem
+                          key={id}
+                          active={typeFilter === id}
+                          onClick={() => {
+                            setTypeFilter(id);
+                            close();
+                          }}
                         >
-                          {({ close }) =>
-                            TYPE_FILTERS.map(({ id, label }) => (
-                              <DropdownItem
-                                key={id}
-                                active={typeFilter === id}
-                                onClick={() => {
-                                  setTypeFilter(id);
-                                  close();
-                                }}
-                              >
-                                {label}
-                              </DropdownItem>
-                            ))
-                          }
-                        </InlineDropdown>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <InlineDropdown
-                          label="Agrupar"
-                          valueLabel={groupLabel}
-                          icon={Layers}
+                          {label}
+                        </DropdownItem>
+                      ))
+                    }
+                  </InlineDropdown>
+                  <InlineDropdown
+                    label="Ordenar"
+                    valueLabel={sortLabel}
+                    icon={ArrowUpDown}
+                  >
+                    {({ close }) =>
+                      SORT_MODES.map(({ id, label }) => (
+                        <DropdownItem
+                          key={id}
+                          active={sortBy === id}
+                          onClick={() => {
+                            setSortBy(id);
+                            close();
+                          }}
                         >
-                          {({ close }) =>
-                            GROUP_MODES.map(({ id, label }) => (
-                              <DropdownItem
-                                key={id}
-                                active={groupBy === id}
-                                onClick={() => {
-                                  setGroupBy(id);
-                                  close();
-                                }}
-                              >
-                                {label}
-                              </DropdownItem>
-                            ))
-                          }
-                        </InlineDropdown>
-                      </div>
-                    </div>
-
-                    {/* Fila 2 - Ordenar y modos de tarjeta */}
-                    <div className="flex gap-2">
-                      <div className="min-w-0 flex-1">
-                        <InlineDropdown
-                          label="Ordenar"
-                          valueLabel={sortLabel}
-                          icon={ArrowUpDown}
+                          {label}
+                        </DropdownItem>
+                      ))
+                    }
+                  </InlineDropdown>
+                  <InlineDropdown
+                    label="Agrupar"
+                    valueLabel={groupLabel}
+                    icon={Layers}
+                  >
+                    {({ close }) =>
+                      GROUP_MODES.map(({ id, label }) => (
+                        <DropdownItem
+                          key={id}
+                          active={groupBy === id}
+                          onClick={() => {
+                            setGroupBy(id);
+                            close();
+                          }}
                         >
-                          {({ close }) =>
-                            SORT_MODES.map(({ id, label }) => (
-                              <DropdownItem
-                                key={id}
-                                active={sortBy === id}
-                                onClick={() => {
-                                  setSortBy(id);
-                                  close();
-                                }}
-                              >
-                                {label}
-                              </DropdownItem>
-                            ))
-                          }
-                        </InlineDropdown>
-                      </div>
-                      <div className="flex rounded-2xl p-1 h-11 items-center shrink-0 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-                        {CARD_VIEWS.map(({ id, label, Icon }) => (
-                          <button
-                            key={id}
-                            type="button"
-                            onClick={() => setCardView(id)}
-                            aria-label={label}
-                            title={label}
-                            className={`px-3 h-full rounded-xl transition-all flex items-center ${
-                              cardView === id
-                                ? "bg-gradient-to-br from-yellow-400 to-yellow-500 text-black shadow-lg shadow-yellow-500/20"
-                                : "text-zinc-400 hover:text-white hover:bg-white/10"
-                            }`}
-                          >
-                            <Icon className="w-4 h-4" />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={resetToToday}
+                          {label}
+                        </DropdownItem>
+                      ))
+                    }
+                  </InlineDropdown>
+                  <SheetOptionGroup label="Vista" icon={LayoutGrid}>
+                    {CARD_VIEWS.map(({ id, label, Icon }) => (
+                      <SheetOption key={id} icon={Icon} active={cardView === id} onClick={() => setCardView(id)}>
+                        {label}
+                      </SheetOption>
+                    ))}
+                  </SheetOptionGroup>
+                  <SheetOptionGroup label="Acciones" layout="stack">
+                    <SheetAction
+                      icon={RotateCcw}
                       disabled={isTodaySelected}
-                      className="w-full h-11 flex items-center justify-center gap-2 rounded-2xl text-xs font-bold uppercase tracking-wide transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-yellow-400 hover:text-yellow-300 hover:bg-black/30 disabled:opacity-40 disabled:hover:bg-transparent"
+                      onClick={() => {
+                        resetToToday();
+                        setMobileFiltersOpen(false);
+                      }}
                     >
-                      <RotateCcw className="w-4 h-4" /> Volver a hoy
-                    </button>
-                  </div>
-                </MobileFiltersPanel>
+                      Volver a hoy
+                    </SheetAction>
+                  </SheetOptionGroup>
+                </MobileOptionsSheet>
               </div>
 
               {/* Escritorio: una sola fila con todo */}

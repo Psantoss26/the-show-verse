@@ -41,6 +41,7 @@ import {
   Calendar,
   Ruler,
   MapPin,
+  RotateCcw,
 } from "lucide-react";
 import {
   AnimatedSection,
@@ -59,6 +60,8 @@ import DetailsInfoTabs from "@/components/details/DetailsInfoTabs";
 import useDetailsStickyTop from "@/hooks/useDetailsStickyTop";
 import { careerRange, formatCareerRange } from "@/lib/actor/careerRange";
 import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
+import MobileOptionsSheet, { SheetAction, SheetOptionGroup } from "@/components/ui/MobileOptionsSheet";
+import { useMediaQuery } from "@/lib/hooks/useMediaQuery";
 import RecommendationHoverIndicator from "@/components/details/RecommendationHoverIndicator";
 import { useAuth } from "@/context/AuthContext";
 import { titleStateKey, useViewerTitleStates } from "@/components/social/useViewerTitleStates";
@@ -952,6 +955,32 @@ function CreditsMediaSection({
     [credits, filters],
   );
 
+  // Por debajo de 1024px los filtros van en la hoja inferior; en escritorio,
+  // desplegados bajo el título.
+  const sheetMode = useMediaQuery("(max-width: 1023.98px)");
+  const searchField = (className) => (
+    <div className={className}>
+      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400 z-10 pointer-events-none" />
+      <input
+        type="text"
+        value={filters.q}
+        onChange={(e) => setFilter("q")(e.target.value)}
+        placeholder="Buscar por título o rol..."
+        className="w-full h-11 rounded-2xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
+      />
+      {filters.q && (
+        <button
+          type="button"
+          onClick={() => setFilter("q")("")}
+          className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded-md transition-colors"
+          aria-label="Limpiar búsqueda"
+        >
+          <X className="w-3.5 h-3.5 text-zinc-400 hover:text-white" />
+        </button>
+      )}
+    </div>
+  );
+
   return (
     <section className="mb-16 group/section">
       {/* Título SIN margen inferior: el hueco va encima de las tarjetas. Con
@@ -991,64 +1020,79 @@ function CreditsMediaSection({
         }
       />
 
-      <MobileFiltersPanel
-        open={filtersOpen}
-        className="relative z-[2]"
-        gapClassName="pt-5"
-      >
-        <div className="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center lg:gap-3">
-          <div className="relative w-full lg:min-w-[240px] lg:flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400 z-10 pointer-events-none" />
-            <input
-              type="text"
-              value={filters.q}
-              onChange={(e) => setFilter("q")(e.target.value)}
-              placeholder="Buscar por título o rol..."
-              className="w-full h-11 rounded-2xl pl-10 pr-10 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/50 placeholder:text-zinc-400 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg text-white"
-            />
-            {filters.q && (
-              <button
-                type="button"
-                onClick={() => setFilter("q")("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-white/10 rounded-md transition-colors"
-                aria-label="Limpiar búsqueda"
-              >
-                <X className="w-3.5 h-3.5 text-zinc-400 hover:text-white" />
-              </button>
-            )}
+      {sheetMode ? (
+        <MobileOptionsSheet
+          open={filtersOpen}
+          onClose={() => setFiltersOpen(false)}
+          title={`Filtros de ${title.toLowerCase()}`}
+          accent="emerald"
+        >
+          {searchField("relative w-full")}
+          <CreditsFilterDropdowns
+            creditFilter={filters.creditFilter}
+            setCreditFilter={setFilter("creditFilter")}
+            sort={filters.sort}
+            setSort={setFilter("sort")}
+          />
+          <YearFilterDropdown
+            label="Desde"
+            value={filters.yearFrom}
+            setValue={setFilter("yearFrom")}
+            options={yearOptions}
+          />
+          <YearFilterDropdown
+            label="Hasta"
+            value={filters.yearTo}
+            setValue={setFilter("yearTo")}
+            options={yearOptions}
+          />
+          <SheetOptionGroup label="Acciones" layout="stack">
+            <SheetAction icon={RotateCcw} disabled={!filtersChanged} onClick={resetFilters}>
+              Limpiar filtros
+            </SheetAction>
+          </SheetOptionGroup>
+        </MobileOptionsSheet>
+      ) : (
+        <MobileFiltersPanel
+          open={filtersOpen}
+          className="relative z-[2]"
+          gapClassName="pt-5"
+        >
+          <div className="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center lg:gap-3">
+            {searchField("relative w-full lg:min-w-[240px] lg:flex-1")}
+            <div className="grid grid-cols-2 gap-2 lg:flex lg:flex-nowrap lg:gap-3">
+              <CreditsFilterDropdowns
+                creditFilter={filters.creditFilter}
+                setCreditFilter={setFilter("creditFilter")}
+                sort={filters.sort}
+                setSort={setFilter("sort")}
+              />
+              <YearFilterDropdown
+                className="lg:w-[150px] lg:shrink-0"
+                label="Desde"
+                value={filters.yearFrom}
+                setValue={setFilter("yearFrom")}
+                options={yearOptions}
+              />
+              <YearFilterDropdown
+                className="lg:w-[150px] lg:shrink-0"
+                label="Hasta"
+                value={filters.yearTo}
+                setValue={setFilter("yearTo")}
+                options={yearOptions}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={resetFilters}
+              disabled={!filtersChanged}
+              className="h-11 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 px-4 text-sm font-semibold text-zinc-200 shadow-lg backdrop-blur-lg transition hover:from-white/15 hover:to-white/10 hover:text-white disabled:opacity-40 lg:shrink-0"
+            >
+              Limpiar filtros
+            </button>
           </div>
-          <div className="grid grid-cols-2 gap-2 lg:flex lg:flex-nowrap lg:gap-3">
-            <CreditsFilterDropdowns
-              creditFilter={filters.creditFilter}
-              setCreditFilter={setFilter("creditFilter")}
-              sort={filters.sort}
-              setSort={setFilter("sort")}
-            />
-            <YearFilterDropdown
-              className="lg:w-[150px] lg:shrink-0"
-              label="Desde"
-              value={filters.yearFrom}
-              setValue={setFilter("yearFrom")}
-              options={yearOptions}
-            />
-            <YearFilterDropdown
-              className="lg:w-[150px] lg:shrink-0"
-              label="Hasta"
-              value={filters.yearTo}
-              setValue={setFilter("yearTo")}
-              options={yearOptions}
-            />
-          </div>
-          <button
-            type="button"
-            onClick={resetFilters}
-            disabled={!filtersChanged}
-            className="h-11 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 px-4 text-sm font-semibold text-zinc-200 shadow-lg backdrop-blur-lg transition hover:from-white/15 hover:to-white/10 hover:text-white disabled:opacity-40 lg:shrink-0"
-          >
-            Limpiar filtros
-          </button>
-        </div>
-      </MobileFiltersPanel>
+        </MobileFiltersPanel>
+      )}
 
       {/* El hueco bajo el título (el `mb-8` de SectionTitle) y `flow-root`
           para que el `mt-3` del carrusel quede dentro y no se funda con él:

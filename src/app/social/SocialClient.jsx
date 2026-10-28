@@ -83,7 +83,7 @@ import {
   likeVerb,
 } from "@/lib/profile/activityLikes";
 import Stars from "@/components/social/Stars";
-import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
+import MobileOptionsSheet, { SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
 import ActivityBackdropImage from "@/components/social/ActivityBackdropImage";
 import { hasActivityBackdropArtwork, isPortraitActivity } from "@/lib/profile/activityBackdrops";
 
@@ -559,9 +559,7 @@ export default function SocialClient({ initialView = "today", initialToday = {},
 
   const filtersRef = useRef(null);
   const listaRef = useRef(null);
-  const panelRef = useRef(null);
-  const { panelOverlay: filtersSticky, isPinned: filtersPinned } =
-    useStickyToolbarState(filtersRef, mobileFiltersOpen);
+  const { isPinned: filtersPinned } = useStickyToolbarState(filtersRef);
 
   const setVista = useCallback((modo) => {
     setVistaState(modo);
@@ -596,15 +594,7 @@ export default function SocialClient({ initialView = "today", initialToday = {},
       const barra = filtersRef.current;
       if (!lista || !barra) return;
       const HUECO = 12;
-      // En móvil el desplegable de filtros cuelga POR DEBAJO de la barra (va en
-      // `absolute`, así que no cuenta en su rectángulo). Mientras está abierto
-      // es él quien marca dónde puede empezar la lista.
-      const panel = panelRef.current;
-      const limite =
-        Math.max(
-          barra.getBoundingClientRect().bottom,
-          panel ? panel.getBoundingClientRect().bottom : 0,
-        ) + HUECO;
+      const limite = barra.getBoundingClientRect().bottom + HUECO;
       const arriba = lista.getBoundingClientRect().top;
       if (arriba >= limite - 1) return;
       window.scrollTo({ top: Math.max(0, window.scrollY + arriba - limite) });
@@ -862,95 +852,60 @@ export default function SocialClient({ initialView = "today", initialToday = {},
             </button>
           </div>
 
-          {/* MISMO DESPLEGABLE QUE LAS PÁGINAS DE USUARIO (Favoritos, Pendientes,
-              Historial): despliegue por alto con la misma curva, y sin fondo
-              propio —cada control lleva su cristal—. Abierto antes de fijarse
-              forma parte del flujo (y sigue en él al fijarse); abierto ya fijado
-              va como overlay (ver useStickyToolbarState). */}
-          {/* El MISMO desplegable que Favoritos y Pendientes: sin superficie
-              propia, cada control con su cristal (y el del navbar al fijarse,
-              `data-menu-pinned`). La caja negra con desenfoque que llevaba al
-              fijarse tapaba ese cristal: un ancestro con `backdrop-filter` lo
-              aplana y los controles se veían oscuros y opacos. */}
-          <MobileFiltersPanel
+          {/* La MISMA hoja de filtros que las páginas de usuario. */}
+          <MobileOptionsSheet
             open={mobileFiltersOpen}
-            ref={panelRef}
-            className={`z-[80] lg:hidden ${
-              filtersSticky ? "absolute left-0 right-0 top-full" : "relative"
-            }`}
-            gapClassName="pt-2"
-            contentClassName="space-y-2"
+            onClose={() => setMobileFiltersOpen(false)}
+            accent="pink"
           >
             {esHoy ? (
               <>
-                {/* Hoy: quién y día en una fila, agrupar en la siguiente. */}
-                <div className="flex gap-2">
-                  <div className="min-w-0 flex-1">{selectorQuien({ compactMobile: true })}</div>
-                  <div className="min-w-0 flex-1">{selectorDia({ compactMobile: true })}</div>
-                </div>
-                <div className="flex gap-2">
-                  <div className="min-w-0 flex-1">{selectorAgruparHoy()}</div>
-                  <SelectorVista
-                    vista={hoyVista}
-                    setVista={setHoyVista}
-                    opciones={VISTAS_HOY}
-                    controlGlass={controlGlass}
-                    activo={activo}
-                  />
-                </div>
+                {selectorQuien()}
+                {selectorDia()}
+                {selectorAgruparHoy()}
+                <SelectorVista
+                  vista={hoyVista}
+                  setVista={setHoyVista}
+                  opciones={VISTAS_HOY}
+                  controlGlass={controlGlass}
+                  activo={activo}
+                />
               </>
             ) : (
               <>
-                {/* Dos controles por fila, como en las páginas de usuario. */}
-                <div className="flex gap-2">
-                  <div className="min-w-0 flex-1">
-                    <SelectorSimple
-                      icon={Filter}
-                      label="Acción"
-                      opciones={FILTROS}
-                      valor={filtro}
-                      onChange={setFiltro}
-                    />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <SelectorSimple
-                      icon={Layers3}
-                      label="Agrupar"
-                      opciones={SOCIAL_GROUP_OPTIONS}
-                      etiquetasCortas={SOCIAL_GROUP_SHORT_LABELS}
-                      valor={agrupar}
-                      onChange={setAgrupar}
-                      compactMobile
-                    />
-                  </div>
-                </div>
-
-                {/* Segunda fila: orden y vistas, para que el menú quede en dos
-                    filas de dos como en las demás páginas. */}
-                <div className="flex gap-2">
-                  <div className="min-w-0 flex-1">
-                    <SelectorSimple
-                      icon={ArrowUpDown}
-                      label="Orden"
-                      opciones={[
-                        ["recent", "Reciente"],
-                        ["oldest", "Antiguo"],
-                      ]}
-                      valor={orden}
-                      onChange={setOrden}
-                    />
-                  </div>
-                  <SelectorVista
-                    vista={vista}
-                    setVista={setVista}
-                    controlGlass={controlGlass}
-                    activo={activo}
-                    fill
-                  />
-                </div>
+                <SelectorSimple
+                  icon={Filter}
+                  label="Acción"
+                  opciones={FILTROS}
+                  valor={filtro}
+                  onChange={setFiltro}
+                />
+                <SelectorSimple
+                  icon={ArrowUpDown}
+                  label="Orden"
+                  opciones={[
+                    ["recent", "Reciente"],
+                    ["oldest", "Antiguo"],
+                  ]}
+                  valor={orden}
+                  onChange={setOrden}
+                />
+                <SelectorSimple
+                  icon={Layers3}
+                  label="Agrupar"
+                  opciones={SOCIAL_GROUP_OPTIONS}
+                  valor={agrupar}
+                  onChange={setAgrupar}
+                />
+                <SelectorVista
+                  vista={vista}
+                  setVista={setVista}
+                  controlGlass={controlGlass}
+                  activo={activo}
+                />
               </>
             )}
-          </MobileFiltersPanel>
+          </MobileOptionsSheet>
 
           {/* Escritorio: todo en una fila */}
           <div className="relative z-10 hidden gap-3 lg:flex">
@@ -1177,7 +1132,16 @@ function SelectorAlcance({
 // desde el botón: el panel de filtros tiene `backdrop-filter`, que crea un
 // contexto de apilamiento, y un menú `absolute` dentro quedaría recortado por
 // él. Con el portal siempre se ve por encima de todo.
-function InlineDropdown({
+// Dentro de la hoja de filtros móvil (MobileOptionsSheet) el desplegable se
+// pinta como un grupo con todas sus opciones a la vista.
+function InlineDropdown(props) {
+  if (useInOptionsSheet()) {
+    return <SheetOptionGroup label={props.label} icon={props.icon}>{props.children}</SheetOptionGroup>;
+  }
+  return <InlineDropdownMenu {...props} />;
+}
+
+function InlineDropdownMenu({
   label,
   valueLabel,
   mobileValueLabel = null,
@@ -1314,7 +1278,15 @@ function InlineDropdown({
   );
 }
 
-function DropdownItem({ active, onClick, children }) {
+// Dentro de la hoja de filtros móvil, cada opción es una píldora.
+function DropdownItem(props) {
+  if (useInOptionsSheet()) {
+    return <SheetOption active={props.active} onClick={props.onClick}>{props.children}</SheetOption>;
+  }
+  return <DropdownMenuItem {...props} />;
+}
+
+function DropdownMenuItem({ active, onClick, children }) {
   return (
     <button
       type="button"
@@ -1409,6 +1381,18 @@ function GrupoDivisor({ titulo, cuenta, total, primero, isBackNav }) {
 }
 
 function SelectorVista({ vista, setVista, controlGlass, activo, fill = false, opciones = VISTAS_FEED }) {
+  // En la hoja de filtros móvil, las vistas como píldoras con su nombre.
+  if (useInOptionsSheet()) {
+    return (
+      <SheetOptionGroup label="Vista" icon={LayoutGrid}>
+        {opciones.map(([valor, Icono, etiqueta]) => (
+          <SheetOption key={valor} icon={Icono} active={vista === valor} onClick={() => setVista(valor)}>
+            {etiqueta}
+          </SheetOption>
+        ))}
+      </SheetOptionGroup>
+    );
+  }
   return (
     <div
       className={`flex h-11 items-center rounded-2xl p-1 ${fill ? "min-w-0 flex-1" : "shrink-0"} ${controlGlass}`}

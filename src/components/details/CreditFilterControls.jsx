@@ -23,6 +23,7 @@ import {
   CheckCircle2,
   ChevronDown,
 } from "lucide-react";
+import { SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
 
 // Acento: verde en la ficha de un actor; amarillo en las de títulos
 // (p. ej. el panel «Portadas y fondos» de DetailsClient). Las opciones lo
@@ -33,7 +34,20 @@ const ACCENTS = {
 };
 const AccentContext = createContext(ACCENTS.emerald);
 
-export function InlineDropdown({
+// Dentro de la hoja de filtros móvil (MobileOptionsSheet) el desplegable se
+// pinta como un grupo con todas sus opciones a la vista.
+export function InlineDropdown(props) {
+  if (useInOptionsSheet()) {
+    return (
+      <SheetOptionGroup label={props.label} icon={props.icon} layout={props.sheetLayout}>
+        {props.children}
+      </SheetOptionGroup>
+    );
+  }
+  return <InlineDropdownMenu {...props} />;
+}
+
+function InlineDropdownMenu({
   label,
   valueLabel,
   // Valor en móvil, donde no se ve la etiqueta (p. ej. «Desde 2010»).
@@ -206,7 +220,15 @@ export function InlineDropdown({
   );
 }
 
-export function DropdownItem({ active, onClick, children }) {
+// Dentro de la hoja de filtros móvil, cada opción es una píldora.
+export function DropdownItem(props) {
+  if (useInOptionsSheet()) {
+    return <SheetOption active={props.active} onClick={props.onClick}>{props.children}</SheetOption>;
+  }
+  return <DropdownMenuItem {...props} />;
+}
+
+function DropdownMenuItem({ active, onClick, children }) {
   const tone = useContext(AccentContext);
   return (
     <button
@@ -245,6 +267,8 @@ export function YearFilterDropdown({
       menuZIndex={menuZIndex}
       fullWidth={fullWidth}
       compact={compact}
+      // En la hoja móvil, los años en una fila deslizable.
+      sheetLayout="scroll"
       label={label}
       valueLabel={value || "Todos"}
       mobileValueLabel={value ? `${label} ${value}` : label}

@@ -22,13 +22,14 @@ import {
   Network,
   Plus,
   Search,
+  ZoomIn,
   SlidersHorizontal,
   Tv,
   X,
 } from "lucide-react";
 import OptimizedImage from "@/components/OptimizedImage";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
-import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
+import MobileOptionsSheet, { SheetAction, SheetOption, SheetOptionGroup } from "@/components/ui/MobileOptionsSheet";
 import { ProfileMenuDropdown } from "@/app/u/[username]/ProfileSection";
 import { useAuth } from "@/context/AuthContext";
 import { setAppPullToRefreshLocked } from "@/lib/android/appBridge";
@@ -1377,7 +1378,7 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
 
   // Mismas piezas y disposición que el menú de las demás secciones del perfil
   // (ProfileSectionToolbar): buscador, desplegables y grupo de botones.
-  const menuControls = (
+  const menuDropdowns = (
     <>
       <ProfileMenuDropdown
         label="Tipo"
@@ -1404,6 +1405,11 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
         onChange={toggleGroup}
         multiple
       />
+    </>
+  );
+  const menuControls = (
+    <>
+      {menuDropdowns}
       <div className={`flex h-11 w-full items-center gap-1 p-1 ${MENU_SURFACE}`}>
         {onToggleHeader && !fullscreen ? (
           <span className="flex h-full flex-1">
@@ -1495,8 +1501,8 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
             className={`flex h-11 w-11 shrink-0 items-center justify-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400/70 ${MENU_SURFACE} ${
               menuOpen ? "text-emerald-400" : "text-zinc-200 hover:bg-white/10"
             }`}
+            aria-haspopup="dialog"
             aria-expanded={menuOpen}
-            aria-controls="profile-menu-neural"
             aria-label="Mostrar opciones"
           >
             <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
@@ -1506,16 +1512,46 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
           {searchField("", "Buscar título, género o saga...", "text-sm")}
           {menuControls}
         </div>
-        {/* Mismo despliegue que los menús móviles del resto de páginas. */}
-        <MobileFiltersPanel
+        {/* La misma hoja de filtros que el resto de páginas: los desplegables
+            como grupos y los botones del gráfico como acciones. */}
+        <MobileOptionsSheet
           open={menuOpen}
+          onClose={() => setMenuOpen(false)}
           id="profile-menu-neural"
-          className="@[1024px]/detail-page:hidden"
-          gapClassName=""
-          contentClassName="grid grid-cols-2 gap-2"
+          accent="emerald"
         >
-          {menuControls}
-        </MobileFiltersPanel>
+          {menuDropdowns}
+          <SheetOptionGroup label="Zoom" icon={ZoomIn}>
+            <SheetOption icon={Minus} onClick={() => zoomBy(1 / 1.35)}>
+              Alejar
+            </SheetOption>
+            <SheetOption icon={Plus} onClick={() => zoomBy(1.35)}>
+              Acercar
+            </SheetOption>
+          </SheetOptionGroup>
+          <SheetOptionGroup label="Acciones" layout="stack">
+            {onToggleHeader && !fullscreen ? (
+              <SheetAction
+                icon={headerCollapsed ? ChevronsDown : ChevronsUp}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onToggleHeader();
+                }}
+              >
+                {headerCollapsed ? "Mostrar la cabecera del perfil" : "Compactar la cabecera del perfil"}
+              </SheetAction>
+            ) : null}
+            <SheetAction
+              icon={fullscreen ? Minimize : Maximize}
+              onClick={() => {
+                setMenuOpen(false);
+                toggleFullscreen();
+              }}
+            >
+              {fullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+            </SheetAction>
+          </SheetOptionGroup>
+        </MobileOptionsSheet>
       </section>
         </div>
       </div>

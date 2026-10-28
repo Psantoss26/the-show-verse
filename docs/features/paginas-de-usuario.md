@@ -43,12 +43,11 @@ El backend entrega la baraja ya filtrada (sin descartados, pendientes ni favorit
 
 Páginas «Ver todos» de *Tendencias*, *Populares*, *Recomendados* y *Más esperadas* (`src/lib/dashboard/sectionItems.js`). La lista llega ya en el RSC, sin esqueletos, y es la misma (mismo orden) que la fila de Inicio. Tienen botón de recargar junto al de volver. Backend: `/v1/dashboard/sections/{key}`. Ver [[dashboards-implementation]].
 
-## Menú desplegable móvil al fijarse
+## Menú de filtros en el móvil
 
-En el móvil, la barra de búsqueda y filtros de Favoritos, Pendientes, Historial, Biblioteca, Calendario, Continuar viendo, En progreso, Listas, Social, las secciones del dashboard y el detalle de lista se fija bajo la barra superior al hacer scroll. Dónde va su desplegable (`MobileFiltersPanel`) se decide al abrirlo y no cambia mientras siga abierto (`panelOverlay` de `useStickyToolbarState`):
+En el móvil, el botón de filtros de la barra de Favoritos, Pendientes, Historial, Biblioteca, Calendario, Continuar viendo, En progreso, Listas, Social, las secciones del dashboard, el detalle de lista, las secciones del Perfil (también la vista neuronal), las películas y series de una persona y «Portadas y fondos» de la ficha abre una **hoja inferior** (`MobileOptionsSheet`) en vez de un desplegable. Lleva todos los filtros, el orden, la agrupación, los modos de vista y las acciones de la página, en ese orden y con todas las opciones a la vista como píldoras. Elegir una opción no cierra la hoja (se ve el resultado detrás y se pueden combinar filtros); las acciones que cambian de modo o abren otra cosa (Añadir título, Borrar registros, Crear lista, Volver a hoy…) sí la cierran. En escritorio la barra sigue con sus desplegables.
 
-- **Abierto antes de fijarse:** va en el flujo y sigue así al fijarse; el contenido pasa por detrás con el scroll normal. Antes pasaba a overlay justo al fijarse y el contenido subía de golpe la altura del panel (y bajaba de golpe al volver arriba).
-- **Abierto con la barra ya fijada:** va como overlay bajo la barra y no empuja el contenido.
+La barra se sigue fijando bajo la barra superior al hacer scroll (`isPinned` de `useStickyToolbarState`).
 
 ## Fichas superpuestas (rutas interceptoras)
 

@@ -108,6 +108,16 @@ Integración de UI con Trakt (auth, estado de visto, modales de historial).
 | `TraktEpisodesWatchedModal.jsx` | Modal de progreso de episodios vistos de una serie/temporada. |
 | `TraktContinueWatching.jsx` | Variante ligera de "continuar viendo" basada solo en Trakt. |
 
+## `ui/`
+
+Piezas de interfaz compartidas por varias páginas.
+
+| Componente | Propósito |
+|---|---|
+| `MobileOptionsSheet.jsx` | Hoja inferior de **filtros y vista** de las páginas en móvil: el botón de filtros de la barra la abre. Mismo cristal que los modales (`LIQUID_GLASS_PANEL`), sube desde abajo solo con `transform` y se cierra con la X, el velo, Escape o arrastrando la cabecera. Dentro no hay desplegables: cada grupo (`SheetOptionGroup`) enseña sus opciones como píldoras (`SheetOption`), en filas, a mitades o en una fila deslizable (`layout="scroll"`, p. ej. años); las acciones de la página van al final con `SheetAction`. Los desplegables de cada página (`InlineDropdown`/`DropdownItem`) consultan `useInOptionsSheet()` y, dentro de la hoja, se pintan como grupo y píldoras. Orden: filtros → orden → agrupar → vista → imagen → acciones. |
+| `MobileFiltersPanel.jsx` | Desplegable en el sitio (altura animada con `grid-template-rows`). Solo donde abrir una hoja sería un modal sobre otro panel: vistas laterales de la ficha y de una persona, vista teléfono del drawer y modal de episodios de Trakt; y los filtros de Actor en escritorio. |
+| `ImageModeSelector.jsx` | Modo de imagen de las tarjetas (póster/backdrop): `ImageModeSegmented` en escritorio y `ImageModeSheetGroup` (grupo «Imagen») en la hoja móvil. |
+
 ## Relacionado
 - [[Home]]
 - [[Frontend]]
