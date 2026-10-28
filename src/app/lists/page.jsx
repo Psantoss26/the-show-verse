@@ -1659,6 +1659,28 @@ const GridListCard = memo(function GridListCard({
   );
 });
 
+// Píldoras de recuento de la cabecera de cada fila: cristal líquido teñido
+// SIN bordes marcados (ni anillo ni reflejo `inset 0 1px`, que dibujan un filo):
+// el volumen lo da el degradado del fondo y la elevación, un halo difuso del
+// mismo tono.
+const GLASS_COUNT_PILL_TONES = {
+  purple:
+    "bg-purple-500/[0.22] to-purple-950/[0.2] text-purple-100 shadow-[0_6px_18px_-8px_rgba(168,85,247,0.6)]",
+  red:
+    "bg-red-500/[0.22] to-red-950/[0.2] text-red-100 shadow-[0_6px_18px_-8px_rgba(239,68,68,0.6)]",
+};
+
+function GlassCountPill({ tone = "purple", title, children }) {
+  return (
+    <span
+      title={title}
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full bg-gradient-to-br from-white/[0.12] via-transparent px-3 py-1 text-xs font-bold backdrop-blur-[14px] backdrop-saturate-[160%] ${GLASS_COUNT_PILL_TONES[tone]}`}
+    >
+      {children}
+    </span>
+  );
+}
+
 const RowListSection = memo(function RowListSection({
   list,
   itemsState,
@@ -1690,10 +1712,16 @@ const RowListSection = memo(function RowListSection({
               </h3>
             </ListNavWrapper>
 
-            <span className="shrink-0 inline-flex items-center gap-2 rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs font-bold text-zinc-200">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+            <GlassCountPill tone="purple">
+              <span className="h-1.5 w-1.5 rounded-full bg-purple-400 shadow-[0_0_6px_rgba(192,132,252,0.9)]" />
               {list.item_count} items
-            </span>
+            </GlassCountPill>
+            {Number(list?.likes) > 0 && (
+              <GlassCountPill tone="red" title={`${list.likes} me gusta`}>
+                <Heart aria-hidden="true" className="h-3 w-3 fill-current" />
+                {list.likes}
+              </GlassCountPill>
+            )}
           </div>
 
           {list.description && (
