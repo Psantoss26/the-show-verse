@@ -307,8 +307,10 @@ export default function CollectionDetailsClient({ collectionId }) {
     const autoPoster = gallery.done
         ? pickLadderPoster(gallery.images?.posters)?.file_path || state.collection?.poster_path || null
         : null
-    const collectionPoster = customPoster || community.poster_path || autoPoster
     const posterPending = !customPoster && (communityPending || (!community.poster_path && !gallery.done))
+    // Mientras espera, ninguna: la galería suele llegar antes que los votos y
+    // la automática se veía un instante antes de la más votada (al recargar).
+    const collectionPoster = posterPending ? null : customPoster || community.poster_path || autoPoster
     const revenueLabel = formatCollectionRevenue(collection?.revenue)
     const castMembers = Array.isArray(collection?.cast) ? collection.cast : []
     // Fondo como en DetailsClient: backdrop en escritorio y póster textless en
