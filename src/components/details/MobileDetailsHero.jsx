@@ -1067,6 +1067,121 @@ const MOBILE_COVER_CONTRAST_SCRIM = `linear-gradient(to bottom,
     rgba(10, 10, 10, 0.9) calc(var(--mobile-cover-h) * 0.86),
     rgb(10, 10, 10) calc(var(--mobile-cover-h) * 0.95))`
 
+// CAPAS ALREDEDOR DE LA PORTADA (ver arriba), sueltas para que la vista previa
+// de pulsación larga (preview/DetailPeekLayout) pinte el mismo borde inferior y
+// el mismo fondo bajo botones y marcador que la ficha. Cuelgan de
+// `--mobile-cover-h` (alto de la portada), igual que en MobileHeroCover.
+//
+// Debajo de la portada: su centro muy difuminado hasta el pie.
+export function MobileCoverUnderlay({ src }) {
+    return (
+        <div
+            className="pointer-events-none absolute inset-x-0 top-0 overflow-hidden"
+            style={{
+                height: 'calc(var(--mobile-cover-h) + 100lvh)',
+                WebkitMaskImage: MOBILE_COVER_UNDERLAY_MASK,
+                maskImage: MOBILE_COVER_UNDERLAY_MASK,
+            }}
+        >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+                src={src}
+                alt=""
+                decoding="async"
+                className="absolute inset-x-0 w-full object-cover object-center"
+                style={{
+                    top: 'calc(var(--mobile-cover-h) - 48px)',
+                    height: 'calc(100lvh - var(--mobile-cover-h) + 96px)',
+                    // Estirado a lo ancho para que el desenfoque no
+                    // oscurezca los laterales.
+                    transform: `scaleX(${MOBILE_COVER_EXTEND_SCALE_X})`,
+                    filter: 'blur(32px) brightness(0.7) saturate(1.15)',
+                }}
+            />
+        </div>
+    )
+}
+
+// Encima de la portada: la prolongación difuminada del borde, el velo de los
+// botones y, con `adaptiveContrast`, el oscurecido medido.
+export function MobileCoverEdgeLayers({ src, objectPosition = 'center bottom', blurredUnderlay = false, adaptiveContrast = false, edgeBandPx = MOBILE_COVER_BLUR_BAND_PX }) {
+    const contrastScrim = useCoverContrastScrim(src, adaptiveContrast)
+    const extendMask =
+        edgeBandPx === MOBILE_COVER_BLUR_BAND_PX
+            ? (blurredUnderlay ? MOBILE_COVER_EXTEND_SHORT_MASK : MOBILE_COVER_EXTEND_MASK)
+            : buildCoverExtendMask(blurredUnderlay ? MOBILE_COVER_EXTEND_SHORT_PX : MOBILE_COVER_EXTEND_PX, edgeBandPx)
+    return (
+        <>
+            {/* Prolongación del borde inferior (ver arriba): el póster y su
+                última fila estirada, en una sola capa difuminada para que el
+                desenfoque no deje costura entre los dos. La franja de 2 px
+                muestra la última fila con el mismo encaje que el `<img>`
+                (ancho completo, alineada abajo) y se estira en vertical. */}
+            <div
+                className="pointer-events-none absolute inset-x-0 top-0 blur-[12px]"
+                style={{
+                    height: `calc(var(--mobile-cover-h) + ${MOBILE_COVER_EXTEND_PX}px)`,
+                    WebkitMaskImage: extendMask,
+                    maskImage: extendMask,
+                }}
+            >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                    src={src}
+                    alt=""
+                    decoding="async"
+                    className="absolute inset-x-0 top-0 w-full object-cover object-bottom"
+                    style={{
+                        height: 'var(--mobile-cover-h)',
+                        objectPosition,
+                        transform: `scaleX(${MOBILE_COVER_EXTEND_SCALE_X})`,
+                    }}
+                />
+                <div
+                    className="absolute inset-x-0 h-[2px] origin-top overflow-hidden"
+                    style={{
+                        // 1px por encima del borde: sin hueco entre ambas.
+                        top: 'calc(var(--mobile-cover-h) - 1px)',
+                        transform: `scale(${MOBILE_COVER_EXTEND_SCALE_X}, ${(MOBILE_COVER_EXTEND_PX + 1) / 2})`,
+                    }}
+                >
+                    {/* Prolonga el borde VISIBLE del recorte, que al
+                        centrarlo ya no coincide con el pie del archivo. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                        src={src}
+                        alt=""
+                        decoding="async"
+                        className="absolute inset-x-0 bottom-0 w-full object-cover"
+                        style={{ height: 'var(--mobile-cover-h)', objectPosition }}
+                    />
+                </div>
+            </div>
+            <div
+                className="pointer-events-none absolute inset-x-0"
+                style={{
+                    top: `calc(var(--mobile-cover-h) - ${MOBILE_COVER_SHADE_LEAD_PX}px)`,
+                    // Con el reflejo, hasta el pie de la pantalla.
+                    height: blurredUnderlay
+                        ? `calc(100lvh + ${MOBILE_COVER_SHADE_LEAD_PX}px)`
+                        : MOBILE_COVER_EXTEND_PX + MOBILE_COVER_SHADE_LEAD_PX,
+                    backgroundImage: blurredUnderlay ? MOBILE_COVER_SHADE_SOFT : MOBILE_COVER_SHADE,
+                }}
+            />
+            {adaptiveContrast ? (
+                <div
+                    className="pointer-events-none absolute inset-x-0 top-0 transition-opacity duration-500 motion-reduce:transition-none"
+                    style={{
+                        height: 'calc(var(--mobile-cover-h) + 100lvh)',
+                        backgroundImage: MOBILE_COVER_CONTRAST_SCRIM,
+                        opacity: contrastScrim ?? 0,
+                    }}
+                />
+            ) : null}
+        </>
+    )
+}
+
 // `inPanel`: la portada de la ficha de teléfono del drawer (`usePanelHeroFit`).
 // Llena su contenedor (una capa fija del panel, detrás del contenido con
 // scroll) en vez de colgar de la ventana, y no lleva nada atado al viewport ni
@@ -1081,7 +1196,6 @@ export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, 
     const firstSrc = lowSrc || src
     const hasImage = Boolean(firstSrc) && !failed
     const hasHigh = hasImage && Boolean(src && src !== firstSrc)
-    const contrastScrim = useCoverContrastScrim(hasImage ? firstSrc : null, adaptiveContrast)
     const highReady = hasHigh && highSrc === src
     // Llegada desde la vista previa de pulsación larga (MobileTitlePeek): la
     // tarjeta flotante ya está enseñando esta portada encima, en este mismo
@@ -1103,10 +1217,6 @@ export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, 
     }
 
     const mask = hasImage ? undefined : 'var(--sv-poster-fade)'
-    const extendMask =
-        edgeBandPx === MOBILE_COVER_BLUR_BAND_PX
-            ? (blurredUnderlay ? MOBILE_COVER_EXTEND_SHORT_MASK : MOBILE_COVER_EXTEND_MASK)
-            : buildCoverExtendMask(blurredUnderlay ? MOBILE_COVER_EXTEND_SHORT_PX : MOBILE_COVER_EXTEND_PX, edgeBandPx)
 
     return (
         // Relevo con el scroll: la portada se desvanece mientras aparece el
@@ -1147,32 +1257,7 @@ export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, 
                 por su fundido inferior (la prolongación difuminada del
                 mosaico, ver UnifiedListDetailsLayout). */}
             {hasImage ? null : collageUnderlay}
-            {hasImage && blurredUnderlay ? (
-                <div
-                    className="pointer-events-none absolute inset-x-0 top-0 overflow-hidden"
-                    style={{
-                        height: 'calc(var(--mobile-cover-h) + 100lvh)',
-                        WebkitMaskImage: MOBILE_COVER_UNDERLAY_MASK,
-                        maskImage: MOBILE_COVER_UNDERLAY_MASK,
-                    }}
-                >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                        src={firstSrc}
-                        alt=""
-                        decoding="async"
-                        className="absolute inset-x-0 w-full object-cover object-center"
-                        style={{
-                            top: 'calc(var(--mobile-cover-h) - 48px)',
-                            height: 'calc(100lvh - var(--mobile-cover-h) + 96px)',
-                            // Estirado a lo ancho para que el desenfoque no
-                            // oscurezca los laterales.
-                            transform: `scaleX(${MOBILE_COVER_EXTEND_SCALE_X})`,
-                            filter: 'blur(32px) brightness(0.7) saturate(1.15)',
-                        }}
-                    />
-                </div>
-            ) : null}
+            {hasImage && blurredUnderlay ? <MobileCoverUnderlay src={firstSrc} /> : null}
             <div
                 className="relative overflow-hidden"
                 style={{ height: 'var(--mobile-cover-h)', WebkitMaskImage: mask, maskImage: mask }}
@@ -1215,74 +1300,13 @@ export function MobileHeroCover({ src, lowSrc, imgRef, onLoad, onError, failed, 
                 )}
             </div>
 
-            {/* Prolongación del borde inferior (ver arriba): el póster y su
-                última fila estirada, en una sola capa difuminada para que el
-                desenfoque no deje costura entre los dos. La franja de 2 px
-                muestra la última fila con el mismo encaje que el `<img>`
-                (ancho completo, alineada abajo) y se estira en vertical. */}
             {hasImage ? (
-                <div
-                    className="pointer-events-none absolute inset-x-0 top-0 blur-[12px]"
-                    style={{
-                        height: `calc(var(--mobile-cover-h) + ${MOBILE_COVER_EXTEND_PX}px)`,
-                        WebkitMaskImage: extendMask,
-                        maskImage: extendMask,
-                    }}
-                >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                        src={firstSrc}
-                        alt=""
-                        decoding="async"
-                        className="absolute inset-x-0 top-0 w-full object-cover object-bottom"
-                        style={{
-                            height: 'var(--mobile-cover-h)',
-                            objectPosition,
-                            transform: `scaleX(${MOBILE_COVER_EXTEND_SCALE_X})`,
-                        }}
-                    />
-                    <div
-                        className="absolute inset-x-0 h-[2px] origin-top overflow-hidden"
-                        style={{
-                            // 1px por encima del borde: sin hueco entre ambas.
-                            top: 'calc(var(--mobile-cover-h) - 1px)',
-                            transform: `scale(${MOBILE_COVER_EXTEND_SCALE_X}, ${(MOBILE_COVER_EXTEND_PX + 1) / 2})`,
-                        }}
-                    >
-                        {/* Prolonga el borde VISIBLE del recorte, que al
-                            centrarlo ya no coincide con el pie del archivo. */}
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                            src={firstSrc}
-                            alt=""
-                            decoding="async"
-                            className="absolute inset-x-0 bottom-0 w-full object-cover"
-                            style={{ height: 'var(--mobile-cover-h)', objectPosition }}
-                        />
-                    </div>
-                </div>
-            ) : null}
-            {hasImage ? (
-                <div
-                    className="pointer-events-none absolute inset-x-0"
-                    style={{
-                        top: `calc(var(--mobile-cover-h) - ${MOBILE_COVER_SHADE_LEAD_PX}px)`,
-                        // Con el reflejo, hasta el pie de la pantalla.
-                        height: blurredUnderlay
-                            ? `calc(100lvh + ${MOBILE_COVER_SHADE_LEAD_PX}px)`
-                            : MOBILE_COVER_EXTEND_PX + MOBILE_COVER_SHADE_LEAD_PX,
-                        backgroundImage: blurredUnderlay ? MOBILE_COVER_SHADE_SOFT : MOBILE_COVER_SHADE,
-                    }}
-                />
-            ) : null}
-            {hasImage && adaptiveContrast ? (
-                <div
-                    className="pointer-events-none absolute inset-x-0 top-0 transition-opacity duration-500 motion-reduce:transition-none"
-                    style={{
-                        height: 'calc(var(--mobile-cover-h) + 100lvh)',
-                        backgroundImage: MOBILE_COVER_CONTRAST_SCRIM,
-                        opacity: contrastScrim ?? 0,
-                    }}
+                <MobileCoverEdgeLayers
+                    src={firstSrc}
+                    objectPosition={objectPosition}
+                    blurredUnderlay={blurredUnderlay}
+                    adaptiveContrast={adaptiveContrast}
+                    edgeBandPx={edgeBandPx}
                 />
             ) : null}
         </div>

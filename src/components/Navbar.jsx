@@ -2,10 +2,9 @@
 import {
   LIQUID_GLASS_BAR,
   LIQUID_GLASS_BAR_FLAT,
+  LIQUID_GLASS_MODAL_HEADER,
   LIQUID_GLASS_PANEL,
-  LIQUID_GLASS_SURFACE,
 } from "@/lib/ui/liquidGlass";
-import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 import OptimizedImage from "@/components/OptimizedImage";
 import {
   useCallback,
@@ -3480,15 +3479,16 @@ function NavbarContent() {
                 difuminar y el cristal se veía plano (ver la búsqueda móvil). */}
             <motion.div
               aria-hidden
-              className="absolute inset-0 bg-black/30"
+              className="absolute inset-0 bg-black/55 backdrop-blur-sm"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             />
-            {/* Mismo cristal que la barra inferior y el menú de secciones de
-                la ficha: `LIQUID_GLASS_SURFACE` + capas ópticas. Entra solo
-                con transform, que no apaga el `backdrop-filter`. El scroll va
-                en un hijo porque la envoltura recorta (`overflow-hidden`). */}
+            {/* Mismo cristal que la hoja de filtros de las páginas de usuario
+                (MobileOptionsSheet): `LIQUID_GLASS_PANEL` sobre el velo
+                desenfocado y cabecera en degradado. Entra solo con transform,
+                que no apaga el `backdrop-filter`. El scroll va en un hijo
+                porque el panel recorta (`overflow-hidden`). */}
             <motion.aside
               id="mobile-navigation-drawer"
               role="dialog"
@@ -3498,13 +3498,12 @@ function NavbarContent() {
               animate={{ x: 0 }}
               exit={{ x: -320 }}
               transition={{ type: "spring", damping: 28, stiffness: 280 }}
-              className={`h-full w-[280px] sm:w-[300px] max-w-[85vw] rounded-r-3xl select-none ${LIQUID_GLASS_SURFACE}`}
+              className={`relative h-full w-[280px] sm:w-[300px] max-w-[85vw] overflow-hidden rounded-r-[2rem] select-none ${LIQUID_GLASS_PANEL}`}
               onClick={(e) => e.stopPropagation()}
             >
-              <LiquidGlassOpticalLayers />
-              <div className="relative flex h-full flex-col overflow-y-auto no-scrollbar px-4 pt-3 pb-6">
+              <div className="relative flex h-full flex-col overflow-y-auto no-scrollbar px-4 pb-6">
                 {/* Header */}
-                <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-2 mb-2">
+                <div className={`-mx-4 mb-2 flex items-center justify-between gap-2 px-4 pt-3 pb-2 ${LIQUID_GLASS_MODAL_HEADER}`}>
                   <Link
                     href="/"
                     onClick={() => setMobileMenuOpen(false)}
@@ -3522,10 +3521,10 @@ function NavbarContent() {
                   <button
                     type="button"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full bg-white/[0.06] text-zinc-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-[6px] transition-[color,background-color,transform] duration-200 hover:-translate-y-0.5 hover:bg-white/[0.1] hover:text-white active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/5 text-white/70 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/80"
                     aria-label="Cerrar menú"
                   >
-                    <XIcon className="h-4 w-4" />
+                    <XIcon className="h-5 w-5" />
                   </button>
                 </div>
 
