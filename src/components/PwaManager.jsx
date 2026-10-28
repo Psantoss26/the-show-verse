@@ -72,7 +72,7 @@ export default function PwaManager() {
   // evento `contextmenu`. En campos editables se respeta (pegar, seleccionar).
   useEffect(() => {
     const query = window.matchMedia?.(
-      "(display-mode: standalone) and (hover: none) and (pointer: coarse)",
+      "(display-mode: standalone) and (hover: none) and (pointer: coarse), (display-mode: fullscreen) and (hover: none) and (pointer: coarse)",
     );
     if (!query) return;
     const onContextMenu = (event) => {
@@ -91,7 +91,9 @@ export default function PwaManager() {
     if (typeof window === "undefined") return;
 
     setIsInstalled(
-      window.matchMedia?.("(display-mode: standalone)")?.matches ||
+      // En Android la app instalada abre a pantalla completa (ver
+      // `display_override` en site.webmanifest), no en `standalone`.
+      window.matchMedia?.("(display-mode: standalone), (display-mode: fullscreen)")?.matches ||
         window.navigator.standalone === true,
     );
 

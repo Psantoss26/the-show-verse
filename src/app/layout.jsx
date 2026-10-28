@@ -53,10 +53,10 @@ export const viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  // La página se dibuja también bajo la barra de navegación del sistema
-  // (Android edge-to-edge, iOS). Sin esto la PWA instalada reservaba esa franja
-  // y la pintaba de negro, mientras que en la pestaña del navegador el
-  // contenido sí pasaba por detrás. También activa `env(safe-area-inset-*)`,
+  // La página se dibuja también en el recorte de la cámara y bajo las barras
+  // del sistema. La PWA de Android abre a pantalla completa (ver
+  // `display_override` en site.webmanifest): sin esto, Android rellenaba de
+  // negro la franja del recorte. También activa `env(safe-area-inset-*)`,
   // que hasta ahora valía 0: la barra inferior y los paneles ya lo usan para
   // no quedar debajo de la barra de gestos.
   viewportFit: "cover",

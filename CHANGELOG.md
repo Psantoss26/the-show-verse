@@ -8,7 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
-- App instalada (PWA) en Android: la franja de la barra de navegación del sistema ya no sale negra. El contenido pasa por detrás, como en el navegador, y la barra inferior de la app se coloca justo encima de la barra de gestos. → [páginas](docs/frontend/app-router-pages.md)
+- App instalada (PWA) en Android: abre a pantalla completa. Ya no salen las franjas negras de la barra de estado (arriba) ni de la barra de navegación del sistema (abajo); para verlas se desliza desde el borde. En el iPhone y en el ordenador sigue igual. Si la app ya estaba instalada, Chrome aplica el cambio al actualizarla (puede tardar hasta un día); desinstalarla y volver a instalarla lo aplica al momento. → [páginas](docs/frontend/app-router-pages.md)
 - Ficha de película o serie, fila de «Portadas y fondos»: al pasar el ratón por una imagen solo se ve su resolución; ya no sale el botón de copiar el enlace en la esquina inferior derecha. → [páginas](docs/frontend/app-router-pages.md)
 - Ficha de película o serie, vista lateral de «Tráiler y vídeos»: cuando hay muchos tipos de vídeo, las pestañas siguen en una sola fila y los tipos que no caben (los últimos, menos relevantes) se juntan en «Otros», con cuántos vídeos suman; antes la última quedaba recortada en el borde. Cuántos caben depende del ancho del panel. → [páginas](docs/frontend/app-router-pages.md)
 - Ficha de película o serie, vista lateral de «Tráiler y vídeos»: si hay vídeos de más de un tipo, bajo el título salen pestañas para filtrar por tipo con cuántos hay de cada uno (Todos, Tráiler, Teaser, Clip, Featurette, Detrás de las cámaras…), como en Premios o Reparto. → [páginas](docs/frontend/app-router-pages.md)

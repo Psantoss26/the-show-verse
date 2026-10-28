@@ -1453,13 +1453,15 @@ body {
    Android Chrome ignora `-webkit-touch-callout`; ese menú lo corta PwaManager
    cancelando `contextmenu`.
 
-   Solo con `display-mode: standalone` y puntero táctil: en una pestaña del
+   Solo con `display-mode: standalone` o `fullscreen` (la app instalada en
+   Android abre a pantalla completa) y puntero táctil: en una pestaña del
    navegador y en la PWA de escritorio se sigue pudiendo copiar texto. Los
    campos editables recuperan la selección (en iOS, `user-select: none` en un
    input impide escribir en él). En `@layer base` para que una utilidad
    `select-text` pueda reactivarla en un elemento concreto. */
 @layer base {
-  @media (display-mode: standalone) and (hover: none) and (pointer: coarse) {
+  @media (display-mode: standalone) and (hover: none) and (pointer: coarse),
+    (display-mode: fullscreen) and (hover: none) and (pointer: coarse) {
     html {
       -webkit-user-select: none;
       user-select: none;
