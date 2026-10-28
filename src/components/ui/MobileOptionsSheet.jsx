@@ -71,6 +71,10 @@ export default function MobileOptionsSheet({
   icon: Icon = SlidersHorizontal,
   accent = "zinc",
   id,
+  // "screen": a todo el ancho (páginas, en móvil). "sectionSheet": encima de
+  // una vista lateral (SectionSheet), que desde 640px es un panel a la
+  // derecha: la hoja sube dentro de su ancho en vez de cruzar la pantalla.
+  placement = "screen",
   children,
 }) {
   const titleId = useId();
@@ -107,9 +111,12 @@ export default function MobileOptionsSheet({
 
   useModalGuard({ open, onClose });
 
+  // Si ya lo puso la vista lateral de debajo, es suyo: al cerrar la hoja no se
+  // quita.
   useEffect(() => {
     if (!open) return undefined;
     const root = document.documentElement;
+    if (root.hasAttribute("data-sv-sheet-open")) return undefined;
     root.setAttribute("data-sv-sheet-open", "");
     return () => root.removeAttribute("data-sv-sheet-open");
   }, [open]);
@@ -168,7 +175,9 @@ export default function MobileOptionsSheet({
       <div
         ref={panelRef}
         tabIndex={-1}
-        className={`relative flex max-h-[min(85dvh,44rem)] w-full flex-col overflow-hidden rounded-t-[2rem] outline-none ${LIQUID_GLASS_PANEL} ${
+        className={`relative flex max-h-[min(85dvh,44rem)] w-full flex-col overflow-hidden rounded-t-[2rem] outline-none ${
+          placement === "sectionSheet" ? "sm:ml-auto sm:w-[30rem] sm:rounded-bl-[2rem] lg:w-[34rem]" : ""
+        } ${LIQUID_GLASS_PANEL} ${
           closing ? "sv-options-sheet-out" : "sv-options-sheet-in"
         }`}
         style={

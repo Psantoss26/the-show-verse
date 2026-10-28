@@ -18,11 +18,12 @@ import {
   Images,
   Star,
   Tags,
+  RotateCcw,
   Trophy,
   Tv as TvIcon,
 } from "lucide-react";
 import OptimizedImage from "@/components/OptimizedImage";
-import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
+import MobileOptionsSheet, { SheetAction, SheetOptionGroup } from "@/components/ui/MobileOptionsSheet";
 import SectionSheet, { SHEET_CONTROL, SectionSheetEmpty } from "./SectionSheet";
 import { TitleRow } from "./SectionSheetRows";
 import FilmographySheet from "./FilmographySheet";
@@ -221,8 +222,6 @@ function TitlesSheet({ meta, items: rawItems, onClose, query, setQuery }) {
 
 // ─── Películas / Series ───────────────────────────────────────────────────
 
-// Menús de los filtros por encima del panel (z-[10000]).
-const SHEET_MENU_Z = 10050;
 
 function CreditsSheet({ meta, data, items: dedupedItems, rawItems, onClose, tab, setTab, query, setQuery }) {
   const items = useMemo(() => (Array.isArray(dedupedItems) ? dedupedItems : []), [dedupedItems]);
@@ -257,99 +256,96 @@ function CreditsSheet({ meta, data, items: dedupedItems, rawItems, onClose, tab,
     [data, raw, items, query, activeTab, sort, yearFrom, yearTo],
   );
   const filtersChanged = sort !== "date_desc" || yearFrom || yearTo;
-  // Los filtros se despliegan con el botón junto al buscador, como en la
-  // sección de la ficha.
+  // El botón junto al buscador abre los filtros en la hoja inferior.
   const [filtersOpen, setFiltersOpen] = useState(false);
   const scores = useSheetImdbScores(filtered);
   return (
-    <SectionSheet
-      open
-      accent={ACCENT}
-      onClose={onClose}
-      title={meta.title}
-      icon={meta.icon}
-      subtitle={`${filtered.length} de ${plural(items.length, "título", "títulos")}`}
-      tabs={tabs}
-      activeTab={activeTab}
-      onTabChange={setTab}
-      search={{ value: query, onChange: setQuery, placeholder: "Buscar título o papel…" }}
-      searchAccessory={
-        <button
-          type="button"
-          onClick={() => setFiltersOpen((open) => !open)}
-          aria-expanded={filtersOpen}
-          aria-label="Filtros y ajustes"
-          title="Filtros y ajustes"
-          className={`relative flex h-11 w-11 shrink-0 items-center justify-center transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 ${SHEET_CONTROL} ${
-            filtersOpen
-              ? "text-emerald-400 !shadow-[0_0_15px_rgba(16,185,129,0.3)]"
-              : "text-zinc-200 hover:from-white/15 hover:to-white/10 hover:text-white"
-          }`}
-        >
-          <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
-          {/* Filtros cambiados: un punto, también con el desplegable cerrado. */}
-          {filtersChanged ? (
-            <span
-              aria-hidden="true"
-              className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]"
-            />
-          ) : null}
-        </button>
-      }
-      toolbar={
-        <MobileFiltersPanel open={filtersOpen} gapClassName="pt-3">
-        {/* Ordenar · Desde · Hasta en UNA fila: cada botón parte del ancho
-            de su contenido y reparte el sobrante (o encoge) según el ancho
-            del panel (`@container`, ver `compact` en InlineDropdown). */}
-        <div className="@container flex gap-1.5">
-          <CreditsFilterDropdowns
-            showRole={false}
-            sort={sort}
-            setSort={setSort}
-            menuZIndex={SHEET_MENU_Z}
-            compact
-          />
-          <YearFilterDropdown
-            label="Desde"
-            value={yearFrom}
-            setValue={setYearFrom}
-            options={yearOptions}
-            menuZIndex={SHEET_MENU_Z}
-            compact
-          />
-          <YearFilterDropdown
-            label="Hasta"
-            value={yearTo}
-            setValue={setYearTo}
-            options={yearOptions}
-            menuZIndex={SHEET_MENU_Z}
-            compact
-          />
-        </div>
-        </MobileFiltersPanel>
-      }
-    >
-      {filtered.length ? (
-        <TitleList items={filtered} onClose={onClose} {...scores} />
-      ) : (
-        <div className="space-y-3">
-          <SectionSheetEmpty>{query || filtersChanged ? "Ningún título coincide." : "No hay créditos."}</SectionSheetEmpty>
-          {filtersChanged ? (
-            <button
-              type="button"
-              onClick={() => {
-                setSort("date_desc");
-                setYearFrom("");
-                setYearTo("");
-              }}
-              className="mx-auto block text-sm font-bold text-emerald-400 hover:underline"
-            >
-              Limpiar filtros
-            </button>
-          ) : null}
-        </div>
-      )}
-    </SectionSheet>
+    <>
+      <SectionSheet
+        open
+        accent={ACCENT}
+        onClose={onClose}
+        title={meta.title}
+        icon={meta.icon}
+        subtitle={`${filtered.length} de ${plural(items.length, "título", "títulos")}`}
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={setTab}
+        search={{ value: query, onChange: setQuery, placeholder: "Buscar título o papel…" }}
+        searchAccessory={
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((open) => !open)}
+            aria-expanded={filtersOpen}
+            aria-label="Filtros y ajustes"
+            title="Filtros y ajustes"
+            className={`relative flex h-11 w-11 shrink-0 items-center justify-center transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 ${SHEET_CONTROL} ${
+              filtersOpen
+                ? "text-emerald-400 !shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                : "text-zinc-200 hover:from-white/15 hover:to-white/10 hover:text-white"
+            }`}
+          >
+            <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+            {/* Filtros cambiados: un punto, también con el desplegable cerrado. */}
+            {filtersChanged ? (
+              <span
+                aria-hidden="true"
+                className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]"
+              />
+            ) : null}
+          </button>
+        }
+      >
+        {filtered.length ? (
+          <TitleList items={filtered} onClose={onClose} {...scores} />
+        ) : (
+          <div className="space-y-3">
+            <SectionSheetEmpty>{query || filtersChanged ? "Ningún título coincide." : "No hay créditos."}</SectionSheetEmpty>
+            {filtersChanged ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSort("date_desc");
+                  setYearFrom("");
+                  setYearTo("");
+                }}
+                className="mx-auto block text-sm font-bold text-emerald-400 hover:underline"
+              >
+                Limpiar filtros
+              </button>
+            ) : null}
+          </div>
+        )}
+      </SectionSheet>
+      {/* Filtros en la hoja inferior, como el menú de las páginas (el rol
+          son las pestañas del panel). */}
+      <MobileOptionsSheet
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        title="Ordenar y filtrar"
+        subtitle={meta.title}
+        accent="emerald"
+        placement="sectionSheet"
+      >
+        <CreditsFilterDropdowns showRole={false} sort={sort} setSort={setSort} />
+        <YearFilterDropdown label="Desde" value={yearFrom} setValue={setYearFrom} options={yearOptions} />
+        <YearFilterDropdown label="Hasta" value={yearTo} setValue={setYearTo} options={yearOptions} />
+        <SheetOptionGroup label="Acciones" layout="stack">
+          <SheetAction
+            icon={RotateCcw}
+            disabled={!filtersChanged}
+            onClick={() => {
+              setFiltersOpen(false);
+              setSort("date_desc");
+              setYearFrom("");
+              setYearTo("");
+            }}
+          >
+            Limpiar filtros
+          </SheetAction>
+        </SheetOptionGroup>
+      </MobileOptionsSheet>
+    </>
   );
 }
 

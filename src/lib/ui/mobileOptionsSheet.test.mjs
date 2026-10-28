@@ -27,6 +27,13 @@ const PAGES = [
   "components/profile/neural/NeuralGraphView.jsx",
 ];
 
+// Vistas laterales (SectionSheet) con filtros: la hoja sube encima del panel,
+// dentro de su ancho desde 640px.
+const SECTION_SHEETS = [
+  "components/details/sectionSheet/ActorSectionSheets.jsx",
+  "components/details/sectionSheet/DetailsSectionSheets.jsx",
+];
+
 // Páginas con desplegables propios: dentro de la hoja se pintan como grupos de
 // píldoras, sin desplegables anidados.
 const LOCAL_DROPDOWNS = [
@@ -54,6 +61,17 @@ test("las páginas abren su menú móvil en la hoja común, que se puede cerrar"
       assert.doesNotMatch(source, /<MobileFiltersPanel\b/, page);
     }
   }
+});
+
+test("las vistas laterales abren sus filtros en la hoja, dentro del ancho del panel", () => {
+  for (const page of SECTION_SHEETS) {
+    const source = read(page);
+    assert.match(source, /<MobileOptionsSheet\s+open={filtersOpen}\s+onClose={\(\) => setFiltersOpen\(false\)}[\s\S]*?placement="sectionSheet"/, page);
+    assert.doesNotMatch(source, /<MobileFiltersPanel\b/, page);
+  }
+  assert.match(sheet, /placement === "sectionSheet" \? "sm:ml-auto sm:w-\[30rem\]/);
+  // La vista lateral de debajo marca `data-sv-sheet-open`: la hoja no se lo quita.
+  assert.match(sheet, /if \(root\.hasAttribute\("data-sv-sheet-open"\)\) return undefined;/);
 });
 
 test("los desplegables de las páginas se pintan como opciones a la vista dentro de la hoja", () => {

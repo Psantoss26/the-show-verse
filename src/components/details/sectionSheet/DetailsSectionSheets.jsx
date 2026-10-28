@@ -43,7 +43,7 @@ import SeasonCard from "@/components/details/SeasonCard";
 import TraktCommentCard from "@/components/details/TraktCommentCard";
 import { buildCrewGroups, crewRoleLabel } from "@/lib/details/sectionSheetData";
 import { DropdownItem, InlineDropdown } from "@/components/details/CreditFilterControls";
-import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
+import MobileOptionsSheet, { SheetAction, SheetOptionGroup } from "@/components/ui/MobileOptionsSheet";
 import useImdbScoreLoader from "@/hooks/useImdbScoreLoader";
 import { getScoreItemKey, readScoreCache } from "@/lib/userLists/listScoreCache";
 
@@ -406,8 +406,6 @@ function languageLabel(code) {
     return code.toUpperCase();
   }
 }
-// Menús por encima del panel (z-[10000]).
-const SHEET_MENU_Z = 10050;
 
 function ImagesSheet({ meta, data, onClose, tab, setTab }) {
   // Pestañas ya calculadas por la ficha (lib/details/artworkSheetTabs): las
@@ -447,10 +445,9 @@ function ImagesSheet({ meta, data, onClose, tab, setTab }) {
     setLanguage("all");
     setTab(id);
   };
-  // Al elegir un filtro, el menú se cierra en el mismo toque y la galería se
-  // reordena justo después (transición): si iban juntos, el cierre esperaba a
-  // volver a pintar todas las imágenes.
-  // Los filtros se despliegan con su botón, junto a las pestañas.
+  // El botón junto a las pestañas abre los filtros en la hoja inferior
+  // (MobileOptionsSheet). Elegir un filtro reordena la galería en una
+  // transición, para que la píldora responda en el mismo toque.
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersChanged = sort !== "default" || language !== "all";
   const filtersToggle =
@@ -460,6 +457,7 @@ function ImagesSheet({ meta, data, onClose, tab, setTab }) {
         <button
           type="button"
           onClick={() => setFiltersOpen((open) => !open)}
+          aria-haspopup="dialog"
           aria-expanded={filtersOpen}
           aria-label="Filtros: ordenar e idioma"
           title="Ordenar y filtrar por idioma"
@@ -481,173 +479,190 @@ function ImagesSheet({ meta, data, onClose, tab, setTab }) {
   const sortLabel = IMAGE_SORTS.find((item) => item.id === sort)?.label || IMAGE_SORTS[0].label;
   const languageValue = language === "all" ? "Todos" : languageLabel(language);
   return (
-    <SectionSheet
-      open
-      onClose={onClose}
-      title={meta.title}
-      icon={meta.icon}
-      subtitle={
-        language === "all"
-          ? plural(total, "imagen", "imágenes")
-          : `${images.length} de ${plural(tabImages.length, "imagen", "imágenes")}`
-      }
-      tabs={tabs.map(({ id, label, count }) => ({ id, label, count }))}
-      activeTab={current?.id}
-      onTabChange={changeTab}
-      tabsAccessory={tabs.length > 1 ? filtersToggle : null}
-      // Con una sola pestaña no hay barra: el botón va solo, a la derecha.
-      searchAccessory={tabs.length > 1 ? null : filtersToggle}
-      toolbar={
-        tabImages.length > 1 ? (
-          <MobileFiltersPanel open={filtersOpen} gapClassName="pt-3">
-          <div className="grid grid-cols-2 gap-2">
-            <InlineDropdown
-              accent="yellow"
-              label="Ordenar"
-              valueLabel={sortLabel}
-              icon={ArrowUpDown}
-              menuZIndex={SHEET_MENU_Z}
-              fullWidth
+    <>
+      <SectionSheet
+        open
+        onClose={onClose}
+        title={meta.title}
+        icon={meta.icon}
+        subtitle={
+          language === "all"
+            ? plural(total, "imagen", "imágenes")
+            : `${images.length} de ${plural(tabImages.length, "imagen", "imágenes")}`
+        }
+        tabs={tabs.map(({ id, label, count }) => ({ id, label, count }))}
+        activeTab={current?.id}
+        onTabChange={changeTab}
+        tabsAccessory={tabs.length > 1 ? filtersToggle : null}
+        // Con una sola pestaña no hay barra: el botón va solo, a la derecha.
+        searchAccessory={tabs.length > 1 ? null : filtersToggle}
+        headerAction={
+          onReset ? (
+            // El mismo «restablecer» que la galería de la ficha: vuelve a las
+            // imágenes por defecto en todas las pestañas.
+            <button
+              type="button"
+              onClick={onReset}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/5 text-red-400 transition hover:bg-red-500/20 hover:text-red-300 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400"
+              aria-label="Restaurar valores por defecto"
+              title="Restaurar valores por defecto"
             >
-              {({ close }) =>
-                IMAGE_SORTS.map((option) => (
-                  <DropdownItem
-                    key={option.id}
-                    active={sort === option.id}
+              <RotateCcw className="h-5 w-5" aria-hidden="true" />
+            </button>
+          ) : null
+        }
+      >
+        {images.length ? (
+          <ul className={`grid gap-2.5 sm:gap-3 ${isPoster ? "grid-cols-3" : "grid-cols-2"}`}>
+            {images.map((image) => {
+              const active = image.file_path === current.activePath;
+              const resolution = image.width && image.height ? `${image.width}×${image.height}` : null;
+              const badge = [isPoster ? null : image.iso_639_1?.toUpperCase(), resolution].filter(Boolean).join(" · ");
+              return (
+                <li key={image.file_path} className="relative">
+                  <button
+                    type="button"
                     onClick={() => {
-                      close();
-                      startTransition(() => setSort(option.id));
+                      if (!active) onSelect?.(current.kind, image.file_path);
                     }}
-                  >
-                    {option.label}
-                  </DropdownItem>
-                ))
-              }
-            </InlineDropdown>
-            <InlineDropdown
-              accent="yellow"
-              label="Idioma"
-              valueLabel={languageValue}
-              icon={Languages}
-              menuZIndex={SHEET_MENU_Z}
-              fullWidth
-            >
-              {({ close }) => (
-                <>
-                  <DropdownItem
-                    active={language === "all"}
-                    onClick={() => {
-                      close();
-                      startTransition(() => setLanguage("all"));
-                    }}
-                  >
-                    Todos ({tabImages.length})
-                  </DropdownItem>
-                  {languages.map((option) => (
-                    <DropdownItem
-                      key={option.code}
-                      active={language === option.code}
-                      onClick={() => {
-                        close();
-                        startTransition(() => setLanguage(option.code));
-                      }}
-                    >
-                      {option.label} ({option.count})
-                    </DropdownItem>
-                  ))}
-                </>
-              )}
-            </InlineDropdown>
-          </div>
-          </MobileFiltersPanel>
-        ) : null
-      }
-      headerAction={
-        onReset ? (
-          // El mismo «restablecer» que la galería de la ficha: vuelve a las
-          // imágenes por defecto en todas las pestañas.
-          <button
-            type="button"
-            onClick={onReset}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/5 text-red-400 transition hover:bg-red-500/20 hover:text-red-300 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400"
-            aria-label="Restaurar valores por defecto"
-            title="Restaurar valores por defecto"
-          >
-            <RotateCcw className="h-5 w-5" aria-hidden="true" />
-          </button>
-        ) : null
-      }
-    >
-      {images.length ? (
-        <ul className={`grid gap-2.5 sm:gap-3 ${isPoster ? "grid-cols-3" : "grid-cols-2"}`}>
-          {images.map((image) => {
-            const active = image.file_path === current.activePath;
-            const resolution = image.width && image.height ? `${image.width}×${image.height}` : null;
-            const badge = [isPoster ? null : image.iso_639_1?.toUpperCase(), resolution].filter(Boolean).join(" · ");
-            return (
-              <li key={image.file_path} className="relative">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!active) onSelect?.(current.kind, image.file_path);
-                  }}
-                  aria-pressed={active}
-                  aria-label={`${active ? "Seleccionada" : "Seleccionar"}${resolution ? ` (${resolution})` : ""}`}
-                  className={`group/img relative block w-full overflow-hidden rounded-xl bg-zinc-900 after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit] after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 ${
-                    active
-                      ? "shadow-[0_0_12px_rgba(16,185,129,0.35)] after:shadow-[inset_0_0_0_2px_rgba(52,211,153,1)]"
-                      : ""
-                  }`}
-                >
-                  <span
-                    className={`block ${isPoster ? "aspect-[2/3]" : "aspect-video"} ${
-                      isLogo ? "bg-[repeating-conic-gradient(#27272a_0%_25%,#18181b_0%_50%)] bg-[length:16px_16px] p-4" : ""
+                    aria-pressed={active}
+                    aria-label={`${active ? "Seleccionada" : "Seleccionar"}${resolution ? ` (${resolution})` : ""}`}
+                    className={`group/img relative block w-full overflow-hidden rounded-xl bg-zinc-900 after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit] after:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 ${
+                      active
+                        ? "shadow-[0_0_12px_rgba(16,185,129,0.35)] after:shadow-[inset_0_0_0_2px_rgba(52,211,153,1)]"
+                        : ""
                     }`}
                   >
-                    <OptimizedImage
-                      src={`https://image.tmdb.org/t/p/${isPoster ? "w342" : isLogo ? "w500" : "w780"}${image.file_path}`}
-                      srcSet={isLogo ? undefined : tmdbSrcSet(image.file_path, isPoster ? "poster" : "backdrop")}
-                      sizes={isPoster ? "(min-width: 640px) 250px, 48vw" : "(min-width: 640px) 400px, 75vw"}
-                      alt=""
-                      className={`h-full w-full ${isLogo ? "object-contain" : "object-cover"} transition-transform duration-500 group-hover/img:scale-[1.03]`}
-                      loading="lazy"
-                      decoding="async"
-                    />
-                  </span>
-                  {active ? (
-                    <span className="absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-white shadow-md">
-                      <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden="true" />
+                    <span
+                      className={`block ${isPoster ? "aspect-[2/3]" : "aspect-video"} ${
+                        isLogo ? "bg-[repeating-conic-gradient(#27272a_0%_25%,#18181b_0%_50%)] bg-[length:16px_16px] p-4" : ""
+                      }`}
+                    >
+                      <OptimizedImage
+                        src={`https://image.tmdb.org/t/p/${isPoster ? "w342" : isLogo ? "w500" : "w780"}${image.file_path}`}
+                        srcSet={isLogo ? undefined : tmdbSrcSet(image.file_path, isPoster ? "poster" : "backdrop")}
+                        sizes={isPoster ? "(min-width: 640px) 250px, 48vw" : "(min-width: 640px) 400px, 75vw"}
+                        alt=""
+                        className={`h-full w-full ${isLogo ? "object-contain" : "object-cover"} transition-transform duration-500 group-hover/img:scale-[1.03]`}
+                        loading="lazy"
+                        decoding="async"
+                      />
                     </span>
-                  ) : null}
-                  {badge ? (
-                    <span className="absolute bottom-1.5 left-1.5 right-1.5 truncate text-right text-[10px] font-bold text-zinc-200">
-                      <span className="rounded-md bg-black/65 px-1.5 py-0.5">{badge}</span>
-                    </span>
-                  ) : null}
-                </button>
-                {/* Sin `backdrop-blur`: eran una capa con desenfoque por
-                    tarjeta (44 en «Con idioma») y, al desplegar la fila de
-                    filtros, la galería se movía y sus tarjetas se convertían en
-                    capas y dejaban de serlo en cada fotograma: parpadeaban las
-                    portadas en el móvil. A este tamaño basta el fondo opaco. */}
-                <a
-                  href={`https://image.tmdb.org/t/p/original${image.file_path}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white/85 transition-colors hover:bg-black/75 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-yellow-400"
-                  aria-label={`Abrir imagen original${resolution ? ` (${resolution})` : ""}`}
-                  title="Abrir original"
+                    {active ? (
+                      <span className="absolute left-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-white shadow-md">
+                        <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden="true" />
+                      </span>
+                    ) : null}
+                    {badge ? (
+                      <span className="absolute bottom-1.5 left-1.5 right-1.5 truncate text-right text-[10px] font-bold text-zinc-200">
+                        <span className="rounded-md bg-black/65 px-1.5 py-0.5">{badge}</span>
+                      </span>
+                    ) : null}
+                  </button>
+                  {/* Sin `backdrop-blur`: eran una capa con desenfoque por
+                      tarjeta (44 en «Con idioma») y, al desplegar la fila de
+                      filtros, la galería se movía y sus tarjetas se convertían en
+                      capas y dejaban de serlo en cada fotograma: parpadeaban las
+                      portadas en el móvil. A este tamaño basta el fondo opaco. */}
+                  <a
+                    href={`https://image.tmdb.org/t/p/original${image.file_path}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/65 text-white/85 transition-colors hover:bg-black/75 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-yellow-400"
+                    aria-label={`Abrir imagen original${resolution ? ` (${resolution})` : ""}`}
+                    title="Abrir original"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <SectionSheetEmpty>{tabImages.length ? "Ninguna imagen en ese idioma." : "No hay imágenes."}</SectionSheetEmpty>
+        )}
+      </SectionSheet>
+      {/* Filtros en la hoja inferior, como el menú de las páginas. */}
+      {tabImages.length > 1 ? (
+        <MobileOptionsSheet
+          open={filtersOpen}
+          onClose={() => setFiltersOpen(false)}
+          title="Ordenar y filtrar"
+          subtitle={meta.title}
+          accent="yellow"
+          placement="sectionSheet"
+        >
+          <InlineDropdown
+            accent="yellow"
+            label="Ordenar"
+            valueLabel={sortLabel}
+            icon={ArrowUpDown}
+          >
+            {({ close }) =>
+              IMAGE_SORTS.map((option) => (
+                <DropdownItem
+                  key={option.id}
+                  active={sort === option.id}
+                  onClick={() => {
+                    close();
+                    startTransition(() => setSort(option.id));
+                  }}
                 >
-                  <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-                </a>
-              </li>
-            );
-          })}
-        </ul>
-      ) : (
-        <SectionSheetEmpty>{tabImages.length ? "Ninguna imagen en ese idioma." : "No hay imágenes."}</SectionSheetEmpty>
-      )}
-    </SectionSheet>
+                  {option.label}
+                </DropdownItem>
+              ))
+            }
+          </InlineDropdown>
+          <InlineDropdown
+            accent="yellow"
+            label="Idioma"
+            valueLabel={languageValue}
+            icon={Languages}
+          >
+            {({ close }) => (
+              <>
+                <DropdownItem
+                  active={language === "all"}
+                  onClick={() => {
+                    close();
+                    startTransition(() => setLanguage("all"));
+                  }}
+                >
+                  Todos ({tabImages.length})
+                </DropdownItem>
+                {languages.map((option) => (
+                  <DropdownItem
+                    key={option.code}
+                    active={language === option.code}
+                    onClick={() => {
+                      close();
+                      startTransition(() => setLanguage(option.code));
+                    }}
+                  >
+                    {option.label} ({option.count})
+                  </DropdownItem>
+                ))}
+              </>
+            )}
+          </InlineDropdown>
+          <SheetOptionGroup label="Acciones" layout="stack">
+            <SheetAction
+              icon={RotateCcw}
+              disabled={!filtersChanged}
+              onClick={() => {
+                setFiltersOpen(false);
+                startTransition(() => {
+                  setSort("default");
+                  setLanguage("all");
+                });
+              }}
+            >
+              Limpiar filtros
+            </SheetAction>
+          </SheetOptionGroup>
+        </MobileOptionsSheet>
+      ) : null}
+    </>
   );
 }
 
