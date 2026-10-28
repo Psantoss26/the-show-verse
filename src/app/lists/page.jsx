@@ -46,6 +46,7 @@ import { resolveListItemIndicator } from "@/lib/lists/listItemHoverIndicator";
 import { enrichListPreviewArtwork } from "@/lib/lists/previewArtwork";
 import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
 import { requestListArtwork } from "@/lib/tmdb/artworkBatch";
+import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
 import { prefetchListDetails } from "@/lib/lists/detailsPrefetch";
 import { stripHtml } from "@/lib/details/formatters";
 
@@ -984,7 +985,12 @@ const ListItemCard = memo(function ListItemCard({
   const mediaType = item?.media_type || (item?.title ? "movie" : "tv");
   const href = `/details/${mediaType}/${item.id}`;
   const previewClick = usePreviewOpen();
-  const posterPath = item?.poster_path || item?.backdrop_path || null;
+  // Póster con la escalera de idioma (inglés primero), como en Favoritos: lo
+  // pone ListItemsRow. Mientras se resuelve no se pinta el de TMDb (llega en
+  // es-ES); solo el ya elegido de la vista previa, si lo hay.
+  const posterPath = item?._englishPosterPending
+    ? item?._listPreviewPoster || null
+    : item?.poster_path || item?.backdrop_path || null;
   const posterUrl = posterPath
     ? `https://image.tmdb.org/t/p/w342${posterPath}`
     : null;
@@ -1230,7 +1236,10 @@ function dedupePreviewItems(items) {
 }
 
 /* ========= fila tipo Dashboard: drag con ratón + 3 completas en móvil ========= */
-function ListItemsRow({ items, isMobile, accent = "trakt" }) {
+function ListItemsRow({ items: rawItems, isMobile, accent = "trakt" }) {
+  // Pósters de la fila con el mismo criterio que Favoritos (inglés → español
+  // → original → sin idioma), del lote /api/tmdb/artwork.
+  const items = useEnglishPosterItems(rawItems, true, { holdOriginalPosters: true });
   const swiperRef = useRef(null);
   const [isHoveredRow, setIsHoveredRow] = useState(false);
   const [canPrev, setCanPrev] = useState(false);

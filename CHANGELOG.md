@@ -8,6 +8,9 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Completadas en el móvil, vista Portadas: las tarjetas ya no llevan el tick verde de completado en la esquina; toda la página es de series terminadas. → [páginas](docs/frontend/app-router-pages.md)
+- En progreso y Completadas en el móvil: en la hoja de opciones, la vista que se llamaba «Compacta» ahora se llama «Lista», que es lo que muestra. → [páginas](docs/frontend/app-router-pages.md)
+- Listas, vista de filas (Mis listas, Comunidad y Colecciones): los pósters de los títulos salen en inglés, con el mismo criterio que Favoritos o Pendientes (si no hay en inglés, el de español, el de su idioma original o uno sin idioma). Antes salían los pósters en español que trae TMDb. → [páginas](docs/frontend/app-router-pages.md)
 - Portada de una temporada: al recargar su página tras cambiar otro usuario la portada más votada, ya sale la nueva a la primera. Antes se veía un instante la anterior y enseguida cambiaba. → [páginas](docs/frontend/app-router-pages.md)
 - Colección: al recargar su página, la portada más votada ya sale a la primera. Antes se veía un instante la portada automática y enseguida cambiaba a la votada; entrando desde otra página no pasaba. → [páginas](docs/frontend/app-router-pages.md)
 - Buscador en el móvil: el botón de filtrar (Todo, Películas, Series, Colecciones, Usuarios, Actores y directores) abre la misma hoja inferior que los menús de filtros de las páginas de usuario, con las opciones en píldoras. Los resultados siguen detrás y cambian al elegir; la hoja se cierra con la X, tocando fuera o arrastrándola hacia abajo. En el ordenador sigue el desplegable de siempre. → [componentes](docs/frontend/components.md)
