@@ -72,7 +72,6 @@ import {
   Heart,
   BookmarkPlus,
   Eye,
-  ThumbsUp,
   Globe,
 } from "lucide-react";
 import PageStatCard from "@/components/ui/PageStatCard";
@@ -422,9 +421,33 @@ const useIsMobileLayout = (breakpointPx = 768) => {
 };
 
 /* --- InView: lazy load por proximidad al viewport --- */
-const useInView = ({ rootMargin = "320px 0px", threshold = 0.01 } = {}) => {
+// Efectos que deben aplicarse ANTES del primer pintado (preferencias, cachés):
+// en el servidor no hay layout effect, de ahí el respaldo.
+const useClientLayoutEffect =
+  typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+// `eager`: comprueba la posición ANTES del primer pintado y, si ya está cerca,
+// nace a la vista. El aviso del observador llega más tarde (0,4-1 s al pasar a
+// «filas», con 255 secciones montándose) y la fila pintaba antes el esqueleto.
+// Solo en las PRIMERAS secciones: la entrada de cada tarjeta (WAAPI, en su
+// layout effect) invalida el layout entre medida y medida, y medir las 255
+// costaba ~230 ms. Las demás esperan al observador.
+const EAGER_IN_VIEW_MARGIN = 320;
+const EAGER_IN_VIEW_ROWS = 6;
+
+const useInView = ({ rootMargin = "320px 0px", threshold = 0.01, eager = false } = {}) => {
   const ref = useRef(null);
   const [inView, setInView] = useState(false);
+
+  useClientLayoutEffect(() => {
+    if (!eager || typeof window === "undefined") return;
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) return;
+    if (rect.top < window.innerHeight + EAGER_IN_VIEW_MARGIN && rect.bottom > -EAGER_IN_VIEW_MARGIN) {
+      setInView(true);
+    }
+    // Solo al montar.
+  }, []);
 
   useEffect(() => {
     const el = ref.current;
@@ -501,7 +524,7 @@ function ListPreviewPosterStrip({ items = [], alt = "" }) {
   }
 
   return (
-    <div className="flex h-full w-full items-stretch justify-center gap-px bg-black/35 p-0.5">
+    <div className="flex h-full w-full items-stretch justify-center gap-px p-0.5">
       {previewItems.map((item, index) => (
         // Cada hueco con la proporción del póster (sin bandas): en el móvil
         // caben tres a buen tamaño, desde sm los cinco.
@@ -1238,6 +1261,10 @@ function dedupePreviewItems(items) {
 }
 
 /* ========= fila tipo Dashboard: drag con ratón + 3 completas en móvil ========= */
+// Tarjetas del primer pintado de cada fila: las 7 visibles en el ordenador
+// ancho más una asomando.
+const ROW_INITIAL_SLIDES = 8;
+
 function ListItemsRow({ items: rawItems, isMobile, accent = "trakt" }) {
   // Pósters de la fila con el mismo criterio que Favoritos (inglés → español
   // → original → sin idioma), del lote /api/tmdb/artwork.
@@ -1259,8 +1286,22 @@ function ListItemsRow({ items: rawItems, isMobile, accent = "trakt" }) {
     [items],
   );
   const viewerStates = useViewerTitleStates(viewerItems, authenticated);
+  // Primero solo las tarjetas que caben a la vista (7 como mucho) y el resto
+  // en cuanto el navegador queda libre: montar los carruseles enteros al pasar
+  // a «filas» (~100 tarjetas en Colecciones) retrasaba el cambio de vista.
+  const [showAllSlides, setShowAllSlides] = useState(false);
+  useEffect(() => {
+    if (showAllSlides) return undefined;
+    if (typeof window.requestIdleCallback === "function") {
+      const id = window.requestIdleCallback(() => setShowAllSlides(true), { timeout: 400 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const id = window.setTimeout(() => setShowAllSlides(true), 120);
+    return () => window.clearTimeout(id);
+  }, [showAllSlides]);
 
   if (!Array.isArray(items) || items.length === 0) return null;
+  const slideItems = showAllSlides ? items : items.slice(0, ROW_INITIAL_SLIDES);
 
   const breakpointsRow = {
     0: { slidesPerView: 3, spaceBetween: 12 },
@@ -1343,7 +1384,7 @@ function ListItemsRow({ items: rawItems, isMobile, accent = "trakt" }) {
             modules={[FreeMode]}
             className="relative z-0 !overflow-visible pb-8 pt-7"
           >
-            {items.map((item, idx) => {
+            {slideItems.map((item, idx) => {
               const mt = item?.media_type || (item?.title ? "movie" : "tv");
               return (
                 <SwiperSlide
@@ -1415,7 +1456,7 @@ function ListItemsRow({ items: rawItems, isMobile, accent = "trakt" }) {
   );
 }
 
-function ListItemsRowSkeleton({ isMobile }) {
+function ListItemsRowSkeleton({ isMobile, pulse = true }) {
   const n = isMobile ? 3 : 7;
   return (
     <div className="-mx-4 px-3 pt-7 sm:mx-0 sm:px-0">
@@ -1423,7 +1464,7 @@ function ListItemsRowSkeleton({ isMobile }) {
         {Array.from({ length: n }).map((_, i) => (
           <div
             key={i}
-            className="w-[30%] sm:w-[22%] md:w-[18%] lg:w-[14%] aspect-[2/3] shrink-0 rounded-xl bg-zinc-900/40 border border-white/5 animate-pulse"
+            className={`w-[30%] sm:w-[22%] md:w-[18%] lg:w-[14%] aspect-[2/3] shrink-0 rounded-xl bg-zinc-900/40 border border-white/5 ${pulse ? "animate-pulse" : ""}`}
           />
         ))}
       </div>
@@ -1459,11 +1500,6 @@ function ListNavWrapper({ list, className = "", children }) {
 // para que, en una rejilla de treinta y tantas colecciones, la última no entre
 // segundo y medio después de la primera: lo que se busca es que el bloque
 // "aterrice", no un desfile.
-// Efectos que deben aplicarse ANTES del primer pintado (preferencias, cachés):
-// en el servidor no hay layout effect, de ahí el respaldo.
-const useClientLayoutEffect =
-  typeof window === "undefined" ? useEffect : useLayoutEffect;
-
 const LIST_ENTRANCE_STEP = 0.035;
 const LIST_ENTRANCE_MAX_DELAY = 0.36;
 
@@ -1626,8 +1662,11 @@ const GridListCard = memo(function GridListCard({
               )}
             </div>
 
-            <footer className="mt-3 flex items-center justify-between gap-3 border-t border-white/5 pt-3 sm:mt-4 sm:pt-4">
-              <div className="flex min-w-0 items-center gap-2">
+            {/* `@container`: en tarjetas estrechas (rejilla de 4 columnas) las
+                píldoras de items y me gusta no dejan sitio al nombre, que se
+                quedaba en «T…»; entonces solo va el avatar (nombre en `title`). */}
+            <footer className="@container mt-3 flex items-center justify-between gap-3 border-t border-white/5 pt-3 sm:mt-4 sm:pt-4">
+              <div className="flex min-w-0 items-center gap-2" title={sourceLabel}>
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10 text-[10px] font-black text-white ring-1 ring-white/20">
                   {list?.source === "trakt" ? (
                     <Avatar src={avatar} name={sourceLabel} />
@@ -1635,21 +1674,13 @@ const GridListCard = memo(function GridListCard({
                     <SourceIcon aria-hidden="true" className="h-3.5 w-3.5" />
                   )}
                 </span>
-                <span className="max-w-[120px] truncate text-xs font-medium text-zinc-300 transition-colors group-hover:text-white">
+                <span className="hidden max-w-[120px] truncate text-xs font-medium text-zinc-300 transition-colors group-hover:text-white @[17.5rem]:inline">
                   {sourceLabel}
                 </span>
               </div>
 
-              <div className="flex shrink-0 items-center gap-3 text-xs font-bold text-zinc-500">
-                <span className="rounded bg-white/5 px-1.5 py-0.5 text-zinc-300">
-                  {itemCount} items
-                </span>
-                {(list?.source === "trakt" || list?.source === "collections") && (
-                  <span className="flex items-center gap-1 transition-colors group-hover:text-pink-500">
-                    <ThumbsUp aria-hidden="true" className="h-3 w-3" />
-                    {likes}
-                  </span>
-                )}
+              <div className="flex shrink-0 items-center gap-2">
+                <ListCountPills itemCount={itemCount} likes={likes} />
               </div>
             </footer>
           </div>
@@ -1670,6 +1701,35 @@ const GLASS_COUNT_PILL_TONES = {
     "bg-red-500/[0.22] to-red-950/[0.2] text-red-100 shadow-[0_6px_18px_-8px_rgba(239,68,68,0.6)]",
 };
 
+// PT Sans pinta las cifras y minúsculas 1 px por encima del centro de su caja
+// de línea (medido a 1x: tinta de 6,5 a 14,5 en una píldora de 24 px); se baja
+// ese píxel para que el texto quede centrado con el icono y en la píldora.
+function GlassCountPillText({ children }) {
+  return <span className="inline-block translate-y-px">{children}</span>;
+}
+
+// Items (morado) y me gusta (rojo, solo con 1 o más) de una lista: cabecera de
+// la vista de filas y pie de las tarjetas de la rejilla.
+function ListCountPills({ itemCount, likes }) {
+  const likeCount = Number(likes) || 0;
+  return (
+    <>
+      <GlassCountPill tone="purple">
+        <span className="h-1.5 w-1.5 rounded-full bg-purple-400 shadow-[0_0_6px_rgba(192,132,252,0.9)]" />
+        <GlassCountPillText>{Number(itemCount) || 0} items</GlassCountPillText>
+      </GlassCountPill>
+      {likeCount > 0 && (
+        <GlassCountPill tone="red" title={`${likeCount} me gusta`}>
+          {/* El corazón de lucide tiene el dibujo medio píxel por debajo
+              del centro de su caja. */}
+          <Heart aria-hidden="true" className="h-3 w-3 -translate-y-[0.5px] fill-current" />
+          <GlassCountPillText>{likeCount}</GlassCountPillText>
+        </GlassCountPill>
+      )}
+    </>
+  );
+}
+
 function GlassCountPill({ tone = "purple", title, children }) {
   return (
     <span
@@ -1683,12 +1743,13 @@ function GlassCountPill({ tone = "purple", title, children }) {
 
 const RowListSection = memo(function RowListSection({
   list,
+  index = 0,
   itemsState,
   ensureListItems,
   isMobile,
 }) {
   const cacheKey = `${list?.source || "unknown"}:${String(list?.id || "")}`;
-  const [ref, inView] = useInView();
+  const [ref, inView] = useInView({ eager: index < EAGER_IN_VIEW_ROWS });
 
   useEffect(() => {
     if (inView) ensureListItems(cacheKey);
@@ -1712,16 +1773,7 @@ const RowListSection = memo(function RowListSection({
               </h3>
             </ListNavWrapper>
 
-            <GlassCountPill tone="purple">
-              <span className="h-1.5 w-1.5 rounded-full bg-purple-400 shadow-[0_0_6px_rgba(192,132,252,0.9)]" />
-              {list.item_count} items
-            </GlassCountPill>
-            {Number(list?.likes) > 0 && (
-              <GlassCountPill tone="red" title={`${list.likes} me gusta`}>
-                <Heart aria-hidden="true" className="h-3 w-3 fill-current" />
-                {list.likes}
-              </GlassCountPill>
-            )}
+            <ListCountPills itemCount={list.item_count} likes={list?.likes} />
           </div>
 
           {list.description && (
@@ -1734,6 +1786,10 @@ const RowListSection = memo(function RowListSection({
 
       {isLoading ? (
         <ListItemsRowSkeleton isMobile={isMobile} />
+      ) : items.length > 0 && !inView ? (
+        // Ya cargada pero lejos de la pantalla (p. ej. al venir de otra vista):
+        // su carrusel se monta al acercarse, con el mismo hueco reservado.
+        <ListItemsRowSkeleton isMobile={isMobile} pulse={false} />
       ) : items.length > 0 ? (
         <ListItemsRow items={items} isMobile={isMobile} accent={list?.source} />
       ) : hasResolvedItems ? (
@@ -1767,8 +1823,9 @@ const ListModeRow = memo(function ListModeRow({
       {/* ✅ antes: Link fijo a /lists/:id */}
       <ListNavWrapper list={list} className="group block">
         <div className="flex items-center gap-4 p-3 bg-zinc-900/30 border border-white/5 rounded-xl hover:bg-zinc-900/60 hover:border-white/10 transition-all sm:gap-5">
-          {/* Ancho = huecos 2:3 del alto interior (3 en el móvil, 5 desde sm). */}
-          <div className="h-[5.5rem] w-[10.75rem] shrink-0 overflow-hidden rounded-lg border border-white/5 bg-zinc-950 sm:h-24 sm:w-[19.5rem] lg:h-28 lg:w-[22.75rem]">
+          {/* Ancho = huecos 2:3 del alto interior (3 en el móvil, 5 desde sm).
+              Sin fondo ni borde: con menos de cinco títulos no queda caja negra. */}
+          <div className="h-[5.5rem] w-[10.75rem] shrink-0 overflow-hidden rounded-lg sm:h-24 sm:w-[19.5rem] lg:h-28 lg:w-[22.75rem]">
             {isLoading ? (
               <div
                 className={`w-full h-full bg-zinc-900/40 ${isPending ? "animate-pulse" : ""}`}
@@ -1937,6 +1994,7 @@ const ListsContent = memo(function ListsContent({
                   <ListEntrance key={`${l.source}-${l.id}`} flipKey={`${l.source}-${l.id}`} index={index} instant={isBackNav}>
                     <RowListSection
                       list={l}
+                      index={index}
                       itemsState={listItemsState(itemsMap, l, index)}
                       ensureListItems={ensureListItems}
                       isMobile={isMobile}
