@@ -1,4 +1,5 @@
 import Link from "next/link";
+import StatSwap from "@/components/ui/StatSwap";
 
 // Tarjeta de información de la cabecera de las páginas de usuario. Es la ÚNICA
 // versión: Favoritos, Pendientes, Biblioteca, Dashboard, Listas, Historial,
@@ -19,6 +20,11 @@ import Link from "next/link";
 // `flex-1 lg:flex-none` cuando la tarjeta es el hijo directo de la fila, o las
 // alturas mínimas de escritorio de Historial). Con `href` la tarjeta es un
 // enlace (Perfil y Social: seguidores, seguidos…).
+//
+// Con `animateChanges` la tarjeta se queda montada cuando la página cambia lo
+// que muestra (p. ej. las pestañas de Listas) y solo se relevan, animados, el
+// icono, la cifra y la etiqueta que cambian (`StatSwap`). `iconKey` identifica
+// el icono (y su color) para saber cuándo ha cambiado.
 export default function PageStatCard({
   label,
   // Etiqueta de la mini tarjeta (móvil), que va SIEMPRE en una línea: para
@@ -35,7 +41,18 @@ export default function PageStatCard({
   focusRingClass = "focus-visible:ring-white/60",
   glass = true,
   className = "",
+  animateChanges = false,
+  iconKey,
 }) {
+  const swap = (key, content, swapClassName) =>
+    animateChanges ? (
+      <StatSwap swapKey={key} className={swapClassName}>
+        {content}
+      </StatSwap>
+    ) : (
+      content
+    );
+
   const interactive = href
     ? `transition duration-300 hover:-translate-y-0.5 hover:from-white/[0.16] hover:to-white/[0.07] focus-visible:outline-none focus-visible:ring-2 ${focusRingClass}`
     : "";
@@ -47,27 +64,39 @@ export default function PageStatCard({
           (el `mb-1` del icono + el hueco reproducen la separación original). */}
       <div className="relative z-10 flex items-center justify-center gap-1.5 md:flex-col md:gap-1">
         <span className={`inline-flex md:mb-1 ${colorClass}`}>
-          <Icon
-            className={`w-4 h-4 md:w-7 md:h-7 shrink-0 ${iconClassName}`}
-            aria-hidden="true"
-          />
+          {swap(
+            `${iconKey ?? label}|${colorClass}`,
+            <Icon
+              className={`w-4 h-4 md:w-7 md:h-7 shrink-0 ${iconClassName}`}
+              aria-hidden="true"
+            />,
+            "inline-flex",
+          )}
         </span>
         <span className="block text-base max-md:leading-none md:text-2xl lg:text-3xl font-black text-white tracking-tight drop-shadow-md">
-          {loading ? (
-            <span className="block h-4 w-8 md:h-8 md:w-14 lg:h-9 rounded-md md:rounded-lg bg-white/10 animate-pulse" />
-          ) : (
-            value
+          {swap(
+            loading ? "loading" : `value:${value}`,
+            loading ? (
+              <span className="block h-4 w-8 md:h-8 md:w-14 lg:h-9 rounded-md md:rounded-lg bg-white/10 animate-pulse" />
+            ) : (
+              value
+            ),
+            "block",
           )}
         </span>
       </div>
       <span className="relative z-10 block max-w-full text-[9px] md:text-[10px] uppercase font-bold text-zinc-300 tracking-wider text-center leading-tight max-md:truncate">
-        {shortLabel ? (
-          <>
-            <span className="md:hidden">{shortLabel}</span>
-            <span className="max-md:hidden">{label}</span>
-          </>
-        ) : (
-          label
+        {swap(
+          `${shortLabel ?? ""}|${label}`,
+          shortLabel ? (
+            <>
+              <span className="md:hidden">{shortLabel}</span>
+              <span className="max-md:hidden">{label}</span>
+            </>
+          ) : (
+            label
+          ),
+          "block max-w-full max-md:truncate",
         )}
       </span>
     </>

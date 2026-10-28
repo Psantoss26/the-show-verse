@@ -2757,11 +2757,9 @@ export default function ListsPage() {
     [contentSource, statsLists, communityTotals],
   );
   const headerStatsLoading = !sourceInitialized && statsLists.length === 0;
-  // Al volver atrás, las tarjetas de la pestaña con la que se vuelve salen
-  // quietas, como el resto de la cabecera; las pestañas que se abran después
-  // sí entran.
-  const [staticStatsSource] = useState(() => (isBackNav ? contentSource : null));
-  const statsEntry = contentSource !== staticStatsSource;
+  // Las tarjetas entran una sola vez, al llegar a la página; al volver atrás
+  // salen quietas, como el resto de la cabecera.
+  const [statsEntry] = useState(() => !isBackNav);
 
   const errorUnified =
     source === "personal" ? error : source === "trakt" ? trakt?.error : "";
@@ -2861,15 +2859,12 @@ export default function ListsPage() {
                 Historial o En progreso: tres por pestaña, con lo que se está
                 mostrando (lib/lists/headerStats).
                 Entran igual que en Historial (bloque que sube y tarjetas
-                escalonadas) al llegar a CADA pestaña: van con la clave de la
-                fuente pintada, como el contenido, así que se vuelven a montar
-                en el mismo relevo. Sin AnimatePresence a propósito: la anterior
-                se desmonta en el mismo render (con él convivían tres
-                fotogramas, seis tarjetas en fila) y la cabecera no cambia de
-                alto. */}
+                escalonadas) solo al llegar a la página. Al cambiar de pestaña
+                NO se vuelven a montar: cada tarjeta va con la clave de su
+                posición y solo se relevan, animados, el icono, la cifra y la
+                etiqueta que cambian (`animateChanges` de PageStatCard). */}
             {personalLocked ? null : (
             <motion.div
-              key={contentSource}
               data-lists-stats={contentSource}
               className="flex gap-2 md:gap-4 w-full lg:w-auto justify-center lg:justify-end"
               initial={statsEntry ? { opacity: 0, y: 20 } : false}
@@ -2878,7 +2873,7 @@ export default function ListsPage() {
             >
               {headerStats.map((stat, index) => (
                 <motion.div
-                  key={stat.key}
+                  key={index}
                   data-list-stat={stat.key}
                   aria-busy={headerStatsLoading || (contentSource === "collections" && stat.key === "likes" && !collectionLikesReady)}
                   className="flex min-w-0 flex-1 lg:flex-none"
@@ -2892,6 +2887,8 @@ export default function ListsPage() {
                     icon={STAT_ICONS[stat.icon] || ListVideo}
                     colorClass={STAT_TONES[stat.tone] || "text-white"}
                     loading={headerStatsLoading || (contentSource === "collections" && stat.key === "likes" && !collectionLikesReady)}
+                    animateChanges
+                    iconKey={stat.icon}
                   />
                 </motion.div>
               ))}
