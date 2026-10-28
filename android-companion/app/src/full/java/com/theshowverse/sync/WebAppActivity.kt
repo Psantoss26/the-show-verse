@@ -12,7 +12,6 @@ import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
-import android.view.WindowManager
 import android.webkit.CookieManager
 import android.webkit.DownloadListener
 import android.webkit.PermissionRequest
@@ -26,6 +25,8 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.browser.customtabs.CustomTabsClient
@@ -246,6 +247,7 @@ class WebAppActivity : AppCompatActivity() {
                 ::pedirPermisoPush,
                 ::abrirSoloEnNavegador,
                 { altoBarraEstadoCss },
+                { altoBarraNavegacionCss },
             ),
             WebAppBridge.NAME,
         )
@@ -464,15 +466,15 @@ class WebAppActivity : AppCompatActivity() {
 
     /**
      * Huecos de las barras y de la cámara. La app dibuja EDGE-TO-EDGE (ver
-     * `configurarVentana`) con las dos barras del sistema visibles.
+     * `configurarVentana`) con las dos barras del sistema visibles y
+     * transparentes.
      *
-     * ARRIBA la web NO se rellena: pasa por detrás de la barra de estado, que es
-     * transparente, y la propia web baja su barra superior ese alto
-     * (`--sv-android-top`, que se le pasa aquí y por `statusBarHeight()` del
-     * puente). Así la franja de la barra de estado muestra el cristal
-     * difuminado de la barra superior, o la portada en las fichas, en vez de
-     * negro. ABAJO y a los lados sí se rellena, como siempre: el navbar inferior
-     * de la web queda encima de los botones de navegación.
+     * Ni arriba ni abajo la web se rellena: pasa por detrás de las dos barras,
+     * y es ella la que baja su barra superior y sube la inferior lo que mide
+     * cada una (`--sv-android-top` y `--sv-android-bottom`, que se le pasan
+     * aquí y por `statusBarHeight()` / `navigationBarHeight()` del puente). Así
+     * esas franjas muestran el fondo de la app en vez de negro. A los lados sí
+     * se rellena (en horizontal, los botones de navegación van en un lateral).
      *
      * Los huecos se leen IGNORANDO SI LAS BARRAS SE VEN: al salir a recientes o
      * al ocultarlas un vídeo cambia su visibilidad, y un relleno que siguiera
@@ -489,12 +491,12 @@ class WebAppActivity : AppCompatActivity() {
                 maxOf(barras.left, camara.left),
                 0,
                 maxOf(barras.right, camara.right),
-                maxOf(barras.bottom, camara.bottom),
+                0,
             )
             val arriba = maxOf(barras.top, camara.top)
             bajarIndicadorDeRecarga(arriba)
             binding.frameMeter.translationY = arriba.toFloat()
-            pasarAltoBarraEstado(arriba)
+            pasarHuecosDeBarras(arriba, maxOf(barras.bottom, camara.bottom))
             insets
         }
         ViewCompat.setOnApplyWindowInsetsListener(binding.errorPanel) { view, insets ->
@@ -513,20 +515,29 @@ class WebAppActivity : AppCompatActivity() {
     }
 
     /**
-     * Alto de la barra de estado en píxeles CSS, para la web. Lo lee el script
-     * de arranque del <head> por el puente (`statusBarHeight()`), antes del
-     * primer pintado, y si cambia con la página ya cargada (girar la pantalla)
-     * se le escribe directamente.
+     * Alto de la barra de estado y de la de navegación en píxeles CSS, para la
+     * web. Los lee el script de arranque del <head> por el puente
+     * (`statusBarHeight()`, `navigationBarHeight()`), antes del primer
+     * pintado, y si cambian con la página ya cargada (girar la pantalla) se le
+     * escriben directamente.
      */
     @Volatile
     private var altoBarraEstadoCss = 0.0
 
-    private fun pasarAltoBarraEstado(px: Int) {
-        val css = px / resources.displayMetrics.density.toDouble()
-        if (css == altoBarraEstadoCss) return
-        altoBarraEstadoCss = css
+    @Volatile
+    private var altoBarraNavegacionCss = 0.0
+
+    private fun pasarHuecosDeBarras(arriba: Int, abajo: Int) {
+        val densidad = resources.displayMetrics.density.toDouble()
+        val estado = arriba / densidad
+        val navegacion = abajo / densidad
+        if (estado == altoBarraEstadoCss && navegacion == altoBarraNavegacionCss) return
+        altoBarraEstadoCss = estado
+        altoBarraNavegacionCss = navegacion
         evaluarJs(
-            "document.documentElement.style.setProperty('--sv-android-top','${css}px')",
+            "var d=document.documentElement.style;" +
+                "d.setProperty('--sv-android-top','${estado}px');" +
+                "d.setProperty('--sv-android-bottom','${navegacion}px')",
         )
     }
 
@@ -680,27 +691,19 @@ class WebAppActivity : AppCompatActivity() {
     }
 
     /**
-     * Ventana EDGE-TO-EDGE con la barra de estado VISIBLE y TRANSPARENTE: se ve
-     * la hora y los iconos, y detrás la web (el cristal de su barra superior o
-     * la portada), no una franja negra. Desde Android 15 (API 35) el sistema ya
-     * la dibuja así; en versiones anteriores hay que pedirlo. Sin el contraste
-     * forzado, que pondría un velo sobre ella.
+     * Ventana EDGE-TO-EDGE con las DOS barras del sistema visibles y
+     * TRANSPARENTES, como la app de Trakt (`enableEdgeToEdge` con
+     * `SystemBarStyle.dark(Color.TRANSPARENT)` arriba y abajo): se ven la hora,
+     * los iconos y la barra de gestos, y detrás la web (el cristal de sus
+     * barras o la portada), no franjas negras. `dark` = iconos claros, porque
+     * la web es oscura; con un velo transparente no hay contraste forzado. La
+     * ventana se dibuja también dentro del recorte de la cámara.
      */
-    @Suppress("DEPRECATION")
     private fun configurarVentana() {
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-            window.statusBarColor = Color.TRANSPARENT
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            window.isStatusBarContrastEnforced = false
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            window.attributes = window.attributes.apply {
-                layoutInDisplayCutoutMode =
-                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-            }
-        }
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+        )
     }
 
     /** Solo para el vídeo a pantalla completa: oculta y devuelve las barras. */

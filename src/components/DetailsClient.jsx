@@ -10167,7 +10167,7 @@ export default function DetailsClient({
           initial={false}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-          className="-mt-[calc(4.5rem+var(--sv-safe-top))] sm:mt-0 flex flex-col lg:flex-row gap-5 lg:gap-12 mb-6 sm:mb-12 items-start"
+          className="-mt-[calc(4.5rem+var(--sv-safe-top,0px))] sm:mt-0 flex flex-col lg:flex-row gap-5 lg:gap-12 mb-6 sm:mb-12 items-start"
         >
           {/* --- COLUMNA IZQUIERDA: POSTER + PROVIDERS + ENLACES (cuando es backdrop) --- */}
           <div
@@ -10226,7 +10226,7 @@ export default function DetailsClient({
                     currentLowLoaded ? "opacity-100" : "opacity-0"
                   }`}
                 >
-                  <div className="absolute inset-x-0 top-full h-[calc(100svh_-_13.5rem_-_env(safe-area-inset-bottom))] origin-top scale-y-[-1]">
+                  <div className="absolute inset-x-0 top-full h-[calc(100svh_-_13.5rem_-_var(--sv-safe-bottom,0px))] origin-top scale-y-[-1]">
                     <OptimizedImage
                       src={posterLowUrl}
                       alt=""

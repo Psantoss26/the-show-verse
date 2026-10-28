@@ -3376,7 +3376,7 @@ export default function FavoritesClient() {
           ref={filtersRef}
           data-menu-pinned={filtersPinned}
           data-grouped={groupBy !== "none" ? "" : undefined}
-          className={`${isBackNav ? "" : "sv-toolbar-rise "}sticky top-[calc(3.5rem+var(--sv-safe-top))] z-[70] space-y-1 ${isBackNav ? "transition-none" : "transition-all duration-300"} sm:top-[calc(5rem+var(--sv-safe-top))] sm:mb-5 lg:mb-6 ${
+          className={`${isBackNav ? "" : "sv-toolbar-rise "}sticky top-[calc(3.5rem+var(--sv-safe-top,0px))] z-[70] space-y-1 ${isBackNav ? "transition-none" : "transition-all duration-300"} sm:top-[calc(5rem+var(--sv-safe-top,0px))] sm:mb-5 lg:mb-6 ${
             groupBy === "none" ? "mb-6" : "mb-2"
           }`}
           // Solo el fundido: la subida va en CSS (`.sv-toolbar-rise`), que

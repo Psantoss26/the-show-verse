@@ -616,7 +616,7 @@ function SearchBar({
     const readSafeAreaBottom = () => {
       const probe = document.createElement("div");
       probe.style.cssText =
-        "position:fixed;visibility:hidden;pointer-events:none;padding-bottom:env(safe-area-inset-bottom)";
+        "position:fixed;visibility:hidden;pointer-events:none;padding-bottom:var(--sv-safe-bottom,0px)";
       document.body.appendChild(probe);
       const value = Number.parseFloat(getComputedStyle(probe).paddingBottom) || 0;
       probe.remove();
@@ -2833,11 +2833,11 @@ function NavbarContent() {
         // Ficha / recomendaciones: nacen ya con el alto compacto (ver la fila
         // móvil). Lo leen los avisos emergentes para colocarse justo debajo.
         data-immersive={isImmersiveRoute ? "" : undefined}
-        // `pt-[var(--sv-safe-top)]`: donde la página pasa por detrás de la
+        // `pt-[var(--sv-safe-top,0px)]`: donde la página pasa por detrás de la
         // barra de estado o de la cámara (la app nativa de Android), la barra
         // baja ese hueco (ver `--sv-safe-top` en globals.css). Lo gana por
         // arriba, y su cristal y su velo lo cubren. En el navegador vale 0.
-        className={`sv-topbar sticky top-0 z-40 w-full pt-[var(--sv-safe-top)] transition-[background-color,backdrop-filter,box-shadow] duration-300 ${
+        className={`sv-topbar sticky top-0 z-40 w-full pt-[var(--sv-safe-top,0px)] transition-[background-color,backdrop-filter,box-shadow] duration-300 ${
           heroNavMode || desktopDetailsNavMode
             ? ""
             : isImmersiveRoute
@@ -3406,7 +3406,7 @@ function NavbarContent() {
         // despegada del canto inferior; se iguala al valor del teléfono en vez de
         // inventar un tercer número, que es además el que ya está calibrado con
         // la escala de compactado al hacer scroll.
-        className={`sv-navbar-bottom-shift desktop:hidden fixed left-1/2 z-30 flex h-14 w-[min(calc(100%_-_3rem),21.5rem)] origin-bottom -translate-x-1/2 items-center rounded-full px-3.5 md:h-[3.75rem] md:w-[min(calc(100%_-_8rem),28rem)] md:px-4 ${LIQUID_GLASS_BAR} bottom-[calc(0.75rem+env(safe-area-inset-bottom))] transform-gpu transition-transform duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+        className={`sv-navbar-bottom-shift desktop:hidden fixed left-1/2 z-30 flex h-14 w-[min(calc(100%_-_3rem),21.5rem)] origin-bottom -translate-x-1/2 items-center rounded-full px-3.5 md:h-[3.75rem] md:w-[min(calc(100%_-_8rem),28rem)] md:px-4 ${LIQUID_GLASS_BAR} bottom-[calc(0.75rem+var(--sv-safe-bottom,0px))] transform-gpu transition-transform duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
           bottomNavCompact ? "scale-[0.86]" : "scale-100"
         }`}
       >

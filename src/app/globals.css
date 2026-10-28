@@ -2277,23 +2277,32 @@ html[data-fit-viewport] [data-scroll-restoration-root] {
   min-height: calc(100svh - 4rem);
 }
 
-/* HUECO SUPERIOR DE LA PÁGINA: lo que la barra superior baja para esquivar la
-   cámara, y lo que suman todas las piezas que se colocan contando con su alto
-   (portadas que suben bajo ella, barras de herramientas `sticky`, avisos). En
-   el navegador y en la PWA (`standalone`, con la barra de estado) vale 0.
+/* HUECOS DE LAS BARRAS DEL SISTEMA. `--sv-safe-top` es lo que la barra
+   superior baja para no quedar bajo la barra de estado o la cámara, y lo que
+   suman todas las piezas que se colocan contando con su alto (portadas que
+   suben bajo ella, barras de herramientas `sticky`, avisos);
+   `--sv-safe-bottom`, lo que sube la barra inferior y lo que va sobre ella
+   para no quedar bajo la barra de navegación del sistema.
+
+   Como en la PWA de Trakt: `viewport-fit=cover` y `env(safe-area-inset-*)`.
+   En la PWA de Android la barra de estado no deja ver la página (Chrome la
+   pinta con `theme-color`), así que el de arriba vale 0; el de abajo, lo que
+   mida la barra de gestos si Chrome dibuja la página bajo ella.
 
    En la APP NATIVA de Android (`data-android-app`, lo pone un script del
-   <head> según el user agent) la web pasa por detrás de la barra de estado,
-   que es transparente, y su alto lo da la propia app (`--sv-android-top`, ver
-   WebAppActivity en android-companion): la barra superior baja ese alto y su
-   cristal difuminado, o la portada de las fichas, ocupa la franja de la barra
-   de estado en vez de negro. Si la app aún no lo ha pasado, el del sistema. */
+   <head> según el user agent) la web pasa por detrás de las DOS barras, que
+   son transparentes, y sus altos los da la propia app (`--sv-android-top`,
+   `--sv-android-bottom`, ver WebAppActivity en android-companion): esas
+   franjas muestran el cristal de las barras de la app o la portada, no negro.
+   Si la app aún no los ha pasado, los del sistema. */
 :root {
   --sv-safe-top: env(safe-area-inset-top, 0px);
+  --sv-safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 html[data-android-app] {
   --sv-safe-top: var(--sv-android-top, env(safe-area-inset-top, 0px));
+  --sv-safe-bottom: var(--sv-android-bottom, env(safe-area-inset-bottom, 0px));
 }
 
 .sv-topbar {
@@ -2463,7 +2472,7 @@ html[data-android-app] {
    al compactar. */
 .sv-toast-stack {
   --sv-topbar-bottom: 4rem;
-  top: calc(var(--sv-safe-top) + var(--sv-topbar-bottom) + 0.375rem);
+  top: calc(var(--sv-safe-top, 0px) + var(--sv-topbar-bottom) + 0.375rem);
   transition: top 300ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 

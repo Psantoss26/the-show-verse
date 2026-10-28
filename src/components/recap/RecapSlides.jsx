@@ -68,7 +68,7 @@ const DISPLAY = "uppercase leading-[0.88] tracking-[-0.005em]";
 function SlideBody({ children, className = "", style }) {
   return (
     <div
-      className={`absolute inset-0 flex flex-col px-[7cqw] pb-[max(7cqh,env(safe-area-inset-bottom))] pt-[15cqh] ${className}`}
+      className={`absolute inset-0 flex flex-col px-[7cqw] pb-[max(7cqh,var(--sv-safe-bottom,0px))] pt-[15cqh] ${className}`}
       style={style}
     >
       {children}

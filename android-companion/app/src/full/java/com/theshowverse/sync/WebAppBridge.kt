@@ -44,6 +44,7 @@ class WebAppBridge(
     private val pedirPermisoPush: () -> Unit = {},
     private val abrirSoloEnNavegador: (String) -> Unit = abrirEnNavegador,
     private val altoBarraEstado: () -> Double = { 0.0 },
+    private val altoBarraNavegacion: () -> Double = { 0.0 },
 ) {
 
     /**
@@ -70,6 +71,13 @@ class WebAppBridge(
      */
     @JavascriptInterface
     fun statusBarHeight(): Double = altoBarraEstado()
+
+    /**
+     * Alto de la barra de navegación (gestos o botones) en píxeles CSS. La web
+     * pasa por detrás de ella (transparente) y sube su barra inferior esto.
+     */
+    @JavascriptInterface
+    fun navigationBarHeight(): Double = altoBarraNavegacion()
 
     /**
      * Estado completo de la sincronización, en JSON, para que Ajustes lo pinte

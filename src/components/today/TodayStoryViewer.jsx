@@ -429,7 +429,7 @@ export default function TodayStoryViewer({ groups, startIndex, seen, onSeen, onC
           </button>
         </div>
 
-        <div className="relative z-10 flex min-h-0 flex-1 flex-col gap-5 px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4">
+        <div className="relative z-10 flex min-h-0 flex-1 flex-col gap-5 px-4 pb-[max(1.5rem,var(--sv-safe-bottom,0px))] pt-4">
           {/* CARTEL GRANDE. En ordenador, al pasar el ratón se convierte en la
               ficha del título (TodayStoryDetails) y la historia se pausa, como
               en Trakt; al salir vuelve el cartel y sigue. En táctil se abre al

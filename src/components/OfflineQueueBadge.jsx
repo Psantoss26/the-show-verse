@@ -26,7 +26,7 @@ export default function OfflineQueueBadge() {
     <div
       role="status"
       aria-live="polite"
-      className="pointer-events-none fixed bottom-[calc(9rem+env(safe-area-inset-bottom))] left-1/2 z-[199] flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full border border-white/15 bg-black/85 px-3.5 py-1.5 text-xs font-medium text-white shadow-[0_10px_30px_-10px_rgba(0,0,0,0.7)] backdrop-blur lg:bottom-[4.5rem]"
+      className="pointer-events-none fixed bottom-[calc(9rem+var(--sv-safe-bottom,0px))] left-1/2 z-[199] flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full border border-white/15 bg-black/85 px-3.5 py-1.5 text-xs font-medium text-white shadow-[0_10px_30px_-10px_rgba(0,0,0,0.7)] backdrop-blur lg:bottom-[4.5rem]"
     >
       {online ? (
         <RefreshCw className="h-3.5 w-3.5 animate-spin" />

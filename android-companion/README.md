@@ -81,7 +81,7 @@ Lo que la carcasa resuelve y un WebView "pelado" no:
 |---|---|
 | Sesión que sobrevive a cerrar la app | cookies persistentes + `flush()` al pausar |
 | Tráileres a pantalla completa | `onShowCustomView` en `WebAppActivity` |
-| Barra de estado visible y TRANSPARENTE, con la web por detrás (su barra superior baja ese alto: `statusBarHeight()` del puente); abajo, relleno sobre los botones de navegación. Huecos leídos ignorando la visibilidad de las barras, para que la miniatura de recientes no salga duplicada | `configurarVentana()` y `configurarInsets()` en `WebAppActivity` |
+| Barra de estado y barra de navegación visibles y TRANSPARENTES, con la web por detrás, como la app de Trakt (`enableEdgeToEdge` + `SystemBarStyle.dark(Color.TRANSPARENT)`); la web baja su barra superior y sube la inferior lo que mide cada una (`statusBarHeight()` y `navigationBarHeight()` del puente). Huecos leídos ignorando la visibilidad de las barras, para que la miniatura de recientes no salga duplicada | `configurarVentana()` y `configurarInsets()` en `WebAppActivity` |
 | Subir foto de perfil (`<input type=file>`) | `onShowFileChooser` |
 | Enlaces a TMDb, YouTube… | pestaña personalizada del navegador |
 | `market://`, `mailto:`… | los resuelve el sistema |

@@ -238,12 +238,12 @@ export default function SectionSheet({
             (~2.200 imágenes pintadas por despliegue en «Portadas y fondos») y
             en el móvil las tarjetas parpadeaban; con ella solo se desplaza.
             No aplana el cristal: eso lo hace `opacity`, no `transform`. */}
-        <div className="details-sheet-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-1 will-change-transform sm:px-6">
+        <div className="details-sheet-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[max(1.5rem,var(--sv-safe-bottom,0px))] pt-1 will-change-transform sm:px-6">
           {children}
         </div>
 
         {footer ? (
-          <div className="shrink-0 border-t border-white/5 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:px-6">
+          <div className="shrink-0 border-t border-white/5 px-4 pb-[max(1rem,var(--sv-safe-bottom,0px))] pt-4 sm:px-6">
             {footer}
           </div>
         ) : null}

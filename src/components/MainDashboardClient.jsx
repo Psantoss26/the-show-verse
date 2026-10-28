@@ -4217,7 +4217,7 @@ export default function MainDashboardClient({ initialData, initialEngineRows = E
           // altura cambió con la vista de tablet: 64px en móvil y en escritorio,
           // pero 80px en tablet (`md:h-20`). Con el -mt-16 fijo quedaban 16px de
           // fondo negro entre el borde de la pantalla y la imagen del hero.
-          className="relative -mt-[calc(4rem+var(--sv-safe-top))] min-h-screen [overflow-x:clip] bg-black text-white selection:bg-amber-500/30"
+          className="relative -mt-[calc(4rem+var(--sv-safe-top,0px))] min-h-screen [overflow-x:clip] bg-black text-white selection:bg-amber-500/30"
           initial="hidden"
           animate="visible"
           variants={fadeInUp}

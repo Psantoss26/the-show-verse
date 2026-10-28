@@ -484,7 +484,7 @@ export default function RecapStory({ recap, user, onClose }) {
           </div>
 
           {/* Pie: qué suena (móvil estrecho) y aviso de pausa. */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-[max(10px,env(safe-area-inset-bottom))] z-30 flex justify-center px-3">
+          <div className="pointer-events-none absolute inset-x-0 bottom-[max(10px,var(--sv-safe-bottom,0px))] z-30 flex justify-center px-3">
             <AnimatePresence>
               {paused && started && slide.duration && !hidden ? (
                 <motion.span

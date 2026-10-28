@@ -1738,7 +1738,7 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
 
             {/* Pie: recuento, estado y ficha del nodo seleccionado. */}
             {/* En móvil, por encima de la barra inferior flotante. */}
-            <div className="pointer-events-none absolute inset-x-4 bottom-[calc(5.5rem_+_env(safe-area-inset-bottom))] flex flex-col items-center gap-2 text-center @[640px]/detail-page:items-start @[640px]/detail-page:text-left @[640px]/detail-page:inset-x-3 @[640px]/detail-page:bottom-3 @[1024px]/detail-page:right-64">
+            <div className="pointer-events-none absolute inset-x-4 bottom-[calc(5.5rem_+_var(--sv-safe-bottom,0px))] flex flex-col items-center gap-2 text-center @[640px]/detail-page:items-start @[640px]/detail-page:text-left @[640px]/detail-page:inset-x-3 @[640px]/detail-page:bottom-3 @[1024px]/detail-page:right-64">
               <SelectedCard
                 node={selectedNode}
                 graph={graph}

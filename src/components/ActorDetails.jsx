@@ -3097,7 +3097,7 @@ export default function ActorDetails({
           // MÓVIL inmersivo: sube hasta el borde superior (los 2rem del `pt-8`
           // + los 3rem del navbar) para que el hueco coincida con la portada
           // fija, y sin `transform` (como en los detalles de listas).
-          className="-mt-[calc(5rem+var(--sv-safe-top))] sm:mt-0 flex flex-col lg:flex-row gap-5 sm:gap-8 lg:gap-12 mb-12 items-start transform-gpu max-sm:![transform:none]"
+          className="-mt-[calc(5rem+var(--sv-safe-top,0px))] sm:mt-0 flex flex-col lg:flex-row gap-5 sm:gap-8 lg:gap-12 mb-12 items-start transform-gpu max-sm:![transform:none]"
         >
           {/* Hueco en flujo de la portada fija para la vista móvil */}
           <div

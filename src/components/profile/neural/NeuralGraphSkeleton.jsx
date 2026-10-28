@@ -19,7 +19,7 @@ export const NEURAL_STAGE_CLASS = [
   // táctil se reserva la barra inferior flotante).
   "@[640px]/detail-page:mx-0 @[640px]/detail-page:rounded-2xl @[640px]/detail-page:bg-white/[0.015]",
   "@[640px]/detail-page:bg-[radial-gradient(120%_90%_at_50%_0%,rgba(16,185,129,0.07),transparent_60%),radial-gradient(90%_80%_at_50%_100%,rgba(99,102,241,0.06),transparent_60%)]",
-  "@[640px]/detail-page:h-[calc(100dvh_-_var(--neural-top,16rem)_-_5.25rem_-_env(safe-area-inset-bottom))] desktop:h-[calc(100dvh_-_var(--neural-top,16rem)_-_1.5rem)]",
+  "@[640px]/detail-page:h-[calc(100dvh_-_var(--neural-top,16rem)_-_5.25rem_-_var(--sv-safe-bottom,0px))] desktop:h-[calc(100dvh_-_var(--neural-top,16rem)_-_1.5rem)]",
 ].join(" ");
 
 // Distancia de un elemento al principio del DOCUMENTO por offsetTop, que no

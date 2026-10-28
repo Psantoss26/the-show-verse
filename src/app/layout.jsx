@@ -53,10 +53,15 @@ export const viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  // Como la PWA de Trakt: la página puede dibujarse bajo las barras del
+  // sistema (la barra de gestos en Android, si Chrome lo permite; la barra de
+  // estado en iOS) y `env(safe-area-inset-*)` da su alto. Las barras de la app
+  // lo suman (`--sv-safe-top`, `--sv-safe-bottom` en globals.css).
+  viewportFit: "cover",
 };
 
 const ANDROID_APP_BOOT_SCRIPT =
-  'if(navigator.userAgent.indexOf("TheShowVerseApp/")!==-1){var d=document.documentElement;d.setAttribute("data-android-app","");try{var h=window.TSVAndroidBridge&&window.TSVAndroidBridge.statusBarHeight&&window.TSVAndroidBridge.statusBarHeight();if(h>0)d.style.setProperty("--sv-android-top",h+"px")}catch(e){}}';
+  'if(navigator.userAgent.indexOf("TheShowVerseApp/")!==-1){var d=document.documentElement;d.setAttribute("data-android-app","");try{var b=window.TSVAndroidBridge,h=b&&b.statusBarHeight&&b.statusBarHeight(),n=b&&b.navigationBarHeight&&b.navigationBarHeight();if(h>0)d.style.setProperty("--sv-android-top",h+"px");if(n>0)d.style.setProperty("--sv-android-bottom",n+"px")}catch(e){}}';
 
 export default function RootLayout({ children, overlay }) {
   return (
@@ -80,9 +85,9 @@ export default function RootLayout({ children, overlay }) {
         />
         {/* App nativa de Android (su WebView añade `TheShowVerseApp/` al user
             agent): `data-android-app` en <html> y el alto de la barra de
-            estado, que pasa por el puente, ANTES del primer pintado. Así la
-            barra superior nace ya bajada, sin saltar al cargar (ver
-            `--sv-safe-top` en globals.css). */}
+            estado y de la de navegación, que pasan por el puente, ANTES del
+            primer pintado. Así las barras de la app nacen ya en su sitio, sin
+            saltar al cargar (ver `--sv-safe-top` en globals.css). */}
         <script
           id="android-app-boot"
           dangerouslySetInnerHTML={{ __html: ANDROID_APP_BOOT_SCRIPT }}
@@ -112,7 +117,7 @@ export default function RootLayout({ children, overlay }) {
             <MobileUserPageSwipeNavigation>
               <DesktopSideNavInset
                 data-scroll-restoration-root
-                className="relative min-h-[100svh] bg-black pb-[calc(5rem+env(safe-area-inset-bottom))] desktop:pb-0"
+                className="relative min-h-[100svh] bg-black pb-[calc(5rem+var(--sv-safe-bottom,0px))] desktop:pb-0"
               >
                 {/* Fichas abiertas desde la página por encima de ella, que
                     sigue viva debajo (ver OverlayRouteHost). */}

@@ -2577,7 +2577,7 @@ export default function FeaturedHero({
     <>
       <section
         ref={heroSectionRef}
-        className="featured-hero-shell relative isolate w-full touch-pan-y overflow-hidden bg-black hero-wide:bg-transparent h-[calc(100svh-7.8rem-env(safe-area-inset-bottom))] hero-wide:h-[var(--hero-wide-height)]"
+        className="featured-hero-shell relative isolate w-full touch-pan-y overflow-hidden bg-black hero-wide:bg-transparent h-[calc(100svh-7.8rem-var(--sv-safe-bottom,0px))] hero-wide:h-[var(--hero-wide-height)]"
         aria-label="Contenido destacado"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -2682,7 +2682,7 @@ export default function FeaturedHero({
           (min-width: 768px) and (hover: none),
           (min-width: 768px) and (pointer: coarse) {
           .hero-wide-indicators {
-            bottom: calc(5.5rem + env(safe-area-inset-bottom));
+            bottom: calc(5.5rem + var(--sv-safe-bottom,0px));
           }
         }
 

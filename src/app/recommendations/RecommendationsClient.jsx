@@ -482,7 +482,7 @@ export default function RecommendationsClient() {
     // de depender del `min-h-[100svh]` del layout, que era lo que provocaba un
     // resto de scroll. `z-0` la mantiene por debajo de las dos barras de
     // navegación. El bloqueo del scroll del documento se hace en un efecto.
-    <div className="fixed inset-0 z-0 flex flex-col overflow-hidden pb-[calc(5rem+env(safe-area-inset-bottom))] sm:static sm:z-auto sm:block sm:overflow-visible sm:pb-32 sm:pt-24">
+    <div className="fixed inset-0 z-0 flex flex-col overflow-hidden pb-[calc(5rem+var(--sv-safe-bottom,0px))] sm:static sm:z-auto sm:block sm:overflow-visible sm:pb-32 sm:pt-24">
       {/* En móvil el contenedor no aporta márgenes NI ancho máximo: la portada
           va a sangre hasta los bordes laterales. */}
       <div className="mx-auto flex w-full min-h-0 max-w-none flex-1 flex-col px-0 sm:block sm:max-w-[80rem] sm:px-6">

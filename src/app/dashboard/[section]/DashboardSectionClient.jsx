@@ -1258,7 +1258,7 @@ export default function DashboardSectionClient({
           ref={filtersRef}
           data-menu-pinned={filtersPinned}
           data-grouped={groupBy !== "none" ? "" : undefined}
-          className={`relative sticky top-[calc(3.5rem+var(--sv-safe-top))] z-[70] space-y-1 transition-all duration-300 sm:top-[calc(5rem+var(--sv-safe-top))] sm:mb-5 lg:mb-6 ${
+          className={`relative sticky top-[calc(3.5rem+var(--sv-safe-top,0px))] z-[70] space-y-1 transition-all duration-300 sm:top-[calc(5rem+var(--sv-safe-top,0px))] sm:mb-5 lg:mb-6 ${
             groupBy === "none" ? "mb-6" : "mb-2"
           }${isBackNav ? "" : " sv-section-toolbar-in"}`}
         >

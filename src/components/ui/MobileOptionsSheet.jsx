@@ -232,7 +232,7 @@ export default function MobileOptionsSheet({
           </div>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-[max(1.5rem,calc(env(safe-area-inset-bottom)+1rem))] pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-[max(1.5rem,calc(var(--sv-safe-bottom,0px)+1rem))] pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <OptionsSheetContext.Provider value={accent}>
             <div className="space-y-5">{children}</div>
           </OptionsSheetContext.Provider>
