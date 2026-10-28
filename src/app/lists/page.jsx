@@ -503,15 +503,17 @@ function ListPreviewPosterStrip({ items = [], alt = "" }) {
   return (
     <div className="flex h-full w-full items-stretch justify-center gap-px bg-black/35 p-0.5">
       {previewItems.map((item, index) => (
+        // Cada hueco con la proporción del póster (sin bandas): en el móvil
+        // caben tres a buen tamaño, desde sm los cinco.
         <div
           key={`${item?.media_type || "movie"}:${item?.id || index}`}
-          className="min-w-0 flex-1 overflow-hidden rounded-[3px] bg-zinc-950"
+          className={`aspect-[2/3] h-full shrink-0 overflow-hidden rounded-[3px] bg-zinc-950 ${index >= 3 ? "max-sm:hidden" : ""}`}
         >
           <TmdbImg
             filePath={item?._listPreviewPoster || item?.poster_path}
             size="w154"
             alt={`${alt}: título ${index + 1}`}
-            className="h-full w-full object-contain"
+            className="h-full w-full object-cover"
           />
         </div>
       ))}
@@ -1736,8 +1738,9 @@ const ListModeRow = memo(function ListModeRow({
     <div ref={ref}>
       {/* ✅ antes: Link fijo a /lists/:id */}
       <ListNavWrapper list={list} className="group block">
-        <div className="flex items-center gap-4 p-3 bg-zinc-900/30 border border-white/5 rounded-xl hover:bg-zinc-900/60 hover:border-white/10 transition-all">
-          <div className="h-16 w-40 shrink-0 overflow-hidden rounded-lg border border-white/5 bg-zinc-950 sm:w-[13.5rem]">
+        <div className="flex items-center gap-4 p-3 bg-zinc-900/30 border border-white/5 rounded-xl hover:bg-zinc-900/60 hover:border-white/10 transition-all sm:gap-5">
+          {/* Ancho = huecos 2:3 del alto interior (3 en el móvil, 5 desde sm). */}
+          <div className="h-[5.5rem] w-[10.75rem] shrink-0 overflow-hidden rounded-lg border border-white/5 bg-zinc-950 sm:h-24 sm:w-[19.5rem] lg:h-28 lg:w-[22.75rem]">
             {isLoading ? (
               <div
                 className={`w-full h-full bg-zinc-900/40 ${isPending ? "animate-pulse" : ""}`}
@@ -1748,10 +1751,12 @@ const ListModeRow = memo(function ListModeRow({
           </div>
 
           <div className="flex-1 min-w-0">
-            <h3 className="text-base font-bold text-white truncate group-hover:text-purple-400 transition-colors">
+            {/* La fila es alta: en el móvil el título usa hasta dos líneas y,
+                desde sm, la descripción. */}
+            <h3 className="line-clamp-2 text-base font-bold leading-snug text-white group-hover:text-purple-400 transition-colors sm:truncate sm:text-lg">
               {list.name}
             </h3>
-            <p className="text-sm text-zinc-400 truncate">
+            <p className="mt-0.5 text-sm text-zinc-400 truncate sm:line-clamp-2 sm:whitespace-normal">
               {list.description || "—"}
             </p>
           </div>

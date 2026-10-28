@@ -8,6 +8,8 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Listas, vista de lista (Mis listas, Comunidad y Colecciones): cada fila es más alta y los pósters, más grandes y sin bandas a los lados. En el móvil se ven tres pósters y el título puede ocupar dos líneas; en el ordenador, cinco, con la descripción en dos líneas. → [páginas](docs/frontend/app-router-pages.md)
+- Completadas, vista Lista: las filas ya no llevan la barra de progreso, que siempre estaba llena; solo queda la etiqueta del 100 %, algo más grande. En progreso, vista Lista: la etiqueta del porcentaje tiene ese mismo tamaño. La barra de progreso deja a la derecha el mismo margen que a la izquierda, junto a la imagen. → [páginas](docs/frontend/app-router-pages.md)
 - Completadas en el móvil, vista Portadas: las tarjetas ya no llevan el tick verde de completado en la esquina; toda la página es de series terminadas. → [páginas](docs/frontend/app-router-pages.md)
 - En progreso y Completadas en el móvil: en la hoja de opciones, la vista que se llamaba «Compacta» ahora se llama «Lista», que es lo que muestra. → [páginas](docs/frontend/app-router-pages.md)
 - Listas, vista de filas (Mis listas, Comunidad y Colecciones): los pósters de los títulos salen en inglés, con el mismo criterio que Favoritos o Pendientes (si no hay en inglés, el de español, el de su idioma original o uno sin idioma). Antes salían los pósters en español que trae TMDb. → [páginas](docs/frontend/app-router-pages.md)
