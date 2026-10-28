@@ -108,7 +108,6 @@ import {
   StarIcon,
   MessageSquareIcon,
   BadgeDollarSignIcon,
-  LinkIcon,
   ImageIcon,
   ImageOff,
   Heart,
@@ -7299,18 +7298,6 @@ export default function DetailsClient({
     posterModeHydrated,
   ]);
 
-  // Copia la URL original de una imagen de TMDb al portapapeles
-  const handleCopyImageUrl = async (filePath) => {
-    const url = buildOriginalImageUrl(filePath);
-    try {
-      navigator?.clipboard?.writeText
-        ? await navigator.clipboard.writeText(url)
-        : window.prompt("Copiar URL:", url);
-    } catch {
-      window.prompt("Copiar URL:", url);
-    }
-  };
-
   // -- Navegacion por scroll horizontal de la galeria de imagenes --
   const updateImagesNav = () => {
     const el = imagesScrollRef.current;
@@ -12292,31 +12279,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                             </div>
                                           )}
 
-                                          <div
-                                            role="button"
-                                            tabIndex={0}
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleCopyImageUrl(filePath);
-                                            }}
-                                            onKeyDown={(e) => {
-                                              if (
-                                                e.key === "Enter" ||
-                                                e.key === " "
-                                              ) {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                handleCopyImageUrl(filePath);
-                                              }
-                                            }}
-                                            className="group/link absolute bottom-0 right-0 z-20 p-2 sm:p-2.5 rounded-tl-xl border-l border-t backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-bottom-right scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100 bg-black/40 border-white/10 text-zinc-300 hover:bg-white/20 hover:text-white"
-                                            aria-label="Copiar URL"
-                                          >
-                                            <LinkIcon className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                                            <div className="pointer-events-none absolute bottom-full mb-2 right-0 z-[100] scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/link:scale-100 group-hover/link:opacity-100 group-hover/link:delay-[2000ms]">
-                                              Copiar URL
-                                            </div>
-                                          </div>
                                         </div>
                                       </SwiperSlide>
                                     );
