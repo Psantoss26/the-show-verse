@@ -54,6 +54,7 @@ import {
 } from "@/lib/navigation/peekHandoff";
 
 import { useMediaQuery } from "@/lib/hooks/useMediaQuery";
+import { isInsidePageModal } from "@/lib/ui/pageModal";
 import useModalGuard from "@/hooks/useModalGuard";
 import {
   TITLE_PEEK_ATTR,
@@ -345,6 +346,8 @@ export default function MobileTitlePeek() {
           width: rect.width,
           height: rect.height,
         },
+        // Pulsada dentro de un modal (episodios agrupados…): encima de él.
+        overModal: isInsidePageModal(gesture.target),
       });
     };
 
@@ -474,7 +477,11 @@ export default function MobileTitlePeek() {
   // página. El navbar y la barra superior, por encima, aparecían de golpe
   // sobre la vista previa en vez de verse a través de ella.
   return createPortal(
-    <div data-sv-no-peek="" ref={layerRef} className="relative z-[9999]">
+    <div
+      data-sv-no-peek=""
+      ref={layerRef}
+      className={`relative ${peek?.overModal ? "z-[10001]" : "z-[9999]"}`}
+    >
       {/* Detrás de la vista previa mientras se va a la ficha: tapa la página
           que se deja y la pantalla de carga con el fondo de la ficha. */}
       {leavingTo && (
@@ -502,6 +509,7 @@ export default function MobileTitlePeek() {
             onPeekOpenFull={openFull}
             peek
             peekOrigin={peek.origin}
+            overModal={peek.overModal}
           />
         ) : null}
       </AnimatePresence>

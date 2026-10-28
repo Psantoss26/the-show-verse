@@ -15,7 +15,8 @@
 //   - en un clic normal, previene la navegación y abre el panel de vista previa.
 
 import { getMediaTypeForItem } from "@/lib/dashboard/media";
-import { isInsidePageModal, useDetailModal } from "@/components/dashboard/DetailModalProvider";
+import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
+import { isInsidePageModal } from "@/lib/ui/pageModal";
 
 export default function usePreviewOpen() {
   const { openDetailModal } = useDetailModal();

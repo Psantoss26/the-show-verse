@@ -48,6 +48,7 @@ import { useAuth } from "@/context/AuthContext";
 import { readDetailOpen, withDetailOpen } from "@/lib/ui/detailOpenPreferences";
 import useModalGuard from "@/hooks/useModalGuard";
 import { useIsMobile, useMediaQuery } from "@/lib/hooks/useMediaQuery";
+import { isInsidePageModal } from "@/lib/ui/pageModal";
 
 const DetailModalContext = createContext({
   openDetailModal: null,
@@ -56,15 +57,6 @@ const DetailModalContext = createContext({
 
 export function useDetailModal() {
   return useContext(DetailModalContext);
-}
-
-// ¿El elemento pulsado está dentro de un modal de la página (p. ej. los
-// episodios agrupados del Historial)? La vista previa abierta desde ahí se
-// superpone a ese modal (ver `overModal`) en vez de quedar debajo, y al
-// cerrarla el modal sigue abierto. Solo se consulta al abrir desde cerrado:
-// en ese momento no hay ficha en pantalla, así que cualquier diálogo es ajeno.
-export function isInsidePageModal(node) {
-  return Boolean(node?.closest?.('[aria-modal="true"]'));
 }
 
 // ANCHO QUE EL DRAWER DERECHO OCUPA EN PANTALLA, publicado como variable CSS
