@@ -2283,17 +2283,18 @@ html[data-fit-viewport] [data-scroll-restoration-root] {
    el navegador y en la PWA (`standalone`, con la barra de estado) vale 0.
 
    En la APP NATIVA de Android (`data-android-app`, lo pone un script del
-   <head> según el user agent) también vale 0 a propósito: va a pantalla
-   completa y la barra se queda arriba del todo, sin el hueco de la barra de
-   estado que ya no se ve. Por eso ahí se quita el logo del centro (lo tapa la
-   cámara) y los controles de los lados se separan más del borde, para que
-   las esquinas muy redondeadas de algunas pantallas no los corten. */
+   <head> según el user agent) va a pantalla completa y la barra no deja el
+   hueco de la barra de estado, que ya no se ve (unos 24-32px, el del recorte
+   de la cámara). Pegada al borde, en cambio, los iconos quedaban demasiado
+   arriba (compactada, a ~8px), dentro de las esquinas redondeadas: se deja un
+   margen fijo de 0.75rem. El logo del centro se quita (lo tapa la cámara) y
+   los controles de los lados se separan más del borde por esas esquinas. */
 :root {
   --sv-safe-top: env(safe-area-inset-top, 0px);
 }
 
 html[data-android-app] {
-  --sv-safe-top: 0px;
+  --sv-safe-top: 0.75rem;
 }
 
 html[data-android-app] .sv-topbar-logo {
