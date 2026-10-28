@@ -2833,8 +2833,9 @@ function NavbarContent() {
         // Ficha / recomendaciones: nacen ya con el alto compacto (ver la fila
         // móvil). Lo leen los avisos emergentes para colocarse justo debajo.
         data-immersive={isImmersiveRoute ? "" : undefined}
-        // `pt-[env(safe-area-inset-top)]`: en la PWA de Android a pantalla
-        // completa la página llega al borde superior y la cámara queda encima.
+        // `pt-[env(safe-area-inset-top)]`: en la app nativa de Android, a
+        // pantalla completa, la página llega al borde superior y la cámara
+        // queda encima.
         // La barra gana ese alto por arriba (su cristal y su velo lo cubren) y
         // sus controles quedan debajo del recorte. En el navegador vale 0.
         className={`sv-topbar sticky top-0 z-40 w-full pt-[env(safe-area-inset-top)] transition-[background-color,backdrop-filter,box-shadow] duration-300 ${
