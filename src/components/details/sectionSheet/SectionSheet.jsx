@@ -9,7 +9,7 @@
 // solo con `transform`: un fundido de opacidad sobre el panel lo convertiría en
 // raíz de backdrop y aplanaría el cristal mientras dura (ver liquidGlass).
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Search, X } from "lucide-react";
 import useModalGuard from "@/hooks/useModalGuard";
@@ -64,9 +64,11 @@ export default function SectionSheet({
   headerAction = null,
   // Control junto a las pestañas, en su misma fila (p. ej. «Más likes»).
   tabsAccessory = null,
-  // Pestañas que no caben: pasan a otra fila en vez de desplazarse de lado
-  // (p. ej. los tipos de vídeo, que pueden ser muchos).
-  wrapTabs = false,
+  // Pestañas que no caben en la fila: en vez de desplazarse de lado, las del
+  // final se juntan en una pestaña `{ id, label }` (p. ej. «Otros» en los
+  // tipos de vídeo). `onTabsOverflowChange(ids)` recibe las que quedan dentro.
+  tabsOverflow = null,
+  onTabsOverflowChange,
   // Pie fijo bajo la lista (p. ej. «Cancelar / Guardar» de un editor).
   footer = null,
   // Control a la derecha del buscador, en su misma fila (p. ej. el botón que
@@ -89,6 +91,12 @@ export default function SectionSheet({
   const titleId = useId();
   const [portalReady, setPortalReady] = useState(false);
   useEffect(() => setPortalReady(true), []);
+  const { tabsRef, measureRef, shownTabs, isTabActive } = useOverflowTabs({
+    tabs,
+    activeTab,
+    overflow: tabsOverflow,
+    onOverflowChange: onTabsOverflowChange,
+  });
   const close = () => {
     if (!closeDisabled) onClose?.();
   };
@@ -157,15 +165,28 @@ export default function SectionSheet({
 
           {Array.isArray(tabs) && tabs.length > 1 ? (
             <div className="mt-4 flex items-stretch gap-2">
+            {measureRef ? (
+              // Copia invisible de TODAS las pestañas (y la de agrupar) a su
+              // ancho natural, para saber cuántas caben.
+              <div aria-hidden="true" className="pointer-events-none invisible absolute h-0 w-0 overflow-hidden">
+                <div ref={measureRef} className="flex w-max gap-1">
+                  {[...tabs, { id: tabsOverflow.id, label: tabsOverflow.label, count: overflowCountHint(tabs) }].map((tab) => (
+                    <span key={tab.id} className="flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs font-bold">
+                      {tab.label}
+                      {typeof tab.count === "number" ? <span>{tab.count}</span> : null}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <div
+              ref={tabsRef}
               role="tablist"
               aria-label={title}
-              className={`flex min-w-0 flex-1 gap-1 p-1 ${
-                wrapTabs ? "flex-wrap" : "overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-              } ${SHEET_CONTROL}`}
+              className={`flex min-w-0 flex-1 gap-1 overflow-x-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${SHEET_CONTROL}`}
             >
-              {tabs.map((tab) => {
-                const active = tab.id === activeTab;
+              {shownTabs.map((tab) => {
+                const active = isTabActive(tab);
                 return (
                   <button
                     key={tab.id}
@@ -254,4 +275,87 @@ export function SectionSheetGroupTitle({ title, count = null }) {
       <span aria-hidden="true" className="h-px min-w-4 flex-1 bg-white/[0.08]" />
     </div>
   );
+}
+
+const TABS_GAP = 4; // gap-1
+const TABS_PADDING = 8; // p-1 a cada lado
+
+// Número más largo que puede llevar la pestaña de agrupar: la suma de todas
+// menos la primera (que nunca se agrupa).
+function overflowCountHint(tabs) {
+  if (!tabs.slice(1).every((tab) => typeof tab.count === "number")) return undefined;
+  return tabs.slice(1).reduce((sum, tab) => sum + tab.count, 0);
+}
+
+// Cuántas pestañas caben en la fila: mide la copia invisible y, si no caben
+// todas, deja las primeras que quepan junto a la pestaña de agrupar (que suma
+// sus números y sale activa si la elegida está dentro).
+function useOverflowTabs({ tabs, activeTab, overflow, onOverflowChange }) {
+  // Refs de callback: el panel se monta en un portal después del primer
+  // render, y la medición tiene que empezar cuando existan los nodos.
+  const [tabsEl, tabsRef] = useState(null);
+  const [measureEl, measureRef] = useState(null);
+  const enabled = Boolean(overflow && Array.isArray(tabs) && tabs.length > 2);
+  const [visibleCount, setVisibleCount] = useState(null);
+  const tabCount = Array.isArray(tabs) ? tabs.length : 0;
+
+  useLayoutEffect(() => {
+    if (!enabled) return undefined;
+    const container = tabsEl;
+    const row = measureEl;
+    if (!container || !row) return undefined;
+    const fit = () => {
+      const widths = [...row.children].map((child) => child.getBoundingClientRect().width);
+      const overflowWidth = widths.pop();
+      const available = container.clientWidth - TABS_PADDING;
+      const span = (count) =>
+        widths.slice(0, count).reduce((sum, width) => sum + width, 0) + TABS_GAP * (count - 1);
+      let count = widths.length;
+      if (span(count) > available) {
+        count = widths.length - 1;
+        while (count > 1 && span(count) + TABS_GAP + overflowWidth > available) count -= 1;
+      }
+      setVisibleCount(count >= widths.length ? null : count);
+    };
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(container);
+    observer.observe(row);
+    return () => observer.disconnect();
+  }, [enabled, tabCount, tabsEl, measureEl]);
+
+  const folded = enabled && visibleCount != null ? tabs.slice(visibleCount) : [];
+  const foldedKey = folded.map((tab) => tab.id).join("\u0000");
+  useEffect(() => {
+    if (enabled) onOverflowChange?.(foldedKey ? foldedKey.split("\u0000") : []);
+    // `foldedKey` resume `folded`: las pestañas llegan nuevas en cada render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, foldedKey]);
+
+  if (!enabled) {
+    return {
+      tabsRef,
+      measureRef: null,
+      shownTabs: Array.isArray(tabs) ? tabs : [],
+      isTabActive: (tab) => tab.id === activeTab,
+    };
+  }
+
+  const foldedIds = new Set(folded.map((tab) => tab.id));
+  const foldedCounts = folded.map((tab) => tab.count);
+  const shownTabs = folded.length
+    ? [
+        ...tabs.slice(0, visibleCount),
+        {
+          id: overflow.id,
+          label: overflow.label,
+          count: foldedCounts.every((count) => typeof count === "number")
+            ? foldedCounts.reduce((sum, count) => sum + count, 0)
+            : undefined,
+        },
+      ]
+    : tabs;
+  const isTabActive = (tab) =>
+    tab.id === activeTab || (tab.id === overflow.id && foldedIds.has(activeTab));
+  return { tabsRef, measureRef, shownTabs, isTabActive };
 }

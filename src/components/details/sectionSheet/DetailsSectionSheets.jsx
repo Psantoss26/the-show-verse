@@ -689,8 +689,12 @@ export function ImagesSheet({ meta, data, onClose, tab, setTab }) {
 
 // ─── Vídeos y soundtrack ──────────────────────────────────────────────────
 
+// Pestaña que junta los tipos de vídeo que no caben en la fila.
+const VIDEO_TYPES_OVERFLOW = { id: "other-types", label: "Otros" };
+
 function VideosSheet({ meta, data, onClose, tab, setTab }) {
   const videos = Array.isArray(data.videos) ? data.videos : [];
+  const [foldedTypes, setFoldedTypes] = useState([]);
   // Pestañas por tipo (Tráiler, Teaser, Clip…), en el orden de relevancia en
   // que llega la lista; solo si hay más de un tipo.
   const typeOptions = videoTypeOptions(videos);
@@ -701,8 +705,17 @@ function VideosSheet({ meta, data, onClose, tab, setTab }) {
           ...typeOptions.map((option) => ({ id: option.type, label: option.label, count: option.count })),
         ]
       : null;
-  const activeTab = tabs && tab ? tab : "all";
-  const visible = activeTab === "all" ? videos : videos.filter((video) => (video?.type || "Other") === activeTab);
+  // Con «Otros» elegido, si al ensancharse el panel ya caben todas: «Todos».
+  const activeTab =
+    tabs && tab && !(tab === VIDEO_TYPES_OVERFLOW.id && !foldedTypes.length) ? tab : "all";
+  // «Otros», o un tipo que ha quedado dentro de «Otros» al estrecharse el panel.
+  const showFolded = activeTab === VIDEO_TYPES_OVERFLOW.id || foldedTypes.includes(activeTab);
+  const visible =
+    activeTab === "all"
+      ? videos
+      : videos.filter((video) =>
+          showFolded ? foldedTypes.includes(video?.type || "Other") : (video?.type || "Other") === activeTab,
+        );
   return (
     <SectionSheet
       open
@@ -711,7 +724,8 @@ function VideosSheet({ meta, data, onClose, tab, setTab }) {
       icon={meta.icon}
       subtitle={plural(videos.length, "vídeo", "vídeos")}
       tabs={tabs}
-      wrapTabs
+      tabsOverflow={VIDEO_TYPES_OVERFLOW}
+      onTabsOverflowChange={setFoldedTypes}
       activeTab={activeTab}
       onTabChange={setTab}
     >
