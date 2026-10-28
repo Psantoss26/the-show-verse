@@ -402,6 +402,7 @@ function SearchBar({
   const [showCollection, setShowCollection] = useState(false);
   const [portalHostReady, setPortalHostReady] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState(null);
+  const [historyMaxHeight, setHistoryMaxHeight] = useState(null);
   const [filterMenuPosition, setFilterMenuPosition] = useState(null);
   const pendingCollectionRef = useRef(null); // colección precargada lista para mostrar
   // Paginación del desplegable.
@@ -551,6 +552,44 @@ function SearchBar({
   // es más bajo que la ventana), descontando el selector de página del pie.
   // Se mide la altura REAL de una fila ya pintada, así que sigue a la fuente y
   // al zoom del sistema.
+  // MÓVIL, búsquedas recientes: el panel crece hasta el borde inferior de la
+  // pantalla VISIBLE (con teclado, `visualViewport` es más bajo) dejando el
+  // mismo margen que los resultados. Con el tope fijo de `100dvh` la parte de
+  // abajo quedaba detrás del teclado y no había forma de llegar a ella.
+  useLayoutEffect(() => {
+    if (!isMobile || !showDropdown || !dropdownPosition || query.trim()) {
+      setHistoryMaxHeight(null);
+      return undefined;
+    }
+    let frameId = 0;
+    const measure = () => {
+      frameId = 0;
+      const viewport = window.visualViewport;
+      const visibleBottom = viewport
+        ? viewport.offsetTop + viewport.height
+        : window.innerHeight;
+      const visibleHeight = viewport ? viewport.height : window.innerHeight;
+      const next = Math.max(
+        160,
+        Math.round(
+          visibleBottom - dropdownPosition.top - Math.max(32, visibleHeight * 0.04),
+        ),
+      );
+      setHistoryMaxHeight((current) => (current === next ? current : next));
+    };
+    const schedule = () => {
+      if (!frameId) frameId = window.requestAnimationFrame(measure);
+    };
+    measure();
+    window.visualViewport?.addEventListener("resize", schedule);
+    window.addEventListener("resize", schedule);
+    return () => {
+      if (frameId) window.cancelAnimationFrame(frameId);
+      window.visualViewport?.removeEventListener("resize", schedule);
+      window.removeEventListener("resize", schedule);
+    };
+  }, [isMobile, showDropdown, dropdownPosition, query]);
+
   useLayoutEffect(() => {
     if (!isMobile || !showDropdown || !dropdownPosition || !query.trim()) {
       return undefined;
@@ -1542,7 +1581,12 @@ function SearchBar({
                     // `mobilePageSize`); el tope del 70% cortaba justo esas
                     // filas y hacía volver el scroll. Queda un tope al alto
                     // de pantalla solo como red de seguridad.
-                    className={`${isMobile ? "max-h-[calc(100dvh-5rem)]" : "max-h-[70vh]"} overflow-y-auto no-scrollbar`}
+                    className={`${isMobile ? "max-h-[calc(100dvh-5rem)]" : "max-h-[75vh]"} overflow-y-auto no-scrollbar`}
+                    style={
+                      historyMaxHeight && !query.trim()
+                        ? { maxHeight: historyMaxHeight }
+                        : undefined
+                    }
                   >
                     {!query.trim() ? (
               <div className="p-2">
@@ -1567,12 +1611,12 @@ function SearchBar({
                     {searchHistory.map((historyQuery) => (
                       <li
                         key={historyQuery}
-                        className="group flex min-h-10 items-center rounded-xl transition-colors hover:bg-white/10 focus-within:bg-white/10"
+                        className={`group flex ${isMobile ? "min-h-12" : "min-h-11"} items-center rounded-xl transition-colors hover:bg-white/10 focus-within:bg-white/10`}
                       >
                         <button
                           type="button"
                           onClick={() => handleHistoryClick(historyQuery)}
-                          className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2 text-left text-sm font-semibold text-white/85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white/80"
+                          className={`flex min-w-0 flex-1 items-center gap-3 px-3 ${isMobile ? "py-3 text-[15px]" : "py-2.5 text-sm"} text-left font-semibold text-white/85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white/80`}
                         >
                           <History
                             className="h-4 w-4 shrink-0 text-white/35 transition-colors group-hover:text-amber-300"
@@ -1589,7 +1633,7 @@ function SearchBar({
                             "search_history_remove",
                             "Eliminar del historial",
                           )}: ${historyQuery}`}
-                          className="mr-1 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white/35 transition-colors hover:bg-white/15 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/80"
+                          className={`mr-1 inline-flex ${isMobile ? "h-9 w-9" : "h-8 w-8"} shrink-0 items-center justify-center rounded-lg text-white/35 transition-colors hover:bg-white/15 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/80`}
                         >
                           <XIcon className="h-3.5 w-3.5" aria-hidden="true" />
                         </button>

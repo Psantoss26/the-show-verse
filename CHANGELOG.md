@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Buscador, «Búsquedas recientes»: guarda las 25 últimas búsquedas en vez de 8. Las filas son algo más altas y, en el móvil, el desplegable baja hasta casi el borde de la pantalla (o del teclado, si está abierto) en vez de quedarse corto; las que no caben salen al desplazarse. → [lib/search](docs/frontend/lib/lib-search.md)
 - Listas sin sesión iniciada: Comunidad y Colecciones se pueden ver enteras, con sus listas y colecciones. Mis listas sigue pidiendo iniciar sesión, pero la tarjeta sale dentro de la página: la cabecera y las pestañas se quedan y se puede volver a Comunidad o Colecciones. Antes, la pantalla de iniciar sesión tapaba toda la página y, al recargar, seguía ahí. → [páginas](docs/frontend/app-router-pages.md)
 - Perfil: el buscador de Neuronal, Actividad, Diario, Favoritos, Pendientes y Puntuaciones encuentra los títulos por su nombre en inglés o en español, como Favoritos o Pendientes, y busca en toda la sección, no solo en lo cargado al desplazarse. Antes un título antiguo de Actividad no aparecía nunca. → [social y perfiles](docs/features/social-y-perfiles.md)
 - Detalle de listas y colecciones: el filtro de tipo, la ordenación, la agrupación y el modo de vista se guardan y se mantienen al volver, como en Favoritos o Pendientes. Las listas comparten sus ajustes entre ellas y las colecciones tienen los suyos. → [componentes](docs/frontend/components.md)
