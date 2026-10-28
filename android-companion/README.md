@@ -81,6 +81,7 @@ Lo que la carcasa resuelve y un WebView "pelado" no:
 |---|---|
 | Sesión que sobrevive a cerrar la app | cookies persistentes + `flush()` al pausar |
 | Tráileres a pantalla completa | `onShowCustomView` en `WebAppActivity` |
+| Pantalla completa siempre, sin barras del sistema: retroceder desde el lateral no las saca (en la PWA de Chrome sí); solo deslizar desde arriba o abajo, por encima y unos segundos | `pantallaCompleta()` en `WebAppActivity` (también al recuperar el foco); la web esquiva la cámara con `env(safe-area-inset-top)` |
 | Subir foto de perfil (`<input type=file>`) | `onShowFileChooser` |
 | Enlaces a TMDb, YouTube… | pestaña personalizada del navegador |
 | `market://`, `mailto:`… | los resuelve el sistema |

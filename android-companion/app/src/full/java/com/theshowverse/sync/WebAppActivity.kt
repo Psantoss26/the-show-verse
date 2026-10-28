@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.webkit.CookieManager
 import android.webkit.DownloadListener
 import android.webkit.PermissionRequest
@@ -124,6 +125,7 @@ class WebAppActivity : AppCompatActivity() {
         configurarRefresco()
         configurarBotonAtras()
         configurarInsets()
+        pantallaCompleta()
 
         binding.retryButton.setOnClickListener {
             ocultarError()
@@ -352,7 +354,6 @@ class WebAppActivity : AppCompatActivity() {
             )
             binding.videoContainer.visibility = View.VISIBLE
             binding.refresh.visibility = View.GONE
-            pantallaCompleta(true)
         }
 
         override fun onHideCustomView() {
@@ -363,7 +364,6 @@ class WebAppActivity : AppCompatActivity() {
             customView = null
             customViewCallback?.onCustomViewHidden()
             customViewCallback = null
-            pantallaCompleta(false)
         }
 
         /** Selector de ficheros (avatar, importaciones). */
@@ -459,31 +459,36 @@ class WebAppActivity : AppCompatActivity() {
     }
 
     /**
-     * Barras del sistema. Al apuntar a Android 15 (API 35) la app dibuja
-     * EDGE-TO-EDGE de forma obligatoria: sin esto, la cabecera de la web
-     * quedaría debajo del reloj y el navbar inferior debajo de los botones de
-     * navegación. Se traslada el hueco de las barras a relleno del contenedor,
-     * y el fondo que asoma es el de la app (negro), así que se sigue viendo como
-     * una sola pieza. El vídeo a pantalla completa NO se rellena a propósito:
-     * ahí sí debe ocupar hasta el borde.
+     * Huecos de las barras y de la cámara. La app va siempre a pantalla completa
+     * (ver `pantallaCompleta`), así que las barras del sistema, ocultas, dan
+     * insets 0 y solo queda el recorte de la cámara.
      *
-     * En versiones anteriores el sistema ya coloca la ventana bajo las barras,
-     * los insets llegan a cero y esto no hace nada.
+     * La WEB no se rellena: llega hasta el borde y la cámara la esquiva ella
+     * misma con `env(safe-area-inset-top)` (la barra superior y las portadas
+     * ya lo usan, igual que en la PWA). El WebView le pasa ese valor porque la
+     * ventana se dibuja dentro del recorte. Si aquí se rellenara, el hueco de
+     * la cámara volvería a ser una franja negra. El círculo de recargar y el
+     * medidor de fotogramas sí bajan, porque son vistas nativas.
+     *
+     * El panel de error, nativo, sí esquiva barras y cámara con relleno.
      */
     private fun configurarInsets() {
-        for (vista in listOf(binding.refresh, binding.errorPanel)) {
-            ViewCompat.setOnApplyWindowInsetsListener(vista) { view, insets ->
-                val barras = insets.getInsets(
-                    WindowInsetsCompat.Type.systemBars() or
-                        WindowInsetsCompat.Type.displayCutout(),
-                )
-                view.setPadding(barras.left, barras.top, barras.right, barras.bottom)
-                if (view === binding.refresh) {
-                    bajarIndicadorDeRecarga(barras.top)
-                    binding.frameMeter.translationY = barras.top.toFloat()
-                }
-                insets
-            }
+        ViewCompat.setOnApplyWindowInsetsListener(binding.refresh) { view, insets ->
+            val barras = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            val camara = insets.getInsets(WindowInsetsCompat.Type.displayCutout())
+            view.setPadding(barras.left, barras.top, barras.right, barras.bottom)
+            val arriba = maxOf(barras.top, camara.top)
+            bajarIndicadorDeRecarga(arriba)
+            binding.frameMeter.translationY = arriba.toFloat()
+            insets
+        }
+        ViewCompat.setOnApplyWindowInsetsListener(binding.errorPanel) { view, insets ->
+            val huecos = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or
+                    WindowInsetsCompat.Type.displayCutout(),
+            )
+            view.setPadding(huecos.left, huecos.top, huecos.right, huecos.bottom)
+            insets
         }
     }
 
@@ -636,15 +641,39 @@ class WebAppActivity : AppCompatActivity() {
         binding.errorPanel.visibility = View.GONE
     }
 
-    private fun pantallaCompleta(activa: Boolean) {
-        val controller = WindowCompat.getInsetsController(window, window.decorView)
-        if (activa) {
-            controller.hide(WindowInsetsCompat.Type.systemBars())
-            controller.systemBarsBehavior =
-                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        } else {
-            controller.show(WindowInsetsCompat.Type.systemBars())
+    /**
+     * PANTALLA COMPLETA SIEMPRE, no solo con vídeo. Es lo que la PWA no puede
+     * hacer bien: en la app instalada desde Chrome, el gesto de retroceder
+     * desde el lateral quita la pantalla completa y Chrome la repone a los
+     * pocos segundos, con la barra de estado y la franja inferior negras
+     * mientras tanto.
+     *
+     * Aquí la ventana es nuestra. Con `BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE`
+     * el gesto de retroceder no saca las barras; solo salen deslizando desde
+     * arriba o desde abajo, POR ENCIMA del contenido (sin moverlo) y se ocultan
+     * solas. La ventana se dibuja también dentro del recorte de la cámara.
+     *
+     * Se vuelve a pedir al recuperar el foco: un diálogo del sistema (permisos,
+     * selector de ficheros, el teclado en algunas versiones) puede devolver las
+     * barras.
+     */
+    private fun pantallaCompleta() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            window.attributes = window.attributes.apply {
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
         }
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        controller.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller.hide(WindowInsetsCompat.Type.systemBars())
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) pantallaCompleta()
     }
 
     // ------------------------------------------------- diagnóstico (Rendimiento)
