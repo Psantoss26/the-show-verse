@@ -10,7 +10,11 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { motion, usePresence, useReducedMotion } from "framer-motion";
 
 import { LIQUID_GLASS_DETAIL_SURFACE } from "@/lib/ui/liquidGlass";
-import { MOBILE_POSTER_OVERSCAN } from "@/components/details/MobileDetailsHero";
+import {
+  MOBILE_POSTER_OVERSCAN,
+  MobileCoverEdgeLayers,
+  MobileCoverUnderlay,
+} from "@/components/details/MobileDetailsHero";
 import { morphPeekCard, peekHrefKeepsParts } from "@/lib/navigation/peekHandoff";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
 
@@ -172,6 +176,8 @@ export default function DetailPeekLayout({
     : (posterLowSrc && lowReady === posterLowSrc) ||
       (posterSrc && posterLoaded === posterSrc);
   const shown = artReady || waitedTooLong;
+  // La que primero está descargada: de ella salen el borde y el fondo.
+  const posterBaseSrc = posterLowSrc || posterSrc;
   const markLoaded = (setter, src) => (event) => {
     const img = event.currentTarget;
     const done = () => setter(src);
@@ -251,7 +257,6 @@ export default function DetailPeekLayout({
   // desvanecen.
   const coverRef = useRef(null);
   const logoRef = useRef(null);
-  const logoShadeRef = useRef(null);
   const actionsRef = useRef(null);
   const scoreboardRef = useRef(null);
   const handleOpenFull = () => {
@@ -259,7 +264,7 @@ export default function DetailPeekLayout({
     const keepParts = peekHrefKeepsParts(prefetchHref);
     morphPeekCard(cardRef.current, coverRef.current, {
       parts: keepParts ? pieces : [],
-      fadeNodes: keepParts ? [logoShadeRef.current] : [logoShadeRef.current, ...pieces],
+      fadeNodes: keepParts ? [] : pieces,
       overscan: MOBILE_POSTER_OVERSCAN,
       fullPoster: !cover,
       reduceMotion,
@@ -303,84 +308,99 @@ export default function DetailPeekLayout({
           }}
           onClick={(event) => event.stopPropagation()}
         >
-          {/* Portada con su logo. Tocarla abre la ficha completa. */}
-          <button
-            ref={coverRef}
-            data-peek-cover=""
-            data-peek-full-poster={cover ? undefined : ""}
-            type="button"
-            onClick={handleOpenFull}
-            aria-label={title ? `Abrir la ficha de ${title}` : "Abrir la ficha"}
-            className="relative block w-full overflow-hidden bg-transparent text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-yellow-400"
-            style={{ height: geometry.posterHeight }}
+          {/* La portada y lo que hay debajo, como en la ficha móvil
+              (DetailsClient, `MobileHeroCover`): el borde inferior se
+              prolonga difuminado y bajo botones y marcador va el centro del
+              póster muy difuminado, con el mismo velo y el mismo oscurecido
+              medido para que el blanco se lea en pósters claros. Todo cuelga
+              de `--mobile-cover-h`, el alto de la portada en la tarjeta. Las
+              capas van en un fondo propio, del alto del CONTENIDO (no de la
+              tarjeta, que se desplaza en pantallas bajas), y recortado: sus
+              capas llegan hasta el pie de la pantalla y, sueltas, alargarían
+              el scroll de la tarjeta. */}
+          <div
+            className="relative"
+            style={{ "--mobile-cover-h": `${geometry.posterHeight}px` }}
           >
-            {/* El pie se funde con el cristal de la tarjeta con una máscara
-                (`sv-preview-fade`, la curva del hero de la ficha rápida), no
-                con un velo negro: el velo acababa en negro sobre un cristal
-                que no lo es y el corte se veía. La máscara va en cada capa
-                (esqueleto, imágenes y velo del logo), no en un envoltorio: en
-                un envoltorio dentro de esta tarjeta Chrome no la pintaba y la
-                imagen llegaba nítida hasta el borde. */}
-            <div className="absolute inset-0">
+            {!cover && posterBaseSrc && (
+              <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+                <MobileCoverUnderlay src={posterBaseSrc} />
+                <div className="absolute inset-x-0 top-0" style={{ height: geometry.posterHeight }}>
+                  {posterLowSrc && (
+                    <img
+                      key={posterLowSrc}
+                      src={posterLowSrc}
+                      alt=""
+                      className="absolute inset-0 h-full w-full object-cover"
+                      onLoad={markLoaded(setLowReady, posterLowSrc)}
+                      draggable={false}
+                      loading="eager"
+                      fetchPriority="high"
+                    />
+                  )}
+                  {posterSrc && (
+                    <img
+                      key={posterSrc}
+                      src={posterSrc}
+                      alt=""
+                      className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 motion-reduce:transition-none ${
+                        posterLoaded === posterSrc ? "opacity-100" : "opacity-0"
+                      }`}
+                      onLoad={markLoaded(setPosterLoaded, posterSrc)}
+                      draggable={false}
+                      loading="eager"
+                      fetchPriority="high"
+                    />
+                  )}
+                </div>
+                <MobileCoverEdgeLayers
+                  src={posterBaseSrc}
+                  objectPosition="center"
+                  blurredUnderlay
+                  adaptiveContrast
+                />
+              </div>
+            )}
+
+            {/* Portada con su logo. Tocarla abre la ficha completa. */}
+            <button
+              ref={coverRef}
+              data-peek-cover=""
+              data-peek-full-poster={cover ? undefined : ""}
+              type="button"
+              onClick={handleOpenFull}
+              aria-label={title ? `Abrir la ficha de ${title}` : "Abrir la ficha"}
+              className="relative block w-full overflow-hidden bg-transparent text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-yellow-400"
+              style={{ height: geometry.posterHeight }}
+            >
+              {/* Esqueleto mientras llega la portada, con el fundido del hero
+                  de la ficha rápida (`sv-preview-fade`). */}
               {!artReady && (
                 <div className="sv-preview-fade absolute inset-0 animate-pulse bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900" />
               )}
-              {/* La portada compuesta trae su propio fundido (ver `fade` en
-                  EpisodeStillStack). */}
+              {/* La portada compuesta (episodios) trae su propio fundido (ver
+                  `fade` en EpisodeStillStack). */}
               {cover && <div className="absolute inset-0">{cover}</div>}
-              {!cover && posterLowSrc && (
-                <img
-                  key={posterLowSrc}
-                  src={posterLowSrc}
-                  alt=""
-                  aria-hidden="true"
-                  className="sv-preview-fade absolute inset-0 h-full w-full object-cover"
-                  onLoad={markLoaded(setLowReady, posterLowSrc)}
-                  draggable={false}
-                  loading="eager"
-                  fetchPriority="high"
-                />
-              )}
-              {!cover && posterSrc && (
-                <img
-                  key={posterSrc}
-                  src={posterSrc}
-                  alt={title}
-                  className={`sv-preview-fade absolute inset-0 h-full w-full object-cover transition-opacity duration-300 motion-reduce:transition-none ${
-                    posterLoaded === posterSrc ? "opacity-100" : "opacity-0"
-                  }`}
-                  onLoad={markLoaded(setPosterLoaded, posterSrc)}
-                  draggable={false}
-                  loading="eager"
-                  fetchPriority="high"
-                />
-              )}
               {logo && (
                 <div
-                  ref={logoShadeRef}
-                  className="sv-preview-fade pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.6),rgba(0,0,0,0.25)_20%,transparent_40%)]"
-                />
+                  ref={logoRef}
+                  data-peek-part="logo"
+                  className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center px-5 pb-3 text-center"
+                >
+                  {logo}
+                </div>
               )}
-            </div>
-            {logo && (
-              <div
-                ref={logoRef}
-                data-peek-part="logo"
-                className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center px-5 pb-3 text-center"
-              >
-                {logo}
-              </div>
-            )}
-          </button>
+            </button>
 
-          {/* Fila y marcador como en la ficha móvil: mismo ancho y 20px
-              entre los dos. */}
-          <div className="px-2.5 pb-2.5 pt-3">
-            <div ref={actionsRef} data-peek-part="actions">
-              {actions}
-            </div>
-            <div ref={scoreboardRef} data-peek-part="scoreboard" className="mt-5">
-              {scoreboard}
+            {/* Fila y marcador como en la ficha móvil: mismo ancho y 20px
+                entre los dos. */}
+            <div className="relative px-2.5 pb-2.5 pt-3">
+              <div ref={actionsRef} data-peek-part="actions">
+                {actions}
+              </div>
+              <div ref={scoreboardRef} data-peek-part="scoreboard" className="mt-5">
+                {scoreboard}
+              </div>
             </div>
           </div>
         </div>
