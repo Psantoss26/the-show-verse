@@ -13,7 +13,7 @@ import {
     collectionOwnArtwork,
     readCollectionArtworkOverride,
 } from '@/lib/lists/collectionCustomization'
-import { fetchCommunityArtwork } from '@/lib/artworkApi'
+import { fetchCommunityArtwork, subscribeCommunityArtwork, withoutArtworkVotes } from '@/lib/artworkApi'
 import ListPosterCard from '@/components/lists/ListPosterCard'
 import FilterableListItems from '@/components/lists/ListDetailsTools'
 import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayout'
@@ -204,6 +204,31 @@ export default function CollectionDetailsClient({ collectionId }) {
         })
         return () => {
             cancelled = true
+        }
+    }, [collectionId])
+    // Restaurar en «Editar colección» retira el voto propio: se quita ya de la
+    // copia (leída al entrar, con el voto de visitas anteriores) y, guardado,
+    // se vuelve a preguntar al servidor.
+    useEffect(() => {
+        if (!collectionId) return undefined
+        let cancelled = false
+        const unsubscribe = subscribeCommunityArtwork({ type: 'collection', id: collectionId }, (event) => {
+            if (event.retract) {
+                setCommunityState((current) =>
+                    current.id === collectionId
+                        ? { ...current, artwork: withoutArtworkVotes(current.artwork, event.retract) }
+                        : current
+                )
+            }
+            if (event.refresh) {
+                fetchCommunityArtwork({ type: 'collection', id: collectionId }).then((artwork) => {
+                    if (!cancelled && artwork) setCommunityState({ id: collectionId, artwork })
+                })
+            }
+        })
+        return () => {
+            cancelled = true
+            unsubscribe()
         }
     }, [collectionId])
     const communityPending = communityState.id !== collectionId

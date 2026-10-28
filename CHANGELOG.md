@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Ficha, temporada y colección: restablecer las imágenes elegidas en una visita anterior ya vuelve a la portada por defecto al momento, en la página y en la vista lateral. Antes seguía saliendo la misma imagen hasta recargar, porque la propia elección contaba como «la más votada» que la página había leído al entrar. → [páginas](docs/frontend/app-router-pages.md)
 - Ficha rápida abierta desde un modal (por ejemplo, los episodios agrupados del Historial): ahora se ve encima del modal, también con la ficha centrada, donde antes quedaba tapada detrás. Al cerrarla, el modal sigue abierto. → [páginas de usuario](docs/features/paginas-de-usuario.md)
 - Social: el subtítulo de la cabecera («Lo destacado de hoy y la actividad de la gente a la que sigues, y la tuya.») va en una sola línea en tablet y ordenador; antes se partía en dos. → [Hoy](docs/features/hoy.md)
 - Social: al entrar, si en Actividad no hay nada de hoy se abre la Semana, y si la semana también está vacía se abre Siguiendo. Si se elige un día a mano, se respeta. → [Hoy](docs/features/hoy.md)

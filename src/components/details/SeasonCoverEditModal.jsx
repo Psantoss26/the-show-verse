@@ -6,7 +6,7 @@ import { ImagesSheet } from '@/components/details/sectionSheet/DetailsSectionShe
 import { useAuth } from '@/context/AuthContext'
 import { saveArtworkOverrides } from '@/lib/artworkApi'
 import { SEASON_ARTWORK_TYPE, buildSeasonCoverChanges } from '@/lib/details/seasonArtwork'
-import { forgetCommunitySeasonPoster } from '@/lib/details/communitySeasonPosters'
+import { forgetCommunitySeasonPoster, retractCommunitySeasonPoster } from '@/lib/details/communitySeasonPosters'
 
 const META = { title: 'Portadas', icon: ImageIcon }
 
@@ -72,6 +72,9 @@ export default function SeasonCoverEditModal({ seasonId, showId, seasonNumber, d
     const target = { type: SEASON_ARTWORK_TYPE, id: seasonId }
     savedRef.current = path
     cacheArtworkOverrides?.({ ...target, changes })
+    // El voto anterior se retira ya: al restablecer, la portada de la página
+    // no debe caer en esa misma imagen como «la más votada».
+    if (previous) retractCommunitySeasonPoster(seasonId, previous)
     const saved = await saveArtworkOverrides({ ...target, changes }).catch(() => false)
     if (saved) {
       // El voto cambia la más votada: las tarjetas vuelven a preguntar.

@@ -4,11 +4,12 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import { Pencil } from 'lucide-react'
 import { ImagesSheet } from '@/components/details/sectionSheet/DetailsSectionSheets'
 import { useAuth } from '@/context/AuthContext'
-import { forgetCommunityArtwork, saveArtworkOverrides } from '@/lib/artworkApi'
+import { forgetCommunityArtwork, retractOwnArtworkVotes, saveArtworkOverrides } from '@/lib/artworkApi'
 import { fetchTmdbImages } from '@/lib/tmdb/imageRequests'
 import {
   COLLECTION_ARTWORK_TYPE,
   buildCollectionArtworkChanges,
+  collectionArtworkVotes,
 } from '@/lib/lists/collectionCustomization'
 
 const META = { title: 'Editar colección', icon: Pencil }
@@ -90,6 +91,9 @@ export default function CollectionEditModal({ collectionId, defaults, own, onClo
     const target = { type: COLLECTION_ARTWORK_TYPE, id: Number(collectionId) }
     savedRef.current = next
     cacheArtworkOverrides?.({ ...target, changes })
+    // Los votos anteriores se retiran ya: al restaurar, la página no debe
+    // caer en esas mismas imágenes como «las más votadas».
+    retractOwnArtworkVotes({ ...target, votes: collectionArtworkVotes(previous) })
     const saved = await saveArtworkOverrides({ ...target, changes }).catch(() => false)
     if (saved) {
       // El voto cambia la más votada: la próxima visita vuelve a preguntar.

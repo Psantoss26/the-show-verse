@@ -313,10 +313,73 @@ const communityArtworkRequests = new Map()
 const COMMUNITY_ARTWORK_TTL_MS = 60000
 const COMMUNITY_ARTWORK_TYPES = new Set(['movie', 'tv', 'collection'])
 
-// Tras votar: la siguiente consulta del título vuelve a preguntar al servidor.
-export function forgetCommunityArtwork({ type, id }) {
+const communityArtworkListeners = new Map()
+
+function communityArtworkKey({ type, id }) {
     const normalizedType = type === 'show' ? 'tv' : type || 'movie'
-    communityArtworkRequests.delete(`${normalizedType}:${Number(id)}`)
+    return `${normalizedType}:${Number(id)}`
+}
+
+function notifyCommunityArtwork(key, event) {
+    for (const listener of communityArtworkListeners.get(key) || []) {
+        try {
+            listener(event)
+        } catch (err) {
+            console.error('Error notificando artwork de la comunidad', err)
+        }
+    }
+}
+
+// Páginas montadas que enseñan la más votada de un título. La copia que
+// leyeron al entrar incluye el voto PROPIO de visitas anteriores: sin este
+// aviso, al restablecer la selección se caía justo en esa imagen (la propia,
+// ahora «de la comunidad») hasta recargar. Eventos: `{ retract: votes }`
+// (quitar ya el voto propio de la copia) y `{ refresh: true }` (volver a
+// preguntar al servidor).
+export function subscribeCommunityArtwork({ type, id }, listener) {
+    if (id == null || id === '' || typeof listener !== 'function') return () => {}
+    const key = communityArtworkKey({ type, id })
+    let listeners = communityArtworkListeners.get(key)
+    if (!listeners) {
+        listeners = new Set()
+        communityArtworkListeners.set(key, listeners)
+    }
+    listeners.add(listener)
+    return () => {
+        listeners.delete(listener)
+        if (!listeners.size) communityArtworkListeners.delete(key)
+    }
+}
+
+// La más votada sin los votos indicados (`{ kind: ruta | ruta[] }`): lo que
+// queda al retirar el voto propio, a la espera de la respuesta del servidor
+// (si otros votaron la misma imagen, la consulta posterior la devuelve).
+export function withoutArtworkVotes(artwork, votes) {
+    if (!artwork || typeof artwork !== 'object' || !votes) return artwork
+    let changed = false
+    const next = { ...artwork }
+    for (const [kind, paths] of Object.entries(votes)) {
+        const list = Array.isArray(paths) || paths instanceof Set ? [...paths] : [paths]
+        if (next[kind] && list.includes(next[kind])) {
+            delete next[kind]
+            changed = true
+        }
+    }
+    return changed ? next : artwork
+}
+
+// El voto propio deja de contar YA en las páginas montadas del título.
+export function retractOwnArtworkVotes({ type, id, votes }) {
+    if (id == null || id === '' || !votes) return
+    notifyCommunityArtwork(communityArtworkKey({ type, id }), { retract: votes })
+}
+
+// Tras votar: la siguiente consulta del título vuelve a preguntar al servidor,
+// y las páginas montadas lo hacen ya.
+export function forgetCommunityArtwork({ type, id }) {
+    const key = communityArtworkKey({ type, id })
+    communityArtworkRequests.delete(key)
+    notifyCommunityArtwork(key, { refresh: true })
 }
 
 export function fetchCommunityArtwork({ type, id }) {

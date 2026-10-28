@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   applyCollectionCustomization,
   buildCollectionArtworkChanges,
+  collectionArtworkVotes,
   collectionCommunityArtwork,
   collectionOwnArtwork,
   collectionArtworkKey,
@@ -84,4 +85,12 @@ test('the cover backdrop is its own selection, stored as `background`', () => {
     buildCollectionArtworkChanges({ cover_backdrop_path: '/portada-es.jpg' }, { cover_backdrop_path: null }),
     [{ kind: 'background', filePath: null }],
   );
+});
+
+test('own artwork as votes per kind, to retract them from the community copy', () => {
+  assert.deepEqual(
+    collectionArtworkVotes({ poster_path: '/p.jpg', backdrop_path: null, cover_backdrop_path: '/c.jpg' }),
+    { poster: '/p.jpg', background: '/c.jpg' },
+  );
+  assert.deepEqual(collectionArtworkVotes(null), {});
 });

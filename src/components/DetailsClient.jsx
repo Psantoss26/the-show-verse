@@ -60,12 +60,16 @@ import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
 import {
   fetchArtworkOverride,
   fetchCommunityArtwork,
+  forgetCommunityArtwork,
   readArtworkPreference,
   readPersistedArtworkOverride,
   resolveCachedArtworkOverride,
+  retractOwnArtworkVotes,
   saveArtworkOverride,
   saveArtworkOverrides,
   shouldSkipRemoteArtwork,
+  subscribeCommunityArtwork,
+  withoutArtworkVotes,
   writeArtworkPreference,
 } from "@/lib/artworkApi";
 import Link from "next/link";
@@ -1283,6 +1287,30 @@ export default function DetailsClient({
       cancelled = true;
     };
   }, [initialCommunityArtwork, endpointType, id]);
+  // Restablecer (aquí o en otra vista del mismo título) retira el voto propio:
+  // se quita ya de la copia y, guardado, se vuelve a preguntar al servidor.
+  useEffect(() => {
+    let cancelled = false;
+    const unsubscribe = subscribeCommunityArtwork(
+      { type: endpointType, id },
+      (event) => {
+        if (event.retract) {
+          setCommunityArtwork((current) =>
+            withoutArtworkVotes(current, event.retract),
+          );
+        }
+        if (event.refresh) {
+          fetchCommunityArtwork({ type: endpointType, id }).then((artwork) => {
+            if (!cancelled && artwork) setCommunityArtwork(artwork);
+          });
+        }
+      },
+    );
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [endpointType, id]);
   const communityArtworkFor = (kind) =>
     remoteArtworkChecked ? communityArtwork?.[kind] || null : null;
   const communityPosterPath = communityArtworkFor("poster");
@@ -1552,6 +1580,33 @@ export default function DetailsClient({
   // igual que DetailModal. Best-effort; si no hay logo, cae al título de texto.
   const [heroLogoPath, setHeroLogoPath] = useState(() => restoredValue(backSnapshot, "heroLogoPath", null));
   const [selectedLogoPath, setSelectedLogoPath] = useState(() => restoredValue(backSnapshot, "selectedLogoPath", null));
+  // Rutas elegidas en esta visita, por tipo: cada una pudo ser el voto propio
+  // que trae la más votada leída al entrar (ver `subscribeCommunityArtwork`).
+  const ownArtworkVotesRef = useRef({ key: null, votes: {} });
+  useEffect(() => {
+    const key = `${endpointType}:${id}`;
+    if (ownArtworkVotesRef.current.key !== key) {
+      ownArtworkVotesRef.current = { key, votes: {} };
+    }
+    const { votes } = ownArtworkVotesRef.current;
+    for (const [kind, path] of [
+      ["poster", selectedPosterPath],
+      ["mobilePoster", selectedMobilePosterPath],
+      ["backdrop", selectedPreviewBackdropPath],
+      ["background", selectedBackgroundPath],
+      ["logo", selectedLogoPath],
+    ]) {
+      if (path) (votes[kind] ??= new Set()).add(path);
+    }
+  }, [
+    endpointType,
+    id,
+    selectedPosterPath,
+    selectedMobilePosterPath,
+    selectedPreviewBackdropPath,
+    selectedBackgroundPath,
+    selectedLogoPath,
+  ]);
   const [titleLogos, setTitleLogos] = useState(() => restoredValue(backSnapshot, "titleLogos", []));
   // ¿Ya terminó el fetch del logo? El título de TEXTO solo se muestra cuando el
   // logo se ha resuelto y NO existe; durante la carga no se muestra nada (el
@@ -7125,10 +7180,20 @@ export default function DetailsClient({
       id,
       changes: resetChanges,
     });
+    // Sin esto, la más votada leída al entrar (con el voto propio de una
+    // visita anterior) volvía a pintar la imagen que se acaba de restablecer.
+    retractOwnArtworkVotes({
+      type: endpointType,
+      id,
+      votes: ownArtworkVotesRef.current.votes,
+    });
+    ownArtworkVotesRef.current = { key: `${endpointType}:${id}`, votes: {} };
     saveArtworkOverrides({
       type: endpointType,
       id,
       changes: resetChanges,
+    }).then((saved) => {
+      if (saved) forgetCommunityArtwork({ type: endpointType, id });
     });
   };
 

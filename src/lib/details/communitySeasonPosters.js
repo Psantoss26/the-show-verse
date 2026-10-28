@@ -90,10 +90,46 @@ export function requestCommunitySeasonPoster(seasonId) {
   });
 }
 
-/** Tras votar: la siguiente consulta vuelve a preguntar al servidor. */
+// Hooks montados por temporada: lo leído al entrar incluye el voto PROPIO de
+// visitas anteriores, y sin avisarles restablecer la portada caía justo en esa
+// imagen (ahora «la más votada») hasta recargar.
+const listeners = new Map(); // seasonId -> Set<fn>
+
+function notify(id, event) {
+  for (const listener of listeners.get(id) || []) listener(event);
+}
+
+function subscribe(id, listener) {
+  let set = listeners.get(id);
+  if (!set) {
+    set = new Set();
+    listeners.set(id, set);
+  }
+  set.add(listener);
+  return () => {
+    set.delete(listener);
+    if (!set.size) listeners.delete(id);
+  };
+}
+
+/**
+ * El voto propio (`path`) deja de contar ya: quien lo tenga como más votado
+ * pasa a «sin votos» hasta que el servidor diga otra cosa (si otros votaron
+ * la misma, la consulta tras guardar la devuelve).
+ */
+export function retractCommunitySeasonPoster(seasonId, path) {
+  const id = normalizeId(seasonId);
+  if (!id || !path) return;
+  if (resolved.get(id)?.poster === path) resolved.set(id, { poster: null, at: Date.now() });
+  notify(id, { retract: path });
+}
+
+/** Tras votar: la siguiente consulta vuelve a preguntar al servidor, y los hooks montados ya. */
 export function forgetCommunitySeasonPoster(seasonId) {
   const id = normalizeId(seasonId);
-  if (id) resolved.delete(id);
+  if (!id) return;
+  resolved.delete(id);
+  notify(id, { refresh: true });
 }
 
 /**
@@ -116,6 +152,32 @@ export function useCommunitySeasonPoster(seasonId) {
     });
     return () => {
       cancelled = true;
+    };
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return undefined;
+    let cancelled = false;
+    const unsubscribe = subscribe(id, (event) => {
+      if (event.retract) {
+        // También si aún se consultaba o falló: la portada del SSR que se
+        // usaría entonces puede ser ese mismo voto.
+        setResult((current) =>
+          current.id === id && current.poster && current.poster !== event.retract
+            ? current
+            : { id, poster: null },
+        );
+      }
+      if (event.refresh) {
+        void requestCommunitySeasonPoster(id).then((poster) => {
+          // Un fallo conserva lo que hay (no se vuelve a la portada del SSR).
+          if (!cancelled && poster !== undefined) setResult({ id, poster });
+        });
+      }
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe();
     };
   }, [id]);
 

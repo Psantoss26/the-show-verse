@@ -61,6 +61,14 @@ export function collectionOwnArtwork(artwork = null) {
 // por tipo) como campos de la colección; las que no sean rutas válidas, null.
 export const collectionCommunityArtwork = collectionOwnArtwork;
 
+// Elección propia (campos) como votos por tipo, `{ poster: '/x.jpg', … }`,
+// para retirarlos de la más votada (`retractOwnArtworkVotes`).
+export function collectionArtworkVotes(own = null) {
+  return Object.fromEntries(
+    ARTWORK_FIELDS.filter(([, field]) => own?.[field]).map(([kind, field]) => [kind, own[field]]),
+  );
+}
+
 // Cambios respecto a la elección propia guardada. Como en «Portadas y fondos»
 // de la ficha, cada elección se guarda tal cual y cuenta como voto (también si
 // es la automática); `null` (Restaurar) la borra y retira el voto.

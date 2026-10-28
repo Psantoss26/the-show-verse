@@ -108,6 +108,7 @@ import {
 } from "@/lib/details/videos";
 import { useAuth } from "@/context/AuthContext";
 import {
+  forgetCommunityArtwork,
   readArtworkPreference,
   writeArtworkPreference,
   readPersistedArtworkOverride,
@@ -425,7 +426,11 @@ export default function PhoneDetailsSections({
       writeArtworkPreference(`showverse:${overrideType}:${id}:${kind}`, null);
     }
     cacheArtworkOverrides?.({ type: overrideType, id, changes });
-    saveArtworkOverrides({ type: overrideType, id, changes });
+    // Sin voto propio cambia la más votada: las fichas montadas del título
+    // vuelven a preguntar.
+    saveArtworkOverrides({ type: overrideType, id, changes }).then((saved) => {
+      if (saved) forgetCommunityArtwork({ type: overrideType, id });
+    });
     onArtworkSelection?.({ kind: "logo", filePath: null });
   }, [cacheArtworkOverrides, overrideType, id, onArtworkSelection]);
 
