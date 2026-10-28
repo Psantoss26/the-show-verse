@@ -368,6 +368,25 @@ servicio de accesibilidad (antes, una pantalla que cambia sin parar no llegaba a
 leerse nunca) valen para todas. Con el indicador desactivado, la accesibilidad sigue
 leyendo Prime Video y Crunchyroll porque alimenta la sincronización; no notifica nada.
 
+## Serie entera y episodio en Continuar viendo
+
+Continuar viendo guarda una fila por título y episodio; la serie sin episodio
+conocido va con temporada y episodio 0. Si un punto llegaba sin episodio de una
+serie cuyo episodio ya estaba bien sincronizado, se creaba una segunda tarjeta con
+la serie entera. Pasa cuando la app no sabe leer el episodio: Prime Video con los
+controles ocultos, o el episodio siguiente que arranca solo.
+
+- **Al guardar** (`POST /auth/netflix/progress`): un punto sin episodio se ignora
+  (`ignored: "show_level_has_episode"`) si de esa serie ya hay un episodio en curso,
+  que conserva su punto. Al revés, cuando llega el episodio, la tarjeta de la serie
+  entera que hubiera de antes se borra.
+- **Al leer** (`GET /progress`, `withoutShowLevelDuplicates`): las parejas que
+  quedaron de antes no se muestran. Se van borrando solas con el siguiente punto
+  del episodio.
+
+Prueba: `streamingProgress.integration.test.js` (opt-in, Postgres desechable) y
+`progress.test.js`.
+
 ## Corrección de detecciones
 
 Cada título que se notifica (ficha o reproducción) queda registrado como una

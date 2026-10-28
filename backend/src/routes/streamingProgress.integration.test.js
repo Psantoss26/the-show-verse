@@ -104,6 +104,29 @@ test('streaming delivery is atomic, idempotent and ordered across devices', {
     assert.equal(history[0].episode, 5);
   });
 
+  // Un punto SIN episodio de una serie de la que ya se sigue un episodio no puede
+  // añadir a Continuar viendo una segunda tarjeta con la serie entera.
+  await t.test('a show-level ping never duplicates an episode already in continue watching', async () => {
+    const show = { tmdbId: 37680, mediaType: 'tv', title: 'Suits', platform: 'primevideo', confidence: 'high' };
+    const ping = (extra) => send({
+      ...show, positionSeconds: 600, runtimeSeconds: 2600,
+      eventId: randomUUID(), observedAt: new Date().toISOString(), ...extra,
+    });
+    const rows = () => db.select().from(watchProgress)
+      .where(and(eq(watchProgress.userId, uid), eq(watchProgress.tmdbId, 37680)));
+
+    // 1) La serie entera llega primero (aún no se sabía el episodio)…
+    await ping({ estimated: true });
+    assert.deepEqual((await rows()).map((r) => [r.season, r.episode]), [[0, 0]]);
+    // 2) …y al saberse el episodio, su tarjeta sustituye a la de la serie.
+    await ping({ season: 6, episode: 9 });
+    assert.deepEqual((await rows()).map((r) => [r.season, r.episode]), [[6, 9]]);
+    // 3) Un punto sin episodio después no vuelve a crear la de la serie.
+    const late = await ping({ estimated: true });
+    assert.equal(late.ignored, 'show_level_has_episode');
+    assert.deepEqual((await rows()).map((r) => [r.season, r.episode]), [[6, 9]]);
+  });
+
   await t.test('shared Netflix emails and multiple devices keep independent tokens', async () => {
     const otherUser = randomUUID();
     await db.insert(users).values({ id: otherUser, username: `test-${otherUser}`, email: `${otherUser}@example.test` });

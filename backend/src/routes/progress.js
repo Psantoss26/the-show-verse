@@ -51,6 +51,18 @@ function toProgressResult(row) {
   };
 }
 
+/**
+ * Sin la tarjeta de la serie entera (temporada y episodio 0) cuando de esa misma
+ * serie ya hay un episodio en curso. El servidor ya no crea esas parejas (ver
+ * POST /auth/netflix/progress), pero quedan las de antes.
+ */
+export function withoutShowLevelDuplicates(rows) {
+  const showsWithEpisode = new Set(
+    rows.filter((r) => r.mediaType === 'tv' && r.episode > 0).map((r) => r.tmdbId),
+  );
+  return rows.filter((r) => !(r.mediaType === 'tv' && !r.episode && showsWithEpisode.has(r.tmdbId)));
+}
+
 export default async function progressRoutes(fastify) {
   fastify.addHook('preHandler', fastify.requireAuth);
 
@@ -65,7 +77,7 @@ export default async function progressRoutes(fastify) {
       .orderBy(desc(watchProgress.updatedAt))
       .limit(50);
 
-    const results = rows.map(toProgressResult);
+    const results = withoutShowLevelDuplicates(rows).map(toProgressResult);
 
     return reply.send({ results });
   });

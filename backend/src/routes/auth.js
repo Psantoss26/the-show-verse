@@ -1458,6 +1458,36 @@ export default async function authRoutes(fastify) {
         }
       }
       const outcome = await (async () => {
+        // ── Serie sin episodio cuando ya se sigue un episodio de ella. Un punto sin
+        // episodio (la app no lo supo leer: Prime Video con los controles ocultos,
+        // el episodio siguiente que arranca solo) no puede crear en Continuar
+        // viendo una segunda tarjeta con la serie entera junto al episodio que ya
+        // está bien sincronizado. Se ignora: el episodio conserva su punto.
+        if (isTv && episode === 0) {
+          const [episodeRow] = await tx
+            .select({ id: watchProgress.id })
+            .from(watchProgress)
+            .where(and(
+              eq(watchProgress.userId, userId),
+              eq(watchProgress.tmdbId, tmdbId),
+              eq(watchProgress.mediaType, 'tv'),
+              gt(watchProgress.episode, 0),
+            ))
+            .limit(1);
+          if (episodeRow) return { ok: true, completed: false, ignored: 'show_level_has_episode' };
+        }
+        // Y al revés: al saberse el episodio, la tarjeta de la serie entera que
+        // hubiera quedado de antes sobra.
+        if (isTv && episode > 0) {
+          await tx.delete(watchProgress).where(and(
+            eq(watchProgress.userId, userId),
+            eq(watchProgress.tmdbId, tmdbId),
+            eq(watchProgress.mediaType, 'tv'),
+            eq(watchProgress.season, 0),
+            eq(watchProgress.episode, 0),
+          ));
+        }
+
         // ── Completado (≥90% y con duración conocida): registrar play + quitar de
         // "Continuar viendo". Regla del "cruce del 90%" (ver lib/rewatchCompletion.js):
         // la fila de watch_progress SOLO existe mientras percent < 0.9, así que si
