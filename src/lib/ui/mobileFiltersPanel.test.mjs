@@ -6,14 +6,13 @@ const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), "
 
 const panel = read("components/ui/MobileFiltersPanel.jsx");
 
-// Los desplegables EN EL SITIO que quedan (la vista teléfono del drawer, el
-// modal de episodios de Trakt y los filtros de Actor en escritorio) comparten
-// la MISMA animación. Las páginas y las vistas laterales usan la hoja
+// Los desplegables EN EL SITIO que quedan (la vista teléfono del drawer y los
+// filtros de Actor en escritorio) comparten la MISMA animación. Las páginas,
+// las vistas laterales y el modal de episodios de Trakt usan la hoja
 // (MobileOptionsSheet, ver mobileOptionsSheet.test.mjs).
 const PAGES = [
   "components/ActorDetails.jsx",
   "components/dashboard/PhoneDetailsSections.jsx",
-  "components/trakt/TraktEpisodesWatchedModal.jsx",
 ];
 
 test("los desplegables en el sitio usan el panel común", () => {
