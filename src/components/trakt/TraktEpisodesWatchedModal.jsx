@@ -910,12 +910,6 @@ export default function TraktEpisodesWatchedModal({
     return new Date().toISOString();
   };
 
-  const resolveEpisodeMarkDate = () => {
-    if (rewatchMarkPreset === "other_date")
-      return fromLocalDatetimeInput(rewatchMarkOtherValue);
-    return new Date().toISOString();
-  };
-
   const onConfirmAddPlay = async () => {
     setAddPlayError("");
     setShowError("");
@@ -1023,7 +1017,9 @@ export default function TraktEpisodesWatchedModal({
     [onDeleteRewatchRun, effectiveViewId, changeView],
   );
 
-  const toggleEpisode = async (sn, en) => {
+  // `markedAt`: fecha elegida en el diálogo al marcar en un rewatch (ya
+  // validada allí).
+  const toggleEpisode = async (sn, en, markedAt = null) => {
     setShowError("");
     if (!isConnected) return;
 
@@ -1048,27 +1044,7 @@ export default function TraktEpisodesWatchedModal({
         );
       }
 
-      const watchedAt = next ? resolveEpisodeMarkDate() : null;
-      if (next && rewatchMarkPreset === "other_date" && !watchedAt) {
-        throw new Error("Elige una fecha válida para marcar el episodio.");
-      }
-
-      const runStartMs = currentRewatchStartedAt
-        ? new Date(currentRewatchStartedAt).getTime()
-        : Number.NaN;
-      const watchedAtMs = watchedAt
-        ? new Date(watchedAt).getTime()
-        : Number.NaN;
-      if (
-        next &&
-        Number.isFinite(runStartMs) &&
-        Number.isFinite(watchedAtMs) &&
-        watchedAtMs < runStartMs
-      ) {
-        throw new Error(
-          "La fecha del episodio no puede ser anterior al inicio del rewatch activo.",
-        );
-      }
+      const watchedAt = next ? markedAt || new Date().toISOString() : null;
 
       await onToggleEpisodeRewatch(sn, en, {
         viewId: effectiveViewId,
@@ -1103,8 +1079,66 @@ export default function TraktEpisodesWatchedModal({
       setPendingUnmark({ sn, en, name, kind: "watched" });
       return;
     }
+    // Rewatch: cada episodio pide su fecha (hoy u otra) al marcarlo.
+    if (isRewatchView) {
+      setRewatchMarkPreset("today");
+      setRewatchMarkOtherValue(toLocalDatetimeInput(new Date().toISOString()));
+      setMarkError("");
+      setPendingMark({ sn, en, name });
+      return;
+    }
     toggleEpisode(sn, en);
   };
+
+  // Diálogo de fecha al marcar un episodio visto en un rewatch.
+  const [pendingMark, setPendingMark] = useState(null);
+  const [markBusy, setMarkBusy] = useState(false);
+  const [markError, setMarkError] = useState("");
+  const lastPendingMarkRef = useRef(null);
+  if (pendingMark) lastPendingMarkRef.current = pendingMark;
+  const shownPendingMark = pendingMark || lastPendingMarkRef.current;
+
+  const cancelMark = useCallback(() => {
+    if (!markBusy) setPendingMark(null);
+  }, [markBusy]);
+
+  const confirmMark = async () => {
+    const pending = pendingMark;
+    if (!pending || markBusy) return;
+    const watchedAt =
+      rewatchMarkPreset === "other_date"
+        ? fromLocalDatetimeInput(rewatchMarkOtherValue)
+        : new Date().toISOString();
+    if (!watchedAt) {
+      setMarkError("Elige una fecha válida para marcar el episodio.");
+      return;
+    }
+    const runStartMs = currentRewatchStartedAt
+      ? new Date(currentRewatchStartedAt).getTime()
+      : Number.NaN;
+    if (
+      Number.isFinite(runStartMs) &&
+      new Date(watchedAt).getTime() < runStartMs
+    ) {
+      setMarkError(
+        "La fecha no puede ser anterior al inicio del rewatch activo.",
+      );
+      return;
+    }
+    setMarkBusy(true);
+    try {
+      await toggleEpisode(pending.sn, pending.en, watchedAt);
+    } finally {
+      setMarkBusy(false);
+      setPendingMark(null);
+    }
+  };
+
+  useModalGuard({
+    open: Boolean(pendingMark),
+    onClose: cancelMark,
+    lockScroll: false,
+  });
 
   const cancelUnmark = useCallback(() => {
     if (!unmarkBusy) setPendingUnmark(null);
@@ -1732,87 +1766,6 @@ export default function TraktEpisodesWatchedModal({
             <div className="text-xs text-red-300 font-medium">{showError}</div>
           )}
 
-          {isConnected && isRewatchView && (
-            // Móvil: título y Hoy / Otra fecha en una fila; el campo de fecha
-            // se despliega debajo. Desde sm, título con su explicación y todo
-            // en línea (lg) o en dos filas (sm-lg).
-            <div
-              role="group"
-              aria-label="Fecha de episodios"
-              className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 rounded-2xl bg-purple-500/5 py-2 pl-3 pr-2 sm:flex sm:flex-col sm:items-stretch sm:gap-3 sm:px-3.5 sm:py-3 lg:flex-row lg:items-center lg:justify-between"
-            >
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-purple-200">
-                  <CalendarClock className="h-3.5 w-3.5 shrink-0 sm:hidden" aria-hidden="true" />
-                  <span className="truncate">Fecha de episodios</span>
-                </div>
-                <div className="mt-0.5 truncate text-[11px] text-zinc-400 sm:mt-1 sm:text-xs">
-                  <span className="sm:hidden">Al marcarlos como vistos</span>
-                  <span className="hidden sm:inline">Usa hoy o una fecha concreta para el episodio.</span>
-                </div>
-              </div>
-
-              {/* En móvil sus dos hijos son celdas de la rejilla de arriba. */}
-              <div className="contents sm:flex sm:items-center">
-                {/* Mismo control segmentado que Lista / Tabla de la barra. */}
-                <div className={`flex h-9 shrink-0 gap-1 rounded-xl ${PAGE_CONTROL} p-1 sm:h-11 sm:rounded-2xl`}>
-                  {[
-                    { id: "today", label: "Hoy" },
-                    { id: "other_date", label: "Otra fecha" },
-                  ].map((option) => (
-                    <button
-                      key={option.id}
-                      type="button"
-                      onClick={() => setRewatchMarkPreset(option.id)}
-                      aria-pressed={rewatchMarkPreset === option.id}
-                      className={`h-full whitespace-nowrap rounded-lg px-2.5 text-xs font-semibold transition-all sm:rounded-xl sm:px-3.5 sm:text-sm ${
-                        rewatchMarkPreset === option.id
-                          ? "bg-white/90 text-black shadow-lg"
-                          : "text-zinc-300 hover:bg-white/10 hover:text-white"
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Campo de fecha: se despliega en vez de aparecer de golpe.
-                    Anima el hueco que ocupa (en móvil, debajo: filas 0fr→1fr;
-                    desde sm, al lado: columnas 0fr→1fr, y el control de al lado
-                    se desplaza a la vez) y el campo entra con un desplazamiento
-                    corto. Sin opacity: aplanaría el cristal. El margen va DENTRO
-                    de lo que anima y el campo sigue montado plegado (invisible +
-                    inert) para poder animar la salida. */}
-                <div
-                  inert={rewatchMarkPreset !== "other_date" || undefined}
-                  className={`col-span-2 grid transition-[grid-template-rows,grid-template-columns,visibility] duration-[280ms] ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${
-                    rewatchMarkPreset === "other_date"
-                      ? "visible grid-rows-[1fr] sm:grid-cols-[1fr]"
-                      : "invisible grid-rows-[0fr] sm:grid-rows-[1fr] sm:grid-cols-[0fr]"
-                  }`}
-                >
-                  <div className="min-h-0 min-w-0 overflow-hidden">
-                    <div
-                      className={`pt-2 transition-transform duration-[280ms] ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none sm:w-[238px] sm:pl-2 sm:pt-0 ${
-                        rewatchMarkPreset === "other_date"
-                          ? "translate-x-0 translate-y-0"
-                          : "-translate-y-2 sm:-translate-x-3 sm:translate-y-0"
-                      }`}
-                    >
-                      <DateTimeField
-                        value={rewatchMarkOtherValue}
-                        onChange={setRewatchMarkOtherValue}
-                        title="Fecha de episodios"
-                        accent="purple"
-                        compact
-                        className="w-full"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Content Area */}
@@ -2543,6 +2496,111 @@ export default function TraktEpisodesWatchedModal({
             </motion.div>
           )}
         </AnimatePresence>
+        {/* Fecha al marcar un episodio visto en un rewatch: hoy u otra,
+            episodio a episodio. Mismo diálogo que la confirmación de abajo. */}
+        <FadePresence
+          show={Boolean(pendingMark)}
+          className="absolute inset-0 z-[70] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+          onClick={cancelMark}
+        >
+          {shownPendingMark && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="episode-mark-title"
+              onClick={(e) => e.stopPropagation()}
+              className={`w-full max-w-sm rounded-3xl p-6 ${LIQUID_GLASS_PANEL}`}
+            >
+              <div className="flex items-start gap-3">
+                <span
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-500/15 text-purple-200"
+                  aria-hidden="true"
+                >
+                  <CalendarClock className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  <h3 id="episode-mark-title" className="text-base font-bold text-white">
+                    ¿Cuándo lo viste?
+                  </h3>
+                  <p className="mt-1.5 truncate text-sm font-semibold text-white">
+                    T{shownPendingMark.sn} · E{shownPendingMark.en}
+                    {shownPendingMark.name ? ` · ${shownPendingMark.name}` : ""}
+                  </p>
+                </div>
+              </div>
+
+              {/* Mismo control segmentado que Lista / Tabla de la barra. */}
+              <div
+                role="group"
+                aria-label="Fecha del episodio"
+                className={`mt-5 flex h-11 gap-1 rounded-2xl ${PAGE_CONTROL} p-1`}
+              >
+                {[
+                  { id: "today", label: "Hoy" },
+                  { id: "other_date", label: "Otra fecha" },
+                ].map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => {
+                      setRewatchMarkPreset(option.id);
+                      setMarkError("");
+                    }}
+                    aria-pressed={rewatchMarkPreset === option.id}
+                    className={`h-full flex-1 whitespace-nowrap rounded-xl text-sm font-semibold transition-all ${
+                      rewatchMarkPreset === option.id
+                        ? "bg-white/90 text-black shadow-lg"
+                        : "text-zinc-300 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+
+              {rewatchMarkPreset === "other_date" && (
+                <DateTimeField
+                  value={rewatchMarkOtherValue}
+                  onChange={(next) => {
+                    setRewatchMarkOtherValue(next);
+                    setMarkError("");
+                  }}
+                  title="Fecha del episodio"
+                  accent="purple"
+                  className="mt-2 w-full"
+                />
+              )}
+
+              {markError && (
+                <p role="alert" className="mt-3 text-xs font-semibold text-red-300">
+                  {markError}
+                </p>
+              )}
+
+              <div className="mt-6 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={cancelMark}
+                  disabled={markBusy}
+                  className="h-11 rounded-xl bg-white/5 text-sm font-bold text-zinc-200 transition hover:bg-white/10 hover:text-white disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60"
+                >
+                  Cancelar
+                </button>
+                <button data-online-only="true"
+                  type="button"
+                  autoFocus
+                  onClick={confirmMark}
+                  disabled={markBusy || !serverOnline}
+                  className="flex h-11 items-center justify-center gap-2 rounded-xl bg-purple-500/90 text-sm font-bold text-white transition hover:bg-purple-500 disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-300"
+                >
+                  {markBusy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                  Marcar visto
+                </button>
+              </div>
+            </div>
+          )}
+        </FadePresence>
+
         {/* Confirmación al desmarcar un episodio visto o quitarlo de
             "Continuar viendo". Vive dentro del panel (lo cubre) para no
             competir con las capas del modal. */}
