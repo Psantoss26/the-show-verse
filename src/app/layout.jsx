@@ -53,14 +53,6 @@ export const viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  // La página se dibuja también en el recorte de la cámara y bajo las barras
-  // del sistema donde la ventana lo permite (la app nativa de Android, a
-  // pantalla completa; iOS). La PWA de Android abre en `standalone`: a
-  // pantalla completa, el gesto de retroceder hacía que Chrome sacara las
-  // barras unos segundos. También activa `env(safe-area-inset-*)`,
-  // que hasta ahora valía 0: la barra inferior y los paneles ya lo usan para
-  // no quedar debajo de la barra de gestos.
-  viewportFit: "cover",
 };
 
 const ANDROID_APP_BOOT_SCRIPT =
