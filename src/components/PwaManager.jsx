@@ -167,7 +167,7 @@ export default function PwaManager() {
       activeColor="blue"
       groupId="pwa-install-action"
       title="Instalar app"
-      className="!fixed !bottom-[calc(5rem+env(safe-area-inset-bottom))] !right-4 !z-50 lg:!bottom-4 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent !border-0 shadow-lg backdrop-blur-md hover:!bg-white/15"
+      className="!fixed !bottom-20 !right-4 !z-50 lg:!bottom-4 !bg-white/5 !bg-gradient-to-br !from-white/20 !via-white/5 !to-transparent !border-0 shadow-lg backdrop-blur-md hover:!bg-white/15"
     >
       <Download className="h-5 w-5" />
     </LiquidButton>
