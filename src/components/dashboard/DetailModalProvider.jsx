@@ -58,6 +58,15 @@ export function useDetailModal() {
   return useContext(DetailModalContext);
 }
 
+// ¿El elemento pulsado está dentro de un modal de la página (p. ej. los
+// episodios agrupados del Historial)? La vista previa abierta desde ahí se
+// superpone a ese modal (ver `overModal`) en vez de quedar debajo, y al
+// cerrarla el modal sigue abierto. Solo se consulta al abrir desde cerrado:
+// en ese momento no hay ficha en pantalla, así que cualquier diálogo es ajeno.
+export function isInsidePageModal(node) {
+  return Boolean(node?.closest?.('[aria-modal="true"]'));
+}
+
 // ANCHO QUE EL DRAWER DERECHO OCUPA EN PANTALLA, publicado como variable CSS
 // en <html>.
 //
@@ -354,6 +363,10 @@ export default function DetailModalProvider({
 
   // Pila de niveles abiertos. El item activo es el de arriba.
   const [stack, setStack] = useState([]);
+  // Abierta desde un modal de la página: el panel sube por ENCIMA de él. Se
+  // decide al abrir desde cerrado y no se limpia al cerrar, para que la
+  // animación de salida siga por encima del modal.
+  const [overModal, setOverModal] = useState(false);
   const activeItem = stack.length > 0 ? stack[stack.length - 1] : null;
 
   // TEMPORADAS Y PERSONAS solo existen como página completa o como panel
@@ -550,6 +563,7 @@ export default function DetailModalProvider({
         commit([...cur.slice(0, -1), item]);
       } else {
         setSwitching(false);
+        setOverModal(Boolean(opts.overModal));
         window.history.pushState({ detailPreview: true }, "", url);
         ownedRef.current = 1;
         commit([item]);
@@ -660,7 +674,7 @@ export default function DetailModalProvider({
           if (!item || !["season", "episode"].includes(item.media_type)) return;
           event.preventDefault();
           event.stopPropagation();
-          openDetailModal(item);
+          openDetailModal(item, { overModal: isInsidePageModal(link) });
         }}
         className="min-w-0 @container/detail-page"
       >
@@ -691,6 +705,7 @@ export default function DetailModalProvider({
             // el panel entrante caía en la rama `else` (deslizar) en vez de hacer
             // el fundido cruzado que corresponde a un cambio con el drawer abierto.
             switching={switching}
+            overModal={overModal}
           />
         )}
       </AnimatePresence>

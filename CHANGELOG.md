@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Ficha rápida abierta desde un modal (por ejemplo, los episodios agrupados del Historial): ahora se ve encima del modal, también con la ficha centrada, donde antes quedaba tapada detrás. Al cerrarla, el modal sigue abierto. → [páginas de usuario](docs/features/paginas-de-usuario.md)
 - Social: el subtítulo de la cabecera («Lo destacado de hoy y la actividad de la gente a la que sigues, y la tuya.») va en una sola línea en tablet y ordenador; antes se partía en dos. → [Hoy](docs/features/hoy.md)
 - Social: al entrar, si en Actividad no hay nada de hoy se abre la Semana, y si la semana también está vacía se abre Siguiendo. Si se elige un día a mano, se respeta. → [Hoy](docs/features/hoy.md)
 - Social: la primera opción de la barra (antes «Hoy») se llama ahora «Actividad»: **Actividad / Siguiendo / Yo**. La píldora del navbar con las historias también pone «Actividad», y el botón de cuadrícula de las historias se llama «Ver toda la actividad». El desplegable Día sigue empezando por «Hoy». → [Hoy](docs/features/hoy.md)

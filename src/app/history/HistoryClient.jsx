@@ -2543,9 +2543,9 @@ function EpisodeSubItem({
   const historyId = getHistoryId(entry);
   const [confirmDel, setConfirmDel] = useState(false);
   // Al pulsar un episodio se abre su PREVIEW (DetailModal drawer), igual que las
-  // tarjetas del historial, en vez de navegar a la ficha completa. El modal de
-  // grupo queda por encima (z), así que la preview se abre por detrás y se puede
-  // seguir seleccionando episodios.
+  // tarjetas del historial, en vez de navegar a la ficha completa. Al abrirse
+  // desde este modal la preview se superpone a él (`overModal`) y, al cerrarla,
+  // el modal sigue abierto.
   const previewClick = usePreviewOpen();
   const showTmdbId = getTmdbId(entry);
   const onPreviewClick = previewClick(entry, {
@@ -2677,8 +2677,9 @@ function ExpandedGroupView({ entry, onCollapse, onRemoveFromHistory, busyId }) {
 
   return createPortal(
     <motion.div
-      // z-[10000] > z-[9999] de DetailModal: el modal de grupo se superpone SOBRE
-      // la preview. Con el drawer derecho abierto, `right: var(--sv-drawer-width)`
+      // z-[10000] > z-[9999] de DetailModal: el modal de grupo tapa una preview
+      // abierta antes; la que se abre DESDE él sube a z-[10001] (`overModal`) y
+      // queda encima. Con el drawer derecho abierto, `right: var(--sv-drawer-width)`
       // restringe su zona (y su fondo difuminado) al espacio LIBRE a la izquierda,
       // así se centra ahí y NO tapa la preview. Sin drawer la var es 0px → ventana
       // completa (centrado normal). El cambio de anchura se anima con transition.
