@@ -236,6 +236,91 @@ export default function MobileOptionsSheet({
   );
 }
 
+// Fila deslizable de las listas largas (p. ej. años), de borde a borde de la
+// hoja en vez de decenas de filas. En el móvil se desliza con el dedo; con
+// ratón no había forma (sin barra y la rueda solo va en vertical), así que:
+//   - la rueda vertical la mueve en horizontal mientras le quede recorrido en
+//     ese sentido; al llegar al final, la rueda vuelve a mover la hoja;
+//   - se puede arrastrar con el ratón, y el clic que cierra un arrastre no
+//     elige la píldora en la que se suelta.
+const DRAG_SCROLL_THRESHOLD = 5;
+
+function SheetScrollRow({ children }) {
+  const rowRef = useRef(null);
+  const dragRef = useRef(null);
+
+  // `wheel` con `passive: false` (el de React es pasivo y no deja anularlo).
+  useEffect(() => {
+    const row = rowRef.current;
+    if (!row) return undefined;
+    const onWheel = (event) => {
+      if (event.ctrlKey || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+      const max = row.scrollWidth - row.clientWidth;
+      if (max <= 0) return;
+      const delta = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY;
+      const canMove = delta > 0 ? row.scrollLeft < max - 1 : row.scrollLeft > 0;
+      if (!canMove) return;
+      event.preventDefault();
+      row.scrollLeft += delta;
+    };
+    row.addEventListener("wheel", onWheel, { passive: false });
+    return () => row.removeEventListener("wheel", onWheel);
+  }, []);
+
+  const onPointerDown = (event) => {
+    if (event.pointerType !== "mouse" || event.button !== 0) return;
+    dragRef.current = { x: event.clientX, left: rowRef.current.scrollLeft, moved: false, id: event.pointerId };
+  };
+  const onPointerMove = (event) => {
+    const drag = dragRef.current;
+    if (!drag || drag.id !== event.pointerId) return;
+    const dx = event.clientX - drag.x;
+    if (!drag.moved && Math.abs(dx) < DRAG_SCROLL_THRESHOLD) return;
+    if (!drag.moved) {
+      drag.moved = true;
+      rowRef.current.setPointerCapture?.(event.pointerId);
+    }
+    rowRef.current.scrollLeft = drag.left - dx;
+  };
+  const endDrag = (event) => {
+    const drag = dragRef.current;
+    if (!drag || drag.id !== event.pointerId) return;
+    // El clic llega justo después del pointerup: se marca para descartarlo.
+    // Si se suelta fuera no hay clic, y la marca caduca para no comerse el
+    // siguiente.
+    if (drag.moved) {
+      const marker = { suppressClick: true };
+      dragRef.current = marker;
+      window.setTimeout(() => {
+        if (dragRef.current === marker) dragRef.current = null;
+      }, 0);
+    } else {
+      dragRef.current = null;
+    }
+  };
+  const onClickCapture = (event) => {
+    if (dragRef.current?.suppressClick) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    dragRef.current = null;
+  };
+
+  return (
+    <div
+      ref={rowRef}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+      onClickCapture={onClickCapture}
+      className="-mx-5 flex select-none gap-2 overflow-x-auto overscroll-x-contain px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0"
+    >
+      {children}
+    </div>
+  );
+}
+
 // Grupo con título (icono + etiqueta) y sus opciones como píldoras: en filas
 // (`wrap`), una debajo de otra (`stack`), a mitades (`grid`) o en una sola fila
 // deslizable (`scroll`). `children`
@@ -254,21 +339,21 @@ export function SheetOptionGroup({ label, icon: Icon, children, layout = "wrap",
           {label}
         </h3>
       ) : null}
-      <div
-        className={
-          layout === "stack"
-            ? "flex flex-col gap-2"
-            : layout === "grid"
-              ? "grid grid-cols-2 gap-2"
-              : layout === "scroll"
-                ? // Listas largas (p. ej. años): una fila que se desliza de
-                  // borde a borde de la hoja en vez de decenas de filas.
-                  "-mx-5 flex gap-2 overflow-x-auto overscroll-x-contain px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0"
+      {layout === "scroll" ? (
+        <SheetScrollRow>{content}</SheetScrollRow>
+      ) : (
+        <div
+          className={
+            layout === "stack"
+              ? "flex flex-col gap-2"
+              : layout === "grid"
+                ? "grid grid-cols-2 gap-2"
                 : "flex flex-wrap gap-2"
-        }
-      >
-        {content}
-      </div>
+          }
+        >
+          {content}
+        </div>
+      )}
     </section>
   );
 }

@@ -101,6 +101,15 @@ test("la hoja usa el cristal de los modales y entra solo con transform", () => {
   assert.doesNotMatch(panelKeyframes, /opacity/);
 });
 
+test("las filas deslizables (años) se mueven con la rueda y arrastrando con el ratón", () => {
+  // Sin barra y con la rueda solo en vertical, en el ordenador no se movían.
+  assert.match(sheet, /row\.addEventListener\("wheel", onWheel, \{ passive: false \}\)/);
+  assert.match(sheet, /row\.scrollLeft \+= delta/);
+  assert.match(sheet, /event\.pointerType !== "mouse"/);
+  // El clic que cierra un arrastre no elige la píldora.
+  assert.match(sheet, /onClickCapture={onClickCapture}/);
+});
+
 test("la hoja bloquea el scroll, cierra con Escape y se arrastra hacia abajo", () => {
   assert.match(sheet, /useModalGuard\(\{ open, onClose \}\)/);
   assert.match(sheet, /onPointerDown={onDragStart}/);
