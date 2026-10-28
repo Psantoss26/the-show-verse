@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- App instalada (PWA) en Android: la franja de la barra de navegación del sistema ya no sale negra. El contenido pasa por detrás, como en el navegador, y la barra inferior de la app se coloca justo encima de la barra de gestos. → [páginas](docs/frontend/app-router-pages.md)
 - Vista previa de pulsación larga en el móvil: el pie del póster y el fondo de la tarjeta son los de la ficha móvil. El borde inferior se prolonga difuminado en vez de fundirse con el cristal, y detrás de los botones y el marcador de puntuaciones se ve el póster muy difuminado, oscurecido lo justo para que se lean sobre pósters claros. → [vista previa móvil](docs/features/vista-previa-movil.md)
 - Móvil, menú lateral de secciones: usa el mismo cristal que la hoja de filtros de las páginas de usuario —panel translúcido sobre un velo oscuro y desenfocado, cabecera con degradado de luz en vez de línea separadora, esquinas más redondeadas y el mismo botón de cerrar—. → [componentes](docs/frontend/components.md)
 - Ordenador, barra lateral: al pasar el ratón por un botón, el icono crece y toma el color de su sección, y detrás aparece una lente de cristal líquido del mismo tono que crece desde el centro con un leve rebote. En la sección activa, donde ya está la cápsula, solo crece el icono. → [componentes](docs/frontend/components.md)
