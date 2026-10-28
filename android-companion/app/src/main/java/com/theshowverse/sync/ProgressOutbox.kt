@@ -32,7 +32,7 @@ object ProgressOutbox {
             entries.put(JSONObject().put("owner", owner(origin, token)).put("payload", payload))
             check(prefs.savePendingProgress(entries.toString())) { "No se pudo guardar el progreso" }
         }
-        schedule(context)
+        schedule(context, deliverNow = true)
     }
     fun pendingCount(context: Context): Int = synchronized(storageLock) { read(Prefs(context)).length() }
     internal fun first(prefs: Prefs): JSONObject? = synchronized(storageLock) {
@@ -96,10 +96,20 @@ object ProgressOutbox {
         check(prefs.savePendingProgress(entries.toString()))
         attempts
     }
-    fun schedule(context: Context) {
+    /**
+     * Programa la entrega. [deliverNow] (un punto nuevo en la cola) SUSTITUYE la
+     * entrega pendiente en vez de conservarla: con `KEEP`, una entrega que se
+     * estaba reintentando (un fallo de red, un evento que el servidor aún no sabe
+     * identificar) seguía esperando su retraso, que se duplica en cada intento
+     * (10 s, 20 s, 40 s… hasta horas), y los puntos que llegaban cada 30 s se
+     * quedaban en la cola sin salir: Continuar viendo se quedaba con el primero y
+     * no avanzaba mientras se veía el título. Sustituirla es seguro: la entrega
+     * va bajo `deliveryLock` y el servidor deduplica por `eventId`.
+     */
+    fun schedule(context: Context, deliverNow: Boolean = false) {
         val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
         val manager = WorkManager.getInstance(context.applicationContext)
-        manager.enqueueUniqueWork(WORK, ExistingWorkPolicy.KEEP,
+        manager.enqueueUniqueWork(WORK, if (deliverNow) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
             OneTimeWorkRequestBuilder<ProgressWorker>().setConstraints(constraints)
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.SECONDS).build())
         // Recovery after reboot/process death, including an enqueue at the end of a running worker.
@@ -123,7 +133,11 @@ class ProgressWorker(context: Context, params: WorkerParameters) : Worker(contex
             val entry = ProgressOutbox.first(prefs) ?: return@synchronized Result.success()
             val payload = entry.getJSONObject("payload")
             val eventId = payload.getString("eventId")
-            if (!attempted.add(eventId)) return@synchronized Result.retry()
+            // Vuelta completa: lo que queda no se puede entregar ahora (títulos que el
+            // servidor aún no identifica). No es un fallo de esta entrega: se da por
+            // terminada y lo que quede sale con el próximo punto o con la
+            // recuperación periódica. Con `retry` el retraso crecía sin parar.
+            if (!attempted.add(eventId)) return@synchronized Result.success()
             val response = try { SyncClient.deliver(origin, token, payload) }
                 catch (_: Exception) { return@synchronized Result.retry() }
             if (prefs.origin != origin || prefs.token != token) return@synchronized Result.success()
