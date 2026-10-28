@@ -64,6 +64,9 @@ export default function SectionSheet({
   headerAction = null,
   // Control junto a las pestañas, en su misma fila (p. ej. «Más likes»).
   tabsAccessory = null,
+  // Pestañas que no caben: pasan a otra fila en vez de desplazarse de lado
+  // (p. ej. los tipos de vídeo, que pueden ser muchos).
+  wrapTabs = false,
   // Pie fijo bajo la lista (p. ej. «Cancelar / Guardar» de un editor).
   footer = null,
   // Control a la derecha del buscador, en su misma fila (p. ej. el botón que
@@ -157,7 +160,9 @@ export default function SectionSheet({
             <div
               role="tablist"
               aria-label={title}
-              className={`flex min-w-0 flex-1 gap-1 overflow-x-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${SHEET_CONTROL}`}
+              className={`flex min-w-0 flex-1 gap-1 p-1 ${
+                wrapTabs ? "flex-wrap" : "overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              } ${SHEET_CONTROL}`}
             >
               {tabs.map((tab) => {
                 const active = tab.id === activeTab;

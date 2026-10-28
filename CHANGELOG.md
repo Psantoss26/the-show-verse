@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Ficha de película o serie, vista lateral de «Tráiler y vídeos»: cuando hay muchos tipos de vídeo, las pestañas que no caben pasan a una segunda fila; antes la última quedaba recortada en el borde. → [páginas](docs/frontend/app-router-pages.md)
 - Ficha de película o serie, vista lateral de «Tráiler y vídeos»: si hay vídeos de más de un tipo, bajo el título salen pestañas para filtrar por tipo con cuántos hay de cada uno (Todos, Tráiler, Teaser, Clip, Featurette, Detrás de las cámaras…), como en Premios o Reparto. → [páginas](docs/frontend/app-router-pages.md)
 - Ficha de película o serie: restablecer «Portadas y fondos» tras elegir una imagen, salir y volver a entrar ya vuelve al momento a la portada y el fondo automáticos, en la ficha y en la vista lateral. Antes, entrando de nuevo desde otra página (no con «atrás»), no hacía nada hasta recargar. → [páginas](docs/frontend/app-router-pages.md)
 - Ficha, temporada y colección: restablecer las imágenes elegidas en una visita anterior ya vuelve a la portada por defecto al momento, en la página y en la vista lateral. Antes seguía saliendo la misma imagen hasta recargar, porque la propia elección contaba como «la más votada» que la página había leído al entrar. → [páginas](docs/frontend/app-router-pages.md)

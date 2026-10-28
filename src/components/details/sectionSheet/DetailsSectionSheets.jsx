@@ -711,6 +711,7 @@ function VideosSheet({ meta, data, onClose, tab, setTab }) {
       icon={meta.icon}
       subtitle={plural(videos.length, "vídeo", "vídeos")}
       tabs={tabs}
+      wrapTabs
       activeTab={activeTab}
       onTabChange={setTab}
     >
