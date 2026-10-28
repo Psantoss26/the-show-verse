@@ -2314,9 +2314,10 @@ html[data-android-app] {
    Los tintes de cada superficie se quedan, así que se ven como cristal
    esmerilado sin desenfoque. Los `filter` de las imágenes (portadas
    difuminadas de fondo) no se tocan: se rasterizan una vez y no cuestan al
-   desplazar. Se salva solo la franja de la barra de estado
-   (`data-sv-keep-blur`, layout.jsx): pequeña y pedida expresamente. */
-html[data-android-app] *:not([data-sv-keep-blur]),
+   desplazar. Sin excepciones: también se probó a dejar un cristal fijo
+   bajo la barra de estado y era lo peor de todo (se difumina en cada
+   fotograma en todas las páginas); ahí va un degradado (layout.jsx). */
+html[data-android-app] *,
 html[data-android-app] *::before,
 html[data-android-app] *::after {
   backdrop-filter: none !important;
