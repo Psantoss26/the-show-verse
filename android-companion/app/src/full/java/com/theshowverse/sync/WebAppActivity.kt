@@ -460,11 +460,15 @@ class WebAppActivity : AppCompatActivity() {
 
     /**
      * Huecos de las barras y de la cámara. La app va siempre a pantalla completa
-     * (ver `pantallaCompleta`), así que las barras del sistema, ocultas, dan
-     * insets 0 y solo queda el recorte de la cámara.
+     * (ver `pantallaCompleta`).
      *
-     * La WEB no se rellena: llega hasta el borde, y si aquí se rellenara el
-     * hueco de la cámara volvería a ser una franja negra. La web reconoce la
+     * La WEB NO SE RELLENA NUNCA, ni con las barras ni con la cámara: llega
+     * hasta el borde. Rellenarla con el hueco de la cámara lo dejaba en una
+     * franja negra. Y con el de las barras se movía al salir de la app: en
+     * recientes el sistema vuelve a mostrarlas, el relleno encogía y bajaba el
+     * WebView justo mientras se capturaba la miniatura, y en ella salía la
+     * barra superior DUPLICADA en el hueco de la barra de estado (y lo mismo
+     * abajo). Las barras, cuando aparecen, van por encima del contenido. La web reconoce la
      * app por el user agent (`data-android-app`) y deja su barra superior
      * arriba del todo, sin el logo central que taparía la cámara y con más
      * margen a los lados por las esquinas redondeadas. El círculo de recargar
@@ -473,11 +477,12 @@ class WebAppActivity : AppCompatActivity() {
      * El panel de error, nativo, sí esquiva barras y cámara con relleno.
      */
     private fun configurarInsets() {
-        ViewCompat.setOnApplyWindowInsetsListener(binding.refresh) { view, insets ->
-            val barras = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+        ViewCompat.setOnApplyWindowInsetsListener(binding.refresh) { _, insets ->
+            // Para las vistas nativas, el hueco de la barra de estado AUNQUE
+            // esté oculta: así no se mueven cuando aparece y desaparece.
+            val estado = insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.statusBars())
             val camara = insets.getInsets(WindowInsetsCompat.Type.displayCutout())
-            view.setPadding(barras.left, barras.top, barras.right, barras.bottom)
-            val arriba = maxOf(barras.top, camara.top)
+            val arriba = maxOf(estado.top, camara.top)
             bajarIndicadorDeRecarga(arriba)
             binding.frameMeter.translationY = arriba.toFloat()
             insets
