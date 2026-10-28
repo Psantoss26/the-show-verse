@@ -9,7 +9,7 @@ import { ImageOff, ListVideo, Music2, Play, ThumbsUp, User } from "lucide-react"
 import OptimizedImage from "@/components/OptimizedImage";
 import Avatar from "@/components/ui/Avatar";
 import { getSoundtrackSourceBadge } from "@/lib/details/soundtrackSource";
-import { videoThumbUrl } from "@/lib/details/videos";
+import { videoThumbUrl, videoTypeLabel } from "@/lib/details/videos";
 
 const ROW_BASE = "flex items-center rounded-2xl bg-black/15 transition-colors";
 const ROW = `${ROW_BASE} gap-3.5 p-2.5`;
@@ -222,17 +222,6 @@ export function TitleRow({
   return rowLink;
 }
 
-const VIDEO_TYPES = {
-  Trailer: "Tráiler",
-  Teaser: "Teaser",
-  Clip: "Clip",
-  Featurette: "Featurette",
-  "Behind the Scenes": "Detrás de las cámaras",
-  Bloopers: "Tomas falsas",
-  "Opening Credits": "Créditos iniciales",
-  Recap: "Resumen",
-};
-
 /** Vídeo: miniatura, nombre, tipo y fecha; abre el reproductor de la ficha. */
 export function VideoRow({ video, onPlay }) {
   const date = video?.published_at ? new Date(video.published_at) : null;
@@ -255,7 +244,7 @@ export function VideoRow({ video, onPlay }) {
       <span className="min-w-0 flex-1">
         <span className="block line-clamp-2 text-sm font-bold leading-tight text-white">{video?.name || "Vídeo"}</span>
         <span className="mt-1 block text-xs font-bold text-zinc-400">
-          {[VIDEO_TYPES[video?.type] || video?.type, dateLabel].filter(Boolean).join(" · ")}
+          {[video?.type ? videoTypeLabel(video.type) : null, dateLabel].filter(Boolean).join(" · ")}
         </span>
       </span>
     </button>

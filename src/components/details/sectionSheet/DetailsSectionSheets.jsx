@@ -42,6 +42,7 @@ import { AwardRow } from "@/components/details/AwardCard";
 import SeasonCard from "@/components/details/SeasonCard";
 import TraktCommentCard from "@/components/details/TraktCommentCard";
 import { buildCrewGroups, crewRoleLabel } from "@/lib/details/sectionSheetData";
+import { videoTypeOptions } from "@/lib/details/videos";
 import { DropdownItem, InlineDropdown } from "@/components/details/CreditFilterControls";
 import MobileOptionsSheet, { SheetAction, SheetOptionGroup } from "@/components/ui/MobileOptionsSheet";
 import useImdbScoreLoader from "@/hooks/useImdbScoreLoader";
@@ -688,13 +689,34 @@ export function ImagesSheet({ meta, data, onClose, tab, setTab }) {
 
 // ─── Vídeos y soundtrack ──────────────────────────────────────────────────
 
-function VideosSheet({ meta, data, onClose }) {
+function VideosSheet({ meta, data, onClose, tab, setTab }) {
   const videos = Array.isArray(data.videos) ? data.videos : [];
+  // Pestañas por tipo (Tráiler, Teaser, Clip…), en el orden de relevancia en
+  // que llega la lista; solo si hay más de un tipo.
+  const typeOptions = videoTypeOptions(videos);
+  const tabs =
+    typeOptions.length > 1
+      ? [
+          { id: "all", label: "Todos", count: videos.length },
+          ...typeOptions.map((option) => ({ id: option.type, label: option.label, count: option.count })),
+        ]
+      : null;
+  const activeTab = tabs && tab ? tab : "all";
+  const visible = activeTab === "all" ? videos : videos.filter((video) => (video?.type || "Other") === activeTab);
   return (
-    <SectionSheet open onClose={onClose} title={meta.title} icon={meta.icon} subtitle={plural(videos.length, "vídeo", "vídeos")}>
-      {videos.length ? (
+    <SectionSheet
+      open
+      onClose={onClose}
+      title={meta.title}
+      icon={meta.icon}
+      subtitle={plural(videos.length, "vídeo", "vídeos")}
+      tabs={tabs}
+      activeTab={activeTab}
+      onTabChange={setTab}
+    >
+      {visible.length ? (
         <ul className="space-y-2">
-          {videos.map((video) => (
+          {visible.map((video) => (
             <li key={video.id || video.key}>
               <VideoRow
                 video={video}

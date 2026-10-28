@@ -71,3 +71,30 @@ export const playableRankedVideos = (videos) => {
     list.sort((a, b) => rankVideo(a) - rankVideo(b))
     return list
 }
+
+// Nombre en español de cada tipo de vídeo de TMDb (los que no estén aquí se
+// muestran tal cual).
+export const VIDEO_TYPE_LABELS = {
+    Trailer: 'Tráiler',
+    Teaser: 'Teaser',
+    Clip: 'Clip',
+    Featurette: 'Featurette',
+    'Behind the Scenes': 'Detrás de las cámaras',
+    Bloopers: 'Tomas falsas',
+    'Opening Credits': 'Créditos iniciales',
+    Recap: 'Resumen'
+}
+
+export const videoTypeLabel = (type) => VIDEO_TYPE_LABELS[type] || type || 'Vídeo'
+
+// Tipos presentes en una lista de vídeos, en el orden en que aparecen (la
+// lista ya llega ordenada por relevancia, así que Tráiler va primero), con
+// cuántos vídeos hay de cada uno.
+export const videoTypeOptions = (videos) => {
+    const counts = new Map()
+    for (const v of videos || []) {
+        const type = v?.type || 'Other'
+        counts.set(type, (counts.get(type) || 0) + 1)
+    }
+    return [...counts].map(([type, count]) => ({ type, count, label: videoTypeLabel(type === 'Other' ? null : type) }))
+}
