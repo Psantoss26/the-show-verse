@@ -3,6 +3,7 @@
 
 import OptimizedImage from "@/components/OptimizedImage";
 import Link from "next/link";
+import LoginRequiredScreen from "@/components/auth/LoginRequiredScreen";
 import { createPortal } from "react-dom";
 import {
   useEffect,
@@ -2728,23 +2729,14 @@ export default function ListsPage() {
 
   if (authStatus === "anonymous" && source === "personal") {
     return (
-      <div className="min-h-screen bg-black text-gray-100 flex items-center justify-center">
-        <div className="max-w-md text-center px-4">
-          <div className="w-16 h-16 bg-zinc-900 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg border border-zinc-800">
-            <ListVideo className="w-8 h-8 text-zinc-500" />
-          </div>
-          <h1 className="text-2xl font-bold text-white mb-3">Mis Listas</h1>
-          <p className="text-zinc-400 mb-8">
-            Inicia sesión para gestionar tus listas personalizadas.
-          </p>
-          <Link
-            href="/login?next=/lists"
-            className="px-8 py-3 bg-white text-black rounded-full font-bold hover:bg-zinc-200 transition"
-          >
-            Iniciar Sesión
-          </Link>
-        </div>
-      </div>
+      <LoginRequiredScreen
+        theme="purple"
+        eyebrow="TUS LISTAS"
+        title="Mis Listas"
+        description="Gestiona y organiza tus listas personales."
+        message="Inicia sesión para gestionar tus listas personalizadas."
+        next="/lists"
+      />
     );
   }
 

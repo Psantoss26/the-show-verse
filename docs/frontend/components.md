@@ -44,6 +44,7 @@ Layout global, dashboards y páginas de detalle "grandes".
 | `LoginForm.jsx` | Formulario de login/registro (usa `useAuth()`), sanitiza `?next=`. |
 | `LoginButton.jsx` | Botón de acceso rápido que redirige a `/login?next=...`. |
 | `UserAvatar.jsx` | Avatar del usuario (iniciales si no hay imagen) enlazado a `/profile`. |
+| `LoginRequiredScreen.jsx` | Pantalla «Inicia sesión» sin sesión en Favoritos, Pendientes, Mis listas y Social: cabecera de la sección, manchas de su color (`theme`: red, blue, purple, pink) y tarjeta de cristal con logo y botón a `/login?next=`. |
 
 ## `dashboard/`
 

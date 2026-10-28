@@ -8,7 +8,7 @@
 // opción más de esa barra y lleva sus filtros en el mismo menú.
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
+import LoginRequiredScreen from "@/components/auth/LoginRequiredScreen";
 import { Activity, Flame, Users } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
@@ -87,22 +87,14 @@ export default function SocialHub({ initialView, initialToday }) {
 
   if (!session || !account?.id) {
     return (
-      <div className="min-h-screen bg-black font-sans text-zinc-100">
-        <div className="relative z-10 mx-auto max-w-[1600px] px-4 py-24 text-center sm:px-6 lg:px-8">
-          <h1 className="text-4xl font-bold tracking-tighter text-white">
-            Social<span className="text-pink-500">.</span>
-          </h1>
-          <p className="mt-3 text-zinc-400">
-            Inicia sesión para ver qué está viendo hoy la gente a la que sigues.
-          </p>
-          <Link
-            href="/login?next=/social"
-            className="mt-6 inline-block rounded-2xl bg-gradient-to-br from-pink-500 to-fuchsia-600 px-6 py-3 text-sm font-bold text-white shadow-lg"
-          >
-            INICIAR SESIÓN
-          </Link>
-        </div>
-      </div>
+      <LoginRequiredScreen
+        theme="pink"
+        eyebrow="COMUNIDAD"
+        title="Social"
+        description="Lo destacado de hoy y la actividad de la gente a la que sigues, y la tuya."
+        message="Inicia sesión para ver qué está viendo hoy la gente a la que sigues."
+        next="/social"
+      />
     );
   }
 
