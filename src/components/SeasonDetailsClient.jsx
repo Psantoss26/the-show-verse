@@ -36,6 +36,7 @@ import {
   MOBILE_REVEAL_BASE,
   MOBILE_STATS_REVEAL_BASE,
   MOBILE_SCOREBOARD_ENTRY_ANIMATION,
+  MOBILE_SCOREBOARD_REVEAL_ANIMATION,
   MobileHeroCover,
   useMobileDetailsHero,
 } from "@/components/details/MobileDetailsHero";
@@ -608,8 +609,14 @@ export default function SeasonDetailsClient({
     fitCover: true,
     fitGap: 20,
     // Incluso en teléfonos bajos prima mantener visibles las puntuaciones:
-    // el póster puede recortarse por debajo del mínimo habitual de 75vw.
+    // el hueco del póster puede bajar del mínimo habitual de 75vw.
     fitCoverMinRatio: 0,
+    // Nada encima del póster (lleva el título impreso al pie): si con el
+    // marcador se recortaría mucho, solo quedan los botones sobre el navbar y
+    // el marcador aparece con el scroll.
+    fitCoverPosterRatio: 1.5,
+    fitCoverScoreboardOptional: true,
+    fitCoverOverlap: false,
   });
   // En teléfono empieza compacto; las estadísticas se revelan con el scroll.
   const mobileScoreboardMode = isPhone ? heroScoreboardMode : "full";
@@ -1606,8 +1613,9 @@ export default function SeasonDetailsClient({
             // completa, como en el panel de títulos (EmbeddedDetailsBridge).
             data-mobile-cover-spacer=""
             className="relative -mx-4 w-[calc(100%+2rem)] max-w-none flex-shrink-0 sm:hidden"
-            // Solo la portada: los botones van justo debajo.
-            style={{ height: "var(--mobile-cover-h)" }}
+            // Solo la portada: los botones van justo debajo. En pantallas
+            // bajas el hueco es más corto que la imagen (ver arriba).
+            style={{ height: "var(--mobile-cover-flow-h, var(--mobile-cover-h))" }}
           />
 
           {/* Left poster */}
@@ -1770,14 +1778,19 @@ export default function SeasonDetailsClient({
               ref={heroScoreboardRef}
               // Centrado entre los botones y el navbar inferior (ver
               // `--mobile-scoreboard-shift` en details/MobileDetailsHero).
+              // En 'hidden' (no cabe sin recortar mucho la portada) entra
+              // con el scroll, como lo secundario, y ya completo.
               className={`mb-6 max-sm:mt-[var(--mobile-scoreboard-shift,0px)] ${mobileScoreboardMode === "compact" ? MOBILE_STATS_REVEAL_BASE : ""} ${
-                !animateMobileEntry
-                  ? ""
-                  : mobileCoverReady
-                    ? MOBILE_SCOREBOARD_ENTRY_ANIMATION
-                    : "max-sm:invisible"
+                mobileScoreboardMode === "hidden"
+                  ? `${MOBILE_REVEAL_BASE} ${animateMobileEntry ? MOBILE_SCOREBOARD_REVEAL_ANIMATION : ""}`
+                  : !animateMobileEntry
+                    ? ""
+                    : mobileCoverReady
+                      ? MOBILE_SCOREBOARD_ENTRY_ANIMATION
+                      : "max-sm:invisible"
               }`}
               {...(mobileScoreboardMode === "compact" ? heroStatsRevealProps : {})}
+              {...(mobileScoreboardMode === "hidden" ? heroRevealProps : {})}
             >
             <DetailsScoreboardPanel
               mobileScoresOnly

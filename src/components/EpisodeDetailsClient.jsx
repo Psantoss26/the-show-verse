@@ -41,6 +41,7 @@ import {
   MOBILE_REVEAL_BASE,
   MOBILE_STATS_REVEAL_BASE,
   MOBILE_SCOREBOARD_ENTRY_ANIMATION,
+  MOBILE_SCOREBOARD_REVEAL_ANIMATION,
   MobileHeroCover,
   useMobileDetailsHero,
 } from "@/components/details/MobileDetailsHero";
@@ -434,7 +435,15 @@ export default function EpisodeDetailsClient({
     revealProps: heroRevealProps,
     statsRevealProps: heroStatsRevealProps,
     rootStyle: heroRootStyle,
-  } = useMobileDetailsHero(true, { lock: mobileCoverReady, fitCover: pathname?.startsWith("/embed/details/"), fitGap: 20, fitCoverMinRatio: 0 });
+  } = useMobileDetailsHero(true, { lock: mobileCoverReady, fitCover: true,
+    fitGap: 20,
+    fitCoverMinRatio: 0,
+    // Como las temporadas: botones siempre a la vista sobre el navbar; el
+    // marcador, de entrada solo si cabe sin recortar mucho la portada.
+    fitCoverPosterRatio: 1.5,
+    fitCoverScoreboardOptional: true,
+    fitCoverOverlap: false,
+  });
   // Qué cabe bajo los botones sin recortar la portada (solo teléfono).
   const mobileScoreboardMode = isPhone ? heroScoreboardMode : "full";
 
@@ -1685,7 +1694,9 @@ export default function EpisodeDetailsClient({
             // completa, como en el panel de títulos (EmbeddedDetailsBridge).
             data-mobile-cover-spacer=""
             className="relative -mx-4 w-[calc(100%+2rem)] max-w-none flex-shrink-0 sm:hidden"
-            style={{ height: "var(--mobile-cover-h)" }}
+            // En el panel en pantallas bajas el hueco (con el título al pie)
+            // es más corto que la portada, que no se recorta por arriba.
+            style={{ height: "var(--mobile-cover-flow-h, var(--mobile-cover-h))" }}
           >
             {mobileCoverReady ? (
               <motion.div
@@ -1899,14 +1910,19 @@ export default function EpisodeDetailsClient({
               // Centrado entre los botones y el navbar inferior (ver
               // `--mobile-scoreboard-shift` en details/MobileDetailsHero); en
               // 'compact' la barra de stats se revela con el scroll.
+              // En 'hidden' (no cabe sin recortar mucho la portada) entra
+              // con el scroll, como lo secundario, y ya completo.
               className={`mb-6 max-sm:mt-[var(--mobile-scoreboard-shift,0px)] ${mobileScoreboardMode === "compact" ? MOBILE_STATS_REVEAL_BASE : ""} ${
-                !animateMobileEntry
-                  ? ""
-                  : mobileCoverReady
-                    ? MOBILE_SCOREBOARD_ENTRY_ANIMATION
-                    : "max-sm:invisible"
+                mobileScoreboardMode === "hidden"
+                  ? `${MOBILE_REVEAL_BASE} ${animateMobileEntry ? MOBILE_SCOREBOARD_REVEAL_ANIMATION : ""}`
+                  : !animateMobileEntry
+                    ? ""
+                    : mobileCoverReady
+                      ? MOBILE_SCOREBOARD_ENTRY_ANIMATION
+                      : "max-sm:invisible"
               }`}
               {...(mobileScoreboardMode === "compact" ? heroStatsRevealProps : {})}
+              {...(mobileScoreboardMode === "hidden" ? heroRevealProps : {})}
             >
             <DetailsScoreboardPanel
               mobileScoresOnly

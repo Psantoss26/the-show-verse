@@ -188,6 +188,10 @@ const MOBILE_SCOREBOARD_MIN_GAP_PX = 16
 // de los botones.
 export const MOBILE_SCOREBOARD_ENTRY_ANIMATION =
     'max-sm:motion-safe:*:animate-sv-mobile-scoreboard-reveal max-sm:*:[animation-delay:140ms]'
+// Marcador en modo 'hidden' (con `revealProps`): entra al revelarse. Copia de
+// la de DetailsClient.
+export const MOBILE_SCOREBOARD_REVEAL_ANIMATION =
+    'max-sm:motion-safe:data-[mobile-reveal=shown]:*:animate-sv-mobile-scoreboard-reveal max-sm:*:[animation-duration:280ms]'
 // Cascada de entrada de la fila de acciones (globals.css).
 export const MOBILE_ACTIONS_ENTRY_ANIMATION = 'sv-mobile-actions-reveal sv-mobile-actions-rise'
 const HERO_SCROLL_TIMELINE_QUERY = '(animation-timeline: scroll()) and (animation-range: 0% 100%)'
@@ -263,8 +267,29 @@ export function readBottomNavTop() {
  * la página pone el logo). Así esas piezas quedan en la misma posición en
  * cualquier móvil: en los altos la portada crece y se recorta por los lados;
  * en los bajos, se recorta por arriba (`object-bottom`).
+ *
+ * `fitCoverPosterRatio` (la ficha: 1.5, el póster 2:3): en los bajos la
+ * portada NO se recorta por arriba. El hueco en flujo sigue midiendo lo que
+ * sobra (`--mobile-cover-flow-h`, donde la página pone el logo), pero la
+ * imagen (`--mobile-cover-h`) nunca baja de ese múltiplo del ancho y sigue por
+ * detrás del logo, los botones y el marcador.
+ *
+ * `fitCoverScoreboardOptional` (ficha, temporadas y episodios): si con el marcador
+ * la portada quedara por debajo de `fitCoverPosterRatio` (con un margen:
+ * MOBILE_FIT_POSTER_MAX_CROP, un recorte pequeño por arriba vale más que
+ * esconder el marcador en móviles normales), el marcador deja de
+ * verse de entrada (`scoreboardMode` 'hidden': la página le pone `revealProps`
+ * y aparece con el scroll, como lo secundario) y la portada llega hasta los
+ * botones, que quedan a `fitGap` del navbar inferior.
+ *
+ * `fitCoverOverlap` (por defecto; la ficha: póster sin idioma con el logo
+ * encima): la imagen sigue sin bajar de `fitCoverPosterRatio` por detrás del
+ * logo y los botones. Temporadas y episodios lo apagan (su póster lleva el
+ * título impreso al pie y nada puede ir encima): la imagen mide lo que el
+ * hueco y, si ni así cabe, se recorta por arriba.
  */
 const HERO_SCROLL_END_SETTLE_MS = 150
+const MOBILE_FIT_POSTER_MAX_CROP = 0.1
 
 const HERO_ROOT_START_STYLE = {
     '--mobile-cover-top': '0px',
@@ -272,7 +297,7 @@ const HERO_ROOT_START_STYLE = {
     '--mobile-scoreboard-shift': '0px',
 }
 
-export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, fitGap = 20, fitCoverMinRatio = 0.75 } = {}) {
+export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, fitGap = 20, fitCoverMinRatio = 0.75, fitCoverPosterRatio = 0, fitCoverScoreboardOptional = false, fitCoverOverlap = true } = {}) {
     const rootRef = useRef(null)
     const coverSpacerRef = useRef(null)
     const actionRowRef = useRef(null)
@@ -403,15 +428,26 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
                 // render de la página entera a mitad de la animación.
                 const visibleCompact = total - readInnerHeight(statsRow)
                 const coverDocTop = spacerRect.top + window.scrollY
+                const posterHeight = window.innerWidth * fitCoverPosterRatio
+                const withBoard = navTopRef.current - fitGap * 2 - visibleCompact - belowCover - coverDocTop
+                // Sin sitio para el marcador sin recortar el póster: solo los
+                // botones, a `fitGap` del navbar. `visibleCompact` se mide
+                // igual con el marcador oculto (sigue en flujo), así que la
+                // decisión no oscila.
+                const mode = fitCoverScoreboardOptional && withBoard < posterHeight * (1 - MOBILE_FIT_POSTER_MAX_CROP) ? 'hidden' : 'compact'
+                const available = mode === 'hidden'
+                    ? navTopRef.current - fitGap - belowCover - coverDocTop
+                    : withBoard
                 // Hacia abajo: con `round` el último hueco salía 1px corto.
-                const height = Math.floor(
-                    Math.max(
-                        window.innerWidth * fitCoverMinRatio,
-                        navTopRef.current - fitGap * 2 - visibleCompact - belowCover - coverDocTop,
-                    ),
+                const height = Math.floor(Math.max(window.innerWidth * fitCoverMinRatio, available))
+                writeHeroVar('--mobile-cover-flow-h', `${height}px`)
+                writeHeroVar(
+                    '--mobile-cover-h',
+                    fitCoverOverlap
+                        ? `${Math.max(height, Math.ceil(posterHeight))}px`
+                        : `${height}px`,
                 )
-                writeHeroVar('--mobile-cover-h', `${height}px`)
-                setScoreboardMode((current) => (current === 'compact' ? current : 'compact'))
+                setScoreboardMode((current) => (current === mode ? current : mode))
                 const fitShift = Math.round((fitGap - baseGap) * 2) / 2
                 writeHeroVar('--mobile-scoreboard-shift', `${fitShift}px`)
                 return
@@ -477,7 +513,7 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
             fitMutations?.disconnect()
             if (raf) window.cancelAnimationFrame(raf)
         }
-    }, [enabled, isPhone, fitCover, fitGap, fitCoverMinRatio, writeHeroVar])
+    }, [enabled, isPhone, fitCover, fitGap, fitCoverMinRatio, fitCoverPosterRatio, fitCoverScoreboardOptional, fitCoverOverlap, writeHeroVar])
 
     // Recorrido del relevo portada → fondo: 55vh, como en la ficha, salvo que
     // la página no dé para tanto (p. ej. colecciones de una sola fila de
@@ -705,7 +741,9 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
             targetsDirty = true
             scheduleSync()
         })
-        mutations.observe(container, { childList: true, subtree: true })
+        // También bloques que pasan a revelarse sin montarse de nuevo (el
+        // marcador en modo 'hidden'): React les pone el atributo.
+        mutations.observe(container, { childList: true, subtree: true, attributes: true, attributeFilter: [MOBILE_REVEAL_ATTR] })
         sync()
         window.addEventListener('scroll', scheduleSync, { passive: true })
         window.addEventListener('resize', scheduleSync, { passive: true })

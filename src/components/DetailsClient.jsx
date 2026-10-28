@@ -9143,11 +9143,21 @@ export default function DetailsClient({
     lock: mobileHeroCoverReady,
     // Logo, botones y marcador compacto a la misma distancia del navbar
     // inferior en cualquier móvil; la portada ocupa el resto (se recorta por
-    // los lados en los altos). Mismo margen entre las tres piezas.
+    // los lados en los altos). Mismo margen entre las tres piezas. En los
+    // bajos la imagen no se recorta por arriba: sigue 2:3 por detrás del logo
+    // y los botones (el hueco en flujo sí se acorta).
     fitCover: true,
     fitGap: MOBILE_HERO_FIT_GAP_PX,
+    fitCoverPosterRatio: 1.5,
+    // Si con las puntuaciones la portada quedaría muy tapada (pantallas
+    // bajas), de entrada solo logo y botones; el marcador sale con el scroll.
+    fitCoverScoreboardOptional: true,
   });
   const mobileScoreboardMode = heroIsPhone ? heroScoreboardMode : "full";
+  // El marcador espera al scroll con la barra «Viendo» o cuando no cabe sin
+  // tapar demasiado la portada ('hidden').
+  const mobileScoreboardWaitsForScroll =
+    mobileActionsWaitForScroll || mobileScoreboardMode === "hidden";
   // La fila de acciones la miden la cabecera y el alto de fila de esta ficha.
   const setMobileActionRowNode = useCallback(
     (node) => {
@@ -10240,8 +10250,10 @@ export default function DetailsClient({
                     }`}
                     style={{
                       // MÓVIL: el hueco de la portada fija (el póster entero,
-                      // 150vw); los botones van justo debajo.
-                      "--details-mobile-poster-height": "var(--mobile-cover-h, 150vw)",
+                      // 150vw); los botones van justo debajo. En pantallas
+                      // bajas el hueco es más corto que la imagen
+                      // (`--mobile-cover-flow-h`): el logo queda sobre ella.
+                      "--details-mobile-poster-height": "var(--mobile-cover-flow-h, var(--mobile-cover-h, 150vw))",
                       // ESCRITORIO: la forma de la caja sigue al modo de portada
                       // (2:3 póster ↔ 16:9 backdrop) y el cambio se anima desde
                       // `.poster-aspect-box`. Antes esto era `sm:aspect-[2/3]`
@@ -11023,7 +11035,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                 className={`max-sm:mt-[var(--mobile-scoreboard-shift,0px)] ${
                   mobileScoreboardMode === "compact" ? MOBILE_STATS_REVEAL_BASE : ""
                 } ${
-                  mobileActionsWaitForScroll
+                  mobileScoreboardWaitsForScroll
                     ? `${MOBILE_REVEAL_BASE} ${detailsRestored ? "" : MOBILE_SCOREBOARD_REVEAL_ANIMATION}`
                     : !(mobileHeroCoverReady && inProgressChecked)
                       ? "max-sm:invisible"
@@ -11032,8 +11044,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         : `${MOBILE_SCOREBOARD_ENTRY_ANIMATION} max-sm:*:[animation-duration:280ms]`
                 }`}
                 {...(mobileScoreboardMode === "compact" ? heroStatsRevealProps : {})}
-                {...(mobileActionsWaitForScroll ? heroRevealProps : {})}
-                {...(!mobileActionsWaitForScroll && mobileHeroCoverReady && inProgressChecked
+                {...(mobileScoreboardWaitsForScroll ? heroRevealProps : {})}
+                {...(!mobileScoreboardWaitsForScroll && mobileHeroCoverReady && inProgressChecked
                   ? { [PEEK_HANDOFF_PART_ATTR]: "scoreboard" }
                   : null)}
               >
