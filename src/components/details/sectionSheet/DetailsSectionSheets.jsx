@@ -407,7 +407,7 @@ function languageLabel(code) {
   }
 }
 
-function ImagesSheet({ meta, data, onClose, tab, setTab }) {
+export function ImagesSheet({ meta, data, onClose, tab, setTab }) {
   // Pestañas ya calculadas por la ficha (lib/details/artworkSheetTabs): las
   // mismas que su galería, con la imagen elegida primero.
   const tabs = Array.isArray(data.images?.tabs) ? data.images.tabs : [];
@@ -450,32 +450,44 @@ function ImagesSheet({ meta, data, onClose, tab, setTab }) {
   // transición, para que la píldora responda en el mismo toque.
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersChanged = sort !== "default" || language !== "all";
-  const filtersToggle =
+  // Con varias pestañas va junto a ellas, en su misma pastilla; con una sola
+  // no hay barra y va en la cabecera, junto a la X y con su mismo diseño (en
+  // una fila propia se quedaba solo, en medio de la nada).
+  const singleTab = tabs.length <= 1;
+  const filtersButton =
     tabImages.length > 1 ? (
-      // La misma pastilla que la barra de pestañas (SectionSheet).
-      <div className={`flex shrink-0 p-1 ${SHEET_CONTROL}`}>
-        <button
-          type="button"
-          onClick={() => setFiltersOpen((open) => !open)}
-          aria-haspopup="dialog"
-          aria-expanded={filtersOpen}
-          aria-label="Filtros: ordenar e idioma"
-          title="Ordenar y filtrar por idioma"
-          className={`relative flex min-h-9 w-9 items-center justify-center rounded-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-yellow-400 ${
-            filtersOpen ? "bg-white/15 text-white" : "text-zinc-400 hover:bg-white/5 hover:text-white"
-          }`}
-        >
-          <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
-          {/* Filtros cambiados: un punto, también cerrado. */}
-          {filtersChanged ? (
-            <span
-              aria-hidden="true"
-              className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-yellow-400 shadow-[0_0_6px_rgba(250,204,21,0.9)]"
-            />
-          ) : null}
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={() => setFiltersOpen((open) => !open)}
+        aria-haspopup="dialog"
+        aria-expanded={filtersOpen}
+        aria-label="Filtros: ordenar e idioma"
+        title="Ordenar y filtrar por idioma"
+        className={
+          singleTab
+            ? `relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 ${
+                filtersOpen ? "bg-white/15 text-white" : "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
+              }`
+            : `relative flex min-h-9 w-9 items-center justify-center rounded-xl transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-yellow-400 ${
+                filtersOpen ? "bg-white/15 text-white" : "text-zinc-400 hover:bg-white/5 hover:text-white"
+              }`
+        }
+      >
+        <SlidersHorizontal className={singleTab ? "h-5 w-5" : "h-4 w-4"} aria-hidden="true" />
+        {/* Filtros cambiados: un punto, también cerrado. */}
+        {filtersChanged ? (
+          <span
+            aria-hidden="true"
+            className={`absolute h-1.5 w-1.5 rounded-full bg-yellow-400 shadow-[0_0_6px_rgba(250,204,21,0.9)] ${
+              singleTab ? "right-1.5 top-1.5" : "right-1 top-1"
+            }`}
+          />
+        ) : null}
+      </button>
     ) : null;
+  // La misma pastilla que la barra de pestañas (SectionSheet).
+  const filtersToggle =
+    filtersButton && !singleTab ? <div className={`flex shrink-0 p-1 ${SHEET_CONTROL}`}>{filtersButton}</div> : null;
   const sortLabel = IMAGE_SORTS.find((item) => item.id === sort)?.label || IMAGE_SORTS[0].label;
   const languageValue = language === "all" ? "Todos" : languageLabel(language);
   return (
@@ -493,11 +505,11 @@ function ImagesSheet({ meta, data, onClose, tab, setTab }) {
         tabs={tabs.map(({ id, label, count }) => ({ id, label, count }))}
         activeTab={current?.id}
         onTabChange={changeTab}
-        tabsAccessory={tabs.length > 1 ? filtersToggle : null}
-        // Con una sola pestaña no hay barra: el botón va solo, a la derecha.
-        searchAccessory={tabs.length > 1 ? null : filtersToggle}
+        tabsAccessory={filtersToggle}
         headerAction={
-          onReset ? (
+          <>
+          {singleTab ? filtersButton : null}
+          {onReset ? (
             // El mismo «restablecer» que la galería de la ficha: vuelve a las
             // imágenes por defecto en todas las pestañas.
             <button
@@ -509,10 +521,18 @@ function ImagesSheet({ meta, data, onClose, tab, setTab }) {
             >
               <RotateCcw className="h-5 w-5" aria-hidden="true" />
             </button>
-          ) : null
+          ) : null}
+          </>
         }
       >
-        {images.length ? (
+        {data.images?.notice ? (
+          <p className="mb-3 rounded-xl bg-yellow-500/10 p-3 text-xs font-medium text-yellow-200">{data.images.notice}</p>
+        ) : null}
+        {data.images?.loading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-zinc-500" aria-label="Cargando imágenes" />
+          </div>
+        ) : images.length ? (
           <ul className={`grid gap-2.5 sm:gap-3 ${isPoster ? "grid-cols-3" : "grid-cols-2"}`}>
             {images.map((image) => {
               const active = image.file_path === current.activePath;

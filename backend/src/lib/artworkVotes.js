@@ -6,7 +6,7 @@
 // ACTUAL, así que cambiar de imagen mueve el voto y restablecer lo retira. La
 // selección propia sigue mandando sobre la de la comunidad en el cliente.
 
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { artworkVotes } from '../db/schema.js';
 
@@ -81,4 +81,48 @@ export async function getCommunityArtwork({ mediaType, tmdbId }, executor = db) 
     .groupBy(artworkVotes.kind, artworkVotes.filePath)
     .orderBy(desc(sql`COUNT(*)`));
   return pickTopVotedArtwork(rows);
+}
+
+// Lo mismo para VARIOS títulos de un tipo a la vez (filas con `tmdbId`):
+// { [tmdbId]: { poster: … } }. Los títulos sin votos no aparecen.
+export function pickTopVotedArtworkByTitle(rows) {
+  const byTitle = new Map();
+  for (const row of rows || []) {
+    const id = Number(row?.tmdbId);
+    if (!Number.isInteger(id)) continue;
+    if (!byTitle.has(id)) byTitle.set(id, []);
+    byTitle.get(id).push(row);
+  }
+  const result = {};
+  for (const [id, titleRows] of byTitle) {
+    const artwork = pickTopVotedArtwork(titleRows);
+    if (Object.keys(artwork).length) result[id] = artwork;
+  }
+  return result;
+}
+
+// Pósters más votados de varias TEMPORADAS (id de TMDb de la temporada, el de
+// `artworkOverrides["season:<id>"]`): { [seasonId]: '/x.jpg' }. Una consulta
+// para todas las tarjetas de «Temporadas» de una serie.
+export async function getCommunitySeasonPosters(seasonIds, executor = db) {
+  const ids = [...new Set((seasonIds || []).map(Number).filter((id) => Number.isInteger(id) && id > 0))];
+  if (!ids.length) return {};
+  const rows = await executor
+    .select({
+      tmdbId: artworkVotes.tmdbId,
+      kind: artworkVotes.kind,
+      filePath: artworkVotes.filePath,
+      votes: sql`COUNT(*)`.mapWith(Number),
+      lastVotedAt: sql`MAX(${artworkVotes.updatedAt})`,
+    })
+    .from(artworkVotes)
+    .where(and(
+      eq(artworkVotes.mediaType, 'season'),
+      eq(artworkVotes.kind, 'poster'),
+      inArray(artworkVotes.tmdbId, ids),
+    ))
+    .groupBy(artworkVotes.tmdbId, artworkVotes.kind, artworkVotes.filePath);
+  return Object.fromEntries(
+    Object.entries(pickTopVotedArtworkByTitle(rows)).map(([id, artwork]) => [id, artwork.poster]),
+  );
 }

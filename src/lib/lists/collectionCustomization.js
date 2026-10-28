@@ -4,7 +4,8 @@
 // no se aplican).
 //
 // Las imágenes usan el MISMO mecanismo que las portadas y fondos de
-// DetailsClient: `uiSettings.artworkOverrides["collection:<id>"]`, guardado
+// DetailsClient (cada elección es además un voto y la más votada es la imagen
+// por defecto para todos): `uiSettings.artworkOverrides["collection:<id>"]`, guardado
 // con `saveArtworkOverrides` (cola PATCH con reintentos y fila bloqueada en
 // el backend) y reflejado al instante con `cacheArtworkOverrides`.
 //
@@ -45,16 +46,31 @@ export function applyCollectionCustomization(collection, artwork = null) {
   return result;
 }
 
-// Cambios de artwork respecto a lo que ya hay guardado. Elegir la imagen
-// original (la automática) borra el override (filePath null), igual que el
-// restablecimiento de la ficha.
-export function buildCollectionArtworkChanges(original, current, draft) {
+// Campos con la elección PROPIA guardada (sin ella, `null`), a partir de los
+// overrides del usuario.
+export function collectionOwnArtwork(artwork = null) {
+  return Object.fromEntries(
+    ARTWORK_FIELDS.map(([kind, field]) => {
+      const value = artwork?.[kind];
+      return [field, typeof value === 'string' && TMDB_PATH.test(value) ? value : null];
+    }),
+  );
+}
+
+// Imágenes MÁS VOTADAS de la colección (/api/community/collection/:id/artwork,
+// por tipo) como campos de la colección; las que no sean rutas válidas, null.
+export const collectionCommunityArtwork = collectionOwnArtwork;
+
+// Cambios respecto a la elección propia guardada. Como en «Portadas y fondos»
+// de la ficha, cada elección se guarda tal cual y cuenta como voto (también si
+// es la automática); `null` (Restaurar) la borra y retira el voto.
+export function buildCollectionArtworkChanges(currentOwn, nextOwn) {
   const changes = [];
   for (const [kind, field] of ARTWORK_FIELDS) {
-    const value = draft[field] || null;
+    const value = nextOwn?.[field] || null;
     if (value && !TMDB_PATH.test(value)) throw new Error('Selecciona una imagen válida de TMDb.');
-    if (value === (current[field] || null)) continue;
-    changes.push({ kind, filePath: value && value !== original[field] ? value : null });
+    if (value === (currentOwn?.[field] || null)) continue;
+    changes.push({ kind, filePath: value });
   }
   return changes;
 }

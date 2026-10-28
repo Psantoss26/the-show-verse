@@ -7,7 +7,13 @@ import { useAuth } from '@/context/AuthContext'
 import CollectionEditModal from '@/components/lists/CollectionEditModal'
 import CollectionCastModal from '@/components/lists/CollectionCastModal'
 import { formatCollectionRevenue } from '@/lib/lists/collectionStats'
-import { applyCollectionCustomization, readCollectionArtworkOverride } from '@/lib/lists/collectionCustomization'
+import {
+    applyCollectionCustomization,
+    collectionCommunityArtwork,
+    collectionOwnArtwork,
+    readCollectionArtworkOverride,
+} from '@/lib/lists/collectionCustomization'
+import { fetchCommunityArtwork } from '@/lib/artworkApi'
 import ListPosterCard from '@/components/lists/ListPosterCard'
 import FilterableListItems from '@/components/lists/ListDetailsTools'
 import UnifiedListDetailsLayout from '@/components/lists/UnifiedListDetailsLayout'
@@ -142,6 +148,8 @@ function MovieCard({ movie, idx, imdbRating, disableHover = false, posterLoading
     )
 }
 
+const COMMUNITY_ARTWORK_TIMEOUT_MS = 1500
+
 export default function CollectionDetailsClient({ collectionId }) {
     const router = useRouter()
     const { preferences, authenticated = false } = useAuth()
@@ -177,6 +185,29 @@ export default function CollectionDetailsClient({ collectionId }) {
             ? { loading: true, error: null, collection: preview, parts: [] }
             : resolveCollectionDetailsInitialState(null))
     }, [isBackNav, collectionId])
+
+    // Imágenes MÁS VOTADAS de la colección: cada elección de «Editar colección»
+    // es un voto y la ganadora de cada imagen es la de por defecto para todos
+    // (backend/src/lib/artworkVotes.js), siempre por detrás de la propia.
+    // Mientras se consulta, las imágenes esperan como esperan a la galería,
+    // para no enseñar la automática y cambiarla; si tarda, valen las
+    // automáticas.
+    const [communityState, setCommunityState] = useState({ id: null, artwork: null })
+    useEffect(() => {
+        if (!collectionId) return undefined
+        let cancelled = false
+        Promise.race([
+            fetchCommunityArtwork({ type: 'collection', id: collectionId }),
+            new Promise((resolve) => setTimeout(() => resolve(null), COMMUNITY_ARTWORK_TIMEOUT_MS)),
+        ]).then((artwork) => {
+            if (!cancelled) setCommunityState({ id: collectionId, artwork })
+        })
+        return () => {
+            cancelled = true
+        }
+    }, [collectionId])
+    const communityPending = communityState.id !== collectionId
+    const community = collectionCommunityArtwork(communityPending ? null : communityState.artwork)
 
     const artworkOverride = readCollectionArtworkOverride(preferences, collectionId)
     // Solo las imágenes son personalizables; nombre y descripción, los de TMDb.
@@ -276,8 +307,8 @@ export default function CollectionDetailsClient({ collectionId }) {
     const autoPoster = gallery.done
         ? pickLadderPoster(gallery.images?.posters)?.file_path || state.collection?.poster_path || null
         : null
-    const collectionPoster = customPoster || autoPoster
-    const posterPending = !customPoster && !gallery.done
+    const collectionPoster = customPoster || community.poster_path || autoPoster
+    const posterPending = !customPoster && (communityPending || (!community.poster_path && !gallery.done))
     const revenueLabel = formatCollectionRevenue(collection?.revenue)
     const castMembers = Array.isArray(collection?.cast) ? collection.cast : []
     // Fondo como en DetailsClient: backdrop en escritorio y póster textless en
@@ -292,14 +323,21 @@ export default function CollectionDetailsClient({ collectionId }) {
             null
         : null
     const autoMobileBackground = gallery.done ? pickTextlessMobileBackground(gallery.images) : null
-    const backgroundBackdrop = customBackdrop || autoBackdrop
-    const backgroundPoster = collection?.mobile_background_path || autoMobileBackground
+    const backgroundBackdrop = communityPending && !customBackdrop
+        ? null
+        : customBackdrop || community.backdrop_path || autoBackdrop
+    const customMobileBackground = artworkOverride.mobilePoster ? collection?.mobile_background_path : null
+    const backgroundPoster = communityPending && !customMobileBackground
+        ? null
+        : customMobileBackground || community.mobile_background_path || autoMobileBackground
     // Modo de portada BACKDROP: la imagen elegida en «Editar colección» o, si
     // no, una CON IDIOMA (inglés → español) de la galería; sin ninguna, el modo
     // no se ofrece. Con una elegida no hace falta esperar a la galería.
     const customCoverBackdrop = artworkOverride.background ? collection?.cover_backdrop_path : null
     const autoCoverBackdrop = gallery.done ? pickCollectionCoverBackdrop(gallery.images?.backdrops) : null
-    const coverBackdropPath = customCoverBackdrop || autoCoverBackdrop
+    const coverBackdropPath = communityPending && !customCoverBackdrop
+        ? null
+        : customCoverBackdrop || community.cover_backdrop_path || autoCoverBackdrop
 
     // IMAGEN Y VÍDEO COMPARTIBLES: la portada es el póster oficial CON idioma
     // (el del marco de la página, incluida la elección de «Editar colección»),
@@ -413,22 +451,16 @@ export default function CollectionDetailsClient({ collectionId }) {
         {editing && collection && (
             <CollectionEditModal
                 key={collectionId}
-                // "Original" = lo que se ve sin selección propia: los fondos
-                // automáticos de la galería, no la portada principal de TMDb.
-                original={{
-                    ...original,
-                    poster_path: autoPoster || original?.poster_path || null,
-                    backdrop_path: autoBackdrop || original?.backdrop_path || null,
-                    mobile_background_path: autoMobileBackground,
-                    cover_backdrop_path: autoCoverBackdrop,
+                collectionId={collectionId}
+                // Lo que se ve sin elección propia: la más votada o, sin votos,
+                // la automática de la galería (no la portada principal de TMDb).
+                defaults={{
+                    poster_path: community.poster_path || autoPoster || original?.poster_path || null,
+                    backdrop_path: community.backdrop_path || autoBackdrop || original?.backdrop_path || null,
+                    mobile_background_path: community.mobile_background_path || autoMobileBackground,
+                    cover_backdrop_path: community.cover_backdrop_path || autoCoverBackdrop,
                 }}
-                collection={{
-                    ...collection,
-                    poster_path: collectionPoster || collection?.poster_path || null,
-                    backdrop_path: backgroundBackdrop || null,
-                    mobile_background_path: backgroundPoster || null,
-                    cover_backdrop_path: coverBackdropPath || null,
-                }}
+                own={collectionOwnArtwork(artworkOverride)}
                 onClose={() => setEditing(false)}
             />
         )}

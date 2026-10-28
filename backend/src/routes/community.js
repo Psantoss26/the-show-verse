@@ -16,11 +16,12 @@ import {
 import { db } from '../db/client.js';
 import { invalidateLevelState } from '../level/store.js';
 import { getFollowingTitleActivity } from '../lib/followingTitleActivity.js';
-import { getCommunityArtwork } from '../lib/artworkVotes.js';
+import { getCommunityArtwork, getCommunitySeasonPosters } from '../lib/artworkVotes.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const TYPES = new Set(['movie', 'tv']);
+const ARTWORK_TYPES = new Set(['movie', 'tv', 'collection']);
 function parseTarget(req, reply) {
   const type = String(req.params.type || '').toLowerCase();
   const tmdbId = Number(req.params.tmdbId);
@@ -214,11 +215,31 @@ export default async function communityRoutes(fastify) {
     return { sentiment, comments, lists: { items: lists }, artwork, state: seed.status };
   });
 
+  // GET /seasons/artwork?ids=1,2,3 — póster más votado de cada TEMPORADA (id
+  // de TMDb de la temporada): { posters: { [id]: '/x.jpg' } }, solo las que
+  // tienen votos. En lote: todas las tarjetas de «Temporadas» de una serie.
+  fastify.get('/seasons/artwork', async (req, reply) => {
+    const ids = String(req.query?.ids || '')
+      .split(',')
+      .map(Number)
+      .filter((id) => Number.isInteger(id) && id > 0)
+      .slice(0, 100);
+    const posters = await getCommunitySeasonPosters(ids);
+    reply.header('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=600');
+    return { posters };
+  });
+
   // GET /:type/:tmdbId/artwork — imagen más votada de cada tipo (poster,
-  // mobilePoster, backdrop, background, logo). Pública: la usa DetailModal,
-  // que no pasa por el SSR de la ficha.
+  // mobilePoster, backdrop, background, logo). Pública: la usan DetailModal,
+  // que no pasa por el SSR de la ficha, y la página de una colección.
   fastify.get('/:type/:tmdbId/artwork', async (req, reply) => {
-    const t = parseTarget(req, reply); if (!t) return;
+    // También colecciones («Editar colección»): sus elecciones son votos igual.
+    const type = String(req.params.type || '').toLowerCase();
+    const tmdbId = Number(req.params.tmdbId);
+    if (!ARTWORK_TYPES.has(type) || !Number.isFinite(tmdbId)) {
+      return reply.status(400).send({ error: 'Invalid type or tmdbId' });
+    }
+    const t = { type, tmdbId };
     const artwork = await getCommunityArtwork({ mediaType: t.type, tmdbId: t.tmdbId });
     reply.header('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=600');
     return { artwork };

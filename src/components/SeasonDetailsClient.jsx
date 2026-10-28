@@ -48,6 +48,7 @@ import ExternalLinksModal from "@/components/details/ExternalLinksModal";
 import SeasonCoverEditModal from "@/components/details/SeasonCoverEditModal";
 import { useAuth } from "@/context/AuthContext";
 import { readSeasonCustomPoster } from "@/lib/details/seasonArtwork";
+import { useCommunitySeasonPoster } from "@/lib/details/communitySeasonPosters";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 import { LIQUID_GLASS_BAR, LIQUID_GLASS_CARD } from "@/lib/ui/liquidGlass";
 import {
@@ -235,6 +236,9 @@ export default function SeasonDetailsClient({
   initialShowProviders = null,
   // Vídeos de la temporada resueltos en el servidor (`null` si no vinieron).
   initialSeasonVideos = null,
+  // Póster más votado de la temporada resuelto en el servidor: ruta, `null`
+  // sin votos o `undefined` si no se pudo saber (se pregunta desde aquí).
+  initialCommunityPoster = undefined,
 }) {
   const router = useRouter();
   const traktRequestIdRef = useRef(0);
@@ -274,8 +278,10 @@ export default function SeasonDetailsClient({
   );
 
   // PORTADA: la elegida en «Editar portada» (por usuario, ver
-  // lib/details/seasonArtwork) o la automática: el primer póster en inglés de
-  // la temporada, resuelto en el servidor (page.jsx); sin él, el de la serie.
+  // lib/details/seasonArtwork), la más votada por todos (cada elección es un
+  // voto, lib/details/communitySeasonPosters; llega en el SSR) o la
+  // automática: el primer póster en inglés de la temporada, resuelto en el
+  // servidor (page.jsx); sin él, el de la serie.
   // La elección vive en las preferencias del navegador: el servidor no la
   // conoce y pinta la automática, y al hidratar React NO corrige el `src`
   // distinto. Se aplica justo después de montar, en un efecto de layout (antes
@@ -319,7 +325,16 @@ export default function SeasonDetailsClient({
   useLayoutEffect(() => setPreferencesMounted(true), []);
   const autoPosterPath = season?.poster_path || show?.poster_path || null;
   const customPosterPath = preferencesMounted ? readSeasonCustomPoster(preferences, season?.id) : null;
-  const posterPath = customPosterPath || autoPosterPath;
+  // Solo si el servidor no supo el más votado se pregunta aquí; mientras, la
+  // portada espera para no enseñar la automática y cambiarla después.
+  const communityLookup = useCommunitySeasonPoster(
+    initialCommunityPoster === undefined ? season?.id : null,
+  );
+  const communityPosterPath =
+    initialCommunityPoster === undefined ? communityLookup.poster : initialCommunityPoster;
+  const posterPending = !customPosterPath && communityLookup.pending;
+  const defaultPosterPath = communityPosterPath || autoPosterPath;
+  const posterPath = posterPending ? null : customPosterPath || defaultPosterPath;
   const adjacentSeasonHrefs = useMemo(
     () => getAdjacentSeasonHrefs(showId, seasonNumber, show?.seasons),
     [showId, seasonNumber, show?.seasons],
@@ -589,7 +604,8 @@ export default function SeasonDetailsClient({
   const mobileCoverLoad = useImageLoadReady(mobileCoverLowSrc);
   const [mobileCoverFailedSrc, setMobileCoverFailedSrc] = useState(null);
   const mobileCoverReady =
-    !mobileCoverLowSrc || mobileCoverLoad.ready || mobileCoverFailedSrc === mobileCoverLowSrc;
+    !posterPending &&
+    (!mobileCoverLowSrc || mobileCoverLoad.ready || mobileCoverFailedSrc === mobileCoverLowSrc);
   useEffect(() => {
     if (mobileCoverReady) sendEmbeddedDetailsAction("hero-ready");
   }, [mobileCoverReady]);
@@ -2221,8 +2237,8 @@ export default function SeasonDetailsClient({
           seasonId={season.id}
           showId={showId}
           seasonNumber={seasonNumber}
-          originalPoster={autoPosterPath}
-          currentPoster={posterPath}
+          defaultPoster={defaultPosterPath}
+          ownPoster={customPosterPath}
           onClose={() => setCoverEditing(false)}
         />
       ) : null}

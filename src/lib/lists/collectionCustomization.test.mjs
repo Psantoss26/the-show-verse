@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {
   applyCollectionCustomization,
   buildCollectionArtworkChanges,
+  collectionCommunityArtwork,
+  collectionOwnArtwork,
   collectionArtworkKey,
   readCollectionArtworkOverride,
 } from './collectionCustomization.js';
@@ -12,7 +14,7 @@ const original = { id: 119, name: 'Colección', description: 'Original', poster_
 test('official artwork remains the default, including after reset', () => {
   assert.deepEqual(applyCollectionCustomization(original, {}), original);
   assert.deepEqual(applyCollectionCustomization(original, null), original);
-  assert.deepEqual(buildCollectionArtworkChanges(original, original, original), []);
+  assert.deepEqual(buildCollectionArtworkChanges({}, {}), []);
 });
 
 test('only images are customizable: name and description stay as in TMDb', () => {
@@ -31,20 +33,32 @@ test('artwork uses the per-user overrides shared with DetailsClient', () => {
   assert.deepEqual(readCollectionArtworkOverride(null, 119), {});
 });
 
-test('artwork changes only send what changed and the original image resets the override', () => {
-  const current = { ...original, poster_path: '/elegido.jpg' };
+test('artwork changes only send what changed; every choice is stored and reset clears it', () => {
+  const own = { poster_path: '/elegido.jpg' };
   assert.deepEqual(
-    buildCollectionArtworkChanges(original, current, { ...current, backdrop_path: '/otro-fondo.jpg' }),
+    buildCollectionArtworkChanges(own, { ...own, backdrop_path: '/otro-fondo.jpg' }),
     [{ kind: 'backdrop', filePath: '/otro-fondo.jpg' }],
   );
+  // Elegir la automática también es un voto.
   assert.deepEqual(
-    buildCollectionArtworkChanges(original, current, { ...current, poster_path: '/original.jpg' }),
-    [{ kind: 'poster', filePath: null }],
+    buildCollectionArtworkChanges(own, { poster_path: '/original.jpg' }),
+    [{ kind: 'poster', filePath: '/original.jpg' }],
   );
+  assert.deepEqual(buildCollectionArtworkChanges(own, { poster_path: null }), [{ kind: 'poster', filePath: null }]);
+});
+
+test('own and community artwork map kinds to collection fields', () => {
+  assert.deepEqual(collectionOwnArtwork({ poster: '/p.jpg', background: '/c.jpg', mobilePoster: 'https://x.test/y.jpg' }), {
+    poster_path: '/p.jpg',
+    backdrop_path: null,
+    mobile_background_path: null,
+    cover_backdrop_path: '/c.jpg',
+  });
+  assert.deepEqual(collectionCommunityArtwork(null).poster_path, null);
 });
 
 test('arbitrary image URLs cannot be persisted or rendered', () => {
-  assert.throws(() => buildCollectionArtworkChanges(original, original, { ...original, poster_path: 'https://other.test/test.jpg' }));
+  assert.throws(() => buildCollectionArtworkChanges({}, { poster_path: 'https://other.test/test.jpg' }));
   assert.equal(applyCollectionCustomization(original, { poster: '//other.test/test.jpg' }).poster_path, original.poster_path);
 });
 
@@ -52,25 +66,22 @@ test('mobile background is a separate poster selection', () => {
   const withAuto = { ...original, mobile_background_path: '/auto.jpg' };
   assert.equal(applyCollectionCustomization(original, { mobilePoster: '/movil.jpg' }).mobile_background_path, '/movil.jpg');
   assert.deepEqual(
-    buildCollectionArtworkChanges(withAuto, withAuto, { ...withAuto, mobile_background_path: '/movil.jpg' }),
+    buildCollectionArtworkChanges({}, { mobile_background_path: '/movil.jpg' }),
     [{ kind: 'mobilePoster', filePath: '/movil.jpg' }],
   );
-  assert.deepEqual(
-    buildCollectionArtworkChanges(withAuto, { ...withAuto, mobile_background_path: '/movil.jpg' }, withAuto),
-    [{ kind: 'mobilePoster', filePath: null }],
-  );
+  assert.equal(withAuto.mobile_background_path, '/auto.jpg');
 });
 
 test('the cover backdrop is its own selection, stored as `background`', () => {
   const withAuto = { ...original, cover_backdrop_path: '/auto-en.jpg' };
   assert.equal(applyCollectionCustomization(withAuto, { background: '/portada-es.jpg' }).cover_backdrop_path, '/portada-es.jpg');
   assert.deepEqual(
-    buildCollectionArtworkChanges(withAuto, withAuto, { ...withAuto, cover_backdrop_path: '/portada-es.jpg' }),
+    buildCollectionArtworkChanges({}, { cover_backdrop_path: '/portada-es.jpg' }),
     [{ kind: 'background', filePath: '/portada-es.jpg' }],
   );
-  // Volver a la automática borra la elección.
+  // Restaurar borra la elección.
   assert.deepEqual(
-    buildCollectionArtworkChanges(withAuto, { ...withAuto, cover_backdrop_path: '/portada-es.jpg' }, withAuto),
+    buildCollectionArtworkChanges({ cover_backdrop_path: '/portada-es.jpg' }, { cover_backdrop_path: null }),
     [{ kind: 'background', filePath: null }],
   );
 });

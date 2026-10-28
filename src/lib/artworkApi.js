@@ -311,10 +311,17 @@ export async function fetchArtworkOverrides({ type, kind, ids }) {
 // la selección propia. `null` = no se pudo saber.
 const communityArtworkRequests = new Map()
 const COMMUNITY_ARTWORK_TTL_MS = 60000
+const COMMUNITY_ARTWORK_TYPES = new Set(['movie', 'tv', 'collection'])
+
+// Tras votar: la siguiente consulta del título vuelve a preguntar al servidor.
+export function forgetCommunityArtwork({ type, id }) {
+    const normalizedType = type === 'show' ? 'tv' : type || 'movie'
+    communityArtworkRequests.delete(`${normalizedType}:${Number(id)}`)
+}
 
 export function fetchCommunityArtwork({ type, id }) {
     const normalizedType = type === 'show' ? 'tv' : type || 'movie'
-    if (normalizedType !== 'movie' && normalizedType !== 'tv') return Promise.resolve(null)
+    if (!COMMUNITY_ARTWORK_TYPES.has(normalizedType)) return Promise.resolve(null)
     if (id == null || id === '') return Promise.resolve(null)
 
     const key = `${normalizedType}:${Number(id)}`

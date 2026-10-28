@@ -75,4 +75,45 @@ test('votos de artwork', { skip: !process.env.LISTS_TEST_DATABASE_URL }, async (
   assert.equal((await artwork()).mobilePoster, '/b.jpg');
   await select(bea, 'mobilePoster', null);
   assert.deepEqual(await artwork(), {});
+
+  // Colecciones («Editar colección»): mismo endpoint que los títulos.
+  const COLLECTION = 2_000_000_301;
+  await app.inject({
+    method: 'PATCH',
+    url: '/users/preferences',
+    headers: { 'x-test-user': ana },
+    payload: { artworkChanges: [{ type: 'collection', id: COLLECTION, kind: 'background', filePath: '/portada.jpg' }] },
+  });
+  const collectionArtwork = await app.inject({ method: 'GET', url: `/community/collection/${COLLECTION}/artwork` });
+  assert.deepEqual(collectionArtwork.json().artwork, { background: '/portada.jpg' });
+  await app.inject({
+    method: 'PATCH',
+    url: '/users/preferences',
+    headers: { 'x-test-user': ana },
+    payload: { artworkChanges: [{ type: 'collection', id: COLLECTION, kind: 'background', filePath: null }] },
+  });
+
+  // Temporadas («Editar portada»): mismo voto, consultado en lote por id.
+  const SEASON_A = 2_000_000_201;
+  const SEASON_B = 2_000_000_202;
+  const selectSeason = (user, id, filePath) => app.inject({
+    method: 'PATCH',
+    url: '/users/preferences',
+    headers: { 'x-test-user': user },
+    payload: { artworkChanges: [{ type: 'season', id, kind: 'poster', filePath }] },
+  });
+  const seasonPosters = async () => {
+    const res = await app.inject({ method: 'GET', url: `/community/seasons/artwork?ids=${SEASON_A},${SEASON_B}` });
+    assert.equal(res.statusCode, 200);
+    return res.json().posters;
+  };
+  assert.deepEqual(await seasonPosters(), {});
+  await selectSeason(ana, SEASON_A, '/s1.jpg');
+  await selectSeason(bea, SEASON_A, '/s2.jpg');
+  await selectSeason(carla, SEASON_A, '/s2.jpg');
+  await selectSeason(ana, SEASON_B, '/s3.jpg');
+  assert.deepEqual(await seasonPosters(), { [SEASON_A]: '/s2.jpg', [SEASON_B]: '/s3.jpg' });
+  for (const user of [ana, bea, carla]) await selectSeason(user, SEASON_A, null);
+  await selectSeason(ana, SEASON_B, null);
+  assert.deepEqual(await seasonPosters(), {});
 });

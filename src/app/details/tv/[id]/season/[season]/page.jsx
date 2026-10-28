@@ -6,6 +6,33 @@ import { playableRankedVideos } from "@/lib/details/videos";
 
 export const revalidate = 3600; // 1h
 
+const BACKEND_BASE =
+  process.env.BACKEND_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
+const COMMUNITY_SERVER_TIMEOUT_MS = 1200;
+
+// Póster MÁS VOTADO de la temporada (cada «Editar portada» es un voto; ver
+// backend/src/lib/artworkVotes.js): ruta, `null` sin votos o `undefined` si
+// no se supo a tiempo (lo pregunta el cliente). Se guarda un minuto, como en
+// el backend.
+async function fetchCommunitySeasonPoster(seasonId) {
+  if (!BACKEND_BASE || !seasonId) return undefined;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), COMMUNITY_SERVER_TIMEOUT_MS);
+  try {
+    const res = await fetch(
+      `${BACKEND_BASE}/v1/community/seasons/artwork?ids=${Number(seasonId)}`,
+      { signal: controller.signal, next: { revalidate: 60 } },
+    );
+    if (!res.ok) return undefined;
+    const json = await res.json();
+    return json?.posters?.[seasonId] || null;
+  } catch {
+    return undefined;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // Tope para resolver las plataformas en el servidor: si JustWatch tarda más,
 // la página sale sin ellas y las pide el cliente, como antes.
 const PROVIDERS_SERVER_TIMEOUT_MS = 1500;
@@ -104,12 +131,18 @@ export default async function SeasonPage({ params }) {
     })
     .catch(() => null);
 
-  const [show, seasonData, ladderPosterPath, initialShowProviders] =
+  // En cuanto se sabe el id de la temporada, en paralelo con lo demás.
+  const communityPosterPromise = seasonPromise
+    .then((seasonJson) => fetchCommunitySeasonPoster(seasonJson?.id))
+    .catch(() => undefined);
+
+  const [show, seasonData, ladderPosterPath, initialShowProviders, initialCommunityPoster] =
     await Promise.all([
       showPromise,
       seasonPromise,
       ladderPosterPromise,
       providersPromise,
+      communityPosterPromise,
     ]);
   const { videos: seasonVideosData, ...seasonWithoutVideos } = seasonData || {};
   const initialSeasonVideos = seasonVideosData
@@ -138,6 +171,7 @@ export default async function SeasonPage({ params }) {
       imdbUrl={imdbUrl}
       initialShowProviders={initialShowProviders}
       initialSeasonVideos={initialSeasonVideos}
+      initialCommunityPoster={initialCommunityPoster}
     />
   );
 }
