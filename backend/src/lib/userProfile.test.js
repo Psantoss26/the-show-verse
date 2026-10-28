@@ -25,7 +25,7 @@ import {
 test('English poster decisions use a versioned cache namespace', () => {
   assert.equal(
     profileEnglishPosterCacheKey('movie', 121),
-    'profile:english-poster:v4:movie:121',
+    'profile:english-poster:v5:movie:121',
   );
 });
 

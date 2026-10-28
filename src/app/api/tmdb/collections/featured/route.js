@@ -62,16 +62,24 @@ async function limitedArtwork(task) {
 // arte sigue calentándose en segundo plano y sale en las respuestas siguientes.
 const PREVIEW_ARTWORK_BUDGET_MS = 1500;
 
-// Misma petición (URL y caché de un día) y mismo criterio que
+// Mismas peticiones (URLs y caché de un día) y mismo criterio que
 // /api/tmdb/artwork: lo elegido aquí es lo que el cliente habría elegido.
-async function fetchMoviePicks(id) {
-  const url = `${TMDB_API}/movie/${id}?api_key=${TMDB_KEY}&append_to_response=images`;
+// Ficha y `/images` por separado: `append_to_response=images` llega a veces
+// desde el servidor filtrado solo al inglés (ver esa ruta).
+async function fetchArtworkJson(url) {
   const res = await limitedArtwork(() =>
     fetch(url, { cache: "force-cache", next: { revalidate: DAY } }),
   );
   if (!res.ok) throw new Error(`TMDb ${res.status}`);
-  const details = await res.json();
-  return pickListArtwork(details?.images, {
+  return res.json();
+}
+
+async function fetchMoviePicks(id) {
+  const [details, images] = await Promise.all([
+    fetchArtworkJson(`${TMDB_API}/movie/${id}?api_key=${TMDB_KEY}`),
+    fetchArtworkJson(`${TMDB_API}/movie/${id}/images?api_key=${TMDB_KEY}`),
+  ]);
+  return pickListArtwork(images, {
     originalLanguage: details?.original_language,
   });
 }
@@ -87,7 +95,7 @@ const readCollectionPreviewPicks = unstable_cache(
     );
     return Object.fromEntries(entries);
   },
-  ["featured-collection-preview-picks-v1"],
+  ["featured-collection-preview-picks-v2"],
   { revalidate: DAY },
 );
 
