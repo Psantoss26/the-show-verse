@@ -1234,6 +1234,10 @@ export default function DetailsClient({
   // -- Imagenes base: evitan SSR/primer render con un poster provisional --
   const [basePosterPath, setBasePosterPath] = useState(() => restoredValue(backSnapshot, "basePosterPath", null));
   const [baseBackdropPath, setBaseBackdropPath] = useState(() => restoredValue(backSnapshot, "baseBackdropPath", null));
+  // Portada y fondo AUTOMÁTICOS que calcula `initArtwork`. Las bases de arriba
+  // nacen con la selección guardada en este dispositivo (para pintarla sin
+  // esperar), así que al restablecer hay que devolverlas a estos.
+  const autoArtworkRef = useRef({ key: null, poster: null, backdrop: null });
   const [artworkInitialized, setArtworkInitialized] = useState(() => restoredValue(backSnapshot, "artworkInitialized", false)); // Se pone a true tras la carga inicial
   // Un usuario autenticado puede tener poster/backdrop/preview/logo personalizados
   // guardados en el servidor (sección "Portadas y fondos"). En una sesión nueva
@@ -3567,6 +3571,11 @@ export default function DetailsClient({
         // `images` en el SSR, es decir sin caché de servidor todavía). En ese
         // caso sustituirla ahora se vería como un parpadeo, así que se
         // mantiene la que el usuario ya está viendo.
+        autoArtworkRef.current = {
+          key: `${endpointType}:${id}`,
+          poster: asTmdbPath(poster) || null,
+          backdrop: asTmdbPath(backdrop) || null,
+        };
         if (poster) {
           setBasePosterPath((prev) => {
             if (hasSavedPoster) return prev || asTmdbPath(poster);
@@ -7180,12 +7189,36 @@ export default function DetailsClient({
       id,
       changes: resetChanges,
     });
+    const ownVotes = ownArtworkVotesRef.current.votes;
+    // Al entrar con la selección guardada en este dispositivo, la portada y el
+    // fondo base nacen con ella (ver `artworkReset`): sin devolverlas a las
+    // automáticas, restablecer seguía enseñando la propia hasta recargar.
+    const auto =
+      autoArtworkRef.current.key === `${endpointType}:${id}`
+        ? autoArtworkRef.current
+        : {};
+    const notOwn = (kind, path) =>
+      path && !ownVotes[kind]?.has(path) ? path : null;
+    setBasePosterPath(
+      (prev) =>
+        auto.poster ||
+        notOwn("poster", prev) ||
+        asTmdbPath(data?.poster_path) ||
+        null,
+    );
+    setBaseBackdropPath(
+      (prev) =>
+        auto.backdrop ||
+        notOwn("background", prev) ||
+        asTmdbPath(data?.backdrop_path) ||
+        null,
+    );
     // Sin esto, la más votada leída al entrar (con el voto propio de una
     // visita anterior) volvía a pintar la imagen que se acaba de restablecer.
     retractOwnArtworkVotes({
       type: endpointType,
       id,
-      votes: ownArtworkVotesRef.current.votes,
+      votes: ownVotes,
     });
     ownArtworkVotesRef.current = { key: `${endpointType}:${id}`, votes: {} };
     saveArtworkOverrides({
