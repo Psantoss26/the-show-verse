@@ -40,6 +40,7 @@ import {
   getLocalInProgress,
   searchProgressTitles,
 } from "@/lib/api/progressClient";
+import { watchProgressRefresh } from "@/lib/api/progressRefresh";
 import { formatPageTitle } from "@/lib/pageTitle";
 import {
   cacheAddHistory,
@@ -1136,6 +1137,10 @@ export default function ContinueWatchingClient() {
       return;
     }
     load();
+    // El progreso de lo que se está viendo en otra app o pestaña llega cada
+    // ~30 s: se relee al volver y mientras la página está a la vista, para que
+    // la barra avance sin recargar. Ver lib/api/progressRefresh.
+    return watchProgressRefresh(load);
   }, [authenticated, hydrated, load]);
 
   const dataLoaded = Array.isArray(items);

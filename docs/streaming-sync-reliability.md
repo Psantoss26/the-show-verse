@@ -387,6 +387,24 @@ controles ocultos, o el episodio siguiente que arranca solo.
 Prueba: `streamingProgress.integration.test.js` (opt-in, Postgres desechable) y
 `progress.test.js`.
 
+## El progreso avanza mientras se ve
+
+El punto de progreso se envía cada 30 s, pero Continuar viendo se quedaba con el
+primero. Había dos causas:
+
+- **En la app Android**, cada punto entra en una cola duradera (`ProgressOutbox`) y
+  WorkManager la entrega. Se programaba con `ExistingWorkPolicy.KEEP`: si una
+  entrega se estaba reintentando (un fallo de red, un evento que el servidor aún no
+  identifica), seguía esperando su retraso, que se duplica en cada intento (10 s,
+  20 s, 40 s… hasta horas), y los puntos nuevos no salían. Ahora un punto nuevo
+  sustituye la entrega pendiente (`REPLACE`): sale al momento. Si lo único que
+  queda en la cola son eventos que el servidor aún no identifica, la entrega
+  termina en vez de reintentarse.
+- **En la web**, la página y la fila del dashboard leían el progreso solo al
+  abrirse (la fila, también al volver a la pestaña). Ahora las dos se releen cada
+  60 s mientras están a la vista y al volver a la pestaña, con un mínimo de 30 s
+  entre lecturas (`lib/api/progressRefresh.js`).
+
 ## Corrección de detecciones
 
 Cada título que se notifica (ficha o reproducción) queda registrado como una
