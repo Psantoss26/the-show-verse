@@ -127,6 +127,7 @@ import { DEFAULT_COMMENT_TAB } from "@/lib/details/commentFilters";
 import { prefetchSubrouteDetails } from "@/lib/navigation/subroutePrefetch";
 import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
 import { useLadderListPreviews } from "@/lib/lists/useLadderListPreviews";
+import ListCountPills from "@/components/lists/ListCountPills";
 // El menú se pega por debajo de los controles flotantes del panel (cerrar,
 // acoplar, ficha completa): están en `top-4` y miden 40px, así que 56px es
 // justo donde dejan de estorbar. En la ficha completa este hueco lo marca el
@@ -2217,7 +2218,7 @@ export default function PhoneDetailsSections({
                               )}
                             </div>
 
-                            <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-4">
+                            <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/5 pt-4">
                               <div className="flex items-center gap-2 min-w-0">
                                 <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10 text-[10px] font-black text-white ring-1 ring-white/20">
                                   <Avatar
@@ -2230,13 +2231,8 @@ export default function PhoneDetailsSections({
                                 </span>
                               </div>
 
-                              <div className="flex items-center gap-3 text-xs font-bold text-zinc-500">
-                                <span className="flex items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 text-zinc-300">
-                                  {itemCount} items
-                                </span>
-                                <span className="flex items-center gap-1">
-                                  <ThumbsUp className="h-3 w-3" /> {likes}
-                                </span>
+                              <div className="flex shrink-0 items-center gap-2">
+                                <ListCountPills itemCount={itemCount} likes={likes} />
                               </div>
                             </div>
                           </div>

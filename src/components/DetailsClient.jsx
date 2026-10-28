@@ -366,6 +366,7 @@ import {
 import MobileOptionsSheet, { SheetOption, SheetOptionGroup } from "@/components/ui/MobileOptionsSheet";
 import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
 import { useLadderListPreviews } from "@/lib/lists/useLadderListPreviews";
+import ListCountPills from "@/components/lists/ListCountPills";
 
 
 // ---------------------------------------------------------------------------
@@ -12950,27 +12951,23 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     </div>
 
                                     {/* Footer */}
-                                    <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-4">
-                                      <div className="flex items-center gap-2 min-w-0">
+                                    {/* `@container`: en tarjetas estrechas las píldoras de
+                                        items y me gusta dejan solo el avatar (nombre en `title`). */}
+                                    <div className="@container mt-4 flex items-center justify-between gap-3 border-t border-white/5 pt-4">
+                                      <div className="flex items-center gap-2 min-w-0" title={username || undefined}>
                                         <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10 text-[10px] font-black text-white ring-1 ring-white/20">
                                           <Avatar
                                             src={avatar}
                                             name={username || "user"}
                                           />
                                         </span>
-                                        <span className="text-xs font-medium text-zinc-300 group-hover:text-white truncate max-w-[120px]">
+                                        <span className="hidden text-xs font-medium text-zinc-300 group-hover:text-white truncate max-w-[120px] @[17.5rem]:inline">
                                           {username || "—"}
                                         </span>
                                       </div>
 
-                                      <div className="flex items-center gap-3 text-xs font-bold text-zinc-500">
-                                        <span className="flex items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 text-zinc-300">
-                                          {itemCount} items
-                                        </span>
-                                        <span className="flex items-center gap-1 transition-colors group-hover:text-pink-500">
-                                          <ThumbsUp className="h-3 w-3" />{" "}
-                                          {likes}
-                                        </span>
+                                      <div className="flex shrink-0 items-center gap-2">
+                                        <ListCountPills itemCount={itemCount} likes={likes} />
                                       </div>
                                     </div>
                                   </div>
