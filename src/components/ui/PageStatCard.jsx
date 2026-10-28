@@ -44,9 +44,9 @@ export default function PageStatCard({
   animateChanges = false,
   iconKey,
 }) {
-  const swap = (key, content, swapClassName) =>
+  const swap = (key, content, swapClassName, stack = false) =>
     animateChanges ? (
-      <StatSwap swapKey={key} className={swapClassName}>
+      <StatSwap swapKey={key} className={swapClassName} stack={stack}>
         {content}
       </StatSwap>
     ) : (
@@ -97,6 +97,8 @@ export default function PageStatCard({
             label
           ),
           "block max-w-full max-md:truncate",
+          // Apiladas en la misma celda: la que sale no se corta con «…».
+          true,
         )}
       </span>
     </>
