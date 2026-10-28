@@ -325,14 +325,19 @@ export default function SeasonDetailsClient({
   useLayoutEffect(() => setPreferencesMounted(true), []);
   const autoPosterPath = season?.poster_path || show?.poster_path || null;
   const customPosterPath = preferencesMounted ? readSeasonCustomPoster(preferences, season?.id) : null;
-  // Solo si el servidor no supo el más votado se pregunta aquí; mientras, la
-  // portada espera para no enseñar la automática y cambiarla después.
-  const communityLookup = useCommunitySeasonPoster(
-    initialCommunityPoster === undefined ? season?.id : null,
-  );
+  // El más votado del servidor viaja en una página en caché (ISR, hasta una
+  // hora): se pinta ya, pero el cliente SIEMPRE vuelve a preguntar (como las
+  // tarjetas de «Temporadas») y, si otro voto cambió la ganadora, la corrige.
+  // Si el servidor no lo supo, la portada espera a esa respuesta para no
+  // enseñar la automática y cambiarla después.
+  const communityLookup = useCommunitySeasonPoster(season?.id);
+  const serverKnowsCommunity = initialCommunityPoster !== undefined;
   const communityPosterPath =
-    initialCommunityPoster === undefined ? communityLookup.poster : initialCommunityPoster;
-  const posterPending = !customPosterPath && communityLookup.pending;
+    communityLookup.pending || communityLookup.failed
+      ? (serverKnowsCommunity ? initialCommunityPoster : null)
+      : communityLookup.poster;
+  const posterPending =
+    !customPosterPath && communityLookup.pending && !serverKnowsCommunity;
   const defaultPosterPath = communityPosterPath || autoPosterPath;
   const posterPath = posterPending ? null : customPosterPath || defaultPosterPath;
   const adjacentSeasonHrefs = useMemo(

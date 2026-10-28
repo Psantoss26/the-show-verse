@@ -8,7 +8,8 @@
 // Por LOTES (/api/community/seasons/artwork?ids=…): las tarjetas de
 // «Temporadas» de una serie montan a la vez y van en una sola petición. Lo
 // resuelto se recuerda un minuto (como la caché del backend); un fallo no se
-// recuerda y vale como «sin votos» (`null`).
+// recuerda y se distingue de «sin votos» (`failed`), para que quien ya tenía
+// un valor (el del SSR) lo conserve.
 
 import { useEffect, useState } from "react";
 
@@ -44,9 +45,9 @@ async function send(ids) {
     });
     const json = res.ok ? await res.json() : null;
     const posters = json?.posters && typeof json.posters === "object" ? json.posters : null;
-    for (const id of ids) settle(id, posters?.[id] || null, Boolean(posters));
+    for (const id of ids) settle(id, posters ? posters[id] || null : undefined, Boolean(posters));
   } catch {
-    for (const id of ids) settle(id, null, false);
+    for (const id of ids) settle(id, undefined, false);
   } finally {
     clearTimeout(abortTimer);
   }
@@ -72,7 +73,7 @@ export function peekCommunitySeasonPoster(seasonId) {
   return entry.poster;
 }
 
-/** Póster más votado de la temporada (`null` sin votos o si falla). */
+/** Póster más votado de la temporada (`null` sin votos, `undefined` si falla). */
 export function requestCommunitySeasonPoster(seasonId) {
   const id = normalizeId(seasonId);
   if (!id) return Promise.resolve(null);
@@ -96,9 +97,10 @@ export function forgetCommunitySeasonPoster(seasonId) {
 }
 
 /**
- * `{ pending, poster }` del póster más votado. `pending` mientras se consulta
- * (quien lo usa no enseña aún la automática, para no cambiarla delante del
- * usuario); sin `seasonId` no se consulta nada.
+ * `{ pending, poster, failed }` del póster más votado. `pending` mientras se
+ * consulta (quien lo usa no enseña aún la automática, para no cambiarla
+ * delante del usuario); `failed` si no se pudo saber (entonces `poster` es
+ * `null`); sin `seasonId` no se consulta nada.
  */
 export function useCommunitySeasonPoster(seasonId) {
   const id = normalizeId(seasonId);
@@ -119,6 +121,7 @@ export function useCommunitySeasonPoster(seasonId) {
 
   return {
     pending: Boolean(id) && !settled && peeked === undefined,
+    failed: settled && result.poster === undefined,
     poster: (settled ? result.poster : peeked) || null,
   };
 }
