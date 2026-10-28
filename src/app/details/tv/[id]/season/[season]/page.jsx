@@ -3,7 +3,11 @@ import { getShareData, shareMetadata } from "@/lib/share/shareMeta";
 import { pickByLanguageLadder } from "@/lib/tmdb/imageLanguageLadder";
 import { getStreamingProviders } from "@/lib/api/justwatch";
 import { playableRankedVideos } from "@/lib/details/videos";
+import { headers } from "next/headers";
+import { clientIpFromHeaders } from "@/lib/backend/server";
 
+// Las peticiones a TMDb se guardan 1 h; la página en sí es dinámica por el
+// póster más votado (fetchCommunitySeasonPoster, sin caché).
 export const revalidate = 3600; // 1h
 
 const BACKEND_BASE =
@@ -12,16 +16,23 @@ const COMMUNITY_SERVER_TIMEOUT_MS = 1200;
 
 // Póster MÁS VOTADO de la temporada (cada «Editar portada» es un voto; ver
 // backend/src/lib/artworkVotes.js): ruta, `null` sin votos o `undefined` si
-// no se supo a tiempo (lo pregunta el cliente). Se guarda un minuto, como en
-// el backend.
+// no se supo a tiempo (lo pregunta el cliente). Sin caché aquí, como las
+// imágenes votadas de la ficha (lib/community/server.js): guardado en la
+// página, al recargar salía la ganadora anterior y el cliente la cambiaba
+// delante del usuario. Esto hace la página dinámica (TMDb sigue en caché).
 async function fetchCommunitySeasonPoster(seasonId) {
   if (!BACKEND_BASE || !seasonId) return undefined;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), COMMUNITY_SERVER_TIMEOUT_MS);
   try {
+    const ip = clientIpFromHeaders(await headers().catch(() => null));
     const res = await fetch(
       `${BACKEND_BASE}/v1/community/seasons/artwork?ids=${Number(seasonId)}`,
-      { signal: controller.signal, next: { revalidate: 60 } },
+      {
+        cache: "no-store",
+        signal: controller.signal,
+        headers: ip ? { "X-Forwarded-For": ip } : {},
+      },
     );
     if (!res.ok) return undefined;
     const json = await res.json();

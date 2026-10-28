@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Portada de una temporada: al recargar su página tras cambiar otro usuario la portada más votada, ya sale la nueva a la primera. Antes se veía un instante la anterior y enseguida cambiaba. → [páginas](docs/frontend/app-router-pages.md)
 - Colección: al recargar su página, la portada más votada ya sale a la primera. Antes se veía un instante la portada automática y enseguida cambiaba a la votada; entrando desde otra página no pasaba. → [páginas](docs/frontend/app-router-pages.md)
 - Buscador en el móvil: el botón de filtrar (Todo, Películas, Series, Colecciones, Usuarios, Actores y directores) abre la misma hoja inferior que los menús de filtros de las páginas de usuario, con las opciones en píldoras. Los resultados siguen detrás y cambian al elegir; la hoja se cierra con la X, tocando fuera o arrastrándola hacia abajo. En el ordenador sigue el desplegable de siempre. → [componentes](docs/frontend/components.md)
 - Portada de una temporada: su página ya enseña la portada más votada actual. Cuando otro usuario cambiaba la ganadora, la tarjeta de «Temporadas» de la serie se actualizaba pero la portada de la página de la temporada seguía con la anterior hasta una hora, porque venía guardada con la página. Ahora la página la vuelve a comprobar al abrirse y la corrige si ha cambiado. → [páginas](docs/frontend/app-router-pages.md)
