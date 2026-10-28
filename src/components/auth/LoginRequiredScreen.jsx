@@ -42,6 +42,40 @@ const THEMES = {
   },
 };
 
+// Solo la tarjeta, para las páginas que siguen enseñando su cabecera y sus
+// pestañas y bloquean una sola sección (Mis listas, en /lists).
+export function LoginRequiredCard({ message, next }) {
+  return (
+    <div className="flex items-center justify-center py-12 lg:py-24">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="max-w-[380px] w-full flex flex-col items-center justify-center px-6 py-10 bg-zinc-950/40 border border-white/10 rounded-[2.5rem] text-center shadow-[0_30px_80px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.15)] backdrop-blur-3xl"
+      >
+        <div className="relative mb-4 flex h-24 w-48 items-center justify-center mx-auto">
+          <img
+            src="/logo-TSV-sinFondo.png"
+            alt="The Show Verse"
+            className="h-full w-auto object-contain scale-[1.6]"
+          />
+        </div>
+        <h2 className="text-2xl font-black text-white tracking-tight drop-shadow-md mb-2">
+          Inicia sesión
+        </h2>
+        <p className="text-zinc-400 text-xs font-medium max-w-sm mb-6 leading-relaxed">
+          {message}
+        </p>
+        <Link
+          href={`/login?next=${next}`}
+          className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 via-indigo-500 to-emerald-500 hover:from-sky-400 hover:via-indigo-400 hover:to-emerald-400 text-white font-extrabold uppercase tracking-widest text-xs transition-all active:scale-[0.98] shadow-[0_4px_20px_rgba(99,102,241,0.25)] hover:shadow-[0_4px_25px_rgba(99,102,241,0.45)] cursor-pointer"
+        >
+          Iniciar sesión
+        </Link>
+      </motion.div>
+    </div>
+  );
+}
+
 export default function LoginRequiredScreen({
   theme = "red",
   eyebrow,
@@ -84,33 +118,7 @@ export default function LoginRequiredScreen({
           ) : null}
         </motion.header>
 
-        <div className="flex items-center justify-center py-12 lg:py-24">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="max-w-[380px] w-full flex flex-col items-center justify-center px-6 py-10 bg-zinc-950/40 border border-white/10 rounded-[2.5rem] text-center shadow-[0_30px_80px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.15)] backdrop-blur-3xl"
-          >
-            <div className="relative mb-4 flex h-24 w-48 items-center justify-center mx-auto">
-              <img
-                src="/logo-TSV-sinFondo.png"
-                alt="The Show Verse"
-                className="h-full w-auto object-contain scale-[1.6]"
-              />
-            </div>
-            <h2 className="text-2xl font-black text-white tracking-tight drop-shadow-md mb-2">
-              Inicia sesión
-            </h2>
-            <p className="text-zinc-400 text-xs font-medium max-w-sm mb-6 leading-relaxed">
-              {message}
-            </p>
-            <Link
-              href={`/login?next=${next}`}
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 via-indigo-500 to-emerald-500 hover:from-sky-400 hover:via-indigo-400 hover:to-emerald-400 text-white font-extrabold uppercase tracking-widest text-xs transition-all active:scale-[0.98] shadow-[0_4px_20px_rgba(99,102,241,0.25)] hover:shadow-[0_4px_25px_rgba(99,102,241,0.45)] cursor-pointer"
-            >
-              Iniciar sesión
-            </Link>
-          </motion.div>
-        </div>
+        <LoginRequiredCard message={message} next={next} />
       </div>
     </div>
   );

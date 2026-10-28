@@ -3,7 +3,7 @@
 
 import OptimizedImage from "@/components/OptimizedImage";
 import Link from "next/link";
-import LoginRequiredScreen from "@/components/auth/LoginRequiredScreen";
+import { LoginRequiredCard } from "@/components/auth/LoginRequiredScreen";
 import { createPortal } from "react-dom";
 import {
   useEffect,
@@ -2735,18 +2735,11 @@ export default function ListsPage() {
   // ✅ readonly: Trakt y Colecciones no crean/borran ni loadMore
   const canEdit = !!canUse && source === "personal";
 
-  if (authStatus === "anonymous" && source === "personal") {
-    return (
-      <LoginRequiredScreen
-        theme="purple"
-        eyebrow="TUS LISTAS"
-        title="Mis Listas"
-        description="Gestiona y organiza tus listas personales."
-        message="Inicia sesión para gestionar tus listas personalizadas."
-        next="/lists"
-      />
-    );
-  }
+  // Sin sesión, Comunidad y Colecciones se ven enteras; solo Mis listas pide
+  // iniciar sesión, y en su sitio: la cabecera y las pestañas se quedan para
+  // poder volver a las otras (antes la pantalla de login sustituía la página
+  // entera y, como la pestaña se guarda, se quedaba ahí al recargar).
+  const personalLocked = authStatus === "anonymous" && source === "personal";
 
   return (
     // Fondo `bg-black`, el mismo del <body> (como Favoritos y Pendientes): la
@@ -2789,6 +2782,7 @@ export default function ListsPage() {
                   <span className="text-purple-500">.</span>
                 </h1>
 
+                {personalLocked ? null : (
                 <motion.div
                   initial={isBackNav ? false : { opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -2807,6 +2801,7 @@ export default function ListsPage() {
                     <RefreshCcw className="h-5 w-5" />
                   </LiquidButton>
                 </motion.div>
+                )}
               </div>
               <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
                 {source === "collections"
@@ -2827,6 +2822,7 @@ export default function ListsPage() {
                 se desmonta en el mismo render (con él convivían tres
                 fotogramas, seis tarjetas en fila) y la cabecera no cambia de
                 alto. */}
+            {personalLocked ? null : (
             <motion.div
               key={contentSource}
               data-lists-stats={contentSource}
@@ -2855,6 +2851,7 @@ export default function ListsPage() {
                 </motion.div>
               ))}
             </motion.div>
+            )}
           </div>
         </motion.header>
 
@@ -3104,7 +3101,7 @@ export default function ListsPage() {
           )}
         </AnimatePresence>
 
-        {errorUnified ? (
+        {errorUnified && !personalLocked ? (
           <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-200 text-sm">
             {String(errorUnified)}
           </div>
@@ -3124,7 +3121,12 @@ export default function ListsPage() {
             pintado): si no, el primer fotograma era la pestaña por defecto y el
             relevo a la buena se veía como una página vacía. Al volver atrás,
             sin entrada (`initial={false}`). */}
-        {prefsHydrated ? (
+        {personalLocked ? (
+          <LoginRequiredCard
+            message="Inicia sesión para gestionar tus listas personalizadas."
+            next="/lists"
+          />
+        ) : prefsHydrated ? (
           <ListsContent
             contentSource={contentSource}
             contentLists={contentLists}
