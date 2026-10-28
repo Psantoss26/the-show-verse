@@ -11,7 +11,7 @@ aliases: [Funcionalidades, Features MOC]
 |---|---|
 | [[niveles-y-logros]] | Nivel, XP, rangos, rachas y logros del perfil. |
 | [[social-y-perfiles]] | Perfiles públicos `/u/[username]`, seguir, sección Social, Miembros, vista neuronal. |
-| [[hoy]] | Vista «Hoy» de Social y píldora del navbar: historias, destacada, «Para ti», feed por título/persona/hora y más activos (Siguiendo o Comunidad; Hoy, Ayer, Semana). |
+| [[hoy]] | Vista «Actividad» (antes «Hoy») de Social y píldora del navbar: historias, destacada, «Para ti», feed por título/persona/hora y más activos (Siguiendo o Comunidad; Hoy, Ayer, Semana). |
 | [[trakt-comparativa-sync]] | Análisis de la sincronización de streaming de Trakt frente a la nuestra, y huecos. |
 | [[comunidad]] | Comentarios y reseñas, sentimiento, listas de la comunidad, «me gusta», «Tus amigos». |
 | [[recap-anual]] | «Tu año en The Show Verse» (`/recap`). |

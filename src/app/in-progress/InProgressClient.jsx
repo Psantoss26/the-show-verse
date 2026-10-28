@@ -925,7 +925,7 @@ const InProgressCard = memo(function InProgressCard({
 
               <div className="flex items-center gap-2 text-xs text-zinc-500 flex-wrap">
                 <span
-                  className={`font-bold px-1.5 py-0.5 rounded text-[10px] ${colors.bg} ${colors.text}`}
+                  className={`font-bold px-2 py-0.5 rounded-md text-xs ${colors.bg} ${colors.text}`}
                 >
                   {progressPct}%
                 </span>
@@ -945,8 +945,11 @@ const InProgressCard = memo(function InProgressCard({
                 )}
               </div>
 
-              {/* Progress bar */}
-              <div className="h-1.5 w-full rounded-full bg-zinc-800 overflow-hidden relative">
+              {/* Progress bar: en Completadas siempre sería 100 %, sobra.
+                  Margen derecho = hueco con la imagen (gap 8/24 px − padding
+                  de la fila 6/16 px), para que quede centrada. */}
+              {activeTab !== "completed" && (
+              <div className="h-1.5 mr-0.5 sm:mr-2 rounded-full bg-zinc-800 overflow-hidden relative">
                 <motion.div
                   className={`h-full rounded-full bg-gradient-to-r ${colors.bar} relative overflow-hidden`}
                   initial={{ width: 0 }}
@@ -963,6 +966,7 @@ const InProgressCard = memo(function InProgressCard({
                   />
                 </motion.div>
               </div>
+              )}
 
               <div className="text-xs text-zinc-300 flex items-center gap-1.5 font-semibold">
                 <Clock className="w-3.5 h-3.5 text-zinc-400" /> {lastWatched}
@@ -997,11 +1001,6 @@ const InProgressCard = memo(function InProgressCard({
               <SmartBackdrop item={item} title={title} />
             ) : (
               <SmartPoster item={item} title={title} />
-            )}
-
-            {/* Tick verde para series completadas (mobile) */}
-            {activeTab === "completed" && (
-              <CheckCircle2 className="absolute top-2.5 left-2.5 z-10 lg:hidden w-5 h-5 text-emerald-400 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" />
             )}
 
             {activeTab === "inprogress" ? (
@@ -2252,7 +2251,7 @@ export default function InProgressClient({
                 Portadas
               </SheetOption>
               <SheetOption icon={LayoutList} active={viewMode === "compact"} onClick={() => setViewMode("compact")}>
-                Compacta
+                Lista
               </SheetOption>
             </SheetOptionGroup>
             {viewMode === "poster" && (

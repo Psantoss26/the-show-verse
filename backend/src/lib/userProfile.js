@@ -55,8 +55,10 @@ const PROFILE_ENGLISH_POSTER_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 const PROFILE_ENGLISH_POSTER_FETCH_CONCURRENCY = 8;
 // v3: escalera de idioma con español e idioma original (v2 guardaba `null`
 // para los títulos sin arte inglés ni sin idioma). v4: dentro de cada idioma,
-// el primer póster de TMDb en vez del más votado.
-const PROFILE_ENGLISH_POSTER_POLICY_VERSION = 'v4';
+// el primer póster de TMDb en vez del más votado. v5: galería `/images`
+// completa (con `append_to_response=images` TMDb devolvía a veces solo el
+// inglés y los títulos sin póster inglés se quedaban sin escalera).
+const PROFILE_ENGLISH_POSTER_POLICY_VERSION = 'v5';
 const profileEnglishPosterMemory = new Map();
 
 // Normaliza limit/offset de una sección paginada (cotas defensivas).
@@ -193,15 +195,18 @@ export async function resolveEnglishPosterPaths(db, items) {
     let posterPath = null;
     let settled = false;
     try {
-      // La ficha con sus imágenes SIN filtro de idioma: trae los pósters de
-      // todos los idiomas y `original_language` para la escalera.
-      const response = await fetch(
-        `https://api.themoviedb.org/3/${item.mediaType}/${item.tmdbId}?api_key=${apiKey}&append_to_response=images`,
-        { signal: AbortSignal.timeout(8000) },
-      );
-      if (response.ok) {
-        const payload = await response.json();
-        posterPath = pickLadderPosterPath(payload?.images?.posters, payload?.original_language);
+      // La ficha (`original_language` para la escalera) y la galería
+      // `/images` SIN filtro de idioma, por separado: pedidas juntas con
+      // `append_to_response=images`, TMDb las devuelve a veces filtradas
+      // solo al inglés.
+      const base = `https://api.themoviedb.org/3/${item.mediaType}/${item.tmdbId}`;
+      const [details, images] = await Promise.all([
+        fetch(`${base}?api_key=${apiKey}`, { signal: AbortSignal.timeout(8000) }),
+        fetch(`${base}/images?api_key=${apiKey}`, { signal: AbortSignal.timeout(8000) }),
+      ]);
+      if (details.ok && images.ok) {
+        const [payload, gallery] = await Promise.all([details.json(), images.json()]);
+        posterPath = pickLadderPosterPath(gallery?.posters, payload?.original_language);
         settled = true;
       }
     } catch {

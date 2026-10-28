@@ -5,7 +5,8 @@
 // guardado con `saveArtworkOverrides` y reflejado al instante con
 // `cacheArtworkOverrides`. El id es el de la temporada en TMDb (`season.id`),
 // único entre todas las series, así que no choca con el de ninguna serie.
-// Solo se elige el póster (`poster`).
+// Solo se elige el póster (`poster`). Cada elección es además un voto: la más
+// votada es la portada por defecto para todos (lib/details/communitySeasonPosters).
 const TMDB_PATH = /^\/[\w.-]+$/;
 
 export const SEASON_ARTWORK_TYPE = 'season';
@@ -19,11 +20,13 @@ export function readSeasonCustomPoster(preferences, seasonId) {
   return typeof poster === 'string' && TMDB_PATH.test(poster) ? poster : null;
 }
 
-// Cambio respecto a lo guardado. Elegir el póster automático (el original)
-// borra la elección (filePath null), como «Restaurar TMDb» en las colecciones.
-export function buildSeasonCoverChanges(originalPoster, currentPoster, draftPoster) {
-  const value = draftPoster || null;
+// Cambio respecto a la elección propia guardada (`null` = ninguna). Como en
+// «Portadas y fondos» de la ficha, cada elección se guarda tal cual y cuenta
+// como voto (también si es la automática); `null` (Restaurar) la borra y
+// retira el voto.
+export function buildSeasonCoverChanges(currentOwnPoster, nextOwnPoster) {
+  const value = nextOwnPoster || null;
   if (value && !TMDB_PATH.test(value)) throw new Error('Selecciona una imagen válida de TMDb.');
-  if (value === (currentPoster || null)) return [];
-  return [{ kind: 'poster', filePath: value && value !== originalPoster ? value : null }];
+  if (value === (currentOwnPoster || null)) return [];
+  return [{ kind: 'poster', filePath: value }];
 }

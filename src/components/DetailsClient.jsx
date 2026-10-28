@@ -60,12 +60,16 @@ import EpisodeRatingsModal from "@/components/details/EpisodeRatingsModal";
 import {
   fetchArtworkOverride,
   fetchCommunityArtwork,
+  forgetCommunityArtwork,
   readArtworkPreference,
   readPersistedArtworkOverride,
   resolveCachedArtworkOverride,
+  retractOwnArtworkVotes,
   saveArtworkOverride,
   saveArtworkOverrides,
   shouldSkipRemoteArtwork,
+  subscribeCommunityArtwork,
+  withoutArtworkVotes,
   writeArtworkPreference,
 } from "@/lib/artworkApi";
 import Link from "next/link";
@@ -104,7 +108,6 @@ import {
   StarIcon,
   MessageSquareIcon,
   BadgeDollarSignIcon,
-  LinkIcon,
   ImageIcon,
   ImageOff,
   Heart,
@@ -348,6 +351,7 @@ import {
   DETAILS_GALLERY_BACKDROP_SIZES,
   DETAILS_GALLERY_POSTER_SIZES,
   DETAILS_POSTER_ROW_SIZES,
+  detailsRowImageLoading,
   tmdbSrcSet,
 } from "@/lib/tmdb/imageSrcSet";
 import { pickExternalIds, withTitleExternalLinks } from "@/lib/details/titleExternalLinks";
@@ -365,6 +369,7 @@ import {
 import MobileOptionsSheet, { SheetOption, SheetOptionGroup } from "@/components/ui/MobileOptionsSheet";
 import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
 import { useLadderListPreviews } from "@/lib/lists/useLadderListPreviews";
+import ListCountPills from "@/components/lists/ListCountPills";
 
 
 // ---------------------------------------------------------------------------
@@ -1228,6 +1233,10 @@ export default function DetailsClient({
   // -- Imagenes base: evitan SSR/primer render con un poster provisional --
   const [basePosterPath, setBasePosterPath] = useState(() => restoredValue(backSnapshot, "basePosterPath", null));
   const [baseBackdropPath, setBaseBackdropPath] = useState(() => restoredValue(backSnapshot, "baseBackdropPath", null));
+  // Portada y fondo AUTOMÁTICOS que calcula `initArtwork`. Las bases de arriba
+  // nacen con la selección guardada en este dispositivo (para pintarla sin
+  // esperar), así que al restablecer hay que devolverlas a estos.
+  const autoArtworkRef = useRef({ key: null, poster: null, backdrop: null });
   const [artworkInitialized, setArtworkInitialized] = useState(() => restoredValue(backSnapshot, "artworkInitialized", false)); // Se pone a true tras la carga inicial
   // Un usuario autenticado puede tener poster/backdrop/preview/logo personalizados
   // guardados en el servidor (sección "Portadas y fondos"). En una sesión nueva
@@ -1281,6 +1290,30 @@ export default function DetailsClient({
       cancelled = true;
     };
   }, [initialCommunityArtwork, endpointType, id]);
+  // Restablecer (aquí o en otra vista del mismo título) retira el voto propio:
+  // se quita ya de la copia y, guardado, se vuelve a preguntar al servidor.
+  useEffect(() => {
+    let cancelled = false;
+    const unsubscribe = subscribeCommunityArtwork(
+      { type: endpointType, id },
+      (event) => {
+        if (event.retract) {
+          setCommunityArtwork((current) =>
+            withoutArtworkVotes(current, event.retract),
+          );
+        }
+        if (event.refresh) {
+          fetchCommunityArtwork({ type: endpointType, id }).then((artwork) => {
+            if (!cancelled && artwork) setCommunityArtwork(artwork);
+          });
+        }
+      },
+    );
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [endpointType, id]);
   const communityArtworkFor = (kind) =>
     remoteArtworkChecked ? communityArtwork?.[kind] || null : null;
   const communityPosterPath = communityArtworkFor("poster");
@@ -1550,6 +1583,33 @@ export default function DetailsClient({
   // igual que DetailModal. Best-effort; si no hay logo, cae al título de texto.
   const [heroLogoPath, setHeroLogoPath] = useState(() => restoredValue(backSnapshot, "heroLogoPath", null));
   const [selectedLogoPath, setSelectedLogoPath] = useState(() => restoredValue(backSnapshot, "selectedLogoPath", null));
+  // Rutas elegidas en esta visita, por tipo: cada una pudo ser el voto propio
+  // que trae la más votada leída al entrar (ver `subscribeCommunityArtwork`).
+  const ownArtworkVotesRef = useRef({ key: null, votes: {} });
+  useEffect(() => {
+    const key = `${endpointType}:${id}`;
+    if (ownArtworkVotesRef.current.key !== key) {
+      ownArtworkVotesRef.current = { key, votes: {} };
+    }
+    const { votes } = ownArtworkVotesRef.current;
+    for (const [kind, path] of [
+      ["poster", selectedPosterPath],
+      ["mobilePoster", selectedMobilePosterPath],
+      ["backdrop", selectedPreviewBackdropPath],
+      ["background", selectedBackgroundPath],
+      ["logo", selectedLogoPath],
+    ]) {
+      if (path) (votes[kind] ??= new Set()).add(path);
+    }
+  }, [
+    endpointType,
+    id,
+    selectedPosterPath,
+    selectedMobilePosterPath,
+    selectedPreviewBackdropPath,
+    selectedBackgroundPath,
+    selectedLogoPath,
+  ]);
   const [titleLogos, setTitleLogos] = useState(() => restoredValue(backSnapshot, "titleLogos", []));
   // ¿Ya terminó el fetch del logo? El título de TEXTO solo se muestra cuando el
   // logo se ha resuelto y NO existe; durante la carga no se muestra nada (el
@@ -3510,6 +3570,11 @@ export default function DetailsClient({
         // `images` en el SSR, es decir sin caché de servidor todavía). En ese
         // caso sustituirla ahora se vería como un parpadeo, así que se
         // mantiene la que el usuario ya está viendo.
+        autoArtworkRef.current = {
+          key: `${endpointType}:${id}`,
+          poster: asTmdbPath(poster) || null,
+          backdrop: asTmdbPath(backdrop) || null,
+        };
         if (poster) {
           setBasePosterPath((prev) => {
             if (hasSavedPoster) return prev || asTmdbPath(poster);
@@ -7123,10 +7188,44 @@ export default function DetailsClient({
       id,
       changes: resetChanges,
     });
+    const ownVotes = ownArtworkVotesRef.current.votes;
+    // Al entrar con la selección guardada en este dispositivo, la portada y el
+    // fondo base nacen con ella (ver `artworkReset`): sin devolverlas a las
+    // automáticas, restablecer seguía enseñando la propia hasta recargar.
+    const auto =
+      autoArtworkRef.current.key === `${endpointType}:${id}`
+        ? autoArtworkRef.current
+        : {};
+    const notOwn = (kind, path) =>
+      path && !ownVotes[kind]?.has(path) ? path : null;
+    setBasePosterPath(
+      (prev) =>
+        auto.poster ||
+        notOwn("poster", prev) ||
+        asTmdbPath(data?.poster_path) ||
+        null,
+    );
+    setBaseBackdropPath(
+      (prev) =>
+        auto.backdrop ||
+        notOwn("background", prev) ||
+        asTmdbPath(data?.backdrop_path) ||
+        null,
+    );
+    // Sin esto, la más votada leída al entrar (con el voto propio de una
+    // visita anterior) volvía a pintar la imagen que se acaba de restablecer.
+    retractOwnArtworkVotes({
+      type: endpointType,
+      id,
+      votes: ownVotes,
+    });
+    ownArtworkVotesRef.current = { key: `${endpointType}:${id}`, votes: {} };
     saveArtworkOverrides({
       type: endpointType,
       id,
       changes: resetChanges,
+    }).then((saved) => {
+      if (saved) forgetCommunityArtwork({ type: endpointType, id });
     });
   };
 
@@ -7198,18 +7297,6 @@ export default function DetailsClient({
     globalViewModeStorageKey,
     posterModeHydrated,
   ]);
-
-  // Copia la URL original de una imagen de TMDb al portapapeles
-  const handleCopyImageUrl = async (filePath) => {
-    const url = buildOriginalImageUrl(filePath);
-    try {
-      navigator?.clipboard?.writeText
-        ? await navigator.clipboard.writeText(url)
-        : window.prompt("Copiar URL:", url);
-    } catch {
-      window.prompt("Copiar URL:", url);
-    }
-  };
 
   // -- Navegacion por scroll horizontal de la galeria de imagenes --
   const updateImagesNav = () => {
@@ -11337,7 +11424,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         }}
                         className="pb-8 !overflow-visible"
                       >
-                        {castDataForUI.slice(0, 20).map((actor) => (
+                        {castDataForUI.slice(0, 20).map((actor, actorIndex) => (
                           <SwiperSlide key={actor.id}>
                             <Link
                               href={`/details/person/${actor.id}`}
@@ -11348,6 +11435,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   <OptimizedImage
                                     src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
                                     alt={actor.name}
+                                    {...detailsRowImageLoading(actorIndex)}
                                     className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110 grayscale-[15%] group-hover:grayscale-0"
                                   />
                                 ) : (
@@ -11400,7 +11488,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         }}
                         className="pb-8 !overflow-visible"
                       >
-                        {ladderRecommendations.slice(0, 15).map((rec) => {
+                        {ladderRecommendations.slice(0, 15).map((rec, recIndex) => {
                           const recTitle = rec.title || rec.name;
                           const recType =
                             rec.media_type === "movie" ||
@@ -11479,7 +11567,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       }
                                       srcSet={tmdbSrcSet(rec.poster_path)}
                                       alt={recTitle}
-                                      loading="lazy"
+                                      {...detailsRowImageLoading(recIndex)}
                                       decoding="async"
                                       sizes={DETAILS_POSTER_ROW_SIZES}
                                       className={recImageClass}
@@ -11537,7 +11625,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         }}
                         className="pb-8"
                       >
-                        {ladderCollectionItems.map((m) => {
+                        {ladderCollectionItems.map((m, colIndex) => {
                           const colAccountState =
                             recAccountStates[`movie:${m.id}`] || null;
                           const colViewerState =
@@ -11600,7 +11688,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       sizes={DETAILS_POSTER_ROW_SIZES}
                                       alt={m.title}
                                       className={colImageClass}
-                                      loading="lazy"
+                                      {...detailsRowImageLoading(colIndex)}
                                       decoding="async"
                                     />
                                   ) : m._englishPosterPending ? null : (
@@ -12191,31 +12279,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                             </div>
                                           )}
 
-                                          <div
-                                            role="button"
-                                            tabIndex={0}
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleCopyImageUrl(filePath);
-                                            }}
-                                            onKeyDown={(e) => {
-                                              if (
-                                                e.key === "Enter" ||
-                                                e.key === " "
-                                              ) {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                handleCopyImageUrl(filePath);
-                                              }
-                                            }}
-                                            className="group/link absolute bottom-0 right-0 z-20 p-2 sm:p-2.5 rounded-tl-xl border-l border-t backdrop-blur-md shadow-sm transition-all duration-300 ease-out transform-gpu origin-bottom-right scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100 bg-black/40 border-white/10 text-zinc-300 hover:bg-white/20 hover:text-white"
-                                            aria-label="Copiar URL"
-                                          >
-                                            <LinkIcon className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
-                                            <div className="pointer-events-none absolute bottom-full mb-2 right-0 z-[100] scale-95 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[10px] font-bold text-white opacity-0 shadow-xl transition-all duration-200 ease-out group-hover/link:scale-100 group-hover/link:opacity-100 group-hover/link:delay-[2000ms]">
-                                              Copiar URL
-                                            </div>
-                                          </div>
                                         </div>
                                       </SwiperSlide>
                                     );
@@ -12948,27 +13011,23 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     </div>
 
                                     {/* Footer */}
-                                    <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-4">
-                                      <div className="flex items-center gap-2 min-w-0">
+                                    {/* `@container`: en tarjetas estrechas las píldoras de
+                                        items y me gusta dejan solo el avatar (nombre en `title`). */}
+                                    <div className="@container mt-4 flex items-center justify-between gap-3 border-t border-white/5 pt-4">
+                                      <div className="flex items-center gap-2 min-w-0" title={username || undefined}>
                                         <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10 text-[10px] font-black text-white ring-1 ring-white/20">
                                           <Avatar
                                             src={avatar}
                                             name={username || "user"}
                                           />
                                         </span>
-                                        <span className="text-xs font-medium text-zinc-300 group-hover:text-white truncate max-w-[120px]">
+                                        <span className="hidden text-xs font-medium text-zinc-300 group-hover:text-white truncate max-w-[120px] @[17.5rem]:inline">
                                           {username || "—"}
                                         </span>
                                       </div>
 
-                                      <div className="flex items-center gap-3 text-xs font-bold text-zinc-500">
-                                        <span className="flex items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 text-zinc-300">
-                                          {itemCount} items
-                                        </span>
-                                        <span className="flex items-center gap-1 transition-colors group-hover:text-pink-500">
-                                          <ThumbsUp className="h-3 w-3" />{" "}
-                                          {likes}
-                                        </span>
+                                      <div className="flex shrink-0 items-center gap-2">
+                                        <ListCountPills itemCount={itemCount} likes={likes} />
                                       </div>
                                     </div>
                                   </div>

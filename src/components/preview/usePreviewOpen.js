@@ -16,6 +16,7 @@
 
 import { getMediaTypeForItem } from "@/lib/dashboard/media";
 import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
+import { isInsidePageModal } from "@/lib/ui/pageModal";
 
 export default function usePreviewOpen() {
   const { openDetailModal } = useDetailModal();
@@ -35,6 +36,8 @@ export default function usePreviewOpen() {
         return;
       }
       if (!openDetailModal) return; // sin provider → navega el <Link>
+      // Desde un modal (episodios agrupados…): la preview va encima de él.
+      const opts = { overModal: isInsidePageModal(event.currentTarget) };
 
       if (
         episode &&
@@ -53,7 +56,7 @@ export default function usePreviewOpen() {
           name: episode.name ?? null,
           still_path: episode.still_path ?? null,
           showName: episode.showName ?? null,
-        });
+        }, opts);
         return;
       }
 
@@ -65,7 +68,7 @@ export default function usePreviewOpen() {
         ...item,
         id,
         media_type: mediaType ?? getMediaTypeForItem(item),
-      });
+      }, opts);
     };
   };
 }

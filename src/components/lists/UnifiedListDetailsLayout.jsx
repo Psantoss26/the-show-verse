@@ -41,6 +41,7 @@ import {
     MOBILE_STATS_REVEAL_BASE,
     MOBILE_STATS_REVEAL_WIDEN,
     MOBILE_SCOREBOARD_ENTRY_ANIMATION,
+    MOBILE_SCOREBOARD_REVEAL_ANIMATION,
     MobileHeroCover,
     MobileHeroRevealContext,
     useMobileDetailsHero,
@@ -660,7 +661,19 @@ export default function UnifiedListDetailsLayout({
         revealProps: heroRevealProps,
         statsRevealProps: heroStatsRevealProps,
         rootStyle: heroRootStyle,
-    } = useMobileDetailsHero(mobileHero, { lock: mobileCoverReady })
+    } = useMobileDetailsHero(mobileHero, {
+        lock: mobileCoverReady,
+        // Ventanas bajas: como la ficha, botones a 20px del navbar inferior
+        // (nunca detrás) y el marcador, si no cabe, sale con el scroll. El
+        // póster de las colecciones lleva el título impreso al pie: nada
+        // encima, se recorta por arriba; el mosaico de las listas sigue 2:3
+        // por detrás del título y los botones.
+        fitCoverWhenShort: true,
+        fitGap: 20,
+        fitCoverPosterRatio: 1.5,
+        fitCoverScoreboardOptional: true,
+        fitCoverOverlap: !posterImage,
+    })
     // Qué cabe bajo los botones sin recortar la portada (solo teléfono).
     const mobileScoreboardMode = mobileHero && isPhone ? heroScoreboardMode : 'full'
 
@@ -876,9 +889,12 @@ export default function UnifiedListDetailsLayout({
                     // entrada de Framer (su `opacity` apagaría el cristal de los
                     // botones): allí entran portada y botones con las clases de
                     // la ficha.
+                    // MÓVIL inmersivo: 32 px hasta la barra de búsqueda y menú
+                    // (48 px parecían despegarla). Sin sinopsis, el marcador
+                    // ya trae su `mb-6`: solo faltan 8 px.
                     className={`${isBackdropCover && hasInfoTabs ? 'mb-6' : 'mb-12'} flex flex-col items-start lg:flex-row lg:gap-12 ${
                         mobileHero
-                            ? '-mt-[5rem] gap-5 sm:mt-0 sm:gap-8 max-sm:![transform:none] max-sm:!opacity-100'
+                            ? `-mt-[5rem] gap-5 sm:mt-0 sm:gap-8 max-sm:![transform:none] max-sm:!opacity-100 ${infoTabs && !isBackdropCover ? 'max-sm:mb-8' : 'max-sm:mb-2'}`
                             : 'gap-8'
                     }`}
                 >
@@ -890,7 +906,9 @@ export default function UnifiedListDetailsLayout({
                             ref={heroCoverSpacerRef}
                             className="relative -mx-4 w-[calc(100%+2rem)] max-w-none flex-shrink-0 sm:hidden"
                             // Solo la portada: los botones van justo debajo.
-                            style={{ height: 'var(--mobile-cover-h)' }}
+                            // En ventanas bajas el hueco es más corto que la
+                            // imagen (ver `fitCoverWhenShort`).
+                            style={{ height: 'var(--mobile-cover-flow-h, var(--mobile-cover-h))' }}
                         >
                             {showMobileTitle && mobileCoverReady ? (
                                 <motion.div
@@ -1039,7 +1057,11 @@ export default function UnifiedListDetailsLayout({
                                     // En 'compact', al desplegarse con el
                                     // scroll, crece también a lo ancho.
                                     : `max-sm:mt-[var(--mobile-scoreboard-shift,0px)] max-sm:mx-auto max-sm:w-[var(--mobile-actions-w,100%)] max-sm:max-w-full ${mobileScoreboardMode === 'compact' ? `${MOBILE_STATS_REVEAL_BASE} ${MOBILE_STATS_REVEAL_WIDEN}` : ''} ${
-                                        !animateMobileEntry
+                                        // 'hidden' (ventanas bajas): entra con
+                                        // el scroll, ya completo.
+                                        mobileScoreboardMode === 'hidden'
+                                            ? `${MOBILE_REVEAL_BASE} ${animateMobileEntry ? MOBILE_SCOREBOARD_REVEAL_ANIMATION : ''}`
+                                            : !animateMobileEntry
                                             ? ''
                                             : mobileCoverReady
                                                 ? MOBILE_SCOREBOARD_ENTRY_ANIMATION
@@ -1047,6 +1069,7 @@ export default function UnifiedListDetailsLayout({
                                     }`
                             }`}
                             {...(mobileScoreboardMode === 'compact' ? heroStatsRevealProps : {})}
+                            {...(mobileScoreboardMode === 'hidden' ? heroRevealProps : {})}
                         >
                             <DetailsScoreboardPanel
                                 mobileScoresOnly

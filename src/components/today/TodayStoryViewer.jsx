@@ -412,15 +412,15 @@ export default function TodayStoryViewer({ groups, startIndex, seen, onSeen, onC
             {paused ? <Play className="h-5 w-5 fill-current" /> : <Pause className="h-5 w-5 fill-current" />}
           </button>
           {/* Página completa de Hoy (como el botón de cuadrícula de Trakt):
-              cierra las historias y deja ver la vista Hoy de Social. */}
+              cierra las historias y deja ver la vista Actividad de Social. */}
           <Link
             href="/social"
             prefetch={false}
             data-story-control
             onClick={onClose}
             className="rounded-full p-2 text-white hover:bg-white/10"
-            aria-label="Ver todo Hoy"
-            title="Ver todo Hoy"
+            aria-label="Ver toda la actividad"
+            title="Ver toda la actividad"
           >
             <LayoutGrid className="h-5 w-5" />
           </Link>

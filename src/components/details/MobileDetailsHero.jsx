@@ -287,6 +287,13 @@ export function readBottomNavTop() {
  * logo y los botones. Temporadas y episodios lo apagan (su póster lleva el
  * título impreso al pie y nada puede ir encima): la imagen mide lo que el
  * hueco y, si ni así cabe, se recorta por arriba.
+ *
+ * `fitCoverWhenShort` (listas y colecciones): la portada sigue en 150vw con el
+ * marcador centrado debajo mientras quepa al menos el compacto a `fitGap` del
+ * navbar inferior; si no (ventanas bajas), se ajusta como con `fitCover` y
+ * las mismas opciones, para que los botones nunca queden tras el navbar. La
+ * decisión se toma con la portada a 150vw, no con el alto ya ajustado, así
+ * que no oscila.
  */
 const HERO_SCROLL_END_SETTLE_MS = 150
 const MOBILE_FIT_POSTER_MAX_CROP = 0.1
@@ -297,7 +304,7 @@ const HERO_ROOT_START_STYLE = {
     '--mobile-scoreboard-shift': '0px',
 }
 
-export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, fitGap = 20, fitCoverMinRatio = 0.75, fitCoverPosterRatio = 0, fitCoverScoreboardOptional = false, fitCoverOverlap = true } = {}) {
+export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, fitGap = 20, fitCoverMinRatio = 0.75, fitCoverPosterRatio = 0, fitCoverScoreboardOptional = false, fitCoverOverlap = true, fitCoverWhenShort = false } = {}) {
     const rootRef = useRef(null)
     const coverSpacerRef = useRef(null)
     const actionRowRef = useRef(null)
@@ -399,7 +406,6 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
             const fullHeight = compactHeight + statsRowHeightRef.current
             // Sitio entre el pie de los botones (con el desplazamiento
             // `-top-2` de su fila) y el navbar, tal como se ve sin scroll.
-            const rowBottom = rowRect.bottom + window.scrollY
             // Con la portada ya visible (`lock`), el navbar se toma de la
             // medida anterior: la barra de direcciones cambia el alto de la
             // ventana al hacer scroll y el marcador no debe moverse por eso.
@@ -412,7 +418,19 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
             }
             const appliedShift = Number.parseFloat(getComputedStyle(scoreboard).marginTop) || 0
             const baseGap = scoreboardRect.top - rowRect.bottom - appliedShift
-            if (fitCover && spacer) {
+            // Pie de los botones con la portada a 150vw (ver `fitCoverWhenShort`).
+            let rowBottom = rowRect.bottom + window.scrollY
+            let fitNow = fitCover
+            if (!fitCover && fitCoverWhenShort && spacer) {
+                const spacerRect = readUntransformedRect(spacer)
+                rowBottom = spacerRect.top + window.scrollY + window.innerWidth * 1.5 + rowRect.bottom - spacerRect.bottom
+                fitNow = navTopRef.current - rowBottom < compactHeight + fitGap * 2
+                if (!fitNow) {
+                    writeHeroVar('--mobile-cover-flow-h', '150vw')
+                    writeHeroVar('--mobile-cover-h', '150vw')
+                }
+            }
+            if (fitNow && spacer) {
                 // Lo que hay del pie de la portada al pie de los botones (el
                 // hueco de la columna, su `-top-2` y la barra «Viendo» si la
                 // hay) no depende del alto de la portada: con él se despeja
@@ -513,7 +531,7 @@ export function useMobileDetailsHero(enabled, { lock = false, fitCover = false, 
             fitMutations?.disconnect()
             if (raf) window.cancelAnimationFrame(raf)
         }
-    }, [enabled, isPhone, fitCover, fitGap, fitCoverMinRatio, fitCoverPosterRatio, fitCoverScoreboardOptional, fitCoverOverlap, writeHeroVar])
+    }, [enabled, isPhone, fitCover, fitGap, fitCoverMinRatio, fitCoverPosterRatio, fitCoverScoreboardOptional, fitCoverOverlap, fitCoverWhenShort, writeHeroVar])
 
     // Recorrido del relevo portada → fondo: 55vh, como en la ficha, salvo que
     // la página no dé para tanto (p. ej. colecciones de una sola fila de

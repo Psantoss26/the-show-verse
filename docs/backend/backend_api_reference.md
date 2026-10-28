@@ -267,7 +267,8 @@ Ver [social-y-perfiles](../features/social-y-perfiles.md).
 | `POST`/`DELETE` | `/v1/community/{type}/{tmdbId}/comments/{id}/like` | Si | Me gusta en un comentario (idempotente) |
 | `GET` | `/v1/community/{type}/{tmdbId}/sentiment` | No | Resumen de sentimiento (temas a favor/en contra) |
 | `GET` | `/v1/community/{type}/{tmdbId}/summary` | Opcional | Resumen de comunidad del titulo (incluye `artwork`, las imagenes mas votadas) |
-| `GET` | `/v1/community/{type}/{tmdbId}/artwork` | No | Imagen mas votada de cada tipo (`poster`, `mobilePoster`, `backdrop`, `background`, `logo`); solo los tipos con algun voto. Cada usuario vale un voto: su seleccion actual en «Portadas y fondos» (tabla `artwork_votes`). Empate: la elegida mas recientemente |
+| `GET` | `/v1/community/{type}/{tmdbId}/artwork` | No | `type`: `movie`, `tv` o `collection` (solo en esta ruta). Imagen mas votada de cada tipo (`poster`, `mobilePoster`, `backdrop`, `background`, `logo`); solo los tipos con algun voto. Cada usuario vale un voto: su seleccion actual en «Portadas y fondos» (tabla `artwork_votes`). Empate: la elegida mas recientemente |
+| `GET` | `/v1/community/seasons/artwork?ids=1,2,3` | No | Poster mas votado de varias temporadas (id de TMDb de la temporada, hasta 100): `{ posters: { [id]: "/x.jpg" } }`, solo las que tienen votos. Mismos votos (`artwork_votes`, `media_type = season`): cada eleccion de «Editar portada» de la temporada |
 | `GET` | `/v1/community/{type}/{tmdbId}/lists` | Opcional | Listas de la comunidad que contienen el titulo |
 | `GET` | `/v1/community/{type}/{tmdbId}/following` | Si | "Tus amigos": que han hecho con este titulo las cuentas que sigues |
 | `GET` | `/v1/community/lists/discover` | Opcional | Descubrir listas de la comunidad |

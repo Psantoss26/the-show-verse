@@ -573,6 +573,9 @@ export default function DetailModal({
   // Ir a la ficha completa desde la vista previa: lo resuelve MobileTitlePeek,
   // que la mantiene encima hasta que la ficha está en pantalla.
   onPeekOpenFull,
+  // Abierta desde un modal de la página (episodios agrupados del Historial…):
+  // panel y modales hijos suben por encima de ese modal (z-[10000]).
+  overModal = false,
 }) {
   const isRightPlacement = placement === "right";
   const isDocked = isRightPlacement && drawerView === "docked";
@@ -3635,6 +3638,10 @@ export default function DetailModal({
     ? createPortal(
         <div
           data-detail-modal-layer=""
+          // Sobre un modal de la página el panel sube a z-[10001] y estos
+          // modales (z-[10000]) quedarían debajo de él: el envoltorio sube con
+          // ellos. Sin desplazamiento ni tamaño, sus hijos `fixed` no cambian.
+          style={overModal ? { position: "relative", zIndex: 10001 } : undefined}
           onPointerDown={stopNestedModalEvent}
           onMouseDown={stopNestedModalEvent}
           onClick={stopNestedModalEvent}
@@ -3737,7 +3744,7 @@ export default function DetailModal({
 
   return (
     <div
-      className={`fixed inset-y-0 z-[9999] flex ${
+      className={`fixed inset-y-0 ${overModal ? "z-[10001]" : "z-[9999]"} flex ${
         // `left-0 w-screen` en vez de `inset-x-0` (equivalente a `right-0`):
         // <html> reserva SIEMPRE el hueco de la scrollbar (`scrollbar-gutter:
         // stable`, ver globals.css), y ese hueco reduce el viewport que usa

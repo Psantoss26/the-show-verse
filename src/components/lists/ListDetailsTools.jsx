@@ -1,7 +1,10 @@
 "use client";
 
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { setLocalStorageItem } from "@/lib/storage/localStorageBudget";
+import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
+import { LIQUID_GLASS_SURFACE } from "@/lib/ui/liquidGlass";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowUpDown,
@@ -57,6 +60,13 @@ const RENDER_BATCH_SIZE = 60;
 
 // Dentro de la hoja de filtros móvil (MobileOptionsSheet) el desplegable se
 // pinta como un grupo con todas sus opciones a la vista.
+// Barra de herramientas (buscador, filtros, vistas, borrar): el mismo cristal
+// líquido que la sinopsis y el marcador de la cabecera (LIQUID_GLASS_SURFACE +
+// LiquidGlassOpticalLayers como primer hijo), no el degradado plano de antes.
+const LIST_TOOL_GLASS = `rounded-2xl ${LIQUID_GLASS_SURFACE}`;
+// El foco del buscador se marca en su cristal (el input va transparente dentro).
+const LIST_SEARCH_FOCUS = "focus-within:ring-2 focus-within:ring-inset focus-within:ring-purple-500/50";
+
 function InlineDropdown(props) {
   if (useInOptionsSheet()) {
     return <SheetOptionGroup label={props.label} icon={props.icon}>{props.children}</SheetOptionGroup>;
@@ -130,9 +140,10 @@ function InlineDropdownMenu({ label, valueLabel, icon: Icon, children }) {
         ref={buttonRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex h-11 w-full items-center justify-between gap-3 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 px-4 text-sm text-zinc-200 shadow-lg backdrop-blur-lg transition hover:from-white/15 hover:to-white/10 hover:text-white lg:min-w-[145px]"
+        className={`inline-flex h-11 w-full items-center justify-between gap-3 px-4 text-sm text-zinc-200 transition-colors hover:text-white lg:min-w-[145px] ${LIST_TOOL_GLASS}`}
       >
-        <div className="flex min-w-0 items-center gap-2">
+        <LiquidGlassOpticalLayers />
+        <div className="relative z-10 flex min-w-0 items-center gap-2">
           {Icon ? <Icon className="h-4 w-4 shrink-0 text-purple-400" /> : null}
           <span className="shrink-0 text-xs font-bold uppercase tracking-wider text-zinc-500">
             {label}:
@@ -142,7 +153,7 @@ function InlineDropdownMenu({ label, valueLabel, icon: Icon, children }) {
           </span>
         </div>
         <ChevronDown
-          className={`h-3.5 w-3.5 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`relative z-10 h-3.5 w-3.5 shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`}
         />
       </button>
 
@@ -345,8 +356,9 @@ function ViewSwitcher({ viewMode, setViewMode, className = "", fill = false }) {
   }
   return (
     <div
-      className={`flex h-11 items-center rounded-2xl bg-gradient-to-br from-white/10 to-white/5 p-1 shadow-lg backdrop-blur-lg ${className}`}
+      className={`flex h-11 items-center p-1 ${LIST_TOOL_GLASS} ${className}`}
     >
+      <LiquidGlassOpticalLayers />
       {VIEW_SWITCHER_OPTIONS.map(({ id, icon: Icon, label }) => (
         <button
           key={id}
@@ -356,7 +368,7 @@ function ViewSwitcher({ viewMode, setViewMode, className = "", fill = false }) {
           // Radio concéntrico al del contenedor: rounded-2xl (16px) menos su
           // relleno p-1 (4px) = 12px. Con rounded-lg el resaltado del modo
           // activo quedaba más cuadrado que la zona que lo alberga.
-          className={`flex h-full min-w-10 items-center justify-center rounded-xl px-3 transition ${
+          className={`relative z-10 flex h-full min-w-10 items-center justify-center rounded-xl px-3 transition ${
             fill ? "flex-1" : ""
           } ${
             viewMode === id
@@ -383,16 +395,59 @@ function DeleteModeToggle({ editMode, setEditMode }) {
       title={editMode ? "Salir del modo borrar" : "Borrar títulos"}
       aria-label={editMode ? "Salir del modo borrar" : "Borrar títulos"}
       aria-pressed={editMode}
-      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-white/10 to-white/5 text-sm font-bold shadow-lg backdrop-blur-lg transition-all ${
-        editMode
-          ? "text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.3)]"
-          : "text-zinc-200 hover:bg-black/30"
+      className={`flex h-11 w-11 shrink-0 items-center justify-center text-sm font-bold transition-colors ${LIST_TOOL_GLASS} ${
+        editMode ? "text-red-400" : "text-zinc-200 hover:text-white"
       }`}
     >
-      {editMode ? <X className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
+      <LiquidGlassOpticalLayers />
+      {editMode ? <X className="relative z-10 h-4 w-4" /> : <Trash2 className="relative z-10 h-4 w-4" />}
     </button>
   );
 }
+
+// AJUSTES GUARDADOS, como en las páginas de usuario (Favoritos, Pendientes…):
+// tipo, orden, agrupación y modo de vista se recuerdan en localStorage, uno
+// por cada clase de página (`prefsKey`: listas o colecciones), y valen para
+// todas las de esa clase. La búsqueda no se guarda.
+//
+// Se leen tras montar (en un layout effect, antes de pintar) y no en el
+// `useState` inicial: estas páginas se pintan en el servidor, que no ve
+// localStorage, y React no corrige al hidratar lo que no coincide.
+const useClientLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+const LIST_PREF_VIEW_MODES = new Set(VIEW_SWITCHER_OPTIONS.map(({ id }) => id));
+
+function readListPref(key, valid) {
+  try {
+    const saved = window.localStorage.getItem(key);
+    return saved && valid(saved) ? saved : null;
+  } catch {
+    return null;
+  }
+}
+
+function useListPref(prefsKey, name, fallback, valid) {
+  const [value, setValue] = useState(fallback);
+  const key = `showverse:${prefsKey}Details:${name}`;
+  const restoredRef = useRef(false);
+  useClientLayoutEffect(() => {
+    const saved = readListPref(key, valid);
+    restoredRef.current = true;
+    if (saved != null) setValue(saved);
+  }, [key]);
+  const update = useCallback(
+    (next) => {
+      setValue(next);
+      if (restoredRef.current) setLocalStorageItem(key, next);
+    },
+    [key],
+  );
+  return [value, update];
+}
+
+const isTypeFilter = (value) => Object.hasOwn(typeLabel, value);
+const isSortBy = (value) => Object.hasOwn(sortLabel, value);
+const isGroupBy = (value) => Object.hasOwn(groupLabel, value);
+const isViewMode = (value) => LIST_PREF_VIEW_MODES.has(value);
 
 export default function FilterableListItems({
   items,
@@ -413,13 +468,15 @@ export default function FilterableListItems({
   // (mediaType, tmdbId) al pasar el ratón (o el foco) por un título: la
   // página pide ahí su nota de IMDb si no la tiene (useListImdbRatings).
   onTitleHover,
+  // Con qué ajustes guardados va esta página (ver useListPref).
+  prefsKey = "list",
 }) {
   const previewClick = usePreviewOpen();
   const [q, setQ] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [sortBy, setSortBy] = useState("list-order");
-  const [groupBy, setGroupBy] = useState("none");
-  const [viewMode, setViewMode] = useState("grid");
+  const [typeFilter, setTypeFilter] = useListPref(prefsKey, "typeFilter", "all", isTypeFilter);
+  const [sortBy, setSortBy] = useListPref(prefsKey, "sortBy", "list-order", isSortBy);
+  const [groupBy, setGroupBy] = useListPref(prefsKey, "groupBy", "none", isGroupBy);
+  const [viewMode, setViewMode] = useListPref(prefsKey, "viewMode", "grid", isViewMode);
   const [editMode, setEditMode] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
@@ -679,25 +736,23 @@ export default function FilterableListItems({
         transition={{ duration: 0.35 }}
       >
         <div className="flex gap-2 lg:hidden">
-          <div className="relative flex-1">
+          <div {...revealPiece} className={`flex-1 ${LIST_TOOL_GLASS} ${LIST_SEARCH_FOCUS}`}>
+            <LiquidGlassOpticalLayers />
             <Search
-              {...revealPiece}
               aria-hidden="true"
               className="pointer-events-none absolute left-3.5 top-1/2 z-10 h-4 w-4 shrink-0 -translate-y-1/2 text-purple-400"
             />
             <input
-              {...revealPiece}
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Buscar..."
-              className="h-11 w-full rounded-2xl bg-gradient-to-br from-white/10 to-white/5 py-2.5 pl-10 pr-10 text-sm text-white shadow-lg backdrop-blur-lg placeholder:text-zinc-400 transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+              className="relative z-10 h-11 w-full rounded-2xl bg-transparent py-2.5 pl-10 pr-10 text-sm text-white placeholder:text-zinc-400 focus:outline-none"
             />
             {q ? (
               <button
-                {...revealPiece}
                 type="button"
                 onClick={() => setQ("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 transition-colors hover:bg-white/10"
+                className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-md p-1 transition-colors hover:bg-white/10"
               >
                 <X className="h-3.5 w-3.5 text-zinc-500" />
               </button>
@@ -707,13 +762,12 @@ export default function FilterableListItems({
             {...revealPiece}
             type="button"
             onClick={() => setMobileFiltersOpen((v) => !v)}
-            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition-all ${
-              mobileFiltersOpen
-                ? "bg-gradient-to-br from-white/15 to-white/10 text-white shadow-lg backdrop-blur-lg"
-                : "bg-gradient-to-br from-white/10 to-white/5 text-zinc-200 shadow-lg backdrop-blur-lg hover:from-white/15 hover:to-white/10 hover:text-white"
+            className={`flex h-11 w-11 shrink-0 items-center justify-center transition-colors ${LIST_TOOL_GLASS} ${
+              mobileFiltersOpen ? "text-white" : "text-zinc-200 hover:text-white"
             }`}
           >
-            <Filter className="h-4 w-4" />
+            <LiquidGlassOpticalLayers />
+            <Filter className="relative z-10 h-4 w-4" />
           </button>
           {editable ? (
             <DeleteModeToggle editMode={editMode} setEditMode={setEditMode} />
@@ -732,7 +786,8 @@ export default function FilterableListItems({
         </MobileOptionsSheet>
 
         <div className="hidden gap-3 lg:flex">
-          <div className="relative min-w-[260px] flex-1">
+          <div className={`min-w-[260px] flex-1 ${LIST_TOOL_GLASS} ${LIST_SEARCH_FOCUS}`}>
+            <LiquidGlassOpticalLayers />
             <Search
               aria-hidden="true"
               className="pointer-events-none absolute left-3.5 top-1/2 z-10 h-4 w-4 shrink-0 -translate-y-1/2 text-purple-400"
@@ -741,13 +796,13 @@ export default function FilterableListItems({
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Buscar por título..."
-              className="h-11 w-full rounded-2xl bg-gradient-to-br from-white/10 to-white/5 py-2.5 pl-10 pr-10 text-sm text-white shadow-lg backdrop-blur-lg placeholder:text-zinc-400 transition-all focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+              className="relative z-10 h-11 w-full rounded-2xl bg-transparent py-2.5 pl-10 pr-10 text-sm text-white placeholder:text-zinc-400 focus:outline-none"
             />
             {q ? (
               <button
                 type="button"
                 onClick={() => setQ("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 transition-colors hover:bg-white/10"
+                className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-md p-1 transition-colors hover:bg-white/10"
               >
                 <X className="h-3.5 w-3.5 text-zinc-500" />
               </button>

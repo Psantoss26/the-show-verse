@@ -117,3 +117,14 @@ test("la hoja bloquea el scroll, cierra con Escape y se arrastra hacia abajo", (
   assert.match(sheet, /role="dialog"/);
   assert.match(sheet, /aria-modal="true"/);
 });
+
+test("el modal de episodios vistos abre sus opciones móviles en la hoja, encima del modal", () => {
+  const modal = read("components/trakt/TraktEpisodesWatchedModal.jsx");
+  assert.match(modal, /<MobileOptionsSheet\s+open={mobileFiltersOpen}\s+onClose={\(\) => setMobileFiltersOpen\(false\)}/);
+  assert.doesNotMatch(modal, /<MobileFiltersPanel\b/);
+  // El modal vive en z-[99999] dentro de la página: la hoja sube por encima
+  // y no apaga su cristal con `data-sv-sheet-open`.
+  assert.match(modal, /layerClassName="z-\[100001\]"/);
+  assert.match(modal, /pausePageBelow={false}/);
+  assert.match(sheet, /if \(!open \|\| !pausePageBelow\) return undefined;/);
+});

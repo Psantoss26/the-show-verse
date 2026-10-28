@@ -48,12 +48,13 @@ import {
   beginPeekHandoff,
   endPeekHandoff,
   findPeekHandoffTarget,
-  handOffPeekParts,
   peekHandoffPartsReady,
+  revealPeekHandoffParts,
   settlePeekCard,
 } from "@/lib/navigation/peekHandoff";
 
 import { useMediaQuery } from "@/lib/hooks/useMediaQuery";
+import { isInsidePageModal } from "@/lib/ui/pageModal";
 import useModalGuard from "@/hooks/useModalGuard";
 import {
   TITLE_PEEK_ATTR,
@@ -222,29 +223,31 @@ export default function MobileTitlePeek() {
       }
       layer.style.pointerEvents = "none";
       // La tarjeta, ya convertida en cabecera, se ajusta a la portada real de
-      // la ficha y sus piezas, a las de la ficha. Al llegar, en el mismo
-      // fotograma, se cambian por las de la ficha (que estaban ocultas debajo)
-      // y solo entonces se desvanece lo que queda: la portada, idéntica.
+      // la ficha y sus piezas, a las de la ficha. Las de la ficha aparecen ya
+      // debajo (la capa de la vista previa es opaca: no se ven dobles) y, al
+      // llegar, la vista previa entera se desvanece encima: es lo mismo en el
+      // mismo sitio. El desvanecido se programa ya con su retardo: así empieza
+      // a tiempo en el compositor aunque la ficha, recién montada, tenga el
+      // hilo principal ocupado.
       const card = layer.querySelector("[data-peek-card]");
       const cover = layer.querySelector("[data-peek-cover]");
-      settlePeekCard(card, cover, findPeekHandoffTarget(), {
+      const settleMs = settlePeekCard(card, cover, findPeekHandoffTarget(), {
         fullPoster: cover?.hasAttribute("data-peek-full-poster"),
         reduceMotion,
-      }).then((landed) => {
-        if (cancelled) return;
-        handOffPeekParts(landed);
-        const fade = layer.animate([{ opacity: 1 }, { opacity: 0 }], {
-          duration: reduceMotion ? 120 : LEAVE_FADE_MS,
-          easing: "cubic-bezier(0.33, 0, 0.2, 1)",
-          fill: "forwards",
-        });
-        leaveFadeRef.current = fade;
-        const done = () => {
-          endPeekHandoff();
-          if (!cancelled) removeInstantly();
-        };
-        fade.finished.then(done, done);
       });
+      revealPeekHandoffParts();
+      const fade = layer.animate([{ opacity: 1 }, { opacity: 0 }], {
+        duration: reduceMotion ? 120 : LEAVE_FADE_MS,
+        delay: settleMs,
+        easing: "cubic-bezier(0.33, 0, 0.2, 1)",
+        fill: "forwards",
+      });
+      leaveFadeRef.current = fade;
+      const done = () => {
+        endPeekHandoff();
+        if (!cancelled) removeInstantly();
+      };
+      fade.finished.then(done, done);
     };
     const check = () => {
       if (cancelled) return;
@@ -343,6 +346,8 @@ export default function MobileTitlePeek() {
           width: rect.width,
           height: rect.height,
         },
+        // Pulsada dentro de un modal (episodios agrupados…): encima de él.
+        overModal: isInsidePageModal(gesture.target),
       });
     };
 
@@ -467,8 +472,16 @@ export default function MobileTitlePeek() {
 
   if (!portalReady) return null;
 
+  // La capa lleva su propio z-index: su desvanecido final (`opacity`) la
+  // convierte en contexto de apilamiento y, sin él, caería al nivel 0 de la
+  // página. El navbar y la barra superior, por encima, aparecían de golpe
+  // sobre la vista previa en vez de verse a través de ella.
   return createPortal(
-    <div data-sv-no-peek="" ref={layerRef}>
+    <div
+      data-sv-no-peek=""
+      ref={layerRef}
+      className={`relative ${peek?.overModal ? "z-[10001]" : "z-[9999]"}`}
+    >
       {/* Detrás de la vista previa mientras se va a la ficha: tapa la página
           que se deja y la pantalla de carga con el fondo de la ficha. */}
       {leavingTo && (
@@ -496,6 +509,7 @@ export default function MobileTitlePeek() {
             onPeekOpenFull={openFull}
             peek
             peekOrigin={peek.origin}
+            overModal={peek.overModal}
           />
         ) : null}
       </AnimatePresence>

@@ -602,13 +602,17 @@ export function hubTitleIndices(graph, index) {
   return [...out];
 }
 
-/** Índices de los nodos cuyo nombre contiene la búsqueda (sin tildes). */
-export function searchNodes(nodes, query, limit = 200) {
+/**
+ * Índices de los nodos cuyo nombre contiene la búsqueda (sin tildes).
+ * `extraNames(node)`: otros nombres del nodo (inglés y español de los títulos).
+ */
+export function searchNodes(nodes, query, limit = 200, extraNames = null) {
   const q = normalizeSearch(query);
   if (!q) return [];
   const out = [];
   for (let i = 0; i < nodes.length && out.length < limit; i += 1) {
-    if (nodes[i].search?.includes(q)) out.push(i);
+    const node = nodes[i];
+    if (node.search?.includes(q) || extraNames?.(node)?.some((name) => normalizeSearch(name).includes(q))) out.push(i);
   }
   return out;
 }

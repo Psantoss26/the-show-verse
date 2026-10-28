@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { pickPreferredVideo } from './videos.js'
+import { pickPreferredVideo, videoTypeOptions } from './videos.js'
 
 test('a trailer wins over official featurettes and teasers', () => {
     const videos = [
@@ -71,4 +71,20 @@ test('official status breaks ties after type and language', () => {
     ]
 
     assert.equal(pickPreferredVideo(videos)?.key, 'official-trailer')
+})
+
+test('videoTypeOptions keeps the list order and counts each type', () => {
+    const options = videoTypeOptions([
+        { key: 'a', type: 'Trailer' },
+        { key: 'b', type: 'Teaser' },
+        { key: 'c', type: 'Trailer' },
+        { key: 'd', type: 'Behind the Scenes' },
+        { key: 'e' }
+    ])
+    assert.deepEqual(options, [
+        { type: 'Trailer', count: 2, label: 'Tráiler' },
+        { type: 'Teaser', count: 1, label: 'Teaser' },
+        { type: 'Behind the Scenes', count: 1, label: 'Detrás de las cámaras' },
+        { type: 'Other', count: 1, label: 'Vídeo' }
+    ])
 })

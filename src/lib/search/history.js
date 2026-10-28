@@ -1,5 +1,5 @@
 const SEARCH_HISTORY_STORAGE_KEY = "showverse:navbar:search-history:v1";
-export const SEARCH_HISTORY_LIMIT = 8;
+export const SEARCH_HISTORY_LIMIT = 25;
 const inMemoryHistoryByStorage = new WeakMap();
 
 function getStorage(storage) {

@@ -75,6 +75,13 @@ export default function MobileOptionsSheet({
   // una vista lateral (SectionSheet), que desde 640px es un panel a la
   // derecha: la hoja sube dentro de su ancho en vez de cruzar la pantalla.
   placement = "screen",
+  // Capa de la hoja: por encima de un modal con z mayor (p. ej. el de
+  // episodios vistos) hay que subirla.
+  layerClassName = "z-[10000]",
+  // `data-sv-sheet-open` apaga el cristal de los hijos de <body> que no son
+  // capas de modal: debajo de un modal pintado dentro de la página (no en un
+  // portal) le quitaría el suyo, así que ahí se desactiva.
+  pausePageBelow = true,
   children,
 }) {
   const titleId = useId();
@@ -114,12 +121,12 @@ export default function MobileOptionsSheet({
   // Si ya lo puso la vista lateral de debajo, es suyo: al cerrar la hoja no se
   // quita.
   useEffect(() => {
-    if (!open) return undefined;
+    if (!open || !pausePageBelow) return undefined;
     const root = document.documentElement;
     if (root.hasAttribute("data-sv-sheet-open")) return undefined;
     root.setAttribute("data-sv-sheet-open", "");
     return () => root.removeAttribute("data-sv-sheet-open");
-  }, [open]);
+  }, [open, pausePageBelow]);
 
   // Foco al panel al abrir (lectores de pantalla y Escape).
   useEffect(() => {
@@ -159,7 +166,7 @@ export default function MobileOptionsSheet({
       // Para los cierres «al pulsar fuera» de la página: la hoja va en un
       // portal, fuera de su contenedor, y no cuenta como fuera.
       data-mobile-options-sheet=""
-      className="fixed inset-0 z-[10000] flex flex-col justify-end"
+      className={`fixed inset-0 ${layerClassName} flex flex-col justify-end`}
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}

@@ -105,7 +105,7 @@ function paintFrameSnapshot(frame, host) {
 }
 
 export default function SubrouteDetailsPanel({ item, placement, contentView, drawerView, tabletViewport,
-  onClose, onOpenDetail, onPlacementChange, onContentViewChange, onDrawerViewChange, onDrawerWidthChange, switching }) {
+  onClose, onOpenDetail, onPlacementChange, onContentViewChange, onDrawerViewChange, onDrawerWidthChange, switching, overModal = false }) {
   const router = useRouter();
   const frame = useRef(null);
   const panelRef = useRef(null);
@@ -426,7 +426,7 @@ export default function SubrouteDetailsPanel({ item, placement, contentView, dra
 
   return createPortal(
     <div
-      className={`fixed inset-y-0 z-[9999] flex ${right ? "left-0 w-screen justify-end pointer-events-none" : "inset-x-0 justify-center"}`}
+      className={`fixed inset-y-0 ${overModal ? "z-[10001]" : "z-[9999]"} flex ${right ? "left-0 w-screen justify-end pointer-events-none" : "inset-x-0 justify-center"}`}
       role="dialog"
       aria-modal={right ? undefined : "true"}
       aria-label={label}

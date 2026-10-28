@@ -12,9 +12,13 @@ import { normalizeArtworkKey, pickListArtwork, pickSeasonArtwork } from "@/lib/t
 // los usuarios: la segunda vez es instantáneo. Los criterios de elección son
 // los mismos (lib/tmdb/artworkPicks).
 //
-// Se pide la FICHA con sus imágenes (`append_to_response=images`, sin filtro
-// de idioma): trae el arte de todos los idiomas y `original_language`, que la
-// escalera necesita para su escalón «idioma original».
+// Se piden la FICHA (aporta `original_language`, que la escalera necesita
+// para su escalón «idioma original») y la galería `/images` sin filtro de
+// idioma, que trae el arte de todos los idiomas. NO `append_to_response=images`:
+// pedido desde el servidor, TMDb lo devuelve a veces filtrado solo al inglés
+// (medido: «Ley y orden: UVE», 39 de 130 pósters y ninguno de los 30 sin
+// idioma), y la portada y el fondo de las listas salían con el póster con
+// título aunque hubiera uno sin texto.
 //
 // También admite TEMPORADAS ("season:1396:2", tarjetas de «Temporadas» de la
 // ficha): su galería sin filtro de idioma más la ficha de la serie, que aporta
@@ -54,8 +58,8 @@ async function fetchTmdbJson(url) {
 // Compartida en vuelo: las temporadas de una serie llegan en el mismo lote y
 // cada una necesita la ficha de la serie (en frío, una sola petición a TMDb).
 const titlesInFlight = new Map();
-function fetchTitleWithImages(mediaType, id) {
-  const url = `https://api.themoviedb.org/3/${mediaType}/${id}?api_key=${TMDB_KEY}&append_to_response=images`;
+function fetchTitle(mediaType, id) {
+  const url = `https://api.themoviedb.org/3/${mediaType}/${id}?api_key=${TMDB_KEY}`;
   const pending = titlesInFlight.get(url);
   if (pending) return pending;
   const promise = fetchTmdbJson(url).finally(() => titlesInFlight.delete(url));
@@ -67,13 +71,16 @@ async function fetchPicks(key) {
   const [kind, id, season] = key.split(":");
   if (kind === "season") {
     const [show, images] = await Promise.all([
-      fetchTitleWithImages("tv", id),
+      fetchTitle("tv", id),
       fetchTmdbJson(`https://api.themoviedb.org/3/tv/${id}/season/${season}/images?api_key=${TMDB_KEY}`),
     ]);
     return pickSeasonArtwork(images, { originalLanguage: show?.original_language });
   }
-  const details = await fetchTitleWithImages(kind, id);
-  return pickListArtwork(details?.images, {
+  const [details, images] = await Promise.all([
+    fetchTitle(kind, id),
+    fetchTmdbJson(`https://api.themoviedb.org/3/${kind}/${id}/images?api_key=${TMDB_KEY}`),
+  ]);
+  return pickListArtwork(images, {
     originalLanguage: details?.original_language,
   });
 }

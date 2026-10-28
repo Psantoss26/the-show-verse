@@ -1,15 +1,21 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { Loader2, Pencil, RotateCcw } from 'lucide-react'
-import SectionSheet from '@/components/details/sectionSheet/SectionSheet'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Image as ImageIcon } from 'lucide-react'
+import { ImagesSheet } from '@/components/details/sectionSheet/DetailsSectionSheets'
 import { useAuth } from '@/context/AuthContext'
 import { saveArtworkOverrides } from '@/lib/artworkApi'
-import { ArtworkEditFooter, ArtworkGrid, titledImages } from '@/components/lists/CollectionEditModal'
 import { SEASON_ARTWORK_TYPE, buildSeasonCoverChanges } from '@/lib/details/seasonArtwork'
+import { forgetCommunitySeasonPoster, retractCommunitySeasonPoster } from '@/lib/details/communitySeasonPosters'
 
-// Pósters de la temporada en TODOS los idiomas (la fila se queda con los que
-// llevan título, en español o inglés, como la portada de las colecciones).
+const META = { title: 'Portadas', icon: ImageIcon }
+
+// Solo pósters en español o inglés (con el título impreso que se espera ver):
+// el filtro de idioma de la vista ofrece así solo estos dos.
+const SPANISH_OR_ENGLISH = new Set(['es', 'en'])
+const isSpanishOrEnglish = (img) => SPANISH_OR_ENGLISH.has(String(img?.iso_639_1 || '').toLowerCase())
+
+// Pósters de la temporada (TMDb devuelve todos los idiomas).
 async function fetchSeasonPosters(showId, seasonNumber) {
   const key = process.env.NEXT_PUBLIC_TMDB_API_KEY
   if (!key) return null
@@ -24,121 +30,81 @@ async function fetchSeasonPosters(showId, seasonNumber) {
 }
 
 /**
- * «Editar portada» de una temporada: elegir su póster entre los de TMDb, solo
- * para la cuenta del usuario. Misma vista lateral que «Editar colección»
- * (lists/CollectionEditModal): Restaurar TMDb en la cabecera, pósters en
- * cuadrícula y Cancelar / Guardar en el pie.
+ * «Editar portada» de una temporada: elegir su póster entre los de TMDb. Es
+ * la MISMA vista lateral que «Portadas y fondos» de la ficha (ImagesSheet):
+ * resolución en cada imagen, orden e idioma en la hoja de filtros y Restaurar
+ * en la cabecera. Sin botón de guardar: elegir una imagen la aplica al
+ * momento. Solo pósters en español o inglés.
  *
- * `originalPoster`: el automático (lo que se ve sin elección propia);
- * `currentPoster`: el que se ve ahora.
+ * Como en la ficha, cada elección es también un VOTO y la más votada es la
+ * portada por defecto de la temporada para todos (en su ficha, las tarjetas
+ * de «Temporadas» y la vista previa). Restaurar borra la elección propia y
+ * retira el voto: se vuelve a ver la por defecto.
+ *
+ * `defaultPoster`: la que se ve sin elección propia (la más votada o la
+ * automática); `ownPoster`: la elección propia guardada (o `null`).
  */
-export default function SeasonCoverEditModal({ seasonId, showId, seasonNumber, originalPoster, currentPoster, onClose }) {
+export default function SeasonCoverEditModal({ seasonId, showId, seasonNumber, defaultPoster, ownPoster, onClose }) {
   const { authenticated, cacheArtworkOverrides } = useAuth()
-  const panelRef = useRef(null)
-  const [portalReady, setPortalReady] = useState(false)
-  const [draft, setDraft] = useState(currentPoster || null)
   const [posters, setPosters] = useState(null)
-  const [imageError, setImageError] = useState(false)
-  const [attempt, setAttempt] = useState(0)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-  const close = () => { if (!saving) onClose() }
-
-  useEffect(() => setPortalReady(true), [])
-
-  useEffect(() => {
-    if (!portalReady) return undefined
-    const previousFocus = document.activeElement
-    panelRef.current?.focus({ preventScroll: true })
-    return () => previousFocus?.focus?.({ preventScroll: true })
-  }, [portalReady])
+  const [tab, setTab] = useState(null)
+  // La elección propia guardada: cada cambio se calcula contra ella (no contra
+  // `ownPoster`, que ya refleja la instantánea local antes de guardar).
+  const savedRef = useRef(ownPoster || null)
+  // La elección propia en la vista, al instante; sin ella se marca la por defecto.
+  const [own, setOwn] = useState(ownPoster || null)
+  const active = own || defaultPoster || null
 
   useEffect(() => {
     let cancelled = false
-    setImageError(false)
     fetchSeasonPosters(showId, seasonNumber).then((result) => {
-      if (cancelled) return
-      setPosters(result)
-      setImageError(!result)
+      if (!cancelled) setPosters(result || [])
     })
     return () => { cancelled = true }
-  }, [showId, seasonNumber, attempt])
+  }, [showId, seasonNumber])
 
-  async function save(event) {
-    event.preventDefault()
-    if (saving || !authenticated) return
-    setError('')
-    setSaving(true)
-    try {
-      const changes = buildSeasonCoverChanges(originalPoster, currentPoster, draft)
-      if (changes.length) {
-        const target = { type: SEASON_ARTWORK_TYPE, id: seasonId }
-        cacheArtworkOverrides?.({ ...target, changes })
-        const saved = await saveArtworkOverrides({ ...target, changes })
-        if (!saved) {
-          // Se devuelve la instantánea local a lo que hay guardado de verdad.
-          cacheArtworkOverrides?.({ ...target, changes: buildSeasonCoverChanges(originalPoster, draft, currentPoster) })
-          throw new Error('No se pudo guardar la portada. Inténtalo de nuevo.')
-        }
-      }
-      onClose()
-    } catch (err) {
-      setError(err?.message || 'No se pudieron guardar los cambios.')
-      setSaving(false)
+  async function apply(path) {
+    if (!authenticated) return
+    const previous = savedRef.current
+    const changes = buildSeasonCoverChanges(previous, path)
+    setOwn(path)
+    if (!changes.length) return
+    const target = { type: SEASON_ARTWORK_TYPE, id: seasonId }
+    savedRef.current = path
+    cacheArtworkOverrides?.({ ...target, changes })
+    // El voto anterior se retira ya: al restablecer, la portada de la página
+    // no debe caer en esa misma imagen como «la más votada».
+    if (previous) retractCommunitySeasonPoster(seasonId, previous)
+    const saved = await saveArtworkOverrides({ ...target, changes }).catch(() => false)
+    if (saved) {
+      // El voto cambia la más votada: las tarjetas vuelven a preguntar.
+      forgetCommunitySeasonPoster(seasonId)
+    } else if (savedRef.current === path) {
+      // Se devuelve la instantánea local a lo que hay guardado de verdad.
+      savedRef.current = previous
+      setOwn(previous)
+      cacheArtworkOverrides?.({ ...target, changes: buildSeasonCoverChanges(path, previous) })
     }
   }
 
-  if (!portalReady) return null
+  // La elegida va primero, como en la ficha.
+  const tabs = useMemo(() => {
+    if (!posters) return []
+    const list = posters.filter((img) => img?.file_path && isSpanishOrEnglish(img))
+    const index = list.findIndex((img) => img.file_path === active)
+    const images = index > 0 ? [list[index], ...list.slice(0, index), ...list.slice(index + 1)] : list
+    return [{ id: 'posters', label: 'Portada', kind: 'poster', aspect: 'poster', images, activePath: active, count: images.length }]
+  }, [posters, active])
 
-  // Misma vista lateral que «Editar colección» y las secciones de la ficha
-  // (details/sectionSheet): pósters en cuadrícula y botones en un pie fijo.
-  return (
-    <SectionSheet
-      open
-      onClose={close}
-      closeDisabled={saving}
-      title="Editar portada"
-      icon={Pencil}
-      subtitle={`Temporada ${seasonNumber} · Solo para tu cuenta`}
-      as="form"
-      panelRef={panelRef}
-      panelProps={{ onSubmit: save, tabIndex: -1 }}
-      headerAction={
-        <button
-          type="button"
-          disabled={saving}
-          onClick={() => setDraft(originalPoster || null)}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/5 text-red-400 transition hover:bg-red-500/20 hover:text-red-300 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 disabled:opacity-50"
-          aria-label="Restaurar TMDb"
-          title="Restaurar TMDb"
-        >
-          <RotateCcw className="h-5 w-5" aria-hidden="true" />
-        </button>
-      }
-      footer={<ArtworkEditFooter saving={saving} canSave={authenticated} onCancel={close} />}
-    >
-      <fieldset disabled={saving} className="min-w-0 space-y-4 pb-2 pt-1">
-        {!authenticated && <p className="rounded-xl bg-yellow-500/10 p-3 text-xs font-medium text-yellow-200">Inicia sesión para guardar tu personalización.</p>}
-        {error && <p role="alert" className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-center text-xs font-medium text-red-400">{error}</p>}
-        {imageError && (
-          <p role="status" className="text-xs font-medium text-zinc-400">
-            No se pudieron cargar más imágenes.{' '}
-            <button type="button" onClick={() => setAttempt((value) => value + 1)} className="font-bold text-zinc-200 underline underline-offset-2 hover:text-white">Reintentar</button>
-          </p>
-        )}
-        {!posters && !imageError ? (
-          <p role="status" className="flex items-center justify-center gap-2 py-12 text-xs font-medium text-zinc-400"><Loader2 className="h-4 w-4 animate-spin" />Cargando imágenes de TMDb…</p>
-        ) : (
-          <ArtworkGrid
-            label="Póster"
-            field="poster_path"
-            original={originalPoster}
-            value={draft}
-            candidates={titledImages(posters)}
-            onSelect={(_, path) => setDraft(path)}
-          />
-        )}
-      </fieldset>
-    </SectionSheet>
-  )
+  const data = {
+    images: {
+      tabs,
+      loading: !posters,
+      notice: authenticated ? null : 'Inicia sesión para guardar tu personalización.',
+      onSelect: authenticated ? (_, path) => apply(path) : undefined,
+      onReset: authenticated && own ? () => apply(null) : undefined,
+    },
+  }
+
+  return <ImagesSheet meta={META} data={data} onClose={onClose} tab={tab} setTab={setTab} />
 }

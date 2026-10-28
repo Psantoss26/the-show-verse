@@ -44,6 +44,8 @@ import {
 } from "@/lib/profile/neuralGraphData";
 import { NEURAL_STAGE_CLASS, NeuralSkeletonArt, documentTop } from "./NeuralGraphSkeleton";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import { getTitleNames } from "@/lib/search/titleNames";
+import { useTitleNameSearch } from "@/lib/search/useTitleNameSearch";
 import {
   FLAG_FAVORITE,
   FLAG_WATCHED,
@@ -515,10 +517,19 @@ export default function NeuralGraphView({ username, headerCollapsed = false, onT
   const [fullscreen, setFullscreen] = useState(false);
 
   const visibility = useMemo(() => (graph ? computeVisibility(graph, filters) : null), [filters, graph]);
+  // La búsqueda mira también el nombre en inglés y en español (llegan al escribir).
+  const searchTitles = useMemo(
+    () => (graph ? graph.nodes.filter((node) => node.kind === "title").map((node) => node.title) : null),
+    [graph],
+  );
+  const titleNamesVersion = useTitleNameSearch(searchTitles, query);
   const matches = useMemo(() => {
     if (!graph) return [];
-    return searchNodes(graph.nodes, query).filter((i) => visibility?.[i]);
-  }, [graph, query, visibility]);
+    const extraNames = (node) => (node.kind === "title" ? getTitleNames(node.title) : null);
+    return searchNodes(graph.nodes, query, 200, extraNames).filter((i) => visibility?.[i]);
+    // titleNamesVersion: recalcular al llegar los nombres en inglés y español.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [graph, query, visibility, titleNamesVersion]);
 
   // Grupos de color, calculados una vez por grafo: se pinta un trazo por color.
   const colorGroups = useMemo(() => {

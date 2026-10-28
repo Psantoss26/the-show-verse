@@ -77,11 +77,9 @@ test("el selector de escritorio usa el recuadro de icono amplio de Historial", (
   );
 });
 
-test("el selector móvil de rewatch muestra solo la fecha sin hora", () => {
-  assert.match(
-    modalSource,
-    /isRewatchView\s*\? formatDate\(currentRewatchStartedAt\)\s*: activeViewLabel/g,
-  );
+test("en la hoja móvil cada rewatch es «Rewatch · fecha» sin hora", () => {
+  assert.match(modalSource, /mobileLabel: formatDate\(item\.startedAt\)/);
+  assert.match(modalSource, /\? `Rewatch · \$\{item\.mobileLabel\}`\s*: item\.label/);
 });
 
 test("el selector de escritorio antepone Rewatch a la fecha", () => {
@@ -94,17 +92,15 @@ test("el selector de escritorio antepone Rewatch a la fecha", () => {
 test("el desplegable conserva el formato y color morado de los rewatch", () => {
   assert.match(modalSource, /label: `Rewatch · \$\{formatDate\(startedAt\)\}`/);
   assert.match(modalSource, /label: `Rewatch · \$\{formatDate\(iso\)\}`/);
-  assert.match(modalSource, /mobileLabel: formatDate\(item\.startedAt\)/);
-  assert.match(modalSource, /\{item\.mobileLabel \|\| item\.label\}/);
   assert.match(modalSource, /bg-purple-500\/12 text-purple-200/);
   assert.match(modalSource, /History className="w-4 h-4 text-purple-400 shrink-0"/);
 });
 
-test("el cuadro de fecha de rewatch no muestra borde", () => {
-  assert.match(
-    modalSource,
-    /items-center gap-x-2 rounded-2xl bg-purple-500\/5 py-2 pl-3 pr-2 sm:flex sm:flex-col/,
-  );
+test("en rewatch, la fecha se elige episodio a episodio al marcarlo (sin franja fija)", () => {
+  assert.doesNotMatch(modalSource, /aria-label="Fecha de episodios"/);
+  assert.match(modalSource, /if \(isRewatchView\) \{[\s\S]*?setPendingMark\(\{ sn, en, name \}\);/);
+  assert.match(modalSource, /show=\{Boolean\(pendingMark\)\}/);
+  assert.match(modalSource, /await toggleEpisode\(pending\.sn, pending\.en, watchedAt\);/);
   assert.doesNotMatch(
     modalSource,
     /rounded-2xl border border-purple-500\/20 bg-purple-500\/5/,

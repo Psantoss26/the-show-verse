@@ -74,7 +74,7 @@ import {
   SlidersHorizontal,
   Star,
 } from "lucide-react";
-import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
+import MobileOptionsSheet, { SheetAction, SheetOption, SheetOptionGroup } from "@/components/ui/MobileOptionsSheet";
 
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
 
@@ -910,12 +910,6 @@ export default function TraktEpisodesWatchedModal({
     return new Date().toISOString();
   };
 
-  const resolveEpisodeMarkDate = () => {
-    if (rewatchMarkPreset === "other_date")
-      return fromLocalDatetimeInput(rewatchMarkOtherValue);
-    return new Date().toISOString();
-  };
-
   const onConfirmAddPlay = async () => {
     setAddPlayError("");
     setShowError("");
@@ -1023,7 +1017,9 @@ export default function TraktEpisodesWatchedModal({
     [onDeleteRewatchRun, effectiveViewId, changeView],
   );
 
-  const toggleEpisode = async (sn, en) => {
+  // `markedAt`: fecha elegida en el diálogo al marcar en un rewatch (ya
+  // validada allí).
+  const toggleEpisode = async (sn, en, markedAt = null) => {
     setShowError("");
     if (!isConnected) return;
 
@@ -1048,27 +1044,7 @@ export default function TraktEpisodesWatchedModal({
         );
       }
 
-      const watchedAt = next ? resolveEpisodeMarkDate() : null;
-      if (next && rewatchMarkPreset === "other_date" && !watchedAt) {
-        throw new Error("Elige una fecha válida para marcar el episodio.");
-      }
-
-      const runStartMs = currentRewatchStartedAt
-        ? new Date(currentRewatchStartedAt).getTime()
-        : Number.NaN;
-      const watchedAtMs = watchedAt
-        ? new Date(watchedAt).getTime()
-        : Number.NaN;
-      if (
-        next &&
-        Number.isFinite(runStartMs) &&
-        Number.isFinite(watchedAtMs) &&
-        watchedAtMs < runStartMs
-      ) {
-        throw new Error(
-          "La fecha del episodio no puede ser anterior al inicio del rewatch activo.",
-        );
-      }
+      const watchedAt = next ? markedAt || new Date().toISOString() : null;
 
       await onToggleEpisodeRewatch(sn, en, {
         viewId: effectiveViewId,
@@ -1103,8 +1079,66 @@ export default function TraktEpisodesWatchedModal({
       setPendingUnmark({ sn, en, name, kind: "watched" });
       return;
     }
+    // Rewatch: cada episodio pide su fecha (hoy u otra) al marcarlo.
+    if (isRewatchView) {
+      setRewatchMarkPreset("today");
+      setRewatchMarkOtherValue(toLocalDatetimeInput(new Date().toISOString()));
+      setMarkError("");
+      setPendingMark({ sn, en, name });
+      return;
+    }
     toggleEpisode(sn, en);
   };
+
+  // Diálogo de fecha al marcar un episodio visto en un rewatch.
+  const [pendingMark, setPendingMark] = useState(null);
+  const [markBusy, setMarkBusy] = useState(false);
+  const [markError, setMarkError] = useState("");
+  const lastPendingMarkRef = useRef(null);
+  if (pendingMark) lastPendingMarkRef.current = pendingMark;
+  const shownPendingMark = pendingMark || lastPendingMarkRef.current;
+
+  const cancelMark = useCallback(() => {
+    if (!markBusy) setPendingMark(null);
+  }, [markBusy]);
+
+  const confirmMark = async () => {
+    const pending = pendingMark;
+    if (!pending || markBusy) return;
+    const watchedAt =
+      rewatchMarkPreset === "other_date"
+        ? fromLocalDatetimeInput(rewatchMarkOtherValue)
+        : new Date().toISOString();
+    if (!watchedAt) {
+      setMarkError("Elige una fecha válida para marcar el episodio.");
+      return;
+    }
+    const runStartMs = currentRewatchStartedAt
+      ? new Date(currentRewatchStartedAt).getTime()
+      : Number.NaN;
+    if (
+      Number.isFinite(runStartMs) &&
+      new Date(watchedAt).getTime() < runStartMs
+    ) {
+      setMarkError(
+        "La fecha no puede ser anterior al inicio del rewatch activo.",
+      );
+      return;
+    }
+    setMarkBusy(true);
+    try {
+      await toggleEpisode(pending.sn, pending.en, watchedAt);
+    } finally {
+      setMarkBusy(false);
+      setPendingMark(null);
+    }
+  };
+
+  useModalGuard({
+    open: Boolean(pendingMark),
+    onClose: cancelMark,
+    lockScroll: false,
+  });
 
   const cancelUnmark = useCallback(() => {
     if (!unmarkBusy) setPendingUnmark(null);
@@ -1379,7 +1413,10 @@ export default function TraktEpisodesWatchedModal({
             </div>
             <button
               type="button"
-              onClick={() => setMobileFiltersOpen((v) => !v)}
+              onClick={() => setMobileFiltersOpen(true)}
+              aria-label="Opciones"
+              aria-haspopup="dialog"
+              aria-expanded={mobileFiltersOpen}
               className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl ${PAGE_CONTROL} transition-all ${
                 mobileFiltersOpen
                   ? "text-emerald-400"
@@ -1390,225 +1427,96 @@ export default function TraktEpisodesWatchedModal({
             </button>
           </div>
 
-          {/* Móvil: panel colapsable de filtros */}
-          <MobileFiltersPanel
+          {/* Móvil: vista, modo, filtro y acciones en la hoja inferior
+              común (por encima del modal, que vive en z-[99999]). */}
+          <MobileOptionsSheet
             open={mobileFiltersOpen}
-            className="lg:hidden"
-            gapClassName=""
+            onClose={() => setMobileFiltersOpen(false)}
+            title="Opciones"
+            subtitle={title || null}
+            accent="emerald"
+            layerClassName="z-[100001]"
+            pausePageBelow={false}
           >
-            <div className="space-y-2 pt-1">
-              {/* Fila 1: vista Global/Rewatch + historial */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className="relative min-w-0" data-view-menu="">
-                  <button
-                    type="button"
-                    onClick={() => setViewMenuOpen((v) => !v)}
-                    disabled={!isConnected || !serverOnline}
-                    aria-label="Cambiar vista (Global o Rewatch por visionado)"
-                    className={`h-11 w-full inline-flex items-center gap-2 rounded-2xl px-3.5 text-sm font-semibold transition ${
-                      !isConnected
-                        ? "opacity-50 cursor-not-allowed bg-black/25 text-white/30"
-                        : `${PAGE_CONTROL} text-zinc-200 ${PAGE_CONTROL_HOVER}`
-                    }`}
-                  >
-                    <span
-                      className={`inline-flex h-6 w-6 items-center justify-center rounded-md shrink-0 ${
-                        isRewatchView
-                          ? "bg-purple-500/10 text-purple-300"
-                          : "bg-red-500/10 text-red-400"
-                      }`}
-                    >
-                      {isRewatchView ? (
-                        <History className="w-3.5 h-3.5" />
-                      ) : (
-                        <Tv className="w-3.5 h-3.5" />
-                      )}
-                    </span>
-                    <span className="flex-1 text-left truncate">
-                      {isRewatchView
-                        ? formatDate(currentRewatchStartedAt)
-                        : activeViewLabel}
-                    </span>
-                    <ChevronDown
-                      className={`w-4 h-4 text-zinc-500 transition-transform ${viewMenuOpen ? "rotate-180" : ""}`}
-                    />
-                  </button>
-
-                  <AnimatePresence>
-                    {viewMenuOpen && isConnected && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -6 }}
-                        transition={{ duration: 0.16, ease: "easeOut" }}
-                        className={`absolute left-0 top-full z-40 mt-1 w-full overflow-hidden ${PAGE_MENU}`}
-                      >
-                        <div className="max-h-56 space-y-1 overflow-y-auto sv-scroll">
-                          {viewMenuItems.map((item) => {
-                            const active = item.id === effectiveViewId;
-                            return (
-                              <button
-                                key={item.id}
-                                type="button"
-                                onClick={() => {
-                                  changeView(item.id);
-                                  setViewMenuOpen(false);
-                                }}
-                                className={`w-full rounded-xl px-3 py-2 text-left text-sm flex items-center gap-2.5 transition ${
-                                  active
-                                    ? item.kind === "rewatch"
-                                      ? "bg-purple-500/12 text-purple-200"
-                                      : "bg-emerald-500/12 text-emerald-300"
-                                    : item.kind === "rewatch"
-                                      ? "text-purple-200 hover:bg-purple-500/10"
-                                      : "text-zinc-300 hover:bg-white/5"
-                                }`}
-                              >
-                                {item.kind === "global" ? (
-                                  <Tv className="w-4 h-4 text-red-400 shrink-0" />
-                                ) : (
-                                  <History className="w-4 h-4 text-purple-400 shrink-0" />
-                                )}
-                                <span className="flex-1 truncate">
-                                  {item.mobileLabel || item.label}
-                                </span>
-                                {active && (
-                                  <Check className="w-4 h-4 shrink-0" />
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-
-                <button
-                  type="button"
-                  disabled={!isConnected || rewatchItems.length === 0}
-                  onClick={() => {
-                                    setHistoryLimit(60);
-                    setHistoryOpen(true);
-                  }}
-                  className={`h-11 min-w-0 w-full inline-flex items-center justify-center gap-2 px-3 text-sm font-semibold rounded-2xl transition whitespace-nowrap ${
-                    !isConnected || rewatchItems.length === 0
-                      ? "opacity-50 cursor-not-allowed bg-black/25 text-white/30"
-                      : `${PAGE_CONTROL} text-zinc-200 ${PAGE_CONTROL_HOVER}`
-                  }`}
-                >
-                  <History className="w-4 h-4 shrink-0 text-emerald-400" />
-                  Historial
-                  {isConnected && rewatchItems.length > 0 && (
-                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-white/5 text-zinc-300">
-                      {rewatchItems.length}
-                    </span>
-                  )}
-                </button>
-              </div>
-
-              {/* Fila 2: añadir a la izquierda; controles a la derecha */}
-              <div className="grid grid-cols-2 items-center gap-2">
-                <button
-                  type="button"
+            <SheetOptionGroup label="Vista" icon={isRewatchView ? History : Tv}>
+              {viewMenuItems.map((item) => (
+                <SheetOption
+                  key={item.id}
+                  active={item.id === effectiveViewId}
                   disabled={!isConnected || !serverOnline}
-                  onClick={() => openAddPlayDialog("play")}
-                  aria-label="Añadir un play completo o crear un rewatch vacío"
-                  className={`min-w-0 w-full h-11 inline-flex items-center justify-center gap-1 px-2 rounded-2xl text-[11px] font-semibold transition whitespace-nowrap ${
-                    !isConnected
-                      ? "opacity-50 cursor-not-allowed bg-black/25 text-white/30"
-                      : `${PAGE_CONTROL} text-zinc-200 ${PAGE_CONTROL_HOVER}`
-                  }`}
+                  onClick={() => changeView(item.id)}
                 >
-                  <Plus className="w-4 h-4 shrink-0" />
-                  <span className="min-[375px]:hidden">Añadir</span>
-                  <span className="hidden min-[375px]:inline">Añadir / Rewatch</span>
-                </button>
+                  {item.kind === "rewatch"
+                    ? `Rewatch · ${item.mobileLabel}`
+                    : item.label}
+                </SheetOption>
+              ))}
+            </SheetOptionGroup>
 
-                <div className="grid min-w-0 grid-cols-4 gap-1">
-                  <div
-                    role="group"
-                    aria-label="Modo de vista"
-                    className={`col-span-2 flex h-11 gap-1 rounded-2xl ${PAGE_CONTROL} p-1`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setViewMode("list")}
-                      aria-label="Vista lista"
-                      aria-pressed={viewMode === "list"}
-                      className={`h-full min-w-0 flex-1 inline-flex items-center justify-center rounded-xl transition-all ${
-                        viewMode === "list"
-                          ? "bg-white/90 text-black shadow-lg"
-                          : "text-zinc-400 hover:bg-white/10 hover:text-white"
-                      }`}
-                    >
-                      <List className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setViewMode("table")}
-                      aria-label="Vista tabla"
-                      aria-pressed={viewMode === "table"}
-                      className={`h-full min-w-0 flex-1 inline-flex items-center justify-center rounded-xl transition-all ${
-                        viewMode === "table"
-                          ? "bg-white/90 text-black shadow-lg"
-                          : "text-zinc-400 hover:bg-white/10 hover:text-white"
-                      }`}
-                    >
-                      <Table2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+            <SheetOptionGroup label="Mostrar como" icon={viewMode === "list" ? List : Table2}>
+              <SheetOption active={viewMode === "list"} onClick={() => setViewMode("list")}>
+                Lista
+              </SheetOption>
+              <SheetOption active={viewMode === "table"} onClick={() => setViewMode("table")}>
+                Tabla
+              </SheetOption>
+            </SheetOptionGroup>
 
-                  <button
-                    type="button"
-                    onClick={() => setOnlyUnwatched(!onlyUnwatched)}
-                    aria-label={onlyUnwatched ? "Mostrar no vistos" : "Mostrar todos"}
-                    className={`h-11 w-full inline-flex items-center justify-center rounded-2xl transition ${
-                      onlyUnwatched
-                        ? "bg-emerald-500/10 text-emerald-400"
-                        : `${PAGE_CONTROL} text-zinc-200 ${PAGE_CONTROL_HOVER}`
-                    }`}
-                  >
-                    <Filter className="w-4 h-4" />
-                  </button>
+            <SheetOptionGroup label="Episodios" icon={Filter}>
+              <SheetOption active={!onlyUnwatched} onClick={() => setOnlyUnwatched(false)}>
+                Todos
+              </SheetOption>
+              <SheetOption active={onlyUnwatched} onClick={() => setOnlyUnwatched(true)}>
+                No vistos
+              </SheetOption>
+            </SheetOptionGroup>
 
-                  <button data-online-only="true"
-                    type="button"
-                    disabled={!canToggleShow || !serverOnline}
-                    onClick={onClickToggleShow}
-                    aria-label={
-                      !isConnected
-                        ? "Conecta Trakt"
-                        : isRewatchView
-                          ? "En rewatch no se usa marcar serie completa"
-                          : usableSeasons.length === 0
-                            ? "Sin temporadas disponibles"
-                            : showCompleted
-                              ? "Quitar serie"
-                              : "Marcar serie"
-                    }
-                    // Marcar / Quitar serie: el estado lo dicen el tinte y el
-                    // icono; no hace falta duplicarlo con texto en móvil.
-                    className={`h-11 w-full inline-flex items-center justify-center rounded-2xl transition
-                      ${
-                        showCompleted
-                          ? "bg-red-500/10 text-red-300 hover:bg-red-500/20"
-                          : "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
-                      }
-                      ${!canToggleShow ? "opacity-50 cursor-not-allowed" : ""}`}
-                  >
-                    {busyShow ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : showCompleted ? (
-                      <EyeOff className="w-4 h-4" />
-                    ) : (
-                      <Eye className="w-4 h-4" />
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </MobileFiltersPanel>
+            <SheetOptionGroup label="Acciones" layout="stack">
+              <SheetAction
+                icon={History}
+                disabled={!isConnected || rewatchItems.length === 0}
+                onClick={() => {
+                  setMobileFiltersOpen(false);
+                  setHistoryLimit(60);
+                  setHistoryOpen(true);
+                }}
+              >
+                Historial
+                {isConnected && rewatchItems.length > 0
+                  ? ` · ${rewatchItems.length}`
+                  : ""}
+              </SheetAction>
+              <SheetAction
+                icon={Plus}
+                disabled={!isConnected || !serverOnline}
+                onClick={() => {
+                  setMobileFiltersOpen(false);
+                  openAddPlayDialog("play");
+                }}
+              >
+                Añadir / Rewatch
+              </SheetAction>
+              {/* Marcar / Quitar serie: la hoja sigue abierta para ver el
+                  progreso y el resultado. */}
+              <SheetAction
+                icon={busyShow ? Loader2 : showCompleted ? EyeOff : Eye}
+                tone={showCompleted ? "danger" : "default"}
+                disabled={!canToggleShow || !serverOnline}
+                onClick={onClickToggleShow}
+                className={busyShow ? "[&>svg]:animate-spin" : ""}
+              >
+                {!isConnected
+                  ? "Conecta Trakt"
+                  : isRewatchView
+                    ? "Marcar serie (solo en vista Global)"
+                    : usableSeasons.length === 0
+                      ? "Sin temporadas disponibles"
+                      : showCompleted
+                        ? "Quitar serie"
+                        : "Marcar serie"}
+              </SheetAction>
+            </SheetOptionGroup>
+          </MobileOptionsSheet>
 
           {/* Desktop: fila única */}
           <div className="hidden lg:flex gap-1.5 xl:gap-3 items-center min-w-0">
@@ -1858,87 +1766,6 @@ export default function TraktEpisodesWatchedModal({
             <div className="text-xs text-red-300 font-medium">{showError}</div>
           )}
 
-          {isConnected && isRewatchView && (
-            // Móvil: título y Hoy / Otra fecha en una fila; el campo de fecha
-            // se despliega debajo. Desde sm, título con su explicación y todo
-            // en línea (lg) o en dos filas (sm-lg).
-            <div
-              role="group"
-              aria-label="Fecha de episodios"
-              className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 rounded-2xl bg-purple-500/5 py-2 pl-3 pr-2 sm:flex sm:flex-col sm:items-stretch sm:gap-3 sm:px-3.5 sm:py-3 lg:flex-row lg:items-center lg:justify-between"
-            >
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-purple-200">
-                  <CalendarClock className="h-3.5 w-3.5 shrink-0 sm:hidden" aria-hidden="true" />
-                  <span className="truncate">Fecha de episodios</span>
-                </div>
-                <div className="mt-0.5 truncate text-[11px] text-zinc-400 sm:mt-1 sm:text-xs">
-                  <span className="sm:hidden">Al marcarlos como vistos</span>
-                  <span className="hidden sm:inline">Usa hoy o una fecha concreta para el episodio.</span>
-                </div>
-              </div>
-
-              {/* En móvil sus dos hijos son celdas de la rejilla de arriba. */}
-              <div className="contents sm:flex sm:items-center">
-                {/* Mismo control segmentado que Lista / Tabla de la barra. */}
-                <div className={`flex h-9 shrink-0 gap-1 rounded-xl ${PAGE_CONTROL} p-1 sm:h-11 sm:rounded-2xl`}>
-                  {[
-                    { id: "today", label: "Hoy" },
-                    { id: "other_date", label: "Otra fecha" },
-                  ].map((option) => (
-                    <button
-                      key={option.id}
-                      type="button"
-                      onClick={() => setRewatchMarkPreset(option.id)}
-                      aria-pressed={rewatchMarkPreset === option.id}
-                      className={`h-full whitespace-nowrap rounded-lg px-2.5 text-xs font-semibold transition-all sm:rounded-xl sm:px-3.5 sm:text-sm ${
-                        rewatchMarkPreset === option.id
-                          ? "bg-white/90 text-black shadow-lg"
-                          : "text-zinc-300 hover:bg-white/10 hover:text-white"
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Campo de fecha: se despliega en vez de aparecer de golpe.
-                    Anima el hueco que ocupa (en móvil, debajo: filas 0fr→1fr;
-                    desde sm, al lado: columnas 0fr→1fr, y el control de al lado
-                    se desplaza a la vez) y el campo entra con un desplazamiento
-                    corto. Sin opacity: aplanaría el cristal. El margen va DENTRO
-                    de lo que anima y el campo sigue montado plegado (invisible +
-                    inert) para poder animar la salida. */}
-                <div
-                  inert={rewatchMarkPreset !== "other_date" || undefined}
-                  className={`col-span-2 grid transition-[grid-template-rows,grid-template-columns,visibility] duration-[280ms] ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${
-                    rewatchMarkPreset === "other_date"
-                      ? "visible grid-rows-[1fr] sm:grid-cols-[1fr]"
-                      : "invisible grid-rows-[0fr] sm:grid-rows-[1fr] sm:grid-cols-[0fr]"
-                  }`}
-                >
-                  <div className="min-h-0 min-w-0 overflow-hidden">
-                    <div
-                      className={`pt-2 transition-transform duration-[280ms] ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none sm:w-[238px] sm:pl-2 sm:pt-0 ${
-                        rewatchMarkPreset === "other_date"
-                          ? "translate-x-0 translate-y-0"
-                          : "-translate-y-2 sm:-translate-x-3 sm:translate-y-0"
-                      }`}
-                    >
-                      <DateTimeField
-                        value={rewatchMarkOtherValue}
-                        onChange={setRewatchMarkOtherValue}
-                        title="Fecha de episodios"
-                        accent="purple"
-                        compact
-                        className="w-full"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Content Area */}
@@ -2669,6 +2496,111 @@ export default function TraktEpisodesWatchedModal({
             </motion.div>
           )}
         </AnimatePresence>
+        {/* Fecha al marcar un episodio visto en un rewatch: hoy u otra,
+            episodio a episodio. Mismo diálogo que la confirmación de abajo. */}
+        <FadePresence
+          show={Boolean(pendingMark)}
+          className="absolute inset-0 z-[70] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+          onClick={cancelMark}
+        >
+          {shownPendingMark && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="episode-mark-title"
+              onClick={(e) => e.stopPropagation()}
+              className={`w-full max-w-sm rounded-3xl p-6 ${LIQUID_GLASS_PANEL}`}
+            >
+              <div className="flex items-start gap-3">
+                <span
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-500/15 text-purple-200"
+                  aria-hidden="true"
+                >
+                  <CalendarClock className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  <h3 id="episode-mark-title" className="text-base font-bold text-white">
+                    ¿Cuándo lo viste?
+                  </h3>
+                  <p className="mt-1.5 truncate text-sm font-semibold text-white">
+                    T{shownPendingMark.sn} · E{shownPendingMark.en}
+                    {shownPendingMark.name ? ` · ${shownPendingMark.name}` : ""}
+                  </p>
+                </div>
+              </div>
+
+              {/* Mismo control segmentado que Lista / Tabla de la barra. */}
+              <div
+                role="group"
+                aria-label="Fecha del episodio"
+                className={`mt-5 flex h-11 gap-1 rounded-2xl ${PAGE_CONTROL} p-1`}
+              >
+                {[
+                  { id: "today", label: "Hoy" },
+                  { id: "other_date", label: "Otra fecha" },
+                ].map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => {
+                      setRewatchMarkPreset(option.id);
+                      setMarkError("");
+                    }}
+                    aria-pressed={rewatchMarkPreset === option.id}
+                    className={`h-full flex-1 whitespace-nowrap rounded-xl text-sm font-semibold transition-all ${
+                      rewatchMarkPreset === option.id
+                        ? "bg-white/90 text-black shadow-lg"
+                        : "text-zinc-300 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+
+              {rewatchMarkPreset === "other_date" && (
+                <DateTimeField
+                  value={rewatchMarkOtherValue}
+                  onChange={(next) => {
+                    setRewatchMarkOtherValue(next);
+                    setMarkError("");
+                  }}
+                  title="Fecha del episodio"
+                  accent="purple"
+                  className="mt-2 w-full"
+                />
+              )}
+
+              {markError && (
+                <p role="alert" className="mt-3 text-xs font-semibold text-red-300">
+                  {markError}
+                </p>
+              )}
+
+              <div className="mt-6 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={cancelMark}
+                  disabled={markBusy}
+                  className="h-11 rounded-xl bg-white/5 text-sm font-bold text-zinc-200 transition hover:bg-white/10 hover:text-white disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60"
+                >
+                  Cancelar
+                </button>
+                <button data-online-only="true"
+                  type="button"
+                  autoFocus
+                  onClick={confirmMark}
+                  disabled={markBusy || !serverOnline}
+                  className="flex h-11 items-center justify-center gap-2 rounded-xl bg-purple-500/90 text-sm font-bold text-white transition hover:bg-purple-500 disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-300"
+                >
+                  {markBusy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                  Marcar visto
+                </button>
+              </div>
+            </div>
+          )}
+        </FadePresence>
+
         {/* Confirmación al desmarcar un episodio visto o quitarlo de
             "Continuar viendo". Vive dentro del panel (lo cubre) para no
             competir con las capas del modal. */}

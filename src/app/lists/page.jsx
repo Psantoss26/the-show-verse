@@ -3,7 +3,7 @@
 
 import OptimizedImage from "@/components/OptimizedImage";
 import Link from "next/link";
-import LoginRequiredScreen from "@/components/auth/LoginRequiredScreen";
+import { LoginRequiredCard } from "@/components/auth/LoginRequiredScreen";
 import { createPortal } from "react-dom";
 import {
   useEffect,
@@ -46,6 +46,7 @@ import { resolveListItemIndicator } from "@/lib/lists/listItemHoverIndicator";
 import { enrichListPreviewArtwork } from "@/lib/lists/previewArtwork";
 import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
 import { requestListArtwork } from "@/lib/tmdb/artworkBatch";
+import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
 import { prefetchListDetails } from "@/lib/lists/detailsPrefetch";
 import { stripHtml } from "@/lib/details/formatters";
 
@@ -71,7 +72,6 @@ import {
   Heart,
   BookmarkPlus,
   Eye,
-  ThumbsUp,
   Globe,
 } from "lucide-react";
 import PageStatCard from "@/components/ui/PageStatCard";
@@ -81,6 +81,7 @@ import useTraktLists from "@/lib/hooks/useTraktLists";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import { useHydrationReady } from "@/lib/hooks/useHydrationReady";
 import ListPosterCard from "@/components/lists/ListPosterCard";
+import ListCountPills from "@/components/lists/ListCountPills";
 import FlipReorder from "@/components/ui/FlipReorder";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import { TmdbImg } from "@/components/lists/ListCoverBackdropCollage";
@@ -421,9 +422,33 @@ const useIsMobileLayout = (breakpointPx = 768) => {
 };
 
 /* --- InView: lazy load por proximidad al viewport --- */
-const useInView = ({ rootMargin = "320px 0px", threshold = 0.01 } = {}) => {
+// Efectos que deben aplicarse ANTES del primer pintado (preferencias, cachés):
+// en el servidor no hay layout effect, de ahí el respaldo.
+const useClientLayoutEffect =
+  typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+// `eager`: comprueba la posición ANTES del primer pintado y, si ya está cerca,
+// nace a la vista. El aviso del observador llega más tarde (0,4-1 s al pasar a
+// «filas», con 255 secciones montándose) y la fila pintaba antes el esqueleto.
+// Solo en las PRIMERAS secciones: la entrada de cada tarjeta (WAAPI, en su
+// layout effect) invalida el layout entre medida y medida, y medir las 255
+// costaba ~230 ms. Las demás esperan al observador.
+const EAGER_IN_VIEW_MARGIN = 320;
+const EAGER_IN_VIEW_ROWS = 6;
+
+const useInView = ({ rootMargin = "320px 0px", threshold = 0.01, eager = false } = {}) => {
   const ref = useRef(null);
   const [inView, setInView] = useState(false);
+
+  useClientLayoutEffect(() => {
+    if (!eager || typeof window === "undefined") return;
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) return;
+    if (rect.top < window.innerHeight + EAGER_IN_VIEW_MARGIN && rect.bottom > -EAGER_IN_VIEW_MARGIN) {
+      setInView(true);
+    }
+    // Solo al montar.
+  }, []);
 
   useEffect(() => {
     const el = ref.current;
@@ -500,17 +525,19 @@ function ListPreviewPosterStrip({ items = [], alt = "" }) {
   }
 
   return (
-    <div className="flex h-full w-full items-stretch justify-center gap-px bg-black/35 p-0.5">
+    <div className="flex h-full w-full items-stretch justify-center gap-px p-0.5">
       {previewItems.map((item, index) => (
+        // Cada hueco con la proporción del póster (sin bandas): en el móvil
+        // caben tres a buen tamaño, desde sm los cinco.
         <div
           key={`${item?.media_type || "movie"}:${item?.id || index}`}
-          className="min-w-0 flex-1 overflow-hidden rounded-[3px] bg-zinc-950"
+          className={`aspect-[2/3] h-full shrink-0 overflow-hidden rounded-[3px] bg-zinc-950 ${index >= 3 ? "max-sm:hidden" : ""}`}
         >
           <TmdbImg
             filePath={item?._listPreviewPoster || item?.poster_path}
             size="w154"
             alt={`${alt}: título ${index + 1}`}
-            className="h-full w-full object-contain"
+            className="h-full w-full object-cover"
           />
         </div>
       ))}
@@ -624,20 +651,15 @@ function ListsSourceSelector({ source, onChange, className = "" }) {
             aria-pressed={active}
             aria-label={label}
             title={label}
-            className={`flex h-full items-center gap-1.5 whitespace-nowrap rounded-xl py-2 text-sm font-bold transition-all ${
-              active ? "px-2.5 lg:px-3.5" : "px-2.5"
-            } ${
+            className={`flex h-full items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-2 text-sm font-bold transition-all lg:px-3.5 ${
               active
                 ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/20"
                 : "text-zinc-400 hover:bg-white/10 hover:text-white"
             }`}
           >
             <Icon className="h-4 w-4 shrink-0" />
-            {active && (
-              <span className="hidden max-w-24 truncate lg:inline lg:max-w-none">
-                {label}
-              </span>
-            )}
+            {/* En escritorio cada sección muestra su título, no solo la activa. */}
+            <span className="hidden lg:inline">{label}</span>
           </button>
         );
       })}
@@ -984,7 +1006,12 @@ const ListItemCard = memo(function ListItemCard({
   const mediaType = item?.media_type || (item?.title ? "movie" : "tv");
   const href = `/details/${mediaType}/${item.id}`;
   const previewClick = usePreviewOpen();
-  const posterPath = item?.poster_path || item?.backdrop_path || null;
+  // Póster con la escalera de idioma (inglés primero), como en Favoritos: lo
+  // pone ListItemsRow. Mientras se resuelve no se pinta el de TMDb (llega en
+  // es-ES); solo el ya elegido de la vista previa, si lo hay.
+  const posterPath = item?._englishPosterPending
+    ? item?._listPreviewPoster || null
+    : item?.poster_path || item?.backdrop_path || null;
   const posterUrl = posterPath
     ? `https://image.tmdb.org/t/p/w342${posterPath}`
     : null;
@@ -1230,7 +1257,14 @@ function dedupePreviewItems(items) {
 }
 
 /* ========= fila tipo Dashboard: drag con ratón + 3 completas en móvil ========= */
-function ListItemsRow({ items, isMobile, accent = "trakt" }) {
+// Tarjetas del primer pintado de cada fila: las 7 visibles en el ordenador
+// ancho más una asomando.
+const ROW_INITIAL_SLIDES = 8;
+
+function ListItemsRow({ items: rawItems, isMobile, accent = "trakt" }) {
+  // Pósters de la fila con el mismo criterio que Favoritos (inglés → español
+  // → original → sin idioma), del lote /api/tmdb/artwork.
+  const items = useEnglishPosterItems(rawItems, true, { holdOriginalPosters: true });
   const swiperRef = useRef(null);
   const [isHoveredRow, setIsHoveredRow] = useState(false);
   const [canPrev, setCanPrev] = useState(false);
@@ -1248,8 +1282,22 @@ function ListItemsRow({ items, isMobile, accent = "trakt" }) {
     [items],
   );
   const viewerStates = useViewerTitleStates(viewerItems, authenticated);
+  // Primero solo las tarjetas que caben a la vista (7 como mucho) y el resto
+  // en cuanto el navegador queda libre: montar los carruseles enteros al pasar
+  // a «filas» (~100 tarjetas en Colecciones) retrasaba el cambio de vista.
+  const [showAllSlides, setShowAllSlides] = useState(false);
+  useEffect(() => {
+    if (showAllSlides) return undefined;
+    if (typeof window.requestIdleCallback === "function") {
+      const id = window.requestIdleCallback(() => setShowAllSlides(true), { timeout: 400 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const id = window.setTimeout(() => setShowAllSlides(true), 120);
+    return () => window.clearTimeout(id);
+  }, [showAllSlides]);
 
   if (!Array.isArray(items) || items.length === 0) return null;
+  const slideItems = showAllSlides ? items : items.slice(0, ROW_INITIAL_SLIDES);
 
   const breakpointsRow = {
     0: { slidesPerView: 3, spaceBetween: 12 },
@@ -1332,7 +1380,7 @@ function ListItemsRow({ items, isMobile, accent = "trakt" }) {
             modules={[FreeMode]}
             className="relative z-0 !overflow-visible pb-8 pt-7"
           >
-            {items.map((item, idx) => {
+            {slideItems.map((item, idx) => {
               const mt = item?.media_type || (item?.title ? "movie" : "tv");
               return (
                 <SwiperSlide
@@ -1404,7 +1452,7 @@ function ListItemsRow({ items, isMobile, accent = "trakt" }) {
   );
 }
 
-function ListItemsRowSkeleton({ isMobile }) {
+function ListItemsRowSkeleton({ isMobile, pulse = true }) {
   const n = isMobile ? 3 : 7;
   return (
     <div className="-mx-4 px-3 pt-7 sm:mx-0 sm:px-0">
@@ -1412,7 +1460,7 @@ function ListItemsRowSkeleton({ isMobile }) {
         {Array.from({ length: n }).map((_, i) => (
           <div
             key={i}
-            className="w-[30%] sm:w-[22%] md:w-[18%] lg:w-[14%] aspect-[2/3] shrink-0 rounded-xl bg-zinc-900/40 border border-white/5 animate-pulse"
+            className={`w-[30%] sm:w-[22%] md:w-[18%] lg:w-[14%] aspect-[2/3] shrink-0 rounded-xl bg-zinc-900/40 border border-white/5 ${pulse ? "animate-pulse" : ""}`}
           />
         ))}
       </div>
@@ -1448,11 +1496,6 @@ function ListNavWrapper({ list, className = "", children }) {
 // para que, en una rejilla de treinta y tantas colecciones, la última no entre
 // segundo y medio después de la primera: lo que se busca es que el bloque
 // "aterrice", no un desfile.
-// Efectos que deben aplicarse ANTES del primer pintado (preferencias, cachés):
-// en el servidor no hay layout effect, de ahí el respaldo.
-const useClientLayoutEffect =
-  typeof window === "undefined" ? useEffect : useLayoutEffect;
-
 const LIST_ENTRANCE_STEP = 0.035;
 const LIST_ENTRANCE_MAX_DELAY = 0.36;
 
@@ -1615,8 +1658,11 @@ const GridListCard = memo(function GridListCard({
               )}
             </div>
 
-            <footer className="mt-3 flex items-center justify-between gap-3 border-t border-white/5 pt-3 sm:mt-4 sm:pt-4">
-              <div className="flex min-w-0 items-center gap-2">
+            {/* `@container`: en tarjetas estrechas (rejilla de 4 columnas) las
+                píldoras de items y me gusta no dejan sitio al nombre, que se
+                quedaba en «T…»; entonces solo va el avatar (nombre en `title`). */}
+            <footer className="@container mt-3 flex items-center justify-between gap-3 border-t border-white/5 pt-3 sm:mt-4 sm:pt-4">
+              <div className="flex min-w-0 items-center gap-2" title={sourceLabel}>
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10 text-[10px] font-black text-white ring-1 ring-white/20">
                   {list?.source === "trakt" ? (
                     <Avatar src={avatar} name={sourceLabel} />
@@ -1624,21 +1670,13 @@ const GridListCard = memo(function GridListCard({
                     <SourceIcon aria-hidden="true" className="h-3.5 w-3.5" />
                   )}
                 </span>
-                <span className="max-w-[120px] truncate text-xs font-medium text-zinc-300 transition-colors group-hover:text-white">
+                <span className="hidden max-w-[120px] truncate text-xs font-medium text-zinc-300 transition-colors group-hover:text-white @[17.5rem]:inline">
                   {sourceLabel}
                 </span>
               </div>
 
-              <div className="flex shrink-0 items-center gap-3 text-xs font-bold text-zinc-500">
-                <span className="rounded bg-white/5 px-1.5 py-0.5 text-zinc-300">
-                  {itemCount} items
-                </span>
-                {(list?.source === "trakt" || list?.source === "collections") && (
-                  <span className="flex items-center gap-1 transition-colors group-hover:text-pink-500">
-                    <ThumbsUp aria-hidden="true" className="h-3 w-3" />
-                    {likes}
-                  </span>
-                )}
+              <div className="flex shrink-0 items-center gap-2">
+                <ListCountPills itemCount={itemCount} likes={likes} />
               </div>
             </footer>
           </div>
@@ -1650,12 +1688,13 @@ const GridListCard = memo(function GridListCard({
 
 const RowListSection = memo(function RowListSection({
   list,
+  index = 0,
   itemsState,
   ensureListItems,
   isMobile,
 }) {
   const cacheKey = `${list?.source || "unknown"}:${String(list?.id || "")}`;
-  const [ref, inView] = useInView();
+  const [ref, inView] = useInView({ eager: index < EAGER_IN_VIEW_ROWS });
 
   useEffect(() => {
     if (inView) ensureListItems(cacheKey);
@@ -1679,10 +1718,7 @@ const RowListSection = memo(function RowListSection({
               </h3>
             </ListNavWrapper>
 
-            <span className="shrink-0 inline-flex items-center gap-2 rounded-full bg-white/5 border border-white/10 px-3 py-1 text-xs font-bold text-zinc-200">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
-              {list.item_count} items
-            </span>
+            <ListCountPills itemCount={list.item_count} likes={list?.likes} />
           </div>
 
           {list.description && (
@@ -1695,6 +1731,10 @@ const RowListSection = memo(function RowListSection({
 
       {isLoading ? (
         <ListItemsRowSkeleton isMobile={isMobile} />
+      ) : items.length > 0 && !inView ? (
+        // Ya cargada pero lejos de la pantalla (p. ej. al venir de otra vista):
+        // su carrusel se monta al acercarse, con el mismo hueco reservado.
+        <ListItemsRowSkeleton isMobile={isMobile} pulse={false} />
       ) : items.length > 0 ? (
         <ListItemsRow items={items} isMobile={isMobile} accent={list?.source} />
       ) : hasResolvedItems ? (
@@ -1727,8 +1767,10 @@ const ListModeRow = memo(function ListModeRow({
     <div ref={ref}>
       {/* ✅ antes: Link fijo a /lists/:id */}
       <ListNavWrapper list={list} className="group block">
-        <div className="flex items-center gap-4 p-3 bg-zinc-900/30 border border-white/5 rounded-xl hover:bg-zinc-900/60 hover:border-white/10 transition-all">
-          <div className="h-16 w-40 shrink-0 overflow-hidden rounded-lg border border-white/5 bg-zinc-950 sm:w-[13.5rem]">
+        <div className="flex items-center gap-4 p-3 bg-zinc-900/30 border border-white/5 rounded-xl hover:bg-zinc-900/60 hover:border-white/10 transition-all sm:gap-5">
+          {/* Ancho = huecos 2:3 del alto interior (3 en el móvil, 5 desde sm).
+              Sin fondo ni borde: con menos de cinco títulos no queda caja negra. */}
+          <div className="h-[5.5rem] w-[10.75rem] shrink-0 overflow-hidden rounded-lg sm:h-24 sm:w-[19.5rem] lg:h-28 lg:w-[22.75rem]">
             {isLoading ? (
               <div
                 className={`w-full h-full bg-zinc-900/40 ${isPending ? "animate-pulse" : ""}`}
@@ -1739,10 +1781,12 @@ const ListModeRow = memo(function ListModeRow({
           </div>
 
           <div className="flex-1 min-w-0">
-            <h3 className="text-base font-bold text-white truncate group-hover:text-purple-400 transition-colors">
+            {/* La fila es alta: en el móvil el título usa hasta dos líneas y,
+                desde sm, la descripción. */}
+            <h3 className="line-clamp-2 text-base font-bold leading-snug text-white group-hover:text-purple-400 transition-colors sm:truncate sm:text-lg">
               {list.name}
             </h3>
-            <p className="text-sm text-zinc-400 truncate">
+            <p className="mt-0.5 text-sm text-zinc-400 truncate sm:line-clamp-2 sm:whitespace-normal">
               {list.description || "—"}
             </p>
           </div>
@@ -1895,6 +1939,7 @@ const ListsContent = memo(function ListsContent({
                   <ListEntrance key={`${l.source}-${l.id}`} flipKey={`${l.source}-${l.id}`} index={index} instant={isBackNav}>
                     <RowListSection
                       list={l}
+                      index={index}
                       itemsState={listItemsState(itemsMap, l, index)}
                       ensureListItems={ensureListItems}
                       isMobile={isMobile}
@@ -2735,18 +2780,11 @@ export default function ListsPage() {
   // ✅ readonly: Trakt y Colecciones no crean/borran ni loadMore
   const canEdit = !!canUse && source === "personal";
 
-  if (authStatus === "anonymous" && source === "personal") {
-    return (
-      <LoginRequiredScreen
-        theme="purple"
-        eyebrow="TUS LISTAS"
-        title="Mis Listas"
-        description="Gestiona y organiza tus listas personales."
-        message="Inicia sesión para gestionar tus listas personalizadas."
-        next="/lists"
-      />
-    );
-  }
+  // Sin sesión, Comunidad y Colecciones se ven enteras; solo Mis listas pide
+  // iniciar sesión, y en su sitio: la cabecera y las pestañas se quedan para
+  // poder volver a las otras (antes la pantalla de login sustituía la página
+  // entera y, como la pestaña se guarda, se quedaba ahí al recargar).
+  const personalLocked = authStatus === "anonymous" && source === "personal";
 
   return (
     // Fondo `bg-black`, el mismo del <body> (como Favoritos y Pendientes): la
@@ -2789,6 +2827,7 @@ export default function ListsPage() {
                   <span className="text-purple-500">.</span>
                 </h1>
 
+                {personalLocked ? null : (
                 <motion.div
                   initial={isBackNav ? false : { opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -2807,6 +2846,7 @@ export default function ListsPage() {
                     <RefreshCcw className="h-5 w-5" />
                   </LiquidButton>
                 </motion.div>
+                )}
               </div>
               <p className="mt-2 text-zinc-400 max-w-lg text-lg hidden md:block">
                 {source === "collections"
@@ -2827,6 +2867,7 @@ export default function ListsPage() {
                 se desmonta en el mismo render (con él convivían tres
                 fotogramas, seis tarjetas en fila) y la cabecera no cambia de
                 alto. */}
+            {personalLocked ? null : (
             <motion.div
               key={contentSource}
               data-lists-stats={contentSource}
@@ -2855,6 +2896,7 @@ export default function ListsPage() {
                 </motion.div>
               ))}
             </motion.div>
+            )}
           </div>
         </motion.header>
 
@@ -3104,7 +3146,7 @@ export default function ListsPage() {
           )}
         </AnimatePresence>
 
-        {errorUnified ? (
+        {errorUnified && !personalLocked ? (
           <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-200 text-sm">
             {String(errorUnified)}
           </div>
@@ -3124,7 +3166,12 @@ export default function ListsPage() {
             pintado): si no, el primer fotograma era la pestaña por defecto y el
             relevo a la buena se veía como una página vacía. Al volver atrás,
             sin entrada (`initial={false}`). */}
-        {prefsHydrated ? (
+        {personalLocked ? (
+          <LoginRequiredCard
+            message="Inicia sesión para gestionar tus listas personalizadas."
+            next="/lists"
+          />
+        ) : prefsHydrated ? (
           <ListsContent
             contentSource={contentSource}
             contentLists={contentLists}

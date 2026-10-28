@@ -36,7 +36,10 @@ test("search history is capped at the configured limit", () => {
   }
 
   assert.equal(readSearchHistory(storage).length, SEARCH_HISTORY_LIMIT);
-  assert.equal(readSearchHistory(storage)[0], "Consulta 10");
+  assert.equal(
+    readSearchHistory(storage)[0],
+    `Consulta ${SEARCH_HISTORY_LIMIT + 2}`,
+  );
 });
 
 test("individual and full removal update persisted history", () => {

@@ -6,10 +6,9 @@
 // resalta la activa según la URL. Mismo estilo de "pastilla" que los antiguos
 // tabs internos, para que la navegación se sienta igual en las tres páginas.
 //
-// Compacto: en escritorio SOLO la ruta activa muestra su etiqueta (icono + texto)
-// y las otras dos quedan como icono suelto. En móvil las tres son solo icono
-// (incluida la activa), como el diseño anterior, para que quepan en la misma fila
-// que el selector de "Ordenar".
+// En escritorio cada sección muestra su título (icono + texto), esté activa o
+// no. En móvil son solo icono (incluida la activa), para que quepan en la misma
+// fila que el buscador.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -37,9 +36,7 @@ export default function WatchingSectionNav({ className = "" }) {
             aria-current={active ? "page" : undefined}
             aria-label={label}
             title={label}
-            className={`flex items-center gap-1.5 whitespace-nowrap rounded-xl py-2 text-sm font-bold transition-all ${
-              active ? "px-2.5 lg:px-3.5" : "px-2.5"
-            } ${
+            className={`flex items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-2 text-sm font-bold transition-all lg:px-3.5 ${
               active
                 ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
                 : "text-zinc-400 hover:bg-white/10 hover:text-white"
@@ -49,7 +46,7 @@ export default function WatchingSectionNav({ className = "" }) {
               className="h-4 w-4 shrink-0"
               fill={active && fillWhenActive ? "currentColor" : "none"}
             />
-            {active && <span className="hidden lg:inline">{label}</span>}
+            <span className="sv-page-toolbar-section-label hidden lg:inline">{label}</span>
           </Link>
         );
       })}

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { pickTopVotedArtwork } from './artworkVotes.js';
+import { pickTopVotedArtwork, pickTopVotedArtworkByTitle } from './artworkVotes.js';
 
 test('una sola selección ya es la imagen por defecto de su tipo', () => {
   assert.deepEqual(
@@ -40,5 +40,17 @@ test('ignora tipos desconocidos y rutas vacías', () => {
       { kind: 'poster', filePath: '', votes: 9 },
     ]),
     {},
+  );
+});
+
+test('por título: la más votada de cada uno, sin mezclarlos', () => {
+  assert.deepEqual(
+    pickTopVotedArtworkByTitle([
+      { tmdbId: 1, kind: 'poster', filePath: '/a.jpg', votes: 1, lastVotedAt: '2026-10-01T00:00:00Z' },
+      { tmdbId: 1, kind: 'poster', filePath: '/b.jpg', votes: 2, lastVotedAt: '2026-09-01T00:00:00Z' },
+      { tmdbId: 2, kind: 'poster', filePath: '/c.jpg', votes: 1, lastVotedAt: '2026-09-01T00:00:00Z' },
+      { tmdbId: 3, kind: 'otro', filePath: '/x.jpg', votes: 5 },
+    ]),
+    { 1: { poster: '/b.jpg' }, 2: { poster: '/c.jpg' } },
   );
 });

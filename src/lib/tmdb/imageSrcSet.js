@@ -37,6 +37,20 @@ export function tmdbSrcSet(path, kind = "poster") {
 export const DETAILS_POSTER_ROW_SIZES =
   "(min-width: 1280px) 330px, (min-width: 1024px) 30vw, (min-width: 768px) 38vw, 48vw";
 
+// Tarjetas de esas filas que se piden nada más montarse: las de la primera
+// vista (hasta 6 enteras y la séptima asomando). Con `loading="lazy"` el
+// navegador esperaba a tener la fila casi encima —con red lenta, Recomendaciones
+// a 400 px del borde seguía sin pedirse a los 3 s— y al desplazarse se veía la
+// tarjeta negra antes que el póster. Prioridad baja: no compiten con la cabecera.
+// Las de más a la derecha siguen en diferido (se ven al deslizar la fila).
+export const DETAILS_POSTER_ROW_EAGER_COUNT = 7;
+
+export function detailsRowImageLoading(index) {
+  return index < DETAILS_POSTER_ROW_EAGER_COUNT
+    ? { loading: "eager", fetchPriority: "low" }
+    : { loading: "lazy" };
+}
+
 // Pósters de la galería de imágenes (7/6/5/4/3 por fila).
 export const DETAILS_GALLERY_POSTER_SIZES =
   "(min-width: 1280px) 18vw, (min-width: 1024px) 24vw, (min-width: 768px) 29vw, (min-width: 640px) 36vw, 48vw";

@@ -156,8 +156,8 @@ export default function TodayNavbarEntry({ variant = "desktop" }) {
   if (!entry) return null;
 
   const label = entry.unseen
-    ? `Hoy: ${entry.unseen} ${entry.unseen === 1 ? "historia sin ver" : "historias sin ver"}`
-    : "Hoy: historias de la gente que sigues";
+    ? `Actividad: ${entry.unseen} ${entry.unseen === 1 ? "historia sin ver" : "historias sin ver"}`
+    : "Actividad: historias de la gente que sigues";
   // El cristal de la casa (LIQUID_GLASS_BAR + capas ópticas), el mismo de las
   // flechas y los menús de cristal: relieve sin contorno dibujado.
   const pillSurface = `${LIQUID_GLASS_BAR} transition-[filter] hover:brightness-110`;
@@ -207,7 +207,7 @@ export default function TodayNavbarEntry({ variant = "desktop" }) {
           <Faces users={entry.faces} />
         </span>
       ) : null}
-      <span className="relative font-bold [text-shadow:0_1px_3px_rgba(0,0,0,0.6)]">Hoy</span>
+      <span className="relative font-bold [text-shadow:0_1px_3px_rgba(0,0,0,0.6)]">Actividad</span>
       <Badge count={entry.unseen} className="relative" />
     </Link>
   );

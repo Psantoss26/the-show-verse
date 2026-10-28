@@ -7,10 +7,14 @@ import {
   readArtworkPreference,
   readPersistedArtworkOverride,
   readPersistedArtworkOverrides,
+  forgetCommunityArtwork,
   resolveCachedArtworkOverride,
+  retractOwnArtworkVotes,
   saveArtworkOverride,
   shouldSkipRemoteArtwork,
+  subscribeCommunityArtwork,
   withCommunityArtwork,
+  withoutArtworkVotes,
   writeArtworkPreference
 } from './artworkApi.js'
 
@@ -271,4 +275,30 @@ test('withCommunityArtwork: sin overrides remotos vale la copia local por títul
         }),
         { backdrop: '/local.jpg', logo: '/logo-votado.png' }
     )
+})
+
+test('withoutArtworkVotes: quita de la más votada solo los votos propios indicados', () => {
+    const community = { poster: '/propio.jpg', logo: '/logo-ajeno.png', backdrop: '/b.jpg' }
+    assert.deepEqual(
+        withoutArtworkVotes(community, { poster: new Set(['/antiguo.jpg', '/propio.jpg']), logo: '/otro.png' }),
+        { logo: '/logo-ajeno.png', backdrop: '/b.jpg' }
+    )
+    assert.equal(withoutArtworkVotes(community, { poster: ['/otro.jpg'] }), community)
+    assert.equal(withoutArtworkVotes(null, { poster: '/propio.jpg' }), null)
+})
+
+test('subscribeCommunityArtwork: restablecer avisa a las páginas montadas del título', () => {
+    const events = []
+    const unsubscribe = subscribeCommunityArtwork({ type: 'show', id: '42' }, (event) => events.push(event))
+    const other = []
+    subscribeCommunityArtwork({ type: 'movie', id: 42 }, (event) => other.push(event))
+
+    retractOwnArtworkVotes({ type: 'tv', id: 42, votes: { poster: '/propio.jpg' } })
+    forgetCommunityArtwork({ type: 'tv', id: 42 })
+    assert.deepEqual(events, [{ retract: { poster: '/propio.jpg' } }, { refresh: true }])
+    assert.deepEqual(other, [])
+
+    unsubscribe()
+    forgetCommunityArtwork({ type: 'tv', id: 42 })
+    assert.equal(events.length, 2)
 })

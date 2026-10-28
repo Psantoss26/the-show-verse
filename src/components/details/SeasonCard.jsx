@@ -7,8 +7,9 @@
 // progreso de vistos. El número de la temporada va en grande al fondo.
 //
 // El póster es el mismo que enseña la ficha de la temporada: el elegido en
-// «Editar portada» (lib/details/seasonArtwork) o el de TMDb de la temporada,
-// y si no tiene, el de la serie.
+// «Editar portada» (lib/details/seasonArtwork), el más votado por todos
+// (lib/details/communitySeasonPosters) o el de TMDb de la temporada, y si no
+// tiene, el de la serie.
 
 import { useLayoutEffect, useState } from "react";
 import { CalendarDays, ExternalLink, Tv } from "lucide-react";
@@ -16,14 +17,16 @@ import OptimizedImage from "@/components/OptimizedImage";
 import LiquidGlassOpticalLayers from "@/components/ui/LiquidGlassOpticalLayers";
 import { useAuth } from "@/context/AuthContext";
 import { readSeasonCustomPoster } from "@/lib/details/seasonArtwork";
+import { useCommunitySeasonPoster } from "@/lib/details/communitySeasonPosters";
 import { useSeasonLadderPoster } from "@/lib/tmdb/useSeasonLadderPoster";
 import { LIQUID_GLASS_CARD } from "@/lib/ui/liquidGlass";
 import { DETAILS_POSTER_ROW_SIZES, tmdbSrcSet } from "@/lib/tmdb/imageSrcSet";
 import { titlePeekSeasonAttrs } from "@/lib/navigation/titlePeek.mjs";
 
 /**
- * Póster de la temporada: el elegido en «Editar portada», el de la escalera de
- * idioma (inglés → español → original → sin idioma; `pending` mientras llega),
+ * Póster de la temporada: el elegido en «Editar portada», el más votado por
+ * todos, el de la escalera de idioma (inglés → español → original → sin
+ * idioma; `pending` mientras llegan el voto y la escalera),
  * el de TMDb de la temporada o, si no tiene, el de la serie. La portada elegida vive en las
  * preferencias del navegador: el servidor no la conoce y pinta la automática,
  * así que se aplica tras montar (como la ficha de la temporada) para no romper
@@ -41,10 +44,11 @@ export function useSeasonPoster({
   useLayoutEffect(() => setMounted(true), []);
   // El automático sigue la escalera de idioma de toda la app (con `showId`).
   const ladder = useSeasonLadderPoster(showId, seasonNumber);
+  const community = useCommunitySeasonPoster(seasonId);
   const customPoster = mounted ? readSeasonCustomPoster(preferences, seasonId) : null;
   if (customPoster) return { poster: customPoster, pending: false };
-  if (ladder.pending) return { poster: null, pending: true };
-  return { poster: ladder.poster || posterPath || fallbackPosterPath || null, pending: false };
+  if (community.pending || ladder.pending) return { poster: null, pending: true };
+  return { poster: community.poster || ladder.poster || posterPath || fallbackPosterPath || null, pending: false };
 }
 
 // TMDb pone nombre propio a algunas temporadas («Libro uno: Agua»): se enseña

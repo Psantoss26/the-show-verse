@@ -62,6 +62,10 @@ import AlertsMenu, { AlertsMenuBoot } from "@/components/notifications/AlertsMen
 import TodayNavbarEntry from "@/components/today/TodayNavbarEntry";
 import OfflineBanner from "@/components/OfflineBanner";
 import useBodyScrollLock from "@/hooks/useBodyScrollLock";
+import MobileOptionsSheet, {
+  SheetOption,
+  SheetOptionGroup,
+} from "@/components/ui/MobileOptionsSheet";
 import { useAppPullToRefreshLock } from "@/lib/android/appBridge";
 import { fuzzySimilarity, tokenFuzzyMatches } from "@/lib/search/fuzzy";
 import {
@@ -402,6 +406,7 @@ function SearchBar({
   const [showCollection, setShowCollection] = useState(false);
   const [portalHostReady, setPortalHostReady] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState(null);
+  const [historyMaxHeight, setHistoryMaxHeight] = useState(null);
   const [filterMenuPosition, setFilterMenuPosition] = useState(null);
   const pendingCollectionRef = useRef(null); // colección precargada lista para mostrar
   // Paginación del desplegable.
@@ -471,7 +476,9 @@ function SearchBar({
         searchRef.current &&
         !searchRef.current.contains(e.target) &&
         !dropdownRef.current?.contains(e.target) &&
-        !filterMenuRef.current?.contains(e.target)
+        !filterMenuRef.current?.contains(e.target) &&
+        // La hoja de filtros del móvil va en su propio portal.
+        !(e.target instanceof Element && e.target.closest("[data-mobile-options-sheet]"))
       ) {
         setShowDropdown(false);
         setShowFilterMenu(false);
@@ -551,6 +558,44 @@ function SearchBar({
   // es más bajo que la ventana), descontando el selector de página del pie.
   // Se mide la altura REAL de una fila ya pintada, así que sigue a la fuente y
   // al zoom del sistema.
+  // MÓVIL, búsquedas recientes: el panel crece hasta el borde inferior de la
+  // pantalla VISIBLE (con teclado, `visualViewport` es más bajo) dejando el
+  // mismo margen que los resultados. Con el tope fijo de `100dvh` la parte de
+  // abajo quedaba detrás del teclado y no había forma de llegar a ella.
+  useLayoutEffect(() => {
+    if (!isMobile || !showDropdown || !dropdownPosition || query.trim()) {
+      setHistoryMaxHeight(null);
+      return undefined;
+    }
+    let frameId = 0;
+    const measure = () => {
+      frameId = 0;
+      const viewport = window.visualViewport;
+      const visibleBottom = viewport
+        ? viewport.offsetTop + viewport.height
+        : window.innerHeight;
+      const visibleHeight = viewport ? viewport.height : window.innerHeight;
+      const next = Math.max(
+        160,
+        Math.round(
+          visibleBottom - dropdownPosition.top - Math.max(32, visibleHeight * 0.04),
+        ),
+      );
+      setHistoryMaxHeight((current) => (current === next ? current : next));
+    };
+    const schedule = () => {
+      if (!frameId) frameId = window.requestAnimationFrame(measure);
+    };
+    measure();
+    window.visualViewport?.addEventListener("resize", schedule);
+    window.addEventListener("resize", schedule);
+    return () => {
+      if (frameId) window.cancelAnimationFrame(frameId);
+      window.visualViewport?.removeEventListener("resize", schedule);
+      window.removeEventListener("resize", schedule);
+    };
+  }, [isMobile, showDropdown, dropdownPosition, query]);
+
   useLayoutEffect(() => {
     if (!isMobile || !showDropdown || !dropdownPosition || !query.trim()) {
       return undefined;
@@ -620,7 +665,12 @@ function SearchBar({
   }, [isMobile, showDropdown, dropdownPosition, query, results.length]);
 
   useLayoutEffect(() => {
-    if (!showFilterMenu || !filterButtonRef.current || !searchRef.current) {
+    if (
+      isMobile ||
+      !showFilterMenu ||
+      !filterButtonRef.current ||
+      !searchRef.current
+    ) {
       setFilterMenuPosition(null);
       return undefined;
     }
@@ -1181,8 +1231,10 @@ function SearchBar({
   const handleFilterToggle = () => {
     const nextOpen = !showFilterMenu;
     setShowFilterMenu(nextOpen);
+    // MÓVIL: la hoja tapa los resultados con su velo, y se dejan detrás para
+    // ver cómo cambian al elegir, como en los menús de las páginas.
     if (nextOpen) {
-      setShowDropdown(false);
+      if (!isMobile) setShowDropdown(false);
     } else if (query.trim()) {
       setShowDropdown(true);
     } else {
@@ -1191,12 +1243,15 @@ function SearchBar({
   };
 
   const handleFilterSelect = (filterId) => {
-    setShowFilterMenu(false);
+    // En la hoja del móvil elegir no cierra (como en las páginas).
+    if (!isMobile) setShowFilterMenu(false);
 
+    // MÓVIL: la elección llega desde la hoja inferior; enfocar el campo
+    // subiría el teclado y taparía los resultados que se quieren ver.
     if (filterId === activeFilter) {
       if (query.trim()) setShowDropdown(true);
       else openSearchHistory();
-      inputRef.current?.focus();
+      if (!isMobile) inputRef.current?.focus();
       return;
     }
 
@@ -1211,7 +1266,7 @@ function SearchBar({
     } else {
       openSearchHistory();
     }
-    inputRef.current?.focus();
+    if (!isMobile) inputRef.current?.focus();
   };
 
   const handleHistoryClick = (historyQuery) => {
@@ -1408,7 +1463,7 @@ function SearchBar({
               )}`}
               aria-controls={showFilterMenu ? filterMenuId : undefined}
               aria-expanded={showFilterMenu}
-              aria-haspopup="menu"
+              aria-haspopup={isMobile ? "dialog" : "menu"}
               title={`${t("search_filter_button", "Filtrar búsqueda")}: ${t(
                 activeFilterOption.labelKey,
                 activeFilterOption.fallbackLabel,
@@ -1431,10 +1486,48 @@ function SearchBar({
         </div>
       </form>
 
+      {/* MÓVIL: como los menús de filtros de las páginas, el botón abre la hoja
+          inferior con las opciones en píldoras. Va por encima del desplegable
+          de resultados (z-[99999]), que sigue detrás y se actualiza al elegir. */}
+      {isMobile && (
+        <MobileOptionsSheet
+          open={isPresent && showFilterMenu}
+          onClose={() => {
+            setShowFilterMenu(false);
+            if (query.trim()) setShowDropdown(true);
+            else openSearchHistory();
+          }}
+          id={filterMenuId}
+          title={t("search_filter_menu", "Filtrar por")}
+          subtitle={t(
+            activeFilterOption.labelKey,
+            activeFilterOption.fallbackLabel,
+          )}
+          accent="emerald"
+          layerClassName="z-[100001]"
+        >
+          <SheetOptionGroup
+            label={t("search_filter_button", "Filtrar búsqueda")}
+            icon={SlidersHorizontal}
+          >
+            {translatedFilterOptions.map(({ id, label, Icon: FilterIcon }) => (
+              <SheetOption
+                key={id}
+                active={activeFilter === id}
+                icon={FilterIcon}
+                onClick={() => handleFilterSelect(id)}
+              >
+                {label}
+              </SheetOption>
+            ))}
+          </SheetOptionGroup>
+        </MobileOptionsSheet>
+      )}
+
       {portalHostReady &&
         createPortal(
           <AnimatePresence>
-            {isPresent && showFilterMenu && filterMenuPosition && (
+            {isPresent && !isMobile && showFilterMenu && filterMenuPosition && (
               <motion.div
                 ref={filterMenuRef}
                 // Marca para que Navbar sepa que esto es "dentro" de la barra
@@ -1542,7 +1635,12 @@ function SearchBar({
                     // `mobilePageSize`); el tope del 70% cortaba justo esas
                     // filas y hacía volver el scroll. Queda un tope al alto
                     // de pantalla solo como red de seguridad.
-                    className={`${isMobile ? "max-h-[calc(100dvh-5rem)]" : "max-h-[70vh]"} overflow-y-auto no-scrollbar`}
+                    className={`${isMobile ? "max-h-[calc(100dvh-5rem)]" : "max-h-[75vh]"} overflow-y-auto no-scrollbar`}
+                    style={
+                      historyMaxHeight && !query.trim()
+                        ? { maxHeight: historyMaxHeight }
+                        : undefined
+                    }
                   >
                     {!query.trim() ? (
               <div className="p-2">
@@ -1567,12 +1665,12 @@ function SearchBar({
                     {searchHistory.map((historyQuery) => (
                       <li
                         key={historyQuery}
-                        className="group flex min-h-10 items-center rounded-xl transition-colors hover:bg-white/10 focus-within:bg-white/10"
+                        className={`group flex ${isMobile ? "min-h-12" : "min-h-11"} items-center rounded-xl transition-colors hover:bg-white/10 focus-within:bg-white/10`}
                       >
                         <button
                           type="button"
                           onClick={() => handleHistoryClick(historyQuery)}
-                          className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2 text-left text-sm font-semibold text-white/85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white/80"
+                          className={`flex min-w-0 flex-1 items-center gap-3 px-3 ${isMobile ? "py-3 text-[15px]" : "py-2.5 text-sm"} text-left font-semibold text-white/85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-white/80`}
                         >
                           <History
                             className="h-4 w-4 shrink-0 text-white/35 transition-colors group-hover:text-amber-300"
@@ -1589,7 +1687,7 @@ function SearchBar({
                             "search_history_remove",
                             "Eliminar del historial",
                           )}: ${historyQuery}`}
-                          className="mr-1 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white/35 transition-colors hover:bg-white/15 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/80"
+                          className={`mr-1 inline-flex ${isMobile ? "h-9 w-9" : "h-8 w-8"} shrink-0 items-center justify-center rounded-lg text-white/35 transition-colors hover:bg-white/15 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/80`}
                         >
                           <XIcon className="h-3.5 w-3.5" aria-hidden="true" />
                         </button>
