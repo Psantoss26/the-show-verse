@@ -62,6 +62,10 @@ import AlertsMenu, { AlertsMenuBoot } from "@/components/notifications/AlertsMen
 import TodayNavbarEntry from "@/components/today/TodayNavbarEntry";
 import OfflineBanner from "@/components/OfflineBanner";
 import useBodyScrollLock from "@/hooks/useBodyScrollLock";
+import MobileOptionsSheet, {
+  SheetOption,
+  SheetOptionGroup,
+} from "@/components/ui/MobileOptionsSheet";
 import { useAppPullToRefreshLock } from "@/lib/android/appBridge";
 import { fuzzySimilarity, tokenFuzzyMatches } from "@/lib/search/fuzzy";
 import {
@@ -472,7 +476,9 @@ function SearchBar({
         searchRef.current &&
         !searchRef.current.contains(e.target) &&
         !dropdownRef.current?.contains(e.target) &&
-        !filterMenuRef.current?.contains(e.target)
+        !filterMenuRef.current?.contains(e.target) &&
+        // La hoja de filtros del móvil va en su propio portal.
+        !(e.target instanceof Element && e.target.closest("[data-mobile-options-sheet]"))
       ) {
         setShowDropdown(false);
         setShowFilterMenu(false);
@@ -659,7 +665,12 @@ function SearchBar({
   }, [isMobile, showDropdown, dropdownPosition, query, results.length]);
 
   useLayoutEffect(() => {
-    if (!showFilterMenu || !filterButtonRef.current || !searchRef.current) {
+    if (
+      isMobile ||
+      !showFilterMenu ||
+      !filterButtonRef.current ||
+      !searchRef.current
+    ) {
       setFilterMenuPosition(null);
       return undefined;
     }
@@ -1220,8 +1231,10 @@ function SearchBar({
   const handleFilterToggle = () => {
     const nextOpen = !showFilterMenu;
     setShowFilterMenu(nextOpen);
+    // MÓVIL: la hoja tapa los resultados con su velo, y se dejan detrás para
+    // ver cómo cambian al elegir, como en los menús de las páginas.
     if (nextOpen) {
-      setShowDropdown(false);
+      if (!isMobile) setShowDropdown(false);
     } else if (query.trim()) {
       setShowDropdown(true);
     } else {
@@ -1230,12 +1243,15 @@ function SearchBar({
   };
 
   const handleFilterSelect = (filterId) => {
-    setShowFilterMenu(false);
+    // En la hoja del móvil elegir no cierra (como en las páginas).
+    if (!isMobile) setShowFilterMenu(false);
 
+    // MÓVIL: la elección llega desde la hoja inferior; enfocar el campo
+    // subiría el teclado y taparía los resultados que se quieren ver.
     if (filterId === activeFilter) {
       if (query.trim()) setShowDropdown(true);
       else openSearchHistory();
-      inputRef.current?.focus();
+      if (!isMobile) inputRef.current?.focus();
       return;
     }
 
@@ -1250,7 +1266,7 @@ function SearchBar({
     } else {
       openSearchHistory();
     }
-    inputRef.current?.focus();
+    if (!isMobile) inputRef.current?.focus();
   };
 
   const handleHistoryClick = (historyQuery) => {
@@ -1447,7 +1463,7 @@ function SearchBar({
               )}`}
               aria-controls={showFilterMenu ? filterMenuId : undefined}
               aria-expanded={showFilterMenu}
-              aria-haspopup="menu"
+              aria-haspopup={isMobile ? "dialog" : "menu"}
               title={`${t("search_filter_button", "Filtrar búsqueda")}: ${t(
                 activeFilterOption.labelKey,
                 activeFilterOption.fallbackLabel,
@@ -1470,10 +1486,48 @@ function SearchBar({
         </div>
       </form>
 
+      {/* MÓVIL: como los menús de filtros de las páginas, el botón abre la hoja
+          inferior con las opciones en píldoras. Va por encima del desplegable
+          de resultados (z-[99999]), que sigue detrás y se actualiza al elegir. */}
+      {isMobile && (
+        <MobileOptionsSheet
+          open={isPresent && showFilterMenu}
+          onClose={() => {
+            setShowFilterMenu(false);
+            if (query.trim()) setShowDropdown(true);
+            else openSearchHistory();
+          }}
+          id={filterMenuId}
+          title={t("search_filter_menu", "Filtrar por")}
+          subtitle={t(
+            activeFilterOption.labelKey,
+            activeFilterOption.fallbackLabel,
+          )}
+          accent="emerald"
+          layerClassName="z-[100001]"
+        >
+          <SheetOptionGroup
+            label={t("search_filter_button", "Filtrar búsqueda")}
+            icon={SlidersHorizontal}
+          >
+            {translatedFilterOptions.map(({ id, label, Icon: FilterIcon }) => (
+              <SheetOption
+                key={id}
+                active={activeFilter === id}
+                icon={FilterIcon}
+                onClick={() => handleFilterSelect(id)}
+              >
+                {label}
+              </SheetOption>
+            ))}
+          </SheetOptionGroup>
+        </MobileOptionsSheet>
+      )}
+
       {portalHostReady &&
         createPortal(
           <AnimatePresence>
-            {isPresent && showFilterMenu && filterMenuPosition && (
+            {isPresent && !isMobile && showFilterMenu && filterMenuPosition && (
               <motion.div
                 ref={filterMenuRef}
                 // Marca para que Navbar sepa que esto es "dentro" de la barra
