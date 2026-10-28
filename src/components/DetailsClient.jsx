@@ -348,6 +348,7 @@ import {
   DETAILS_GALLERY_BACKDROP_SIZES,
   DETAILS_GALLERY_POSTER_SIZES,
   DETAILS_POSTER_ROW_SIZES,
+  detailsRowImageLoading,
   tmdbSrcSet,
 } from "@/lib/tmdb/imageSrcSet";
 import { pickExternalIds, withTitleExternalLinks } from "@/lib/details/titleExternalLinks";
@@ -11337,7 +11338,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         }}
                         className="pb-8 !overflow-visible"
                       >
-                        {castDataForUI.slice(0, 20).map((actor) => (
+                        {castDataForUI.slice(0, 20).map((actor, actorIndex) => (
                           <SwiperSlide key={actor.id}>
                             <Link
                               href={`/details/person/${actor.id}`}
@@ -11348,6 +11349,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   <OptimizedImage
                                     src={`https://image.tmdb.org/t/p/w342${actor.profile_path}`}
                                     alt={actor.name}
+                                    {...detailsRowImageLoading(actorIndex)}
                                     className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110 grayscale-[15%] group-hover:grayscale-0"
                                   />
                                 ) : (
@@ -11400,7 +11402,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         }}
                         className="pb-8 !overflow-visible"
                       >
-                        {ladderRecommendations.slice(0, 15).map((rec) => {
+                        {ladderRecommendations.slice(0, 15).map((rec, recIndex) => {
                           const recTitle = rec.title || rec.name;
                           const recType =
                             rec.media_type === "movie" ||
@@ -11479,7 +11481,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       }
                                       srcSet={tmdbSrcSet(rec.poster_path)}
                                       alt={recTitle}
-                                      loading="lazy"
+                                      {...detailsRowImageLoading(recIndex)}
                                       decoding="async"
                                       sizes={DETAILS_POSTER_ROW_SIZES}
                                       className={recImageClass}
@@ -11537,7 +11539,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                         }}
                         className="pb-8"
                       >
-                        {ladderCollectionItems.map((m) => {
+                        {ladderCollectionItems.map((m, colIndex) => {
                           const colAccountState =
                             recAccountStates[`movie:${m.id}`] || null;
                           const colViewerState =
@@ -11600,7 +11602,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                       sizes={DETAILS_POSTER_ROW_SIZES}
                                       alt={m.title}
                                       className={colImageClass}
-                                      loading="lazy"
+                                      {...detailsRowImageLoading(colIndex)}
                                       decoding="async"
                                     />
                                   ) : m._englishPosterPending ? null : (

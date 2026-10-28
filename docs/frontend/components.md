@@ -26,7 +26,7 @@ Layout global, dashboards y páginas de detalle "grandes".
 | `DiscoverClient.jsx` | Cliente de `/discover`: filtros (género, año, plataforma) sobre discover de TMDb. |
 | `WatchNextAssistant.jsx` | Asistente "qué ver ahora" (llama a `api/ai/watch-next`). |
 | `DetailsSectionMenu.jsx` | Menú de navegación por anclas dentro de una ficha de detalle (temporadas, reparto, etc.). |
-| `DetailsClient.jsx` | Componente principal de ficha de película/serie: puntuaciones (TMDb/Trakt/IMDb/RT/Metacritic), listas, episodios/temporadas, colecciones, comentarios, reparto, recomendaciones, Trakt y Plex. El componente más grande de la app. |
+| `DetailsClient.jsx` | Componente principal de ficha de película/serie: puntuaciones (TMDb/Trakt/IMDb/RT/Metacritic), listas, episodios/temporadas, colecciones, comentarios, reparto, recomendaciones, Trakt y Plex. El componente más grande de la app. En las filas de Reparto, Recomendaciones y Colección, las tarjetas de la primera vista (`detailsRowImageLoading` de `src/lib/tmdb/imageSrcSet.js`, 7 por fila) piden su imagen al montarse con prioridad baja; el resto de la fila sigue en diferido. |
 | `DetailsPageLoader.jsx` | Envoltorio que carga datos diferidos (créditos, recomendaciones, reviews, watch providers) y monta `DetailsClient`. |
 | `SeasonDetailsClient.jsx` | Cliente de `/details/tv/[id]/season/[season]`. |
 | `EpisodeDetailsClient.jsx` | Cliente de la ficha de episodio. |
