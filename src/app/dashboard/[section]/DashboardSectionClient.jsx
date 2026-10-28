@@ -47,7 +47,8 @@ import LiquidButton from "@/components/LiquidButton";
 import { useRouter } from "@/lib/offline/useOfflineRouter";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
 import HoverExpandCard from "@/components/ui/HoverExpandCard";
-import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
+import MobileOptionsSheet, { SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
+import { ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
 import PageStatCard from "@/components/ui/PageStatCard";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
@@ -358,7 +359,16 @@ function PosterImage({
   );
 }
 
-function Dropdown({
+// Dentro de la hoja de filtros móvil (MobileOptionsSheet) el desplegable se
+// pinta como un grupo con todas sus opciones a la vista.
+function Dropdown(props) {
+  if (useInOptionsSheet()) {
+    return <SheetOptionGroup label={props.label} icon={props.icon}>{props.children}</SheetOptionGroup>;
+  }
+  return <DropdownMenu {...props} />;
+}
+
+function DropdownMenu({
   label,
   valueLabel,
   mobileValueLabel,
@@ -485,7 +495,15 @@ function Dropdown({
   );
 }
 
-function DropdownItem({ active, onClick, children }) {
+// Dentro de la hoja de filtros móvil, cada opción es una píldora.
+function DropdownItem(props) {
+  if (useInOptionsSheet()) {
+    return <SheetOption active={props.active} onClick={props.onClick}>{props.children}</SheetOption>;
+  }
+  return <DropdownMenuItem {...props} />;
+}
+
+function DropdownMenuItem({ active, onClick, children }) {
   return (
     <button
       type="button"
@@ -878,8 +896,7 @@ export default function DashboardSectionClient({
   const router = useRouter();
   const toolbarSearchFitRef = usePageToolbarSearchFit();
   const filtersRef = useRef(null);
-  const { panelOverlay: filtersSticky, isPinned: filtersPinned } =
-    useStickyToolbarState(filtersRef, mobileFiltersOpen);
+  const { isPinned: filtersPinned } = useStickyToolbarState(filtersRef);
   const [previewBackdropsByItem, setPreviewBackdropsByItem] = useState(
     () => initialBackdrops || {},
   );
@@ -1090,10 +1107,8 @@ export default function DashboardSectionClient({
 
   const sortOption = SORT_OPTIONS.find((option) => option.key === sortBy);
   const sortLabel = sortOption?.label || "Orden";
-  const sortShortLabel = sortOption?.short || sortLabel;
   const groupOption = GROUP_OPTIONS.find((option) => option.key === groupBy);
   const groupLabel = groupOption?.label || "Agrupar";
-  const groupShortLabel = groupOption?.short || groupLabel;
   const mediaTypeLabel =
     mediaFilter === "all" ? "Todo" : mediaFilter === "movie" ? "Películas" : "Series";
 
@@ -1282,88 +1297,29 @@ export default function DashboardSectionClient({
             </button>
           </div>
 
-          <MobileFiltersPanel
+          <MobileOptionsSheet
             open={mobileFiltersOpen}
-            className={`z-[80] lg:hidden ${
-              filtersSticky ? "absolute left-0 right-0 top-full" : "relative"
-            }`}
-            gapClassName="pt-2"
-            contentClassName="space-y-2"
+            onClose={() => setMobileFiltersOpen(false)}
+            accent="amber"
           >
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <Dropdown
-                  label="Tipo"
-                  valueLabel={mediaTypeLabel}
-                  icon={Filter}
-                >
-                  {renderMediaOptions}
-                </Dropdown>
-              </div>
-              <div className="flex-1">
-                <Dropdown
-                  label="Agrupar"
-                  valueLabel={groupLabel}
-                  mobileValueLabel={groupShortLabel}
-                  compactMobile
-                  icon={Layers3}
-                >
-                  {renderGroupOptions}
-                </Dropdown>
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <Dropdown
-                  label="Orden"
-                  valueLabel={sortLabel}
-                  mobileValueLabel={sortShortLabel}
-                  icon={ArrowUpDown}
-                >
-                  {renderSortOptions}
-                </Dropdown>
-              </div>
-              <div className="flex-1 flex gap-2">
-                <div className="flex rounded-2xl p-1 h-11 items-center flex-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-                  {VIEW_MODE_BUTTONS.map(([mode, Icon, label]) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => setViewMode(mode)}
-                      aria-label={label}
-                      aria-pressed={viewMode === mode}
-                      className={`flex-1 h-full px-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center ${
-                        viewMode === mode ? ACTIVE_TOGGLE_CLASS : INACTIVE_TOGGLE_CLASS
-                      }`}
-                    >
-                      <Icon className="w-4 h-4" />
-                    </button>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setImageMode(imageMode === "poster" ? "backdrop" : "poster")
-                  }
-                  aria-label={
-                    imageMode === "poster" ? "Mostrar fondos" : "Mostrar pósters"
-                  }
-                  className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${
-                    imageMode === "backdrop"
-                      ? "text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.28)]"
-                      : "text-zinc-200 hover:bg-black/30"
-                  }`}
-                >
-                  {imageMode === "poster" ? (
-                    <Film className="w-4 h-4" />
-                  ) : (
-                    <MonitorPlay className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
-            </div>
-          </MobileFiltersPanel>
+            <Dropdown label="Tipo" valueLabel={mediaTypeLabel} icon={Filter}>
+              {renderMediaOptions}
+            </Dropdown>
+            <Dropdown label="Orden" valueLabel={sortLabel} icon={ArrowUpDown}>
+              {renderSortOptions}
+            </Dropdown>
+            <Dropdown label="Agrupar" valueLabel={groupLabel} icon={Layers3}>
+              {renderGroupOptions}
+            </Dropdown>
+            <SheetOptionGroup label="Vista" icon={LayoutGrid}>
+              {VIEW_MODE_BUTTONS.map(([mode, Icon, label]) => (
+                <SheetOption key={mode} icon={Icon} active={viewMode === mode} onClick={() => setViewMode(mode)}>
+                  {label.replace(/^Vista /, "").replace(/^./, (c) => c.toUpperCase())}
+                </SheetOption>
+              ))}
+            </SheetOptionGroup>
+            <ImageModeSheetGroup value={imageMode} onChange={setImageMode} />
+          </MobileOptionsSheet>
 
           <div
             ref={toolbarSearchFitRef}

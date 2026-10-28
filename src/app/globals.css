@@ -621,6 +621,44 @@ html:not([data-avatar-boot]) .alerts-boot {
   }
 }
 
+/* Hoja inferior de filtros y vista de las páginas en móvil
+   (ui/MobileOptionsSheet): sube desde abajo y baja al cerrar, SOLO con
+   transform, por lo mismo que la vista lateral. */
+@keyframes sv-options-sheet-in {
+  from {
+    transform: translate3d(0, 100%, 0);
+  }
+
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes sv-options-sheet-out {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: translate3d(0, 100%, 0);
+  }
+}
+
+.sv-options-sheet-in {
+  animation: sv-options-sheet-in 340ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sv-options-sheet-out {
+  animation: sv-options-sheet-out 220ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-options-sheet-in,
+  .sv-options-sheet-out {
+    animation: none;
+  }
+}
+
 /* Salida (ver FadePresence): `forwards` la deja a 0 hasta que se desmonta, sin
    el fotograma a opacidad 1 que dejaba Framer al terminar la salida. */
 @keyframes sv-fade-out {

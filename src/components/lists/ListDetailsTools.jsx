@@ -40,7 +40,7 @@ import {
   titleMatchesQuery,
 } from "@/lib/search/titleMatching";
 import { useTitleNameSearch } from "@/lib/search/useTitleNameSearch";
-import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
+import MobileOptionsSheet, { SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
 
 const DETAILS_HREF_RE = /^\/details\/(movie|tv)\/(\d+)(?:[/?#]|$)/;
 // Lo que ha de pasar sin scroll para dar el hover por intencionado: los
@@ -55,7 +55,16 @@ const INITIAL_RENDER_COUNT = 60;
 const LOADING_PLACEHOLDER_CARDS = 12;
 const RENDER_BATCH_SIZE = 60;
 
-function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
+// Dentro de la hoja de filtros móvil (MobileOptionsSheet) el desplegable se
+// pinta como un grupo con todas sus opciones a la vista.
+function InlineDropdown(props) {
+  if (useInOptionsSheet()) {
+    return <SheetOptionGroup label={props.label} icon={props.icon}>{props.children}</SheetOptionGroup>;
+  }
+  return <InlineDropdownMenu {...props} />;
+}
+
+function InlineDropdownMenu({ label, valueLabel, icon: Icon, children }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const buttonRef = useRef(null);
@@ -167,7 +176,15 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
   );
 }
 
-function DropdownItem({ active, onClick, children }) {
+// Dentro de la hoja de filtros móvil, cada opción es una píldora.
+function DropdownItem(props) {
+  if (useInOptionsSheet()) {
+    return <SheetOption active={props.active} onClick={props.onClick}>{props.children}</SheetOption>;
+  }
+  return <DropdownMenuItem {...props} />;
+}
+
+function DropdownMenuItem({ active, onClick, children }) {
   return (
     <button
       type="button"
@@ -307,16 +324,30 @@ function groupItems(entries, groupBy) {
   }));
 }
 
+const VIEW_SWITCHER_OPTIONS = [
+  { id: "grid", icon: Grid3X3, label: "Grid", sheetLabel: "Cuadrícula" },
+  { id: "compact", icon: Rows3, label: "Compacto", sheetLabel: "Compacta" },
+  { id: "list", icon: List, label: "Lista", sheetLabel: "Lista" },
+];
+
 function ViewSwitcher({ viewMode, setViewMode, className = "", fill = false }) {
+  // En la hoja de filtros móvil, las vistas como píldoras con su nombre.
+  if (useInOptionsSheet()) {
+    return (
+      <SheetOptionGroup label="Vista" icon={Grid3X3}>
+        {VIEW_SWITCHER_OPTIONS.map(({ id, icon, sheetLabel }) => (
+          <SheetOption key={id} icon={icon} active={viewMode === id} onClick={() => setViewMode(id)}>
+            {sheetLabel}
+          </SheetOption>
+        ))}
+      </SheetOptionGroup>
+    );
+  }
   return (
     <div
       className={`flex h-11 items-center rounded-2xl bg-gradient-to-br from-white/10 to-white/5 p-1 shadow-lg backdrop-blur-lg ${className}`}
     >
-      {[
-        { id: "grid", icon: Grid3X3, label: "Grid" },
-        { id: "compact", icon: Rows3, label: "Compacto" },
-        { id: "list", icon: List, label: "Lista" },
-      ].map(({ id, icon: Icon, label }) => (
+      {VIEW_SWITCHER_OPTIONS.map(({ id, icon: Icon, label }) => (
         <button
           key={id}
           type="button"
@@ -392,8 +423,7 @@ export default function FilterableListItems({
   const [editMode, setEditMode] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
-  const { panelOverlay: filtersSticky, isPinned: filtersPinned } =
-    useStickyToolbarState(filtersRef, mobileFiltersOpen);
+  const { isPinned: filtersPinned } = useStickyToolbarState(filtersRef);
   // Al VOLVER (atrás/adelante) se renderizan todos los items de golpe para que la
   // altura del documento sea correcta al instante y el scroll se restaure sin saltos.
   const isBackNav = useIsHistoryNavigation();
@@ -690,45 +720,16 @@ export default function FilterableListItems({
           ) : null}
         </div>
 
-        <MobileFiltersPanel
+        <MobileOptionsSheet
           open={mobileFiltersOpen}
-          className={`lg:hidden ${
-            filtersSticky ? "absolute left-0 right-0 top-full z-[80]" : "relative"
-          }`}
-          gapClassName={filtersSticky ? "pt-2" : ""}
+          onClose={() => setMobileFiltersOpen(false)}
+          accent="purple"
         >
-          {/* DOS CONTROLES POR FILA, como en Historial: antes iban a uno
-              por fila hasta 640px, así que en un móvil el panel ocupaba
-              cuatro filas y dejaba medio ancho sin usar. */}
-          <div className="space-y-2 pt-2">
-            <div className="flex gap-2">
-              <div className="min-w-0 flex-1">
-                <TypeDropdown
-                  typeFilter={typeFilter}
-                  setTypeFilter={setTypeFilter}
-                />
-              </div>
-              <div className="min-w-0 flex-1">
-                <SortDropdown sortBy={sortBy} setSortBy={setSortBy} />
-              </div>
-            </div>
-
-            {/* Última fila: agrupar + modos de vista + borrar */}
-            <div className="flex gap-2">
-              <div className="min-w-0 flex-1">
-                <GroupDropdown groupBy={groupBy} setGroupBy={setGroupBy} />
-              </div>
-              <div className="flex min-w-0 flex-1 gap-2">
-                <ViewSwitcher
-                  viewMode={viewMode}
-                  setViewMode={setViewMode}
-                  className="min-w-0 flex-1"
-                  fill
-                />
-              </div>
-            </div>
-          </div>
-        </MobileFiltersPanel>
+          <TypeDropdown typeFilter={typeFilter} setTypeFilter={setTypeFilter} />
+          <SortDropdown sortBy={sortBy} setSortBy={setSortBy} />
+          <GroupDropdown groupBy={groupBy} setGroupBy={setGroupBy} />
+          <ViewSwitcher viewMode={viewMode} setViewMode={setViewMode} />
+        </MobileOptionsSheet>
 
         <div className="hidden gap-3 lg:flex">
           <div className="relative min-w-[260px] flex-1">

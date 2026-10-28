@@ -362,7 +362,7 @@ import {
   createPlatformItem,
   dedupeStreamingProviders,
 } from "@/lib/streaming/providers";
-import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
+import MobileOptionsSheet, { SheetOption, SheetOptionGroup } from "@/components/ui/MobileOptionsSheet";
 import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
 import { useLadderListPreviews } from "@/lib/lists/useLadderListPreviews";
 
@@ -2481,6 +2481,8 @@ export default function DetailsClient({
 
     const onDown = (e) => {
       if (!artworkMenusOpenRef.current) return;
+      // La hoja móvil de filtros va en un portal y se cierra ella sola.
+      if (e.target instanceof Element && e.target.closest("[data-mobile-options-sheet]")) return;
       const wrap = artworkControlsWrapRef.current;
       if (!wrap) return;
       if (!wrap.contains(e.target)) {
@@ -11901,230 +11903,53 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           </div>
                         </div>
 
-                        {/* Panel movil desplegable en 2 filas maximo */}
-                        {/* Por ENCIMA de la galería que sigue: el contenido del panel lleva un
-                            `transform` (su animación) y eso encierra el z-index del
-                            desplegable de resolución en el panel; el Swiper de las
-                            imágenes (`.swiper`: relative, z-index 1) lo tapaba. Con
-                            z-[2] el panel gana a la galería y sigue por debajo de las
-                            barras fijas (z-30). */}
-                        <MobileFiltersPanel
+                        {/* Móvil: portada, resolución e idioma en la hoja de filtros. */}
+                        <MobileOptionsSheet
                           open={artworkControlsOpen}
-                          className="sm:hidden relative z-[2]"
-                          gapClassName=""
-                          contentClassName="pb-4"
+                          onClose={() => setArtworkControlsOpen(false)}
+                          title="Portadas y fondos"
+                          icon={ImageIcon}
+                          accent="yellow"
                         >
-                            <div>
-                              {/* En móvil se editan exactamente las dos capas del hero:
-                                  póster neutro y logo. */}
-                              <div className="flex flex-wrap items-center gap-2">
-                                {/* Las etiquetas hacen explícita la categoría seleccionable,
-                                    además de conservar su icono visual. */}
-                                <div className="flex isolate transform-gpu rounded-2xl p-1 h-10 items-center bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setActiveImagesTab("posters")
-                                    }
-                                    className={`px-2.5 h-full rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-                                      activeImagesTab === "posters"
-                                        ? "bg-white/10 text-white shadow-md"
-                                        : "text-zinc-400 hover:text-white hover:bg-white/10"
-                                    }`}
-                                    style={{
-                                      WebkitTapHighlightColor: "transparent",
-                                    }}
-                                    aria-label="Portada"
-                                    aria-pressed={activeImagesTab === "posters"}
-                                  >
-                                    <ImageIcon className="w-4 h-4" />
-                                    <span className="text-xs font-semibold">Portada</span>
-                                  </button>
-                                  {/* Portada CON IDIOMA: sustituye a la portada sin
-                                      idioma + logo (trae el título impreso). */}
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setActiveImagesTab("localizedPosters")
-                                    }
-                                    className={`px-2.5 h-full rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-                                      activeImagesTab === "localizedPosters"
-                                        ? "bg-white/10 text-white shadow-md"
-                                        : "text-zinc-400 hover:text-white hover:bg-white/10"
-                                    }`}
-                                    style={{
-                                      WebkitTapHighlightColor: "transparent",
-                                    }}
-                                    aria-label="Portada con idioma"
-                                    aria-pressed={activeImagesTab === "localizedPosters"}
-                                  >
-                                    <Languages className="w-4 h-4" />
-                                    <span className="text-xs font-semibold">Con idioma</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setActiveImagesTab("logos")
-                                    }
-                                    className={`px-2.5 h-full rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-                                      activeImagesTab === "logos"
-                                        ? "bg-white/10 text-white shadow-md"
-                                        : "text-zinc-400 hover:text-white hover:bg-white/10"
-                                    }`}
-                                    style={{
-                                      WebkitTapHighlightColor: "transparent",
-                                    }}
-                                    aria-label="Logo"
-                                    aria-pressed={activeImagesTab === "logos"}
-                                  >
-                                    <Sparkles className="w-4 h-4" />
-                                    <span className="text-xs font-semibold">Logo</span>
-                                  </button>
-                                </div>
-
-                                {/* Resolución móvil - más compacto */}
-                                <div
-                                  ref={resMenuRef}
-                                  className="relative min-w-[6.25rem] flex-1"
-                                >
-                                  <button
-                                    type="button"
-                                    onClick={() => setResMenuOpen((v) => !v)}
-                                    className="h-10 w-full inline-flex isolate transform-gpu items-center justify-between gap-2
-                px-3 rounded-2xl transition text-sm
-                bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200 hover:bg-black/30"
-                                    aria-label="Resolución"
-                                    style={{
-                                      WebkitTapHighlightColor: "transparent",
-                                    }}
-                                  >
-                                    <span className="inline-flex items-center gap-2 truncate">
-                                      <span className="text-[10px] font-extrabold tracking-wider text-zinc-400/90">
-                                        RES
-                                      </span>
-                                      <span className="font-semibold truncate">
-                                        {imagesResFilter === "all"
-                                          ? "Todas"
-                                          : imagesResFilter === "720p"
-                                            ? "720p"
-                                            : imagesResFilter === "1080p"
-                                              ? "1080p"
-                                              : imagesResFilter === "2k"
-                                                ? "2K"
-                                                : "4K"}
-                                      </span>
-                                    </span>
-                                    <ChevronDown
-                                      className={`w-4 h-4 shrink-0 transition-transform ${resMenuOpen ? "rotate-180" : ""}`}
-                                    />
-                                  </button>
-
-                                  <AnimatePresence>
-                                    {resMenuOpen && (
-                                      <motion.div
-                                        initial={{
-                                          opacity: 0,
-                                          y: 6,
-                                          scale: 0.98,
-                                        }}
-                                        animate={{
-                                          opacity: 1,
-                                          y: 0,
-                                          scale: 1,
-                                        }}
-                                        exit={{
-                                          opacity: 0,
-                                          y: 6,
-                                          scale: 0.98,
-                                        }}
-                                        transition={{
-                                          duration: 0.14,
-                                          ease: "easeOut",
-                                        }}
-                                        className="absolute isolate left-0 top-full z-[9999] mt-2 w-full rounded-2xl
-                    bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_30px_80px_-15px_rgba(0,0,0,0.9)] overflow-hidden"
-                                      >
-                                        <div className="py-1">
-                                          {[
-                                            { id: "all", label: "Todas" },
-                                            { id: "720p", label: "720p" },
-                                            { id: "1080p", label: "1080p" },
-                                            { id: "2k", label: "2K" },
-                                            { id: "4k", label: "4K" },
-                                          ].map((opt) => {
-                                            const active =
-                                              imagesResFilter === opt.id;
-                                            return (
-                                              <button
-                                                key={opt.id}
-                                                type="button"
-                                                onClick={() => {
-                                                  setImagesResFilter(opt.id);
-                                                  setResMenuOpen(false);
-                                                }}
-                                                className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between
-                            transition ${active ? "bg-white/10 text-white" : "text-zinc-300 hover:bg-white/5"}`}
-                                              >
-                                                <span className="font-semibold">
-                                                  {opt.label}
-                                                </span>
-                                                {active && (
-                                                  <Check className="w-4 h-4 text-emerald-300" />
-                                                )}
-                                              </button>
-                                            );
-                                          })}
-                                        </div>
-                                      </motion.div>
-                                    )}
-                                  </AnimatePresence>
-                                </div>
-
-                                {/* Los logos sí tienen variantes localizadas; el póster
-                                    móvil se mantiene neutro y no necesita este filtro. */}
-                                {activeImagesTab === "logos" && (
-                                  <div
-                                    className="flex isolate transform-gpu rounded-2xl p-1 h-10 items-center bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]"
-                                    aria-label="Idioma de los logos"
-                                  >
-                                    <button
-                                      type="button"
-                                      onClick={() => setLangES((value) => !value)}
-                                      className={`px-3 h-full rounded-xl text-xs font-medium transition-all flex items-center justify-center ${
-                                        langES
-                                          ? "bg-white/10 text-white shadow-md"
-                                          : "text-zinc-400 hover:text-white hover:bg-white/10"
-                                      }`}
-                                      style={{
-                                        WebkitTapHighlightColor: "transparent",
-                                      }}
-                                      aria-label="Mostrar logos en español"
-                                      aria-pressed={langES}
-                                    >
-                                      ES
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => setLangEN((value) => !value)}
-                                      className={`px-3 h-full rounded-xl text-xs font-medium transition-all flex items-center justify-center ${
-                                        langEN
-                                          ? "bg-white/10 text-white shadow-md"
-                                          : "text-zinc-400 hover:text-white hover:bg-white/10"
-                                      }`}
-                                      style={{
-                                        WebkitTapHighlightColor: "transparent",
-                                      }}
-                                      aria-label="Mostrar logos en inglés"
-                                      aria-pressed={langEN}
-                                    >
-                                      EN
-                                    </button>
-                                  </div>
-                                )}
-
-                              </div>
-                            </div>
-                        </MobileFiltersPanel>
+                          <SheetOptionGroup label="Imagen" icon={ImageIcon}>
+                            <SheetOption icon={ImageIcon} active={activeImagesTab === "posters"} onClick={() => setActiveImagesTab("posters")}>
+                              Portada
+                            </SheetOption>
+                            {/* Portada CON IDIOMA: sustituye a la portada sin idioma + logo
+                                (trae el título impreso). */}
+                            <SheetOption icon={Languages} active={activeImagesTab === "localizedPosters"} onClick={() => setActiveImagesTab("localizedPosters")}>
+                              Con idioma
+                            </SheetOption>
+                            <SheetOption icon={Sparkles} active={activeImagesTab === "logos"} onClick={() => setActiveImagesTab("logos")}>
+                              Logo
+                            </SheetOption>
+                          </SheetOptionGroup>
+                          <SheetOptionGroup label="Resolución">
+                            {[
+                              { id: "all", label: "Todas" },
+                              { id: "720p", label: "720p" },
+                              { id: "1080p", label: "1080p" },
+                              { id: "2k", label: "2K" },
+                              { id: "4k", label: "4K" },
+                            ].map((opt) => (
+                              <SheetOption key={opt.id} active={imagesResFilter === opt.id} onClick={() => setImagesResFilter(opt.id)}>
+                                {opt.label}
+                              </SheetOption>
+                            ))}
+                          </SheetOptionGroup>
+                          {/* Los logos sí tienen variantes localizadas; el póster móvil se
+                              mantiene neutro y no necesita este filtro. */}
+                          {activeImagesTab === "logos" && (
+                            <SheetOptionGroup label="Idioma de los logos" icon={Languages}>
+                              <SheetOption active={langES} onClick={() => setLangES((value) => !value)}>
+                                Español
+                              </SheetOption>
+                              <SheetOption active={langEN} onClick={() => setLangEN((value) => !value)}>
+                                Inglés
+                              </SheetOption>
+                            </SheetOptionGroup>
+                          )}
+                        </MobileOptionsSheet>
 
                         {!!imagesError && (
                           <div className="text-sm text-red-400 mb-3">

@@ -6,28 +6,19 @@ const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), "
 
 const panel = read("components/ui/MobileFiltersPanel.jsx");
 
-// Todos los menús desplegables móviles comparten la MISMA animación.
+// Los desplegables EN EL SITIO que quedan (dentro de paneles o modales, donde
+// abrir una hoja encima sería un modal sobre otro, y los filtros de Actor en
+// escritorio) comparten la MISMA animación. Las páginas usan la hoja
+// (MobileOptionsSheet, ver mobileOptionsSheet.test.mjs).
 const PAGES = [
-  "app/biblioteca/BibliotecaClient.jsx",
-  "app/calendar/CalendarClient.jsx",
-  "app/continue-watching/ContinueWatchingClient.jsx",
-  "app/dashboard/[section]/DashboardSectionClient.jsx",
-  "app/favorites/FavoritesClient.jsx",
-  "app/history/HistoryClient.jsx",
-  "app/in-progress/InProgressClient.jsx",
-  "app/lists/page.jsx",
-  "app/social/SocialClient.jsx",
-  "app/u/[username]/ProfileSection.jsx",
-  "app/watchlist/WatchlistClient.jsx",
   "components/ActorDetails.jsx",
-  "components/DetailsClient.jsx",
   "components/dashboard/PhoneDetailsSections.jsx",
-  "components/profile/neural/NeuralGraphView.jsx",
-  "components/lists/ListDetailsTools.jsx",
+  "components/details/sectionSheet/ActorSectionSheets.jsx",
+  "components/details/sectionSheet/DetailsSectionSheets.jsx",
   "components/trakt/TraktEpisodesWatchedModal.jsx",
 ];
 
-test("todas las páginas despliegan su menú móvil con el panel común", () => {
+test("los desplegables en el sitio usan el panel común", () => {
   for (const page of PAGES) {
     const source = read(page);
     assert.match(source, /import MobileFiltersPanel from "@\/components\/ui\/MobileFiltersPanel";/, page);

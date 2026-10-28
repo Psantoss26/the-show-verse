@@ -72,7 +72,7 @@ import {
   pendingItemKey,
 } from "@/lib/userLists/pendingListAdditions";
 import { LIST_CHANGED_EVENT } from "@/lib/userLists/optimisticListCache";
-import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
+import MobileOptionsSheet, { SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
 import { normalizeSearchText, titleMatchesQuery } from "@/lib/search/titleMatching";
 import { useTitleNameSearch } from "@/lib/search/useTitleNameSearch";
 
@@ -532,7 +532,28 @@ function relativeActivityTime(value) {
 // Exportado: la vista neuronal reutiliza el mismo menú que las demás secciones.
 // `multiple`: `value` es una lista y cada opción se marca o desmarca sin cerrar
 // el desplegable (`onChange` recibe la opción pulsada).
-export function ProfileMenuDropdown({ label, valueLabel, icon: Icon, options, value, onChange, multiple = false }) {
+export function ProfileMenuDropdown(props) {
+  // En la hoja de filtros móvil, todas las opciones a la vista.
+  if (useInOptionsSheet()) {
+    const { label, icon, options, value, onChange, multiple = false } = props;
+    return (
+      <SheetOptionGroup label={label} icon={icon}>
+        {options.map(([optionValue, optionLabel]) => (
+          <SheetOption
+            key={optionValue}
+            active={multiple ? value.includes(optionValue) : value === optionValue}
+            onClick={() => onChange(optionValue)}
+          >
+            {optionLabel}
+          </SheetOption>
+        ))}
+      </SheetOptionGroup>
+    );
+  }
+  return <ProfileMenuDropdownMenu {...props} />;
+}
+
+function ProfileMenuDropdownMenu({ label, valueLabel, icon: Icon, options, value, onChange, multiple = false }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const buttonRef = useRef(null);
@@ -646,6 +667,17 @@ export function ProfileMenuDropdown({ label, valueLabel, icon: Icon, options, va
 }
 
 function ProfileViewMode({ value, options, onChange }) {
+  if (useInOptionsSheet()) {
+    return (
+      <SheetOptionGroup label="Vista" icon={LayoutGrid}>
+        {options.map(([optionValue, label, Icon]) => (
+          <SheetOption key={optionValue} icon={Icon} active={value === optionValue} onClick={() => onChange(optionValue)}>
+            {label}
+          </SheetOption>
+        ))}
+      </SheetOptionGroup>
+    );
+  }
   return (
     <div className="flex h-11 w-full items-center gap-1 overflow-clip rounded-2xl bg-black/30 bg-gradient-to-br from-white/10 to-white/5 p-1 shadow-lg">
       {options.map(([optionValue, label, Icon]) => {
@@ -723,8 +755,8 @@ function ProfileSectionToolbar({ section, controls, onChange }) {
           className={`flex h-11 w-11 shrink-0 items-center justify-center overflow-clip rounded-2xl bg-black/30 bg-gradient-to-br from-white/10 to-white/5 shadow-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400/70 ${
             mobileControlsOpen ? "text-emerald-400" : "text-zinc-200 hover:bg-white/10"
           }`}
+          aria-haspopup="dialog"
           aria-expanded={mobileControlsOpen}
-          aria-controls={`profile-menu-${section}`}
           aria-label="Mostrar opciones"
         >
           <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
@@ -753,19 +785,18 @@ function ProfileSectionToolbar({ section, controls, onChange }) {
         <ProfileViewMode value={controls.view} options={options.views} onChange={handleViewChange} />
       </div>
 
-      {/* Mismo despliegue que los menús móviles del resto de páginas. */}
-      <MobileFiltersPanel
+      {/* La misma hoja de filtros que el resto de páginas. */}
+      <MobileOptionsSheet
         open={mobileControlsOpen}
+        onClose={() => setMobileControlsOpen(false)}
         id={`profile-menu-${section}`}
-        className="@[1024px]/detail-page:hidden"
-        gapClassName=""
-        contentClassName="grid grid-cols-2 gap-2"
+        accent="emerald"
       >
         <ProfileMenuDropdown label={section === "activity" ? "Acción" : "Tipo"} valueLabel={filterLabel} icon={Filter} options={options.filters} value={controls.filter} onChange={(filter) => onChange({ filter })} />
         <ProfileMenuDropdown label="Ordenar" valueLabel={sortLabel} icon={ArrowUpDown} options={options.sorts} value={controls.sort} onChange={(sort) => onChange({ sort })} />
         <ProfileMenuDropdown label="Agrupar" valueLabel={groupLabel} icon={Layers3} options={options.groups} value={controls.group} onChange={(group) => onChange({ group })} />
         <ProfileViewMode value={controls.view} options={options.views} onChange={handleViewChange} />
-      </MobileFiltersPanel>
+      </MobileOptionsSheet>
     </section>
   );
 }

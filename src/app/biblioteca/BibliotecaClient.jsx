@@ -48,7 +48,7 @@ import { pickLadderBackdrop, pickLadderPoster } from "@/lib/details/tmdbImages";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import HoverExpandCard from "@/components/ui/HoverExpandCard";
-import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
+import MobileOptionsSheet, { SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
 import PageStatCard from "@/components/ui/PageStatCard";
 
 
@@ -375,7 +375,16 @@ function StatBox({
 
 // ================== UI COMPONENTS ==================
 
-function InlineDropdown({
+// Dentro de la hoja de filtros móvil (MobileOptionsSheet) el desplegable se
+// pinta como un grupo con todas sus opciones a la vista.
+function InlineDropdown(props) {
+  if (useInOptionsSheet()) {
+    return <SheetOptionGroup label={props.label} icon={props.icon}>{props.children}</SheetOptionGroup>;
+  }
+  return <InlineDropdownMenu {...props} />;
+}
+
+function InlineDropdownMenu({
   label,
   valueLabel,
   mobileValueLabel,
@@ -498,7 +507,15 @@ function InlineDropdown({
   );
 }
 
-function DropdownItem({ active, onClick, children }) {
+// Dentro de la hoja de filtros móvil, cada opción es una píldora.
+function DropdownItem(props) {
+  if (useInOptionsSheet()) {
+    return <SheetOption active={props.active} onClick={props.onClick}>{props.children}</SheetOption>;
+  }
+  return <DropdownMenuItem {...props} />;
+}
+
+function DropdownMenuItem({ active, onClick, children }) {
   return (
     <button
       type="button"
@@ -1005,8 +1022,7 @@ export default function BibliotecaClient() {
   const loadMoreRef = useRef(null);
   const deferredQuery = useDeferredValue(query);
   const filtersRef = useRef(null);
-  const { panelOverlay: filtersSticky, isPinned: filtersPinned } =
-    useStickyToolbarState(filtersRef, mobileFiltersOpen);
+  const { isPinned: filtersPinned } = useStickyToolbarState(filtersRef);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -2087,79 +2103,37 @@ export default function BibliotecaClient() {
             </button>
           </div>
 
-          {/* En flujo si se abre antes de fijarse (y sigue así al fijarse) y
-              como overlay si se abre con la barra ya adherida al navbar móvil. */}
-          <MobileFiltersPanel
+          <MobileOptionsSheet
             open={mobileFiltersOpen}
-            className={`z-[80] lg:hidden ${
-              filtersSticky ? "absolute left-0 right-0" : "relative"
-            }`}
-            style={filtersSticky ? { top: "calc(100% + 4px)" } : undefined}
-            // En flujo, el hueco de 4px que daba `mt-1` va dentro para que se anime.
-            gapClassName={filtersSticky ? "" : "pt-1"}
-            contentClassName="space-y-1 pt-1 pb-1"
+            onClose={() => setMobileFiltersOpen(false)}
+            accent="amber"
           >
-            <div className="flex gap-2">
-              <div className="flex-1">{renderTypeDropdown()}</div>
-              <div className="flex-1">{renderResDropdown()}</div>
-            </div>
-            <div className="flex gap-2">
-              <div className="flex-1">{renderSortDropdown()}</div>
-              <div className="flex-1">{renderGroupDropdown()}</div>
-            </div>
-            <div className="flex gap-2">
-              <div className="flex-1 flex gap-2">
-                <div className="flex rounded-2xl p-1 h-11 items-center flex-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-                  <button
-                    type="button"
-                    onClick={() => setViewMode("list")}
-                    className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${viewMode === "list" ? "bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/20" : "text-zinc-400 hover:text-white hover:bg-white/10"}`}
-                    title="Lista"
-                  >
-                    <LayoutList className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setViewMode("compact")}
-                    className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${viewMode === "compact" ? "bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/20" : "text-zinc-400 hover:text-white hover:bg-white/10"}`}
-                    title="Compacta"
-                  >
-                    <Grid3x3 className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setViewMode("grid")}
-                    className={`flex-1 h-full px-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${viewMode === "grid" ? "bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/20" : "text-zinc-400 hover:text-white hover:bg-white/10"}`}
-                    title="Grid"
-                  >
-                    <LayoutGrid className="w-4 h-4" />
-                  </button>
-                </div>
-                {viewMode !== "list" && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setImageMode(
-                        imageMode === "poster" ? "backdrop" : "poster",
-                      )
-                    }
-                    className={`h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg ${imageMode === "backdrop" ? "text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.3)]" : "text-zinc-200 hover:bg-black/30"}`}
-                    title={
-                      imageMode === "poster"
-                        ? "Cambiar a Backdrop"
-                        : "Cambiar a Poster"
-                    }
-                  >
-                    {imageMode === "poster" ? (
-                      <PosterGlyph className="w-4 h-4" />
-                    ) : (
-                      <BackdropGlyph className="w-4 h-4" />
-                    )}
-                  </button>
-                )}
-              </div>
-            </div>
-          </MobileFiltersPanel>
+            {renderTypeDropdown()}
+            {renderResDropdown()}
+            {renderSortDropdown()}
+            {renderGroupDropdown()}
+            <SheetOptionGroup label="Vista" icon={LayoutGrid}>
+              <SheetOption icon={LayoutList} active={viewMode === "list"} onClick={() => setViewMode("list")}>
+                Lista
+              </SheetOption>
+              <SheetOption icon={Grid3x3} active={viewMode === "compact"} onClick={() => setViewMode("compact")}>
+                Compacta
+              </SheetOption>
+              <SheetOption icon={LayoutGrid} active={viewMode === "grid"} onClick={() => setViewMode("grid")}>
+                Cuadrícula
+              </SheetOption>
+            </SheetOptionGroup>
+            {viewMode !== "list" && (
+              <SheetOptionGroup label="Imagen" icon={PosterGlyph}>
+                <SheetOption icon={PosterGlyph} active={imageMode === "poster"} onClick={() => setImageMode("poster")}>
+                  Portada
+                </SheetOption>
+                <SheetOption icon={BackdropGlyph} active={imageMode === "backdrop"} onClick={() => setImageMode("backdrop")}>
+                  Fondo
+                </SheetOption>
+              </SheetOptionGroup>
+            )}
+          </MobileOptionsSheet>
 
           {/* Desktop filters */}
           <div className="hidden lg:flex gap-3 relative z-10">

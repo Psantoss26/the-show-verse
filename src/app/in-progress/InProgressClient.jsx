@@ -55,8 +55,8 @@ import { tmdbImageLangsParam } from "@/lib/tmdb/imageLanguages";
 import { pickLadderBackdrop, pickLadderPoster } from "@/lib/details/tmdbImages";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
-import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
-import { ImageModeSegmented, ImageModeToggleButton } from "@/components/ui/ImageModeSelector";
+import MobileOptionsSheet, { SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
+import { ImageModeSegmented, ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
 import PageStatCard from "@/components/ui/PageStatCard";
 
 // Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
@@ -643,7 +643,16 @@ function GroupDivider({
 // ----------------------------
 // INLINE DROPDOWN (same as History with emerald accent)
 // ----------------------------
-function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
+// Dentro de la hoja de filtros móvil (MobileOptionsSheet) el desplegable se
+// pinta como un grupo con todas sus opciones a la vista.
+function InlineDropdown(props) {
+  if (useInOptionsSheet()) {
+    return <SheetOptionGroup label={props.label} icon={props.icon}>{props.children}</SheetOptionGroup>;
+  }
+  return <InlineDropdownMenu {...props} />;
+}
+
+function InlineDropdownMenu({ label, valueLabel, icon: Icon, children }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const buttonRef = useRef(null);
@@ -771,7 +780,15 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
   );
 }
 
-function DropdownItem({ active, onClick, children }) {
+// Dentro de la hoja de filtros móvil, cada opción es una píldora.
+function DropdownItem(props) {
+  if (useInOptionsSheet()) {
+    return <SheetOption active={props.active} onClick={props.onClick}>{props.children}</SheetOption>;
+  }
+  return <DropdownMenuItem {...props} />;
+}
+
+function DropdownMenuItem({ active, onClick, children }) {
   return (
     <button
       type="button"
@@ -1278,8 +1295,7 @@ export default function InProgressClient({
   const [isMobile, setIsMobile] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
-  const { panelOverlay: filtersSticky, isPinned: filtersPinned } =
-    useStickyToolbarState(filtersRef, mobileFiltersOpen);
+  const { isPinned: filtersPinned } = useStickyToolbarState(filtersRef);
   const [uiReady, setUiReady] = useState(false);
 
   // Al volver desde una ficha, restauramos la caché antes del primer paint. Así
@@ -2179,117 +2195,70 @@ export default function InProgressClient({
             </button>
           </div>
 
-          {/* Mobile: collapsible filters */}
-          <MobileFiltersPanel
+          <MobileOptionsSheet
             open={mobileFiltersOpen}
-            className={`z-[80] ${
-              filtersSticky ? "absolute left-0 right-0 top-full" : "relative"
-            }`}
-            gapClassName="pt-2"
+            onClose={() => setMobileFiltersOpen(false)}
+            accent="emerald"
           >
-            <div className="space-y-2">
-              {/* Fila 1: ordenar (+ imagen de las tarjetas en la vista de
-                  pósters: el botón que alterna de Favoritos, aquí porque la
-                  fila de Agrupar y la vista no tiene sitio). El selector de
-                  secciones permanece visible en la barra principal. */}
-              <div className="flex gap-2">
-              <div className="min-w-0 flex-1">
-              <InlineDropdown
-                label="Ordenar"
-                valueLabel={sortLabels[sortBy]}
-                icon={ArrowUpDown}
-              >
-                {({ close }) => (
-                  <>
-                    {Object.entries(sortLabels).map(([key, label]) => (
-                      <DropdownItem
-                        key={key}
-                        active={sortBy === key}
-                        onClick={() => {
-                          setSortBy(key);
-                          close();
-                        }}
-                      >
-                        {label}
-                      </DropdownItem>
-                    ))}
-                  </>
-                )}
-              </InlineDropdown>
-              </div>
-              {viewMode === "poster" && (
-                <ImageModeToggleButton
-                  value={posterImageMode}
-                  onChange={setPosterImageMode}
-                />
+            <InlineDropdown
+              label="Ordenar"
+              valueLabel={sortLabels[sortBy]}
+              icon={ArrowUpDown}
+            >
+              {({ close }) => (
+                <>
+                  {Object.entries(sortLabels).map(([key, label]) => (
+                    <DropdownItem
+                      key={key}
+                      active={sortBy === key}
+                      onClick={() => {
+                        setSortBy(key);
+                        close();
+                      }}
+                    >
+                      {label}
+                    </DropdownItem>
+                  ))}
+                </>
               )}
-              </div>
-
-              {/* Fila 2: Agrupar + botones de vista */}
-              <div className="flex gap-2 items-center">
-                <div className="flex-1 min-w-0">
-                  <InlineDropdown
-                    label="Agrupar"
-                    valueLabel={groupLabels[groupBy]}
-                    icon={Layers}
-                  >
-                    {({ close }) => (
-                      <>
-                        {Object.entries(groupLabels).map(([key, label]) => (
-                          <DropdownItem
-                            key={key}
-                            active={groupBy === key}
-                            onClick={() => {
-                              setGroupBy(key);
-                              close();
-                            }}
-                          >
-                            {label}
-                          </DropdownItem>
-                        ))}
-                      </>
-                    )}
-                  </InlineDropdown>
-                </div>
-                {/* Grupo de vista: MISMA estructura que WatchingSectionNav
-                    (inline-flex gap-1 p-1, botones px-2.5 py-2 con icono w-4)
-                    para que ocupe EXACTAMENTE el mismo ancho que los 3 botones
-                    de sección de la fila de arriba y las dos filas se alineen. */}
-                <div className="inline-flex h-11 shrink-0 items-center gap-1 rounded-2xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-                  <button
-                    onClick={() => setViewMode("cards")}
-                    className={`flex items-center justify-center rounded-xl px-2.5 py-2 transition-all ${
-                      viewMode === "cards"
-                        ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                        : "text-zinc-400 hover:text-white hover:bg-white/10"
-                    }`}
-                  >
-                    <Film className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setViewMode("poster")}
-                    className={`flex items-center justify-center rounded-xl px-2.5 py-2 transition-all ${
-                      viewMode === "poster"
-                        ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                        : "text-zinc-400 hover:text-white hover:bg-white/10"
-                    }`}
-                  >
-                    <LayoutGrid className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setViewMode("compact")}
-                    className={`flex items-center justify-center rounded-xl px-2.5 py-2 transition-all ${
-                      viewMode === "compact"
-                        ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                        : "text-zinc-400 hover:text-white hover:bg-white/10"
-                    }`}
-                  >
-                    <LayoutList className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </MobileFiltersPanel>
+            </InlineDropdown>
+            <InlineDropdown
+              label="Agrupar"
+              valueLabel={groupLabels[groupBy]}
+              icon={Layers}
+            >
+              {({ close }) => (
+                <>
+                  {Object.entries(groupLabels).map(([key, label]) => (
+                    <DropdownItem
+                      key={key}
+                      active={groupBy === key}
+                      onClick={() => {
+                        setGroupBy(key);
+                        close();
+                      }}
+                    >
+                      {label}
+                    </DropdownItem>
+                  ))}
+                </>
+              )}
+            </InlineDropdown>
+            <SheetOptionGroup label="Vista" icon={LayoutGrid}>
+              <SheetOption icon={Film} active={viewMode === "cards"} onClick={() => setViewMode("cards")}>
+                Tarjetas
+              </SheetOption>
+              <SheetOption icon={LayoutGrid} active={viewMode === "poster"} onClick={() => setViewMode("poster")}>
+                Portadas
+              </SheetOption>
+              <SheetOption icon={LayoutList} active={viewMode === "compact"} onClick={() => setViewMode("compact")}>
+                Compacta
+              </SheetOption>
+            </SheetOptionGroup>
+            {viewMode === "poster" && (
+              <ImageModeSheetGroup value={posterImageMode} onChange={setPosterImageMode} />
+            )}
+          </MobileOptionsSheet>
           </div>
 
           {/* Desktop: Single row */}

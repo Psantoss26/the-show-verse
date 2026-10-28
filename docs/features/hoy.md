@@ -20,7 +20,7 @@ Hoy es una opción más de la barra sticky de Social (`SocialClient`), junto a S
 - **Agrupar:** por título, por persona o por hora.
 - **Vista** (botones de icono): rejilla de carteles o lista. Se recuerda en `localStorage` (`showverse:social:todayLayout`), aparte de la vista de Siguiendo / Yo.
 
-El buscador filtra lo de Hoy por título o persona. En móvil, como el resto de menús, van dentro de `MobileFiltersPanel`. `TodayClient` es controlado: recibe esos valores como props y devuelve los recuentos de los días (`onDaysChange`). `SocialHub` (`src/app/social/SocialHub.jsx`) pone el fondo y la cabecera «Social.» con las cifras (Siguiendo, Seguidores, Activos). Cambiar de opción solo reescribe la URL, sin volver a pedir el RSC.
+El buscador filtra lo de Hoy por título o persona. En móvil, como el resto de menús, van en la hoja de filtros (`MobileOptionsSheet`). `TodayClient` es controlado: recibe esos valores como props y devuelve los recuentos de los días (`onDaysChange`). `SocialHub` (`src/app/social/SocialHub.jsx`) pone el fondo y la cabecera «Social.» con las cifras (Siguiendo, Seguidores, Activos). Cambiar de opción solo reescribe la URL, sin volver a pedir el RSC.
 
 Parámetros de URL (`src/lib/today/params.js`):
 - `scope=following|community`

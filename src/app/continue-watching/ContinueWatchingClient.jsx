@@ -67,8 +67,8 @@ import {
   preloadImage,
 } from "@/lib/dashboard/media";
 import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
-import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
-import { ImageModeSegmented, ImageModeToggleButton } from "@/components/ui/ImageModeSelector";
+import MobileOptionsSheet, { SheetAction, SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
+import { ImageModeSegmented, ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
 import PageStatCard from "@/components/ui/PageStatCard";
 
 // Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
@@ -372,7 +372,16 @@ function StatCard(props) {
 // ----------------------------
 // DROPDOWN (acento ámbar de "Continuar viendo")
 // ----------------------------
-function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
+// Dentro de la hoja de filtros móvil (MobileOptionsSheet) el desplegable se
+// pinta como un grupo con todas sus opciones a la vista.
+function InlineDropdown(props) {
+  if (useInOptionsSheet()) {
+    return <SheetOptionGroup label={props.label} icon={props.icon}>{props.children}</SheetOptionGroup>;
+  }
+  return <InlineDropdownMenu {...props} />;
+}
+
+function InlineDropdownMenu({ label, valueLabel, icon: Icon, children }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const buttonRef = useRef(null);
@@ -491,7 +500,15 @@ function InlineDropdown({ label, valueLabel, icon: Icon, children }) {
   );
 }
 
-function DropdownItem({ active, onClick, children }) {
+// Dentro de la hoja de filtros móvil, cada opción es una píldora.
+function DropdownItem(props) {
+  if (useInOptionsSheet()) {
+    return <SheetOption active={props.active} onClick={props.onClick}>{props.children}</SheetOption>;
+  }
+  return <DropdownMenuItem {...props} />;
+}
+
+function DropdownMenuItem({ active, onClick, children }) {
   return (
     <button
       type="button"
@@ -582,36 +599,6 @@ function EditModeButton({ mode, editMode, setEditMode }) {
     >
       <ModeIcon className="w-4 h-4" />
     </button>
-  );
-}
-
-// Móvil: los dos modos juntos en un segmentado (como Historial/Continuar viendo
-// en la fila del buscador), para que el bloque mida lo mismo que el de arriba.
-function EditModeSegmented({ editMode, setEditMode }) {
-  return (
-    <div className="inline-flex h-11 shrink-0 items-center gap-1 rounded-2xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-      {Object.entries(EDIT_MODE_BUTTONS).map(([mode, config]) => {
-        const active = editMode === mode;
-        const ModeIcon = active ? X : config.Icon;
-        const label = active ? "Salir del modo edición" : config.title;
-        return (
-          <button
-            key={mode}
-            type="button"
-            onClick={() => setEditMode((current) => (current === mode ? null : mode))}
-            title={label}
-            aria-label={label}
-            aria-pressed={active}
-            className={`flex h-full items-center justify-center rounded-xl px-2.5 text-sm font-bold transition-all ${active
-              ? config.segmentActive
-              : "text-zinc-400 hover:text-white hover:bg-white/10"
-              }`}
-          >
-            <ModeIcon className="w-4 h-4" />
-          </button>
-        );
-      })}
-    </div>
   );
 }
 
@@ -1021,8 +1008,7 @@ export default function ContinueWatchingClient() {
   const [imageModeHydrated, setImageModeHydrated] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const filtersRef = useRef(null);
-  const { panelOverlay: filtersSticky, isPinned: filtersPinned } =
-    useStickyToolbarState(filtersRef, mobileFiltersOpen);
+  const { isPinned: filtersPinned } = useStickyToolbarState(filtersRef);
   // null | "remove" | "complete" (ver EditModeButton).
   const [editMode, setEditMode] = useState(null);
   const [busyId, setBusyId] = useState(null);
@@ -1319,137 +1305,98 @@ export default function ContinueWatchingClient() {
               </button>
             </div>
 
-            <MobileFiltersPanel
+            <MobileOptionsSheet
               open={mobileFiltersOpen}
+              onClose={() => setMobileFiltersOpen(false)}
               id="continue-watching-mobile-filters"
-              className={`z-[80] ${
-                filtersSticky ? "absolute left-0 right-0 top-full" : "relative"
-              }`}
-              gapClassName="pt-2"
+              accent="emerald"
             >
-              {/* El bloque de la derecha mide lo mismo (136 px) en las tres filas
-                  (buscador, Ordenar y Tipo): segmentado de 2 + botón suelto, botón
-                  suelto + segmentado de 2, y segmentado de 3 con px-3. */}
-              <div className="space-y-2">
-                {/* Fila 1: Ordenar y acciones de añadir, finalizar y eliminar. */}
-                <div className="flex gap-2">
-                  <div className="flex-1 min-w-0">
-                    <InlineDropdown
-                      label="Ordenar"
-                      valueLabel={sortLabels[sortBy]}
-                      icon={ArrowUpDown}
+              <InlineDropdown
+                label="Tipo"
+                valueLabel={typeLabels[typeFilter]}
+                icon={Film}
+              >
+                {({ close }) => (
+                  <>
+                    {Object.entries(typeLabels).map(([key, label]) => (
+                      <DropdownItem
+                        key={key}
+                        active={typeFilter === key}
+                        onClick={() => {
+                          setTypeFilter(key);
+                          close();
+                        }}
+                      >
+                        {label}
+                      </DropdownItem>
+                    ))}
+                  </>
+                )}
+              </InlineDropdown>
+              <InlineDropdown
+                label="Ordenar"
+                valueLabel={sortLabels[sortBy]}
+                icon={ArrowUpDown}
+              >
+                {({ close }) => (
+                  <>
+                    {Object.entries(sortLabels).map(([key, label]) => (
+                      <DropdownItem
+                        key={key}
+                        active={sortBy === key}
+                        onClick={() => {
+                          setSortBy(key);
+                          close();
+                        }}
+                      >
+                        {label}
+                      </DropdownItem>
+                    ))}
+                  </>
+                )}
+              </InlineDropdown>
+              <SheetOptionGroup label="Vista" icon={LayoutGrid}>
+                <SheetOption icon={Film} active={viewMode === "cards"} onClick={() => setViewMode("cards")}>
+                  Tarjetas
+                </SheetOption>
+                <SheetOption icon={LayoutGrid} active={viewMode === "poster"} onClick={() => setViewMode("poster")}>
+                  Portadas
+                </SheetOption>
+                <SheetOption icon={LayoutList} active={viewMode === "compact"} onClick={() => setViewMode("compact")}>
+                  Compacta
+                </SheetOption>
+              </SheetOptionGroup>
+              {viewMode === "poster" && (
+                <ImageModeSheetGroup value={posterImageMode} onChange={setPosterImageMode} />
+              )}
+              <SheetOptionGroup label="Acciones" layout="stack">
+                <SheetAction
+                  icon={Plus}
+                  onClick={() => {
+                    setMobileFiltersOpen(false);
+                    openAddModal();
+                  }}
+                >
+                  Añadir título
+                </SheetAction>
+                {Object.entries(EDIT_MODE_BUTTONS).map(([mode, config]) => {
+                  const active = editMode === mode;
+                  return (
+                    <SheetAction
+                      key={mode}
+                      icon={active ? X : config.Icon}
+                      tone={mode === "remove" && !active ? "danger" : "default"}
+                      onClick={() => {
+                        setEditMode((current) => (current === mode ? null : mode));
+                        setMobileFiltersOpen(false);
+                      }}
                     >
-                      {({ close }) => (
-                        <>
-                          {Object.entries(sortLabels).map(([key, label]) => (
-                            <DropdownItem
-                              key={key}
-                              active={sortBy === key}
-                              onClick={() => {
-                                setSortBy(key);
-                                close();
-                              }}
-                            >
-                              {label}
-                            </DropdownItem>
-                          ))}
-                        </>
-                      )}
-                    </InlineDropdown>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={openAddModal}
-                    title="Añadir título"
-                    aria-label="Añadir título a Continuar viendo"
-                    className="h-11 w-11 shrink-0 flex items-center justify-center rounded-2xl text-zinc-200 transition-all bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg hover:bg-black/30 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                  <EditModeSegmented editMode={editMode} setEditMode={setEditMode} />
-                </div>
-
-                {/* Fila 2: Tipo y modos de vista compactos. */}
-                <div className="flex gap-2">
-                  <div className="flex-1 min-w-0">
-                    <InlineDropdown
-                      label="Tipo"
-                      valueLabel={typeLabels[typeFilter]}
-                      icon={Film}
-                    >
-                      {({ close }) => (
-                        <>
-                          {Object.entries(typeLabels).map(([key, label]) => (
-                            <DropdownItem
-                              key={key}
-                              active={typeFilter === key}
-                              onClick={() => {
-                                setTypeFilter(key);
-                                close();
-                              }}
-                            >
-                              {label}
-                            </DropdownItem>
-                          ))}
-                        </>
-                      )}
-                    </InlineDropdown>
-                  </div>
-
-                  {/* Imagen de las tarjetas: el botón que alterna de Favoritos
-                      (solo en la vista de pósters). */}
-                  {viewMode === "poster" && (
-                    <ImageModeToggleButton
-                      value={posterImageMode}
-                      onChange={setPosterImageMode}
-                    />
-                  )}
-
-                  <div className="inline-flex h-11 shrink-0 items-center gap-1 rounded-2xl p-1 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg shadow-lg">
-                    <button
-                      type="button"
-                      onClick={() => setViewMode("cards")}
-                      title="Vista de tarjetas"
-                      aria-label="Vista de tarjetas"
-                      aria-pressed={viewMode === "cards"}
-                      className={`flex h-full items-center justify-center rounded-xl px-3 text-sm font-bold transition-all ${viewMode === "cards"
-                        ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                        : "text-zinc-400 hover:text-white hover:bg-white/10"
-                        }`}
-                    >
-                      <Film className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setViewMode("poster")}
-                      title="Vista de portadas"
-                      aria-label="Vista de portadas"
-                      aria-pressed={viewMode === "poster"}
-                      className={`flex h-full items-center justify-center rounded-xl px-3 text-sm font-bold transition-all ${viewMode === "poster"
-                        ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                        : "text-zinc-400 hover:text-white hover:bg-white/10"
-                        }`}
-                    >
-                      <LayoutGrid className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setViewMode("compact")}
-                      title="Vista compacta"
-                      aria-label="Vista compacta"
-                      aria-pressed={viewMode === "compact"}
-                      className={`flex h-full items-center justify-center rounded-xl px-3 text-sm font-bold transition-all ${viewMode === "compact"
-                        ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                        : "text-zinc-400 hover:text-white hover:bg-white/10"
-                        }`}
-                    >
-                      <LayoutList className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </MobileFiltersPanel>
+                      {active ? "Salir del modo edición" : config.title}
+                    </SheetAction>
+                  );
+                })}
+              </SheetOptionGroup>
+            </MobileOptionsSheet>
           </div>
 
           {/* Escritorio: Fila única */}
