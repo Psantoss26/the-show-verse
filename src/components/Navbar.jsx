@@ -3443,11 +3443,15 @@ function NavbarContent() {
               href={item.href}
               prefetch
               {...navPrefetchHandlers(item.href)}
-              className={`${navLinkClassMobileBottom(item.href, item.tone)} !h-11 !w-11 !flex-none`}
+              className={`${navLinkClassMobileBottom(item.href, item.tone)} sv-side-nav-link !h-11 !w-11 !flex-none`}
+              data-tone={item.tone}
               aria-current={active ? "page" : undefined}
               aria-label={label}
               title={label}
             >
+              {/* Hover: lente de cristal del color de la sección que crece
+                  desde el centro (ver `.sv-side-nav-hover` en globals.css). */}
+              <span aria-hidden="true" className="sv-side-nav-hover" />
               <span
                 className={`${mobileBottomIconSlotClass} sv-desktop-side-nav-icon`}
                 style={{ "--sv-side-nav-index": index }}

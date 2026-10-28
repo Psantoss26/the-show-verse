@@ -3608,11 +3608,88 @@ html[data-details-sequence-transition] .sv-topbar {
   transition-delay: calc(140ms + var(--sv-side-nav-index, 0) * 45ms);
 }
 
+/* HOVER DE LOS BOTONES DE LA BARRA LATERAL: el icono crece y toma el color de
+   su sección, y detrás aparece una lente de cristal líquido (desenfoque,
+   brillo especular arriba, sombra interior abajo y halo del tono) que crece
+   desde el centro con un leve rebote. En la sección activa ya está la cápsula
+   (BottomNavActiveLens), así que ahí solo crece el icono.
+   CSS sin capa a propósito: gana a las utilidades del icono (transition-all,
+   drop-shadow) sin `!important`. */
+.sv-side-nav-link {
+  --sv-tone: 255 255 255;
+}
+.sv-side-nav-link[data-tone="gold"] { --sv-tone: 252 211 77; }
+.sv-side-nav-link[data-tone="blue"] { --sv-tone: 125 211 252; }
+.sv-side-nav-link[data-tone="purple"] { --sv-tone: 240 171 252; }
+.sv-side-nav-link[data-tone="green"] { --sv-tone: 110 231 183; }
+.sv-side-nav-link[data-tone="indigo"] { --sv-tone: 165 180 252; }
+.sv-side-nav-link[data-tone="lime"] { --sv-tone: 190 242 100; }
+.sv-side-nav-link[data-tone="red"] { --sv-tone: 248 113 113; }
+.sv-side-nav-link[data-tone="pink"] { --sv-tone: 249 168 212; }
+
+.sv-side-nav-hover {
+  position: absolute;
+  inset: 2px;
+  z-index: 0;
+  border-radius: 9999px;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 22%, rgb(255 255 255 / 0.26), transparent 68%),
+    rgb(var(--sv-tone) / 0.16);
+  box-shadow:
+    inset 0 1px 1.5px rgb(255 255 255 / 0.32),
+    inset 0 -2px 4px rgb(0 0 0 / 0.28),
+    0 4px 14px rgb(0 0 0 / 0.45),
+    0 0 18px rgb(var(--sv-tone) / 0.38);
+  backdrop-filter: blur(12px) saturate(190%) brightness(1.12);
+  transform: scale(0.5);
+  opacity: 0;
+  transition:
+    transform 240ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 180ms ease-out;
+}
+
+.sv-side-nav-link svg {
+  transition:
+    scale 420ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    color 220ms ease-out,
+    filter 220ms ease-out;
+}
+
+@media (hover: hover) {
+  .sv-side-nav-link:hover .sv-side-nav-hover {
+    transform: scale(1);
+    opacity: 1;
+    transition:
+      transform 420ms cubic-bezier(0.34, 1.56, 0.64, 1),
+      opacity 160ms ease-out;
+  }
+
+  .sv-side-nav-link:hover svg {
+    scale: 1.18;
+    color: rgb(var(--sv-tone));
+    filter: drop-shadow(0 0 6px rgb(var(--sv-tone) / 0.55))
+      drop-shadow(0 1px 2px rgb(0 0 0 / 0.6));
+  }
+}
+
+.sv-side-nav-link:focus-visible .sv-side-nav-hover {
+  transform: scale(1);
+  opacity: 1;
+}
+
+.sv-side-nav-link[aria-current="page"] .sv-side-nav-hover {
+  display: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sv-desktop-side-nav,
   .sv-desktop-side-nav[data-shown],
   .sv-desktop-side-nav-icon,
-  .sv-desktop-side-nav[data-shown] .sv-desktop-side-nav-icon {
+  .sv-desktop-side-nav[data-shown] .sv-desktop-side-nav-icon,
+  .sv-side-nav-hover,
+  .sv-side-nav-link svg,
+  .sv-side-nav-link:hover .sv-side-nav-hover {
     transition: none;
   }
 }
