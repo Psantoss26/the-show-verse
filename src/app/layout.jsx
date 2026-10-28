@@ -15,6 +15,7 @@ import OfflineBanner from "@/components/OfflineBanner";
 import ScrollRestoration from "@/components/ScrollRestoration";
 import OverlayRouteHost from "@/components/navigation/OverlayRouteHost";
 import OutsideEmbed from "@/components/navigation/OutsideEmbed";
+import DesktopSideNavInset from "@/components/navigation/DesktopSideNavInset";
 import MobileUserPageSwipeNavigation from "@/components/MobileUserPageSwipeNavigation";
 import MobileTitlePeek from "@/components/preview/MobileTitlePeek";
 import { AVATAR_BOOT_SCRIPT } from "@/components/auth/AvatarBootScript";
@@ -96,14 +97,14 @@ export default function RootLayout({ children, overlay }) {
             <ScrollRestoration />
             <Navbar />
             <MobileUserPageSwipeNavigation>
-              <div
+              <DesktopSideNavInset
                 data-scroll-restoration-root
                 className="relative min-h-[100svh] bg-black pb-[calc(5rem+env(safe-area-inset-bottom))] desktop:pb-0"
               >
                 {/* Fichas abiertas desde la página por encima de ella, que
                     sigue viva debajo (ver OverlayRouteHost). */}
                 <OverlayRouteHost overlay={overlay}>{children}</OverlayRouteHost>
-              </div>
+              </DesktopSideNavInset>
             </MobileUserPageSwipeNavigation>
             <OutsideEmbed>
               <PwaManager />

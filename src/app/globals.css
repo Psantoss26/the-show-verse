@@ -3580,3 +3580,39 @@ html[data-details-sequence-transition] .sv-topbar {
     animation: none;
   }
 }
+
+/* BARRA LATERAL DE ESCRITORIO (Navbar): entrada y salida por el borde
+   izquierdo. Solo `transform`: con `opacity` la barra sería raíz del fondo y su
+   cristal (`backdrop-filter`) se vería plano durante la animación. La
+   posición (fuera / dentro) la pone Navbar en línea; aquí van las curvas. Tras
+   la salida se desmonta (DESKTOP_SIDE_NAV_EXIT_MS).
+   - Entrada: la píldora se desliza con una curva que frena suave y los iconos
+     llegan detrás, escalonados de arriba abajo.
+   - Salida: más corta y acelerando, todo a la vez, sin escalonado. */
+.sv-desktop-side-nav {
+  transition: transform 280ms cubic-bezier(0.55, 0, 0.75, 0.2);
+}
+
+.sv-desktop-side-nav[data-shown] {
+  transition: transform 560ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sv-desktop-side-nav-icon {
+  transform: translate3d(-0.875rem, 0, 0) scale(0.6);
+  transition: transform 200ms cubic-bezier(0.55, 0, 0.75, 0.2);
+}
+
+.sv-desktop-side-nav[data-shown] .sv-desktop-side-nav-icon {
+  transform: none;
+  transition: transform 520ms cubic-bezier(0.34, 1.4, 0.64, 1);
+  transition-delay: calc(140ms + var(--sv-side-nav-index, 0) * 45ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-desktop-side-nav,
+  .sv-desktop-side-nav[data-shown],
+  .sv-desktop-side-nav-icon,
+  .sv-desktop-side-nav[data-shown] .sv-desktop-side-nav-icon {
+    transition: none;
+  }
+}

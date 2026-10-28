@@ -23,3 +23,20 @@ test("la clave antigua «today» se convierte en Social sin perder la barra", ()
   assert.deepEqual(sanitizeMobileBottomNav(["today", "lists"]), ["social", "lists"]);
   assert.deepEqual(sanitizeMobileBottomNav(["today", "social", "lists"]), ["social", "lists"]);
 });
+
+test("desktop side nav hides on dashboards and shows on full-screen pages", async () => {
+  const { showsDesktopSideNav } = await import("./mobileBottomNav.js");
+  for (const path of ["/", "/movies", "/series/", "/dashboard/trending", "/login", "/embed/details/movie/550"]) {
+    assert.equal(showsDesktopSideNav(path), false, path);
+  }
+  for (const path of [
+    "/favorites",
+    "/history",
+    "/details/movie/550",
+    "/details/tv/1399/season/1",
+    "/details/tv/1399/season/1/episode/2",
+    "/movies-and-more",
+  ]) {
+    assert.equal(showsDesktopSideNav(path), true, path);
+  }
+});

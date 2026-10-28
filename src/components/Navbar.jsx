@@ -76,7 +76,7 @@ import {
   getTitleCandidates,
   normalizeSearchText,
 } from "@/lib/search/titleMatching";
-import { getMobileBottomNavItems } from "@/lib/ui/mobileBottomNav";
+import { getMobileBottomNavItems, showsDesktopSideNav } from "@/lib/ui/mobileBottomNav";
 
 // Búsqueda tolerante a erratas: por debajo de esta longitud de consulta el fuzzy
 // es ruido (todo "se parece"), así que se mantiene el comportamiento por substring.
@@ -122,6 +122,10 @@ const MOBILE_BOTTOM_NAV_ICONS = {
   recap: PartyPopper,
   recommendations: ThumbsUp,
 };
+
+// Lo que dura la salida de la barra lateral de escritorio antes de desmontarse
+// (la transición de `.sv-desktop-side-nav` en globals.css, con margen).
+const DESKTOP_SIDE_NAV_EXIT_MS = 320;
 
 const MOBILE_BOTTOM_NAV_ACTIVE_ICON_CLASSES = {
   "in-progress": "fill-emerald-400 text-emerald-300",
@@ -2677,6 +2681,28 @@ function NavbarContent() {
   );
   // Sección activa de la barra inferior y su tono, para la cápsula.
   const mobileBottomActive = mobileBottomItems.find((entry) => isActive(entry.href));
+  // Barra lateral de escritorio. Fuera de sus páginas NO está montada: solo
+  // vive lo que dura su salida. Al entrar se monta fuera de pantalla y pasa a
+  // visible dos fotogramas después (si no, el primer pintado ya sería el estado
+  // final y no se vería entrar); al salir se anima fuera y se desmonta.
+  const desktopSideNavRoute = showsDesktopSideNav(pathname);
+  const [desktopSideNavMounted, setDesktopSideNavMounted] = useState(false);
+  const [desktopSideNavShown, setDesktopSideNavShown] = useState(false);
+  useEffect(() => {
+    if (!desktopSideNavRoute) {
+      setDesktopSideNavShown(false);
+      const timer = window.setTimeout(
+        () => setDesktopSideNavMounted(false),
+        DESKTOP_SIDE_NAV_EXIT_MS,
+      );
+      return () => window.clearTimeout(timer);
+    }
+    setDesktopSideNavMounted(true);
+    let frameId = window.requestAnimationFrame(() => {
+      frameId = window.requestAnimationFrame(() => setDesktopSideNavShown(true));
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [desktopSideNavRoute]);
   const loginHref = `/login?next=${encodeURIComponent(
     pathname || "/",
   )}`;
@@ -3350,6 +3376,93 @@ function NavbarContent() {
           );
         })}
       </nav>
+
+      {/* ===================== BARRA LATERAL (ESCRITORIO) ===================== */}
+      {/* La barra inferior del móvil, en vertical junto al borde izquierdo: las
+          mismas secciones (preferencia de Ajustes), el mismo cristal y la misma
+          cápsula activa, que se coloca con `offsetTop` igual que en horizontal.
+          Solo en páginas a pantalla completa (ver `showsDesktopSideNav`). Va
+          por debajo de la barra superior y de los modales (z-30), así que
+          cualquier capa que tape la página la tapa también a ella. */}
+      {/* ENTRADA Y SALIDA: se desliza desde el borde izquierdo y vuelve a
+          salir por él antes de desmontarse. Solo se anima `transform` (y
+          `translate` es el centrado vertical, aparte): una `opacity` en la
+          barra la convertiría en raíz del fondo y su cristal se vería plano
+          mientras dura la animación. La posición va en línea, no en
+          globals.css, para que la barra nunca quede a la vista fuera de sus
+          páginas aunque falte esa hoja; desde allí solo llegan las curvas y el
+          escalonado de los iconos. Mientras sale es `inert`. */}
+      {desktopSideNavMounted && (
+      <nav
+        aria-label={t("mobile_bottom_nav_label", "Navegación principal")}
+        inert={!desktopSideNavShown}
+        data-shown={desktopSideNavShown ? "" : undefined}
+        style={{
+          transform: desktopSideNavShown
+            ? "none"
+            : "translate3d(calc(-100% - 1.5rem), 0, 0)",
+        }}
+        className={`sv-desktop-side-nav hidden desktop:flex fixed left-4 top-1/2 z-30 w-14 -translate-y-1/2 flex-col items-center gap-1 rounded-full px-1.5 py-2 ${LIQUID_GLASS_BAR}`}
+      >
+        {/* Las mismas capas ópticas que la barra inferior, con la máscara y
+            la luz giradas para una pieza vertical. */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 rounded-[inherit] backdrop-blur-[2px] backdrop-brightness-[1.16] backdrop-saturate-[240%]"
+          style={{
+            WebkitMaskImage:
+              "radial-gradient(135% 115% at 50% 50%, transparent 40%, #000 95%)",
+            maskImage:
+              "radial-gradient(135% 115% at 50% 50%, transparent 40%, #000 95%)",
+          }}
+        />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[linear-gradient(160deg,rgba(255,255,255,0.11)_0%,rgba(255,255,255,0.03)_16%,transparent_40%,transparent_60%,rgba(255,255,255,0.03)_86%,rgba(255,255,255,0.07)_100%)]"
+        />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 rounded-[inherit] bg-[radial-gradient(100%_60%_at_50%_0%,rgba(255,255,255,0.08)_0%,transparent_75%)]"
+        />
+
+        <BottomNavActiveLens
+          activeKey={mobileBottomActive?.href || null}
+          circleClassName={getMobileBottomLensCircleClass(
+            mobileBottomActive?.tone,
+          )}
+        />
+
+        {mobileBottomItems.map((item, index) => {
+          const Icon = MOBILE_BOTTOM_NAV_ICONS[item.key];
+          const active = isActive(item.href);
+          const label = t(item.labelKey, item.fallbackLabel);
+
+          return (
+            <Link
+              key={item.key}
+              href={item.href}
+              prefetch
+              {...navPrefetchHandlers(item.href)}
+              className={`${navLinkClassMobileBottom(item.href, item.tone)} !h-11 !w-11 !flex-none`}
+              aria-current={active ? "page" : undefined}
+              aria-label={label}
+              title={label}
+            >
+              <span
+                className={`${mobileBottomIconSlotClass} sv-desktop-side-nav-icon`}
+                style={{ "--sv-side-nav-index": index }}
+              >
+                <Icon
+                  className={`h-[22px] w-[22px] shrink-0 transform-gpu transition-all duration-300 ease-out drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)] ${active ? MOBILE_BOTTOM_NAV_ACTIVE_ICON_CLASSES[item.key] || "" : ""}`}
+                  strokeWidth={MOBILE_BOTTOM_ICON_STROKE}
+                  style={{ shapeRendering: "geometricPrecision" }}
+                />
+              </span>
+            </Link>
+          );
+        })}
+      </nav>
+      )}
 
       {/* ===================== DRAWER MENÚ (MÓVIL) ===================== */}
       <AnimatePresence>

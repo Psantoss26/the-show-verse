@@ -44,3 +44,24 @@ export function sanitizeMobileBottomNav(value) {
 export function getMobileBottomNavItems(value) {
   return sanitizeMobileBottomNav(value).map((key) => itemByKey.get(key));
 }
+
+// BARRA LATERAL DE ESCRITORIO: las mismas secciones que la inferior del móvil,
+// en vertical junto al borde izquierdo. Solo va en las páginas a pantalla
+// completa (páginas de usuario, fichas, temporadas y episodios). Los dashboards
+// ya tienen sus pestañas en la barra superior y su hero ocupa ese borde; el
+// acceso y el alta no navegan por secciones, y la ficha del panel lateral
+// (`/embed/details/...`) no lleva barras.
+const DESKTOP_SIDE_NAV_HIDDEN = [
+  /^\/$/,
+  /^\/movies\/?$/,
+  /^\/series\/?$/,
+  /^\/dashboard(?:\/|$)/,
+  /^\/login(?:\/|$)/,
+  /^\/auth(?:\/|$)/,
+  /^\/embed(?:\/|$)/,
+];
+
+export function showsDesktopSideNav(pathname) {
+  const path = pathname || "/";
+  return !DESKTOP_SIDE_NAV_HIDDEN.some((pattern) => pattern.test(path));
+}
