@@ -10,7 +10,7 @@
 // ficha, que ya los tiene cargados; el equipo técnico y las notas de IMDb de
 // recomendaciones se piden aquí al abrir su vista, con caché compartida.
 
-import { startTransition, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import {
   Check,
@@ -36,6 +36,13 @@ import {
 import OptimizedImage from "@/components/OptimizedImage";
 import { COMMENT_TABS, DEFAULT_COMMENT_TAB, normalizeCommentFilters } from "@/lib/details/commentFilters";
 import { tmdbSrcSet } from "@/lib/tmdb/imageSrcSet";
+import {
+  animateArtworkRowHeight,
+  artworkImagesReady,
+  fadeOutArtworkRow,
+  playArtworkRowEntrance,
+  preloadArtworkImages,
+} from "@/lib/details/artworkRowTransition";
 import SectionSheet, { SHEET_CONTROL, SectionSheetEmpty, SectionSheetGroupTitle } from "./SectionSheet";
 import { ListRow, PersonRow, TitleRow, TrackRow, VideoRow } from "./SectionSheetRows";
 import { AwardRow } from "@/components/details/AwardCard";
@@ -408,6 +415,19 @@ function languageLabel(code) {
   }
 }
 
+// `src`, `srcSet` y `sizes` de una tarjeta de la cuadrícula: los mismos en la
+// tarjeta y en su precarga (ver `artworkRowTransition`).
+function sheetCardImage(image, { isPoster, isLogo }) {
+  return {
+    src: `https://image.tmdb.org/t/p/${isPoster ? "w342" : isLogo ? "w500" : "w780"}${image.file_path}`,
+    srcSet: isLogo ? undefined : tmdbSrcSet(image.file_path, isPoster ? "poster" : "backdrop"),
+    sizes: isPoster ? "(min-width: 640px) 250px, 48vw" : "(min-width: 640px) 400px, 75vw",
+  };
+}
+// Tarjetas que se esperan antes de cambiar de cuadrícula: la primera pantalla
+// de un teléfono alto (5 filas de 3 pósters u 8 de 2 apaisadas) y la que asoma.
+const SHEET_PRELOAD_COUNT = 18;
+
 export function ImagesSheet({ meta, data, onClose, tab, setTab }) {
   // Pestañas ya calculadas por la ficha (lib/details/artworkSheetTabs): las
   // mismas que su galería, con la imagen elegida primero.
@@ -446,6 +466,59 @@ export function ImagesSheet({ meta, data, onClose, tab, setTab }) {
     setLanguage("all");
     setTab(id);
   };
+  // Al cambiar de tipo de imagen o de idioma, la cuadrícula anterior se queda
+  // hasta que la nueva tiene su primera pantalla descargada y decodificada;
+  // entonces se apaga y la nueva entra en cascada. Antes se cambiaba al
+  // momento y las tarjetas salían en negro hasta pintar su imagen.
+  const gridKey = `${current?.id ?? ""}|${language}`;
+  const gridRef = useRef(null);
+  const [shownGrid, setShownGrid] = useState(() => ({ key: gridKey, images, current }));
+  const gridStale = shownGrid.key !== gridKey;
+  const gridEntranceRef = useRef(null);
+  const latestGridRef = useRef(null);
+  // Va ANTES del efecto de abajo (los efectos corren en orden): ese lee la
+  // cuadrícula de este render sin depender de ella.
+  useEffect(() => {
+    latestGridRef.current = { key: gridKey, images, current, isPoster, isLogo };
+  });
+  useEffect(() => {
+    if (!gridStale) return undefined;
+    const target = latestGridRef.current;
+    const pending = target.images
+      .slice(0, SHEET_PRELOAD_COUNT)
+      .map((image) => sheetCardImage(image, target));
+    let cancelled = false;
+    const commit = async () => {
+      const grid = gridRef.current;
+      const fromHeight = grid?.getBoundingClientRect().height || 0;
+      await fadeOutArtworkRow(grid);
+      if (cancelled) return;
+      gridEntranceRef.current = { key: target.key, fromHeight };
+      setShownGrid({ key: target.key, images: target.images, current: target.current });
+    };
+    if (!pending.length || artworkImagesReady(pending)) commit();
+    else preloadArtworkImages(pending).then(() => !cancelled && commit());
+    return () => {
+      cancelled = true;
+    };
+  }, [gridStale, gridKey]);
+  useLayoutEffect(() => {
+    const entrance = gridEntranceRef.current;
+    if (!entrance || entrance.key !== shownGrid.key || gridStale) return;
+    gridEntranceRef.current = null;
+    const grid = gridRef.current;
+    if (!grid) return;
+    // La entrada cancela antes el apagado: el alto, después.
+    const toHeight = grid.getBoundingClientRect().height;
+    playArtworkRowEntrance(grid, grid.querySelectorAll(":scope > li"), { stagger: 25 });
+    animateArtworkRowHeight(grid, entrance.fromHeight, toHeight);
+  }, [shownGrid, gridStale]);
+  // Mientras tanto se ve la anterior (sin poder pulsarla: es de otro tipo).
+  // Si ya es la misma, la de este render: trae el orden y la elegida al día.
+  const gridImages = gridStale ? shownGrid.images : images;
+  const gridCurrent = gridStale ? shownGrid.current : current;
+  const gridIsPoster = gridCurrent?.aspect === "poster";
+  const gridIsLogo = gridCurrent?.aspect === "logo";
   // El botón junto a las pestañas abre los filtros en la hoja inferior
   // (MobileOptionsSheet). Elegir un filtro reordena la galería en una
   // transición, para que la píldora responda en el mismo toque.
@@ -533,18 +606,23 @@ export function ImagesSheet({ meta, data, onClose, tab, setTab }) {
           <div className="flex justify-center py-12">
             <Loader2 className="h-6 w-6 animate-spin text-zinc-500" aria-label="Cargando imágenes" />
           </div>
-        ) : images.length ? (
-          <ul className={`grid gap-2.5 sm:gap-3 ${isPoster ? "grid-cols-3" : "grid-cols-2"}`}>
-            {images.map((image) => {
-              const active = image.file_path === current.activePath;
+        ) : gridImages.length ? (
+          <ul
+            ref={gridRef}
+            aria-busy={gridStale || undefined}
+            className={`grid gap-2.5 sm:gap-3 ${gridIsPoster ? "grid-cols-3" : "grid-cols-2"} ${gridStale ? "pointer-events-none" : ""}`}
+          >
+            {gridImages.map((image) => {
+              const active = image.file_path === gridCurrent.activePath;
+              const card = sheetCardImage(image, { isPoster: gridIsPoster, isLogo: gridIsLogo });
               const resolution = image.width && image.height ? `${image.width}×${image.height}` : null;
-              const badge = [isPoster ? null : image.iso_639_1?.toUpperCase(), resolution].filter(Boolean).join(" · ");
+              const badge = [gridIsPoster ? null : image.iso_639_1?.toUpperCase(), resolution].filter(Boolean).join(" · ");
               return (
                 <li key={image.file_path} className="relative">
                   <button
                     type="button"
                     onClick={() => {
-                      if (!active) onSelect?.(current.kind, image.file_path);
+                      if (!active) onSelect?.(gridCurrent.kind, image.file_path);
                     }}
                     aria-pressed={active}
                     aria-label={`${active ? "Seleccionada" : "Seleccionar"}${resolution ? ` (${resolution})` : ""}`}
@@ -555,16 +633,16 @@ export function ImagesSheet({ meta, data, onClose, tab, setTab }) {
                     }`}
                   >
                     <span
-                      className={`block ${isPoster ? "aspect-[2/3]" : "aspect-video"} ${
-                        isLogo ? "bg-[repeating-conic-gradient(#27272a_0%_25%,#18181b_0%_50%)] bg-[length:16px_16px] p-4" : ""
+                      className={`block ${gridIsPoster ? "aspect-[2/3]" : "aspect-video"} ${
+                        gridIsLogo ? "bg-[repeating-conic-gradient(#27272a_0%_25%,#18181b_0%_50%)] bg-[length:16px_16px] p-4" : ""
                       }`}
                     >
                       <OptimizedImage
-                        src={`https://image.tmdb.org/t/p/${isPoster ? "w342" : isLogo ? "w500" : "w780"}${image.file_path}`}
-                        srcSet={isLogo ? undefined : tmdbSrcSet(image.file_path, isPoster ? "poster" : "backdrop")}
-                        sizes={isPoster ? "(min-width: 640px) 250px, 48vw" : "(min-width: 640px) 400px, 75vw"}
+                        src={card.src}
+                        srcSet={card.srcSet}
+                        sizes={card.sizes}
                         alt=""
-                        className={`h-full w-full ${isLogo ? "object-contain" : "object-cover"} transition-transform duration-500 group-hover/img:scale-[1.03]`}
+                        className={`h-full w-full ${gridIsLogo ? "object-contain" : "object-cover"} transition-transform duration-500 group-hover/img:scale-[1.03]`}
                         loading="lazy"
                         decoding="async"
                       />

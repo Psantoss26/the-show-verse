@@ -9,11 +9,12 @@
 // solo con `transform`: un fundido de opacidad sobre el panel lo convertiría en
 // raíz de backdrop y aplanaría el cristal mientras dura (ver liquidGlass).
 
-import { useEffect, useId, useLayoutEffect, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Search, X } from "lucide-react";
 import useModalGuard from "@/hooks/useModalGuard";
 import { LIQUID_GLASS_MODAL_HEADER, LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
+import { placeTabPill } from "@/lib/details/artworkRowTransition";
 
 // Superficie de los controles del panel (barra de pestañas, buscador, botones
 // de filtros): la misma de cristal que los desplegables de filtros
@@ -91,12 +92,16 @@ export default function SectionSheet({
   const titleId = useId();
   const [portalReady, setPortalReady] = useState(false);
   useEffect(() => setPortalReady(true), []);
-  const { tabsRef, measureRef, shownTabs, isTabActive } = useOverflowTabs({
+  const { tabsEl, tabsRef, measureRef, shownTabs, isTabActive } = useOverflowTabs({
     tabs,
     activeTab,
     overflow: tabsOverflow,
     onOverflowChange: onTabsOverflowChange,
   });
+  const pillRef = useTabPill(
+    tabsEl,
+    `${activeTab ?? ""}\u0000${shownTabs.map((tab) => tab.id).join("\u0000")}`,
+  );
   const close = () => {
     if (!closeDisabled) onClose?.();
   };
@@ -183,8 +188,15 @@ export default function SectionSheet({
               ref={tabsRef}
               role="tablist"
               aria-label={title}
-              className={`flex min-w-0 flex-1 gap-1 overflow-x-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${SHEET_CONTROL}`}
+              className={`relative flex min-w-0 flex-1 gap-1 overflow-x-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${SHEET_CONTROL}`}
             >
+              {/* Pastilla de la pestaña activa: se desliza entre pestañas
+                  (solo transform y ancho; ver `useTabPill`). */}
+              <span
+                ref={pillRef}
+                aria-hidden="true"
+                className="pointer-events-none absolute left-0 top-1 bottom-1 rounded-xl bg-white/15 opacity-0 transition-[transform,width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+              />
               {shownTabs.map((tab) => {
                 const active = isTabActive(tab);
                 return (
@@ -194,8 +206,8 @@ export default function SectionSheet({
                     role="tab"
                     aria-selected={active}
                     onClick={() => onTabChange?.(tab.id)}
-                    className={`flex min-h-9 flex-1 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-3 text-xs font-bold transition ${
-                      active ? "bg-white/15 text-white" : "text-zinc-400 hover:bg-white/5 hover:text-white"
+                    className={`relative flex min-h-9 flex-1 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-3 text-xs font-bold transition-colors duration-300 ${
+                      active ? "text-white" : "text-zinc-400 hover:bg-white/5 hover:text-white"
                     }`}
                   >
                     {tab.label}
@@ -334,6 +346,7 @@ function useOverflowTabs({ tabs, activeTab, overflow, onOverflowChange }) {
 
   if (!enabled) {
     return {
+      tabsEl,
       tabsRef,
       measureRef: null,
       shownTabs: Array.isArray(tabs) ? tabs : [],
@@ -357,5 +370,31 @@ function useOverflowTabs({ tabs, activeTab, overflow, onOverflowChange }) {
     : tabs;
   const isTabActive = (tab) =>
     tab.id === activeTab || (tab.id === overflow.id && foldedIds.has(activeTab));
-  return { tabsRef, measureRef, shownTabs, isTabActive };
+  return { tabsEl, tabsRef, measureRef, shownTabs, isTabActive };
+}
+
+// Coloca la pastilla de la pestaña activa bajo su botón: se desliza al cambiar
+// de pestaña y, si la nueva queda fuera de la barra (se desplaza de lado),
+// la trae a la vista. Al abrir y al cambiar de tamaño, sin animar.
+function useTabPill(tabsEl, activeKey) {
+  const [pillEl, pillRef] = useState(null);
+  const placedRef = useRef(false);
+  useLayoutEffect(() => {
+    if (!tabsEl || !pillEl) return;
+    const button = tabsEl.querySelector('[role="tab"][aria-selected="true"]');
+    const animate = placedRef.current;
+    placeTabPill(pillEl, button, { animate });
+    if (!button?.offsetWidth) return;
+    if (animate) button.scrollIntoView?.({ block: "nearest", inline: "nearest", behavior: "smooth" });
+    placedRef.current = true;
+  }, [tabsEl, pillEl, activeKey]);
+  useEffect(() => {
+    if (!tabsEl || !pillEl || typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(() => {
+      placeTabPill(pillEl, tabsEl.querySelector('[role="tab"][aria-selected="true"]'), { animate: false });
+    });
+    observer.observe(tabsEl);
+    return () => observer.disconnect();
+  }, [tabsEl, pillEl]);
+  return pillRef;
 }

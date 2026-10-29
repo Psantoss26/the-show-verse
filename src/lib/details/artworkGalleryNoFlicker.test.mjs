@@ -11,8 +11,22 @@ const source = await readFile(new URL("../../components/DetailsClient.jsx", impo
 test("la precarga de la galería depende de qué imágenes hay, no de su orden", () => {
   assert.match(source, /const artworkRowIdentity = useMemo\(/);
   assert.match(source, /\.sort\(\),\s*\]\.join\("\|"\)/, "la identidad ordena las rutas: ignora el orden");
-  assert.match(source, /\}, \[imagesLoading, artworkRowIdentity, artworkPreloadCount\]\);/);
+  // El relevo de la fila (ArtworkRowSwap) depende de la identidad.
+  assert.match(source, /identity=\{artworkRowIdentity\}/);
+  assert.match(source, /\}, \[imagesLoading, identity, rowRef\]\);/);
   assert.doesNotMatch(source, /\}, \[imagesLoading, artworkSelection, artworkPreloadCount\]\);/);
+});
+
+// Al cambiar de tipo de imagen o de filtro, la fila anterior se queda hasta
+// tener descargadas las nuevas con el MISMO srcset que las tarjetas (con otra
+// URL la tarjeta volvía a esperar y salía en negro), y el relevo es estado de
+// la fila, no de la ficha entera (su render cortaba la animación).
+test("cambiar de tipo releva la fila sin esqueleto ni tarjetas en negro", () => {
+  assert.match(source, /function ArtworkRowSwap\(/);
+  assert.match(source, /const \[shown, setShown\] = useState\(null\);/);
+  assert.match(source, /artworkCardImage\(rowArtworkSelection, filePath\)/);
+  assert.match(source, /\.map\(\(filePath\) => artworkCardImage\(selection, filePath\)\)/);
+  assert.doesNotMatch(source, /setShownArtwork/);
 });
 
 test("al elegir una imagen se captura la posición para la animación FLIP", () => {

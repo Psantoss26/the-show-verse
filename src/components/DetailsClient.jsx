@@ -347,6 +347,15 @@ import ExternalLinksModal from "@/components/details/ExternalLinksModal";
 import SeasonsSection from "@/components/details/SeasonsSection";
 import { buildArtworkSheetTabs } from "@/lib/details/artworkSheetTabs";
 import {
+  animateArtworkRowHeight,
+  artworkImagesReady,
+  createControlsFlip,
+  fadeOutArtworkRow,
+  placeTabPill,
+  playArtworkRowEntrance,
+  preloadArtworkImages,
+} from "@/lib/details/artworkRowTransition";
+import {
   DETAILS_GALLERY_BACKDROP_SIZES,
   DETAILS_GALLERY_POSTER_SIZES,
   DETAILS_POSTER_ROW_SIZES,
@@ -376,6 +385,148 @@ import ListCountPills from "@/components/lists/ListCountPills";
 
 // Clave de API de TMDb inyectada como variable de entorno publica
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+
+// `src`, `srcSet` y `sizes` de una tarjeta de «Portadas y fondos». Los usan la
+// tarjeta y su precarga: tienen que ser los mismos para que el navegador elija
+// el mismo candidato y la tarjeta lo encuentre ya descargado.
+function artworkCardImage({ isPoster, isLogoTab, size }, filePath) {
+  return {
+    src: `https://image.tmdb.org/t/p/${size}${filePath}`,
+    srcSet: isPoster
+      ? tmdbSrcSet(filePath, "poster")
+      : isLogoTab
+        ? `https://image.tmdb.org/t/p/w185${filePath} 185w, https://image.tmdb.org/t/p/w500${filePath} 500w, https://image.tmdb.org/t/p/original${filePath} 1000w`
+        : tmdbSrcSet(filePath, "backdrop"),
+    sizes: isPoster
+      ? DETAILS_GALLERY_POSTER_SIZES
+      : isLogoTab
+        ? "(max-width: 640px) 50vw, (max-width: 1024px) 30vw, 240px"
+        : DETAILS_GALLERY_BACKDROP_SIZES,
+  };
+}
+
+// Fila de «Portadas y fondos» con relevo suave. Al cambiar de tipo de imagen o
+// de filtro (`identity`), la fila que se ve se queda hasta que la nueva tiene
+// sus primeras imágenes descargadas y decodificadas (`preloadImages`, con el
+// mismo `srcset` que la tarjeta: ver `artworkCardImage`); entonces se apaga y
+// la nueva entra en cascada, sin esqueletos ni tarjetas en negro. El esqueleto
+// solo sale la primera vez, cuando aún no hay ninguna fila que enseñar.
+//
+// La fila que se ve es estado de ESTE componente y no de DetailsClient: el
+// relevo vuelve a pintar solo la fila (con la ficha entera eran ~70 ms de
+// render en mitad de la animación). `render(selection, tab, stale)` pinta la
+// fila con la ficha; mientras `stale`, la anterior, sin poder pulsarla (sus
+// tarjetas son de otro tipo de imagen).
+function ArtworkRowSwap({
+  identity,
+  selection,
+  tab,
+  imagesLoading,
+  ready,
+  onReady,
+  rowRef,
+  preloadImages,
+  render,
+}) {
+  const [shown, setShown] = useState(null);
+  // Durante la entrada solo se montan las tarjetas que se ven (y unas pocas
+  // más): montar las 100-140 de golpe eran ~70 ms de render y estilos en
+  // mitad del relevo. El resto, al terminar la entrada.
+  const [mountLimit, setMountLimit] = useState(null);
+  const entranceRef = useRef(null);
+  const latestRef = useRef(null);
+  // Va ANTES del efecto de abajo (los efectos corren en orden): ese lee los
+  // datos de este render sin depender de ellos.
+  useEffect(() => {
+    latestRef.current = { identity, selection, tab, ready, shown, onReady, preloadImages };
+  });
+
+  // SOLO cuando cambia QUÉ imágenes hay, nunca al elegir una: elegir la
+  // reordena (animación FLIP de DetailsClient) con la fila ya a la vista.
+  useEffect(() => {
+    if (typeof window === "undefined" || imagesLoading) return undefined;
+    const latest = latestRef.current;
+    const target = { identity: latest.identity, selection: latest.selection, tab: latest.tab };
+    const images = latest.preloadImages(target.selection);
+
+    let cancelled = false;
+    const commit = async () => {
+      const row = rowRef.current;
+      const current = latestRef.current;
+      // Primera fila (o vuelta atrás con la fila restaurada), o la misma que
+      // ya se ve (p. ej. al volver a la pestaña antes del relevo): sin
+      // transición.
+      if (!current.ready || !row || current.shown?.identity === target.identity) {
+        row?.getAnimations?.().forEach((animation) => animation.cancel());
+        setMountLimit(null);
+        setShown(target);
+        if (!current.ready) current.onReady();
+        return;
+      }
+      const fromHeight = row.getBoundingClientRect().height;
+      await fadeOutArtworkRow(row);
+      if (cancelled) return;
+      entranceRef.current = { identity: target.identity, fromHeight };
+      setMountLimit(images.length + 4);
+      setShown(target);
+    };
+
+    if (!images.length || artworkImagesReady(images)) {
+      commit();
+    } else {
+      preloadArtworkImages(images).then(() => {
+        if (!cancelled) commit();
+      });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [imagesLoading, identity, rowRef]);
+
+  const stale = ready && !!shown && shown.identity !== identity;
+
+  // Si la nueva tarda (red lenta), la anterior se atenúa: la pestaña ya
+  // cambió y así se ve que está cargando. Con WAAPI, como el apagado que la
+  // sigue, para que una transición CSS no se cruce con él.
+  useEffect(() => {
+    if (!stale) return undefined;
+    const row = rowRef.current;
+    if (!row?.animate) return undefined;
+    const timer = setTimeout(() => {
+      row.animate([{ opacity: 0.55 }], { duration: 260, easing: "ease-out", fill: "forwards" });
+    }, 180);
+    return () => clearTimeout(timer);
+  }, [stale, rowRef]);
+
+  // Entrada de la fila nueva, ya en el DOM y antes de pintarla: cascada de
+  // tarjetas y alto animado (póster ↔ apaisada). La entrada cancela antes el
+  // apagado de la fila; el alto, después.
+  useLayoutEffect(() => {
+    const entrance = entranceRef.current;
+    if (!entrance || stale || entrance.identity !== shown?.identity) return;
+    entranceRef.current = null;
+    const row = rowRef.current;
+    if (!row) return;
+    // Sin `swiper.update()`: Swiper ya se recoloca al montar o al cambiar sus
+    // diapositivas, y aquí solo añadiría otro layout forzado de la ficha.
+    const toHeight = row.getBoundingClientRect().height;
+    playArtworkRowEntrance(row, row.querySelectorAll("[data-artwork-path]"));
+    animateArtworkRowHeight(row, entrance.fromHeight, toHeight);
+  }, [shown, stale, rowRef]);
+
+  useEffect(() => {
+    if (mountLimit == null) return undefined;
+    const timer = setTimeout(() => setMountLimit(null), 700);
+    return () => clearTimeout(timer);
+  }, [mountLimit, shown]);
+
+  return render(
+    stale ? shown.selection : selection,
+    stale ? shown.tab : tab,
+    stale,
+    stale ? null : mountLimit,
+  );
+}
 const SOUNDTRACK_ALGORITHM_VERSION = "soundtrack-ranking-v47";
 const EMPTY_SOUNDTRACK_TRACKS = [];
 const DETAILS_ROUTE_TRANSITION_KEY = "showverse:details-route-transition";
@@ -2582,6 +2733,57 @@ export default function DetailsClient({
     setResMenuOpen(false);
   }, [activeImagesTab]);
 
+  // Barra de filtros de «Portadas y fondos» (escritorio): la pastilla de la
+  // pestaña activa se desliza entre botones y, al cambiar de tipo, los
+  // controles que se mueven (ES/EN solo existe en Portada, Backdrop y Logo) se
+  // deslizan a su sitio en vez de saltar (FLIP: `capture` antes, `play` tras
+  // pintar).
+  const artworkControlsBarRef = useRef(null);
+  const artworkTabsRef = useRef(null);
+  const artworkTabPillRef = useRef(null);
+  const [artworkControlsFlip] = useState(createControlsFlip);
+  const artworkTabPillPlacedRef = useRef(false);
+  const selectArtworkTab = (tab) => {
+    if (tab === activeImagesTab) return;
+    artworkControlsFlip.capture(artworkControlsBarRef.current);
+    // La pastilla sale ya, en el clic: el render de la ficha que sigue (~50 ms)
+    // no la retrasa.
+    placeTabPill(
+      artworkTabPillRef.current,
+      artworkTabsRef.current?.querySelector(`[data-artwork-tab="${tab}"]`),
+    );
+    setActiveImagesTab(tab);
+  };
+  useLayoutEffect(() => {
+    artworkControlsFlip.play(artworkControlsBarRef.current);
+    const tabs = artworkTabsRef.current;
+    const button = tabs?.querySelector(`[data-artwork-tab="${activeImagesTab}"]`);
+    placeTabPill(artworkTabPillRef.current, button, {
+      animate: artworkTabPillPlacedRef.current,
+    });
+    if (button?.offsetWidth) artworkTabPillPlacedRef.current = true;
+  }, [activeImagesTab, artworkControlsFlip]);
+  // La sección se monta al acercarse (después de este efecto) y, oculta en el
+  // móvil (`hidden sm:flex`), mide 0: la pastilla se coloca al montar la barra
+  // y cada vez que cambia de tamaño, sin animar.
+  const artworkTabsObserverRef = useRef(null);
+  const setArtworkTabsNode = useCallback((node) => {
+    artworkTabsRef.current = node;
+    artworkTabsObserverRef.current?.disconnect();
+    artworkTabsObserverRef.current = null;
+    if (!node) return;
+    const place = () => {
+      const button = node.querySelector('[data-artwork-tab][aria-pressed="true"]');
+      placeTabPill(artworkTabPillRef.current, button, { animate: false });
+      if (button?.offsetWidth) artworkTabPillPlacedRef.current = true;
+    };
+    place();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(place);
+    observer.observe(node);
+    artworkTabsObserverRef.current = observer;
+  }, []);
+
   // -- Utilidades de resolucion de imagen --
 
   // Devuelve el lado mas largo de una imagen (ancho o alto)
@@ -3082,88 +3284,18 @@ export default function DetailsClient({
     [activeImagesTab, artworkSelection.size, artworkSelection.ordered],
   );
 
-  // Precarga las primeras N imagenes de la fila actual.
-  // No muestra el carrusel hasta que todas las imagenes visibles esten cargadas
-  // para evitar que aparezcan una por una (efecto "pop-in").
-  //
-  // SOLO cuando cambia QUÉ imágenes hay (pestaña, filtros, galería), nunca al
-  // elegir una. Antes dependía de `artworkSelection` entero: al elegir la
-  // primera vez, la comprobación de caché de abajo pedía `w342`/`w780` mientras
-  // que las tarjetas cargan por `srcSet` (otra URL), daba "no cargada", y el
-  // carrusel se cambiaba por el esqueleto hasta descargarlas: se desmontaba
-  // (adiós animación) y volvía a aparecer, un parpadeo. La segunda vez ya
-  // estaban en caché y no pasaba. Al reordenar, todas esas tarjetas ya se están
-  // viendo: no hay nada que esperar.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    // Mientras las imagenes de TMDb estan cargando, ocultamos el carrusel
-    if (imagesLoading) {
-      setArtworkRowReady(false);
-      return;
-    }
-
-    const { ordered, size, isPoster } = artworkSelection;
-    if (!ordered || ordered.length === 0) {
-      setArtworkRowReady(true);
-      return;
-    }
-
-    const limit = Math.max(1, Math.min(ordered.length, artworkPreloadCount));
-    const urls = [];
-    for (let i = 0; i < limit; i += 1) {
-      const fp = ordered[i]?.file_path;
-      if (!fp) continue;
-      // Precarga rapida (cache en memoria JS)
-      preloadTmdb(fp, size);
-      // Tambien esperamos la carga real del navegador
-      urls.push(`https://image.tmdb.org/t/p/${size}${fp}`);
-    }
-
-    if (!urls.length) {
-      setArtworkRowReady(true);
-      return;
-    }
-
-    // Si las imagenes ya estan en cache del navegador, mostrar inmediatamente
-    const isCached = urls.every((url) => {
-      const img = new Image();
-      img.src = url;
-      return img.complete;
-    });
-
-    if (isCached) {
-      setArtworkRowReady(true);
-      return;
-    }
-
-    let cancelled = false;
-    setArtworkRowReady(false);
-
-    let done = 0;
-    const finishOne = () => {
-      done += 1;
-      if (!cancelled && done >= urls.length) setArtworkRowReady(true);
-    };
-
-    for (const url of urls) {
-      const img = new Image();
-      img.decoding = "async";
-      try {
-        img.fetchPriority = "high";
-      } catch {}
-      img.onload = finishOne;
-      img.onerror = finishOne; // Si una falla, no bloqueamos toda la fila
-      img.src = url;
-    }
-
-    return () => {
-      cancelled = true;
-    };
-    // `artworkSelection` se lee de este render a propósito: lo que dispara la
-    // precarga es `artworkRowIdentity`, que lo resume sin el orden (ver arriba).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imagesLoading, artworkRowIdentity, artworkPreloadCount]);
+  // Imágenes que se esperan antes de enseñar una fila (ver `ArtworkRowSwap`):
+  // las que caben en la de ESA pestaña (+1, la que asoma). No se usa
+  // `artworkPreloadCount`, que aún es el de la pestaña anterior.
+  const artworkRowPreloadImages = (selection) => {
+    const { ordered, isPoster } = selection;
+    const visibleCount = getArtworkSlidesPerView(window.innerWidth, isPoster) + 1;
+    return (ordered || [])
+      .slice(0, visibleCount)
+      .map((img) => img?.file_path)
+      .filter(Boolean)
+      .map((filePath) => artworkCardImage(selection, filePath));
+  };
 
   // Recalcula cuantas imagenes precargar al cambiar el tamano del viewport
   useEffect(() => {
@@ -11897,23 +12029,39 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           {/* Desktop: Tabs + Filtros en línea | Móvil: Botón que abre modal */}
                           <div className="self-start shrink-0 flex items-center gap-2 sm:gap-3 h-10 md:h-11">
                             {/* VERSIÓN DESKTOP: Tabs y filtros visibles */}
-                            <div className="hidden sm:flex items-center gap-3 flex-wrap justify-end h-10 md:h-11">
+                            <div
+                              ref={artworkControlsBarRef}
+                              className="relative hidden sm:flex items-center gap-3 flex-wrap justify-end h-10 md:h-11"
+                            >
                               {/* Tabs de tipo de imagen: Portada, Backdrop (con idioma:
                                   portada en modo backdrop y tarjetas backdrop), Fondo y
                                   Logo. «Vista previa» (el backdrop de DetailModal) se
                                   edita desde el botón Editar del propio DetailModal. */}
-                              <div className="flex isolate transform-gpu items-center rounded-2xl p-1 w-fit h-10 md:h-11 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
+                              <div
+                                ref={setArtworkTabsNode}
+                                data-flip-id="tabs"
+                                className="relative flex isolate transform-gpu items-center rounded-2xl p-1 w-fit h-10 md:h-11 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]"
+                              >
+                                {/* Pastilla de la pestaña activa: se desliza
+                                    (`placeTabPill`), solo transform y ancho. */}
+                                <span
+                                  ref={artworkTabPillRef}
+                                  aria-hidden="true"
+                                  className="pointer-events-none absolute left-0 top-1 bottom-1 rounded-xl bg-white/10 shadow-md opacity-0 transition-[transform,width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+                                />
                                 {["posters", "cardBackdrops", "background", "logos"].map(
                                   (tab) => (
                                     <button
                                       key={tab}
                                       type="button"
-                                      onClick={() => setActiveImagesTab(tab)}
-                                      className={`h-8 md:h-9 px-3 rounded-xl text-xs font-semibold transition-all
+                                      data-artwork-tab={tab}
+                                      aria-pressed={activeImagesTab === tab}
+                                      onClick={() => selectArtworkTab(tab)}
+                                      className={`relative h-8 md:h-9 px-3 rounded-xl text-xs font-semibold transition-colors duration-300
               ${
                 activeImagesTab === tab
-                  ? "bg-white/10 text-white shadow-md"
-                  : "text-zinc-400 hover:text-white hover:bg-white/10"
+                  ? "text-white"
+                  : "text-zinc-400 hover:text-white hover:bg-white/5"
               }`}
                                       style={{
                                         WebkitTapHighlightColor: "transparent",
@@ -11932,7 +12080,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               </div>
 
                               {/* Resolución (sin label superior) */}
-                              <div ref={resMenuRef} className="relative">
+                              <div ref={resMenuRef} data-flip-id="res" className="relative">
                                 <button
                                   type="button"
                                   onClick={() => setResMenuOpen((v) => !v)}
@@ -12023,6 +12171,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               {activeImagesTab !== "background" &&
                                 activeImagesTab !== "backdrops" && (
                                 <div
+                                  data-flip-id="lang"
                                   className="flex isolate transform-gpu rounded-2xl p-1 h-10 md:h-11 items-center bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]"
                                   aria-label="Idioma"
                                 >
@@ -12079,7 +12228,16 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           </div>
                         )}
 
-                        {(() => {
+                        <ArtworkRowSwap
+                          identity={artworkRowIdentity}
+                          selection={artworkSelection}
+                          tab={activeImagesTab}
+                          imagesLoading={imagesLoading}
+                          ready={artworkRowReady}
+                          onReady={() => setArtworkRowReady(true)}
+                          rowRef={artworkRowRef}
+                          preloadImages={artworkRowPreloadImages}
+                          render={(rowArtworkSelection, rowImagesTab, artworkRowStale, rowMountLimit) => {
                           const {
                             ordered,
                             isPoster,
@@ -12090,7 +12248,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             aspect,
                             size,
                             activePath,
-                          } = artworkSelection;
+                          } = rowArtworkSelection;
 
                           // 2 en móvil y 4 en escritorio para imágenes apaisadas
                           // (vista previa, fondo y logos).
@@ -12122,7 +12280,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
 
                           const loadingCarousel = (
                             <Swiper
-                              key={`${activeImagesTab}-loading`}
+                              key={`${rowImagesTab}-loading`}
                               spaceBetween={12}
                               slidesPerView={isBackdropLike ? 2 : 3}
                               breakpoints={breakpoints}
@@ -12132,7 +12290,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               {Array.from({ length: loadingCardsCount }).map(
                                 (_, index) => (
                                   <SwiperSlide
-                                    key={`${activeImagesTab}-loading-${index}`}
+                                    key={`${rowImagesTab}-loading-${index}`}
                                     className="h-full pt-1 pb-3"
                                   >
                                     <div
@@ -12168,13 +12326,16 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           return (
                             <div
                               ref={artworkRowRef}
-                              className="relative overflow-visible"
+                              aria-busy={artworkRowStale || undefined}
+                              className={`relative overflow-visible ${
+                                artworkRowStale ? "pointer-events-none" : ""
+                              }`}
                             >
                               {!artworkRowReady && loadingCarousel}
 
                               {artworkRowReady && (
                                 <DetailsArrowCarousel
-                                  key={activeImagesTab}
+                                  key={rowImagesTab}
                                   onSwiper={(swiper) => {
                                     artworkSwiperRef.current = swiper;
                                   }}
@@ -12184,7 +12345,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   className="pt-3 pb-8"
                                   arrowClassName="top-3 bottom-8"
                                 >
-                                  {ordered.map((img, index) => {
+                                  {(rowMountLimit ? ordered.slice(0, rowMountLimit) : ordered).map((img, index) => {
                                     const filePath = img?.file_path;
                                     if (!filePath) return null;
 
@@ -12193,24 +12354,18 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     const isPriority =
                                       index < artworkPreloadCount;
                                     const imgAlt = isPoster
-                                      ? `${isLocalizedPosterTab ? "Portada con idioma" : isMobilePosterTab ? "Portada sin idioma" : artworkSelection.isCardPosterTab ? "Portada de tarjetas" : "Portada"} de ${title}`
+                                      ? `${isLocalizedPosterTab ? "Portada con idioma" : isMobilePosterTab ? "Portada sin idioma" : rowArtworkSelection.isCardPosterTab ? "Portada de tarjetas" : "Portada"} de ${title}`
                                       : isLogoTab
                                         ? `Logo de ${title}`
                                       : isBackdropTab
                                         ? `Vista previa de ${title}`
                                         : `Fondo de ${title}`;
 
-                                    const imgSrc = `https://image.tmdb.org/t/p/${size}${filePath}`;
-                                    const imgSrcSet = isPoster
-                                      ? tmdbSrcSet(filePath, "poster")
-                                      : isLogoTab
-                                        ? `https://image.tmdb.org/t/p/w185${filePath} 185w, https://image.tmdb.org/t/p/w500${filePath} 500w, https://image.tmdb.org/t/p/original${filePath} 1000w`
-                                      : tmdbSrcSet(filePath, "backdrop");
-                                    const imgSizes = isPoster
-                                      ? DETAILS_GALLERY_POSTER_SIZES
-                                      : isLogoTab
-                                        ? "(max-width: 640px) 50vw, (max-width: 1024px) 30vw, 240px"
-                                      : DETAILS_GALLERY_BACKDROP_SIZES;
+                                    const {
+                                      src: imgSrc,
+                                      srcSet: imgSrcSet,
+                                      sizes: imgSizes,
+                                    } = artworkCardImage(rowArtworkSelection, filePath);
 
                                     return (
                                       <SwiperSlide
@@ -12227,12 +12382,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                               handleSelectLogo(filePath);
                                             } else if (isMobilePosterTab) {
                                               handleSelectMobilePoster(filePath);
-                                            } else if (activeImagesTab === "posters" || activeImagesTab === "cardPosters")
+                                            } else if (rowImagesTab === "posters" || rowImagesTab === "cardPosters")
                                               handleSelectPoster(filePath);
-                                            else if (activeImagesTab === "cardBackdrops")
+                                            else if (rowImagesTab === "cardBackdrops")
                                               handleSelectCardBackdrop(filePath);
                                             else if (
-                                              activeImagesTab === "backdrops"
+                                              rowImagesTab === "backdrops"
                                             )
                                               handleSelectPreviewBackdrop(
                                                 filePath,
@@ -12251,12 +12406,12 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                                 handleSelectLogo(filePath);
                                               } else if (isMobilePosterTab) {
                                                 handleSelectMobilePoster(filePath);
-                                              } else if (activeImagesTab === "posters" || activeImagesTab === "cardPosters")
+                                              } else if (rowImagesTab === "posters" || rowImagesTab === "cardPosters")
                                                 handleSelectPoster(filePath);
-                                              else if (activeImagesTab === "cardBackdrops")
+                                              else if (rowImagesTab === "cardBackdrops")
                                                 handleSelectCardBackdrop(filePath);
                                               else if (
-                                                activeImagesTab === "backdrops"
+                                                rowImagesTab === "backdrops"
                                               )
                                                 handleSelectPreviewBackdrop(
                                                   filePath,
@@ -12325,7 +12480,8 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               )}
                             </div>
                           );
-                        })()}
+                          }}
+                        />
                       </section>
                     )}
                   </AnimatedSection>
