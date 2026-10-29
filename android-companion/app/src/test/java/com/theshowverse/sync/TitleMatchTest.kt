@@ -46,6 +46,16 @@ class TitleMatchTest {
     }
 
     @Test
+    fun corroboratesAnyAcceptsTheOriginalOrEnglishTitle() {
+        // Prime Video pinta «The Mentalist» y TMDb (es-ES) devuelve «El mentalista».
+        val pantalla = listOf("The Mentalist", "Temporada 1")
+        assertFalse(TitleMatch.corroborates("El mentalista", pantalla))
+        assertTrue(TitleMatch.corroboratesAny(listOf("El mentalista", "The Mentalist"), pantalla))
+        // Ningún nombre en pantalla: se sigue descartando.
+        assertFalse(TitleMatch.corroboratesAny(listOf("Los Soprano", "The Sopranos"), pantalla))
+    }
+
+    @Test
     fun hintIsUsableOnlyWhenTheSessionLacksTheSeries() {
         // Caso Netflix: la sesión da el episodio, la ficha aportó la serie.
         assertTrue(TitleMatch.hintIsUsable("Los Simpson", "Bart el temerario", null))

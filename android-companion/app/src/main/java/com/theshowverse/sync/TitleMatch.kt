@@ -106,6 +106,14 @@ object TitleMatch {
     }
 
     /**
+     * Como [corroborates], pero con todos los nombres del título resuelto (el de
+     * TMDb en español, el original, el inglés…): basta con que UNO aparezca en la
+     * pantalla. La plataforma no tiene por qué usar el mismo idioma que TMDb.
+     */
+    fun corroboratesAny(resolvedNames: List<String?>, screenTexts: List<String?>): Boolean =
+        resolvedNames.any { corroborates(it, screenTexts) }
+
+    /**
      * ¿[screen] respalda el título [resolved]? Como [similar], pero TMDb no puede
      * devolver MÁS palabras que las leídas: «Interstellar» en pantalla no respalda
      * la serie «Interstellar Ella». Un subtítulo de más ya lo cubren las partes

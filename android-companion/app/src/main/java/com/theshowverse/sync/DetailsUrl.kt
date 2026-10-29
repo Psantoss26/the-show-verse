@@ -17,6 +17,10 @@ data class SyncedInfo(
     // desde la notificación y viaja en los pings de progreso para que el servidor
     // sepa qué guardó cada detección (y lo mueva o borre si se corrige).
     val detectionId: String? = null,
+    // Otros nombres del título en TMDb (original, inglés). Solo para corroborar
+    // la ficha: la plataforma puede pintar «The Mentalist» y TMDb devolver
+    // «El mentalista».
+    val alternativeTitles: List<String> = emptyList(),
 )
 
 /**

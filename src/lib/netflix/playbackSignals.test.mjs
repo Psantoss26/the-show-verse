@@ -95,6 +95,8 @@ const SHOWS = [
   {
     id: 1429,
     name: "Ataque a los Titanes",
+    original_name: "進撃の巨人",
+    en_name: "Attack on Titan",
     popularity: 250,
     vote_count: 7000,
     seasons: [
@@ -314,7 +316,11 @@ function installFakeNetwork(sent, detections = null) {
     const detail = url.match(/\/3\/tv\/(\d+)\?/);
     if (detail) {
       const show = showById(detail[1]);
-      return show ? json({ seasons: show.seasons }) : json({ status_code: 34 }, 404);
+      if (!show) return json({ status_code: 34 }, 404);
+      // La ficha en inglés trae sus nombres (los de las alternativas del título).
+      return new URL(url).searchParams.get("language") === "en-US"
+        ? json({ seasons: show.seasons, name: show.en_name || show.name, original_name: show.original_name || show.name })
+        : json({ seasons: show.seasons });
     }
     if (detections && url.includes("/v1/streaming/detections/lookup")) {
       detections.lookups.push(JSON.parse(init.body));
@@ -418,7 +424,7 @@ test("Netflix, episodio: serie, temporada y episodio correctos", async () => {
     durationSec: 4200,
   });
   assert.deepEqual(
-    { ...synced(result), title: undefined, posterPath: undefined, episodeName: undefined },
+    { ...synced(result), title: undefined, posterPath: undefined, episodeName: undefined, alternativeTitles: undefined },
     {
       tmdbId: 66732,
       mediaType: "tv",
@@ -428,8 +434,22 @@ test("Netflix, episodio: serie, temporada y episodio correctos", async () => {
       title: undefined,
       posterPath: undefined,
       episodeName: undefined,
+      alternativeTitles: undefined,
     },
   );
+});
+
+// La app de Android solo acepta una ficha si lo resuelto se parece a lo que ve en
+// pantalla, y la plataforma puede pintar el título en otro idioma («The
+// Mentalist» para «El mentalista»): el servidor le manda los demás nombres.
+test("Solo resolver: devuelve el título original y el inglés como alternativas", async () => {
+  const result = await sync({
+    platform: "prime",
+    showName: "Ataque a los Titanes",
+    mediaTypeHint: "tv",
+  });
+  assert.equal(synced(result).title, "Ataque a los Titanes");
+  assert.deepEqual(synced(result).alternativeTitles, ["進撃の巨人", "Attack on Titan"]);
 });
 
 test("Netflix, episodio SIN temporada: se localiza por el nombre del episodio", async () => {

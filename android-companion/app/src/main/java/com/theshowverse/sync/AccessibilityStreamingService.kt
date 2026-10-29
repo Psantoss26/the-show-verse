@@ -303,8 +303,10 @@ class AccessibilityStreamingService : AccessibilityService() {
                 // en el Historial (Netflix).
                 //
                 // Solo se acepta si lo que ha devuelto TMDb se PARECE a algo que de
-                // verdad se leyó en la pantalla.
-                if (!TitleMatch.corroborates(synced.title, textosDePantalla)) {
+                // verdad se leyó en la pantalla, en CUALQUIERA de sus nombres: la
+                // plataforma puede pintar el original o el inglés («The Mentalist»)
+                // y TMDb devolver el español («El mentalista»).
+                if (!TitleMatch.corroboratesAny(listOf(synced.title) + synced.alternativeTitles, textosDePantalla)) {
                     p.addLog(
                         "Ficha descartada (${Platforms.nameFor(pkg)}): TMDb devolvió " +
                             "«${synced.title}» y en pantalla ponía «$primary»",

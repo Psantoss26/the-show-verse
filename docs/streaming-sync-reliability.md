@@ -234,6 +234,13 @@ contrario no vale: TMDb no puede devolver más palabras que las leídas
 («Interstellar» en pantalla no respalda la serie «Interstellar Ella»), salvo
 artículos y conectores.
 
+La comprobación vale con cualquiera de los nombres del título
+(`TitleMatch.corroboratesAny`): el de TMDb en español, el original y el inglés. En
+modo «solo resolver» el servidor los devuelve en `synced.alternativeTitles`
+(`loadAlternativeTitles` en `extension-sync/route.js`, con la ficha en `en-US` de
+TMDb). Prime Video pinta «The Mentalist» y TMDb devuelve «El mentalista», y esa
+ficha se descartaba solo por el idioma.
+
 En el servidor, el tipo «serie» de una ficha de Android (`mediaTypeHint: "tv"`)
 solo se aplica a su título principal (`showName`). Los demás textos de la señal
 pueden ser de un carrusel y se buscan sin tipo: en la ficha de *Interstellar* el

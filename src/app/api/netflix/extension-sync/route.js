@@ -138,6 +138,30 @@ function tmdbJson(url) {
   });
 }
 
+// Otros nombres del título resuelto (original e inglés) distintos de `title`. La
+// app de Android comprueba que lo resuelto se parece a lo que ve en pantalla, y
+// las plataformas pintan a menudo el título original o el inglés («The
+// Mentalist» para «El mentalista»): sin estos nombres esa ficha se descartaba.
+async function loadAlternativeTitles(tmdbId, mediaType, entity, title) {
+  const names = [entity?.original_name, entity?.original_title];
+  if (TMDB_API_KEY && tmdbId && (mediaType === "tv" || mediaType === "movie")) {
+    const en = await tmdbJson(
+      `${TMDB_API}/${mediaType}/${tmdbId}?api_key=${TMDB_API_KEY}&language=en-US`,
+    );
+    names.push(en?.name, en?.title, en?.original_name, en?.original_title);
+  }
+  const seen = new Set([String(title || "").trim().toLowerCase()]);
+  const out = [];
+  for (const name of names) {
+    const clean = String(name || "").trim();
+    const key = clean.toLowerCase();
+    if (!clean || seen.has(key)) continue;
+    seen.add(key);
+    out.push(clean);
+  }
+  return out;
+}
+
 // Localiza la temporada buscando el episodio en TODAS las temporadas de la serie.
 // Necesario para Netflix web (muestra el episodio pero NO la temporada) y para
 // HBO Max/Prime (serie + nombre de episodio sin números). Escalera, de más a
@@ -1064,6 +1088,9 @@ export async function POST(request) {
           season: isTv ? season : null,
           episode: isTv ? episode : null,
           title: resolvedTitle,
+          alternativeTitles: await loadAlternativeTitles(
+            tmdbId, mediaType, resolution?.entity, resolvedTitle,
+          ),
           episodeName: isTv ? (tmdbEpisodeName || episodeName || null) : null,
           posterPath,
           // La confianza viaja también en modo "solo resolver": el cliente la

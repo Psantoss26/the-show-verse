@@ -226,6 +226,9 @@ object SyncClient {
                 posterPath = synced.optString("posterPath").ifBlank { null },
                 confidence = synced.optString("confidence").ifBlank { null },
                 detectionId = synced.optString("detectionId").ifBlank { null },
+                alternativeTitles = synced.optJSONArray("alternativeTitles")?.let { arr ->
+                    (0 until arr.length()).mapNotNull { arr.optString(it).ifBlank { null } }
+                }.orEmpty(),
             )
         } catch (e: Exception) {
             null
