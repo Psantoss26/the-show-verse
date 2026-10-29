@@ -1577,7 +1577,9 @@ export default function SeasonDetailsClient({
         </div>
 
         <MobileHeroCover
-          objectPosition="center center"
+          // Anclada arriba: si el hueco es más bajo que el póster, lo que se
+          // pierde es el pie, nunca el borde superior.
+          objectPosition="center top"
           src={posterPath ? `https://image.tmdb.org/t/p/w780${posterPath}` : null}
           lowSrc={mobileCoverLowSrc}
           imgRef={mobileCoverLoad.imgRef}
