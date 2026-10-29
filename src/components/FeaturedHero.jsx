@@ -600,14 +600,22 @@ function FeaturedSlide({
         ctx.drawImage(img, 0, 0, size, size);
         const { data } = ctx.getImageData(0, 0, size, size);
         let lumSum = 0;
+        let valueSum = 0;
         let opaque = 0;
         for (let i = 0; i < data.length; i += 4) {
           if (data[i + 3] < 40) continue; // ignora píxeles transparentes
           lumSum += 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+          valueSum += Math.max(data[i], data[i + 1], data[i + 2]);
           opaque += 1;
         }
         if (opaque < size * size * 0.02) return; // logo casi vacío: no tocar
-        if (!cancelled) setLogoIsDark(lumSum / opaque < 75); // 0-255; <75 = oscuro
+        // La luminancia sola confunde los colores saturados con oscuros: un rojo
+        // puro (220,30,30) da ~70 y el logo rojo/azul de «Spider-Man: Brand New
+        // Day» acababa como silueta blanca. Exigimos además poco brillo en el
+        // canal más alto (valor HSV): negros, grises y azul marino sí; rojos no.
+        if (!cancelled) {
+          setLogoIsDark(lumSum / opaque < 75 && valueSum / opaque < 110); // 0-255
+        }
       } catch {
         // canvas "tainted" u otro error: dejamos el logo tal cual
       }
@@ -2441,7 +2449,11 @@ export default function FeaturedHero({
       unsubscribe();
     };
   }, [activeId, activeMediaType]);
-  const activeLogoPath = ownLogo || activeAssets.communityLogo || activeAssets.logo || null;
+  // Restablecido en la ficha (marca `auto`): el automático aunque haya otro
+  // más votado.
+  const ownAutoArtwork = useOwnArtwork(activeMediaType, activeMovie?.id, "auto");
+  const activeLogoPath =
+    ownLogo || (ownAutoArtwork ? null : activeAssets.communityLogo) || activeAssets.logo || null;
   const activeBackdropOptions = useMemo(() => {
     if (!activeMovie) return [];
 
