@@ -608,6 +608,9 @@ function Top10MobileBackdropCard({
 function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
   const { session, account } = useAuth();
   const router = useRouter();
+  // Backdrop elegido en la ficha (pestaña «Backdrop») o, sin él, el más
+  // votado: manda sobre el automático (no se guarda en su caché).
+  const cardBackdrop = useOwnCardBackdrop("movie", movie?.id);
 
   const [extras, setExtras] = useState({
     runtime: null,
@@ -701,7 +704,9 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
         }
       } else {
         const cachedBackdrop = movieBackdropCache.get(movie.id);
-        if (cachedBackdrop !== undefined) {
+        if (cardBackdrop) {
+          revealBackdrop(cardBackdrop);
+        } else if (cachedBackdrop !== undefined) {
           revealBackdrop(cachedBackdrop);
         } else {
           try {
@@ -811,7 +816,7 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
     return () => {
       abort = true;
     };
-  }, [isSpotlight, movie]);
+  }, [isSpotlight, movie, cardBackdrop]);
 
   const href = `/details/movie/${movie.id}`;
 

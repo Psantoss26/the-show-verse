@@ -346,6 +346,7 @@ import PosterStack from "@/components/details/PosterStack";
 import ExternalLinksModal from "@/components/details/ExternalLinksModal";
 import SeasonsSection from "@/components/details/SeasonsSection";
 import { buildArtworkSheetTabs } from "@/lib/details/artworkSheetTabs";
+import CardPosterImage from "@/components/CardPosterImage";
 import {
   animateArtworkRowHeight,
   artworkImagesReady,
@@ -11782,13 +11783,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                   {/* Mientras llega el de la escalera de
                                       idioma, solo el fondo de la tarjeta. */}
                                   {rec._englishPosterPending ? null : (
-                                    <OptimizedImage
-                                      src={
-                                        rec.poster_path
-                                          ? `https://image.tmdb.org/t/p/w342${rec.poster_path}`
-                                          : "/placeholder.png"
-                                      }
-                                      srcSet={tmdbSrcSet(rec.poster_path)}
+                                    <CardPosterImage
+                                      type={rec.media_type || type}
+                                      id={rec.id}
+                                      path={rec.poster_path}
+                                      placeholder="/placeholder.png"
                                       alt={recTitle}
                                       {...detailsRowImageLoading(recIndex)}
                                       decoding="async"
@@ -11905,9 +11904,10 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               >
                                 <div className="aspect-[2/3] overflow-hidden relative">
                                   {m.poster_path ? (
-                                    <OptimizedImage
-                                      src={`https://image.tmdb.org/t/p/w342${m.poster_path}`}
-                                      srcSet={tmdbSrcSet(m.poster_path)}
+                                    <CardPosterImage
+                                      type="movie"
+                                      id={m.id}
+                                      path={m.poster_path}
                                       sizes={DETAILS_POSTER_ROW_SIZES}
                                       alt={m.title}
                                       className={colImageClass}

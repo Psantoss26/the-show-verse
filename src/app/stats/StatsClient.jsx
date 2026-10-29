@@ -195,6 +195,7 @@ const useIsMobileLayout = (breakpointPx = 768) => {
 };
 
 import dynamic from "next/dynamic";
+import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
 
 // Charts are code-split out of the initial Profile bundle (recharts is heavy and
 // the charts render deferred / below the fold anyway).
@@ -1151,7 +1152,10 @@ function ProfileUnifiedCard({
     `0 10px 24px -18px rgba(${hoverShadowRgb}, 0.58)`,
     "0 16px 30px -24px rgba(0, 0, 0, 0.75)",
   ].join(", ");
+  // Portada elegida en la ficha o, sin ella, la más votada (solo títulos).
+  const cardPoster = useOwnCardPoster(mediaType, isMedia ? tmdbId : null);
   const path =
+    cardPoster ||
     media?.poster_path ||
     media?.posterPath ||
     media?.profile_path ||

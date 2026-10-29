@@ -3,7 +3,10 @@ import test from 'node:test'
 
 import {
   ARTWORK_PREFERENCES_CACHE_KEY,
+  forgetCommunityArtwork,
+  getCardArtwork,
   getOwnCardPoster,
+  retractOwnArtworkVotes,
   notifyPersistedArtworkOverridesChanged,
   subscribeOwnCardPosters
 } from './artworkApi.js'
@@ -94,3 +97,63 @@ test('cualquier capa: el logo propio sale de la misma memoria', async () => {
   assert.equal(getOwnArtwork('tv', 7, 'backdrop'), null)
   delete globalThis.window
 })
+
+test('tarjetas: sin elección propia, la más votada, pedida por lotes', async () => {
+  installWindow(
+    memoryStorage({
+      [ARTWORK_PREFERENCES_CACHE_KEY]: snapshot({ 'movie:701': { poster: '/propia.jpg' } })
+    })
+  )
+  const requests = []
+  globalThis.fetch = async (url) => {
+    // Los lotes que dejaron en cola otros tests (series) no cuentan.
+    if (String(url).includes('type=movie')) requests.push(String(url))
+    return {
+      ok: true,
+      json: async () => ({
+        artwork: {
+          701: { poster: '/votada-701.jpg' },
+          702: { poster: '/votada-702.jpg', cardBackdrop: '/fondo-702.jpg' }
+        }
+      })
+    }
+  }
+  let calls = 0
+  const unsubscribe = subscribeOwnCardPosters(() => {
+    calls += 1
+  })
+  // El aviso de `installWindow` aún estaba en cola.
+  await Promise.resolve()
+  calls = 0
+
+  // La propia manda y no pide nada; las demás aún no se saben.
+  assert.equal(getCardArtwork('movie', 701, 'poster'), '/propia.jpg')
+  assert.equal(getCardArtwork('movie', 702, 'poster'), null)
+  assert.equal(getCardArtwork('movie', 703, 'cardBackdrop'), null)
+  assert.equal(getCardArtwork('movie', 702, 'cardBackdrop'), null)
+  await new Promise((resolve) => setTimeout(resolve, 40))
+
+  // Un solo lote con las dos que faltaban.
+  assert.equal(requests.length, 1)
+  assert.match(requests[0], /type=movie&ids=702,703$/)
+  assert.equal(calls, 1)
+  assert.equal(getCardArtwork('movie', 702, 'poster'), '/votada-702.jpg')
+  assert.equal(getCardArtwork('movie', 702, 'cardBackdrop'), '/fondo-702.jpg')
+  // Resuelta sin votos: ya no se vuelve a pedir.
+  assert.equal(getCardArtwork('movie', 703, 'cardBackdrop'), null)
+  await new Promise((resolve) => setTimeout(resolve, 40))
+  assert.equal(requests.length, 1)
+
+  // Retirar el voto propio la quita ya; olvidarla la vuelve a pedir.
+  retractOwnArtworkVotes({ type: 'movie', id: 702, votes: { poster: '/votada-702.jpg' } })
+  assert.equal(getCardArtwork('movie', 702, 'poster'), null)
+  assert.equal(getCardArtwork('movie', 702, 'cardBackdrop'), '/fondo-702.jpg')
+  forgetCommunityArtwork({ type: 'movie', id: 702 })
+  getCardArtwork('movie', 702, 'poster')
+  await new Promise((resolve) => setTimeout(resolve, 40))
+  assert.equal(requests.length, 2)
+  assert.equal(getCardArtwork('movie', 702, 'poster'), '/votada-702.jpg')
+  unsubscribe()
+  delete globalThis.fetch
+})
+

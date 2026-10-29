@@ -71,6 +71,7 @@ import useModalGuard from "@/hooks/useModalGuard";
 import { useAuth } from "@/context/AuthContext";
 import HoverExpandCard from "@/components/ui/HoverExpandCard";
 import MobileOptionsSheet, { SheetAction, SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
+import useOwnCardPoster, { useOwnCardBackdrop } from "@/lib/hooks/useOwnCardPoster";
 
 const TYPE_FILTERS = [
   { id: "all", label: "Todo" },
@@ -176,8 +177,11 @@ function useStoredSetting(storageKey, options, initial, cookieField, serverValue
 
 // --- COMPONENTES UI AUXILIARES ---
 
-function TmdbPoster({ path, alt, className = "" }) {
+// Póster y fondo de las tarjetas: la imagen elegida en la ficha o, sin ella,
+// la más votada (`artwork` = { type, id } del título); si no, la del item.
+function TmdbPoster({ path: itemPath, artwork, alt, className = "" }) {
   const [failed, setFailed] = useState(false);
+  const path = useOwnCardPoster(artwork?.type, artwork?.id) || itemPath;
 
   if (!path || failed) {
     return (
@@ -200,8 +204,9 @@ function TmdbPoster({ path, alt, className = "" }) {
   );
 }
 
-function TmdbBackdrop({ path, fallbackPath, alt, className = "" }) {
+function TmdbBackdrop({ path: itemPath, fallbackPath, artwork, alt, className = "" }) {
   const [failed, setFailed] = useState(false);
+  const path = useOwnCardBackdrop(artwork?.type, artwork?.id) || itemPath;
   const imagePath = failed ? fallbackPath : path || fallbackPath;
 
   if (!imagePath) {
@@ -252,6 +257,9 @@ function normalizeMovieItem(item) {
     subtitle: raw ? String(raw).slice(0, 4) : null,
     date: date && Number.isFinite(date.getTime()) ? date : null,
     href: `/details/${mediaType}/${item?.id}`,
+    // Título de la imagen elegida o más votada (`useOwnCardImage`).
+    artworkType: mediaType,
+    artworkId: item?.id ?? null,
     posterPath: item?.poster_path || item?.backdrop_path || null,
     backdropPath: item?.backdrop_path || item?.poster_path || null,
   };
@@ -275,6 +283,8 @@ function normalizeEpisodeItem(item) {
       show?.tmdbId && season > 0 && number > 0
         ? `/details/tv/${show.tmdbId}/season/${season}/episode/${number}`
         : `/details/tv/${show?.tmdbId}`,
+    artworkType: "tv",
+    artworkId: show?.tmdbId ?? null,
     posterPath: show?.poster_path || show?.backdrop_path || null,
     backdropPath: show?.backdrop_path || show?.poster_path || null,
   };
@@ -461,6 +471,7 @@ const CalendarListCard = memo(function CalendarListCard({
             <div className="absolute inset-0 rounded-[inherit] overflow-hidden">
               <TmdbBackdrop
                 path={item.backdropPath}
+                artwork={{ type: item.artworkType, id: item.artworkId }}
                 fallbackPath={item.posterPath}
                 alt={item.title}
                 className="absolute inset-0 w-full h-full object-cover"
@@ -520,6 +531,7 @@ const CalendarCompactCard = memo(function CalendarCompactCard({
           <div className="absolute inset-0 rounded-[inherit] overflow-hidden">
             <TmdbPoster
               path={item.posterPath}
+              artwork={{ type: item.artworkType, id: item.artworkId }}
               alt={item.title}
               className="w-full h-full object-cover"
             />
@@ -562,6 +574,7 @@ const CalendarGridCard = memo(function CalendarGridCard({
           <div className="absolute inset-0 rounded-[inherit] overflow-hidden">
             <TmdbPoster
               path={item.posterPath}
+              artwork={{ type: item.artworkType, id: item.artworkId }}
               alt={item.title}
               className="w-full h-full object-cover"
             />

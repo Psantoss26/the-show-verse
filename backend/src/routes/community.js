@@ -16,7 +16,7 @@ import {
 import { db } from '../db/client.js';
 import { invalidateLevelState } from '../level/store.js';
 import { getFollowingTitleActivity } from '../lib/followingTitleActivity.js';
-import { getCommunityArtwork, getCommunitySeasonPosters } from '../lib/artworkVotes.js';
+import { getCommunityArtwork, getCommunityArtworkForTitles, getCommunitySeasonPosters } from '../lib/artworkVotes.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -37,6 +37,16 @@ const commentBody = z.object({ comment: z.string().min(1).max(2000), spoiler: z.
 // Con sesión, la respuesta lleva el `liked` de ESTE visitante: no puede quedarse
 // en una caché compartida o un usuario vería los corazones de otro. Sin sesión la
 // respuesta es idéntica para todos y se sigue pudiendo cachear como antes.
+// `?ids=1,2,3` de las consultas de artwork por lotes: enteros positivos, 100
+// como mucho.
+export function parseArtworkIds(value) {
+  return String(value || '')
+    .split(',')
+    .map(Number)
+    .filter((id) => Number.isInteger(id) && id > 0)
+    .slice(0, 100);
+}
+
 function setCommunityCache(reply, viewerId, publicValue) {
   reply.header('Cache-Control', viewerId ? 'private, no-store' : publicValue);
 }
@@ -219,14 +229,24 @@ export default async function communityRoutes(fastify) {
   // de TMDb de la temporada): { posters: { [id]: '/x.jpg' } }, solo las que
   // tienen votos. En lote: todas las tarjetas de «Temporadas» de una serie.
   fastify.get('/seasons/artwork', async (req, reply) => {
-    const ids = String(req.query?.ids || '')
-      .split(',')
-      .map(Number)
-      .filter((id) => Number.isInteger(id) && id > 0)
-      .slice(0, 100);
+    const ids = parseArtworkIds(req.query?.ids);
     const posters = await getCommunitySeasonPosters(ids);
     reply.header('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=600');
     return { posters };
+  });
+
+  // GET /artwork?type=movie&ids=1,2,3[&kinds=poster,cardBackdrop] — imagen
+  // más votada de cada tipo para VARIOS títulos: { artwork: { [id]: { … } } },
+  // solo los que tienen votos. En lote: las tarjetas de las páginas de usuario,
+  // dashboards y DetailModal (portada `poster`, backdrop `cardBackdrop`…).
+  fastify.get('/artwork', async (req, reply) => {
+    const type = String(req.query?.type || '').toLowerCase();
+    if (!ARTWORK_TYPES.has(type)) return reply.status(400).send({ error: 'Invalid type' });
+    const tmdbIds = parseArtworkIds(req.query?.ids);
+    const kinds = String(req.query?.kinds || '').split(',').map((kind) => kind.trim()).filter(Boolean);
+    const artwork = await getCommunityArtworkForTitles({ mediaType: type, tmdbIds, kinds });
+    reply.header('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=600');
+    return { artwork };
   });
 
   // GET /:type/:tmdbId/artwork — imagen más votada de cada tipo (poster,

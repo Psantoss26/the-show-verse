@@ -216,6 +216,7 @@ import { useDetailModal } from "@/components/dashboard/DetailModalProvider";
 import { useTraktEpisodesWatched } from "@/lib/hooks/useTraktEpisodesWatched";
 import { statusRetryDelay } from "@/lib/trakt/statusRetry";
 import { useIsHistoryNavigation } from "@/lib/hooks/useIsHistoryNavigation";
+import { useOwnCardBackdrop } from "@/lib/hooks/useOwnCardPoster";
 
 function normalizeUrl(url) {
   if (!url) return null;
@@ -374,16 +375,21 @@ function DetailModalActionsReveal({ children, className = "" }) {
 function SimilarBackdrop({ rec, onOpen }) {
   const recMediaType = getMediaTypeForItem(rec);
   const recTitle = rec?.title || rec?.name || "";
+  // Backdrop elegido en la ficha (pestaña «Backdrop») o, sin él, el más
+  // votado: manda y no se pide el automático.
+  const cardBackdrop = useOwnCardBackdrop(recMediaType, rec?.id);
   const fallback = rec?.backdrop_path
     ? buildImg(rec.backdrop_path, "w780")
     : rec?.poster_path
       ? buildImg(rec.poster_path, "w780")
       : null;
-  const [src, setSrc] = useState(fallback);
+  const [autoSrc, setSrc] = useState(fallback);
+  const src = cardBackdrop ? buildImg(cardBackdrop, "w780") : autoSrc;
 
   useEffect(() => {
     let alive = true;
     setSrc(fallback);
+    if (cardBackdrop) return undefined;
     (async () => {
       try {
         const path = await fetchBestBackdrop(rec.id, recMediaType, {
@@ -398,7 +404,7 @@ function SimilarBackdrop({ rec, onOpen }) {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rec?.id, recMediaType]);
+  }, [rec?.id, recMediaType, cardBackdrop]);
 
   return (
     <div

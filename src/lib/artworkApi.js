@@ -183,6 +183,10 @@ let cardPosterNotifyQueued = false
 // portada en el panel lateral con una lista detrás).
 export function notifyPersistedArtworkOverridesChanged() {
     cardPosterMemo = null
+    queueCardArtworkNotify()
+}
+
+function queueCardArtworkNotify() {
     if (cardPosterNotifyQueued || cardPosterListeners.size === 0) return
     cardPosterNotifyQueued = true
     queueMicrotask(() => {
@@ -207,9 +211,16 @@ export function getOwnArtwork(type, id, kind) {
     return readArtworkPreference(`showverse:${normalizedType}:${id}:${kind}`) || null
 }
 
-// `null` = sin portada propia para tarjetas: se usa el criterio automático.
+// Imagen de una TARJETA: la elección propia y, sin ella, la más votada por
+// todos (`getCommunityCardArtwork`), igual que en la ficha. `null` = ninguna de
+// las dos: la tarjeta usa su criterio automático.
+export function getCardArtwork(type, id, kind) {
+    return getOwnArtwork(type, id, kind) || getCommunityCardArtwork(type, id, kind)
+}
+
+// Portada de la tarjeta (kind `poster`): propia o más votada.
 export function getOwnCardPoster(type, id) {
-    return getOwnArtwork(type, id, 'poster')
+    return getCardArtwork(type, id, 'poster')
 }
 
 export function subscribeOwnCardPosters(listener) {
@@ -447,7 +458,9 @@ export function withoutArtworkVotes(artwork, votes) {
 // El voto propio deja de contar YA en las páginas montadas del título.
 export function retractOwnArtworkVotes({ type, id, votes }) {
     if (id == null || id === '' || !votes) return
-    notifyCommunityArtwork(communityArtworkKey({ type, id }), { retract: votes })
+    const key = communityArtworkKey({ type, id })
+    notifyCommunityArtwork(key, { retract: votes })
+    retractCommunityCardVotes(key, votes)
 }
 
 // Tras votar: la siguiente consulta del título vuelve a preguntar al servidor,
@@ -456,6 +469,7 @@ export function forgetCommunityArtwork({ type, id }) {
     const key = communityArtworkKey({ type, id })
     communityArtworkRequests.delete(key)
     notifyCommunityArtwork(key, { refresh: true })
+    forgetCommunityCardArtwork(key)
 }
 
 export function fetchCommunityArtwork({ type, id }) {
@@ -494,4 +508,153 @@ export function withCommunityArtwork(overrides, community, localPreference = nul
         if (filePath) merged[kind] = filePath
     }
     return merged
+}
+
+// ---------------------------------------------------------------------------
+// Más votada para las TARJETAS de páginas, dashboards y DetailModal, por LOTES
+// (/api/community/artwork?type=…&ids=…): una página monta decenas o cientos
+// de tarjetas a la vez y van en pocas peticiones. Lo resuelto se guarda en
+// localStorage: al volver, cada tarjeta enseña su imagen sin esperar ni
+// cambiar delante del usuario. Pasados `FRESH` ms se sigue usando mientras se
+// vuelve a preguntar. Las tarjetas lo leen con `getCardArtwork` y se enteran
+// de lo que llega por la misma suscripción que la elección propia.
+const COMMUNITY_CARD_STORAGE_KEY = 'showverse:community-card-artwork:v1'
+const COMMUNITY_CARD_FRESH_MS = 10 * 60 * 1000
+const COMMUNITY_CARD_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
+const COMMUNITY_CARD_RETRY_MS = 60 * 1000
+const COMMUNITY_CARD_BATCH_MS = 16
+const COMMUNITY_CARD_MAX_IDS = 100
+const COMMUNITY_CARD_MAX_ENTRIES = 4000
+const COMMUNITY_CARD_TYPES = new Set(['movie', 'tv'])
+
+let communityCardEntries = null // `${type}:${id}` -> { artwork, at }
+const communityCardQueue = new Set()
+const communityCardInFlight = new Set()
+const communityCardFailedAt = new Map()
+let communityCardTimer = 0
+let communityCardPersistTimer = 0
+
+function loadCommunityCardEntries() {
+    if (communityCardEntries) return communityCardEntries
+    communityCardEntries = new Map()
+    try {
+        const raw = JSON.parse(window.localStorage.getItem(COMMUNITY_CARD_STORAGE_KEY) || '{}')
+        const oldest = Date.now() - COMMUNITY_CARD_MAX_AGE_MS
+        for (const [key, entry] of Object.entries(raw || {})) {
+            if (entry && typeof entry.a === 'object' && Number(entry.t) > oldest) {
+                communityCardEntries.set(key, { artwork: entry.a, at: Number(entry.t) })
+            }
+        }
+    } catch {
+        // Sin almacenamiento: solo memoria.
+    }
+    return communityCardEntries
+}
+
+function persistCommunityCardEntries() {
+    if (communityCardPersistTimer) return
+    communityCardPersistTimer = setTimeout(() => {
+        communityCardPersistTimer = 0
+        const entries = [...loadCommunityCardEntries()]
+            .sort((a, b) => b[1].at - a[1].at)
+            .slice(0, COMMUNITY_CARD_MAX_ENTRIES)
+        try {
+            window.localStorage.setItem(
+                COMMUNITY_CARD_STORAGE_KEY,
+                JSON.stringify(Object.fromEntries(entries.map(([key, entry]) => [key, { a: entry.artwork, t: entry.at }])))
+            )
+        } catch {
+            // Cuota llena: se queda en memoria.
+        }
+    }, 500)
+}
+
+async function sendCommunityCardBatch(type, ids) {
+    const keys = ids.map((id) => `${type}:${id}`)
+    keys.forEach((key) => communityCardInFlight.add(key))
+    try {
+        const response = await fetch(`/api/community/artwork?type=${type}&ids=${ids.join(',')}`, {
+            cache: 'no-store'
+        })
+        const json = response.ok ? await response.json() : null
+        const artwork = json?.artwork && typeof json.artwork === 'object' ? json.artwork : null
+        if (!artwork) throw new Error(`HTTP ${response.status}`)
+        const entries = loadCommunityCardEntries()
+        const at = Date.now()
+        ids.forEach((id, index) => {
+            const value = artwork[id]
+            entries.set(keys[index], { artwork: value && typeof value === 'object' ? value : {}, at })
+            communityCardFailedAt.delete(keys[index])
+        })
+        persistCommunityCardEntries()
+        queueCardArtworkNotify()
+    } catch {
+        // Se reintenta pasado un rato; mientras, la tarjeta usa lo que tenga.
+        const at = Date.now()
+        keys.forEach((key) => communityCardFailedAt.set(key, at))
+    } finally {
+        keys.forEach((key) => communityCardInFlight.delete(key))
+    }
+}
+
+function flushCommunityCardQueue() {
+    communityCardTimer = 0
+    const byType = new Map()
+    for (const key of communityCardQueue) {
+        const [type, id] = key.split(':')
+        if (!byType.has(type)) byType.set(type, [])
+        byType.get(type).push(Number(id))
+    }
+    communityCardQueue.clear()
+    for (const [type, ids] of byType) {
+        for (let start = 0; start < ids.length; start += COMMUNITY_CARD_MAX_IDS) {
+            void sendCommunityCardBatch(type, ids.slice(start, start + COMMUNITY_CARD_MAX_IDS))
+        }
+    }
+}
+
+function queueCommunityCardRequest(key) {
+    if (communityCardQueue.has(key) || communityCardInFlight.has(key)) return
+    const failedAt = communityCardFailedAt.get(key)
+    if (failedAt && Date.now() - failedAt < COMMUNITY_CARD_RETRY_MS) return
+    communityCardQueue.add(key)
+    if (!communityCardTimer) communityCardTimer = setTimeout(flushCommunityCardQueue, COMMUNITY_CARD_BATCH_MS)
+}
+
+function communityCardKey(type, id) {
+    const normalizedType = type === 'show' ? 'tv' : type === 'tv' ? 'tv' : type || 'movie'
+    const numericId = Number(id)
+    if (!COMMUNITY_CARD_TYPES.has(normalizedType) || !Number.isInteger(numericId) || numericId <= 0) return null
+    return `${normalizedType}:${numericId}`
+}
+
+// Más votada de una capa (`poster`, `cardBackdrop`, `logo`…) para una tarjeta.
+// Lo que no se sabe (o caducó) se pide en el siguiente lote; mientras, `null`
+// (o lo que hubiera) y al llegar se avisa a las tarjetas suscritas.
+export function getCommunityCardArtwork(type, id, kind) {
+    if (typeof window === 'undefined' || !kind) return null
+    const key = communityCardKey(type, id)
+    if (!key) return null
+    const entry = loadCommunityCardEntries().get(key)
+    if (!entry || Date.now() - entry.at > COMMUNITY_CARD_FRESH_MS) queueCommunityCardRequest(key)
+    return entry?.artwork?.[kind] || null
+}
+
+// Votos propios retirados o nuevos (ver `retractOwnArtworkVotes` y
+// `forgetCommunityArtwork`): las tarjetas del título se actualizan ya.
+function retractCommunityCardVotes(key, votes) {
+    const entry = communityCardEntries?.get(key)
+    if (!entry) return
+    const artwork = withoutArtworkVotes(entry.artwork, votes)
+    if (artwork === entry.artwork) return
+    communityCardEntries.set(key, { ...entry, artwork })
+    persistCommunityCardEntries()
+    queueCardArtworkNotify()
+}
+
+function forgetCommunityCardArtwork(key) {
+    if (!communityCardEntries?.delete(key)) return
+    communityCardFailedAt.delete(key)
+    persistCommunityCardEntries()
+    queueCardArtworkNotify()
 }

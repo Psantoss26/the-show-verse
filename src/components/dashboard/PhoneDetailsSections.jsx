@@ -71,6 +71,7 @@ import { buildCastDataForUI } from "@/lib/details/cast";
 import DetailsSectionSheets, { openSectionSheet } from "@/components/details/sectionSheet/DetailsSectionSheets";
 import { createValueStore } from "@/lib/details/valueStore";
 import { buildArtworkSheetTabs } from "@/lib/details/artworkSheetTabs";
+import CardPosterImage from "@/components/CardPosterImage";
 import { tmdbSrcSet } from "@/lib/tmdb/imageSrcSet";
 import {
   LIQUID_GLASS_BAR,
@@ -1361,13 +1362,11 @@ export default function PhoneDetailsSections({
                       >
                         <div className="aspect-[2/3] overflow-hidden relative">
                           {rec._englishPosterPending ? null : (
-                          <OptimizedImage
-                            src={
-                              rec.poster_path
-                                ? `https://image.tmdb.org/t/p/w342${rec.poster_path}`
-                                : "/placeholder.png"
-                            }
-                            srcSet={tmdbSrcSet(rec.poster_path)}
+                          <CardPosterImage
+                            type={getMediaTypeForItem(rec)}
+                            id={rec.id}
+                            path={rec.poster_path}
+                            placeholder="/placeholder.png"
                               sizes="(max-width: 639px) 30vw, 200px"
                               alt={rec.title || rec.name || ""}
                             loading="lazy"
@@ -1412,13 +1411,11 @@ export default function PhoneDetailsSections({
                         >
                           <div className="aspect-[2/3] overflow-hidden relative">
                             {movie._englishPosterPending ? null : (
-                            <OptimizedImage
-                              src={
-                                movie.poster_path
-                                  ? `https://image.tmdb.org/t/p/w342${movie.poster_path}`
-                                  : "/placeholder.png"
-                              }
-                              srcSet={tmdbSrcSet(movie.poster_path)}
+                            <CardPosterImage
+                              type="movie"
+                              id={movie.id}
+                              path={movie.poster_path}
+                              placeholder="/placeholder.png"
                               sizes="(max-width: 639px) 30vw, 200px"
                               alt={movie.title || movie.name || ""}
                               loading="lazy"

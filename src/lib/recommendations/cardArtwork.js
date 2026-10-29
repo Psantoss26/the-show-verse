@@ -15,6 +15,7 @@
 
 import { useEffect, useState } from "react";
 import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
+import { fetchCommunityArtwork, getOwnArtwork } from "@/lib/artworkApi";
 import {
   pickBestNeutralPosterByResVotes,
   resolveNeutralBackdropPath,
@@ -47,17 +48,22 @@ export async function loadCardArtwork(item, { priority = "normal" } = {}) {
   const key = cacheKey(item.mediaType, item.tmdbId);
   if (artworkCache.has(key)) return artworkCache.get(key);
 
-  const images = await fetchTmdbImages(
-    item.mediaType === "tv" ? "tv" : "movie",
-    item.tmdbId,
-    { allLanguages: true, priority },
-  ).catch(() => null);
+  const mediaType = item.mediaType === "tv" ? "tv" : "movie";
+  const [images, community] = await Promise.all([
+    fetchTmdbImages(mediaType, item.tmdbId, { allLanguages: true, priority }).catch(() => null),
+    fetchCommunityArtwork({ type: mediaType, id: item.tmdbId }).catch(() => null),
+  ]);
+  // Como en la ficha: la imagen elegida por el usuario y, sin ella, la más
+  // votada por todos, capa a capa (portada móvil, fondo y logo).
+  const chosen = (kind) => getOwnArtwork(mediaType, item.tmdbId, kind) || community?.[kind] || null;
+  const posters = (images?.posters || []).filter((poster) => poster?.file_path);
+  const chosenPosterPath = chosen("mobilePoster");
 
   // Sin arte neutro se cae al póster que ya venía en la recomendación: es mejor
   // enseñar el póster con título que dejar la pantalla vacía.
-  const chosenPoster = pickBestNeutralPosterByResVotes(
-    (images?.posters || []).filter((poster) => poster?.file_path),
-  );
+  const chosenPoster = chosenPosterPath
+    ? posters.find((poster) => poster.file_path === chosenPosterPath) || { file_path: chosenPosterPath }
+    : pickBestNeutralPosterByResVotes(posters);
 
   // OJO: ese selector NO garantiza un póster sin idioma. Cuando el título no
   // tiene ninguno textless cae al mejor disponible, que viene localizado y ya
@@ -72,8 +78,8 @@ export async function loadCardArtwork(item, { priority = "normal" } = {}) {
   // El backdrop (vista de escritorio) también se quiere SIN idioma: encima va el
   // logo, y un fondo con el título impreso lo duplicaría. Sale de la misma
   // respuesta, así que no cuesta ninguna petición extra.
-  const neutralBackdrop = resolveNeutralBackdropPath(images?.backdrops || []);
-  const logoPath = pickLogo(images?.logos);
+  const neutralBackdrop = chosen("backdrop") || resolveNeutralBackdropPath(images?.backdrops || []);
+  const logoPath = chosen("logo") || pickLogo(images?.logos);
 
   const artwork = {
     posterPath: chosenPoster?.file_path || item.posterPath || null,

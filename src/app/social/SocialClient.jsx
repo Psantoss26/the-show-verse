@@ -86,7 +86,8 @@ import {
 import Stars from "@/components/social/Stars";
 import MobileOptionsSheet, { SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
 import ActivityBackdropImage from "@/components/social/ActivityBackdropImage";
-import { hasActivityBackdropArtwork, isPortraitActivity } from "@/lib/profile/activityBackdrops";
+import { activityBackdropTarget, hasActivityBackdropArtwork, isPortraitActivity } from "@/lib/profile/activityBackdrops";
+import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
 
 const PAGE_SIZE = 30;
 const FEED_VACIO = { items: [], hasMore: false, offset: 0, loaded: false, error: "" };
@@ -251,7 +252,12 @@ function tiempoTitle(fecha) {
 // backdrop del título (vista «Lista con backdrop»).
 function CartelEvento({ evento, className = "", backdrop = false, size = "w185" }) {
   const href = hrefDeEvento(evento);
-  const src = evento.posterPath ? `https://image.tmdb.org/t/p/${size}${evento.posterPath}` : null;
+  // Portada elegida en la ficha o, sin ella, la más votada (como en el
+  // Perfil). Las temporadas conservan la suya.
+  const target = evento.mediaType === "season" ? null : activityBackdropTarget(evento);
+  const cardPoster = useOwnCardPoster(target?.mediaType, target?.tmdbId);
+  const posterPath = cardPoster || evento.posterPath;
+  const src = posterPath ? `https://image.tmdb.org/t/p/${size}${posterPath}` : null;
   // Me gusta a una persona con backdrop: solo su foto centrada, sin fondo.
   const fondo = backdrop && isPortraitActivity(evento) ? "" : "bg-zinc-900";
   const imagen = backdrop ? (

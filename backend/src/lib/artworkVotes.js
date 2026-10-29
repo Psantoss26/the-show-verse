@@ -126,3 +126,29 @@ export async function getCommunitySeasonPosters(seasonIds, executor = db) {
     Object.entries(pickTopVotedArtworkByTitle(rows)).map(([id, artwork]) => [id, artwork.poster]),
   );
 }
+
+// Más votadas de VARIOS títulos de un tipo (`movie`, `tv` o `collection`) a la
+// vez: { [tmdbId]: { poster, cardBackdrop, … } }, solo los títulos y tipos de
+// imagen con algún voto. Las tarjetas de las páginas montan por decenas y van
+// en una sola consulta. `kinds` limita los tipos de imagen (todos sin él).
+export async function getCommunityArtworkForTitles({ mediaType, tmdbIds, kinds }, executor = db) {
+  const ids = [...new Set((tmdbIds || []).map(Number).filter((id) => Number.isInteger(id) && id > 0))];
+  if (!ids.length) return {};
+  const kindList = (kinds || []).filter((kind) => ARTWORK_VOTE_KINDS.includes(kind));
+  const rows = await executor
+    .select({
+      tmdbId: artworkVotes.tmdbId,
+      kind: artworkVotes.kind,
+      filePath: artworkVotes.filePath,
+      votes: sql`COUNT(*)`.mapWith(Number),
+      lastVotedAt: sql`MAX(${artworkVotes.updatedAt})`,
+    })
+    .from(artworkVotes)
+    .where(and(
+      eq(artworkVotes.mediaType, mediaType),
+      inArray(artworkVotes.tmdbId, ids),
+      ...(kindList.length ? [inArray(artworkVotes.kind, kindList)] : []),
+    ))
+    .groupBy(artworkVotes.tmdbId, artworkVotes.kind, artworkVotes.filePath);
+  return pickTopVotedArtworkByTitle(rows);
+}

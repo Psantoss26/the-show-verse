@@ -24,6 +24,7 @@ import {
   tmdbImage,
   whenLabel,
 } from "./todayUi";
+import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
 
 export function previewItem(media) {
   return {
@@ -74,7 +75,9 @@ export function AvatarStack({ users, max = 4, size = "h-7 w-7" }) {
 }
 
 export function Poster({ media, className = "", size = "w185" }) {
-  const src = tmdbImage(media?.posterPath, size);
+  // Portada elegida en la ficha o, sin ella, la más votada.
+  const cardPoster = useOwnCardPoster(media?.type === "tv" ? "tv" : "movie", media?.tmdbId);
+  const src = tmdbImage(cardPoster || media?.posterPath, size);
   return (
     <span className={`block overflow-hidden bg-zinc-900 ${className}`}>
       {src ? (

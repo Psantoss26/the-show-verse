@@ -1,19 +1,20 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { getOwnArtwork, subscribeOwnCardPosters } from "@/lib/artworkApi";
+import { getCardArtwork, subscribeOwnCardPosters } from "@/lib/artworkApi";
 
-// Portada elegida para la tarjeta de un título (ver `getOwnCardPoster`). Se
-// suscribe a la instantánea de la cuenta: al elegir otra en la ficha, solo
-// vuelven a renderizar las tarjetas de ESE título, también en las páginas que
-// siguen vivas en segundo plano. En el servidor y al hidratar vale `null`,
-// igual que antes de existir la elección.
+// Imagen de la tarjeta de un título: la elegida en la ficha y, sin ella, la
+// más votada por todos (`getCardArtwork`), como en la ficha. Se suscribe a la
+// instantánea de la cuenta y a la caché por lotes de votos: al elegir otra en
+// la ficha o al llegar los votos, solo vuelven a renderizar las tarjetas de
+// ESE título, también en las páginas que siguen vivas en segundo plano. En el
+// servidor y al hidratar vale `null`, igual que sin elección ni votos.
 export default function useOwnCardPoster(type, id) {
   return useOwnArtwork(type, id, "poster");
 }
 
-// Backdrop elegido para las tarjetas backdrop (pestaña «Backdrop» de la ficha,
-// kind `cardBackdrop`): el backdrop CON idioma de la portada en modo backdrop.
+// Backdrop de las tarjetas backdrop (pestaña «Backdrop» de la ficha, kind
+// `cardBackdrop`): el backdrop CON idioma de la portada en modo backdrop.
 export function useOwnCardBackdrop(type, id) {
   return useOwnArtwork(type, id, "cardBackdrop");
 }
@@ -28,14 +29,15 @@ export function useOwnCardImage(type, id, mode) {
 export function useOwnArtwork(type, id, kind) {
   return useSyncExternalStore(
     subscribeOwnCardPosters,
-    () => getOwnArtwork(type, id, kind),
+    () => getCardArtwork(type, id, kind),
     () => null,
   );
 }
 
 // Para listas que pintan varios pósters en un mismo componente (donde no cabe
-// un hook por tarjeta): vuelve a renderizar al cambiar cualquier elección y el
-// componente lee cada una con `getOwnCardPoster`, que sale de memoria.
+// un hook por tarjeta): vuelve a renderizar al cambiar cualquier elección o al
+// llegar votos, y el componente lee cada una con `getOwnCardPoster`, que sale
+// de memoria.
 let ownCardPosterVersion = 0;
 function subscribeVersion(listener) {
   return subscribeOwnCardPosters(() => {

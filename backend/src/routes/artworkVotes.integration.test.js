@@ -116,4 +116,39 @@ test('votos de artwork', { skip: !process.env.LISTS_TEST_DATABASE_URL }, async (
   for (const user of [ana, bea, carla]) await selectSeason(user, SEASON_A, null);
   await selectSeason(ana, SEASON_B, null);
   assert.deepEqual(await seasonPosters(), {});
+
+  // Tarjetas de páginas y dashboards: la más votada de VARIOS títulos en lote,
+  // filtrable por tipo de imagen.
+  const TITLE_A = 2_000_000_401;
+  const TITLE_B = 2_000_000_402;
+  const selectTitle = (user, id, kind, filePath) => app.inject({
+    method: 'PATCH',
+    url: '/users/preferences',
+    headers: { 'x-test-user': user },
+    payload: { artworkChanges: [{ type: 'movie', id, kind, filePath }] },
+  });
+  const titlesArtwork = async (query) => {
+    const res = await app.inject({ method: 'GET', url: `/community/artwork?type=movie&ids=${TITLE_A},${TITLE_B}${query || ''}` });
+    assert.equal(res.statusCode, 200);
+    return res.json().artwork;
+  };
+  assert.deepEqual(await titlesArtwork(), {});
+  await selectTitle(ana, TITLE_A, 'poster', '/p1.jpg');
+  await selectTitle(bea, TITLE_A, 'poster', '/p2.jpg');
+  await selectTitle(carla, TITLE_A, 'poster', '/p2.jpg');
+  await selectTitle(ana, TITLE_B, 'cardBackdrop', '/b1.jpg');
+  await selectTitle(ana, TITLE_B, 'logo', '/l1.png');
+  assert.deepEqual(await titlesArtwork(), {
+    [TITLE_A]: { poster: '/p2.jpg' },
+    [TITLE_B]: { cardBackdrop: '/b1.jpg', logo: '/l1.png' },
+  });
+  assert.deepEqual(await titlesArtwork('&kinds=poster,cardBackdrop'), {
+    [TITLE_A]: { poster: '/p2.jpg' },
+    [TITLE_B]: { cardBackdrop: '/b1.jpg' },
+  });
+  assert.equal((await app.inject({ method: 'GET', url: '/community/artwork?type=nope&ids=1' })).statusCode, 400);
+  for (const user of [ana, bea, carla]) await selectTitle(user, TITLE_A, 'poster', null);
+  await selectTitle(ana, TITLE_B, 'cardBackdrop', null);
+  await selectTitle(ana, TITLE_B, 'logo', null);
+  assert.deepEqual(await titlesArtwork(), {});
 });

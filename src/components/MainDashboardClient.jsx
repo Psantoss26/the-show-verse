@@ -79,6 +79,7 @@ import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
 import {
   fetchArtworkOverrides,
+  getCardArtwork,
   readPersistedArtworkOverrides,
 } from "@/lib/artworkApi";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
@@ -92,6 +93,7 @@ import FeaturedHero from "@/components/FeaturedHero";
 import ContinueWatchingSection from "@/components/ContinueWatchingSection";
 import DashboardCalendarSection from "@/components/DashboardCalendarSection";
 import DashboardBackdropRow from "@/components/dashboard/DashboardBackdropRow";
+import { useOwnCardBackdrop } from "@/lib/hooks/useOwnCardPoster";
 import {
   DashboardHoverBackdropLayer,
   DashboardHoverBackdropProvider,
@@ -572,6 +574,10 @@ function InlinePreviewCard({
     stableBackdropState.mediaIdentity === mediaIdentity
       ? stableBackdropState.value
       : backdropOverride;
+  // Backdrop elegido en la ficha (pestaña «Backdrop») o, sin él, el más
+  // votado: manda sobre el de la sección y el automático, sin guardarse en
+  // `movieBackdropCache` (al quitarlo vuelve el automático).
+  const cardBackdrop = useOwnCardBackdrop(mediaType, movie?.id);
   const [backdropPath, setBackdropPath] = useState(() =>
     getInitialDashboardPreviewBackdrop(
       movie,
@@ -749,7 +755,9 @@ function InlinePreviewCard({
           }
         }
       } else {
-        if (stableBackdropOverride) {
+        if (cardBackdrop) {
+          revealBackdrop(cardBackdrop);
+        } else if (stableBackdropOverride) {
           movieBackdropCache.set(backdropCacheKey, stableBackdropOverride);
           revealBackdrop(stableBackdropOverride);
         } else {
@@ -871,7 +879,7 @@ function InlinePreviewCard({
     return () => {
       abort = true;
     };
-  }, [isSpotlight, mediaType, movie, stableBackdropOverride]);
+  }, [isSpotlight, mediaType, movie, stableBackdropOverride, cardBackdrop]);
 
   // Carga perezosa (en hover == al montar) de los datos que alimentan la fila
   // meta compartida. También se usa en spotlight para el mismo diseño de estado
@@ -1804,6 +1812,10 @@ function InlinePreviewCardAnticipated({
     stableBackdropState.mediaIdentity === mediaIdentity
       ? stableBackdropState.value
       : backdropOverride;
+  // Backdrop elegido en la ficha (pestaña «Backdrop») o, sin él, el más
+  // votado: manda sobre el de la sección y el automático, sin guardarse en
+  // `movieBackdropCache` (al quitarlo vuelve el automático).
+  const cardBackdrop = useOwnCardBackdrop(mediaType, movie?.id);
   const [backdropPath, setBackdropPath] = useState(() =>
     getInitialDashboardPreviewBackdrop(movie, stableBackdropOverride),
   );
@@ -1974,7 +1986,9 @@ function InlinePreviewCardAnticipated({
       // conservan su artwork propio o el override explícito de la sección.
       const mediaTypeForBackdrop = getMediaTypeForItem(movie);
       const backdropCacheKey = getBackdropCacheKey(movie, mediaTypeForBackdrop);
-      if (stableBackdropOverride) {
+      if (cardBackdrop) {
+        revealBackdrop(cardBackdrop);
+      } else if (stableBackdropOverride) {
         movieBackdropCache.set(backdropCacheKey, stableBackdropOverride);
         revealBackdrop(stableBackdropOverride);
       } else {
@@ -2007,7 +2021,7 @@ function InlinePreviewCardAnticipated({
     return () => {
       abort = true;
     };
-  }, [movie, stableBackdropOverride]);
+  }, [movie, stableBackdropOverride, cardBackdrop]);
 
   const openPreviewModal = () => {
     openDetailModal?.({ ...movie, logo_path: logoPath || movie?.logo_path || null });
@@ -3650,7 +3664,9 @@ function TopRatedHero({
                 : "movie";
             const itemKey = getBackdropCacheKey(movie, mediaType);
 
-            const override = backdropOverrides?.[id] || null;
+            // Backdrop elegido en la ficha o el más votado (pestaña
+            // «Backdrop»), por delante del de la sección y del automático.
+            const override = getCardArtwork(mediaType, id, "cardBackdrop") || backdropOverrides?.[id] || null;
             let chosen = override || null;
             if (!chosen) {
               chosen = await fetchBestBackdrop(id, mediaType, {
