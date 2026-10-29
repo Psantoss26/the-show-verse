@@ -74,6 +74,7 @@ import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import MobileOptionsSheet, { SheetAction, SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
 import { ImageModeSegmented, ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
 import PageStatCard from "@/components/ui/PageStatCard";
+import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
 
 // Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
 // el mismo escalón que `w1280` en los backdrops. Antes era `w500` y en
@@ -1745,10 +1746,12 @@ function Poster({ entry, className = "" }) {
 
   const type = getItemType(entry);
   const id = getTmdbId(entry);
+  // Portada elegida en la ficha: manda sobre la automática y no pide nada.
+  const ownPoster = useOwnCardPoster(type, id);
 
   useEffect(() => {
     let abort = false;
-    if (!hasBeenInView || !type || !id) return;
+    if (ownPoster || !hasBeenInView || !type || !id) return;
     setPosterPath(null);
 
     const load = async () => {
@@ -1762,10 +1765,11 @@ function Poster({ entry, className = "" }) {
     return () => {
       abort = true;
     };
-  }, [entry, hasBeenInView, type, id]);
+  }, [entry, hasBeenInView, type, id, ownPoster]);
 
-  const src = posterPath
-    ? `https://image.tmdb.org/t/p/${POSTER_CARD_SIZE}${posterPath}`
+  const shownPosterPath = ownPoster || posterPath;
+  const src = shownPosterPath
+    ? `https://image.tmdb.org/t/p/${POSTER_CARD_SIZE}${shownPosterPath}`
     : null;
 
   return (

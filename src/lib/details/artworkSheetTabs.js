@@ -4,9 +4,12 @@
 // español e inglés como en ella).
 //
 //   - Escritorio: Portada, Vista previa, Fondo y Logo.
-//   - Móvil: Portada, Con idioma y Logo. La portada móvil va sin idioma con el
-//     logo encima; elegir una «Con idioma» la sustituye y el logo se oculta (ya
-//     trae el título impreso). Las dos pestañas guardan la misma preferencia.
+//   - Móvil: Portada, Con idioma, Tarjetas y Logo. La portada móvil va sin
+//     idioma con el logo encima; elegir una «Con idioma» la sustituye y el logo
+//     se oculta (ya trae el título impreso). Esas dos guardan la misma
+//     preferencia (`mobilePoster`), que es SOLO de la ficha móvil. «Tarjetas»
+//     es la portada de las tarjetas de páginas y dashboards: la misma
+//     preferencia que «Portada» en escritorio (`poster`).
 //
 // En cada pestaña la imagen elegida va primero y se marca (`activePath`).
 
@@ -69,6 +72,16 @@ export function buildArtworkSheetTabs({ mobile = false, posters, backdrops, logo
           images: allPosters.filter((img) => !isLanguageNeutralImage(img)),
           activePath: active.mobilePoster,
           injectActive: false,
+        },
+        {
+          id: "cardPosters",
+          label: "Tarjetas",
+          kind: "poster",
+          aspect: "poster",
+          images: allPosters,
+          // Solo la elegida a propósito: sin ella, cada página usa su portada
+          // automática y no hay una que marcar.
+          activePath: active.cardPoster ?? null,
         },
         { id: "logos", label: "Logo", kind: "logo", aspect: "logo", images: languageLogos, activePath: active.logo },
       ]

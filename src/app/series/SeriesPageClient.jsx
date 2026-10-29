@@ -83,6 +83,7 @@ import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
 import LiquidButton from "@/components/LiquidButton";
+import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
 
 /* =================== ANIMATION VARIANTS =================== */
 const fadeInUp = {
@@ -324,20 +325,6 @@ async function getBestTrailerCachedTV(showId) {
   return p;
 }
 
-/* ======== Preferencias de artwork guardadas en localStorage (TV) ======== */
-function getTVArtworkPreference(showId) {
-  if (typeof window === "undefined") {
-    return { poster: null, backdrop: null, background: null };
-  }
-  const base = `showverse:tv:${showId}`;
-  const poster = window.localStorage.getItem(`${base}:poster`);
-  const background = window.localStorage.getItem(`${base}:background`);
-  return {
-    poster: poster || null,
-    background: background || null,
-  };
-}
-
 /* ====================================================================
  * LOGICA IMAGENES (Backdrops / Posters)
  * ==================================================================== */
@@ -388,6 +375,8 @@ function PosterImage({ show, cache }) {
   const initialPosterPath = show?.poster_path || show?.backdrop_path || null;
   const [posterPath, setPosterPath] = useState(initialPosterPath);
   const [ready, setReady] = useState(!!initialPosterPath);
+  // Portada elegida en la ficha (la de la cuenta), suscrita.
+  const userPoster = useOwnCardPoster("tv", show?.id);
 
   useEffect(() => {
     let abort = false;
@@ -400,10 +389,8 @@ function PosterImage({ show, cache }) {
       setReady(!!basePoster);
 
       // 1) Preferencia usuario
-      const { poster: userPoster } = getTVArtworkPreference(show.id);
       if (userPoster) {
         if (!abort) {
-          cache.current.set(show.id, userPoster);
           setPosterPath(userPoster);
           setReady(true);
         }
@@ -444,7 +431,7 @@ function PosterImage({ show, cache }) {
     return () => {
       abort = true;
     };
-  }, [show, cache]);
+  }, [show, cache, userPoster]);
 
   if (!ready || !posterPath) {
     return (

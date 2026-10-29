@@ -127,6 +127,7 @@ import {
   Building2,
   MapPin,
   Languages,
+  LayoutGrid,
   Award,
   ListVideo,
   Check,
@@ -2772,7 +2773,12 @@ export default function DetailsClient({
       isMobileViewport && activeImagesTab === "localizedPosters";
     const isMobilePosterTab =
       isMobileViewport && (activeImagesTab === "posters" || isLocalizedPosterTab);
-    const isPoster = activeImagesTab === "posters" || isLocalizedPosterTab;
+    // MÓVIL: «Tarjetas» elige la portada de las tarjetas de páginas y
+    // dashboards, que es la de escritorio (kind `poster`); la del hero móvil
+    // no sale de la ficha.
+    const isCardPosterTab = activeImagesTab === "cardPosters";
+    const isPoster =
+      activeImagesTab === "posters" || isLocalizedPosterTab || isCardPosterTab;
     const rawList = isLogoTab
       ? titleLogos
       : isPoster
@@ -2807,6 +2813,10 @@ export default function DetailsClient({
       ? displayHeroLogoPath
       : isMobilePosterTab
         ? currentMobilePosterActive
+      : isCardPosterTab
+        ? // Solo la elegida a propósito: sin ella cada tarjeta usa su
+          // portada automática, que no tiene por qué ser la de la ficha.
+          selectedPosterPath || null
       : isPoster
         ? currentPosterActive
       : isBackdropTab
@@ -2917,6 +2927,7 @@ export default function DetailsClient({
       isPoster,
       isMobilePosterTab,
       isLocalizedPosterTab,
+      isCardPosterTab,
       isLogoTab,
       isBackdropTab,
       isBackgroundTab,
@@ -2949,7 +2960,10 @@ export default function DetailsClient({
 
   // «Con idioma» solo existe en móvil: en escritorio la portada es otra capa.
   useEffect(() => {
-    if (!isMobileViewport && activeImagesTab === "localizedPosters") {
+    if (
+      !isMobileViewport &&
+      (activeImagesTab === "localizedPosters" || activeImagesTab === "cardPosters")
+    ) {
       setActiveImagesTab("posters");
     }
   }, [isMobileViewport, activeImagesTab]);
@@ -7080,10 +7094,14 @@ export default function DetailsClient({
   // =====================================================================
 
 
-  // Selecciona un poster especifico y lo persiste
+  // Selecciona un poster especifico y lo persiste. Es también la portada de
+  // las tarjetas de páginas y dashboards (`useOwnCardPoster`).
   const handleSelectPoster = (filePath) => {
-    setPosterViewMode("poster");
-    setPosterLayoutMode("poster");
+    // En móvil llega desde «Tarjetas»: no toca la ficha, que pinta otra capa.
+    if (!isMobileViewport) {
+      setPosterViewMode("poster");
+      setPosterLayoutMode("poster");
+    }
     setSelectedPosterPath(filePath);
     persistArtworkPreference(posterStorageKey, filePath);
     cacheArtworkOverrides?.({
@@ -8042,6 +8060,7 @@ export default function DetailsClient({
         active: {
           poster: sheetPosterActive,
           mobilePoster: sheetMobilePosterActive,
+          cardPoster: selectedPosterPath || null,
           preview: sheetPreviewActive,
           background: sheetBackgroundActive,
           logo: displayHeroLogoPath,
@@ -8054,6 +8073,7 @@ export default function DetailsClient({
       titleLogos,
       sheetPosterActive,
       sheetMobilePosterActive,
+      selectedPosterPath,
       sheetPreviewActive,
       sheetBackgroundActive,
       displayHeroLogoPath,
@@ -12008,6 +12028,11 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                             <SheetOption icon={Languages} active={activeImagesTab === "localizedPosters"} onClick={() => setActiveImagesTab("localizedPosters")}>
                               Con idioma
                             </SheetOption>
+                            {/* Portada de las TARJETAS (páginas y dashboards): la
+                                misma que «Portada» en escritorio, no la de este hero. */}
+                            <SheetOption icon={LayoutGrid} active={activeImagesTab === "cardPosters"} onClick={() => setActiveImagesTab("cardPosters")}>
+                              Tarjetas
+                            </SheetOption>
                             <SheetOption icon={Sparkles} active={activeImagesTab === "logos"} onClick={() => setActiveImagesTab("logos")}>
                               Logo
                             </SheetOption>
@@ -12025,10 +12050,14 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               </SheetOption>
                             ))}
                           </SheetOptionGroup>
-                          {/* Los logos sí tienen variantes localizadas; el póster móvil se
-                              mantiene neutro y no necesita este filtro. */}
-                          {activeImagesTab === "logos" && (
-                            <SheetOptionGroup label="Idioma de los logos" icon={Languages}>
+                          {/* Los logos y las portadas de tarjetas sí tienen variantes
+                              localizadas; el póster móvil se mantiene neutro y no
+                              necesita este filtro. */}
+                          {(activeImagesTab === "logos" || activeImagesTab === "cardPosters") && (
+                            <SheetOptionGroup
+                              label={activeImagesTab === "logos" ? "Idioma de los logos" : "Idioma de las portadas"}
+                              icon={Languages}
+                            >
                               <SheetOption active={langES} onClick={() => setLangES((value) => !value)}>
                                 Español
                               </SheetOption>
@@ -12159,7 +12188,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                     const isPriority =
                                       index < artworkPreloadCount;
                                     const imgAlt = isPoster
-                                      ? `${isLocalizedPosterTab ? "Portada con idioma" : isMobilePosterTab ? "Portada sin idioma" : "Portada"} de ${title}`
+                                      ? `${isLocalizedPosterTab ? "Portada con idioma" : isMobilePosterTab ? "Portada sin idioma" : artworkSelection.isCardPosterTab ? "Portada de tarjetas" : "Portada"} de ${title}`
                                       : isLogoTab
                                         ? `Logo de ${title}`
                                       : isBackdropTab
@@ -12193,7 +12222,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                               handleSelectLogo(filePath);
                                             } else if (isMobilePosterTab) {
                                               handleSelectMobilePoster(filePath);
-                                            } else if (activeImagesTab === "posters")
+                                            } else if (activeImagesTab === "posters" || activeImagesTab === "cardPosters")
                                               handleSelectPoster(filePath);
                                             else if (
                                               activeImagesTab === "backdrops"
@@ -12215,7 +12244,7 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                                                 handleSelectLogo(filePath);
                                               } else if (isMobilePosterTab) {
                                                 handleSelectMobilePoster(filePath);
-                                              } else if (activeImagesTab === "posters")
+                                              } else if (activeImagesTab === "posters" || activeImagesTab === "cardPosters")
                                                 handleSelectPoster(filePath);
                                               else if (
                                                 activeImagesTab === "backdrops"

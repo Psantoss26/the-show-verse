@@ -95,6 +95,7 @@ import { ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
 import MobileOptionsSheet, { SheetOption, SheetOptionBreak, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
 import PageStatCard from "@/components/ui/PageStatCard";
 import useUserDetailsSequenceSource from "@/lib/navigation/useUserDetailsSequenceSource";
+import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
 
 // Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
 // el mismo escalón que `w1280` en los backdrops. Antes era `w500` y en
@@ -930,7 +931,11 @@ function SmartPoster({ item, title, mode = "poster" }) {
           : item.poster_path || item.backdrop_path || null,
     };
   }
-  const initialSrc = getCachedSmartPosterUrl(item, mode);
+  // Portada elegida en la ficha: manda sobre la automática y no pide nada.
+  const ownPoster = useOwnCardPoster(type, id);
+  const ownPosterUrl =
+    mode === "poster" && ownPoster ? buildImg(ownPoster, POSTER_CARD_SIZE) : null;
+  const initialSrc = ownPosterUrl || getCachedSmartPosterUrl(item, mode);
 
   const [src, setSrc] = useState(initialSrc);
   const { imgRef, onLoad, ready, instant } = useImageLoadReady(src);
@@ -938,7 +943,7 @@ function SmartPoster({ item, title, mode = "poster" }) {
   useEffect(() => {
     let abort = false;
 
-    const cachedUrl = getCachedSmartPosterUrl(item, mode);
+    const cachedUrl = ownPosterUrl || getCachedSmartPosterUrl(item, mode);
     if (cachedUrl) {
       setSrc(cachedUrl);
       return () => {
@@ -982,7 +987,7 @@ function SmartPoster({ item, title, mode = "poster" }) {
     return () => {
       abort = true;
     };
-  }, [mode, type, id, imageKey, originalLanguage]);
+  }, [mode, type, id, imageKey, originalLanguage, ownPosterUrl]);
 
   return (
     <div className="relative w-full h-full">

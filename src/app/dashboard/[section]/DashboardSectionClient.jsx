@@ -70,6 +70,7 @@ import {
   readScoreCache,
   writeScoreCache,
 } from "@/lib/userLists/listScoreCache";
+import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
 
 const EMPTY_SCORES = new Map();
 
@@ -313,7 +314,10 @@ function PosterImage({
   eager = false,
 }) {
   const [failed, setFailed] = useState(false);
-  const poster = item?.poster_path;
+  // Portada elegida en la ficha (en el HTML del servidor aún no se conoce:
+  // se aplica al hidratar).
+  const ownPoster = useOwnCardPoster(resolveType(item), item?.id);
+  const poster = ownPoster || item?.poster_path;
   const wantsBackdrop = mode === "backdrop";
   const backdrop = wantsBackdrop
     ? previewBackdropPath

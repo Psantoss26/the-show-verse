@@ -151,6 +151,61 @@ export function readPersistedArtworkOverride({ type, id, storage }) {
     return entry && typeof entry === 'object' ? entry : {}
 }
 
+// ---------------------------------------------------------------------------
+// Portada elegida para las TARJETAS (Favoritos, Pendientes, En progreso,
+// Historial, Perfil, dashboards...). Es la portada de ESCRITORIO de la ficha
+// (kind `poster`): en escritorio la pestaña «Portada» y en móvil la pestaña
+// «Tarjetas». La portada del hero móvil (`mobilePoster`, con o sin idioma) es
+// solo de la ficha y nunca llega aquí.
+//
+// Una página puede pintar cientos de tarjetas y cada una pregunta en cada
+// render, así que la instantánea se lee y se parsea UNA vez y se guarda en
+// memoria hasta que AuthContext la reescribe (`notifyPersistedArtworkOverridesChanged`)
+// u otra pestaña la cambia (evento `storage`).
+const cardPosterListeners = new Set()
+let cardPosterMemo = null
+let cardPosterStorageListening = false
+
+function readCardPosterOverrides() {
+    if (cardPosterMemo === null) {
+        cardPosterMemo = { overrides: readPersistedArtworkOverrides() }
+    }
+    return cardPosterMemo.overrides
+}
+
+export function notifyPersistedArtworkOverridesChanged() {
+    cardPosterMemo = null
+    for (const listener of cardPosterListeners) listener()
+}
+
+// `null` = sin portada propia para tarjetas: se usa el criterio automático.
+export function getOwnCardPoster(type, id) {
+    if (id == null || id === '' || typeof window === 'undefined') return null
+    const normalizedType = type === 'show' ? 'tv' : type === 'tv' ? 'tv' : 'movie'
+    const overrides = readCardPosterOverrides()
+    if (overrides != null) {
+        return overrides[`${normalizedType}:${Number(id)}`]?.poster || null
+    }
+    // Sin instantánea de la cuenta (sin sesión o primera visita del
+    // dispositivo): la copia local que escribe la ficha, como el dashboard.
+    return readArtworkPreference(`showverse:${normalizedType}:${id}:poster`) || null
+}
+
+export function subscribeOwnCardPosters(listener) {
+    cardPosterListeners.add(listener)
+    if (!cardPosterStorageListening && typeof window !== 'undefined') {
+        cardPosterStorageListening = true
+        window.addEventListener('storage', (event) => {
+            if (event.key === null || event.key === ARTWORK_PREFERENCES_CACHE_KEY) {
+                notifyPersistedArtworkOverridesChanged()
+            }
+        })
+    }
+    return () => {
+        cardPosterListeners.delete(listener)
+    }
+}
+
 // Mantiene la selección durante la sesión incluso cuando un navegador móvil
 // rechaza localStorage (modo privado, WebView o cuota). localStorage sigue
 // siendo la persistencia preferida entre recargas.

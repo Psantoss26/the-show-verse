@@ -73,6 +73,7 @@ import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import MobileOptionsSheet, { SheetAction, SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
 import { ImageModeSegmented, ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
 import PageStatCard from "@/components/ui/PageStatCard";
+import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
 
 // Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
 // el mismo escalón que `w1280` en los backdrops. Antes era `w500` y en
@@ -281,6 +282,8 @@ function SmartImage({ item, kind, alt, imgClassName = "" }) {
   const originalLanguage = item.original_language;
   const [src, setSrc] = useState(null);
   const [ready, setReady] = useState(false);
+  // Portada elegida en la ficha, suscrita (se actualiza con la página viva).
+  const ownPoster = useOwnCardPoster(type, id);
 
   useEffect(() => {
     let abort = false;
@@ -289,9 +292,8 @@ function SmartImage({ item, kind, alt, imgClassName = "" }) {
     (async () => {
       const key = `${type}:${id}`;
       const cache = kind === "poster" ? posterChoiceCache : backdropChoiceCache;
-      const preference = getArtworkPreference(id, type);
       const preferredPath =
-        kind === "poster" ? preference.poster : preference.backdrop;
+        kind === "poster" ? ownPoster : getArtworkPreference(id, type).backdrop;
       const fallbackPath =
         kind === "poster"
           ? itemPosterPath || itemBackdropPath || null
@@ -311,7 +313,7 @@ function SmartImage({ item, kind, alt, imgClassName = "" }) {
     return () => {
       abort = true;
     };
-  }, [type, id, kind, itemPosterPath, itemBackdropPath, originalLanguage]);
+  }, [type, id, kind, itemPosterPath, itemBackdropPath, originalLanguage, ownPoster]);
 
   const Fallback = kind === "poster" ? Film : Tv;
   return (
@@ -918,10 +920,10 @@ const ProgressCard = memo(function ProgressCard({
           <div className="p-4 space-y-3">
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
+                <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
                   {item.remainingLabel ? `Progreso · ${item.remainingLabel}` : "Progreso"}
                 </span>
-                <span className="text-[11px] text-zinc-500">{pct}% visto</span>
+                <span className="text-xs text-zinc-300 font-semibold">{pct}% visto</span>
               </div>
               <div className="h-2.5 w-full rounded-full bg-zinc-800/80 overflow-hidden relative">
                 <motion.div
@@ -936,8 +938,8 @@ const ProgressCard = memo(function ProgressCard({
               </div>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-zinc-400 inline-flex items-center gap-1.5">
-                {mediaTypeOf(item) === "movie" ? <Film className="w-3 h-3 text-zinc-500" /> : <Tv className="w-3 h-3 text-zinc-500" />}
+              <span className="text-xs text-zinc-300 font-semibold inline-flex items-center gap-1.5">
+                {mediaTypeOf(item) === "movie" ? <Film className="w-3.5 h-3.5 text-zinc-400" /> : <Tv className="w-3.5 h-3.5 text-zinc-400" />}
                 {mediaTypeOf(item) === "movie" ? "Película" : "Serie"}
               </span>
               <span className="text-xs text-zinc-300 font-semibold inline-flex items-center gap-1.5">

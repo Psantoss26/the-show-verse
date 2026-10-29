@@ -7,11 +7,8 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import NextImage from "next/image";
-import {
-  buildImg,
-  fetchBestPoster,
-  getArtworkPreference,
-} from "@/lib/dashboard/media";
+import { buildImg, fetchBestPoster } from "@/lib/dashboard/media";
+import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
 
 const shimmer = {
   animate: {
@@ -43,18 +40,21 @@ export default function PosterImage({
   eager = false,
 }) {
   const [posterPath, setPosterPath] = useState(null);
+  const mediaType =
+    movie?.media_type === "tv" ||
+    (movie?.name && !movie?.title) ||
+    movie?.first_air_date
+      ? "tv"
+      : "movie";
+  // Portada elegida en la ficha, suscrita: al cambiarla, la tarjeta se
+  // actualiza también con el dashboard vivo en segundo plano.
+  const userPoster = useOwnCardPoster(mediaType, movie?.id);
 
   useEffect(() => {
     let abort = false;
 
     const load = async () => {
       if (!movie) return;
-      const mediaType =
-        movie.media_type === "tv" ||
-        (movie.name && !movie.title) ||
-        movie.first_air_date
-          ? "tv"
-          : "movie";
       const posterCacheKey = `${mediaType}:${movie.id}`;
       const reveal = (path) => {
         if (abort) return;
@@ -62,8 +62,12 @@ export default function PosterImage({
         setPosterPath(path);
       };
 
-      const { poster: userPoster } = getArtworkPreference(movie.id);
-      if (userPoster) return reveal(userPoster);
+      if (userPoster) {
+        // Sin pasar por la caché de elección automática: al quitarla, la
+        // tarjeta vuelve a la automática.
+        setPosterPath(userPoster);
+        return;
+      }
 
       const cached = cache.current.get(posterCacheKey);
       if (cached) return reveal(cached);
@@ -101,7 +105,7 @@ export default function PosterImage({
     return () => {
       abort = true;
     };
-  }, [movie, cache, posterOverride]);
+  }, [movie, mediaType, cache, posterOverride, userPoster]);
 
   const src = posterPath ? buildImg(posterPath, "w342") : null;
   const [loadedSrc, setLoadedSrc] = useState(null);

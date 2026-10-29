@@ -75,6 +75,7 @@ import { LIST_CHANGED_EVENT } from "@/lib/userLists/optimisticListCache";
 import MobileOptionsSheet, { SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
 import { normalizeSearchText, titleMatchesQuery } from "@/lib/search/titleMatching";
 import { useTitleNameSearch } from "@/lib/search/useTitleNameSearch";
+import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
 
 // Sección de Perfil ↔ lista del store de altas optimistas.
 const PROFILE_PENDING_LIST_BY_SECTION = {
@@ -131,6 +132,17 @@ function getItemTitle(item) {
 function getItemMediaType(item) {
   const type = item?.mediaType || item?.media_type || item?.type || item?.movie?.mediaType || item?.show?.mediaType;
   return type === "tv" || type === "show" || type === "episode" ? "tv" : "movie";
+}
+
+// Póster de la tarjeta: la portada elegida en la ficha (del espectador) manda
+// sobre la que trae el item. Temporadas sueltas conservan la suya.
+function useItemCardPosterPath(item, fallback) {
+  const rawType = item?.mediaType || item?.media_type || item?.type;
+  const ownPoster = useOwnCardPoster(
+    getItemMediaType(item),
+    rawType === "season" ? null : item?.tmdbId || item?.id,
+  );
+  return ownPoster || fallback || null;
 }
 
 function getItemDate(item) {
@@ -830,7 +842,8 @@ function ActivityPoster({ item, className = "", backdrop = false, size = "w185" 
   const previewClick = usePreviewOpen();
   const type = ["tv", "show", "season", "episode"].includes(item?.mediaType) ? "tv" : "movie";
   const href = getActivityDetailsHref(item);
-  const src = item?.posterPath ? `https://image.tmdb.org/t/p/${size}${item.posterPath}` : null;
+  const posterPath = useItemCardPosterPath(item, item?.posterPath);
+  const src = posterPath ? `https://image.tmdb.org/t/p/${size}${posterPath}` : null;
   const poster = backdrop ? (
     <ActivityBackdropImage item={item} alt={item?.title || ""} />
   ) : src ? (
@@ -877,7 +890,8 @@ function ActivityReview({ item, actor, compact = false, posterList = false, back
   const previewClick = usePreviewOpen();
   const type = ["tv", "show", "season", "episode"].includes(item.mediaType) ? "tv" : "movie";
   const href = getActivityDetailsHref(item) || `/details/${type}/${item.tmdbId}`;
-  const src = item.posterPath ? `https://image.tmdb.org/t/p/w185${item.posterPath}` : null;
+  const posterPath = useItemCardPosterPath(item, item.posterPath);
+  const src = posterPath ? `https://image.tmdb.org/t/p/w185${posterPath}` : null;
 
   return (
     <article className={`rounded-xl bg-white/[0.04] px-3 @[640px]/detail-page:px-4 ${compact ? "py-3" : "py-4"}`}>
@@ -1038,8 +1052,9 @@ function ReviewCard({ item }) {
   const [expanded, setExpanded] = useState(false);
   const previewClick = usePreviewOpen();
   const type = item.mediaType === "tv" ? "tv" : "movie";
-  const src = item.posterPath
-    ? `https://image.tmdb.org/t/p/w185${item.posterPath}`
+  const posterPath = useItemCardPosterPath(item, item.posterPath);
+  const src = posterPath
+    ? `https://image.tmdb.org/t/p/w185${posterPath}`
     : null;
   return (
     <div className="flex gap-4 rounded-xl bg-zinc-900/40 p-4 shadow-sm transition-all hover:bg-zinc-900/60">
@@ -1214,7 +1229,7 @@ function ProfileMediaListItem({ item, showStars, viewerState, compact = false })
   const previewClick = usePreviewOpen();
   const type = getItemMediaType(item);
   const title = getItemTitle(item) || "Sin título";
-  const src = item?.posterPath || item?.poster_path || item?.profilePosterPath;
+  const src = useItemCardPosterPath(item, item?.posterPath || item?.poster_path || item?.profilePosterPath);
   const date = getItemDate(item);
   const rating = viewerState?.rating ?? item?.userRating ?? item?.user_rating ?? item?.rating;
   const hasRating = Number(rating) > 0;
@@ -1249,7 +1264,7 @@ function DiaryListItem({ item, viewerState, onOpenGroup }) {
   const episodeGroup = Array.isArray(item?.episodeGroup) ? item.episodeGroup : null;
   const grouped = episodeGroup?.length > 1;
   const title = getItemTitle(item) || "Sin título";
-  const src = item?.posterPath || item?.poster_path;
+  const src = useItemCardPosterPath(item, item?.posterPath || item?.poster_path);
   const date = getItemDate(item);
   const href = type === "tv" && episode
     ? `/details/tv/${item.tmdbId}/season/${episode.season}/episode/${episode.episode}`
@@ -1346,7 +1361,7 @@ function DiaryGroupedEpisodesModal({ entry, onClose }) {
   const previewClick = usePreviewOpen();
   const episodes = Array.isArray(entry?.episodeGroup) ? entry.episodeGroup : [];
   const title = getItemTitle(entry) || "Serie";
-  const posterPath = entry?.posterPath || entry?.poster_path;
+  const posterPath = useItemCardPosterPath(entry, entry?.posterPath || entry?.poster_path);
   const href = `/details/tv/${entry?.tmdbId || entry?.id}`;
   const episodeStills = useDiaryEpisodeStills(entry?.tmdbId, episodes);
 

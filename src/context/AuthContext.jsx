@@ -14,6 +14,7 @@ import {
 import {
   ARTWORK_PREFERENCES_CACHE_KEY,
   applyArtworkOverrideChanges,
+  notifyPersistedArtworkOverridesChanged,
 } from "@/lib/artworkApi";
 import { AUTH_USER_CACHE_KEY } from "@/lib/auth/authUserCache";
 import { finalizeLogout } from "@/lib/auth/logoutFinalization";
@@ -181,6 +182,10 @@ function writeAuthPreferencesCache(prefs) {
     setLocalStorageItem(AUTH_PREFERENCES_CACHE_KEY, JSON.stringify(prefs));
   } catch {
     // ignore
+  } finally {
+    // Las tarjetas leen la portada elegida de esta instantánea (memoria en
+    // `artworkApi`): sin avisar, una página viva seguiría con la anterior.
+    notifyPersistedArtworkOverridesChanged();
   }
 }
 

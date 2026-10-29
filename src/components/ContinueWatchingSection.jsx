@@ -64,7 +64,6 @@ import {
   buildImg,
   fetchBestWatchingBackdrop,
   fetchBestWatchingPoster,
-  getArtworkPreference,
   movieBackdropCache,
   getBackdropCacheKey,
   getPreviewBackdropFallback,
@@ -78,6 +77,7 @@ import {
 import { useScrollRevealProps } from "@/lib/hooks/useHasScrolled";
 import PosterImage from "@/components/dashboard/DashboardPosterImage";
 import { getMobileCardsPerRow } from "@/lib/ui/mobileCardsPerRow";
+import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
 
 const EMPTY_ARRAY = [];
 const MAX_ITEMS = 20;
@@ -412,6 +412,7 @@ function useShowBackdrop(show) {
 
 function useShowPoster(show) {
   const [posterPath, setPosterPath] = useState(null);
+  const userPoster = useOwnCardPoster(mediaTypeOf(show), show?.id);
 
   useEffect(() => {
     if (!show?.id) {
@@ -421,7 +422,6 @@ function useShowPoster(show) {
 
     const type = mediaTypeOf(show);
     let canceled = false;
-    const { poster: userPoster } = getArtworkPreference(show.id, type);
     setPosterPath(userPoster || show.poster_path || null);
 
     const resolvePoster = async () => {
@@ -442,7 +442,7 @@ function useShowPoster(show) {
     return () => {
       canceled = true;
     };
-  }, [show]);
+  }, [show, userPoster]);
 
   return posterPath;
 }

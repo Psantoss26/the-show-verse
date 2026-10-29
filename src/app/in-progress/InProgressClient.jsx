@@ -58,6 +58,7 @@ import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import MobileOptionsSheet, { SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
 import { ImageModeSegmented, ImageModeSheetGroup } from "@/components/ui/ImageModeSelector";
 import PageStatCard from "@/components/ui/PageStatCard";
+import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
 
 // Tamaño de TMDb de los pósteres de las tarjetas: el mayor estándar (`w780`),
 // el mismo escalón que `w1280` en los backdrops. Antes era `w500` y en
@@ -214,6 +215,7 @@ const IN_PROGRESS_CACHE_TTL = 1000 * 60 * 5;
 const COMPLETED_CACHE_KEY = "showverse:showverse:completed:v4";
 const COMPLETED_CACHE_TTL = 1000 * 60 * 10;
 const IN_PROGRESS_VIEW_MODES = new Set(["cards", "compact", "poster"]);
+const POSTER_IMAGE_MODES = new Set(["poster", "backdrop"]);
 
 function readStoredInProgressValue(key, fallback, validValues = null) {
   if (typeof window === "undefined") return fallback;
@@ -304,15 +306,6 @@ async function getBestPosterCached(type, id, originalLanguage) {
   return p;
 }
 
-const getPosterPreference = (type, id) => {
-  if (typeof window === "undefined") return null;
-  const key =
-    type === "tv"
-      ? `showverse:tv:${id}:poster`
-      : `showverse:movie:${id}:poster`;
-  return window.localStorage.getItem(key) || null;
-};
-
 // Persisted in localStorage (not sessionStorage) so a returning user gets an
 // instant paint on the first visit of a NEW session. Data is served
 // stale-while-revalidate: we render whatever is cached (up to a hard age cap)
@@ -381,6 +374,8 @@ function SmartPoster({ item, title }) {
   const type = "tv"; // In Progress is always TV
   const id = item.tmdbId;
   const originalLanguage = item.original_language;
+  // Portada elegida en la ficha (la de la cuenta, no solo la de este equipo).
+  const pref = useOwnCardPoster(type, id);
 
   const [src, setSrc] = useState(null);
   const [ready, setReady] = useState(false);
@@ -393,7 +388,6 @@ function SmartPoster({ item, title }) {
 
     const load = async () => {
       const key = `${type}:${id}`;
-      const pref = getPosterPreference(type, id);
 
       // Resolvemos SIEMPRE la versión final antes de mostrar nada (sin flash de
       // una imagen que luego se sobreescribe) y con fallback al póster del propio
@@ -421,7 +415,7 @@ function SmartPoster({ item, title }) {
     return () => {
       abort = true;
     };
-  }, [type, id, originalLanguage]);
+  }, [type, id, originalLanguage, pref]);
 
   return (
     <div className="relative w-full h-full">
@@ -1141,10 +1135,10 @@ const InProgressCard = memo(function InProgressCard({
             {/* Progress bar - thicker with shimmer + color label */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
+                <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
                   Progreso
                 </span>
-                <span className="text-[11px] text-zinc-500">
+                <span className="text-xs text-zinc-300 font-semibold">
                   {episodeProgress.longLabel}
                 </span>
               </div>
@@ -1173,8 +1167,8 @@ const InProgressCard = memo(function InProgressCard({
               <div className="flex items-center gap-3">
                 {lastEpCode && (
                   <div className="flex items-center gap-1.5">
-                    <Eye className="w-3 h-3 text-zinc-500" />
-                    <span className="text-[11px] text-zinc-400">
+                    <Eye className="w-3.5 h-3.5 text-zinc-400" />
+                    <span className="text-xs text-zinc-300 font-semibold">
                       Último:{" "}
                       <span className="text-white font-semibold">
                         {lastEpCode}
@@ -1184,8 +1178,8 @@ const InProgressCard = memo(function InProgressCard({
                 )}
                 {remaining > 0 && (
                   <div className="flex items-center gap-1.5">
-                    <Layers className="w-3 h-3 text-zinc-500" />
-                    <span className="text-[11px] text-zinc-400">
+                    <Layers className="w-3.5 h-3.5 text-zinc-400" />
+                    <span className="text-xs text-zinc-300 font-semibold">
                       Faltan:{" "}
                       <span className="text-white font-semibold">
                         {remaining}
@@ -1286,18 +1280,22 @@ export default function InProgressClient({
   const [completedLoaded, setCompletedLoaded] = useState(false);
 
   // UI
+  // En progreso y Completadas comparten componente pero NO vista: cada página
+  // guarda la suya. Completadas, sin vista propia aún, parte de la de En
+  // progreso (la clave compartida de antes) para no perder la elección.
+  const viewPrefsPrefix = activeTab === "completed" ? "showverse:completed" : "showverse:inprogress";
   const [viewMode, setViewMode] = useState(() =>
     readStoredInProgressValue(
-      "showverse:inprogress:viewMode",
-      "cards",
+      `${viewPrefsPrefix}:viewMode`,
+      readStoredInProgressValue("showverse:inprogress:viewMode", "cards", IN_PROGRESS_VIEW_MODES),
       IN_PROGRESS_VIEW_MODES,
     ),
   );
   const [posterImageMode, setPosterImageMode] = useState(() =>
     readStoredInProgressValue(
-      "showverse:inprogress:posterImageMode",
-      "poster",
-      new Set(["poster", "backdrop"]),
+      `${viewPrefsPrefix}:posterImageMode`,
+      readStoredInProgressValue("showverse:inprogress:posterImageMode", "poster", POSTER_IMAGE_MODES),
+      POSTER_IMAGE_MODES,
     ),
   );
   const [sortBy, setSortBy] = useState(() =>
@@ -1366,15 +1364,15 @@ export default function InProgressClient({
   // Persist
   useEffect(() => {
     if (!uiReady) return;
-    window.localStorage.setItem("showverse:inprogress:viewMode", viewMode);
-  }, [uiReady, viewMode]);
+    window.localStorage.setItem(`${viewPrefsPrefix}:viewMode`, viewMode);
+  }, [uiReady, viewMode, viewPrefsPrefix]);
   useEffect(() => {
     if (!uiReady) return;
     window.localStorage.setItem(
-      "showverse:inprogress:posterImageMode",
+      `${viewPrefsPrefix}:posterImageMode`,
       posterImageMode,
     );
-  }, [posterImageMode, uiReady]);
+  }, [posterImageMode, uiReady, viewPrefsPrefix]);
   useEffect(() => {
     if (!uiReady) return;
     window.localStorage.setItem("showverse:inprogress:sortBy", sortBy);

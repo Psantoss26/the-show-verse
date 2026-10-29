@@ -40,6 +40,8 @@ import NeuralPreviewCard from "@/components/profile/neural/NeuralPreviewCard";
 import ProGate from "@/components/billing/ProGate";
 import PlanBadge from "@/components/billing/PlanBadge";
 import PageStatCard from "@/components/ui/PageStatCard";
+import { getOwnCardPoster } from "@/lib/artworkApi";
+import { useOwnCardPostersVersion } from "@/lib/hooks/useOwnCardPoster";
 import {
   Activity,
   Award,
@@ -305,6 +307,8 @@ function PendingPreview({ username, items, onOpen }) {
   }, [username]);
 
   const maxItems = pendingItems.length;
+  // Re-renderiza el mazo al elegir otra portada en la ficha.
+  useOwnCardPostersVersion();
 
   return (
     <section>
@@ -316,7 +320,9 @@ function PendingPreview({ username, items, onOpen }) {
         /* Mazo de pósters apilados sin fondo ni borde contenedor */
         <div className="relative flex h-[170px] @[640px]/detail-page:h-[190px] w-full items-center justify-start overflow-visible py-3">
           {pendingItems.map((item, index) => {
-            const source = item.posterPath ? `https://image.tmdb.org/t/p/w342${item.posterPath}` : null;
+            const posterPath =
+              getOwnCardPoster(item.mediaType === "tv" ? "tv" : "movie", item.tmdbId) || item.posterPath;
+            const source = posterPath ? `https://image.tmdb.org/t/p/w342${posterPath}` : null;
             const href = `/details/${item.mediaType === "tv" ? "tv" : "movie"}/${item.tmdbId}`;
             const titleText = item.title || item.name || "Título";
             const cardWidthPercent = 28;

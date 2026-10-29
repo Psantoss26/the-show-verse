@@ -72,7 +72,6 @@ import PreviewTrailerAudioButton, {
 } from "@/components/dashboard/PreviewTrailerAudioControl";
 import {
   fetchBestBackdropNoLang,
-  getArtworkPreference,
   fetchBestBackdrop as fetchBestCardBackdrop,
   fetchBestPoster as fetchBestCardPoster,
 } from "@/lib/dashboard/media";
@@ -84,6 +83,7 @@ import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
 import LiquidButton from "@/components/LiquidButton";
+import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
 
 /* =================== ANIMATION VARIANTS =================== */
 const fadeInUp = {
@@ -406,6 +406,8 @@ function PosterImage({ movie, cache }) {
   const initialPosterPath = movie?.poster_path || movie?.backdrop_path || null;
   const [posterPath, setPosterPath] = useState(initialPosterPath);
   const [ready, setReady] = useState(!!initialPosterPath);
+  // Portada elegida en la ficha, suscrita (se actualiza con la página viva).
+  const userPoster = useOwnCardPoster("movie", movie?.id);
 
   useEffect(() => {
     let abort = false;
@@ -418,10 +420,8 @@ function PosterImage({ movie, cache }) {
       setReady(!!basePoster);
 
       // 1) Preferencia usuario
-      const { poster: userPoster } = getArtworkPreference(movie.id);
       if (userPoster) {
         if (!abort) {
-          cache.current.set(movie.id, userPoster);
           setPosterPath(userPoster);
           setReady(true);
         }
@@ -462,7 +462,7 @@ function PosterImage({ movie, cache }) {
     return () => {
       abort = true;
     };
-  }, [movie, cache]);
+  }, [movie, cache, userPoster]);
 
   if (!ready || !posterPath) {
     return (

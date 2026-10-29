@@ -15,7 +15,7 @@ const backdrops = [
 ];
 const logos = [{ file_path: "/logo.png", iso_639_1: "es" }];
 
-test("móvil: las mismas pestañas que la ficha (Portada sin idioma, Con idioma y Logo)", () => {
+test("móvil: las mismas pestañas que la ficha (Portada sin idioma, Con idioma, Tarjetas y Logo)", () => {
   const tabs = buildArtworkSheetTabs({
     mobile: true,
     posters,
@@ -26,6 +26,7 @@ test("móvil: las mismas pestañas que la ficha (Portada sin idioma, Con idioma 
   assert.deepEqual(tabs.map((tab) => [tab.id, tab.label]), [
     ["posters", "Portada"],
     ["localizedPosters", "Con idioma"],
+    ["cardPosters", "Tarjetas"],
     ["logos", "Logo"],
   ]);
   // Solo portadas sin idioma, con la elegida primero.
@@ -44,9 +45,9 @@ test("escritorio: Portada, Vista previa, Fondo y Logo", () => {
   assert.deepEqual(tabs[2].images.map((img) => img.file_path), ["/limpio.jpg", "/main.jpg"]);
 });
 
-test("móvil sin portadas neutras: solo «Con idioma»; pestañas vacías fuera", () => {
+test("móvil sin portadas neutras: sin «Portada»; pestañas vacías fuera", () => {
   const tabs = buildArtworkSheetTabs({ mobile: true, posters: [posters[0]], backdrops: [], logos: [] });
-  assert.deepEqual(tabs.map((tab) => tab.id), ["localizedPosters"]);
+  assert.deepEqual(tabs.map((tab) => tab.id), ["localizedPosters", "cardPosters"]);
   assert.deepEqual(tabs[0].images.map((img) => img.file_path), ["/es.jpg"]);
 });
 
@@ -83,4 +84,23 @@ test("logos: solo en español e inglés (con el elegido primero); si no hay ning
   const onlyOthers = [{ file_path: "/ja.png", iso_639_1: "ja" }, { file_path: "/fr.png", iso_639_1: "fr" }];
   const tabs = buildArtworkSheetTabs({ posters, backdrops, logos: onlyOthers });
   assert.equal(tabs.find((tab) => tab.id === "logos").count, 2);
+});
+
+test("móvil: «Tarjetas» guarda la portada de escritorio y solo marca la elegida a propósito", () => {
+  const card = (active) =>
+    buildArtworkSheetTabs({ mobile: true, posters, backdrops, logos, active }).find(
+      (tab) => tab.id === "cardPosters",
+    );
+
+  // Sin elección propia no hay marca, aunque la ficha de escritorio tenga una
+  // portada automática.
+  const auto = card({ poster: "/neutral-1.jpg", mobilePoster: "/neutral-2.jpg" });
+  assert.equal(auto.kind, "poster");
+  assert.equal(auto.activePath, null);
+  // Todas las portadas, con y sin idioma.
+  assert.deepEqual(auto.images.map((img) => img.file_path), ["/es.jpg", "/neutral-1.jpg", "/neutral-2.jpg"]);
+
+  const chosen = card({ cardPoster: "/neutral-2.jpg", mobilePoster: "/es.jpg" });
+  assert.equal(chosen.activePath, "/neutral-2.jpg");
+  assert.deepEqual(chosen.images.map((img) => img.file_path), ["/neutral-2.jpg", "/es.jpg", "/neutral-1.jpg"]);
 });
