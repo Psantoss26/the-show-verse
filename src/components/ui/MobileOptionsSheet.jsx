@@ -366,7 +366,9 @@ export function SheetOptionGroup({ label, icon: Icon, children, layout = "wrap",
 }
 
 // Una opción: píldora de cristal; la elegida, en blanco con su marca.
-export function SheetOption({ active, onClick, children, icon: Icon, disabled = false, className = "" }) {
+// `count`: cuántos elementos deja ese filtro, en una insignia propia junto a
+// la etiqueta (no «Inglés (43)» dentro del texto).
+export function SheetOption({ active, onClick, children, icon: Icon, count = null, disabled = false, className = "" }) {
   const accent = useContext(OptionsSheetContext);
   return (
     <button
@@ -384,6 +386,18 @@ export function SheetOption({ active, onClick, children, icon: Icon, disabled = 
         <Icon className={`h-4 w-4 shrink-0 ${active ? "text-zinc-950" : ACCENTS[accent] || ACCENTS.zinc}`} aria-hidden="true" />
       ) : null}
       <span className="min-w-0 truncate">{children}</span>
+      {count != null ? (
+        // `pt-px`: las cifras de PT Sans quedan 1 px por encima del centro de
+        // su línea (medido: 5,5 px de hueco arriba y 6,5 abajo); así quedan
+        // centradas en la insignia.
+        <span
+          className={`inline-flex min-h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 pt-px text-[11px] font-bold tabular-nums leading-none ${
+            active ? "bg-zinc-950/10 text-zinc-700" : "bg-white/[0.08] text-zinc-400"
+          }`}
+        >
+          {count}
+        </span>
+      ) : null}
       {active && !Icon ? <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" /> : null}
     </button>
   );

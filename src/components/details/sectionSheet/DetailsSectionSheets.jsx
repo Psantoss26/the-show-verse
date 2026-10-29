@@ -738,23 +738,25 @@ export function ImagesSheet({ meta, data, onClose, tab, setTab }) {
               <>
                 <DropdownItem
                   active={language === "all"}
+                  count={tabImages.length}
                   onClick={() => {
                     close();
                     startTransition(() => setLanguage("all"));
                   }}
                 >
-                  Todos ({tabImages.length})
+                  Todos
                 </DropdownItem>
                 {languages.map((option) => (
                   <DropdownItem
                     key={option.code}
                     active={language === option.code}
+                    count={option.count}
                     onClick={() => {
                       close();
                       startTransition(() => setLanguage(option.code));
                     }}
                   >
-                    {option.label} ({option.count})
+                    {option.label}
                   </DropdownItem>
                 ))}
               </>

@@ -223,12 +223,12 @@ function InlineDropdownMenu({
 // Dentro de la hoja de filtros móvil, cada opción es una píldora.
 export function DropdownItem(props) {
   if (useInOptionsSheet()) {
-    return <SheetOption active={props.active} onClick={props.onClick}>{props.children}</SheetOption>;
+    return <SheetOption active={props.active} onClick={props.onClick} count={props.count}>{props.children}</SheetOption>;
   }
   return <DropdownMenuItem {...props} />;
 }
 
-function DropdownMenuItem({ active, onClick, children }) {
+function DropdownMenuItem({ active, onClick, children, count = null }) {
   const tone = useContext(AccentContext);
   return (
     <button
@@ -240,7 +240,16 @@ function DropdownMenuItem({ active, onClick, children }) {
           : "text-zinc-300 hover:bg-white/5 hover:text-white"
       }`}
     >
-      <span className="font-medium whitespace-nowrap">{children}</span>
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="font-medium whitespace-nowrap">{children}</span>
+        {/* Cuántos elementos deja la opción (`count`), en su insignia. */}
+        {count != null ? (
+          // `pt-px`: centra las cifras de PT Sans (ver SheetOption).
+          <span className="inline-flex min-h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-white/[0.08] px-1.5 pt-px text-[11px] font-bold tabular-nums leading-none text-zinc-400">
+            {count}
+          </span>
+        ) : null}
+      </span>
       {/* Hueco de la marca siempre reservado (como en Favoritos): el ancho
           del menú no cambia según la opción elegida. */}
       {active ? (
