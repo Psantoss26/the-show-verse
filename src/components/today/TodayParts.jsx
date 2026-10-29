@@ -2,11 +2,11 @@
 
 // src/components/today/TodayParts.jsx
 // Bloques de Hoy (Social): carril de historias,
-// historia destacada, destacados, «Para ti» y los más activos. La agrupación
+// historia destacada, destacados, «Para ti», los más activos y los seguimientos. La agrupación
 // del feed vive en TodayFeed y el reproductor en TodayStoryViewer.
 
 import Link from "next/link";
-import { ImageOff, MessageSquare, Play, Star } from "lucide-react";
+import { ImageOff, MessageSquare, Play, Star, UserPlus } from "lucide-react";
 
 import OptimizedImage from "@/components/OptimizedImage";
 import Avatar from "@/components/ui/Avatar";
@@ -377,6 +377,36 @@ export function TodayMostActive({ ranking, onOpenPerson }) {
               </span>
             </span>
           </button>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Seguimientos: quién empezó a seguir a quién en el día elegido
+// ─────────────────────────────────────────────
+
+export function TodayFollows({ follows, tz, onOpenPerson }) {
+  if (!follows?.length) return null;
+  return (
+    <ol className={`space-y-1 rounded-2xl p-2 ${CARD_SURFACE}`}>
+      {follows.map((follow) => (
+        <li key={follow.key} className="flex items-center gap-3 rounded-xl px-2 py-2.5">
+          <button
+            type="button"
+            onClick={() => onOpenPerson(follow.user)}
+            aria-label={displayName(follow.user)}
+            className="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/70"
+          >
+            <UserAvatar user={follow.user} className="h-9 w-9" />
+          </button>
+          <UserPlus className="h-4 w-4 shrink-0 text-sky-400" aria-hidden="true" />
+          <span className="min-w-0 flex-1 text-sm leading-5 text-zinc-400">
+            <PersonName user={follow.user} onOpenPerson={onOpenPerson} /> ha empezado a seguir a{" "}
+            <PersonName user={follow.target} onOpenPerson={onOpenPerson} />
+            <span className="block text-xs text-zinc-500">{whenLabel(follow.at, tz)}</span>
+          </span>
         </li>
       ))}
     </ol>

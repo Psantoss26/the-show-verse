@@ -9,7 +9,7 @@
 
 const TV_TYPES = new Set(["tv", "show", "season", "episode"]);
 // Sin ficha de título propia: el arte es el de la lista, la colección o el actor.
-const WITHOUT_TITLE = new Set(["list", "like_list", "like_collection", "like_actor"]);
+const WITHOUT_TITLE = new Set(["list", "like_list", "like_collection", "like_actor", "follow", "follower"]);
 
 /**
  * ¿La acción se pinta con un RETRATO (la foto de una persona) en vez de un
@@ -17,7 +17,12 @@ const WITHOUT_TITLE = new Set(["list", "like_list", "like_collection", "like_act
  * su foto, centrada en la caja 16:9 y sin fondo detrás.
  */
 export function isPortraitActivity(item) {
-  return item?.type === "like_actor";
+  return item?.type === "like_actor" || isUserActivity(item);
+}
+
+/** ¿La imagen de la acción es el avatar de otra cuenta? (seguimientos) */
+export function isUserActivity(item) {
+  return item?.type === "follow" || item?.type === "follower";
 }
 
 /** Título de TMDb cuyo backdrop corresponde a la acción, o null. */
@@ -42,5 +47,6 @@ export function hasActivityBackdropArtwork(item) {
   if (activityBackdropTarget(item)) return true;
   if ((item?.type === "list" || item?.type === "like_list") && item.previewItems?.length) return true;
   if (item?.type === "like_actor" && Number(item.personId) > 0) return true;
+  if (isUserActivity(item)) return true;
   return item?.type === "like_collection" && Number(item.collectionId) > 0;
 }

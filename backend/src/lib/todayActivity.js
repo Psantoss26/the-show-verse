@@ -44,6 +44,7 @@ import {
 // una respuesta desproporcionada. Se quedan las más recientes.
 export const TODAY_SOURCE_MAX = 2000;
 const FOR_YOU_MAX = 25;
+const FOLLOWS_MAX = 30;
 const CACHE_TTL = { following: 30, community: 60 };
 
 export function todayCacheKey(scope, viewerId, day, tz) {
@@ -139,6 +140,36 @@ async function loadSourceRows(db, scope, followingIds, startAt, endAt) {
       .orderBy(desc(titleComments.createdAt))
       .limit(TODAY_SOURCE_MAX),
   ]);
+}
+
+// Seguimientos del día elegido: quién empezó a seguir a quién. Sin título, así
+// que no entran en las historias; van en su propio bloque. El seguidor pasa el
+// mismo filtro que el resto de autores y el seguido tiene que estar activo.
+async function loadFollows(db, scope, followingIds, range) {
+  if (scope === 'following' && !followingIds.length) return [];
+  const rows = await db
+    .select({
+      id: follows.id,
+      followerId: follows.followerId,
+      followingId: follows.followingId,
+      at: follows.createdAt,
+    })
+    .from(follows)
+    .innerJoin(users, eq(users.id, follows.followingId))
+    .where(and(
+      authorFilter(scope, follows.followerId, followingIds),
+      eq(users.isActive, true),
+      gte(follows.createdAt, new Date(range.startAt)),
+      lt(follows.createdAt, new Date(range.endAt)),
+    ))
+    .orderBy(desc(follows.createdAt))
+    .limit(FOLLOWS_MAX);
+  return rows.map((row) => ({
+    key: `follow:${row.id}`,
+    followerId: row.followerId,
+    followingId: row.followingId,
+    at: new Date(row.at).toISOString(),
+  }));
 }
 
 function imagePaths(meta) {
@@ -305,14 +336,26 @@ async function buildToday(db, viewerId, { scope, range, tz, nowMs, withForYou = 
   const counted = countActionsByDay(all, [...days, week]);
   const selected = actionsInRange(all, range);
 
+  const followRows = await loadFollows(db, scope, followingIds, range).catch(() => []);
   const [hydrated, authors, forYou] = await Promise.all([
     hydrateActions(db, selected),
-    loadAuthors(db, [...new Set(selected.map((a) => a.userId))]),
+    loadAuthors(db, [...new Set([
+      ...selected.map((a) => a.userId),
+      ...followRows.flatMap((f) => [f.followerId, f.followingId]),
+    ])]),
     withForYou ? loadForYou(db, viewerId, range, tz).catch(() => []) : null,
   ]);
   const actions = hydrated
     .map(({ userId, mediaType, tmdbId, ...action }) => ({ ...action, user: authors.get(userId) || null }))
     .filter((action) => action.user);
+  const followEvents = followRows
+    .map(({ key, at, followerId, followingId }) => ({
+      key,
+      at,
+      user: authors.get(followerId) || null,
+      target: authors.get(followingId) || null,
+    }))
+    .filter((follow) => follow.user && follow.target);
 
   return {
     scope,
@@ -331,6 +374,7 @@ async function buildToday(db, viewerId, { scope, range, tz, nowMs, withForYou = 
     following: followingCount,
     truncated: [watches, ratings, comments].some((rows) => rows.length >= TODAY_SOURCE_MAX),
     actions,
+    follows: followEvents,
     forYou,
   };
 }

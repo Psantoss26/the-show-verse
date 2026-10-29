@@ -87,6 +87,7 @@ Maqueta como la Today de Trakt. En escritorio hay tres columnas con su título a
   - por título (por defecto);
   - por persona, con un bloque por persona;
   - por hora, en franjas mañana 5–12, tarde 12–18, noche 18–23 y madrugada. La madrugada cuenta como el final del día anterior.
+- **Seguimientos:** quién empezó a seguir a quién en la ventana (`follows` de la respuesta, hasta 30, de `loadFollows` en `todayActivity.js`: el seguidor pasa el filtro de Quién y el seguido tiene que estar activo). No son historias (no tienen título): van en su propio bloque.
 - **Más activos:** las 5 personas con más acciones en la ventana: puesto, cara, nombre, «N historias» y una barra fina proporcional al primero.
 - **Panel de persona** (`TodayPersonDrawer`): el mismo panel lateral que las secciones de DetailsClient (`SectionSheet`, acento `pink` y la foto en `leading`). Tiene:
   - pestañas Todo / Vistos / Notas / Reseñas con recuento;

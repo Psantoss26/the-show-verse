@@ -73,6 +73,29 @@ export function addDismissed(list, id) {
   return next.slice(-DISMISSED_MAX);
 }
 
+/** Nombre del seguidor de una alerta `new_follower`. */
+export function followerName(item) {
+  return item?.follower?.displayName || item?.follower?.username || "Alguien";
+}
+
+/**
+ * Adónde lleva tocar una alerta: el perfil del seguidor en `new_follower`; el
+ * resto, su ficha (`detailsHref`, normalmente getActivityDetailsHref).
+ */
+export function alertHref(item, detailsHref) {
+  if (item?.type === "new_follower") {
+    return item.follower?.username ? `/u/${encodeURIComponent(item.follower.username)}` : null;
+  }
+  return detailsHref(item);
+}
+
+// Grupo de avisos de una alerta: las de un mismo título van juntas; un seguidor
+// nuevo no es de ningún título y va solo.
+function alertGroupKey(item) {
+  if (item?.type === "new_follower") return `follower:${item.follower?.username || item.id}`;
+  return `${item.mediaType}:${Number(item.tmdbId)}`;
+}
+
 /** "S01E03 de " para episodios, como en la Actividad del perfil. */
 export function episodeCode(item) {
   if (item?.season == null || item?.episode == null) return "";
@@ -167,7 +190,7 @@ export function freshAlertGroups(alerts, { since, shown = new Set(), skip = () =
 
   const groups = new Map();
   for (const row of rows) {
-    const key = `${row.item.mediaType}:${Number(row.item.tmdbId)}`;
+    const key = alertGroupKey(row.item);
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(row);
   }
@@ -208,6 +231,7 @@ function alertSentence({ kind, item }) {
     if (item.type === "collection_next") {
       return item.afterTitle ? `Siguiente de la saga después de ${item.afterTitle}` : "Siguiente de la saga";
     }
+    if (item.type === "new_follower") return "Ha empezado a seguirte";
     return null;
   }
   // La nota no va en el texto: el aviso la pinta como icono (ver `rating` en
@@ -225,6 +249,7 @@ const ALERT_LOOK = {
   auto_watched: { icon: "autoWatched", label: "Visto" },
   show_completed: { icon: "completed", label: "Serie completada" },
   collection_next: { icon: "saga", label: "Saga" },
+  new_follower: { icon: "follow", label: "Nuevo seguidor" },
   watched: { icon: "watched", label: "Visto" },
   rating: { icon: "rate", label: "Nota" },
   watchlist: { icon: "watchlist", label: "Pendientes" },
@@ -253,9 +278,12 @@ export function describeAlertGroup(rows) {
   );
   return {
     ...look,
-    title: list.find((row) => row.item.title)?.item.title || null,
+    title: list.find((row) => row.item.title)?.item.title
+      || (primary.item.type === "new_follower" ? followerName(primary.item) : null),
     text: list.map(alertSentence).filter(Boolean).join(". "),
     posterPath: list.find((row) => row.item.posterPath)?.item.posterPath || null,
+    // Seguidor nuevo: su avatar en lugar del cartel.
+    image: primary.item.type === "new_follower" ? primary.item.follower?.avatarUrl || null : null,
     // Una puntuación sola: el aviso enseña el título con la nota como icono
     // y, si es de un episodio o una temporada, cuál (`ratingTarget`).
     ...(list.length === 1 && primary.kind !== "reminder" && primary.item.type === "rating" && typeof primary.item.rating === "number"

@@ -49,3 +49,28 @@ test('push: url de la ficha', () => {
   assert.equal(alertUrl({ tmdbId: 5, mediaType: 'tv' }), '/details/tv/5');
   assert.equal(alertUrl({ tmdbId: 0, mediaType: 'tv' }), '/');
 });
+
+test('push: nuevo seguidor, solo y al perfil', () => {
+  const follower = { username: 'ana b', displayName: 'Ana', avatarUrl: 'https://x/a.png' };
+  const messages = buildPushMessages({
+    events: [
+      { id: 'follower:1', type: 'new_follower', follower, createdAt: ago(1) },
+      { id: 'follower:2', type: 'new_follower', follower: { username: 'luis', displayName: 'Luis', avatarUrl: null }, createdAt: ago(2) },
+    ],
+  }, { now: NOW });
+  assert.equal(messages.length, 2);
+  const ana = messages.find((m) => m.alertIds[0] === 'follower:1');
+  assert.equal(ana.type, 'new_follower');
+  assert.equal(ana.title, 'Ana');
+  assert.equal(ana.body, 'Ha empezado a seguirte');
+  assert.equal(ana.url, '/u/ana%20b');
+  assert.equal(ana.image, 'https://x/a.png');
+  assert.equal(ana.tag, 'tsv:follower:ana b');
+});
+
+test('push: un avatar data: no viaja en el mensaje', () => {
+  const [message] = buildPushMessages({
+    events: [{ id: 'follower:3', type: 'new_follower', follower: { username: 'eva', displayName: 'Eva', avatarUrl: 'data:image/webp;base64,AAAA' }, createdAt: ago(1) }],
+  }, { now: NOW });
+  assert.equal(message.image, null);
+});

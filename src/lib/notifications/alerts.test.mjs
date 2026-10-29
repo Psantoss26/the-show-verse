@@ -135,3 +135,25 @@ test("ventanas emergentes: la nota va como icono, no en el texto", () => {
   ]);
   assert.equal(episode.ratingTarget, "S01E03");
 });
+
+test("nuevo seguidor: enlace al perfil, aviso propio y avatar", async () => {
+  const { alertHref, describeAlertGroup, freshAlertGroups } = await import("./alerts.js");
+  const item = {
+    id: "follower:1",
+    type: "new_follower",
+    follower: { username: "ana", displayName: "Ana", avatarUrl: "https://x/a.png" },
+    createdAt: "2026-10-29T10:00:00.000Z",
+  };
+  assert.equal(alertHref(item, () => "/nope"), "/u/ana");
+  assert.equal(alertHref({ type: "watched" }, () => "/details/movie/1"), "/details/movie/1");
+  const groups = freshAlertGroups(
+    { events: [item, { id: "c1", type: "cw_added", mediaType: "tv", tmdbId: 1, createdAt: "2026-10-29T10:00:00.000Z" }] },
+    { since: "2026-10-29T09:00:00.000Z" },
+  );
+  assert.deepEqual(groups.map((g) => g.key).sort(), ["follower:ana", "tv:1"]);
+  const content = describeAlertGroup(groups.find((g) => g.key === "follower:ana").rows);
+  assert.equal(content.title, "Ana");
+  assert.equal(content.text, "Ha empezado a seguirte");
+  assert.equal(content.image, "https://x/a.png");
+  assert.equal(content.icon, "follow");
+});

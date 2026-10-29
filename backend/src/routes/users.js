@@ -444,6 +444,8 @@ export default async function usersRoutes(fastify) {
       .values({ followerId: req.user.id, followingId: target.id })
       .onConflictDoNothing();
     await invalidateTodayFollowing(req.user.id);
+    // El seguido recibe la alerta «ha empezado a seguirte» (y su push).
+    req.pushUserId = target.id;
     return reply.send({ following: true });
   });
 

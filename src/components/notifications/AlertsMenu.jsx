@@ -20,21 +20,25 @@ import {
   Sparkles,
   Star,
   Trophy,
+  UserPlus,
   X as XIcon,
 } from "lucide-react";
 import OptimizedImage from "@/components/OptimizedImage";
+import Avatar from "@/components/ui/Avatar";
 import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import { useTranslation } from "@/lib/i18n";
 import {
   ALERTS_LOADED_EVENT,
   ALERTS_REFRESH_EVENT,
   addDismissed,
+  alertHref,
   alertsTimeline,
   alertsDismissedKey,
   alertsLastSeenKey,
   alertsUnreadKey,
   countUnread,
   episodeCode,
+  followerName,
   normalizeAlerts,
   platformIcon,
   platformLabel,
@@ -66,6 +70,7 @@ const EVENTS = {
   auto_watched: { Icon: CheckCircle2, tone: "text-emerald-400" },
   show_completed: { Icon: Trophy, tone: "text-amber-400", filled: true },
   collection_next: { Icon: Layers, tone: "text-purple-400" },
+  new_follower: { Icon: UserPlus, tone: "text-sky-400" },
 };
 
 // Sin volver a pedir las alertas más de una vez en este intervalo por foco o
@@ -145,6 +150,9 @@ function AlertText({ kind, item }) {
       return <>Has terminado {code}<Title item={item} />: pasa de Continuar viendo a visto</>;
     }
     if (item.type === "show_completed") return <>Has completado la serie <Title item={item} /></>;
+    if (item.type === "new_follower") {
+      return <><span className="font-bold text-white">{followerName(item)}</span> ha empezado a seguirte</>;
+    }
     if (item.type === "collection_next") {
       const upcoming = upcomingRelease(item.releaseDate);
       return (
@@ -184,8 +192,9 @@ function alertIcon(kind, item) {
 // Fila con la misma forma que las del desplegable de secciones de Perfil,
 // en orden cartel, icono y texto. `isNew` marca lo llegado desde la última apertura.
 function AlertRow({ kind, item, isNew, onNavigate, onDismiss }) {
-  const href = getActivityDetailsHref(item);
+  const href = alertHref(item, getActivityDetailsHref);
   const { Icon, tone, filled } = alertIcon(kind, item);
+  const isFollower = kind === "event" && item.type === "new_follower";
   const src = item.posterPath ? `https://image.tmdb.org/t/p/w185${item.posterPath}` : null;
   // Con plataforma conocida, su logotipo SUSTITUYE al icono de la alerta en el
   // hueco de la izquierda (no se enseñan los dos, ni el logotipo aparte).
@@ -194,7 +203,14 @@ function AlertRow({ kind, item, isNew, onNavigate, onDismiss }) {
   const body = (
     <>
       <span className="h-16 w-11 shrink-0 overflow-hidden rounded-lg">
-        {src ? (
+        {isFollower ? (
+          // Seguidor: su avatar redondo, centrado en el hueco del cartel.
+          <span className="flex h-full w-full items-center justify-center">
+            <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-zinc-800 text-sm font-black text-zinc-200">
+              <Avatar src={item.follower?.avatarUrl} name={followerName(item)} alt="" width={44} height={44} loading="lazy" />
+            </span>
+          </span>
+        ) : src ? (
           <OptimizedImage src={src} alt="" width={44} height={64} className="h-full w-full object-cover" loading="lazy" />
         ) : (
           <span className="flex h-full w-full items-center justify-center text-zinc-600">

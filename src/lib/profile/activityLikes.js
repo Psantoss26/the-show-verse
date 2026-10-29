@@ -5,11 +5,27 @@
 //   - like_collection  colección de TMDb (collectionId, name)
 //   - like_actor       persona de TMDb: actor, actriz, dirección… (personId, name)
 // Para filtrar y agrupar, los cuatro son una sola acción: "like".
+//
+// Los seguimientos comparten estas mismas piezas (enlace, nombre y verbo),
+// porque también apuntan a algo que no es un título: otra cuenta.
+//   - follow    la cuenta empezó a seguir a `targetUser`
+//   - follower  `targetUser` empezó a seguir a la cuenta
+// Para filtrar y agrupar son la acción "follow".
 
 export const LIKE_ACTIVITY_TYPES = Object.freeze(["like_review", "like_list", "like_collection", "like_actor"]);
+export const FOLLOW_ACTIVITY_TYPES = Object.freeze(["follow", "follower"]);
 
 export function isLikeActivity(item) {
   return LIKE_ACTIVITY_TYPES.includes(item?.type);
+}
+
+export function isFollowActivity(item) {
+  return FOLLOW_ACTIVITY_TYPES.includes(item?.type);
+}
+
+/** ¿Se pinta con likeTargetHref/likeTargetName/likeVerb? Me gusta y seguimientos. */
+export function hasTargetActivity(item) {
+  return isLikeActivity(item) || isFollowActivity(item);
 }
 
 /**
@@ -19,11 +35,15 @@ export function isLikeActivity(item) {
 export function activityActionKey(item) {
   if (item?.type === "list_item") return "list";
   if (isLikeActivity(item)) return "like";
+  if (isFollowActivity(item)) return "follow";
   return item?.type;
 }
 
 /** Página de la lista o colección con me gusta (las reseñas van a su ficha). */
 export function likeTargetHref(item) {
+  if (isFollowActivity(item)) {
+    return item.targetUser?.username ? `/u/${encodeURIComponent(item.targetUser.username)}` : null;
+  }
   if (item?.type === "like_list" && item.listId) {
     return `/lists/community/${encodeURIComponent(String(item.listId))}`;
   }
@@ -46,6 +66,7 @@ export function likeTargetName(item) {
     return String(item.name || "").replace(/\s*[-–—]\s*(colecci[oó]n|collection)\s*$/i, "").trim() || "Colección";
   }
   if (item?.type === "like_actor") return item.name || "una persona";
+  if (isFollowActivity(item)) return item.targetUser?.displayName || item.targetUser?.username || "un usuario";
   return item?.title || "";
 }
 
@@ -64,16 +85,20 @@ const LIKE_VERBS = {
     like_collection: "ha dado me gusta a la colección",
     // Neutro: vale para actores, actrices, directores… («a Brad Pitt»).
     like_actor: "ha dado me gusta a",
+    follow: "ha empezado a seguir a",
+    follower: "tiene un nuevo seguidor:",
   },
   first: {
     like_review: "Has dado me gusta a una reseña de",
     like_list: "Has dado me gusta a la lista",
     like_collection: "Has dado me gusta a la colección",
     like_actor: "Has dado me gusta a",
+    follow: "Has empezado a seguir a",
+    follower: "Tienes un nuevo seguidor:",
   },
 };
 
-/** Verbo del me gusta: en tercera persona ("ha dado…") o en primera ("Has dado…"). */
+/** Verbo del me gusta o del seguimiento: en tercera persona ("ha dado…") o en primera ("Has dado…"). */
 export function likeVerb(item, { firstPerson = false } = {}) {
   return LIKE_VERBS[firstPerson ? "first" : "third"][item?.type] || null;
 }

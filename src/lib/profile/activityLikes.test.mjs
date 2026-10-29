@@ -48,3 +48,21 @@ test("verbos en tercera y primera persona", () => {
   assert.equal(likeVerb({ type: "like_review" }, { firstPerson: true }), "Has dado me gusta a una reseña de");
   assert.equal(likeVerb({ type: "watched" }), null);
 });
+
+test("seguimientos: acción, enlace, nombre y verbos", async () => {
+  const { isFollowActivity, hasTargetActivity } = await import("./activityLikes.js");
+  const follow = { type: "follow", targetUser: { username: "ana b", displayName: "Ana" } };
+  const follower = { type: "follower", targetUser: { username: "luis", displayName: null } };
+  assert.equal(isFollowActivity(follow), true);
+  assert.equal(isLikeActivity(follow), false);
+  assert.equal(hasTargetActivity(follower), true);
+  assert.equal(activityActionKey(follow), "follow");
+  assert.equal(activityActionKey(follower), "follow");
+  assert.equal(likeTargetHref(follow), "/u/ana%20b");
+  assert.equal(likeTargetName(follow), "Ana");
+  assert.equal(likeTargetName(follower), "luis");
+  assert.equal(likeVerb(follow), "ha empezado a seguir a");
+  assert.equal(likeVerb(follow, { firstPerson: true }), "Has empezado a seguir a");
+  assert.equal(likeVerb(follower), "tiene un nuevo seguidor:");
+  assert.equal(likeVerb(follower, { firstPerson: true }), "Tienes un nuevo seguidor:");
+});

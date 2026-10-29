@@ -6,13 +6,16 @@
 //       · entradas automáticas en "Continuar viendo" y pasos automáticos a
 //         visto: los recibos de progreso (streaming_events);
 //       · series completadas: el mismo criterio que el perfil;
-//       · siguiente película de una colección: TMDb (belongs_to_collection).
+//       · siguiente película de una colección: TMDb (belongs_to_collection);
+//       · nuevos seguidores: la tabla follows.
 
 import { and, asc, desc, eq, gte, inArray, sql } from 'drizzle-orm';
 import {
+  follows,
   streamingEvents,
   titleComments,
   userRatings,
+  users,
   watchHistory,
   watchProgress,
 } from '../db/schema.js';
@@ -260,6 +263,34 @@ async function getCollectionNext(db, userId, watched) {
   return out;
 }
 
+// Quién ha empezado a seguir al usuario en la ventana. Sin título: la alerta
+// lleva al perfil del seguidor (`follower`).
+async function getNewFollowers(db, userId, since) {
+  const rows = await db
+    .select({
+      id: follows.id,
+      createdAt: follows.createdAt,
+      username: users.username,
+      displayName: users.displayName,
+      avatarUrl: users.avatarUrl,
+    })
+    .from(follows)
+    .innerJoin(users, eq(users.id, follows.followerId))
+    .where(and(eq(follows.followingId, userId), eq(users.isActive, true), gte(follows.createdAt, since)))
+    .orderBy(desc(follows.createdAt))
+    .limit(EVENTS_LIMIT);
+  return rows.map((row) => ({
+    id: `follower:${row.id}`,
+    type: 'new_follower',
+    follower: {
+      username: row.username,
+      displayName: row.displayName || row.username,
+      avatarUrl: row.avatarUrl || null,
+    },
+    createdAt: row.createdAt,
+  }));
+}
+
 export async function getUserNotifications(db, userId) {
   const since = new Date(Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
@@ -300,12 +331,13 @@ export async function getUserNotifications(db, userId) {
   const { completions, completedShows } = await getShowCompletions(db, userId, watched, since)
     .catch(() => ({ completions: new Map(), completedShows: [] }));
 
-  const [activity, reminders, autoCompleted, cwAdds, collectionNext] = await Promise.all([
+  const [activity, reminders, autoCompleted, cwAdds, collectionNext, newFollowers] = await Promise.all([
     getUserActivity(db, userId, { limit: 40 }),
     getReminders(db, userId, watched, completions),
     getAutoCompleted(db, userId, since),
     getContinueWatchingAdds(db, userId, since),
     getCollectionNext(db, userId, watched).catch(() => []),
+    getNewFollowers(db, userId, since).catch(() => []),
   ]);
 
   const actions = splitAutoCompleted(
@@ -313,14 +345,14 @@ export async function getUserNotifications(db, userId) {
     autoCompleted,
   ).slice(0, ACTIONS_LIMIT);
 
-  const events = [...cwAdds, ...autoCompleted, ...completedShows, ...collectionNext]
+  const events = [...cwAdds, ...autoCompleted, ...completedShows, ...collectionNext, ...newFollowers]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, EVENTS_LIMIT);
 
   // La actividad ya viene con título y cartel; el resto sale de tablas que a
   // menudo no los guardan (los visionados sincronizados). Las películas de una
   // colección ya traen los suyos de TMDb.
-  const bare = [...reminders, ...events.filter((item) => item.type !== 'collection_next')];
+  const bare = [...reminders, ...events.filter((item) => item.tmdbId && item.type !== 'collection_next')];
   if (bare.length) {
     await fillMissingPosters(db, userId, bare);
     const metadata = await getMediaMetadataMap(bare).catch(() => new Map());

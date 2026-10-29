@@ -30,6 +30,7 @@ import {
   TodayForYouRow,
   TodayHero,
   TodayHighlightCard,
+  TodayFollows,
   TodayMostActive,
 } from "@/components/today/TodayParts";
 import { hasUnseenFrames, readSeenStories, writeSeenStories } from "@/lib/today/seenStories";
@@ -228,6 +229,11 @@ export default function TodayClient({
   const empty = data && !derived.prepared.length;
   const quiet = data && isQuietDay(data.range?.day, derived.prepared.length);
   const noFollowing = scope === "following" && data && data.following === 0;
+  // Seguimientos del día (quién empezó a seguir a quién); el buscador filtra
+  // por el nombre de cualquiera de los dos.
+  const follows = (data?.follows || []).filter((follow) =>
+    !text || [follow.user, follow.target].some((user) =>
+      [user?.displayName, user?.username].some((value) => String(value || "").toLowerCase().includes(text))));
 
   return (
     <div>
@@ -279,6 +285,12 @@ export default function TodayClient({
               </button>
             ) : null}
             <TodayForYouRow items={data.forYou} />
+            {follows.length ? (
+              <div className="mt-6 w-full max-w-md text-left">
+                <ColumnHeading id="today-follows-empty">Seguimientos</ColumnHeading>
+                <TodayFollows follows={follows} tz={tz} onOpenPerson={setPerson} />
+              </div>
+            ) : null}
           </div>
         ) : (
           <>
@@ -352,6 +364,12 @@ export default function TodayClient({
                 <div className="xl:sticky xl:top-40">
                   <ColumnHeading id="today-most-active">Más activos</ColumnHeading>
                   <TodayMostActive ranking={derived.ranking} onOpenPerson={setPerson} />
+                  {follows.length ? (
+                    <div className="mt-8">
+                      <ColumnHeading id="today-follows" count={follows.length}>Seguimientos</ColumnHeading>
+                      <TodayFollows follows={follows} tz={tz} onOpenPerson={setPerson} />
+                    </div>
+                  ) : null}
                 </div>
               </aside>
             </div>

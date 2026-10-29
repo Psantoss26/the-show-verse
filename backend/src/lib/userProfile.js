@@ -841,6 +841,17 @@ export async function buildSectionCounts(db, targetId, { includePrivateLists = f
       db.select({ n: count() }).from(listLikes).where(eq(listLikes.userId, targetId)),
       db.select({ n: count() }).from(collectionLikes).where(eq(collectionLikes.userId, targetId)),
       db.select({ n: count() }).from(actorLikes).where(eq(actorLikes.userId, targetId)),
+      // Seguimientos en los dos sentidos, solo con cuentas activas (como el feed).
+      db
+        .select({ n: count() })
+        .from(follows)
+        .innerJoin(users, eq(users.id, follows.followingId))
+        .where(and(eq(follows.followerId, targetId), eq(users.isActive, true))),
+      db
+        .select({ n: count() })
+        .from(follows)
+        .innerJoin(users, eq(users.id, follows.followerId))
+        .where(and(eq(follows.followingId, targetId), eq(users.isActive, true))),
     ]),
   ]);
   return {
@@ -1389,6 +1400,29 @@ async function hydrateListPreviewItems(db, items) {
   }
 }
 
+const FOLLOW_USER_FIELDS = {
+  userId: users.id,
+  username: users.username,
+  displayName: users.displayName,
+  avatarUrl: users.avatarUrl,
+};
+
+// Seguimiento en la actividad: `follow` (la cuenta empezó a seguir a
+// `targetUser`) o `follower` (`targetUser` empezó a seguir a la cuenta).
+function mapFollowEvent(row, type) {
+  return {
+    id: `${type}:${row.followId}`,
+    type,
+    targetUser: {
+      id: row.userId,
+      username: row.username,
+      displayName: row.displayName || row.username,
+      avatarUrl: row.avatarUrl || null,
+    },
+    createdAt: row.createdAt,
+  };
+}
+
 // Actividad pública del perfil. Se deriva de los registros ya persistidos en vez
 // de duplicarlos en otra tabla: así incluye también la actividad anterior a esta
 // vista y siempre refleja el estado real de cada sección.
@@ -1410,6 +1444,8 @@ export async function getUserActivity(db, targetId, opts = {}) {
     listLikeRows,
     collectionLikeRows,
     actorLikeRows,
+    followingRows,
+    followerRows,
   ] = await Promise.all([
     db
       .select({
@@ -1557,6 +1593,22 @@ export async function getUserActivity(db, targetId, opts = {}) {
       .where(eq(actorLikes.userId, targetId))
       .orderBy(desc(actorLikes.createdAt))
       .limit(sourceLimit),
+    // Seguimientos: a quién empezó a seguir y quién empezó a seguirle. Las
+    // cuentas desactivadas no aparecen, igual que en sus listas de seguidores.
+    db
+      .select({ ...FOLLOW_USER_FIELDS, followId: follows.id, createdAt: follows.createdAt })
+      .from(follows)
+      .innerJoin(users, eq(users.id, follows.followingId))
+      .where(and(eq(follows.followerId, targetId), eq(users.isActive, true)))
+      .orderBy(desc(follows.createdAt))
+      .limit(sourceLimit),
+    db
+      .select({ ...FOLLOW_USER_FIELDS, followId: follows.id, createdAt: follows.createdAt })
+      .from(follows)
+      .innerJoin(users, eq(users.id, follows.followerId))
+      .where(and(eq(follows.followingId, targetId), eq(users.isActive, true)))
+      .orderBy(desc(follows.createdAt))
+      .limit(sourceLimit),
   ]);
 
   const events = [
@@ -1597,6 +1649,8 @@ export async function getUserActivity(db, targetId, opts = {}) {
       posterPath: null,
       createdAt: row.createdAt,
     })),
+    ...followingRows.map((row) => mapFollowEvent(row, 'follow')),
+    ...followerRows.map((row) => mapFollowEvent(row, 'follower')),
   ];
 
   events.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -1672,10 +1726,11 @@ export async function getFollowingActivity(db, viewerId, opts = {}) {
 
   if (!siguiendo.length) return { items: [], hasMore: false, offset };
 
+  const seguidos = new Set(siguiendo.map((autor) => autor.id));
   const porCuenta = await Promise.all(
     siguiendo.map(async (autor) => {
       const page = await getUserActivity(db, autor.id, { limit: limit + offset, offset: 0 });
-      return page.items.map((item) => ({
+      return page.items.filter((item) => !duplicatedFollowerEvent(item, viewerId, seguidos)).map((item) => ({
         ...item,
         // El id del evento solo era único DENTRO de una cuenta; al fusionar hay
         // que prefijarlo o dos usuarios con el mismo tipo e id colisionarían.
@@ -1692,6 +1747,15 @@ export async function getFollowingActivity(db, viewerId, opts = {}) {
   const eventos = porCuenta.flat();
   eventos.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   return packPage(eventos.slice(offset, offset + limit + 1), limit, offset);
+}
+
+// «X tiene un nuevo seguidor: Y» sobra en el feed si Y es quien mira (ya lo
+// sabe) o alguien a quien sigue: entonces ya sale como «Y ha empezado a seguir
+// a X» desde la actividad de Y.
+function duplicatedFollowerEvent(item, viewerId, seguidos) {
+  if (item.type !== 'follower') return false;
+  const id = item.targetUser?.id;
+  return id === viewerId || seguidos.has(id);
 }
 
 // Ventana que define "activo" en el resumen de la sección social.

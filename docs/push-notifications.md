@@ -1,7 +1,7 @@
 # Notificaciones: dentro de la app y en el dispositivo
 
 Los avisos (progreso sincronizado, vistos, series completadas, recordatorios de
-puntuar y reseñar) salen de la misma fuente que la campana del navbar:
+puntuar y reseñar, seguidores nuevos) salen de la misma fuente que la campana del navbar:
 `getUserNotifications` en `backend/src/lib/notifications.js`. Hay dos formas de
 enseñarlos:
 
@@ -27,7 +27,11 @@ Todas las ventanas emergentes usan el mismo diseño liquid glass
    - visto manual: `POST /v1/history/*`;
    - progreso con sesión: `POST /v1/progress`;
    - sincronización con token del dispositivo: `/v1/auth/netflix/{sync,progress,sync/batch}`
-     (marcan `req.pushUserId`).
+     (marcan `req.pushUserId`);
+   - seguir a alguien: `POST /v1/users/:username/follow` marca `req.pushUserId`
+     del SEGUIDO, que recibe «Ha empezado a seguirte» (`new_follower`: va solo,
+     sin agrupar con títulos, lleva a `/u/<username>` y usa el avatar como
+     imagen salvo que sea `data:`, que no cabe en el mensaje).
 2. `plugins/pushDispatch.js` (hook `onResponse`) programa un despacho para ese
    usuario. Las llamadas seguidas (una temporada marcada, un lote) se agrupan en
    un solo despacho a los 4 s.

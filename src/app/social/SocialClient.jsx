@@ -50,6 +50,7 @@ import {
   Star,
   ThumbsUp,
   User,
+  UserPlus,
   Users,
   BookmarkPlus,
   X,
@@ -77,7 +78,7 @@ import {
 } from "@/lib/profile/activityRatingTarget";
 import {
   activityActionKey,
-  isLikeActivity,
+  hasTargetActivity,
   likeAuthor,
   likeTargetHref,
   likeTargetName,
@@ -86,7 +87,7 @@ import {
 import Stars from "@/components/social/Stars";
 import MobileOptionsSheet, { SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
 import ActivityBackdropImage from "@/components/social/ActivityBackdropImage";
-import { activityBackdropTarget, hasActivityBackdropArtwork, isPortraitActivity } from "@/lib/profile/activityBackdrops";
+import { activityBackdropTarget, hasActivityBackdropArtwork, isPortraitActivity, isUserActivity } from "@/lib/profile/activityBackdrops";
 import useOwnCardPoster from "@/lib/hooks/useOwnCardPoster";
 
 const PAGE_SIZE = 30;
@@ -108,6 +109,8 @@ const ACCIONES = {
   like_list: { Icono: Heart, tono: "text-pink-400", relleno: true },
   like_collection: { Icono: Heart, tono: "text-pink-400", relleno: true },
   like_actor: { Icono: Heart, tono: "text-pink-400", relleno: true },
+  follow: { Icono: UserPlus, tono: "text-sky-400" },
+  follower: { Icono: UserPlus, tono: "text-sky-400" },
 };
 
 // Conjugación: en "Siguiendo" habla el autor del evento ("Ana ha visto…"); en
@@ -144,6 +147,7 @@ const FILTROS = [
   ["watchlist", "Pendientes"],
   ["list", "Listas"],
   ["like", "Likes"],
+  ["follow", "Seguimientos"],
 ];
 
 // Vista y agrupado se RECUERDAN entre visitas, como en las páginas de usuario:
@@ -204,7 +208,7 @@ function hrefDeEvento(evento) {
 // Título enlazado a su ficha, con el mismo peso que en el perfil y el hover en
 // el rosa de la sección.
 function TituloEvento({ evento }) {
-  const titulo = isLikeActivity(evento) ? likeTargetName(evento) || "Sin título" : evento.title || evento.name || "Sin título";
+  const titulo = hasTargetActivity(evento) ? likeTargetName(evento) || "Sin título" : evento.title || evento.name || "Sin título";
   const href = hrefDeEvento(evento);
   if (!href) return <span className="font-bold text-white">{titulo}</span>;
   return (
@@ -237,7 +241,7 @@ function SujetoEvento({ evento, mostrarAutor }) {
 }
 
 function verboDe(evento, mostrarAutor) {
-  if (isLikeActivity(evento)) return likeVerb(evento, { firstPerson: !(mostrarAutor && evento.author) });
+  if (hasTargetActivity(evento)) return likeVerb(evento, { firstPerson: !(mostrarAutor && evento.author) });
   const v = mostrarAutor && evento.author ? VERBOS.tercera : VERBOS.primera;
   if (evento.type === "watched" && evento.completedShow) return v.completed;
   return v[evento.type] || v.watched;
@@ -262,6 +266,14 @@ function CartelEvento({ evento, className = "", backdrop = false, size = "w185" 
   const fondo = backdrop && isPortraitActivity(evento) ? "" : "bg-zinc-900";
   const imagen = backdrop ? (
     <ActivityBackdropImage item={evento} alt={evento.title || ""} />
+  ) : isUserActivity(evento) ? (
+    <Avatar
+      src={evento.targetUser?.avatarUrl}
+      name={likeTargetName(evento)}
+      alt=""
+      loading="lazy"
+      fallbackClassName="flex h-full w-full items-center justify-center text-lg font-black text-zinc-300"
+    />
   ) : src ? (
     <OptimizedImage src={src} alt={evento.title || ""} className="h-full w-full object-cover" loading="lazy" />
   ) : (

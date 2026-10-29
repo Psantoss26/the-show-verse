@@ -29,13 +29,14 @@ import {
   SlidersHorizontal,
   ArrowUpDown,
   ThumbsUp,
+  UserPlus,
   X,
 } from "lucide-react";
 import ListCoverBackdropCollage from "@/components/lists/ListCoverBackdropCollage";
 import { getListDetails } from "@/lib/api/backendLists";
 import { enrichListPreviewArtwork } from "@/lib/lists/previewArtwork";
 import ActivityBackdropImage from "@/components/social/ActivityBackdropImage";
-import { hasActivityBackdropArtwork, isPortraitActivity } from "@/lib/profile/activityBackdrops";
+import { hasActivityBackdropArtwork, isPortraitActivity, isUserActivity } from "@/lib/profile/activityBackdrops";
 import { fetchTmdbImages } from "@/lib/tmdb/imageRequests";
 import MemberRow from "@/components/social/MemberRow";
 import PosterTile from "@/components/social/PosterTile";
@@ -55,6 +56,8 @@ import {
 import { dedupeActivityItems } from "@/lib/profile/activityItems";
 import {
   activityActionKey,
+  hasTargetActivity,
+  isFollowActivity,
   isLikeActivity,
   likeAuthor,
   likeTargetHref,
@@ -125,7 +128,7 @@ const PROFILE_VIEW_STORAGE_PREFIX = "showverse:profile:view-mode:v2:";
 const diarySeasonStillsCache = new Map();
 
 function getItemTitle(item) {
-  if (isLikeActivity(item)) return likeTargetName(item);
+  if (hasTargetActivity(item)) return likeTargetName(item);
   return String(item?.title || item?.name || item?.movie?.title || item?.show?.title || item?.listName || "");
 }
 
@@ -336,6 +339,7 @@ function activityTypeLabel(type) {
     list: "Listas",
     list_item: "Elementos de listas",
     like: "Likes",
+    follow: "Seguimientos",
   }[type] || "Otros";
 }
 
@@ -368,8 +372,8 @@ function groupProfileItems(items, groupBy, section) {
       key = String(stars);
       label = `${stars} ${stars === 1 ? "estrella" : "estrellas"}`;
     } else if (groupBy === "action" && section === "activity") {
-      // Los tres me gusta forman un solo grupo, "Likes".
-      const action = isLikeActivity(item) ? "like" : item?.type;
+      // Los me gusta forman un solo grupo, "Likes", y los seguimientos otro.
+      const action = isLikeActivity(item) ? "like" : isFollowActivity(item) ? "follow" : item?.type;
       key = action || "other";
       label = activityTypeLabel(action);
     }
@@ -399,6 +403,7 @@ function sectionMenuOptions(section) {
           ["review", "Reseñas"],
           ["list", "Listas"],
           ["like", "Likes"],
+          ["follow", "Seguimientos"],
         ]
       : [["all", "Todo"], ["movie", "Películas"], ["tv", "Series"]],
     sorts: [
@@ -846,6 +851,14 @@ function ActivityPoster({ item, className = "", backdrop = false, size = "w185" 
   const src = posterPath ? `https://image.tmdb.org/t/p/${size}${posterPath}` : null;
   const poster = backdrop ? (
     <ActivityBackdropImage item={item} alt={item?.title || ""} />
+  ) : isUserActivity(item) ? (
+    <Avatar
+      src={item.targetUser?.avatarUrl}
+      name={likeTargetName(item)}
+      alt=""
+      loading="lazy"
+      fallbackClassName="flex h-full w-full items-center justify-center text-lg font-black text-zinc-300"
+    />
   ) : src ? (
     <OptimizedImage src={src} alt={item?.title || ""} className="h-full w-full object-cover" loading="lazy" />
   ) : (
@@ -949,10 +962,12 @@ function ActivityRow({ item, actor, compact = false, posterList = false, backdro
     like_list: { icon: Heart, tone: "text-pink-400", filled: true },
     like_collection: { icon: Heart, tone: "text-pink-400", filled: true },
     like_actor: { icon: Heart, tone: "text-pink-400", filled: true },
+    follow: { icon: UserPlus, tone: "text-sky-400" },
+    follower: { icon: UserPlus, tone: "text-sky-400" },
   };
   const definition = definitions[item.type] || definitions.watched;
   const Icon = definition.icon;
-  const isLike = isLikeActivity(item);
+  const isLike = hasTargetActivity(item);
   const actionText = isLike
     ? likeVerb(item)
     : item.type === "watched" && item.completedShow

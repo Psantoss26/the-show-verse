@@ -42,6 +42,7 @@ import { LIQUID_GLASS_PANEL } from "@/lib/ui/liquidGlass";
 import {
   ALERTS_LOADED_EVENT,
   ALERTS_REFRESH_EVENT,
+  alertHref,
   alertLook,
   describeAlertGroup,
   freshAlertGroups,
@@ -391,7 +392,7 @@ export default function InAppNotifications() {
           key: `tsv:${group.key}`,
           tmdbId: target.tmdbId,
           mediaType: target.mediaType,
-          url: getActivityDetailsHref(target),
+          url: alertHref(target, getActivityDetailsHref),
         });
       }
     };

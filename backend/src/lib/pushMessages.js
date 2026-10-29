@@ -44,6 +44,9 @@ function episodeCode(item) {
 
 /** Ficha a la que lleva la alerta. Mismo criterio que getActivityDetailsHref. */
 export function alertUrl(item) {
+  if (item?.type === 'new_follower') {
+    return item.follower?.username ? `/u/${encodeURIComponent(item.follower.username)}` : '/';
+  }
   const id = Number(item?.tmdbId);
   if (!Number.isInteger(id) || id <= 0) return '/';
   if (item.mediaType === 'tv' && item.season != null && item.episode != null) {
@@ -76,9 +79,17 @@ function eventText(item) {
       return 'Has completado la serie';
     case 'collection_next':
       return item.afterTitle ? `Siguiente de la saga después de ${item.afterTitle}` : 'Siguiente de la saga';
+    case 'new_follower':
+      return 'Ha empezado a seguirte';
     default:
       return null;
   }
+}
+
+// Solo URLs: un avatar subido llega como `data:` (varios KB) y no cabe en el
+// mensaje push, que tiene un límite de tamaño.
+function remoteImage(url) {
+  return typeof url === 'string' && /^https?:\/\//i.test(url) ? url : null;
 }
 
 function time(value) {
@@ -110,7 +121,10 @@ export function buildPushMessages(
 
   const groups = new Map();
   for (const alert of alerts) {
-    const key = `${alert.item.mediaType}:${Number(alert.item.tmdbId)}`;
+    // Un seguidor nuevo no es de ningún título: va solo, con su propio aviso.
+    const key = alert.item.type === 'new_follower'
+      ? `follower:${alert.item.follower?.username || alert.item.id}`
+      : `${alert.item.mediaType}:${Number(alert.item.tmdbId)}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(alert);
   }
@@ -126,10 +140,12 @@ export function buildPushMessages(
       // Tipo de la alerta principal: la web elige con él icono y rótulo.
       type: primary.reminder ? (primary.item.needsRating ? 'reminder' : 'reminderReview') : primary.item.type,
       alertIds: group.map((alert) => alert.item.id),
-      title: group.find((alert) => alert.item.title)?.item.title || 'The Show Verse',
+      title: group.find((alert) => alert.item.title)?.item.title
+        || primary.item.follower?.displayName
+        || 'The Show Verse',
       body: group.map((alert) => alert.text).join('. '),
       url: alertUrl(target),
-      image: withPoster ? `${POSTER_BASE}${withPoster.posterPath}` : null,
+      image: withPoster ? `${POSTER_BASE}${withPoster.posterPath}` : remoteImage(primary.item.follower?.avatarUrl),
       tag: `tsv:${key}`,
       createdAt: new Date(Math.max(...group.map((alert) => time(alert.item.createdAt)))).toISOString(),
     });

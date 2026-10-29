@@ -39,6 +39,7 @@ const ACCION_LABELS = {
   watchlist: "Pendientes",
   list: "Listas",
   like: "Likes",
+  follow: "Seguimientos",
 };
 
 const MESES = [

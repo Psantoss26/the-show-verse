@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { ImageOff } from "lucide-react";
 import OptimizedImage from "@/components/OptimizedImage";
+import Avatar from "@/components/ui/Avatar";
 import { PosterShelf, useCoverArtImages } from "@/components/lists/listCoverArt";
 import { useAuth } from "@/context/AuthContext";
-import { activityBackdropSrc, activityBackdropTarget } from "@/lib/profile/activityBackdrops";
+import { activityBackdropSrc, activityBackdropTarget, isUserActivity } from "@/lib/profile/activityBackdrops";
 import { applyCollectionCustomization, readCollectionArtworkOverride } from "@/lib/lists/collectionCustomization";
 import { pickCollectionCoverBackdrop } from "@/lib/lists/coverBackdrop";
 import { buildPosterCollageTargets } from "@/lib/lists/posterCollage";
@@ -84,6 +85,20 @@ function PersonPortrait({ item, alt }) {
           <ImageOff className="h-5 w-5" aria-hidden="true" />
         </span>
       )}
+    </span>
+  );
+}
+
+// Seguimiento: el avatar de la otra cuenta, redondo y centrado como la foto de
+// una persona (la caja va sin fondo, ver `isPortraitActivity`).
+function UserPortrait({ item, alt }) {
+  const user = item?.targetUser;
+  const name = user?.displayName || user?.username || "Usuario";
+  return (
+    <span className="flex h-full w-full items-center justify-center">
+      <span className="flex aspect-square h-full items-center justify-center overflow-hidden rounded-full border border-white/10 bg-zinc-900 text-2xl font-black text-zinc-300">
+        <Avatar src={user?.avatarUrl} name={name} alt={alt} loading="lazy" />
+      </span>
     </span>
   );
 }
@@ -184,5 +199,6 @@ export default function ActivityBackdropImage({ item, alt = "", sizes = DEFAULT_
   if (item?.type === "list" || item?.type === "like_list") return <ListShelf item={item} alt={alt} />;
   if (item?.type === "like_collection") return <CollectionBackdrop item={item} alt={alt} sizes={sizes} />;
   if (item?.type === "like_actor") return <PersonPortrait item={item} alt={alt} />;
+  if (isUserActivity(item)) return <UserPortrait item={item} alt={alt} />;
   return <TitleBackdrop item={item} alt={alt} sizes={sizes} />;
 }
