@@ -98,9 +98,10 @@ export default function SectionSheet({
     overflow: tabsOverflow,
     onOverflowChange: onTabsOverflowChange,
   });
+  const hideTabCounts = useCompactTabCounts(tabsEl, !measureRef);
   const pillRef = useTabPill(
     tabsEl,
-    `${activeTab ?? ""}\u0000${shownTabs.map((tab) => tab.id).join("\u0000")}`,
+    `${activeTab ?? ""}\u0000${hideTabCounts}\u0000${shownTabs.map((tab) => tab.id).join("\u0000")}`,
   );
   const close = () => {
     if (!closeDisabled) onClose?.();
@@ -212,7 +213,9 @@ export default function SectionSheet({
                   >
                     {tab.label}
                     {typeof tab.count === "number" ? (
-                      <span className={active ? tone.count : "text-zinc-500"}>{tab.count}</span>
+                      <span data-tab-count="" className={`${active ? tone.count : "text-zinc-500"} ${hideTabCounts ? "hidden" : ""}`}>
+                        {tab.count}
+                      </span>
                     ) : null}
                   </button>
                 );
@@ -291,6 +294,7 @@ export function SectionSheetGroupTitle({ title, count = null }) {
 
 const TABS_GAP = 4; // gap-1
 const TABS_PADDING = 8; // p-1 a cada lado
+const TAB_PADDING_X = 24; // px-3 de cada pestaña
 
 // Número más largo que puede llevar la pestaña de agrupar: la suma de todas
 // menos la primera (que nunca se agrupa).
@@ -371,6 +375,49 @@ function useOverflowTabs({ tabs, activeTab, overflow, onOverflowChange }) {
   const isTabActive = (tab) =>
     tab.id === activeTab || (tab.id === overflow.id && foldedIds.has(activeTab));
   return { tabsEl, tabsRef, measureRef, shownTabs, isTabActive };
+}
+
+// Si las pestañas con su número no caben en la barra, se quitan los números
+// (el subtítulo del panel ya cuenta las imágenes): así caben sin desplazarse
+// de lado (p. ej. las cuatro de «Portadas y fondos» en un teléfono). Al
+// ocultarlos se apunta cuánto ocupaban, para volver a enseñarlos si la barra
+// crece. Las barras que agrupan pestañas en «Otros» (`tabsOverflow`) ya se
+// ajustan solas y no lo usan.
+function useCompactTabCounts(tabsEl, enabled) {
+  const [hidden, setHidden] = useState(false);
+  const countsWidthRef = useRef(0);
+  useLayoutEffect(() => {
+    if (!enabled || !tabsEl) return undefined;
+    const fit = () => {
+      const counts = [...tabsEl.querySelectorAll("[data-tab-count]")];
+      if (!counts.length) return;
+      // Ancho natural de las pestañas (las `flex-1` se estiran: se mide su
+      // contenido con un Range) más sus márgenes, huecos y el de la barra.
+      const tabs = [...tabsEl.querySelectorAll('[role="tab"]')];
+      const range = document.createRange();
+      const natural =
+        tabs.reduce((sum, tab) => {
+          range.selectNodeContents(tab);
+          return sum + range.getBoundingClientRect().width + TAB_PADDING_X;
+        }, 0) +
+        TABS_GAP * (tabs.length - 1) +
+        TABS_PADDING;
+      const shown = counts.some((count) => count.offsetWidth > 0);
+      if (shown) {
+        // Ancho del número y del hueco que lo separa de la etiqueta (gap-1.5).
+        countsWidthRef.current = counts.reduce((sum, count) => sum + count.offsetWidth + 6, 0);
+        if (natural > tabsEl.clientWidth + 1) setHidden(true);
+      } else if (natural + countsWidthRef.current <= tabsEl.clientWidth) {
+        setHidden(false);
+      }
+    };
+    fit();
+    if (typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(fit);
+    observer.observe(tabsEl);
+    return () => observer.disconnect();
+  }, [tabsEl, enabled]);
+  return enabled && hidden;
 }
 
 // Coloca la pastilla de la pestaña activa bajo su botón: se desliza al cambiar

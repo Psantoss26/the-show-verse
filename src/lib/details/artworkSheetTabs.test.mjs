@@ -15,7 +15,7 @@ const backdrops = [
 ];
 const logos = [{ file_path: "/logo.png", iso_639_1: "es" }];
 
-test("móvil: las mismas pestañas que la ficha (Portada sin idioma, Con idioma, Tarjetas y Logo)", () => {
+test("móvil: Portada (sin idioma por defecto, con las de idioma en el filtro), Tarjetas, Backdrop y Logo", () => {
   const tabs = buildArtworkSheetTabs({
     mobile: true,
     posters,
@@ -25,13 +25,14 @@ test("móvil: las mismas pestañas que la ficha (Portada sin idioma, Con idioma,
   });
   assert.deepEqual(tabs.map((tab) => [tab.id, tab.label]), [
     ["posters", "Portada"],
-    ["localizedPosters", "Con idioma"],
     ["cardPosters", "Tarjetas"],
     ["cardBackdrops", "Backdrop"],
     ["logos", "Logo"],
   ]);
-  // Solo portadas sin idioma, con la elegida primero.
-  assert.deepEqual(tabs[0].images.map((img) => img.file_path), ["/neutral-2.jpg", "/neutral-1.jpg"]);
+  // Sin idioma (la elegida primero) y después las con idioma; abre filtrada
+  // en «Sin idioma».
+  assert.deepEqual(tabs[0].images.map((img) => img.file_path), ["/neutral-2.jpg", "/neutral-1.jpg", "/es.jpg"]);
+  assert.equal(tabs[0].defaultLanguage, "none");
   assert.equal(tabs[0].activePath, "/neutral-2.jpg");
   assert.equal(tabs[0].kind, "mobilePoster");
 });
@@ -55,21 +56,22 @@ test("DetailModal: Vista previa (backdrop sin idioma de la galería) y Logo", ()
   assert.equal(tabs[1].activePath, "/logo.png");
 });
 
-test("móvil sin portadas neutras: sin «Portada»; pestañas vacías fuera", () => {
+test("móvil sin portadas neutras: «Portada» con las de idioma y sin filtro por defecto; pestañas vacías fuera", () => {
   const tabs = buildArtworkSheetTabs({ mobile: true, posters: [posters[0]], backdrops: [], logos: [] });
-  assert.deepEqual(tabs.map((tab) => tab.id), ["localizedPosters", "cardPosters"]);
   // Sin backdrops no hay pestaña «Backdrop».
+  assert.deepEqual(tabs.map((tab) => tab.id), ["posters", "cardPosters"]);
   assert.deepEqual(tabs[0].images.map((img) => img.file_path), ["/es.jpg"]);
+  assert.equal(tabs[0].defaultLanguage, null);
 });
 
-test("móvil: la portada elegida se marca solo en su pestaña", () => {
+test("móvil: una portada elegida con idioma va primera y marcada en «Portada»", () => {
   const tabs = buildArtworkSheetTabs({ mobile: true, posters, backdrops, logos, active: { mobilePoster: "/es.jpg" } });
-  const [neutral, localized] = tabs;
-  assert.deepEqual(neutral.images.map((img) => img.file_path), ["/neutral-1.jpg", "/neutral-2.jpg"]);
-  assert.deepEqual(localized.images.map((img) => img.file_path), ["/es.jpg"]);
-  assert.equal(localized.kind, "mobilePoster");
-  assert.equal(localized.activePath, "/es.jpg");
-  assert.equal("injectActive" in localized, false);
+  const [portada] = tabs;
+  assert.deepEqual(portada.images.map((img) => img.file_path), ["/es.jpg", "/neutral-1.jpg", "/neutral-2.jpg"]);
+  assert.equal(portada.kind, "mobilePoster");
+  assert.equal(portada.activePath, "/es.jpg");
+  assert.equal("injectActive" in portada, false);
+  assert.equal(tabs.some((tab) => tab.id === "localizedPosters"), false);
 });
 
 test("la elegida aparece aunque el filtro de su pestaña la deje fuera", () => {
@@ -107,7 +109,7 @@ test("móvil: «Tarjetas» guarda la portada de escritorio y solo marca la elegi
   const auto = card({ poster: "/neutral-1.jpg", mobilePoster: "/neutral-2.jpg" });
   assert.equal(auto.kind, "poster");
   assert.equal(auto.activePath, null);
-  // Solo portadas con idioma (español o inglés), como «Con idioma».
+  // Solo portadas con idioma (español o inglés), como las de «Portada».
   assert.deepEqual(auto.images.map((img) => img.file_path), ["/es.jpg"]);
 
   // Una elegida antes sin idioma se sigue enseñando (primera y marcada).
@@ -116,7 +118,7 @@ test("móvil: «Tarjetas» guarda la portada de escritorio y solo marca la elegi
   assert.deepEqual(chosen.images.map((img) => img.file_path), ["/neutral-2.jpg", "/es.jpg"]);
 });
 
-test("«Con idioma» y «Tarjetas»: solo español e inglés; si no hay, los idiomas que haya", () => {
+test("con idioma en «Portada» y «Tarjetas»: solo español e inglés; si no hay, los idiomas que haya", () => {
   const ids = (list) => (tab) => list.find((t) => t.id === tab)?.images.map((img) => img.file_path);
 
   const mixed = [
@@ -127,7 +129,7 @@ test("«Con idioma» y «Tarjetas»: solo español e inglés; si no hay, los idi
     { file_path: "/neutral.jpg", iso_639_1: null },
   ];
   const withEsEn = ids(buildArtworkSheetTabs({ mobile: true, posters: mixed }));
-  assert.deepEqual(withEsEn("localizedPosters"), ["/en.jpg", "/es.jpg"]);
+  assert.deepEqual(withEsEn("posters"), ["/neutral.jpg", "/en.jpg", "/es.jpg"]);
   assert.deepEqual(withEsEn("cardPosters"), ["/en.jpg", "/es.jpg"]);
 
   const others = [
@@ -136,12 +138,12 @@ test("«Con idioma» y «Tarjetas»: solo español e inglés; si no hay, los idi
     { file_path: "/neutral.jpg", iso_639_1: null },
   ];
   const withOthers = ids(buildArtworkSheetTabs({ mobile: true, posters: others }));
-  assert.deepEqual(withOthers("localizedPosters"), ["/fr.jpg", "/ja.jpg"]);
+  assert.deepEqual(withOthers("posters"), ["/neutral.jpg", "/fr.jpg", "/ja.jpg"]);
   assert.deepEqual(withOthers("cardPosters"), ["/fr.jpg", "/ja.jpg"]);
 
   // Sin ninguna con idioma, «Tarjetas» no se queda vacía.
   const onlyNeutral = ids(buildArtworkSheetTabs({ mobile: true, posters: [{ file_path: "/neutral.jpg", iso_639_1: null }] }));
-  assert.equal(onlyNeutral("localizedPosters"), undefined);
+  assert.deepEqual(onlyNeutral("posters"), ["/neutral.jpg"]);
   assert.deepEqual(onlyNeutral("cardPosters"), ["/neutral.jpg"]);
 });
 

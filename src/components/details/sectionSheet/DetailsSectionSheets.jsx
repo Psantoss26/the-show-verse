@@ -415,6 +415,16 @@ function languageLabel(code) {
   }
 }
 
+// Idioma con el que abre una pestaña. «Portada» en el móvil trae también las
+// portadas con idioma y abre en «Sin idioma» (`defaultLanguage`), salvo que la
+// elegida tenga idioma: entonces en el suyo, para que se vea marcada. El
+// resto, en «Todos».
+function defaultTabLanguage(tab) {
+  if (!tab?.defaultLanguage) return "all";
+  const active = tab.activePath ? tab.images?.find((image) => image.file_path === tab.activePath) : null;
+  return active ? imageLanguage(active) : tab.defaultLanguage;
+}
+
 // `src`, `srcSet` y `sizes` de una tarjeta de la cuadrícula: los mismos en la
 // tarjeta y en su precarga (ver `artworkRowTransition`).
 function sheetCardImage(image, { isPoster, isLogo }) {
@@ -441,9 +451,15 @@ export function ImagesSheet({ meta, data, onClose, tab, setTab }) {
   const isLogo = current?.aspect === "logo";
   const total = tabs.reduce((sum, item) => sum + item.count, 0);
   // Orden por resolución y filtro por idioma. El idioma depende de la
-  // pestaña: al cambiarla vuelve a «Todos».
+  // pestaña: al cambiarla vuelve al de esa pestaña (`defaultTabLanguage`).
+  // Se guarda junto a la pestaña en la que se eligió; sin elección (o en otra
+  // pestaña), el de la pestaña.
   const [sort, setSort] = useState("default");
-  const [language, setLanguage] = useState("all");
+  const defaultLanguage = defaultTabLanguage(current);
+  const [languageChoice, setLanguageChoice] = useState({ tabId: null, value: null });
+  const language =
+    languageChoice.tabId === current?.id && languageChoice.value != null ? languageChoice.value : defaultLanguage;
+  const setLanguage = (value) => setLanguageChoice({ tabId: current?.id ?? null, value });
   const languages = useMemo(() => {
     const counts = new Map();
     tabImages.forEach((image) => {
@@ -463,7 +479,7 @@ export function ImagesSheet({ meta, data, onClose, tab, setTab }) {
     return [...filtered].sort((a, b) => direction * (imagePixels(a) - imagePixels(b)));
   }, [tabImages, language, sort]);
   const changeTab = (id) => {
-    setLanguage("all");
+    setLanguageChoice({ tabId: null, value: null });
     setTab(id);
   };
   // Al cambiar de tipo de imagen o de idioma, la cuadrícula anterior se queda
@@ -523,7 +539,7 @@ export function ImagesSheet({ meta, data, onClose, tab, setTab }) {
   // (MobileOptionsSheet). Elegir un filtro reordena la galería en una
   // transición, para que la píldora responda en el mismo toque.
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const filtersChanged = sort !== "default" || language !== "all";
+  const filtersChanged = sort !== "default" || language !== defaultLanguage;
   // Con varias pestañas va junto a ellas, en su misma pastilla; con una sola
   // no hay barra y va en la cabecera, junto a la X y con su mismo diseño (en
   // una fila propia se quedaba solo, en medio de la nada).
@@ -659,7 +675,7 @@ export function ImagesSheet({ meta, data, onClose, tab, setTab }) {
                     ) : null}
                   </button>
                   {/* Sin `backdrop-blur`: eran una capa con desenfoque por
-                      tarjeta (44 en «Con idioma») y, al desplegar la fila de
+                      tarjeta (44 portadas con idioma) y, al desplegar la fila de
                       filtros, la galería se movía y sus tarjetas se convertían en
                       capas y dejaban de serlo en cada fotograma: parpadeaban las
                       portadas en el móvil. A este tamaño basta el fondo opaco. */}
@@ -752,7 +768,7 @@ export function ImagesSheet({ meta, data, onClose, tab, setTab }) {
                 setFiltersOpen(false);
                 startTransition(() => {
                   setSort("default");
-                  setLanguage("all");
+                  setLanguage(null);
                 });
               }}
             >

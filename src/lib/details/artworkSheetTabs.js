@@ -6,12 +6,15 @@
 //   - Escritorio: Portada, Backdrop, Fondo y Logo. «Vista previa» (el backdrop de
 //     DetailModal) se edita desde el propio DetailModal: ver
 //     `buildDetailModalArtworkTabs`.
-//   - Móvil: Portada, Con idioma, Tarjetas, Backdrop y Logo. La portada móvil va sin
-//     idioma con el logo encima; elegir una «Con idioma» la sustituye y el logo
-//     se oculta (ya trae el título impreso). Esas dos guardan la misma
-//     preferencia (`mobilePoster`), que es SOLO de la ficha móvil. «Tarjetas»
-//     es la portada de las tarjetas de páginas y dashboards: la misma
-//     preferencia que «Portada» en escritorio (`poster`).
+//   - Móvil: Portada, Tarjetas, Backdrop y Logo. «Portada» (`mobilePoster`,
+//     SOLO de la ficha móvil) trae las portadas sin idioma y las que tienen
+//     idioma en español e inglés (o, sin ninguna, las de otros idiomas), y
+//     abre filtrada en «Sin idioma» (`defaultLanguage`): la portada móvil va
+//     sin idioma con el logo encima; elegir una con idioma desde el filtro de
+//     idioma la sustituye y el logo se oculta (ya trae el título impreso).
+//     Antes esas iban en una pestaña aparte, «Con idioma». «Tarjetas» es la
+//     portada de las tarjetas de páginas y dashboards: la misma preferencia
+//     que «Portada» en escritorio (`poster`).
 //
 // En cada pestaña la imagen elegida va primero y se marca (`activePath`).
 
@@ -27,7 +30,7 @@ const SPANISH_OR_ENGLISH = new Set(["es", "es-es", "en", "en-us"]);
 const isSpanishOrEnglishImage = (img) =>
   SPANISH_OR_ENGLISH.has(String(img?.iso_639_1 || "").trim().toLowerCase());
 
-// Portadas CON IDIOMA de las pestañas «Con idioma» y «Tarjetas»: solo en
+// Portadas CON IDIOMA de «Portada» (móvil) y «Tarjetas»: solo en
 // español e inglés; si el título no tiene ninguna en esos idiomas, las de los
 // idiomas que haya.
 export const spanishOrEnglishFirst = (images) =>
@@ -93,11 +96,12 @@ export function buildArtworkSheetTabs({ mobile = false, posters, backdrops, logo
   const languageLogos = languageLogosOf(allLogos);
   const sources = { poster: allPosters, mobilePoster: allPosters, cardBackdrop: allBackdrops, background: allBackdrops, logo: allLogos };
 
+  const neutralPosters = allPosters.filter(isLanguageNeutralImage);
   const localizedPosters = spanishOrEnglishFirst(
     allPosters.filter((img) => !isLanguageNeutralImage(img)),
   );
   // «Backdrop»: la portada backdrop de la ficha y las tarjetas backdrop de
-  // páginas y dashboards (kind `cardBackdrop`). Con idioma, como «Con idioma»:
+  // páginas y dashboards (kind `cardBackdrop`). Con idioma, como «Tarjetas»:
   // español e inglés; si no hay, los idiomas que haya; sin ninguno con idioma,
   // todos.
   const cardBackdropTab = {
@@ -119,18 +123,11 @@ export function buildArtworkSheetTabs({ mobile = false, posters, backdrops, logo
           label: "Portada",
           kind: "mobilePoster",
           aspect: "poster",
-          // Solo sin idioma: las que lo tienen van en «Con idioma».
-          images: allPosters.filter(isLanguageNeutralImage),
-          activePath: active.mobilePoster,
-          // La elegida solo se marca en la pestaña que le corresponde.
-          injectActive: false,
-        },
-        {
-          id: "localizedPosters",
-          label: "Con idioma",
-          kind: "mobilePoster",
-          aspect: "poster",
-          images: localizedPosters,
+          // Primero las sin idioma y después las con idioma en español e
+          // inglés (o las que haya). Se abre en «Sin idioma» si hay alguna;
+          // la vista lateral abre en el idioma de la elegida si es otro.
+          images: [...neutralPosters, ...localizedPosters],
+          defaultLanguage: neutralPosters.length ? "none" : null,
           activePath: active.mobilePoster,
           injectActive: false,
         },
@@ -139,7 +136,7 @@ export function buildArtworkSheetTabs({ mobile = false, posters, backdrops, logo
           label: "Tarjetas",
           kind: "poster",
           aspect: "poster",
-          // Las mismas que «Con idioma»; sin ninguna con idioma, todas.
+          // Las con idioma de «Portada»; sin ninguna con idioma, todas.
           images: orAll(localizedPosters, allPosters),
           // Solo la elegida a propósito: sin ella, cada página usa su portada
           // automática y no hay una que marcar.
