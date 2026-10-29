@@ -4769,9 +4769,13 @@ export default function HistoryClient() {
             <motion.div
               // Visible solo si la zona mide al menos 64rem (ver globals.css).
               className="sv-history-calendar space-y-6 sticky top-20"
-              initial={{ opacity: 0, x: 20 }}
+              // Llegando desde Continuar viendo (o volviendo atrás) sale quieto
+              // con la barra y la columna izquierda, sin esperar a su entrada.
+              initial={staticChrome ? false : { opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5, delay: 0.4 }}
+              transition={
+                staticChrome ? { duration: 0 } : { duration: 0.5, delay: 0.4 }
+              }
             >
               <CalendarPanel
                 monthDate={monthDate}
