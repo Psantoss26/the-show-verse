@@ -13,6 +13,7 @@
 import { startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import {
+  Bookmark,
   Check,
   ChevronDown,
   ArrowUpRight,
@@ -668,7 +669,7 @@ export function ImagesSheet({ meta, data, onClose, tab, setTab }) {
               // solo como información.
               const isDefault = Boolean(gridCurrent.defaultPath) && image.file_path === gridCurrent.defaultPath;
               return (
-                <li key={image.file_path} className="group/card @container relative">
+                <li key={image.file_path} className="group/card relative">
                   <button
                     type="button"
                     onClick={() => {
@@ -705,12 +706,15 @@ export function ImagesSheet({ meta, data, onClose, tab, setTab }) {
                           </span>
                         ) : null}
                         {/* La imagen por defecto según el criterio automático
-                            (la que se ve sin elecciones ni votos). En tarjetas
-                            estrechas, solo el icono. */}
+                            (la que se ve sin elecciones ni votos): solo el
+                            icono, en un círculo como la marca verde; el texto,
+                            en el `title` y la etiqueta accesible. */}
                         {isDefault ? (
-                          <span className={`${IMAGE_CARD_CHIP} min-w-0 @max-[8.5rem]:w-5 @max-[8.5rem]:justify-center @max-[8.5rem]:px-0`} title="Imagen por defecto según el criterio automático">
-                            <Sparkles className="h-3 w-3 shrink-0 text-yellow-300" strokeWidth={2.5} />
-                            <span className="hidden translate-y-[0.5px] truncate @[8.5rem]:inline">Por defecto</span>
+                          <span
+                            className={`${IMAGE_CARD_CHIP} w-5 shrink-0 justify-center !px-0`}
+                            title="Imagen por defecto según el criterio automático"
+                          >
+                            <Bookmark className="h-3 w-3 text-yellow-300" strokeWidth={2.5} />
                           </span>
                         ) : null}
                       </span>
