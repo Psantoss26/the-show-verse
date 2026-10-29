@@ -101,7 +101,7 @@ import {
   movieExtrasCache,
   preloadImage,
 } from "@/lib/dashboard/media";
-import { useOwnCardBackdrop } from "@/lib/hooks/useOwnCardPoster";
+import { useCardArtworkState } from "@/lib/hooks/useOwnCardPoster";
 
 /* =================== CONSTANTES / VARIANTES =================== */
 const EMPTY_ARRAY = [];
@@ -185,11 +185,17 @@ function getInitialItemBackdrop(item, backdropOverride) {
 // los backdrops de TODAS sus tarjetas al montar el dashboard.
 function useItemBackdrop(item, backdropOverride, { preload = true } = {}) {
   const mediaType = getMediaTypeForItem(item);
-  // Backdrop elegido en la ficha (pestaña «Backdrop»): manda sobre todo y no
-  // se guarda en `movieBackdropCache`, para que al quitarlo vuelva el automático.
-  const ownBackdrop = useOwnCardBackdrop(mediaType, item?.id);
+  // Backdrop elegido en la ficha (pestaña «Backdrop») o, sin él, el más
+  // votado: manda sobre todo y no se guarda en `movieBackdropCache`, para que
+  // al quitarlo vuelva el automático. Mientras no se sabe si hay votado
+  // (`pending`) no se pinta el automático: se veía un instante y se cambiaba.
+  const { path: ownBackdrop, pending: ownBackdropPending } = useCardArtworkState(
+    mediaType,
+    item?.id,
+    "cardBackdrop",
+  );
   const [backdropPath, setBackdropPath] = useState(() =>
-    ownBackdrop || getInitialItemBackdrop(item, backdropOverride),
+    ownBackdrop || (ownBackdropPending ? null : getInitialItemBackdrop(item, backdropOverride)),
   );
   // Valor ya pintado, para no llamar a `setState` si no cambia. Un updater que
   // devuelve el mismo valor NO es gratis: React programa igualmente el render y
@@ -226,8 +232,9 @@ function useItemBackdrop(item, backdropOverride, { preload = true } = {}) {
       setBackdropPath(path);
     };
 
-    if (ownBackdrop) {
-      reveal(ownBackdrop);
+    if (ownBackdrop || ownBackdropPending) {
+      // Sin votado aún por saber, nada: el efecto vuelve a correr al saberse.
+      reveal(ownBackdrop || null);
       return () => {
         abort = true;
       };
@@ -266,7 +273,7 @@ function useItemBackdrop(item, backdropOverride, { preload = true } = {}) {
     return () => {
       abort = true;
     };
-  }, [itemKey, backdropOverride, preload, ownBackdrop]);
+  }, [itemKey, backdropOverride, preload, ownBackdrop, ownBackdropPending]);
 
   return { backdropPath, mediaType };
 }

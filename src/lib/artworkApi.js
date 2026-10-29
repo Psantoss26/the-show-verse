@@ -640,6 +640,22 @@ export function getCommunityCardArtwork(type, id, kind) {
     return entry?.artwork?.[kind] || null
 }
 
+// Estado de la imagen de una tarjeta: su ruta (propia o más votada), `false`
+// si ya se sabe que no hay ninguna de las dos (usa la automática) o `null` si
+// aún no se sabe si hay votada (el lote está en camino). Para quien no debe
+// pintar la automática y cambiarla un instante después (vistas previas).
+export function getCardArtworkState(type, id, kind) {
+    const own = getOwnArtwork(type, id, kind)
+    if (own) return own
+    if (typeof window === 'undefined') return null
+    const key = communityCardKey(type, id)
+    if (!key) return false
+    const community = getCommunityCardArtwork(type, id, kind)
+    if (community) return community
+    if (loadCommunityCardEntries().has(key) || communityCardFailedAt.has(key)) return false
+    return null
+}
+
 // Votos propios retirados o nuevos (ver `retractOwnArtworkVotes` y
 // `forgetCommunityArtwork`): las tarjetas del título se actualizan ya.
 function retractCommunityCardVotes(key, votes) {

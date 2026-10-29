@@ -1,7 +1,7 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
-import { getCardArtwork, subscribeOwnCardPosters } from "@/lib/artworkApi";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { getCardArtwork, getCardArtworkState, subscribeOwnCardPosters } from "@/lib/artworkApi";
 
 // Imagen de la tarjeta de un título: la elegida en la ficha y, sin ella, la
 // más votada por todos (`getCardArtwork`), como en la ficha. Se suscribe a la
@@ -32,6 +32,30 @@ export function useOwnArtwork(type, id, kind) {
     () => getCardArtwork(type, id, kind),
     () => null,
   );
+}
+
+// Como `useOwnArtwork`, pero sabiendo si aún se espera la más votada:
+// `{ path, pending }`. `pending` mientras el lote de votos del título está en
+// camino (como mucho `waitMs`, para no dejar la imagen esperando si la red va
+// lenta). Lo usan las vistas previas del dashboard: sin esperar, enseñaban un
+// instante el backdrop automático y lo cambiaban por el votado.
+export function useCardArtworkState(type, id, kind, { waitMs = 1000 } = {}) {
+  const state = useSyncExternalStore(
+    subscribeOwnCardPosters,
+    () => getCardArtworkState(type, id, kind),
+    () => null,
+  );
+  const key = `${type}:${id}:${kind}`;
+  const [expiredKey, setExpiredKey] = useState(null);
+  useEffect(() => {
+    if (state !== null || id == null) return undefined;
+    const timer = setTimeout(() => setExpiredKey(key), waitMs);
+    return () => clearTimeout(timer);
+  }, [state, key, id, waitMs]);
+  return {
+    path: state || null,
+    pending: state === null && id != null && expiredKey !== key,
+  };
 }
 
 // Para listas que pintan varios pósters en un mismo componente (donde no cabe

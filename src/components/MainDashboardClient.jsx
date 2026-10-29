@@ -93,7 +93,7 @@ import FeaturedHero from "@/components/FeaturedHero";
 import ContinueWatchingSection from "@/components/ContinueWatchingSection";
 import DashboardCalendarSection from "@/components/DashboardCalendarSection";
 import DashboardBackdropRow from "@/components/dashboard/DashboardBackdropRow";
-import { useOwnCardBackdrop } from "@/lib/hooks/useOwnCardPoster";
+import { useCardArtworkState } from "@/lib/hooks/useOwnCardPoster";
 import {
   DashboardHoverBackdropLayer,
   DashboardHoverBackdropProvider,
@@ -576,14 +576,22 @@ function InlinePreviewCard({
       : backdropOverride;
   // Backdrop elegido en la ficha (pestaña «Backdrop») o, sin él, el más
   // votado: manda sobre el de la sección y el automático, sin guardarse en
-  // `movieBackdropCache` (al quitarlo vuelve el automático).
-  const cardBackdrop = useOwnCardBackdrop(mediaType, movie?.id);
+  // `movieBackdropCache` (al quitarlo vuelve el automático). Mientras no se
+  // sabe si hay votado (`pending`), no se pinta el automático: se veía un
+  // instante y se cambiaba por el votado.
+  const { path: cardBackdrop, pending: cardBackdropPending } = useCardArtworkState(
+    mediaType,
+    movie?.id,
+    "cardBackdrop",
+  );
   const [backdropPath, setBackdropPath] = useState(() =>
-    getInitialDashboardPreviewBackdrop(
-      movie,
-      stableBackdropOverride,
-      isSpotlight,
-    ),
+    !isSpotlight && (cardBackdrop || cardBackdropPending)
+      ? cardBackdrop
+      : getInitialDashboardPreviewBackdrop(
+          movie,
+          stableBackdropOverride,
+          isSpotlight,
+        ),
   );
   const [backdropReady, setBackdropReady] = useState(() => !!backdropPath);
 
@@ -757,6 +765,9 @@ function InlinePreviewCard({
       } else {
         if (cardBackdrop) {
           revealBackdrop(cardBackdrop);
+        } else if (cardBackdropPending) {
+          // Se espera a saber si hay votado (el efecto vuelve a correr).
+          revealBackdrop(null);
         } else if (stableBackdropOverride) {
           movieBackdropCache.set(backdropCacheKey, stableBackdropOverride);
           revealBackdrop(stableBackdropOverride);
@@ -879,7 +890,7 @@ function InlinePreviewCard({
     return () => {
       abort = true;
     };
-  }, [isSpotlight, mediaType, movie, stableBackdropOverride, cardBackdrop]);
+  }, [isSpotlight, mediaType, movie, stableBackdropOverride, cardBackdrop, cardBackdropPending]);
 
   // Carga perezosa (en hover == al montar) de los datos que alimentan la fila
   // meta compartida. También se usa en spotlight para el mismo diseño de estado
@@ -1814,10 +1825,18 @@ function InlinePreviewCardAnticipated({
       : backdropOverride;
   // Backdrop elegido en la ficha (pestaña «Backdrop») o, sin él, el más
   // votado: manda sobre el de la sección y el automático, sin guardarse en
-  // `movieBackdropCache` (al quitarlo vuelve el automático).
-  const cardBackdrop = useOwnCardBackdrop(mediaType, movie?.id);
+  // `movieBackdropCache` (al quitarlo vuelve el automático). Mientras no se
+  // sabe si hay votado (`pending`), no se pinta el automático: se veía un
+  // instante y se cambiaba por el votado.
+  const { path: cardBackdrop, pending: cardBackdropPending } = useCardArtworkState(
+    mediaType,
+    movie?.id,
+    "cardBackdrop",
+  );
   const [backdropPath, setBackdropPath] = useState(() =>
-    getInitialDashboardPreviewBackdrop(movie, stableBackdropOverride),
+    cardBackdrop || cardBackdropPending
+      ? cardBackdrop
+      : getInitialDashboardPreviewBackdrop(movie, stableBackdropOverride),
   );
   const [backdropReady, setBackdropReady] = useState(() => !!backdropPath);
   const [logoPath, setLogoPath] = useState(
@@ -1988,6 +2007,9 @@ function InlinePreviewCardAnticipated({
       const backdropCacheKey = getBackdropCacheKey(movie, mediaTypeForBackdrop);
       if (cardBackdrop) {
         revealBackdrop(cardBackdrop);
+      } else if (cardBackdropPending) {
+        // Se espera a saber si hay votado (el efecto vuelve a correr).
+        revealBackdrop(null);
       } else if (stableBackdropOverride) {
         movieBackdropCache.set(backdropCacheKey, stableBackdropOverride);
         revealBackdrop(stableBackdropOverride);
@@ -2021,7 +2043,7 @@ function InlinePreviewCardAnticipated({
     return () => {
       abort = true;
     };
-  }, [movie, stableBackdropOverride, cardBackdrop]);
+  }, [movie, stableBackdropOverride, cardBackdrop, cardBackdropPending]);
 
   const openPreviewModal = () => {
     openDetailModal?.({ ...movie, logo_path: logoPath || movie?.logo_path || null });

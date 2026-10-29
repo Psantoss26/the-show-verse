@@ -83,7 +83,7 @@ import { fetchOmdbByImdb } from "@/lib/api/omdb";
 import { fetchImdbRatingByImdb } from "@/lib/api/imdbRatings";
 import { formatDashboardAwards } from "@/lib/details/awardsText";
 import LiquidButton from "@/components/LiquidButton";
-import useOwnCardPoster, { useOwnCardBackdrop } from "@/lib/hooks/useOwnCardPoster";
+import useOwnCardPoster, { useCardArtworkState, useOwnCardBackdrop } from "@/lib/hooks/useOwnCardPoster";
 
 /* =================== ANIMATION VARIANTS =================== */
 const fadeInUp = {
@@ -609,8 +609,14 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
   const { session, account } = useAuth();
   const router = useRouter();
   // Backdrop elegido en la ficha (pestaña «Backdrop») o, sin él, el más
-  // votado: manda sobre el automático (no se guarda en su caché).
-  const cardBackdrop = useOwnCardBackdrop("movie", movie?.id);
+  // votado: manda sobre el automático (no se guarda en su caché). Mientras no
+  // se sabe si hay votado (`pending`) no se pinta el automático: se veía un
+  // instante y se cambiaba por el votado.
+  const { path: cardBackdrop, pending: cardBackdropPending } = useCardArtworkState(
+    "movie",
+    movie?.id,
+    "cardBackdrop",
+  );
 
   const [extras, setExtras] = useState({
     runtime: null,
@@ -706,6 +712,9 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
         const cachedBackdrop = movieBackdropCache.get(movie.id);
         if (cardBackdrop) {
           revealBackdrop(cardBackdrop);
+        } else if (cardBackdropPending) {
+          // Se espera a saber si hay votado (el efecto vuelve a correr).
+          revealBackdrop(null);
         } else if (cachedBackdrop !== undefined) {
           revealBackdrop(cachedBackdrop);
         } else {
@@ -816,7 +825,7 @@ function InlinePreviewCard({ movie, heightClass, isSpotlight = false }) {
     return () => {
       abort = true;
     };
-  }, [isSpotlight, movie, cardBackdrop]);
+  }, [isSpotlight, movie, cardBackdrop, cardBackdropPending]);
 
   const href = `/details/movie/${movie.id}`;
 
