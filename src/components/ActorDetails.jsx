@@ -1474,12 +1474,14 @@ function AwardCard({ item }) {
           )}
         </div>
 
-        {/* Logo cuadrado al 75 % del ancho: el mismo margen a cada lado en
-            cualquier tamaño de tarjeta. Desde `sm` deja libre la fila de
-            resultado y año (`pt-8`); abajo, el hueco del texto. */}
-        <div className="relative flex flex-1 flex-col items-center justify-center px-2 pb-14 sm:px-4 sm:pb-20 sm:pt-8 z-10">
+        {/* Logo cuadrado al 85 % del ancho: el mismo margen a cada lado en
+            cualquier tamaño de tarjeta. Ocupa el hueco entre la fila de
+            resultado y año (`sm:pt-8`; en el móvil no hay) y el texto, que va
+            en el flujo: así queda centrado entre los dos midan lo que midan.
+            Si el texto ocupa mucho, el logo se encoge (`min-h-0`). */}
+        <div className="relative z-10 flex min-h-0 flex-1 flex-col items-center justify-center px-2 pt-2 sm:px-4 sm:pt-8">
           {imageSrc ? (
-            <div className="flex aspect-square w-[75%] items-center justify-center">
+            <div className="flex aspect-square max-h-full w-[85%] items-center justify-center">
               <OptimizedImage
                 key={imageSrc}
                 src={imageSrc}
@@ -1498,7 +1500,7 @@ function AwardCard({ item }) {
               />
             </div>
           ) : (
-            <div className="flex aspect-square w-[75%] items-center justify-center">
+            <div className="flex aspect-square max-h-full w-[85%] items-center justify-center">
               {result === "winner" ? (
                 <Trophy className="h-[85%] w-[85%] text-yellow-300 drop-shadow-[0_8px_20px_rgba(0,0,0,0.6)]" />
               ) : (
@@ -1508,7 +1510,7 @@ function AwardCard({ item }) {
           )}
         </div>
 
-        <div className="absolute inset-x-0 bottom-0 flex flex-col justify-end px-2 py-2 sm:px-3 sm:py-3 z-20">
+        <div className="relative z-20 flex flex-col justify-end px-2 py-2 sm:px-3 sm:py-3">
           <div className="sm:hidden">
             <p className="text-center text-[10px] font-extrabold leading-tight text-white line-clamp-2 drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
               {awardTitle}
