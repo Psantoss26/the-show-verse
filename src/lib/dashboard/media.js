@@ -541,6 +541,12 @@ export async function getTitleLogos(itemId, mediaType = "movie", opts = {}) {
   }
 }
 
+// Orden de idiomas del logo de CABECERA, el mismo en la ficha (DetailsClient),
+// la ficha rápida (DetailModal) y el destacado del dashboard (FeaturedHero):
+// inglés -> sin idioma -> español y, si no, el más votado de cualquier idioma.
+// Sin elección propia ni más votada, los tres enseñan así el mismo logo.
+export const HERO_LOGO_LANGS = Object.freeze(["en", null, "es"]);
+
 export async function fetchBestLogo(
   itemId,
   mediaType = "movie",

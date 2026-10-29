@@ -260,6 +260,7 @@ import {
 import { tmdbImageLanguages } from "@/lib/tmdb/imageLanguageLadder";
 import {
   getTitleLogos,
+  HERO_LOGO_LANGS,
 } from "@/lib/dashboard/media";
 
 // -- Funciones de formato: numeros, fechas, HTML, conteos --
@@ -748,7 +749,7 @@ function getSeasonNumber(season) {
 // después inglés, sin idioma y español; por último, votos de TMDb.
 function pickDefaultHeroLogo(logos) {
   if (!Array.isArray(logos) || logos.length === 0) return null;
-  const languageOrder = ["en", null, "es"];
+  const languageOrder = HERO_LOGO_LANGS;
   const score = (logo) => {
     const lang = logo?.iso_639_1 ?? null;
     const languageIndex = languageOrder.indexOf(lang);

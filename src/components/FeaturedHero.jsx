@@ -48,6 +48,12 @@ import DetailActionsRow from "@/components/details/DetailActionsRow";
 import DetailsMetaGenresRow from "@/components/details/DetailsMetaGenresRow";
 import { DetailsRatingsBadges } from "@/components/details/DetailsScoreboardPanel";
 import { traktGetItemStatus, traktSetRating } from "@/lib/api/traktClient";
+import {
+  fetchCommunityArtwork,
+  subscribeCommunityArtwork,
+  withoutArtworkVotes,
+} from "@/lib/artworkApi";
+import { useOwnArtwork } from "@/lib/hooks/useOwnCardPoster";
 
 import {
   buildImg,
@@ -57,6 +63,7 @@ import {
   fetchBestBackdropNoLang,
   fetchBestPosterNoLang,
   fetchBestLogo,
+  HERO_LOGO_LANGS,
   getBestTrailerCached,
   yearOf,
   ratingOf,
@@ -73,6 +80,12 @@ const HERO_POSTER_SIZE = "w780";
 const HERO_AUTO_ADVANCE_MS = 6000;
 // Lo que el contenido espera al fondo como mucho antes de entrar sin él.
 const HERO_ENTRANCE_MAX_WAIT_MS = 1200;
+// Lo que el logo espera como mucho a saber cuál es el MÁS VOTADO (mismo tope
+// que la portada de las colecciones). Va en paralelo con `/images`, así que
+// normalmente no añade espera; si tarda más, entra el automático y el votado
+// lo sustituye al llegar.
+const HERO_COMMUNITY_WAIT_MS = 1500;
+const COMMUNITY_TIMED_OUT = Symbol("community-timed-out");
 const HERO_SWIPE_THRESHOLD_PX = 60;
 // Cuánto puede moverse el dedo y seguir contando como TOQUE (abrir la ficha).
 //
@@ -2206,16 +2219,35 @@ export default function FeaturedHero({
       // `priority: "high"` (solo para el slide activo) además la salta al
       // frente de la cola de `fetchTmdbImages` por delante del resto de
       // peticiones de fondo del dashboard.
-      const [primaryBackdropResult, posterResult, logoResult] =
+      // El logo, con el MISMO criterio que la ficha y la ficha rápida: la
+      // elección propia (ver `ownLogo` abajo) -> el más votado por todos ->
+      // el automático (inglés -> sin idioma -> español; si no, el más votado
+      // de TMDb en cualquier idioma).
+      const communityPromise = fetchCommunityArtwork({ type: mediaType, id });
+      const [primaryBackdropResult, posterResult, logoResult, communityResult] =
         await Promise.allSettled([
           fetchBestBackdropNoLang(id, mediaType, { priority }),
           fetchBestPosterNoLang(id, mediaType, { priority }),
-          // Orden de preferencia: inglés → español → sin idioma → y, si no,
-          // el más votado de cualquier idioma (el fetch trae logos de TODOS
-          // los idiomas, así que nunca debería quedar vacío si TMDb tiene
-          // alguno).
-          fetchBestLogo(id, mediaType, ["en", "es", null], { priority }),
+          fetchBestLogo(id, mediaType, HERO_LOGO_LANGS, { priority }),
+          Promise.race([
+            communityPromise,
+            new Promise((resolve) =>
+              setTimeout(() => resolve(COMMUNITY_TIMED_OUT), HERO_COMMUNITY_WAIT_MS),
+            ),
+          ]),
         ]);
+      const communityArtwork =
+        communityResult.status === "fulfilled" ? communityResult.value : null;
+      const communityTimedOut = communityArtwork === COMMUNITY_TIMED_OUT;
+      const communityLogo = communityTimedOut ? null : communityArtwork?.logo || null;
+      if (communityTimedOut) {
+        communityPromise.then((artwork) => {
+          if (!artwork?.logo) return;
+          setAssets((prev) =>
+            prev[id] ? { ...prev, [id]: { ...prev[id], communityLogo: artwork.logo } } : prev,
+          );
+        });
+      }
 
       const primaryBackdrop =
         primaryBackdropResult.status === "fulfilled"
@@ -2273,7 +2305,9 @@ export default function FeaturedHero({
       }
 
       setAssets((prev) =>
-        prev[id] ? prev : { ...prev, [id]: { backdrop, backdrops, poster, logo } },
+        prev[id]
+          ? prev
+          : { ...prev, [id]: { backdrop, backdrops, poster, logo, communityLogo } },
       );
       resolvingAssetsRef.current.delete(id);
     },
@@ -2367,6 +2401,47 @@ export default function FeaturedHero({
   const staticEntrance = isBackNav && activeMovie != null && activeMovie.id === firstSlideId;
   const resolvedActiveAssets = activeMovie ? assets[activeMovie.id] : null;
   const activeAssets = resolvedActiveAssets || {};
+  const activeMediaType = activeMovie ? getMediaTypeForItem(activeMovie) : null;
+  // Logo elegido en la ficha o en la ficha rápida: cambia al momento, también
+  // con el dashboard vivo en segundo plano.
+  const ownLogo = useOwnArtwork(activeMediaType, activeMovie?.id, "logo");
+  // Votos nuevos del título activo (alguien elige o restaura su logo): el más
+  // votado se vuelve a pedir, o se retira el voto propio al momento.
+  const activeId = activeMovie?.id ?? null;
+  useEffect(() => {
+    if (activeId == null || !activeMediaType) return undefined;
+    let cancelled = false;
+    const setCommunityLogo = (update) =>
+      setAssets((prev) => {
+        const current = prev[activeId];
+        if (!current) return prev;
+        const communityLogo = update(current.communityLogo || null);
+        return communityLogo === current.communityLogo
+          ? prev
+          : { ...prev, [activeId]: { ...current, communityLogo } };
+      });
+    const unsubscribe = subscribeCommunityArtwork(
+      { type: activeMediaType, id: activeId },
+      (event) => {
+        if (event.retract) {
+          setCommunityLogo(
+            (current) => withoutArtworkVotes({ logo: current }, event.retract)?.logo || null,
+          );
+        }
+        if (event.refresh) {
+          fetchCommunityArtwork({ type: activeMediaType, id: activeId }).then((artwork) => {
+            // `null` = la consulta falló: se queda el que había.
+            if (!cancelled && artwork) setCommunityLogo(() => artwork.logo || null);
+          });
+        }
+      },
+    );
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [activeId, activeMediaType]);
+  const activeLogoPath = ownLogo || activeAssets.communityLogo || activeAssets.logo || null;
   const activeBackdropOptions = useMemo(() => {
     if (!activeMovie) return [];
 
@@ -2591,7 +2666,7 @@ export default function FeaturedHero({
           movie={activeMovie}
           backdropPath={activeBackdrop}
           posterPath={activePoster}
-          logoPath={activeAssets.logo || null}
+          logoPath={activeLogoPath}
           logoResolved={!!resolvedActiveAssets}
           isActive
           isMobile={isMobile}

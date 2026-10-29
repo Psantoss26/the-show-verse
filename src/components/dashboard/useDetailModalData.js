@@ -43,6 +43,7 @@ import {
   getArtworkPreference,
   getMovieImages,
   fetchBestLogo,
+  HERO_LOGO_LANGS,
   fetchBestPosterNoLang,
   fetchBestBackdropNoLang,
   preloadImage,
@@ -647,7 +648,7 @@ export function useDetailModalData(item, { phoneView = false } = {}) {
       // Logo GENERAL de la serie para la cabecera del episodio (best-effort).
       (async () => {
         try {
-          const logoPath = await fetchBestLogo(showId, "tv", ["en", null, "es"]);
+          const logoPath = await fetchBestLogo(showId, "tv", HERO_LOGO_LANGS);
           if (!cancelledEp) {
             setData((prev) => ({
               ...prev,
@@ -1234,7 +1235,7 @@ export function useDetailModalData(item, { phoneView = false } = {}) {
         // verse nunca en esta ficha.
         const [artworkOverrides, bestLogo, autoArtwork] = await Promise.all([
           artworkOverridesPromise,
-          fetchBestLogo(id, mediaType, ["en", null, "es"]),
+          fetchBestLogo(id, mediaType, HERO_LOGO_LANGS),
           autoArtworkPromise,
         ]);
         const logoPath = overrideFrom(artworkOverrides, "logo") || bestLogo;

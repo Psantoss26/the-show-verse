@@ -124,6 +124,7 @@ import {
   fetchBestBackdrop,
   fetchBestBackdropNoLang,
   fetchBestLogo,
+  HERO_LOGO_LANGS,
   preparePreviewBackdrop,
 } from "@/lib/dashboard/media";
 
@@ -1868,7 +1869,7 @@ function InlinePreviewCardAnticipated({
     setLogoPath(seedLogoPath);
     if (!movie?.id) return undefined;
 
-    fetchBestLogo(movie.id, mediaType, ["en", null, "es"])
+    fetchBestLogo(movie.id, mediaType, HERO_LOGO_LANGS)
       .then((path) => {
         if (!cancelled) setLogoPath(path || seedLogoPath || null);
       })

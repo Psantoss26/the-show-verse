@@ -81,3 +81,16 @@ test('tarjetas: sin instantánea de la cuenta, la copia local de la ficha', () =
   assert.equal(getOwnCardPoster('tv', 5), '/local.jpg')
   delete globalThis.window
 })
+
+test('cualquier capa: el logo propio sale de la misma memoria', async () => {
+  const { getOwnArtwork } = await import('./artworkApi.js')
+  installWindow(
+    memoryStorage({
+      [ARTWORK_PREFERENCES_CACHE_KEY]: snapshot({ 'tv:7': { logo: '/logo.png', poster: '/p.jpg' } })
+    })
+  )
+  assert.equal(getOwnArtwork('tv', 7, 'logo'), '/logo.png')
+  assert.equal(getOwnArtwork('show', 7, 'poster'), '/p.jpg')
+  assert.equal(getOwnArtwork('tv', 7, 'backdrop'), null)
+  delete globalThis.window
+})

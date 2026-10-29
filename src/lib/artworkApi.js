@@ -191,17 +191,25 @@ export function notifyPersistedArtworkOverridesChanged() {
     })
 }
 
-// `null` = sin portada propia para tarjetas: se usa el criterio automático.
-export function getOwnCardPoster(type, id) {
-    if (id == null || id === '' || typeof window === 'undefined') return null
+// Elección PROPIA de una capa (`poster`, `logo`, `backdrop`…) de un título,
+// desde la misma memoria. `null` = sin elección: se usa la más votada o la
+// automática. La usan las tarjetas (`poster`) y el destacado del dashboard
+// (`logo`).
+export function getOwnArtwork(type, id, kind) {
+    if (id == null || id === '' || !kind || typeof window === 'undefined') return null
     const normalizedType = type === 'show' ? 'tv' : type === 'tv' ? 'tv' : 'movie'
     const overrides = readCardPosterOverrides()
     if (overrides != null) {
-        return overrides[`${normalizedType}:${Number(id)}`]?.poster || null
+        return overrides[`${normalizedType}:${Number(id)}`]?.[kind] || null
     }
     // Sin instantánea de la cuenta (sin sesión o primera visita del
     // dispositivo): la copia local que escribe la ficha, como el dashboard.
-    return readArtworkPreference(`showverse:${normalizedType}:${id}:poster`) || null
+    return readArtworkPreference(`showverse:${normalizedType}:${id}:${kind}`) || null
+}
+
+// `null` = sin portada propia para tarjetas: se usa el criterio automático.
+export function getOwnCardPoster(type, id) {
+    return getOwnArtwork(type, id, 'poster')
 }
 
 export function subscribeOwnCardPosters(listener) {

@@ -19,7 +19,7 @@ Layout global, dashboards y páginas de detalle "grandes".
 | `PwaManager.jsx` | Gestiona instalación de PWA y limpieza de cachés `showverse-*` del Service Worker. |
 | `OptimizedImage.jsx` | Wrapper ligero sobre `<img>` (sin `next/image`) usado en casi toda la app, alineado con `images.unoptimized` de `next.config.ts`. |
 | `MainDashboardClient.jsx` | Cliente de la home (`/`): filas de tendencias/populares/recomendados, hero destacado, carruseles. |
-| `FeaturedHero.jsx` | Hero principal del dashboard (backdrop grande, trailer en hover/autoplay, CTAs favorito/watchlist). |
+| `FeaturedHero.jsx` | Hero principal del dashboard (backdrop grande, trailer en hover/autoplay, CTAs favorito/watchlist). El logo sigue el mismo criterio que la ficha y la ficha rápida: elección propia (`useOwnArtwork(…, "logo")`, al momento) → el más votado (`fetchCommunityArtwork`, en paralelo con `/images` y con tope de 1,5 s; escucha `subscribeCommunityArtwork` del título activo) → automático con `HERO_LOGO_LANGS` (inglés → sin idioma → español, de `lib/dashboard/media.js`). |
 | `ContinueWatchingSection.jsx` | Carrusel "Continuar viendo" (progreso Trakt); patrón reutilizado por `DashboardCalendarSection`. |
 | `DashboardCalendarSection.jsx` | Sección "Calendario" del home: próximos episodios (BBDD propia + TMDb) reutilizando el carrusel de Continuar viendo. |
 | `CarruselIndividual.jsx` | Carrusel horizontal simple (Swiper) para una lista de títulos. |

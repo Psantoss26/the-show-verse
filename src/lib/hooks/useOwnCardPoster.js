@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { getOwnCardPoster, subscribeOwnCardPosters } from "@/lib/artworkApi";
+import { getOwnArtwork, subscribeOwnCardPosters } from "@/lib/artworkApi";
 
 // Portada elegida para la tarjeta de un título (ver `getOwnCardPoster`). Se
 // suscribe a la instantánea de la cuenta: al elegir otra en la ficha, solo
@@ -9,9 +9,14 @@ import { getOwnCardPoster, subscribeOwnCardPosters } from "@/lib/artworkApi";
 // siguen vivas en segundo plano. En el servidor y al hidratar vale `null`,
 // igual que antes de existir la elección.
 export default function useOwnCardPoster(type, id) {
+  return useOwnArtwork(type, id, "poster");
+}
+
+// Lo mismo para cualquier capa (p. ej. el logo del destacado del dashboard).
+export function useOwnArtwork(type, id, kind) {
   return useSyncExternalStore(
     subscribeOwnCardPosters,
-    () => getOwnCardPoster(type, id),
+    () => getOwnArtwork(type, id, kind),
     () => null,
   );
 }
