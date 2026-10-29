@@ -86,6 +86,8 @@ import ListCountPills from "@/components/lists/ListCountPills";
 import FlipReorder from "@/components/ui/FlipReorder";
 import usePreviewOpen from "@/components/preview/usePreviewOpen";
 import { TmdbImg } from "@/components/lists/ListCoverBackdropCollage";
+import { getOwnCardPoster } from "@/lib/artworkApi";
+import useOwnCardPoster, { useOwnCardPostersVersion } from "@/lib/hooks/useOwnCardPoster";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import MobileOptionsSheet, { SheetAction, SheetOption, SheetOptionGroup, useInOptionsSheet } from "@/components/ui/MobileOptionsSheet";
 
@@ -514,7 +516,23 @@ function LoadMoreSentinel({ onVisible, loading, failed = false }) {
   );
 }
 
+// Póster de un título en las vistas de listas y colecciones: la portada
+// elegida en la ficha o, sin ella, la más votada (`getOwnCardPoster`, que sale
+// de memoria; quien lo use se suscribe con `useOwnCardPostersVersion`), como
+// las tarjetas del detalle de listas y colecciones; si no, la de la vista
+// previa (arte sin texto) o la del item.
+function listItemPosterPath(item) {
+  const mediaType = item?.media_type || (item?.title ? "movie" : "tv");
+  return (
+    getOwnCardPoster(mediaType, item?.id) ||
+    item?._listPreviewPoster ||
+    item?.poster_path ||
+    null
+  );
+}
+
 function ListPreviewPosterStrip({ items = [], alt = "" }) {
+  useOwnCardPostersVersion();
   const previewItems = items.slice(0, 5);
 
   if (!previewItems.length) {
@@ -535,7 +553,7 @@ function ListPreviewPosterStrip({ items = [], alt = "" }) {
           className={`aspect-[2/3] h-full shrink-0 overflow-hidden rounded-[3px] bg-zinc-950 ${index >= 3 ? "max-sm:hidden" : ""}`}
         >
           <TmdbImg
-            filePath={item?._listPreviewPoster || item?.poster_path}
+            filePath={listItemPosterPath(item)}
             size="w154"
             alt={`${alt}: título ${index + 1}`}
             className="h-full w-full object-cover"
@@ -546,10 +564,12 @@ function ListPreviewPosterStrip({ items = [], alt = "" }) {
   );
 }
 
+// Quien la llame se suscribe con `useOwnCardPostersVersion` (ver
+// `listItemPosterPath`).
 function getPosterStackUrls(items = []) {
   return items
     .slice(0, 5)
-    .map((item) => item?._listPreviewPoster || item?.poster_path || null)
+    .map(listItemPosterPath)
     .filter(Boolean)
     .map((filePath) =>
       /^https?:\/\//i.test(filePath)
@@ -1021,12 +1041,17 @@ const ListItemCard = memo(function ListItemCard({
   const mediaType = item?.media_type || (item?.title ? "movie" : "tv");
   const href = `/details/${mediaType}/${item.id}`;
   const previewClick = usePreviewOpen();
-  // Póster con la escalera de idioma (inglés primero), como en Favoritos: lo
-  // pone ListItemsRow. Mientras se resuelve no se pinta el de TMDb (llega en
-  // es-ES); solo el ya elegido de la vista previa, si lo hay.
-  const posterPath = item?._englishPosterPending
-    ? item?._listPreviewPoster || null
-    : item?.poster_path || item?.backdrop_path || null;
+  // Portada elegida en la ficha o, sin ella, la más votada: manda y no espera
+  // a la automática. Si no, el póster con la escalera de idioma (inglés
+  // primero), como en Favoritos: lo pone ListItemsRow. Mientras se resuelve no
+  // se pinta el de TMDb (llega en es-ES); solo el ya elegido de la vista
+  // previa, si lo hay.
+  const cardPoster = useOwnCardPoster(mediaType, item?.id);
+  const posterPath =
+    cardPoster ||
+    (item?._englishPosterPending
+      ? item?._listPreviewPoster || null
+      : item?.poster_path || item?.backdrop_path || null);
   const posterUrl = posterPath
     ? `https://image.tmdb.org/t/p/w342${posterPath}`
     : null;
@@ -1603,6 +1628,8 @@ const GridListCard = memo(function GridListCard({
   // todos ellos: 57-75 ms por fotograma con CPU x4, frente a 14-18 en Comunidad.
   const isPending = itemsState === null;
   const items = Array.isArray(itemsState) ? itemsState : [];
+  // Elección propia o más votada de cada título: al cambiar, se recalcula.
+  useOwnCardPostersVersion();
   const previewPosters = getPosterStackUrls(items);
   const description = stripHtml(list?.description);
   const itemCount = Number(list?.item_count || 0);

@@ -154,7 +154,9 @@ test("grid replica las tarjetas de DetailsClient y lista muestra cinco posters c
   assert.match(collage, /object-contain/);
 
   assert.match(posterStrip, /items\.slice\(0, 5\)/);
-  assert.match(posterStrip, /_listPreviewPoster/);
+  // Portada elegida o más votada y, sin ellas, la de la vista previa.
+  assert.match(posterStrip, /listItemPosterPath\(item\)/);
+  assert.match(listsPage, /getOwnCardPoster\(mediaType, item\?\.id\) \|\|\s*item\?\._listPreviewPoster/);
   assert.match(posterStrip, /object-contain/);
   assert.match(listMode, /<ListPreviewPosterStrip/);
 
