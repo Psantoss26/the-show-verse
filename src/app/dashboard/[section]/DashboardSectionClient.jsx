@@ -41,6 +41,7 @@ import {
 } from "@/lib/search/titleMatching";
 import { tmdbImageLangsParam } from "@/lib/tmdb/imageLanguages";
 import { pickByLanguageLadder } from "@/lib/tmdb/imageLanguageLadder";
+import { pickLadderPoster } from "@/lib/details/tmdbImages";
 import useStickyToolbarState from "@/hooks/useStickyToolbarState";
 import usePageToolbarSearchFit from "@/hooks/usePageToolbarSearchFit";
 import LiquidButton from "@/components/LiquidButton";
@@ -263,18 +264,21 @@ function pickDashboardBackdrop(backdrops = [], originalLanguage) {
   return pickByLanguageLadder(backdrops, pickLargest, { originalLanguage })?.file_path || null;
 }
 
-async function fetchDashboardBackdrop(type, id, originalLanguage) {
-  if (!TMDB_API_KEY || !type || !id) return null;
+async function fetchDashboardArtwork(type, id, originalLanguage) {
+  if (!TMDB_API_KEY || !type || !id) return { poster: null, backdrop: null };
   try {
     const url =
       `https://api.themoviedb.org/3/${type}/${id}/images` +
       `?api_key=${TMDB_API_KEY}&${tmdbImageLangsParam(originalLanguage)}`;
     const response = await fetch(url, { cache: "force-cache" });
-    if (!response.ok) return null;
+    if (!response.ok) return { poster: null, backdrop: null };
     const json = await response.json();
-    return pickDashboardBackdrop(json?.backdrops || [], originalLanguage);
+    return {
+      poster: pickLadderPoster(json?.posters || [], { originalLanguage })?.file_path || null,
+      backdrop: pickDashboardBackdrop(json?.backdrops || [], originalLanguage),
+    };
   } catch {
-    return null;
+    return { poster: null, backdrop: null };
   }
 }
 
@@ -282,19 +286,25 @@ function dashboardImageKey(item) {
   return `${resolveType(item)}:${item?.id}`;
 }
 
-// Backdrop de la tarjeta: el del lote de arte (/api/tmdb/artwork, el mismo que
-// usan las filas del dashboard) y, si el lote no responde, /images directo.
+// Arte de la tarjeta, { poster, backdrop }: el del lote de arte
+// (/api/tmdb/artwork, el mismo que usan las filas del dashboard y Favoritos)
+// y, si el lote no responde, /images directo. El póster sigue la escalera de
+// idioma de toda la app, no el es-ES que trae el motor.
 // `undefined` = aún sin respuesta.
-function peekDashboardBackdrop(item) {
+function peekDashboardArtwork(item) {
   const picks = peekListArtwork(resolveType(item), item?.id);
-  return picks ? picks.dashboardBackdrop || null : undefined;
+  return picks
+    ? { poster: picks.poster || null, backdrop: picks.dashboardBackdrop || null }
+    : undefined;
 }
 
-async function loadDashboardBackdrop(item) {
+async function loadDashboardArtwork(item) {
   const type = resolveType(item);
   const picks = await requestListArtwork(type, item?.id);
-  if (picks) return picks.dashboardBackdrop || null;
-  return fetchDashboardBackdrop(type, item?.id, item?.original_language);
+  if (picks) {
+    return { poster: picks.poster || null, backdrop: picks.dashboardBackdrop || null };
+  }
+  return fetchDashboardArtwork(type, item?.id, item?.original_language);
 }
 
 // Las primeras tarjetas (lo que cabe en la primera pantalla de la rejilla más
@@ -309,16 +319,22 @@ function PosterImage({
   item,
   mode = "poster",
   title,
+  ladderPosterPath,
+  posterPending = false,
   previewBackdropPath,
   backdropPending = false,
   eager = false,
 }) {
   const [failed, setFailed] = useState(false);
   // Portada elegida en la ficha (en el HTML del servidor aún no se conoce:
-  // se aplica al hidratar).
+  // se aplica al hidratar). Si no, la de la escalera de idioma; el póster del
+  // motor (es-ES) solo cuando la escalera no encontró ninguno, y nunca
+  // mientras se resuelve.
   const ownPoster = useOwnCardPoster(resolveType(item), item?.id);
-  const poster = ownPoster || item?.poster_path;
+  const poster =
+    ownPoster || (posterPending ? null : ladderPosterPath || item?.poster_path);
   const wantsBackdrop = mode === "backdrop";
+  const imagePending = wantsBackdrop ? backdropPending : posterPending && !ownPoster;
   // Backdrop elegido en la ficha (pestaña «Backdrop»): manda sobre el del
   // lote de arte y no lo espera.
   const ownBackdrop = useOwnCardBackdrop(resolveType(item), item?.id);
@@ -328,11 +344,11 @@ function PosterImage({
   const preferredPath =
     wantsBackdrop
       ? backdrop || (!backdropPending ? poster : null)
-      : poster || backdrop;
+      : poster || (!posterPending ? backdrop : null);
 
   useEffect(() => {
     setFailed(false);
-  }, [backdropPending, mode, preferredPath]);
+  }, [imagePending, mode, preferredPath]);
 
   const path =
     wantsBackdrop
@@ -344,9 +360,9 @@ function PosterImage({
         : preferredPath;
 
   if (!path) {
-    // Backdrop aún en camino (lote de arte): el fondo de la tarjeta, sin el
+    // Arte aún en camino (lote de arte): el fondo de la tarjeta, sin el
     // icono de «sin imagen», que se veía como tarjeta rota un instante.
-    if (backdropPending) return <div className="h-full w-full bg-zinc-900" />;
+    if (imagePending) return <div className="h-full w-full bg-zinc-900" />;
     return (
       <div className="flex h-full w-full items-center justify-center bg-zinc-900 text-zinc-700">
         <Film className="h-8 w-8 opacity-60" />
@@ -635,6 +651,8 @@ function SectionCard({
   totalItems = 0,
   viewMode,
   imageMode = "poster",
+  ladderPosterPath,
+  posterPending = false,
   previewBackdropPath,
   backdropPending = false,
   watchCount = 0,
@@ -733,6 +751,8 @@ function SectionCard({
                 item={item}
                 mode="backdrop"
                 title={title}
+                ladderPosterPath={ladderPosterPath}
+                posterPending={posterPending}
                 previewBackdropPath={previewBackdropPath}
                 backdropPending={backdropPending}
                 eager={index < EAGER_IMAGE_COUNT}
@@ -777,6 +797,8 @@ function SectionCard({
               item={item}
               mode={effectiveImageMode}
               title={title}
+              ladderPosterPath={ladderPosterPath}
+              posterPending={posterPending}
               previewBackdropPath={previewBackdropPath}
               backdropPending={backdropPending}
               eager={index < EAGER_IMAGE_COUNT}
@@ -806,6 +828,8 @@ function SectionCard({
             item={item}
             mode={effectiveImageMode}
             title={title}
+            ladderPosterPath={ladderPosterPath}
+            posterPending={posterPending}
             previewBackdropPath={previewBackdropPath}
             backdropPending={backdropPending}
             eager={index < EAGER_IMAGE_COUNT}
@@ -877,7 +901,7 @@ export default function DashboardSectionClient({
   initialDescription = null,
   initialViewMode = null,
   initialImageMode = null,
-  initialBackdrops = null,
+  initialArtwork = null,
 }) {
   // La lista llega normalmente con la página (ver page.jsx): sin petición ni
   // esqueletos. Solo si el servidor no la pudo dar, se pide aquí.
@@ -904,8 +928,8 @@ export default function DashboardSectionClient({
   const toolbarSearchFitRef = usePageToolbarSearchFit();
   const filtersRef = useRef(null);
   const { isPinned: filtersPinned } = useStickyToolbarState(filtersRef);
-  const [previewBackdropsByItem, setPreviewBackdropsByItem] = useState(
-    () => initialBackdrops || {},
+  const [artworkByItem, setArtworkByItem] = useState(
+    () => initialArtwork || {},
   );
 
   useEffect(() => {
@@ -973,13 +997,14 @@ export default function DashboardSectionClient({
     [data?.items],
   );
 
-  // Backdrops (vista lista o modo backdrop) por el lote de arte, EN ORDEN y
+  // Arte (póster de la escalera y backdrop) por el lote de arte, EN ORDEN y
   // por tandas: cada tarjeta se pinta en cuanto llega la suya, sin esperar a
-  // las 200. Lo ya resuelto en esta visita (p. ej. las filas del dashboard)
-  // está desde el primer render (peekDashboardBackdrop).
+  // las 200. Lo elegido en el servidor (page.jsx) y lo ya resuelto en esta
+  // visita (p. ej. las filas del dashboard) está desde el primer render
+  // (peekDashboardArtwork).
   const wantsPreviewBackdrops = viewMode === "list" || imageMode === "backdrop";
   useEffect(() => {
-    if (!wantsPreviewBackdrops || rawItems.length === 0) return undefined;
+    if (rawItems.length === 0) return undefined;
 
     let cancelled = false;
     const pending = rawItems.filter((item) => {
@@ -987,8 +1012,8 @@ export default function DashboardSectionClient({
       return (
         Number.isFinite(Number(item?.id)) &&
         (type === "movie" || type === "tv") &&
-        initialBackdrops?.[dashboardImageKey(item)] === undefined &&
-        peekDashboardBackdrop(item) === undefined
+        initialArtwork?.[dashboardImageKey(item)] === undefined &&
+        peekDashboardArtwork(item) === undefined
       );
     });
     const BATCH = 16;
@@ -997,11 +1022,11 @@ export default function DashboardSectionClient({
       Promise.all(
         chunk.map(async (item) => [
           dashboardImageKey(item),
-          await loadDashboardBackdrop(item).catch(() => null),
+          await loadDashboardArtwork(item).catch(() => ({ poster: null, backdrop: null })),
         ]),
       ).then((entries) => {
         if (cancelled) return;
-        setPreviewBackdropsByItem((current) => ({
+        setArtworkByItem((current) => ({
           ...current,
           ...Object.fromEntries(entries),
         }));
@@ -1011,7 +1036,7 @@ export default function DashboardSectionClient({
     return () => {
       cancelled = true;
     };
-  }, [initialBackdrops, rawItems, wantsPreviewBackdrops]);
+  }, [initialArtwork, rawItems]);
 
   const filtered = useMemo(() => {
     const q = normText(deferredQuery);
@@ -1051,13 +1076,21 @@ export default function DashboardSectionClient({
     return arr;
   }, [filtered, sortBy, rawItems]);
 
+  const getArtwork = useCallback(
+    (item) => {
+      const known = artworkByItem[dashboardImageKey(item)];
+      return known !== undefined ? known : peekDashboardArtwork(item);
+    },
+    [artworkByItem],
+  );
+
   const getPreviewBackdropPath = useCallback(
     (item) => {
       if (!wantsPreviewBackdrops) return undefined;
-      const known = previewBackdropsByItem[dashboardImageKey(item)];
-      return known !== undefined ? known : peekDashboardBackdrop(item);
+      const artwork = getArtwork(item);
+      return artwork === undefined ? undefined : artwork.backdrop;
     },
-    [previewBackdropsByItem, wantsPreviewBackdrops],
+    [getArtwork, wantsPreviewBackdrops],
   );
 
   const isPreviewBackdropPending = useCallback(
@@ -1448,6 +1481,8 @@ export default function DashboardSectionClient({
                       totalItems={group.items.length}
                       viewMode={viewMode}
                       imageMode={imageMode}
+                      ladderPosterPath={getArtwork(item)?.poster}
+                      posterPending={getArtwork(item) === undefined}
                       previewBackdropPath={getPreviewBackdropPath(item)}
                       backdropPending={isPreviewBackdropPending(item)}
                       {...userStateOf(item)}
@@ -1470,6 +1505,8 @@ export default function DashboardSectionClient({
                 totalItems={sorted.length}
                 viewMode={viewMode}
                 imageMode={imageMode}
+                ladderPosterPath={getArtwork(item)?.poster}
+                posterPending={getArtwork(item) === undefined}
                 previewBackdropPath={getPreviewBackdropPath(item)}
                 backdropPending={isPreviewBackdropPending(item)}
                 {...userStateOf(item)}

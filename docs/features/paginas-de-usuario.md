@@ -41,7 +41,7 @@ El backend entrega la baraja ya filtrada (sin descartados, pendientes ni favorit
 
 ## Secciones del dashboard (`/dashboard/[section]`)
 
-Páginas «Ver todos» de *Tendencias*, *Populares*, *Recomendados* y *Más esperadas* (`src/lib/dashboard/sectionItems.js`). La lista llega ya en el RSC, sin esqueletos, y es la misma (mismo orden) que la fila de Inicio. Tienen botón de recargar junto al de volver. Backend: `/v1/dashboard/sections/{key}`. Ver [[dashboards-implementation]].
+Páginas «Ver todos» de *Tendencias*, *Populares*, *Recomendados* y *Más esperadas* (`src/lib/dashboard/sectionItems.js`). La lista llega ya en el RSC, sin esqueletos, y es la misma (mismo orden) que la fila de Inicio. Tienen botón de recargar junto al de volver. Backend: `/v1/dashboard/sections/{key}`. Sin portada propia ni votada, el póster de cada tarjeta sigue la misma escalera de idioma que Favoritos (inglés → español → original → sin idioma, `poster` del lote `/api/tmdb/artwork`), no el es-ES que trae el motor, que solo se usa si la escalera no encuentra ninguno. Las 24 primeras llegan elegidas en el RSC (`lib/dashboard/sectionArtwork.js`, póster y backdrop con el mismo criterio que el lote); el resto, por el lote en tandas de 16, sin pintar el póster del motor mientras se resuelve. Ver [[dashboards-implementation]].
 
 ## Entrada de Favoritos y Pendientes
 

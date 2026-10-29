@@ -5,7 +5,7 @@ import {
   getBackendAccessToken,
   getBackendRefreshToken,
 } from "@/lib/backend/server";
-import { loadSectionBackdrops } from "@/lib/dashboard/sectionBackdrops";
+import { loadSectionArtwork } from "@/lib/dashboard/sectionArtwork";
 import { loadSectionItems, SECTION_CONFIG } from "@/lib/dashboard/sectionItems";
 import {
   readSectionViewPrefs,
@@ -77,13 +77,12 @@ export default async function DashboardSectionPage({ params }) {
   const viewPrefs = readSectionViewPrefs(
     cookieStore.get(SECTION_VIEW_COOKIE)?.value,
   );
-  // En vista lista o modo backdrop, los backdrops de la primera pantalla
-  // también vienen elegidos: esas tarjetas no nacen vacías.
-  const initialBackdrops =
-    initialData &&
-    (viewPrefs?.viewMode === "list" || viewPrefs?.imageMode === "backdrop")
-      ? await loadSectionBackdrops(initialData.items)
-      : null;
+  // El arte de la primera pantalla (póster con la escalera de idioma, como
+  // Favoritos, y backdrop) viene elegido: esas tarjetas no nacen con el
+  // póster en español del motor ni vacías.
+  const initialArtwork = initialData
+    ? await loadSectionArtwork(initialData.items)
+    : null;
   const config = SECTION_CONFIG[section];
   // Ficha rápida (DetailModal) como drawer desde la derecha al pulsar una
   // tarjeta, igual que en Favoritos y el resto de páginas de usuario.
@@ -96,7 +95,7 @@ export default async function DashboardSectionPage({ params }) {
         initialDescription={config?.description || null}
         initialViewMode={viewPrefs?.viewMode || null}
         initialImageMode={viewPrefs?.imageMode || null}
-        initialBackdrops={initialBackdrops}
+        initialArtwork={initialArtwork}
       />
     </DetailModalProvider>
   );
