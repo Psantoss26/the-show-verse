@@ -41,7 +41,6 @@ import {
   useSyncExternalStore,
 } from "react";
 import Link from "next/link";
-import { AnimatePresence, motion } from "framer-motion";
 import {
   ChevronDown,
   ChevronLeft,
@@ -56,8 +55,6 @@ import {
   Image as ImageIcon,
   Music2,
   Play,
-  RotateCcw,
-  SlidersHorizontal,
   ThumbsDown,
   ThumbsUp,
   Trophy,
@@ -115,7 +112,6 @@ import {
   saveArtworkOverride,
   saveArtworkOverrides,
 } from "@/lib/artworkApi";
-import MobileFiltersPanel from "@/components/ui/MobileFiltersPanel";
 import CommentFilterBar from "@/components/details/CommentFilterBar";
 import {
   cachedCommentsResponse,
@@ -178,14 +174,6 @@ function imgResBucket(img) {
   if (long >= 1280) return "720p";
   return "sd";
 }
-
-const RES_FILTERS = [
-  { id: "all", label: "Todas" },
-  { id: "720p", label: "720p" },
-  { id: "1080p", label: "1080p" },
-  { id: "2k", label: "2K" },
-  { id: "4k", label: "4K" },
-];
 
 function getSoundtrackSourceBadge(source) {
   const key = String(source || "Spotify").toLowerCase();
@@ -340,8 +328,6 @@ export default function PhoneDetailsSections({
   // logo. Es exactamente el conjunto de pestañas que enseña la ficha móvil.
   const [activeImagesTab, setActiveImagesTab] = useState("posters");
   const [imagesResFilter, setImagesResFilter] = useState("all");
-  const [controlsOpen, setControlsOpen] = useState(false);
-  const [resMenuOpen, setResMenuOpen] = useState(false);
 
   // Selección del usuario. Se siembra igual que la ficha completa: instantánea
   // persistida si la hay y, si no, la copia local por título.
@@ -365,7 +351,6 @@ export default function PhoneDetailsSections({
     setSelectedCardPoster(pick("poster", cardPosterKey));
     setActiveImagesTab("posters");
     setImagesResFilter("all");
-    setControlsOpen(false);
   }, [id, overrideType, mobilePosterKey, logoKey, cardPosterKey]);
 
   const persistSelection = useCallback(
@@ -1477,136 +1462,10 @@ export default function PhoneDetailsSections({
         <section className="sv-phone-section" id="phone-section-media" ref={registerSection("media")}>
           <AnimatedSection delay={0.04}>
             <section className="group/section">
-              {/* El encabezado y los controles comparten fila, igual que en la
-                  ficha móvil: el botón de filtros abre el panel desplegable y
-                  el de restaurar deshace las selecciones. */}
-              <div className="flex items-end justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <SectionTitle title="Portadas y fondos" icon={ImageIcon} onOpen={sectionSheetOpener("images")} />
-                </div>
-                <div className="mb-8 flex shrink-0 items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setControlsOpen((open) => !open);
-                      setResMenuOpen(false);
-                    }}
-                    className="inline-flex isolate items-center justify-center w-10 h-10 rounded-2xl transition-all duration-300 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200 hover:bg-black/30 transform-gpu"
-                    aria-label="Filtros"
-                    aria-expanded={controlsOpen}
-                  >
-                    <SlidersHorizontal className="w-5 h-5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleResetArtwork}
-                    className="inline-flex isolate items-center justify-center w-10 h-10 rounded-2xl transition-all bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] transform-gpu text-red-400 hover:bg-red-500/20 hover:text-red-300"
-                    aria-label="Restaurar valores por defecto"
-                  >
-                    <RotateCcw className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Por ENCIMA de la galería que sigue: el contenido del panel lleva un
-                  `transform` (su animación) y eso encierra el z-index del
-                  desplegable de resolución en el panel; el Swiper de las
-                  imágenes (`.swiper`: relative, z-index 1) lo tapaba. Con
-                  z-[2] el panel gana a la galería y sigue por debajo de las
-                  barras fijas (z-30). */}
-              <MobileFiltersPanel
-                open={controlsOpen}
-                className="relative z-[2]"
-                gapClassName=""
-                contentClassName="pb-4"
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="flex isolate transform-gpu rounded-2xl p-1 h-10 items-center bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)]">
-                    <button
-                      type="button"
-                      onClick={() => setActiveImagesTab("posters")}
-                      className={`px-2.5 h-full rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-                        activeImagesTab === "posters"
-                          ? "bg-white/10 text-white shadow-md"
-                          : "text-zinc-400 hover:text-white hover:bg-white/10"
-                      }`}
-                      aria-label="Portada"
-                      aria-pressed={activeImagesTab === "posters"}
-                    >
-                      <ImageIcon className="w-4 h-4" />
-                      <span className="text-xs font-semibold">Portada</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveImagesTab("logos")}
-                      className={`px-2.5 h-full rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-                        activeImagesTab === "logos"
-                          ? "bg-white/10 text-white shadow-md"
-                          : "text-zinc-400 hover:text-white hover:bg-white/10"
-                      }`}
-                      aria-label="Logo"
-                      aria-pressed={activeImagesTab === "logos"}
-                    >
-                      <Sparkles className="w-4 h-4" />
-                      <span className="text-xs font-semibold">Logo</span>
-                    </button>
-                  </div>
-
-                  <div className="relative min-w-[6.25rem] flex-1">
-                    <button
-                      type="button"
-                      onClick={() => setResMenuOpen((open) => !open)}
-                      className="h-10 w-full inline-flex isolate transform-gpu items-center justify-between gap-2 px-3 rounded-2xl transition text-sm bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200 hover:bg-black/30"
-                      aria-label="Resolución"
-                      aria-expanded={resMenuOpen}
-                    >
-                      <span className="inline-flex items-center gap-2 truncate">
-                        <span className="text-[10px] font-extrabold tracking-wider text-zinc-400/90">
-                          RES
-                        </span>
-                        <span className="font-semibold truncate">
-                          {RES_FILTERS.find((f) => f.id === imagesResFilter)
-                            ?.label || "Todas"}
-                        </span>
-                      </span>
-                      <ChevronDown
-                        className={`w-4 h-4 shrink-0 transition-transform ${resMenuOpen ? "rotate-180" : ""}`}
-                      />
-                    </button>
-
-                    <AnimatePresence>
-                      {resMenuOpen && (
-                        <motion.ul
-                          initial={{ opacity: 0, y: -6 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -6 }}
-                          transition={{ duration: 0.14 }}
-                          className="absolute left-0 right-0 z-40 mt-2 overflow-hidden rounded-2xl bg-black/70 backdrop-blur-xl shadow-[0_16px_40px_rgba(0,0,0,0.6)]"
-                        >
-                          {RES_FILTERS.map((filter) => (
-                            <li key={filter.id}>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setImagesResFilter(filter.id);
-                                  setResMenuOpen(false);
-                                }}
-                                className={`w-full px-3 py-2 text-left text-sm transition ${
-                                  imagesResFilter === filter.id
-                                    ? "bg-white/10 font-bold text-white"
-                                    : "text-zinc-300 hover:bg-white/5 hover:text-white"
-                                }`}
-                              >
-                                {filter.label}
-                              </button>
-                            </li>
-                          ))}
-                        </motion.ul>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                </div>
-              </MobileFiltersPanel>
+              {/* Sin botones en la fila del título, como en la ficha móvil: las
+                  pestañas, los filtros y Restaurar están en la vista lateral que
+                  abre el título. */}
+              <SectionTitle title="Portadas y fondos" icon={ImageIcon} onOpen={sectionSheetOpener("images")} />
 
               {imagesLoading && artworkSelection.ordered.length === 0 ? (
                 <div className="grid grid-cols-3 gap-3">

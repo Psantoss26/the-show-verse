@@ -22,7 +22,9 @@ const PAGES = [
   "app/u/[username]/ProfileSection.jsx",
   "app/watchlist/WatchlistClient.jsx",
   "components/ActorDetails.jsx",
-  "components/DetailsClient.jsx",
+  // DetailsClient ya no: «Portadas y fondos» no tiene botones en la fila del
+  // título en el móvil (sus filtros están en la vista lateral, ver
+  // SECTION_SHEETS).
   "components/lists/ListDetailsTools.jsx",
   "components/profile/neural/NeuralGraphView.jsx",
 ];

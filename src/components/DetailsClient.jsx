@@ -126,8 +126,6 @@ import {
   Link2,
   Building2,
   MapPin,
-  Languages,
-  LayoutGrid,
   Award,
   ListVideo,
   Check,
@@ -143,7 +141,6 @@ import {
   Eye,
   LibraryBig,
   MessageSquare,
-  SlidersHorizontal,
   Trophy,
 } from "lucide-react";
 
@@ -367,7 +364,6 @@ import {
   createPlatformItem,
   dedupeStreamingProviders,
 } from "@/lib/streaming/providers";
-import MobileOptionsSheet, { SheetOption, SheetOptionGroup } from "@/components/ui/MobileOptionsSheet";
 import { useEnglishPosterItems } from "@/lib/tmdb/useEnglishPosterItems";
 import { useLadderListPreviews } from "@/lib/lists/useLadderListPreviews";
 import ListCountPills from "@/components/lists/ListCountPills";
@@ -2518,9 +2514,6 @@ export default function DetailsClient({
   // Controla si la fila de artwork esta lista para mostrarse (precarga completada)
   const [artworkRowReady, setArtworkRowReady] = useState(() => restoredValue(backSnapshot, "artworkRowReady", false));
 
-  // Panel movil de filtros (colapsable)
-  const [artworkControlsOpen, setArtworkControlsOpen] = useState(false);
-
   // Ref del wrapper de controles de artwork para detectar click fuera
   const artworkControlsWrapRef = useRef(null);
   // ¿Hay algo que cerrar? (panel de filtros o menú de resolución; se actualiza
@@ -2535,19 +2528,15 @@ export default function DetailsClient({
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === "Escape") {
-        setArtworkControlsOpen(false);
         setResMenuOpen?.(false);
       }
     };
 
     const onDown = (e) => {
       if (!artworkMenusOpenRef.current) return;
-      // La hoja móvil de filtros va en un portal y se cierra ella sola.
-      if (e.target instanceof Element && e.target.closest("[data-mobile-options-sheet]")) return;
       const wrap = artworkControlsWrapRef.current;
       if (!wrap) return;
       if (!wrap.contains(e.target)) {
-        setArtworkControlsOpen(false);
         setResMenuOpen?.(false);
       }
     };
@@ -2565,7 +2554,7 @@ export default function DetailsClient({
 
   // -- Dropdown de resolucion --
   const [resMenuOpen, setResMenuOpen] = useState(false);
-  artworkMenusOpenRef.current = artworkControlsOpen || resMenuOpen;
+  artworkMenusOpenRef.current = resMenuOpen;
   const resMenuRef = useRef(null);
 
   // Cierra el menu de resolucion al hacer click fuera
@@ -2984,6 +2973,9 @@ export default function DetailsClient({
       // «Vista previa» ya no está en la ficha (se edita en DetailModal): una
       // vuelta atrás que la restaure cae en la portada.
       activeImagesTab === "backdrops" ||
+      // En el móvil la fila del título no tiene botones: la galería enseña
+      // siempre la portada y el resto de pestañas está en la vista lateral.
+      (isMobileViewport && activeImagesTab !== "posters") ||
       (!isMobileViewport &&
         (activeImagesTab === "localizedPosters" || activeImagesTab === "cardPosters"))
     ) {
@@ -11998,29 +11990,16 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                               )}
                             </div>
 
-                            {/* ===================== MÓVIL: botón filtros + reset ===================== */}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setArtworkControlsOpen((v) => !v);
-                                setResMenuOpen(false);
-                              }}
-                              className="sm:hidden inline-flex isolate items-center justify-center w-10 h-10 rounded-2xl
-        transition-all duration-300 bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] text-zinc-200
-        hover:bg-black/30 transform-gpu hover:-translate-y-0.5"
-                              aria-label="Filtros"
-                              style={{ WebkitTapHighlightColor: "transparent" }}
-                            >
-                              <SlidersHorizontal className="w-5 h-5" />
-                            </button>
-
+                            {/* Restaurar: solo desde 640px. En el móvil la fila del
+                                título queda sin botones; las pestañas, los filtros y
+                                Restaurar están en la vista lateral que abre el título. */}
                             <button
                               type="button"
                               onClick={() => {
                                 captureArtworkFlip();
                                 handleResetArtwork();
                               }}
-                              className="inline-flex isolate items-center justify-center w-10 h-10 md:w-11 md:h-11 rounded-2xl
+                              className="hidden sm:inline-flex isolate items-center justify-center w-10 h-10 md:w-11 md:h-11 rounded-2xl
         transition-all bg-black/20 bg-gradient-to-br from-white/10 via-white/5 to-black/40 backdrop-blur-[50px] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] transform-gpu
         text-red-400 hover:bg-red-500/20 hover:text-red-300 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)]"
                               aria-label="Restaurar valores por defecto"
@@ -12031,64 +12010,6 @@ ${currentHighLoaded ? "opacity-100" : "opacity-0"}`}
                           </div>
                         </div>
 
-                        {/* Móvil: portada, resolución e idioma en la hoja de filtros. */}
-                        <MobileOptionsSheet
-                          open={artworkControlsOpen}
-                          onClose={() => setArtworkControlsOpen(false)}
-                          title="Portadas y fondos"
-                          icon={ImageIcon}
-                          accent="yellow"
-                        >
-                          <SheetOptionGroup label="Imagen" icon={ImageIcon}>
-                            <SheetOption icon={ImageIcon} active={activeImagesTab === "posters"} onClick={() => setActiveImagesTab("posters")}>
-                              Portada
-                            </SheetOption>
-                            {/* Portada CON IDIOMA: sustituye a la portada sin idioma + logo
-                                (trae el título impreso). */}
-                            <SheetOption icon={Languages} active={activeImagesTab === "localizedPosters"} onClick={() => setActiveImagesTab("localizedPosters")}>
-                              Con idioma
-                            </SheetOption>
-                            {/* Portada de las TARJETAS (páginas y dashboards): la
-                                misma que «Portada» en escritorio, no la de este hero. */}
-                            <SheetOption icon={LayoutGrid} active={activeImagesTab === "cardPosters"} onClick={() => setActiveImagesTab("cardPosters")}>
-                              Tarjetas
-                            </SheetOption>
-                            <SheetOption icon={Sparkles} active={activeImagesTab === "logos"} onClick={() => setActiveImagesTab("logos")}>
-                              Logo
-                            </SheetOption>
-                          </SheetOptionGroup>
-                          <SheetOptionGroup label="Resolución">
-                            {[
-                              { id: "all", label: "Todas" },
-                              { id: "720p", label: "720p" },
-                              { id: "1080p", label: "1080p" },
-                              { id: "2k", label: "2K" },
-                              { id: "4k", label: "4K" },
-                            ].map((opt) => (
-                              <SheetOption key={opt.id} active={imagesResFilter === opt.id} onClick={() => setImagesResFilter(opt.id)}>
-                                {opt.label}
-                              </SheetOption>
-                            ))}
-                          </SheetOptionGroup>
-                          {/* Logos, «Con idioma» y «Tarjetas» tienen variantes
-                              localizadas (español e inglés; si no hay, las que
-                              haya); la portada sin idioma no necesita este filtro. */}
-                          {(activeImagesTab === "logos" ||
-                            activeImagesTab === "localizedPosters" ||
-                            activeImagesTab === "cardPosters") && (
-                            <SheetOptionGroup
-                              label={activeImagesTab === "logos" ? "Idioma de los logos" : "Idioma de las portadas"}
-                              icon={Languages}
-                            >
-                              <SheetOption active={langES} onClick={() => setLangES((value) => !value)}>
-                                Español
-                              </SheetOption>
-                              <SheetOption active={langEN} onClick={() => setLangEN((value) => !value)}>
-                                Inglés
-                              </SheetOption>
-                            </SheetOptionGroup>
-                          )}
-                        </MobileOptionsSheet>
 
                         {!!imagesError && (
                           <div className="text-sm text-red-400 mb-3">
