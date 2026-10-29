@@ -54,6 +54,7 @@ import {
   fetchCommunityArtwork,
   readPersistedArtworkOverride,
   withCommunityArtwork,
+  withoutArtworkVotes,
 } from "@/lib/artworkApi";
 import { dedupeStreamingProviders } from "@/lib/streaming/providers";
 
@@ -213,6 +214,13 @@ const EMPTY_DATA = {
   // ficha de teléfono lo oculta -- mismo criterio que `mobilePosterHasBurnedTitle`
   // en DetailsClient.
   heroPosterHasBurnedTitle: false,
+  // Portada y logo AUTOMÁTICOS del hero (sin las elecciones ni los votos
+  // propios): a los que vuelve «Restablecer» de la ficha de teléfono. Sin
+  // ellos, la portada elegida («Con idioma» incluida) seguía puesta y el logo
+  // desaparecía hasta reabrir.
+  autoHeroPosterPath: null,
+  autoHeroHasBurnedTitle: false,
+  autoLogoPath: null,
   // Backdrop del hero: SOLO el definitivo (textless), fijado una única vez y ya
   // precargado. Hasta que existe se muestra el esqueleto, nunca una imagen
   // intermedia: así el usuario ve aparecer una sola imagen.
@@ -793,14 +801,23 @@ export function useDetailModalData(item, { phoneView = false } = {}) {
     // (cada selección de un usuario es un voto; ver artworkVotes.js en el
     // backend), igual que en DetailsClient. Solo se espera junto a cargas que
     // ya eran de red (galería, logo, fondo), así que no añade espera propia.
-    const artworkOverridesPromise = Promise.all([
+    const artworkSourcesPromise = Promise.all([
       persistedOverride
         ? persistedOverride
         : fetchArtworkOverride({ type: overrideType, id }).catch(() => null),
       fetchCommunityArtwork({ type: overrideType, id }),
-    ]).then(([ownOverrides, communityArtwork]) =>
-      withCommunityArtwork(ownOverrides, communityArtwork, artworkPreference),
+    ]);
+    const artworkOverridesPromise = artworkSourcesPromise.then(
+      ([ownOverrides, communityArtwork]) =>
+        withCommunityArtwork(ownOverrides, communityArtwork, artworkPreference),
     );
+    // Lo que se vería SIN elección propia: la más votada sin contar el voto
+    // propio (cada elección es un voto y Restablecer lo retira).
+    const autoArtworkPromise = artworkSourcesPromise
+      .then(([ownOverrides, communityArtwork]) =>
+        withoutArtworkVotes(communityArtwork, ownOverrides ?? artworkPreference) || {},
+      )
+      .catch(() => ({}));
     // Cuando la instantánea confirma los overrides, MANDA sobre la copia local
     // por título: esa clave queda obsoleta si el usuario reseteó la portada
     // desde otro dispositivo. Es el mismo criterio que `initialFor` en
@@ -1212,15 +1229,17 @@ export function useDetailModalData(item, { phoneView = false } = {}) {
         // semilla) o de la revalidación remota, igual que la portada: sin
         // esperarla, un logo elegido a mano en otro dispositivo no llegaría a
         // verse nunca en esta ficha.
-        const [artworkOverrides, bestLogo] = await Promise.all([
+        const [artworkOverrides, bestLogo, autoArtwork] = await Promise.all([
           artworkOverridesPromise,
           fetchBestLogo(id, mediaType, ["en", null, "es"]),
+          autoArtworkPromise,
         ]);
         const logoPath = overrideFrom(artworkOverrides, "logo") || bestLogo;
         if (!cancelled) {
           setData((prev) => ({
             ...prev,
             logoPath: logoPath || prev.logoPath,
+            autoLogoPath: autoArtwork?.logo || bestLogo || null,
             logoResolved: true,
           }));
         }
@@ -1293,6 +1312,30 @@ export function useDetailModalData(item, { phoneView = false } = {}) {
         const chosenLang = chosen?.iso_639_1;
         const hasBurnedTitle =
           typeof chosenLang === "string" && chosenLang.trim() !== "";
+        const burnedTitle = (path) => {
+          const lang = (images?.posters || []).find(
+            (poster) => poster?.file_path === path,
+          )?.iso_639_1;
+          return typeof lang === "string" && lang.trim() !== "";
+        };
+
+        // La automática (misma política, sin elecciones propias) se calcula
+        // aparte: el hero no la espera para pintarse.
+        autoArtworkPromise.then((autoArtwork) => {
+          if (cancelled) return;
+          const autoHeroPosterPath =
+            pickModalHeroPosterPath({
+              mobilePosterOverride: autoArtwork?.mobilePoster || null,
+              posterOverride: autoArtwork?.poster || null,
+              mainPosterPath: item?.poster_path || null,
+              posters: images?.posters,
+            }) || finalPoster;
+          setData((prev) => ({
+            ...prev,
+            autoHeroPosterPath,
+            autoHeroHasBurnedTitle: burnedTitle(autoHeroPosterPath),
+          }));
+        });
 
         // La precarga no puede impedir que la portada se fije: si falla (CDN
         // caído, imagen retirada), el `<img>` la vuelve a pedir por su cuenta y
@@ -1475,6 +1518,18 @@ export function useDetailModalData(item, { phoneView = false } = {}) {
   // obligaría a volver a pedir las imágenes.
   const applyArtworkSelection = useCallback(({ kind, filePath, hasBurnedTitle }) => {
     setData((prev) => {
+      // Restablecer: vuelven la portada y el logo automáticos.
+      if (kind === "reset") {
+        return {
+          ...prev,
+          heroPosterPath: prev.autoHeroPosterPath || prev.heroPosterPath,
+          heroPosterHasBurnedTitle: prev.autoHeroPosterPath
+            ? Boolean(prev.autoHeroHasBurnedTitle)
+            : prev.heroPosterHasBurnedTitle,
+          logoPath: prev.autoLogoPath || null,
+          logoResolved: true,
+        };
+      }
       if (kind === "logo") {
         return { ...prev, logoPath: filePath || null, logoResolved: true };
       }

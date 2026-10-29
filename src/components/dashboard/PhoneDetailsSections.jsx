@@ -443,7 +443,8 @@ export default function PhoneDetailsSections({
     saveArtworkOverrides({ type: overrideType, id, changes }).then((saved) => {
       if (saved) forgetCommunityArtwork({ type: overrideType, id });
     });
-    onArtworkSelection?.({ kind: "logo", filePath: null });
+    // El hero vuelve a su portada y su logo automáticos (ver `applyArtworkSelection`).
+    onArtworkSelection?.({ kind: "reset" });
   }, [cacheArtworkOverrides, overrideType, id, onArtworkSelection]);
 
   const isLogoTab = activeImagesTab === "logos";
