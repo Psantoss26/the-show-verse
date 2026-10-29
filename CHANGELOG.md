@@ -8,6 +8,7 @@ Las entradas anteriores a julio de 2026 no están aquí: el estado de esa fecha 
 
 ## Sin publicar
 
+- Ficha de la serie, sección «Temporadas»: el cambio entre la vista de tarjetas y la de pósters es animado. La vista actual se desvanece, la sección cambia de altura con suavidad (sin empujar de golpe lo de debajo) y las temporadas de la nueva vista entran en cascada. Con movimiento reducido el cambio sigue siendo directo. → [componentes](docs/frontend/components.md)
 - Vista lateral de Temporadas en el móvil: las tarjetas son iguales que las de la sección «Temporadas» de la ficha. El póster crece y los datos suben, así que la barra de progreso ya no queda por debajo del póster y el margen es el mismo arriba y abajo. → [componentes](docs/frontend/components.md)
 - Tarjetas de premios en la ficha de película o serie y en la de persona: sin el rótulo con el nombre corto del galardón (OSCAR, GLOBOS, ACTORES, AFI…). El logo del tipo de premio crece para ocupar ese hueco. → [componentes](docs/frontend/components.md)
 - Vista previa de pulsación larga de una temporada en el móvil: el póster ya no pierde la parte de arriba. El marcador va compacto (solo TMDb, Trakt e IMDb, sin la fila de estadísticas) y la portada crece hasta verse entera; en móviles bajos, como 375×667, la tarjeta se estrecha un poco para que siga entera. → [vista previa móvil](docs/features/vista-previa-movil.md)

@@ -9,8 +9,14 @@
 // La vista elegida y el desplegado viven AQUÍ y no en DetailsClient: cambiar
 // de vista solo re-renderiza esta sección, no la ficha entera. La vista se
 // recuerda en el navegador.
+//
+// Cambio de vista animado (Web Animations API, sin Framer: ver FadePresence):
+// la vista actual se apaga, la sección pasa de su altura a la de la nueva
+// vista sin saltos y las temporadas de la nueva entran en cascada. El selector
+// cambia al momento; la vista pintada (`shownView`) cambia al terminar la
+// salida. Con movimiento reducido el cambio es directo.
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { SwiperSlide } from "swiper/react";
 import { ChevronDown, ChevronUp, GalleryHorizontalEnd, Layers, LayoutGrid, Loader2 } from "lucide-react";
 import DetailsArrowCarousel from "@/components/details/DetailsArrowCarousel";
@@ -27,6 +33,20 @@ const VIEWS = [
 // Dos filas de la rejilla de escritorio (3 columnas).
 const COLLAPSED_CARDS = 6;
 const MOBILE_QUERY = "(max-width: 640px)";
+
+const EASE_OUT = "cubic-bezier(0.22, 1, 0.36, 1)";
+const EASE_IN = "cubic-bezier(0.4, 0, 1, 1)";
+const EXIT_MS = 160;
+const HEIGHT_MS = 360;
+const ENTER_MS = 380;
+const ENTER_STAGGER_MS = 35;
+// Solo escalonan las primeras: las que quedan fuera de la fila o de la
+// pantalla entran con la última, sin alargar el cambio.
+const ENTER_STAGGER_MAX = 6;
+
+function prefersReducedMotion() {
+  return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+}
 
 function subscribeMobile(callback) {
   if (typeof window === "undefined") return () => {};
@@ -82,7 +102,15 @@ export default function SeasonsSection({
   const [view, setView] = useState(() =>
     computeDefaultSeasonsView(items.length, isMobile),
   );
+  // Vista pintada: va detrás de `view` mientras dura la salida de la anterior.
+  const [shownView, setShownView] = useState(view);
+  const [swapCount, setSwapCount] = useState(0);
   const [expanded, setExpanded] = useState(false);
+  const wrapperRef = useRef(null);
+  const contentRef = useRef(null);
+  // Cambio en curso: altura de partida y animaciones vivas (para cortarlas si
+  // se vuelve a pulsar antes de que acabe).
+  const transitionRef = useRef({ token: 0, fromHeight: null, animations: [] });
 
   const seriesSignature = items.map((s) => s.seasonId ?? s.seasonNumber ?? s.key).join(",");
 
@@ -92,11 +120,122 @@ export default function SeasonsSection({
   // - En móvil con más de 1 temporada: pósters en carrusel horizontal ("posters").
   // - Para series de más de 3 temporadas en escritorio: preferencia guardada o "posters".
   useEffect(() => {
-    setView(computeDefaultSeasonsView(items.length, isMobile));
+    const next = computeDefaultSeasonsView(items.length, isMobile);
+    // Vista por defecto (montaje, otra serie, otro viewport): sin animación.
+    stopTransition();
+    setView(next);
+    setShownView(next);
   }, [isMobile, items.length, seriesSignature]);
 
+  function stopTransition() {
+    const current = transitionRef.current;
+    current.token += 1;
+    current.fromHeight = null;
+    current.animations.forEach((animation) => animation.cancel());
+    current.animations = [];
+    if (wrapperRef.current) wrapperRef.current.style.overflow = "";
+  }
+
+  // Entrada de la vista nueva: corre antes de pintar, así que el primer
+  // fotograma ya sale con las temporadas ocultas y la altura de partida.
+  useLayoutEffect(() => {
+    const current = transitionRef.current;
+    const wrapper = wrapperRef.current;
+    const content = contentRef.current;
+    if (current.fromHeight == null || !wrapper || !content) return;
+    const fromHeight = current.fromHeight;
+    current.fromHeight = null;
+    // La salida dejó el contenido a opacidad 0 y la altura fija (`fill: forwards`).
+    current.animations.forEach((animation) => animation.cancel());
+    current.animations = [];
+
+    const toHeight = content.getBoundingClientRect().height;
+    const animations = [];
+    if (Math.abs(toHeight - fromHeight) > 1) {
+      // Mientras cambia de altura se recorta (el carrusel de pósters es
+      // `overflow-visible`); al terminar vuelve a su altura natural.
+      wrapper.style.overflow = "hidden";
+      animations.push(
+        wrapper.animate([{ height: `${fromHeight}px` }, { height: `${toHeight}px` }], {
+          duration: HEIGHT_MS,
+          easing: EASE_OUT,
+        }),
+      );
+    }
+    content.querySelectorAll("[data-season-item]").forEach((item, index) => {
+      animations.push(
+        item.animate(
+          [
+            { opacity: 0, transform: "translateY(10px) scale(0.96)", filter: "blur(4px)" },
+            { opacity: 1, transform: "none", filter: "blur(0px)" },
+          ],
+          {
+            duration: ENTER_MS,
+            delay: Math.min(index, ENTER_STAGGER_MAX) * ENTER_STAGGER_MS,
+            easing: EASE_OUT,
+            fill: "backwards",
+          },
+        ),
+      );
+    });
+    current.animations = animations;
+    const token = current.token;
+    Promise.all(animations.map((animation) => animation.finished))
+      .then(() => {
+        if (transitionRef.current.token !== token) return;
+        transitionRef.current.animations = [];
+        wrapper.style.overflow = "";
+      })
+      .catch(() => {
+        // Cancelada por otro cambio: ese limpia.
+      });
+  }, [shownView, swapCount]);
+
   const chooseView = (next) => {
+    // Ya es la vista elegida (pintada o entrando).
+    if (next === view) return;
     setView(next);
+    const content = contentRef.current;
+    if (!content || !wrapperRef.current || prefersReducedMotion() || typeof content.animate !== "function") {
+      stopTransition();
+      setShownView(next);
+    } else {
+      // Salida: la vista actual (o la que estaba entrando) se apaga en su sitio.
+      const wrapper = wrapperRef.current;
+      const fromHeight = wrapper.getBoundingClientRect().height;
+      stopTransition();
+      wrapper.style.overflow = "hidden";
+      const exit = content.animate(
+        [
+          { opacity: 1, transform: "none", filter: "blur(0px)" },
+          { opacity: 0, transform: "scale(0.98)", filter: "blur(4px)" },
+        ],
+        { duration: EXIT_MS, easing: EASE_IN, fill: "forwards" },
+      );
+      // Durante la salida la altura no se mueve.
+      const hold = wrapper.animate([{ height: `${fromHeight}px` }, { height: `${fromHeight}px` }], {
+        duration: EXIT_MS,
+        fill: "forwards",
+      });
+      const current = transitionRef.current;
+      current.animations = [exit, hold];
+      const token = current.token;
+      exit.finished
+        .then(() => {
+          if (transitionRef.current.token !== token) return;
+          // Altura de partida para la entrada. La salida (opacidad 0) y la
+          // altura fija siguen aplicadas hasta que las cancele el efecto de
+          // entrada, en el mismo fotograma en que pinta la vista nueva.
+          transitionRef.current.fromHeight = fromHeight;
+          setShownView(next);
+          // Vuelta a la vista que se estaba apagando: no cambia `shownView`,
+          // pero la entrada tiene que correr igual.
+          setSwapCount((count) => count + 1);
+        })
+        .catch(() => {
+          // Cancelada por otro cambio.
+        });
+    }
     // Solo guardamos en localStorage para series de más de 3 temporadas en escritorio,
     // garantizando que las series de 1-3 temporadas abran siempre en recuadros en escritorio.
     if (!isMobile && items.length > 3) {
@@ -158,7 +297,10 @@ export default function SeasonsSection({
         <div className="flex justify-center py-10">
           <Loader2 className="animate-spin text-white/50" aria-label="Cargando temporadas" />
         </div>
-      ) : view === "posters" ? (
+      ) : (
+      <div ref={wrapperRef}>
+      <div ref={contentRef}>
+      {shownView === "posters" ? (
         <DetailsArrowCarousel
           spaceBetween={12}
           slidesPerView={3}
@@ -177,7 +319,9 @@ export default function SeasonsSection({
             <SwiperSlide key={key}>
               {/* Vista de teléfono del modal lateral: sin hover, como el
                   resto de secciones (el diseño que se replica es el táctil). */}
-              <SeasonPosterCard {...season} enableHover={!phoneLayout} />
+              <div data-season-item>
+                <SeasonPosterCard {...season} enableHover={!phoneLayout} />
+              </div>
             </SwiperSlide>
           ))}
         </DetailsArrowCarousel>
@@ -185,7 +329,9 @@ export default function SeasonsSection({
         <>
           <div className={`grid grid-cols-1 gap-4 ${phoneLayout ? "" : "sm:grid-cols-2 lg:grid-cols-3"}`}>
             {visibleCards.map(({ key, ...season }) => (
-              <SeasonCard key={key} {...season} enableHover={!phoneLayout} />
+              <div key={key} data-season-item>
+                <SeasonCard {...season} enableHover={!phoneLayout} />
+              </div>
             ))}
           </div>
           {hiddenCount > 0 ? (
@@ -211,6 +357,9 @@ export default function SeasonsSection({
             </div>
           ) : null}
         </>
+      )}
+      </div>
+      </div>
       )}
     </section>
   );
