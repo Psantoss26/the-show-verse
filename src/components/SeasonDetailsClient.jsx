@@ -639,20 +639,16 @@ export default function SeasonDetailsClient({
     rootStyle: heroRootStyle,
   } = useMobileDetailsHero(true, {
     lock: mobileCoverReady,
+    // Mismo encuadre que la ficha de la serie (DetailsClient): botones y
+    // marcador compacto a la misma distancia del navbar inferior; en los
+    // bajos el hueco en flujo se acorta pero la imagen sigue 2:3 por detrás
+    // de los botones, con su misma transición inferior.
     fitCover: true,
     fitGap: 20,
-    // Incluso en teléfonos bajos prima mantener visibles las puntuaciones:
-    // el hueco del póster puede bajar del mínimo habitual de 75vw.
-    fitCoverMinRatio: 0,
-    // Nada encima del póster (lleva el título impreso al pie): si con el
-    // marcador se recortaría mucho, solo quedan los botones sobre el navbar y
-    // el marcador aparece con el scroll.
     fitCoverPosterRatio: 1.5,
+    // Si con las puntuaciones la portada quedaría muy tapada (pantallas
+    // bajas), de entrada solo los botones; el marcador sale con el scroll.
     fitCoverScoreboardOptional: true,
-    fitCoverOverlap: false,
-    // El póster entero, sin recortar arriba ni abajo: los botones van bajo
-    // su pie y el marcador en lo que sobre (o con el scroll).
-    fitCoverExactPoster: true,
   });
   // En teléfono empieza compacto; las estadísticas se revelan con el scroll.
   const mobileScoreboardMode = isPhone ? heroScoreboardMode : "full";
@@ -1592,9 +1588,6 @@ export default function SeasonDetailsClient({
         </div>
 
         <MobileHeroCover
-          // Anclada arriba: si el hueco es más bajo que el póster, lo que se
-          // pierde es el pie, nunca el borde superior.
-          objectPosition="center top"
           src={posterPath ? `https://image.tmdb.org/t/p/w780${posterPath}` : null}
           lowSrc={mobileCoverLowSrc}
           imgRef={mobileCoverLoad.imgRef}
@@ -1608,9 +1601,6 @@ export default function SeasonDetailsClient({
           // parte central muy difuminada en vez de una franja lisa, así que no
           // se ve el corte donde termina la imagen.
           blurredUnderlay
-          // Transición corta en el pie: el póster lleva el título impreso
-          // abajo y nada debe taparlo más allá del borde.
-          tightEdge
           // Rótulo y botones legibles sobre pósters claros: se oscurece su
           // zona según lo claro que sea (medido), nada en los oscuros. Igual
           // que en la ficha de la serie.
@@ -1751,10 +1741,11 @@ export default function SeasonDetailsClient({
               </h1>
             </div>
 
-            {/* MÓVIL: bajo el pie de la portada (sin montarse en él) y con la entrada de la
-                ficha (la fila sube y los botones caen en cascada) cuando la
-                portada está lista; hasta entonces, invisible en su sitio. */}
-            <div className="relative mb-6 px-1 max-sm:mb-4">
+            {/* MÓVIL: pegada a la portada (`-top-2`, como en la ficha) y con
+                la entrada de la ficha (la fila sube y los botones caen en
+                cascada) cuando la portada está lista; hasta entonces,
+                invisible en su sitio. */}
+            <div className="relative mb-6 px-1 max-sm:-top-2 max-sm:mb-4">
               <div
                 ref={heroActionRowRef}
                 className={
